@@ -42,9 +42,13 @@ Paths operacionais:
 - Venv: `.dadaia/.venv`
 - Banco: `.dadaia/data/dadaia.db`
 - Catálogo: `.dadaia/src/repos.xlsx`
+- Relatórios persistentes: `.dadaia/reports/`
+- Scripts de automação: `.dadaia/scripts/`
+- Estados JSON duráveis: `.dadaia/states/`
 - Efêmeros Python: `.dadaia/tmp/python/`
 - Efêmeros JSON: `.dadaia/tmp/json/`
 - Materialização: `.dadaia/contexts/<context-name>/`
+- Academy: `.dadaia/academy/`
 
 ---
 
