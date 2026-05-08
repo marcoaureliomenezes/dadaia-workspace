@@ -46,6 +46,8 @@
         01_visao_geral.md
     .venv/
     reports/
+    scripts/
+    states/
     src/
       repos.xlsx
     data/
@@ -67,13 +69,17 @@
 - `.dadaia/contexts/` contém apenas materializações gerenciadas pelo produto.
 - `.dadaia/tmp/python/` e `.dadaia/tmp/json/` são as únicas áreas válidas para artefatos efêmeros gerados por agentes.
 - `.dadaia/reports/` contém relatórios persistentes e legíveis para humanos.
+- `.dadaia/scripts/` contém scripts de automação persistentes do workspace (ex: watchdog, deploy, manutenção).
+- `.dadaia/states/` contém arquivos JSON de estado durável do workspace (ex: whitelist de modelos, estado de audit). Distinto de `tmp/json/` que é efêmero.
 - `.dadaia/src/` contém arquivos fonte do workspace, como `repos.xlsx`.
 - Repositórios de origem apontados por `repo_ref` não são apagados nem mutados diretamente pelo sistema de deleção.
 
 ### Política de efemeridade
-- Scripts e artefatos transitórios não pertencem ao repositório da biblioteca.
+- Scripts e artefatos transitórios gerados por sessão não pertencem ao repositório da biblioteca.
 - O conteúdo de `.dadaia/tmp/` pode ser recriado, limpo ou substituído sem impacto no estado durável do workspace.
 - O conteúdo de `.dadaia/academy/` não é efêmero: ele faz parte do runtime durável do workspace e pode ser enriquecido incrementalmente pelo usuário ou por workflows de agente.
+- O conteúdo de `.dadaia/states/` é durável: JSON states não devem ser limpos por rotinas de manutenção; somente o sistema que os escreve pode atualizá-los ou removê-los.
+- O conteúdo de `.dadaia/scripts/` é durável: scripts de automação persistem entre sessões e devem ser versionados ou gerenciados explicitamente pelo usuário.
 
 ---
 

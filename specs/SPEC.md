@@ -28,7 +28,7 @@ Esta spec define o comportamento do produto como um todo. Regras de arquitetura 
 - **Para** que o diretório fique pronto para trabalho com `.dadaia/`, `.claude/` e artefatos necessários instalados
 
 **Critérios de Aceite:**
-- Dado um diretório ainda não inicializado, quando executo `dadaia init`, então o sistema cria o template canônico de `<workspace-root>/.dadaia/` com `src/`, `reports/`, `data/`, `tmp/python/`, `tmp/json/`, `contexts/` e `.dadaia/.venv/`, cria `.claude/` se necessário, instala os artefatos públicos necessários no `.claude/` do workspace e exibe confirmação clara
+- Dado um diretório ainda não inicializado, quando executo `dadaia init`, então o sistema cria o template canônico de `<workspace-root>/.dadaia/` com `contexts/`, `data/`, `reports/`, `scripts/`, `states/`, `src/`, `tmp/python/`, `tmp/json/`, e `.dadaia/.venv/`, cria `.claude/` se necessário, instala os artefatos públicos necessários no `.claude/` do workspace e exibe confirmação clara
 - Dado um workspace parcialmente inicializado, quando executo `dadaia init`, então o sistema reconcilia os paths mínimos ausentes sem destruir conteúdo já existente e informa quais estruturas foram criadas ou preservadas
 
 ### US-002: Gerenciar Spec Context Projects com estados claros
@@ -108,7 +108,7 @@ Esta spec define o comportamento do produto como um todo. Regras de arquitetura 
 - FR-006: The system shall guarantee that at most one Spec Context Project has state `ativo` at any given time.
 - FR-007: The system shall provide a machine-readable `dadaia context show --json` output suitable for agent automation.
 - FR-008: When a context transitions from `inativo` to `ativo`, the system shall materialize a managed working area for that context inside the workspace.
-- FR-009: The bootstrap flow shall create the canonical `<workspace-root>/.dadaia/` template, including `.dadaia/.venv/`, `.dadaia/tmp/python/`, and `.dadaia/tmp/json/`, create `.claude/` if needed, and install distributed agent artifacts unless the user explicitly opts out.
+- FR-009: The bootstrap flow shall create the canonical `<workspace-root>/.dadaia/` template, including `.dadaia/.venv/`, `.dadaia/reports/`, `.dadaia/scripts/`, `.dadaia/states/`, `.dadaia/tmp/python/`, `.dadaia/tmp/json/`, `.dadaia/data/`, `.dadaia/src/`, and `.dadaia/contexts/`, create `.claude/` if needed, and install distributed agent artifacts unless the user explicitly opts out.
 - FR-010: When deleting a `standby` context, the system shall remove workspace-managed materialization only after all required sync steps for that context have succeeded.
 - FR-011: If a sync step fails during deletion after previous repositories were already synchronized, the system shall keep local metadata and managed files intact and explicitly report that remote side effects may already have occurred.
 - FR-012: All commands in the frozen CLI surface shall provide self-sufficient help text for human and agent use.
@@ -122,6 +122,8 @@ Esta spec define o comportamento do produto como um todo. Regras de arquitetura 
 - FR-020: The system shall support an agent-facing academy workflow exposed through an installed slash command `/dadaia-academy`, separate from the frozen top-level `dadaia` CLI surface.
 - FR-021: Dadaia Academy sessions shall be organized as sequentially numbered directories inside `<workspace-root>/.dadaia/academy/`, each containing `README.md`, `EXAMPLE.md`, `REFERENCES.md`, and numbered markdown content files.
 - FR-022: When the academy workflow generates or updates a course from a custom user prompt, it shall ground the material in the local academy base content and the relevant dadaia-workspace specs.
+- FR-023: The bootstrap flow shall create `<workspace-root>/.dadaia/states/` as the durable storage area for persistent JSON state files written by workspace automations (e.g., model whitelists, audit snapshots). This directory shall not be cleared by maintenance routines; only the system that writes a state file may update or remove it.
+- FR-024: The bootstrap flow shall create `<workspace-root>/.dadaia/scripts/` as the persistent storage area for workspace automation scripts (e.g., watchdog, deploy, maintenance). Scripts placed here survive across sessions and are managed explicitly by the user or by automation.
 
 ---
 

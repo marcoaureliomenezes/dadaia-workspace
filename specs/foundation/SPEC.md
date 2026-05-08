@@ -110,6 +110,24 @@ Application state shall be persisted and reloaded per operation. Module-level mu
 ### RF-ARCH-008: Materialização gerenciada
 The product shall treat `.dadaia/contexts/<name>/` as the only managed workspace area for context materialization.
 
+### RF-ARCH-008-B: Diretórios de runtime do workspace
+The bootstrap flow shall create the following canonical subdirectories inside `.dadaia/`:
+
+| Diretório | Tipo | Propósito |
+|---|---|---|
+| `.venv/` | Durável | Python environment isolado para automações do workspace |
+| `contexts/` | Durável | Materializações gerenciadas de Spec Context Projects |
+| `data/` | Durável | SQLite (`dadaia.db`) — metadata de workspace e contextos |
+| `reports/` | Durável | Relatórios persistentes legíveis para humanos |
+| `scripts/` | Durável | Scripts de automação do workspace (watchdog, deploy, manutenção) |
+| `states/` | Durável | Arquivos JSON de estado durável (whitelists, snapshots, configs) |
+| `src/` | Durável | Arquivos fonte do workspace (ex: `repos.xlsx`) |
+| `academy/` | Durável | Material base e cursos gerados da Dadaia Academy |
+| `tmp/python/` | Efêmero | Scripts transitórios de agentes — podem ser limpos a qualquer momento |
+| `tmp/json/` | Efêmero | Outputs JSON transitórios de agentes — podem ser limpos a qualquer momento |
+
+Distinção crítica: `states/` e `data/` são duráveis e não devem ser limpos por rotinas de manutenção. `tmp/` é efêmero e pode ser recriado.
+
 ### RF-ARCH-009: Poetry como única ferramenta de build
 The project shall use Poetry as the only dependency and build manager.
 
@@ -148,7 +166,7 @@ Any task that edits files under `specs/` shall run a spec consistency review bef
 If an official CLI command exists for a capability intended for agent use, installed assets and automations shall use that command instead of bypassing it through direct file, database, or internal-module access.
 
 ### RF-SLOPE-007: Fallback efêmero controlado
-When CLI coverage does not yet exist, the only allowed automation fallback is an ephemeral Python script in `.dadaia/tmp/python/` with structured transient outputs in `.dadaia/tmp/json/`.
+When CLI coverage does not yet exist, the only allowed automation fallback is an ephemeral Python script in `.dadaia/tmp/python/` with structured transient outputs in `.dadaia/tmp/json/`. Persistent state that must survive across sessions shall be written to `.dadaia/states/` (JSON) or `.dadaia/data/dadaia.db` (SQLite), never to `tmp/`.
 
 ---
 
