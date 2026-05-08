@@ -110,18 +110,20 @@ class SpecContextService:
                     has_specs_dir=has_specs,
                 ))
         else:
-            # STANDBY: reuse existing materialization
+            # STANDBY: repos already have materialized_path persisted in db
             materialized_repos = list(all_repos)
+            # Reconcile context_dir from persisted value if available
+            context_dir = ctx.context_dir if ctx.context_dir else context_dir
 
         primary_mat = next(r for r in materialized_repos if r.role == RepoRole.PRIMARY)
         specs_dir = (primary_mat.materialized_path / "specs") if primary_mat.materialized_path else None
 
-        # Warn if specs directory is incomplete
+        # Warn if specs directory is missing or incomplete
         if specs_dir and specs_dir.exists():
-            if not (specs_dir / "constitution.md").exists() or not (specs_dir / "SPEC.md").exists():
+            if not (specs_dir / "constitution.md").exists():
                 import warnings
                 warnings.warn(
-                    f"Context '{name}': specs/ directory is missing constitution.md or SPEC.md",
+                    f"Context '{name}': specs/ directory is missing constitution.md",
                     stacklevel=2,
                 )
         elif specs_dir:

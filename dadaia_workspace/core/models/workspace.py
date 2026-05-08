@@ -7,8 +7,47 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Workspace:
     root: Path
-    dadaia_dir: Path   # root/.dadaia/
-    claude_dir: Path   # root/.claude/
+    dadaia_dir: Path      # root/.dadaia/
+    claude_dir: Path      # root/.claude/
+    repos_dir: Path       # root/repos/
+
+    # Durable subdirs
+    @property
+    def contexts_dir(self) -> Path:
+        return self.dadaia_dir / "contexts"
+
+    @property
+    def data_dir(self) -> Path:
+        return self.dadaia_dir / "data"
+
+    @property
+    def reports_dir(self) -> Path:
+        return self.dadaia_dir / "reports"
+
+    @property
+    def scripts_dir(self) -> Path:
+        return self.dadaia_dir / "scripts"
+
+    @property
+    def states_dir(self) -> Path:
+        return self.dadaia_dir / "states"
+
+    @property
+    def src_dir(self) -> Path:
+        return self.dadaia_dir / "src"
+
+    @property
+    def academy_dir(self) -> Path:
+        return self.dadaia_dir / "academy"
+
+    # Ephemeral subdirs
+    @property
+    def tmp_python_dir(self) -> Path:
+        return self.dadaia_dir / "tmp" / "python"
+
+    @property
+    def tmp_json_dir(self) -> Path:
+        return self.dadaia_dir / "tmp" / "json"
 
     @classmethod
     def from_root(cls, root: Path) -> "Workspace":
@@ -16,4 +55,5 @@ class Workspace:
             root=root,
             dadaia_dir=root / ".dadaia",
             claude_dir=root / ".claude",
+            repos_dir=root / "repos",
         )
