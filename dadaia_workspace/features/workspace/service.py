@@ -8,14 +8,24 @@ from dadaia_workspace.core.protocols.runtime_env import PythonEnvironmentManager
 from dadaia_workspace.core.protocols.storage import PublicAssetManager
 from dadaia_workspace.infrastructure.database import bootstrap_schema
 
-_DADAIA_DIRS = [
+# Durable directories — must not be cleared by maintenance routines
+_DADAIA_DURABLE_DIRS = [
+    "academy",
     "contexts",
     "data",
     "reports",
+    "scripts",
+    "states",
     "src",
+]
+
+# Ephemeral directories — can be recreated or cleared at any time
+_DADAIA_EPHEMERAL_DIRS = [
     "tmp/python",
     "tmp/json",
 ]
+
+_DADAIA_DIRS = _DADAIA_DURABLE_DIRS + _DADAIA_EPHEMERAL_DIRS
 
 
 class WorkspaceService:
