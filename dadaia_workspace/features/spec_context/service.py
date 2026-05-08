@@ -116,7 +116,11 @@ class SpecContextService:
             context_dir = ctx.context_dir if ctx.context_dir else context_dir
 
         primary_mat = next(r for r in materialized_repos if r.role == RepoRole.PRIMARY)
-        specs_dir = (primary_mat.materialized_path / "specs") if primary_mat.materialized_path else None
+        specs_dir = (
+            primary_mat.materialized_path / "specs"
+            if primary_mat.materialized_path and primary_mat.has_specs_dir
+            else None
+        )
 
         # Warn if specs directory is missing or incomplete
         if specs_dir and specs_dir.exists():
