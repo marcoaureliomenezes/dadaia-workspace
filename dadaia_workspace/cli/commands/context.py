@@ -14,6 +14,7 @@ from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
+    WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 
@@ -31,7 +32,11 @@ def _resolve_workspace() -> Path:
 
 
 def _ctx_service() -> "container.SpecContextService":  # type: ignore[name-defined]
-    return container.build_spec_context_service(_resolve_workspace())
+    try:
+        return container.build_spec_context_service(_resolve_workspace())
+    except WorkspaceNotInitializedError:
+        err_console.print("[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first.")
+        raise typer.Exit(1)
 
 
 def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]

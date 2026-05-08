@@ -1,5 +1,6 @@
 """Git client using subprocess."""
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -24,13 +25,21 @@ class GitSubprocessClient:
 
     def clone(self, repo_ref: str, target_dir: Path) -> None:
         target_dir.parent.mkdir(parents=True, exist_ok=True)
-        # Skip if already cloned (idempotent)
-        if target_dir.exists() and self.is_git_repo(target_dir):
-            return
-        # For local paths, use the absolute resolved path
-        if not repo_ref.startswith(("http", "git@", "ssh://", "git://")):
-            repo_ref = str(Path(repo_ref).resolve())
-        self._run(["git", "clone", repo_ref, str(target_dir)])
+        is_remote = repo_ref.startswith(("http", "git@", "ssh://", "git://"))
+        if is_remote:
+            # Skip if already cloned (idempotent)
+            if target_dir.exists() and self.is_git_repo(target_dir):
+                return
+            self._run(["git", "clone", repo_ref, str(target_dir)])
+        else:
+            # Local path: copy the full directory tree (including uncommitted content).
+            # git clone would only copy tracked files and requires a .git directory.
+            src = Path(repo_ref).resolve()
+            if not src.exists():
+                raise GitOperationError(f"Local repo path does not exist: {src}")
+            if target_dir.exists():
+                return  # already materialized (idempotent)
+            shutil.copytree(src, target_dir, symlinks=False)
 
     def is_git_repo(self, path: Path) -> bool:
         return (path / ".git").exists()

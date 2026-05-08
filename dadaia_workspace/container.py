@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.spec_context.service import SpecContextService
@@ -32,6 +33,10 @@ def build_workspace_service(workspace_root: Path) -> WorkspaceService:
 
 def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     db = _db_path(workspace_root)
+    if not db.exists():
+        raise WorkspaceNotInitializedError(
+            f"Workspace not initialized at '{workspace_root}'. Run 'dadaia init' first."
+        )
     return SpecContextService(
         repo=SQLiteSpecContextRepository(db),
         git=GitSubprocessClient(),
