@@ -1,0 +1,227 @@
+# Spec: Foundation — Arquitetura e Qualidade de Software
+
+> **Status:** Aprovado  
+> **Versão:** 2.3  
+> **Escopo:** Princípios de arquitetura, design e qualidade que governam **toda** a implementação do dadaia-workspace  
+> **Referências:** `specs/constitution.md`
+
+---
+
+## Contexto
+
+Esta spec congela a arquitetura de implementação do dadaia-workspace. Ela existe para impedir que cada incremento de feature reabra decisões sobre camadas, nomes, estados, pontos de composição e distribuição de artefatos de agente.
+
+**Problema central a evitar:** *slope code* causado por inconsistência estrutural entre specs e por camadas paralelas criadas para acomodar ambiguidades.
+
+---
+
+## Requisitos de Arquitetura
+
+### RF-ARCH-001: Quatro camadas e uma composition root
+The implementation shall use exactly four layers plus a composition root:
+
+```
+CLI  →  Features  →  Core  ←  Infrastructure
+           \                  /
+            \                /
+             └ container ───┘
+```
+
+- `cli/` depende de `features/`, `core/` e do `container`.
+- `features/` depende apenas de `core/`.
+- `infrastructure/` implementa Protocols de `core/`.
+- `core/` não depende de nenhuma outra camada.
+- `dadaia_workspace/container.py` é a composition root do pacote e pode montar dependências de `features/` com `infrastructure/`.
+
+### RF-ARCH-002: Estrutura oficial do pacote
+The Python package shall follow the structure below exactly.
+
+```
+dadaia_workspace/
+  __init__.py
+  container.py
+  cli/
+    __init__.py
+    main.py
+    commands/
+      __init__.py
+      init.py
+      context.py
+      repos.py
+      public.py
+  core/
+    __init__.py
+    exceptions.py
+    models/
+      __init__.py
+      workspace.py
+      spec_context.py
+    protocols/
+      __init__.py
+      repositories.py
+      git_client.py
+      storage.py
+  features/
+    __init__.py
+    workspace/
+      __init__.py
+      service.py
+    spec_context/
+      __init__.py
+      service.py
+    repos/
+      __init__.py
+      service.py
+    public/
+      __init__.py
+      service.py
+  infrastructure/
+    __init__.py
+    database.py
+    sqlite_repositories.py
+    git_subprocess.py
+    excel_reader.py
+    public_assets.py
+  public/
+    rules/
+    skills/
+    commands/
+tests/
+  unit/
+  integration/
+  e2e/
+```
+
+### RF-ARCH-003: Protocol-first
+Every infrastructure dependency used by a feature shall first be expressed as a `Protocol` in `core/protocols/`.
+
+### RF-ARCH-004: Composition root fora do core
+The composition root shall live at `dadaia_workspace/container.py`, not inside `core/`.
+
+### RF-ARCH-005: Zero imports cross-feature
+No module inside `features/X/` shall import from `features/Y/` where `X != Y`.
+
+### RF-ARCH-006: Modelos imutáveis e estados fixos
+Core models shall be frozen dataclasses. The only valid context states are `inativo`, `standby`, and `ativo`.
+
+### RF-ARCH-007: Estado persistido e sem globais
+Application state shall be persisted and reloaded per operation. Module-level mutable state is prohibited.
+
+### RF-ARCH-008: Materialização gerenciada
+The product shall treat `.dadaia/contexts/<name>/` as the only managed workspace area for context materialization.
+
+### RF-ARCH-009: Poetry como única ferramenta de build
+The project shall use Poetry as the only dependency and build manager.
+
+### RF-ARCH-010: Contrato de artefatos de agente
+The versioned source of truth for product agent assets shall live directly in `dadaia_workspace/public/`. A repository-local `.claude/` directory shall not be part of the package architecture.
+
+### RF-ARCH-011: CLI-first para automação por agentes
+The implementation shall treat the official `dadaia` CLI as the primary integration boundary for human and agent automation, with granular help at the root command, command-group, and subcommand levels.
+
+### RF-ARCH-012: Objetos com intenção explícita
+Classes, services, methods, and exceptions shall be named after the business capability they implement. Generic `Manager`, `Helper`, `Utils`, or ambiguous orchestration names are prohibited unless their responsibility is singular and explicit.
+
+### RF-ARCH-013: OOP explícita nas capabilities
+Business capabilities shall be implemented through explicit service classes and domain models. Script-like procedural orchestration is limited to CLI entrypoints and small composition helpers.
+
+---
+
+## Guardrails Anti-Slope Code
+
+### RF-SLOPE-001: Sem wrappers vazios
+The implementation shall not introduce classes or functions that only delegate to another class or function with no additional policy.
+
+### RF-SLOPE-002: Um nível de abstração por módulo
+Each module shall operate at a single abstraction level.
+
+### RF-SLOPE-003: Novos módulos exigem justificativa real
+New modules are justified only by a new Protocol, a new infrastructure implementation, a new feature service, or a new CLI command module.
+
+### RF-SLOPE-004: Sem reabrir contratos no código
+If the implementation encounters a missing or conflicting behavior contract, it shall stop and update the specs instead of inventing behavior in code.
+
+### RF-SLOPE-005: Revisão obrigatória ao alterar `specs/`
+Any task that edits files under `specs/` shall run a spec consistency review before completion. Remaining issues shall be logged in `z_bug_specs.md`.
+
+### RF-SLOPE-006: Sem bypass da CLI oficial
+If an official CLI command exists for a capability intended for agent use, installed assets and automations shall use that command instead of bypassing it through direct file, database, or internal-module access.
+
+### RF-SLOPE-007: Fallback efêmero controlado
+When CLI coverage does not yet exist, the only allowed automation fallback is an ephemeral Python script in `.dadaia/tmp/python/` with structured transient outputs in `.dadaia/tmp/json/`.
+
+---
+
+## Requisitos de Qualidade
+
+### RF-QA-001: Pirâmide de testes
+The implementation shall follow a testing pyramid with `unit/`, `integration/`, and `e2e/` tests.
+
+### RF-QA-002: Fakes para features
+Unit tests for feature services shall use fake implementations of Protocols rather than mocks as the primary strategy.
+
+### RF-QA-003: Cobertura mínima
+The `features/` layer shall maintain coverage of at least 80%. `core/models/` and `core/exceptions.py` shall have full coverage.
+
+### RF-QA-004: Type hints completos
+All public functions and methods shall pass `mypy --strict`.
+
+### RF-QA-005: Contratos automáveis
+Any CLI surface intended for agent automation shall expose a stable machine-readable mode when the human-readable output would be fragile to parse.
+
+### RF-QA-006: Causalidade explícita de erros
+The implementation shall preserve exception causality across infrastructure, features, and CLI boundaries, using explicit chaining rather than replacing original errors with generic failures.
+
+### RF-QA-007: Mensagens de erro orientadas a autorrecuperação
+CLI-facing errors shall identify the failed capability, the relevant workspace/context/resource, the likely recoverable cause, and the next safe recovery action when one exists.
+
+---
+
+## Convenções de Código
+
+### RF-CONV-001: Nomenclatura
+
+| Elemento | Convenção | Exemplo |
+|---|---|---|
+| Classes | PascalCase | `SpecContextService` |
+| Funções e métodos | snake_case | `build_spec_context_service()` |
+| Constantes de módulo | UPPER_SNAKE_CASE | `DEFAULT_CONTEXTS_DIR` |
+| Arquivos Python | snake_case | `git_subprocess.py` |
+| Variáveis privadas | prefixo `_` | `self._repo` |
+| Protocols | sem prefixo `I` | `SpecContextRepository` |
+
+### RF-CONV-002: Surface da CLI congelada
+The v1.0 CLI surface shall remain frozen as defined in `specs/SPEC.md` and feature specs unless the specs are explicitly revised first.
+
+### RF-CONV-003: Output na CLI
+The CLI layer shall use `typer.echo()` and/or `rich`. `print()` outside CLI is prohibited.
+
+### RF-CONV-004: Formatação e linting
+The project shall pass `ruff format`, `ruff check`, and `mypy` before a task is considered done.
+
+### RF-CONV-005: Nomes guiados por intenção
+Public classes and methods shall prefer names that encode business intent and command purpose over vague transport-agnostic names.
+
+---
+
+## Configuração de Projeto
+
+### RF-BUILD-001: Entry point oficial
+```toml
+[tool.poetry.scripts]
+dadaia = "dadaia_workspace.cli.main:app"
+```
+
+### RF-BUILD-002: Public assets empacotados
+The package shall include the contents of `dadaia_workspace/public/` in the built distribution.
+
+### RF-BUILD-003: `.claude/` é somente runtime do workspace
+The repository shall not contain a product-local `.claude/` directory. Runtime installation for users shall happen by extracting packaged public assets into the workspace-root `.claude/` directory.
+
+---
+
+## Fora de Escopo desta Spec
+
+- Detalhes comportamentais de cada feature
+- CI/CD
+- Publicação no PyPI

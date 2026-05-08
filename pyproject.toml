@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "dadaia-workspace"
+version = "0.1.0"
+description = "AI-native workspace management CLI with Spec Context Projects"
+authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
+readme = "README.md"
+packages = [{include = "dadaia_workspace"}]
+
+[tool.poetry.scripts]
+dadaia = "dadaia_workspace.cli.main:app"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+typer = {extras = ["all"], version = "^0.12"}
+rich = "^13"
+openpyxl = "^3.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8"
+pytest-cov = "^5"
+ruff = "^0.4"
+mypy = "^1.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
