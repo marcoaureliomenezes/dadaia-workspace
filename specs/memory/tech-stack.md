@@ -18,37 +18,41 @@
 | Output rico | Rich | Tabelas e destaque visual em saídas humanas |
 | Contrato machine-readable | JSON via `--json` | Evita parsing frágil por agentes |
 
-### Superfície congelada do v1.0
-- `dadaia init`
-- `dadaia context create|list|show|activate|deactivate|delete|add-repo|remove-repo`
-- `dadaia repos list`
-- `dadaia public install`
+### Superfície v4.0
+
+```
+dadaia init [--skip-assets]
+dadaia context create|list|show|activate|deactivate|promote|delete
+dadaia repos list
+dadaia public install [--target <path>] [--force]
+dadaia doctor [--fix]
+```
 
 ### Política operacional para agentes
 - A superfície de autodiscovery inclui `dadaia --help`, `dadaia <grupo> --help` e `dadaia <grupo> <subcomando> --help`.
-- Sempre que uma capacidade existir na CLI oficial, agentes devem preferir a CLI ao acesso direto a arquivos, banco ou módulos internos.
-- Falhas de comando devem preservar a causa original e expor mensagens acionáveis o suficiente para guiar retry, correção de entrada ou uso do comando adequado.
+- Falhas de comando preservam a causa original e expõem mensagens acionáveis para guiar retry, correção ou uso do comando adequado.
 
 ---
 
-## Persistência e Catálogo
+## Estado e Catálogo
 
 | Item | Escolha | Justificativa |
 |---|---|---|
-| Estado persistido | SQLite via `sqlite3` | Simples, local, suficiente para metadata e restrições de unicidade |
-| Catálogo de repositórios | openpyxl sobre `.xlsx` | Formato facilmente editável pelo usuário |
+| Estado de contextos | JSON (`spec_contexts.json`) via stdlib `json` | Simples, legível por humanos, reparável sem ferramentas especiais |
+| Escrita atômica de estado | `os.replace()` com arquivo `.tmp` intermediário | Garante que o estado nunca fica corrompido por escrita parcial |
+| Catálogo de repositórios | openpyxl sobre `.xlsx` | Formato facilmente editável pelo operador |
 
 Paths operacionais:
-- Venv: `.dadaia/.venv`
-- Banco: `.dadaia/data/dadaia.db`
+- Venv: `.dadaia/.venv/`
+- Estado de contextos: `.dadaia/states/spec_contexts.json`
+- Ponteiro do primário: `.dadaia/states/primary_context.json`
 - Catálogo: `.dadaia/src/repos.xlsx`
 - Relatórios persistentes: `.dadaia/reports/`
 - Scripts de automação: `.dadaia/scripts/`
-- Estados JSON duráveis: `.dadaia/states/`
 - Efêmeros Python: `.dadaia/tmp/python/`
 - Efêmeros JSON: `.dadaia/tmp/json/`
-- Materialização: `.dadaia/contexts/<context-name>/`
-- Academy: `.dadaia/academy/`
+
+**Não existe mais** `.dadaia/data/dadaia.db` (SQLite removido) nem `.dadaia/contexts/` (materialização removida).
 
 ---
 
@@ -58,8 +62,9 @@ Paths operacionais:
 |---|---|---|
 | Execução git | `subprocess` com CLI `git` | Zero dependências extras; usa a configuração do sistema |
 | Origem de credenciais | Sistema operacional | Mantém segurança fora do app |
+| Uso no produto | clone em `activate`, commit+push em `deactivate` | Ciclo de vida de repos gerenciado |
 
-O produto opera sobre clones gerenciados materializados no workspace, não sobre o repositório de origem diretamente.
+O produto opera sobre repos clonados em `<workspace-root>/repos/`. O clone é feito via `git clone <repo_url>` usando `subprocess`. O git sync antes de deactivate é obrigatório para evitar perda de dados.
 
 ---
 
@@ -69,7 +74,6 @@ O produto opera sobre clones gerenciados materializados no workspace, não sobre
 - O executável pip canônico é `<workspace-root>/.dadaia/.venv/bin/pip`.
 - Agentes e automações devem preferir essa venv a qualquer Python global do sistema.
 - Scripts Python efêmeros e dados transitórios usados por agentes pertencem apenas a `.dadaia/tmp/python/` e `.dadaia/tmp/json/`.
-- Scripts efêmeros são fallback controlado, não a interface primária, para capacidades que já existam na CLI oficial.
 
 ---
 
@@ -81,6 +85,7 @@ O produto opera sobre clones gerenciados materializados no workspace, não sobre
 | Formatação e lint | ruff |
 | Type checking | mypy --strict |
 | Estratégia de testes de features | fakes sobre Protocols |
+| Testes E2E | `tests/e2e/features/` com subprocess CLI |
 
 ---
 
@@ -96,25 +101,48 @@ dadaia_workspace/
       context.py
       repos.py
       public.py
+      doctor.py
   core/
     exceptions.py
     models/
+      workspace.py
+      spec_context.py
     protocols/
+      context_store.py
+      git_client.py
+      storage.py
+      runtime_env.py
   features/
     workspace/
+      service.py
     spec_context/
+      service.py
+      doctor.py
     repos/
+      service.py
     public/
+      service.py
   infrastructure/
-    database.py
-    sqlite_repositories.py
+    json_context_store.py
     git_subprocess.py
     excel_reader.py
     public_assets.py
+    python_env.py
   public/
     rules/
     skills/
     commands/
+    scripts/
+    data/
+      repos.xlsx
+tests/
+  fakes.py
+  unit/
+  integration/
+  e2e/
+    features/
+      test_workspace_setup.py
+      test_spec_context.py
 ```
 
 ---

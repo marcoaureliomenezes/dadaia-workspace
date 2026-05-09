@@ -1,8 +1,8 @@
 # Spec: Foundation — Arquitetura e Qualidade de Software
 
-> **Status:** Aprovado  
-> **Versão:** 2.3  
-> **Escopo:** Princípios de arquitetura, design e qualidade que governam **toda** a implementação do dadaia-workspace  
+> **Status:** Aprovado
+> **Versão:** 3.0
+> **Escopo:** Princípios de arquitetura, design e qualidade que governam **toda** a implementação do dadaia-workspace
 > **Referências:** `specs/constitution.md`
 
 ---
@@ -31,7 +31,7 @@ CLI  →  Features  →  Core  ←  Infrastructure
 - `features/` depende apenas de `core/`.
 - `infrastructure/` implementa Protocols de `core/`.
 - `core/` não depende de nenhuma outra camada.
-- `dadaia_workspace/container.py` é a composition root do pacote e pode montar dependências de `features/` com `infrastructure/`.
+- `dadaia_workspace/container.py` é a composition root do pacote.
 
 ### RF-ARCH-002: Estrutura oficial do pacote
 The Python package shall follow the structure below exactly.
@@ -49,6 +49,9 @@ dadaia_workspace/
       context.py
       repos.py
       public.py
+      doctor.py
+      academy.py
+      export.py
   core/
     __init__.py
     exceptions.py
@@ -56,11 +59,16 @@ dadaia_workspace/
       __init__.py
       workspace.py
       spec_context.py
+      course.py
+      export.py
     protocols/
       __init__.py
-      repositories.py
+      context_store.py
+      primary_context_store.py
       git_client.py
       storage.py
+      runtime_env.py
+      course_store.py
   features/
     __init__.py
     workspace/
@@ -69,27 +77,68 @@ dadaia_workspace/
     spec_context/
       __init__.py
       service.py
+      doctor.py
     repos/
       __init__.py
       service.py
     public/
       __init__.py
       service.py
+    academy/
+      __init__.py
+      service.py
+      knowledge_basis/
+    export/
+      __init__.py
+      service.py
   infrastructure/
     __init__.py
-    database.py
-    sqlite_repositories.py
+    json_context_store.py
+    json_primary_context_store.py
+    json_course_store.py
     git_subprocess.py
     excel_reader.py
     public_assets.py
+    python_env.py
   public/
     rules/
+      dadaia-workspace-sdd-enforcer.md
+      dadaia-workspace-spec-governance.md
+      dadaia-workspace-dev-guardrail.md
     skills/
+      dadaia-grill-me/
+        SKILL.md
+      dadaia-workspace-spec-navigator/
+        SKILL.md
+      dadaia-workspace-spec-reviewer/
+        SKILL.md
+      dadaia-workspace-doctor/
+        SKILL.md
     commands/
+      dadaia-workspace-refine-specs.md
+      dadaia-academy.md
+      dadaia-workspace-doctor.md
+    agents/
+      architect-agent.md
+      product-auditor-agent.md
+      product-engineer-agent.md
+      soft-engineer-agent.md
+    scripts/
+    scaffold/
+      constitution.md
+      SPEC.md
+      memory/
+      foundation/
+    data/
+      repos.xlsx
 tests/
+  fakes.py
   unit/
   integration/
   e2e/
+    features/
+      test_workspace_setup.py
+      test_spec_context.py
 ```
 
 ### RF-ARCH-003: Protocol-first
@@ -102,13 +151,13 @@ The composition root shall live at `dadaia_workspace/container.py`, not inside `
 No module inside `features/X/` shall import from `features/Y/` where `X != Y`.
 
 ### RF-ARCH-006: Modelos imutáveis e estados fixos
-Core models shall be frozen dataclasses. The only valid context states are `inativo`, `standby`, and `ativo`.
+Core models shall be frozen dataclasses. The only valid context states are `inativo` and `ativo`. The `is_primary` boolean flag distinguishes the primary context within `ativo` state.
 
 ### RF-ARCH-007: Estado persistido e sem globais
-Application state shall be persisted and reloaded per operation. Module-level mutable state is prohibited.
+Application state shall be persisted and reloaded per operation from JSON files. Module-level mutable state is prohibited.
 
-### RF-ARCH-008: Materialização gerenciada
-The product shall treat `.dadaia/contexts/<name>/` as the only managed workspace area for context materialization.
+### RF-ARCH-008: Ciclo de vida de repos gerenciado
+The product shall manage repository clones in `<workspace-root>/repos/<slug>/`. Cloning happens on `activate`. Removal (after mandatory git sync) happens on `deactivate`. No other mechanism creates or removes repos.
 
 ### RF-ARCH-008-B: Diretórios de runtime do workspace
 The bootstrap flow shall create the following canonical subdirectories inside `.dadaia/`:
@@ -116,17 +165,15 @@ The bootstrap flow shall create the following canonical subdirectories inside `.
 | Diretório | Tipo | Propósito |
 |---|---|---|
 | `.venv/` | Durável | Python environment isolado para automações do workspace |
-| `contexts/` | Durável | Materializações gerenciadas de Spec Context Projects |
-| `data/` | Durável | SQLite (`dadaia.db`) — metadata de workspace e contextos |
 | `reports/` | Durável | Relatórios persistentes legíveis para humanos |
-| `scripts/` | Durável | Scripts de automação do workspace (watchdog, deploy, manutenção) |
-| `states/` | Durável | Arquivos JSON de estado durável (whitelists, snapshots, configs) |
+| `scripts/` | Durável | Scripts de automação do workspace (ctx-inject.sh, watchdog, etc.) |
+| `states/` | Durável | Arquivos JSON de estado durável (`spec_contexts.json`, `primary_context.json`) |
 | `src/` | Durável | Arquivos fonte do workspace (ex: `repos.xlsx`) |
-| `academy/` | Durável | Material base e cursos gerados da Dadaia Academy |
+| `dist/` | Durável | Artefatos de export gerados por `dadaia export` — criado on-demand, não por `dadaia init` |
 | `tmp/python/` | Efêmero | Scripts transitórios de agentes — podem ser limpos a qualquer momento |
 | `tmp/json/` | Efêmero | Outputs JSON transitórios de agentes — podem ser limpos a qualquer momento |
 
-Distinção crítica: `states/` e `data/` são duráveis e não devem ser limpos por rotinas de manutenção. `tmp/` é efêmero e pode ser recriado.
+**Não existem mais**: `.dadaia/data/` (SQLite removido) e `.dadaia/contexts/` (materialização gerenciada removida).
 
 ### RF-ARCH-009: Poetry como única ferramenta de build
 The project shall use Poetry as the only dependency and build manager.
@@ -138,10 +185,10 @@ The versioned source of truth for product agent assets shall live directly in `d
 The implementation shall treat the official `dadaia` CLI as the primary integration boundary for human and agent automation, with granular help at the root command, command-group, and subcommand levels.
 
 ### RF-ARCH-012: Objetos com intenção explícita
-Classes, services, methods, and exceptions shall be named after the business capability they implement. Generic `Manager`, `Helper`, `Utils`, or ambiguous orchestration names are prohibited unless their responsibility is singular and explicit.
+Classes, services, methods, and exceptions shall be named after the business capability they implement.
 
 ### RF-ARCH-013: OOP explícita nas capabilities
-Business capabilities shall be implemented through explicit service classes and domain models. Script-like procedural orchestration is limited to CLI entrypoints and small composition helpers.
+Business capabilities shall be implemented through explicit service classes and domain models.
 
 ---
 
@@ -163,17 +210,17 @@ If the implementation encounters a missing or conflicting behavior contract, it 
 Any task that edits files under `specs/` shall run a spec consistency review before completion. Remaining issues shall be logged in `z_bug_specs.md`.
 
 ### RF-SLOPE-006: Sem bypass da CLI oficial
-If an official CLI command exists for a capability intended for agent use, installed assets and automations shall use that command instead of bypassing it through direct file, database, or internal-module access.
+If an official CLI command exists for a capability intended for agent use, installed assets and automations shall use that command instead of bypassing it through direct file or internal-module access.
 
 ### RF-SLOPE-007: Fallback efêmero controlado
-When CLI coverage does not yet exist, the only allowed automation fallback is an ephemeral Python script in `.dadaia/tmp/python/` with structured transient outputs in `.dadaia/tmp/json/`. Persistent state that must survive across sessions shall be written to `.dadaia/states/` (JSON) or `.dadaia/data/dadaia.db` (SQLite), never to `tmp/`.
+When CLI coverage does not yet exist, the only allowed automation fallback is an ephemeral Python script in `.dadaia/tmp/python/` with structured transient outputs in `.dadaia/tmp/json/`. Persistent state that must survive across sessions shall be written to `.dadaia/states/` (JSON), never to `tmp/`.
 
 ---
 
 ## Requisitos de Qualidade
 
 ### RF-QA-001: Pirâmide de testes
-The implementation shall follow a testing pyramid with `unit/`, `integration/`, and `e2e/` tests.
+The implementation shall follow a testing pyramid with `unit/`, `integration/`, and `e2e/` tests. E2E tests live under `tests/e2e/features/`.
 
 ### RF-QA-002: Fakes para features
 Unit tests for feature services shall use fake implementations of Protocols rather than mocks as the primary strategy.
@@ -188,7 +235,7 @@ All public functions and methods shall pass `mypy --strict`.
 Any CLI surface intended for agent automation shall expose a stable machine-readable mode when the human-readable output would be fragile to parse.
 
 ### RF-QA-006: Causalidade explícita de erros
-The implementation shall preserve exception causality across infrastructure, features, and CLI boundaries, using explicit chaining rather than replacing original errors with generic failures.
+The implementation shall preserve exception causality across infrastructure, features, and CLI boundaries.
 
 ### RF-QA-007: Mensagens de erro orientadas a autorrecuperação
 CLI-facing errors shall identify the failed capability, the relevant workspace/context/resource, the likely recoverable cause, and the next safe recovery action when one exists.
@@ -203,13 +250,13 @@ CLI-facing errors shall identify the failed capability, the relevant workspace/c
 |---|---|---|
 | Classes | PascalCase | `SpecContextService` |
 | Funções e métodos | snake_case | `build_spec_context_service()` |
-| Constantes de módulo | UPPER_SNAKE_CASE | `DEFAULT_CONTEXTS_DIR` |
-| Arquivos Python | snake_case | `git_subprocess.py` |
-| Variáveis privadas | prefixo `_` | `self._repo` |
-| Protocols | sem prefixo `I` | `SpecContextRepository` |
+| Constantes de módulo | UPPER_SNAKE_CASE | `STATE_FILE_NAME` |
+| Arquivos Python | snake_case | `json_context_store.py` |
+| Variáveis privadas | prefixo `_` | `self._store` |
+| Protocols | sem prefixo `I` | `ContextStore` |
 
 ### RF-CONV-002: Surface da CLI congelada
-The v1.0 CLI surface shall remain frozen as defined in `specs/SPEC.md` and feature specs unless the specs are explicitly revised first.
+The CLI surface shall remain frozen as defined in `specs/SPEC.md` and feature specs unless the specs are explicitly revised first.
 
 ### RF-CONV-003: Output na CLI
 The CLI layer shall use `typer.echo()` and/or `rich`. `print()` outside CLI is prohibited.
@@ -218,7 +265,7 @@ The CLI layer shall use `typer.echo()` and/or `rich`. `print()` outside CLI is p
 The project shall pass `ruff format`, `ruff check`, and `mypy` before a task is considered done.
 
 ### RF-CONV-005: Nomes guiados por intenção
-Public classes and methods shall prefer names that encode business intent and command purpose over vague transport-agnostic names.
+Public classes and methods shall prefer names that encode business intent over vague transport-agnostic names.
 
 ---
 
@@ -231,10 +278,10 @@ dadaia = "dadaia_workspace.cli.main:app"
 ```
 
 ### RF-BUILD-002: Public assets empacotados
-The package shall include the contents of `dadaia_workspace/public/` in the built distribution.
+The package shall include the contents of `dadaia_workspace/public/` in the built distribution, including `dadaia_workspace/public/data/repos.xlsx`.
 
 ### RF-BUILD-003: `.claude/` é somente runtime do workspace
-The repository shall not contain a product-local `.claude/` directory. Runtime installation for users shall happen by extracting packaged public assets into the workspace-root `.claude/` directory.
+The repository shall not contain a product-local `.claude/` directory.
 
 ---
 
