@@ -2,7 +2,8 @@
 
 import typer
 
-from dadaia_workspace.cli.commands import context, init, public, repos
+from dadaia_workspace.cli.commands import academy, context, doctor, init, public, repos
+from dadaia_workspace.cli.commands.export import export
 
 app = typer.Typer(
     name="dadaia",
@@ -10,13 +11,16 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-# Top-level init command
+# Top-level commands
 app.command(name="init")(init.init)
+app.command(name="export")(export)
 
 # Sub-command groups
 app.add_typer(context.app, name="context")
 app.add_typer(repos.app, name="repos")
 app.add_typer(public.app, name="public")
+app.add_typer(doctor.app, name="doctor")
+app.add_typer(academy.app, name="academy")
 
 
 if __name__ == "__main__":
