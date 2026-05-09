@@ -1,19 +1,38 @@
-# Spec: Feature — Dadaia Academy
+# Spec: Feature — dadaia-academy
 
-> **Status:** Aprovado  
-> **Versão:** 0.1  
-> **Autor:** Marco Menezes  
-> **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/product.md`, `specs/memory/architecture.md`, `specs/features/agent-rules-skills/SPEC.md`
+> **Status:** Aprovado
+> **Versão:** 1.0
+> **Autor:** Marco Menezes
+> **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/architecture.md`, `specs/foundation/SPEC.md`
 
 ---
 
 ## Contexto
 
-A **Dadaia Academy** é a camada de aprendizagem prática do dadaia-workspace. Ela existe para reduzir a dependência de documentação externa dispersa e para transformar o próprio runtime do workspace em um ambiente de estudo guiado, com sessões, referências e exemplos reutilizáveis.
+A dadaia-academy é a feature de aprendizagem do dadaia-workspace. Ela organiza cursos de estudo AI-native dentro do runtime do usuário, usando um catálogo de módulos versionados no pacote (`knowledge_basis`) como base e o agente Claude como motor de personalização e tutoria.
 
-No primeiro incremento, a Academy entrega um **material base inicial** em `<workspace-root>/.dadaia/academy/`. Em um incremento posterior, um slash command de agente chamado `/dadaia-academy` usará esse material base, as specs relevantes do workspace e um prompt customizado do usuário para gerar cursos vivos e mais especializados.
+### Divisão de responsabilidades
 
-O comando `/dadaia-academy` pertence ao ambiente de agentes instalado em `.claude/commands/`. Ele não altera a CLI top-level congelada do binário `dadaia`.
+| Componente | Responsabilidade |
+|---|---|
+| `dadaia academy` CLI | CRUD de cursos (criar, listar, deletar, atualizar) — Python puro, sem LLM |
+| `/dadaia-academy` slash command | O agente Claude lê o conteúdo do curso e personaliza/tutora com base no prompt do usuário |
+| `knowledge_basis/` | Fonte canônica de módulos — versionada dentro do pacote Python, não copiada para o workspace |
+| `.dadaia/academy/<slug>/` | Cópia de trabalho do curso no workspace do usuário |
+| `.dadaia/states/academy.json` | Estado persistido de todos os cursos criados |
+
+### Knowledge Basis (catálogo de módulos)
+
+| Número | Nome do módulo |
+|---|---|
+| 1 | `01_o_que_e_o_dadaia_workspace` |
+| 2 | `02_claude_code_quick_start` |
+| 3 | `03_open_code_quick_start` |
+| 4 | `04_sdd_quick_start` |
+| 5 | `05_agents_e_multi_agent_orchestration_quick_start` |
+| 6 | `06_specify_e_implementacao_por_spec` |
+
+Cada módulo contém: `README.md`, `EXAMPLE.md`, `EXERCISES.md`, `REFERENCES.md` + 3 arquivos de conteúdo numerados.
 
 ---
 
@@ -21,168 +40,195 @@ O comando `/dadaia-academy` pertence ao ambiente de agentes instalado em `.claud
 
 | Termo | Definição |
 |---|---|
-| **Academy root** | Diretório `<workspace-root>/.dadaia/academy/`, que contém o material base e os cursos gerados |
-| **Material base** | Conteúdo inicial, estático e curado manualmente que serve de referência universal para a academy |
-| **Curso vivo** | Curso gerado ou expandido a partir de um prompt do usuário usando o material base como grounding |
-| **Sessão** | Unidade principal de aprendizagem, organizada em uma pasta numerada |
-| **Módulo numerado** | Arquivo markdown com prefixo de dois dígitos que compõe o conteúdo principal da sessão |
-| **Academy command** | Slash command `/dadaia-academy` instalado no ambiente de agentes para gerar ou enriquecer cursos |
+| **Course** | Cópia de trabalho de um módulo do knowledge_basis registrada em `academy.json` |
+| **slug** | Identificador único do curso no workspace; usado como nome de pasta em `.dadaia/academy/` |
+| **knowledge_basis** | Catálogo de módulos versionado em `dadaia_workspace/features/academy/knowledge_basis/` |
+| **module_number** | Número do módulo (1–6); identifica qual pasta do knowledge_basis copiar |
+| **academy.json** | Arquivo JSON em `.dadaia/states/`; fonte da verdade de todos os cursos |
+| **curso ativo** | Qualquer curso presente em `academy.json` com sua pasta em `.dadaia/academy/<slug>/` |
 
 ---
 
 ## Usuários e Goals
 
-### US-001: Explorar o material base da academy dentro do workspace
-
-- **Como** engenheiro usando o dadaia-workspace
-- **Quero** encontrar uma trilha inicial de sessões diretamente em `.dadaia/academy/`
-- **Para** aprender o produto e o ecossistema agentic sem depender de links espalhados ou memória informal
+### US-001: Listar cursos disponíveis
 
 **Critérios de Aceite:**
-- Dado um workspace com a Academy inicializada, quando abro `.dadaia/academy/`, então encontro sessões numeradas com nomes descritivos
-- Dado uma sessão da Academy, quando abro sua pasta, então encontro `README.md`, `REFERENCES.md`, `EXAMPLE.md` e módulos numerados em markdown
+- Dado que existem cursos em `academy.json`, quando executo `dadaia academy list`, então o sistema exibe tabela com `slug`, `name` e `module_name`.
+- Dado que `academy.json` está vazio, quando executo `dadaia academy list`, então o sistema informa que não há cursos e sugere `dadaia academy create`.
 
-### US-002: Aprender a usar o dadoia-workspace e seu ecossistema agentic
-
-- **Como** usuário novo do workspace
-- **Quero** uma trilha inicial cobrindo o produto, Claude Code, Open Code, SDD e multi-agent orchestration
-- **Para** acelerar onboarding e adoção prática das convenções do produto
+### US-002: Criar um curso a partir do knowledge basis
 
 **Critérios de Aceite:**
-- Dado o material base inicial, quando percorro a Academy, então encontro as cinco sessões canônicas previstas nesta spec
-- Dado cada sessão, quando concluo a leitura, então encontro um exemplo prático simples, profundo e reutilizável imediatamente
+- Dado um slug único e módulo válido (1–6), quando executo `dadaia academy create <slug> --module <n>`, então o sistema copia o diretório do módulo para `.dadaia/academy/<slug>/`, registra o curso em `academy.json` e confirma com o `course_dir` resultante.
+- Dado um slug já existente em `academy.json`, quando executo `create`, então o sistema rejeita com erro claro.
+- Dado um número de módulo inválido (fora de 1–6), quando executo `create`, então o sistema rejeita e lista os módulos disponíveis.
+- Dado `--name` não fornecido, quando executo `create`, então o sistema usa o `module_name` como nome padrão.
 
-### US-003: Gerar cursos vivos a partir de um prompt customizado
-
-- **Como** engenheiro ou agente de IA
-- **Quero** invocar `/dadaia-academy` com um prompt customizado
-- **Para** gerar ou expandir cursos dentro da Academy usando a base local como referência
+### US-003: Deletar um curso
 
 **Critérios de Aceite:**
-- Dado o slash command `/dadaia-academy`, quando ele recebe um prompt customizado do usuário, então cria ou expande um curso apenas dentro de `.dadaia/academy/`
-- Dado um workflow de geração de curso, quando ele produz conteúdo, então usa o material base da Academy e as specs relevantes do workspace como grounding prioritário
+- Dado um slug existente, quando executo `dadaia academy delete <slug>`, então o sistema remove `.dadaia/academy/<slug>/` do disco e a entrada de `academy.json`.
+- Dado um slug inexistente, quando executo `delete`, então o sistema retorna erro informativo.
+- Dado que `.dadaia/academy/<slug>/` não existe mas a entrada está no JSON (estado inconsistente), quando executo `delete`, então o sistema remove a entrada do JSON e emite aviso.
 
-### US-004: Preservar uma estrutura didática padronizada
-
-- **Como** mantenedor do material da Academy
-- **Quero** uma estrutura de sessão sempre igual
-- **Para** permitir evolução incremental do conteúdo, revisões futuras e geração consistente por agentes
+### US-004: Atualizar um curso com outro módulo
 
 **Critérios de Aceite:**
-- Dado uma sessão da Academy, quando seus arquivos são inspecionados, então a estrutura sempre inclui `README.md`, `REFERENCES.md`, `EXAMPLE.md` e arquivos de conteúdo com prefixo numérico de dois dígitos
-- Dado um módulo de conteúdo da Academy, quando seu nome é criado, então usa `snake_case` ASCII com prefixo numérico como `01_introducao.md`
+- Dado um slug existente e módulo válido, quando executo `dadaia academy update <slug> --module <n>`, então o sistema substitui o conteúdo de `.dadaia/academy/<slug>/` pelo módulo escolhido e atualiza `academy.json`.
+- Dado um slug inexistente, quando executo `update`, então o sistema retorna erro informativo orientando a usar `create`.
+- Dado um número de módulo inválido, quando executo `update`, então o sistema rejeita e lista os módulos disponíveis.
 
-### US-005: Manter rastreabilidade das fontes usadas em cada sessão
-
-- **Como** mantenedor da Academy
-- **Quero** registrar as referências usadas na produção do conteúdo
-- **Para** conseguir revisar, atualizar e enriquecer a sessão ao longo do tempo
+### US-005: Usar um curso com o agente Claude
 
 **Critérios de Aceite:**
-- Dado uma sessão da Academy, quando abro `REFERENCES.md`, então encontro as URLs externas e os arquivos internos usados como base
-- Dado uma atualização futura da sessão, quando novas fontes forem adicionadas, então `REFERENCES.md` continua sendo o registro explícito dessas fontes
+- Dado um curso existente, quando o operador invoca `/dadaia-academy`, então o agente lista os cursos via `dadaia academy list`, lê os arquivos de `.dadaia/academy/<slug>/` e responde às perguntas e personalizações do usuário.
+- O agente não executa `dadaia academy create`, `delete` nem `update` diretamente — orienta o usuário a usar a CLI quando necessário.
+- O agente usa os arquivos do curso como contexto primário de aprendizagem, nunca o knowledge_basis do pacote diretamente.
 
 ---
 
 ## Requisitos Funcionais
 
-### Modelo do Runtime
-- FR-001: The system shall reserve `<workspace-root>/.dadaia/academy/` as the root directory for Dadaia Academy base content and generated courses.
-- FR-002: The first base curriculum of Dadaia Academy shall be represented by numbered session directories directly under `<workspace-root>/.dadaia/academy/`.
-- FR-003: The academy workflow shall never create or update course artifacts outside `<workspace-root>/.dadaia/academy/`.
+### CLI `dadaia academy`
 
-### Command de Agente
-- FR-004: The system shall provide an agent-facing slash command named `/dadaia-academy`.
-- FR-005: The academy command shall be installed through the agent-assets mechanism under `.claude/commands/`.
-- FR-006: The academy command shall remain separate from the frozen top-level surface of the `dadaia` binary.
-- FR-007: When invoked with a custom user prompt, the academy command shall generate or expand course content grounded in the local academy base material and relevant dadaia-workspace specs.
+- FR-001: The system shall provide a `dadaia academy` command group with subcommands: `list`, `create`, `delete`, and `update`.
+- FR-002: `dadaia academy list` shall display a table with `slug`, `name`, and `module_name` for all courses in `academy.json`.
+- FR-003: If `academy.json` is empty, `list` shall state that no courses exist and suggest `dadaia academy create`.
+- FR-004: `dadaia academy create <slug> --module <n> [--name <name>]` shall copy the knowledge_basis module directory to `.dadaia/academy/<slug>/`, register the course in `academy.json`, and display the resulting `course_dir`.
+- FR-005: `create` shall reject if `slug` already exists in `academy.json`.
+- FR-006: `create` shall reject if `module_number` is not in range 1–6, listing available modules.
+- FR-007: If `--name` is not provided, `create` shall use the module directory name as the course name.
+- FR-008: `dadaia academy delete <slug>` shall remove `.dadaia/academy/<slug>/` from disk and the course entry from `academy.json`.
+- FR-009: `delete` shall return an informative error if `slug` does not exist in `academy.json`.
+- FR-010: If `.dadaia/academy/<slug>/` is absent but the JSON entry exists (inconsistent state), `delete` shall remove the JSON entry and emit a warning.
+- FR-011: `dadaia academy update <slug> --module <n>` shall replace `.dadaia/academy/<slug>/` with the selected knowledge_basis module and update the corresponding `academy.json` entry.
+- FR-012: `update` shall return an informative error if `slug` does not exist, suggesting `create`.
+- FR-013: `update` shall reject if `module_number` is not in range 1–6, listing available modules.
 
-### Estrutura das Sessões
-- FR-008: Each academy session shall live in a sequentially numbered directory with a descriptive name, such as `01_o_que_e_o_dadaia_workspace/`.
-- FR-009: Each academy session directory shall contain `README.md`, `REFERENCES.md`, `EXAMPLE.md`, and numbered markdown lesson files.
-- FR-010: Numbered lesson files shall use a two-digit prefix and `snake_case` naming, such as `01_introducao.md` and `02_modelos_de_linguagem.md`.
-- FR-011: The content of academy sessions shall be written in pt-BR with correct grammar and accents, while preserving technical English terms in English.
-- FR-012: Each academy session shall end with at least one practical example that the user can reuse as a base for their own projects.
+### Knowledge Basis
 
-### Material Base Inicial
-- FR-013: The initial base curriculum shall include exactly these five canonical sessions: `01_o_que_e_o_dadaia_workspace`, `02_claude_code_quick_start`, `03_open_code_quick_start`, `04_sdd_quick_start`, and `05_agents_e_multi_agent_orchestration_quick_start`.
-- FR-014: The session `01_o_que_e_o_dadaia_workspace` shall explain the workspace vision, setup flow, features, SDD orientation, `.dadaia/`, `.claude/`, and Spec Context Projects.
-- FR-015: The session `02_claude_code_quick_start` shall use the official Claude Code references as factual grounding for CLI, commands, skills, tools, and the Python Agent SDK.
-- FR-016: The session `03_open_code_quick_start` shall use the official Open Code references as factual grounding for CLI, tools, rules, commands, and skills.
-- FR-017: The session `04_sdd_quick_start` shall use the specified SDD references and the local dadaia-workspace specs to explain SDD conceptually and operationally.
-- FR-018: The session `05_agents_e_multi_agent_orchestration_quick_start` shall use the specified external references and the local harness-engineering material to explain agents and orchestration in a practical way.
+- FR-014: The knowledge basis shall live exclusively in `dadaia_workspace/features/academy/knowledge_basis/` inside the installed Python package. It is never copied to the user's workspace.
+- FR-015: The CLI shall resolve the knowledge_basis path via `importlib.resources` or `Path(__file__)` relative to the installed package, not from an env var or user-configurable path.
+- FR-016: `dadaia academy modules` shall list available modules by reading the `knowledge_basis/` directory dynamically via `importlib.resources`. Output shall display module number and folder name only — no absolute paths.
 
-### Rastreabilidade e Reaproveitamento
-- FR-019: Each `REFERENCES.md` shall explicitly list the URLs and local files used to build its session.
-- FR-020: The academy workflow shall treat the existing local base material as reusable grounding that can be enriched over time rather than recreated from scratch.
-- FR-021: Supplemental advanced tracks may coexist under the academy root, but they shall not replace the five canonical initial sessions.
+### Persistência JSON
+
+- FR-017: All writes to `academy.json` shall be atomic: write to `.tmp` file then `os.replace()`.
+- FR-018: `academy.json` shall include a `version` field for future schema evolution.
+- FR-019: `dadaia init` shall create `.dadaia/academy/` directory and an empty `academy.json` (`{"version": "1", "courses": []}`) if they do not exist.
+
+### Slash command `/dadaia-academy`
+
+- FR-020: The `/dadaia-academy` command shall be an agent command in `.claude/commands/dadaia-academy.md`.
+- FR-021: The command shall use `dadaia academy list` as the discovery mechanism for existing courses.
+- FR-022: The command shall read course files from `.dadaia/academy/<slug>/` as primary context for tutoring.
+- FR-023: The command shall not call `dadaia academy create`, `delete`, or `update` autonomously — it shall present CLI instructions to the user when state changes are needed.
+- FR-024: The command source shall live at `dadaia_workspace/public/commands/dadaia-academy.md` and be installed via `dadaia public install`.
+
+### Help e Erros
+
+- FR-025: `dadaia academy --help` shall list exactly: `list`, `create`, `delete`, `update`, and `modules`.
+- FR-026: Each subcommand shall have help text documenting required arguments and expected outcomes.
+- FR-027: Error messages shall identify the failed capability, the relevant resource, and the next safe recovery action.
 
 ---
 
 ## Requisitos Não-Funcionais
 
-- NFR-001: [Didática] Each session shall favor clear, direct, practice-oriented explanations over encyclopedic coverage.
-- NFR-002: [Consistência] The academy structure shall remain stable enough for future automation by slash command and specialized skills.
-- NFR-003: [Rastreabilidade] The base material shall remain inspectable and updateable by humans without hidden generation steps.
-- NFR-004: [Portabilidade] The base material shall be usable from the workspace filesystem without depending on network access after it has been created.
+- NFR-001: [Atomicidade] Toda escrita em `academy.json` é atômica via `os.replace()`. Estado corrompido por escrita parcial é proibido.
+- NFR-002: [Segurança] O CLI nunca executa código do knowledge_basis — apenas copia arquivos markdown para o disco do usuário.
+- NFR-003: [Portabilidade] O CLI resolve o path do knowledge_basis via o pacote instalado; funciona em qualquer workspace sem variáveis de ambiente adicionais.
+- NFR-004: [Idempotência] `dadaia init` pode ser executado múltiplas vezes sem duplicar `academy.json` ou `.dadaia/academy/`.
+- NFR-005: [Feedback] Cada subcomando emite confirmação, warning ou erro legível ao usuário.
+
+---
+
+## Modelo de Domínio
+
+### `Course` (Python dataclass)
+
+```python
+@dataclass(frozen=True)
+class Course:
+    slug: str           # unique identifier; folder name in .dadaia/academy/
+    name: str           # human-readable name
+    module_number: int  # 1–6
+    module_name: str    # e.g. "04_sdd_quick_start"
+    created_at: str     # ISO 8601
+    course_dir: Path    # absolute path: .dadaia/academy/<slug>/
+```
+
+### `academy.json` (formato canônico)
+
+```json
+{
+  "version": "1",
+  "courses": [
+    {
+      "slug": "sdd-intro",
+      "name": "SDD Introduction",
+      "module_number": 4,
+      "module_name": "04_sdd_quick_start",
+      "created_at": "2026-05-09T10:00:00Z",
+      "course_dir": "/workspace/.dadaia/academy/sdd-intro"
+    }
+  ]
+}
+```
 
 ---
 
 ## Estrutura de Arquivos
 
+### Pacote (fonte canônica)
+
+```
+dadaia_workspace/
+  features/
+    academy/
+      __init__.py
+      service.py           ← AcademyService
+      knowledge_basis/
+        01_o_que_e_o_dadaia_workspace/
+        02_claude_code_quick_start/
+        03_open_code_quick_start/
+        04_sdd_quick_start/
+        05_agents_e_multi_agent_orchestration_quick_start/
+        06_specify_e_implementacao_por_spec/
+  public/
+    commands/
+      dadaia-academy.md    ← slash command source
+```
+
+### Runtime workspace
+
 ```
 <workspace-root>/
   .dadaia/
     academy/
-      01_o_que_e_o_dadaia_workspace/
+      <slug>/              ← cópia de trabalho do curso
         README.md
-        REFERENCES.md
         EXAMPLE.md
-        01_visao_geral_do_workspace.md
-        02_arquitetura_do_runtime.md
-        03_fluxo_de_trabalho_orientado_a_sdd.md
-      02_claude_code_quick_start/
-        README.md
+        EXERCISES.md
         REFERENCES.md
-        EXAMPLE.md
-        01_visao_geral_do_claude_code.md
-        02_commands_tools_e_skills.md
-        03_agent_sdk_python_e_fluxos_praticos.md
-      03_open_code_quick_start/
-        README.md
-        REFERENCES.md
-        EXAMPLE.md
-        01_visao_geral_do_open_code.md
-        02_cli_tools_e_rules.md
-        03_commands_skills_e_uso_pratico.md
-      04_sdd_quick_start/
-        README.md
-        REFERENCES.md
-        EXAMPLE.md
-        01_por_que_sdd.md
-        02_artefatos_phase_gates_e_ears_gears.md
-        03_aplicando_sdd_no_dadaia_workspace.md
-      05_agents_e_multi_agent_orchestration_quick_start/
-        README.md
-        REFERENCES.md
-        EXAMPLE.md
-        01_o_que_e_um_agent.md
-        02_padroes_de_orquestracao.md
-        03_aplicacoes_praticas_em_claude_code_e_open_code.md
+        01_*.md
+        02_*.md
+        03_*.md
+    states/
+      academy.json         ← estado persistido dos cursos
+  .claude/
+    commands/
+      dadaia-academy.md    ← slash command instalado
 ```
 
 ---
 
-## Fora de Escopo (incremento atual)
+## Fora de Escopo (v1.0)
 
-- Tracking de progresso do usuário
-- Persistência de progresso ou preferências da Academy em SQLite
-- Interface web ou GUI da Academy
-- Implementação de skills especializadas para geração de cursos além do command `/dadaia-academy`
-- Empacotamento definitivo do material base dentro da lib `dadaia-workspace`
-
----
-
-## Questões Abertas
-
-*Nenhuma bloqueante para a criação do material base inicial. A promoção futura do conteúdo base para `dadaia_workspace/public/` será tratada em um incremento posterior.*
+- Geração de conteúdo via LLM API pelo CLI Python
+- Múltiplos módulos por curso (composite courses)
+- Versionamento de cursos (snapshots)
+- Progresso do usuário por curso (exercícios completados, notas)
+- Compartilhamento de cursos entre workspaces
+- `dadaia academy create` interativo (seleção via menu — usa flags explícitas)

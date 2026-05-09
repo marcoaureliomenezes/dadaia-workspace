@@ -1,8 +1,8 @@
 # Spec: dadaia-workspace
 
-> **Status:** Aprovado  
-> **Versão:** 1.3  
-> **Autor:** Marco Menezes  
+> **Status:** Aprovado
+> **Versão:** 3.0
+> **Autor:** Marco Menezes
 > **Referências:** `specs/constitution.md`, `specs/memory/product.md`, `specs/foundation/SPEC.md`
 
 ---
@@ -11,11 +11,9 @@
 
 dadaia-workspace é o produto que organiza o desenvolvimento AI-assisted em torno de um workspace, de Spec Context Projects e de artefatos de agente instaláveis. O sistema precisa ser simples de descobrir pela CLI, seguro para evoluir com SDD e consistente o suficiente para que agentes não tomem decisões arquiteturais por conta própria.
 
-O runtime workspace do produto vive fora do repositório da biblioteca. No setup inicial, o produto deve criar o template canônico em `<workspace-root>/.dadaia/` e preparar `.claude/` para uso de agentes. Os artefatos versionados do produto vivem em `dadaia_workspace/public/` e são sempre extraídos para a `.claude/` na raiz do workspace do usuário.
+O runtime workspace vive fora do repositório da biblioteca. No setup inicial, o produto cria o template canônico em `<workspace-root>/.dadaia/`, prepara `.claude/` com artefatos instalados e configura o hook `UserPromptSubmit` que injeta automaticamente o contexto primário em cada sessão de agente.
 
-Dentro do runtime do usuário, o produto também precisa sustentar uma camada de aprendizagem prática chamada **Dadaia Academy**. O material base e os cursos vivos dessa feature pertencem a `<workspace-root>/.dadaia/academy/`. O fluxo de geração da academy será exposto por slash command de agente, preservando a CLI congelada do binário `dadaia`.
-
-Esta spec define o comportamento do produto como um todo. Regras de arquitetura e detalhes por domínio ficam nas specs de `foundation/` e `features/`.
+O estado de todos os Spec Context Projects é gerenciado por `spec_contexts.json`. Repositórios são clonados automaticamente ao ativar um contexto e removidos (após git sync obrigatório) ao desativá-lo. Apenas os repos dos contextos ativos existem em disco.
 
 ---
 
@@ -25,105 +23,185 @@ Esta spec define o comportamento do produto como um todo. Regras de arquitetura 
 
 - **Como** engenheiro iniciando um novo workspace
 - **Quero** executar um único bootstrap inicial
-- **Para** que o diretório fique pronto para trabalho com `.dadaia/`, `.claude/` e artefatos necessários instalados
+- **Para** que o diretório fique pronto para trabalho com `.dadaia/`, `.claude/` e hook de contexto configurado
 
 **Critérios de Aceite:**
-- Dado um diretório ainda não inicializado, quando executo `dadaia init`, então o sistema cria o template canônico de `<workspace-root>/.dadaia/` com `contexts/`, `data/`, `reports/`, `scripts/`, `states/`, `src/`, `tmp/python/`, `tmp/json/`, e `.dadaia/.venv/`, cria `.claude/` se necessário, instala os artefatos públicos necessários no `.claude/` do workspace e exibe confirmação clara
-- Dado um workspace parcialmente inicializado, quando executo `dadaia init`, então o sistema reconcilia os paths mínimos ausentes sem destruir conteúdo já existente e informa quais estruturas foram criadas ou preservadas
+- Dado um diretório ainda não inicializado, quando executo `dadaia init`, então o sistema cria o template canônico de `.dadaia/` com `scripts/`, `states/`, `src/`, `tmp/python/`, `tmp/json/`, `.venv/`, copia `ctx-inject.sh` para `.dadaia/scripts/`, copia `repos.xlsx` para `.dadaia/src/`, instala artefatos públicos em `.claude/`, configura o hook `UserPromptSubmit` em `.claude/settings.json`, e exibe confirmação clara.
+- Dado um workspace parcialmente inicializado, quando executo `dadaia init`, então o sistema reconcilia os paths mínimos ausentes sem destruir conteúdo já existente.
 
-### US-002: Gerenciar Spec Context Projects com estados claros
+### US-002: Criar um Spec Context Project a partir do whitelist
 
-- **Como** engenheiro trabalhando em mudanças multi-repositório
-- **Quero** criar, ativar, desativar, visualizar, deletar e ajustar repositórios de um contexto
-- **Para** manter o foco de trabalho rastreável, materializado e consistente para humanos e agentes
+- **Como** engenheiro iniciando trabalho em um projeto
+- **Quero** criar um Spec Context Project associado a um repo do whitelist
+- **Para** registrar esse projeto no workspace sem ainda precisar clonar o repo
 
 **Critérios de Aceite:**
-- Dado um workspace inicializado, quando executo `dadaia context create <nome> --repo <ref>`, então o sistema cria o contexto em `inativo`
-- Dado um contexto `inativo` ou `standby`, quando executo `dadaia context activate <nome>`, então o sistema materializa o contexto quando necessário e o move para `ativo`
-- Dado um contexto `ativo`, quando executo `dadaia context deactivate`, então o sistema move o contexto para `standby`
-- Dado um contexto `standby`, quando executo `dadaia context delete <nome>`, então o sistema sincroniza os repositórios materializados de forma segura e remove apenas a materialização gerenciada e a metadata do contexto
+- Dado um repo válido no whitelist, quando executo `dadaia context create <nome> --repo <slug>`, então o sistema registra o contexto em `inativo` no JSON (sem clonar o repo).
+- Dado um slug não presente no whitelist, quando executo `create`, então o sistema rejeita com erro claro listando os repos disponíveis.
+- Dado um nome já existente no JSON, quando executo `create` com o mesmo nome, então o sistema rejeita sem alterar estado.
 
-### US-003: Descoberta confiável por humanos e agentes
+### US-003: Ativar um contexto e trabalhar com o repo
+
+- **Como** engenheiro pronto para trabalhar em um projeto
+- **Quero** ativar um contexto
+- **Para** que o repo seja clonado localmente e o ambiente do workspace aponte para as specs desse projeto
+
+**Critérios de Aceite:**
+- Dado um contexto `inativo`, quando executo `dadaia context activate <nome>`, então o sistema clona o repo em `repos/<slug>/` (se ausente), marca o contexto como `ativo`, e auto-promove a primário se não há primário.
+- Dado que o repo já existe em disco, quando executo `activate`, então o sistema apenas atualiza o estado sem re-clonar.
+- Dado que `repos/<slug>/specs/` não existe após o clone, então o sistema cria o scaffold de specs e emite aviso.
+
+### US-004: Promover um contexto a primário
+
+- **Como** engenheiro com múltiplos contextos ativos
+- **Quero** designar qual é o contexto primário
+- **Para** que o hook de agente injete as specs corretas automaticamente
+
+**Critérios de Aceite:**
+- Dado um contexto `ativo`, quando executo `dadaia context promote <nome>`, então o sistema remove `is_primary` do anterior (se houver), marca o novo como primário e escreve `primary_context.json`.
+- Dado um contexto `inativo`, quando executo `promote`, então o sistema rejeita com erro orientando a ativar primeiro.
+
+### US-005: Desativar um contexto e liberar espaço em disco
+
+- **Como** engenheiro concluindo trabalho em um projeto
+- **Quero** desativar um contexto
+- **Para** que o repo seja sincronizado e removido do disco, liberando espaço
+
+**Critérios de Aceite:**
+- Dado um contexto `ativo` e não primário, quando executo `dadaia context deactivate <nome>`, então o sistema executa commit+push (se necessário), remove `repos/<slug>/` e marca o contexto como `inativo`.
+- Dado um contexto `ativo` e primário, quando executo `deactivate`, então o sistema rejeita e orienta a executar `dadaia context promote <outro>` primeiro.
+- Dado que o git push falha, quando executo `deactivate`, então o sistema aborta sem remover o repo do disco.
+
+### US-006: Descoberta confiável por humanos e agentes
 
 - **Como** agente de IA ou engenheiro
-- **Quero** descobrir o estado do workspace e do contexto ativo por comandos de help e por saída estável
-- **Para** operar o sistema sem depender de documentação externa ou parsing frágil de tabela humana
+- **Quero** saber qual contexto é o primário sem precisar invocar a CLI explicitamente
+- **Para** operar o sistema sem depender de documentação externa
 
 **Critérios de Aceite:**
-- Dado qualquer ambiente com dadaia instalado, quando executo `dadaia --help`, então o sistema lista `init`, `context`, `repos` e `public` com descrições claras
-- Dado qualquer grupo ou subcomando da CLI congelada, quando executo `--help`, então o sistema explica uso, parâmetros e precondições de forma clara para autodiscovery por agentes e humanos
-- Dado `dadaia context show --json`, quando existe um contexto ativo, então o sistema retorna uma saída machine-readable estável com contexto, paths e repositórios associados
-- Dado que não existe contexto ativo, quando executo `dadaia context show --json`, então o sistema retorna uma resposta estável indicando ausência de contexto ativo
+- Dado que o hook `UserPromptSubmit` está configurado, quando o agente recebe uma mensagem, então o contexto primário já está injetado no contexto da conversa.
+- Dado `dadaia context show --json`, quando existe um contexto primário, então o sistema retorna saída machine-readable com `name`, `state`, `is_primary`, `repo_slug` e `specs_dir`.
+- Dado que não existe contexto primário, quando executo `dadaia context show --json`, então o sistema retorna `{"context": null}`.
 
-### US-006: Diagnosticar e contornar falhas da CLI
-
-- **Como** agente de IA ou engenheiro
-- **Quero** receber erros claros, com contexto e próxima ação segura
-- **Para** me autorresolver sem depender de inspeção de código na maioria dos casos
-
-**Critérios de Aceite:**
-- Dado uma chamada CLI com precondição ausente ou input inválido, quando o comando falha, então a mensagem identifica o comando ou capacidade, o contexto ou recurso relevante, a causa provável recuperável e a próxima ação segura sugerida
-- Dado uma falha originada em camada interna, quando ela é propagada para a CLI, então a cadeia causal da exceção é preservada de forma diagnóstica
-
-### US-004: Instalar e atualizar artefatos de agente
+### US-007: Gerenciar cursos de aprendizagem da dadaia-academy
 
 - **Como** usuário do dadaia-workspace
-- **Quero** instalar rules, skills e workflows distribuídos pelo pacote
-- **Para** que meu workspace fique pronto para seguir o padrão SDD recomendado sem configuração manual extensa
+- **Quero** criar e gerenciar cursos a partir do catálogo de módulos do pacote
+- **Para** aprender sobre o workspace e práticas SDD diretamente no meu ambiente de trabalho
 
 **Critérios de Aceite:**
-- Dado um workspace inicializado, quando executo `dadaia public install`, então o sistema copia os artefatos distribuídos do pacote para o `.claude/` alvo
-- Dado que o workspace já possui artefatos locais customizados, quando executo `dadaia public install` sem força, então o sistema não sobrescreve silenciosamente arquivos existentes
+- Dado um módulo válido (1–6), quando executo `dadaia academy create <slug> --module <n>`, então o sistema copia o módulo para `.dadaia/academy/<slug>/` e registra o curso em `academy.json`.
+- Dado cursos existentes, quando executo `dadaia academy list`, então o sistema exibe tabela com slug, name e module_name.
+- Dado um slug existente, quando executo `dadaia academy delete <slug>`, então o sistema remove o diretório do disco e a entrada do JSON.
+- Dado um curso existente e módulo válido, quando executo `dadaia academy update <slug> --module <n>`, então o sistema substitui o conteúdo pelo novo módulo.
 
-### US-005: Consultar o catálogo de repositórios conhecidos
+### US-008: Instalar e atualizar artefatos de agente
 
-- **Como** engenheiro criando ou ajustando um contexto
-- **Quero** consultar os repositórios conhecidos do workspace
-- **Para** reutilizar referências já registradas sem precisar memorizar links
-
-**Critérios de Aceite:**
-- Dado que o catálogo de repositórios contém entradas, quando executo `dadaia repos list`, então o sistema exibe a lista de repositórios conhecidos com identificadores úteis
-- Dado que o catálogo está vazio, quando executo `dadaia repos list`, então o sistema informa claramente que nenhum repositório foi registrado
-
-### US-007: Aprender e gerar material com a Dadaia Academy
-
-- **Como** engenheiro usando o dadaia-workspace
-- **Quero** acessar material base e futuramente acionar um workflow de academy a partir de slash command
-- **Para** aprender o workspace, Claude Code, Open Code, SDD e multi-agent orchestration sem depender de documentação externa dispersa
+- **Como** usuário do dadaia-workspace
+- **Quero** instalar rules, skills, agents e commands distribuídos pelo pacote
+- **Para** que meu workspace fique pronto para SDD sem configuração manual
 
 **Critérios de Aceite:**
-- Dado um workspace com academy inicializada, quando exploro `<workspace-root>/.dadaia/academy/`, então encontro sessões numeradas e padronizadas com conteúdo didático, referências e exemplos práticos
-- Dado o slash command `/dadaia-academy`, quando ele for invocado por um agente com um prompt customizado do usuário, então o workflow cria ou expande cursos apenas dentro de `<workspace-root>/.dadaia/academy/`, usando o material base e as specs relevantes como grounding
-- Dado que a academy é uma capacidade agent-facing, quando observo `dadaia --help`, então a superfície top-level congelada do binário permanece limitada a `init`, `context`, `repos` e `public`
+- Dado um workspace inicializado, quando executo `dadaia public install`, então o sistema copia os artefatos distribuídos (rules, skills, commands, agents) para o `.claude/` alvo.
+- Dado que o workspace já possui artefatos customizados, quando executo `dadaia public install` sem força, então o sistema não sobrescreve arquivos existentes.
+
+### US-009: Consultar o catálogo de repositórios disponíveis
+
+- **Como** engenheiro criando um novo contexto
+- **Quero** consultar os repositórios do whitelist
+- **Para** escolher qual repo usar sem memorizar slugs ou URLs
+
+**Critérios de Aceite:**
+- Dado que o catálogo contém entradas, quando executo `dadaia repos list`, então o sistema exibe a lista com nome, URL e descrição.
+- Dado que o catálogo está vazio, quando executo `dadaia repos list`, então o sistema informa claramente.
+
+### US-010: Diagnosticar e reparar estado do workspace
+
+- **Como** engenheiro com estado potencialmente corrompido
+- **Quero** diagnosticar e reparar o workspace automaticamente
+- **Para** restaurar a consistência sem recriar o workspace do zero
+
+**Critérios de Aceite:**
+- Dado um workspace com state inconsistente, quando executo `dadaia doctor`, então o sistema lista todos os problemas encontrados.
+- Dado `dadaia doctor --fix`, então o sistema repara automaticamente o que conseguir (re-clone, remove orphan repos, regenera primary_context.json).
+
+### US-011: Isolar contexto por sessão de agente
+
+- **Como** operador com múltiplos projetos ativos simultaneamente
+- **Quero** trabalhar em projeto A em um terminal e projeto B em outro sem conflito
+- **Para** paralelizar trabalho sem que sessões interfiram entre si
+
+**Critérios de Aceite:**
+- Dado a env var `DADAIA_CONTEXT=<name>` definida antes de iniciar uma sessão de agente, quando o hook dispara, então aquela sessão usa o contexto indicado pela env var, ignorando `primary_context.json`.
+
+### US-012: Exportar o workspace para migração de VPS
+
+- **Como** operador migrando para um novo VPS
+- **Quero** exportar todo o estado durável do workspace em um único artefato portátil
+- **Para** restaurar o ambiente sem perda de state (contexts, academy, scripts, hooks, configs) num novo servidor
+
+**Critérios de Aceite:**
+- Dado um workspace inicializado, quando executo `dadaia export`, então o sistema gera `.dadaia/dist/workspace-<timestamp>.tar.gz` incluindo `.dadaia/states/`, `.dadaia/academy/`, `.dadaia/scripts/`, `.dadaia/src/`, `CLAUDE.md`, `AGENTS.md`, `.claude/settings.json`, `.claude/rules/` e `mnt/` (se existir).
+- Dado `dadaia export`, então o artefato NUNCA contém `*.env`, `.dadaia/.venv/`, `.dadaia/tmp/`, ou `repos/`.
+- Dado `dadaia export --list`, quando executo, então o sistema imprime o manifest JSON em stdout sem criar arquivo.
+- Dado `dadaia export --exclude-mnt`, quando executo, então `mnt/` é omitido do artefato.
+- Dado `dadaia export --include-reports`, quando executo, então `.dadaia/reports/` é adicionado ao artefato.
+- Dado extrair o artefato em `/home/ubuntu/workspace/` num novo VPS e executar `dadaia init`, então o workspace é restaurado sem recriar do zero.
 
 ---
 
 ## Requisitos Funcionais
 
-- FR-001: The system shall provide a top-level `dadaia init` command that bootstraps the current directory as a dadaia workspace.
-- FR-002: The system shall durably persist workspace state and Spec Context Project metadata across sessions.
-- FR-003: The system shall provide a `dadaia context` command group with the frozen v1.0 subcommands: `create`, `list`, `show`, `activate`, `deactivate`, `delete`, `add-repo`, and `remove-repo`.
-- FR-004: The system shall provide a `dadaia repos list` command for consulting the workspace repository catalog.
-- FR-005: The system shall provide a `dadaia public install` command for installing distributed agent artifacts into a target `.claude/` directory.
-- FR-006: The system shall guarantee that at most one Spec Context Project has state `ativo` at any given time.
-- FR-007: The system shall provide a machine-readable `dadaia context show --json` output suitable for agent automation.
-- FR-008: When a context transitions from `inativo` to `ativo`, the system shall materialize a managed working area for that context inside the workspace.
-- FR-009: The bootstrap flow shall create the canonical `<workspace-root>/.dadaia/` template, including `.dadaia/.venv/`, `.dadaia/reports/`, `.dadaia/scripts/`, `.dadaia/states/`, `.dadaia/tmp/python/`, `.dadaia/tmp/json/`, `.dadaia/data/`, `.dadaia/src/`, and `.dadaia/contexts/`, create `.claude/` if needed, and install distributed agent artifacts unless the user explicitly opts out.
-- FR-010: When deleting a `standby` context, the system shall remove workspace-managed materialization only after all required sync steps for that context have succeeded.
-- FR-011: If a sync step fails during deletion after previous repositories were already synchronized, the system shall keep local metadata and managed files intact and explicitly report that remote side effects may already have occurred.
-- FR-012: All commands in the frozen CLI surface shall provide self-sufficient help text for human and agent use.
-- FR-013: The system shall treat `<workspace-root>/.dadaia/.venv/` as the isolated Python environment for workspace automation after bootstrap.
-- FR-014: The system shall reserve `<workspace-root>/.dadaia/tmp/python/` and `<workspace-root>/.dadaia/tmp/json/` for ephemeral agent artifacts and transient generated data.
-- FR-015: The system shall provide granular help text at the root command, command-group, and subcommand levels of the frozen CLI surface for autonomous discovery by humans and agents.
-- FR-016: The system shall treat the official CLI as the primary supported integration surface for agent automation whenever a command exists for the requested capability.
-- FR-017: If a CLI invocation fails, the system shall emit an error message that identifies the failed capability or command, the relevant workspace/context/resource, and the next safe recovery action when one exists.
-- FR-018: The system shall preserve causal error context across layers so CLI failures remain diagnosable instead of opaque.
-- FR-019: The system shall reserve `<workspace-root>/.dadaia/academy/` for Dadaia Academy base materials and generated learning artifacts.
-- FR-020: The system shall support an agent-facing academy workflow exposed through an installed slash command `/dadaia-academy`, separate from the frozen top-level `dadaia` CLI surface.
-- FR-021: Dadaia Academy sessions shall be organized as sequentially numbered directories inside `<workspace-root>/.dadaia/academy/`, each containing `README.md`, `EXAMPLE.md`, `REFERENCES.md`, and numbered markdown content files.
-- FR-022: When the academy workflow generates or updates a course from a custom user prompt, it shall ground the material in the local academy base content and the relevant dadaia-workspace specs.
-- FR-023: The bootstrap flow shall create `<workspace-root>/.dadaia/states/` as the durable storage area for persistent JSON state files written by workspace automations (e.g., model whitelists, audit snapshots). This directory shall not be cleared by maintenance routines; only the system that writes a state file may update or remove it.
-- FR-024: The bootstrap flow shall create `<workspace-root>/.dadaia/scripts/` as the persistent storage area for workspace automation scripts (e.g., watchdog, deploy, maintenance). Scripts placed here survive across sessions and are managed explicitly by the user or by automation.
+- FR-001: The system shall provide `dadaia init` to bootstrap the workspace. The command is idempotent and creates the following canonical structure:
+
+  | Path | Type | Notes |
+  |---|---|---|
+  | `.dadaia/.venv/` | Durable | Isolated Python environment |
+  | `.dadaia/academy/` | Durable | Working copies of academy courses |
+  | `.dadaia/reports/architect-agent-review/` | Durable | architect-agent output dir |
+  | `.dadaia/reports/specs-sdd-review/` | Durable | product-auditor-agent output dir |
+  | `.dadaia/reports/bugs/soft-engineer-report/` | Durable | soft-engineer-agent bug reports |
+  | `.dadaia/scripts/` + `ctx-inject.sh` | Durable | Hook script, copied from package |
+  | `.dadaia/src/` + `repos.xlsx` | Durable | Whitelist, copied from package |
+  | `.dadaia/states/` | Durable | JSON state directory |
+  | `.dadaia/states/academy.json` | Durable | Empty course registry `{"version":"1","courses":[]}` |
+  | `.dadaia/tmp/python/` | Ephemeral | Transient agent scripts |
+  | `.dadaia/tmp/json/` | Ephemeral | Transient structured outputs |
+  | `.claude/` + `settings.json` | — | Hook configured; public assets installed |
+
+  **Does not create** `.dadaia/data/` (SQLite removed). Feature specs (agents FR-009, academy FR-019) that reference init behavior defer to this table.
+- FR-002: The system shall persist all Spec Context Project state in `.dadaia/states/spec_contexts.json` using atomic writes.
+- FR-003: The system shall provide a `dadaia context` command group with subcommands: `create`, `list`, `show`, `activate`, `deactivate`, `promote`, and `delete`.
+- FR-004: The system shall provide `dadaia repos list` for consulting the workspace repository whitelist.
+- FR-005: The system shall provide `dadaia public install` for installing distributed agent artifacts (rules, skills, commands, agents) into a target `.claude/` directory.
+- FR-006: When a context is activated and `repos/<slug>/` does not exist, the system shall clone the repo using `git clone <repo_url>`.
+- FR-007: When a context is deactivated, the system shall perform mandatory git sync (commit if dirty, push if has remote) before removing `repos/<slug>/`. If git sync fails, deactivate shall abort.
+- FR-008: The system shall guarantee that at most one Spec Context Project has `is_primary=True` at any time.
+- FR-009: When `activate` is called and no context is currently primary, the system shall auto-promote the newly activated context to primary.
+- FR-010: The system shall prevent `deactivate` on a primary context; the user must run `dadaia context promote <other>` first.
+- FR-011: The system shall provide `dadaia context promote <name>` to designate a new primary context, transferring `is_primary` atomically.
+- FR-012: When `promote` is called, the system shall write `primary_context.json` atomically.
+- FR-013: The system shall provide `dadaia context show [<name>] [--json]`. Without a name, it displays the current primary context. With a name, it displays that specific context.
+- FR-014: The `--json` output shall include `name`, `state`, `is_primary`, `repo_slug`, and `specs_dir`.
+- FR-015: The system shall provide `dadaia doctor [--fix]` to diagnose and optionally repair inconsistencies between `spec_contexts.json` and the disk state.
+- FR-016: The `UserPromptSubmit` hook script shall check `DADAIA_CONTEXT` env var first; if set, use `repos/<DADAIA_CONTEXT>/specs/` as the active specs path, ignoring `primary_context.json`.
+- FR-017: When `activate` clones a repo and `repos/<slug>/specs/` does not exist after cloning, the system shall create a minimal scaffold specs structure and emit a warning.
+- FR-018: `create` shall validate that the requested `repo_slug` exists in the whitelist (`repos.xlsx`); if not, the command shall reject with an error listing available repos.
+- FR-019: All commands shall provide self-sufficient help text for human and agent use.
+- FR-020: If a CLI invocation fails, the system shall emit an error message identifying the failed capability, the relevant resource, and the next safe recovery action.
+- FR-021: The system shall treat `<workspace-root>/.dadaia/.venv/` as the isolated Python environment for workspace automation after bootstrap.
+- FR-022: The system shall reserve `.dadaia/tmp/python/` and `.dadaia/tmp/json/` for ephemeral agent artifacts.
+- FR-023: The system shall never delete or mutate content in `repos/<slug>/` except as part of an explicit `deactivate` or `delete` lifecycle operation.
+- FR-024: The system shall provide 4 specialized agent files in `dadaia_workspace/public/agents/` installed to `<workspace-root>/.claude/agents/` via `dadaia public install`.
+- FR-025: The system shall provide a `dadaia-grill-me` skill at `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md` installed via `dadaia public install`.
+- FR-026: `dadaia init` shall create academy-related directories: `.dadaia/academy/` and `.dadaia/states/academy.json` (empty), and report subdirectories: `.dadaia/reports/architect-agent-review/`, `.dadaia/reports/specs-sdd-review/`, `.dadaia/reports/bugs/soft-engineer-report/`.
+- FR-027: `dadaia academy create <slug> --module <n>` shall copy the knowledge_basis module to `.dadaia/academy/<slug>/` and register the course atomically in `academy.json`.
+- FR-028: `dadaia academy delete <slug>` shall remove `.dadaia/academy/<slug>/` from disk and its entry from `academy.json`.
+- FR-029: `dadaia academy update <slug> --module <n>` shall replace `.dadaia/academy/<slug>/` with the selected module and update `academy.json` atomically.
+- FR-030: `dadaia academy list` shall display all courses in `academy.json` with slug, name, and module_name.
+- FR-031: The system shall provide a `dadaia academy` command group with subcommands: `list`, `create`, `delete`, `update`, and `modules`.
+- FR-032: The system shall provide `dadaia export` to generate a portable `.tar.gz` archive of all durable workspace state to `.dadaia/dist/workspace-<timestamp>.tar.gz` by default. Full behavior is specified in `specs/features/workspace-export/SPEC.md`.
+- FR-033: `dadaia export` shall support flags: `--output <dir>` (alternate output path), `--include-reports` (include `.dadaia/reports/`), `--exclude-mnt` (omit `mnt/`), and `--list` (dry-run: print manifest without creating file). The archive shall never include `*.env` files, `.dadaia/.venv/`, `.dadaia/tmp/`, or `repos/`.
 
 ---
 
@@ -133,24 +211,24 @@ Esta spec define o comportamento do produto como um todo. Regras de arquitetura 
 - NFR-002: [Usabilidade] The `--help` and `--json` surfaces shall be stable enough for autonomous agent usage.
 - NFR-003: [Portabilidade] The system shall run on Linux and macOS with Python 3.12+ and git installed.
 - NFR-004: [Segurança] The system shall never persist credentials, tokens or secrets inside workspace state or agent artifacts.
-- NFR-005: [Segurança Operacional] The system shall never delete source repositories outside the workspace-managed materialization area.
-- NFR-006: [Diagnosabilidade] Common CLI failures shall be understandable enough for an autonomous agent to select a safe recovery path without inspecting source code in the common case.
+- NFR-005: [Integridade] Deactivation shall never result in data loss. Git sync failure must abort the operation, leaving the repo in place.
+- NFR-006: [Diagnosabilidade] Common CLI failures shall be understandable enough for an autonomous agent to select a safe recovery path.
+- NFR-007: [Reparabilidade] The workspace state shall be fully diagnosable and repairable by `dadaia doctor` without recreating the workspace.
 
 ---
 
-## Fora de Escopo (v1.0)
+## Fora de Escopo (v3.0)
 
 - GUI ou interface web
-- Comando `update` para renomear contextos
-- Estado `arquivado`
+- Repositórios secundários por contexto
 - Sincronização bidirecional automática de specs entre repositórios
-- Gerenciamento de branches além das operações git mínimas definidas nas specs de feature
-- Integração com CI/CD
-- Tracking de progresso da Dadaia Academy
-- Persistência da Academy em SQLite no v1.0
+- Tracking de progresso por curso (exercícios completados, notas pessoais)
+- Múltiplos primários simultâneos
+- Geração de conteúdo de curso via LLM API pelo CLI Python
+- Orquestração automática entre agentes especializados
 
 ---
 
 ## Questões Abertas
 
-*Nenhuma bloqueante após esta rodada de refinamento. Questões residuais não-bloqueantes, se surgirem, devem ser registradas em `z_bug_specs.md`.*
+*Nenhuma bloqueante. Questões residuais devem ser registradas em `z_bug_specs.md`.*

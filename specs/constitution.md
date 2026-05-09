@@ -8,7 +8,7 @@
 
 ## Propósito do Projeto
 
-dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório em um **workspace AI-native** para desenvolvimento multi-repositório orientado por SDD. O produto organiza contexto, repos materializados, artefatos de agente e regras de trabalho em um único fluxo previsível e seguro.
+dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório em um **workspace AI-native** para desenvolvimento multi-repositório orientado por SDD. O produto organiza repositórios, contextos de trabalho, estado durável em JSON e artefatos de agente em um único fluxo previsível e seguro.
 
 ---
 
@@ -20,7 +20,7 @@ dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório
 | Package manager | Poetry | latest stable |
 | CLI framework | Typer | latest stable |
 | Ambiente Python isolado | `venv` (stdlib) | — |
-| Persistência de estado | SQLite (stdlib `sqlite3`) | — |
+| Estado persistido | JSON via `json` + `os.replace()` (stdlib) | — |
 | Catálogo de repositórios | openpyxl | latest stable |
 | Operações git | subprocess (stdlib) | — |
 | Testes | pytest | latest stable |
@@ -29,16 +29,18 @@ dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório
 
 **Nenhuma tecnologia fora desta lista pode ser adicionada sem revisão e atualização desta constituição.**
 
+**SQLite não faz parte da stack.** O estado do workspace é gerenciado inteiramente por arquivos JSON.
+
 ---
 
 ## Segurança (Não-Negociáveis)
 
 - **NUNCA** exponha credenciais, tokens ou secrets em código-fonte, specs ou logs.
-- **NUNCA** armazene tokens git no banco de dados SQLite, em `.dadaia/`, em `.claude/` ou em qualquer arquivo do projeto.
+- **NUNCA** armazene tokens git em `.dadaia/`, em `.claude/` ou em qualquer arquivo do projeto.
 - Todas as operações git usam **exclusivamente** as credenciais do sistema operacional (`~/.gitconfig`, SSH keys, credential manager do OS).
 - **NUNCA** faça log de URLs com tokens embutidos.
 - **SEMPRE** valide entradas do usuário na camada CLI antes de chamar serviços.
-- **NUNCA** apague diretórios de repositório fora da área gerenciada de materialização do contexto.
+- **NUNCA** apague diretórios de repositório em `repos/` sem que o ciclo de vida de deactivate tenha sido concluído com sucesso (commit + push verificados).
 
 ---
 
@@ -61,23 +63,29 @@ CLI  →  Features  →  Core  ←  Infrastructure
 - `dadaia_workspace/container.py` é a **composition root**. Ele pode conhecer `features/` e `infrastructure/`, mas **não faz parte do core**.
 
 ### Regras de Dependência
-- A camada **CLI** nunca acessa diretamente SQLite, git ou filesystem.
+- A camada **CLI** nunca acessa diretamente filesystem, git ou estado JSON de forma não mediada.
 - Nenhuma feature importa outra feature.
 - Nenhum módulo dentro de `core/` importa `features/`, `cli/` ou `infrastructure/`.
 - Toda dependência externa usada por `features/` deve passar por um `Protocol` definido em `core/`.
 
-### Estados Oficiais do Spec Context Project
+### Estados do Spec Context Project
 Os únicos estados válidos são:
 - `inativo`
-- `standby`
 - `ativo`
 
-Nenhum outro estado faz parte do v1.0.
+A flag `is_primary` (`bool`) distingue, dentro de `ativo`, qual contexto é o primário do workspace. Somente um contexto pode ter `is_primary=True` ao mesmo tempo. **Não existe estado `standby`.**
 
-### Materialização Gerenciada
-- Um contexto `inativo` existe apenas como metadata persistida.
-- Um contexto `standby` ou `ativo` possui materialização gerenciada em `.dadaia/contexts/<context-name>/`.
-- Toda remoção de arquivos em disco se limita à materialização gerenciada dentro de `.dadaia/contexts/`.
+### Ciclo de Vida de Repositórios
+- Um contexto `inativo` não tem repo clonado em disco.
+- Um contexto `ativo` tem repo clonado em `repos/<slug>/`.
+- **`activate`**: se o repo não está em disco, clona automaticamente via `git clone`.
+- **`deactivate`**: executa git commit (se houver mudanças) + git push (se houver remote) antes de remover o repo do disco. Se o git sync falhar, a operação é abortada para evitar perda de dados.
+
+### JSON como Fonte da Verdade
+- O estado de todos os contextos vive em `.dadaia/states/spec_contexts.json`.
+- O ponteiro do contexto primário vive em `.dadaia/states/primary_context.json`.
+- Toda escrita nesses arquivos é atômica: write para `.tmp` → `os.replace()`.
+- O estado pode ser diagnosticado e reparado por `dadaia doctor [--fix]`.
 
 ### Workspace Runtime Externo ao Repositório
 - O **dadaia workspace runtime** vive no diretório de trabalho do usuário, fora do repositório da biblioteca `dadaia-workspace/`.
@@ -95,15 +103,19 @@ Nenhum outro estado faz parte do v1.0.
 - Artefatos efêmeros não devem ser criados em `dadaia-workspace/`, em `specs/`, em `tests/` ou na raiz do repositório.
 
 ### Artefatos de Agente
-- Neste repositório, `dadaia_workspace/public/` é a única localização versionada para rules, skills e workflows do produto.
+- Neste repositório, `dadaia_workspace/public/` é a única localização versionada para rules, skills, commands, scripts e agents do produto.
 - `dadaia-workspace/.claude/` não faz parte da arquitetura do produto e não deve existir.
-- O comando `dadaia public install` extrai os artefatos versionados para o `.claude/` do workspace do usuário.
+- O comando `dadaia public install` extrai os artefatos versionados para o `.claude/` do workspace do usuário. Agents são instalados em `.claude/agents/`.
+- Os 4 sub-agentes especializados (`architect-agent`, `product-auditor-agent`, `product-engineer-agent`, `soft-engineer-agent`) são distribuídos em `dadaia_workspace/public/agents/` e instalados em `<workspace-root>/.claude/agents/`.
+- A skill `dadaia-grill-me` é distribuída em `dadaia_workspace/public/skills/dadaia-grill-me/` e compartilhada pelo `architect-agent` e `product-auditor-agent`.
+- A rule `dadaia-workspace-dev-guardrail` é sempre ativa e proíbe edição direta de qualquer asset lib-originated em `.claude/`. Assets lib-originated são identificados por comparação com `dadaia_workspace/public/`.
+- A skill `dadaia-workspace-doctor` e o command `/dadaia-workspace-doctor` permitem diagnosticar drift entre lib e `.claude/` instalado, e reparar schema stale em `.dadaia/states/*.json`.
 
 ### Integração CLI-First para Agentes
 - A CLI oficial `dadaia` é a interface primária do produto para consumo por humanos e agentes.
 - Toda capacidade oficialmente suportada para automação deve ser exposta por comando CLI com help no comando raiz, no grupo e no subcomando correspondente.
-- Skills, workflows e automações devem usar a CLI oficial sempre que a capacidade desejada existir nela; não devem contornar comandos existentes por leitura direta de SQLite, arquivos gerenciados ou módulos internos do pacote.
-- Se a CLI ainda não cobrir uma necessidade operacional, o único fallback permitido para automação é criar script Python efêmero em `<workspace-root>/.dadaia/tmp/python/` e gravar saída estruturada em `<workspace-root>/.dadaia/tmp/json/`, de forma descartável e não versionada.
+- Skills, workflows e automações devem usar a CLI oficial sempre que a capacidade desejada existir nela.
+- Se a CLI ainda não cobrir uma necessidade operacional, o único fallback permitido para automação é criar script Python efêmero em `<workspace-root>/.dadaia/tmp/python/` e gravar saída estruturada em `<workspace-root>/.dadaia/tmp/json/`.
 
 ---
 
@@ -111,11 +123,10 @@ Nenhum outro estado faz parte do v1.0.
 
 - Cobertura mínima: **80%** para código novo na camada `features/`.
 - `core/models/` e `core/exceptions.py` devem ter cobertura completa.
-- Toda função pública deve ter docstring curta e type hints completos.
+- Toda função pública deve ter type hints completos.
 - Nenhum `print()` fora da CLI.
 - O código deve passar em `ruff format`, `ruff check` e `mypy --strict`.
-- Classes, métodos e exceções públicas devem ter nomes que explicitem a capacidade de negócio que representam.
-- Falhas devem preservar a cadeia de causa entre infraestrutura, feature e CLI; não é permitido perder a exceção original ou substituí-la por mensagens genéricas.
+- Falhas devem preservar a cadeia de causa entre infraestrutura, feature e CLI.
 - Mensagens de exceção e de erro de CLI devem informar a capacidade ou comando que falhou, o contexto ou recurso relevante e a próxima ação segura de recuperação quando ela existir.
 
 ---
@@ -124,9 +135,10 @@ Nenhum outro estado faz parte do v1.0.
 
 - **NUNCA** implemente uma feature sem `SPEC.md` aprovado.
 - **NUNCA** avance de fase (`SPEC.md` → `PLAN.md` → `TASKS.md` → implementação) sem aprovação humana explícita.
-- Toda alteração em `specs/` deve passar por uma revisão de consistência de spec antes de ser considerada pronta.
-- Se restarem conflitos, ambiguidades ou buracos após a revisão, eles devem ser registrados em `z_bug_specs.md` antes de qualquer implementação.
+- Toda alteração em `specs/` deve passar por uma revisão de consistência antes de ser considerada pronta.
+- Se restarem conflitos, ambiguidades ou buracos após a revisão, eles devem ser registrados em `z_bug_specs.md`.
 - Se a implementação divergir da spec, atualize a spec primeiro. Nunca ajuste a spec para justificar o código já escrito.
+- **Versão atômica**: specs devem representar apenas o estado atual do produto. Não arquive specs de features descartadas — delete-as.
 
 ---
 
