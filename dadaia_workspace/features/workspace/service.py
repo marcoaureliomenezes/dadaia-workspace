@@ -1,19 +1,20 @@
 """WorkspaceService — bootstrap and management of the .dadaia/ template."""
 
+import json
+import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.models.workspace import Workspace
-from dadaia_workspace.core.protocols.repositories import WorkspaceRepository
 from dadaia_workspace.core.protocols.runtime_env import PythonEnvironmentManager
 from dadaia_workspace.core.protocols.storage import PublicAssetManager
-from dadaia_workspace.infrastructure.database import bootstrap_schema
 
 # Durable directories — must not be cleared by maintenance routines
 _DADAIA_DURABLE_DIRS = [
     "academy",
-    "contexts",
-    "data",
     "reports",
+    "reports/architect-agent-review",
+    "reports/specs-sdd-review",
+    "reports/bugs/soft-engineer-report",
     "scripts",
     "states",
     "src",
@@ -27,15 +28,18 @@ _DADAIA_EPHEMERAL_DIRS = [
 
 _DADAIA_DIRS = _DADAIA_DURABLE_DIRS + _DADAIA_EPHEMERAL_DIRS
 
+_HOOK_KEY = "UserPromptSubmit"
+
+_EMPTY_CONTEXTS = {"version": "1", "contexts": []}
+_EMPTY_ACADEMY = {"version": "1", "courses": []}
+
 
 class WorkspaceService:
     def __init__(
         self,
-        workspace_repo: WorkspaceRepository,
         public_assets: PublicAssetManager,
         python_env: PythonEnvironmentManager,
     ) -> None:
-        self._workspace_repo = workspace_repo
         self._public_assets = public_assets
         self._python_env = python_env
 
@@ -47,12 +51,9 @@ class WorkspaceService:
         for subdir in _DADAIA_DIRS:
             (workspace.dadaia_dir / subdir).mkdir(parents=True, exist_ok=True)
 
-        # Bootstrap SQLite schema
-        db_path = workspace.dadaia_dir / "data" / "dadaia.db"
-        bootstrap_schema(db_path)
-
-        # Persist workspace metadata
-        self._workspace_repo.save(workspace)
+        # Initialize JSON state files (idempotent — never overwrite existing data)
+        self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
+        self._init_json_file(workspace.dadaia_dir / "academy" / "academy.json", _EMPTY_ACADEMY)
 
         # Create .venv (idempotent)
         self._python_env.ensure_workspace_venv(str(workspace_root))
@@ -62,8 +63,67 @@ class WorkspaceService:
         if not skip_assets:
             installed = self._public_assets.install(workspace.claude_dir)
 
+        # Install repos.xlsx catalog (idempotent — never overwrite)
+        self._install_repos_catalog(workspace)
+
+        # Install AGENTS.md in workspace root (idempotent — never overwrite)
+        self._install_agents_md(workspace_root)
+
+        # Install ctx-inject.sh and configure the hook
+        self._install_hook_script(workspace)
+        self._configure_hook(workspace)
+
         return workspace, installed
 
     def is_initialized(self, workspace_root: Path) -> bool:
-        db_path = workspace_root / ".dadaia" / "data" / "dadaia.db"
-        return db_path.exists()
+        return (workspace_root / ".dadaia" / "states" / "spec_contexts.json").exists()
+
+    def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]
+        if not path.exists():
+            path.write_text(json.dumps(empty, indent=2))
+
+    def _install_repos_catalog(self, workspace: Workspace) -> None:
+        dest = workspace.dadaia_dir / "src" / "repos.xlsx"
+        if not dest.exists():
+            src = Path(__file__).parent.parent.parent / "public" / "data" / "repos.xlsx"
+            if src.exists():
+                shutil.copy2(src, dest)
+
+    def _install_agents_md(self, workspace_root: Path) -> None:
+        dest = workspace_root / "AGENTS.md"
+        if not dest.exists():
+            src = Path(__file__).parent.parent.parent / "public" / "data" / "AGENTS.md"
+            if src.exists():
+                shutil.copy2(src, dest)
+
+    def _install_hook_script(self, workspace: Workspace) -> None:
+        scripts_dir = workspace.dadaia_dir / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        dest = scripts_dir / "ctx-inject.sh"
+        src = Path(__file__).parent.parent.parent / "public" / "scripts" / "ctx-inject.sh"
+        shutil.copy2(src, dest)
+        dest.chmod(0o755)
+
+    def _configure_hook(self, workspace: Workspace) -> None:
+        hook_script = workspace.dadaia_dir / "scripts" / "ctx-inject.sh"
+        hook_entry = {"type": "command", "command": str(hook_script)}
+
+        claude_dir = workspace.claude_dir
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        settings_path = claude_dir / "settings.json"
+
+        settings: dict = {}  # type: ignore[type-arg]
+        if settings_path.exists():
+            try:
+                settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                settings = {}
+
+        hooks = settings.setdefault("hooks", {})
+        existing = hooks.get(_HOOK_KEY, [])
+        already_installed = any(
+            isinstance(e, dict) and e.get("command") == hook_entry["command"] for e in existing
+        )
+        if not already_installed:
+            hooks[_HOOK_KEY] = existing + [hook_entry]
+            settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
