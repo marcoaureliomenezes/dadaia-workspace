@@ -3,43 +3,48 @@
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.features.academy.service import AcademyService
+from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.repos.service import ReposService
+from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.workspace.service import WorkspaceService
-from dadaia_workspace.infrastructure.database import get_connection
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
+from dadaia_workspace.infrastructure.json_primary_context_store import JsonPrimaryContextStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from dadaia_workspace.infrastructure.sqlite_repositories import (
-    SQLiteSpecContextRepository,
-    SQLiteWorkspaceRepository,
-)
 
 
-def _db_path(workspace_root: Path) -> Path:
-    return workspace_root / ".dadaia" / "data" / "dadaia.db"
+def _states_dir(workspace_root: Path) -> Path:
+    return workspace_root / ".dadaia" / "states"
+
+
+def _guard_initialized(workspace_root: Path) -> None:
+    marker = _states_dir(workspace_root) / "spec_contexts.json"
+    if not marker.exists():
+        raise WorkspaceNotInitializedError(
+            f"Workspace not initialized at '{workspace_root}'. Run 'dadaia init' first."
+        )
 
 
 def build_workspace_service(workspace_root: Path) -> WorkspaceService:
-    db = _db_path(workspace_root)
     return WorkspaceService(
-        workspace_repo=SQLiteWorkspaceRepository(db),
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
     )
 
 
 def build_spec_context_service(workspace_root: Path) -> SpecContextService:
-    db = _db_path(workspace_root)
-    if not db.exists():
-        raise WorkspaceNotInitializedError(
-            f"Workspace not initialized at '{workspace_root}'. Run 'dadaia init' first."
-        )
+    _guard_initialized(workspace_root)
+    states = _states_dir(workspace_root)
     return SpecContextService(
-        repo=SQLiteSpecContextRepository(db),
-        git=GitSubprocessClient(),
+        context_store=JsonContextStore(states),
+        primary_store=JsonPrimaryContextStore(states),
+        git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
 
@@ -50,3 +55,32 @@ def build_public_service() -> PublicAssetService:
 
 def build_repos_service() -> ReposService:
     return ReposService(excel_reader=OpenpyxlExcelReader())
+
+
+def build_doctor_service(workspace_root: Path) -> DoctorService:
+    _guard_initialized(workspace_root)
+    states = _states_dir(workspace_root)
+    return DoctorService(
+        context_store=JsonContextStore(states),
+        primary_store=JsonPrimaryContextStore(states),
+        git_client=GitSubprocessClient(),
+        workspace_root=workspace_root,
+    )
+
+
+def build_academy_service(workspace_root: Path) -> AcademyService:
+    _guard_initialized(workspace_root)
+    academy_dir = workspace_root / ".dadaia" / "academy"
+    return AcademyService(
+        course_store=JsonCourseStore(academy_dir),
+        workspace_root=workspace_root,
+    )
+
+
+def build_export_service(workspace_root: Path) -> ExportService:
+    _guard_initialized(workspace_root)
+    states = _states_dir(workspace_root)
+    return ExportService(
+        context_store=JsonContextStore(states),
+        workspace_root=workspace_root,
+    )
