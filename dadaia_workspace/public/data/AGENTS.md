@@ -249,68 +249,74 @@ Para ativar um agente, diga: **"aja como @<nome-do-agente>"** ou **"use o @<nome
 
 ### @architect-agent
 
-**Quando usar:** revisão de specs, validação de decisões de arquitetura, auditoria de design de features.
+**Quando usar:** revisão de SPEC.md, validação de decisões arquiteturais, auditoria de design antes de aprovar uma spec.
+**NÃO usar para:** implementação de código, bug fixes, execução de TASKS.md.
 
 **Responsabilidades:**
 - Revisar `specs/` quanto à consistência arquitetural e conformidade com `specs/constitution.md`
 - Validar que designs respeitam a arquitetura em 4 camadas (CLI → Features → Core ← Infrastructure)
 - Identificar riscos: wrappers desnecessários, imports cross-feature, mutação de estado, uso de SQLite
-- Escrever relatórios de revisão em `.dadaia/reports/architect-agent-review/`
+- Escrever relatórios em `.dadaia/reports/architect-agent-review/`
 
 **Regras do agente:**
 - Sempre carregue `specs/constitution.md` e `specs/foundation/SPEC.md` antes de qualquer revisão
-- Nunca proponha implementação — sugira edições de spec
+- Nunca proponha implementação — sugira edições de spec apenas
 - Use `/dadaia-grill-me` quando uma revisão completa de spec for necessária
 
 ---
 
 ### @product-auditor-agent
 
-**Quando usar:** auditar specs existentes, encontrar gaps, verificar consistência entre documentos SDD.
+**Quando usar:** detectar drift entre spec aprovado e código implementado; auditar compliance SDD; verificar se implementação ficou dentro do escopo.
+**Palavras-chave de disparo:** audit, drift, compliance, divergência, revisão de spec.
+**NÃO usar para:** decisões arquiteturais, implementação de código.
 
 **Responsabilidades:**
-- Auditar specs para gaps de requisitos, critérios de aceitação irrespondíveis, nomenclatura divergente
-- Verificar consistência SPEC ↔ PLAN ↔ TASKS ↔ código implementado
-- Encontrar drift entre `specs/constitution.md` e o estado real do sistema
-- Escrever relatórios de auditoria em `.dadaia/reports/audit/`
+- Comparar código implementado contra `SPEC.md` aprovados para detectar drift
+- Identificar onde o código inventou comportamento não especificado
+- Escrever relatórios SDD em `.dadaia/reports/specs-sdd-review/`
+- Sinalizar specs que precisam de revisão antes do próximo ciclo de implementação
 
 **Regras do agente:**
-- Sempre inspecione antes de perguntar (leia arquivos, rode diagnósticos)
-- Nunca misture auditoria com implementação na mesma sessão
+- Drift verdict: spec ganha sempre — se o código diverge, o código deve mudar, não o spec
+- Nunca proponha decisões arquiteturais — isso é domínio do architect-agent
+- Use `/dadaia-grill-me` para o protocolo de refinamento estruturado quando necessário
 
 ---
 
 ### @product-engineer-agent
 
-**Quando usar:** desenvolvimento de features dentro dos gates SDD, implementação de backlog aprovado.
+**Quando usar:** implementar features aprovadas no pipeline SDD; criar SPEC/PLAN/TASKS para novas features; executar items de backlog.
+**Para bug fixes em código existente: use soft-engineer-agent.**
 
 **Responsabilidades:**
 - Implementar tasks de `TASKS.md` aprovados, uma por vez
 - Escrever código que segue a arquitetura em 4 camadas do `dadaia-workspace`
-- Executar critérios de verificação de cada task antes de marcar como concluída
-- Propor SPEC.md Draft quando uma nova feature for necessária
+- Criar SPEC.md Draft quando o operador solicita nova feature
+- Verificar critérios de cada task antes de declarar concluída
 
 **Regras do agente:**
-- Nunca implemente sem SPEC+PLAN+TASKS todos aprovados
-- Execute apenas a task solicitada — nunca avance para a próxima sem instrução
-- Se a implementação vai divergir do spec: PARE e reporte
-- Testes: `pytest tests/unit/ -v` após cada mudança
+- Nunca implemente sem SPEC+PLAN+TASKS todos com `**Status:** Aprovado`
+- Execute apenas a task solicitada — nunca avance sem instrução explícita
+- Se a implementação divergir do spec: PARE e descreva a divergência
+- Testes: `ruff format`, `ruff check`, `mypy --strict`, `pytest tests/unit/ -v`
 
 ---
 
 ### @soft-engineer-agent
 
-**Quando usar:** investigação de bugs, fixes pontuais, diagnóstico de problemas sem criação de nova feature.
+**Quando usar:** investigação de bugs, crash analysis, falhas de teste, fixes pontuais em código existente.
+**NÃO criar novas features** — use product-engineer-agent para isso.
 
 **Responsabilidades:**
 - Investigar bugs reportados via código, testes e inspeção de estado
-- Escrever fixes mínimos que ficam dentro do escopo do spec aprovado
-- Produzir relatórios de bug em `.dadaia/reports/bugs/`
-- Rodar suite de testes após cada fix
+- Escrever fixes mínimos dentro do escopo do spec aprovado
+- Produzir relatórios de bug em `.dadaia/reports/bugs/soft-engineer-report/`
+- Rodar suite de testes após cada fix e incluir output no relatório
 
 **Regras do agente:**
-- Nunca implemente nova feature — se o fix exigir novo comportamento, escale para @product-engineer-agent
-- Fix apenas o que está quebrado — zero escopo creep
+- Nunca crie nova feature — se o fix exigir novo comportamento, escale para @product-engineer-agent
+- Fix apenas o que está quebrado — zero scope creep
 - Sempre rode `pytest tests/unit/ -v` após aplicar um fix
 
 ---
