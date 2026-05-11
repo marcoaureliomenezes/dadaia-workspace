@@ -19,9 +19,11 @@ class OpenpyxlExcelReader:
         headers = [str(h) if h is not None else "" for h in rows[0]]
         result = []
         for row in rows[1:]:
-            result.append({
-                headers[i]: str(cell) if cell is not None else ""
-                for i, cell in enumerate(row)
-                if i < len(headers)
-            })
+            result.append(
+                {
+                    headers[i]: str(cell) if cell is not None else ""
+                    for i, cell in enumerate(row)
+                    if i < len(headers)
+                }
+            )
         return result

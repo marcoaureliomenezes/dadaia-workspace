@@ -11,10 +11,8 @@ from dadaia_workspace.core.protocols.storage import PublicAssetManager
 # Durable directories — must not be cleared by maintenance routines
 _DADAIA_DURABLE_DIRS = [
     "academy",
+    "agentic",
     "reports",
-    "reports/architect-agent-review",
-    "reports/specs-sdd-review",
-    "reports/bugs/soft-engineer-report",
     "scripts",
     "states",
     "src",
@@ -50,6 +48,10 @@ class WorkspaceService:
         # Create .dadaia/ directory structure
         for subdir in _DADAIA_DIRS:
             (workspace.dadaia_dir / subdir).mkdir(parents=True, exist_ok=True)
+        (workspace.root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
+        workspace.claude_dir.mkdir(parents=True, exist_ok=True)
+        (workspace.root / ".codex").mkdir(parents=True, exist_ok=True)
+        (workspace.root / ".opencode").mkdir(parents=True, exist_ok=True)
 
         # Initialize JSON state files (idempotent — never overwrite existing data)
         self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
@@ -61,13 +63,11 @@ class WorkspaceService:
         # Install public assets
         installed: list[str] = []
         if not skip_assets:
-            installed = self._public_assets.install(workspace.claude_dir)
+            installed.extend(self._public_assets.stage(workspace_root))
+            installed.extend(self._public_assets.install(workspace_root, target="all"))
 
         # Install repos.xlsx catalog (idempotent — never overwrite)
         self._install_repos_catalog(workspace)
-
-        # Install AGENTS.md in workspace root (idempotent — never overwrite)
-        self._install_agents_md(workspace_root)
 
         # Install ctx-inject.sh and configure the hook
         self._install_hook_script(workspace)
@@ -89,20 +89,14 @@ class WorkspaceService:
             if src.exists():
                 shutil.copy2(src, dest)
 
-    def _install_agents_md(self, workspace_root: Path) -> None:
-        dest = workspace_root / "AGENTS.md"
-        if not dest.exists():
-            src = Path(__file__).parent.parent.parent / "public" / "data" / "AGENTS.md"
-            if src.exists():
-                shutil.copy2(src, dest)
-
     def _install_hook_script(self, workspace: Workspace) -> None:
         scripts_dir = workspace.dadaia_dir / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
         dest = scripts_dir / "ctx-inject.sh"
         src = Path(__file__).parent.parent.parent / "public" / "scripts" / "ctx-inject.sh"
-        shutil.copy2(src, dest)
-        dest.chmod(0o755)
+        if src.exists():
+            shutil.copy2(src, dest)
+            dest.chmod(0o755)
 
     def _configure_hook(self, workspace: Workspace) -> None:
         hook_script = workspace.dadaia_dir / "scripts" / "ctx-inject.sh"

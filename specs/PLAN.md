@@ -16,7 +16,7 @@
 | Workspace init check | `is_initialized()` checa existência de `.dadaia/states/spec_contexts.json` |
 | Repo validation em create | CLI layer chama `ReposService` → obtém `repo_url` → passa para `SpecContextService.create()` |
 | Multi-context | Múltiplos `ativo` permitidos; apenas um `is_primary=True` por vez |
-| Agentes públicos | 4 sub-agentes `.md` em `dadaia_workspace/public/agents/`; instalados em `.claude/agents/` |
+| Agentes públicos | 4 personas `.md` em `dadaia_workspace/public/agents/`; staged em `.dadaia/agentic/` e projetadas para runtimes suportados |
 
 ---
 
@@ -91,10 +91,12 @@ Remove SQLite e alinha core models + protocols com a spec v4.0.
 - `tests/unit/test_academy_service.py`
 - `tests/e2e/features/test_academy.py`
 
-### Fase 5 — Public assets
+### Fase 5 — Universal agentic assets
 
 **Modificar:**
-- `dadaia_workspace/infrastructure/public_assets.py` — adicionar `agents/`
+- `dadaia_workspace/infrastructure/public_assets.py` — suportar staging, manifest e projeções runtime
+- `dadaia_workspace/features/public/service.py` — adicionar `stage`, `install --target all|claude|codex|opencode|agents` e `doctor`
+- `dadaia_workspace/cli/commands/public.py` — expor `stage`, `install` e `doctor`
 
 **Criar:**
 - `dadaia_workspace/public/agents/architect-agent.md`
@@ -105,6 +107,7 @@ Remove SQLite e alinha core models + protocols com a spec v4.0.
 - `dadaia_workspace/public/rules/dadaia-workspace-dev-guardrail.md`
 - `dadaia_workspace/public/skills/dadaia-workspace-doctor/SKILL.md`
 - `dadaia_workspace/public/commands/dadaia-workspace-doctor.md`
+- templates/configs universais em `dadaia_workspace/public/`
 
 ### Fase 6 — Quality gate
 
@@ -133,8 +136,13 @@ dadaia academy modules
 dadaia academy create c1 --module 4
 dadaia academy list
 dadaia academy delete c1
-dadaia public install --target /tmp/test-ws/.claude
-ls /tmp/test-ws/.claude/agents/           # 4 agent files
+dadaia public stage
+dadaia public install --target all
+dadaia public doctor
+ls /tmp/test-ws/.agents/skills/
+ls /tmp/test-ws/.claude/agents/           # Claude Code agent files
+ls /tmp/test-ws/.codex/
+ls /tmp/test-ws/.opencode/
 dadaia doctor
 dadaia doctor --fix
 ```

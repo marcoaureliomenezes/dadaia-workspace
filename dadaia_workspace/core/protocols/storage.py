@@ -5,8 +5,16 @@ from typing import Protocol
 
 
 class PublicAssetManager(Protocol):
-    def install(self, target_claude_dir: Path, force: bool = False) -> list[str]:
-        """Install public assets into target_claude_dir. Returns list of installed paths."""
+    def stage(self, workspace_root: Path) -> list[str]:
+        """Stage package public assets into workspace_root/.dadaia/agentic."""
+        ...
+
+    def install(self, workspace_root: Path, target: str = "all", force: bool = False) -> list[str]:
+        """Install staged public assets into runtime projections."""
+        ...
+
+    def doctor(self, workspace_root: Path) -> list[str]:
+        """Compare package source, staging, and runtime projections."""
         ...
 
 

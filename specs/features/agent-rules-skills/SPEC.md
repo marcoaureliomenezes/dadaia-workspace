@@ -49,7 +49,8 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 | Arquiteto de software | `software-architect` | Agent |
 | Auditor de produto | `product-auditor-agent` | Agent |
 | Engenheiro de produto | `product-engineer` | Agent |
-| Engenheiro de software | `soft-engineer-agent` | Agent |
+| Engenheiro de software | `software-engineer` | Agent |
+| QA Engineer | `qa-engineer` | Agent |
 
 ---
 
@@ -125,8 +126,8 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 - **Para** orquestrar reviews, auditorias, spec refinement e implementação sem interferência entre os papéis
 
 **Critérios de Aceite:**
-- Dado um workspace inicializado, quando executo `dadaia public install --target all`, então os 4 agentes são projetados para os runtimes suportados, incluindo `.claude/agents/` para Claude Code
-- Dado um agente instalado, quando o operador o invoca, então o agente segue seu escopo de escrita restrito (software-architect→reports, auditor→reports, product-engineer→specs, soft-engineer→código+reports)
+- Dado um workspace inicializado, quando executo `dadaia public install --target all`, então os 5 agentes SDD são projetados para os runtimes suportados, incluindo `.claude/agents/` para Claude Code
+- Dado um agente instalado, quando o operador o invoca, então o agente segue seu escopo de escrita restrito (software-architect→reports, auditor→reports, product-engineer→specs, software-engineer→código+reports, qa-engineer→testes E2E+reports)
 - Dado o `software-architect` ou `product-auditor-agent`, quando invocados, então usam a skill `dadaia-grill-me` para revisar specs criticamente
 
 ---
@@ -172,7 +173,7 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 - FR-030: Guidance for the academy command shall preserve the file structure from the knowledge_basis module (README, EXAMPLE, EXERCISES, REFERENCES, numbered content files).
 
 ### Agents
-- FR-031: The system shall provide 4 SDD pipeline agent files in `dadaia_workspace/public/agents/`: `software-architect.md`, `product-auditor-agent.md`, `product-engineer.md`, `soft-engineer-agent.md`. Domain agents (`devops-engineer.md`, `game-developer.md`) are also present and defined in their own feature specs.
+- FR-031: The system shall provide 5 SDD pipeline agent files in `dadaia_workspace/public/agents/`: `software-architect.md`, `product-auditor-agent.md`, `product-engineer.md`, `software-engineer.md`, `qa-engineer.md`. Domain agents (`devops-engineer.md`, `game-developer.md`) are also present and defined in their own feature specs.
 - FR-032: Agent files shall include enough metadata to project Claude Code sub-agent frontmatter (`name`, `description`, `model`, and `tools`) and runtime-native formats where supported.
 - FR-033: Each agent's system prompt shall explicitly define its allowed write paths and prohibited paths.
 - FR-034: `dadaia public install --target claude|all` shall copy/project `dadaia_workspace/public/agents/` to `<workspace-root>/.claude/agents/`; other runtimes receive native projections only when supported.
@@ -233,7 +234,8 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
         software-architect.md
         product-auditor-agent.md
         product-engineer.md
-        soft-engineer-agent.md
+        software-engineer.md
+        qa-engineer.md
         devops-engineer.md
         game-developer.md
       commands/

@@ -22,9 +22,11 @@
 
 ```
 dadaia init [--skip-assets]
-dadaia context create|list|show|activate|deactivate|promote|delete
+dadaia context create|list|show|activate|deactivate|promote|delete|use
 dadaia repos list
-dadaia public install [--target <path>] [--force]
+dadaia public stage
+dadaia public install --target all|claude|codex|opencode|agents [--force]
+dadaia public doctor
 dadaia doctor [--fix]
 ```
 
@@ -49,6 +51,11 @@ Paths operacionais:
 - Catálogo: `.dadaia/src/repos.xlsx`
 - Relatórios persistentes: `.dadaia/reports/`
 - Scripts de automação: `.dadaia/scripts/`
+- Staging de assets agentic: `.dadaia/agentic/`
+- Skills universais: `.agents/skills/`
+- Projeção Claude Code: `.claude/`
+- Projeção Codex: `.codex/`
+- Projeção OpenCode: `.opencode/` e `opencode.json`
 - Efêmeros Python: `.dadaia/tmp/python/`
 - Efêmeros JSON: `.dadaia/tmp/json/`
 
@@ -129,10 +136,12 @@ dadaia_workspace/
     public_assets.py
     python_env.py
   public/
+    agents/
     rules/
     skills/
     commands/
     scripts/
+    templates/
     data/
       repos.xlsx
 tests/

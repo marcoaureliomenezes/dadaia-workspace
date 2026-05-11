@@ -12,7 +12,7 @@ from dadaia_workspace.core.models.export import ExportManifest, ExportOptions, E
 from dadaia_workspace.core.protocols.context_store import ContextStore
 
 _EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
-    {".npm", ".npm-global", ".cache", ".local", "linuxbrew", ".codex", ".venv", "tmp", "contexts"}
+    {".npm", ".npm-global", ".cache", ".local", "linuxbrew", ".venv", "tmp", "contexts"}
 )
 
 
@@ -54,6 +54,7 @@ class ExportService:
         _add_if_exists(dadaia / "states", ".dadaia/states")
         _add_if_exists(dadaia / "academy", ".dadaia/academy")
         _add_if_exists(dadaia / "scripts", ".dadaia/scripts")
+        _add_if_exists(dadaia / "agentic" / "manifest.json", ".dadaia/agentic/manifest.json")
         _add_if_exists(dadaia / "src", ".dadaia/src")
 
         if options.include_reports:
@@ -62,12 +63,19 @@ class ExportService:
         for name in ("CLAUDE.md", "AGENTS.md", "opencode.json"):
             _add_if_exists(root / name, name)
 
+        _add_if_exists(root / ".agents" / "skills", ".agents/skills")
+
         claude = root / ".claude"
         _add_if_exists(claude / "settings.json", ".claude/settings.json")
         _add_if_exists(claude / "settings.local.json", ".claude/settings.local.json")
         _add_if_exists(claude / "rules", ".claude/rules")
 
-        _add_if_exists(root / ".codex" / "hooks.json", ".codex/hooks.json")
+        codex = root / ".codex"
+        _add_if_exists(codex / "config.toml", ".codex/config.toml")
+        _add_if_exists(codex / "hooks.json", ".codex/hooks.json")
+        _add_if_exists(codex / "rules", ".codex/rules")
+
+        _add_if_exists(root / ".opencode", ".opencode")
 
         mnt = root / "mnt"
         if not options.exclude_mnt and mnt.exists():
@@ -89,7 +97,10 @@ class ExportService:
                 for ctx in self._store.list_all()
             )
         except Exception:
-            print("WARNING: could not read spec_contexts.json — contexts list will be empty", file=sys.stderr)
+            print(
+                "WARNING: could not read spec_contexts.json — contexts list will be empty",
+                file=sys.stderr,
+            )
             contexts = ()
 
         arc_names = tuple(arc for _, arc in includes)
@@ -129,7 +140,11 @@ class ExportService:
         return archive_path
 
     def run(self, options: ExportOptions) -> ExportResult:
-        output_dir = options.output if options.output is not None else self._workspace_root / ".dadaia" / "dist"
+        output_dir = (
+            options.output
+            if options.output is not None
+            else self._workspace_root / ".dadaia" / "dist"
+        )
         output_dir.mkdir(parents=True, exist_ok=True)
 
         includes = self.resolve_includes(options)
