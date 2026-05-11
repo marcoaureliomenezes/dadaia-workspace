@@ -21,13 +21,17 @@ class ContextStateError(DadaiaError):
     """Raised when an operation is invalid for the context's current state."""
 
 
-class GitOperationError(DadaiaError):
-    """Raised when a git operation (clone, commit, push) fails."""
-
-
 class PublicAssetError(DadaiaError):
     """Raised when installing public assets fails."""
 
 
 class RepoCatalogError(DadaiaError):
     """Raised when reading the repos catalog fails."""
+
+
+class GitCloneError(DadaiaError):
+    """Raised when cloning a repository fails."""
+
+
+class GitSyncError(DadaiaError):
+    """Raised when committing or pushing changes before deactivate fails."""

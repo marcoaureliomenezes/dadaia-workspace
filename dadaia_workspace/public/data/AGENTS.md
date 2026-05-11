@@ -153,7 +153,9 @@ dadaia doctor --fix                    # tenta reparar problemas encontrados
 dadaia repos list                      # lista repos registrados
 
 # Public assets
-dadaia public install --target .claude # instala assets lib em .claude/
+dadaia public stage                    # gera .dadaia/agentic/
+dadaia public install --target all     # instala projeções .agents/.claude/.codex/.opencode
+dadaia public doctor                   # verifica drift de assets
 ```
 
 ---
@@ -229,15 +231,17 @@ dadaia doctor        # estado do workspace dadaia
 
 ## 8. Lib-Originated Assets — Regra de Não-Edição
 
-Arquivos em `.claude/` que têm contraparte em `dadaia_workspace/public/` são **lib-originated**.
+Arquivos em `.agents/`, `.claude/`, `.codex/` ou `.opencode/` que vêm de `.dadaia/agentic/manifest.json`
+são **lib-originated**.
 Nunca edite esses arquivos diretamente.
 
 Workflow correto:
 1. Edite `dadaia_workspace/public/<tipo>/<arquivo>`
 2. Commit no repo `dadaia-workspace`
-3. `dadaia public install --target <workspace-root>/.claude`
+3. `dadaia public stage`
+4. `dadaia public install --target all`
 
-Para verificar drift: `dadaia doctor`
+Para verificar drift: `dadaia public doctor`
 
 ---
 

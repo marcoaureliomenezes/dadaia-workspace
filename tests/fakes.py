@@ -3,21 +3,9 @@
 from pathlib import Path
 
 from dadaia_workspace.core.models.spec_context import SpecContextProject
-from dadaia_workspace.core.models.workspace import Workspace
 
 
-class FakeWorkspaceRepository:
-    def __init__(self) -> None:
-        self._store: dict[str, Workspace] = {}
-
-    def save(self, workspace: Workspace) -> None:
-        self._store[str(workspace.root)] = workspace
-
-    def load(self, root: Path) -> Workspace | None:
-        return self._store.get(str(root))
-
-
-class FakeSpecContextRepository:
+class FakeContextStore:
     def __init__(self) -> None:
         self._store: dict[str, SpecContextProject] = {}
 
@@ -27,15 +15,8 @@ class FakeSpecContextRepository:
     def update(self, ctx: SpecContextProject) -> None:
         self._store[ctx.name] = ctx
 
-    def get_by_name(self, name: str) -> SpecContextProject | None:
+    def get(self, name: str) -> SpecContextProject | None:
         return self._store.get(name)
-
-    def get_active(self) -> SpecContextProject | None:
-        from dadaia_workspace.core.models.spec_context import ContextState
-        for ctx in self._store.values():
-            if ctx.state == ContextState.ATIVO:
-                return ctx
-        return None
 
     def list_all(self) -> list[SpecContextProject]:
         return list(self._store.values())
@@ -44,45 +25,83 @@ class FakeSpecContextRepository:
         self._store.pop(name, None)
 
 
+class FakePrimaryContextStore:
+    def __init__(self) -> None:
+        self._data: dict[str, str] | None = None
+
+    def write(self, name: str, repo_slug: str, specs_dir: Path) -> None:
+        self._data = {"name": name, "repo_slug": repo_slug, "specs_dir": str(specs_dir)}
+
+    def read(self) -> dict[str, str] | None:
+        return self._data
+
+    def clear(self) -> None:
+        self._data = None
+
+
 class FakeGitClient:
-    def __init__(self, *, fail_push: bool = False, has_remote: bool = True) -> None:
+    def __init__(self) -> None:
         self.cloned: list[tuple[str, Path]] = []
         self.committed: list[Path] = []
         self.pushed: list[Path] = []
-        self._fail_push = fail_push
-        self._has_remote = has_remote
+        self._dirty: set[Path] = set()
+        self._has_remote: set[Path] = set()
 
-    def clone(self, repo_ref: str, target_dir: Path) -> None:
-        target_dir.mkdir(parents=True, exist_ok=True)
-        (target_dir / ".git").mkdir(exist_ok=True)
-        self.cloned.append((repo_ref, target_dir))
+    def clone(self, url: str, dest: Path) -> None:
+        dest.mkdir(parents=True, exist_ok=True)
+        self.cloned.append((url, dest))
 
-    def is_git_repo(self, path: Path) -> bool:
-        return (path / ".git").exists()
+    def is_dirty(self, path: Path) -> bool:
+        return path in self._dirty
 
-    def has_changes(self, path: Path) -> bool:
-        return False
-
-    def has_remote(self, path: Path) -> bool:
-        return self._has_remote
-
-    def commit_all(self, path: Path, message: str) -> None:
+    def commit_all(self, path: Path, msg: str) -> None:
         self.committed.append(path)
 
+    def has_remote(self, path: Path) -> bool:
+        return path in self._has_remote
+
     def push(self, path: Path) -> None:
-        if self._fail_push:
-            from dadaia_workspace.core.exceptions import GitOperationError
-            raise GitOperationError("push failed (fake)")
         self.pushed.append(path)
+
+
+class FakeCourseStore:
+    def __init__(self) -> None:
+        self._store: dict[str, object] = {}
+
+    def save(self, course: object) -> None:
+        self._store[course.slug] = course  # type: ignore[call-overload]
+
+    def update(self, course: object) -> None:
+        self._store[course.slug] = course  # type: ignore[call-overload]
+
+    def get(self, slug: str) -> object | None:
+        return self._store.get(slug)
+
+    def list_all(self) -> list[object]:
+        return list(self._store.values())
+
+    def delete(self, slug: str) -> None:
+        self._store.pop(slug, None)
 
 
 class FakePublicAssetManager:
     def __init__(self) -> None:
-        self.installed: list[tuple[Path, bool]] = []
+        self.staged: list[Path] = []
+        self.installed: list[tuple[Path, str, bool]] = []
+        self.doctored: list[Path] = []
 
-    def install(self, target_claude_dir: Path, force: bool = False) -> list[str]:
-        self.installed.append((target_claude_dir, force))
-        return [str(target_claude_dir / "rules" / "fake-rule.md")]
+    def stage(self, workspace_root: Path) -> list[str]:
+        self.staged.append(workspace_root)
+        (workspace_root / ".dadaia" / "agentic").mkdir(parents=True, exist_ok=True)
+        return [str(workspace_root / ".dadaia" / "agentic")]
+
+    def install(self, workspace_root: Path, target: str = "all", force: bool = False) -> list[str]:
+        self.installed.append((workspace_root, target, force))
+        return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
+
+    def doctor(self, workspace_root: Path) -> list[str]:
+        self.doctored.append(workspace_root)
+        return ["[ok] fake"]
 
 
 class FakeExcelReader:

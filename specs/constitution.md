@@ -8,7 +8,7 @@
 
 ## Propósito do Projeto
 
-dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório em um **workspace AI-native** para desenvolvimento multi-repositório orientado por SDD. O produto organiza repositórios, contextos de trabalho, estado durável em JSON e artefatos de agente em um único fluxo previsível e seguro.
+dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório em um **workspace AI-native multi-runtime** para desenvolvimento multi-repositório orientado por SDD. O produto organiza repositórios, contextos de trabalho, estado durável em JSON e artefatos de agente para Claude Code, OpenCode e Codex em um único fluxo previsível e seguro.
 
 ---
 
@@ -36,7 +36,7 @@ dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório
 ## Segurança (Não-Negociáveis)
 
 - **NUNCA** exponha credenciais, tokens ou secrets em código-fonte, specs ou logs.
-- **NUNCA** armazene tokens git em `.dadaia/`, em `.claude/` ou em qualquer arquivo do projeto.
+- **NUNCA** armazene tokens git em `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.opencode/` ou em qualquer arquivo do projeto.
 - Todas as operações git usam **exclusivamente** as credenciais do sistema operacional (`~/.gitconfig`, SSH keys, credential manager do OS).
 - **NUNCA** faça log de URLs com tokens embutidos.
 - **SEMPRE** valide entradas do usuário na camada CLI antes de chamar serviços.
@@ -103,13 +103,20 @@ A flag `is_primary` (`bool`) distingue, dentro de `ativo`, qual contexto é o pr
 - Artefatos efêmeros não devem ser criados em `dadaia-workspace/`, em `specs/`, em `tests/` ou na raiz do repositório.
 
 ### Artefatos de Agente
-- Neste repositório, `dadaia_workspace/public/` é a única localização versionada para rules, skills, commands, scripts e agents do produto.
-- `dadaia-workspace/.claude/` não faz parte da arquitetura do produto e não deve existir.
-- O comando `dadaia public install` extrai os artefatos versionados para o `.claude/` do workspace do usuário. Agents são instalados em `.claude/agents/`.
-- Os 4 sub-agentes especializados (`architect-agent`, `product-auditor-agent`, `product-engineer-agent`, `soft-engineer-agent`) são distribuídos em `dadaia_workspace/public/agents/` e instalados em `<workspace-root>/.claude/agents/`.
-- A skill `dadaia-grill-me` é distribuída em `dadaia_workspace/public/skills/dadaia-grill-me/` e compartilhada pelo `architect-agent` e `product-auditor-agent`.
-- A rule `dadaia-workspace-dev-guardrail` é sempre ativa e proíbe edição direta de qualquer asset lib-originated em `.claude/`. Assets lib-originated são identificados por comparação com `dadaia_workspace/public/`.
-- A skill `dadaia-workspace-doctor` e o command `/dadaia-workspace-doctor` permitem diagnosticar drift entre lib e `.claude/` instalado, e reparar schema stale em `.dadaia/states/*.json`.
+- Neste repositório, `dadaia_workspace/public/` é a única localização versionada para rules, skills, commands, scripts, agents e templates universais do produto.
+- `dadaia-workspace/.agents/`, `dadaia-workspace/.claude/`, `dadaia-workspace/.codex/` e `dadaia-workspace/.opencode/` não fazem parte da arquitetura de authoring do produto e não devem ser usados como fonte canônica.
+- `<workspace-root>/.dadaia/agentic/` é uma área local gerada pela CLI a partir do pacote instalado. Ela contém manifest com versão do pacote, hashes, timestamp de geração e versão de schema.
+- `<workspace-root>/.agents/skills/` é o destino universal para skills reutilizáveis entre runtimes que suportam o padrão de Agent Skills.
+- O comando `dadaia public stage` materializa os artefatos versionados de `dadaia_workspace/public/` em `.dadaia/agentic/`.
+- O comando `dadaia public install --target all|claude|codex|opencode|agents` projeta os artefatos staged para os runtimes suportados, gerando `.dadaia/agentic/` antes se necessário.
+- Claude Code recebe projeções em `.claude/agents/`, `.claude/commands/`, `.claude/skills/` e `.claude/settings.json`.
+- OpenCode recebe projeções em `.opencode/agents/`, `.opencode/commands/`, `.opencode/skills/` e `opencode.json`, usando comandos, permissões e instruções nativas em vez de hooks inexistentes.
+- Codex recebe projeções em `.codex/config.toml`, `.codex/hooks.json`, `.codex/rules/` e skills compartilhadas em `.agents/skills/`.
+- `AGENTS.md` é o documento universal de regras e personas para runtimes que leem instruções no workspace root.
+- Os 4 agentes especializados (`architect-agent`, `product-auditor-agent`, `product-engineer-agent`, `soft-engineer-agent`) são distribuídos em `dadaia_workspace/public/agents/` e projetados para cada runtime conforme suas capacidades nativas.
+- A skill `dadaia-grill-me` é distribuída em `dadaia_workspace/public/skills/dadaia-grill-me/` e instalada em `.agents/skills/`, além das projeções runtime-specific quando suportadas.
+- A rule `dadaia-workspace-dev-guardrail` é sempre ativa e proíbe edição direta de qualquer asset lib-originated em `.agents/`, `.claude/`, `.codex/` ou `.opencode/`. Assets lib-originated são identificados por comparação com o manifest staged em `.dadaia/agentic/`.
+- `dadaia public doctor` diagnostica drift entre pacote, staging e projeções runtime, reportando `ok`, `missing`, `drift` e `unsupported`.
 
 ### Integração CLI-First para Agentes
 - A CLI oficial `dadaia` é a interface primária do produto para consumo por humanos e agentes.

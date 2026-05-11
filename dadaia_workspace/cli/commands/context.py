@@ -1,9 +1,7 @@
 """dadaia context subcommands."""
 
 import json
-import sys
 from pathlib import Path
-from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
@@ -14,9 +12,11 @@ from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
+    RepoCatalogError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.features.spec_context.service import SpecContextService
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 console = Console()
@@ -31,49 +31,56 @@ def _resolve_workspace() -> Path:
     return cwd
 
 
-def _ctx_service() -> "container.SpecContextService":  # type: ignore[name-defined]
+def _ctx_service() -> SpecContextService:
     try:
         return container.build_spec_context_service(_resolve_workspace())
     except WorkspaceNotInitializedError:
-        err_console.print("[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first.")
-        raise typer.Exit(1)
+        err_console.print(
+            "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
+        )
+        raise typer.Exit(1) from None
 
 
 def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
     return {
         "name": ctx.name,
         "state": ctx.state.value,
-        "context_dir": str(ctx.context_dir) if ctx.context_dir else None,
-        "specs_dir": str(ctx.specs_dir) if ctx.specs_dir else None,
-        "primary_repo": {
-            "repo_ref": ctx.primary_repo.repo_ref,
-            "source_kind": ctx.primary_repo.source_kind.value,
-            "materialized_path": str(ctx.primary_repo.materialized_path) if ctx.primary_repo.materialized_path else None,
-        },
-        "secondary_repos": [
-            {
-                "repo_ref": r.repo_ref,
-                "source_kind": r.source_kind.value,
-                "materialized_path": str(r.materialized_path) if r.materialized_path else None,
-            }
-            for r in ctx.secondary_repos
-        ],
+        "repo_slug": ctx.repo_slug,
+        "repo_url": ctx.repo_url,
+        "is_primary": ctx.is_primary,
+        "created_at": ctx.created_at,
+        "activated_at": ctx.activated_at,
     }
 
 
 @app.command()
 def create(
     name: str = typer.Argument(..., help="Context name"),
-    repo: str = typer.Option(..., "--repo", help="Primary repo ref (URL or local path)"),
-    secondary: list[str] = typer.Option([], "--secondary", help="Secondary repo refs"),
+    repo: str = typer.Option(..., "--repo", help="Repo slug (directory name under repos/)"),
 ) -> None:
     """Create a new Spec Context Project in state 'inativo'."""
+    workspace_root = _resolve_workspace()
+    # Look up repo_url from whitelist; fall back gracefully if catalog unavailable
+    repo_url = ""
     try:
-        ctx = _ctx_service().create(name, repo, secondary or None)
-        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created (state: {ctx.state})")
-    except ContextAlreadyExistsError as e:
+        repos_svc = container.build_repos_service()
+        rows = repos_svc.list_known(workspace_root)
+        for row in rows:
+            if row.get("Repo Name") == repo:
+                repo_url = row.get("Repo URL", "")
+                break
+    except (RepoCatalogError, Exception):
+        pass
+
+    try:
+        ctx = _ctx_service().create(name, repo, repo_url)
+        console.print(
+            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
+            f"(repo: {ctx.repo_slug}, state: {ctx.state})"
+        )
+    except (ContextAlreadyExistsError, ContextNotFoundError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="list")
@@ -87,12 +94,11 @@ def list_all() -> None:
     table = Table(title="Spec Context Projects")
     table.add_column("Name", style="bold")
     table.add_column("State")
-    table.add_column("Primary Repo")
-    table.add_column("Secondaries")
+    table.add_column("Primary")
+    table.add_column("Repo")
 
     state_style = {
         ContextState.ATIVO: "[green]ativo[/green]",
-        ContextState.STANDBY: "[yellow]standby[/yellow]",
         ContextState.INATIVO: "[dim]inativo[/dim]",
     }
 
@@ -100,103 +106,116 @@ def list_all() -> None:
         table.add_row(
             ctx.name,
             state_style.get(ctx.state, ctx.state.value),
-            ctx.primary_repo.repo_ref,
-            ", ".join(r.repo_ref for r in ctx.secondary_repos) or "—",
+            "[bold yellow]✓[/bold yellow]" if ctx.is_primary else "",
+            ctx.repo_slug,
         )
     console.print(table)
 
 
 @app.command()
 def show(
-    name: Optional[str] = typer.Argument(None, help="Context name (omit for active context)"),
+    name: str | None = typer.Argument(None, help="Context name"),
     json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
 ) -> None:
-    """Show details of a context. Omit name to show the active context."""
-    ctx = _ctx_service().show(name)
-    selected_by = "name" if name else "active"
+    """Show details of a context."""
+    svc = _ctx_service()
+    if name is None:
+        # Show primary context
+        all_ctxs = svc.list_all()
+        ctx = next((c for c in all_ctxs if c.is_primary), None)
+    else:
+        try:
+            ctx = svc.show(name)
+        except ContextNotFoundError as e:
+            err_console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
 
     if json_output:
-        payload = {
-            "context": _ctx_to_dict(ctx) if ctx else None,
-            "selected_by": selected_by,
-        }
-        print(json.dumps(payload, indent=2))
+        if ctx is None:
+            print(json.dumps({"context": None}, indent=2))
+        else:
+            print(json.dumps(_ctx_to_dict(ctx), indent=2))
         return
 
     if ctx is None:
-        msg = f"Context '{name}' not found." if name else "No active context."
+        msg = f"Context '{name}' not found." if name else "No primary context."
         console.print(f"[dim]{msg}[/dim]")
         return
 
-    console.print(f"[bold]Name:[/bold]        {ctx.name}")
-    console.print(f"[bold]State:[/bold]       {ctx.state.value}")
-    console.print(f"[bold]Primary:[/bold]     {ctx.primary_repo.repo_ref}")
-    if ctx.secondary_repos:
-        console.print(f"[bold]Secondary:[/bold]  {', '.join(r.repo_ref for r in ctx.secondary_repos)}")
-    if ctx.context_dir:
-        console.print(f"[bold]Context dir:[/bold] {ctx.context_dir}")
-    if ctx.specs_dir:
-        console.print(f"[bold]Specs dir:[/bold]  {ctx.specs_dir}")
+    console.print(f"[bold]Name:[/bold]       {ctx.name}")
+    console.print(f"[bold]State:[/bold]      {ctx.state.value}")
+    console.print(f"[bold]Primary:[/bold]    {ctx.is_primary}")
+    console.print(f"[bold]Repo:[/bold]       {ctx.repo_slug}")
+    console.print(f"[bold]Repo URL:[/bold]   {ctx.repo_url or '—'}")
+    console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
+    console.print(f"[bold]Activated:[/bold]  {ctx.activated_at or '—'}")
 
 
 @app.command()
 def activate(name: str = typer.Argument(..., help="Context name to activate")) -> None:
-    """Activate a context, materializing its repos if needed."""
+    """Activate a context (clone repo if absent; auto-promote if no primary)."""
     try:
-        ctx = _ctx_service().activate(name)
-        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now active")
-        if ctx.specs_dir:
-            console.print(f"  specs_dir: {ctx.specs_dir}")
+        ws = _resolve_workspace()
+        ctx = container.build_spec_context_service(ws).activate(name)
+        primary_note = " [bold yellow](primary)[/bold yellow]" if ctx.is_primary else ""
+        console.print(
+            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now active{primary_note}"
+        )
+        if ctx.is_primary:
+            container.build_public_service().install(ws, target="opencode", force=True)
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
-def deactivate() -> None:
-    """Deactivate the current active context (moves to standby)."""
+def deactivate(name: str = typer.Argument(..., help="Context name to deactivate")) -> None:
+    """Deactivate a context (git sync + remove repo from disk)."""
     try:
-        ctx = _ctx_service().deactivate()
-        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' moved to standby")
-    except ContextStateError as e:
+        ctx = _ctx_service().deactivate(name)
+        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' deactivated")
+    except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
+
+
+@app.command()
+def promote(name: str = typer.Argument(..., help="Context name to promote as primary")) -> None:
+    """Promote an active context as the workspace primary."""
+    try:
+        ws = _resolve_workspace()
+        ctx = container.build_spec_context_service(ws).promote(name)
+        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now primary")
+        container.build_public_service().install(ws, target="opencode", force=True)
+    except (ContextNotFoundError, ContextStateError) as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
 
 @app.command()
 def delete(name: str = typer.Argument(..., help="Context name to delete")) -> None:
-    """Delete a context. Syncs managed repos before removing if in standby."""
+    """Delete a context. Context must be inactive."""
     try:
         _ctx_service().delete(name)
         console.print(f"[green]✓[/green] Context '[bold]{name}[/bold]' deleted")
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
-@app.command(name="add-repo")
-def add_repo(
-    name: str = typer.Argument(..., help="Context name"),
-    repo: str = typer.Option(..., "--repo", help="Repo ref to add as secondary"),
-) -> None:
-    """Add a secondary repo to an existing context."""
-    try:
-        ctx = _ctx_service().add_repo(name, repo)
-        console.print(f"[green]✓[/green] Added '{repo}' to context '[bold]{ctx.name}[/bold]'")
-    except (ContextNotFoundError, ContextAlreadyExistsError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+@app.command()
+def use(name: str = typer.Argument(..., help="Context name to isolate this session to")) -> None:
+    """Isolate this shell session to a specific context without changing global state.
 
+    Run: eval $(dadaia context use <name>)
 
-@app.command(name="remove-repo")
-def remove_repo(
-    name: str = typer.Argument(..., help="Context name"),
-    repo: str = typer.Option(..., "--repo", help="Repo ref to remove"),
-) -> None:
-    """Remove a secondary repo from a context."""
-    try:
-        ctx = _ctx_service().remove_repo(name, repo)
-        console.print(f"[green]✓[/green] Removed '{repo}' from context '[bold]{ctx.name}[/bold]'")
-    except (ContextNotFoundError, ContextStateError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+    Sets DADAIA_CONTEXT for the current shell only. Does NOT modify spec_contexts.json
+    or primary_context.json.
+    """
+    all_ctxs = _ctx_service().list_all()
+    ctx = next((c for c in all_ctxs if c.name == name), None)
+    if ctx is None:
+        available = ", ".join(c.name for c in all_ctxs) or "none"
+        err_console.print(f"[red]Error:[/red] Context '{name}' not found. Available: {available}")
+        raise typer.Exit(1) from None
+    print(f"export DADAIA_CONTEXT={name}")

@@ -3,25 +3,17 @@
 **Feature ID:** cross-tool-parity
 **Status:** Aprovado
 **Owner:** dadaia Labs
-**Version:** 1.0
+**Version:** 2.0
 **Data:** 2026-05-09
+**Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
 
 ## Contexto e Motivação
 
-O workspace dadaia Labs é operado via Claude Code (ferramenta principal). Quando o contexto
-do Claude esgota, o operador precisa trocar para OpenCode ou Codex e continuar com as **mesmas
-regras, mesma consciência do projeto e os mesmos agentes**. Hoje essa troca quebra porque:
+O workspace dadaia Labs é operado por Claude Code, OpenCode e Codex. Paridade não significa que todos tenham os mesmos mecanismos técnicos; significa que todos recebem as mesmas regras SDD, o mesmo contrato de descoberta de contexto e as mesmas personas de agente dentro das capacidades nativas de cada runtime.
 
-- `AGENTS.md` no workspace root continha conteúdo de bot Telegram (sem regras SDD)
-- Codex lê apenas `AGENTS.md` + PreToolUse hook — sem regras chega ao modelo
-- OpenCode lê as rules via `opencode.json` mas não tem agentes definidos
-- `dadaia public install` não instala `AGENTS.md` — novos workspaces ficam sem cross-tool parity
-- Agentes Claude Code (`.claude/agents/`) não documentam dadaia CLI, venv policy, nem academy
-
-**Objetivo:** garantir que Claude Code, OpenCode e Codex sejam intercambiáveis como ferramentas
-de trabalho neste workspace, cada uma com o contexto completo e agentes adequados.
+**Objetivo:** garantir que Claude Code, OpenCode e Codex sejam intercambiáveis como ferramentas de trabalho, usando `dadaia_workspace/public/` como fonte canônica, `.dadaia/agentic/` como staging gerado e projeções para `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `opencode.json` e `AGENTS.md`.
 
 ---
 
@@ -29,25 +21,22 @@ de trabalho neste workspace, cada uma com o contexto completo e agentes adequado
 
 | Ferramenta | Carrega automaticamente |
 |---|---|
-| Claude Code | `.claude/rules/*.md`, `.claude/agents/*.md`, `.claude/skills/`, CLAUDE.md |
-| OpenCode | `AGENTS.md` (primário) + `opencode.json` instructions |
-| Codex | `AGENTS.md` (primário) + `.codex/hooks.json` PreToolUse |
+| Claude Code | `.claude/rules/`, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`, `AGENTS.md` |
+| OpenCode | `AGENTS.md`, `opencode.json`, `.opencode/commands/`, `.opencode/skills/`, `.opencode/agents/` |
+| Codex | `AGENTS.md`, `.codex/rules/`, `.codex/hooks.json`, `.codex/config.toml`, `.agents/skills/` |
 
-`AGENTS.md` é o documento universal — o único que precisa existir para garantir parity mínima
-para OpenCode e Codex.
+`AGENTS.md` é o documento universal mínimo. Diretórios runtime-specific são projeções geradas, nunca fonte canônica.
 
 ---
 
 ## User Stories
 
-**US-CTP-001:** Como operador, quando o contexto do Claude esgota, quero abrir OpenCode e
-continuar trabalhando com as mesmas regras SDD e conhecimento do projeto.
+**US-CTP-001:** Como operador, quando alterno entre Claude Code, OpenCode e Codex, quero preservar as mesmas regras SDD e o mesmo procedimento de descoberta de contexto.
 
-**US-CTP-002:** Como operador, quero usar o @architect-agent, @product-engineer-agent,
-@soft-engineer-agent e @product-auditor-agent em qualquer uma das três ferramentas.
+**US-CTP-002:** Como operador, quero usar o @architect-agent, @product-engineer-agent, @soft-engineer-agent e @product-auditor-agent em qualquer runtime que suporte personas/agentes, sem falsa paridade nos runtimes que não suportam.
 
 **US-CTP-003:** Como operador, ao inicializar um novo workspace com `dadaia init`, quero que
-`AGENTS.md` seja gerado automaticamente com o conteúdo correto.
+`AGENTS.md`, `.agents/skills/`, `.claude/`, `.codex/`, `.opencode/` e configs relacionadas sejam geradas por projeção.
 
 ---
 
@@ -59,23 +48,19 @@ Spec Context discovery, dadaia CLI reference, venv policy, regras de segurança,
 do projeto, 4 agentes com personas, checklist pré-código.
 
 **FR-CTP-002 — opencode.json inclui AGENTS.md:**
-`opencode.json` deve listar `"AGENTS.md"` como primeira entrada em `instructions`.
+`opencode.json` e `.opencode/` devem ser gerados como projeção nativa do OpenCode, sem depender de `.claude/` como fonte primária.
 
-**FR-CTP-003 — Template canônico em public/:**
-`dadaia_workspace/public/data/AGENTS.md` deve conter o template de `AGENTS.md` instalado
-por `dadaia public install`.
+**FR-CTP-003 — Codex nativo:**
+`.codex/config.toml`, `.codex/hooks.json`, `.codex/rules/` e `.agents/skills/` devem ser gerados como projeção nativa do Codex.
 
 **FR-CTP-004 — dadaia init gera AGENTS.md:**
-`dadaia init` deve criar `AGENTS.md` no workspace root a partir do template em `public/data/`.
-Se `AGENTS.md` já existe, não sobreescreva (comportamento idêntico ao de outros arquivos do scaffold).
+O template de `AGENTS.md` deve viver em `dadaia_workspace/public/` e ser staged em `.dadaia/agentic/` antes da instalação.
 
-**FR-CTP-005 — Agentes Claude Code atualizados:**
-Os 4 agentes em `dadaia_workspace/public/agents/` devem incluir seções sobre:
-dadaia CLI reference, venv policy, como descobrir o spec context ativo.
+**FR-CTP-005 — Init multi-runtime:**
+`dadaia init` deve criar o scaffold multi-runtime chamando o mesmo fluxo de staging/projeção usado por `dadaia public install --target all`.
 
-**FR-CTP-006 — dadaia public install inclui AGENTS.md:**
-O comando `dadaia public install` deve copiar `public/data/AGENTS.md` para `<target>/AGENTS.md`
-(um nível acima de `.claude/`, no workspace root).
+**FR-CTP-006 — Sem falsa paridade:**
+Quando uma ferramenta não suportar hooks, sub-agentes, commands ou skills em determinado formato, a projeção deve omitir a capacidade e `dadaia public doctor` deve reportar `unsupported`.
 
 ---
 
@@ -84,10 +69,9 @@ O comando `dadaia public install` deve copiar `public/data/AGENTS.md` para `<tar
 **NFR-CTP-001:** `AGENTS.md` deve ser legível sem contexto adicional — qualquer modelo AI
 que o leia deve conseguir operar o workspace seguindo as regras.
 
-**NFR-CTP-002:** O template em `public/data/AGENTS.md` deve ser idêntico ao `AGENTS.md`
-instalado — sem placeholders, sem variáveis de substituição.
+**NFR-CTP-002:** Projeções runtime-specific devem ser recriáveis a partir de `.dadaia/agentic/`.
 
-**NFR-CTP-003:** `dadaia init` não deve falhar se `AGENTS.md` já existe — usar modo "create if absent".
+**NFR-CTP-003:** `dadaia init` e `dadaia public install` não devem sobrescrever arquivos existentes sem `--force`.
 
 ---
 
@@ -97,16 +81,15 @@ instalado — sem placeholders, sem variáveis de substituição.
 - [ ] `AGENTS.md` contém seção SDD com pipeline e HARD STOP template
 - [ ] `AGENTS.md` contém seção `dadaia context list` para Spec Context discovery
 - [ ] `AGENTS.md` contém seção de agentes com os 4 personas
-- [ ] `opencode.json` lista `"AGENTS.md"` como primeiro item de `instructions`
-- [ ] `dadaia public install` cria/atualiza `AGENTS.md` no workspace root
-- [ ] `dadaia init` cria `AGENTS.md` se não existir
-- [ ] Agentes em `public/agents/` mencionam `dadaia CLI`, `venv policy`, `dadaia context list`
+- [ ] `.agents/skills/` contém skills universais
+- [ ] `.claude/`, `.codex/` e `.opencode/` são gerados por `dadaia public install --target all`
+- [ ] `dadaia public doctor` reporta `ok`, `missing`, `drift` ou `unsupported`
+- [ ] Nenhuma spec exige hook parity para OpenCode
 
 ---
 
 ## Out of Scope
 
-- Hooks automáticos para OpenCode/Codex equivalentes ao ctx-inject.sh do Claude Code
-  (OpenCode e Codex não suportam UserPromptSubmit; instrução em AGENTS.md é suficiente)
-- Sincronização automática de AGENTS.md com `.claude/rules/` (manutenção manual)
-- Skills/commands para OpenCode ou Codex (sem mecanismo equivalente disponível)
+- Implementar capabilities inexistentes em runtimes.
+- Usar `.claude/` como fonte primária para OpenCode ou Codex.
+- Sincronização automática fora do fluxo `stage` → `install`.

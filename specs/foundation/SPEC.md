@@ -84,6 +84,8 @@ dadaia_workspace/
     public/
       __init__.py
       service.py
+      staging.py
+      doctor.py
     academy/
       __init__.py
       service.py
@@ -101,6 +103,11 @@ dadaia_workspace/
     public_assets.py
     python_env.py
   public/
+    agents/
+      architect-agent.md
+      product-auditor-agent.md
+      product-engineer-agent.md
+      soft-engineer-agent.md
     rules/
       dadaia-workspace-sdd-enforcer.md
       dadaia-workspace-spec-governance.md
@@ -118,12 +125,13 @@ dadaia_workspace/
       dadaia-workspace-refine-specs.md
       dadaia-academy.md
       dadaia-workspace-doctor.md
-    agents/
-      architect-agent.md
-      product-auditor-agent.md
-      product-engineer-agent.md
-      soft-engineer-agent.md
     scripts/
+    templates/
+      AGENTS.md
+      opencode.json
+      codex/
+        config.toml
+        hooks.json
     scaffold/
       constitution.md
       SPEC.md
@@ -165,6 +173,7 @@ The bootstrap flow shall create the following canonical subdirectories inside `.
 | Diretório | Tipo | Propósito |
 |---|---|---|
 | `.venv/` | Durável | Python environment isolado para automações do workspace |
+| `agentic/` | Gerado | Staging local dos assets públicos do pacote, com manifest e hashes |
 | `reports/` | Durável | Relatórios persistentes legíveis para humanos |
 | `scripts/` | Durável | Scripts de automação do workspace (ctx-inject.sh, watchdog, etc.) |
 | `states/` | Durável | Arquivos JSON de estado durável (`spec_contexts.json`, `primary_context.json`) |
@@ -179,7 +188,20 @@ The bootstrap flow shall create the following canonical subdirectories inside `.
 The project shall use Poetry as the only dependency and build manager.
 
 ### RF-ARCH-010: Contrato de artefatos de agente
-The versioned source of truth for product agent assets shall live directly in `dadaia_workspace/public/`. A repository-local `.claude/` directory shall not be part of the package architecture.
+The versioned source of truth for product agent assets shall live directly in `dadaia_workspace/public/`. Runtime projection directories (`.agents/`, `.claude/`, `.codex/`, `.opencode/`) shall not be part of the package authoring architecture.
+
+### RF-ARCH-010-B: Staging agentic gerado
+The workspace runtime shall stage package public assets in `<workspace-root>/.dadaia/agentic/` before installing runtime projections. The staging directory is generated state, not canonical source.
+
+### RF-ARCH-010-C: Projeções runtime-specific
+The public asset feature shall project staged assets into:
+- `.agents/skills/` for universal skills;
+- `.claude/` for Claude Code assets and supported hooks;
+- `.codex/` for Codex config, hooks, rules and shared skills;
+- `.opencode/` plus `opencode.json` for OpenCode native commands, skills, agents and instructions;
+- `AGENTS.md` for universal workspace instructions.
+
+Unsupported runtime capabilities shall be reported as `unsupported` by doctor instead of emulated as false parity.
 
 ### RF-ARCH-011: CLI-first para automação por agentes
 The implementation shall treat the official `dadaia` CLI as the primary integration boundary for human and agent automation, with granular help at the root command, command-group, and subcommand levels.
@@ -280,8 +302,8 @@ dadaia = "dadaia_workspace.cli.main:app"
 ### RF-BUILD-002: Public assets empacotados
 The package shall include the contents of `dadaia_workspace/public/` in the built distribution, including `dadaia_workspace/public/data/repos.xlsx`.
 
-### RF-BUILD-003: `.claude/` é somente runtime do workspace
-The repository shall not contain a product-local `.claude/` directory.
+### RF-BUILD-003: Diretórios de projeção são somente runtime do workspace
+The repository shall not contain product-local `.agents/`, `.claude/`, `.codex/`, or `.opencode/` directories as authoring sources.
 
 ---
 

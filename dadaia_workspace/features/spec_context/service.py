@@ -1,265 +1,233 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
-    GitOperationError,
+    GitSyncError,
 )
-from dadaia_workspace.core.models.spec_context import (
-    ContextRepositoryRef,
-    ContextState,
-    RepoRole,
-    SpecContextProject,
-    detect_source_kind,
-    derive_repo_slug,
-)
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
-from dadaia_workspace.core.protocols.repositories import SpecContextRepository
+from dadaia_workspace.core.protocols.primary_context_store import PrimaryContextStore
+
+# Canonical scaffold source — lives inside the installed package
+_PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
+_SCAFFOLD_SRC = _PUBLIC_DIR / "scaffold"
+
+
+def _now() -> str:
+    return datetime.now(tz=UTC).isoformat()
 
 
 class SpecContextService:
     def __init__(
         self,
-        repo: SpecContextRepository,
-        git: GitClient,
+        context_store: ContextStore,
+        primary_store: PrimaryContextStore,
+        git_client: GitClient,
         workspace_root: Path,
     ) -> None:
-        self._repo = repo
-        self._git = git
+        self._store = context_store
+        self._primary = primary_store
+        self._git = git_client
         self._workspace_root = workspace_root
 
-    def _contexts_dir(self) -> Path:
-        return self._workspace_root / ".dadaia" / "contexts"
+    def _repos_dir(self) -> Path:
+        return self._workspace_root / "repos"
 
-    def _make_repo_ref(self, repo_ref: str, role: RepoRole) -> ContextRepositoryRef:
-        source_kind = detect_source_kind(repo_ref)
-        slug = derive_repo_slug(repo_ref)
-        return ContextRepositoryRef(
-            repo_ref=repo_ref,
-            role=role,
-            source_kind=source_kind,
-            repo_slug=slug,
-        )
+    def _repo_path(self, repo_slug: str) -> Path:
+        return self._repos_dir() / repo_slug
+
+    def _specs_dir(self, repo_slug: str) -> Path:
+        return self._repo_path(repo_slug) / "specs"
+
+    def _has_primary(self) -> bool:
+        return any(c.is_primary for c in self._store.list_all())
 
     # ------------------------------------------------------------------ create
 
-    def create(
-        self,
-        name: str,
-        primary_ref: str,
-        secondary_refs: list[str] | None = None,
-    ) -> SpecContextProject:
-        if self._repo.get_by_name(name) is not None:
+    def create(self, name: str, repo_slug: str, repo_url: str) -> SpecContextProject:
+        if self._store.get(name) is not None:
             raise ContextAlreadyExistsError(
                 f"Context '{name}' already exists. Use a different name."
             )
-        primary = self._make_repo_ref(primary_ref, RepoRole.PRIMARY)
-        secondaries = tuple(
-            self._make_repo_ref(ref, RepoRole.SECONDARY)
-            for ref in (secondary_refs or [])
-        )
         ctx = SpecContextProject(
             name=name,
             state=ContextState.INATIVO,
-            primary_repo=primary,
-            secondary_repos=secondaries,
+            repo_slug=repo_slug,
+            repo_url=repo_url,
+            is_primary=False,
+            created_at=_now(),
+            activated_at=None,
         )
-        self._repo.save(ctx)
+        self._store.save(ctx)
         return ctx
 
     # ------------------------------------------------------------------ list / show
 
     def list_all(self) -> list[SpecContextProject]:
-        return self._repo.list_all()
+        return self._store.list_all()
 
-    def show(self, name: str | None = None) -> SpecContextProject | None:
-        if name is not None:
-            return self._repo.get_by_name(name)
-        return self._repo.get_active()
+    def show(self, name: str) -> SpecContextProject:
+        ctx = self._store.get(name)
+        if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        return ctx
 
     # ------------------------------------------------------------------ activate
 
     def activate(self, name: str) -> SpecContextProject:
-        ctx = self._repo.get_by_name(name)
+        ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
 
-        context_dir = self._contexts_dir() / name
-        all_repos = [ctx.primary_repo, *ctx.secondary_repos]
+        # Clone if repo not on disk
+        repo_path = self._repo_path(ctx.repo_slug)
+        if not repo_path.exists():
+            self._git.clone(ctx.repo_url, repo_path)
 
-        if ctx.state == ContextState.INATIVO:
-            # Materialize: clone all repos
-            context_dir.mkdir(parents=True, exist_ok=True)
-            repos_dir = context_dir / "repos"
-            materialized_repos: list[ContextRepositoryRef] = []
-            for repo in all_repos:
-                target = repos_dir / repo.repo_slug
-                self._git.clone(repo.repo_ref, target)
-                specs_dir_candidate = target / "specs"
-                has_specs = specs_dir_candidate.exists()
-                materialized_repos.append(ContextRepositoryRef(
-                    repo_ref=repo.repo_ref,
-                    role=repo.role,
-                    source_kind=repo.source_kind,
-                    repo_slug=repo.repo_slug,
-                    materialized_path=target,
-                    has_specs_dir=has_specs,
-                ))
-        else:
-            # STANDBY: repos already have materialized_path persisted in db
-            materialized_repos = list(all_repos)
-            # Reconcile context_dir from persisted value if available
-            context_dir = ctx.context_dir if ctx.context_dir else context_dir
+        # Scaffold specs/ if absent
+        specs_dir = self._specs_dir(ctx.repo_slug)
+        if not specs_dir.exists():
+            if _SCAFFOLD_SRC.exists():
+                shutil.copytree(_SCAFFOLD_SRC, specs_dir)
+            else:
+                for subdir in ("", "memory", "features", "foundation"):
+                    (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
 
-        primary_mat = next(r for r in materialized_repos if r.role == RepoRole.PRIMARY)
-        specs_dir = (
-            primary_mat.materialized_path / "specs"
-            if primary_mat.materialized_path and primary_mat.has_specs_dir
-            else None
-        )
+        # Copy repo-AGENTS.md template if not already present
+        repo_agents_dst = repo_path / "AGENTS.md"
+        repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
+        if not repo_agents_dst.exists() and repo_agents_src.exists():
+            shutil.copy2(repo_agents_src, repo_agents_dst)
 
-        # Warn if specs directory is missing or incomplete
-        if specs_dir and specs_dir.exists():
-            if not (specs_dir / "constitution.md").exists():
-                import warnings
-                warnings.warn(
-                    f"Context '{name}': specs/ directory is missing constitution.md",
-                    stacklevel=2,
-                )
-        elif specs_dir:
-            import warnings
-            warnings.warn(
-                f"Context '{name}': primary repo has no specs/ directory",
-                stacklevel=2,
-            )
-
-        # Move current ATIVO → STANDBY atomically
-        current_active = self._repo.get_active()
-        if current_active is not None and current_active.name != name:
-            standby = SpecContextProject(
-                name=current_active.name,
-                state=ContextState.STANDBY,
-                primary_repo=current_active.primary_repo,
-                secondary_repos=current_active.secondary_repos,
-                context_dir=current_active.context_dir,
-                specs_dir=current_active.specs_dir,
-            )
-            self._repo.update(standby)
-
-        new_ctx = SpecContextProject(
-            name=name,
+        activated = SpecContextProject(
+            name=ctx.name,
             state=ContextState.ATIVO,
-            primary_repo=materialized_repos[0],
-            secondary_repos=tuple(materialized_repos[1:]),
-            context_dir=context_dir,
-            specs_dir=specs_dir,
+            repo_slug=ctx.repo_slug,
+            repo_url=ctx.repo_url,
+            is_primary=ctx.is_primary,
+            created_at=ctx.created_at,
+            activated_at=_now(),
         )
-        self._repo.update(new_ctx)
-        return new_ctx
+        self._store.update(activated)
+
+        # Auto-promote if no primary exists yet
+        if not self._has_primary():
+            self._promote_to_primary(activated)
+            ctx_after = self._store.get(name)
+            if ctx_after is not None:
+                return ctx_after
+
+        return activated
 
     # ------------------------------------------------------------------ deactivate
 
-    def deactivate(self) -> SpecContextProject:
-        ctx = self._repo.get_active()
+    def deactivate(self, name: str) -> SpecContextProject:
+        ctx = self._store.get(name)
         if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        if ctx.state != ContextState.ATIVO:
+            raise ContextStateError(f"Context '{name}' is not active. It cannot be deactivated.")
+        if ctx.is_primary:
             raise ContextStateError(
-                "No context is currently active. Use 'dadaia context list' to see available contexts."
+                f"Context '{name}' is the primary context and cannot be deactivated. "
+                "Promote another context first with 'dadaia context promote <name>'."
             )
-        standby = SpecContextProject(
+
+        repo_path = self._repo_path(ctx.repo_slug)
+        if repo_path.exists():
+            if self._git.is_dirty(repo_path):
+                try:
+                    self._git.commit_all(repo_path, "chore: auto-sync before deactivate")
+                except GitSyncError as exc:
+                    raise GitSyncError(
+                        f"Git sync failed for context '{name}' at '{repo_path}'. "
+                        "Resolve the issue and retry deactivate."
+                    ) from exc
+            if self._git.has_remote(repo_path):
+                try:
+                    self._git.push(repo_path)
+                except GitSyncError as exc:
+                    raise GitSyncError(
+                        f"Git push failed for context '{name}' at '{repo_path}'. "
+                        "Resolve the issue and retry deactivate."
+                    ) from exc
+            shutil.rmtree(repo_path)
+
+        inactive = SpecContextProject(
             name=ctx.name,
-            state=ContextState.STANDBY,
-            primary_repo=ctx.primary_repo,
-            secondary_repos=ctx.secondary_repos,
-            context_dir=ctx.context_dir,
-            specs_dir=ctx.specs_dir,
+            state=ContextState.INATIVO,
+            repo_slug=ctx.repo_slug,
+            repo_url=ctx.repo_url,
+            is_primary=False,
+            created_at=ctx.created_at,
+            activated_at=None,
         )
-        self._repo.update(standby)
-        return standby
+        self._store.update(inactive)
+        return inactive
+
+    # ------------------------------------------------------------------ promote
+
+    def promote(self, name: str) -> SpecContextProject:
+        ctx = self._store.get(name)
+        if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        if ctx.state != ContextState.ATIVO:
+            raise ContextStateError(
+                f"Context '{name}' must be active before it can be promoted. "
+                "Run 'dadaia context activate {name}' first."
+            )
+        if ctx.is_primary:
+            return ctx  # already primary — idempotent
+
+        # Demote current primary (if any)
+        for existing in self._store.list_all():
+            if existing.is_primary:
+                demoted = SpecContextProject(
+                    name=existing.name,
+                    state=existing.state,
+                    repo_slug=existing.repo_slug,
+                    repo_url=existing.repo_url,
+                    is_primary=False,
+                    created_at=existing.created_at,
+                    activated_at=existing.activated_at,
+                )
+                self._store.update(demoted)
+
+        return self._promote_to_primary(ctx)
+
+    def _promote_to_primary(self, ctx: SpecContextProject) -> SpecContextProject:
+        promoted = SpecContextProject(
+            name=ctx.name,
+            state=ctx.state,
+            repo_slug=ctx.repo_slug,
+            repo_url=ctx.repo_url,
+            is_primary=True,
+            created_at=ctx.created_at,
+            activated_at=ctx.activated_at,
+        )
+        self._store.update(promoted)
+        self._primary.write(
+            name=promoted.name,
+            repo_slug=promoted.repo_slug,
+            specs_dir=self._specs_dir(promoted.repo_slug),
+        )
+        return promoted
 
     # ------------------------------------------------------------------ delete
 
     def delete(self, name: str) -> None:
-        ctx = self._repo.get_by_name(name)
+        ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         if ctx.state == ContextState.ATIVO:
             raise ContextStateError(
-                f"Context '{name}' is active. Run 'dadaia context deactivate' before deleting."
+                f"Context '{name}' is active. Run 'dadaia context deactivate {name}' before deleting."
             )
-        if ctx.state == ContextState.STANDBY:
-            self._sync_and_remove(ctx)
-        else:
-            # INATIVO: just remove metadata
-            self._repo.delete(name)
-
-    def _sync_and_remove(self, ctx: SpecContextProject) -> None:
-        all_repos = [ctx.primary_repo, *ctx.secondary_repos]
-        errors: list[str] = []
-        for repo in all_repos:
-            if repo.materialized_path is None or not repo.materialized_path.exists():
-                continue
-            try:
-                if self._git.has_changes(repo.materialized_path):
-                    self._git.commit_all(repo.materialized_path, f"chore: sync before delete context '{ctx.name}'")
-                if self._git.has_remote(repo.materialized_path):
-                    self._git.push(repo.materialized_path)
-            except GitOperationError as e:
-                errors.append(str(e))
-
-        if errors:
-            raise GitOperationError(
-                f"Context '{ctx.name}' sync failed — local files preserved.\n"
-                + "\n".join(errors)
-            )
-
-        # Only remove after all syncs succeeded
-        if ctx.context_dir and ctx.context_dir.exists():
-            shutil.rmtree(ctx.context_dir)
-        self._repo.delete(ctx.name)
-
-    # ------------------------------------------------------------------ add/remove repo
-
-    def add_repo(self, name: str, repo_ref: str) -> SpecContextProject:
-        ctx = self._repo.get_by_name(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-        all_refs = {ctx.primary_repo.repo_ref} | {r.repo_ref for r in ctx.secondary_repos}
-        if repo_ref in all_refs:
-            raise ContextAlreadyExistsError(
-                f"Repo '{repo_ref}' is already associated with context '{name}'."
-            )
-        new_secondary = self._make_repo_ref(repo_ref, RepoRole.SECONDARY)
-        updated = SpecContextProject(
-            name=ctx.name,
-            state=ctx.state,
-            primary_repo=ctx.primary_repo,
-            secondary_repos=(*ctx.secondary_repos, new_secondary),
-            context_dir=ctx.context_dir,
-            specs_dir=ctx.specs_dir,
-        )
-        self._repo.update(updated)
-        return updated
-
-    def remove_repo(self, name: str, repo_ref: str) -> SpecContextProject:
-        ctx = self._repo.get_by_name(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-        if ctx.primary_repo.repo_ref == repo_ref:
-            raise ContextStateError(
-                f"Cannot remove the primary repo from context '{name}'."
-            )
-        new_secondaries = tuple(r for r in ctx.secondary_repos if r.repo_ref != repo_ref)
-        updated = SpecContextProject(
-            name=ctx.name,
-            state=ctx.state,
-            primary_repo=ctx.primary_repo,
-            secondary_repos=new_secondaries,
-            context_dir=ctx.context_dir,
-            specs_dir=ctx.specs_dir,
-        )
-        self._repo.update(updated)
-        return updated
+        self._store.delete(name)

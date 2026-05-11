@@ -1,7 +1,6 @@
 """dadaia init command."""
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -12,7 +11,7 @@ console = Console()
 app = typer.Typer()
 
 
-def _resolve_workspace(workspace: Optional[Path]) -> Path:
+def _resolve_workspace(workspace: Path | None) -> Path:
     if workspace:
         return workspace.resolve()
     # Walk up from CWD looking for .claude/ or .dadaia/
@@ -25,8 +24,10 @@ def _resolve_workspace(workspace: Optional[Path]) -> Path:
 
 @app.command()
 def init(
-    workspace: Optional[Path] = typer.Option(None, "--workspace", "-w", help="Workspace root path"),
-    skip_assets: bool = typer.Option(False, "--skip-assets", help="Skip installing public agent assets"),
+    workspace: Path | None = typer.Option(None, "--workspace", "-w", help="Workspace root path"),
+    skip_assets: bool = typer.Option(
+        False, "--skip-assets", help="Skip installing public agent assets"
+    ),
 ) -> None:
     """Bootstrap a dadaia workspace: creates .dadaia/ and installs agent assets into .claude/."""
     root = _resolve_workspace(workspace)
@@ -41,7 +42,9 @@ def init(
         console.print("[dim]Skipped public asset installation (--skip-assets)[/dim]")
     else:
         if installed:
-            console.print(f"[green]✓[/green] Installed {len(installed)} asset(s) into {root / '.claude'}")
+            console.print(
+                f"[green]✓[/green] Installed {len(installed)} asset(s) into {root / '.claude'}"
+            )
             for item in installed:
                 console.print(f"  {item}")
         else:

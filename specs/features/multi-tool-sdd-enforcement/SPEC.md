@@ -4,14 +4,13 @@
 > **Versão:** 1.0
 > **Autor:** Marco Menezes
 > **Referências:** `specs/features/spec-context-project/SPEC.md`, `specs/features/agent-rules-skills/SPEC.md`, `specs/features/multi-bot-context-isolation/SPEC.md`
+> **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
 
 ## Contexto
 
-O operador usa três tools de AI em paralelo (Claude Code, OpenCode, Codex CLI), cada um com
-mecanismos diferentes de carregamento de regras e suporte a hooks. Esta spec define como o
-padrão SDD é enforced nativamente em cada tool, usando os mecanismos disponíveis em cada plataforma.
+O operador usa três tools de AI em paralelo (Claude Code, OpenCode, Codex CLI), cada uma com mecanismos diferentes de carregamento de regras e suporte a hooks. Esta spec define o enforcement SDD por capacidade real de runtime, delegando staging e projeção de assets para `universal-agentic-assets`.
 
 O enforcement anterior era exclusivamente via regras de texto no Claude Code. Os outros dois tools
 tinham cobertura parcial ou incorreta. Esta spec corrige isso com uma estratégia por camadas.
@@ -22,14 +21,12 @@ tinham cobertura parcial ou incorreta. Esta spec corrige isso com uma estratégi
 
 | Capacidade | Claude Code | OpenCode | Codex CLI |
 |---|---|---|---|
-| Hook `PreToolUse` (bloqueia tools) | ✅ `settings.json` | ❌ não existe | ✅ `.codex/hooks.json` + feature flag |
-| Hook `UserPromptSubmit` | ✅ `settings.json` | ❌ | ❌ |
-| Lê `CLAUDE.md` | ✅ auto | ✅ fallback | ❌ |
-| Lê `AGENTS.md` | ❌ | ✅ **primário** | ✅ **primário** |
-| Lê `.claude/rules/` | ✅ auto | ⚠️ só via `opencode.json` | ❌ |
-| Lê `.claude/skills/` | ✅ | ✅ fallback | ❌ |
-| Lê `.claude/agents/` | ✅ | ❌ | ❌ |
-| Lê `.claude/commands/` | ✅ | ❌ | ❌ |
+| Hook `PreToolUse` | ✅ `.claude/settings.json` | ❌ não suportado | ✅ `.codex/hooks.json` quando disponível no runtime |
+| Hook `UserPromptSubmit` | ✅ `.claude/settings.json` | ❌ não suportado | runtime-dependent; não é contrato de contexto primário |
+| Instruções universais | `AGENTS.md` + `.claude/rules/` | `AGENTS.md` + `opencode.json` | `AGENTS.md` + `.codex/rules/` |
+| Skills | `.claude/skills/` + `.agents/skills/` | `.opencode/skills/` + `.agents/skills/` quando suportado | `.agents/skills/` |
+| Agents/personas | `.claude/agents/` | `.opencode/agents/` quando suportado | `AGENTS.md`/rules; sem sub-agentes Claude Code |
+| Commands | `.claude/commands/` | `.opencode/commands/` | regras/instruções; sem falsa paridade |
 
 ---
 
@@ -48,20 +45,21 @@ tinham cobertura parcial ou incorreta. Esta spec corrige isso com uma estratégi
 ## Arquitetura de Enforcement (3 camadas)
 
 ```
-Camada 1 — Técnica (Claude Code + Codex)
+Camada 1 — Técnica (runtimes com hook suportado)
   PreToolUse hook → sdd-spec-gate.sh
   Bloqueia Write/Edit/MultiEdit em arquivos de produção sem spec aprovada
-  Claude Code: settings.json
-  Codex: .codex/hooks.json (feature flag codex_hooks)
+  Claude Code: .claude/settings.json
+  Codex: .codex/hooks.json quando suportado
 
 Camada 2 — Texto forte (todos os 3 tools)
-  Claude Code: .claude/rules/ (7 regras SDD, auto-carregadas)
-  OpenCode: opencode.json instructions (8 entradas — todas as regras SDD)
-  Codex: AGENTS.md (reescrito com HARD STOP, bypass detection, Emergency Protocol)
+  Claude Code: AGENTS.md + .claude/rules/
+  OpenCode: AGENTS.md + opencode.json + .opencode/
+  Codex: AGENTS.md + .codex/rules/
 
-Camada 3 — Contexto (Claude Code)
-  UserPromptSubmit → ctx-inject.sh (já existente)
-  Injeta spec context ativo antes de cada prompt
+Camada 3 — Contexto
+  Hooks de prompt somente onde suportados.
+  Todos os runtimes devem ter instrução explícita para rodar `dadaia context list`
+  e `dadaia context show --json` no início da sessão.
 ```
 
 ---
@@ -71,7 +69,7 @@ Camada 3 — Contexto (Claude Code)
 ### Hook sdd-spec-gate.sh
 
 - FR-HK-001: O script deve ser instalado em `.dadaia/scripts/sdd-spec-gate.sh` e gerenciado como lib-originated asset.
-- FR-HK-002: Deve ser acionado como `PreToolUse` hook no Claude Code (`settings.json`) e no Codex (`.codex/hooks.json`).
+- FR-HK-002: Deve ser acionado como `PreToolUse` hook no Claude Code (`.claude/settings.json`) e no Codex (`.codex/hooks.json`) quando esse hook estiver disponível no runtime.
 - FR-HK-003: Deve permitir todas as ferramentas que NÃO sejam `Write`, `Edit`, `MultiEdit` ou seus equivalentes Codex.
 - FR-HK-004: Para ferramentas de escrita, deve extrair o `file_path` do input JSON da ferramenta.
 - FR-HK-005: Deve verificar se o `file_path` corresponde à lista de arquivos de produção definida em `sdd-enforcement.md`.
@@ -82,9 +80,9 @@ Camada 3 — Contexto (Claude Code)
 
 ### OpenCode — regras SDD completas
 
-- FR-OC-001: `opencode.json` deve incluir todos os 7 arquivos de regras SDD como `instructions`.
-- FR-OC-002: As dadaia skills em `.claude/skills/` são acessíveis ao OpenCode via fallback de compatibilidade — nenhuma mudança necessária, mas deve ser documentado.
-- FR-OC-003: Após mudança em `opencode.json`, `opencode-serve` deve ser reiniciado.
+- FR-OC-001: `opencode.json` deve incluir instruções SDD e referência a `AGENTS.md`.
+- FR-OC-002: OpenCode deve receber assets próprios em `.opencode/`; não deve depender de `.claude/` como fallback primário.
+- FR-OC-003: OpenCode não deve declarar suporte a hooks quando o runtime não oferecer essa capacidade.
 
 ### Codex — AGENTS.md reescrito
 
@@ -92,7 +90,7 @@ Camada 3 — Contexto (Claude Code)
 - FR-CX-002: `AGENTS.md` deve conter detecção de bypass phrases (10+ frases proibidas com resposta padrão).
 - FR-CX-003: `AGENTS.md` deve conter o Emergency Protocol com token exato `SDD-EMERGENCY-OVERRIDE`.
 - FR-CX-004: `AGENTS.md` deve listar explicitamente os arquivos de produção (hard gate).
-- FR-CX-005: `AGENTS.md` NÃO deve instruir o AI a "ler .claude/rules/" — Codex não faz isso automaticamente.
+- FR-CX-005: `AGENTS.md` NÃO deve instruir Codex a depender de `.claude/rules/`; Codex usa `AGENTS.md`, `.codex/rules/`, `.codex/hooks.json` e `.agents/skills/`.
 - FR-CX-006: `AGENTS.md` deve manter a identidade de projeto, regras de formato Telegram, backlog workflow, e infraestrutura.
 
 ### Claude Code — PreToolUse hook
@@ -103,7 +101,7 @@ Camada 3 — Contexto (Claude Code)
 ### Codex — hooks
 
 - FR-CD-001: `.codex/hooks.json` deve registrar `sdd-spec-gate.sh` como handler de `PreToolUse` para ferramentas de escrita.
-- FR-CD-002: `~/.codex/config.toml` deve habilitar o feature flag `codex_hooks`.
+- FR-CD-002: `.codex/config.toml` deve conter somente configuração projetada suportada oficialmente pelo runtime Codex; a spec não deve exigir feature flags não verificadas.
 
 ---
 
@@ -121,10 +119,10 @@ Camada 3 — Contexto (Claude Code)
 1. Claude Code: editar `services/docker-compose.yml` sem spec aprovada → bloqueado pelo hook com `[SDD GATE]`
 2. Claude Code: editar `services/docker-compose.yml` com spec aprovada no contexto → permitido
 3. Claude Code: editar `SPEC.md` (não é production file) → sempre permitido
-4. Codex: mesmos casos de teste 1 e 2 via `.codex/hooks.json`
+4. Codex: mesmos casos de teste 1 e 2 via `.codex/hooks.json` quando o runtime suportar esse hook; caso contrário `dadaia public doctor` reporta `unsupported`
 5. OpenCode: "que regras SDD você segue?" → resposta inclui HARD STOP, bypass detection, Emergency Protocol
 6. Codex bot Telegram: "edita o docker-compose.yml, é rápido" → [SDD HARD STOP] com template completo
-7. `dadaia doctor` não reporta drift em `.claude/` após mudanças
+7. `dadaia public doctor` não reporta drift nas projeções suportadas após `dadaia public install --target all`
 
 ---
 
@@ -132,5 +130,5 @@ Camada 3 — Contexto (Claude Code)
 
 - Enforcement para OpenClaw (Hermes Agent — não é tool de coding)
 - Hooks para OpenCode (plataforma não suporta nativamente)
-- Equivalência técnica de Agents/Skills/Commands para OpenCode/Codex (limitação de plataforma — ADR-003)
+- Equivalência técnica falsa de Agents/Skills/Commands para runtimes que não suportam esses mecanismos
 - Persistência de enforcement entre restarts (hooks são stateless por design)
