@@ -128,9 +128,12 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             reports.append("[missing] stage:manifest.json")
 
-        for expected_src, dst, label in self._runtime_expectations(agentic_dir, workspace_root):
+        for expected_src, dst, label, transform in self._runtime_expectations(agentic_dir, workspace_root):
             if expected_src is None:
                 reports.append(f"[unsupported] {label}")
+            elif transform:
+                content = _strip_tools_from_frontmatter(expected_src.read_text(encoding="utf-8"))
+                reports.append(self._compare_content(content, dst, label))
             else:
                 reports.append(self._compare(expected_src, dst, label))
 
@@ -275,46 +278,41 @@ class FileSystemPublicAssetManager:
 
     def _runtime_expectations(
         self, agentic_dir: Path, workspace_root: Path
-    ) -> Iterable[tuple[Path | None, Path, str]]:
+    ) -> Iterable[tuple[Path | None, Path, str, bool]]:
+        """Yield (src, dst, label, transform) tuples for doctor comparison.
+
+        transform=True means dst was produced by _strip_tools_from_frontmatter(src)
+        and must be compared by content rather than by SHA256 of the original src.
+        """
         agents_md = self._agents_md_source(agentic_dir)
         if agents_md is not None:
-            yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md")
+            yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md", False)
 
         for src in self._iter_files(agentic_dir / "skills"):
             rel = src.relative_to(agentic_dir / "skills")
-            yield (
-                src,
-                workspace_root / ".agents" / "skills" / rel,
-                f"agents:skills/{rel.as_posix()}",
-            )
+            yield (src, workspace_root / ".agents" / "skills" / rel, f"agents:skills/{rel.as_posix()}", False)
 
         for name in _CLAUDE_DIRS:
             base = agentic_dir / name
             for src in self._iter_files(base):
                 rel = src.relative_to(base)
-                yield (
-                    src,
-                    workspace_root / ".claude" / name / rel,
-                    f"claude:{name}/{rel.as_posix()}",
-                )
+                yield (src, workspace_root / ".claude" / name / rel, f"claude:{name}/{rel.as_posix()}", False)
 
         for src in self._iter_files(agentic_dir / "rules"):
             rel = src.relative_to(agentic_dir / "rules")
-            yield (src, workspace_root / ".codex" / "rules" / rel, f"codex:rules/{rel.as_posix()}")
+            yield (src, workspace_root / ".codex" / "rules" / rel, f"codex:rules/{rel.as_posix()}", False)
 
-        yield (None, workspace_root / ".codex" / "agents", "codex:agents")
+        yield (None, workspace_root / ".codex" / "agents", "codex:agents", False)
 
         for name in _OPENCODE_DIRS:
             base = agentic_dir / name
             for src in self._iter_files(base):
                 rel = src.relative_to(base)
-                yield (
-                    src,
-                    workspace_root / ".opencode" / name / rel,
-                    f"opencode:{name}/{rel.as_posix()}",
-                )
+                # OpenCode agents have tools: stripped — compare transformed content
+                is_opencode_agent = name == "agents"
+                yield (src, workspace_root / ".opencode" / name / rel, f"opencode:{name}/{rel.as_posix()}", is_opencode_agent)
 
-        yield (None, workspace_root / ".opencode" / "hooks", "opencode:hooks")
+        yield (None, workspace_root / ".opencode" / "hooks", "opencode:hooks", False)
 
     def _agents_md_source(self, agentic_dir: Path) -> Path | None:
         for path in (agentic_dir / "templates" / "AGENTS.md", agentic_dir / "data" / "AGENTS.md"):
