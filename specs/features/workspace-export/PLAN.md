@@ -96,15 +96,20 @@ class ExportService:
 | `.dadaia/states/` | `.dadaia/states/` | sempre |
 | `.dadaia/academy/` | `.dadaia/academy/` | sempre |
 | `.dadaia/scripts/` | `.dadaia/scripts/` | sempre |
+| `.dadaia/agentic/manifest.json` | `.dadaia/agentic/manifest.json` | se existir |
 | `.dadaia/src/` | `.dadaia/src/` | sempre |
 | `.dadaia/reports/` | `.dadaia/reports/` | `--include-reports` |
 | `CLAUDE.md` | `CLAUDE.md` | sempre (se existir) |
 | `AGENTS.md` | `AGENTS.md` | sempre (se existir) |
 | `opencode.json` | `opencode.json` | sempre (se existir) |
+| `.agents/skills/` | `.agents/skills/` | sempre (se existir) |
 | `.claude/settings.json` | `.claude/settings.json` | sempre (se existir) |
 | `.claude/settings.local.json` | `.claude/settings.local.json` | se existir |
 | `.claude/rules/` | `.claude/rules/` | sempre (se existir) |
+| `.codex/config.toml` | `.codex/config.toml` | se existir |
 | `.codex/hooks.json` | `.codex/hooks.json` | se existir |
+| `.codex/rules/` | `.codex/rules/` | se existir |
+| `.opencode/` | `.opencode/` | se existir |
 | `mnt/` | `mnt/` | se existir e não `--exclude-mnt` |
 
 ---

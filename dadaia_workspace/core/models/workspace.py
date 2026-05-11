@@ -7,19 +7,11 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Workspace:
     root: Path
-    dadaia_dir: Path      # root/.dadaia/
-    claude_dir: Path      # root/.claude/
-    repos_dir: Path       # root/repos/
+    dadaia_dir: Path  # root/.dadaia/
+    claude_dir: Path  # root/.claude/
+    repos_dir: Path  # root/repos/
 
     # Durable subdirs
-    @property
-    def contexts_dir(self) -> Path:
-        return self.dadaia_dir / "contexts"
-
-    @property
-    def data_dir(self) -> Path:
-        return self.dadaia_dir / "data"
-
     @property
     def reports_dir(self) -> Path:
         return self.dadaia_dir / "reports"

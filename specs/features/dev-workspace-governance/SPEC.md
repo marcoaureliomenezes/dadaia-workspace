@@ -4,6 +4,7 @@
 > **Versão:** 1.0
 > **Autor:** Marco Menezes
 > **Referências:** `specs/constitution.md`, `specs/features/agent-rules-skills/SPEC.md`, `specs/memory/architecture.md`
+> **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
 
@@ -16,8 +17,8 @@ O dadaia-workspace é desenvolvido dentro de um dadaia-workspace — o "paradoxo
 
 Isso cria dois pontos de falha específicos que precisam de governança explícita:
 
-**Ponto 1 — `.claude/` com assets de duas origens:**
-O `.claude/` do workspace de DEV contém assets lib-originated (fonte canônica em `dadaia_workspace/public/`) e assets projeto-específicos (ex: `security-first.md`, `sdd-enforcement.md`). Editar diretamente um asset lib-originated em `.claude/` cria drift silencioso — a lib evolui mas o workspace fica com versão stale do asset.
+**Ponto 1 — projeções runtime com assets de duas origens:**
+O workspace de DEV contém assets lib-originated em `.agents/`, `.claude/`, `.codex/` e `.opencode/` (fonte canônica em `dadaia_workspace/public/`, staged em `.dadaia/agentic/`) e assets projeto-específicos. Editar diretamente um asset lib-originated em qualquer projeção runtime cria drift silencioso — a lib evolui mas o workspace fica com versão stale do asset.
 
 **Ponto 2 — `.dadaia/states/*.json` pode ficar inconsistente:**
 Quando a lib evolui e o schema dos Python models muda (ex: campo renomeado, campo novo, campo removido), os JSON de estado do workspace ficam com schema antigo. A estratégia escolhida é estados plain-JSON auto-reparáveis por agente de AI, sem migrations ou versioning explícito. Não se usa SQLite nem migration scripts — essa abordagem gera slope code e tornou-se inviável em experimentos anteriores.
@@ -28,11 +29,11 @@ Quando a lib evolui e o schema dos Python models muda (ex: campo renomeado, camp
 
 | Termo | Definição |
 |---|---|
-| **Asset lib-originated** | Arquivo em `.claude/` cujo path relativo existe em `dadaia_workspace/public/` — fonte canônica é a lib |
-| **Asset projeto-específico** | Arquivo em `.claude/` que não existe em `dadaia_workspace/public/` — gerenciado pelo operador |
+| **Asset lib-originated** | Arquivo em `.agents/`, `.claude/`, `.codex/` ou `.opencode/` cujo path relativo é gerado a partir de `dadaia_workspace/public/` via `.dadaia/agentic/` |
+| **Asset projeto-específico** | Arquivo em projeção runtime que não existe no manifest staged — gerenciado pelo operador |
 | **Schema drift** | Divergência entre campos em um `.dadaia/states/*.json` e os frozen dataclasses em `core/models/` |
-| **Lib drift** | Divergência de conteúdo entre um asset lib-originated em `.claude/` e sua versão canônica em `dadaia_workspace/public/` |
-| **Dev guardrail** | Rule sempre ativa que proíbe edição direta de assets lib-originated em `.claude/` |
+| **Lib drift** | Divergência de conteúdo entre package source, `.dadaia/agentic/` e projeções runtime |
+| **Dev guardrail** | Rule sempre ativa que proíbe edição direta de assets lib-originated em runtime projections |
 | **Doctor** | Skill + command de diagnóstico e reparo operacional do workspace |
 
 ---
@@ -42,22 +43,22 @@ Quando a lib evolui e o schema dos Python models muda (ex: campo renomeado, camp
 ### US-001: Guardrail contra edição direta de assets lib-originated
 
 - **Como** agente de IA trabalhando no workspace de DEV
-- **Quero** ser impedido de editar diretamente assets lib-originated em `.claude/`
+- **Quero** ser impedido de editar diretamente assets lib-originated em `.agents/`, `.claude/`, `.codex/` ou `.opencode/`
 - **Para** que a fonte canônica da lib nunca seja bypassada por edições locais silenciosas
 
 **Critérios de Aceite:**
-- Dado um pedido para editar um arquivo em `.claude/rules/`, `.claude/skills/`, `.claude/commands/` ou `.claude/agents/`, quando esse arquivo existe em `dadaia_workspace/public/` com o mesmo path relativo, então o agente recusa a edição direta e instrui: editar em `dadaia_workspace/public/<path>` e executar `dadaia public install`
-- Dado um pedido para editar um asset projeto-específico (não presente em `dadaia_workspace/public/`), quando o agente verifica, então a edição direta em `.claude/` é permitida
+- Dado um pedido para editar um arquivo lib-originated em runtime projections, quando esse arquivo existe no manifest staged, então o agente recusa a edição direta e instrui: editar em `dadaia_workspace/public/<path>`, executar `dadaia public stage` e `dadaia public install`
+- Dado um pedido para editar um asset projeto-específico (não presente no manifest staged), quando o agente verifica, então a edição direta é permitida
 
 ### US-002: Detecção de lib drift no workspace
 
 - **Como** engenheiro de DEV
-- **Quero** saber quais assets em `.claude/` estão divergindo da versão canônica na lib
+- **Quero** saber quais assets staged ou projetados estão divergindo da versão canônica na lib
 - **Para** executar `dadaia public install` e sincronizar antes de trabalhar
 
 **Critérios de Aceite:**
-- Dado que a skill `dadaia-workspace-doctor` é invocada, quando ela executa a Fase 1, então ela compara cada arquivo de `dadaia_workspace/public/` com o correspondente em `.claude/` e produz uma tabela com status: `ok`, `drift` ou `missing`
-- Dado drift detectado, quando a fase conclui, então a skill exibe o diff e recomenda `dadaia public install --force` sem escrever em `.claude/`
+- Dado que `dadaia public doctor` ou a skill `dadaia-workspace-doctor` é invocada, quando ela executa a Fase 1, então ela compara package source, `.dadaia/agentic/` e projeções runtime e produz status `ok`, `missing`, `drift` ou `unsupported`
+- Dado drift detectado, quando a fase conclui, então a skill exibe o diff e recomenda `dadaia public stage` ou `dadaia public install --force` sem escrever nas projeções runtime
 
 ### US-003: Reparo de JSON state com schema stale
 
@@ -79,7 +80,7 @@ Quando a lib evolui e o schema dos Python models muda (ex: campo renomeado, camp
 - **Para** focar no problema específico sem executar o fluxo completo
 
 **Critérios de Aceite:**
-- Dado `/dadaia-workspace-doctor lib`, quando o command executa, então só a Fase 1 (lib vs .claude) é executada
+- Dado `/dadaia-workspace-doctor lib`, quando o command executa, então só a Fase 1 (package vs staging vs runtime projections) é executada
 - Dado `/dadaia-workspace-doctor state`, quando o command executa, então só a Fase 2 (JSON migration) é executada
 - Dado `/dadaia-workspace-doctor` sem argumento, quando o command executa, então todas as fases são executadas em sequência
 
@@ -90,9 +91,9 @@ Quando a lib evolui e o schema dos Python models muda (ex: campo renomeado, camp
 ### Dev Guardrail Rule
 - FR-001: The system shall provide an always-on rule named `dadaia-workspace-dev-guardrail` in `dadaia_workspace/public/rules/`.
 - FR-002: The `dadaia-workspace-dev-guardrail` rule shall instruct the agent to identify lib-originated assets by checking whether the asset's relative path exists in `dadaia_workspace/public/` (located via `python -c "import dadaia_workspace; print(dadaia_workspace.__file__)"` and resolving to the package root).
-- FR-003: The `dadaia-workspace-dev-guardrail` rule shall instruct the agent to never directly edit a lib-originated asset in `.claude/`. The only allowed path is: edit in `dadaia_workspace/public/<relative-path>` → run `dadaia public install`.
+- FR-003: The `dadaia-workspace-dev-guardrail` rule shall instruct the agent to never directly edit a lib-originated asset in `.agents/`, `.claude/`, `.codex/` or `.opencode/`. The only allowed path is: edit in `dadaia_workspace/public/<relative-path>` → run `dadaia public stage` → run `dadaia public install`.
 - FR-004: If lib drift is detected during any task, the rule shall instruct the agent to report the drift and recommend `dadaia public install --force` before continuing.
-- FR-005: Project-specific assets — files in `.claude/` with no counterpart in `dadaia_workspace/public/` — may be freely edited directly.
+- FR-005: Project-specific assets — files in runtime projections with no counterpart in the staged manifest — may be freely edited directly.
 
 ### Doctor Skill — Phase 0: Workspace Identification
 - FR-006: The system shall provide a skill named `dadaia-workspace-doctor` in `dadaia_workspace/public/skills/dadaia-workspace-doctor/SKILL.md`.
@@ -100,10 +101,10 @@ Quando a lib evolui e o schema dos Python models muda (ex: campo renomeado, camp
 - FR-008: Phase 0 shall list and read all `*.json` files in `<workspace-root>/.dadaia/states/` before proceeding.
 
 ### Doctor Skill — Phase 1: Lib vs Installed Drift
-- FR-009: Phase 1 shall iterate all files under `<lib-root>/public/{rules,skills,commands,agents}/` and compare each with its counterpart in `<workspace-root>/.claude/<type>/`.
-- FR-010: For each asset, Phase 1 shall report one of three statuses: `ok` (identical), `drift` (exists but differs), or `missing` (not installed).
+- FR-009: Phase 1 shall iterate all files under `<lib-root>/public/`, compare them with `.dadaia/agentic/`, and compare supported runtime projections.
+- FR-010: For each asset, Phase 1 shall report one of four statuses: `ok` (identical), `drift` (exists but differs), `missing` (not installed), or `unsupported` (runtime lacks the capability).
 - FR-011: For assets with `drift` status, Phase 1 shall display a concise diff.
-- FR-012: Phase 1 shall never write to `.claude/`. All remediation is performed by the operator via `dadaia public install [--force]`.
+- FR-012: Phase 1 shall never write to runtime projections. All remediation is performed by the operator via `dadaia public stage` and `dadaia public install [--force]`.
 
 ### Doctor Skill — Phase 2: JSON State Migration
 - FR-013: Phase 2 shall read each `*.json` in `.dadaia/states/` and identify its corresponding Python frozen dataclass(es) in `core/models/`.
@@ -131,7 +132,7 @@ Quando a lib evolui e o schema dos Python models muda (ex: campo renomeado, camp
 ## Requisitos Não-Funcionais
 
 - NFR-001: [Integridade] Phase 2 repair shall never cause data loss. If a write fails, the original JSON must be intact.
-- NFR-002: [Segurança] The doctor skill shall never write to `.claude/`. Only the operator, via `dadaia public install`, may modify lib-originated assets.
+- NFR-002: [Segurança] The doctor skill shall never write to runtime projections. Only the operator, via `dadaia public install`, may modify lib-originated assets.
 - NFR-003: [Diagnóstico] Phase 1 and Phase 2 shall always report their findings before applying any change, allowing the operator to review.
 - NFR-004: [Leveza] JSON state files shall remain human-readable plain text. No embedded versioning, migration logs, or schema metadata shall be added to state files.
 - NFR-005: [Manutenibilidade] The migration logic in Phase 2 is driven by reading current Python models and spec examples — no separate migration scripts or migration tables are maintained.

@@ -111,6 +111,13 @@ O **Spec Context Project** é a entidade central do dadaia-workspace. Representa
 - Dado `DADAIA_CONTEXT=<name>` definido antes de iniciar o agente, quando o hook `UserPromptSubmit` dispara, então o contexto injetado é o do env var, não o de `primary_context.json`.
 - A env var não altera `spec_contexts.json` nem `primary_context.json`.
 
+### US-009: Isolar sessão de terminal via CLI ergonômica
+
+**Critérios de Aceite:**
+- Dado um operador abrindo uma nova sessão de terminal, quando executa `eval $(dadaia context use <name>)`, então `DADAIA_CONTEXT` fica definida para aquela sessão de shell sem alterar o estado global.
+- Dado um nome inexistente, quando executa `dadaia context use <name>`, então o sistema rejeita com erro e lista os contextos disponíveis.
+- Dado que múltiplas sessões usam `eval $(dadaia context use <name>)` com nomes diferentes, cada sessão vê apenas seu próprio contexto no hook `UserPromptSubmit`.
+
 ---
 
 ## Requisitos Funcionais
@@ -175,13 +182,17 @@ O **Spec Context Project** é a entidade central do dadaia-workspace. Representa
 
 ### Hook e Isolamento de Sessão
 
-- FR-033: `ctx-inject.sh` shall check `DADAIA_CONTEXT` env var before reading `primary_context.json`. If set, use `repos/<DADAIA_CONTEXT>/specs/`.
+- FR-033: `ctx-inject.sh` shall check `DADAIA_CONTEXT` env var before reading `primary_context.json`. If set, output `[<name>]` (context name found) or `[<name>] WARNING: specs not found` (context name set but specs dir absent). If not set, read `primary_context.json` and output `[<name>]` when found, or `[context: none] — run: eval $(dadaia context use <name>)` when absent.
 - FR-034: Session-level override via `DADAIA_CONTEXT` shall not modify `spec_contexts.json` or `primary_context.json`.
 - FR-034-B: `dadaia context show --json` shall always read from `spec_contexts.json` and `primary_context.json`, ignoring the `DADAIA_CONTEXT` environment variable. The env var is exclusive to `ctx-inject.sh`.
 
+### Isolamento via CLI
+
+- FR-037: `dadaia context use <name>` shall validate that the context exists in `spec_contexts.json`, then write `export DADAIA_CONTEXT=<name>` to stdout. It shall not modify `spec_contexts.json` or `primary_context.json`. When the context does not exist, it shall exit with an error message listing available contexts.
+
 ### CLI Help
 
-- FR-035: `dadaia context --help` shall list exactly: `create`, `list`, `show`, `activate`, `deactivate`, `promote`, and `delete`.
+- FR-035: `dadaia context --help` shall list exactly: `create`, `list`, `show`, `activate`, `deactivate`, `promote`, `delete`, and `use`.
 - FR-036: Each subcommand shall have dedicated help text documenting preconditions and expected outcomes.
 
 ---

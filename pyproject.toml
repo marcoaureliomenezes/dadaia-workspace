@@ -31,7 +31,11 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"dadaia_workspace/cli/commands/*.py" = ["B904"]
+"dadaia_workspace/cli/commands/repos.py" = ["SIM118"]
 
 [tool.mypy]
 python_version = "3.12"

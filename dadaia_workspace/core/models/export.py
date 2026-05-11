@@ -18,8 +18,8 @@ class ExportManifest:
     exported_at: str
     workspace_root: str
     dadaia_version: str
-    contexts: tuple  # tuple[dict] — frozen-compatible
-    includes: tuple  # tuple[str] of archive-relative names
+    contexts: tuple[dict[str, object], ...]
+    includes: tuple[str, ...]
     mnt_included: bool
     reports_included: bool
     total_size_bytes: int

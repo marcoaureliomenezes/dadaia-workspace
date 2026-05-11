@@ -21,7 +21,7 @@ Resolvido na v4.0: `deactivate <name>` é a única forma suportada. Não há fal
 
 ### GAP-003 — Escopo de instalação do `/spec-context` por bot ✅ FECHADO
 
-Resolvido: Claude Code, Opencode e Codex lêem de `<workspace-root>/.claude/commands/`. O comando `dadaia public install` instala para esse diretório canônico. Documentado em `spec-context-agent-command/SPEC.md` v3.0.
+Resolvido novamente em 2026-05-09: commands são projetados para diretórios nativos por runtime. Claude Code usa `.claude/commands/`; OpenCode usa `.opencode/commands/` quando suportado; runtimes sem command support recebem instrução equivalente via `AGENTS.md`/rules e são reportados como `unsupported` pelo doctor. Documentado em `spec-context-agent-command/SPEC.md` e `universal-agentic-assets/SPEC.md`.
 
 ### GAP-004 — Alias `/ctx` para `/spec-context` ✅ FECHADO
 

@@ -2,12 +2,12 @@
 
 ## O que é
 
-**dadaia-workspace** é uma biblioteca Python com CLI para criar um workspace AI-native guiado por SDD. O produto organiza:
+**dadaia-workspace** é uma biblioteca Python com CLI para criar um workspace AI-native multi-runtime guiado por SDD. O produto organiza:
 
 - um workspace runtime fora do repositório da biblioteca;
 - o estado de Spec Context Projects em um arquivo JSON de fácil leitura e reparo;
 - o ciclo de vida de repositórios (clone ao ativar, sincronização e remoção ao desativar);
-- os artefatos de agente instalados no `.claude/` do workspace.
+- os artefatos de agente instalados para Claude Code, OpenCode e Codex a partir de uma fonte canônica comum.
 
 ---
 
@@ -29,15 +29,15 @@ O dadaia-workspace resolve isso com **Spec Context Projects** que registram, clo
 | Usuário | Como usa |
 |---|---|
 | Engenheiro de software | Inicializa workspace, cria contextos, ativa/desativa repos, promove primário, instala artefatos de agente |
-| Agente de IA | Descobre contexto primário via hook automático ou CLI estável, carrega specs, segue rules/skills instalados |
-| Mantenedor do produto | Versiona artefatos em `dadaia_workspace/public/`, valida extração para `.claude/` do workspace, governa o padrão SDD |
+| Agente de IA | Descobre contexto primário via hook suportado, `AGENTS.md` ou CLI estável, carrega specs, segue rules/skills instalados |
+| Mantenedor do produto | Versiona artefatos em `dadaia_workspace/public/`, valida staging em `.dadaia/agentic/`, valida projeções para `.agents/`, `.claude/`, `.codex/` e `.opencode/`, governa o padrão SDD |
 
 ---
 
 ## Conceitos Chave
 
 ### Workspace
-Diretório de trabalho do usuário, fora do repositório da biblioteca, inicializado por `dadaia init` com `.dadaia/` e `.claude/` prontos para uso.
+Diretório de trabalho do usuário, fora do repositório da biblioteca, inicializado por `dadaia init` com `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `AGENTS.md` e configs de runtime prontos para uso conforme as capacidades de cada ferramenta.
 
 ### Template `.dadaia`
 Estrutura canônica de runtime do workspace. Contém o JSON de estado, scripts de automação, whitelist de repos e a venv isolada do workspace.
@@ -67,13 +67,16 @@ O contexto primário é o único que o ambiente do workspace aponta automaticame
 Comando de diagnóstico e reparo do estado do workspace. Verifica se o estado em `spec_contexts.json` é consistente com o disco (repos presentes/ausentes, primary_context.json correto) e, com `--fix`, repara automaticamente o que conseguir.
 
 ### Artefatos de Agente
-Rules, skills e workflows versionados em `dadaia_workspace/public/` e instalados no workspace do usuário em `.claude/`. O repositório da biblioteca não mantém uma `.claude/` própria.
+Rules, skills, commands, agents, scripts e templates versionados em `dadaia_workspace/public/`, staged em `.dadaia/agentic/` e projetados para `.agents/`, `.claude/`, `.codex/`, `.opencode/` e `AGENTS.md`. O repositório da biblioteca não mantém diretórios runtime (`.agents/`, `.claude/`, `.codex/`, `.opencode/`) como fonte própria.
+
+### Staging Agentic
+Área gerada em `<workspace-root>/.dadaia/agentic/` por `dadaia public stage`. Contém uma cópia dos assets públicos do pacote instalado e um manifest com schema version, package version, hashes e timestamp. Pode ser recriada a qualquer momento a partir de `dadaia_workspace/public/`.
 
 ---
 
 ## Proposta de Valor
 
 - **Para o engenheiro:** ciclo de vida de repos controlado — sem repos desnecessários em disco; sem perda de dados na remoção.
-- **Para agentes de IA:** contexto primário injetado automaticamente em cada sessão; specs sempre na fonte canônica.
+- **Para agentes de IA:** contexto primário descoberto por contrato estável; specs sempre na fonte canônica; regras e skills disponíveis nos runtimes suportados.
 - **Para o produto:** estado simples em JSON — legível, reparável, sem dependências de banco de dados.
 - **Para operações:** `dadaia doctor` permite reparar estado corrompido sem recriar o workspace do zero.

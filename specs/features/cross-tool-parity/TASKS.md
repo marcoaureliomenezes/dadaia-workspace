@@ -4,6 +4,7 @@
 **Status:** Aprovado
 **PLAN:** `specs/features/cross-tool-parity/PLAN.md`
 **Data:** 2026-05-09
+**Consolidado por:** `specs/features/universal-agentic-assets/TASKS.md`
 
 ---
 
@@ -16,20 +17,18 @@
 
 ---
 
-## T01 — Criar `public/data/` e `public/data/AGENTS.md`
+## T01 — Criar template universal de `AGENTS.md` em `public/`
 
-**Objetivo:** criar o diretório `public/data/` e copiar o conteúdo atual do `AGENTS.md`
-do workspace root como template canônico.
+**Objetivo:** criar o template universal de `AGENTS.md` dentro de `dadaia_workspace/public/`, para staging em `.dadaia/agentic/` e projeção no workspace root.
 
 **Ação:**
 ```bash
-mkdir -p dadaia_workspace/public/data
-cp /home/ubuntu/workspace/AGENTS.md dadaia_workspace/public/data/AGENTS.md
+dadaia public stage
 ```
 
 **Verificação:**
 ```bash
-head -3 dadaia_workspace/public/data/AGENTS.md
+head -3 .dadaia/agentic/templates/AGENTS.md
 # deve mostrar: # dadaia Labs — AI Coding Assistant
 ```
 
@@ -81,40 +80,43 @@ head -3 dadaia_workspace/public/data/AGENTS.md
 
 ---
 
-## T06 — Atualizar `WorkspaceService.init()` para criar AGENTS.md
+## T06 — Atualizar `WorkspaceService.init()` para projeções multi-runtime
 
-**Objetivo:** `dadaia init` deve criar `AGENTS.md` no workspace root a partir de `public/data/AGENTS.md`.
+**Objetivo:** `dadaia init` deve executar staging e instalar projeções multi-runtime, incluindo `AGENTS.md`.
 
 **Arquivo:** `dadaia_workspace/features/workspace/service.py`
 
 **Padrão:** seguir exatamente o padrão de criação de outros arquivos do scaffold (create if absent).
-Usar `importlib.resources` ou `Path(__file__).parent` para localizar `public/data/AGENTS.md`.
+Usar o mesmo fluxo de `dadaia public stage` e `dadaia public install --target all`.
 
 **Verificação:**
 ```bash
 # Em um diretório limpo sem AGENTS.md
 dadaia init /tmp/test-ws-ctp
-ls /tmp/test-ws-ctp/AGENTS.md  # deve existir
+ls /tmp/test-ws-ctp/AGENTS.md
+ls /tmp/test-ws-ctp/.agents/skills
+ls /tmp/test-ws-ctp/.codex
+ls /tmp/test-ws-ctp/.opencode
 head -3 /tmp/test-ws-ctp/AGENTS.md  # deve ser "# dadaia Labs — AI Coding Assistant"
 rm -rf /tmp/test-ws-ctp
 ```
 
 ---
 
-## T07 — Verificar/Atualizar `PublicAssetService.install()` para AGENTS.md
+## T07 — Verificar/Atualizar `PublicAssetService` para stage/install/doctor
 
-**Objetivo:** `dadaia public install --target .claude` deve também instalar `AGENTS.md`
-no workspace root (um nível acima de `.claude/`).
+**Objetivo:** `dadaia public stage`, `dadaia public install --target all|claude|codex|opencode|agents` e `dadaia public doctor` devem operar sobre package source, staging e projeções.
 
 **Arquivo:** `dadaia_workspace/features/public/service.py`
 
-Verificar se `install()` já suporta arquivos em `public/data/` sendo instalados fora de `.claude/`.
-Se não, adicionar lógica: arquivos em `public/data/` vão para `<workspace-root>/`, não para `<target>/`.
+Verificar que install gera staging se ausente, preserva arquivos sem `--force`, e reporta unsupported quando runtime não suporta uma capability.
 
 **Verificação:**
 ```bash
-dadaia public install --target /tmp/test-install/.claude
-ls /tmp/test-install/AGENTS.md  # deve existir no root, não em .claude/
+dadaia public stage
+dadaia public install --target all
+dadaia public doctor
+ls /tmp/test-install/AGENTS.md
 rm -rf /tmp/test-install
 ```
 
@@ -136,16 +138,17 @@ head -3 $WS/AGENTS.md
 python3 -c "import json; d=json.load(open('$WS/opencode.json')); print(d['instructions'][0])"
 # → AGENTS.md
 
-# 3. Template canônico existe
-ls $REPO/dadaia_workspace/public/data/AGENTS.md
+# 3. Staging canônico existe
+ls $WS/.dadaia/agentic/manifest.json
 
 # 4. Agentes atualizados
 grep -l "dadaia context list" $REPO/dadaia_workspace/public/agents/*.md | wc -l
 # → 4
 
-# 5. dadaia init gera AGENTS.md (em workspace limpo)
+# 5. dadaia init gera projeções multi-runtime (em workspace limpo)
 TMPWS=$(mktemp -d)
 $WS/.dadaia/.venv/bin/dadaia init "$TMPWS"
 ls "$TMPWS/AGENTS.md" && head -2 "$TMPWS/AGENTS.md"
+ls "$TMPWS/.agents/skills" "$TMPWS/.codex" "$TMPWS/.opencode" "$TMPWS/.claude"
 rm -rf "$TMPWS"
 ```

@@ -45,16 +45,25 @@ workspace-YYYY-MM-DD-HHMMSS.tar.gz
 │   ├── states/                   ← spec_contexts.json, primary_context.json (CRÍTICO)
 │   ├── academy/                  ← conteúdo de cursos ativos
 │   ├── scripts/                  ← ctx-inject.sh, sdd-spec-gate.sh
+│   ├── agentic/                  ← manifest e staging de assets agentic
 │   └── src/                      ← repos.xlsx (catálogo de repos)
 ├── CLAUDE.md                     ← contexto VPS para Claude Code
-├── AGENTS.md                     ← regras universais (OpenCode + Codex)
+├── AGENTS.md                     ← regras universais
 ├── opencode.json                 ← config do opencode-serve
+├── .agents/
+│   └── skills/                   ← skills universais instaladas
 ├── .claude/
 │   ├── settings.json             ← hooks + permissions
 │   ├── settings.local.json       ← permissões locais (se existir)
 │   └── rules/                    ← regras SDD workspace-specific
 ├── .codex/
-│   └── hooks.json                ← hooks do Codex (se existir)
+│   ├── config.toml               ← config Codex projetada
+│   ├── hooks.json                ← hooks do Codex (se existir)
+│   └── rules/                    ← rules Codex projetadas
+├── .opencode/
+│   ├── agents/
+│   ├── commands/
+│   └── skills/
 └── mnt/                          ← volumes críticos de containers (se mnt/ existir)
     ├── hermes/data/              ← config e logs do Hermes
     ├── openclaw/data/.openclaw/  ← config crítica do OpenClaw
@@ -125,13 +134,18 @@ dadaia export --list
     ".dadaia/states/",
     ".dadaia/academy/",
     ".dadaia/scripts/",
+    ".dadaia/agentic/manifest.json",
     ".dadaia/src/",
     "CLAUDE.md",
     "AGENTS.md",
     "opencode.json",
+    ".agents/skills/",
     ".claude/settings.json",
     ".claude/rules/",
+    ".codex/config.toml",
     ".codex/hooks.json",
+    ".codex/rules/",
+    ".opencode/",
     "mnt/"
   ],
   "mnt_included": true,
@@ -178,8 +192,8 @@ docker compose -f services/docker-compose.yml up -d
 | FR3 | O artefato inclui `.dadaia/academy/` com conteúdo de cursos ativos |
 | FR4 | O artefato inclui `.dadaia/scripts/` e `.dadaia/src/` |
 | FR5 | O artefato inclui arquivos de configuração do workspace root: CLAUDE.md, AGENTS.md, opencode.json |
-| FR6 | O artefato inclui `.claude/settings.json`, `.claude/settings.local.json` (se existir), `.claude/rules/` |
-| FR7 | O artefato inclui `.codex/hooks.json` (se existir) |
+| FR6 | O artefato inclui projeções runtime: `.agents/skills/`, `.claude/`, `.codex/`, `.opencode/` e `opencode.json` |
+| FR7 | O artefato inclui `.dadaia/agentic/manifest.json` para diagnóstico de versão/hashes |
 | FR8 | O artefato inclui `mnt/` com excludes de cache definidos (se mnt/ existir e --exclude-mnt não usado) |
 | FR9 | O artefato EXCLUI `.dadaia/.venv/`, `.dadaia/tmp/`, `.dadaia/contexts/`, `repos/` |
 | FR10 | O artefato EXCLUI dentro de mnt/: `.npm/`, `.cache/`, `linuxbrew/`, `.codex/` (caches OpenClaw) |

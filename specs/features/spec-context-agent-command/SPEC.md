@@ -4,6 +4,7 @@
 > **Versão:** 4.0
 > **Autor:** Marco Menezes
 > **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/features/spec-context-project/SPEC.md`
+> **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 > **Substitui:** v2.0 (descartada integralmente)
 > **Dependência:** Requer `spec-context-project/SPEC.md` v4.0 aprovado
 
@@ -11,13 +12,13 @@
 
 ## Contexto
 
-O `/spec-context` é um **agent command** — arquivo markdown em `.claude/commands/` — que permite ao operador listar, ativar e promover Spec Contexts a partir de qualquer sessão de agente (Claude Code, Opencode, Codex) sem precisar acessar o terminal diretamente.
+O `/spec-context` é um **agent command** canônico versionado em `dadaia_workspace/public/commands/spec-context.md` e projetado para runtimes que suportam commands. Ele permite ao operador listar, ativar e promover Spec Contexts a partir de sessões de agente sem acessar o terminal diretamente.
 
 A v3.0 alinha-se ao modelo v4.0 do spec-context-project: múltiplos contextos podem estar `ativo` simultaneamente; um é designado `is_primary=True` como o foco principal do workspace. O command expõe `dadaia context list`, `dadaia context activate` e `dadaia context promote` para gerenciar esse estado via agente.
 
 ### Topologia de instalação (GAP-003 resolvido)
 
-Claude Code, Opencode e Codex compartilham o mesmo `.claude/commands/` do workspace root. Todos os bots que rodam a partir desse workspace têm acesso ao mesmo conjunto de commands. Não há diretórios separados por bot.
+Cada runtime recebe commands no seu destino nativo quando suportado. Claude Code usa `.claude/commands/`; OpenCode usa `.opencode/commands/`; runtimes sem command support recebem instrução equivalente via `AGENTS.md`/rules. Não há promessa de que Codex execute slash commands Claude Code.
 
 ### Isolamento de sessão via `DADAIA_CONTEXT` (GAP-005 resolvido)
 
@@ -29,7 +30,7 @@ Quando o operador quer trabalhar em projetos diferentes em sessões de bot disti
 
 | Termo | Definição |
 |---|---|
-| **Agent command** | Arquivo markdown em `.claude/commands/` executado pelo agente quando o operador usa o slash command correspondente |
+| **Agent command** | Arquivo markdown canônico em `dadaia_workspace/public/commands/` projetado para o destino nativo do runtime quando suportado |
 | **Contexto primário** | O Spec Context Project com `is_primary=True`; apontado por `primary_context.json`; foco atual do workspace |
 | **Contexto ativo** | Qualquer Spec Context Project em estado `ativo` (repo em disco) — pode haver múltiplos |
 | **Operador** | Usuário com ID Telegram autorizado nos bots |
@@ -86,7 +87,7 @@ Quando o operador quer trabalhar em projetos diferentes em sessões de bot disti
 ### Distribuição
 
 - FR-011: The command source shall live at `dadaia_workspace/public/commands/spec-context.md`.
-- FR-012: The command shall be deployed to `<workspace-root>/.claude/commands/spec-context.md` via `dadaia public install`.
+- FR-012: The command shall be deployed to runtime-native command directories via `dadaia public install`: `.claude/commands/spec-context.md` for Claude Code, `.opencode/commands/spec-context.md` for OpenCode when supported, and `unsupported` for runtimes without command support.
 
 ---
 
@@ -148,6 +149,7 @@ dadaia_workspace/public/commands/spec-context.md
 Instalado em runtime em:
 ```
 <workspace-root>/.claude/commands/spec-context.md
+<workspace-root>/.opencode/commands/spec-context.md
 ```
 
 ---
