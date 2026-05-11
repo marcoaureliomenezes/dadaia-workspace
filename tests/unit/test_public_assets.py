@@ -27,7 +27,7 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
 
     assert (workspace / "AGENTS.md").exists()
     assert (workspace / ".agents" / "skills" / "dadaia-grill-me" / "SKILL.md").exists()
-    assert (workspace / ".claude" / "agents" / "architect-agent.md").exists()
+    assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists()
