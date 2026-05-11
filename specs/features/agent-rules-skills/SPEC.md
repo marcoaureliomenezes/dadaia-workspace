@@ -4,15 +4,17 @@
 > **Versão:** 2.0  
 > **Autor:** Marco Menezes  
 > **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/architecture.md`
+> **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
 
 ## Contexto
 
-O dadaia-workspace precisa governar dois ambientes ao mesmo tempo:
+O dadaia-workspace precisa governar três camadas ao mesmo tempo:
 
 1. o repositório da biblioteca, que versiona assets de agente diretamente em `dadaia_workspace/public/`;
-2. o ambiente do usuário final, que recebe artefatos extraídos para `.claude/` no momento do bootstrap ou de uma instalação explícita.
+2. o staging gerado do workspace em `.dadaia/agentic/`;
+3. as projeções runtime-specific para `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `opencode.json` e `AGENTS.md`.
 
 Esta feature define esse contrato completo para que as regras SDD sejam sempre aplicadas, para que a revisão de spec seja obrigatória e para que a descoberta do contexto ativo seja estável para agentes.
 
@@ -25,12 +27,11 @@ Para assets instalados no workspace, a política operacional é CLI-first: agent
 | Termo | Definição |
 |---|---|
 | **Packaged source of truth** | Arquivos de rule, skill e workflow versionados neste repositório em `dadaia_workspace/public/` |
-| **Installed assets** | Artefatos copiados para o `.claude/` do workspace do usuário |
+| **Staged assets** | Artefatos copiados para `.dadaia/agentic/` a partir do pacote instalado |
+| **Installed assets** | Artefatos projetados para `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `opencode.json` e `AGENTS.md` |
 | **Spec Navigator** | Skill que resolve o contexto ativo via `dadaia context show --json` |
 | **Spec Reviewer** | Skill que lê o conjunto de specs e aponta conflitos, lacunas e inconsistências |
-| **SDD Enforcer** | Rule sempre ativa que bloqueia implementação sem SPEC aprovada |
-| **Spec Governance** | Rule sempre ativa que obriga revisão de consistência sempre que `specs/` for alterado |
-| **Academy Command** | Slash command instalado em `.claude/commands/` que opera sobre `.dadaia/academy/` |
+| **Academy Command** | Agent command projetado para runtimes que suportam commands e que opera sobre `.dadaia/academy/` |
 
 ---
 
@@ -40,16 +41,14 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 
 | Artefato | Nome | Tipo |
 |---|---|---|
-| Enforcer de SDD | `dadaia-workspace-sdd-enforcer` | Rule |
-| Governança de specs | `dadaia-workspace-spec-governance` | Rule |
 | Guardrail de DEV | `dadaia-workspace-dev-guardrail` | Rule |
 | Navegador de specs | `dadaia-workspace-spec-navigator` | Skill |
 | Revisor de specs | `dadaia-workspace-spec-reviewer` | Skill |
 | Grill crítico de specs | `dadaia-grill-me` | Skill |
 | Doctor do workspace | `dadaia-workspace-doctor` | Skill + Command |
-| Arquiteto de software | `architect-agent` | Agent |
+| Arquiteto de software | `software-architect` | Agent |
 | Auditor de produto | `product-auditor-agent` | Agent |
-| Engenheiro de produto | `product-engineer-agent` | Agent |
+| Engenheiro de produto | `product-engineer` | Agent |
 | Engenheiro de software | `soft-engineer-agent` | Agent |
 
 ---
@@ -86,16 +85,16 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 - Dado um contexto ativo, quando a skill `dadaia-workspace-spec-navigator` é invocada, então ela usa `dadaia context show --json` para resolver `specs_dir`
 - Dado que não existe contexto ativo, quando a skill é invocada, então ela informa a ausência de contexto e pede ativação explícita antes de seguir
 
-### US-004: Distribuição clara entre `public/` e `.claude/`
+### US-004: Distribuição clara entre `public/`, staging e projeções
 
 - **Como** mantenedor do dadoia-workspace
-- **Quero** manter `dadaia_workspace/public/` como origem versionada e `.claude/` do workspace como destino de instalação
+- **Quero** manter `dadaia_workspace/public/` como origem versionada, `.dadaia/agentic/` como staging gerado e diretórios runtime como projeções
 - **Para** evitar conflito entre desenvolvimento interno e instalação para usuários finais
 
 **Critérios de Aceite:**
 - Dado este repositório, quando um artefato é evoluído, então a versão autoritativa existe em `dadaia_workspace/public/`
-- Dado este repositório, quando o produto é inspecionado, então `dadaia-workspace/.claude/` não existe como diretório de assets do produto
-- Dado o pacote distribuído, quando o usuário executa `dadaia public install` ou `dadaia init`, então os artefatos instalados vêm de `dadaia_workspace/public/`
+- Dado este repositório, quando o produto é inspecionado, então `dadaia-workspace/.agents/`, `.claude/`, `.codex/` e `.opencode/` não existem como diretórios de authoring do produto
+- Dado o pacote distribuído, quando o usuário executa `dadaia public stage`, `dadaia public install` ou `dadaia init`, então os artefatos instalados vêm de `dadaia_workspace/public/` via `.dadaia/agentic/`
 
 ### US-005: Skills usam CLI e se recuperam por contratos estáveis
 
@@ -112,23 +111,23 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 
 - **Como** usuário do workspace ou agente de IA
 - **Quero** um slash command especializado para a dadaia-academy
-- **Para** tutoria e personalização de cursos via Claude sem mexer na CLI congelada do binário `dadaia`
+- **Para** tutoria e personalização de cursos via agente sem mexer na CLI congelada do binário `dadaia`
 
 **Critérios de Aceite:**
-- Dado um workspace com assets instalados, quando o agente lista os slash commands disponíveis, então `/dadaia-academy` aparece como command do ambiente de agente
+- Dado um workspace com assets instalados, quando o runtime suporta commands, então `/dadaia-academy` aparece como command do ambiente de agente
 - Dado a invocação de `/dadaia-academy`, quando o agente tutora um curso, então ele usa `dadaia academy list` para descobrir cursos e lê `.dadaia/academy/<slug>/` como contexto primário
 - O command `/dadaia-academy` não escreve em `academy.json` diretamente — orienta o usuário a usar a CLI para CRUD
 
 ### US-007: Agentes especializados disponíveis no workspace
 
 - **Como** engenheiro com múltiplos papéis de desenvolvimento
-- **Quero** 4 sub-agentes Claude Code com papéis distintos e permissões restritas
+- **Quero** 4 agentes especializados com papéis distintos e permissões restritas, projetados conforme suporte de cada runtime
 - **Para** orquestrar reviews, auditorias, spec refinement e implementação sem interferência entre os papéis
 
 **Critérios de Aceite:**
-- Dado um workspace inicializado, quando executo `dadaia public install`, então os 4 agentes são instalados em `.claude/agents/`
-- Dado um agente instalado, quando o operador o invoca, então o agente segue seu escopo de escrita restrito (architect→reports, auditor→reports, engineer→specs, soft-engineer→código+reports)
-- Dado o `architect-agent` ou `product-auditor-agent`, quando invocados, então usam a skill `dadaia-grill-me` para revisar specs criticamente
+- Dado um workspace inicializado, quando executo `dadaia public install --target all`, então os 4 agentes são projetados para os runtimes suportados, incluindo `.claude/agents/` para Claude Code
+- Dado um agente instalado, quando o operador o invoca, então o agente segue seu escopo de escrita restrito (software-architect→reports, auditor→reports, product-engineer→specs, soft-engineer→código+reports)
+- Dado o `software-architect` ou `product-auditor-agent`, quando invocados, então usam a skill `dadaia-grill-me` para revisar specs criticamente
 
 ---
 
@@ -136,16 +135,12 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 
 ### Modelo de Distribuição
 - FR-001: The repository shall keep the versioned source of truth for agent assets under `dadaia_workspace/public/`.
-- FR-002: A repository-local `.claude/` directory shall not be used as authoring or storage for product agent assets.
-- FR-003: The command `dadaia public install` shall install packaged public assets — rules, skills, commands, and agents — into the target `.claude/` directory. Agents shall be installed to `<target>/.claude/agents/`. Scripts (`ctx-inject.sh`) are not part of `dadaia public install`; they are installed to `.dadaia/scripts/` exclusively by `dadaia init`.
-- FR-004: The command `dadaia init` shall install packaged public assets into the workspace `.claude/` directory unless the user explicitly opts out.
+- FR-002: Repository-local runtime projection directories (`.agents/`, `.claude/`, `.codex/`, `.opencode/`) shall not be used as authoring or storage for product agent assets.
+- FR-003: The command `dadaia public stage` shall materialize packaged public assets into `.dadaia/agentic/`, and `dadaia public install --target all|claude|codex|opencode|agents` shall project staged assets into runtime-specific destinations.
+- FR-004: The command `dadaia init` shall stage and install packaged public assets into supported workspace runtimes unless the user explicitly opts out.
 
 ### Rules
-- FR-005: The system shall provide an always-on rule named `dadaia-workspace-sdd-enforcer`.
-- FR-006: The `dadaia-workspace-sdd-enforcer` rule shall instruct the agent to never implement code without approved `SPEC.md`, `PLAN.md`, and `TASKS.md` when they are required by the workflow.
-- FR-007: The system shall provide an always-on rule named `dadaia-workspace-spec-governance`.
-- FR-008: The `dadaia-workspace-spec-governance` rule shall instruct the agent that any change in `specs/` requires a consistency review across the whole relevant spec set before completion.
-- FR-009: If unresolved inconsistencies remain after a spec refinement pass, the governance rule shall require them to be written to `z_bug_specs.md` before any implementation begins.
+- FR-005: SDD enforcement and spec-governance instructions shall be delivered via `AGENTS.md`; dedicated rule files for these concerns are eliminated. The single remaining rule file is `dadaia-workspace-dev-guardrail`.
 
 ### Skills
 - FR-010: The system shall provide a skill named `dadaia-workspace-spec-navigator`.
@@ -177,38 +172,38 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 - FR-030: Guidance for the academy command shall preserve the file structure from the knowledge_basis module (README, EXAMPLE, EXERCISES, REFERENCES, numbered content files).
 
 ### Agents
-- FR-031: The system shall provide 4 specialized agent files in `dadaia_workspace/public/agents/`: `architect-agent.md`, `product-auditor-agent.md`, `product-engineer-agent.md`, `soft-engineer-agent.md`.
-- FR-032: Agent files shall use Claude Code sub-agent frontmatter format: `name`, `description`, `model`, and `tools`.
+- FR-031: The system shall provide 4 SDD pipeline agent files in `dadaia_workspace/public/agents/`: `software-architect.md`, `product-auditor-agent.md`, `product-engineer.md`, `soft-engineer-agent.md`. Domain agents (`devops-engineer.md`, `game-developer.md`) are also present and defined in their own feature specs.
+- FR-032: Agent files shall include enough metadata to project Claude Code sub-agent frontmatter (`name`, `description`, `model`, and `tools`) and runtime-native formats where supported.
 - FR-033: Each agent's system prompt shall explicitly define its allowed write paths and prohibited paths.
-- FR-034: `dadaia public install` shall copy `dadaia_workspace/public/agents/` to `<workspace-root>/.claude/agents/`.
+- FR-034: `dadaia public install --target claude|all` shall copy/project `dadaia_workspace/public/agents/` to `<workspace-root>/.claude/agents/`; other runtimes receive native projections only when supported.
 
 ### `dadaia-grill-me` Skill
 - FR-035: The system shall provide a skill named `dadaia-grill-me` at `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md`.
 - FR-036: The `dadaia-grill-me` skill shall instruct the agent to ask incisive questions that expose missing behavior contracts, conflicting requirements, ambiguous state machine transitions, and weak acceptance criteria.
 - FR-037: The skill shall produce structured output: question → finding → recommendation.
-- FR-038: `dadaia public install` shall copy the `dadaia-grill-me` skill to `<workspace-root>/.claude/skills/dadaia-grill-me/SKILL.md`.
+- FR-038: `dadaia public install --target agents|all` shall copy the `dadaia-grill-me` skill to `<workspace-root>/.agents/skills/dadaia-grill-me/SKILL.md`, and runtime-specific skill directories when supported.
 
 ### `dadaia-workspace-dev-guardrail` Rule
 - FR-039: The system shall provide an always-on rule named `dadaia-workspace-dev-guardrail` at `dadaia_workspace/public/rules/dadaia-workspace-dev-guardrail.md`.
 - FR-040: The `dadaia-workspace-dev-guardrail` rule shall instruct the agent to identify lib-originated assets by verifying whether the asset's relative path exists under `dadaia_workspace/public/` (resolved via the installed package path).
-- FR-041: The `dadaia-workspace-dev-guardrail` rule shall instruct the agent to never directly edit a lib-originated asset in `.claude/`. Edits must be made in `dadaia_workspace/public/<relative-path>` first, then applied via `dadaia public install`.
+- FR-041: The `dadaia-workspace-dev-guardrail` rule shall instruct the agent to never directly edit a lib-originated asset in `.agents/`, `.claude/`, `.codex/` or `.opencode/`. Edits must be made in `dadaia_workspace/public/<relative-path>` first, then applied via `dadaia public stage` and `dadaia public install`.
 - FR-042: If lib drift is detected, the rule shall require the agent to report it and recommend `dadaia public install --force` before proceeding.
-- FR-043: Project-specific assets in `.claude/` — those with no counterpart in `dadaia_workspace/public/` — are exempt from this rule and may be edited freely.
+- FR-043: Project-specific assets in runtime projections — those with no counterpart in the staged manifest — are exempt from this rule and may be edited freely.
 
 ### `dadaia-workspace-doctor` Skill and Command
 - FR-044: The system shall provide a skill named `dadaia-workspace-doctor` at `dadaia_workspace/public/skills/dadaia-workspace-doctor/SKILL.md`.
 - FR-045: The `dadaia-workspace-doctor` skill shall implement a three-phase protocol: Phase 1 (lib vs installed drift detection), Phase 2 (JSON state schema migration), Phase 3 (report).
-- FR-046: In Phase 1, the skill shall compare every file under `dadaia_workspace/public/` with its installed counterpart in `<workspace-root>/.claude/` and classify each as `ok`, `drift`, or `missing`. The skill shall never write to `.claude/`.
+- FR-046: In Phase 1, the doctor flow shall compare package source, `.dadaia/agentic/`, and runtime projections, classifying each as `ok`, `missing`, `drift`, or `unsupported`. It shall never mutate runtime projection files.
 - FR-047: In Phase 2, the skill shall read each `*.json` in `.dadaia/states/`, cross-reference it with the corresponding frozen dataclasses in `core/models/` and the canonical JSON example in `specs/memory/architecture.md`, and repair mismatches atomically.
 - FR-048: The system shall provide a slash command `/dadaia-workspace-doctor` at `dadaia_workspace/public/commands/dadaia-workspace-doctor.md` as a thin entry point for the skill. Accepts optional scope arguments: `lib` (Phase 1 only) or `state` (Phase 2 only).
-- FR-049: `dadaia public install` shall copy the `dadaia-workspace-doctor` skill and command to the target workspace.
+- FR-049: `dadaia public install` shall project the `dadaia-workspace-doctor` skill and command to supported runtime destinations.
 
 ---
 
 ## Requisitos Não-Funcionais
 
 - NFR-001: [Governança] The rule set shall prioritize consistency enforcement over token minimization for this product's own development workflow.
-- NFR-002: [Portabilidade] Installed assets shall work in a workspace-local `.claude/` directory without requiring direct edits to `.github/` files.
+- NFR-002: [Portabilidade] Installed assets shall work in workspace-local runtime projection directories without requiring direct edits to `.github/` files.
 - NFR-003: [Manutenibilidade] Installed assets shall remain semantically aligned with the versioned source in `dadaia_workspace/public/`.
 - NFR-004: [Descoberta] Skills shall rely on stable JSON contracts instead of parsing human-formatted CLI tables.
 - NFR-005: [Autorrecuperação] Installed skills shall prefer help-first discovery and CLI error recovery over direct inspection of internal files whenever an official command exists.
@@ -222,9 +217,9 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
   dadaia_workspace/
     public/
       rules/
-        dadaia-workspace-sdd-enforcer.md
-        dadaia-workspace-spec-governance.md
         dadaia-workspace-dev-guardrail.md
+      templates/
+        repo-AGENTS.md
       skills/
         dadaia-workspace-spec-navigator/
           SKILL.md
@@ -235,10 +230,12 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
         dadaia-workspace-doctor/
           SKILL.md
       agents/
-        architect-agent.md
+        software-architect.md
         product-auditor-agent.md
-        product-engineer-agent.md
+        product-engineer.md
         soft-engineer-agent.md
+        devops-engineer.md
+        game-developer.md
       commands/
         dadaia-workspace-refine-specs.md
         dadaia-academy.md
@@ -258,4 +255,4 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 
 ## Questões Abertas
 
-*Nenhuma bloqueante após a definição do modelo `dadaia_workspace/public/` → `.claude/` do usuário.*
+*Nenhuma bloqueante após a definição do modelo `dadaia_workspace/public/` → `.dadaia/agentic/` → runtime projections.*
