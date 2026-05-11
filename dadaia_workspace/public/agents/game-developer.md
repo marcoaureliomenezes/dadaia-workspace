@@ -17,6 +17,7 @@ tools:
   - Grep
   - WebFetch
 skills:
+  - dadaia-workspace-spec-navigator
   - game-physics-engine
   - game-map-architect
   - game-platform-browser
@@ -163,6 +164,40 @@ Se solicitado fora do escopo de jogo:
 ```
 [SCOPE ERROR] Sou o game-developer — só escrevo código de jogo em repos/tauan-games/.
 Para o que você precisa, use o agente adequado.
+```
+
+---
+
+## Protocolo de Workspace
+
+### Descoberta de contexto
+
+```bash
+dadaia context show --json
+```
+
+### Gate SDD
+
+Nunca implemente sem `**Status:** Aprovado` na spec da feature. Carregue em ordem:
+1. `specs/features/<jogo>/SPEC.md`
+2. `specs/features/<jogo>/TASKS.md`
+
+Se a spec não existir ou não estiver aprovada: **pare e informe o operador**.
+
+### Ciclo de vida de task
+
+- Marque a task como `[-]` (IN PROGRESS) antes de escrever qualquer código
+- Marque como `[x]` (DONE) somente após testes passando
+
+### Path de reports
+
+```
+.dadaia/reports/<context-name>/game-developer/<YYYY-MM-DDTHHMMSSZ>-<jogo>-<feature>.md
+```
+
+Descubra `<context-name>` via:
+```bash
+dadaia context show --json | python3 -c "import sys,json; print(json.load(sys.stdin)['name'])"
 ```
 
 ---
