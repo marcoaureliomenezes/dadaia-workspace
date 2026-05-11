@@ -17,6 +17,10 @@ _SCHEMA_VERSION = "1"
 # OpenCode v1.14+ expects `tools` to be an object or omitted — not an array.
 # Strip it from agent frontmatter when deploying to the opencode projection.
 _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
+# `opencode_model:` lets agents declare a cheaper model for the OpenCode projection.
+_FRONTMATTER_OPENCODE_MODEL_RE = re.compile(r"^opencode_model:\s*(.+?)$", re.MULTILINE)
+_FRONTMATTER_MODEL_VALUE_RE = re.compile(r"^(model:\s*)(.+?)$", re.MULTILINE)
+_FRONTMATTER_OPENCODE_MODEL_FIELD_RE = re.compile(r"^opencode_model:[^\n]*\n", re.MULTILINE)
 _VALID_TARGETS = {"all", "agents", "claude", "codex", "opencode"}
 _COPY_DIRS = ("rules", "skills", "commands", "agents", "scripts", "data", "scaffold", "templates", "plugins")
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents")
@@ -52,6 +56,31 @@ def _strip_tools_from_frontmatter(content: str) -> str:
     frontmatter = content[4 : end_idx + 1]
     cleaned = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
     return f"---\n{cleaned}---\n{content[end_idx + 5:]}"
+
+
+def _prepare_agent_for_opencode(content: str) -> str:
+    """Prepare an agent .md file for the OpenCode projection.
+
+    - Strips the `tools` array (OpenCode v1.14+ incompatibility with list form)
+    - If `opencode_model:` is declared, swaps the `model:` value and removes the field
+    """
+    if not content.startswith("---\n"):
+        return content
+    end_idx = content.find("\n---\n", 4)
+    if end_idx == -1:
+        return content
+    frontmatter = content[4 : end_idx + 1]
+    body = content[end_idx + 5:]
+
+    m = _FRONTMATTER_OPENCODE_MODEL_RE.search(frontmatter)
+    if m:
+        opencode_model = m.group(1).strip()
+        frontmatter = _FRONTMATTER_MODEL_VALUE_RE.sub(
+            lambda match: f"{match.group(1)}{opencode_model}", frontmatter, count=1
+        )
+    frontmatter = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
+    frontmatter = _FRONTMATTER_OPENCODE_MODEL_FIELD_RE.sub("", frontmatter)
+    return f"---\n{frontmatter}---\n{body}"
 
 
 class FileSystemPublicAssetManager:
@@ -132,7 +161,7 @@ class FileSystemPublicAssetManager:
             if expected_src is None:
                 reports.append(f"[unsupported] {label}")
             elif transform:
-                content = _strip_tools_from_frontmatter(expected_src.read_text(encoding="utf-8"))
+                content = _prepare_agent_for_opencode(expected_src.read_text(encoding="utf-8"))
                 reports.append(self._compare_content(content, dst, label))
             else:
                 reports.append(self._compare(expected_src, dst, label))
@@ -261,7 +290,7 @@ class FileSystemPublicAssetManager:
             if dst.exists() and not force:
                 installed.append(f"[skip] {dst}")
                 continue
-            content = _strip_tools_from_frontmatter(src.read_text(encoding="utf-8"))
+            content = _prepare_agent_for_opencode(src.read_text(encoding="utf-8"))
             dst.write_text(content, encoding="utf-8")
             installed.append(f"[ok]   {dst}")
 

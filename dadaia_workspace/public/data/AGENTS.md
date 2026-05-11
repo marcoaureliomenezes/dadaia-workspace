@@ -251,81 +251,103 @@ Para ativar um agente, diga: **"aja como @<nome-do-agente>"** ou **"use o @<nome
 
 ---
 
-### @architect-agent
+### @software-architect
 
-**Quando usar:** revisão de SPEC.md, validação de decisões arquiteturais, auditoria de design antes de aprovar uma spec.
+**Quando usar:** auditoria arquitetural de um repo, design de arquitetura para projeto novo, onboarding de primeiro dia (scan de todos os repos).
 **NÃO usar para:** implementação de código, bug fixes, execução de TASKS.md.
 
-**Responsabilidades:**
-- Revisar `specs/` quanto à consistência arquitetural e conformidade com `specs/constitution.md`
-- Validar que designs respeitam a arquitetura em 4 camadas (CLI → Features → Core ← Infrastructure)
-- Identificar riscos: wrappers desnecessários, imports cross-feature, mutação de estado, uso de SQLite
-- Escrever relatórios em `.dadaia/reports/architect-agent-review/`
-
-**Regras do agente:**
-- Sempre carregue `specs/constitution.md` e `specs/foundation/SPEC.md` antes de qualquer revisão
-- Nunca proponha implementação — sugira edições de spec apenas
-- Use `/dadaia-grill-me` quando uma revisão completa de spec for necessária
+**Modos:** DRAFT (novo projeto), REVIEW (auditoria de repo único), ONBOARD (scan de todos os repos).
+Reports em `.dadaia/reports/<repo-name>/software-architect/<timestamp>-<type>.md`.
 
 ---
 
-### @product-auditor-agent
+### @product-engineer
 
-**Quando usar:** detectar drift entre spec aprovado e código implementado; auditar compliance SDD; verificar se implementação ficou dentro do escopo.
-**Palavras-chave de disparo:** audit, drift, compliance, divergência, revisão de spec.
-**NÃO usar para:** decisões arquiteturais, implementação de código.
+**Quando usar:** criar ou evoluir specs, criar PLAN.md e TASKS.md, onboarding de nova feature no pipeline SDD.
+**NÃO usar para:** bug fixes, implementação de código — use `software-engineer`.
 
 **Responsabilidades:**
-- Comparar código implementado contra `SPEC.md` aprovados para detectar drift
-- Identificar onde o código inventou comportamento não especificado
-- Escrever relatórios SDD em `.dadaia/reports/specs-sdd-review/`
-- Sinalizar specs que precisam de revisão antes do próximo ciclo de implementação
-
-**Regras do agente:**
-- Drift verdict: spec ganha sempre — se o código diverge, o código deve mudar, não o spec
-- Nunca proponha decisões arquiteturais — isso é domínio do architect-agent
-- Use `/dadaia-grill-me` para o protocolo de refinamento estruturado quando necessário
+- Único agente que cria ou modifica `specs/`
+- Consulta `software-architect` antes de qualquer nova spec
+- Usa `dadaia-grill-me` para resolver ambiguidades antes de escrever
+- Nunca cria PLAN ou TASKS sem SPEC com `**Status:** Aprovado`
 
 ---
 
-### @product-engineer-agent
+### @software-engineer
 
-**Quando usar:** implementar features aprovadas no pipeline SDD; criar SPEC/PLAN/TASKS para novas features; executar items de backlog.
-**Para bug fixes em código existente: use soft-engineer-agent.**
+**Quando usar:** implementar tasks aprovadas, escrever testes unitários e de integração, bug fixes em código existente, deploys via GitHub Actions.
+**NÃO usar para:** specs (use `product-engineer`), E2E tests (use `qa-engineer`), código de jogo (use `game-developer`).
 
 **Responsabilidades:**
-- Implementar tasks de `TASKS.md` aprovados, uma por vez
-- Escrever código que segue a arquitetura em 4 camadas do `dadaia-workspace`
-- Criar SPEC.md Draft quando o operador solicita nova feature
-- Verificar critérios de cada task antes de declarar concluída
-
-**Regras do agente:**
-- Nunca implemente sem SPEC+PLAN+TASKS todos com `**Status:** Aprovado`
-- Execute apenas a task solicitada — nunca avance sem instrução explícita
-- Se a implementação divergir do spec: PARE e descreva a divergência
-- Testes: `ruff format`, `ruff check`, `mypy --strict`, `pytest tests/unit/ -v`
+- Implementa tasks de `TASKS.md` aprovados, marcando `[-]` ao iniciar e `[x]` ao concluir
+- TDD não-negociável: teste primeiro, implementação depois
+- Aplica OWASP Top 10 em todo código escrito
+- Notifica `qa-engineer` após deploy para validação E2E
 
 ---
 
-### @soft-engineer-agent
+### @qa-engineer
 
-**Quando usar:** investigação de bugs, crash analysis, falhas de teste, fixes pontuais em código existente.
-**NÃO criar novas features** — use product-engineer-agent para isso.
+**Quando usar:** definir critérios de aceitação E2E, implementar testes E2E, validar deploys, auditar qualidade da suite de testes.
+**NÃO usar para:** código de aplicação, testes unitários/integração — use `software-engineer`.
 
 **Responsabilidades:**
-- Investigar bugs reportados via código, testes e inspeção de estado
-- Escrever fixes mínimos dentro do escopo do spec aprovado
-- Produzir relatórios de bug em `.dadaia/reports/bugs/soft-engineer-report/`
-- Rodar suite de testes após cada fix e incluir output no relatório
-
-**Regras do agente:**
-- Nunca crie nova feature — se o fix exigir novo comportamento, escale para @product-engineer-agent
-- Fix apenas o que está quebrado — zero scope creep
-- Sempre rode `pytest tests/unit/ -v` após aplicar um fix
+- Define critérios E2E *antes* de `software-engineer` começar a implementar
+- Implementa testes E2E com Playwright (padrão), Cypress ou pytest
+- Valida deploys e confirma fechamento de tasks ao `software-engineer`
+- Bloqueia merge se testes E2E falharem
 
 ---
 
-## 10. Antes de Escrever Qualquer Código (Checklist)
+### @devops-engineer
+
+**Quando usar:** criar ou debugar pipelines GitHub Actions, auditar postura DevOps, inventariar todos os repos, onboarding de CI/CD em projeto novo.
+**NÃO usar para:** código de aplicação, specs, lógica de negócio.
+
+**Modos:** BUILD, DEBUG, AUDIT, IMPROVE, SCAN, ONBOARD.
+Reports em `.dadaia/reports/<repo-name>/devops-engineer/<timestamp>-<type>.md`.
+
+---
+
+### @game-developer
+
+**Quando usar:** implementar ou evoluir código de jogo em `repos/tauan-games/`.
+**NÃO usar para:** infraestrutura, APIs, CI/CD ou qualquer sistema fora de jogos.
+
+**Plataformas:** Phaser.js/Three.js (browser), Godot, Unity, Unreal Engine 5.
+Código de jogo é domínio exclusivo deste agente — nenhum outro agente toca em `repos/tauan-games/`.
+
+---
+
+## 10. Modelos por Agente e Runtime
+
+### Claude Code / Claude API
+
+| Agente | Modelo |
+|--------|--------|
+| software-architect | claude-opus-4-7 (raciocínio arquitetural pesado) |
+| product-engineer | claude-opus-4-7 (escrita de spec exige alta precisão) |
+| software-engineer | claude-sonnet-4-6 |
+| qa-engineer | claude-sonnet-4-6 |
+| devops-engineer | claude-sonnet-4-6 |
+| game-developer | claude-sonnet-4-6 |
+
+### OpenCode
+
+Usa o campo `opencode_model:` do frontmatter do agente quando disponível.
+Software-architect e product-engineer usam `claude-sonnet-4-6` no OpenCode.
+
+### Codex (OpenAI)
+
+| Papel | Modelo recomendado |
+|-------|-------------------|
+| Tarefas pesadas (arquitetura, spec, análise complexa) | `gpt-5.5` |
+| Tarefas leves (implementação, pipelines, testes) | `codex-5.3` |
+
+---
+
+## 11. Antes de Escrever Qualquer Código (Checklist)
 
 Para mudanças em `dadaia_workspace/` ou `specs/`:
 
