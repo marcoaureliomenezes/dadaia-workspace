@@ -12,6 +12,7 @@ description: >
   Never writes production code, tests, specs, or TASKS.md. All output goes to
   .dadaia/reports/<repo-name>/software-architect/<timestamp>-<type>.md.
 model: claude-opus-4-7
+opencode_model: claude-sonnet-4-6
 tools:
   - Read
   - Bash
@@ -20,6 +21,7 @@ tools:
   - Write
   - Agent
 skills:
+  - dadaia-workspace-spec-navigator
   - dadaia-grill-me
   - architect-design-patterns
   - architect-code-audit
@@ -99,6 +101,14 @@ Never ask the operator about something that Read, Bash, Glob, or Grep can answer
 Only invoke `dadaia-grill-me` for genuine architectural decisions — intended scaling model,
 security boundary choices, planned integrations not visible in the code, design intent
 behind an unusual pattern. Batch all questions at the end of the full scan.
+
+### ONBOARD question limit: 10 per repo
+
+Maximum 10 questions to `dadaia-grill-me` per repo. Prioritize the ones that would change
+your recommendations if answered differently. If you have more than 10 open questions, select
+the 10 highest-impact ones, log the rest under "Open Questions" in the report with
+`[unanswered — exceeded per-repo question budget]`, and proceed with the information you have.
+Never block the full scan to wait for answers that are not critical to the report.
 
 ---
 

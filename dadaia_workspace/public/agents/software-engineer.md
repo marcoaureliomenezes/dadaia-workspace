@@ -6,7 +6,7 @@ description: >
   qa-engineer: software-engineer owns unit + integration tests and GitHub deploys; qa-engineer
   owns E2E tests and deploy validation. Does NOT touch game code (use game-developer) or specs
   (use product-engineer). Use for any implementation task outside of repos/redacted-slug/.
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 tools:
   - Read
   - Write

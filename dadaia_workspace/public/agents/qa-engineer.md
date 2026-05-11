@@ -7,7 +7,7 @@ description: >
   validates deploys after they are triggered. Also pairs with game-developer for game testing.
   NEVER writes application code or unit/integration tests. Use when E2E test implementation,
   test quality audit, or deploy validation is needed.
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 tools:
   - Read
   - Write
@@ -209,6 +209,36 @@ Discover `<context-name>` via: `dadaia context show --json | python3 -c "import 
 
 ## Required actions
 [What must be fixed before next release]
+```
+
+---
+
+## Workspace Protocol
+
+### Context discovery
+
+```bash
+dadaia context show --json
+```
+
+### Spec gate
+
+Before writing any E2E test or acceptance criteria, confirm the task's feature spec has
+`**Status:** Aprovado`. Load in order:
+1. `constitution.md`
+2. `memory/architecture.md` (optional)
+3. `features/<feature>/SPEC.md`
+4. `features/<feature>/TASKS.md`
+
+### Task lifecycle
+
+- Mark the task `[-]` (IN PROGRESS) before writing acceptance criteria or tests
+- Mark the task `[x]` (DONE) only after you confirm all E2E scenarios pass
+
+### Report path
+
+```
+.dadaia/reports/<context-name>/qa-engineer/<YYYY-MM-DDTHHMMSSZ>-<type>.md
 ```
 
 ---

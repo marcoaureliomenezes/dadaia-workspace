@@ -39,9 +39,8 @@ def test_init_creates_dadaia_dirs(service: WorkspaceService, workspace_root: Pat
 
 def test_init_creates_report_subdirs(service: WorkspaceService, workspace_root: Path) -> None:
     service.init(workspace_root, skip_assets=True)
-    assert (workspace_root / ".dadaia" / "reports" / "architect-agent-review").is_dir()
-    assert (workspace_root / ".dadaia" / "reports" / "specs-sdd-review").is_dir()
-    assert (workspace_root / ".dadaia" / "reports" / "bugs" / "soft-engineer-report").is_dir()
+    # Agents create <context>/<agent-name>/ subdirs at runtime — only the root dir is pre-created.
+    assert (workspace_root / ".dadaia" / "reports").is_dir()
 
 
 def test_init_creates_spec_contexts_json(service: WorkspaceService, workspace_root: Path) -> None:
