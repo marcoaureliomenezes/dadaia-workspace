@@ -4,25 +4,28 @@
 > **Versão:** 1.0
 > **Autor:** Marco Menezes
 > **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/architecture.md`, `specs/features/agent-rules-skills/SPEC.md`
+> **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
 
 ## Contexto
 
-O dadaia-workspace distribui 4 agentes especializados como sub-agentes Claude Code (`claude agents`). Cada agente é um arquivo markdown em `.claude/agents/` com um system prompt focado, modelo configurado e permissões restritas de escrita. Os agentes colaboram em um fluxo de desenvolvimento orientado por SDD:
+O dadaia-workspace distribui agentes canônicos em `dadaia_workspace/public/agents/`. Claude Code recebe esses agentes como sub-agentes em `.claude/agents/`; OpenCode recebe projeções nativas quando suportado; Codex recebe as personas via `AGENTS.md`, `.codex/rules/` e skills universais, sem fingir suporte a sub-agentes Claude Code. Os **4 agentes do pipeline SDD** colaboram em um fluxo de desenvolvimento orientado por SDD:
 
 ```
-architect-agent          product-auditor-agent
+software-architect       product-auditor-agent
      │                          │
      │ reports (arquitectura)   │ reports (specs vs impl)
      └──────────────┬───────────┘
                     │
-              product-engineer-agent
+              product-engineer
                     │ (lê reports, escreve Specs/Plan/Tasks)
                     │
               soft-engineer-agent
                     │ (implementa + TDD + bug reports)
 ```
+
+Além do core-4, existem **agentes de domínio** com specs próprias: `devops-engineer` (CI/CD, git flow) e `game-developer` (código de jogo exclusivo). Esses agentes não fazem parte do pipeline SDD e são definidos em `specs/features/devops-engineer/` e `specs/features/game-developer/`.
 
 Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônico de output e um papel único no fluxo.
 
@@ -32,8 +35,9 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 
 | Termo | Definição |
 |---|---|
-| **Sub-agente Claude Code** | Arquivo `.md` em `.claude/agents/` com frontmatter YAML; invocado via `claude --agent <name>` ou pelo operador via Task tool |
-| **`dadaia-grill-me` skill** | Skill compartilhada de revisão crítica; usada pelo architect-agent e product-auditor-agent para identificar buracos e inconsistências |
+| **Agente especializado** | Persona canônica versionada em `dadaia_workspace/public/agents/` e projetada para cada runtime conforme suporte nativo |
+| **Sub-agente Claude Code** | Projeção `.md` em `.claude/agents/` com frontmatter YAML; invocado via `claude --agent <name>` ou pelo operador via Task tool |
+| **`dadaia-grill-me` skill** | Skill compartilhada de revisão crítica; usada pelo software-architect e product-auditor-agent para identificar buracos e inconsistências |
 | **Report path** | Diretório canônico onde cada agente pode escrever outputs; definido por agente e criado por `dadaia init` |
 | **Frontmatter de agente** | Seção YAML no topo do arquivo `.md` do agente: `name`, `description`, `model`, `tools` |
 
@@ -44,8 +48,8 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 ### US-001: Revisão arquitetural autônoma
 
 **Critérios de Aceite:**
-- Dado um repositório com código e specs, quando o operador invoca o `architect-agent`, então o agente lê o código, identifica problemas arquiteturais (acoplamento, código legado, código morto, drift entre arquitetura especificada e implementada) e gera um report em `.dadaia/reports/architect-agent-review/`.
-- O agente NUNCA escreve fora de `.dadaia/reports/architect-agent-review/`.
+- Dado um repositório com código e specs, quando o operador invoca o `software-architect`, então o agente lê o código, identifica problemas arquiteturais (acoplamento, código legado, código morto, drift entre arquitetura especificada e implementada) e gera um report em `.dadaia/reports/software-architect/<context-name>/`.
+- O agente NUNCA escreve fora de `.dadaia/reports/software-architect/`.
 - O agente usa `dadaia-grill-me` skill para revisar specs e planos criticamente.
 
 ### US-002: Auditoria de specs vs implementação
@@ -73,9 +77,9 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 
 ---
 
-## Definição dos 4 Agentes
+## Definição dos 4 Agentes do Pipeline SDD
 
-### `architect-agent`
+### `software-architect`
 
 **Papel:** Especialista em arquitetura de software, qualidade de código e arquitetura de testes.
 
@@ -85,7 +89,7 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 - Avalia arquitetura de testes: pirâmide unit/integration/e2e, uso de fakes vs. mocks, cobertura
 - Usa `dadaia-grill-me` skill para revisar specs e planos criticamente, identificando buracos e inconsistências
 
-**Permissões (write):** Somente `.dadaia/reports/architect-agent-review/`  
+**Permissões (write):** Somente `.dadaia/reports/software-architect/`  
 **Proibições:** Jamais escreve em `specs/`, código de produção, `tests/`, ou qualquer outro path  
 **Model:** `claude-opus-4-7`
 
@@ -103,12 +107,12 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 **Proibições:** Jamais modifica specs, código, testes ou qualquer outro path  
 **Model:** `claude-opus-4-7`
 
-### `product-engineer-agent`
+### `product-engineer`
 
 **Papel:** Engenheiro de produto responsável por Specs, Plans e Tasks. Analisa um repositório por vez.
 
 **Capacidades:**
-- Lê reports de `architect-agent` e `product-auditor-agent` antes de qualquer ação
+- Lê reports de `software-architect` e `product-auditor-agent` antes de qualquer ação
 - Cria e atualiza `SPEC.md`, `PLAN.md` e `TASKS.md` baseado nos reports e nas specs existentes
 - Tasks geradas identificam: arquivos afetados, contratos a mudar, pontos específicos na codebase — facilitando a divisão de trabalho
 - Sempre considera reports arquiteturais e de auditoria para garantir que as alterações nas specs tocam os lugares certos
@@ -140,22 +144,22 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 
 ### Definição de Agentes
 
-- FR-001: The system shall provide 4 specialized agents: `architect-agent`, `product-auditor-agent`, `product-engineer-agent`, and `soft-engineer-agent`.
+- FR-001: The system shall provide 4 specialized SDD pipeline agents: `software-architect`, `product-auditor-agent`, `product-engineer`, and `soft-engineer-agent`. Domain agents (`devops-engineer`, `game-developer`) are defined in their own feature specs.
 - FR-002: Each agent shall be defined as a markdown file in `dadaia_workspace/public/agents/` with a YAML frontmatter block specifying `name`, `description`, `model`, and `tools`.
-- FR-003: The `architect-agent` and `product-auditor-agent` shall reference the `dadaia-grill-me` skill in their system prompts.
+- FR-003: The `software-architect` and `product-auditor-agent` shall reference the `dadaia-grill-me` skill in their system prompts.
 - FR-004: Each agent's system prompt shall explicitly state which directories the agent is allowed to write to and which are prohibited.
 
 ### Permissões de Escrita (por agente)
 
-- FR-005: `architect-agent` write scope: exclusively `.dadaia/reports/architect-agent-review/`.
+- FR-005: `software-architect` write scope: exclusively `.dadaia/reports/software-architect/`.
 - FR-006: `product-auditor-agent` write scope: exclusively `.dadaia/reports/specs-sdd-review/`.
-- FR-007: `product-engineer-agent` write scope: exclusively `specs/` of the active context repository.
+- FR-007: `product-engineer` write scope: exclusively `specs/` of the active context repository.
 - FR-008: `soft-engineer-agent` write scope: production code + tests of the active context repository, and `.dadaia/reports/bugs/soft-engineer-report/`.
 
 ### Report Directories
 
 - FR-009: `dadaia init` shall create the following report subdirectories under `.dadaia/reports/`:
-  - `architect-agent-review/`
+  - `software-architect/`
   - `specs-sdd-review/`
   - `bugs/soft-engineer-report/`
 - FR-010: Report files written by agents shall follow the naming convention `<YYYY-MM-DD>-<topic>.md`.
@@ -165,20 +169,20 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 - FR-011: The system shall provide a skill named `dadaia-grill-me` at `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md`.
 - FR-012: The skill shall instruct the agent to ask incisive questions that expose: missing behavior contracts, conflicting requirements, ambiguous state machine transitions, missing traceability, and weak acceptance criteria.
 - FR-013: The skill shall produce its output as a structured list: question → finding → recommendation.
-- FR-014: The skill shall be referenced by name in the `architect-agent` and `product-auditor-agent` system prompts.
+- FR-014: The skill shall be referenced by name in the `software-architect` and `product-auditor-agent` system prompts.
 
 ### Distribuição
 
-- FR-015: Agent files shall live at `dadaia_workspace/public/agents/` and be installed to `<workspace-root>/.claude/agents/` via `dadaia public install`.
-- FR-016: The `dadaia-grill-me` skill shall live at `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md` and be installed to `<workspace-root>/.claude/skills/dadaia-grill-me/SKILL.md` via `dadaia public install`.
-- FR-017: `dadaia public install` shall include `agents/` in the installed artifact set, alongside `rules/`, `skills/`, `commands/`, and `scripts/`.
+- FR-015: Agent files shall live at `dadaia_workspace/public/agents/` and be projected to runtime-native destinations via `dadaia public install --target all|claude|opencode|codex`.
+- FR-016: The `dadaia-grill-me` skill shall live at `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md` and be installed to `<workspace-root>/.agents/skills/dadaia-grill-me/SKILL.md`, plus runtime-specific skill directories when supported.
+- FR-017: `dadaia public install` shall include `agents/` in the staged artifact set and shall report unsupported runtime agent projection as `unsupported` instead of fabricating parity.
 
 ---
 
 ## Requisitos Não-Funcionais
 
 - NFR-001: [Isolamento] Cada agente opera com um escopo de escrita estritamente limitado. O sistema prompt é a única barreira de segurança — nenhum mecanismo de enforcement em código é implementado (é responsabilidade do operador respeitar os agentes corretos para cada tarefa).
-- NFR-002: [Colaboração] A sequência canônica de uso é: architect-agent → product-auditor-agent → product-engineer-agent → soft-engineer-agent. Os agentes não se chamam entre si automaticamente — o operador orquestra.
+- NFR-002: [Colaboração] A sequência canônica de uso é: software-architect → product-auditor-agent → product-engineer → soft-engineer-agent. Os agentes não se chamam entre si automaticamente — o operador orquestra.
 - NFR-003: [Qualidade dos reports] Reports devem ser legíveis por humanos e estruturados o suficiente para serem consumidos pelo agente da próxima etapa.
 - NFR-004: [Manutenibilidade] Cada arquivo de agente em `dadaia_workspace/public/agents/` é autossuficiente — não depende de state externo para sua definição.
 
@@ -192,10 +196,12 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 dadaia_workspace/
   public/
     agents/
-      architect-agent.md
+      software-architect.md
       product-auditor-agent.md
-      product-engineer-agent.md
+      product-engineer.md
       soft-engineer-agent.md
+      devops-engineer.md        ← definido em specs/features/devops-engineer/
+      game-developer.md         ← definido em specs/features/game-developer/
     skills/
       dadaia-grill-me/
         SKILL.md
@@ -211,19 +217,29 @@ dadaia_workspace/
 <workspace-root>/
   .dadaia/
     reports/
-      architect-agent-review/    ← criado por dadaia init
+      software-architect/        ← criado por dadaia init
       specs-sdd-review/          ← criado por dadaia init
       bugs/
         soft-engineer-report/    ← criado por dadaia init
+  .agents/
+    skills/
+      dadaia-grill-me/
+        SKILL.md                 ← skill universal
   .claude/
     agents/
-      architect-agent.md         ← instalado por dadaia public install
+      software-architect.md      ← instalado por dadaia public install
       product-auditor-agent.md
-      product-engineer-agent.md
+      product-engineer.md
       soft-engineer-agent.md
+      devops-engineer.md
+      game-developer.md
     skills/
       dadaia-grill-me/
         SKILL.md                 ← instalado por dadaia public install
+  .codex/
+    rules/
+  .opencode/
+    agents/
 ```
 
 ---

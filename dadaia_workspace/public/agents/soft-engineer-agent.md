@@ -13,7 +13,9 @@ tools:
   - Grep
   - Write
   - Edit
-maxTurns: 20
+skills:
+  - dadaia-workspace-spec-navigator
+maxTurns: 30
 ---
 
 # Soft Engineer Agent

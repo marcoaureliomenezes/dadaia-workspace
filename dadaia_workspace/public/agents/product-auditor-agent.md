@@ -13,6 +13,8 @@ tools:
   - Grep
   - Write
   - Agent
+skills:
+  - dadaia-workspace-spec-navigator
 maxTurns: 30
 ---
 
