@@ -149,3 +149,33 @@
 - [ ] T67 — Integrar com sdd-spec-gate: Write/Edit só permitido se houver uma task com estado `[-]` (IN PROGRESS) que cubra o arquivo-alvo
 - [ ] T68 — Distribuir skill via `dadaia public install --target all`
 - [ ] T69 — Atualizar `foundation/SPEC.md` e `specs/SPEC.md` para refletir a nova política de estados de task como contrato normativo
+
+---
+
+## Fase 8 — Branch tracking + Export trim
+
+> Fase criada em 2026-05-12. Garante que export/import restaura a branch exata de cada repo.
+
+### 8A — Modelo e protocolo
+
+- [x] T70 — Adicionar `current_branch: str | None = None` a `dadaia_workspace/core/models/spec_context.py` (`SpecContextProject`)
+- [x] T71 — Adicionar `current_branch(path: Path) -> str` ao Protocol `dadaia_workspace/core/protocols/git_client.py`
+- [x] T72 — Adicionar `checkout(path: Path, branch: str) -> None` ao Protocol `dadaia_workspace/core/protocols/git_client.py`
+- [x] T73 — Implementar `current_branch()` e `checkout()` em `dadaia_workspace/infrastructure/git_subprocess.py`
+- [x] T74 — Atualizar `dadaia_workspace/infrastructure/json_context_store.py`: ler/escrever `current_branch` (campo opcional com default `None`)
+
+### 8B — Activate e Deactivate
+
+- [x] T75 — Atualizar `features/spec_context/service.py` `activate()`: após clone, se `ctx.current_branch` estiver definido, chamar `git_client.checkout(dest, ctx.current_branch)`; depois ler e armazenar branch atual via `git_client.current_branch(dest)`
+- [x] T76 — Atualizar `features/spec_context/service.py` `deactivate()`: antes do git sync, ler e armazenar `current_branch` via `git_client.current_branch(repo_path)`
+
+### 8C — Export trim + branch refresh
+
+- [x] T77 — Atualizar `features/export/service.py` `resolve_includes()`: remover `.dadaia/scripts/`, `.dadaia/agentic/manifest.json`, `.dadaia/src/`
+- [x] T78 — Adicionar `_refresh_branches()` ao `ExportService`: para cada repo ativo em disco, ler `git_client.current_branch()` e atualizar `spec_contexts.json` atomicamente antes de criar o artefato
+- [x] T79 — Chamar `_refresh_branches()` em `ExportService.run()` antes de `resolve_includes()`
+
+### 8D — Verificação E2E
+
+- [ ] T80 — Teste manual: checkout branch `feature/test` em um repo ativo → `dadaia export` → verificar que `spec_contexts.json` no artefato tem `current_branch: feature/test` → `dadaia import` em dir novo → verificar que o repo foi clonado e está na branch `feature/test`
+- [ ] T81 — Verificar que artefato não contém `.dadaia/scripts/`, `.dadaia/agentic/`, `.dadaia/src/`

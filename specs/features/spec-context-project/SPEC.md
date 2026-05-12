@@ -45,6 +45,7 @@ O **Spec Context Project** é a entidade central do dadaia-workspace. Representa
 | **Whitelist** | `repos.xlsx` em `.dadaia/src/`; define repos válidos para criar contextos |
 | **Git sync** | Antes de deactivate: `git add -A && git commit` (se dirty) + `git push` (se tem remote) |
 | **Scaffold** | Estrutura mínima de `specs/` criada por `activate` quando o repo clonado não tem `specs/` |
+| **`current_branch`** | Branch git ativa no repo no momento da última operação (activate, deactivate ou refresh de export). Armazenada em `spec_contexts.json`. Usada por `activate` para restaurar a branch correta após clone em novo workspace. |
 
 ---
 
@@ -133,10 +134,13 @@ O **Spec Context Project** é a entidade central do dadaia-workspace. Representa
 ### Ativação
 
 - FR-006: `dadaia context activate <name>` shall clone `repo_url` to `repos/<slug>/` if the directory does not exist.
+- FR-006-B: After cloning, if `current_branch` is set in the context state and differs from the default branch, `activate` shall run `git checkout <current_branch>` in the cloned repo. If checkout fails (branch deleted or unavailable), `activate` shall emit a warning and continue on the default branch.
+- FR-006-C: After clone (and optional checkout), `activate` shall read the actual current branch via `git branch --show-current` and store it as `current_branch` in `spec_contexts.json`.
 - FR-007: After cloning, if `repos/<slug>/specs/` does not exist, `activate` shall create a minimal scaffold.
 - FR-008: `activate` shall mark the context as `ativo` and resolve `specs_dir` in the JSON.
 - FR-009: If no context currently has `is_primary=True`, `activate` shall auto-promote the newly activated context.
 - FR-010: If a context is already `ativo`, re-activating shall be a no-op (no re-clone).
+- FR-010-B: `deactivate` shall read the actual current branch via `git branch --show-current` and store it as `current_branch` in `spec_contexts.json` before running git sync — ensuring the branch is recorded before the repo is removed from disk.
 
 ### Promoção a Primário
 
@@ -166,7 +170,7 @@ O **Spec Context Project** é a entidade central do dadaia-workspace. Representa
 - FR-023: `dadaia context list` shall display a table with `name`, `state`, `is_primary`, and `repo_slug` for all contexts.
 - FR-024: `dadaia context show [--json]` without a name shall display the primary context.
 - FR-025: `dadaia context show <name> [--json]` shall display the named context.
-- FR-026: `--json` output shall include `name`, `state`, `is_primary`, `repo_slug`, and `specs_dir`.
+- FR-026: `--json` output shall include `name`, `state`, `is_primary`, `repo_slug`, `specs_dir`, and `current_branch`.
 - FR-027: When no primary context exists, `dadaia context show --json` shall return `{"context": null}`.
 
 ### Doctor

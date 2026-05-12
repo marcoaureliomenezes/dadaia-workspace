@@ -5,6 +5,26 @@
 
 ---
 
+## Bugs Abertos
+
+### BUG-001 — `dadaia-switch-context` command: lógica de troca obsoleta e stale v2 language ✅ RESOLVIDO (2026-05-12)
+
+**Arquivo afetado:** `.claude/commands/dadaia-switch-context.md` (project-specific, não lib-originated)
+
+**Sintomas observados em produção:**
+1. Step 3 executou `dadaia context deactivate` sem argumento `NAME` → erro: `Missing argument 'NAME'`
+2. Step 3 executou `dadaia context deactivate workflow-tools` → erro: primary context cannot be deactivated; must promote another first
+3. Step 4 chamava `dadaia context activate` mas não promovia o contexto a primário
+
+**Causa raiz:**
+- Step 3 instruía deactivar o contexto primário antes de promover o novo — operação bloqueada pelo CLI v4 (corretamente)
+- A lógica de troca de contexto é simplesmente `promote`; deactivate remove o repo do disco e não é a operação correta para switch
+- Linguagem v2 stale: referências a `.dadaia/contexts/`, estado `standby` e "materialized copies" — nenhum existe na v4
+
+**Fix aplicado:** Step 3 removido; fluxo correto é: se target está `inativo` → `activate` primeiro; depois sempre `promote`. Toda linguagem v2 stale removida.
+
+---
+
 ## Gaps fechados
 
 ### GAP-013 — `ContextStore` Protocol: um arquivo ou dois? ✅ FECHADO
