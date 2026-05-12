@@ -82,5 +82,6 @@ def build_export_service(workspace_root: Path) -> ExportService:
     states = _states_dir(workspace_root)
     return ExportService(
         context_store=JsonContextStore(states),
+        git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )

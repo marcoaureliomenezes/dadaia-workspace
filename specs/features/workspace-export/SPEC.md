@@ -40,13 +40,10 @@ Esta spec define o comando `dadaia export` que empacota tudo isso em um único `
 
 ```
 workspace-YYYY-MM-DD-HHMMSS.tar.gz
-├── export-manifest.json          ← metadados + lista de contexts + URLs dos repos
+├── export-manifest.json          ← metadados + lista de contexts + URLs + branches dos repos
 ├── .dadaia/
-│   ├── states/                   ← spec_contexts.json, primary_context.json (CRÍTICO)
-│   ├── academy/                  ← conteúdo de cursos ativos
-│   ├── scripts/                  ← ctx-inject.sh, sdd-spec-gate.sh
-│   ├── agentic/                  ← manifest e staging de assets agentic
-│   └── src/                      ← repos.xlsx (catálogo de repos)
+│   ├── states/                   ← spec_contexts.json (com current_branch atualizado), primary_context.json (CRÍTICO)
+│   └── academy/                  ← conteúdo de cursos ativos
 ├── CLAUDE.md                     ← contexto VPS para Claude Code
 ├── AGENTS.md                     ← regras universais
 ├── opencode.json                 ← config do opencode-serve
@@ -77,8 +74,11 @@ workspace-YYYY-MM-DD-HHMMSS.tar.gz
 | `.dadaia/.venv/` | Recriável com `dadaia init` |
 | `.dadaia/tmp/` | Efêmero por design |
 | `.dadaia/contexts/` | Deprecated (213MB de resquícios) |
+| `.dadaia/scripts/` | Regenerado por `dadaia public install` — ctx-inject.sh e sdd-spec-gate.sh são lib-originated |
+| `.dadaia/agentic/` | Gerado por `dadaia public stage` — regenerado por `dadaia init` |
+| `.dadaia/src/` | repos.xlsx é distribuído com o pacote — regenerado por `dadaia init` |
 | `.dadaia/reports/` | Opcional via `--include-reports` |
-| `repos/` | Gerenciados por git; URLs em spec_contexts.json |
+| `repos/` | Gerenciados por git; URL + branch em `spec_contexts.json` |
 | `mnt/openclaw/data/.npm/` | Cache npm, recriável |
 | `mnt/openclaw/data/.cache/` | Cache linux/node, recriável |
 | `mnt/openclaw/data/linuxbrew/` | Package manager, recriado pelo container |
@@ -188,22 +188,21 @@ docker compose -f services/docker-compose.yml up -d
 | ID | Requisito |
 |---|---|
 | FR1 | `dadaia export` gera `.dadaia/dist/workspace-<timestamp>.tar.gz` |
-| FR2 | O artefato inclui todos os estados JSON de `.dadaia/states/` |
+| FR2 | O artefato inclui todos os estados JSON de `.dadaia/states/` — com `spec_contexts.json` atualizado com `current_branch` de cada repo ativo |
 | FR3 | O artefato inclui `.dadaia/academy/` com conteúdo de cursos ativos |
-| FR4 | O artefato inclui `.dadaia/scripts/` e `.dadaia/src/` |
-| FR5 | O artefato inclui arquivos de configuração do workspace root: CLAUDE.md, AGENTS.md, opencode.json |
-| FR6 | O artefato inclui projeções runtime: `.agents/skills/`, `.claude/`, `.codex/`, `.opencode/` e `opencode.json` |
-| FR7 | O artefato inclui `.dadaia/agentic/manifest.json` para diagnóstico de versão/hashes |
-| FR8 | O artefato inclui `mnt/` com excludes de cache definidos (se mnt/ existir e --exclude-mnt não usado) |
-| FR9 | O artefato EXCLUI `.dadaia/.venv/`, `.dadaia/tmp/`, `.dadaia/contexts/`, `repos/` |
-| FR10 | O artefato EXCLUI dentro de mnt/: `.npm/`, `.cache/`, `linuxbrew/`, `.codex/` (caches OpenClaw) |
-| FR11 | O artefato EXCLUI qualquer arquivo `*.env` (secrets protection) — emitir warning se detectar |
-| FR12 | `export-manifest.json` é gerado dentro do artefato com: timestamp, version, contexts+URLs, includes, sizes |
-| FR13 | `dadaia export --list` imprime o manifest em stdout sem criar o arquivo |
-| FR14 | `dadaia export --include-reports` adiciona `.dadaia/reports/` ao artefato |
-| FR15 | `dadaia export --output <dir>` salva o arquivo no diretório especificado |
-| FR16 | `dadaia export --exclude-mnt` omite o diretório `mnt/` inteiro |
-| FR17 | `.dadaia/dist/` é criado automaticamente se não existir |
+| FR4 | O artefato inclui arquivos de configuração do workspace root: CLAUDE.md, AGENTS.md, opencode.json |
+| FR5 | O artefato inclui projeções runtime: `.agents/skills/`, `.claude/settings.json`, `.claude/settings.local.json`, `.claude/rules/`, `.codex/`, `.opencode/` |
+| FR6 | O artefato inclui `mnt/` com excludes de cache definidos (se mnt/ existir e --exclude-mnt não usado) |
+| FR7 | Antes de criar o artefato, `dadaia export` atualiza `current_branch` em `spec_contexts.json` para cada repo ativo lendo `git branch --show-current` do disco. Se o repo não estiver em disco, mantém o valor existente |
+| FR8 | O artefato EXCLUI: `.dadaia/.venv/`, `.dadaia/tmp/`, `.dadaia/contexts/`, `.dadaia/scripts/`, `.dadaia/agentic/`, `.dadaia/src/`, `repos/` |
+| FR9 | O artefato EXCLUI dentro de mnt/: `.npm/`, `.cache/`, `linuxbrew/`, `.codex/` (caches OpenClaw) |
+| FR10 | O artefato EXCLUI qualquer arquivo `*.env` (secrets protection) — emitir warning se detectar |
+| FR11 | `export-manifest.json` é gerado dentro do artefato com: timestamp, version, contexts+URLs+branches, includes, sizes |
+| FR12 | `dadaia export --list` imprime o manifest em stdout sem criar o arquivo |
+| FR13 | `dadaia export --include-reports` adiciona `.dadaia/reports/` ao artefato |
+| FR14 | `dadaia export --output <dir>` salva o arquivo no diretório especificado |
+| FR15 | `dadaia export --exclude-mnt` omite o diretório `mnt/` inteiro |
+| FR16 | `.dadaia/dist/` é criado automaticamente se não existir |
 
 ---
 
