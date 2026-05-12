@@ -1,6 +1,7 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
 import shutil
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -91,6 +92,22 @@ class SpecContextService:
         if not repo_path.exists():
             self._git.clone(ctx.repo_url, repo_path)
 
+        # Checkout target branch if stored in context
+        if ctx.current_branch:
+            try:
+                self._git.checkout(repo_path, ctx.current_branch)
+            except Exception as exc:
+                print(
+                    f"WARNING: could not checkout branch {ctx.current_branch!r}: {exc}",
+                    file=sys.stderr,
+                )
+
+        # Read actual branch from disk
+        try:
+            actual_branch: str | None = self._git.current_branch(repo_path)
+        except Exception:
+            actual_branch = None
+
         # Scaffold specs/ if absent
         specs_dir = self._specs_dir(ctx.repo_slug)
         if not specs_dir.exists():
@@ -114,6 +131,7 @@ class SpecContextService:
             is_primary=ctx.is_primary,
             created_at=ctx.created_at,
             activated_at=_now(),
+            current_branch=actual_branch,
         )
         self._store.update(activated)
 
@@ -141,7 +159,12 @@ class SpecContextService:
             )
 
         repo_path = self._repo_path(ctx.repo_slug)
+        branch_before_sync: str | None = None
         if repo_path.exists():
+            try:
+                branch_before_sync = self._git.current_branch(repo_path)
+            except Exception:
+                pass
             if self._git.is_dirty(repo_path):
                 try:
                     self._git.commit_all(repo_path, "chore: auto-sync before deactivate")
@@ -168,6 +191,7 @@ class SpecContextService:
             is_primary=False,
             created_at=ctx.created_at,
             activated_at=None,
+            current_branch=branch_before_sync,
         )
         self._store.update(inactive)
         return inactive
@@ -197,6 +221,7 @@ class SpecContextService:
                     is_primary=False,
                     created_at=existing.created_at,
                     activated_at=existing.activated_at,
+                    current_branch=existing.current_branch,
                 )
                 self._store.update(demoted)
 
@@ -211,6 +236,7 @@ class SpecContextService:
             is_primary=True,
             created_at=ctx.created_at,
             activated_at=ctx.activated_at,
+            current_branch=ctx.current_branch,
         )
         self._store.update(promoted)
         self._primary.write(

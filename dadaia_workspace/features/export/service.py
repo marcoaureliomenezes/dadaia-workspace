@@ -9,7 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.models.export import ExportManifest, ExportOptions, ExportResult
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.protocols.context_store import ContextStore
+from dadaia_workspace.core.protocols.git_client import GitClient
 
 _EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
     {".npm", ".npm-global", ".cache", ".local", "linuxbrew", ".venv", "tmp", "contexts"}
@@ -35,8 +37,9 @@ def _dadaia_version() -> str:
 
 
 class ExportService:
-    def __init__(self, context_store: ContextStore, workspace_root: Path) -> None:
+    def __init__(self, context_store: ContextStore, git_client: GitClient, workspace_root: Path) -> None:
         self._store = context_store
+        self._git = git_client
         self._workspace_root = workspace_root
 
     def resolve_includes(self, options: ExportOptions) -> list[tuple[Path, str]]:
@@ -53,9 +56,6 @@ class ExportService:
 
         _add_if_exists(dadaia / "states", ".dadaia/states")
         _add_if_exists(dadaia / "academy", ".dadaia/academy")
-        _add_if_exists(dadaia / "scripts", ".dadaia/scripts")
-        _add_if_exists(dadaia / "agentic" / "manifest.json", ".dadaia/agentic/manifest.json")
-        _add_if_exists(dadaia / "src", ".dadaia/src")
 
         if options.include_reports:
             _add_if_exists(dadaia / "reports", ".dadaia/reports")
@@ -83,6 +83,29 @@ class ExportService:
 
         return includes
 
+    def _refresh_branches(self) -> None:
+        for ctx in self._store.list_all():
+            if ctx.state != ContextState.ATIVO:
+                continue
+            repo_path = self._workspace_root / "repos" / ctx.repo_slug
+            if not repo_path.exists():
+                continue
+            try:
+                branch = self._git.current_branch(repo_path)
+                updated = SpecContextProject(
+                    name=ctx.name,
+                    state=ctx.state,
+                    repo_slug=ctx.repo_slug,
+                    repo_url=ctx.repo_url,
+                    is_primary=ctx.is_primary,
+                    created_at=ctx.created_at,
+                    activated_at=ctx.activated_at,
+                    current_branch=branch,
+                )
+                self._store.update(updated)
+            except Exception:
+                pass
+
     def build_manifest(
         self, includes: list[tuple[Path, str]], options: ExportOptions
     ) -> ExportManifest:
@@ -93,6 +116,7 @@ class ExportService:
                     "repo_url": ctx.repo_url,
                     "is_primary": ctx.is_primary,
                     "state": ctx.state,
+                    "current_branch": ctx.current_branch,
                 }
                 for ctx in self._store.list_all()
             )
@@ -147,6 +171,7 @@ class ExportService:
         )
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        self._refresh_branches()
         includes = self.resolve_includes(options)
         manifest = self.build_manifest(includes, options)
 
