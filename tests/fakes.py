@@ -44,8 +44,10 @@ class FakeGitClient:
         self.cloned: list[tuple[str, Path]] = []
         self.committed: list[Path] = []
         self.pushed: list[Path] = []
+        self.checked_out: list[tuple[Path, str]] = []
         self._dirty: set[Path] = set()
         self._has_remote: set[Path] = set()
+        self._branches: dict[Path, str] = {}
 
     def clone(self, url: str, dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
@@ -62,6 +64,13 @@ class FakeGitClient:
 
     def push(self, path: Path) -> None:
         self.pushed.append(path)
+
+    def current_branch(self, path: Path) -> str:
+        return self._branches.get(path, "main")
+
+    def checkout(self, path: Path, branch: str) -> None:
+        self.checked_out.append((path, branch))
+        self._branches[path] = branch
 
 
 class FakeCourseStore:

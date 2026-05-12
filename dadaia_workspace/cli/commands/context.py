@@ -50,6 +50,7 @@ def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "is_primary": ctx.is_primary,
         "created_at": ctx.created_at,
         "activated_at": ctx.activated_at,
+        "current_branch": ctx.current_branch,
     }
 
 
