@@ -111,7 +111,8 @@ class ImportService:
     # ── Phase 4 ─────────────────────────────────────────────────────────────
 
     def bootstrap(self, workspace_root: Path) -> None:
-        subprocess.run(["dadaia", "init"], cwd=workspace_root, check=True)
+        dadaia_bin = str(Path(sys.executable).parent / "dadaia")
+        subprocess.run([dadaia_bin, "init"], cwd=workspace_root, check=True)
 
     # ── Phase 5 ─────────────────────────────────────────────────────────────
 
@@ -130,9 +131,10 @@ class ImportService:
             (str(c["name"]) for c in ativo if c.get("is_primary")), None
         )
 
+        dadaia_bin = str(Path(sys.executable).parent / "dadaia")
         for ctx in ativo:
             result = subprocess.run(
-                ["dadaia", "context", "activate", str(ctx["name"])],
+                [dadaia_bin, "context", "activate", str(ctx["name"])],
                 cwd=workspace_root,
                 capture_output=True,
                 text=True,
@@ -142,7 +144,7 @@ class ImportService:
 
         if primary_name:
             result = subprocess.run(
-                ["dadaia", "context", "promote", primary_name],
+                [dadaia_bin, "context", "promote", primary_name],
                 cwd=workspace_root,
                 capture_output=True,
                 text=True,
