@@ -48,3 +48,9 @@ class GitSubprocessClient:
         result = _run(["git", "checkout", branch], cwd=path)
         if result.returncode != 0:
             raise GitSyncError(f"git checkout {branch!r} failed in {path}: {result.stderr.strip()}")
+
+    def is_git_root(self, path: Path) -> bool:
+        result = _run(["git", "rev-parse", "--show-toplevel"], cwd=path)
+        if result.returncode != 0:
+            return False
+        return Path(result.stdout.strip()).resolve() == path.resolve()
