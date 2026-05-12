@@ -72,6 +72,9 @@ class FakeGitClient:
         self.checked_out.append((path, branch))
         self._branches[path] = branch
 
+    def is_git_root(self, path: Path) -> bool:
+        return path.exists()
+
 
 class FakeCourseStore:
     def __init__(self) -> None:
