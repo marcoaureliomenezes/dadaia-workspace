@@ -4,6 +4,7 @@ import typer
 
 from dadaia_workspace.cli.commands import academy, context, doctor, init, public, repos
 from dadaia_workspace.cli.commands.export import export
+from dadaia_workspace.cli.commands.import_ import import_workspace
 
 app = typer.Typer(
     name="dadaia",
@@ -14,6 +15,7 @@ app = typer.Typer(
 # Top-level commands
 app.command(name="init")(init.init)
 app.command(name="export")(export)
+app.command(name="import")(import_workspace)
 
 # Sub-command groups
 app.add_typer(context.app, name="context")

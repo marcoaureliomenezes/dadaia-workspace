@@ -52,6 +52,7 @@ dadaia_workspace/
       doctor.py
       academy.py
       export.py
+      import_.py
   core/
     __init__.py
     exceptions.py
@@ -61,6 +62,7 @@ dadaia_workspace/
       spec_context.py
       course.py
       export.py
+      import_.py
     protocols/
       __init__.py
       context_store.py
@@ -91,6 +93,9 @@ dadaia_workspace/
       service.py
       knowledge_basis/
     export/
+      __init__.py
+      service.py
+    import_/
       __init__.py
       service.py
   infrastructure/

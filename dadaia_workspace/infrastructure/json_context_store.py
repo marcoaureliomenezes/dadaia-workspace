@@ -31,6 +31,7 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "is_primary": ctx.is_primary,
         "created_at": ctx.created_at,
         "activated_at": ctx.activated_at,
+        "current_branch": ctx.current_branch,
     }
 
 
@@ -43,6 +44,7 @@ def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
         is_primary=d["is_primary"],
         created_at=d["created_at"],
         activated_at=d.get("activated_at"),
+        current_branch=d.get("current_branch"),
     )
 
 

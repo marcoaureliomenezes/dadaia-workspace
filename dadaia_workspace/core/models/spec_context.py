@@ -18,3 +18,4 @@ class SpecContextProject:
     is_primary: bool
     created_at: str
     activated_at: str | None = None
+    current_branch: str | None = None
