@@ -11,7 +11,7 @@ dadaia = "dadaia_workspace.cli.main:app"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-typer = {extras = ["all"], version = "^0.12"}
+typer = {extras = ["all"], version = ">=0.12"}
 rich = "^13"
 openpyxl = "^3.1"
 
