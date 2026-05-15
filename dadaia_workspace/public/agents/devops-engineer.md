@@ -24,7 +24,26 @@ skills:
   - github-actions-pipelines
   - devops-gitflow-governance
   - devops-deploy-strategies
+  - dadaia-task-manager
 maxTurns: 60
+input_contract:
+  requires_inputs:
+    - name: context
+      kind: string
+      source: workflow_input
+      description: "Active Spec Context Project name"
+      stop_if_missing: true
+    - name: discovery_report
+      kind: report
+      source: report_path
+      description: "Discovery report produced by product-engineer for this evolution"
+      stop_if_missing: false
+  produces_outputs:
+    - name: devops_report
+      kind: report
+      path: .dadaia/reports/{context}/devops-engineer/{ts}-devops.md
+      schema_ref: handoff-schema-v1
+  stop_if_missing: true
 ---
 
 # DevOps Engineer

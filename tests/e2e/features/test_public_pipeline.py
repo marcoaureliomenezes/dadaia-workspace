@@ -11,8 +11,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 # ---------------------------------------------------------------------------
@@ -39,7 +37,9 @@ EXPECTED_SKILLS = {
     "architect-code-audit",
     "architect-design-patterns",
     "dadaia-grill-me",
+    "dadaia-task-manager",
     "dadaia-workspace-doctor",
+    "dadaia-workspace-manager",
     "dadaia-workspace-spec-navigator",
     "dadaia-workspace-spec-reviewer",
     "devops-deploy-strategies",
@@ -225,9 +225,9 @@ class TestInstallAll:
 
         assert (workspace / ".codex" / "hooks.json").exists(), ".codex/hooks.json not created"
         assert (workspace / ".codex" / "config.toml").exists(), ".codex/config.toml not created"
-        assert (
-            workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md"
-        ).exists(), ".codex/rules/dadaia-workspace-dev-guardrail.md not installed"
+        assert (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists(), (
+            ".codex/rules/dadaia-workspace-dev-guardrail.md not installed"
+        )
 
     def test_install_no_stale_agents_in_claude(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -235,9 +235,7 @@ class TestInstallAll:
 
         claude_agents = _runtime_agents(workspace / ".claude" / "agents")
         stale_found = claude_agents & STALE_AGENTS
-        assert not stale_found, (
-            f"Stale agents found in .claude/agents/: {sorted(stale_found)}"
-        )
+        assert not stale_found, f"Stale agents found in .claude/agents/: {sorted(stale_found)}"
 
     def test_install_no_stale_agents_in_opencode(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -245,9 +243,7 @@ class TestInstallAll:
 
         opencode_agents = _runtime_agents(workspace / ".opencode" / "agents")
         stale_found = opencode_agents & STALE_AGENTS
-        assert not stale_found, (
-            f"Stale agents found in .opencode/agents/: {sorted(stale_found)}"
-        )
+        assert not stale_found, f"Stale agents found in .opencode/agents/: {sorted(stale_found)}"
 
 
 # ---------------------------------------------------------------------------
@@ -336,9 +332,7 @@ class TestDoctor:
         report = mgr.doctor(workspace)
 
         failures = [line for line in report if line.startswith(("[drift]", "[missing]"))]
-        assert not failures, (
-            f"Doctor reported failures after clean install:\n" + "\n".join(failures)
-        )
+        assert not failures, "Doctor reported failures after clean install:\n" + "\n".join(failures)
 
     def test_doctor_detects_drift_after_runtime_modification(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -351,10 +345,10 @@ class TestDoctor:
 
         report = mgr.doctor(workspace)
 
-        drift_lines = [l for l in report if "[drift]" in l and "software-engineer" in l]
+        drift_lines = [line for line in report if "[drift]" in line and "software-engineer" in line]
         assert drift_lines, (
             "Doctor did not detect drift in .claude/agents/software-engineer.md.\n"
-            f"Full report:\n" + "\n".join(report)
+            "Full report:\n" + "\n".join(report)
         )
 
     def test_doctor_detects_missing_after_runtime_deletion(self, tmp_path: Path) -> None:
@@ -367,8 +361,82 @@ class TestDoctor:
 
         report = mgr.doctor(workspace)
 
-        missing_lines = [l for l in report if "[missing]" in l and "qa-engineer" in l]
+        missing_lines = [line for line in report if "[missing]" in line and "qa-engineer" in line]
         assert missing_lines, (
             "Doctor did not detect missing .claude/agents/qa-engineer.md.\n"
-            f"Full report:\n" + "\n".join(report)
+            "Full report:\n" + "\n".join(report)
         )
+
+
+# ---------------------------------------------------------------------------
+# TestWorkflows — validates the workflows/ asset type (multi-agent-orchestration)
+# ---------------------------------------------------------------------------
+
+
+EXPECTED_WORKFLOWS = {"spec-refinement", "tdd-cycle"}
+
+
+class TestWorkflows:
+    def test_stage_includes_all_workflow_files(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        _manager().stage(workspace)
+        workflows_dir = workspace / ".dadaia" / "agentic" / "workflows"
+        assert workflows_dir.is_dir()
+        staged = {p.stem.removesuffix(".workflow") for p in workflows_dir.glob("*.workflow.md")}
+        assert staged == EXPECTED_WORKFLOWS
+
+    def test_install_all_projects_workflows_to_every_runtime(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        _staged_install(workspace)
+        for runtime in (".agents", ".claude", ".opencode", ".codex"):
+            for stem in EXPECTED_WORKFLOWS:
+                projected = workspace / runtime / "workflows" / f"{stem}.workflow.md"
+                assert projected.exists(), f"workflow not projected to {projected}"
+
+    def test_doctor_reports_partial_for_opencode_when_parallel_group(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        _staged_install(workspace)
+        report = _manager().doctor(workspace)
+        partial_lines = [
+            line for line in report if line.startswith("[partial]") and "spec-refinement" in line
+        ]
+        assert partial_lines, (
+            "Doctor did not emit [partial] for opencode:spec-refinement.\n"
+            "Full report:\n" + "\n".join(report)
+        )
+
+    def test_doctor_reports_unsupported_for_codex_when_parallel_group(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        _staged_install(workspace)
+        report = _manager().doctor(workspace)
+        unsupported_lines = [
+            line
+            for line in report
+            if line.startswith("[unsupported]") and "codex:workflows/spec-refinement" in line
+        ]
+        assert unsupported_lines, (
+            "Doctor did not emit [unsupported] for codex:spec-refinement.\n"
+            "Full report:\n" + "\n".join(report)
+        )
+
+    def test_doctor_reports_ok_for_serial_workflow(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        _staged_install(workspace)
+        report = _manager().doctor(workspace)
+        # tdd-cycle has no parallel_group → both opencode and codex should be [ok]
+        ok_lines = [
+            line
+            for line in report
+            if line.startswith("[ok]") and "tdd-cycle" in line and ":workflows/" in line
+        ]
+        assert any("opencode" in line for line in ok_lines)
+        assert any("codex" in line for line in ok_lines)
+        assert any("claude" in line for line in ok_lines)
+
+    def test_seed_workflows_pass_schema_validation(self, tmp_path: Path) -> None:
+        """`dadaia public stage` aborts if any workflow fails schema validation."""
+        workspace = tmp_path / "ws"
+        # Should not raise — seed workflows are valid by contract.
+        _manager().stage(workspace)
+        # Re-staging idempotently must keep working.
+        _manager().stage(workspace)
