@@ -1,9 +1,9 @@
 # Spec: Feature — Specialized Agents
 
-> **Status:** Aprovado
-> **Versão:** 1.0
+> **Status:** Em revisão
+> **Versão:** 1.1
 > **Autor:** Marco Menezes
-> **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/architecture.md`, `specs/features/agent-rules-skills/SPEC.md`
+> **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/architecture.md`, `specs/features/agent-rules-skills/SPEC.md`, `specs/features/multi-agent-orchestration/SPEC.md`
 > **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
@@ -194,6 +194,78 @@ Nenhum agente tem permissão irrestrita de escrita. Cada um tem um path canônic
 - FR-015: Agent files shall live at `dadaia_workspace/public/agents/` and be projected to runtime-native destinations via `dadaia public install --target all|claude|opencode|codex`.
 - FR-016: The `dadaia-grill-me` skill shall live at `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md` and be installed to `<workspace-root>/.agents/skills/dadaia-grill-me/SKILL.md`, plus runtime-specific skill directories when supported.
 - FR-017: `dadaia public install` shall include `agents/` in the staged artifact set and shall report unsupported runtime agent projection as `unsupported` instead of fabricating parity.
+
+### Input Contract (obrigatório por agente)
+
+> Adicionado pela evolução `multi-agent-orchestration`. Resolve o gap apontado na literatura v1/v2: sem contrato declarado, agentes invocados em sessões "frescas" inventam contexto. Falha cedo, falha clara.
+
+- **FR-018:** Every agent file in `dadaia_workspace/public/agents/` shall declare an `input_contract` block in the YAML frontmatter with three fields: `requires_inputs` (list), `produces_outputs` (list), `stop_if_missing` (bool, default `true`).
+- **FR-019:** Each element of `requires_inputs` shall declare: `name` (snake_case), `kind` (one of `string | path | report`), `source` (one of `workflow_input | report_path | stdin`), `description` (short text), `stop_if_missing` (bool, default `true`).
+- **FR-020:** Each element of `produces_outputs` shall declare: `name` (snake_case), `kind` (typically `report`), `path` (template; may contain `{context}`, `{run_id}`, `{ts}` placeholders), `schema_ref` (e.g., `handoff-schema-v1` or a feature-specific schema id).
+- **FR-021:** When `stop_if_missing: true`, the agent's system prompt shall instruct: "if any required input is missing, do not start work; emit a clear error citing the missing input and its declared source."
+- **FR-022:** Reports produced by an agent (under `produces_outputs[*].path`) shall conform to **Handoff Schema v1** (see section "Handoff Schema v1" below). Schema evolutions require a SemVer bump (`handoff-schema-v2`) and a deprecation window.
+
+#### Bloco padrão de `input_contract` (referência)
+
+```yaml
+input_contract:
+  requires_inputs:
+    - name: context
+      kind: string
+      source: workflow_input
+      description: "Active Spec Context Project name (e.g. dadaia-workspace)"
+      stop_if_missing: true
+    - name: discovery_report             # exemplo para agente que consome report do Stage 0
+      kind: report
+      source: report_path
+      description: "Path to the discovery report produced by product-engineer"
+      stop_if_missing: true
+  produces_outputs:
+    - name: orchestration_arch_report
+      kind: report
+      path: .dadaia/reports/{context}/software-architect/{ts}-orchestration-arch.md
+      schema_ref: handoff-schema-v1
+  stop_if_missing: true
+```
+
+### Handoff Schema v1
+
+> Definido por esta spec; consumido por `specs/features/multi-agent-orchestration/SPEC.md` via `must_include` checks por stage.
+
+Todo report inter-agente em `.dadaia/reports/<context>/<agent>/<ts>-<type>.md` shall begin with:
+
+```markdown
+# <Tipo> — <Contexto>
+
+Data: <ISO 8601 UTC>
+Agente: <nome do agente>
+Spec Context: <nome>
+Inputs:
+- <path absoluto ou relativo a workspace-root de cada input consumido>
+Escopo: <1–3 linhas>
+
+---
+
+## Findings
+<seção obrigatória>
+
+## Riscos
+<seção obrigatória — pode ser "Nenhum identificado nesta rodada">
+
+## Decisões necessárias
+<seção obrigatória — lista de decisões que precisam do operador ou de outro agente>
+
+## Recomendações
+<seção obrigatória — direta, sem hedging>
+
+## Artefatos consultados
+<seção obrigatória — paths versionados; rastreabilidade>
+
+## Próximo gate
+<seção obrigatória — nomeia o próximo stage do workflow ou o gate operacional>
+```
+
+- **FR-023:** The `dadaia orchestrate` workflow runner shall validate that reports produced by stages whose `expected_output.must_include` lists the canonical section headings above contain those exact headings; missing headings emit `stage_failed` with a clear message.
 
 ---
 

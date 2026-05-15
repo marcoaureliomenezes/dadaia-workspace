@@ -17,7 +17,35 @@ tools:
   - Grep
 skills:
   - dadaia-workspace-spec-navigator
+  - dadaia-task-manager
 maxTurns: 40
+input_contract:
+  requires_inputs:
+    - name: context
+      kind: string
+      source: workflow_input
+      description: "Active Spec Context Project name"
+      stop_if_missing: true
+    - name: task_id
+      kind: string
+      source: workflow_input
+      description: "Approved task identifier from TASKS.md (TDD red phase)"
+      stop_if_missing: false
+    - name: discovery_report
+      kind: report
+      source: report_path
+      description: "Discovery report when running as specialist in spec-refinement"
+      stop_if_missing: false
+  produces_outputs:
+    - name: red_test_report
+      kind: report
+      path: .dadaia/reports/{context}/qa-engineer/{ts}-{task_id}-red.md
+      schema_ref: handoff-schema-v1
+    - name: qa_audit_report
+      kind: report
+      path: .dadaia/reports/{context}/qa-engineer/{ts}-qa.md
+      schema_ref: handoff-schema-v1
+  stop_if_missing: true
 ---
 
 # QA Engineer

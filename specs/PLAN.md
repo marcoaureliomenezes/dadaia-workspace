@@ -1,7 +1,8 @@
 # PLAN: dadaia-workspace — Backlog Completo
 
-> **Status:** Aprovado
-> **Referências:** `specs/SPEC.md`, `specs/foundation/SPEC.md`, todos os `specs/features/*/SPEC.md`
+> **Status:** Em revisão
+> **Versão:** 3.1
+> **Referências:** `specs/SPEC.md` (v3.1), `specs/foundation/SPEC.md` (v3.1), todos os `specs/features/*/SPEC.md` incluindo `multi-agent-orchestration` e `release-pipeline`
 
 ---
 
@@ -120,6 +121,86 @@ pytest tests/unit/ -v
 pytest tests/integration/ -v
 pytest tests/e2e/ -v
 ```
+
+---
+
+### Fase 9 — Multi-Agent Orchestration (multi-agent-orchestration v0.1)
+
+> Endereça `specs/features/multi-agent-orchestration/SPEC.md`. Adiciona orquestração como tipo de asset universal de primeira classe + CLI `dadaia orchestrate`. Decisões: ADR-ORCH-001..006 (vide spec).
+
+**Criar (Protocols em `core/protocols/`):**
+- `dadaia_workspace/core/protocols/workflow_store.py` — Protocol `WorkflowStore` (list, get, validate)
+- `dadaia_workspace/core/protocols/run_state_store.py` — Protocol `RunStateStore` (create_run, load_run, update_manifest, append_event, list_runs, iter_events)
+- `dadaia_workspace/core/protocols/agent_dispatcher.py` — Protocol `AgentDispatcher` (capabilities, dispatch, dispatch_parallel) + `DispatcherCapabilities` dataclass
+
+**Criar (Models em `core/models/`):**
+- `dadaia_workspace/core/models/workflow.py` — `WorkflowDefinition`, `WorkflowStage`, `WorkflowInput`, `ExitCriterion` (frozen dataclasses)
+- `dadaia_workspace/core/models/run_state.py` — `RunManifest`, `StageState`, `RunEvent`, `StageInvocation`, `StageResult`
+
+**Criar (feature module `features/orchestration/`):**
+- `dadaia_workspace/features/orchestration/__init__.py`
+- `dadaia_workspace/features/orchestration/service.py` — `OrchestrationService` (list_workflows, show_workflow, start_run, resume_run, get_run_status)
+- `dadaia_workspace/features/orchestration/runner.py` — `WorkflowRunner` (DAG execution, propagação de status, agrupamento parallel_group)
+- `dadaia_workspace/features/orchestration/resolver.py` — `InputResolver` (função pura — workflow_input + stage_output → StageInvocation.inputs)
+
+**Criar (implementações em `infrastructure/`):**
+- `dadaia_workspace/infrastructure/markdown_workflow_store.py` — `MarkdownWorkflowStore` (lê `*.workflow.md` de `.dadaia/agentic/workflows/`; parse YAML + validação de schema; usa `pyyaml`)
+- `dadaia_workspace/infrastructure/json_run_state_store.py` — `JsonRunStateStore` (manifest.json atômico + events.jsonl append-only; ULID-like run_id)
+- `dadaia_workspace/infrastructure/claude_agent_dispatcher.py` — `ClaudeAgentDispatcher` (mode=native; prepara `invocation.md` por stage; host agent dispara via tool `Agent`)
+- `dadaia_workspace/infrastructure/cli_agent_dispatcher.py` — `CliAgentDispatcher` (default; mode=cli-only) + adapters para OpenCode (`best-effort-sequential`) e Codex (`unsupported` para parallel_group)
+
+**Criar (CLI em `cli/commands/`):**
+- `dadaia_workspace/cli/commands/orchestrate.py` — Typer app com 5 subcomandos: `list`, `show`, `run`, `status`, `resume`
+
+**Criar (workflows seed em `public/workflows/`):**
+- `dadaia_workspace/public/workflows/spec-refinement.workflow.md`
+- `dadaia_workspace/public/workflows/tdd-cycle.workflow.md`
+
+**Modificar:**
+- `dadaia_workspace/container.py` — adicionar `build_orchestration_service(workspace_root, runtime=None)` + `_select_dispatcher(runtime)` helper
+- `dadaia_workspace/cli/main.py` — registrar grupo `orchestrate`
+- `dadaia_workspace/infrastructure/public_assets.py` — incluir `"workflows"` em `_COPY_DIRS`, `_CLAUDE_DIRS`, `_OPENCODE_DIRS`; adicionar projeção para `.codex/workflows/` e `.agents/workflows/`
+- `dadaia_workspace/features/public/doctor.py` — adicionar status `partial` ao classificador de runtime (além dos existentes `ok | missing | drift | unsupported`)
+- `dadaia_workspace/public/agents/*.md` (todos os 6) — adicionar bloco `input_contract` no frontmatter conforme `specs/features/agents/SPEC.md` FR-018..023
+- `pyproject.toml` — adicionar `pyyaml = "^6.0"` em `[tool.poetry.dependencies]`
+- `specs/constitution.md` — atualizar lista de stack para incluir `pyyaml` (rodada de governança subsequente)
+
+**Criar (testes):**
+- `tests/unit/test_workflow_schema.py` — parse + validação + erros (sem name, sem stages, ciclo, agent inexistente, parallel_group inválido)
+- `tests/unit/test_run_state_store.py` — lifecycle de run, atomicidade, idempotência de resume, events.jsonl append-only
+- `tests/unit/test_orchestration_service.py` — gates, resume, parallel_group via fake dispatcher
+- `tests/unit/test_orchestration_runtime.py` — testes paramétricos por runtime (claude full / opencode partial / codex unsupported)
+- `tests/integration/test_cli_orchestrate.py` — happy path + erros principais
+- `tests/e2e/features/test_orchestration_pipeline.py` — `stage → install → list → run → status → resume → status` em modo `--runtime cli`
+- `tests/fakes.py` — adicionar `FakeWorkflowStore`, `FakeRunStateStore`, `FakeAgentDispatcher`
+
+### Fase 10 — Release Pipeline v0.1.0 (release-pipeline)
+
+> Endereça `specs/features/release-pipeline/SPEC.md`. Inclui pré-requisitos de fechamento de gaps QA antes da tag.
+
+**Pré-release (fechar gaps QA antes da tag v0.1.0):**
+
+- Corrigir as 3 falhas pré-existentes do CI (FR-REL-028): `test_academy_modules` (Typer API), `test_stage_creates_all_expected_skills` e `test_install_all_populates_universal_skills` (`EXPECTED_SKILLS` desatualizado — adicionar `dadaia-workspace-manager`).
+- Criar unit tests para `features/export/service.py`, `features/import_/service.py`, `features/repos/service.py`.
+- Criar integration tests para CLI `dadaia context` (create/activate/deactivate/promote/show/list/delete), `dadaia export`, `dadaia import`, `dadaia doctor`.
+- Criar testes para hooks `ctx-inject.sh` e `sdd-spec-gate.sh` via subprocess.
+- Adicionar gate `--cov-fail-under=80` em `pyproject.toml`.
+
+**Criar (root files do repositório):**
+- `.github/workflows/ci.yml` — 3 jobs (lint, typecheck, test) + 1 condicional (pr-title); Python 3.12; ubuntu-latest; cache poetry
+- `.github/workflows/release.yml` — 4 jobs (validate → build → publish → smoke-test); OIDC trusted publishing
+- `.github/CODEOWNERS` — global fallback owner + explicit ownership de `.github/`, `pyproject.toml`, `Makefile`, `scripts/`
+- `CHANGELOG.md` — Keep a Changelog 1.1.0; seção `[Unreleased]` no topo + `[0.1.0]` inicial
+- `RELEASING.md` — passo a passo: bump pyproject → CHANGELOG → commit → tag → push → monitor → smoke verify
+
+**Modificar (configurações operacionais — operador executa, não código):**
+- Criar conta PyPI (operador)
+- Configurar pending publisher no PyPI para `dadaia-workspace` (workflow `release.yml`, environment `pypi`)
+- Criar environment `pypi` no GitHub Actions com deployment branches `v*.*.*`
+- Configurar branch protection em `main` (require PR, required status checks `lint`/`typecheck`/`test`, no force push, include administrators)
+- Adicionar `poetry.lock` ao git (se ainda não estiver)
+
+**Não cria:** `.pre-commit-config.yaml`, Trivy/SAST, Codecov, Renovate, semantic-release, multi-OS matrix, multi-Python matrix. Justificativas em `release-pipeline/SPEC.md` "Fora de Escopo (v0.1)".
 
 ---
 

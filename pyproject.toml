@@ -11,15 +11,17 @@ dadaia = "dadaia_workspace.cli.main:app"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-typer = {extras = ["all"], version = ">=0.12"}
+typer = {extras = ["all"], version = ">=0.25"}
 rich = "^13"
 openpyxl = "^3.1"
+pyyaml = "^6.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8"
 pytest-cov = "^5"
-ruff = "^0.4"
+ruff = ">=0.15"
 mypy = "^1.10"
+types-PyYAML = ">=6"
 
 [build-system]
 requires = ["poetry-core"]
@@ -44,3 +46,14 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["dadaia_workspace"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+]

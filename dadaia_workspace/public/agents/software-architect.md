@@ -25,7 +25,26 @@ skills:
   - dadaia-grill-me
   - architect-design-patterns
   - architect-code-audit
+  - dadaia-task-manager
 maxTurns: 50
+input_contract:
+  requires_inputs:
+    - name: context
+      kind: string
+      source: workflow_input
+      description: "Active Spec Context Project name"
+      stop_if_missing: true
+    - name: discovery_report
+      kind: report
+      source: report_path
+      description: "Discovery report produced by product-engineer for this evolution"
+      stop_if_missing: true
+  produces_outputs:
+    - name: arch_report
+      kind: report
+      path: .dadaia/reports/{context}/software-architect/{ts}-arch.md
+      schema_ref: handoff-schema-v1
+  stop_if_missing: true
 ---
 
 # Software Architect
