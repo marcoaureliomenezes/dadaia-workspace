@@ -1,9 +1,9 @@
 # Spec: Foundation — Arquitetura e Qualidade de Software
 
-> **Status:** Aprovado
-> **Versão:** 3.0
+> **Status:** Em revisão
+> **Versão:** 3.1
 > **Escopo:** Princípios de arquitetura, design e qualidade que governam **toda** a implementação do dadaia-workspace
-> **Referências:** `specs/constitution.md`
+> **Referências:** `specs/constitution.md`, `specs/features/multi-agent-orchestration/SPEC.md`, `specs/features/release-pipeline/SPEC.md`
 
 ---
 
@@ -34,7 +34,8 @@ CLI  →  Features  →  Core  ←  Infrastructure
 - `dadaia_workspace/container.py` é a composition root do pacote.
 
 ### RF-ARCH-002: Estrutura oficial do pacote
-The Python package shall follow the structure below exactly.
+
+The Python package shall follow the structure below exactly. The enumerated names of `public/<type>/` assets are **authoritative** — any addition, removal, or rename in `dadaia_workspace/public/` shall be reflected here in the same PR.
 
 ```
 dadaia_workspace/
@@ -53,6 +54,7 @@ dadaia_workspace/
       academy.py
       export.py
       import_.py
+      orchestrate.py                   ← NOVO (multi-agent-orchestration)
   core/
     __init__.py
     exceptions.py
@@ -63,6 +65,8 @@ dadaia_workspace/
       course.py
       export.py
       import_.py
+      workflow.py                      ← NOVO: WorkflowDefinition, WorkflowStage, WorkflowInput, ExitCriterion
+      run_state.py                     ← NOVO: RunManifest, StageState, RunEvent, DispatcherCapabilities, StageInvocation, StageResult
     protocols/
       __init__.py
       context_store.py
@@ -71,6 +75,9 @@ dadaia_workspace/
       storage.py
       runtime_env.py
       course_store.py
+      workflow_store.py                ← NOVO Protocol
+      run_state_store.py               ← NOVO Protocol
+      agent_dispatcher.py              ← NOVO Protocol
   features/
     __init__.py
     workspace/
@@ -98,6 +105,11 @@ dadaia_workspace/
     import_/
       __init__.py
       service.py
+    orchestration/                     ← NOVA feature
+      __init__.py
+      service.py                       ← OrchestrationService
+      runner.py                        ← WorkflowRunner (DAG execution)
+      resolver.py                      ← InputResolver (pure function)
   infrastructure/
     __init__.py
     json_context_store.py
@@ -107,29 +119,47 @@ dadaia_workspace/
     excel_reader.py
     public_assets.py
     python_env.py
+    markdown_workflow_store.py         ← NOVO (multi-agent-orchestration)
+    json_run_state_store.py            ← NOVO
+    claude_agent_dispatcher.py         ← NOVO
+    cli_agent_dispatcher.py            ← NOVO (default + opencode/codex via adapter)
   public/
     agents/
-      architect-agent.md
-      product-auditor-agent.md
-      product-engineer-agent.md
-      soft-engineer-agent.md
+      product-engineer.md
+      software-architect.md
+      software-engineer.md
+      qa-engineer.md
+      devops-engineer.md
+      game-developer.md
     rules/
-      dadaia-workspace-sdd-enforcer.md
-      dadaia-workspace-spec-governance.md
       dadaia-workspace-dev-guardrail.md
+      game-developer-scope.md
     skills/
+      architect-code-audit/
+      architect-design-patterns/
       dadaia-grill-me/
-        SKILL.md
-      dadaia-workspace-spec-navigator/
-        SKILL.md
-      dadaia-workspace-spec-reviewer/
-        SKILL.md
       dadaia-workspace-doctor/
-        SKILL.md
+      dadaia-workspace-manager/
+      dadaia-workspace-spec-navigator/
+      dadaia-workspace-spec-reviewer/
+      devops-deploy-strategies/
+      devops-gitflow-governance/
+      game-map-architect/
+      game-packaging-distribution/
+      game-physics-engine/
+      game-platform-browser/
+      game-platform-godot/
+      game-platform-unity/
+      game-platform-unreal/
+      github-actions-pipelines/
     commands/
-      dadaia-workspace-refine-specs.md
       dadaia-academy.md
       dadaia-workspace-doctor.md
+      dadaia-workspace-refine-specs.md
+      spec-context.md
+    workflows/                         ← NOVO tipo de asset (multi-agent-orchestration)
+      spec-refinement.workflow.md
+      tdd-cycle.workflow.md
     scripts/
     templates/
       AGENTS.md
@@ -144,6 +174,7 @@ dadaia_workspace/
       foundation/
     data/
       repos.xlsx
+    plugins/                           ← presente; tipo neutro (extensão futura)
 tests/
   fakes.py
   unit/
@@ -152,7 +183,11 @@ tests/
     features/
       test_workspace_setup.py
       test_spec_context.py
+      test_public_pipeline.py
+      test_orchestration_pipeline.py   ← NOVO (multi-agent-orchestration)
 ```
+
+**Nota:** os nomes e quantidades de assets em `public/` listados acima são **fonte autoritativa**. Toda atualização (adição, remoção, rename) em `public/<type>/` deve refletir-se nesta RF-ARCH-002 via PR único — qualquer drift entre esta seção e o conteúdo real do diretório é tratado como bug e registrado em `z_bug_specs.md`.
 
 ### RF-ARCH-003: Protocol-first
 Every infrastructure dependency used by a feature shall first be expressed as a `Protocol` in `core/protocols/`.
@@ -184,6 +219,7 @@ The bootstrap flow shall create the following canonical subdirectories inside `.
 | `states/` | Durável | Arquivos JSON de estado durável (`spec_contexts.json`, `primary_context.json`) |
 | `src/` | Durável | Arquivos fonte do workspace (ex: `repos.xlsx`) |
 | `dist/` | Durável | Artefatos de export gerados por `dadaia export` — criado on-demand, não por `dadaia init` |
+| `runs/` | Durável | Estado durável de runs de workflows multi-agente; criado on-demand por `dadaia orchestrate run`; cada run vive em `runs/<run-id>/` com `manifest.json` (atômico) + `events.jsonl` (append-only). NOVO (multi-agent-orchestration). |
 | `tmp/python/` | Efêmero | Scripts transitórios de agentes — podem ser limpos a qualquer momento |
 | `tmp/json/` | Efêmero | Outputs JSON transitórios de agentes — podem ser limpos a qualquer momento |
 
@@ -216,6 +252,14 @@ Classes, services, methods, and exceptions shall be named after the business cap
 
 ### RF-ARCH-013: OOP explícita nas capabilities
 Business capabilities shall be implemented through explicit service classes and domain models.
+
+### RF-ARCH-014: Orquestração via Protocols, sem framework externo
+
+A orquestração multi-agente (`features/orchestration/`) shall depend only on three new Protocols (`WorkflowStore`, `RunStateStore`, `AgentDispatcher`) declared in `core/protocols/`. No external orchestration framework (`langgraph`, `crewai`, `agno`, `autogen`, `langchain-orchestrator`, etc.) shall be added to the runtime dependency set.
+
+### RF-ARCH-015: Run state durável como source-of-truth append-only
+
+Run state for multi-agent workflows shall persist under `<workspace-root>/.dadaia/runs/<run-id>/` with two files: `manifest.json` (written atomically via tmp + `os.replace()`) and `events.jsonl` (append-only). `events.jsonl` is the **source of truth**; `manifest.json` is a reconstructable projection. Detalhes em `specs/features/multi-agent-orchestration/SPEC.md` ADR-ORCH-003.
 
 ---
 
@@ -294,6 +338,25 @@ The project shall pass `ruff format`, `ruff check`, and `mypy` before a task is 
 ### RF-CONV-005: Nomes guiados por intenção
 Public classes and methods shall prefer names that encode business intent over vague transport-agnostic names.
 
+### RF-CONV-006: Task State Contract
+
+Every backlog task in a `TASKS.md` file shall use exactly three state markers:
+
+| Marcador | Estado | Semântica |
+|---|---|---|
+| `[ ]` | TODO | Task ainda não iniciada |
+| `[-]` | IN PROGRESS | Task em execução — exatamente uma por sessão de trabalho |
+| `[x]` | DONE | Task completa e verificada |
+
+**Invariantes:**
+
+- Nunca mais de uma task `[-]` por TASKS.md ativo por vez.
+- Um agente nunca começa a escrever código de produção sem marcar a task alvo como `[-]` primeiro.
+- Um agente nunca marca `[x]` sem verificar que os critérios de aceite da task foram atendidos.
+- A transição `[ ]` → `[-]` é a chave que desbloqueia o SDD Gate (`sdd-spec-gate.sh`) para edições em paths de produção.
+
+**Skill de enforcement:** `dadaia-task-manager` — disponível em todos os agentes que implementam backlog.
+
 ---
 
 ## Configuração de Projeto
@@ -314,6 +377,10 @@ The repository shall not contain product-local `.agents/`, `.claude/`, `.codex/`
 
 ## Fora de Escopo desta Spec
 
-- Detalhes comportamentais de cada feature
-- CI/CD
-- Publicação no PyPI
+- Detalhes comportamentais de cada feature (vivem em `specs/features/<nome>/SPEC.md`)
+- Especificação completa do gitflow, branch protection, OIDC, smoke test e procedimento de release — domínio de `specs/features/release-pipeline/SPEC.md`
+- Schema YAML do frontmatter de workflow + ciclo de vida de run — domínio de `specs/features/multi-agent-orchestration/SPEC.md`
+- Conteúdo dos 2 workflows seed (`spec-refinement`, `tdd-cycle`) — entregue como código em `dadaia_workspace/public/workflows/`
+- Decisões cosméticas de naming dentro de `public/<type>/` quando não impactam contratos cross-feature
+
+> **Nota:** CI/CD e publicação no PyPI deixaram de ser "fora de escopo" e passam a ser cobertos por `specs/features/release-pipeline/SPEC.md` a partir desta v3.1.

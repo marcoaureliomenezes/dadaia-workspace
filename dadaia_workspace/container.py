@@ -3,18 +3,28 @@
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.workspace.service import WorkspaceService
+from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
+from dadaia_workspace.infrastructure.cli_agent_dispatcher import (
+    CliAgentDispatcher,
+    CodexAgentDispatcher,
+    OpenCodeAgentDispatcher,
+)
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_primary_context_store import JsonPrimaryContextStore
+from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
+from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -83,5 +93,41 @@ def build_export_service(workspace_root: Path) -> ExportService:
     return ExportService(
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
+        workspace_root=workspace_root,
+    )
+
+
+def _select_dispatcher(runtime: str | None) -> AgentDispatcher:
+    import os
+
+    runtime = (runtime or os.environ.get("DADAIA_AGENT_RUNTIME") or "cli").lower()
+    if runtime == "claude":
+        return ClaudeAgentDispatcher()
+    if runtime == "opencode":
+        return OpenCodeAgentDispatcher()
+    if runtime == "codex":
+        return CodexAgentDispatcher()
+    return CliAgentDispatcher()
+
+
+def _agent_catalog(workspace_root: Path) -> tuple[str, ...]:
+    agents_dir = workspace_root / ".dadaia" / "agentic" / "agents"
+    if not agents_dir.exists():
+        return ()
+    return tuple(sorted(p.stem for p in agents_dir.glob("*.md")))
+
+
+def build_orchestration_service(
+    workspace_root: Path, runtime: str | None = None
+) -> OrchestrationService:
+    _guard_initialized(workspace_root)
+    workflows_dir = workspace_root / ".dadaia" / "agentic" / "workflows"
+    runs_dir = workspace_root / ".dadaia" / "runs"
+    return OrchestrationService(
+        workflow_store=MarkdownWorkflowStore(
+            workflows_dir, agent_catalog=_agent_catalog(workspace_root)
+        ),
+        run_state_store=JsonRunStateStore(runs_dir),
+        dispatcher=_select_dispatcher(runtime),
         workspace_root=workspace_root,
     )

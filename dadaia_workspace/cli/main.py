@@ -2,7 +2,15 @@
 
 import typer
 
-from dadaia_workspace.cli.commands import academy, context, doctor, init, public, repos
+from dadaia_workspace.cli.commands import (
+    academy,
+    context,
+    doctor,
+    init,
+    orchestrate,
+    public,
+    repos,
+)
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
 
@@ -23,6 +31,7 @@ app.add_typer(repos.app, name="repos")
 app.add_typer(public.app, name="public")
 app.add_typer(doctor.app, name="doctor")
 app.add_typer(academy.app, name="academy")
+app.add_typer(orchestrate.app, name="orchestrate")
 
 
 if __name__ == "__main__":

@@ -22,9 +22,21 @@ _FRONTMATTER_OPENCODE_MODEL_RE = re.compile(r"^opencode_model:\s*(.+?)$", re.MUL
 _FRONTMATTER_MODEL_VALUE_RE = re.compile(r"^(model:\s*)(.+?)$", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_FIELD_RE = re.compile(r"^opencode_model:[^\n]*\n", re.MULTILINE)
 _VALID_TARGETS = {"all", "agents", "claude", "codex", "opencode"}
-_COPY_DIRS = ("rules", "skills", "commands", "agents", "scripts", "data", "scaffold", "templates", "plugins")
-_CLAUDE_DIRS = ("rules", "skills", "commands", "agents")
-_OPENCODE_DIRS = ("commands", "skills", "agents", "plugins")
+_COPY_DIRS = (
+    "rules",
+    "skills",
+    "commands",
+    "agents",
+    "scripts",
+    "data",
+    "scaffold",
+    "templates",
+    "plugins",
+    "workflows",
+)
+_CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
+_OPENCODE_DIRS = ("commands", "skills", "agents", "plugins", "workflows")
+_FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
 
 
 def _sha256(path: Path) -> str:
@@ -55,7 +67,7 @@ def _strip_tools_from_frontmatter(content: str) -> str:
         return content
     frontmatter = content[4 : end_idx + 1]
     cleaned = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
-    return f"---\n{cleaned}---\n{content[end_idx + 5:]}"
+    return f"---\n{cleaned}---\n{content[end_idx + 5 :]}"
 
 
 def _prepare_agent_for_opencode(content: str) -> str:
@@ -70,7 +82,7 @@ def _prepare_agent_for_opencode(content: str) -> str:
     if end_idx == -1:
         return content
     frontmatter = content[4 : end_idx + 1]
-    body = content[end_idx + 5:]
+    body = content[end_idx + 5 :]
 
     m = _FRONTMATTER_OPENCODE_MODEL_RE.search(frontmatter)
     if m:
@@ -108,10 +120,32 @@ class FileSystemPublicAssetManager:
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {dst}")
 
+        self._validate_workflows(agentic_dir)
+
         manifest_path = agentic_dir / "manifest.json"
         manifest_path.write_text(_json_dump(self._build_manifest(agentic_dir)), encoding="utf-8")
         staged.append(f"[stage] {manifest_path}")
         return staged
+
+    def _validate_workflows(self, agentic_dir: Path) -> None:
+        """Validate every *.workflow.md against schema; abort stage if any fails."""
+        workflows_dir = agentic_dir / "workflows"
+        if not workflows_dir.exists():
+            return
+        from dadaia_workspace.core.exceptions import WorkflowSchemaError
+        from dadaia_workspace.infrastructure.markdown_workflow_store import (
+            MarkdownWorkflowStore,
+        )
+
+        agent_catalog: list[str] = sorted(p.stem for p in (agentic_dir / "agents").glob("*.md"))
+        store = MarkdownWorkflowStore(workflows_dir, agent_catalog=agent_catalog or None)
+        try:
+            store.list()
+        except WorkflowSchemaError as e:
+            raise PublicAssetError(
+                "workflow schema validation failed during `dadaia public stage`: "
+                f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
+            ) from e
 
     def install(self, workspace_root: Path, target: str = "all", force: bool = False) -> list[str]:
         if target not in _VALID_TARGETS:
@@ -157,7 +191,9 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             reports.append("[missing] stage:manifest.json")
 
-        for expected_src, dst, label, transform in self._runtime_expectations(agentic_dir, workspace_root):
+        for expected_src, dst, label, transform in self._runtime_expectations(
+            agentic_dir, workspace_root
+        ):
             if expected_src is None:
                 reports.append(f"[unsupported] {label}")
             elif transform:
@@ -195,7 +231,27 @@ class FileSystemPublicAssetManager:
             )
         )
 
+        reports.extend(self._classify_workflows(agentic_dir))
+
         return reports
+
+    def _classify_workflows(self, agentic_dir: Path) -> list[str]:
+        out: list[str] = []
+        workflows_dir = agentic_dir / "workflows"
+        if not workflows_dir.exists():
+            return out
+        for wf in sorted(workflows_dir.glob("*.workflow.md")):
+            text = wf.read_text(encoding="utf-8")
+            has_parallel = bool(_FRONTMATTER_PARALLEL_GROUP_RE.search(text))
+            tag = f"workflows/{wf.name}"
+            if has_parallel:
+                out.append(f"[partial] opencode:{tag} (parallel_group sequentially)")
+                out.append(f"[unsupported] codex:{tag} (parallel_group not dispatchable)")
+            else:
+                out.append(f"[ok] opencode:{tag}")
+                out.append(f"[ok] codex:{tag}")
+            out.append(f"[ok] claude:{tag}")
+        return out
 
     def _build_manifest(self, agentic_dir: Path) -> dict[str, object]:
         assets: list[dict[str, str]] = []
@@ -225,6 +281,12 @@ class FileSystemPublicAssetManager:
         self._copy_tree(
             agentic_dir / "skills", workspace_root / ".agents" / "skills", force, installed
         )
+        self._copy_tree(
+            agentic_dir / "workflows",
+            workspace_root / ".agents" / "workflows",
+            force,
+            installed,
+        )
 
     def _install_claude(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -246,6 +308,7 @@ class FileSystemPublicAssetManager:
     ) -> None:
         codex_dir = workspace_root / ".codex"
         self._copy_tree(agentic_dir / "rules", codex_dir / "rules", force, installed)
+        self._copy_tree(agentic_dir / "workflows", codex_dir / "workflows", force, installed)
         self._install_universal_skills(agentic_dir, workspace_root, force, installed)
         self._write_generated(
             codex_dir / "hooks.json",
@@ -319,17 +382,32 @@ class FileSystemPublicAssetManager:
 
         for src in self._iter_files(agentic_dir / "skills"):
             rel = src.relative_to(agentic_dir / "skills")
-            yield (src, workspace_root / ".agents" / "skills" / rel, f"agents:skills/{rel.as_posix()}", False)
+            yield (
+                src,
+                workspace_root / ".agents" / "skills" / rel,
+                f"agents:skills/{rel.as_posix()}",
+                False,
+            )
 
         for name in _CLAUDE_DIRS:
             base = agentic_dir / name
             for src in self._iter_files(base):
                 rel = src.relative_to(base)
-                yield (src, workspace_root / ".claude" / name / rel, f"claude:{name}/{rel.as_posix()}", False)
+                yield (
+                    src,
+                    workspace_root / ".claude" / name / rel,
+                    f"claude:{name}/{rel.as_posix()}",
+                    False,
+                )
 
         for src in self._iter_files(agentic_dir / "rules"):
             rel = src.relative_to(agentic_dir / "rules")
-            yield (src, workspace_root / ".codex" / "rules" / rel, f"codex:rules/{rel.as_posix()}", False)
+            yield (
+                src,
+                workspace_root / ".codex" / "rules" / rel,
+                f"codex:rules/{rel.as_posix()}",
+                False,
+            )
 
         yield (None, workspace_root / ".codex" / "agents", "codex:agents", False)
 
@@ -339,7 +417,12 @@ class FileSystemPublicAssetManager:
                 rel = src.relative_to(base)
                 # OpenCode agents have tools: stripped — compare transformed content
                 is_opencode_agent = name == "agents"
-                yield (src, workspace_root / ".opencode" / name / rel, f"opencode:{name}/{rel.as_posix()}", is_opencode_agent)
+                yield (
+                    src,
+                    workspace_root / ".opencode" / name / rel,
+                    f"opencode:{name}/{rel.as_posix()}",
+                    is_opencode_agent,
+                )
 
         yield (None, workspace_root / ".opencode" / "hooks", "opencode:hooks", False)
 

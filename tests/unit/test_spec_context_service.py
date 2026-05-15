@@ -175,3 +175,73 @@ def test_promote_inativo_raises(service: SpecContextService) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     with pytest.raises(ContextStateError):
         service.promote("proj")
+
+
+def test_promote_not_found_raises(service: SpecContextService) -> None:
+    with pytest.raises(ContextNotFoundError):
+        service.promote("ghost")
+
+
+def test_promote_already_primary_is_idempotent(
+    service: SpecContextService, workspace_root: Path
+) -> None:
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.activate("proj")  # auto-promotes
+    ctx = service.promote("proj")  # already primary — should return same ctx
+    assert ctx.is_primary is True
+
+
+# ------------------------------------------------------------------ delete
+
+
+def test_delete_removes_inativo_context(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.delete("proj")
+    assert store.get("proj") is None
+
+
+def test_delete_not_found_raises(service: SpecContextService) -> None:
+    with pytest.raises(ContextNotFoundError):
+        service.delete("ghost")
+
+
+def test_delete_ativo_context_raises(service: SpecContextService, workspace_root: Path) -> None:
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.activate("proj")
+    with pytest.raises(ContextStateError):
+        service.delete("proj")
+
+
+# ------------------------------------------------------------------ deactivate edge cases
+
+
+def test_deactivate_syncs_dirty_repo(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    (workspace_root / "repos" / "r2").mkdir(parents=True)
+    service.create("other", "r2", "https://github.com/org/r2")
+    service.activate("other")
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.activate("proj")
+    assert service.show("proj").is_primary is False
+    repo = workspace_root / "repos" / "my-repo"
+    git._dirty.add(repo)
+    service.deactivate("proj")
+    assert repo in git.committed
+
+
+def test_deactivate_pushes_when_remote_present(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    (workspace_root / "repos" / "r2").mkdir(parents=True)
+    service.create("other", "r2", "https://github.com/org/r2")
+    service.activate("other")
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.activate("proj")
+    assert service.show("proj").is_primary is False
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    service.deactivate("proj")
+    assert repo in git.pushed

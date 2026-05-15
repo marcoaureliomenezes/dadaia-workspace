@@ -37,7 +37,9 @@ def _dadaia_version() -> str:
 
 
 class ExportService:
-    def __init__(self, context_store: ContextStore, git_client: GitClient, workspace_root: Path) -> None:
+    def __init__(
+        self, context_store: ContextStore, git_client: GitClient, workspace_root: Path
+    ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
@@ -110,7 +112,7 @@ class ExportService:
         self, includes: list[tuple[Path, str]], options: ExportOptions
     ) -> ExportManifest:
         try:
-            contexts = tuple(
+            contexts: tuple[dict[str, object], ...] = tuple(
                 {
                     "name": ctx.name,
                     "repo_url": ctx.repo_url,
