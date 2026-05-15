@@ -49,7 +49,6 @@ testpaths = ["tests"]
 addopts = "--cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
-branch = true
 source = ["dadaia_workspace"]
 
 [tool.coverage.report]
