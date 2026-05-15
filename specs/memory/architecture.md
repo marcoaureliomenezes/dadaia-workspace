@@ -83,6 +83,12 @@
     src/
       repos.xlsx          ← whitelist de repos disponíveis para Spec Contexts
     dist/                 ← artefatos de export gerados por `dadaia export`
+    runs/                 ← estado durável de runs de workflows multi-agente (NOVO em v3.1)
+      <run-id>/
+        manifest.json     ← projeção materializada do estado da run (atomic write)
+        events.jsonl      ← source-of-truth append-only de eventos da run
+        <stage-id>/
+          invocation.md   ← arquivo de instrução preparado pela CLI para o agente alvo
     tmp/
       python/             ← scripts efêmeros de agentes
       json/               ← outputs JSON efêmeros de agentes
@@ -106,6 +112,7 @@
 - `.dadaia/states/academy.json` é o estado persistido de todos os cursos da academy. Escrito atomicamente.
 - `.dadaia/src/repos.xlsx` é a whitelist de repos disponíveis para criação de Spec Contexts.
 - `.dadaia/dist/` contém artefatos de export gerados por `dadaia export`. Criado on-demand pelo ExportService; não é criado por `dadaia init`. Não deve ser apagado por `dadaia doctor`.
+- `.dadaia/runs/` contém estado durável de runs de workflows multi-agente. Criado on-demand por `dadaia orchestrate run`. Cada `<run-id>/` carrega `manifest.json` (projeção atômica) e `events.jsonl` (source of truth append-only). Subdiretório por stage (`<stage-id>/invocation.md`) é gerado pela CLI quando o stage é preparado para execução pelo host agent. Não deve ser apagado por `dadaia doctor` nem por `dadaia init`; remoção é responsabilidade explícita do operador.
 - `.claude/` contém projeção Claude Code gerada por `dadaia public install --target claude|all`.
 - `.codex/` contém projeção Codex gerada por `dadaia public install --target codex|all`.
 - `.opencode/` e `opencode.json` contêm projeção OpenCode gerada por `dadaia public install --target opencode|all`.
@@ -121,6 +128,7 @@
 - O conteúdo de `.dadaia/states/` é durável: somente o sistema que escreve um state file pode atualizá-lo ou removê-lo.
 - O conteúdo de `.dadaia/scripts/` é durável: scripts persistem entre sessões.
 - O conteúdo de `.dadaia/dist/` é durável: artefatos de export persistem até remoção explícita pelo operador.
+- O conteúdo de `.dadaia/runs/` é durável: estado de runs de workflows persiste entre sessões; é source of truth para `dadaia orchestrate status/resume`. Remoção é responsabilidade explícita do operador (não há cleanup automático em v0.1).
 
 ---
 

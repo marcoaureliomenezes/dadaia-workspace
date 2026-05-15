@@ -1,8 +1,24 @@
 """In-memory fakes for all protocols — enable unit tests without I/O."""
 
+from collections.abc import Iterable
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import (
+    OrchestrationUnsupportedError,
+    RunNotFoundError,
+    WorkflowNotFoundError,
+)
+from dadaia_workspace.core.models.run_state import (
+    DispatcherCapabilities,
+    DispatcherMode,
+    RunEvent,
+    RunManifest,
+    StageInvocation,
+    StageResult,
+    StageStatus,
+)
 from dadaia_workspace.core.models.spec_context import SpecContextProject
+from dadaia_workspace.core.models.workflow import WorkflowDefinition
 
 
 class FakeContextStore:
@@ -122,6 +138,96 @@ class FakeExcelReader:
 
     def read_rows(self, file_path: Path) -> list[dict[str, str]]:
         return self._rows
+
+
+class FakeWorkflowStore:
+    def __init__(self, workflows: Iterable[WorkflowDefinition] | None = None) -> None:
+        self._by_name: dict[str, WorkflowDefinition] = {w.name: w for w in (workflows or ())}
+
+    def add(self, workflow: WorkflowDefinition) -> None:
+        self._by_name[workflow.name] = workflow
+
+    def list(self) -> tuple[WorkflowDefinition, ...]:
+        return tuple(self._by_name.values())
+
+    def get(self, name: str) -> WorkflowDefinition:
+        if name not in self._by_name:
+            raise WorkflowNotFoundError(f"workflow '{name}' not found")
+        return self._by_name[name]
+
+    def validate(self, name: str) -> tuple[str, ...]:
+        if name not in self._by_name:
+            return (f"workflow '{name}' not found",)
+        return ()
+
+
+class FakeRunStateStore:
+    def __init__(self) -> None:
+        self.manifests: dict[str, RunManifest] = {}
+        self.events: dict[str, list[RunEvent]] = {}
+
+    def create_run(self, manifest: RunManifest) -> None:
+        self.manifests[manifest.run_id] = manifest
+        self.events.setdefault(manifest.run_id, [])
+
+    def load_run(self, run_id: str) -> RunManifest:
+        if run_id not in self.manifests:
+            raise RunNotFoundError(f"run '{run_id}' not found")
+        return self.manifests[run_id]
+
+    def update_manifest(self, manifest: RunManifest) -> None:
+        self.manifests[manifest.run_id] = manifest
+
+    def append_event(self, event: RunEvent) -> None:
+        self.events.setdefault(event.run_id, []).append(event)
+
+    def list_runs(self) -> tuple[RunManifest, ...]:
+        return tuple(self.manifests.values())
+
+    def iter_events(self, run_id: str) -> Iterable[RunEvent]:
+        return list(self.events.get(run_id, []))
+
+
+class FakeAgentDispatcher:
+    """Configurable fake — defaults to native (Claude-like). Use _set_mode for variants."""
+
+    def __init__(self, mode: DispatcherMode = DispatcherMode.NATIVE) -> None:
+        self._mode = mode
+        self.dispatched: list[StageInvocation] = []
+        self.parallel_dispatched: list[tuple[StageInvocation, ...]] = []
+
+    def capabilities(self) -> DispatcherCapabilities:
+        runtime_name = {
+            DispatcherMode.NATIVE: "claude",
+            DispatcherMode.BEST_EFFORT_SEQUENTIAL: "opencode",
+            DispatcherMode.UNSUPPORTED: "codex",
+            DispatcherMode.CLI_ONLY: "cli",
+        }[self._mode]
+        return DispatcherCapabilities(
+            runtime_name=runtime_name,
+            supports_parallel=self._mode == DispatcherMode.NATIVE,
+            supports_gates_inline=False,
+            mode=self._mode,
+        )
+
+    def dispatch(self, invocation: StageInvocation) -> StageResult:
+        self.dispatched.append(invocation)
+        return StageResult(
+            run_id=invocation.run_id,
+            stage_id=invocation.stage_id,
+            status=StageStatus.AWAITING_GATE,
+            output_path=invocation.invocation_path,
+        )
+
+    def dispatch_parallel(
+        self, invocations: tuple[StageInvocation, ...]
+    ) -> tuple[StageResult, ...]:
+        if self._mode == DispatcherMode.UNSUPPORTED and any(
+            inv.parallel_group for inv in invocations
+        ):
+            raise OrchestrationUnsupportedError("fake codex dispatcher rejects parallel_group")
+        self.parallel_dispatched.append(invocations)
+        return tuple(self.dispatch(inv) for inv in invocations)
 
 
 class FakePythonEnvironmentManager:

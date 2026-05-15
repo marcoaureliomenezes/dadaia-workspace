@@ -18,6 +18,7 @@ tools:
   - WebFetch
 skills:
   - dadaia-workspace-spec-navigator
+  - dadaia-task-manager
   - game-physics-engine
   - game-map-architect
   - game-platform-browser
@@ -26,6 +27,24 @@ skills:
   - game-platform-unreal
   - game-packaging-distribution
 maxTurns: 60
+input_contract:
+  requires_inputs:
+    - name: context
+      kind: string
+      source: workflow_input
+      description: "Active Spec Context Project name (must be a tauan-games project)"
+      stop_if_missing: true
+    - name: game_spec
+      kind: report
+      source: report_path
+      description: "Approved game-feature SPEC.md path under repos/tauan-games/.../specs/"
+      stop_if_missing: true
+  produces_outputs:
+    - name: game_impl_report
+      kind: report
+      path: .dadaia/reports/{context}/game-developer/{ts}-impl.md
+      schema_ref: handoff-schema-v1
+  stop_if_missing: true
 ---
 
 # Game Developer

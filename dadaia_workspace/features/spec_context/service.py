@@ -1,5 +1,6 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
+import contextlib
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -161,10 +162,8 @@ class SpecContextService:
         repo_path = self._repo_path(ctx.repo_slug)
         branch_before_sync: str | None = None
         if repo_path.exists():
-            try:
+            with contextlib.suppress(Exception):
                 branch_before_sync = self._git.current_branch(repo_path)
-            except Exception:
-                pass
             if self._git.is_git_root(repo_path):
                 if self._git.is_dirty(repo_path):
                     try:

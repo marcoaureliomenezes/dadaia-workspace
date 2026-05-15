@@ -1,9 +1,9 @@
 # Spec: Feature — Agent Rules, Skills & Public Assets
 
-> **Status:** Aprovado
-> **Versão:** 2.0  
+> **Status:** Em revisão
+> **Versão:** 2.1
 > **Autor:** Marco Menezes  
-> **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/architecture.md`
+> **Referências:** `specs/SPEC.md`, `specs/constitution.md`, `specs/memory/architecture.md`, `specs/features/multi-agent-orchestration/SPEC.md`
 > **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
@@ -194,10 +194,20 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
 ### `dadaia-workspace-doctor` Skill and Command
 - FR-044: The system shall provide a skill named `dadaia-workspace-doctor` at `dadaia_workspace/public/skills/dadaia-workspace-doctor/SKILL.md`.
 - FR-045: The `dadaia-workspace-doctor` skill shall implement a three-phase protocol: Phase 1 (lib vs installed drift detection), Phase 2 (JSON state schema migration), Phase 3 (report).
-- FR-046: In Phase 1, the doctor flow shall compare package source, `.dadaia/agentic/`, and runtime projections, classifying each as `ok`, `missing`, `drift`, or `unsupported`. It shall never mutate runtime projection files.
+- FR-046: In Phase 1, the doctor flow shall compare package source, `.dadaia/agentic/`, and runtime projections, classifying each as `ok`, `missing`, `drift`, `partial`, or `unsupported`. The `partial` status was added by the `multi-agent-orchestration` feature to honor best-effort capability mappings (e.g., OpenCode running `parallel_group` sequentially). It shall never mutate runtime projection files.
 - FR-047: In Phase 2, the skill shall read each `*.json` in `.dadaia/states/`, cross-reference it with the corresponding frozen dataclasses in `core/models/` and the canonical JSON example in `specs/memory/architecture.md`, and repair mismatches atomically.
 - FR-048: The system shall provide a slash command `/dadaia-workspace-doctor` at `dadaia_workspace/public/commands/dadaia-workspace-doctor.md` as a thin entry point for the skill. Accepts optional scope arguments: `lib` (Phase 1 only) or `state` (Phase 2 only).
 - FR-049: `dadaia public install` shall project the `dadaia-workspace-doctor` skill and command to supported runtime destinations.
+
+### `workflows/` — Novo Tipo Universal de Asset
+
+> Adicionado por `specs/features/multi-agent-orchestration/SPEC.md`. Define `workflows/` como tipo de asset versionado no pacote, ao lado de `agents/`, `skills/`, `rules/`, `commands/`, `scripts/`.
+
+- **FR-050:** The system shall recognize `workflows/` as a versioned asset type with source of truth at `dadaia_workspace/public/workflows/<slug>.workflow.md`. Each file is Markdown with YAML frontmatter conforming to schema version `"1"` as declared in `specs/features/multi-agent-orchestration/SPEC.md`.
+- **FR-051:** `dadaia public stage` shall include `public/workflows/` in `_COPY_DIRS` and produce sha256 hashes for each workflow file in `.dadaia/agentic/manifest.json`.
+- **FR-052:** `dadaia public install --target all|claude|opencode|codex|agents` shall project `<workspace-root>/.dadaia/agentic/workflows/` to: `.agents/workflows/` (universal reference), `.claude/workflows/`, `.opencode/workflows/`, `.codex/workflows/`. The files installed in Codex/OpenCode are reference documents; runtime execution semantics are governed by `AgentDispatcher` capabilities.
+- **FR-053:** `dadaia public doctor` shall classify each projected workflow per runtime as `ok`, `partial` (best-effort), `unsupported` (e.g., Codex with `parallel_group`), `missing`, or `drift`.
+- **FR-054:** Workflows that fail schema validation at `dadaia public stage` time shall abort the staging operation with a clear error orientado a recuperação (per RF-QA-007). Validation rules are defined in `specs/features/multi-agent-orchestration/SPEC.md` FR-ORCH-005.
 
 ---
 
@@ -242,6 +252,10 @@ Todos os artefatos usam o prefixo `dadaia-workspace-`.
         dadaia-workspace-refine-specs.md
         dadaia-academy.md
         dadaia-workspace-doctor.md
+        spec-context.md
+      workflows/                                    ← NOVO tipo de asset
+        spec-refinement.workflow.md
+        tdd-cycle.workflow.md
 ```
 
 ---

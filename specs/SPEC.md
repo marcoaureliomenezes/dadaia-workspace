@@ -1,9 +1,9 @@
 # Spec: dadaia-workspace
 
-> **Status:** Aprovado
-> **Versão:** 3.0
+> **Status:** Em revisão
+> **Versão:** 3.1
 > **Autor:** Marco Menezes
-> **Referências:** `specs/constitution.md`, `specs/memory/product.md`, `specs/foundation/SPEC.md`
+> **Referências:** `specs/constitution.md`, `specs/memory/product.md`, `specs/foundation/SPEC.md`, `specs/features/multi-agent-orchestration/SPEC.md`, `specs/features/release-pipeline/SPEC.md`
 
 ---
 
@@ -163,6 +163,22 @@ O estado de todos os Spec Context Projects é gerenciado por `spec_contexts.json
 - Dado `dadaia import --dry-run`, quando executo, então o sistema exibe o que seria feito sem modificar disco.
 - Dado `dadaia import` executado duas vezes no mesmo diretório, então o estado não é corrompido.
 
+### US-014: Executar um workflow multi-agente
+
+> Graduado de "fora de escopo" para escopo aprovado nesta v3.1. Detalhes em `specs/features/multi-agent-orchestration/SPEC.md`.
+
+- **Como** operador (ou agente principal de uma sessão Claude/OpenCode/Codex)
+- **Quero** disparar um workflow multi-agente declarado e gerenciar seu ciclo de vida via CLI
+- **Para** orquestrar pipelines como `spec-refinement` (product → 3 especialistas em paralelo → product) sem prompts longos manuais
+
+**Critérios de Aceite:**
+- Dado um workflow válido em `.dadaia/agentic/workflows/`, quando executo `dadaia orchestrate run <workflow> --context <nome>`, então o sistema cria `.dadaia/runs/<run-id>/manifest.json` + `events.jsonl`, prepara a invocação do primeiro stage e imprime o `run_id` + path da invocação.
+- Dado um `run_id`, quando executo `dadaia orchestrate status <run-id>`, então a CLI exibe status agregado, status por stage, e o próximo gate pendente — sem mutar estado.
+- Dado uma run em `awaiting_gate`, quando executo `dadaia orchestrate resume <run-id>`, então o sistema marca o gate como resolvido e prepara o próximo stage; idempotente em estados estáveis.
+- Dado runtime Claude e workflow com `parallel_group`, então o agente principal dispara N chamadas `Agent` em **uma única mensagem**, conforme convenção declarada no header do `invocation.md`.
+- Dado runtime OpenCode com `parallel_group`, então `dadaia public doctor` reporta `partial`; stages do grupo são executados sequencialmente.
+- Dado runtime Codex e workflow com `parallel_group`, então `dadaia public doctor` reporta `unsupported`; `dadaia orchestrate run --runtime codex <workflow>` rejeita com `OrchestrationUnsupportedError`.
+
 ---
 
 ## Requisitos Funcionais
@@ -229,6 +245,18 @@ O estado de todos os Spec Context Projects é gerenciado por `spec_contexts.json
 - FR-038: `dadaia import` shall abort before any extraction if `export-manifest.json` is absent or invalid in the archive.
 - FR-039: If any `dadaia context activate` call fails during import, the error shall be recorded and reported at the end without aborting the remaining activations.
 
+### Orquestração Multi-Agente (v3.1)
+
+> Detalhes em `specs/features/multi-agent-orchestration/SPEC.md`. Esta seção lista apenas os FRs canônicos do produto.
+
+- **FR-040:** The system shall provide the command group `dadaia orchestrate {list, show, run, status, resume}` for declaring, inspecting and executing multi-agent workflows.
+- **FR-041:** Workflows shall live as a versioned asset type at `dadaia_workspace/public/workflows/<slug>.workflow.md`, projected universally to `.agents/workflows/`, `.claude/workflows/`, `.opencode/workflows/`, `.codex/workflows/` via `dadaia public install --target all`.
+- **FR-042:** Run state shall persist under `<workspace-root>/.dadaia/runs/<run-id>/` with `manifest.json` (atomic) and `events.jsonl` (append-only). The `events.jsonl` is the source of truth; `manifest.json` is a reconstructable projection.
+- **FR-043:** `dadaia public doctor` shall classify each workflow per runtime as `ok | partial | unsupported | missing | drift`. The status `partial` is new and accommodates best-effort capability mappings (e.g., OpenCode running `parallel_group` sequentially).
+- **FR-044:** The package shall ship two seed workflows: `spec-refinement.workflow.md` and `tdd-cycle.workflow.md`. Both must pass schema validation at every `dadaia public stage`.
+- **FR-045:** Every agent file in `dadaia_workspace/public/agents/` shall declare an `input_contract` block in its YAML frontmatter (`requires_inputs`, `produces_outputs`, `stop_if_missing`). Reports produced by agents shall conform to **Handoff Schema v1** as defined in `specs/features/agents/SPEC.md`.
+- **FR-046:** The implementation shall add `pyyaml ^6.0` as a runtime dependency in `pyproject.toml` (ADR-ORCH-001 in `specs/features/multi-agent-orchestration/SPEC.md`).
+
 ---
 
 ## Requisitos Não-Funcionais
@@ -243,7 +271,7 @@ O estado de todos os Spec Context Projects é gerenciado por `spec_contexts.json
 
 ---
 
-## Fora de Escopo (v3.0)
+## Fora de Escopo (v3.1)
 
 - GUI ou interface web
 - Repositórios secundários por contexto
@@ -251,7 +279,10 @@ O estado de todos os Spec Context Projects é gerenciado por `spec_contexts.json
 - Tracking de progresso por curso (exercícios completados, notas pessoais)
 - Múltiplos primários simultâneos
 - Geração de conteúdo de curso via LLM API pelo CLI Python
-- Orquestração automática entre agentes especializados
+- Workflows com sub-workflows aninhados (composição recursiva)
+- Agente `workflow-orchestrator` versionado (decisão diferida, ver ADR-ORCH-005 em `multi-agent-orchestration/SPEC.md`)
+- Cancelamento gracioso de runs em andamento (`dadaia orchestrate cancel`) — v0.2+
+- Streaming de eventos em tempo real para dashboard externo
 
 ---
 
