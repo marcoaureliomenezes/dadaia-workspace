@@ -86,8 +86,6 @@ jobs:
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest
-        env:
-          COVERAGE_PROCESS_START: ""
         run: poetry run pytest -q
 
   pr-title:
