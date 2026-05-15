@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate tag matches pyproject version
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      version: ${{ steps.derive.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: derive
+        name: Derive version from tag
+        run: |
+          tag="${GITHUB_REF##*/v}"
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+          pyver=$(grep -E '^version *= *"' pyproject.toml | head -1 | sed -E 's/version *= *"([^"]+)".*/\1/')
+          if [ "$tag" != "$pyver" ]; then
+            echo "::error::Tag v$tag does not match pyproject.toml version $pyver"
+            exit 1
+          fi
+
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    needs: [validate]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pipx install poetry==1.8.3
+      - run: poetry install --no-interaction --no-ansi --with dev
+      - name: pytest (smoke)
+        run: poetry run pytest -q
+      - name: Build artifacts
+        run: poetry build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ needs.validate.outputs.version }}
+          path: dist/
+
+  publish:
+    name: Publish to PyPI (OIDC trusted publishing)
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ needs.validate.outputs.version }}
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  smoke-test:
+    name: Install from PyPI + smoke run
+    runs-on: ubuntu-latest
+    needs: [validate, publish]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Wait for PyPI to propagate
+        run: sleep 30
+      - name: pip install released version
+        run: pip install "dadaia-workspace==${{ needs.validate.outputs.version }}"
+      - name: dadaia --help
+        run: dadaia --help
+      - name: dadaia init in tmpdir
+        run: |
+          mkdir -p /tmp/smoke-ws
+          dadaia init --workspace /tmp/smoke-ws
+          test -f /tmp/smoke-ws/.dadaia/states/spec_contexts.json

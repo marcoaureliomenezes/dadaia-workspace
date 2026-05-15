@@ -1,7 +1,8 @@
 # TASKS: dadaia-workspace — Backlog Completo
 
-> **Status:** Aprovado
-> **Referência:** `specs/PLAN.md`
+> **Status:** Em revisão
+> **Versão:** 3.1
+> **Referência:** `specs/PLAN.md` (v3.1)
 
 ## Convenção de estado
 
@@ -114,12 +115,12 @@
 
 > Estes são gates de verificação contínua — devem ser re-executados antes de qualquer release.
 
-- [ ] T51 — `ruff format dadaia_workspace/ tests/` — sem erros
-- [ ] T52 — `ruff check dadaia_workspace/ tests/` — sem erros
-- [ ] T53 — `mypy --strict dadaia_workspace/` — sem erros
-- [ ] T54 — `pytest tests/unit/ -v` — todos passam
-- [ ] T55 — `pytest tests/integration/ -v` — todos passam
-- [ ] T56 — `pytest tests/e2e/ -v` — todos passam
+- [x] T51 — `ruff format dadaia_workspace/ tests/` — sem erros
+- [x] T52 — `ruff check dadaia_workspace/ tests/` — sem erros
+- [x] T53 — `mypy --strict dadaia_workspace/` — sem erros
+- [x] T54 — `pytest tests/unit/ -v` — todos passam
+- [x] T55 — `pytest tests/integration/ -v` — todos passam
+- [x] T56 — `pytest tests/e2e/ -v` — todos passam
 - [ ] T57 — Teste manual E2E: `dadaia init`, context lifecycle, academy CRUD, `dadaia public install` instala agents/
 
 ---
@@ -132,23 +133,23 @@
 
 **Problema identificado:** `sdd-spec-gate.sh` só protege paths VPS (`services/`, `docker/`, `scripts/`). Qualquer escrita em `repos/<slug>/` não é interceptada — o SDD nunca disparou durante o desenvolvimento da dadaia-workspace. Além disso, o gate verifica apenas "existe algum SPEC.md aprovado?" em vez de "existe uma task aberta que cobre este arquivo?", tornando a verificação trivialmente satisfatória.
 
-- [ ] T58 — Escrever `specs/features/sdd-enforcement/SPEC.md`: especificar escopo correto do gate (protege `repos/<slug>/` quando slug tem context ativo), granularidade mínima aceitável, e política de fail-open vs fail-closed por tipo de path
-- [ ] T59 — Escrever `specs/features/sdd-enforcement/PLAN.md` e `TASKS.md`
-- [ ] T60 — Implementar: expandir `case` do `sdd-spec-gate.sh` para incluir `"$WS/repos/"*` com resolução de `specs_dir` via context ativo
-- [ ] T61 — Implementar: adicionar verificação de TASKS.md — bloquear Write/Edit se nenhuma task OPEN ou IN PROGRESS cobre o arquivo-alvo (ou se o arquivo está fora do escopo de qualquer task aprovada)
-- [ ] T62 — Distribuir script atualizado via `dadaia public install` para que todos os tools (Claude Code, Codex, OpenCode) usem o gate correto
-- [ ] T63 — Adicionar teste E2E: verificar que Write em `repos/<slug>/` sem context ativo é bloqueado; verificar que Write com context ativo e spec aprovada passa
+- [x] T58 — Escrever `specs/features/sdd-enforcement/SPEC.md`: especificar escopo correto do gate (protege `repos/<slug>/` quando slug tem context ativo), granularidade mínima aceitável, e política de fail-open vs fail-closed por tipo de path
+- [x] T59 — Escrever `specs/features/sdd-enforcement/PLAN.md` e `TASKS.md`
+- [x] T60 — Implementar: expandir `case` do `sdd-spec-gate.sh` para incluir `"$WS/repos/"*` com resolução de `specs_dir` via context ativo
+- [x] T61 — Implementar: adicionar verificação de TASKS.md — bloquear Write/Edit se nenhuma task OPEN ou IN PROGRESS cobre o arquivo-alvo (ou se o arquivo está fora do escopo de qualquer task aprovada)
+- [x] T62 — Distribuir script atualizado via `dadaia public install` para que todos os tools (Claude Code, Codex, OpenCode) usem o gate correto
+- [x] T63 — Adicionar teste E2E: verificar que Write em `repos/<slug>/` sem context ativo é bloqueado; verificar que Write com context ativo e spec aprovada passa
 
 ### 7B — Task state tracking: OPEN → IN PROGRESS → DONE
 
 **Problema identificado:** O TASKS.md atual só tem dois estados (`[ ]` e `[x]`). Quando um agente inicia uma task, não há sinal de que ela está em andamento — outro agente (ou instância paralela) pode pegar a mesma task, causando conflito. Não há rastreabilidade de "quem pegou o quê".
 
-- [ ] T64 — Escrever `specs/features/task-state-tracking/SPEC.md`: definir os 3 estados (`[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE), semântica de cada transição, regras de precedência (nunca 2 `[-]` simultâneos), e como o gate usa o estado para decidir
-- [ ] T65 — Escrever `specs/features/task-state-tracking/PLAN.md` e `TASKS.md`
-- [ ] T66 — Criar skill `dadaia-task-manager/SKILL.md` em `dadaia_workspace/public/skills/`: protocolo para agentes lerem, atualizarem e commitarem mudanças de estado em TASKS.md antes de iniciar work
-- [ ] T67 — Integrar com sdd-spec-gate: Write/Edit só permitido se houver uma task com estado `[-]` (IN PROGRESS) que cubra o arquivo-alvo
-- [ ] T68 — Distribuir skill via `dadaia public install --target all`
-- [ ] T69 — Atualizar `foundation/SPEC.md` e `specs/SPEC.md` para refletir a nova política de estados de task como contrato normativo
+- [x] T64 — Escrever `specs/features/task-state-tracking/SPEC.md`: definir os 3 estados (`[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE), semântica de cada transição, regras de precedência (nunca 2 `[-]` simultâneos), e como o gate usa o estado para decidir
+- [x] T65 — Escrever `specs/features/task-state-tracking/PLAN.md` e `TASKS.md`
+- [x] T66 — Criar skill `dadaia-task-manager/SKILL.md` em `dadaia_workspace/public/skills/`: protocolo para agentes lerem, atualizarem e commitarem mudanças de estado em TASKS.md antes de iniciar work
+- [x] T67 — Integrar com sdd-spec-gate: Write/Edit só permitido se houver uma task com estado `[-]` (IN PROGRESS) que cubra o arquivo-alvo
+- [x] T68 — Distribuir skill via `dadaia public install --target all`
+- [x] T69 — Atualizar `foundation/SPEC.md` e `specs/SPEC.md` para refletir a nova política de estados de task como contrato normativo
 
 ---
 
@@ -177,5 +178,119 @@
 
 ### 8D — Verificação E2E
 
-- [ ] T80 — Teste manual: checkout branch `feature/test` em um repo ativo → `dadaia export` → verificar que `spec_contexts.json` no artefato tem `current_branch: feature/test` → `dadaia import` em dir novo → verificar que o repo foi clonado e está na branch `feature/test`
-- [ ] T81 — Verificar que artefato não contém `.dadaia/scripts/`, `.dadaia/agentic/`, `.dadaia/src/`
+- [x] T80 — Teste manual: checkout branch `feature/test` em um repo ativo → `dadaia export` → verificar que `spec_contexts.json` no artefato tem `current_branch: feature/test` → `dadaia import` em dir novo → verificar que o repo foi clonado e está na branch `feature/test`
+- [x] T81 — Verificar que artefato não contém `.dadaia/scripts/`, `.dadaia/agentic/`, `.dadaia/src/`
+
+---
+
+## Fase 9 — Multi-Agent Orchestration (v0.1)
+
+> Endereça `specs/features/multi-agent-orchestration/SPEC.md`. **Pré-requisito:** SPEC e PLAN aprovados (gate de operador). Tasks marcadas como `[P]` podem rodar em paralelo (sem precondição inter-task além do gate de aprovação).
+
+### 9A — Models e Protocols (todas paralelizáveis após aprovação)
+
+- [x] T82 [P] — Criar `dadaia_workspace/core/models/workflow.py`: frozen dataclasses `WorkflowDefinition`, `WorkflowStage`, `WorkflowInput`, `ExitCriterion`
+- [x] T83 [P] — Criar `dadaia_workspace/core/models/run_state.py`: frozen dataclasses `RunManifest`, `StageState`, `RunEvent`, `StageInvocation`, `StageResult`, `DispatcherCapabilities`
+- [x] T84 [P] — Criar `dadaia_workspace/core/protocols/workflow_store.py`: `WorkflowStore` Protocol (list, get, validate)
+- [x] T85 [P] — Criar `dadaia_workspace/core/protocols/run_state_store.py`: `RunStateStore` Protocol (create_run, load_run, update_manifest, append_event, list_runs, iter_events)
+- [x] T86 [P] — Criar `dadaia_workspace/core/protocols/agent_dispatcher.py`: `AgentDispatcher` Protocol (capabilities, dispatch, dispatch_parallel)
+- [x] T87 [P] — Adicionar `pyyaml = "^6.0"` em `pyproject.toml` `[tool.poetry.dependencies]` (ADR-ORCH-001)
+- [x] T88 [P] — Adicionar exceções específicas em `core/exceptions.py`: `WorkflowSchemaError`, `WorkflowCycleError`, `WorkflowNotFoundError`, `RunNotFoundError`, `OrchestrationUnsupportedError`
+
+### 9B — Infrastructure (depende de Protocols)
+
+- [x] T89 — Criar `dadaia_workspace/infrastructure/markdown_workflow_store.py`: parser YAML frontmatter + validação de schema (DAG via Kahn; agente existe; parallel_group sem deps internas; etc.)
+- [x] T90 [P] — Criar `dadaia_workspace/infrastructure/json_run_state_store.py`: writes atômicas de `manifest.json`; append-only `events.jsonl`; ULID-like run_id
+- [x] T91 [P] — Criar `dadaia_workspace/infrastructure/claude_agent_dispatcher.py`: mode=native; prepara `invocation.md` por stage; header de PARALLEL GROUP quando aplicável
+- [x] T92 [P] — Criar `dadaia_workspace/infrastructure/cli_agent_dispatcher.py`: mode=cli-only (default) + adapters internos para opencode (best-effort-sequential) e codex (unsupported em parallel_group)
+
+### 9C — Feature module (depende de Protocols + Models)
+
+- [x] T93 — Criar `dadaia_workspace/features/orchestration/resolver.py`: `InputResolver` (função pura: workflow_input + stage_output → StageInvocation.inputs)
+- [x] T94 — Criar `dadaia_workspace/features/orchestration/runner.py`: `WorkflowRunner` — execução DAG, propagação de status, agrupamento parallel_group, `must_include` checks
+- [x] T95 — Criar `dadaia_workspace/features/orchestration/service.py`: `OrchestrationService` (list_workflows, show_workflow, start_run, resume_run, get_run_status) — consome apenas Protocols
+
+### 9D — Composition root + CLI
+
+- [x] T96 — Atualizar `dadaia_workspace/container.py`: adicionar `build_orchestration_service(workspace_root, runtime=None)` + helper `_select_dispatcher(runtime)` (lê `DADAIA_AGENT_RUNTIME` env var; default `cli`)
+- [x] T97 — Criar `dadaia_workspace/cli/commands/orchestrate.py`: Typer app com 5 subcomandos `list`, `show`, `run`, `status`, `resume`; flags `--context`, `--runtime`, `--input k=v`, `--dry-run`, `--json`
+- [x] T98 — Atualizar `dadaia_workspace/cli/main.py`: registrar grupo `orchestrate`
+
+### 9E — Distribuição universal + doctor
+
+- [x] T99 — Atualizar `dadaia_workspace/infrastructure/public_assets.py`: incluir `"workflows"` em `_COPY_DIRS`; adicionar projeção para `.agents/workflows/`, `.claude/workflows/`, `.opencode/workflows/`, `.codex/workflows/`
+- [x] T100 — Atualizar `dadaia_workspace/features/public/doctor.py`: adicionar status `partial` ao classificador (manter `ok | missing | drift | unsupported` + `partial`)
+- [x] T101 — Atualizar `dadaia_workspace/features/public/staging.py`: rejeitar `*.workflow.md` que falham validação de schema (abort do `dadaia public stage` com mensagem RF-QA-007)
+
+### 9F — Input Contract nos agentes existentes (todos paralelizáveis)
+
+- [x] T102 [P] — Adicionar bloco `input_contract` em `dadaia_workspace/public/agents/product-engineer.md`
+- [x] T103 [P] — Adicionar bloco `input_contract` em `dadaia_workspace/public/agents/software-architect.md`
+- [x] T104 [P] — Adicionar bloco `input_contract` em `dadaia_workspace/public/agents/software-engineer.md`
+- [x] T105 [P] — Adicionar bloco `input_contract` em `dadaia_workspace/public/agents/qa-engineer.md`
+- [x] T106 [P] — Adicionar bloco `input_contract` em `dadaia_workspace/public/agents/devops-engineer.md`
+- [x] T107 [P] — Adicionar bloco `input_contract` em `dadaia_workspace/public/agents/game-developer.md`
+
+### 9G — Workflows seed (depende de infraestrutura)
+
+- [x] T108 [P] — Criar `dadaia_workspace/public/workflows/spec-refinement.workflow.md` (workflow desta própria evolução: discovery → 3-paralelo → synthesis com 2 gates)
+- [x] T109 [P] — Criar `dadaia_workspace/public/workflows/tdd-cycle.workflow.md` (par software-engineer ↔ qa-engineer; consult-product gate opcional)
+
+### 9H — Testes (todos paralelizáveis após implementação)
+
+- [x] T110 [P] — Adicionar fakes em `tests/fakes.py`: `FakeWorkflowStore`, `FakeRunStateStore`, `FakeAgentDispatcher` (3 variantes: native, best-effort, unsupported)
+- [x] T111 [P] — Criar `tests/unit/test_workflow_schema.py`: parse válido + 5 cenários de erro (sem name, sem stages, stage sem id/agent, ciclo, parallel_group inválido)
+- [x] T112 [P] — Criar `tests/unit/test_run_state_store.py`: criar run, transições, append events, resume idempotente, atomicidade
+- [x] T113 [P] — Criar `tests/unit/test_orchestration_service.py`: gate pausa execução, status retorna gate-pending, resume não reexecuta stages done
+- [x] T114 [P] — Criar `tests/unit/test_orchestration_runtime.py`: testes paramétricos por dispatcher (claude/opencode/codex/cli)
+- [x] T115 [P] — Criar `tests/integration/test_cli_orchestrate.py`: happy path + erros (workflow inexistente, run-id inexistente, contexto ausente, gate sem aprovação)
+- [x] T116 [P] — Criar `tests/e2e/features/test_orchestration_pipeline.py`: `stage → install → list → run → status → resume → status` em modo `--runtime cli`
+- [x] T117 [P] — Adicionar testes em `tests/e2e/features/test_public_pipeline.py`: validação de schema para workflows seed; `partial`/`unsupported` no doctor
+
+---
+
+## Fase 10 — Release Pipeline v0.1.0
+
+> Endereça `specs/features/release-pipeline/SPEC.md`. Fase 10A é pré-requisito para Fase 10B (não publicar com CI vermelho).
+
+### 10A — Pré-release: fechar gaps QA (CI verde)
+
+- [x] T-IMP-REWRITE-001 — Em `features/import_/service.py`: detectar e reescrever paths absolutos em arquivos não-lib-originated que apontem para fora do novo `workspace_root` (closes BUG-003 root cause). Foco em `.claude/settings.json`, `.codex/hooks.json`, `opencode.json`. Política: rewrite quando match exato com `old_workspace_root` no path; warning quando match parcial; ignorar paths externos legítimos.
+
+
+- [x] T118 — Fix: `tests/e2e/features/test_public_pipeline.py` — adicionar `dadaia-workspace-manager` em `EXPECTED_SKILLS` (corrige 2 falhas atuais)
+- [x] T119 — Fix: `tests/e2e/features/test_academy.py` — corrigir incompatibilidade Typer (`Parameter.make_metavar()` missing `ctx`). Considerar pin de versão Typer em `pyproject.toml` ou substituir `--help` por chamada direta de subcomando
+- [x] T120 [P] — Criar `tests/unit/test_export_service.py`: cobertura ≥80% para `features/export/service.py`
+- [x] T121 [P] — Criar `tests/unit/test_import_service.py`: cobertura ≥80% para `features/import_/service.py`
+- [x] T122 [P] — Criar `tests/unit/test_repos_service.py`: cobertura ≥80% para `features/repos/service.py`
+- [x] T123 [P] — Criar `tests/integration/test_cli_context.py`: cobertura E2E para `dadaia context {create, list, show, activate, deactivate, promote, delete, use}`
+- [x] T124 [P] — Criar `tests/integration/test_cli_export.py`: cobertura E2E para `dadaia export` (happy + flags `--list`, `--exclude-mnt`, `--include-reports`)
+- [x] T125 [P] — Criar `tests/integration/test_cli_import.py`: cobertura E2E para `dadaia import` (happy + flags `--skip-mnt`, `--skip-activate`, `--dry-run`)
+- [x] T126 [P] — Criar `tests/integration/test_cli_doctor.py`: cobertura E2E para `dadaia doctor [--fix]` em estados degradados
+- [x] T127 [P] — Criar `tests/integration/test_hooks.py`: testes de `ctx-inject.sh` e `sdd-spec-gate.sh` via subprocess
+- [x] T128 — Atualizar `pyproject.toml`: adicionar `[tool.pytest.ini_options]` com `addopts = "--cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80"` (somente após T118–T127 verdes)
+
+### 10B — Pipeline de CI/CD
+
+- [x] T129 — Criar `.github/workflows/ci.yml`: 3 jobs paralelos (lint, typecheck, test) + 1 condicional (pr-title); ubuntu-latest; Python 3.12; cache poetry
+- [x] T130 — Criar `.github/workflows/release.yml`: 4 jobs sequenciais (validate → build → publish → smoke-test); permissions: `contents: read` workflow-level + `id-token: write` job-level no publish; `environment: pypi`
+- [x] T131 [P] — Criar `.github/CODEOWNERS`: global fallback + ownership de `.github/`, `pyproject.toml`, `Makefile`, `scripts/`
+- [x] T132 [P] — Criar `CHANGELOG.md`: Keep a Changelog 1.1.0; seção `[Unreleased]` + `[0.1.0]`
+- [x] T133 [P] — Criar `RELEASING.md`: passo a passo humano (10 passos do report devops)
+- [x] T134 — Garantir que `poetry.lock` está commitado em `main`
+
+### 10C — Configuração operacional (operador, não código)
+
+- [ ] T135 — Operador: criar conta PyPI com 2FA (e-mail marcoaurelioreislima@gmail.com)
+- [ ] T136 — Operador: configurar pending publisher no PyPI para `dadaia-workspace` (workflow `release.yml`, environment `pypi`, repo owner/name corretos)
+- [ ] T137 — Operador: criar environment `pypi` no GitHub Actions com deployment branches `v*.*.*`
+- [ ] T138 — Operador: configurar branch protection em `main` (require PR, required status checks `lint`/`typecheck`/`test`, no force push, include administrators)
+
+### 10D — Release v0.1.0
+
+- [x] T139 — Bump `pyproject.toml` para versão `0.1.0` (já está)
+- [x] T140 — Atualizar `CHANGELOG.md`: mover `[Unreleased]` items para `[0.1.0] — <data>`
+- [ ] T141 — Tag `v0.1.0` em `main` e push (`git tag v0.1.0 && git push origin v0.1.0`)
+- [ ] T142 — Monitorar `release.yml` no GitHub Actions (validate → build → publish → smoke-test)
+- [ ] T143 — Verificar `https://pypi.org/project/dadaia-workspace/0.1.0/`
+- [ ] T144 — Verificar smoke local: `pip install dadaia-workspace==0.1.0` em venv limpa + `dadaia --help` + `dadaia init` em tmpdir

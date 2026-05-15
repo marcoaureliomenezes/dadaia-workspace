@@ -1,0 +1,18 @@
+# CODEOWNERS — owners required to approve PRs touching listed paths.
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Fallback owner — every PR requires their review by default.
+*                       @marcoaureliomenezes
+
+# Pipelines & repo governance
+/.github/               @marcoaureliomenezes
+/CODEOWNERS             @marcoaureliomenezes
+
+# Build / release tooling
+/pyproject.toml         @marcoaureliomenezes
+/poetry.lock            @marcoaureliomenezes
+/Makefile               @marcoaureliomenezes
+/scripts/               @marcoaureliomenezes
+
+# Specs are guarded by the operator + product-engineer agent
+/specs/                 @marcoaureliomenezes

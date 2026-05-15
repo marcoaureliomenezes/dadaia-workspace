@@ -17,7 +17,35 @@ tools:
   - Agent
 skills:
   - dadaia-workspace-spec-navigator
+  - dadaia-task-manager
 maxTurns: 60
+input_contract:
+  requires_inputs:
+    - name: context
+      kind: string
+      source: workflow_input
+      description: "Active Spec Context Project name"
+      stop_if_missing: true
+    - name: task_id
+      kind: string
+      source: workflow_input
+      description: "Approved task identifier from TASKS.md (e.g. T123)"
+      stop_if_missing: true
+    - name: failing_tests_report
+      kind: report
+      source: report_path
+      description: "Red-phase report from qa-engineer (TDD inbound)"
+      stop_if_missing: false
+  produces_outputs:
+    - name: green_report
+      kind: report
+      path: .dadaia/reports/{context}/software-engineer/{ts}-{task_id}-green.md
+      schema_ref: handoff-schema-v1
+    - name: refactor_report
+      kind: report
+      path: .dadaia/reports/{context}/software-engineer/{ts}-{task_id}-refactor.md
+      schema_ref: handoff-schema-v1
+  stop_if_missing: true
 ---
 
 # Software Engineer

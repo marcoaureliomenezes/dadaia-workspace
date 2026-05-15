@@ -14,6 +14,7 @@ python = "^3.12"
 typer = {extras = ["all"], version = ">=0.12"}
 rich = "^13"
 openpyxl = "^3.1"
+pyyaml = "^6.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8"
@@ -44,3 +45,15 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+branch = true
+source = ["dadaia_workspace"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+]

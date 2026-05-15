@@ -35,3 +35,23 @@ class GitCloneError(DadaiaError):
 
 class GitSyncError(DadaiaError):
     """Raised when committing or pushing changes before deactivate fails."""
+
+
+class WorkflowSchemaError(DadaiaError):
+    """Raised when a workflow file fails schema validation."""
+
+
+class WorkflowCycleError(WorkflowSchemaError):
+    """Raised when stage dependencies form a cycle."""
+
+
+class WorkflowNotFoundError(DadaiaError):
+    """Raised when a workflow name is not present in the workflow store."""
+
+
+class RunNotFoundError(DadaiaError):
+    """Raised when a run_id is not present under .dadaia/runs/."""
+
+
+class OrchestrationUnsupportedError(DadaiaError):
+    """Raised when the selected runtime cannot execute a workflow's required capability."""
