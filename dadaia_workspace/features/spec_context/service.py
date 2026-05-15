@@ -165,22 +165,23 @@ class SpecContextService:
                 branch_before_sync = self._git.current_branch(repo_path)
             except Exception:
                 pass
-            if self._git.is_dirty(repo_path):
-                try:
-                    self._git.commit_all(repo_path, "chore: auto-sync before deactivate")
-                except GitSyncError as exc:
-                    raise GitSyncError(
-                        f"Git sync failed for context '{name}' at '{repo_path}'. "
-                        "Resolve the issue and retry deactivate."
-                    ) from exc
-            if self._git.has_remote(repo_path):
-                try:
-                    self._git.push(repo_path)
-                except GitSyncError as exc:
-                    raise GitSyncError(
-                        f"Git push failed for context '{name}' at '{repo_path}'. "
-                        "Resolve the issue and retry deactivate."
-                    ) from exc
+            if self._git.is_git_root(repo_path):
+                if self._git.is_dirty(repo_path):
+                    try:
+                        self._git.commit_all(repo_path, "chore: auto-sync before deactivate")
+                    except GitSyncError as exc:
+                        raise GitSyncError(
+                            f"Git sync failed for context '{name}' at '{repo_path}'. "
+                            "Resolve the issue and retry deactivate."
+                        ) from exc
+                if self._git.has_remote(repo_path):
+                    try:
+                        self._git.push(repo_path)
+                    except GitSyncError as exc:
+                        raise GitSyncError(
+                            f"Git push failed for context '{name}' at '{repo_path}'. "
+                            "Resolve the issue and retry deactivate."
+                        ) from exc
             shutil.rmtree(repo_path)
 
         inactive = SpecContextProject(
