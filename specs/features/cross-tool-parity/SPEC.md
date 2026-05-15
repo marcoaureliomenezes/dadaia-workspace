@@ -1,10 +1,10 @@
 # Feature Spec: Cross-Tool Parity
 
 **Feature ID:** cross-tool-parity
-**Status:** Aprovado
+**Status:** Em revisão
 **Owner:** dadaia Labs
-**Version:** 2.0
-**Data:** 2026-05-09
+**Version:** 2.1
+**Data:** 2026-05-14
 **Consolidado por:** `specs/features/universal-agentic-assets/SPEC.md`
 
 ---
@@ -80,11 +80,29 @@ que o leia deve conseguir operar o workspace seguindo as regras.
 - [ ] `AGENTS.md` começa com `# dadaia Labs — AI Coding Assistant` (não `Workspace Assistant`)
 - [ ] `AGENTS.md` contém seção SDD com pipeline e HARD STOP template
 - [ ] `AGENTS.md` contém seção `dadaia context list` para Spec Context discovery
-- [ ] `AGENTS.md` contém seção de agentes com os 4 personas
+- [ ] `AGENTS.md` contém seção de agentes com os 6 personas (`software-architect`, `product-engineer`, `software-engineer`, `qa-engineer`, `devops-engineer`, `game-developer`)
 - [ ] `.agents/skills/` contém skills universais
 - [ ] `.claude/`, `.codex/` e `.opencode/` são gerados por `dadaia public install --target all`
-- [ ] `dadaia public doctor` reporta `ok`, `missing`, `drift` ou `unsupported`
+- [ ] `dadaia public doctor` reporta `ok`, `missing`, `drift`, `partial` ou `unsupported`
 - [ ] Nenhuma spec exige hook parity para OpenCode
+
+---
+
+## Paridade de Orquestração (adicionado por `multi-agent-orchestration`)
+
+A partir desta evolução, a matriz de paridade inclui as capacidades de orquestração multi-agente. Cada linha lista o suporte declarado de cada runtime.
+
+| Capacidade | Claude Code | OpenCode | Codex | Mecanismo |
+|---|---|---|---|---|
+| **workflows declarados** | full | full | full | `.../workflows/*.workflow.md` é projetado em todos os runtimes como referência human-readable |
+| **`dadaia orchestrate {list, show, run, status, resume}`** | full | full | full | CLI universal; não depende do runtime |
+| **`parallel_group` em workflows** | full (`mode=native`) | partial (`mode=best-effort-sequential`) | unsupported (`mode=unsupported`) | host agent dispara N `Agent` numa msg (Claude); OpenCode executa sequencial; Codex rejeita |
+| **gates `operator-approval`** | full | full | full | Gate é gravado em `events.jsonl`; resolução via CLI `dadaia orchestrate resume <run-id>` (universal) |
+| **run-state em `.dadaia/runs/`** | full | full | full | CLI universal; arquivos atômicos `manifest.json` + `events.jsonl` |
+| **dispatcher selection (`DADAIA_AGENT_RUNTIME`)** | claude | opencode | codex | env var + flag `--runtime` |
+
+**FR-CTP-007 — Orquestração honesta por runtime:**
+`dadaia public doctor` shall classify each workflow per runtime using `ok | partial | unsupported | missing | drift`. The CLI surface `dadaia orchestrate` is identical across runtimes; only the dispatcher implementation differs. Tentativas de uso fora da capacidade do runtime devem falhar cedo com mensagem orientada (RF-QA-007), não simular paridade.
 
 ---
 

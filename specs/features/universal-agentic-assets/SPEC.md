@@ -1,9 +1,9 @@
 # Spec: Feature — Universal Agentic Assets
 
-> **Status:** Aprovado
-> **Versão:** 1.0
+> **Status:** Em revisão
+> **Versão:** 1.1
 > **Autor:** Marco Menezes
-> **Referências:** `specs/constitution.md`, `specs/SPEC.md`, `specs/memory/architecture.md`, `specs/foundation/SPEC.md`
+> **Referências:** `specs/constitution.md`, `specs/SPEC.md`, `specs/memory/architecture.md`, `specs/foundation/SPEC.md`, `specs/features/multi-agent-orchestration/SPEC.md`
 > **Consolida:** `agent-rules-skills`, `agents`, `cross-tool-parity`, `multi-tool-sdd-enforcement`, `dev-workspace-governance`, `spec-context-agent-command`
 
 ---
@@ -35,9 +35,12 @@ Projeções runtime-specific:
 | **commands** | `commands/` | — | `commands/` | `commands/` | — (via AGENTS.md) | — |
 | **rules** | `rules/` | — | `rules/` | — (via AGENTS.md) | `rules/` | — |
 | **skills** | `skills/` | `skills/` | `skills/` | `skills/` | `skills/` (via `.agents/`) | — |
+| **workflows** | `workflows/` | `workflows/` | `workflows/` | `workflows/` (partial) | `workflows/` (unsupported para `parallel_group`) | — |
 | **hooks** | `scripts/` | — | `settings.json` | — (unsupported) | `hooks.json` | — |
 | **scripts** | `scripts/` | — | — | — | — | `.dadaia/scripts/` |
 | **instructions** | `data/AGENTS.md` | — | — | — | — | `AGENTS.md` |
+
+> Linha `workflows` adicionada pela evolução `multi-agent-orchestration`. A coluna `.agents/` recebe a projeção universal de descoberta — qualquer runtime pode lê-la como referência human-readable. Codex recebe o arquivo mesmo declarando `unsupported` para `parallel_group`, paralelo ao tratamento de hooks em OpenCode (ADR-UAA-004).
 
 ---
 
@@ -142,7 +145,14 @@ Codex recebe instruções universais via `AGENTS.md`, configuração em `.codex/
 - FR-UAA-022: Universal skills shall be installed in `.agents/skills/`.
 - FR-UAA-023: Hooks are supported for Claude Code and Codex only where their runtime hook model supports them.
 - FR-UAA-024: OpenCode shall use commands, config, permissions, and instructions rather than hook parity.
-- FR-UAA-025: The 4 specialized agent personas shall remain canonical in `dadaia_workspace/public/agents/` and be projected into runtime-native formats when supported.
+- FR-UAA-025: The 6 specialized agent personas shall remain canonical in `dadaia_workspace/public/agents/` and be projected into runtime-native formats when supported. The list of agents is governed by `specs/foundation/SPEC.md` RF-ARCH-002.
+
+### Workflows como tipo universal (adicionado por `multi-agent-orchestration`)
+
+- **FR-UAA-028:** `workflows/` shall be a versioned asset type with source of truth at `dadaia_workspace/public/workflows/<slug>.workflow.md`. Schema is governed by `specs/features/multi-agent-orchestration/SPEC.md`.
+- **FR-UAA-029:** `dadaia public install --target all` shall project workflows to `.agents/workflows/`, `.claude/workflows/`, `.opencode/workflows/`, `.codex/workflows/`.
+- **FR-UAA-030:** `dadaia public doctor` shall classify each projected workflow per runtime using one of the statuses `ok`, `partial`, `unsupported`, `missing`, `drift`. The `partial` status is **new** and explicitly accommodates best-effort runtime mappings (e.g., OpenCode executing `parallel_group` stages sequentially).
+- **FR-UAA-031:** Doctor output for workflows shall honestly distinguish `partial` (capability mapped with best-effort fallback) from `unsupported` (capability not mappable at all). `partial` is allowed in the final report; `unsupported` is allowed; falsely claiming parity is prohibited (NFR-UAA-005).
 
 ---
 

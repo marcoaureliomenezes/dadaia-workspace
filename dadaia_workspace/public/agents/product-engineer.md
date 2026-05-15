@@ -21,7 +21,30 @@ tools:
 skills:
   - dadaia-workspace-spec-navigator
   - dadaia-grill-me
+  - dadaia-task-manager
 maxTurns: 50
+input_contract:
+  requires_inputs:
+    - name: context
+      kind: string
+      source: workflow_input
+      description: "Active Spec Context Project name (e.g. dadaia-workspace)"
+      stop_if_missing: true
+    - name: topic
+      kind: string
+      source: workflow_input
+      description: "Feature topic label or evolution identifier"
+      stop_if_missing: false
+  produces_outputs:
+    - name: discovery_report
+      kind: report
+      path: .dadaia/reports/{context}/product-engineer/{ts}-discovery.md
+      schema_ref: handoff-schema-v1
+    - name: synthesis_spec
+      kind: report
+      path: specs/features/{topic}/SPEC.md
+      schema_ref: handoff-schema-v1
+  stop_if_missing: true
 ---
 
 # Product Engineer
