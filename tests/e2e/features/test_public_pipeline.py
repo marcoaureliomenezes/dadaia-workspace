@@ -146,9 +146,9 @@ class TestStage:
             if a["type"] == "agents" and a["path"].endswith(".md")
         }
 
-        assert staged == EXPECTED_AGENTS, (
-            f"Staged agents mismatch.\n  Expected: {sorted(EXPECTED_AGENTS)}\n  Got: {sorted(staged)}"
-        )
+        assert (
+            staged == EXPECTED_AGENTS
+        ), f"Staged agents mismatch.\n  Expected: {sorted(EXPECTED_AGENTS)}\n  Got: {sorted(staged)}"
 
     def test_stage_manifest_has_no_stale_agents(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -160,9 +160,9 @@ class TestStage:
         all_paths = {a["path"] for a in manifest["assets"]}
 
         for stale in STALE_AGENTS:
-            assert f"agents/{stale}.md" not in all_paths, (
-                f"Stale agent '{stale}.md' found in manifest — must be deleted from canonical source"
-            )
+            assert (
+                f"agents/{stale}.md" not in all_paths
+            ), f"Stale agent '{stale}.md' found in manifest — must be deleted from canonical source"
 
     def test_stage_creates_all_expected_skills(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -225,9 +225,9 @@ class TestInstallAll:
 
         assert (workspace / ".codex" / "hooks.json").exists(), ".codex/hooks.json not created"
         assert (workspace / ".codex" / "config.toml").exists(), ".codex/config.toml not created"
-        assert (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists(), (
-            ".codex/rules/dadaia-workspace-dev-guardrail.md not installed"
-        )
+        assert (
+            workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md"
+        ).exists(), ".codex/rules/dadaia-workspace-dev-guardrail.md not installed"
 
     def test_install_no_stale_agents_in_claude(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -261,9 +261,9 @@ class TestContentConsistency:
             content = agent_file.read_text(encoding="utf-8")
             keys = _parse_frontmatter_keys(content)
             missing = _REQUIRED_FRONTMATTER - keys
-            assert not missing, (
-                f"Agent '{agent_file.name}' is missing required frontmatter fields: {missing}"
-            )
+            assert (
+                not missing
+            ), f"Agent '{agent_file.name}' is missing required frontmatter fields: {missing}"
 
     def test_staged_agent_skill_references_are_all_valid(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -313,9 +313,9 @@ class TestContentConsistency:
         skills_dir = workspace / ".dadaia" / "agentic" / "skills"
         for skill_dir in sorted(skills_dir.iterdir()):
             if skill_dir.is_dir():
-                assert (skill_dir / "SKILL.md").exists(), (
-                    f"Skill directory '{skill_dir.name}' has no SKILL.md"
-                )
+                assert (
+                    skill_dir / "SKILL.md"
+                ).exists(), f"Skill directory '{skill_dir.name}' has no SKILL.md"
 
 
 # ---------------------------------------------------------------------------
