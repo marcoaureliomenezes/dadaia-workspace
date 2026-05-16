@@ -24,7 +24,7 @@ dadaia context show --json
 
 # Load these documents in order:
 # 1. specs/constitution.md          — hard constraints and project philosophy
-# 2. specs/memory/architecture.md   — layer diagram, module ownership, dependency rules
+# 2. specs/memory/architecture.html  — layer diagram, module ownership, dependency rules
 # 3. specs/foundation/SPEC.md       — foundational layer contract
 # 4. specs/SPEC.md                  — product-level contract
 ```
