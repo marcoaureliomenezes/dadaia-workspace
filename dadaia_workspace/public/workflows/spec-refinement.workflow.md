@@ -8,11 +8,11 @@ inputs:
     type: string
     required: true
     description: Active spec context name (e.g. dadaia-workspace).
-  topic:
+  release_id:
     type: string
     required: false
     default: "next-evolution"
-    description: Free-form topic label persisted into output paths.
+    description: Release ID under `specs/releases/`. (Alias: formerly `topic` — pass `release_id` for new callers.)
 stages:
   - id: discovery
     agent: product-engineer
@@ -89,7 +89,7 @@ stages:
     agent: product-engineer
     needs: [arch_review, devops_review, qa_review, frontend_review, backend_review]
     expected_output:
-      path: "specs/features/{topic}/SPEC.md"
+      path: "specs/releases/{release_id}/SPEC.md"
       must_include: ["Status", "Critérios de Aceite"]
     inputs:
       - kind: stage_output
