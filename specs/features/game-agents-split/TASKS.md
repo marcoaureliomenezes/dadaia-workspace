@@ -33,5 +33,5 @@
 
 ## Propagation
 
-- [-] TA17 — dadaia public stage && install --target all
-- [ ] TA18 — dadaia public doctor (todos os entries [ok])
+- [x] TA17 — dadaia public stage && install --target all
+- [x] TA18 — dadaia public doctor (todos os entries [ok])
