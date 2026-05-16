@@ -1,51 +1,77 @@
 ---
 name: dadaia-workspace-spec-navigator
-description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, or planning. Supports both the repository itself and an active runtime context discovered via primary_context.json or `dadaia context show --json`."
+description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via specs/releases/ACTIVE.md and reads memory HTML + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via primary_context.json or `dadaia context show --json`."
 ---
 
 # dadaia-workspace-spec-navigator
 
 ## Goal
 
-Resolve the active Spec Context Project and load the correct specs for the current task.
+Resolve the active Spec Context Project, the active release, and load the right specs in
+canonical order for the current task.
 
 ## Workflow
 
-1. If the task is about the `dadaia-workspace` repository itself, load local repository specs in this order and stop:
-   - `specs/constitution.md`
-   - `specs/memory/architecture.md`
-   - `specs/memory/product.md`
-   - `specs/memory/tech-stack.md`
-   - `specs/foundation/SPEC.md`
-   - `specs/SPEC.md`
-   - the relevant feature spec
-   - `specs/PLAN.md` and `specs/TASKS.md` when planning or implementation is in scope
-   - if implementation is in scope, verify every required artifact for that scope contains the explicit marker `**Status:** Aprovado`; otherwise stop before implementation
+1. **Resolve workspace context.**
+   - If the task is about the `dadaia-workspace` repository itself, treat its local
+     `specs/` as the target spec context.
+   - Otherwise, resolve in priority order:
+     - **a) `DADAIA_CONTEXT` env var** — if set, use
+       `<workspace-root>/repos/<DADAIA_CONTEXT>/specs/`.
+     - **b) `primary_context.json`** — read `.dadaia/states/primary_context.json` and
+       parse `specs_dir`. Fallback: `dadaia context show --json`.
+   - If neither resolves: stop and tell the operator to activate a context first
+     (`dadaia context activate <name>`).
 
-2. Otherwise resolve the active context using one of these two mechanisms (in priority order):
+2. **Read constitution and atomic memory (HTML).**
+   - `<specs-dir>/constitution.md`
+   - `<specs-dir>/memory/architecture.html`
+   - `<specs-dir>/memory/product/index.html` — entry point for product catalog. Load
+     specific `<specs-dir>/memory/product/<feature-slug>.html` files on demand when the
+     task requires functional depth on a particular feature (avoids overloading context
+     with all features at once).
+   - `<specs-dir>/memory/tech-stack.html`
 
-   **a) `DADAIA_CONTEXT` env var** — if the env var is set, use `<workspace-root>/repos/<DADAIA_CONTEXT>/specs/` directly. This takes priority over the JSON file.
+   Parse HTML as text and extract content. Sections of interest are typically marked with
+   `class="…"` or `id="…"` attributes (e.g. `<section id="layers">`, `<section id="catalog">`,
+   `<section id="purpose">`).
 
-   **b) `primary_context.json`** — read `.dadaia/states/primary_context.json` directly. Parse the `specs_dir` field. As a fallback, run `dadaia context show --json` and parse the JSON output.
+3. **Resolve the active release.**
+   - Read `<specs-dir>/releases/ACTIVE.md`. Expected format:
+     ```
+     release: <release-id>
+     phase: <DISCOVERY|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
+     ```
+   - If file is missing or `release: none`: no active release. Inform the operator and
+     stop before implementation.
 
-3. If no active context is found (env var unset and JSON file absent or `context: null`): stop and tell the user to activate a context first (`dadaia context activate <name>`).
+4. **Read the active release's specs in order:**
+   - `<specs-dir>/releases/<release-id>/SPEC.md`
+   - `<specs-dir>/releases/<release-id>/PLAN.md` (if planning/implementation in scope)
+   - `<specs-dir>/releases/<release-id>/TASKS.md` (if implementation in scope)
+   - `<specs-dir>/releases/<release-id>/CLOSURE.md` (only if phase = `CLOSURE` or
+     `ARCHIVED`)
 
-4. Read `<specs_dir>/constitution.md`.
-5. Read `<specs_dir>/memory/architecture.md`.
-6. Read `<specs_dir>/memory/product.md`.
-7. Read `<specs_dir>/memory/tech-stack.md`.
-8. Read `<specs_dir>/foundation/SPEC.md`.
-9. Read `<specs_dir>/SPEC.md`.
-10. Read the feature spec relevant to the current task.
-11. If planning or implementation is in scope, read `<specs_dir>/PLAN.md` and `<specs_dir>/TASKS.md`.
-12. If implementation is in scope, verify every required artifact for that scope contains the explicit marker `**Status:** Aprovado`; otherwise stop before implementation.
-13. If required files are missing, report that the context is incomplete and stop before implementation.
+5. **Approval verification.**
+   - If implementation is in scope, every loaded SPEC/PLAN/TASKS must contain the explicit
+     marker `**Status:** Aprovado`. Otherwise, stop before implementation and surface
+     which artifact lacks approval.
+
+6. **Legacy compat (migration window).**
+   - If `specs/features/<name>/{SPEC,PLAN,TASKS}.md` exist, treat them as legacy. They do
+     not authorize implementation unless explicitly referenced from the active release's
+     SPEC. Report their presence as a migration warning.
 
 ## Guardrails
 
+- **Ignore `_archive/`** by default. The archive is historical; agents do not use it as a
+  source of approval. Read only when the operator asks for history.
+- **Ignore `backlog/`** for implementation decisions. Backlog is informal; nothing there
+  authorizes work.
 - Do not parse `dadaia context list` as the canonical source for automation.
 - Do not assume specs exist if `specs_dir` is present but required files are missing.
-- Do not treat `Em revisão`, `Draft`, or missing status markers as approval for implementation.
-- For dadaia-workspace itself, always load the foundation spec when the task can affect architecture, state machine, CLI, schema, or agent assets.
-- If the task affects bootstrap, Python execution, or automation hygiene, always load `specs/memory/architecture.md` and `specs/memory/tech-stack.md`.
-- Never reference `standby`, `context_dir`, `select`, or `is_selected` — these concepts do not exist in v3.0.
+- Do not treat `Em revisão`, `Draft`, or missing status markers as approval.
+- Never reference `standby`, `context_dir`, `select`, or `is_selected` — these concepts do
+  not exist in v3.0.
+- HTML memory files are read-only for every agent except `product-engineer` during the
+  CLOSURE phase. Reading is always allowed.

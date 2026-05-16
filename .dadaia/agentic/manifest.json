@@ -32,7 +32,7 @@
     },
     {
       "path": "agents/product-engineer.md",
-      "sha256": "187e4bb3e03cbe1c8450552f77e81095a25a04e4a2ab16549efd6bf320581b6f",
+      "sha256": "b632ca02bc425aa30e877b70dc167282dfe5855ebf0571b6b57194b3dd9b49ba",
       "type": "agents"
     },
     {
@@ -142,7 +142,7 @@
     },
     {
       "path": "scripts/sdd-spec-gate.sh",
-      "sha256": "c51d0fafa4ca03e374755ace73ea736fdc2ebf2bfcdfc7089e98eef0a0fae909",
+      "sha256": "b16e30109468af4011286a0d815df68c871448b8a7bb7580a004c5a12940bab8",
       "type": "scripts"
     },
     {
@@ -161,8 +161,13 @@
       "type": "skills"
     },
     {
+      "path": "skills/dadaia-release-closure/SKILL.md",
+      "sha256": "a125ce8be54aed700c8bb493611d2ad01bbe9e4b3dd23f82c70d1edd1cf6fae6",
+      "type": "skills"
+    },
+    {
       "path": "skills/dadaia-task-manager/SKILL.md",
-      "sha256": "01575c225b277bdaaeaca0fd286ba72a93ce21387bc6ca9392598a9fed95eb5b",
+      "sha256": "4cd50ed940b8511e21f431a505d9489b2f82cb54f24944c8ea1fdecd9d3f1857",
       "type": "skills"
     },
     {
@@ -177,12 +182,17 @@
     },
     {
       "path": "skills/dadaia-workspace-spec-navigator/SKILL.md",
-      "sha256": "f5ddcc771dd1cfd0ac96dde2d2daaabdab4bdb977dfff40c947b1c3708dad2ca",
+      "sha256": "9917f7c8e856461bd4bb109a9845c38af9456af8c895202d27dcf7032f5fed65",
       "type": "skills"
     },
     {
       "path": "skills/dadaia-workspace-spec-reviewer/SKILL.md",
-      "sha256": "44ae0adc9b1fa1fb7721ad912f07a1bfd7e4829ecce37ff70eb11ce68128b0e1",
+      "sha256": "d6afebeec9e490d747617d4a5cd6863c024bbcbc7477d4f2239c3f62dbccc45a",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dev-server-registry/SKILL.md",
+      "sha256": "498868a07c999ff994e9fc6adcbf11e5932058f7af85966bc17098df15fd2777",
       "type": "skills"
     },
     {
@@ -271,6 +281,26 @@
       "type": "skills"
     },
     {
+      "path": "templates/memory-architecture.html.j2",
+      "sha256": "619e70aabc2325027454ac199856d5e9dab43e7c3d40754dbfe5e450315c8fb1",
+      "type": "templates"
+    },
+    {
+      "path": "templates/memory-product-feature.html.j2",
+      "sha256": "64f55649cd02afc60d1da2d4d02066bea6382c9b3bd213da019ecfa10b4bf07e",
+      "type": "templates"
+    },
+    {
+      "path": "templates/memory-product-index.html.j2",
+      "sha256": "17c5786cd120593f3ee1c7a636284d59e8b1330b15402930337d1b4904c1ab0f",
+      "type": "templates"
+    },
+    {
+      "path": "templates/memory-tech-stack.html.j2",
+      "sha256": "5f4374c6eb5d490bdeffd33533a6ccae6d8d06adc11b9ca6e09af9498795f97b",
+      "type": "templates"
+    },
+    {
       "path": "templates/repo-AGENTS.md",
       "sha256": "2d7c96dfafd58c0f6261f88c0f7315544f16427e583275cd604f15454f17f2b4",
       "type": "templates"
@@ -331,7 +361,7 @@
       "type": "workflows"
     }
   ],
-  "generated_at": "2026-05-16T18:24:53.123729+00:00",
+  "generated_at": "2026-05-16T20:17:39.529235+00:00",
   "package_version": "0.1.0",
   "schema_version": "1"
 }
