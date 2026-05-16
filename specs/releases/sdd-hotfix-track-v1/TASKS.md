@@ -155,7 +155,7 @@ quando write-sets são disjuntos.
 
 ## T7 — CI: ci.yml branch trigger + SemVer branch validation
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** devops-engineer
 - **Precondições:** T1 [x] (doctor deve aceitar novos formatos antes de CI rodar)
 - **Paraleliza com:** T6, T8
