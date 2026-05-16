@@ -8,7 +8,7 @@
 
 ## Rules and Agents
 
-- [ ] TA01 — Criar game-agents-coordination.md rule
+- [-] TA01 — Criar game-agents-coordination.md rule
 - [ ] TA02 — Atualizar game-developer-scope.md (3 agents + sub-domínios)
 - [ ] TA03 — Atualizar game-developer.md (narrow scope, WebSearch, workspace table)
 - [ ] TA04 — Criar game-designer.md agent

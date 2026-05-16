@@ -286,7 +286,7 @@
 
 - [ ] T162 — Atualizar `dadaia_workspace/public/rules/game-developer-scope.md` (3 agentes + sub-domínios)
 - [ ] T163 — Atualizar `dadaia_workspace/public/workflows/tdd-cycle.workflow.md` (remover game-developer do implementer list)
-- [ ] T166 — Criar `dadaia_workspace/public/rules/game-agents-coordination.md` (decision authority matrix + protocolo anti-deadlock com dadaia-grill-me)
+- [-] T166 — Criar `dadaia_workspace/public/rules/game-agents-coordination.md` (decision authority matrix + protocolo anti-deadlock com dadaia-grill-me)
 
 ### 11F — Propagação
 
