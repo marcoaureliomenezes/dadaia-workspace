@@ -353,3 +353,82 @@ def test_to_dict_includes_required_keys(tmp_path: Path) -> None:
     issues = SpecsDoctor(specs).check()
     payload = issues[0].to_dict()
     assert set(payload.keys()) == {"code", "severity", "description", "path"}
+
+
+# ---- check 3 hardening: whitespace-only values in ACTIVE.md
+
+
+def test_active_md_empty_release_value_is_error(tmp_path: Path) -> None:
+    """release: with whitespace-only value must be treated as missing (SPEC-DOC-003 ERROR)."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release:   \nphase: TASKS\n", encoding="utf-8"
+    )
+    issues = SpecsDoctor(specs).check()
+    doc3_errors = [
+        i for i in issues
+        if i.code == "SPEC-DOC-003" and i.severity == Severity.ERROR
+    ]
+    assert doc3_errors, [i.to_dict() for i in issues]
+
+
+def test_active_md_empty_phase_value_is_error(tmp_path: Path) -> None:
+    """phase: with whitespace-only value must be treated as missing (SPEC-DOC-003 ERROR)."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release: r1\nphase:   \n", encoding="utf-8"
+    )
+    issues = SpecsDoctor(specs).check()
+    doc3_errors = [
+        i for i in issues
+        if i.code == "SPEC-DOC-003" and i.severity == Severity.ERROR
+    ]
+    assert doc3_errors, [i.to_dict() for i in issues]
+
+
+# ---- check 12: backlog schema (SPEC-DOC-012)
+
+
+def test_backlog_well_formed_passes(tmp_path: Path) -> None:
+    """A correctly formatted candidates.md produces no SPEC-DOC-012 issues."""
+    specs = _make_clean_specs_tree(tmp_path)
+    candidates = (
+        "# Backlog\n\n"
+        "## Candidatas ativas\n\n"
+        "- my-feature — Does something useful (owner: software-engineer, contexto: `_archive/legacy-features/my-feature/SPEC.md`)\n"
+    )
+    (specs / "backlog" / "candidates.md").write_text(candidates, encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    doc12 = [i for i in issues if i.code == "SPEC-DOC-012"]
+    assert doc12 == [], doc12
+
+
+def test_backlog_historico_section_skipped(tmp_path: Path) -> None:
+    """Bullets under '## Histórico' are free-form and must not trigger SPEC-DOC-012."""
+    specs = _make_clean_specs_tree(tmp_path)
+    candidates = (
+        "# Backlog\n\n"
+        "## Candidatas ativas\n\n"
+        "- good-feature — Does something (owner: devops-engineer, contexto: `_archive/legacy-features/good-feature/SPEC.md`)\n\n"
+        "## Histórico (candidatas promovidas a release)\n\n"
+        "- this bullet has free-form text without the expected schema\n"
+        "- another free-form line (released on 2026-01-01)\n"
+    )
+    (specs / "backlog" / "candidates.md").write_text(candidates, encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    doc12 = [i for i in issues if i.code == "SPEC-DOC-012"]
+    assert doc12 == [], doc12
+
+
+def test_backlog_malformed_bullet_warns(tmp_path: Path) -> None:
+    """A bullet in '## Candidatas ativas' missing '(owner: ...)' raises SPEC-DOC-012 WARNING."""
+    specs = _make_clean_specs_tree(tmp_path)
+    candidates = (
+        "# Backlog\n\n"
+        "## Candidatas ativas\n\n"
+        "- bad-feature — Missing the owner field entirely\n"
+    )
+    (specs / "backlog" / "candidates.md").write_text(candidates, encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    doc12 = [i for i in issues if i.code == "SPEC-DOC-012"]
+    assert doc12 and doc12[0].severity == Severity.WARNING, [i.to_dict() for i in issues]
