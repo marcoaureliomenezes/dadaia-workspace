@@ -257,7 +257,7 @@ Architect: software-architect (first review)
 If the project purpose is unclear after inspection, say so explicitly.>
 
 ## Architecture Status
-- Declared architecture: YES (architecture.md + foundation/SPEC.md) | PARTIAL | NO
+- Declared architecture: YES (architecture.html + foundation/SPEC.md) | PARTIAL | NO
 - Implementation found: YES | PARTIAL | NO
 - Alignment: ALIGNED | PARTIAL DRIFT | SIGNIFICANT DRIFT | UNDETERMINED
 
