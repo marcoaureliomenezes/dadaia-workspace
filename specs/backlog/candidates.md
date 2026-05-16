@@ -19,6 +19,7 @@ era uma feature SPEC.md em Draft sob o modelo antigo `specs/features/<name>/`, a
 arquivada em `specs/_archive/legacy-features/<name>/SPEC.md`. Promover para release exige
 nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 
+- sdd-hotfix-track — Track separado em `specs/hotfix/` + versionamento vMAJOR.MINOR.PATCH para releases, com PATCH reservado para hotfixes (owner: product-engineer, contexto: `.claude/plans/devemos-melhorar-o-streamed-snail.md`)
 - dev-server-registry — Registry para resolver conflito de portas entre agentes em dev. PLAN antigo de 2287 linhas precisava ser compactado (owner: software-engineer, contexto: `_archive/legacy-features/dev-server-registry/SPEC.md`)
 - release-pipeline — Pipeline de release semver/build/publicação cross-repo (owner: devops-engineer, contexto: `_archive/legacy-features/release-pipeline/SPEC.md`)
 - agents — Padrão de agentes canonical em `dadaia_workspace/public/agents/` + projeção multi-tool (owner: product-engineer, contexto: `_archive/legacy-features/agents/SPEC.md`)
