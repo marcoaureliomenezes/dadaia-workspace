@@ -107,7 +107,7 @@ quando write-sets são disjuntos.
 
 ## T4 — Constitution L148 edit (D17)
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Precondições:** **explicit operator confirmation** (constitution edit per product-engineer agent contract)
 - **Paraleliza com:** T1, T2, T3, T5
