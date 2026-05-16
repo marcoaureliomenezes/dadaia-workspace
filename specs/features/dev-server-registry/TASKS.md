@@ -56,12 +56,12 @@
 
 ## Task 5 — Service + Unit Tests (TDD)
 
-- [ ] Step 5.1: Create empty `__init__.py`
-- [ ] Step 5.2: Write failing service tests
-- [ ] Step 5.3: Run tests — verify they fail
-- [ ] Step 5.4: Implement `dadaia_workspace/features/server_registry/service.py`
-- [ ] Step 5.5: Run tests — verify they all pass
-- [ ] Step 5.6: Commit
+- [-] Step 5.1: Create empty `__init__.py`
+- [-] Step 5.2: Write failing service tests
+- [-] Step 5.3: Run tests — verify they fail
+- [-] Step 5.4: Implement `dadaia_workspace/features/server_registry/service.py`
+- [-] Step 5.5: Run tests — verify they all pass
+- [-] Step 5.6: Commit
 
 ---
 
