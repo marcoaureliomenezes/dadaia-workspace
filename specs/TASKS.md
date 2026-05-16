@@ -263,7 +263,7 @@
 ### 11B — Novos agentes
 
 - [x] T149 — Criar `dadaia_workspace/public/agents/game-designer.md`
-- [-] T150 — Criar `dadaia_workspace/public/agents/game-tester.md`
+- [x] T150 — Criar `dadaia_workspace/public/agents/game-tester.md`
 - [x] T151 — Atualizar `dadaia_workspace/public/agents/game-developer.md` (narrow scope, redistribuir skills)
 
 ### 11C — Novas skills
