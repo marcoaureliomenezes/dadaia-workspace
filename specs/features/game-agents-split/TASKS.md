@@ -18,7 +18,7 @@
 
 - [x] TA06 — Criar game-unreal-developer/SKILL.md
 - [x] TA07 — Criar game-flight-dynamics/SKILL.md
-- [-] TA08 — Criar game-unreal-designer/SKILL.md
+- [x] TA08 — Criar game-unreal-designer/SKILL.md
 - [ ] TA09 — Criar game-visual-design/SKILL.md
 - [ ] TA10 — Criar game-geospatial-pipeline/SKILL.md
 - [ ] TA11 — Criar game-audio-design/SKILL.md
