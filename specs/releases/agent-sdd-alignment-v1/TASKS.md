@@ -131,7 +131,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-E4.2 `[parallel: no]` Revisar o playbook cross-referenciando contra `sdd-release-lifecycle-v1/SPEC.md` Phase 6 (a migração real do dadaia-workspace serve como exemplo trabalhado). Ajustar passos divergentes. **Critério:** ≥1 referência inline a `sdd-release-lifecycle-v1/SPEC.md` Phase 6 como case study.
 
-- [ ] T-E4.3 `[parallel: no]` Verificar `wc -l docs/sdd-migration-playbook.md` ≤ 200. **Critério:** comando retorna ≤ 200.
+- [-] T-E4.3 `[parallel: no]` Verificar `wc -l docs/sdd-migration-playbook.md` ≤ 200. **Critério:** comando retorna ≤ 200.
 
 ---
 
