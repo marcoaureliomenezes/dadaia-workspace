@@ -11,7 +11,7 @@ inputs:
   feature_topic:
     type: string
     required: true
-    description: Feature topic slug under specs/features/.
+    description: Release ID under `specs/releases/`. (Alias: formerly `feature_topic` slug under specs/features/ — use release_id for new callers.)
   task_id_frontend:
     type: string
     required: true
