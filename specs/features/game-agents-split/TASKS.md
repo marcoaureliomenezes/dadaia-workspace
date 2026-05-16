@@ -16,7 +16,7 @@
 
 ## Skills
 
-- [ ] TA06 — Criar game-unreal-developer/SKILL.md
+- [-] TA06 — Criar game-unreal-developer/SKILL.md
 - [ ] TA07 — Criar game-flight-dynamics/SKILL.md
 - [ ] TA08 — Criar game-unreal-designer/SKILL.md
 - [ ] TA09 — Criar game-visual-design/SKILL.md
