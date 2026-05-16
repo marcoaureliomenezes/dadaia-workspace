@@ -101,7 +101,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-E2.2 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/cross-cutting-feature.workflow.md` L14: ajustar description do input para "Release ID under `specs/releases/`" preservando compat retroativa (alias para nome antigo se houver chamadas). **Critério:** description menciona `specs/releases/`.
 
-- [ ] T-E2.3 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/architecture-review.workflow.md` L20: description do input — "When scope=feature, the release id under `specs/releases/`". **Critério:** description menciona `specs/releases/`.
+- [-] T-E2.3 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/architecture-review.workflow.md` L20: description do input — "When scope=feature, the release id under `specs/releases/`". **Critério:** description menciona `specs/releases/`.
 
 - [ ] T-E2.4 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/game-spec-definition.workflow.md` L104 (path-only patch): `specs/features/<jogo>/SPEC.md` → `specs/releases/{release_id}/SPEC.md`. Semântica de game scope continua tracked em backlog `game-agents-split`. **Critério:** grep `features/<jogo>` → 0 hits.
 
