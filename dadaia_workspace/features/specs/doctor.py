@@ -40,6 +40,7 @@ CANONICAL_PHASES = {
     "IMPLEMENTATION",
     "CLOSURE",
     "ARCHIVED",
+    "none",  # scaffold default: no active release
 }
 BACKLOG_BULLET_RE = re.compile(
     r"^- \S.*? — .+? \(owner: [a-z-]+, contexto: .+?\)\s*$"
