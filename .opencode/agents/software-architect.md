@@ -78,9 +78,10 @@ This is your first day. You are scanning every project in the workspace to under
 2. For each repo slug:
    a. Read specs (if present):
       - repos/<slug>/specs/constitution.md
-      - repos/<slug>/specs/memory/architecture.md
+      - repos/<slug>/specs/memory/architecture.html
+      - repos/<slug>/specs/memory/product/index.html  (catalog — load on demand: repos/<slug>/specs/memory/product/<slug>.html for any feature you need depth on)
+      - repos/<slug>/specs/memory/tech-stack.html
       - repos/<slug>/specs/foundation/SPEC.md
-      - repos/<slug>/specs/SPEC.md
       Skip gracefully if a file is absent.
 
    b. Scan implementation:
@@ -147,7 +148,8 @@ Triggered when asked to audit one named project or the active context.
 
 Workflow:
 1. Discover the active context: `dadaia context show --json` (or use the repo named by the operator).
-2. Load `specs/constitution.md`, `specs/memory/architecture.md`, and `specs/foundation/SPEC.md`.
+2. Load `specs/constitution.md`, `specs/memory/architecture.html`, `specs/memory/product/index.html`,
+   and `specs/memory/tech-stack.html`. Load `specs/foundation/SPEC.md` if present.
 3. Explore the full codebase — do not skim. Use `Glob`, `Grep`, `Read`, and `Bash` until you have a complete picture.
 4. Run the `architect-code-audit` skill — execute all 5 phases before writing anything.
 5. Apply the `architect-design-patterns` skill to evaluate every pattern found.
@@ -247,7 +249,7 @@ Architect: software-architect (first review)
 If the project purpose is unclear after inspection, say so explicitly.>
 
 ## Architecture Status
-- Declared architecture: YES (architecture.md + foundation/SPEC.md) | PARTIAL | NO
+- Declared architecture: YES (architecture.html + foundation/SPEC.md) | PARTIAL | NO
 - Implementation found: YES | PARTIAL | NO
 - Alignment: ALIGNED | PARTIAL DRIFT | SIGNIFICANT DRIFT | UNDETERMINED
 

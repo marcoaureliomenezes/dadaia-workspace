@@ -12,7 +12,7 @@ inputs:
     type: string
     required: false
     default: "next-evolution"
-    description: Release ID under `specs/releases/`. (Alias: formerly `topic` — pass `release_id` for new callers.)
+    description: "Release ID under `specs/releases/` (alias of legacy `topic` — pass `release_id` for new callers)."
 stages:
   - id: discovery
     agent: product-engineer
