@@ -127,7 +127,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 8 — Migration playbook (E4)
 
-- [-] T-E4.1 `[parallel: no]` Criar `docs/sdd-migration-playbook.md` (operator-facing, estilo `docs/sdd_patterns.md`, ≤ 200 linhas). 6 seções canônicas conforme SPEC §Delta E4: Preconditions, Scaffold, Triage, Migrar memory, Ativar primeira release, Verificar com doctor + ativar context. **Critério:** arquivo existe; tem 6 headers `## ` correspondentes às seções.
+- [x] T-E4.1 `[parallel: no]` Criar `docs/sdd-migration-playbook.md` (operator-facing, estilo `docs/sdd_patterns.md`, ≤ 200 linhas). 6 seções canônicas conforme SPEC §Delta E4: Preconditions, Scaffold, Triage, Migrar memory, Ativar primeira release, Verificar com doctor + ativar context. **Critério:** arquivo existe; tem 6 headers `## ` correspondentes às seções.
 
 - [ ] T-E4.2 `[parallel: no]` Revisar o playbook cross-referenciando contra `sdd-release-lifecycle-v1/SPEC.md` Phase 6 (a migração real do dadaia-workspace serve como exemplo trabalhado). Ajustar passos divergentes. **Critério:** ≥1 referência inline a `sdd-release-lifecycle-v1/SPEC.md` Phase 6 como case study.
 
