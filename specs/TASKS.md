@@ -256,7 +256,7 @@
 ### 11A — Design e especificação
 
 - [x] T145 — Escrever design doc em `docs/superpowers/specs/2026-05-16-game-agents-split-design.md`
-- [ ] T146 — Criar `specs/features/game-agents-split/SPEC.md` com Status: Aprovado (extraído do design doc)
+- [-] T146 — Criar `specs/features/game-agents-split/SPEC.md` com Status: Aprovado (extraído do design doc)
 - [ ] T147 — Criar `specs/features/game-agents-split/PLAN.md`
 - [ ] T148 — Criar `specs/features/game-agents-split/TASKS.md`
 
