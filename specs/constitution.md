@@ -145,7 +145,7 @@ A flag `is_primary` (`bool`) distingue, dentro de `ativo`, qual contexto é o pr
 - Toda alteração em `specs/` deve passar por uma revisão de consistência antes de ser considerada pronta.
 - Se restarem conflitos, ambiguidades ou buracos após a revisão, eles devem ser registrados em `z_bug_specs.md`.
 - Se a implementação divergir da spec, atualize a spec primeiro. Nunca ajuste a spec para justificar o código já escrito.
-- **Versão atômica**: specs devem representar apenas o estado atual do produto. Não arquive specs de features descartadas — delete-as.
+- **Versão atômica**: specs ativas em `specs/releases/<v-id>/` representam apenas o estado atual; specs encerradas vão para `specs/_archive/releases/<v-id>/`. Hotfix releases (PATCH≥1) seguem o mesmo caminho. Não há rascunhos órfãos fora dessas trilhas.
 
 ---
 
