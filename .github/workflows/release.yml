@@ -2,36 +2,42 @@ name: Release
 
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate:
-    name: Validate tag matches pyproject version
+  check:
+    name: Check if version needs releasing
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
-      version: ${{ steps.derive.outputs.version }}
+      version: ${{ steps.check.outputs.version }}
+      skip: ${{ steps.check.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
-      - id: derive
-        name: Derive version from tag
+        with:
+          fetch-tags: true
+      - id: check
+        name: Compare pyproject version vs existing tags
         run: |
-          tag="${GITHUB_REF##*/v}"
-          echo "version=$tag" >> "$GITHUB_OUTPUT"
           pyver=$(grep -E '^version *= *"' pyproject.toml | head -1 | sed -E 's/version *= *"([^"]+)".*/\1/')
-          if [ "$tag" != "$pyver" ]; then
-            echo "::error::Tag v$tag does not match pyproject.toml version $pyver"
-            exit 1
+          echo "version=$pyver" >> "$GITHUB_OUTPUT"
+          if git ls-remote --tags origin "refs/tags/v$pyver" | grep -q "v$pyver"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v$pyver already exists — skipping release."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "New version v$pyver — proceeding with release."
           fi
 
   build:
     name: Build sdist + wheel
     runs-on: ubuntu-latest
-    needs: [validate]
-    timeout-minutes: 5
+    needs: [check]
+    if: needs.check.outputs.skip == 'false'
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -39,35 +45,53 @@ jobs:
           python-version: "3.12"
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest (smoke)
+      - name: pytest (full suite)
         run: poetry run pytest -q
       - name: Build artifacts
         run: poetry build
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ needs.validate.outputs.version }}
+          name: dist-${{ needs.check.outputs.version }}
           path: dist/
+
+  approve:
+    name: Approve release to PyPI
+    runs-on: ubuntu-latest
+    needs: [check, build]
+    if: needs.check.outputs.skip == 'false'
+    environment: release-gate
+    timeout-minutes: 60
+    steps:
+      - name: Release approved
+        run: echo "Release v${{ needs.check.outputs.version }} approved — proceeding to publish."
 
   publish:
     name: Publish to PyPI (OIDC trusted publishing)
     runs-on: ubuntu-latest
-    needs: [validate, build]
+    needs: [check, build, approve]
+    if: needs.check.outputs.skip == 'false'
     environment: pypi
     permissions:
-      contents: read
+      contents: write
       id-token: write
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: dist-${{ needs.validate.outputs.version }}
+          name: dist-${{ needs.check.outputs.version }}
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Create GitHub release tag
+        run: |
+          git tag "v${{ needs.check.outputs.version }}"
+          git push origin "v${{ needs.check.outputs.version }}"
 
   smoke-test:
     name: Install from PyPI + smoke run
     runs-on: ubuntu-latest
-    needs: [validate, publish]
+    needs: [check, publish]
+    if: needs.check.outputs.skip == 'false'
     timeout-minutes: 5
     steps:
       - uses: actions/setup-python@v5
@@ -76,7 +100,7 @@ jobs:
       - name: Wait for PyPI to propagate
         run: sleep 30
       - name: pip install released version
-        run: pip install "dadaia-workspace==${{ needs.validate.outputs.version }}"
+        run: pip install "dadaia-workspace==${{ needs.check.outputs.version }}"
       - name: dadaia --help
         run: dadaia --help
       - name: dadaia init in tmpdir
