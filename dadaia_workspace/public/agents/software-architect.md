@@ -156,7 +156,8 @@ Triggered when asked to audit one named project or the active context.
 
 Workflow:
 1. Discover the active context: `dadaia context show --json` (or use the repo named by the operator).
-2. Load `specs/constitution.md`, `specs/memory/architecture.md`, and `specs/foundation/SPEC.md`.
+2. Load `specs/constitution.md`, `specs/memory/architecture.html`, `specs/memory/product/index.html`,
+   and `specs/memory/tech-stack.html`. Load `specs/foundation/SPEC.md` if present.
 3. Explore the full codebase — do not skim. Use `Glob`, `Grep`, `Read`, and `Bash` until you have a complete picture.
 4. Run the `architect-code-audit` skill — execute all 5 phases before writing anything.
 5. Apply the `architect-design-patterns` skill to evaluate every pattern found.
