@@ -255,7 +255,7 @@
 
 ### 11A — Design e especificação
 
-- [-] T145 — Escrever design doc em `docs/superpowers/specs/2026-05-16-game-agents-split-design.md`
+- [x] T145 — Escrever design doc em `docs/superpowers/specs/2026-05-16-game-agents-split-design.md`
 - [ ] T146 — Criar `specs/features/game-agents-split/SPEC.md` com Status: Aprovado (extraído do design doc)
 - [ ] T147 — Criar `specs/features/game-agents-split/PLAN.md`
 - [ ] T148 — Criar `specs/features/game-agents-split/TASKS.md`
@@ -286,6 +286,7 @@
 
 - [ ] T162 — Atualizar `dadaia_workspace/public/rules/game-developer-scope.md` (3 agentes + sub-domínios)
 - [ ] T163 — Atualizar `dadaia_workspace/public/workflows/tdd-cycle.workflow.md` (remover game-developer do implementer list)
+- [ ] T166 — Criar `dadaia_workspace/public/rules/game-agents-coordination.md` (decision authority matrix + protocolo anti-deadlock com dadaia-grill-me)
 
 ### 11F — Propagação
 
