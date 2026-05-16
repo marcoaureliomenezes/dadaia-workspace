@@ -136,7 +136,7 @@ quando write-sets são disjuntos.
 
 ## T6 — Workflow hotfix-release.workflow.md (criação)
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Precondições:** T3 [x] (referencia agentes patchados)
 - **Paraleliza com:** T7, T8
