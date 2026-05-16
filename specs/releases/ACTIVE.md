@@ -1,2 +1,2 @@
-release: sdd-release-lifecycle-v1
-phase: IMPLEMENTATION
+release: agent-sdd-alignment-v1
+phase: TASKS
