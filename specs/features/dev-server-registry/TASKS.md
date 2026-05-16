@@ -62,12 +62,13 @@
 - [x] Step 5.4: Implement `dadaia_workspace/features/server_registry/service.py`
 - [x] Step 5.5: Run tests — verify they all pass
 - [x] Step 5.6: Commit
+- [x] Step 5.7: Spec compliance review — fix ruff SIM103 in `_is_stale`, verify mypy + 22 tests pass
 
 ---
 
 ## Task 6 — Dashboard + Unit Tests (TDD)
 
-- [ ] Step 6.1: Write failing dashboard tests
+- [-] Step 6.1: Write failing dashboard tests
 - [ ] Step 6.2: Run tests — verify they fail
 - [ ] Step 6.3: Implement `dadaia_workspace/features/server_registry/dashboard.py`
 - [ ] Step 6.4: Run tests — verify they all pass
