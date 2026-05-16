@@ -20,7 +20,7 @@
 - [x] TA07 — Criar game-flight-dynamics/SKILL.md
 - [x] TA08 — Criar game-unreal-designer/SKILL.md
 - [x] TA09 — Criar game-visual-design/SKILL.md
-- [-] TA10 — Criar game-geospatial-pipeline/SKILL.md
+- [x] TA10 — Criar game-geospatial-pipeline/SKILL.md
 - [ ] TA11 — Criar game-audio-design/SKILL.md
 - [ ] TA12 — Criar game-testing-ue5/SKILL.md
 
