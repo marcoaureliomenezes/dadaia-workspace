@@ -91,7 +91,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-E1.2 `[parallel: yes]` Editar `dadaia_workspace/public/skills/dadaia-release-closure/SKILL.md` L71 (bullets "Memory updates"): substituir `specs/memory/product.html` (singular inexistente) por catálogo folder `specs/memory/product/index.html` + per-feature `specs/memory/product/<slug>.html`. **Critério:** grep `memory/product\.html\b` → 0 hits; grep `memory/product/index\.html` → ≥1 hit.
 
-- [ ] T-E1.3 `[parallel: yes]` Editar `dadaia_workspace/public/skills/architect-code-audit/SKILL.md` L27 (Phase 0 — Context Loading): `specs/memory/architecture.md` → `specs/memory/architecture.html`. **Critério:** grep `memory/architecture\.md` → 0 hits.
+- [-] T-E1.3 `[parallel: yes]` Editar `dadaia_workspace/public/skills/architect-code-audit/SKILL.md` L27 (Phase 0 — Context Loading): `specs/memory/architecture.md` → `specs/memory/architecture.html`. **Critério:** grep `memory/architecture\.md` → 0 hits.
 
 - [ ] T-E1.4 `[parallel: yes]` Editar `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md` L196 (tabela "Edições Pendentes"): exemplo `specs/features/platform/snapshots/SPEC.md` → `specs/releases/<release-id>/SPEC.md`. **Critério:** grep `features/platform/snapshots` → 0 hits.
 
