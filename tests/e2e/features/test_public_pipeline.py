@@ -44,6 +44,7 @@ EXPECTED_SKILLS = {
     "dadaia-workspace-manager",
     "dadaia-workspace-spec-navigator",
     "dadaia-workspace-spec-reviewer",
+    "dev-server-registry",
     "devops-deploy-strategies",
     "devops-gitflow-governance",
     "game-map-architect",
