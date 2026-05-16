@@ -278,9 +278,9 @@
 
 ### 11D — Novos workflows
 
-- [ ] T159 — Criar `dadaia_workspace/public/workflows/game-spec-definition.workflow.md`
-- [ ] T160 — Criar `dadaia_workspace/public/workflows/game-dev-cycle.workflow.md`
-- [ ] T161 — Criar `dadaia_workspace/public/workflows/game-bugfix.workflow.md`
+- [-] T159 — Criar `dadaia_workspace/public/workflows/game-spec-definition.workflow.md`
+- [-] T160 — Criar `dadaia_workspace/public/workflows/game-dev-cycle.workflow.md`
+- [-] T161 — Criar `dadaia_workspace/public/workflows/game-bugfix.workflow.md`
 
 ### 11E — Atualizações
 
