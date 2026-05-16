@@ -220,6 +220,30 @@ You receive a task description from the implementer. Your job is to define E2E a
   transitions) and frame stability when feasible. You do NOT touch `repos/tauan-games/`
   source — read-only.
 
+### Hotfix candidate filing (D11)
+
+When **Deploy Validation** returns FAIL against a production environment, you must file a
+hotfix candidate stub in addition to the deploy validation report. This is a separate output.
+
+**When to file:** any Deploy Validation FAIL in a production or staging environment that
+indicates a regression or incident — not just a flaky test.
+
+**Output path:**
+```
+.dadaia/reports/<context>/qa-engineer/<ts>-hotfix-candidate.html
+```
+
+**Minimum content:**
+- Timestamp (ISO 8601 with timezone, format `YYYY-MM-DDTHHMMSSZ` for backlog bullets)
+- Affected release (from ACTIVE.md at time of failure)
+- Failing E2E scenario(s) — name + last observable assertion
+- Suggested PATCH bump (e.g. "current feature is v0.5.0 → suggest v0.5.1")
+- Severity assessment: LOW / MEDIUM / HIGH / CRITICAL
+
+**What happens next:** product-engineer reads this stub and transcribes it as a bullet in
+`specs/backlog/candidates.md ## Hotfixes pendentes` (D11). You do NOT write to backlog
+directly — that is product-engineer's domain.
+
 ### When invoked by software-architect or product-engineer (audit mode)
 
 These two may invoke you directly to assess test architecture (pyramid balance) or to

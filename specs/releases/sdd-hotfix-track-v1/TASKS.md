@@ -185,7 +185,7 @@ quando write-sets são disjuntos.
 
 ## T9 — `dadaia public stage && install --target all`
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** devops-engineer
 - **Precondições:** T1..T8 todos [x]
 - **Paraleliza com:** nenhuma (operação serializada por design)

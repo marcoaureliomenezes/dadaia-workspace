@@ -345,6 +345,54 @@ active).
 
 ---
 
+## Hotfix release lifecycle
+
+A hotfix release is a **regular release** under `specs/releases/v<M>.<m>.<p>/` with
+PATCH ≥ 1 (per D1). It uses a condensed flow — no separate directory, no special status
+ladder, no gate changes. All three differences are in what is optional versus mandatory.
+
+### Hard rule — origin (D4)
+
+A hotfix release may only be created from a bullet that exists in
+`specs/backlog/candidates.md` section `## Hotfixes pendentes`. No shortcut. If the bullet
+does not exist there, file it first — then promote. Skipping this step is a process violation.
+
+### Condensed flow (compared to 8-phase feature release)
+
+1. **File** — bullet in `## Hotfixes pendentes` (qa-engineer or operator)
+2. **Promote** — assign `v<M>.<m>.<p+1>` (PATCH bump of current feature release), move
+   bullet to `## Histórico` with the release-id (D23), create `specs/releases/<v-id>/`,
+   update `ACTIVE.md`
+3. **SPEC** — use template `release_hotfix.md.j2` (D24); ≤ 100 lines; 6 mandatory
+   sections; "Fix scope" declares whether PLAN is needed
+4. **TASKS** — 1-N small tasks
+5. **PLAN** (optional) — only if SPEC declared it required
+6. **Implementation** — standard marker `[-]` flow
+7. **CLOSURE** — smoke evidence in `## Validations` is non-negotiable (D25); memory
+   update is optional if bug did not change visible behaviour (D16); use template
+   `closure_hotfix.md.j2`; `git mv` to `_archive/releases/`
+
+### Naming (D3)
+
+Folder name: `v<M>.<m>.<p>` matching `^v\d+\.\d+\.\d+$`. PATCH ≥ 1 for hotfix;
+PATCH = 0 for feature release. No other format is accepted for new releases.
+
+### Scaffolding
+
+```bash
+dadaia specs hotfix open v<M>.<m>.<p> --patches <patches-release-id> --severity <S>
+```
+
+This creates SPEC.md + TASKS.md stub. Edit SPEC.md to fill the 6 sections, get
+`**Status:** Aprovado`, then update `ACTIVE.md`.
+
+### Status ladder
+
+Same as feature releases: `Draft → Em revisão → Aprovado`. There is no hotfix-specific
+status ladder (D2).
+
+---
+
 ## SDD HARD STOP
 
 If asked to create PLAN/TASKS without an approved SPEC, or to skip CLOSURE before
