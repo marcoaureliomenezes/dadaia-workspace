@@ -274,7 +274,7 @@
 - [x] T155 — Criar `dadaia_workspace/public/skills/game-visual-design/SKILL.md`
 - [x] T156 — Criar `dadaia_workspace/public/skills/game-geospatial-pipeline/SKILL.md`
 - [x] T157 — Criar `dadaia_workspace/public/skills/game-audio-design/SKILL.md`
-- [-] T158 — Criar `dadaia_workspace/public/skills/game-testing-ue5/SKILL.md`
+- [x] T158 — Criar `dadaia_workspace/public/skills/game-testing-ue5/SKILL.md`
 
 ### 11D — Novos workflows
 

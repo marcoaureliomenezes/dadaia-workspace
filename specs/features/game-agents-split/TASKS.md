@@ -22,7 +22,7 @@
 - [x] TA09 — Criar game-visual-design/SKILL.md
 - [x] TA10 — Criar game-geospatial-pipeline/SKILL.md
 - [x] TA11 — Criar game-audio-design/SKILL.md
-- [-] TA12 — Criar game-testing-ue5/SKILL.md
+- [x] TA12 — Criar game-testing-ue5/SKILL.md
 
 ## Workflows
 
