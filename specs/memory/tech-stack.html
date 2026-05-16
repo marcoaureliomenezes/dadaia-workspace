@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Tech Stack — dadaia-workspace</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2.2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .meta { color: #666; font-size: .9em; }
+  </style>
+</head>
+<body>
+
+<h1>Tech Stack Memory — dadaia-workspace</h1>
+<p class="meta">Última atualização: 2026-05-16 · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="languages">
+  <h2>Linguagens</h2>
+  <table>
+    <thead>
+      <tr><th>Linguagem</th><th>Versão</th><th>Uso</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Python</td><td>^3.12</td><td>CLI inteira, features, infrastructure, container, testes pytest</td></tr>
+      <tr><td>Bash</td><td>4+ POSIX-compatível</td><td>Hooks (sdd-spec-gate.sh, ctx-inject.sh), entry scripts</td></tr>
+      <tr><td>HTML5 + Mermaid</td><td>Mermaid via CDN</td><td>Memory files atômicos em <code>specs/memory/*.html</code> e reports em <code>.dadaia/reports/&lt;ctx&gt;/&lt;agent&gt;/*.html</code></td></tr>
+      <tr><td>Markdown</td><td>CommonMark</td><td>SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions</td></tr>
+      <tr><td>YAML frontmatter</td><td>YAML 1.2</td><td>Frontmatter de agents/skills/workflows</td></tr>
+      <tr><td>JSON</td><td>stdlib</td><td>Estado runtime em <code>.dadaia/states/</code>, manifest.json</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="runtimes">
+  <h2>Runtimes e ferramentas</h2>
+  <table>
+    <thead>
+      <tr><th>Ferramenta</th><th>Versão</th><th>Função</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Poetry</td><td>core (build-backend)</td><td>Build, lock, virtualenv via <code>.venv</code> ou poetry-managed env</td></tr>
+      <tr><td>pytest</td><td>^8</td><td>Test runner (unit/integration/e2e). Coverage gate 80%</td></tr>
+      <tr><td>pytest-cov</td><td>^5</td><td>Coverage measurement</td></tr>
+      <tr><td>ruff</td><td>&gt;=0.15</td><td>Linter + formatter (line-length 100, target py312)</td></tr>
+      <tr><td>mypy</td><td>^1.10</td><td>Type checker</td></tr>
+      <tr><td>git</td><td>2.x</td><td>VCS; <code>git_subprocess.py</code> wrapeia comandos</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências aprovadas</h2>
+  <table>
+    <thead>
+      <tr><th>Dependência</th><th>Versão</th><th>Camada</th><th>Justificativa</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>typer</td><td>&gt;=0.25 (extras=[all])</td><td>cli/</td><td>CLI framework com auto-completion e rich formatting</td></tr>
+      <tr><td>rich</td><td>^13</td><td>cli/</td><td>Pretty terminal output</td></tr>
+      <tr><td>openpyxl</td><td>^3.1</td><td>infrastructure/</td><td>Leitura de planilhas Excel (academy)</td></tr>
+      <tr><td>pyyaml</td><td>^6.0</td><td>infrastructure/ + features/</td><td>YAML frontmatter parsing</td></tr>
+      <tr><td>types-PyYAML</td><td>&gt;=6</td><td>dev</td><td>Type stubs para mypy</td></tr>
+    </tbody>
+  </table>
+  <p>Sem dependência de jinja2: templates HTML usam placeholders <code>{{ name }}</code> documentais que o agente product-engineer preenche por substituição manual em fase CLOSURE.</p>
+</section>
+
+<section id="constraints">
+  <h2>Restrições e proibições</h2>
+  <ul>
+    <li>NÃO adicionar dependências fora desta lista sem release aprovada que justifique.</li>
+    <li>NÃO usar libs com network em build/test (offline-first).</li>
+    <li>NÃO usar threading/multiprocessing nas features — orquestração concorrente fica em <code>features/orchestration/</code>.</li>
+    <li>NÃO chamar <code>os.system</code>/<code>subprocess</code> fora de <code>infrastructure/</code> — features usam protocols.</li>
+    <li>NÃO importar Python &lt;3.12 backports — runtime mínimo é 3.12 (match/case, generic types nativos, type statement).</li>
+    <li>NÃO escrever em <code>.claude/</code>, <code>.codex/</code>, <code>.opencode/</code>, <code>.agents/</code> diretamente — apenas via <code>dadaia public install</code> a partir de <code>public/</code>.</li>
+  </ul>
+</section>
+
+<section id="commands">
+  <h2>Comandos canônicos</h2>
+  <p>Como rodar, testar, lintar e empacotar:</p>
+  <pre><code># Setup
+poetry install
+
+# Run CLI (dev)
+poetry run dadaia &lt;subcommand&gt;
+# ou globalmente após install
+dadaia &lt;subcommand&gt;
+
+# Tests
+pytest                                  # all
+pytest tests/unit/features/specs/       # specs doctor unit tests
+pytest -k test_clean_tree               # by name
+
+# Lint + format
+ruff check .
+ruff format .
+
+# Type check
+mypy dadaia_workspace
+
+# Asset chain
+dadaia public stage
+dadaia public install --target all      # --force para sobrescrever drift
+dadaia public doctor
+
+# SDD
+dadaia specs doctor                     # estrutura SDD
+dadaia specs doctor --json              # machine-readable
+</code></pre>
+</section>
+
+</body>
+</html>

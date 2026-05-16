@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — agent-orchestration (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>agent-orchestration</h1>
+<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>Executa <strong>workflows</strong> (DAGs de stages) onde cada stage dispatcha um agente especialista em um runtime escolhido (cli, Claude API, Codex, OpenCode). Suporta dependências entre stages, paralelização via <code>parallel_group</code>, gates de aprovação humana (<code>operator-approval</code>), binding de inputs (workflow inputs + stage outputs → próximas stages) e retomada após falhas ou gates.</p>
+  <p>Cada run produz um <strong>manifest</strong> imutável e um <strong>event log</strong> em JSONL, permitindo auditoria completa do que foi disparado, com qual prompt, em qual ordem e com que resultado.</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li><code>dadaia orchestrate list</code> — lista os 11 workflows pré-instalados (spec-refinement, tdd-cycle, bug-fix-fastlane, cross-cutting-feature, architecture-review, onboarding-new-repo, security-patch, game-dev-cycle, game-bugfix, game-spec-definition, deploy-validation-only).</li>
+    <li><code>dadaia orchestrate show spec-refinement</code> — mostra o schema do workflow (inputs, stages com <code>needs</code>/<code>parallel_group</code>/<code>gate</code>, <code>expected_output</code>).</li>
+    <li><code>dadaia orchestrate run spec-refinement --input topic=auth</code> — cria run (id gerado), persiste <code>manifest.json</code>, emite <code>RUN_STARTED</code>, identifica stages prontas (sem dependências pendentes) e despacha-as.</li>
+    <li>O <code>StageRunner</code> agrupa stages com o mesmo <code>parallel_group</code> e despacha simultaneamente via <code>AgentDispatcher</code> (cli/claude/codex/opencode). Cada stage recebe seu <code>invocation.md</code> em <code>.dadaia/runs/&lt;run_id&gt;/&lt;stage_id&gt;/</code>.</li>
+    <li>Quando um stage termina, ele escreve seu output (HTML/markdown report) no caminho declarado em <code>expected_output</code>; o runner recalcula próximas stages prontas e despacha novamente.</li>
+    <li>Em gates de aprovação ou falhas, o run pausa com status apropriado. <code>dadaia orchestrate status &lt;run_id&gt;</code> mostra o estado do DAG; <code>resume &lt;run_id&gt;</code> retoma após o operador resolver o gate.</li>
+  </ol>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Op as Operador
+    participant CLI as dadaia orchestrate run
+    participant Mgr as RunManifest
+    participant Runner as StageRunner
+    participant Disp as AgentDispatcher
+    participant Ag as Agente especialista
+    Op->>CLI: run spec-refinement --input topic=auth
+    CLI->>Mgr: cria manifest.json + events.jsonl
+    CLI->>Runner: _advance()
+    Runner->>Runner: next_ready_stages() + group_ready()
+    Runner->>Disp: dispatch parallel_group=specialists
+    par stages paralelas
+        Disp->>Ag: software-architect (cli runtime)
+        Disp->>Ag: devops-engineer
+        Disp->>Ag: qa-engineer
+        Disp->>Ag: frontend-engineer
+        Disp->>Ag: backend-engineer
+    end
+    Ag-->>Mgr: report HTML em expected_output
+    Mgr-->>Runner: stage completed event
+    Runner->>Runner: synthesis stage now ready
+    Runner->>Disp: dispatch product-engineer (synthesis)
+    Disp->>Op: gate operator-approval (pausa)
+  </pre>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Quando o operador quer executar um pipeline multi-agente — refinement de spec, ciclo TDD, fastlane de bugfix, onboarding de novo repo. Também usado por hooks/cron schedules para tarefas recorrentes.</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Sem este runner, multi-agent flows precisariam ser disparados manualmente um a um, sem paralelização e sem persistência de estado. Os <code>parallel_groups</code> permitem padrões como "1 discovery → 5 specialists paralelos → 1 synthesis" sem encadeamento artificial. Gates evitam que o pipeline corra solto em decisões críticas. O event log imutável é fonte de verdade auditável para reproduzir runs ou diagnosticar falhas.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li><code>.dadaia/runs/&lt;run_id&gt;/manifest.json</code> — registro imutável do run</li>
+    <li><code>.dadaia/runs/&lt;run_id&gt;/events.jsonl</code> — append-only log de eventos (RUN_STARTED, STAGE_DISPATCHED, STAGE_COMPLETED, GATE_AWAITING, RUN_COMPLETED, RUN_FAILED)</li>
+    <li><code>.dadaia/runs/&lt;run_id&gt;/&lt;stage_id&gt;/invocation.md</code> — prompt da stage</li>
+    <li>Paths declarados em <code>expected_output</code> de cada stage (tipicamente reports HTML em <code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/&lt;ts&gt;-&lt;type&gt;.html</code>)</li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Depende de <a href="context-management.html">context-management</a> (resolve context ativo para path templating).</li>
+    <li>Depende de <a href="public-asset-distribution.html">public-asset-distribution</a> (workflows instalados a partir de <code>public/workflows/</code>).</li>
+    <li>Os 11 workflows + agentes especialistas dispatch-ados vivem como assets canônicos versionados.</li>
+  </ul>
+</section>
+
+</body>
+</html>
