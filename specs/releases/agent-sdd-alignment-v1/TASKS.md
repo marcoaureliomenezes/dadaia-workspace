@@ -71,7 +71,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 5 — Propagação e verificação end-to-end
 
-- [ ] T-5.1 `[parallel: no]` Rodar `dadaia public stage && dadaia public install --target all`. Cobre agentes (Fases 1–2), skills E1 + workflows E2 (Fase 6), templates atualizados (Fase 7). **Critério:** sem erro; mensagens de install para cada arquivo editado em agents/, skills/, workflows/ e templates/.
+- [-] T-5.1 `[parallel: no]` Rodar `dadaia public stage && dadaia public install --target all`. Cobre agentes (Fases 1–2), skills E1 + workflows E2 (Fase 6), templates atualizados (Fase 7). **Critério:** sem erro; mensagens de install para cada arquivo editado em agents/, skills/, workflows/ e templates/.
 
 - [ ] T-5.2 `[parallel: no]` Rodar `dadaia public doctor`. **Critério:** `[ok]` em todos os targets para agentes, skills, workflows e templates editados. Se drift, escalar antes de `--force`.
 
