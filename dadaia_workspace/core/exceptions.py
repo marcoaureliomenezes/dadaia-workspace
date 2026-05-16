@@ -55,3 +55,11 @@ class RunNotFoundError(DadaiaError):
 
 class OrchestrationUnsupportedError(DadaiaError):
     """Raised when the selected runtime cannot execute a workflow's required capability."""
+
+
+class PortConflictError(DadaiaError):
+    """Raised when a port is already registered as active by a different project."""
+
+
+class PortNotRegisteredError(DadaiaError):
+    """Raised when an operation targets a port not present in the registry."""
