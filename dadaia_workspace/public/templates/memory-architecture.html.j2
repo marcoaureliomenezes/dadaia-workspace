@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Memory — Architecture — {{ context_name }}</title>
+  <title>Memory — Architecture — {{ project_name | default(context_name | default('Projeto')) }}</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
   <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
   <style>
@@ -26,31 +26,31 @@
 </head>
 <body>
 
-<h1>Architecture Memory — {{ context_name }}</h1>
-<p class="meta">Última atualização: {{ last_updated_iso }} · Closure: {{ last_release_id }}</p>
+<h1>Architecture Memory — {{ project_name | default(context_name | default('Projeto')) }}</h1>
+<p class="meta">Última atualização: {{ today | default(last_updated_iso | default('—')) }} · Closure: {{ last_release_id | default('none') }}</p>
 
 <section id="overview">
   <h2>Visão geral</h2>
-  <p>{{ architecture_overview }}</p>
+  <p>{{ architecture_overview | default('Visão geral ainda não documentada.') }}</p>
 </section>
 
 <section id="layers">
   <h2>Camadas</h2>
-  {{ layers_html }}
+  {{ layers_html | default('<p>Sem camadas registradas.</p>') }}
 </section>
 
 <section id="dependency-rules">
   <h2>Regras de dependência</h2>
   <p>Setas indicam dependência permitida; ausência de seta significa proibição.</p>
   <pre class="mermaid">
-{{ dependency_rules_mermaid }}
+{{ dependency_rules_mermaid | default('graph TD\n  A[Sem dados]') }}
   </pre>
 </section>
 
 <section id="data-flow">
   <h2>Fluxo de dados principal</h2>
   <pre class="mermaid">
-{{ data_flow_mermaid }}
+{{ data_flow_mermaid | default('graph TD\n  A[Sem dados]') }}
   </pre>
 </section>
 
@@ -61,7 +61,7 @@
       <tr><th>De</th><th>Para</th><th>Tipo de contrato</th><th>Notas</th></tr>
     </thead>
     <tbody>
-      {{ contracts_rows }}
+      {{ contracts_rows | default('<tr><td colspan="4">Sem contratos registrados.</td></tr>') }}
     </tbody>
   </table>
 </section>
@@ -70,13 +70,13 @@
   <h2>Estado runtime</h2>
   <p>Locais canônicos de estado em disco e seu propósito:</p>
   <ul>
-    {{ runtime_state_bullets }}
+    {{ runtime_state_bullets | default('<li>Sem estado runtime registrado.</li>') }}
   </ul>
 </section>
 
 <section id="evidence">
   <h2>Evidências visuais</h2>
-  {{ screenshots_html }}
+  {{ screenshots_html | default('<p>Sem evidências visuais.</p>') }}
 </section>
 
 </body>
