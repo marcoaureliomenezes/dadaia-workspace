@@ -12,7 +12,7 @@
 - [x] TA02 — Atualizar game-developer-scope.md (3 agents + sub-domínios)
 - [x] TA03 — Atualizar game-developer.md (narrow scope, WebSearch, workspace table)
 - [x] TA04 — Criar game-designer.md agent
-- [ ] TA05 — Criar game-tester.md agent
+- [-] TA05 — Criar game-tester.md agent
 
 ## Skills
 
