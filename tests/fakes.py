@@ -17,6 +17,7 @@ from dadaia_workspace.core.models.run_state import (
     StageResult,
     StageStatus,
 )
+from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
 from dadaia_workspace.core.models.workflow import WorkflowDefinition
 
@@ -243,3 +244,38 @@ class FakePythonEnvironmentManager:
 
     def pip_executable(self, workspace_root: str) -> str:
         return f"{workspace_root}/.dadaia/.venv/bin/pip"
+
+
+class FakeServerRegistryStore:
+    """In-memory ServerRegistryStore — keyed by port number."""
+
+    def __init__(self) -> None:
+        self._store: dict[int, PortEntry] = {}
+
+    def save(self, entry: PortEntry) -> None:
+        self._store[entry.port] = entry
+
+    def update(self, entry: PortEntry) -> None:
+        self._store[entry.port] = entry
+
+    def get(self, port: int) -> PortEntry | None:
+        return self._store.get(port)
+
+    def list_all(self) -> list[PortEntry]:
+        return sorted(self._store.values(), key=lambda e: e.port)
+
+    def delete(self, port: int) -> None:
+        self._store.pop(port, None)
+
+    def count(self) -> int:
+        return len(self._store)
+
+
+class FakeProcessProbe:
+    """Controllable probe — add PIDs to _alive_pids to simulate live processes."""
+
+    def __init__(self) -> None:
+        self._alive_pids: set[int] = set()
+
+    def is_pid_alive(self, pid: int) -> bool:
+        return pid in self._alive_pids
