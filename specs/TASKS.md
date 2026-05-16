@@ -249,6 +249,51 @@
 
 ---
 
+## Fase 11 — Game Agents Split (game-developer → game-developer + game-designer + game-tester)
+
+> Endereça a divisão do agente monolítico `game-developer` em 3 agentes especializados com skills próprias e workflows exclusivos para games. Referência: design doc em `docs/superpowers/specs/2026-05-16-game-agents-split-design.md`.
+
+### 11A — Design e especificação
+
+- [-] T145 — Escrever design doc em `docs/superpowers/specs/2026-05-16-game-agents-split-design.md`
+- [ ] T146 — Criar `specs/features/game-agents-split/SPEC.md` com Status: Aprovado (extraído do design doc)
+- [ ] T147 — Criar `specs/features/game-agents-split/PLAN.md`
+- [ ] T148 — Criar `specs/features/game-agents-split/TASKS.md`
+
+### 11B — Novos agentes
+
+- [ ] T149 — Criar `dadaia_workspace/public/agents/game-designer.md`
+- [ ] T150 — Criar `dadaia_workspace/public/agents/game-tester.md`
+- [ ] T151 — Atualizar `dadaia_workspace/public/agents/game-developer.md` (narrow scope, redistribuir skills)
+
+### 11C — Novas skills
+
+- [ ] T152 — Criar `dadaia_workspace/public/skills/game-unreal-developer/SKILL.md`
+- [ ] T153 — Criar `dadaia_workspace/public/skills/game-flight-dynamics/SKILL.md`
+- [ ] T154 — Criar `dadaia_workspace/public/skills/game-unreal-designer/SKILL.md`
+- [ ] T155 — Criar `dadaia_workspace/public/skills/game-visual-design/SKILL.md`
+- [ ] T156 — Criar `dadaia_workspace/public/skills/game-geospatial-pipeline/SKILL.md`
+- [ ] T157 — Criar `dadaia_workspace/public/skills/game-audio-design/SKILL.md`
+- [ ] T158 — Criar `dadaia_workspace/public/skills/game-testing-ue5/SKILL.md`
+
+### 11D — Novos workflows
+
+- [ ] T159 — Criar `dadaia_workspace/public/workflows/game-spec-definition.workflow.md`
+- [ ] T160 — Criar `dadaia_workspace/public/workflows/game-dev-cycle.workflow.md`
+- [ ] T161 — Criar `dadaia_workspace/public/workflows/game-bugfix.workflow.md`
+
+### 11E — Atualizações
+
+- [ ] T162 — Atualizar `dadaia_workspace/public/rules/game-developer-scope.md` (3 agentes + sub-domínios)
+- [ ] T163 — Atualizar `dadaia_workspace/public/workflows/tdd-cycle.workflow.md` (remover game-developer do implementer list)
+
+### 11F — Propagação
+
+- [ ] T164 — Rodar `dadaia public stage && dadaia public install --target all`
+- [ ] T165 — Rodar `dadaia public doctor` — todos os entries devem ser `[ok]`
+
+---
+
 ## Fase 10 — Release Pipeline v0.1.0
 
 > Endereça `specs/features/release-pipeline/SPEC.md`. Fase 10A é pré-requisito para Fase 10B (não publicar com CI vermelho).
