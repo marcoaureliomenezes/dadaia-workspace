@@ -83,7 +83,7 @@ Move legacy `.md` memory files to a timestamped archive, then render fresh HTML 
 templates using the current code state as input.
 
 ```bash
-TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%SZ)   # e.g. 2026-05-16T180000Z
+TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%SZ)   # e.g. 2026-05-16T120000Z
 mkdir -p specs/_archive/legacy-memory/$TIMESTAMP
 git mv specs/memory/*.md specs/_archive/legacy-memory/$TIMESTAMP/
 ```
@@ -100,8 +100,11 @@ Then activate CLOSURE phase temporarily to unlock memory writes:
 # Revert ACTIVE.md to phase: IMPLEMENTATION after writing
 ```
 
-This exact sequence was executed with timestamp `2026-05-16T180000Z` in the canonical
-worked example. The legacy-root content (`specs/PLAN.md`, `specs/TASKS.md`,
+This sequence was executed with timestamp `2026-05-16T120000Z` in the canonical
+worked example (T-6.5 of `sdd-release-lifecycle-v1`). Note: `2026-05-16T180000Z` is a
+separate archive created in Phase 7 (T-7.3) when the interim `product.html` was
+replaced by the folder catalog — not the markdown migration timestamp.
+The legacy-root content (`specs/PLAN.md`, `specs/TASKS.md`,
 `security/`, `foundation/`) was also archived:
 
 ```bash
