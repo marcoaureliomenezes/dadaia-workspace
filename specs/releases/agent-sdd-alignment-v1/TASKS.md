@@ -109,7 +109,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 7 — Scaffold CLI `dadaia specs init` (E3)
 
-- [-] T-E3.1 `[parallel: no]` Atualizar 3 templates `dadaia_workspace/public/templates/memory-{architecture,tech-stack,product-index}.html.j2` com placeholders `{{ project_name }}`, `{{ today }}`, `{{ last_release_id }}` (default `"none"`), `{{ architecture_overview }}`, `{{ layers_html }}` (default `<p>Sem camadas registradas.</p>`) e catálogo vazio. Defaults devem ser opcionais (renders existentes não quebram). **Critério:** renderizar cada template com dict vazio não levanta `jinja2.UndefinedError`.
+- [x] T-E3.1 `[parallel: no]` Atualizar 3 templates `dadaia_workspace/public/templates/memory-{architecture,tech-stack,product-index}.html.j2` com placeholders `{{ project_name }}`, `{{ today }}`, `{{ last_release_id }}` (default `"none"`), `{{ architecture_overview }}`, `{{ layers_html }}` (default `<p>Sem camadas registradas.</p>`) e catálogo vazio. Defaults devem ser opcionais (renders existentes não quebram). **Critério:** renderizar cada template com dict vazio não levanta `jinja2.UndefinedError`.
 
 - [ ] T-E3.2 `[parallel: no]` Criar módulo `dadaia_workspace/features/specs/scaffolder.py` com função pura `scaffold(specs_dir: Path, project_name: str, force: bool, templates_dir: Path) -> list[str]`. Cria 8 outputs canônicos + 3 `.gitkeep` (lista em SPEC §Delta E3). Idempotente: arquivo existente → `[skip] <path>`; `force=True` → `[overwrite] <path>`. Sem `force`, retorno é determinístico. **Critério:** módulo existe; função tem assinatura especificada; mypy passa.
 
