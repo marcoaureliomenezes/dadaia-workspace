@@ -27,7 +27,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-1.2 `[parallel: no]` Editar `dadaia_workspace/public/agents/software-architect.md` REVIEW workflow (L158): mesma substituição da T-1.1 + remover `foundation/SPEC.md` como obrigatório (manter "if present"). **Critério:** `grep "memory/architecture.md" software-architect.md` → 0 hits.
 
-- [ ] T-1.3 `[parallel: no]` Editar `dadaia_workspace/public/agents/software-architect.md` Report Template (L258): `architecture.md + foundation/SPEC.md` → `architecture.html + foundation/SPEC.md`. **Critério:** template `Architecture Status` referencia `architecture.html`.
+- [-] T-1.3 `[parallel: no]` Editar `dadaia_workspace/public/agents/software-architect.md` Report Template (L258): `architecture.md + foundation/SPEC.md` → `architecture.html + foundation/SPEC.md`. **Critério:** template `Architecture Status` referencia `architecture.html`.
 
 ---
 
