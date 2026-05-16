@@ -65,7 +65,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 4 — CI hook
 
-- [-] T-4.1 `[parallel: no]` Editar `.github/workflows/ci.yml`: adicionar job `specs-doctor` no padrão dos jobs `lint/typecheck/test`. Comando: `poetry run dadaia specs doctor --specs-dir specs`. Timeout 3min. Reusa cache Poetry. **Critério:** YAML válido (sem indentação quebrada); job aparece em `gh workflow view CI` após push.
+- [ ] T-4.1 `[parallel: no]` Editar `.github/workflows/ci.yml`: adicionar job `specs-doctor` no padrão dos jobs `lint/typecheck/test`. Comando: `poetry run dadaia specs doctor --specs-dir specs`. Timeout 3min. Reusa cache Poetry. **Critério:** YAML válido (sem indentação quebrada); job aparece em `gh workflow view CI` após push.
 
 ---
 
