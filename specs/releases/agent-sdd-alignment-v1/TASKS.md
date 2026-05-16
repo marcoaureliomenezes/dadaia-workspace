@@ -33,7 +33,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 2 — Implementer agents alignment (paralelizáveis entre si)
 
-- [-] T-2.1 `[parallel: yes]` Editar `dadaia_workspace/public/agents/software-engineer.md`: (a) inserir bloco "Resolving the active release" antes da seção "## TDD — non-negotiable" (L106); (b) atualizar L109 e L144 para referenciar `specs/releases/<active>/{SPEC,TASKS}.md`. **Critério:** grep `releases/<active>` → ≥2 hits; grep `features/<feature>` → 0 hits fora do bloco "Legacy compat".
+- [x] T-2.1 `[parallel: yes]` Editar `dadaia_workspace/public/agents/software-engineer.md`: (a) inserir bloco "Resolving the active release" antes da seção "## TDD — non-negotiable" (L106); (b) atualizar L109 e L144 para referenciar `specs/releases/<active>/{SPEC,TASKS}.md`. **Critério:** grep `releases/<active>` → ≥2 hits; grep `features/<feature>` → 0 hits fora do bloco "Legacy compat".
 
 - [ ] T-2.2 `[parallel: yes]` Editar `dadaia_workspace/public/agents/qa-engineer.md`: (a) inserir bloco "Resolving the active release" antes da seção "## Test quality audit"; (b) atualizar Spec gate (L320–322) — substituir `memory/architecture.md` por `memory/architecture.html`, remover `(optional)`, e substituir `features/<feature>/{SPEC,TASKS}.md` por `releases/<active>/{SPEC,TASKS}.md`. **Critério:** grep `features/<feature>` → 0 hits fora de "Legacy compat".
 
