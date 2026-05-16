@@ -2,34 +2,49 @@
 
 Esta rule é sempre ativa neste workspace.
 
-## Domínio exclusivo
+## Domínio Exclusivo de Jogos
 
-O agente `game-developer` é o ÚNICO autorizado a escrever, modificar ou evoluir qualquer
-código de jogo neste workspace. Código de jogo inclui:
-- Qualquer arquivo dentro de `repos/redacted-slug/`
-- Game loop, física, colisão, input, rendering, assets procedurais
-- Testes de jogabilidade e scripts de build/export de jogos
+Três agentes especializados têm autoridade exclusiva sobre todo o código de jogo.
+Código de jogo inclui qualquer arquivo dentro de `repos/redacted-slug/`.
 
-## Proibido para outros agentes
+| Agente | Sub-domínio | O que escreve |
+|---|---|---|
+| `game-developer` | Lógica | C++, Blueprints (gameplay), IA, física, balística, mecânicas |
+| `game-designer` | Design | Assets estáticos, materiais, mapas, áudio, scripts de pipeline |
+| `game-tester` | Testes | Scripts de automação UE5, reports HTML com evidências |
 
-Os agentes `product-engineer`, `soft-engineer-agent` e `software-architect` NÃO devem
-modificar arquivos em `repos/redacted-slug/` ou qualquer outro diretório de jogo.
+## Proibido para Outros Agentes
+
+Nenhum dos agentes abaixo deve modificar arquivos em `repos/redacted-slug/`:
+`product-engineer`, `software-architect`, `software-engineer`, `frontend-engineer`,
+`backend-engineer`, `qa-engineer`, `devops-engineer`.
+
+Estes agentes podem **LER** arquivos de jogo para contexto, mas nunca escrever.
 
 Se receber uma tarefa que envolva código de jogo, responda:
 
 ```
-[SCOPE ERROR] Código de jogo é domínio exclusivo do game-developer.
-Use o agente game-developer para esta tarefa.
+[SCOPE ERROR] Código de jogo é domínio exclusivo dos agentes game-developer,
+game-designer e game-tester. Use o agente correto para esta tarefa.
 ```
 
-## O game-developer NÃO toca em
+## Fronteira de Escopo
 
-- Infraestrutura do VPS, Docker, CI/CD
-- Pipelines de dados, APIs de negócio
-- Dashboards, sistemas de autenticação
-- Qualquer arquivo fora do domínio de jogos
+O critério é simples: se o arquivo vive em `repos/redacted-slug/`, é domínio dos
+agentes de jogo. Se vive fora, não é.
 
-## Fronteira de escopo
+## Jogos Ativos no Workspace
 
-O critério é simples: se o arquivo vive em `repos/redacted-slug/` ou em um diretório de
-projeto de jogo, é domínio do `game-developer`. Se vive fora, não é.
+| Jogo | Engine | Agentes responsáveis |
+|---|---|---|
+| `redacted-slug-trex` | Phaser.js 3.60 | game-developer, game-designer, game-tester |
+| `redacted-slug` | Three.js r165 | game-developer, game-designer, game-tester |
+| `redacted-slug-v2` | Unreal Engine 5 | game-developer, game-designer, game-tester |
+
+## O Que Cada Agente NÃO Toca
+
+**game-developer:** assets visuais, áudio, terreno, materiais, mapas, testes
+
+**game-designer:** lógica de jogo, IA de inimigos, física de voo, balística, testes
+
+**game-tester:** código de produção e assets — apenas scripts de teste e reports
