@@ -38,15 +38,15 @@
 
 ## Task 3 — Fakes
 
-- [ ] Step 3.1: Add `FakeServerRegistryStore` and `FakeProcessProbe` to `tests/fakes.py`
-- [ ] Step 3.2: Verify fakes import cleanly
-- [ ] Step 3.3: Commit
+- [x] Step 3.1: Add `FakeServerRegistryStore` and `FakeProcessProbe` to `tests/fakes.py`
+- [x] Step 3.2: Verify fakes import cleanly
+- [x] Step 3.3: Commit
 
 ---
 
 ## Task 4 — Infrastructure Store + Unit Tests (TDD)
 
-- [ ] Step 4.1: Write failing tests first
+- [-] Step 4.1: Write failing tests first
 - [ ] Step 4.2: Run tests — verify they all fail
 - [ ] Step 4.3: Implement `dadaia_workspace/infrastructure/json_server_registry_store.py`
 - [ ] Step 4.4: Run tests — verify they all pass
