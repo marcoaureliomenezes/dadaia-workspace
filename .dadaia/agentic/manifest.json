@@ -7,12 +7,12 @@
     },
     {
       "path": "agents/devops-engineer.md",
-      "sha256": "d1ddfb7e9cc3c25cc6f8b0ec89816a020f1688888434bd2a8da2a3f41f56d7f2",
+      "sha256": "0f5ffb3860aad0c3e4b4f757b2669fe3ec134e6e6e85e1695e227b8f80ca6d41",
       "type": "agents"
     },
     {
       "path": "agents/frontend-engineer.md",
-      "sha256": "7f4d5674070fd48de8e7b91d04d7f7760c09b4c74f8d913af5298c5c67c04fe7",
+      "sha256": "5c4e5f112972b62e56cccb62995340f8bfc19f2477c0d56cfd635622925d8872",
       "type": "agents"
     },
     {
@@ -37,17 +37,17 @@
     },
     {
       "path": "agents/qa-engineer.md",
-      "sha256": "6ab1244de10100dd63224c34079f520c9e7fe955a274c6d323f18ce8d5c17bef",
+      "sha256": "5cf4cac3596f383844557af2451f2ccf6bfbde744f9939bdec47692830d53be1",
       "type": "agents"
     },
     {
       "path": "agents/software-architect.md",
-      "sha256": "b5652d4ca2966a8c4ee57a2b8862e0e0f3c6ebfaf9b3fed2448aae67ff4ed28c",
+      "sha256": "a629e9fb654531b1f35f970e12b35019e63b3b68636b2f3b25a26b71be7cad5e",
       "type": "agents"
     },
     {
       "path": "agents/software-engineer.md",
-      "sha256": "b46620dbe86b5230c71bfc92c3adc2ffc99fc987a52a1fecde7d3297e8088e18",
+      "sha256": "058c011f050f922abde0a5825dee64be409434da0361d6b99d9958da4545188b",
       "type": "agents"
     },
     {
@@ -147,7 +147,7 @@
     },
     {
       "path": "skills/architect-code-audit/SKILL.md",
-      "sha256": "37b143ba89b7e3b64191d6ae311b322ea6cbe95503b287545ec44c7e00b0da8b",
+      "sha256": "6d7c62ddf3821fd4eeb3e836daf09301be8e71162202819644fe30faf34cef94",
       "type": "skills"
     },
     {
@@ -157,17 +157,17 @@
     },
     {
       "path": "skills/dadaia-grill-me/SKILL.md",
-      "sha256": "0a874e805afa6939b4aaac1997c564b7a09506ea16efb14fbd9d1c980d3c5d9e",
+      "sha256": "7347c999b99f80af6d338f40999f046983cfdd6d0000b76562f5a0d98afd88f9",
       "type": "skills"
     },
     {
       "path": "skills/dadaia-release-closure/SKILL.md",
-      "sha256": "a125ce8be54aed700c8bb493611d2ad01bbe9e4b3dd23f82c70d1edd1cf6fae6",
+      "sha256": "8d672bf5e8e94ed02503a94d13a51026e0d777dec9d3621099fa38edb14fe283",
       "type": "skills"
     },
     {
       "path": "skills/dadaia-task-manager/SKILL.md",
-      "sha256": "4cd50ed940b8511e21f431a505d9489b2f82cb54f24944c8ea1fdecd9d3f1857",
+      "sha256": "37a19d706cf05d011a771659069d21da20e6f0179bb3ca5a0dc2af3b27e33ea6",
       "type": "skills"
     },
     {
@@ -282,7 +282,7 @@
     },
     {
       "path": "templates/memory-architecture.html.j2",
-      "sha256": "619e70aabc2325027454ac199856d5e9dab43e7c3d40754dbfe5e450315c8fb1",
+      "sha256": "f084c5d0fb44b6efb12c40f8865cbd548232854b2a8f022611ebd92ec3d23cf9",
       "type": "templates"
     },
     {
@@ -292,12 +292,12 @@
     },
     {
       "path": "templates/memory-product-index.html.j2",
-      "sha256": "17c5786cd120593f3ee1c7a636284d59e8b1330b15402930337d1b4904c1ab0f",
+      "sha256": "1e90eec86cdc0f45f2c254d35272c6cd6b9ab3992890f4d5e3702dbff07be725",
       "type": "templates"
     },
     {
       "path": "templates/memory-tech-stack.html.j2",
-      "sha256": "5f4374c6eb5d490bdeffd33533a6ccae6d8d06adc11b9ca6e09af9498795f97b",
+      "sha256": "0c44eca41c79e3d6fd1377838da50c6f47d9c8076ee5f5bf26deda59d7c4566d",
       "type": "templates"
     },
     {
@@ -307,7 +307,7 @@
     },
     {
       "path": "workflows/architecture-review.workflow.md",
-      "sha256": "b9bf9d96ba05b44e4a8ed32fddeb517024442167c8dc14ed932f59702548f94c",
+      "sha256": "fd217a6390ba98ddf60ce1e07edd75f169e16f9af6609edad020d75c8cbfd652",
       "type": "workflows"
     },
     {
@@ -317,7 +317,7 @@
     },
     {
       "path": "workflows/cross-cutting-feature.workflow.md",
-      "sha256": "f2c203a1bcfa2644cdc35707dc2d5f932302a16d53ea1bd175f45c3e13578075",
+      "sha256": "62a9af9c2104a919846274e47c722b3a04d1382355fe22ede039d2c441c37f90",
       "type": "workflows"
     },
     {
@@ -337,7 +337,7 @@
     },
     {
       "path": "workflows/game-spec-definition.workflow.md",
-      "sha256": "928f12b80bc7dbd5fec20d782f8ed1be9be40e509bd298a9bccbb5ad5d6fd57d",
+      "sha256": "1657ab3b5ebc4c366944596ee6b97a2cde494a1ebbf0ceb68aa60f5d2fe588e1",
       "type": "workflows"
     },
     {
@@ -352,7 +352,7 @@
     },
     {
       "path": "workflows/spec-refinement.workflow.md",
-      "sha256": "e3e2f2b1b064681033098d4737671b2664b19faccf33fc6a953ba65dc72ebb76",
+      "sha256": "57f795ad42253271838cc62ab055479b8a513d59fb39280407f5269a68047b31",
       "type": "workflows"
     },
     {
@@ -361,7 +361,7 @@
       "type": "workflows"
     }
   ],
-  "generated_at": "2026-05-16T20:17:39.529235+00:00",
+  "generated_at": "2026-05-16T21:31:58.868377+00:00",
   "package_version": "0.1.0",
   "schema_version": "1"
 }

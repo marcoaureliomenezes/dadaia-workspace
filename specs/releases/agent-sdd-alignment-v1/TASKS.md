@@ -71,15 +71,15 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 5 — Propagação e verificação end-to-end
 
-- [-] T-5.1 `[parallel: no]` Rodar `dadaia public stage && dadaia public install --target all`. Cobre agentes (Fases 1–2), skills E1 + workflows E2 (Fase 6), templates atualizados (Fase 7). **Critério:** sem erro; mensagens de install para cada arquivo editado em agents/, skills/, workflows/ e templates/.
+- [x] T-5.1 `[parallel: no]` Rodar `dadaia public stage && dadaia public install --target all`. Cobre agentes (Fases 1–2), skills E1 + workflows E2 (Fase 6), templates atualizados (Fase 7). **Critério:** sem erro; mensagens de install para cada arquivo editado em agents/, skills/, workflows/ e templates/.
 
-- [ ] T-5.2 `[parallel: no]` Rodar `dadaia public doctor`. **Critério:** `[ok]` em todos os targets para agentes, skills, workflows e templates editados. Se drift, escalar antes de `--force`.
+- [x] T-5.2 `[parallel: no]` Rodar `dadaia public doctor`. **Critério:** `[ok]` em todos os targets para agentes, skills, workflows e templates editados. Se drift, escalar antes de `--force`.
 
-- [ ] T-5.3 `[parallel: no]` Verificação final agents: `grep -rn "memory/architecture\.md\|features/<feature>/SPEC\|features/<feature>/TASKS" dadaia_workspace/public/agents/{software-architect,software-engineer,qa-engineer,devops-engineer,frontend-engineer,backend-engineer}.md`. **Critério:** hits aparecem **apenas** dentro de blocos "Legacy compat".
+- [x] T-5.3 `[parallel: no]` Verificação final agents: `grep -rn "memory/architecture\.md\|features/<feature>/SPEC\|features/<feature>/TASKS" dadaia_workspace/public/agents/{software-architect,software-engineer,qa-engineer,devops-engineer,frontend-engineer,backend-engineer}.md`. **Critério:** hits aparecem **apenas** dentro de blocos "Legacy compat".
 
-- [ ] T-5.4 `[parallel: no]` Verificação final skills+workflows: `grep -rnE "features/<feat>/|memory/architecture\.md|memory/product\.html\b" dadaia_workspace/public/{skills,workflows}/**/*.md`. **Critério:** 0 hits fora de blocos "Legacy compat".
+- [x] T-5.4 `[parallel: no]` Verificação final skills+workflows: `grep -rnE "features/<feat>/|memory/architecture\.md|memory/product\.html\b" dadaia_workspace/public/{skills,workflows}/**/*.md`. **Critério:** 0 hits fora de blocos "Legacy compat".
 
-- [ ] T-5.5 `[parallel: no]` Rodar `dadaia specs doctor` final no workspace + `pytest tests/unit/features/specs/`. **Critério:** doctor exit 0; pytest 30+ verde (22 originais + 5 doctor novos + 3+ scaffolder).
+- [x] T-5.5 `[parallel: no]` Rodar `dadaia specs doctor` final no workspace + `pytest tests/unit/features/specs/`. **Critério:** doctor exit 0; pytest 30+ verde (22 originais + 5 doctor novos + 3+ scaffolder).
 
 ---
 

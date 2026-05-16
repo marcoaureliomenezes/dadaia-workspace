@@ -193,7 +193,7 @@ Lista consolidada de todas as mudanças a fazer:
 | Arquivo | Seção | O que mudar |
 |---------|-------|-------------|
 | `specs/constitution.md` | Stack | Atualizar provider primário para OpenRouter |
-| `specs/features/platform/snapshots/SPEC.md` | FR1/FR2 | Declarar dependência de volume-migration |
+| `specs/releases/<release-id>/SPEC.md` | FR1/FR2 | Declarar dependência de volume-migration |
 | ... | | |
 
 ---
