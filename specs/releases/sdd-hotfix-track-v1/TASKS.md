@@ -82,7 +82,7 @@ quando write-sets são disjuntos.
 
 ## T3 — Agentes: 3 surgical patches (product/qa/devops)
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Precondições:** nenhuma
 - **Paraleliza com:** T1, T2, T4, T5
