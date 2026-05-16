@@ -86,9 +86,10 @@ This is your first day. You are scanning every project in the workspace to under
 2. For each repo slug:
    a. Read specs (if present):
       - repos/<slug>/specs/constitution.md
-      - repos/<slug>/specs/memory/architecture.md
+      - repos/<slug>/specs/memory/architecture.html
+      - repos/<slug>/specs/memory/product/index.html  (catalog — load on demand: repos/<slug>/specs/memory/product/<slug>.html for any feature you need depth on)
+      - repos/<slug>/specs/memory/tech-stack.html
       - repos/<slug>/specs/foundation/SPEC.md
-      - repos/<slug>/specs/SPEC.md
       Skip gracefully if a file is absent.
 
    b. Scan implementation:
