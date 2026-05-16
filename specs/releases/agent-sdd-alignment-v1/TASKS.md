@@ -99,7 +99,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-E2.1 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/spec-refinement.workflow.md` L14 + L92: renomear input `topic` → `release_id` (description: "Release ID under `specs/releases/`"); `path: "specs/features/{topic}/SPEC.md"` → `path: "specs/releases/{release_id}/SPEC.md"`. **Critério:** grep `features/{topic}` → 0 hits; grep `releases/{release_id}/SPEC.md` → ≥1 hit.
 
-- [-] T-E2.2 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/cross-cutting-feature.workflow.md` L14: ajustar description do input para "Release ID under `specs/releases/`" preservando compat retroativa (alias para nome antigo se houver chamadas). **Critério:** description menciona `specs/releases/`.
+- [x] T-E2.2 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/cross-cutting-feature.workflow.md` L14: ajustar description do input para "Release ID under `specs/releases/`" preservando compat retroativa (alias para nome antigo se houver chamadas). **Critério:** description menciona `specs/releases/`.
 
 - [ ] T-E2.3 `[parallel: yes]` Editar `dadaia_workspace/public/workflows/architecture-review.workflow.md` L20: description do input — "When scope=feature, the release id under `specs/releases/`". **Critério:** description menciona `specs/releases/`.
 
