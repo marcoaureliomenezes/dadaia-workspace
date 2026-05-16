@@ -4,7 +4,7 @@ description: >
   Modo de refinamento de backlog — entrevista o operador sobre as SPECs do projeto dadaia Labs
   (ou sobre uma feature específica) até atingir entendimento compartilhado completo.
   Resolve inconsistências, gaps de escopo e decisões em aberto.
-  Finaliza gerando um report em .dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.md.
+  Finaliza gerando um report em .dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html.
   Use quando o operador mencionar "grill", "refine specs", "revisar backlog" ou "/dadaia-grill-me".
 applyTo: "specs/**"
 ---
@@ -134,11 +134,11 @@ Formato obrigatório de cada turno:
 
 ### Fase 3 — Gerar Report
 
-Ao terminar (ou em `/dadaia-grill-me report`), escrever `.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.md`:
+Ao terminar (ou em `/dadaia-grill-me report`), escrever `.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html`:
 
 ---
 
-## Formato do Report (`.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.md`)
+## Formato do Report (`.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html`)
 
 ```markdown
 # Refinamento de Specs — dadaia Labs

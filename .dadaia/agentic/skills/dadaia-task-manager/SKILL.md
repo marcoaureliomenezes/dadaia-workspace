@@ -105,15 +105,22 @@ o context primário; se inativo, ative ou peça ao operador.
 
 ## Onde TASKS.md vive
 
-O gate v2 procura tasks `[-]` em:
+O gate v3 procura tasks `[-]` recursivamente em todo `<primary_specs_dir>/`, com prioridade:
 
-- `<primary_specs_dir>/TASKS.md` (raiz)
-- `<primary_specs_dir>/features/*/TASKS.md` (features individuais)
+- **Primário:** `<primary_specs_dir>/releases/<active-release-id>/TASKS.md` — onde a
+  release ativa (apontada por `<primary_specs_dir>/releases/ACTIVE.md`) mantém suas tasks.
+- **Legacy compat:** `<primary_specs_dir>/features/*/TASKS.md` — habilitado quando a env
+  var `SDD_LEGACY_FEATURES=1` (default durante janela de migração). Após a release de
+  migração concluir, esse fallback é desligado.
+- **Raiz (legado):** `<primary_specs_dir>/TASKS.md` — só durante a migração; após, é
+  reportado pelo doctor como erro estrutural.
 
-A presença de **pelo menos uma** task `[-]` em qualquer um desses caminhos
-libera o gate para todo o `repos/<primary_slug>/`. Em v0.1, o gate não valida
-que a task `[-]` cobre exatamente o arquivo-alvo — é responsabilidade sua
-estar trabalhando no escopo declarado.
+A presença de **pelo menos uma** task `[-]` em qualquer um desses caminhos libera o gate
+para todo o `repos/<primary_slug>/`. O gate não valida que a task `[-]` cobre exatamente
+o arquivo-alvo — é responsabilidade sua estar trabalhando no escopo declarado pela task.
+
+TASKS.md **permanece em markdown** mesmo após a migração de memory para HTML. Os markers
+`[ ]/[-]/[x]` são contrato máquina e exigem parsing simples por grep.
 
 ## Por que o commit extra `chore(tasks): start`?
 

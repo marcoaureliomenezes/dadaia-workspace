@@ -161,6 +161,7 @@ class FileSystemPublicAssetManager:
 
         targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
         self._install_agents_md(agentic_dir, workspace_root, force, installed)
+        self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
             if item == "agents":
@@ -275,6 +276,15 @@ class FileSystemPublicAssetManager:
         if src is not None:
             self._copy_file(src, workspace_root / "AGENTS.md", force, installed)
 
+    def _install_reports_agents_md(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        src = agentic_dir / "data" / "reports-AGENTS.md"
+        if src.exists():
+            reports_dir = workspace_root / ".dadaia" / "reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            self._copy_file(src, reports_dir / "AGENTS.md", force, installed)
+
     def _install_universal_skills(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
     ) -> None:
@@ -379,6 +389,15 @@ class FileSystemPublicAssetManager:
         agents_md = self._agents_md_source(agentic_dir)
         if agents_md is not None:
             yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md", False)
+
+        reports_agents_md = agentic_dir / "data" / "reports-AGENTS.md"
+        if reports_agents_md.exists():
+            yield (
+                reports_agents_md,
+                workspace_root / ".dadaia" / "reports" / "AGENTS.md",
+                "reports:AGENTS.md",
+                False,
+            )
 
         for src in self._iter_files(agentic_dir / "skills"):
             rel = src.relative_to(agentic_dir / "skills")

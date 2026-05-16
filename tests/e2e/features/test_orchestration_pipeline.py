@@ -48,7 +48,11 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
     disc_out = tmp_path / invocations[0].expected_output_path
     disc_out.parent.mkdir(parents=True, exist_ok=True)
     disc_out.write_text(
-        "# Discovery\n\n## Findings\n...\n## Riscos\n...\n## Decisões necessárias\n...\n"
+        "<!DOCTYPE html><html><body>"
+        "<h2>Findings</h2><p>ok</p>"
+        "<h2>Riscos</h2><p>ok</p>"
+        "<h2>Decisões necessárias</h2><p>ok</p>"
+        "</body></html>"
     )
 
     # discovery → 3 specialists in one parallel batch

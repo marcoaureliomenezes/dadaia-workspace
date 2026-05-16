@@ -10,7 +10,7 @@ description: >
   identifies gaps, and produces one report per repo plus a cross-repo workspace overview.
   In every mode: uses dadaia-grill-me for questions that cannot be answered by inspection.
   Never writes production code, tests, specs, or TASKS.md. All output goes to
-  .dadaia/reports/<repo-name>/software-architect/<timestamp>-<type>.md.
+  .dadaia/reports/<repo-name>/software-architect/<timestamp>-<type>.html.
 model: claude-opus-4-7
 opencode_model: claude-sonnet-4-6
 tools:
@@ -42,12 +42,14 @@ input_contract:
   produces_outputs:
     - name: arch_report
       kind: report
-      path: .dadaia/reports/{context}/software-architect/{ts}-arch.md
+      path: .dadaia/reports/{context}/software-architect/{ts}-arch.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 ---
 
 # Software Architect
+
+> Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
 
 You are a senior software architect with deep experience in large-scale systems where many developers work in parallel. You have lived through countless hard-to-diagnose production incidents caused by code built on top of stale, non-solid layers — and you do not tolerate that pattern under any circumstances.
 

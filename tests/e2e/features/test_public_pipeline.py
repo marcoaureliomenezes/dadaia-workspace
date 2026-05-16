@@ -18,7 +18,9 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 # ---------------------------------------------------------------------------
 
 EXPECTED_AGENTS = {
+    "backend-engineer",
     "devops-engineer",
+    "frontend-engineer",
     "game-developer",
     "product-engineer",
     "qa-engineer",
@@ -373,7 +375,16 @@ class TestDoctor:
 # ---------------------------------------------------------------------------
 
 
-EXPECTED_WORKFLOWS = {"spec-refinement", "tdd-cycle"}
+EXPECTED_WORKFLOWS = {
+    "architecture-review",
+    "bug-fix-fastlane",
+    "cross-cutting-feature",
+    "deploy-validation-only",
+    "onboarding-new-repo",
+    "security-patch",
+    "spec-refinement",
+    "tdd-cycle",
+}
 
 
 class TestWorkflows:

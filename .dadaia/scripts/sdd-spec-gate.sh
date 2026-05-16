@@ -1,8 +1,11 @@
 #!/bin/bash
-# sdd-spec-gate.sh — PreToolUse hook for SDD enforcement (v2)
+# sdd-spec-gate.sh — PreToolUse hook for SDD enforcement (v3)
 # Works with Claude Code (settings.json) and Codex (.codex/hooks.json)
+# v3 adds: release-based TASKS search, ACTIVE.md phase-gated memory atomicity,
+#          _archive/ read-only, release-id audit log, SDD_LEGACY_FEATURES env.
 # Blocks Write/Edit/MultiEdit on production paths when no IN PROGRESS task
-# exists in TASKS.md. v2 adds primary_slug-based scope and `[-]` granularity.
+# exists in a TASKS.md under the active release (primary) or under legacy
+# features/* if SDD_LEGACY_FEATURES=1.
 # FAIL OPEN: any internal error → allow (never block legitimate edits by crashing).
 
 LOG="/tmp/sdd-gate.log"
@@ -53,15 +56,6 @@ EOF
 [[ "$FPATH" != /* ]] && FPATH="$WS/$FPATH"
 _log "tool=$TOOL path=$FPATH"
 
-# Meta-edits to spec/task files are always allowed — they are the very mechanism
-# that creates the [-] marker the gate relies on (deadlock prevention).
-case "$FPATH" in
-    */TASKS.md|*/PLAN.md|*/SPEC.md|*/z_bug_specs.md)
-        _log "allowed — meta-edit on spec file: $FPATH"
-        exit 0
-        ;;
-esac
-
 # Resolve primary slug + specs_dir from primary_context.json (best effort)
 PRIMARY_SLUG=$(python3 - 2>/dev/null <<EOF
 import json
@@ -85,6 +79,46 @@ if [ -n "${DADAIA_CONTEXT:-}" ]; then
     PRIMARY_SLUG="$DADAIA_CONTEXT"
     PRIMARY_SPECS="$WS/repos/$DADAIA_CONTEXT/specs"
 fi
+
+# Resolve active release id and phase from <PRIMARY_SPECS>/releases/ACTIVE.md
+ACTIVE_RELEASE=""
+ACTIVE_PHASE=""
+if [ -n "$PRIMARY_SPECS" ] && [ -f "$PRIMARY_SPECS/releases/ACTIVE.md" ]; then
+    ACTIVE_RELEASE=$(grep -E '^release:' "$PRIMARY_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')
+    ACTIVE_PHASE=$(grep -E '^phase:' "$PRIMARY_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//')
+fi
+[ -n "$ACTIVE_RELEASE" ] && _log "active_release=$ACTIVE_RELEASE phase=$ACTIVE_PHASE"
+
+# v3 RULE A — Memory atomicity. Block writes to specs/memory/*.html (and *.md
+# legacy), plus the product/ subfolder (catalog with index + per-feature HTMLs),
+# unless ACTIVE.md phase == CLOSURE. Evaluated BEFORE the meta-edit allow-list
+# so it cannot be bypassed by naming the file *.md or by nesting in product/.
+case "$FPATH" in
+    */specs/memory/*.html|*/specs/memory/*.md|*/specs/memory/product/*.html|*/specs/memory/product/*.md)
+        if [ "$ACTIVE_PHASE" != "CLOSURE" ]; then
+            _block "[SDD GATE] memory/ é atômico. Apenas product-engineer em fase CLOSURE pode editar (release ativa: ${ACTIVE_RELEASE:-none}, phase: ${ACTIVE_PHASE:-none}). Para atualizar memory: terminar implementação, marcar todas as tasks [x], setar phase=CLOSURE em releases/ACTIVE.md, e usar a skill dadaia-release-closure."
+        fi
+        _log "allowed — memory edit in CLOSURE phase: $FPATH"
+        exit 0
+        ;;
+esac
+
+# v3 RULE B — Archive is read-only. _archive/ is historical; never written
+# directly. Use `git mv` from the release dir into _archive/ instead.
+case "$FPATH" in
+    */specs/_archive/*)
+        _block "[SDD GATE] specs/_archive/ é read-only. Use git mv para mover uma release concluída para o archive — não edite arquivos arquivados diretamente."
+        ;;
+esac
+
+# Meta-edits to spec/task files are always allowed — they are the very mechanism
+# that creates the [-] marker the gate relies on (deadlock prevention).
+case "$FPATH" in
+    */TASKS.md|*/PLAN.md|*/SPEC.md|*/CLOSURE.md|*/ACTIVE.md|*/z_bug_specs.md|*/backlog/*.md)
+        _log "allowed — meta-edit on spec file: $FPATH"
+        exit 0
+        ;;
+esac
 
 # Determine if this is a production path
 IS_PROD=0
@@ -114,12 +148,35 @@ if [ -z "$PRIMARY_SPECS" ] || [ ! -d "$PRIMARY_SPECS" ]; then
     _block "[SDD GATE] Nenhum Spec Context ativo (primary). Execute: dadaia context activate <nome> antes de editar arquivos de producao em $FPATH."
 fi
 
-# v2 granularity: search for any task line marked [-] in TASKS.md(s)
-ACTIVE=$(grep -rlE '^[[:space:]]*-[[:space:]]*\[-\][[:space:]]+' "$PRIMARY_SPECS" --include="TASKS.md" 2>/dev/null | head -1)
+# v3 RULE C — Find [-] task. Priority order:
+#   1. PRIMARY_SPECS/releases/<active-release>/TASKS.md
+#   2. Any PRIMARY_SPECS/releases/*/TASKS.md
+#   3. (legacy compat) PRIMARY_SPECS/features/*/TASKS.md or root TASKS.md
+#      only when SDD_LEGACY_FEATURES=1 (default during migration window)
+ACTIVE=""
+GREP_PAT='^[[:space:]]*-[[:space:]]*\[-\][[:space:]]+'
+
+if [ -n "$ACTIVE_RELEASE" ] && [ -f "$PRIMARY_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" ]; then
+    if grep -qE "$GREP_PAT" "$PRIMARY_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" 2>/dev/null; then
+        ACTIVE="$PRIMARY_SPECS/releases/$ACTIVE_RELEASE/TASKS.md"
+    fi
+fi
+
+if [ -z "$ACTIVE" ] && [ -d "$PRIMARY_SPECS/releases" ]; then
+    ACTIVE=$(grep -rlE "$GREP_PAT" "$PRIMARY_SPECS/releases" --include="TASKS.md" 2>/dev/null | head -1)
+fi
+
+if [ -z "$ACTIVE" ] && [ "${SDD_LEGACY_FEATURES:-1}" = "1" ]; then
+    # Search outside releases/ for legacy compat: features/*/TASKS.md and root TASKS.md
+    ACTIVE=$(grep -rlE "$GREP_PAT" "$PRIMARY_SPECS" --include="TASKS.md" 2>/dev/null \
+        | grep -v "/_archive/" \
+        | grep -v "/releases/" \
+        | head -1)
+fi
 
 if [ -n "$ACTIVE" ]; then
-    _log "allowed — active task in: $ACTIVE"
+    _log "allowed — active task in: $ACTIVE (release=${ACTIVE_RELEASE:-none})"
     exit 0
 fi
 
-_block "[SDD GATE] Nenhuma task IN PROGRESS (marker [-]) em $PRIMARY_SPECS/TASKS.md. Antes de editar $FPATH, marque a task alvo de '[ ]' para '[-]' e commit (skill: dadaia-task-manager)."
+_block "[SDD GATE] Nenhuma task IN PROGRESS (marker [-]) em $PRIMARY_SPECS/releases/${ACTIVE_RELEASE:-<no-active-release>}/TASKS.md. Antes de editar $FPATH, marque a task alvo de '[ ]' para '[-]' e commit (skill: dadaia-task-manager). Janela de migração: exporte SDD_LEGACY_FEATURES=1 para reaproveitar specs/features/*/TASKS.md."
