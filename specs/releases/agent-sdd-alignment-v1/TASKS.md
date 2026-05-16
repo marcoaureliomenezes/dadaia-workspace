@@ -93,7 +93,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-E1.3 `[parallel: yes]` Editar `dadaia_workspace/public/skills/architect-code-audit/SKILL.md` L27 (Phase 0 — Context Loading): `specs/memory/architecture.md` → `specs/memory/architecture.html`. **Critério:** grep `memory/architecture\.md` → 0 hits.
 
-- [ ] T-E1.4 `[parallel: yes]` Editar `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md` L196 (tabela "Edições Pendentes"): exemplo `specs/features/platform/snapshots/SPEC.md` → `specs/releases/<release-id>/SPEC.md`. **Critério:** grep `features/platform/snapshots` → 0 hits.
+- [-] T-E1.4 `[parallel: yes]` Editar `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md` L196 (tabela "Edições Pendentes"): exemplo `specs/features/platform/snapshots/SPEC.md` → `specs/releases/<release-id>/SPEC.md`. **Critério:** grep `features/platform/snapshots` → 0 hits.
 
 ### E2 — Workflows (4 patches, write-sets disjuntos)
 
