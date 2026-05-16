@@ -51,11 +51,11 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-3.2 `[parallel: no]` Adicionar método `_check_backlog_schema` em `dadaia_workspace/features/specs/doctor.py` (código SPEC-DOC-012, severity WARNING). Skipa seções `## Histórico*` e linhas sem `- `. Regex documentado em PLAN.md Fase 3 Edit B. Registrar no `check()` via `issues.extend(self._check_backlog_schema())`. **Critério:** método existe; `check()` o invoca.
 
-- [ ] T-3.3 `[parallel: yes com 3.4/3.5]` Adicionar testes em `tests/unit/features/specs/test_doctor.py`: `test_active_md_empty_release_value_is_error`, `test_active_md_empty_phase_value_is_error`. Cada um escreve ACTIVE.md malformado em `tmp_path` e espera issue SPEC-DOC-003 ERROR. **Critério:** 2 testes novos verdes.
+- [-] T-3.3 `[parallel: yes com 3.4/3.5]` Adicionar testes em `tests/unit/features/specs/test_doctor.py`: `test_active_md_empty_release_value_is_error`, `test_active_md_empty_phase_value_is_error`. Cada um escreve ACTIVE.md malformado em `tmp_path` e espera issue SPEC-DOC-003 ERROR. **Critério:** 2 testes novos verdes.
 
-- [ ] T-3.4 `[parallel: yes com 3.3/3.5]` Adicionar testes positivos em `tests/unit/features/specs/test_doctor.py`: `test_backlog_well_formed_passes`, `test_backlog_historico_section_skipped`. **Critério:** 2 testes novos verdes; nenhum issue gerado.
+- [-] T-3.4 `[parallel: yes com 3.3/3.5]` Adicionar testes positivos em `tests/unit/features/specs/test_doctor.py`: `test_backlog_well_formed_passes`, `test_backlog_historico_section_skipped`. **Critério:** 2 testes novos verdes; nenhum issue gerado.
 
-- [ ] T-3.5 `[parallel: yes com 3.3/3.4]` Adicionar teste negativo em `tests/unit/features/specs/test_doctor.py`: `test_backlog_malformed_bullet_warns`. **Critério:** 1 teste novo verde gerando SPEC-DOC-012 WARNING.
+- [-] T-3.5 `[parallel: yes com 3.3/3.4]` Adicionar teste negativo em `tests/unit/features/specs/test_doctor.py`: `test_backlog_malformed_bullet_warns`. **Critério:** 1 teste novo verde gerando SPEC-DOC-012 WARNING.
 
 - [ ] T-3.6 `[parallel: no]` Rodar `pytest tests/unit/features/specs/test_doctor.py -v` e confirmar 27+ testes verdes. **Critério:** exit 0; saída lista os 5 testes novos por nome.
 
