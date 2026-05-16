@@ -115,7 +115,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-E3.3 `[parallel: no]` Wiring CLI em `dadaia_workspace/cli/commands/specs.py`: adicionar subcomando `init` ao grupo `specs`. Args: `--specs-dir <path>` (default `./specs/`), `--name <project-name>` (default = parent dir name), `--force` (default false). Output: lista linhas `[created] / [skip] / [overwrite] <path>`. **Critério:** `dadaia specs init --help` mostra os 3 flags; subcomando aparece em `dadaia specs --help`.
 
-- [-] T-E3.4 `[parallel: yes com T-E3.5]` Editar `dadaia_workspace/features/specs/doctor.py`: (a) adicionar `"none"` em `CANONICAL_PHASES`; (b) short-circuit em todos os `_check_*` que dependem de release ativa quando `release == "none"` (estende tratamento existente das linhas 414/434). **Critério:** `dadaia specs doctor --specs-dir <repo-com-release-none>` exit 0; nenhum issue release-scoped reportado.
+- [x] T-E3.4 `[parallel: yes com T-E3.5]` Editar `dadaia_workspace/features/specs/doctor.py`: (a) adicionar `"none"` em `CANONICAL_PHASES`; (b) short-circuit em todos os `_check_*` que dependem de release ativa quando `release == "none"` (estende tratamento existente das linhas 414/434). **Critério:** `dadaia specs doctor --specs-dir <repo-com-release-none>` exit 0; nenhum issue release-scoped reportado.
 
 - [ ] T-E3.5 `[parallel: yes com T-E3.4]` Criar `tests/unit/features/specs/test_scaffolder.py` com 3+ testes: (1) `test_scaffold_happy_path` — `tmp_path` vazio gera toda a árvore; (2) `test_scaffold_is_idempotent` — segunda execução retorna `[skip]` em todos os outputs; (3) `test_scaffold_force_overwrites` — `force=True` reescreve. Bonus opcional: `test_templates_render_with_defaults` — render sem dict não falha. **Critério:** 3+ testes verdes.
 
