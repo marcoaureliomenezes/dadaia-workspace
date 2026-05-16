@@ -171,7 +171,7 @@ quando write-sets são disjuntos.
 
 ## T8 — Smoke-test end-to-end (doctor + scaffolder + backlog)
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** devops-engineer
 - **Precondições:** T1 [x], T2 [x]
 - **Paraleliza com:** T6, T7 (read-only sobre seus outputs)
