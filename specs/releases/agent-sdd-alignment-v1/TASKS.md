@@ -57,7 +57,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-3.5 `[parallel: yes com 3.3/3.4]` Adicionar teste negativo em `tests/unit/features/specs/test_doctor.py`: `test_backlog_malformed_bullet_warns`. **Critério:** 1 teste novo verde gerando SPEC-DOC-012 WARNING.
 
-- [-] T-3.6 `[parallel: no]` Rodar `pytest tests/unit/features/specs/test_doctor.py -v` e confirmar 27+ testes verdes. **Critério:** exit 0; saída lista os 5 testes novos por nome.
+- [x] T-3.6 `[parallel: no]` Rodar `pytest tests/unit/features/specs/test_doctor.py -v` e confirmar 27+ testes verdes. **Critério:** exit 0; saída lista os 5 testes novos por nome.
 
 - [ ] T-3.7 `[parallel: no]` Rodar `dadaia specs doctor --specs-dir specs` no próprio workspace. **Critério:** exit 0 (warnings em backlog atuais aceitáveis; fixar `candidates.md` se houver falha de schema flagrante para evitar ruído).
 
