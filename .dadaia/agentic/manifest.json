@@ -7,7 +7,7 @@
     },
     {
       "path": "agents/devops-engineer.md",
-      "sha256": "0f5ffb3860aad0c3e4b4f757b2669fe3ec134e6e6e85e1695e227b8f80ca6d41",
+      "sha256": "f4f4394d222bfb328a69b47456eb8444423a460965d2ade01a0057c9893d9923",
       "type": "agents"
     },
     {
@@ -32,12 +32,12 @@
     },
     {
       "path": "agents/product-engineer.md",
-      "sha256": "b632ca02bc425aa30e877b70dc167282dfe5855ebf0571b6b57194b3dd9b49ba",
+      "sha256": "4af3c44a7ecf57cf198c5af5034de661e206a0082a0d1e0c71c472a49543c335",
       "type": "agents"
     },
     {
       "path": "agents/qa-engineer.md",
-      "sha256": "5cf4cac3596f383844557af2451f2ccf6bfbde744f9939bdec47692830d53be1",
+      "sha256": "3001f403e5d24a25e765c21601349e32a3d4e21dd40aa447c2c836974a59f80a",
       "type": "agents"
     },
     {
@@ -281,6 +281,11 @@
       "type": "skills"
     },
     {
+      "path": "templates/closure_hotfix.md.j2",
+      "sha256": "b3a07c51fdd97c104eee2f345f8551248d08ae2d938c42004ee7edb3a5e74fe1",
+      "type": "templates"
+    },
+    {
       "path": "templates/memory-architecture.html.j2",
       "sha256": "f084c5d0fb44b6efb12c40f8865cbd548232854b2a8f022611ebd92ec3d23cf9",
       "type": "templates"
@@ -301,6 +306,11 @@
       "type": "templates"
     },
     {
+      "path": "templates/release_hotfix.md.j2",
+      "sha256": "723b5fc6d03196624cae32352a5718399f1b93263df21794942afb78782fbaf5",
+      "type": "templates"
+    },
+    {
       "path": "templates/repo-AGENTS.md",
       "sha256": "2d7c96dfafd58c0f6261f88c0f7315544f16427e583275cd604f15454f17f2b4",
       "type": "templates"
@@ -312,7 +322,7 @@
     },
     {
       "path": "workflows/bug-fix-fastlane.workflow.md",
-      "sha256": "a39d48f53e42566d373501748af749d41620143660d06c82f75bb54f627a8cf5",
+      "sha256": "50ffb23b361e1f39ce7ec89666934098f97c2add727721949331baf04e479558",
       "type": "workflows"
     },
     {
@@ -341,6 +351,11 @@
       "type": "workflows"
     },
     {
+      "path": "workflows/hotfix-release.workflow.md",
+      "sha256": "e3011d7df115c2db8d8224e48aa9801ac552dec5d207b646b4a3de7cceca3ecc",
+      "type": "workflows"
+    },
+    {
       "path": "workflows/onboarding-new-repo.workflow.md",
       "sha256": "9bc0ba129e70437358bab69175317daf87b81dc2589a7017ddcb2c19a0d8d685",
       "type": "workflows"
@@ -361,7 +376,7 @@
       "type": "workflows"
     }
   ],
-  "generated_at": "2026-05-16T21:31:58.868377+00:00",
+  "generated_at": "2026-05-16T22:29:06.197310+00:00",
   "package_version": "0.1.0",
   "schema_version": "1"
 }

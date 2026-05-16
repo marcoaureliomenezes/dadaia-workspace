@@ -1,6 +1,6 @@
 ---
 name: bug-fix-fastlane
-description: Fast-lane hotfix loop. qa-engineer reproduces the bug as a failing test, the implementer applies the minimum fix, qa-engineer validates the deploy. No refactor stage, no product consult — for urgent fixes only.
+description: "Fast-lane hotfix loop. qa-engineer reproduces the bug as a failing test, the implementer applies the minimum fix, qa-engineer validates the deploy. No refactor stage, no product consult — for urgent fixes only. Fixes that require updates to `specs/memory/product/*.html` must migrate to a hotfix release (file under `specs/backlog/candidates.md` section `## Hotfixes pendentes`)."
 version: 0.1.0
 schema_version: "1"
 inputs:

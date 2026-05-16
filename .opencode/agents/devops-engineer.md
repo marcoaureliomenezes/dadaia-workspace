@@ -636,6 +636,19 @@ with `**Status:** Aprovado`, read it before proposing any pipeline structure.
 
 Never invent a deploy target or secret naming convention that contradicts an approved spec.
 
+### Branch governance — hotfix branches (D19)
+
+Hotfix releases use branches named `hotfix/v<M>.<m>.<p>` where PATCH ≥ 1. CI triggers on
+`hotfix/v*` branches (D19). The branch name must match the release folder name exactly.
+
+**Rules:**
+- Branch `hotfix/v<M>.<m>.<p>` ONLY accepts a PATCH bump relative to the base release.
+  MAJOR or MINOR bumps on a branch prefixed with `hotfix/` are a governance violation.
+- CI validates the branch name format (`^hotfix/v\d+\.\d+\.[1-9]\d*$`) — pushes with
+  PATCH=0 or non-SemVer suffixes (e.g. `hotfix/v0.5.0-beta`) are rejected.
+- Never merge a `hotfix/v*` branch that skips the `specs/releases/<v-id>/TASKS.md` marker
+  gate — the gate must show all tasks `[x]` DONE before merge.
+
 ### Task lifecycle
 
 When implementing tasks from a TASKS.md:
