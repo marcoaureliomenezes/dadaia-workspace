@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Memory — Product — {{ context_name }}</title>
+  <title>Memory — Product — {{ project_name | default(context_name | default('Projeto')) }}</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
   <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
   <style>
@@ -29,19 +29,19 @@
 </head>
 <body>
 
-<h1>Product Memory — {{ context_name }}</h1>
-<p class="meta">Última atualização: {{ last_updated_iso }} · Closure: {{ last_release_id }}</p>
+<h1>Product Memory — {{ project_name | default(context_name | default('Projeto')) }}</h1>
+<p class="meta">Última atualização: {{ today | default(last_updated_iso | default('—')) }} · Closure: {{ last_release_id | default('none') }}</p>
 
 <section id="vision">
   <h2>Visão atômica</h2>
-  <p>{{ product_vision_oneliner }}</p>
-  <p>{{ product_vision_paragraph }}</p>
+  <p>{{ product_vision_oneliner | default('Visão do produto ainda não documentada.') }}</p>
+  <p>{{ product_vision_paragraph | default('') }}</p>
 </section>
 
 <section id="users">
   <h2>Usuários</h2>
   <ul>
-    {{ users_bullets }}
+    {{ users_bullets | default('<li>Usuários ainda não documentados.</li>') }}
   </ul>
 </section>
 
@@ -50,14 +50,14 @@
   <p>Cada feature em produção tem seu próprio HTML descritivo. Ordem reflete relevância
      no dia-a-dia do operador (1 = mais usada). Para detalhe funcional, clique no nome.</p>
   <ol class="catalog">
-    {{ catalog_items }}
+    {{ catalog_items | default('') }}
   </ol>
 </section>
 
 <section id="capability-map">
   <h2>Mapa de capacidades</h2>
   <pre class="mermaid">
-{{ capability_map_mermaid }}
+{{ capability_map_mermaid | default('graph TD\n  A[Sem dados]') }}
   </pre>
 </section>
 
@@ -65,13 +65,13 @@
   <h2>Limites conhecidos</h2>
   <p>Comportamentos esperados que NÃO fazem parte do produto atual:</p>
   <ul>
-    {{ explicit_non_goals }}
+    {{ explicit_non_goals | default('<li>Limites ainda não documentados.</li>') }}
   </ul>
 </section>
 
 <section id="evidence">
   <h2>Evidências visuais</h2>
-  {{ screenshots_html }}
+  {{ screenshots_html | default('<p>Sem evidências visuais.</p>') }}
 </section>
 
 </body>
