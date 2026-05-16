@@ -29,7 +29,7 @@
 - [x] TA13 — Criar game-spec-definition.workflow.md
 - [x] TA14 — Criar game-dev-cycle.workflow.md
 - [x] TA15 — Criar game-bugfix.workflow.md
-- [ ] TA16 — Atualizar tdd-cycle.workflow.md (remover game-developer do implementer list)
+- [-] TA16 — Atualizar tdd-cycle.workflow.md (remover game-developer do implementer list)
 
 ## Propagation
 
