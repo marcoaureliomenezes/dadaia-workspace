@@ -20,10 +20,10 @@
 - Create: `dadaia_workspace/core/models/server_registry.py`
 - Modify: `dadaia_workspace/core/exceptions.py`
 
-- [-] Step 1.1: Create `dadaia_workspace/core/models/server_registry.py`
-- [ ] Step 1.2: Add exceptions to `dadaia_workspace/core/exceptions.py`
-- [ ] Step 1.3: Verify import
-- [ ] Step 1.4: Commit
+- [x] Step 1.1: Create `dadaia_workspace/core/models/server_registry.py`
+- [x] Step 1.2: Add exceptions to `dadaia_workspace/core/exceptions.py`
+- [x] Step 1.3: Verify import
+- [x] Step 1.4: Commit
 
 ---
 
