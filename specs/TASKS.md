@@ -269,7 +269,7 @@
 ### 11C — Novas skills
 
 - [x] T152 — Criar `dadaia_workspace/public/skills/game-unreal-developer/SKILL.md`
-- [ ] T153 — Criar `dadaia_workspace/public/skills/game-flight-dynamics/SKILL.md`
+- [-] T153 — Criar `dadaia_workspace/public/skills/game-flight-dynamics/SKILL.md`
 - [ ] T154 — Criar `dadaia_workspace/public/skills/game-unreal-designer/SKILL.md`
 - [ ] T155 — Criar `dadaia_workspace/public/skills/game-visual-design/SKILL.md`
 - [ ] T156 — Criar `dadaia_workspace/public/skills/game-geospatial-pipeline/SKILL.md`
