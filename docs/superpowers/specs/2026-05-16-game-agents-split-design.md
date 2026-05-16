@@ -30,7 +30,7 @@ The goal is to split responsibilities into three purpose-built agents — `game-
 
 **Model:** claude-sonnet-4-6  
 **Max turns:** 60  
-**Tools:** Read, Write, Edit, Bash, Glob, Grep, WebFetch
+**Tools:** Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch
 
 **Exclusive domain:** game logic in `repos/tauan-games/`
 
@@ -42,7 +42,19 @@ The goal is to split responsibilities into three purpose-built agents — `game-
 - JSBSim: flight dynamics model integration (thrust, drag, lift, rudder, landing gear, ground effect, stall)
 - Does NOT touch: visual assets, audio, terrain, materials, maps, tests
 
+**Workspace: tauan-games**
+
+| Game | Engine | Stack |
+|---|---|---|
+| `tauan-trex` | Phaser.js 3.60 | HTML + JS, CDN, no build step |
+| `aero-fighters` | Three.js r165 | HTML + JS, CDN, N64 aesthetic |
+| `aero-fighters-v2` | Unreal Engine 5 | C++ + Blueprints, JSBSim, Cesium, Nanite, Lumen |
+
+**WebSearch trusted sources:** `dev.epicgames.com`, `forums.unrealengine.com`, `github.com`, `stackoverflow.com`, `reddit.com/r/unrealengine`, `reddit.com/r/gamedev`, `jsbsim-team.github.io`
+
 **Skills assigned:**
+- `dadaia-workspace-spec-navigator` (existing)
+- `dadaia-task-manager` (existing)
 - `game-physics-engine` (existing)
 - `game-platform-browser` (existing — backward compat)
 - `game-platform-godot` (existing — ladder)
@@ -58,7 +70,7 @@ The goal is to split responsibilities into three purpose-built agents — `game-
 
 **Model:** claude-opus-4-7  
 **Max turns:** 60  
-**Tools:** Read, Write, Edit, Bash, Glob, Grep, WebFetch
+**Tools:** Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch
 
 **Exclusive domain:** design and static assets in `repos/tauan-games/`
 
@@ -71,7 +83,11 @@ The goal is to split responsibilities into three purpose-built agents — `game-
 - Active research: fetches map references and terrain data from safe public repositories (OSM, USGS, NASA EarthData, OpenTopography, Fab, Sketchfab CC)
 - Does NOT touch: game logic, enemy AI, ballistics, flight physics, tests
 
+**WebSearch trusted sources:** `dev.epicgames.com`, `forums.unrealengine.com`, `openstreetmap.org`, `earthexplorer.usgs.gov`, `earthdata.nasa.gov`, `opentopography.org`, `sketchfab.com`, `fab.com`, `artstation.com`, `freesound.org`, `cesium.com/learn`, `sidefx.com/docs`, `gdal.org`, `qgis.org`
+
 **Skills assigned:**
+- `dadaia-workspace-spec-navigator` (existing)
+- `dadaia-task-manager` (existing)
 - `game-map-architect` (migrated from game-developer)
 - `game-unreal-designer` (new — deep UE5 design + map research protocol)
 - `game-visual-design` (new — art direction, Nanite, Lumen, Megascans, post-process)
@@ -84,7 +100,7 @@ The goal is to split responsibilities into three purpose-built agents — `game-
 
 **Model:** claude-opus-4-7  
 **Max turns:** 40  
-**Tools:** Read, Write, Edit, Bash, Glob, Grep, WebFetch
+**Tools:** Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch
 
 **Domain:** testing and quality validation in `repos/tauan-games/`
 
@@ -97,7 +113,11 @@ The goal is to split responsibilities into three purpose-built agents — `game-
 - Active research: Epic issue tracker, UE5 release notes, forums.unrealengine.com/c/development-discussion/testing-qa
 - Does NOT write production code or game assets; writes only test scripts and reports
 
+**WebSearch trusted sources:** `dev.epicgames.com`, `forums.unrealengine.com`, `issues.unrealengine.com`, `github.com`, `reddit.com/r/unrealengine`
+
 **Skills assigned:**
+- `dadaia-workspace-spec-navigator` (existing)
+- `dadaia-task-manager` (existing)
 - `game-testing-ue5` (new — UE5 Automation, Gauntlet, PIE, report format, research protocol)
 
 ---
@@ -145,6 +165,8 @@ UE5 Automation Testing Framework: FunctionalTest actor setup, `RunTests` CLI fla
 
 ### `game-spec-definition.workflow.md` (new)
 
+**When to use:** active context is a game project (tauan-games). For all other contexts, use `spec-refinement`.
+
 **Trigger:** new game or major evolution (e.g., aero-fighters-v2).
 
 **Stages:**
@@ -153,6 +175,8 @@ UE5 Automation Testing Framework: FunctionalTest actor setup, `RunTests` CLI fla
 |---|---|---|---|---|
 | `discovery` | product-engineer | — | — | Discovery report + open questions resolved via dadaia-grill-me |
 | `arch-review` | software-architect | discovery [gate] | specialists | Architecture feasibility, patterns, tech decisions |
+| `backend-review` *(optional)* | backend-engineer | discovery [gate] | specialists | Backend services feasibility (only when `include_web_specialists=true`) |
+| `frontend-review` *(optional)* | frontend-engineer | discovery [gate] | specialists | Frontend/UI feasibility (only when `include_web_specialists=true`) |
 | `devops-review` | devops-engineer | discovery [gate] | specialists | UE5 build pipeline, CI/CD, deploy strategy |
 | `gameplay-analysis` | game-developer | discovery [gate] | specialists | Mechanic viability, JSBSim feasibility, AI scope |
 | `design-analysis` | game-designer | discovery [gate] | specialists | Map feasibility, asset pipeline, visual direction, research findings |
@@ -205,7 +229,32 @@ After:  implementer_agent = frontend-engineer | backend-engineer | software-engi
 
 ---
 
-## Section 4 — Scope Rule Update
+## Section 4 — Coordination Rule: `game-agents-coordination.md`
+
+New always-active rule for all game agents. Defines authority per domain and deadlock protocol.
+
+### Decision Authority Matrix
+
+| Domain | Primary Authority | May Object (with evidence) | Tie-breaker |
+|---|---|---|---|
+| Game mechanics, physics, AI, ballistics | game-developer | game-designer, game-tester | product-engineer |
+| Visual design, maps, audio, art direction | game-designer | game-developer, game-tester | product-engineer |
+| Quality criteria, test strategy | game-tester | game-developer, game-designer | product-engineer |
+| Architecture patterns (general) | software-architect | game-developer (UE5 idioms) | game-developer wins on UE5-specific decisions |
+| CI/CD, build pipeline, deploy | devops-engineer | game-developer, game-designer | devops-engineer |
+| Scope, priorities, SPEC content | product-engineer | all agents | product-engineer (final word) |
+
+### Anti-Deadlock Protocol
+
+1. Divergence → each agent documents position + trade-offs in their report
+2. `product-engineer` synthesizes and proposes resolution
+3. If still unresolved → **invoke `dadaia-grill-me` with operator** (structured human decision)
+
+**Absolute rule:** no agent blocks another's domain. Objections without evidence are ignored.
+
+---
+
+## Section 5 — Scope Rule Update
 
 ### `game-developer-scope.md` (updated)
 
@@ -223,12 +272,13 @@ Cross-domain rule: if a bug spans logic AND design, `game-tester` classifies it 
 
 ---
 
-## Section 5 — Manifest Implications
+## Section 6 — Manifest Implications
 
-**New entries (12):**
+**New entries (13):**
 - 2 agents: `game-designer`, `game-tester`
 - 7 skills: `game-unreal-developer`, `game-flight-dynamics`, `game-unreal-designer`, `game-visual-design`, `game-geospatial-pipeline`, `game-audio-design`, `game-testing-ue5`
 - 3 workflows: `game-spec-definition`, `game-dev-cycle`, `game-bugfix`
+- 1 rule: `game-agents-coordination`
 
 **Modified entries (3):**
 - 1 agent: `game-developer` (narrowed)
