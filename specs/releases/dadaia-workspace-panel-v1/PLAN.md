@@ -266,23 +266,17 @@ without invention.
 | R-DOC | Regression of `dadaia specs doctor` due to image/path drift introduced by panel docs | Run `dadaia specs doctor` before every commit on this release; baseline is `0 errors, 0 warnings`; any new warning is investigated, not committed-around |
 | R-CONCUR | Stdlib `HTTPServer` single-threaded; iframe load races wrapper request | Use `ThreadingHTTPServer` (stdlib) on both the panel and the patched dashboard (R5 in architect report) |
 | R-BIND | Bind fix on `dadaia server dashboard` regresses an undocumented LAN workflow | Operator confirmed at Q7 that LAN was never desired — current `0.0.0.0` is a footgun. AC-6 explicitly verifies loopback-only after fix |
+| R1-ASSETS | `panel.css`/`panel.js` packaging gap in installed wheels | Static assets are Python string constants in `views/_assets.py` (R1 resolution) — no `importlib.resources`, no `pyproject.toml` package-data. If assets ever need to be edited outside the codebase (e.g. live tweaks by ops), this needs a refactor; acceptable for Release-1 (~150 total LoC of CSS+JS) |
+| R4-BRANCH | Branch staleness in Memories cards | The `current_branch` field shown per context is whatever `SpecContextService` has cached (last `dadaia context show/activate` invocation). If the operator switches branches in a repo without re-activating the context, the panel will show stale info. Accepted for Release-1 due to per-request subprocess cost (8 contexts × every-5s auto-refresh). Mitigation: a future release can add a manual "refresh contexts" button or a per-request `git rev-parse` with a TTL cache |
 
 ---
 
 ## Dependencies & sequencing
 
-- **Blocked on `agent-sdd-alignment-v1` reaching CLOSURE before `ACTIVE.md` flips to
-  `dadaia-workspace-panel-v1`.** That release is currently in `phase: TASKS`. The two
-  releases have disjoint write-sets (alignment touches agents + `doctor.py`; this one
-  adds `features/panel/` + edits `cli/commands/server.py` + `container.py`), so
-  parallel SPEC/PLAN work is safe — but only one ACTIVE release at a time per the
-  lifecycle constraint.
-- **Reports already in:** software-architect (D1–D5) and frontend-engineer (mockup +
-  tokens). No further specialist dispatch needed before software-engineer starts.
+- **Blocked on `agent-sdd-alignment-v1` reaching CLOSURE before `ACTIVE.md` flips to `dadaia-workspace-panel-v1`** (currently `phase: TASKS`). Disjoint write-sets (alignment touches agents + `doctor.py`; this release adds `features/panel/` + edits `cli/commands/server.py` + `container.py`) so parallel SPEC/PLAN work is safe — but only one ACTIVE release at a time per lifecycle constraint.
+- **Reports already in:** software-architect (D1–D5) and frontend-engineer (mockup + tokens). **Pre-implementation review:** software-engineer (P0/P1 action items already folded into TASKS — see R1/R2/R3/R4 acceptance criteria deltas).
 - **No new runtime deps; no CI changes; no infra changes** for Release-1.
-- **Memory contract dependency:** SPEC-DOC-008 / SPEC-DOC-010 in
-  `dadaia_workspace/features/specs/doctor.py`. If that contract changes mid-release,
-  re-evaluate `views/memory.py`.
+- **Memory contract dependency:** SPEC-DOC-008 / SPEC-DOC-010 in `dadaia_workspace/features/specs/doctor.py`. If that contract changes mid-release, re-evaluate `views/memory.py`.
 
 ---
 
