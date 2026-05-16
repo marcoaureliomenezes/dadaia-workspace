@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from enum import Enum
 from html.parser import HTMLParser
 from pathlib import Path
@@ -45,6 +45,11 @@ CANONICAL_PHASES = {
 BACKLOG_BULLET_RE = re.compile(
     r"^- \S.*? — .+? \(owner: [a-z-]+, contexto: .+?\)\s*$"
 )
+# SPEC-DOC-022: format for ## Hotfixes pendentes bullets
+# Pattern: - <YYYY-MM-DDTHHMMSSZ> <severity> <component> — <one-liner> (post-mortem: <link>)
+BACKLOG_HOTFIX_RE = re.compile(
+    r"^- (\d{4}-\d{2}-\d{2}T\d{6}Z) (LOW|MEDIUM|HIGH|CRITICAL) ([\w\-/]+) — .+ \(post-mortem: .+\)$"
+)
 FORBIDDEN_MEMORY_H2_RE = re.compile(
     r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE
 )
@@ -54,6 +59,16 @@ TOPLEVEL_MEMORY_FILES = ("architecture.html", "tech-stack.html")
 PRODUCT_INDEX_REL = "product/index.html"
 HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
+
+# SPEC-DOC-016: SemVer folder naming for releases created on/after this date (D3).
+# Vintage releases (Created: <= 2026-05-17) are excluded.
+RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)   # WARNING starts here
+RELEASE_SEMVER_HARD = date(2026, 7, 1)     # ERROR starts here
+RELEASE_VINTAGE_CUTOFF = date(2026, 5, 17)  # releases on/before this are excluded
+
+# SPEC-DOC-023: hotfix bullets older than 72 hours in ## Hotfixes pendentes get WARNING
+_HOTFIX_STALE_HOURS = 72
 
 
 class Severity(str, Enum):
@@ -250,6 +265,7 @@ class SpecsDoctor:
         issues.extend(self._check_memory_image_links())
         issues.extend(self._check_memory_mermaid_script())
         issues.extend(self._check_backlog_schema())
+        issues.extend(self._check_release_semver_naming())
         return issues
 
     # 1
@@ -657,11 +673,15 @@ class SpecsDoctor:
     def _check_backlog_schema(self) -> list[SpecsDoctorIssue]:
         """Validate bullet format in specs/backlog/candidates.md (SPEC-DOC-012).
 
-        Only bullets inside sections whose header matches ``## Candidatas`` are
-        validated.  Sections starting with ``## Histórico`` (and any other
-        non-Candidatas sections such as ``## Convenções``) are skipped entirely.
-        Backlog file absent → noop.  Failures produce WARNING (not ERROR) because
-        backlog schema is guidance, not a hard contract.
+        Validates two sections:
+        - ``## Candidatas ativas`` — format: ``- <name> — <one-liner> (owner: <agent>, contexto: <link>)``
+        - ``## Hotfixes pendentes`` — format (D22): ``- <ts> <severity> <component> — <one-liner> (post-mortem: <link>)``
+
+        Also emits WARNING for bullets in ``## Hotfixes pendentes`` whose timestamp is
+        older than 72 hours without being moved to ``## Histórico`` (D23).
+
+        Sections starting with ``## Histórico`` are skipped. Backlog file absent → noop.
+        Failures produce WARNING (not ERROR) during initial adoption period.
 
         Note: only ``candidates.md`` is validated; other files under
         ``specs/backlog/`` (e.g. ``dadaia-workspace-panel.md``) are free-form
@@ -674,29 +694,142 @@ class SpecsDoctor:
 
         text = candidates_path.read_text(encoding="utf-8")
         in_candidatas_section = False
+        in_hotfixes_section = False
+        now_utc = datetime.now(tz=timezone.utc)
+
         for lineno, raw_line in enumerate(text.splitlines(), start=1):
             line = raw_line.rstrip()
             if line.startswith("## "):
                 in_candidatas_section = bool(re.match(r"^##\s+Candidatas", line))
+                in_hotfixes_section = bool(re.match(r"^##\s+Hotfixes\s+pendentes", line))
                 continue
-            if not in_candidatas_section:
-                continue
-            if not line.startswith("- "):
-                continue
-            if not BACKLOG_BULLET_RE.match(line):
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-012",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"candidates.md line {lineno}: bullet does not match "
-                            "expected format "
-                            "'- <name> — <one-liner> (owner: <agent>, contexto: <link>)': "
-                            f"{line!r}"
-                        ),
-                        path=str(candidates_path),
+
+            # --- ## Candidatas ativas section ---
+            if in_candidatas_section:
+                if not line.startswith("- "):
+                    continue
+                if not BACKLOG_BULLET_RE.match(line):
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-012",
+                            severity=Severity.WARNING,
+                            description=(
+                                f"candidates.md line {lineno}: bullet does not match "
+                                "expected format "
+                                "'- <name> — <one-liner> (owner: <agent>, contexto: <link>)': "
+                                f"{line!r}"
+                            ),
+                            path=str(candidates_path),
+                        )
                     )
-                )
+                continue
+
+            # --- ## Hotfixes pendentes section ---
+            if in_hotfixes_section:
+                if not line.startswith("- "):
+                    continue
+                m = BACKLOG_HOTFIX_RE.match(line)
+                if not m:
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-012",
+                            severity=Severity.WARNING,
+                            description=(
+                                f"candidates.md line {lineno}: hotfix bullet does not match "
+                                "expected format "
+                                "'- <YYYY-MM-DDTHHMMSSZ> <LOW|MEDIUM|HIGH|CRITICAL> <component>"
+                                " — <one-liner> (post-mortem: <link>)': "
+                                f"{line!r}"
+                            ),
+                            path=str(candidates_path),
+                        )
+                    )
+                else:
+                    # Check staleness (D23): timestamp older than _HOTFIX_STALE_HOURS
+                    ts_raw = m.group(1)  # e.g. 2026-05-14T120000Z
+                    try:
+                        ts = datetime.strptime(ts_raw, "%Y-%m-%dT%H%M%SZ").replace(
+                            tzinfo=timezone.utc
+                        )
+                        age_hours = (now_utc - ts).total_seconds() / 3600
+                        if age_hours > _HOTFIX_STALE_HOURS:
+                            issues.append(
+                                SpecsDoctorIssue(
+                                    code="SPEC-DOC-012",
+                                    severity=Severity.WARNING,
+                                    description=(
+                                        f"candidates.md line {lineno}: hotfix bullet is stale "
+                                        f"({age_hours:.0f}h > {_HOTFIX_STALE_HOURS}h). "
+                                        "Consider promoting to a hotfix release or moving to "
+                                        "## Histórico (D23)."
+                                    ),
+                                    path=str(candidates_path),
+                                )
+                            )
+                    except ValueError:
+                        pass  # timestamp parse failure already flagged above
+
+        return issues
+
+    # 13
+    def _check_release_semver_naming(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-016: release folder names must follow SemVer (v<M>.<m>.<p>) for releases
+        whose SPEC.md has Created: >= RELEASE_SEMVER_CUTOFF.
+
+        Vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF) are excluded.
+        Severity: WARNING until RELEASE_SEMVER_HARD, ERROR on/after that date.
+
+        Applies to both specs/releases/ and specs/_archive/releases/.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        today = date.today()
+
+        # Only run this check if we are at or past the cutoff
+        if today < RELEASE_SEMVER_CUTOFF:
+            return issues
+
+        severity = Severity.ERROR if today >= RELEASE_SEMVER_HARD else Severity.WARNING
+
+        for releases_root in (
+            self.specs_dir / "releases",
+            self.specs_dir / "_archive" / "releases",
+        ):
+            if not releases_root.exists():
+                continue
+            for entry in releases_root.iterdir():
+                if not entry.is_dir():
+                    continue
+                folder_name = entry.name
+                # Resolve Created: date from SPEC.md
+                spec_path = entry / "SPEC.md"
+                created = _extract_created_date(spec_path) if spec_path.exists() else None
+
+                # Skip vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF)
+                if created is not None and created <= RELEASE_VINTAGE_CUTOFF:
+                    continue
+
+                # Skip releases without a determinable Created: date
+                # (they could be legacy — give benefit of the doubt)
+                if created is None:
+                    continue
+
+                # Skip releases created before the cutoff
+                if created < RELEASE_SEMVER_CUTOFF:
+                    continue
+
+                if not RELEASE_SEMVER_RE.match(folder_name):
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-016",
+                            severity=severity,
+                            description=(
+                                f"Release folder '{folder_name}' does not follow SemVer "
+                                f"naming (^v\\d+\\.\\d+\\.\\d+$). Created: {created}. "
+                                "Rename to v<MAJOR>.<MINOR>.<PATCH> (D3, SPEC-DOC-016)."
+                            ),
+                            path=str(entry),
+                        )
+                    )
         return issues
 
     # 11
