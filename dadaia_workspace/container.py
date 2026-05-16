@@ -4,11 +4,13 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
+from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.repos.service import ReposService
+from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.workspace.service import WorkspaceService
@@ -24,6 +26,7 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_primary_context_store import JsonPrimaryContextStore
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
+from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -130,4 +133,13 @@ def build_orchestration_service(
         run_state_store=JsonRunStateStore(runs_dir),
         dispatcher=_select_dispatcher(runtime),
         workspace_root=workspace_root,
+    )
+
+
+def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
+    _guard_initialized(workspace_root)
+    states = _states_dir(workspace_root)
+    return ServerRegistryService(
+        store=JsonServerRegistryStore(states),
+        probe=OsProcessProbe(),
     )

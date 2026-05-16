@@ -37,9 +37,7 @@ def _is_stale(entry: PortEntry, probe: ProcessProbe) -> bool:
             return True
     except ValueError:
         pass
-    if entry.pid is not None and not probe.is_pid_alive(entry.pid):
-        return True
-    return False
+    return entry.pid is not None and not probe.is_pid_alive(entry.pid)
 
 
 class ServerRegistryService:
