@@ -431,7 +431,7 @@ File: .github/workflows/production-deploy.yml:49-50
 Issue: `aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}` — static key, violates Security Law.
 Risk: Compromised key = full AWS account access. No rotation enforcement.
 Fix: Replace with OIDC role (see Step 2 + Step 3 below).
-Spec conflict: specs/features/deploy-pipeline/SPEC.md lists these keys as required — this spec is
+Spec conflict: specs/releases/<active-release>/SPEC.md lists these keys as required — this spec is
 wrong. Escalate to product-engineer for correction before closing this report.
 
 ## Pipeline Type Decision
@@ -616,10 +616,29 @@ dadaia context show --json
 The active repo context determines which project's specs and pipelines you are working on.
 Load `repos/<slug>/specs/constitution.md` to understand the project before any audit or build.
 
+### Resolving the active release
+
+When implementing tasks from a release, resolve the active release before starting:
+
+```bash
+cat <specs-dir>/releases/ACTIVE.md
+# Format:
+#   release: <release-id>
+#   phase: <IMPLEMENTATION|...>
+```
+
+Then load:
+- `specs/releases/<release-id>/SPEC.md` — release objective and acceptance criteria
+- `specs/releases/<release-id>/TASKS.md` — task checklist; pick the task you are implementing
+
+> **Legacy compat:** If `releases/ACTIVE.md` does not exist (repo not yet migrated to
+> release-based SDD), fall back to `specs/features/<feature>/{SPEC,TASKS}.md`. Set env
+> `SDD_LEGACY_FEATURES=1` to signal compat mode. New repos must use the release model.
+
 ### SDD gate
 
 DevOps work that affects production configuration (deploy targets, secrets, environments) must
-have an approved spec if one governs that area. If you find a `specs/features/deploy-pipeline/`
+have an approved spec if one governs that area. If you find a `specs/releases/<release-id>/`
 with `**Status:** Aprovado`, read it before proposing any pipeline structure.
 
 Never invent a deploy target or secret naming convention that contradicts an approved spec.
