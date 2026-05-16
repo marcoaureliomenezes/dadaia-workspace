@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
 import typer
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_hotfix_release
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
+
+# Sub-app for `dadaia specs hotfix <verb>`
+hotfix_app = typer.Typer(help="Hotfix release helpers.")
+app.add_typer(hotfix_app, name="hotfix")
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
@@ -140,3 +145,102 @@ def init(
 
     if result.errors:
         sys.exit(1)
+
+
+@hotfix_app.command("open")
+def hotfix_open(
+    version_id: str = typer.Argument(
+        ...,
+        help="SemVer version ID for the hotfix release (e.g. v0.5.1). PATCH must be >= 1.",
+    ),
+    patches: str = typer.Option(
+        ...,
+        "--patches",
+        help="Release ID this hotfix patches (e.g. agent-sdd-alignment-v1 or v0.5.0).",
+    ),
+    severity: str = typer.Option(
+        "MEDIUM",
+        "--severity",
+        help="Hotfix severity: LOW, MEDIUM, HIGH, or CRITICAL.",
+    ),
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing files.",
+    ),
+) -> None:
+    """Open a new hotfix release scaffold under specs/releases/<version-id>/.
+
+    Creates SPEC.md (from release_hotfix.md.j2 template) and TASKS.md stub.
+    PLAN.md is intentionally omitted — the SPEC declares whether it is needed (D24).
+
+    Pre-condition (human audit, D4): there should be a matching bullet in
+    specs/backlog/candidates.md ## Hotfixes pendentes before running this command.
+    """
+    target = _resolve_specs_dir(specs_dir)
+
+    # Human-audit warning for D4: check if ## Hotfixes pendentes has any bullets
+    candidates_path = target / "backlog" / "candidates.md"
+    if candidates_path.exists():
+        text = candidates_path.read_text(encoding="utf-8")
+        in_hotfixes = False
+        has_hotfix_bullet = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("## "):
+                in_hotfixes = bool(re.match(r"^##\s+Hotfixes\s+pendentes", stripped))
+                continue
+            if in_hotfixes and stripped.startswith("- "):
+                has_hotfix_bullet = True
+                break
+        if not has_hotfix_bullet:
+            typer.echo(
+                "[WARNING] No bullets found in specs/backlog/candidates.md "
+                "## Hotfixes pendentes. Per D4, a hotfix release must originate from "
+                "an entry in that section. Proceeding anyway — this is a human audit gate.",
+                err=True,
+            )
+    else:
+        typer.echo(
+            "[WARNING] specs/backlog/candidates.md not found — cannot verify ## Hotfixes pendentes. "
+            "Per D4, a hotfix must originate from that section.",
+            err=True,
+        )
+
+    try:
+        result = scaffold_hotfix_release(
+            specs_dir=target,
+            version_id=version_id,
+            patches_release_id=patches,
+            severity=severity,
+            templates_dir=_TEMPLATES_DIR,
+            force=force,
+        )
+    except ValueError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    for path in result.created:
+        action = "[overwrite]" if force else "[created]"
+        typer.echo(f"{action} {path}")
+    for path in result.skipped:
+        typer.echo(f"[skip] {path}")
+    for error in result.errors:
+        typer.echo(f"[error] {error}", err=True)
+
+    if result.errors:
+        sys.exit(1)
+
+    typer.echo(
+        f"[ok] Hotfix release {version_id} scaffolded under {target / 'releases' / version_id}. "
+        "Next steps:\n"
+        "  1. Edit SPEC.md — fill incident summary, root cause, fix scope.\n"
+        "  2. Get SPEC.md Status: Aprovado from product-engineer.\n"
+        "  3. Update specs/releases/ACTIVE.md to point to this release.\n"
+        "  4. Add tasks to TASKS.md and begin implementation."
+    )

@@ -7,10 +7,14 @@ Creates the canonical SDD directory tree for new repositories.
 from __future__ import annotations
 
 import datetime
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import jinja2
+
+# SemVer pattern for hotfix release version IDs (v<M>.<m>.<p>).
+_RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 
 
 @dataclass
@@ -188,5 +192,137 @@ def scaffold(
     _touch(specs_dir / "_archive" / "releases" / ".gitkeep")
     _touch(specs_dir / "_archive" / "legacy-features" / ".gitkeep")
     _touch(specs_dir / "assets" / ".gitkeep")
+
+    return result
+
+
+_HOTFIX_TASKS_STUB = """\
+# Tasks: Hotfix Release — {version_id}
+
+> **Status:** Draft
+> **Release ID:** {version_id}
+> **Patches release:** {patches_release_id}
+> **Owner:** product-engineer
+> **Created:** {today}
+
+Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
+
+---
+
+## T1 — (Add hotfix tasks here)
+
+- [ ] **Status:** OPEN
+- **Owner:** software-engineer
+- **Precondições:** nenhuma
+- **Files modified:** (list files)
+- **Mudanças:** (describe changes)
+- **Aceite:** (acceptance criteria)
+"""
+
+
+def scaffold_hotfix_release(
+    specs_dir: Path,
+    version_id: str,
+    patches_release_id: str,
+    severity: str,
+    templates_dir: Path,
+    force: bool = False,
+) -> ScaffoldResult:
+    """Scaffold a hotfix release directory under specs/releases/<version_id>/.
+
+    Creates SPEC.md (rendered from release_hotfix.md.j2) and TASKS.md (stub).
+    PLAN.md is NOT created — the SPEC declares whether it is needed (D24).
+
+    Args:
+        specs_dir: Target specs/ directory. Must already exist.
+        version_id: SemVer release ID (e.g. v0.5.1). Must match ^v\\d+\\.\\d+\\.\\d+$ and
+            have PATCH >= 1 (hotfix releases have PATCH >= 1 per D1).
+        patches_release_id: The feature release this hotfix patches
+            (e.g. agent-sdd-alignment-v1 or v0.5.0). Must resolve to a directory
+            under specs/releases/ or specs/_archive/releases/.
+        severity: Hotfix severity — one of LOW, MEDIUM, HIGH, CRITICAL.
+        templates_dir: Directory containing Jinja2 .j2 template files.
+        force: If True, overwrite existing files. If False, skip existing files.
+
+    Returns:
+        ScaffoldResult with lists of created, skipped, and error entries.
+
+    Raises:
+        ValueError: If version_id is not valid SemVer, PATCH == 0, or
+            patches_release_id does not resolve.
+    """
+    result = ScaffoldResult()
+
+    # Validate version_id
+    if not _RELEASE_SEMVER_RE.match(version_id):
+        raise ValueError(
+            f"version_id {version_id!r} does not match SemVer pattern ^v\\d+\\.\\d+\\.\\d+$. "
+            "Hotfix releases must use a version like v1.2.3."
+        )
+
+    # Validate PATCH >= 1
+    parts = version_id.lstrip("v").split(".")
+    patch = int(parts[2])
+    if patch == 0:
+        raise ValueError(
+            f"version_id {version_id!r} has PATCH=0. Hotfix releases require PATCH >= 1 "
+            "(feature releases have PATCH=0, hotfix releases have PATCH >= 1 per D1)."
+        )
+
+    # Validate patches_release_id resolves
+    candidates = [
+        specs_dir / "releases" / patches_release_id,
+        specs_dir / "_archive" / "releases" / patches_release_id,
+    ]
+    if not any(c.is_dir() for c in candidates):
+        raise ValueError(
+            f"patches_release_id {patches_release_id!r} does not resolve to a directory "
+            f"under specs/releases/ or specs/_archive/releases/. "
+            f"Checked: {[str(c) for c in candidates]}"
+        )
+
+    # Validate severity
+    valid_severities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+    if severity not in valid_severities:
+        raise ValueError(
+            f"severity {severity!r} is not valid. Must be one of {sorted(valid_severities)}."
+        )
+
+    today = datetime.date.today().isoformat()
+    template_context: dict[str, str] = {
+        "version_id": version_id,
+        "patches_release_id": patches_release_id,
+        "severity": severity,
+        "today": today,
+    }
+
+    release_dir = specs_dir / "releases" / version_id
+    release_dir.mkdir(parents=True, exist_ok=True)
+
+    def _write(path: Path, content: str) -> None:
+        if path.exists() and not force:
+            result.skipped.append(path)
+            return
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+            result.created.append(path)
+        except OSError as exc:
+            result.errors.append(f"Failed to write {path}: {exc}")
+
+    # SPEC.md — rendered from release_hotfix.md.j2
+    try:
+        spec_content = _render_template(templates_dir, "release_hotfix.md.j2", template_context)
+        _write(release_dir / "SPEC.md", spec_content)
+    except Exception as exc:
+        result.errors.append(f"Template render error (release_hotfix): {exc}")
+
+    # TASKS.md — stub with 0 tasks
+    tasks_content = _HOTFIX_TASKS_STUB.format(
+        version_id=version_id,
+        patches_release_id=patches_release_id,
+        today=today,
+    )
+    _write(release_dir / "TASKS.md", tasks_content)
 
     return result

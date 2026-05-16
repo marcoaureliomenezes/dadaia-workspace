@@ -8,7 +8,7 @@ import jinja2
 import pytest
 
 from dadaia_workspace.features.specs.doctor import SpecsDoctor, Severity
-from dadaia_workspace.features.specs.scaffolder import ScaffoldResult, scaffold
+from dadaia_workspace.features.specs.scaffolder import ScaffoldResult, scaffold, scaffold_hotfix_release
 
 # Templates directory — canonical location inside the package
 # File is at tests/unit/features/specs/test_scaffolder.py
@@ -192,3 +192,104 @@ def test_templates_render_with_empty_context(tmp_path: Path) -> None:
             assert len(rendered) > 100, f"Template {name} rendered suspiciously short output"
         except jinja2.UndefinedError as exc:
             pytest.fail(f"Template {name} raised UndefinedError with empty context: {exc}")
+
+
+# ---- scaffold_hotfix_release tests
+
+
+def _make_specs_with_patches_release(tmp_path: Path, patches_id: str = "v0.5.0") -> Path:
+    """Create a minimal specs/ tree with a patches release directory."""
+    specs_dir = tmp_path / "specs"
+    patches_dir = specs_dir / "releases" / patches_id
+    patches_dir.mkdir(parents=True)
+    (patches_dir / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
+    (specs_dir / "_archive" / "releases").mkdir(parents=True)
+    return specs_dir
+
+
+def test_hotfix_scaffold_happy_path(tmp_path: Path) -> None:
+    """scaffold_hotfix_release creates SPEC.md and TASKS.md for a valid hotfix version."""
+    specs_dir = _make_specs_with_patches_release(tmp_path)
+    result = scaffold_hotfix_release(
+        specs_dir=specs_dir,
+        version_id="v0.5.1",
+        patches_release_id="v0.5.0",
+        severity="HIGH",
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert result.errors == [], f"Unexpected errors: {result.errors}"
+    assert result.skipped == [], f"Unexpected skips: {result.skipped}"
+    release_dir = specs_dir / "releases" / "v0.5.1"
+    assert (release_dir / "SPEC.md").exists()
+    assert (release_dir / "TASKS.md").exists()
+    # PLAN.md must NOT be created (D24 — hotfix PLAN is optional)
+    assert not (release_dir / "PLAN.md").exists()
+    # Verify template variables rendered
+    spec_text = (release_dir / "SPEC.md").read_text(encoding="utf-8")
+    assert "v0.5.1" in spec_text
+    assert "v0.5.0" in spec_text
+    assert "HIGH" in spec_text
+
+
+def test_hotfix_scaffold_idempotent(tmp_path: Path) -> None:
+    """Running scaffold_hotfix_release twice without force skips on the second run."""
+    specs_dir = _make_specs_with_patches_release(tmp_path)
+    first = scaffold_hotfix_release(
+        specs_dir=specs_dir,
+        version_id="v0.5.1",
+        patches_release_id="v0.5.0",
+        severity="LOW",
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert first.errors == []
+    assert len(first.created) == 2  # SPEC.md + TASKS.md
+
+    second = scaffold_hotfix_release(
+        specs_dir=specs_dir,
+        version_id="v0.5.1",
+        patches_release_id="v0.5.0",
+        severity="LOW",
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert second.errors == []
+    assert second.created == [], "Second run should not overwrite without --force"
+    assert len(second.skipped) == 2
+
+
+def test_hotfix_scaffold_rejects_patch_zero(tmp_path: Path) -> None:
+    """scaffold_hotfix_release raises ValueError when version_id has PATCH=0 (feature release)."""
+    specs_dir = _make_specs_with_patches_release(tmp_path)
+    with pytest.raises(ValueError, match="PATCH=0"):
+        scaffold_hotfix_release(
+            specs_dir=specs_dir,
+            version_id="v0.6.0",
+            patches_release_id="v0.5.0",
+            severity="LOW",
+            templates_dir=_TEMPLATES_DIR,
+        )
+
+
+def test_hotfix_scaffold_rejects_invalid_semver(tmp_path: Path) -> None:
+    """scaffold_hotfix_release raises ValueError when version_id is not valid SemVer."""
+    specs_dir = _make_specs_with_patches_release(tmp_path)
+    with pytest.raises(ValueError, match="SemVer"):
+        scaffold_hotfix_release(
+            specs_dir=specs_dir,
+            version_id="my-hotfix-v1",
+            patches_release_id="v0.5.0",
+            severity="LOW",
+            templates_dir=_TEMPLATES_DIR,
+        )
+
+
+def test_hotfix_scaffold_rejects_invalid_patches_release(tmp_path: Path) -> None:
+    """scaffold_hotfix_release raises ValueError when patches_release_id does not resolve."""
+    specs_dir = _make_specs_with_patches_release(tmp_path)
+    with pytest.raises(ValueError, match="does not resolve"):
+        scaffold_hotfix_release(
+            specs_dir=specs_dir,
+            version_id="v0.5.1",
+            patches_release_id="nonexistent-release-id",
+            severity="LOW",
+            templates_dir=_TEMPLATES_DIR,
+        )
