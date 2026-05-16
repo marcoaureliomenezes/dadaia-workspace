@@ -29,10 +29,10 @@
 
 ## Task 2 — Protocols
 
-- [ ] Step 2.1: Create `dadaia_workspace/core/protocols/server_registry_store.py`
-- [ ] Step 2.2: Create `dadaia_workspace/core/protocols/process_probe.py`
-- [ ] Step 2.3: Verify import
-- [ ] Step 2.4: Commit
+- [-] Step 2.1: Create `dadaia_workspace/core/protocols/server_registry_store.py`
+- [-] Step 2.2: Create `dadaia_workspace/core/protocols/process_probe.py`
+- [-] Step 2.3: Verify import
+- [-] Step 2.4: Commit
 
 ---
 
