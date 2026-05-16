@@ -44,13 +44,25 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
     assert (tmp_path / ".dadaia" / "runs" / manifest.run_id / "manifest.json").exists()
     assert (tmp_path / ".dadaia" / "runs" / manifest.run_id / "events.jsonl").exists()
 
+    # Simulate agent output for discovery (has must_include validation)
+    disc_out = tmp_path / invocations[0].expected_output_path
+    disc_out.parent.mkdir(parents=True, exist_ok=True)
+    disc_out.write_text(
+        "# Discovery\n\n## Findings\n...\n## Riscos\n...\n## Decisões necessárias\n...\n"
+    )
+
     # discovery → 3 specialists in one parallel batch
     _, parallel = service.resume_run(manifest.run_id)
     assert {inv.stage_id for inv in parallel} == {"arch_review", "devops_review", "qa_review"}
 
-    # specialists → synthesis
+    # specialists → synthesis (no must_include on specialists)
     _, synth = service.resume_run(manifest.run_id)
     assert {inv.stage_id for inv in synth} == {"synthesis"}
+
+    # Simulate agent output for synthesis (has must_include validation)
+    synth_out = tmp_path / synth[0].expected_output_path
+    synth_out.parent.mkdir(parents=True, exist_ok=True)
+    synth_out.write_text("# SPEC\n\n## Status\nDraft\n\n## Critérios de Aceite\n...\n")
 
     # synthesis → completed
     final, more = service.resume_run(manifest.run_id)

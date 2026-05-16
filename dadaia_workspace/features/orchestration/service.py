@@ -12,6 +12,7 @@ from dadaia_workspace.core.models.run_state import (
     StageInvocation,
     StageState,
     StageStatus,
+    make_run_id,
 )
 from dadaia_workspace.core.models.workflow import WorkflowDefinition
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
@@ -23,10 +24,10 @@ from dadaia_workspace.features.orchestration.runner import (
     emit_event,
     group_ready,
     next_ready_stages,
+    stage_by_id,
     update_stage_state,
     with_status,
 )
-from dadaia_workspace.infrastructure.json_run_state_store import make_run_id
 
 
 def _now(clock: Callable[[], datetime] | None) -> str:
@@ -109,7 +110,7 @@ class OrchestrationService:
         workflow = self._workflows.get(manifest.workflow_name)
 
         if manifest.status == RunStatus.AWAITING_GATE:
-            manifest = self._resolve_awaiting_gates(manifest)
+            manifest = self._resolve_awaiting_gates(manifest, workflow)
 
         if manifest.status == RunStatus.FAILED:
             manifest = self._reset_failed_for_retry(manifest)
@@ -161,7 +162,7 @@ class OrchestrationService:
                     manifest,
                     stage.id,
                     status=StageStatus.AWAITING_GATE,
-                    output_path=inv.invocation_path,
+                    output_path=inv.expected_output_path,
                 )
                 emit_event(
                     self._runs,
@@ -180,6 +181,7 @@ class OrchestrationService:
     def _maybe_complete(
         self, workflow: WorkflowDefinition, manifest: RunManifest
     ) -> tuple[StageInvocation, ...]:
+        _ = workflow
         if all(s.status == StageStatus.COMPLETED for s in manifest.stages):
             now = _now(self._clock)
             manifest = with_status(manifest, RunStatus.COMPLETED, finished_at=now)
@@ -191,18 +193,71 @@ class OrchestrationService:
                 clock=self._clock,
             )
             return ()
+        if any(s.status == StageStatus.FAILED for s in manifest.stages):
+            now = _now(self._clock)
+            manifest = with_status(manifest, RunStatus.FAILED, finished_at=now)
+            self._runs.update_manifest(manifest)
+            emit_event(
+                self._runs,
+                manifest.run_id,
+                EventKind.RUN_FAILED,
+                clock=self._clock,
+            )
+            return ()
         # Some stages still pending but none ready ⇒ wait on operator.
         manifest = with_status(manifest, RunStatus.AWAITING_GATE, finished_at=None)
         self._runs.update_manifest(manifest)
-        _ = workflow  # surfaced via load_run; kept for future validations
         return ()
 
-    def _resolve_awaiting_gates(self, manifest: RunManifest) -> RunManifest:
-        """Mark every awaiting-gate stage as completed and emit gate_resolved events."""
+    def _resolve_awaiting_gates(
+        self, manifest: RunManifest, workflow: WorkflowDefinition
+    ) -> RunManifest:
+        """Resolve awaiting-gate stages: validate must_include then mark COMPLETED or FAILED."""
         new_stages: list[StageState] = []
         any_resolved = False
         for s in manifest.stages:
-            if s.status == StageStatus.AWAITING_GATE:
+            if s.status != StageStatus.AWAITING_GATE:
+                new_stages.append(s)
+                continue
+            any_resolved = True
+            wf_stage = stage_by_id(workflow, s.id)
+            must_include = wf_stage.expected_output.must_include
+            validation_error: str | None = None
+            if must_include:
+                if s.output_path is None:
+                    validation_error = (
+                        "must_include requirements present but no output_path recorded"
+                    )
+                else:
+                    output_file = self._workspace_root / s.output_path
+                    if not output_file.exists():
+                        validation_error = f"output file not found: {s.output_path}"
+                    else:
+                        content = output_file.read_text()
+                        missing = [item for item in must_include if item not in content]
+                        if missing:
+                            validation_error = f"output missing required content: {missing!r}"
+            if validation_error:
+                new_stages.append(
+                    StageState(
+                        id=s.id,
+                        agent=s.agent,
+                        status=StageStatus.FAILED,
+                        started_at=s.started_at,
+                        finished_at=_now(self._clock),
+                        output_path=s.output_path,
+                        error=validation_error,
+                    )
+                )
+                emit_event(
+                    self._runs,
+                    manifest.run_id,
+                    EventKind.STAGE_FAILED,
+                    stage_id=s.id,
+                    payload={"error": validation_error},
+                    clock=self._clock,
+                )
+            else:
                 new_stages.append(
                     StageState(
                         id=s.id,
@@ -228,9 +283,6 @@ class OrchestrationService:
                     stage_id=s.id,
                     clock=self._clock,
                 )
-                any_resolved = True
-            else:
-                new_stages.append(s)
         if not any_resolved:
             return manifest
         manifest = RunManifest(
