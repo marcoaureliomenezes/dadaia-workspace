@@ -117,3 +117,49 @@ def test_get_unknown_workflow_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(WorkflowNotFoundError):
         store.get("ghost")
+
+
+_VALID_PLACEHOLDER = """---
+name: param
+description: Parameterized implementer.
+version: 0.1.0
+schema_version: "1"
+inputs:
+  implementer_agent:
+    type: string
+    required: false
+    default: software-engineer
+    description: Which engineer runs the stage.
+stages:
+  - id: discover
+    agent: product-engineer
+    expected_output:
+      path: out/{run_id}/discover.md
+  - id: implement
+    agent: "{{implementer_agent}}"
+    needs: [discover]
+    expected_output:
+      path: out/{run_id}/implement.md
+---
+# param
+"""
+
+
+def test_agent_placeholder_resolved_from_inputs(tmp_path: Path) -> None:
+    """Stage 'agent' may use {{<input_name>}} when the input is declared."""
+    _write(tmp_path, "param.workflow.md", _VALID_PLACEHOLDER)
+    store = MarkdownWorkflowStore(tmp_path, agent_catalog=["product-engineer", "software-engineer"])
+    workflows = store.list()
+    assert len(workflows) == 1
+    impl_stage = next(s for s in workflows[0].stages if s.id == "implement")
+    # The placeholder is stored verbatim — the orchestrator resolves it at run time.
+    assert impl_stage.agent == "{{implementer_agent}}"
+
+
+def test_agent_placeholder_referencing_unknown_input_rejected(tmp_path: Path) -> None:
+    """Placeholder pointing at a name not declared under 'inputs' must fail validation."""
+    broken = _VALID_PLACEHOLDER.replace("{{implementer_agent}}", "{{unknown_param}}")
+    _write(tmp_path, "param.workflow.md", broken)
+    store = MarkdownWorkflowStore(tmp_path, agent_catalog=["product-engineer", "software-engineer"])
+    with pytest.raises(WorkflowSchemaError):
+        store.list()

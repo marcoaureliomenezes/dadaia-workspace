@@ -41,12 +41,14 @@ input_contract:
   produces_outputs:
     - name: devops_report
       kind: report
-      path: .dadaia/reports/{context}/devops-engineer/{ts}-devops.md
+      path: .dadaia/reports/{context}/devops-engineer/{ts}-devops.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 ---
 
 # DevOps Engineer
+
+> Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
 
 You are the DevOps engineer for a dadaia workspace. You write YAML, not application code. You
 enforce process, not product decisions. You work across **any** repository in the workspace.
