@@ -38,6 +38,10 @@ nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 - foundation — Foundation spec workspace-level (owner: software-architect, contexto: `_archive/legacy-features/foundation/SPEC.md`)
 - security — Security spec workspace-level (owner: software-architect, contexto: `_archive/legacy-features/security/SPEC.md`)
 
+## Hotfixes pendentes
+
+(vazio — bullets neste formato: `- <YYYY-MM-DDTHHMMSSZ> <LOW|MEDIUM|HIGH|CRITICAL> <component> — <one-liner> (post-mortem: <link>)`)
+
 ## Histórico (candidatas promovidas a release)
 
 - sdd-release-lifecycle → release `sdd-release-lifecycle-v1` (promovido em 2026-05-16; source SPEC em `_archive/legacy-features/sdd-release-lifecycle/SPEC.md`)
