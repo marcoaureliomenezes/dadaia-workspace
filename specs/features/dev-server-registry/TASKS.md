@@ -46,11 +46,11 @@
 
 ## Task 4 — Infrastructure Store + Unit Tests (TDD)
 
-- [-] Step 4.1: Write failing tests first
-- [ ] Step 4.2: Run tests — verify they all fail
-- [ ] Step 4.3: Implement `dadaia_workspace/infrastructure/json_server_registry_store.py`
-- [ ] Step 4.4: Run tests — verify they all pass
-- [ ] Step 4.5: Commit
+- [x] Step 4.1: Write failing tests first
+- [x] Step 4.2: Run tests — verify they all fail
+- [x] Step 4.3: Implement `dadaia_workspace/infrastructure/json_server_registry_store.py`
+- [x] Step 4.4: Run tests — verify they all pass
+- [x] Step 4.5: Commit
 
 ---
 
