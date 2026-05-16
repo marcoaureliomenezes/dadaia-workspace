@@ -26,7 +26,7 @@ O estado de todos os Spec Context Projects é gerenciado por `spec_contexts.json
 - **Para** que o diretório fique pronto para trabalho com `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `AGENTS.md` e configs de runtime configuradas
 
 **Critérios de Aceite:**
-- Dado um diretório ainda não inicializado, quando executo `dadaia init`, então o sistema cria o template canônico de `.dadaia/` com `agentic/`, `scripts/`, `states/`, `src/`, `tmp/python/`, `tmp/json/`, `.venv/`, copia scripts para `.dadaia/scripts/`, copia `repos.xlsx` para `.dadaia/src/`, executa staging de assets públicos, instala projeções para `.agents/`, `.claude/`, `.codex/`, `.opencode/`, cria `AGENTS.md`, gera configs suportadas, e exibe confirmação clara.
+- Dado um diretório ainda não inicializado, quando executo `dadaia init`, então o sistema cria o template canônico de `.dadaia/` com `agentic/`, `scripts/`, `states/`, `src/`, `tmp/python/`, `tmp/json/`, `.venv/`, copia scripts para `.dadaia/scripts/`, copia `repos.xlsx` para `.dadaia/src/`, executa staging de assets públicos, instala projeções para `.agents/`, `.claude/`, `.codex/`, `.opencode/`, cria `AGENTS.md`, gera configs suportadas, cria `.dadaia/states/server_registry.json` vazio (se ausente), e exibe confirmação clara.
 - Dado um workspace parcialmente inicializado, quando executo `dadaia init`, então o sistema reconcilia os paths mínimos ausentes sem destruir conteúdo já existente.
 
 ### US-002: Criar um Spec Context Project a partir do whitelist

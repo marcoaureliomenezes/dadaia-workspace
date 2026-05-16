@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — context-management (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>context-management</h1>
+<p class="meta">CLI surface: <code>dadaia context {create|list|show|activate|deactivate|promote|delete|use}</code> · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>Gerencia múltiplos <strong>Spec Context Projects</strong> — cada um mapeia <code>nome → repo_slug → repo_url</code> e tem state machine (inativo ↔ ativo). Um context ativo é clonado em <code>repos/&lt;repo_slug&gt;/</code> e suporta promoção a <strong>primary</strong> (o context default usado por agentes e gates).</p>
+  <p>Permite ao operador trocar entre projetos/branches em paralelo sem criar múltiplos workspaces, e mantém um único primary explícito em <code>.dadaia/states/primary_context.json</code> que outras features (gate, orchestration, public install) leem para resolver caminhos.</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li><code>dadaia context create my-feature --repo dadaia-workspace</code> — registra o context (inativo, sem clone).</li>
+    <li><code>dadaia context activate my-feature</code> — clona o repo em <code>repos/dadaia-workspace/</code>, faz checkout da branch, marca ativo e promove a primary se for o único ativo.</li>
+    <li><code>dadaia context list</code> — mostra todos com state, primary marker, repo slug.</li>
+    <li><code>dadaia context promote other-ctx</code> — move o primary status; dispara reinstall de public assets para alinhar projeções com o novo primary.</li>
+    <li><code>dadaia context deactivate</code> — git sync, remove o repo do disco, volta a inativo.</li>
+    <li><code>eval "$(dadaia context use my-feature)"</code> — seta apenas <code>DADAIA_CONTEXT</code> na shell corrente, sem mutar o estado global. Útil para sessões one-off.</li>
+  </ol>
+  <p>O hook <code>.dadaia/scripts/ctx-inject.sh</code> (instalado por <code>workspace-init</code>) executa em cada UserPromptSubmit e injeta <code>DADAIA_CONTEXT</code> a partir de <code>primary_context.json</code> — assim agentes auto-descobrem o context sem flags explícitas.</p>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Quando o operador vai começar a trabalhar em um repositório novo, ou alternar entre projetos paralelos sem fechar o workspace.</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Sem context management, agentes precisariam de paths absolutos hardcoded ou flags em cada comando. A state machine inativo/ativo + primary garante que o gate, orchestration e public install sempre conhecem inequivocamente onde está o "projeto atual". Promote dispara reinstall de assets, garantindo que <code>.claude/</code> reflete o context certo.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li><code>.dadaia/states/spec_contexts.json</code> — registro de todos os contexts (state, primary flag, repo metadata)</li>
+    <li><code>.dadaia/states/primary_context.json</code> — qual é o primary corrente (<code>repo_slug</code> + <code>specs_dir</code>)</li>
+    <li><code>repos/&lt;repo_slug&gt;/</code> — repo clonado durante activate, removido em deactivate</li>
+    <li><code>.claude/</code> e outras projeções — reinstaladas em promote</li>
+    <li><code>DADAIA_CONTEXT</code> env var — exportada por <code>use</code> ou pelo hook</li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Depende de <a href="workspace-init.html">workspace-init</a> (cria <code>spec_contexts.json</code> e o hook ctx-inject).</li>
+    <li>Activate/promote dispara <a href="public-asset-distribution.html">public-asset-distribution</a> internamente.</li>
+    <li><a href="agent-orchestration.html">agent-orchestration</a> e <a href="sdd-gate-v3.html">sdd-gate-v3</a> consomem o primary context para resolver paths.</li>
+  </ul>
+</section>
+
+</body>
+</html>

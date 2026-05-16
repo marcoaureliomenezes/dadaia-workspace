@@ -55,6 +55,7 @@ dadaia_workspace/
       export.py
       import_.py
       orchestrate.py                   ← NOVO (multi-agent-orchestration)
+      server.py                        ← NOVO (dev-server-registry)
   core/
     __init__.py
     exceptions.py
@@ -67,6 +68,7 @@ dadaia_workspace/
       import_.py
       workflow.py                      ← NOVO: WorkflowDefinition, WorkflowStage, WorkflowInput, ExitCriterion
       run_state.py                     ← NOVO: RunManifest, StageState, RunEvent, DispatcherCapabilities, StageInvocation, StageResult
+      server_registry.py               ← NOVO: PortEntry, ServerRegistry, PortStatus (dev-server-registry)
     protocols/
       __init__.py
       context_store.py
@@ -78,6 +80,7 @@ dadaia_workspace/
       workflow_store.py                ← NOVO Protocol
       run_state_store.py               ← NOVO Protocol
       agent_dispatcher.py              ← NOVO Protocol
+      server_registry_store.py         ← NOVO Protocol (dev-server-registry)
   features/
     __init__.py
     workspace/
@@ -110,6 +113,10 @@ dadaia_workspace/
       service.py                       ← OrchestrationService
       runner.py                        ← WorkflowRunner (DAG execution)
       resolver.py                      ← InputResolver (pure function)
+    server_registry/                   ← NOVA feature (dev-server-registry)
+      __init__.py
+      service.py                       ← ServerRegistryService
+      dashboard.py                     ← DashboardHandler (http.server.BaseHTTPRequestHandler)
   infrastructure/
     __init__.py
     json_context_store.py
@@ -123,6 +130,7 @@ dadaia_workspace/
     json_run_state_store.py            ← NOVO
     claude_agent_dispatcher.py         ← NOVO
     cli_agent_dispatcher.py            ← NOVO (default + opencode/codex via adapter)
+    json_server_registry_store.py      ← NOVO (dev-server-registry)
   public/
     agents/
       product-engineer.md
@@ -151,6 +159,7 @@ dadaia_workspace/
       game-platform-godot/
       game-platform-unity/
       game-platform-unreal/
+      dev-server-registry/               ← NOVO (dev-server-registry)
       github-actions-pipelines/
     commands/
       dadaia-academy.md
@@ -185,6 +194,7 @@ tests/
       test_spec_context.py
       test_public_pipeline.py
       test_orchestration_pipeline.py   ← NOVO (multi-agent-orchestration)
+      test_server_port_registry.py     ← NOVO (dev-server-registry)
 ```
 
 **Nota:** os nomes e quantidades de assets em `public/` listados acima são **fonte autoritativa**. Toda atualização (adição, remoção, rename) em `public/<type>/` deve refletir-se nesta RF-ARCH-002 via PR único — qualquer drift entre esta seção e o conteúdo real do diretório é tratado como bug e registrado em `z_bug_specs.md`.
