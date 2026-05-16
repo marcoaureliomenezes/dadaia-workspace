@@ -30,6 +30,11 @@ _HOOK_KEY = "UserPromptSubmit"
 
 _EMPTY_CONTEXTS = {"version": "1", "contexts": []}
 _EMPTY_ACADEMY = {"version": "1", "courses": []}
+_EMPTY_SERVER_REGISTRY = {
+    "version": "1",
+    "range": {"min_port": 3000, "max_port": 3999},
+    "entries": [],
+}
 
 
 class WorkspaceService:
@@ -56,6 +61,7 @@ class WorkspaceService:
         # Initialize JSON state files (idempotent — never overwrite existing data)
         self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
         self._init_json_file(workspace.dadaia_dir / "academy" / "academy.json", _EMPTY_ACADEMY)
+        self._init_json_file(workspace.states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
 
         # Create .venv (idempotent)
         self._python_env.ensure_workspace_venv(str(workspace_root))
