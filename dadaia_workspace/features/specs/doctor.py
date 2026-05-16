@@ -192,9 +192,11 @@ def _read_active_md(path: Path) -> tuple[str | None, str | None, str | None]:
     for line in text.splitlines():
         line = line.strip()
         if line.startswith("release:"):
-            release = line.split(":", 1)[1].strip()
+            value = line.split(":", 1)[1].strip()
+            release = value if value else None
         elif line.startswith("phase:"):
-            phase = line.split(":", 1)[1].strip()
+            value = line.split(":", 1)[1].strip()
+            phase = value if value else None
     if release is None or phase is None:
         return release, phase, "ACTIVE.md missing 'release:' or 'phase:' line"
     return release, phase, None
