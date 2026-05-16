@@ -48,7 +48,7 @@ quando write-sets são disjuntos.
 
 ## T2 — Templates (release_hotfix.md.j2, closure_hotfix.md.j2) + scaffolder + CLI command
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Precondições:** nenhuma (templates standalone)
 - **Paraleliza com:** T1, T3, T4, T5
