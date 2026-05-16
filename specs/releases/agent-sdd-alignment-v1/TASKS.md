@@ -87,7 +87,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ### E1 — Skills (4 patches surgical, write-sets disjuntos)
 
-- [ ] T-E1.1 `[parallel: yes]` Editar `dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md` L32: substituir "raiz `specs/TASKS.md` ou `specs/features/<feat>/TASKS.md`" por primary `specs/releases/<active>/TASKS.md` (resolver via `releases/ACTIVE.md`) + nota "Legacy compat: se `releases/ACTIVE.md` ausente, cair em `features/<feat>/TASKS.md` com `SDD_LEGACY_FEATURES=1`". **Critério:** grep `specs/releases/<active>/TASKS.md` → ≥1 hit; nota legacy presente.
+- [-] T-E1.1 `[parallel: yes]` Editar `dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md` L32: substituir "raiz `specs/TASKS.md` ou `specs/features/<feat>/TASKS.md`" por primary `specs/releases/<active>/TASKS.md` (resolver via `releases/ACTIVE.md`) + nota "Legacy compat: se `releases/ACTIVE.md` ausente, cair em `features/<feat>/TASKS.md` com `SDD_LEGACY_FEATURES=1`". **Critério:** grep `specs/releases/<active>/TASKS.md` → ≥1 hit; nota legacy presente.
 
 - [ ] T-E1.2 `[parallel: yes]` Editar `dadaia_workspace/public/skills/dadaia-release-closure/SKILL.md` L71 (bullets "Memory updates"): substituir `specs/memory/product.html` (singular inexistente) por catálogo folder `specs/memory/product/index.html` + per-feature `specs/memory/product/<slug>.html`. **Critério:** grep `memory/product\.html\b` → 0 hits; grep `memory/product/index\.html` → ≥1 hit.
 
