@@ -290,8 +290,8 @@
 
 ### 11F — Propagação
 
-- [-] T164 — Rodar `dadaia public stage && dadaia public install --target all`
-- [ ] T165 — Rodar `dadaia public doctor` — todos os entries devem ser `[ok]`
+- [x] T164 — Rodar `dadaia public stage && dadaia public install --target all`
+- [x] T165 — Rodar `dadaia public doctor` — todos os entries devem ser `[ok]`
 
 ---
 
