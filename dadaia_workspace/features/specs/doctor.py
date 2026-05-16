@@ -41,6 +41,9 @@ CANONICAL_PHASES = {
     "CLOSURE",
     "ARCHIVED",
 }
+BACKLOG_BULLET_RE = re.compile(
+    r"^- \S.*? — .+? \(owner: [a-z-]+, contexto: .+?\)\s*$"
+)
 FORBIDDEN_MEMORY_H2_RE = re.compile(
     r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE
 )
@@ -245,6 +248,7 @@ class SpecsDoctor:
         # 9: covered inside _check_active_md (release id ↔ dir)
         issues.extend(self._check_memory_image_links())
         issues.extend(self._check_memory_mermaid_script())
+        issues.extend(self._check_backlog_schema())
         return issues
 
     # 1
@@ -646,6 +650,52 @@ class SpecsDoctor:
                             path=str(p),
                         )
                     )
+        return issues
+
+    # 12
+    def _check_backlog_schema(self) -> list[SpecsDoctorIssue]:
+        """Validate bullet format in specs/backlog/candidates.md (SPEC-DOC-012).
+
+        Only bullets inside sections whose header matches ``## Candidatas`` are
+        validated.  Sections starting with ``## Histórico`` (and any other
+        non-Candidatas sections such as ``## Convenções``) are skipped entirely.
+        Backlog file absent → noop.  Failures produce WARNING (not ERROR) because
+        backlog schema is guidance, not a hard contract.
+
+        Note: only ``candidates.md`` is validated; other files under
+        ``specs/backlog/`` (e.g. ``dadaia-workspace-panel.md``) are free-form
+        and are not touched by this check.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        candidates_path = self.specs_dir / "backlog" / "candidates.md"
+        if not candidates_path.exists():
+            return issues
+
+        text = candidates_path.read_text(encoding="utf-8")
+        in_candidatas_section = False
+        for lineno, raw_line in enumerate(text.splitlines(), start=1):
+            line = raw_line.rstrip()
+            if line.startswith("## "):
+                in_candidatas_section = bool(re.match(r"^##\s+Candidatas", line))
+                continue
+            if not in_candidatas_section:
+                continue
+            if not line.startswith("- "):
+                continue
+            if not BACKLOG_BULLET_RE.match(line):
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-012",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"candidates.md line {lineno}: bullet does not match "
+                            "expected format "
+                            "'- <name> — <one-liner> (owner: <agent>, contexto: <link>)': "
+                            f"{line!r}"
+                        ),
+                        path=str(candidates_path),
+                    )
+                )
         return issues
 
     # 11
