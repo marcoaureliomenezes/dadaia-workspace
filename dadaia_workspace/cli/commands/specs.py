@@ -9,6 +9,7 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs.scaffolder import scaffold
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -84,3 +85,58 @@ def doctor(
 
     has_errors = any(i.severity == Severity.ERROR for i in issues)
     sys.exit(1 if has_errors else 0)
+
+
+# Canonical templates directory — inside the installed package
+_TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
+
+
+@app.command("init")
+def init(
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to target specs/ directory. Default: ./specs/",
+    ),
+    name: str | None = typer.Option(
+        None,
+        "--name",
+        help="Project name for rendered templates. Default: parent directory name.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing files. Without this flag, existing files are skipped.",
+    ),
+) -> None:
+    """Bootstrap a SDD release-lifecycle specs/ directory structure."""
+    # Resolve specs_dir
+    if specs_dir:
+        target = Path(specs_dir).resolve()
+    else:
+        target = Path.cwd() / "specs"
+
+    # Resolve project name
+    if name:
+        project_name = name
+    else:
+        project_name = target.parent.name
+
+    result = scaffold(
+        specs_dir=target,
+        project_name=project_name,
+        force=force,
+        templates_dir=_TEMPLATES_DIR,
+    )
+
+    # Print created/skipped/error summary
+    for path in result.created:
+        action = "[overwrite]" if force else "[created]"
+        typer.echo(f"{action} {path}")
+    for path in result.skipped:
+        typer.echo(f"[skip] {path}")
+    for error in result.errors:
+        typer.echo(f"[error] {error}", err=True)
+
+    if result.errors:
+        sys.exit(1)
