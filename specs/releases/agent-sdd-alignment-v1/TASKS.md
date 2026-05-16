@@ -47,7 +47,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 3 — Doctor checks (ACTIVE.md hardening + backlog schema)
 
-- [ ] T-3.1 `[parallel: no]` Editar `dadaia_workspace/features/specs/doctor.py` `_read_active_md` (linhas 192–200): tratar empty values (`release: ` e `phase: ` com espaços apenas) como `None`. **Critério:** `_read_active_md` retorna tupla `(None, None, error_message)` quando valores são whitespace-only.
+- [-] T-3.1 `[parallel: no]` Editar `dadaia_workspace/features/specs/doctor.py` `_read_active_md` (linhas 192–200): tratar empty values (`release: ` e `phase: ` com espaços apenas) como `None`. **Critério:** `_read_active_md` retorna tupla `(None, None, error_message)` quando valores são whitespace-only.
 
 - [ ] T-3.2 `[parallel: no]` Adicionar método `_check_backlog_schema` em `dadaia_workspace/features/specs/doctor.py` (código SPEC-DOC-012, severity WARNING). Skipa seções `## Histórico*` e linhas sem `- `. Regex documentado em PLAN.md Fase 3 Edit B. Registrar no `check()` via `issues.extend(self._check_backlog_schema())`. **Critério:** método existe; `check()` o invoca.
 
