@@ -39,9 +39,9 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-2.3 `[parallel: yes]` Editar `dadaia_workspace/public/agents/devops-engineer.md`: (a) inserir bloco "Resolving the active release" dentro de "## Workspace Protocol" após "### Context discovery"; (b) atualizar L617 (manter `repos/<slug>/specs/constitution.md`, ok) + L622 (exemplo `specs/features/deploy-pipeline/` → `specs/releases/<release-id>/`); (c) atualizar L434 (corpo do exemplo "spec conflict") para path de release. **Critério:** grep `specs/features/` → 0 hits fora de "Legacy compat".
 
-- [-] T-2.4 `[parallel: yes]` Editar `dadaia_workspace/public/agents/frontend-engineer.md`: (a) inserir bloco "Resolving the active release" antes da seção "## TDD — non-negotiable" (L124); (b) atualizar L127 e L187 referenciando `specs/releases/<active>/{SPEC,TASKS}.md`. **Critério:** mesmo padrão que T-2.1.
+- [x] T-2.4 `[parallel: yes]` Editar `dadaia_workspace/public/agents/frontend-engineer.md`: (a) inserir bloco "Resolving the active release" antes da seção "## TDD — non-negotiable" (L124); (b) atualizar L127 e L187 referenciando `specs/releases/<active>/{SPEC,TASKS}.md`. **Critério:** mesmo padrão que T-2.1.
 
-- [ ] T-2.5 `[parallel: yes]` Verificar `dadaia_workspace/public/agents/backend-engineer.md` está limpo (sem `features/<feature>` ou `memory/.*\.md`). **Critério:** `grep -E "features/<feature>|memory/.*\.md" backend-engineer.md` → 0 hits. Se passar, marcar `[x]` imediatamente sem edit; se falhar, abrir sub-task de correção.
+- [x] T-2.5 `[parallel: yes]` Verificar `dadaia_workspace/public/agents/backend-engineer.md` está limpo (sem `features/<feature>` ou `memory/.*\.md`). **Critério:** `grep -E "features/<feature>|memory/.*\.md" backend-engineer.md` → 0 hits. Se passar, marcar `[x]` imediatamente sem edit; se falhar, abrir sub-task de correção.
 
 ---
 
