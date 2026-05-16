@@ -122,7 +122,7 @@ quando write-sets são disjuntos.
 
 ## T5 — bug-fix-fastlane: adendo de enforcement no header (D10)
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Precondições:** nenhuma
 - **Paraleliza com:** T1, T2, T3, T4
