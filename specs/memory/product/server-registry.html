@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — server-registry (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>server-registry</h1>
+<p class="meta">CLI surface: interno (sem CLI direta nesta versão) · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>Registry interno de portas (range 3000-3999) associadas a projetos, com TTL e PID tracking. Previne conflito de portas entre dev servers spawnados em paralelo por agentes diferentes (ex. tauan-trex em 3001, portifolio em 3002) e permite a outras sessões descobrir a URL ativa de um projeto sem hardcoding.</p>
+  <p>Sweeper automático expira entradas com TTL vencido ou cujo PID não está mais vivo, evitando vazamento de slots.</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li>Um agente ou script spawna um dev server e registra a porta: <code>register(port=3001, project="tauan-trex", pid=os.getpid(), ttl_hours=8)</code>.</li>
+    <li>Outras sessões consultam: <code>get(port=3001)</code> → <code>PortEntry(url="http://localhost:3001", project, pid, expires_at)</code>.</li>
+    <li>Antes de spawnar nova porta: <code>next()</code> retorna a próxima livre no range.</li>
+    <li>Sweeper roda periodicamente removendo entradas com PID morto ou TTL expirado.</li>
+  </ol>
+  <p>A versão atual não expõe CLI dedicada — uso é via API Python interna. Uma feature candidata em <code>backlog/candidates.md</code> (<code>dev-server-registry</code>) prevê CLI completa.</p>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Quando agentes ou scripts spawn dev servers locais e precisam coordenar para não colidir em porta.</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Sem o registry, agentes paralelos sobreescreveriam portas uns dos outros — bug não-determinístico e difícil de diagnosticar. TTL + PID tracking evita slot leak quando processos morrem inesperadamente.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li><code>.dadaia/states/server_registry.json</code> — array de PortEntry com TTL+PID</li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Standalone — não depende de outras features além da estrutura criada por <a href="workspace-init.html">workspace-init</a>.</li>
+    <li>Há candidata <code>dev-server-registry</code> em <code>backlog/candidates.md</code> para evolução desta feature com CLI completa + dashboard web.</li>
+  </ul>
+</section>
+
+</body>
+</html>
