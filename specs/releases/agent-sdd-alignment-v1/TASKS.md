@@ -49,7 +49,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 - [x] T-3.1 `[parallel: no]` Editar `dadaia_workspace/features/specs/doctor.py` `_read_active_md` (linhas 192–200): tratar empty values (`release: ` e `phase: ` com espaços apenas) como `None`. **Critério:** `_read_active_md` retorna tupla `(None, None, error_message)` quando valores são whitespace-only.
 
-- [ ] T-3.2 `[parallel: no]` Adicionar método `_check_backlog_schema` em `dadaia_workspace/features/specs/doctor.py` (código SPEC-DOC-012, severity WARNING). Skipa seções `## Histórico*` e linhas sem `- `. Regex documentado em PLAN.md Fase 3 Edit B. Registrar no `check()` via `issues.extend(self._check_backlog_schema())`. **Critério:** método existe; `check()` o invoca.
+- [-] T-3.2 `[parallel: no]` Adicionar método `_check_backlog_schema` em `dadaia_workspace/features/specs/doctor.py` (código SPEC-DOC-012, severity WARNING). Skipa seções `## Histórico*` e linhas sem `- `. Regex documentado em PLAN.md Fase 3 Edit B. Registrar no `check()` via `issues.extend(self._check_backlog_schema())`. **Critério:** método existe; `check()` o invoca.
 
 - [ ] T-3.3 `[parallel: yes com 3.4/3.5]` Adicionar testes em `tests/unit/features/specs/test_doctor.py`: `test_active_md_empty_release_value_is_error`, `test_active_md_empty_phase_value_is_error`. Cada um escreve ACTIVE.md malformado em `tmp_path` e espera issue SPEC-DOC-003 ERROR. **Critério:** 2 testes novos verdes.
 
