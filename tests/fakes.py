@@ -216,7 +216,7 @@ class FakeAgentDispatcher:
             run_id=invocation.run_id,
             stage_id=invocation.stage_id,
             status=StageStatus.AWAITING_GATE,
-            output_path=invocation.invocation_path,
+            output_path=invocation.expected_output_path,
         )
 
     def dispatch_parallel(

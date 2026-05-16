@@ -125,6 +125,82 @@ def test_list_runs_returns_all_created_runs(tmp_path: Path) -> None:
     assert len(all_runs) == 2
 
 
+def test_must_include_validation_fails_stage_when_file_missing(tmp_path: Path) -> None:
+    wf = WorkflowDefinition(
+        name="strict",
+        description="",
+        version="0.1.0",
+        schema_version="1",
+        inputs=(),
+        stages=(
+            WorkflowStage(
+                id="step",
+                agent="software-engineer",
+                expected_output=StageExpectedOutput(
+                    path="out/step.md",
+                    must_include=("## Summary",),
+                ),
+                gate=StageGate(kind="operator-approval", prompt="ok?"),
+            ),
+        ),
+    )
+    workflow_store = FakeWorkflowStore([wf])
+    runs = FakeRunStateStore()
+    dispatcher = FakeAgentDispatcher(mode=DispatcherMode.NATIVE)
+    service = OrchestrationService(
+        workflow_store=workflow_store,
+        run_state_store=runs,
+        dispatcher=dispatcher,
+        workspace_root=tmp_path,
+    )
+    manifest, _ = service.start_run("strict", context="ctx", runtime="claude")
+    # Resume without creating the output file → must_include check should fail
+    manifest_after, _ = service.resume_run(manifest.run_id)
+    final = runs.load_run(manifest.run_id)
+    assert final.status == RunStatus.FAILED
+    assert final.stages[0].status == StageStatus.FAILED
+    assert "out/step.md" in (final.stages[0].error or "")
+
+
+def test_must_include_validation_passes_when_content_present(tmp_path: Path) -> None:
+    wf = WorkflowDefinition(
+        name="strict2",
+        description="",
+        version="0.1.0",
+        schema_version="1",
+        inputs=(),
+        stages=(
+            WorkflowStage(
+                id="step",
+                agent="software-engineer",
+                expected_output=StageExpectedOutput(
+                    path="out/step.md",
+                    must_include=("## Summary",),
+                ),
+                gate=StageGate(kind="operator-approval", prompt="ok?"),
+            ),
+        ),
+    )
+    workflow_store = FakeWorkflowStore([wf])
+    runs = FakeRunStateStore()
+    dispatcher = FakeAgentDispatcher(mode=DispatcherMode.NATIVE)
+    service = OrchestrationService(
+        workflow_store=workflow_store,
+        run_state_store=runs,
+        dispatcher=dispatcher,
+        workspace_root=tmp_path,
+    )
+    manifest, _ = service.start_run("strict2", context="ctx", runtime="claude")
+    # Create output file with required content
+    out_file = tmp_path / "out" / "step.md"
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    out_file.write_text("# Report\n\n## Summary\n\nAll good.\n")
+    manifest_after, _ = service.resume_run(manifest.run_id)
+    final = runs.load_run(manifest.run_id)
+    assert final.status == RunStatus.COMPLETED
+    assert final.stages[0].status == StageStatus.COMPLETED
+
+
 def test_resume_failed_run_resets_failed_stages(tmp_path: Path) -> None:
     from dadaia_workspace.core.models.run_state import (
         RunManifest,
