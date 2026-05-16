@@ -29,7 +29,9 @@ Quando você for trabalhar em produção (qualquer arquivo coberto pelo gate
 
 ### Passo 1 — Identificar a task
 
-Leia o `TASKS.md` relevante (raiz `specs/TASKS.md` ou `specs/features/<feat>/TASKS.md`).
+Leia o `TASKS.md` relevante (primary: `specs/releases/<active>/TASKS.md`, resolvido via
+`specs/releases/ACTIVE.md`; Legacy compat: se `releases/ACTIVE.md` ausente, cair em
+`specs/features/<feat>/TASKS.md` com `SDD_LEGACY_FEATURES=1`).
 Identifique a task que você vai executar. Ela **deve** existir e estar `[ ]`
 (OPEN). Se não estiver em OPEN, abra interrupção com o operador antes de
 prosseguir.
