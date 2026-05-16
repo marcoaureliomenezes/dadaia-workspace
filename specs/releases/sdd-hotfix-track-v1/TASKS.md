@@ -18,7 +18,7 @@ quando write-sets são disjuntos.
 
 ## T1 — doctor.py: SemVer regex (SPEC-DOC-016) + backlog dual-section (SPEC-DOC-012 estendido)
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Precondições:** nenhuma
 - **Paraleliza com:** T2, T3, T4, T5
