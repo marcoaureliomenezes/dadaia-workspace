@@ -68,7 +68,8 @@ Explicit list of memory files written during this CLOSURE phase. If a memory fil
 updated, state the reason here (e.g. "memory/tech-stack.html: no change — release did not
 touch dependencies").
 
-- `specs/memory/product.html` — <one-liner of what changed>
+- `specs/memory/product/index.html` — <one-liner of what changed in the catalog>
+- `specs/memory/product/<slug>.html` — <one-liner per feature page updated>
 - `specs/memory/architecture.html` — <one-liner>
 - `specs/memory/tech-stack.html` — <one-liner or "no change: reason">
 

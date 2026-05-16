@@ -114,9 +114,30 @@ when needed.
 
 ---
 
+## Resolving the active release
+
+Before starting any task, resolve the active release and load the correct spec artifacts:
+
+```bash
+cat <specs-dir>/releases/ACTIVE.md
+# Format:
+#   release: <release-id>
+#   phase: <IMPLEMENTATION|...>
+```
+
+Then load:
+- `specs/releases/<release-id>/SPEC.md` — release objective and acceptance criteria
+- `specs/releases/<release-id>/TASKS.md` — task checklist; pick the task you are implementing
+
+> **Legacy compat:** If `releases/ACTIVE.md` does not exist (repo not yet migrated to
+> release-based SDD), fall back to `specs/features/<feature>/{SPEC,TASKS}.md`. Set env
+> `SDD_LEGACY_FEATURES=1` to signal compat mode. New repos must use the release model.
+
+---
+
 ## TDD — non-negotiable
 
-1. Read the approved SPEC.md and TASKS.md for the current task
+1. Read the approved `specs/releases/<active-release>/SPEC.md` and `specs/releases/<active-release>/TASKS.md` for the current task
 2. Write the test(s) first — they must fail before you write any production code
 3. Implement the minimum code to make the test pass
 4. Refactor if needed — tests must still pass

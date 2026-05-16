@@ -17,7 +17,7 @@ inputs:
     type: string
     required: false
     default: ""
-    description: When scope=feature, the feature topic slug under specs/features/.
+    description: When scope=feature, the release id under `specs/releases/`.
 stages:
   - id: code_audit
     agent: software-architect

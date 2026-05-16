@@ -101,7 +101,7 @@ stages:
     agent: product-engineer
     needs: [arch_review, devops_review, gameplay_analysis, design_analysis, qa_criteria]
     expected_output:
-      path: "specs/features/{topic}/SPEC.md"
+      path: "specs/releases/{release_id}/SPEC.md"
       must_include: ["Status", "Critérios de Aceite"]
     inputs:
       - kind: stage_output

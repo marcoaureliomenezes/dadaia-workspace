@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Memory — Tech Stack — {{ context_name }}</title>
+  <title>Memory — Tech Stack — {{ project_name | default(context_name | default('Projeto')) }}</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
   <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
   <style>
@@ -24,8 +24,8 @@
 </head>
 <body>
 
-<h1>Tech Stack Memory — {{ context_name }}</h1>
-<p class="meta">Última atualização: {{ last_updated_iso }} · Closure: {{ last_release_id }}</p>
+<h1>Tech Stack Memory — {{ project_name | default(context_name | default('Projeto')) }}</h1>
+<p class="meta">Última atualização: {{ today | default(last_updated_iso | default('—')) }} · Closure: {{ last_release_id | default('none') }}</p>
 
 <section id="languages">
   <h2>Linguagens</h2>
@@ -34,7 +34,7 @@
       <tr><th>Linguagem</th><th>Versão</th><th>Uso</th></tr>
     </thead>
     <tbody>
-      {{ languages_rows }}
+      {{ languages_rows | default('<tr><td colspan="3">Sem linguagens registradas.</td></tr>') }}
     </tbody>
   </table>
 </section>
@@ -46,7 +46,7 @@
       <tr><th>Ferramenta</th><th>Versão</th><th>Função</th></tr>
     </thead>
     <tbody>
-      {{ runtimes_rows }}
+      {{ runtimes_rows | default('<tr><td colspan="3">Sem runtimes registrados.</td></tr>') }}
     </tbody>
   </table>
 </section>
@@ -58,7 +58,7 @@
       <tr><th>Dependência</th><th>Versão</th><th>Camada</th><th>Justificativa</th></tr>
     </thead>
     <tbody>
-      {{ dependencies_rows }}
+      {{ dependencies_rows | default('<tr><td colspan="4">Sem dependências registradas.</td></tr>') }}
     </tbody>
   </table>
 </section>
@@ -67,14 +67,14 @@
   <h2>Restrições e proibições</h2>
   <p>Tecnologias explicitamente proibidas e por quê:</p>
   <ul>
-    {{ constraints_bullets }}
+    {{ constraints_bullets | default('<li>Sem restrições registradas.</li>') }}
   </ul>
 </section>
 
 <section id="commands">
   <h2>Comandos canônicos</h2>
   <p>Como rodar, testar, lintar e empacotar:</p>
-  <pre><code>{{ canonical_commands }}</code></pre>
+  <pre><code>{{ canonical_commands | default('# Sem comandos canônicos registrados') }}</code></pre>
 </section>
 
 </body>

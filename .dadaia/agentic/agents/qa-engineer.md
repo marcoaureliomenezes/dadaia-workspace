@@ -176,7 +176,7 @@ to the target stack.
 
 You receive a task description from the implementer. Your job is to define E2E acceptance criteria:
 
-1. Read the active context's SPEC.md and TASKS.md for the task
+1. Read the active context's `specs/releases/<active-release>/SPEC.md` and `specs/releases/<active-release>/TASKS.md` for the task
 2. Define the E2E scenarios — what observable outcomes must pass for this task to be accepted
 3. Pick the appropriate toolchain from the table above (`frontend-engineer` → Playwright + MCP;
    `backend-engineer` → Playwright for APIs through a browser, or `httpx`/`go test` directly;
@@ -225,6 +225,28 @@ You receive a task description from the implementer. Your job is to define E2E a
 These two may invoke you directly to assess test architecture (pyramid balance) or to
 draft acceptance criteria for an evolving spec. Treat their request as a non-implementer
 audit — produce a `qa_audit_report`, not a `red_test_report`.
+
+---
+
+## Resolving the active release
+
+Before writing any E2E acceptance criteria or test, resolve the active release and load
+the correct spec artifacts:
+
+```bash
+cat <specs-dir>/releases/ACTIVE.md
+# Format:
+#   release: <release-id>
+#   phase: <IMPLEMENTATION|...>
+```
+
+Then load:
+- `specs/releases/<release-id>/SPEC.md` — release objective and acceptance criteria
+- `specs/releases/<release-id>/TASKS.md` — task checklist; identify the task you are supporting
+
+> **Legacy compat:** If `releases/ACTIVE.md` does not exist (repo not yet migrated to
+> release-based SDD), fall back to `specs/features/<feature>/{SPEC,TASKS}.md`. Set env
+> `SDD_LEGACY_FEATURES=1` to signal compat mode. New repos must use the release model.
 
 ---
 
@@ -314,12 +336,15 @@ dadaia context show --json
 
 ### Spec gate
 
-Before writing any E2E test or acceptance criteria, confirm the task's feature spec has
+Before writing any E2E test or acceptance criteria, confirm the task's release spec has
 `**Status:** Aprovado`. Load in order:
 1. `constitution.md`
-2. `memory/architecture.md` (optional)
-3. `features/<feature>/SPEC.md`
-4. `features/<feature>/TASKS.md`
+2. `memory/architecture.html`
+3. `releases/<active-release>/SPEC.md`
+4. `releases/<active-release>/TASKS.md`
+
+> **Legacy compat:** If `releases/ACTIVE.md` does not exist, fall back to
+> `features/<feature>/{SPEC,TASKS}.md` (`SDD_LEGACY_FEATURES=1`).
 
 ### Task lifecycle
 
