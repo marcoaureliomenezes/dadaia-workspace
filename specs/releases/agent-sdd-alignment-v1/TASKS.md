@@ -23,7 +23,7 @@ outra `[-]` da mesma fase em sessões separadas (write-set disjunto).
 
 ## Phase 1 — software-architect alignment
 
-- [-] T-1.1 `[parallel: no]` Editar `dadaia_workspace/public/agents/software-architect.md` ONBOARD workflow (L86–92): substituir `memory/architecture.md` por `memory/architecture.html`, `memory/product/index.html` e `memory/tech-stack.html`; adicionar nota sobre carregar `memory/product/<slug>.html` sob demanda. **Owner:** product-engineer. **Critério:** `grep "memory/architecture.html" software-architect.md` → ≥1 hit.
+- [x] T-1.1 `[parallel: no]` Editar `dadaia_workspace/public/agents/software-architect.md` ONBOARD workflow (L86–92): substituir `memory/architecture.md` por `memory/architecture.html`, `memory/product/index.html` e `memory/tech-stack.html`; adicionar nota sobre carregar `memory/product/<slug>.html` sob demanda. **Owner:** product-engineer. **Critério:** `grep "memory/architecture.html" software-architect.md` → ≥1 hit.
 
 - [ ] T-1.2 `[parallel: no]` Editar `dadaia_workspace/public/agents/software-architect.md` REVIEW workflow (L158): mesma substituição da T-1.1 + remover `foundation/SPEC.md` como obrigatório (manter "if present"). **Critério:** `grep "memory/architecture.md" software-architect.md` → 0 hits.
 
