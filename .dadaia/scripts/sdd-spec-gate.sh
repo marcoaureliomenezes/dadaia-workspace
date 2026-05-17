@@ -114,7 +114,7 @@ esac
 # Meta-edits to spec/task files are always allowed — they are the very mechanism
 # that creates the [-] marker the gate relies on (deadlock prevention).
 case "$FPATH" in
-    */TASKS.md|*/PLAN.md|*/SPEC.md|*/CLOSURE.md|*/ACTIVE.md|*/z_bug_specs.md|*/backlog/*.md)
+    */TASKS.md|*/PLAN.md|*/SPEC.md|*/CLOSURE.md|*/ACTIVE.md|*/backlog/*.md)
         _log "allowed — meta-edit on spec file: $FPATH"
         exit 0
         ;;
