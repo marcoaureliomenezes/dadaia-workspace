@@ -369,7 +369,7 @@ feat(public-assets): T-PB-2 — stop copying workflows to .codex/workflows/ + sa
     # expect: ≥1 (definition)
     ```
 
-- [-] **T-MPP-3.3** `[parallel: no]` Add cleanup block in `_install_codex()` — log `[removed]` line + `shutil.rmtree(..., onerror=_log_cleanup_error)`.
+- [x] **T-MPP-3.3** `[parallel: no]` Add cleanup block in `_install_codex()` — log `[removed]` line + `shutil.rmtree(..., onerror=_log_cleanup_error)`.
   - **Owner:** software-engineer
   - **Effort:** S (~9 LoC added)
   - **Files MODIFIED:**
