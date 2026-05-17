@@ -147,7 +147,7 @@
     },
     {
       "path": "scripts/sdd-spec-gate.sh",
-      "sha256": "b16e30109468af4011286a0d815df68c871448b8a7bb7580a004c5a12940bab8",
+      "sha256": "3996b3c631c76ee157e97fd49b48f11805f46beeafbbd28533b50d268451fe85",
       "type": "scripts"
     },
     {
@@ -386,7 +386,7 @@
       "type": "workflows"
     }
   ],
-  "generated_at": "2026-05-17T03:42:04.590094+00:00",
+  "generated_at": "2026-05-17T03:44:49.142224+00:00",
   "package_version": "0.1.0",
   "schema_version": "1"
 }

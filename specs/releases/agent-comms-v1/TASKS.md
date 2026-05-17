@@ -233,7 +233,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-12 — z_bug archive (git mv) + sdd-spec-gate.sh patch
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Wave:** 3
 - **Precondições:** T-AC-11 [x] + `dadaia public doctor` verde verificado (R2 mitigation)
