@@ -112,7 +112,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-05 — `StdlibHandoffValidator` adapter + tests
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Wave:** 1
 - **Precondições:** T-AC-01 [x], T-AC-03 [x], T-AC-04 [x]
