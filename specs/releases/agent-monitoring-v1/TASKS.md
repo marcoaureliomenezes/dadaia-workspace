@@ -105,7 +105,7 @@
 
 ## Phase 6 — Aggregator
 
-- [ ] **T-AM-11** — Implement `features/telemetry/aggregator/queries.py`.
+- [-] **T-AM-11** — Implement `features/telemetry/aggregator/queries.py`.
   - SQL group-by per agent / per context / per day.
   - `cwd → spec_context` lookup at query time via injected `SpecContextService.list_all()` (architect D9).
   - Bucket `context_slug=null, context_name="unassigned"` for cwd outside any registered context.
@@ -114,7 +114,7 @@
   - Files: `features/telemetry/aggregator/queries.py`, `features/telemetry/aggregator/models.py`, `tests/unit/features/telemetry/test_aggregator.py`.
   - Parallel-safe: yes after T-AM-04 + T-AM-10.
 
-- [ ] **T-AM-12** — Wire `TelemetryService` in `features/telemetry/service.py`.
+- [-] **T-AM-12** — Wire `TelemetryService` in `features/telemetry/service.py`.
   - DI constructor: `(reader_factory, dao, aggregator, pricing_table, workspace_root, spec_context_service)`.
   - Public methods: `refresh()` (lazy on-request, cache 30s), `list_agents()`, `list_workflows()`, `list_sessions_by_agent(name)`.
   - Process lock via `fcntl.flock` on `~/.dadaia/state/telemetry/telemetry.lock` (architect D6).
