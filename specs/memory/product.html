@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — dadaia-workspace</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2.2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .meta { color: #666; font-size: .9em; }
+    .swatch { display: inline-block; width: 1em; height: 1em; border-radius: 2px; border: 1px solid #ccc; vertical-align: middle; margin-right: .3em; }
+  </style>
+</head>
+<body>
+
+<h1>Product Memory — dadaia-workspace</h1>
+<p class="meta">Última atualização: 2026-05-17 · Release: dadaia-workspace-brand-identity-v1</p>
+
+<section id="brand-identity">
+  <h2>Brand identity</h2>
+  <p>
+    Paleta canônica e tokens CSS do dadaia-workspace, definidos na release
+    <a href="../releases/dadaia-workspace-brand-identity-v1/SPEC.md">dadaia-workspace-brand-identity-v1 SPEC</a>.
+    A paleta é declarada como constante <code>PALETTE</code> em
+    <code>dadaia_workspace/features/panel/views/_assets.py</code>
+    e consumida via tokens CSS em <code>PANEL_CSS</code>.
+  </p>
+
+  <h3>Paleta canônica (5 cores)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Hex</th>
+        <th>Papel semântico</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>accent</td>
+        <td><span class="swatch" style="background:#9cddc8;"></span><code>#9cddc8</code></td>
+        <td>Aba ativa, border de destaque, badges decorativos com texto escuro. Nunca como cor de texto (ratio ~2.1:1 sobre branco falha WCAG AA).</td>
+      </tr>
+      <tr>
+        <td>accent_secondary</td>
+        <td><span class="swatch" style="background:#bfd8ad;"></span><code>#bfd8ad</code></td>
+        <td>Fundo de badges de estado positivo ("ativo hoje"), fundo de linhas expandidas.</td>
+      </tr>
+      <tr>
+        <td>warning_bg</td>
+        <td><span class="swatch" style="background:#ddd9ab;"></span><code>#ddd9ab</code></td>
+        <td>Fundo do banner de aviso de preço desatualizado. Texto sobreposto: <code>#3d3600</code>.</td>
+      </tr>
+      <tr>
+        <td>alert</td>
+        <td><span class="swatch" style="background:#f7af63;"></span><code>#f7af63</code></td>
+        <td>Ícone/border de alerta inline. Nunca como cor de texto (ratio insuficiente sobre branco).</td>
+      </tr>
+      <tr>
+        <td>cost</td>
+        <td><span class="swatch" style="background:#633d2e;"></span><code>#633d2e</code></td>
+        <td>Valores monetários (ex: <code>$1.84</code>), wordmark do topbar. Ratio ~8:1 sobre branco (WCAG AAA).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Mapeamento token CSS → PALETTE</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Token CSS</th>
+        <th>PALETTE key</th>
+        <th>Hex</th>
+        <th>Valor anterior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>--color-accent</code></td>
+        <td>accent</td>
+        <td><code>#9cddc8</code></td>
+        <td><code>#7ec8e3</code> (atualizado)</td>
+      </tr>
+      <tr>
+        <td><code>--color-primary-ring</code></td>
+        <td>accent</td>
+        <td><code>#9cddc8</code></td>
+        <td><code>#7ec8e3</code> (atualizado)</td>
+      </tr>
+      <tr>
+        <td><code>--color-primary-bg</code></td>
+        <td>—</td>
+        <td><code>#f0fbf7</code></td>
+        <td><code>#f0faff</code> (atualizado, derivado de accent)</td>
+      </tr>
+      <tr>
+        <td><code>--color-accent-secondary</code></td>
+        <td>accent_secondary</td>
+        <td><code>#bfd8ad</code></td>
+        <td>(novo)</td>
+      </tr>
+      <tr>
+        <td><code>--color-warning-bg</code></td>
+        <td>warning_bg</td>
+        <td><code>#ddd9ab</code></td>
+        <td>(novo)</td>
+      </tr>
+      <tr>
+        <td><code>--color-alert</code></td>
+        <td>alert</td>
+        <td><code>#f7af63</code></td>
+        <td>(novo)</td>
+      </tr>
+      <tr>
+        <td><code>--color-cost</code></td>
+        <td>cost</td>
+        <td><code>#633d2e</code></td>
+        <td>(novo)</td>
+      </tr>
+      <tr>
+        <td><code>--color-cost</code> (wordmark)</td>
+        <td>cost</td>
+        <td><code>#633d2e</code></td>
+        <td><code>--color-heading</code> (atualizado via T-BR-07)</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+</body>
+</html>

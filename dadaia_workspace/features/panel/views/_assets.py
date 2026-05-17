@@ -109,7 +109,7 @@ code {
 .topbar-wordmark {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-heading);
+  color: var(--color-cost); /* brand-identity-v1 T-BR-07: high-contrast brown (AAA on white) */
   letter-spacing: -0.01em;
 }
 .topbar-wordmark span { color: var(--color-accent-dark); }
