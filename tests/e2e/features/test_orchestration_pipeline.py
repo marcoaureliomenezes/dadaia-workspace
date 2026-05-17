@@ -55,9 +55,15 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
         "</body></html>"
     )
 
-    # discovery → 3 specialists in one parallel batch
+    # discovery → 5 specialists in one parallel batch (multi-platform-parity-v1 expansion)
     _, parallel = service.resume_run(manifest.run_id)
-    assert {inv.stage_id for inv in parallel} == {"arch_review", "devops_review", "qa_review"}
+    assert {inv.stage_id for inv in parallel} == {
+        "arch_review",
+        "devops_review",
+        "qa_review",
+        "frontend_review",
+        "backend_review",
+    }
 
     # specialists → synthesis (no must_include on specialists)
     _, synth = service.resume_run(manifest.run_id)
