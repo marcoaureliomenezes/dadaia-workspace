@@ -46,105 +46,25 @@ mudanças em `core/`, `features/`, `container.py`, `handoff_validator.py`,
 
 ## Validations
 
-Evidence triple format: **command** · **expected** · **observed**. Comandos rodados
-contra commit head `8ae7263` (`HEAD` no momento do CLOSURE), workspace
-`/home/marco/workspace/dadaia/repos/dadaia-workspace/`, após
-`dadaia public install --target codex --force`.
+Evidence triples (description, command, observed output) para os 15 critérios de aceitação enumerados na SPEC § Critérios de Aceitação. Comandos rodados contra commit head `8ae7263` (HEAD no momento do CLOSURE), workspace `/home/marco/workspace/dadaia/repos/dadaia-workspace/`, após `dadaia public install --target codex --force`.
 
-### AC-1 — FR-1 — 10 `[agents.<name>]` blocos rendered
-
-- **command:** `grep -c '^\[agents\.' .codex/config.toml`
-- **expected:** `10`
-- **observed:** `10` — **PASS**
-
-### AC-2 — FR-1 — Hyphenated names get quoted keys
-
-- **command:** `grep -c '^\[agents\."software-engineer"\]\|^\[agents\."software-architect"\]' .codex/config.toml`
-- **expected:** `≥2`
-- **observed:** `2` — **PASS**
-
-### AC-3 — FR-1 — Codex agents doctor green
-
-- **command:** `dadaia public doctor 2>&1 | grep "codex:config.toml"`
-- **expected:** linha começa com `[ok]`
-- **observed:** `[ok] codex:config.toml` — **PASS**
-
-### AC-4 — FR-2 — `.codex/workflows/` não existe após install
-
-- **command:** `ls .codex/workflows/ 2>&1`
-- **expected:** `No such file or directory`
-- **observed:** `ls: cannot access '.codex/workflows/': No such file or directory` — **PASS**
-
-### AC-5 — FR-2 — Cleanup remove diretório legado
-
-- **command (manual):** pre-create `.codex/workflows/legacy.workflow.md`, run `dadaia public install --target codex --force`, then `ls .codex/workflows/`
-- **expected:** stderr log line + `No such file or directory` post-install
-- **observed:** `[removed] /home/marco/workspace/dadaia/repos/dadaia-workspace/.codex/workflows (not-applicable: codex has no workflow runtime) — 1 entries` então `ls: cannot access '.codex/workflows/': No such file or directory` — **PASS**
-
-### AC-6 — FR-3 — Doctor emite `[not-applicable]` para Codex workflows
-
-- **command:** `dadaia public doctor 2>&1 | grep -c "^\[not-applicable\] codex:workflows/"`
-- **expected:** `≥12`
-- **observed:** `12` — **PASS**
-
-### AC-7 — FR-3 — Doctor mantém `[partial]` para OpenCode parallel
-
-- **command:** `dadaia public doctor 2>&1 | grep -c "^\[partial\] opencode:workflows/"`
-- **expected:** `≥5`
-- **observed:** `5` — **PASS**
-
-### AC-8 — FR-3 — CLI styling cyan aplicado
-
-- **command:** `sed -n '70,76p' dadaia_workspace/cli/commands/public.py`
-- **expected:** branch `[not-applicable]` com `style="cyan"` antes do branch `else`
-- **observed (linha 74):** `elif item.startswith("[not-applicable]") or item.startswith("[unsupported]"):` → `console.print(item, style="cyan", markup=False)` — **PASS** (ADR-ENG-1: color reuse com `[unsupported]`)
-
-### AC-9 — FR-4 — `[skills]` table presente
-
-- **command:** `grep -A1 '^\[skills\]' .codex/config.toml`
-- **expected:** contém `paths = [".agents/skills"]`
-- **observed:**
-  ```
-  [skills]
-  paths = [".agents/skills"]
-  ```
-  **PASS**
-
-### AC-10 — NFR-4 — Zero novas dependências runtime
-
-- **command:** `git diff 4b60392..HEAD --stat -- pyproject.toml`
-- **expected:** empty diff
-- **observed:** empty — **PASS**
-
-### AC-11 — NFR-5 — `core/`, `features/`, `container.py` untouched
-
-- **command:** `git diff 4b60392..HEAD --stat -- 'dadaia_workspace/core/**' 'dadaia_workspace/features/**' 'dadaia_workspace/container.py'`
-- **expected:** empty diff
-- **observed:** empty — **PASS** (ADR-ARCH-3 layer rule preserved)
-
-### AC-12 — NFR-6 — Cobertura ≥80% em `infrastructure.public_assets`
-
-- **command:** `pytest tests/unit/test_public_assets.py tests/integration/test_public_assets.py --cov=dadaia_workspace.infrastructure.public_assets --cov-report=term-missing`
-- **expected:** ≥80%
-- **observed:** **76% (97/421 lines uncovered)** — **DRIFT** — ver § Drifts §1 abaixo.
-
-### AC-13 — NFR-8 — `handoff_validator.py` untouched
-
-- **command:** `git diff 4b60392..HEAD --stat -- dadaia_workspace/core/protocols/handoff_validator.py`
-- **expected:** empty diff
-- **observed:** empty — **PASS** (zero overlap com agent-comms-v1)
-
-### AC-14 — Global — `dadaia specs doctor` 0 errors / 0 warnings
-
-- **command:** `dadaia specs doctor --specs-dir /home/marco/workspace/dadaia/repos/dadaia-workspace/specs 2>&1 | tail -3`
-- **expected:** `0 errors, 0 warnings`
-- **observed:** `[ok] /home/marco/workspace/dadaia/repos/dadaia-workspace/specs — 0 errors, 0 warnings.` — **PASS**
-
-### AC-15 — Global — `agent-comms-v1` archive intacto
-
-- **command:** `ls specs/_archive/releases/agent-comms-v1/` + `git diff 4b60392..HEAD --stat -- specs/_archive/releases/agent-comms-v1/**`
-- **expected:** `SPEC.md PLAN.md TASKS.md CLOSURE.md` presentes, diff vazio
-- **observed:** `CLOSURE.md PLAN.md SPEC.md TASKS.md`; diff vazio — **PASS**
+| # | Description | Command | Observed |
+|---|-------------|---------|----------|
+| AC-1 | FR-1 — 10 `[agents.<name>]` blocos rendered | `grep -c '^\[agents\.' .codex/config.toml` | `10` — **PASS** |
+| AC-2 | FR-1 — Hyphenated names get quoted keys | `grep -c '^\[agents\."software-engineer"\]\|^\[agents\."software-architect"\]' .codex/config.toml` | `2` (expected ≥2) — **PASS** |
+| AC-3 | FR-1 — Codex agents doctor green | `dadaia public doctor 2>&1 \| grep "codex:config.toml"` | `[ok] codex:config.toml` — **PASS** |
+| AC-4 | FR-2 — `.codex/workflows/` não existe após install | `ls .codex/workflows/ 2>&1` | `ls: cannot access '.codex/workflows/': No such file or directory` — **PASS** |
+| AC-5 | FR-2 — Cleanup remove diretório legado | pre-create `.codex/workflows/legacy.workflow.md`, run `dadaia public install --target codex --force`, then `ls .codex/workflows/` | stderr `[removed] /.../.codex/workflows (not-applicable: codex has no workflow runtime) — 1 entries` then `ls: cannot access '.codex/workflows/': No such file or directory` — **PASS** |
+| AC-6 | FR-3 — Doctor emite `[not-applicable]` para Codex workflows | `dadaia public doctor 2>&1 \| grep -c "^\[not-applicable\] codex:workflows/"` | `12` (expected ≥12) — **PASS** |
+| AC-7 | FR-3 — Doctor mantém `[partial]` para OpenCode parallel | `dadaia public doctor 2>&1 \| grep -c "^\[partial\] opencode:workflows/"` | `5` (expected ≥5) — **PASS** |
+| AC-8 | FR-3 — CLI styling cyan aplicado | `sed -n '70,76p' dadaia_workspace/cli/commands/public.py` | linha 74 — `elif item.startswith("[not-applicable]") or item.startswith("[unsupported]"):` → `console.print(item, style="cyan", markup=False)` — **PASS** (ADR-ENG-1) |
+| AC-9 | FR-4 — `[skills]` table presente | `grep -A1 '^\[skills\]' .codex/config.toml` | `[skills]\npaths = [".agents/skills"]` — **PASS** |
+| AC-10 | NFR-4 — Zero novas dependências runtime | `git diff 4b60392..HEAD --stat -- pyproject.toml` | empty diff — **PASS** |
+| AC-11 | NFR-5 — `core/`, `features/`, `container.py` untouched | `git diff 4b60392..HEAD --stat -- 'dadaia_workspace/core/**' 'dadaia_workspace/features/**' 'dadaia_workspace/container.py'` | empty diff — **PASS** (ADR-ARCH-3 layer rule preserved) |
+| AC-12 | NFR-6 — Cobertura ≥80% em `infrastructure.public_assets` | `pytest tests/unit/test_public_assets.py tests/integration/test_public_assets.py --cov=dadaia_workspace.infrastructure.public_assets --cov-report=term-missing` | `76%` (97/421 lines uncovered) — **DRIFT** — ver § Drifts §1 abaixo |
+| AC-13 | NFR-8 — `handoff_validator.py` untouched | `git diff 4b60392..HEAD --stat -- dadaia_workspace/core/protocols/handoff_validator.py` | empty diff — **PASS** (zero overlap com agent-comms-v1) |
+| AC-14 | Global — `dadaia specs doctor` 0 errors / 0 warnings | `dadaia specs doctor --specs-dir /home/marco/workspace/dadaia/repos/dadaia-workspace/specs 2>&1 \| tail -3` | `[ok] /home/marco/workspace/dadaia/repos/dadaia-workspace/specs — 0 errors, 0 warnings.` — **PASS** |
+| AC-15 | Global — `agent-comms-v1` archive intacto | `ls specs/_archive/releases/agent-comms-v1/` + `git diff 4b60392..HEAD --stat -- specs/_archive/releases/agent-comms-v1/**` | `CLOSURE.md PLAN.md SPEC.md TASKS.md`; diff vazio — **PASS** |
 
 ---
 
