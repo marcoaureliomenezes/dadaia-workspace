@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>RCA — dev-server-registry visibility — dadaia-workspace</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2.2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .meta { color: #666; font-size: .9em; }
+    .sev-blocker { color: #b00020; font-weight: 700; }
+    .sev-high { color: #d05a00; font-weight: 700; }
+    .sev-medium { color: #946a00; font-weight: 600; }
+    blockquote { border-left: 3px solid #999; padding: .2rem 1rem; margin: 1rem 0; color: #555; background: #f6f6f6; }
+  </style>
+</head>
+<body>
+
+<h1>RCA — dev-server-registry visibility</h1>
+<p class="meta">Author: software-engineer (claude-main) · Created: 2026-05-17T20:00:00Z · Context: dadaia-workspace · Release: v0.1.1</p>
+
+<section id="symptom">
+  <h2>Symptom</h2>
+  <p>Operador rodou um dev server para o projeto <code>redacted-slug</code> e tentou registrá-lo via <code>dadaia server register</code>. Apesar de "ações drásticas" (re-execuções, re-registros manuais), o servidor não apareceu nem em <code>dadaia server list</code> nem no panel. Somente o <code>redacted-slug</code> (port 3968) — registrado por outro agente concorrente — ficou visível.</p>
+  <p>Inventário live confirmado durante a investigação:</p>
+  <table>
+    <thead><tr><th>Port</th><th>Bind</th><th>PID</th><th>Process</th><th>Uptime</th><th>Registered?</th></tr></thead>
+    <tbody>
+      <tr><td>4000</td><td><code>0.0.0.0</code> ⚠️ LAN-exposed</td><td>1414778</td><td><code>python3 -m http.server 4000 --directory repos/redacted-slug/.worktrees/fe-qual-refactor/frontend/dist</code></td><td>27h</td><td>❌</td></tr>
+      <tr><td>8122</td><td><code>127.0.0.1</code></td><td>1507281</td><td><code>python -m http.server 8122 --directory repos/redacted-slug</code></td><td>25h</td><td>❌</td></tr>
+      <tr><td>3968</td><td><code>0.0.0.0</code> (Docker NAT)</td><td>—</td><td><code>redacted-slug-dev</code> Docker (Vite)</td><td>1m</td><td>✅</td></tr>
+      <tr><td>4999</td><td><code>127.0.0.1</code></td><td>3440084</td><td><code>dadaia panel</code> (smoke instance)</td><td>7m</td><td>✅ (panel intencionalmente não registrado — SPEC FR-6)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="failure-modes">
+  <h2>Failure modes identified (read-only investigation)</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Sev</th><th>Location (file:line)</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>A</td>
+        <td class="sev-blocker">BLOCKER</td>
+        <td><code>cli/commands/server.py:26-30</code><br>(copy in <code>cli/commands/panel.py:24-29</code>)</td>
+        <td><code>_resolve_workspace()</code> anda para cima de <code>cwd</code> e retorna o primeiro diretório com <code>.dadaia/</code>. Mas 4 sub-repos (<code>repos/redacted-slug</code>, <code>repos/redacted-slug</code>, <code>repos/dadaia-workspace</code>, <code>repos/workflow-tools</code>) têm <code>.dadaia/</code> próprio sem <code>states/</code>. Cwd dentro de qualquer sub-repo → resolver retorna o sub-repo → <code>_guard_initialized</code> raises <code>WorkspaceNotInitializedError</code> → CLI exibe "Workspace not initialized" e aborta. Operador não percebeu no ruído de outros logs.</td>
+      </tr>
+      <tr>
+        <td>B</td>
+        <td class="sev-high">HIGH</td>
+        <td><code>infrastructure/json_server_registry_store.py:13-17, 39-48</code></td>
+        <td><code>_load()</code> chama <code>json.load(f)</code> sem try/except. <code>_from_dict(d)</code> exige 4 chaves obrigatórias (<code>port</code>, <code>project</code>, <code>reserved_at</code>, <code>expires_at</code>) sem fallback. Um único entry malformado quebra <code>list_all()</code> inteiro → <code>/api/servers</code> retorna <code>{"groups": []}</code> mesmo com entries válidas em disco. Cascata silenciosa.</td>
+      </tr>
+      <tr>
+        <td>C</td>
+        <td class="sev-high">HIGH</td>
+        <td><code>core/protocols/process_probe.py:14-19</code></td>
+        <td><code>OsProcessProbe.is_pid_alive</code> trata <code>PermissionError</code> igual a <code>ProcessLookupError</code> — ambos retornam <code>False</code>. PIDs root-owned (e.g. docker-proxy do <code>redacted-slug-dev</code> container) ficam marcados stale. <code>ServerRegistryService._sweep()</code> roda em cada <code>register()</code> e deleta entries stale. Resultado: registrar uma porta nova de qualquer projeto deleta acidentalmente entries de portas root-owned.</td>
+      </tr>
+      <tr>
+        <td>D</td>
+        <td class="sev-medium">MEDIUM (gap estrutural)</td>
+        <td>(registry contract)</td>
+        <td>Registry é <strong>push-only</strong>: agentes que sobem <code>python -m http.server</code> sem chamar <code>dadaia server register</code> produzem orphans invisíveis ao panel. Nenhum mecanismo de reconciliação existe — <code>dadaia server clean</code> só limpa entries stale registradas. Skill <code>dev-server-registry/SKILL.md:17</code> diz "Never start a server without registering its port first" mas é texto, não enforcement.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="reproduction">
+  <h2>Reproduction (commands operator can run)</h2>
+  <h3>Bug A reproduction</h3>
+  <pre>cd /home/marco/workspace/dadaia/repos/redacted-slug
+dadaia server list
+# → "Error: Workspace not initialized. Run dadaia init first."
+# Observed because repos/redacted-slug/.dadaia/ exists (no states/) and the resolver
+# walks up and stops there before reaching the workspace root.</pre>
+
+  <h3>Bug B reproduction</h3>
+  <pre>cp .dadaia/states/server_registry.json /tmp/backup.json
+echo '{"entries": [{}]}' &gt; .dadaia/states/server_registry.json
+dadaia server list
+# → KeyError raised, registry inacessível
+# Restore: cp /tmp/backup.json .dadaia/states/server_registry.json</pre>
+
+  <h3>Bug C reproduction</h3>
+  <pre>python -c "import os; os.kill(1, 0)" || echo "PID 1 marked dead (incorrectly)"
+# As non-root user: os.kill(1, 0) raises PermissionError which the probe
+# treats as ProcessLookupError → entry deleted by _sweep().</pre>
+
+  <h3>Gap D reproduction</h3>
+  <pre>python -m http.server 9999 --bind 127.0.0.1 &
+dadaia server list
+# → port 9999 nowhere; panel /api/servers returns empty group; no scan command exists.</pre>
+</section>
+
+<section id="recommendation">
+  <h2>Recommendation</h2>
+  <p>Promote to hotfix release <strong>v0.1.1</strong> (patches <code>dadaia-workspace-panel-v1</code>), HIGH severity, scope:</p>
+  <ol>
+    <li><strong>Fix A:</strong> Centralize <code>resolve_workspace_root()</code> in <code>core/workspace_resolver.py</code>; require <code>.dadaia/states/spec_contexts.json</code>, not just <code>.dadaia/</code>. Replace duplicates in <code>server.py</code> + <code>panel.py</code>.</li>
+    <li><strong>Fix B:</strong> Skip-and-log discipline in <code>JsonServerRegistryStore</code>. Per-entry try/except. Never raise on malformed input.</li>
+    <li><strong>Fix C:</strong> <code>OsProcessProbe.is_pid_alive</code> treats <code>PermissionError</code> as alive (unprobable, not dead). Documented trade-off: false-positive better than false-negative.</li>
+    <li><strong>Fix D:</strong> New <code>dadaia server scan</code> CLI subcommand (read-only) + panel "Unregistered listeners" section with LAN-exposed warning badge.</li>
+  </ol>
+  <p>Acceptance + 12 observable criteria specified in <code>specs/releases/v0.1.1/SPEC.md</code>. PLAN.md ordering: 6 phases, fresh agent per phase, TDD discipline.</p>
+</section>
+
+<section id="trade-offs">
+  <h2>Trade-offs accepted</h2>
+  <ul>
+    <li><strong>PermissionError → alive</strong>: false-positive (entry survives even when PID died but is unprobable) is preferable to false-negative (entry deleted prematurely). TTL of 8h is the secondary cleanup signal.</li>
+    <li><strong>Scan parses <code>ss -tlnp</code></strong>: linux-only. macOS/Windows ficam sem feature. Aceitável: dadaia-workspace é Linux-only por design.</li>
+    <li><strong>Centralized resolver breaks "each CLI has its own helper" pattern</strong>: net positive — 1 lugar para corrigir vs. N cópias divergindo.</li>
+    <li><strong>"Hotfix" includes new feature (scan + UI)</strong>: tipicamente seria MINOR semver, não PATCH. Aceitável porque scan + UI são partes integrais da observabilidade do fix — sem elas, bugs A/B/C continuam não-observáveis para o operador.</li>
+  </ul>
+</section>
+
+<section id="evidence">
+  <h2>Evidence collected during investigation</h2>
+  <ul>
+    <li><code>ss -tlnp</code> output confirmando 2 orphans + 1 registered</li>
+    <li><code>find repos -maxdepth 3 -name ".dadaia" -type d</code> retornou 4 sub-repos com <code>.dadaia/</code></li>
+    <li><code>ls repos/&lt;sub-repo&gt;/.dadaia/</code> confirmou que nenhum tem <code>states/</code></li>
+    <li>Live <code>curl http://127.0.0.1:4999/api/servers</code> retornou <code>{"groups": []}</code> durante janela de stale + 1 entry depois do re-register</li>
+    <li>Schema do registry conferido em <code>infrastructure/json_server_registry_store.py</code></li>
+    <li>Probe semantics confirmada em <code>core/protocols/process_probe.py:14-19</code> e via <code>os.kill(1, 0)</code> em REPL</li>
+  </ul>
+</section>
+
+</body>
+</html>
