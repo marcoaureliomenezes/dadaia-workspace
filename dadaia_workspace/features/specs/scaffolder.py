@@ -82,7 +82,8 @@ def _render_template(
         autoescape=False,
     )
     template = env.get_template(template_name)
-    return template.render(context)
+    rendered: str = template.render(context)
+    return rendered
 
 
 def scaffold(
@@ -141,9 +142,7 @@ def scaffold(
     else:
         try:
             constitution_path.parent.mkdir(parents=True, exist_ok=True)
-            content = _CONSTITUTION_STUB.format(
-                project_name=project_name, today=today
-            )
+            content = _CONSTITUTION_STUB.format(project_name=project_name, today=today)
             constitution_path.write_text(content, encoding="utf-8")
             result.created.append(constitution_path)
         except OSError as exc:
@@ -151,18 +150,14 @@ def scaffold(
 
     # 2 — memory/architecture.html
     try:
-        arch_html = _render_template(
-            templates_dir, "memory-architecture.html.j2", template_context
-        )
+        arch_html = _render_template(templates_dir, "memory-architecture.html.j2", template_context)
         _write(specs_dir / "memory" / "architecture.html", arch_html)
     except Exception as exc:
         result.errors.append(f"Template render error (architecture): {exc}")
 
     # 3 — memory/tech-stack.html
     try:
-        tech_html = _render_template(
-            templates_dir, "memory-tech-stack.html.j2", template_context
-        )
+        tech_html = _render_template(templates_dir, "memory-tech-stack.html.j2", template_context)
         _write(specs_dir / "memory" / "tech-stack.html", tech_html)
     except Exception as exc:
         result.errors.append(f"Template render error (tech-stack): {exc}")

@@ -86,6 +86,7 @@ def test_init_creates_server_registry_json(tmp_path: Path) -> None:
     registry = tmp_path / ".dadaia" / "states" / "server_registry.json"
     assert registry.exists()
     import json
+
     data = json.loads(registry.read_text())
     assert data["version"] == "1"
     assert data["entries"] == []

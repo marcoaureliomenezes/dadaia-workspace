@@ -12,11 +12,12 @@ Design decisions implemented here:
 
 Privacy invariant (T1): no content fields are read or returned.
 """
+
 from __future__ import annotations
 
 import sqlite3
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from dadaia_workspace.features.telemetry.aggregator.models import (
@@ -37,7 +38,7 @@ _SOURCE_HINT = ".claude/skills/, .agents/skills/"
 
 
 def _now_iso() -> str:
-    return datetime.now(tz=timezone.utc).isoformat()
+    return datetime.now(tz=UTC).isoformat()
 
 
 def _micro_to_usd(micro: int) -> float:
@@ -135,10 +136,9 @@ class TelemetryAggregator:
         best: tuple[str | None, str] = (None, "unassigned")
         best_len = -1
         for root, (slug, display) in ctx_map.items():
-            if cwd_norm == root or cwd_norm.startswith(root + "/"):
-                if len(root) > best_len:
-                    best = (slug, display)
-                    best_len = len(root)
+            if (cwd_norm == root or cwd_norm.startswith(root + "/")) and len(root) > best_len:
+                best = (slug, display)
+                best_len = len(root)
         return best
 
     # ------------------------------------------------------------------
@@ -175,14 +175,19 @@ class TelemetryAggregator:
         # Query: sessions in window, with their cwd.
         # We use a cutoff timestamp derived from window_days.
         # ------------------------------------------------------------------
-        now_dt = datetime.now(tz=timezone.utc)
-        cutoff_iso = datetime(
-            now_dt.year, now_dt.month, now_dt.day,
-            now_dt.hour, now_dt.minute, now_dt.second,
-            tzinfo=timezone.utc,
+        now_dt = datetime.now(tz=UTC)
+        datetime(
+            now_dt.year,
+            now_dt.month,
+            now_dt.day,
+            now_dt.hour,
+            now_dt.minute,
+            now_dt.second,
+            tzinfo=UTC,
         )
         # Simple ISO string comparison works for UTC timestamps stored as ISO.
         from datetime import timedelta
+
         cutoff = (now_dt - timedelta(days=window_days)).isoformat()
 
         # sessions in window: keyed by session_id → (agent_name, cwd, entrypoint, git_branch, last_event_at, is_sidechain, provider)
@@ -197,7 +202,7 @@ class TelemetryAggregator:
         ).fetchall()
 
         # Build a dict: session_id → row dict
-        session_info: dict[str, dict] = {}
+        session_info: dict[str, dict[str, Any]] = {}
         for r in session_rows:
             session_info[r["session_id"]] = {
                 "agent_name": r["agent_name"],
@@ -305,13 +310,13 @@ class TelemetryAggregator:
         # Context breakdown per agent.
         # ------------------------------------------------------------------
         # agent → context_key → {session_count, cost_micro_sum, cost_null_count}
-        agent_ctx_sessions: dict[str, dict[tuple, list[str]]] = defaultdict(
+        agent_ctx_sessions: dict[str, dict[tuple[str | None, str], list[str]]] = defaultdict(
             lambda: defaultdict(list)
         )
-        agent_ctx_cost_sum: dict[str, dict[tuple, int]] = defaultdict(
+        agent_ctx_cost_sum: dict[str, dict[tuple[str | None, str], int]] = defaultdict(
             lambda: defaultdict(int)
         )
-        agent_ctx_cost_null: dict[str, dict[tuple, int]] = defaultdict(
+        agent_ctx_cost_null: dict[str, dict[tuple[str | None, str], int]] = defaultdict(
             lambda: defaultdict(int)
         )
         # Resolve each session to a context bucket.
@@ -339,7 +344,6 @@ class TelemetryAggregator:
         # ------------------------------------------------------------------
         # For each session: sum costs from events.
         session_cost: dict[str, int | None] = {}
-        session_cost_known: dict[str, bool] = {}
         session_tokens: dict[str, dict[str, int]] = defaultdict(
             lambda: {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0}
         )
@@ -363,9 +367,7 @@ class TelemetryAggregator:
         for sid in session_ids_in_window:
             total_ev = session_event_count[sid]
             null_ev = session_has_null[sid]
-            if total_ev == 0:
-                session_cost[sid] = None
-            elif null_ev == total_ev:
+            if total_ev == 0 or null_ev == total_ev:
                 session_cost[sid] = None
             elif sid not in session_cost:
                 session_cost[sid] = 0
@@ -393,6 +395,7 @@ class TelemetryAggregator:
         if distinct_models:
             # Find newest effective_from across used models.
             import datetime as _dt
+
             newest: _dt.date | None = None
             table = getattr(self._pricing, "PRICING_TABLE", {})
             for m in distinct_models:
@@ -413,12 +416,10 @@ class TelemetryAggregator:
             tok = agent_tokens[a_name]
             total_micro = agent_cost_sum.get(a_name, 0)
             null_count = agent_cost_null_count.get(a_name, 0)
-            total_count = agent_cost_total_count.get(a_name, 0)
+            agent_cost_total_count.get(a_name, 0)
 
-            cost_known = (null_count == 0)
-            total_cost_usd: float | None = (
-                _micro_to_usd(total_micro) if cost_known else None
-            )
+            cost_known = null_count == 0
+            total_cost_usd: float | None = _micro_to_usd(total_micro) if cost_known else None
             # When some (but not all) events have NULL cost, still report
             # what we know but mark cost_known=False.
             if not cost_known and total_micro > 0:
@@ -456,9 +457,7 @@ class TelemetryAggregator:
                 # Sum costs for events in this ctx.
                 ctx_micro = agent_ctx_cost_sum.get(a_name, {}).get(ctx_key, 0)
                 ctx_null = agent_ctx_cost_null.get(a_name, {}).get(ctx_key, 0)
-                ctx_ev_count = sum(
-                    session_event_count.get(s, 0) for s in ctx_sids
-                )
+                ctx_ev_count = sum(session_event_count.get(s, 0) for s in ctx_sids)
                 ctx_cost_usd: float | None
                 if ctx_ev_count > 0 and ctx_null == ctx_ev_count:
                     ctx_cost_usd = None
@@ -476,9 +475,7 @@ class TelemetryAggregator:
                 )
 
             # Compute cost_fraction (0..1) for breakdown entries.
-            total_breakdown_cost = sum(
-                cb.cost_usd for cb in breakdown if cb.cost_usd is not None
-            )
+            total_breakdown_cost = sum(cb.cost_usd for cb in breakdown if cb.cost_usd is not None)
             rebuilt_breakdown: list[ContextBreakdown] = []
             for cb in breakdown:
                 frac: float | None = None
@@ -497,9 +494,10 @@ class TelemetryAggregator:
             # Recent sessions (up to 10).
             recent: list[RecentSession] = []
             for sid in agent_sorted_sessions.get(a_name, [])[:10]:
-                info = session_info.get(sid)
-                if info is None:
+                sess_info = session_info.get(sid)
+                if sess_info is None:
                     continue
+                info = sess_info
                 s_cost_micro = session_cost.get(sid)
                 s_cost_usd: float | None = (
                     _micro_to_usd(s_cost_micro) if s_cost_micro is not None else None
@@ -555,7 +553,7 @@ class TelemetryAggregator:
         # ------------------------------------------------------------------
         # Sort: total_cost_usd DESC NULLS LAST, then session_count DESC.
         # ------------------------------------------------------------------
-        def _sort_key(s: AgentSummary) -> tuple:
+        def _sort_key(s: AgentSummary) -> tuple[float, int]:
             # Use a large negative number for None so nulls sort last.
             cost_key = s.total_cost_usd if s.total_cost_usd is not None else -1.0
             return (-cost_key, -s.session_count)
@@ -567,7 +565,8 @@ class TelemetryAggregator:
         # ------------------------------------------------------------------
         if context_slug is not None:
             summaries = [
-                s for s in summaries
+                s
+                for s in summaries
                 if any(cb.context_slug == context_slug for cb in s.context_breakdown)
             ]
 
@@ -683,8 +682,7 @@ class TelemetryAggregator:
 
             ev_count = len(ev_rows)
             session_cost_usd: float | None = (
-                None if ev_count == 0 or null_count == ev_count
-                else _micro_to_usd(cost_sum)
+                None if ev_count == 0 or null_count == ev_count else _micro_to_usd(cost_sum)
             )
 
             ctx_slug, _ = self._resolve_context(sr["cwd"], ctx_map)

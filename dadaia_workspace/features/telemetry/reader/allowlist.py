@@ -10,7 +10,10 @@ Decision references:
     D-AM-19   — Mark suspect events (don't drop); suspect=1 flag in output.
     T1 (CRITICAL) — Threat matrix T1: zero leakage of message content.
 """
+
 from __future__ import annotations
+
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Approved top-level keys (applies to ALL event types)
@@ -78,7 +81,7 @@ _REQUIRED_KEYS: frozenset[str] = frozenset({"sessionId", "timestamp", "type"})
 # ---------------------------------------------------------------------------
 
 
-def allowlist_event(raw: object) -> dict | None:
+def allowlist_event(raw: object) -> dict[str, Any] | None:
     """Filter *raw* to only allowlisted keys, returning a new dict.
 
     Returns ``None`` when:
@@ -106,7 +109,7 @@ def allowlist_event(raw: object) -> dict | None:
         return None
 
     # Start with a shallow copy restricted to the allowed top-level keys.
-    output: dict = {k: v for k, v in raw.items() if k in ALLOWED_TOP_LEVEL_KEYS}
+    output: dict[str, Any] = {k: v for k, v in raw.items() if k in ALLOWED_TOP_LEVEL_KEYS}
 
     suspect = False
 
@@ -122,9 +125,7 @@ def allowlist_event(raw: object) -> dict | None:
                         val = usage[key]
                         extracted_usage[key] = val
                         # Validate token bounds (D-AM-19)
-                        if isinstance(val, int) and (
-                            val > MAX_TOKEN_COUNT_PER_EVENT or val < 0
-                        ):
+                        if isinstance(val, int) and (val > MAX_TOKEN_COUNT_PER_EVENT or val < 0):
                             suspect = True
                 if extracted_usage:
                     output["usage"] = extracted_usage

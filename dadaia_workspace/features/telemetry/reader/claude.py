@@ -14,6 +14,7 @@ Decision references:
     D-AM-13  — usage in event.message.usage.*; model in event.message.model
     D-AM-19  — Mark suspect events (not drop)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,7 +22,7 @@ import json
 import logging
 import pathlib
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any
 
 from dadaia_workspace.features.telemetry import budget as _budget
 from dadaia_workspace.features.telemetry.reader.allowlist import allowlist_event
@@ -72,9 +73,9 @@ def _compute_event_id(session_id: str, uuid: str) -> str:
 
 
 def _derive_agent_name(
-    session_agent_name: Optional[str],
+    session_agent_name: str | None,
     is_sidechain: bool,
-    sub_slug: Optional[str],
+    sub_slug: str | None,
     provider: str = "claude",
 ) -> str:
     """Determine the canonical agent name for the agents table.
@@ -102,13 +103,13 @@ class _SessionAcc:
 
     first_event_at: str
     last_event_at: str
-    agent_name: Optional[str] = None
-    ai_title: Optional[str] = None
-    cwd: Optional[str] = None
-    git_branch: Optional[str] = None
-    entrypoint: Optional[str] = None
+    agent_name: str | None = None
+    ai_title: str | None = None
+    cwd: str | None = None
+    git_branch: str | None = None
+    entrypoint: str | None = None
     is_sidechain: int = 0
-    sub_slug: Optional[str] = None
+    sub_slug: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +157,7 @@ def read_session_file(
     # ------------------------------------------------------------------
     # Load or initialise reader state
     # ------------------------------------------------------------------
-    state: Optional[ReaderState] = dao.get_reader_state(str_path)
+    state: ReaderState | None = dao.get_reader_state(str_path)
     byte_offset: int = 0
 
     if state is not None:
@@ -181,9 +182,7 @@ def read_session_file(
     bytes_this_cycle = 0
     session_acc: dict[str, _SessionAcc] = {}
     # Collect all events for post-processing after session state is stable
-    pending_events: list[tuple[str, dict]] = []  # (session_id, clean)
-
-    lines_data: list[tuple[int, bytes]] = []   # (line_start, raw_line)
+    pending_events: list[tuple[str, dict[str, Any]]] = []  # (session_id, clean)
 
     with open(path, "rb") as fh:
         fh.seek(byte_offset)
@@ -377,8 +376,8 @@ def read_session_file(
                 tokens_cache_read=usage.get("cache_read_input_tokens", 0),
                 tokens_cache_create=usage.get("cache_creation_input_tokens", 0),
                 tokens_output=usage.get("output_tokens", 0),
-                cost_micro_usd=None,       # P5 pricing module fills this
-                pricing_version=None,      # P5 pricing module fills this
+                cost_micro_usd=None,  # P5 pricing module fills this
+                pricing_version=None,  # P5 pricing module fills this
                 suspect=suspect,
             )
         )

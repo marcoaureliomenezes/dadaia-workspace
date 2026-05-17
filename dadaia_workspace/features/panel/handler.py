@@ -78,6 +78,7 @@ _AUTH_REQUIRED_PREFIX = "/api/"
 # JSON serialisation helper
 # ---------------------------------------------------------------------------
 
+
 def _to_json_bytes(obj: Any) -> bytes:
     """Serialise a dataclass (recursively) to JSON bytes.
 
@@ -85,6 +86,7 @@ def _to_json_bytes(obj: Any) -> bytes:
     field before encoding.  This is defence-in-depth; the reader allowlist
     is the primary gate.
     """
+
     def _default(o: Any) -> Any:
         if dataclasses.is_dataclass(o) and not isinstance(o, type):
             d = dataclasses.asdict(o)
@@ -104,6 +106,7 @@ def _to_json_bytes(obj: Any) -> bytes:
 # Query-string parsing helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_int(params: dict[str, list[str]], key: str, default: int) -> int:
     vals = params.get(key)
     if vals:
@@ -122,6 +125,7 @@ def _parse_str(params: dict[str, list[str]], key: str) -> str | None:
 # ---------------------------------------------------------------------------
 # make_handler_class
 # ---------------------------------------------------------------------------
+
 
 def make_handler_class(
     views: dict[str, Callable[..., tuple[int, str, bytes]]],
@@ -151,9 +155,7 @@ def make_handler_class(
         telemetry routes return 503 Service Unavailable.
     """
     compiled: list[tuple[re.Pattern[str], Callable[..., tuple[int, str, bytes]]]] = [
-        (re.compile(pat), views[name])
-        for pat, name in _RAW_ROUTES
-        if name in views
+        (re.compile(pat), views[name]) for pat, name in _RAW_ROUTES if name in views
     ]
     # Telemetry routes are handled inline (not via views dict) because they
     # depend on the injected telemetry service and auth token — not a pure
@@ -275,9 +277,8 @@ def make_handler_class(
             except Exception as exc:  # noqa: BLE001
                 # Do NOT expose internal details (A06).
                 import logging
-                logging.getLogger(__name__).warning(
-                    "PanelHandler: telemetry route error: %s", exc
-                )
+
+                logging.getLogger(__name__).warning("PanelHandler: telemetry route error: %s", exc)
                 self._respond(
                     500,
                     "application/json",

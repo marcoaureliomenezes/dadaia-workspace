@@ -2,6 +2,7 @@
 
 Spec: dadaia-workspace-brand-identity-v1 SPEC.md §3 logo specs.
 """
+
 from __future__ import annotations
 
 import re
@@ -20,8 +21,7 @@ def _drawable_count(root: ET.Element) -> int:
     return sum(
         1
         for el in _all_descendants(root)
-        if el.tag.endswith("}path") or el.tag.endswith("}circle")
-        or el.tag in ("path", "circle")
+        if el.tag.endswith("}path") or el.tag.endswith("}circle") or el.tag in ("path", "circle")
     )
 
 

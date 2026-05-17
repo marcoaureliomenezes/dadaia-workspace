@@ -4,9 +4,8 @@ Uses a minimal harness that calls _security_headers() and inspects
 what headers would be sent, avoiding the need to spin up a real HTTP server
 for this unit test.
 """
-from __future__ import annotations
 
-from unittest.mock import MagicMock
+from __future__ import annotations
 
 
 def _make_handler_with_spy():
@@ -82,6 +81,7 @@ class TestSecurityHeaders:
         handler, headers_sent = _make_handler_with_spy()
         handler._security_headers("text/plain")  # type: ignore[attr-defined]
 
-        security_headers = [k for k, v in headers_sent
-                            if k in ("Content-Security-Policy", "X-Content-Type-Options")]
+        security_headers = [
+            k for k, v in headers_sent if k in ("Content-Security-Policy", "X-Content-Type-Options")
+        ]
         assert not security_headers

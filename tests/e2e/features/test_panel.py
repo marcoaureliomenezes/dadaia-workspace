@@ -42,7 +42,9 @@ _REPO_ROOT = Path(__file__).parents[3]  # repos/dadaia-workspace/
 # Walking: repos/dadaia-workspace/ → repos/ → dadaia/  (which has .dadaia/states/)
 _DADAIA_WORKSPACE_ROOT = _REPO_ROOT.parents[1]  # /home/marco/workspace/dadaia/
 # The real memory file is served from repos/<slug>/specs/memory/ relative to the workspace.
-_REAL_MEMORY_HTML = _DADAIA_WORKSPACE_ROOT / "repos" / "dadaia-workspace" / "specs" / "memory" / "architecture.html"
+_REAL_MEMORY_HTML = (
+    _DADAIA_WORKSPACE_ROOT / "repos" / "dadaia-workspace" / "specs" / "memory" / "architecture.html"
+)
 
 
 def _find_free_port() -> int:
@@ -93,9 +95,7 @@ def _wait_for_ready(proc: subprocess.Popen[str], port: int, timeout: float = 10.
                 f"Panel process exited early (rc={proc.returncode}). stderr:\n{stderr}"
             )
     stderr = proc.stderr.read() if proc.stderr else ""
-    raise TimeoutError(
-        f"Panel did not print ready-line within {timeout}s. stderr:\n{stderr}"
-    )
+    raise TimeoutError(f"Panel did not print ready-line within {timeout}s. stderr:\n{stderr}")
 
 
 def _kill_proc(proc: subprocess.Popen[str]) -> None:
@@ -141,19 +141,16 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
         # The index view renders sections for Servers, Memories, and Agents.
         # The exact text tokens are drawn from the frontend mockup / T-3.1 acceptance.
         assert "Servers" in body, "Index page missing 'Servers' section"
-        assert any(
-            marker in body for marker in ("Memórias", "Memories", "memories", "memory")
-        ), "Index page missing Memories section marker"
-        assert any(
-            marker in body
-            for marker in ("Agents", "Agentes", "Em breve", "Release-2")
-        ), "Index page missing Agents/Workflows section marker"
+        assert any(marker in body for marker in ("Memórias", "Memories", "memories", "memory")), (
+            "Index page missing Memories section marker"
+        )
+        assert any(marker in body for marker in ("Agents", "Agentes", "Em breve", "Release-2")), (
+            "Index page missing Agents/Workflows section marker"
+        )
 
         # --- /api/servers ---
         # Response shape: {"groups": [...]}  (see views/api.py contract docstring)
-        with urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/api/servers", timeout=5
-        ) as resp:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/servers", timeout=5) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/servers: {ct}"
@@ -164,9 +161,7 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
 
         # --- /api/contexts ---
         # Response shape: {"contexts": [...]}  (see views/api.py contract docstring)
-        with urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/api/contexts", timeout=5
-        ) as resp:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/contexts", timeout=5) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/contexts: {ct}"

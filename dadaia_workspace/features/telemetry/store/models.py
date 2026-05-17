@@ -3,6 +3,7 @@
 Column types follow the SPEC § Schema DDL exactly.  No content fields are
 present — the privacy invariant (D-AM-03) is enforced at the model layer.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ class ReaderState:
     """Checkpoint per source file (jsonl or Codex sqlite)."""
 
     file_path: str
-    kind: str           # 'claude_jsonl' | 'codex_sqlite'
+    kind: str  # 'claude_jsonl' | 'codex_sqlite'
     byte_offset: int
     last_mtime: float
     last_inode: int
@@ -26,17 +27,17 @@ class Session:
     """One row per sessionId (Claude Code) or thread_id (Codex)."""
 
     session_id: str
-    provider: str       # 'claude' | 'codex'
+    provider: str  # 'claude' | 'codex'
     agent_name: str | None
     ai_title: str | None
     entrypoint: str | None
     cwd: str | None
     git_branch: str | None
-    is_sidechain: int   # 0 | 1
+    is_sidechain: int  # 0 | 1
     sub_slug: str | None
     first_event_at: str
     last_event_at: str
-    status: str         # 'open' | 'closed'
+    status: str  # 'open' | 'closed'
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,7 @@ class Agent:
 
     name: str
     provider: str
-    is_subagent: int    # 0 | 1
+    is_subagent: int  # 0 | 1
     first_seen_at: str
     last_seen_at: str
 
@@ -63,9 +64,9 @@ class Event:
     tokens_cache_read: int
     tokens_cache_create: int
     tokens_output: int
-    cost_micro_usd: int | None   # NULL when model unknown or Codex aggregated
+    cost_micro_usd: int | None  # NULL when model unknown or Codex aggregated
     pricing_version: str | None
-    suspect: int                 # 0 | 1 — devops T7 bounds check
+    suspect: int  # 0 | 1 — devops T7 bounds check
 
 
 @dataclass(frozen=True)

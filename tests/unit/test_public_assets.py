@@ -70,13 +70,17 @@ _CLASSIFY_WORKFLOWS_CASES = [
     {
         "id": "codex_linear",
         "content": "# linear workflow\nstep: do_something\n",
-        "expected_in": ["[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"],
+        "expected_in": [
+            "[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"
+        ],
         "expected_not_in": ["[partial] opencode:workflows/sample.workflow.md"],
     },
     {
         "id": "codex_parallel",
         "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
-        "expected_in": ["[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"],
+        "expected_in": [
+            "[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"
+        ],
         "expected_not_in": ["[ok] opencode:workflows/sample.workflow.md"],
     },
     {
@@ -88,13 +92,17 @@ _CLASSIFY_WORKFLOWS_CASES = [
     {
         "id": "opencode_parallel",
         "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
-        "expected_in": ["[partial] opencode:workflows/sample.workflow.md (parallel_group sequentially)"],
+        "expected_in": [
+            "[partial] opencode:workflows/sample.workflow.md (parallel_group sequentially)"
+        ],
         "expected_not_in": ["[ok] opencode:workflows/sample.workflow.md"],
     },
 ]
 
 
-@pytest.mark.parametrize("case", _CLASSIFY_WORKFLOWS_CASES, ids=[str(c["id"]) for c in _CLASSIFY_WORKFLOWS_CASES])
+@pytest.mark.parametrize(
+    "case", _CLASSIFY_WORKFLOWS_CASES, ids=[str(c["id"]) for c in _CLASSIFY_WORKFLOWS_CASES]
+)
 def test_classify_workflows_quadrants(tmp_path: Path, case: dict) -> None:  # type: ignore[type-arg]
     agentic_dir = tmp_path / "agentic"
     workflows_dir = agentic_dir / "workflows"
@@ -106,7 +114,9 @@ def test_classify_workflows_quadrants(tmp_path: Path, case: dict) -> None:  # ty
     for expected in case["expected_in"]:
         assert expected in result, f"Expected {expected!r} in result; got {result}"
     for not_expected in case["expected_not_in"]:
-        assert not_expected not in result, f"Did not expect {not_expected!r} in result; got {result}"
+        assert not_expected not in result, (
+            f"Did not expect {not_expected!r} in result; got {result}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +137,9 @@ _PARSE_FM_SIMPLE_CASES = [
 ]
 
 
-@pytest.mark.parametrize("case", _PARSE_FM_SIMPLE_CASES, ids=[c["id"] for c in _PARSE_FM_SIMPLE_CASES])
+@pytest.mark.parametrize(
+    "case", _PARSE_FM_SIMPLE_CASES, ids=[c["id"] for c in _PARSE_FM_SIMPLE_CASES]
+)
 def test_parse_agent_frontmatter_extracts_whitelisted_fields(case: dict) -> None:  # type: ignore[type-arg]
     """T-PB-1 #1 — basic key:value parsing."""
     result = _parse_agent_frontmatter(case["text"])
@@ -160,7 +172,7 @@ def test_render_agent_toml_block_drops_unknown_fields() -> None:
         "name": "dev",
         "model": "claude-3",
         "skills": ["dadaia-handoff-emitter"],  # unknown field — must be dropped
-        "opencode_model": "claude-haiku",       # unknown field — must be dropped
+        "opencode_model": "claude-haiku",  # unknown field — must be dropped
     }
     result = _render_agent_toml_block("dev", fm)
     assert "skills" not in result
@@ -179,9 +191,7 @@ def test_render_agent_toml_block_emits_tools_array_literal() -> None:
     """T-PB-1 #6 — tools list → TOML array of quoted strings."""
     fm: dict[str, object] = {"name": "dev", "tools": ["Read", "Edit", "Bash"]}
     result = _render_agent_toml_block("dev", fm)
-    assert 'tools = ["Read", "Edit", "Bash"]' in result, (
-        f"Expected tools array in: {result!r}"
-    )
+    assert 'tools = ["Read", "Edit", "Bash"]' in result, f"Expected tools array in: {result!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -320,7 +330,9 @@ def test_install_codex_cleans_existing_workflows_dir(tmp_path: Path) -> None:
     )
 
 
-def test_install_codex_emits_removed_log_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_install_codex_emits_removed_log_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """T-PB-2 #2 — _install_codex() writes a [removed] line to stderr listing the workflows dir."""
     manager, workspace_root = _make_codex_install_manager(tmp_path)
 
@@ -332,9 +344,7 @@ def test_install_codex_emits_removed_log_line(tmp_path: Path, capsys: pytest.Cap
     manager.install(workspace_root, target="codex", force=True)
 
     captured = capsys.readouterr()
-    assert "[removed]" in captured.err, (
-        f"Expected '[removed]' in stderr; got:\n{captured.err!r}"
-    )
+    assert "[removed]" in captured.err, f"Expected '[removed]' in stderr; got:\n{captured.err!r}"
     assert str(workflows_dir) in captured.err, (
         f"Expected workflows dir path {workflows_dir!r} in stderr; got:\n{captured.err!r}"
     )

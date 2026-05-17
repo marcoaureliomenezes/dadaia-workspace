@@ -89,9 +89,7 @@ class ReportsValidationService:
             raw = path.read_text(encoding="utf-8")
             doc: dict[str, object] = json.loads(raw)
         except json.JSONDecodeError as exc:
-            malformed_error = HandoffValidationError(
-                "$root", f"malformed JSON: {exc}"
-            )
+            malformed_error = HandoffValidationError("$root", f"malformed JSON: {exc}")
             return ValidationResult(path=path, valid=False, errors=(malformed_error,))
 
         errors = list(self._validator.validate(doc))
@@ -111,9 +109,7 @@ class ReportsValidationService:
         Returns:
             A list of ``ValidationResult`` — one per discovered file.
         """
-        search_root = (
-            self._reports_root / context if context else self._reports_root
-        )
+        search_root = self._reports_root / context if context else self._reports_root
         results: list[ValidationResult] = []
         for handoff_path in sorted(search_root.rglob("*.handoff.json")):
             results.append(self.validate_file(handoff_path))

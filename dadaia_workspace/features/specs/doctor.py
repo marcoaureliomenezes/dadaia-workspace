@@ -26,8 +26,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
-from enum import Enum
+from datetime import UTC, date, datetime
+from enum import StrEnum
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -42,17 +42,13 @@ CANONICAL_PHASES = {
     "ARCHIVED",
     "none",  # scaffold default: no active release
 }
-BACKLOG_BULLET_RE = re.compile(
-    r"^- \S.*? — .+? \(owner: [a-z-]+, contexto: .+?\)\s*$"
-)
+BACKLOG_BULLET_RE = re.compile(r"^- \S.*? — .+? \(owner: [a-z-]+, contexto: .+?\)\s*$")
 # SPEC-DOC-022: format for ## Hotfixes pendentes bullets
 # Pattern: - <YYYY-MM-DDTHHMMSSZ> <severity> <component> — <one-liner> (post-mortem: <link>)
 BACKLOG_HOTFIX_RE = re.compile(
     r"^- (\d{4}-\d{2}-\d{2}T\d{6}Z) (LOW|MEDIUM|HIGH|CRITICAL) ([\w\-/]+) — .+ \(post-mortem: .+\)$"
 )
-FORBIDDEN_MEMORY_H2_RE = re.compile(
-    r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE
-)
+FORBIDDEN_MEMORY_H2_RE = re.compile(r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE)
 # Top-level memory files (still single HTML).
 TOPLEVEL_MEMORY_FILES = ("architecture.html", "tech-stack.html")
 # Product memory is a folder catalog: index.html is required + 0..N feature HTMLs.
@@ -63,15 +59,15 @@ PLAN_MAX_LINES = 300
 # SPEC-DOC-016: SemVer folder naming for releases created on/after this date (D3).
 # Vintage releases (Created: <= 2026-05-17) are excluded.
 RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
-RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)   # WARNING starts here
-RELEASE_SEMVER_HARD = date(2026, 7, 1)     # ERROR starts here
+RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
+RELEASE_SEMVER_HARD = date(2026, 7, 1)  # ERROR starts here
 RELEASE_VINTAGE_CUTOFF = date(2026, 5, 17)  # releases on/before this are excluded
 
 # SPEC-DOC-023: hotfix bullets older than 72 hours in ## Hotfixes pendentes get WARNING
 _HOTFIX_STALE_HOURS = 72
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     ERROR = "error"
     WARNING = "warning"
 
@@ -399,7 +395,7 @@ class SpecsDoctor:
                                 severity=Severity.ERROR,
                                 description=(
                                     f"memory/product/index.html links to missing file: "
-                                    f"<a href=\"{href}\"> (resolves to {target})"
+                                    f'<a href="{href}"> (resolves to {target})'
                                 ),
                                 path=str(index_path),
                             )
@@ -562,9 +558,7 @@ class SpecsDoctor:
                     SpecsDoctorIssue(
                         code="SPEC-DOC-006",
                         severity=Severity.ERROR,
-                        description=(
-                            f"CLOSURE.md missing required sections: {missing}"
-                        ),
+                        description=(f"CLOSURE.md missing required sections: {missing}"),
                         path=str(closure),
                     )
                 )
@@ -661,7 +655,7 @@ class SpecsDoctor:
                             code="SPEC-DOC-010",
                             severity=Severity.ERROR,
                             description=(
-                                f"memory/{rel} references broken <img src=\"{src}\"> "
+                                f'memory/{rel} references broken <img src="{src}"> '
                                 f"(resolves to {target})"
                             ),
                             path=str(p),
@@ -695,7 +689,7 @@ class SpecsDoctor:
         text = candidates_path.read_text(encoding="utf-8")
         in_candidatas_section = False
         in_hotfixes_section = False
-        now_utc = datetime.now(tz=timezone.utc)
+        now_utc = datetime.now(tz=UTC)
 
         for lineno, raw_line in enumerate(text.splitlines(), start=1):
             line = raw_line.rstrip()
@@ -748,9 +742,7 @@ class SpecsDoctor:
                     # Check staleness (D23): timestamp older than _HOTFIX_STALE_HOURS
                     ts_raw = m.group(1)  # e.g. 2026-05-14T120000Z
                     try:
-                        ts = datetime.strptime(ts_raw, "%Y-%m-%dT%H%M%SZ").replace(
-                            tzinfo=timezone.utc
-                        )
+                        ts = datetime.strptime(ts_raw, "%Y-%m-%dT%H%M%SZ").replace(tzinfo=UTC)
                         age_hours = (now_utc - ts).total_seconds() / 3600
                         if age_hours > _HOTFIX_STALE_HOURS:
                             issues.append(
@@ -848,8 +840,8 @@ class SpecsDoctor:
                         code="SPEC-DOC-011",
                         severity=Severity.WARNING,
                         description=(
-                            f"memory/{rel} has <pre class=\"mermaid\"> blocks but no "
-                            "Mermaid <script src=\"...mermaid...\"> — diagrams will not render"
+                            f'memory/{rel} has <pre class="mermaid"> blocks but no '
+                            'Mermaid <script src="...mermaid..."> — diagrams will not render'
                         ),
                         path=str(p),
                     )

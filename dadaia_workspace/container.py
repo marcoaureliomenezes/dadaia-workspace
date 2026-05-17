@@ -16,6 +16,7 @@ from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
+from dadaia_workspace.features.reports_validation.service import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
@@ -35,7 +36,6 @@ from dadaia_workspace.infrastructure.json_primary_context_store import JsonPrima
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
-from dadaia_workspace.features.reports_validation.service import ReportsValidationService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator

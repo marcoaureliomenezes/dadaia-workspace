@@ -16,10 +16,12 @@ Convert to micro-USD: int(round(total_usd * 1_000_000)).
 Rounding uses Python built-in round() — banker's rounding (round-half-to-even).
 For the micro-USD precision required here, float arithmetic is adequate.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -49,7 +51,7 @@ PRICING_TABLE: dict[str, list[ModelPricing]] = {
 }
 
 
-def compute_cost(usage: dict, model: str, when: date) -> int | None:
+def compute_cost(usage: dict[str, Any], model: str, when: date) -> int | None:
     """Return cost in micro-USD (10^-6 USD) for the event, or None if model unknown.
 
     Args:

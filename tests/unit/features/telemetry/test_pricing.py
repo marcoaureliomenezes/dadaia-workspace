@@ -1,4 +1,5 @@
 """Unit tests for features/telemetry/pricing.py (T-AM-10)."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -11,7 +12,6 @@ from dadaia_workspace.features.telemetry.pricing import (
     compute_cost,
     pricing_age_days,
 )
-
 
 # ---------------------------------------------------------------------------
 # compute_cost
@@ -60,9 +60,7 @@ class TestComputeCost:
     ) -> None:
         assert compute_cost(usage, model, when) == expected
 
-    def test_known_model_historical_effective_from(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_known_model_historical_effective_from(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Historical events use the price vigent at their occurrence date.
 
         Patch PRICING_TABLE to add a future row at 2027-01-01 with doubled prices.
@@ -87,9 +85,7 @@ class TestComputeCost:
         assert result_2027 == 30_000_000
 
     def test_unknown_model_returns_none(self) -> None:
-        result = compute_cost(
-            {"input_tokens": 1_000_000}, "unknown-model-x", date(2026, 1, 1)
-        )
+        result = compute_cost({"input_tokens": 1_000_000}, "unknown-model-x", date(2026, 1, 1))
         assert result is None
 
     def test_usage_zero_returns_zero(self) -> None:

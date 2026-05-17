@@ -7,12 +7,9 @@ import pytest
 from dadaia_workspace.core.models.handoff import (
     ArtifactRef,
     ArtifactType,
-    Finding,
     HandoffDocument,
-    NextHandoff,
     Severity,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -68,8 +65,14 @@ def test_handoff_document_from_dict_minimal() -> None:
     assert doc.produced_at == "2026-05-16T23:29:05Z"
     assert isinstance(doc.artifact, ArtifactRef)
     assert doc.artifact.type == ArtifactType.report
-    assert doc.artifact.path == ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T232905Z.html"
-    assert doc.artifact.content_hash == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    assert (
+        doc.artifact.path
+        == ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T232905Z.html"
+    )
+    assert (
+        doc.artifact.content_hash
+        == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
     # Optional fields default
     assert doc.release_id is None
     assert doc.findings == ()

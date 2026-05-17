@@ -20,7 +20,6 @@ import hashlib
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
@@ -46,7 +45,9 @@ def _init_workspace(workspace: Path) -> None:
     FileSystemPublicAssetManager().stage(workspace)
 
 
-def _make_valid_handoff(base_dir: Path, stem: str = "report", release_id: str | None = None) -> Path:
+def _make_valid_handoff(
+    base_dir: Path, stem: str = "report", release_id: str | None = None
+) -> Path:
     """Create a minimal valid handoff.json file with a companion artifact."""
     artifact_path = base_dir / f"{stem}.html"
     artifact_path.write_text(f"<html>{stem}</html>", encoding="utf-8")
@@ -149,7 +150,9 @@ def test_04_file_not_found_exits_2_with_error_message(tmp_path: Path, monkeypatc
     assert "ghost.handoff.json" in result.output or "not found" in result.output.lower()
 
 
-def test_05_all_flag_discovers_handoff_files_under_reports_root(tmp_path: Path, monkeypatch) -> None:
+def test_05_all_flag_discovers_handoff_files_under_reports_root(
+    tmp_path: Path, monkeypatch
+) -> None:
     """Test 5: --all discovers all *.handoff.json files under the workspace reports root."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -167,7 +170,9 @@ def test_05_all_flag_discovers_handoff_files_under_reports_root(tmp_path: Path, 
     assert "3 valid" in result.output
 
 
-def test_06_json_output_is_parseable_with_valid_count_and_errors(tmp_path: Path, monkeypatch) -> None:
+def test_06_json_output_is_parseable_with_valid_count_and_errors(
+    tmp_path: Path, monkeypatch
+) -> None:
     """Test 6: --json output is parseable JSON with 'valid' field and 'errors' array."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -201,9 +206,7 @@ def test_07_release_filter_narrows_discovery(tmp_path: Path, monkeypatch) -> Non
     _make_valid_handoff(reports_root, stem="other-report-1", release_id="panel-v1")
     _make_valid_handoff(reports_root, stem="other-report-2", release_id="panel-v1")
 
-    result = _runner.invoke(
-        app, ["reports", "validate", "--all", "--release", "agent-comms-v1"]
-    )
+    result = _runner.invoke(app, ["reports", "validate", "--all", "--release", "agent-comms-v1"])
 
     assert result.exit_code == 0, result.output
     assert "1 valid" in result.output
@@ -250,7 +253,4 @@ def test_10_workspace_not_initialized_exits_3(tmp_path: Path, monkeypatch) -> No
     assert result.exit_code == 3, result.output
     # Output should indicate schema or workspace initialization issue
     combined = result.output + (result.stderr or "")
-    assert any(
-        kw in combined.lower()
-        for kw in ("schema", "workspace", "initialized", "not found")
-    )
+    assert any(kw in combined.lower() for kw in ("schema", "workspace", "initialized", "not found"))

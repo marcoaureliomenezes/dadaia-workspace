@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json as _json
-import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -39,11 +37,25 @@ def _resolve_workspace() -> Path:
 
 @app.command(name="validate")
 def validate(
-    paths: Optional[list[Path]] = typer.Argument(default=None, help="Paths to .handoff.json files to validate."),
-    all_: bool = typer.Option(False, "--all", help="Validate all *.handoff.json files under the workspace reports root."),
-    release: Optional[str] = typer.Option(None, "--release", help="Filter to a specific release ID (matches against handoff release_id field)."),
-    strict: bool = typer.Option(False, "--strict/--no-strict", help="Exit 1 on any validation violation. Default: non-strict (warnings only)."),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output instead of human-readable text."),
+    paths: list[Path] | None = typer.Argument(
+        default=None, help="Paths to .handoff.json files to validate."
+    ),
+    all_: bool = typer.Option(
+        False, "--all", help="Validate all *.handoff.json files under the workspace reports root."
+    ),
+    release: str | None = typer.Option(
+        None,
+        "--release",
+        help="Filter to a specific release ID (matches against handoff release_id field).",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict/--no-strict",
+        help="Exit 1 on any validation violation. Default: non-strict (warnings only).",
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON output instead of human-readable text."
+    ),
 ) -> None:
     """Validate one or more agent handoff JSON files.
 
@@ -63,9 +75,7 @@ def validate(
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:
-        err_console.print(
-            "[red]Error:[/red] provide one or more PATHS or use [bold]--all[/bold]."
-        )
+        err_console.print("[red]Error:[/red] provide one or more PATHS or use [bold]--all[/bold].")
         raise typer.Exit(3)
 
     workspace_root = _resolve_workspace()
@@ -125,10 +135,7 @@ def validate(
             {
                 "path": str(r.path),
                 "valid": r.valid,
-                "errors": [
-                    {"field_path": e.field_path, "message": e.message}
-                    for e in r.errors
-                ],
+                "errors": [{"field_path": e.field_path, "message": e.message} for e in r.errors],
                 "hash_status": r.hash_status,
             }
             for r in results

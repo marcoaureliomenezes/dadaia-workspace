@@ -23,8 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from dadaia_workspace.core.models.server_registry import PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
@@ -203,8 +202,4 @@ class PanelService:
 
     def _active_contexts(self) -> list[SpecContextProject]:
         """Return contexts with state == ativo."""
-        return [
-            ctx
-            for ctx in self._spec_context.list_all()
-            if ctx.state == ContextState.ATIVO
-        ]
+        return [ctx for ctx in self._spec_context.list_all() if ctx.state == ContextState.ATIVO]

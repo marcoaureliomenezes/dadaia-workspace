@@ -2,6 +2,7 @@
 
 Verifies all constants are positive integers within sensible bounds.
 """
+
 from __future__ import annotations
 
 import dadaia_workspace.features.telemetry.budget as budget
