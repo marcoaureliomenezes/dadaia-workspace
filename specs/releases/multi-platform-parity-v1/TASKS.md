@@ -93,7 +93,7 @@ feat(public-assets): T-PB-3 — emit [not-applicable] doctor status for Codex wo
     # expect: ≥1
     ```
 
-- [ ] **T-MPP-1.2** `[parallel: no]` Add CLI styling branch for `[not-applicable]` in `dadaia public doctor` output.
+- [-] **T-MPP-1.2** `[parallel: no]` Add CLI styling branch for `[not-applicable]` in `dadaia public doctor` output.
   - **Owner:** software-engineer
   - **Effort:** S (~4 LoC added)
   - **Files MODIFIED:**
