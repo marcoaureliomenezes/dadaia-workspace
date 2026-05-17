@@ -35,8 +35,10 @@ from dadaia_workspace.infrastructure.json_primary_context_store import JsonPrima
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
+from dadaia_workspace.features.reports_validation.service import ReportsValidationService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 
 
 def _states_dir(workspace_root: Path) -> Path:
@@ -158,6 +160,25 @@ def build_panel_service(workspace_root: Path) -> PanelService:
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
     )
+
+
+def build_reports_validation_service(workspace_root: Path) -> ReportsValidationService:
+    """Compose ``ReportsValidationService`` with ``StdlibHandoffValidator``.
+
+    Schema is read from the staged location:
+    ``workspace_root/.dadaia/agentic/schemas/handoff-v1.schema.json``.
+    Reports root is ``workspace_root/.dadaia/reports``.
+
+    Args:
+        workspace_root: Root directory of the initialized dadaia workspace.
+
+    Returns:
+        A fully wired ``ReportsValidationService`` instance.
+    """
+    schema_path = workspace_root / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
+    reports_root = workspace_root / ".dadaia" / "reports"
+    validator = StdlibHandoffValidator(schema_path)
+    return ReportsValidationService(validator=validator, reports_root=reports_root)
 
 
 def build_panel_views(
