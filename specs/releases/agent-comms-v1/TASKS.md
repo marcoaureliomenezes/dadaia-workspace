@@ -147,7 +147,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-07 — Container wiring + CLI Typer app + main.py registration
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Wave:** 1
 - **Precondições:** T-AC-05 [x], T-AC-06 [x]
