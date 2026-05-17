@@ -93,7 +93,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-09 — Panel "Unregistered" section UI
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p5
 - **Owner:** frontend-engineer
 - **Precondições:** T-DSR-08 done.
 - **Files modified:**
