@@ -70,7 +70,7 @@
 
 ## Phase 4 — Reader Codex + workflows
 
-- [-] **T-AM-07** — Implement `features/telemetry/reader/codex.py`. <!-- software-engineer-p4 -->
+- [x] **T-AM-07** — Implement `features/telemetry/reader/codex.py`. <!-- software-engineer-p4 -->
   - `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)`.
   - Query `threads` table with defensive column selection; degrade to empty list on `OperationalError`.
   - Maps `tokens_used` (aggregated) → `tokens_input=tokens_used, tokens_output=0` with `cost_micro_usd=NULL` (D-AM-16).
@@ -78,13 +78,13 @@
   - Files: `features/telemetry/reader/codex.py`, `tests/unit/features/telemetry/test_reader_codex.py`.
   - Parallel-safe: yes.
 
-- [-] **T-AM-08** — Implement `features/telemetry/budget.py` named constants. <!-- software-engineer-p4 -->
+- [x] **T-AM-08** — Implement `features/telemetry/budget.py` named constants. <!-- software-engineer-p4 -->
   - `MAX_BYTES_PER_FILE_PER_CYCLE`, `MAX_LINE_LENGTH`, `MAX_EVENTS_PER_CYCLE`, `CACHE_TTL_SECONDS`, `PRICING_STALENESS_THRESHOLD_DAYS`, `MAX_TOKEN_COUNT_PER_EVENT`.
   - Tests: assert types and reasonable defaults.
   - Files: `features/telemetry/budget.py`, `tests/unit/features/telemetry/test_budget.py`.
   - Parallel-safe: yes.
 
-- [-] **T-AM-09** — Implement `features/telemetry/reader/workflows.py` (SKILL.md frontmatter parser, architect D12). <!-- software-engineer-p4 -->
+- [x] **T-AM-09** — Implement `features/telemetry/reader/workflows.py` (SKILL.md frontmatter parser, architect D12). <!-- software-engineer-p4 -->
   - Walk `.claude/skills/*/SKILL.md` and `.agents/skills/*/SKILL.md`.
   - Parse YAML frontmatter (regex stdlib parser like multi-platform-parity-v1 used; no `pyyaml`).
   - Extract `name`, `description`, optional `applyTo`.
