@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 from collections.abc import Iterable
@@ -57,6 +58,17 @@ def _package_version() -> str:
 
 def _json_dump(data: object) -> str:
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
+
+
+def _atomic_write_text(dst: Path, content: str) -> None:
+    """Write *content* to *dst* atomically via a sibling .tmp file + os.replace().
+
+    Guarantees the destination either contains the full new content or is
+    unchanged — prevents readers from observing a partially-written file.
+    """
+    tmp = dst.with_suffix(dst.suffix + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, dst)
 
 
 def _strip_tools_from_frontmatter(content: str) -> str:
@@ -470,7 +482,7 @@ class FileSystemPublicAssetManager:
         if dst.exists() and not force:
             installed.append(f"[skip] {dst}")
             return
-        dst.write_text(content, encoding="utf-8")
+        _atomic_write_text(dst, content)
         installed.append(f"[ok]   {dst}")
 
     def _compare(self, src: Path, dst: Path, label: str) -> str:
