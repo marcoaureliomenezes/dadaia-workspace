@@ -419,7 +419,7 @@ feat(public-assets): T-PB-2 — stop copying workflows to .codex/workflows/ + sa
 These tasks run at PR-level once Phase 1 + 2 + 3 are all `[x]`. They are
 verification-only — no production code changes — and gate the merge into `main`.
 
-- [-] **T-MPP-CC-1** `[parallel: yes]` AC-10 — verify zero new runtime dependencies.
+- [x] **T-MPP-CC-1** `[parallel: yes]` AC-10 — verify zero new runtime dependencies.
   - **Owner:** software-engineer
   - **Effort:** S (verification only)
   - **Verification:**
@@ -429,7 +429,7 @@ verification-only — no production code changes — and gate the merge into `ma
     ```
   - **Acceptance ref:** AC-10; NFR-4 (stdlib-only).
 
-- [ ] **T-MPP-CC-2** `[parallel: yes]` AC-11 — verify `core/`, `features/`, `container.py` are untouched.
+- [x] **T-MPP-CC-2** `[parallel: yes]` AC-11 — verify `core/`, `features/`, `container.py` are untouched.
   - **Owner:** software-engineer
   - **Effort:** S (verification only)
   - **Verification:**
@@ -439,7 +439,7 @@ verification-only — no production code changes — and gate the merge into `ma
     ```
   - **Acceptance ref:** AC-11; NFR-5; ADR-ARCH-3.
 
-- [ ] **T-MPP-CC-3** `[parallel: yes]` AC-13 + AC-15 — verify `handoff_validator.py` and `agent-comms-v1` archive untouched.
+- [x] **T-MPP-CC-3** `[parallel: yes]` AC-13 + AC-15 — verify `handoff_validator.py` and `agent-comms-v1` archive untouched.
   - **Owner:** software-engineer
   - **Effort:** S (verification only)
   - **Verification:**
@@ -449,7 +449,7 @@ verification-only — no production code changes — and gate the merge into `ma
     ```
   - **Acceptance ref:** AC-13, AC-15; NFR-8 (zero overlap with agent-comms-v1).
 
-- [ ] **T-MPP-CC-4** `[parallel: yes]` AC-12 — coverage ≥80% on `infrastructure.public_assets`.
+- [x] **T-MPP-CC-4** `[parallel: yes]` AC-12 — coverage ≥80% on `infrastructure.public_assets`.
   - **Owner:** software-engineer
   - **Effort:** S (verification only)
   - **Verification:**
@@ -459,7 +459,7 @@ verification-only — no production code changes — and gate the merge into `ma
     ```
   - **Acceptance ref:** AC-12; constitution L131.
 
-- [ ] **T-MPP-CC-5** `[parallel: yes]` AC-14 — `dadaia specs doctor` reports 0 errors, 0 warnings.
+- [x] **T-MPP-CC-5** `[parallel: yes]` AC-14 — `dadaia specs doctor` reports 0 errors, 0 warnings.
   - **Owner:** software-engineer
   - **Effort:** S (verification only)
   - **Verification:**
