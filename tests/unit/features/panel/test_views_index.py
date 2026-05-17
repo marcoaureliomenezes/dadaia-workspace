@@ -212,3 +212,91 @@ def test_index_returns_bytes() -> None:
     assert isinstance(status, int)
     assert isinstance(ct, str)
     assert isinstance(body, bytes)
+
+
+# ---------------------------------------------------------------------------
+# T-AM-01: A11y role snapshot tests
+# ---------------------------------------------------------------------------
+
+
+def test_nav_has_role_tablist() -> None:
+    """T-AM-01: <nav class="nav-tabs"> must carry role="tablist"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'role="tablist"' in html
+
+
+def test_tab_servers_has_id() -> None:
+    """T-AM-01: Servers tab button must have id="tab-servers"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-servers"' in html
+
+
+def test_tab_memories_has_id() -> None:
+    """T-AM-01: Memories tab button must have id="tab-memories"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-memories"' in html
+
+
+def test_tab_agents_has_id() -> None:
+    """T-AM-01: Agents tab button must have id="tab-agents"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-agents"' in html
+
+
+def test_section_servers_has_tabpanel_role() -> None:
+    """T-AM-01: section#section-servers must have role="tabpanel"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="section-servers"' in html
+    # Verify role=tabpanel appears somewhere before closing of the section
+    assert 'role="tabpanel"' in html
+
+
+def test_section_servers_has_aria_labelledby() -> None:
+    """T-AM-01: section#section-servers must have aria-labelledby="tab-servers"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'aria-labelledby="tab-servers"' in html
+
+
+def test_section_memories_has_aria_labelledby() -> None:
+    """T-AM-01: section#section-memories must have aria-labelledby="tab-memories"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'aria-labelledby="tab-memories"' in html
+
+
+def test_section_agents_has_aria_labelledby() -> None:
+    """T-AM-01: section#section-agents must have aria-labelledby="tab-agents"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'aria-labelledby="tab-agents"' in html
+
+
+def test_sections_have_tabindex_zero() -> None:
+    """T-AM-01: all tabpanel sections must have tabindex="0"."""
+    service = _build_service()
+    html = _render(service)
+    assert html.count('tabindex="0"') >= 3
+
+
+def test_tabpanel_count_is_three() -> None:
+    """T-AM-01: there must be exactly 3 role=tabpanel elements (Servers/Memories/Agents)."""
+    service = _build_service()
+    html = _render(service)
+    assert html.count('role="tabpanel"') == 3
+
+
+def test_panel_js_contains_keydown_handler() -> None:
+    """T-AM-01: PANEL_JS must include keyboard navigation for ArrowRight/ArrowLeft/Home/End."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    assert "ArrowRight" in PANEL_JS
+    assert "ArrowLeft" in PANEL_JS
+    assert "Home" in PANEL_JS
+    assert "End" in PANEL_JS
+    assert "keydown" in PANEL_JS
