@@ -49,7 +49,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-01 — Canonical schema `handoff-v1.schema.json`
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Wave:** 0
 - **Precondições:** ACTIVE.md flipped para `agent-comms-v1`
