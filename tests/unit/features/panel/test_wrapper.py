@@ -54,8 +54,8 @@ def test_wrapper_slug_escaped() -> None:
 
 def test_wrapper_path_escaped() -> None:
     """R3-A: path with special HTML chars must be escaped in output."""
-    html = _render("safe-slug", '<img src=x onerror=alert(1)>.html')
-    assert '<img src=x onerror=alert(1)>' not in html
+    html = _render("safe-slug", "<img src=x onerror=alert(1)>.html")
+    assert "<img src=x onerror=alert(1)>" not in html
     assert "&lt;img" in html
 
 

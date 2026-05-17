@@ -4,9 +4,8 @@ T1 CRITICAL: zero leakage of content/text/messages/snapshot/thinking/
 prompt/response into telemetry output.  The test_no_forbidden_in_output
 test is the critical gate.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from dadaia_workspace.features.telemetry.reader.allowlist import (
     FORBIDDEN_KEYS,

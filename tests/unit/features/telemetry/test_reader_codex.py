@@ -2,14 +2,11 @@
 
 All fixtures are synthesized in-memory — NO real Codex data is read.
 """
+
 from __future__ import annotations
 
 import pathlib
 import sqlite3
-import threading
-import time
-
-import pytest
 
 from dadaia_workspace.features.telemetry.reader.codex import ReadResult, read_codex_db
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
@@ -217,7 +214,7 @@ class TestIdempotentReread:
         result1 = read_codex_db(db_path, dao, NOW_ISO)
         assert result1.events_ingested == 1
 
-        result2 = read_codex_db(db_path, dao, NOW_ISO)
+        read_codex_db(db_path, dao, NOW_ISO)
         # Second run returns non-zero sessions_ingested (upsert), but events
         # are idempotent via INSERT OR IGNORE.
         assert _count_table(dao, "events") == 1

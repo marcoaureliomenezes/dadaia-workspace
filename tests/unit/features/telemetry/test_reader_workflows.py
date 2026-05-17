@@ -2,14 +2,13 @@
 
 All fixtures are synthesized in tmp_path — no real workspace skill files are read.
 """
+
 from __future__ import annotations
 
 import pathlib
 import sqlite3
 
-import pytest
-
-from dadaia_workspace.features.telemetry.reader.workflows import ReadResult, read_workflows
+from dadaia_workspace.features.telemetry.reader.workflows import read_workflows
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 
@@ -172,6 +171,7 @@ class TestSubstringMatchAgentLink:
         # Also need to pre-insert the agent so FK constraint is satisfied
         dao = _make_dao()
         from dadaia_workspace.features.telemetry.store.models import Agent
+
         dao.upsert_agent(
             Agent(
                 name="software-architect",
@@ -215,6 +215,7 @@ The PRODUCT-ENGINEER agent runs this workflow.
         _make_skill_file(tmp_path, ".claude/skills", "case-test", content)
         dao = _make_dao()
         from dadaia_workspace.features.telemetry.store.models import Agent
+
         dao.upsert_agent(
             Agent(
                 name="product-engineer",

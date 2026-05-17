@@ -29,8 +29,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -137,9 +135,7 @@ def test_full_handoff_emit_and_validate(tmp_path: Path) -> None:
         f"dadaia reports validate exited {result.returncode}; expected 0.\n"
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
     )
-    assert "1 valid" in result.stdout, (
-        f"Expected '1 valid' in stdout.\nstdout: {result.stdout}"
-    )
+    assert "1 valid" in result.stdout, f"Expected '1 valid' in stdout.\nstdout: {result.stdout}"
 
 
 # ---------------------------------------------------------------------------
@@ -258,23 +254,19 @@ def test_doctor_reports_schema_ok_after_install(tmp_path: Path) -> None:
     # Rich console strips ANSI — but subprocess captures plain text.
     # The doctor line should match `[ok] stage:schemas/handoff-v1.schema.json`.
     output_lines = doctor.stdout.splitlines()
-    schema_lines = [
-        line for line in output_lines if "handoff-v1.schema.json" in line
-    ]
+    schema_lines = [line for line in output_lines if "handoff-v1.schema.json" in line]
     assert schema_lines, (
         f"No line mentioning 'handoff-v1.schema.json' in doctor output.\n"
         f"Full output:\n{doctor.stdout}"
     )
 
-    ok_schema_lines = [
-        line for line in schema_lines if line.strip().startswith("[ok]")
-    ]
+    ok_schema_lines = [line for line in schema_lines if line.strip().startswith("[ok]")]
     assert ok_schema_lines, (
-        f"Found handoff-v1.schema.json lines but none starts with '[ok]'.\n"
-        f"Schema lines:\n" + "\n".join(schema_lines)
+        "Found handoff-v1.schema.json lines but none starts with '[ok]'.\n"
+        "Schema lines:\n" + "\n".join(schema_lines)
     )
     # Confirm the expected canonical form is present.
     assert any("stage:schemas/handoff-v1.schema.json" in line for line in ok_schema_lines), (
-        f"Expected 'stage:schemas/handoff-v1.schema.json' in [ok] line.\n"
-        f"Ok schema lines:\n" + "\n".join(ok_schema_lines)
+        "Expected 'stage:schemas/handoff-v1.schema.json' in [ok] line.\n"
+        "Ok schema lines:\n" + "\n".join(ok_schema_lines)
     )

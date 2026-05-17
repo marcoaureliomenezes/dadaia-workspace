@@ -16,35 +16,41 @@ def _write_registry(path: Path, entries: list[dict]) -> None:  # type: ignore[ty
 
 
 def test_render_html_shows_project_name(tmp_path: Path) -> None:
-    _write_registry(tmp_path, [
-        {
-            "port": 3000,
-            "project": "portifolio",
-            "url": "http://localhost:3000",
-            "status": "active",
-            "pid": None,
-            "reserved_at": "2026-05-16T10:00:00Z",
-            "expires_at": "2099-01-01T00:00:00Z",
-            "description": None,
-        }
-    ])
+    _write_registry(
+        tmp_path,
+        [
+            {
+                "port": 3000,
+                "project": "portifolio",
+                "url": "http://localhost:3000",
+                "status": "active",
+                "pid": None,
+                "reserved_at": "2026-05-16T10:00:00Z",
+                "expires_at": "2099-01-01T00:00:00Z",
+                "description": None,
+            }
+        ],
+    )
     html = render_html(tmp_path)
     assert "portifolio" in html
 
 
 def test_render_html_shows_clickable_url(tmp_path: Path) -> None:
-    _write_registry(tmp_path, [
-        {
-            "port": 3000,
-            "project": "portifolio",
-            "url": "http://localhost:3000",
-            "status": "active",
-            "pid": None,
-            "reserved_at": "2026-05-16T10:00:00Z",
-            "expires_at": "2099-01-01T00:00:00Z",
-            "description": None,
-        }
-    ])
+    _write_registry(
+        tmp_path,
+        [
+            {
+                "port": 3000,
+                "project": "portifolio",
+                "url": "http://localhost:3000",
+                "status": "active",
+                "pid": None,
+                "reserved_at": "2026-05-16T10:00:00Z",
+                "expires_at": "2099-01-01T00:00:00Z",
+                "description": None,
+            }
+        ],
+    )
     html = render_html(tmp_path)
     assert 'href="http://localhost:3000"' in html
     assert "http://localhost:3000" in html
@@ -69,17 +75,20 @@ def test_render_html_includes_auto_refresh(tmp_path: Path) -> None:
 
 
 def test_render_html_shows_description_when_present(tmp_path: Path) -> None:
-    _write_registry(tmp_path, [
-        {
-            "port": 3000,
-            "project": "portifolio",
-            "url": "http://localhost:3000",
-            "status": "active",
-            "pid": None,
-            "reserved_at": "2026-05-16T10:00:00Z",
-            "expires_at": "2099-01-01T00:00:00Z",
-            "description": "Vite dev server",
-        }
-    ])
+    _write_registry(
+        tmp_path,
+        [
+            {
+                "port": 3000,
+                "project": "portifolio",
+                "url": "http://localhost:3000",
+                "status": "active",
+                "pid": None,
+                "reserved_at": "2026-05-16T10:00:00Z",
+                "expires_at": "2099-01-01T00:00:00Z",
+                "description": "Vite dev server",
+            }
+        ],
+    )
     html = render_html(tmp_path)
     assert "Vite dev server" in html

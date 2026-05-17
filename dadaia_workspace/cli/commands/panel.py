@@ -6,6 +6,7 @@ import logging
 import sys
 import webbrowser
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -38,16 +39,17 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
     endpoints degrade to 503 when this returns None.
     """
     try:
-        from dadaia_workspace.features.telemetry.service import TelemetryService
-        from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-        from dadaia_workspace.features.telemetry.store.schema import apply_migrations
-        from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
+        import pathlib
+        import sqlite3
+
         from dadaia_workspace.features.telemetry import pricing as _pricing
+        from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
         from dadaia_workspace.features.telemetry.reader import claude as _claude_reader
         from dadaia_workspace.features.telemetry.reader import codex as _codex_reader
         from dadaia_workspace.features.telemetry.reader import workflows as _wf_reader
-        import sqlite3
-        import pathlib
+        from dadaia_workspace.features.telemetry.service import TelemetryService
+        from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
+        from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 
         state_dir = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
         state_dir.mkdir(parents=True, exist_ok=True)
@@ -68,7 +70,7 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
             workspace_root=workspace_root,
         )
 
-        def _reader_factory() -> tuple:
+        def _reader_factory() -> tuple[Any, Any, Any]:
             return (_claude_reader, _codex_reader, _wf_reader)
 
         return TelemetryService(
@@ -81,7 +83,9 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
             spec_context_service=spec_context,
         )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Telemetry unavailable: %s — /api/agents, /api/workflows will return 503", exc)
+        logger.warning(
+            "Telemetry unavailable: %s — /api/agents, /api/workflows will return 503", exc
+        )
         return None
 
 

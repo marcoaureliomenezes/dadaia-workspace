@@ -3,8 +3,6 @@
 import tomllib
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 _AGENT_A_CONTENT = """\
@@ -77,10 +75,10 @@ def test_install_codex_writes_agents_blocks_for_fixture_agents(tmp_path: Path) -
     # Assert (c) and (d): both fixture agent blocks present
     agents = parsed.get("agents", {})
     assert "agent-a" in agents, (
-        f"Expected [agents.\"agent-a\"] in config.toml; found agents: {list(agents.keys())}"
+        f'Expected [agents."agent-a"] in config.toml; found agents: {list(agents.keys())}'
     )
     assert "agent-b" in agents, (
-        f"Expected [agents.\"agent-b\"] in config.toml; found agents: {list(agents.keys())}"
+        f'Expected [agents."agent-b"] in config.toml; found agents: {list(agents.keys())}'
     )
 
     # Assert (e): no leftover .tmp file (atomic write smoke)

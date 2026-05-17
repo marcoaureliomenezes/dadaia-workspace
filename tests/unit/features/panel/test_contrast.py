@@ -2,6 +2,7 @@
 
 Spec: dadaia-workspace-brand-identity-v1 SPEC.md §3 acceptance criteria.
 """
+
 from __future__ import annotations
 
 import re

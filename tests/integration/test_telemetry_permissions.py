@@ -8,6 +8,7 @@ Uses tmp_path to avoid touching the real ~/.dadaia/state/telemetry/ directory.
 All readers and the aggregator are replaced with in-process stubs so no real
 operator data is read and no network calls are made.
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -15,16 +16,13 @@ import sqlite3
 from datetime import date
 from typing import Any
 
-import pytest
-
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.service import TelemetryService
-
+from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 
 # ---------------------------------------------------------------------------
 # Stubs — same pattern as tests/unit/features/telemetry/test_service.py
 # ---------------------------------------------------------------------------
+
 
 class _StubPricing:
     PRICING_TABLE: dict[str, list] = {}
@@ -74,6 +72,7 @@ class _StubSCS:
 # under tmp_path (so chmod effects are visible).
 # ---------------------------------------------------------------------------
 
+
 def _make_service_on_disk(
     state_dir: pathlib.Path,
     workspace_root: pathlib.Path,
@@ -103,6 +102,7 @@ def _make_service_on_disk(
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestTelemetryDirectoryPermissions:
     def test_state_dir_created_with_0o700(self, tmp_path: pathlib.Path) -> None:
         """After construction, state_dir mode must be 0o700 (owner rwx only)."""
@@ -124,14 +124,13 @@ class TestTelemetryDirectoryPermissions:
         # Pre-create with permissive mode.
         state_dir.mkdir(parents=True)
         import os
+
         os.chmod(state_dir, 0o755)
 
         _make_service_on_disk(state_dir, tmp_path)
 
         mode = state_dir.stat().st_mode & 0o777
-        assert mode == 0o700, (
-            f"state_dir mode was not corrected — got 0o{mode:o}, expected 0o700."
-        )
+        assert mode == 0o700, f"state_dir mode was not corrected — got 0o{mode:o}, expected 0o700."
 
 
 class TestTelemetrySQLitePermissions:
@@ -153,6 +152,7 @@ class TestTelemetrySQLitePermissions:
     def test_sqlite_mode_idempotent_on_second_refresh(self, tmp_path: pathlib.Path) -> None:
         """Calling refresh() twice keeps the SQLite file at 0o600."""
         import os
+
         state_dir = tmp_path / "telemetry"
         svc = _make_service_on_disk(state_dir, tmp_path)
 

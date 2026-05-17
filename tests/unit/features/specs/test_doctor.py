@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
-
 
 MINIMAL_MEMORY_PRODUCT_INDEX = """<!DOCTYPE html><html><head>
 <title>Product</title>
@@ -67,18 +64,11 @@ def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
     (specs / "memory" / "architecture.html").write_text(
         MINIMAL_MEMORY_ARCHITECTURE, encoding="utf-8"
     )
-    (specs / "memory" / "tech-stack.html").write_text(
-        MINIMAL_MEMORY_TECH_STACK, encoding="utf-8"
-    )
+    (specs / "memory" / "tech-stack.html").write_text(MINIMAL_MEMORY_TECH_STACK, encoding="utf-8")
     (specs / "releases" / "ACTIVE.md").write_text(
         f"release: {release_id}\nphase: IMPLEMENTATION\n", encoding="utf-8"
     )
-    spec_md = (
-        "# Spec\n\n"
-        "> **Status:** Aprovado\n"
-        "> **Created:** 2026-04-01\n\n"
-        "Content.\n"
-    )
+    spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-04-01\n\nContent.\n"
     plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
     tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n"
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
@@ -138,7 +128,9 @@ def test_legacy_product_html_at_root_reports_doc_002L(tmp_path: Path) -> None:
         "<html><body><h1>x</h1></body></html>", encoding="utf-8"
     )
     issues = SpecsDoctor(specs).check()
-    matching = [i for i in issues if i.code == "SPEC-DOC-002L" and "product.html is legacy" in i.description]
+    matching = [
+        i for i in issues if i.code == "SPEC-DOC-002L" and "product.html is legacy" in i.description
+    ]
     assert matching, [i.to_dict() for i in issues]
 
 
@@ -153,8 +145,7 @@ def test_broken_anchor_in_product_index_reports_doc_002(tmp_path: Path) -> None:
     (specs / "memory" / "product" / "index.html").write_text(bad_index, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     matching = [
-        i for i in issues
-        if i.code == "SPEC-DOC-002" and "missing-feature.html" in i.description
+        i for i in issues if i.code == "SPEC-DOC-002" and "missing-feature.html" in i.description
     ]
     assert matching, [i.to_dict() for i in issues]
 
@@ -171,9 +162,7 @@ def test_missing_active_md_reports_doc_003(tmp_path: Path) -> None:
 
 def test_non_canonical_phase_reports_doc_003(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "releases" / "ACTIVE.md").write_text(
-        "release: r1\nphase: WORKING\n", encoding="utf-8"
-    )
+    (specs / "releases" / "ACTIVE.md").write_text("release: r1\nphase: WORKING\n", encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-003" in _codes(issues)
 
@@ -202,9 +191,7 @@ def test_non_canonical_status_reports_doc_004(tmp_path: Path) -> None:
 
 def test_oversized_plan_after_cutoff_is_error(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
-    big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(
-        f"- line {i}" for i in range(400)
-    )
+    big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(f"- line {i}" for i in range(400))
     (specs / "releases" / "r1" / "PLAN.md").write_text(big, encoding="utf-8")
     (specs / "releases" / "r1" / "SPEC.md").write_text(
         "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-06-01\n", encoding="utf-8"
@@ -216,9 +203,7 @@ def test_oversized_plan_after_cutoff_is_error(tmp_path: Path) -> None:
 
 def test_oversized_plan_before_cutoff_is_warning(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
-    big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(
-        f"- line {i}" for i in range(400)
-    )
+    big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(f"- line {i}" for i in range(400))
     (specs / "releases" / "r1" / "PLAN.md").write_text(big, encoding="utf-8")
     (specs / "releases" / "r1" / "SPEC.md").write_text(
         "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-04-01\n", encoding="utf-8"
@@ -363,28 +348,18 @@ def test_to_dict_includes_required_keys(tmp_path: Path) -> None:
 def test_active_md_empty_release_value_is_error(tmp_path: Path) -> None:
     """release: with whitespace-only value must be treated as missing (SPEC-DOC-003 ERROR)."""
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "releases" / "ACTIVE.md").write_text(
-        "release:   \nphase: TASKS\n", encoding="utf-8"
-    )
+    (specs / "releases" / "ACTIVE.md").write_text("release:   \nphase: TASKS\n", encoding="utf-8")
     issues = SpecsDoctor(specs).check()
-    doc3_errors = [
-        i for i in issues
-        if i.code == "SPEC-DOC-003" and i.severity == Severity.ERROR
-    ]
+    doc3_errors = [i for i in issues if i.code == "SPEC-DOC-003" and i.severity == Severity.ERROR]
     assert doc3_errors, [i.to_dict() for i in issues]
 
 
 def test_active_md_empty_phase_value_is_error(tmp_path: Path) -> None:
     """phase: with whitespace-only value must be treated as missing (SPEC-DOC-003 ERROR)."""
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "releases" / "ACTIVE.md").write_text(
-        "release: r1\nphase:   \n", encoding="utf-8"
-    )
+    (specs / "releases" / "ACTIVE.md").write_text("release: r1\nphase:   \n", encoding="utf-8")
     issues = SpecsDoctor(specs).check()
-    doc3_errors = [
-        i for i in issues
-        if i.code == "SPEC-DOC-003" and i.severity == Severity.ERROR
-    ]
+    doc3_errors = [i for i in issues if i.code == "SPEC-DOC-003" and i.severity == Severity.ERROR]
     assert doc3_errors, [i.to_dict() for i in issues]
 
 
@@ -426,9 +401,7 @@ def test_backlog_malformed_bullet_warns(tmp_path: Path) -> None:
     """A bullet in '## Candidatas ativas' missing '(owner: ...)' raises SPEC-DOC-012 WARNING."""
     specs = _make_clean_specs_tree(tmp_path)
     candidates = (
-        "# Backlog\n\n"
-        "## Candidatas ativas\n\n"
-        "- bad-feature — Missing the owner field entirely\n"
+        "# Backlog\n\n## Candidatas ativas\n\n- bad-feature — Missing the owner field entirely\n"
     )
     (specs / "backlog" / "candidates.md").write_text(candidates, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
@@ -443,7 +416,7 @@ def test_hotfix_bullet_well_formed_passes(tmp_path: Path) -> None:
     """A correctly formatted bullet in '## Hotfixes pendentes' produces no SPEC-DOC-012 issues."""
     specs = _make_clean_specs_tree(tmp_path)
     # Timestamp fresh (1 hour ago) so no staleness warning
-    ts = (datetime.now(tz=timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H%M%SZ")
+    ts = (datetime.now(tz=UTC) - timedelta(hours=1)).strftime("%Y-%m-%dT%H%M%SZ")
     candidates = (
         "# Backlog\n\n"
         "## Candidatas ativas\n\n"
@@ -478,11 +451,7 @@ def test_hotfix_bullet_idempotent_with_historico(tmp_path: Path) -> None:
 def test_hotfix_bullet_malformed_warns(tmp_path: Path) -> None:
     """A malformed bullet in '## Hotfixes pendentes' raises SPEC-DOC-012 WARNING."""
     specs = _make_clean_specs_tree(tmp_path)
-    candidates = (
-        "# Backlog\n\n"
-        "## Hotfixes pendentes\n\n"
-        "- fix this bug (no proper format at all)\n"
-    )
+    candidates = "# Backlog\n\n## Hotfixes pendentes\n\n- fix this bug (no proper format at all)\n"
     (specs / "backlog" / "candidates.md").write_text(candidates, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     doc12 = [i for i in issues if i.code == "SPEC-DOC-012"]
@@ -493,7 +462,7 @@ def test_hotfix_bullet_malformed_warns(tmp_path: Path) -> None:
 def test_hotfix_bullet_stale_75h_warns(tmp_path: Path) -> None:
     """A hotfix bullet with a timestamp older than 72h raises SPEC-DOC-012 WARNING (D23)."""
     specs = _make_clean_specs_tree(tmp_path)
-    stale_ts = (datetime.now(tz=timezone.utc) - timedelta(hours=75)).strftime("%Y-%m-%dT%H%M%SZ")
+    stale_ts = (datetime.now(tz=UTC) - timedelta(hours=75)).strftime("%Y-%m-%dT%H%M%SZ")
     candidates = (
         "# Backlog\n\n"
         "## Hotfixes pendentes\n\n"
@@ -509,7 +478,7 @@ def test_hotfix_bullet_stale_75h_warns(tmp_path: Path) -> None:
 def test_hotfix_bullet_fresh_10h_no_stale_warning(tmp_path: Path) -> None:
     """A hotfix bullet with a timestamp only 10h old does NOT trigger a staleness warning."""
     specs = _make_clean_specs_tree(tmp_path)
-    fresh_ts = (datetime.now(tz=timezone.utc) - timedelta(hours=10)).strftime("%Y-%m-%dT%H%M%SZ")
+    fresh_ts = (datetime.now(tz=UTC) - timedelta(hours=10)).strftime("%Y-%m-%dT%H%M%SZ")
     candidates = (
         "# Backlog\n\n"
         "## Hotfixes pendentes\n\n"
@@ -533,6 +502,7 @@ def test_semver_folder_name_new_release_passes(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     from datetime import date as _date
+
     with patch("dadaia_workspace.features.specs.doctor.date") as mock_date:
         mock_date.today.return_value = _date(2026, 6, 15)
         mock_date.side_effect = lambda *a, **kw: _date(*a, **kw)
@@ -549,6 +519,7 @@ def test_semver_folder_name_non_semver_new_release_warns(tmp_path: Path) -> None
         encoding="utf-8",
     )
     from datetime import date as _date
+
     with patch("dadaia_workspace.features.specs.doctor.date") as mock_date:
         mock_date.today.return_value = _date(2026, 6, 15)
         mock_date.side_effect = lambda *a, **kw: _date(*a, **kw)
@@ -566,6 +537,7 @@ def test_semver_folder_name_vintage_release_excluded(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     from datetime import date as _date
+
     with patch("dadaia_workspace.features.specs.doctor.date") as mock_date:
         mock_date.today.return_value = _date(2026, 6, 15)
         mock_date.side_effect = lambda *a, **kw: _date(*a, **kw)
@@ -582,6 +554,7 @@ def test_semver_folder_name_before_cutoff_not_checked(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     from datetime import date as _date
+
     with patch("dadaia_workspace.features.specs.doctor.date") as mock_date:
         mock_date.today.return_value = _date(2026, 5, 20)
         mock_date.side_effect = lambda *a, **kw: _date(*a, **kw)

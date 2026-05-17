@@ -6,15 +6,11 @@ import hashlib
 import json
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core.exceptions import HandoffValidationError
 from dadaia_workspace.features.reports_validation.service import (
     ReportsValidationService,
-    ValidationResult,
 )
 from tests.fakes import FakeHandoffValidator
-
 
 # ---------------------------------------------------------------------------
 # Helpers

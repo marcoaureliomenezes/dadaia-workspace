@@ -3,21 +3,22 @@
 All tests use a synthetic in-memory SQLite database and a duck-typed
 SpecContextService stub — no real operator data is read.
 """
+
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timezone, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
     WorkflowListResult,
 )
+from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
+from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
+from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 
 # ---------------------------------------------------------------------------
 # Constants — synthetic fixture paths
@@ -27,7 +28,7 @@ _KNOWN_ROOT = "/home/marco/workspace/dadaia/repos/dadaia-workspace"
 _UNKNOWN_ROOT = "/tmp/unknown-project"
 _CONTEXT_SLUG = "dadaia-workspace"
 
-_NOW = datetime.now(tz=timezone.utc)
+_NOW = datetime.now(tz=UTC)
 _NOW_ISO = _NOW.isoformat()
 _RECENT_ISO = (_NOW - timedelta(days=5)).isoformat()
 _OLD_ISO = (_NOW - timedelta(days=200)).isoformat()
@@ -37,8 +38,10 @@ _OLD_ISO = (_NOW - timedelta(days=200)).isoformat()
 # SpecContextService stub
 # ---------------------------------------------------------------------------
 
+
 class _ContextEntry:
     """Duck-typed context entry for the stub."""
+
     def __init__(self, slug: str, name: str, repo_root: str) -> None:
         self.slug = slug
         self.name = name
@@ -47,6 +50,7 @@ class _ContextEntry:
 
 class _FakeSCS:
     """Minimal duck-typed SpecContextService stub."""
+
     def __init__(self, entries: list[_ContextEntry] | None = None) -> None:
         self._entries = entries or [
             _ContextEntry(
@@ -63,6 +67,7 @@ class _FakeSCS:
 # ---------------------------------------------------------------------------
 # Pricing module stub
 # ---------------------------------------------------------------------------
+
 
 class _FakePricing:
     """Minimal pricing stub that returns known values."""
@@ -91,6 +96,7 @@ class _FakePricing:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
@@ -129,19 +135,46 @@ def _seed_db(conn: sqlite3.Connection) -> None:
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         [
             (
-                "session-1-abcdefgh", "claude", "claude (main)", None, "cli",
-                _KNOWN_ROOT, "main",
-                0, None, _RECENT_ISO, _RECENT_ISO, "closed",
+                "session-1-abcdefgh",
+                "claude",
+                "claude (main)",
+                None,
+                "cli",
+                _KNOWN_ROOT,
+                "main",
+                0,
+                None,
+                _RECENT_ISO,
+                _RECENT_ISO,
+                "closed",
             ),
             (
-                "session-2-abcdefgh", "claude", "claude (main)", None, "cli",
-                _KNOWN_ROOT, "feat/x",
-                0, None, _RECENT_ISO, _RECENT_ISO, "closed",
+                "session-2-abcdefgh",
+                "claude",
+                "claude (main)",
+                None,
+                "cli",
+                _KNOWN_ROOT,
+                "feat/x",
+                0,
+                None,
+                _RECENT_ISO,
+                _RECENT_ISO,
+                "closed",
             ),
             (
-                "session-3-abcdefgh", "claude", "software-architect", None, "cli",
-                _UNKNOWN_ROOT, None,
-                1, None, _RECENT_ISO, _RECENT_ISO, "closed",
+                "session-3-abcdefgh",
+                "claude",
+                "software-architect",
+                None,
+                "cli",
+                _UNKNOWN_ROOT,
+                None,
+                1,
+                None,
+                _RECENT_ISO,
+                _RECENT_ISO,
+                "closed",
             ),
         ],
     )
@@ -153,8 +186,20 @@ def _seed_db(conn: sqlite3.Connection) -> None:
         "  tokens_input, tokens_cache_read, tokens_cache_create, tokens_output,"
         "  cost_micro_usd, pricing_version, suspect)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        ("ev-s1-1", "session-1-abcdefgh", "claude (main)", "claude-sonnet-4-6",
-         _RECENT_ISO, 1000, 200, 50, 100, 3000, "2025-01-01", 1),
+        (
+            "ev-s1-1",
+            "session-1-abcdefgh",
+            "claude (main)",
+            "claude-sonnet-4-6",
+            _RECENT_ISO,
+            1000,
+            200,
+            50,
+            100,
+            3000,
+            "2025-01-01",
+            1,
+        ),
     )
     # session-1 event-2: cost known, suspect=0
     conn.execute(
@@ -163,8 +208,20 @@ def _seed_db(conn: sqlite3.Connection) -> None:
         "  tokens_input, tokens_cache_read, tokens_cache_create, tokens_output,"
         "  cost_micro_usd, pricing_version, suspect)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        ("ev-s1-2", "session-1-abcdefgh", "claude (main)", "claude-sonnet-4-6",
-         _RECENT_ISO, 500, 100, 25, 50, 1500, "2025-01-01", 0),
+        (
+            "ev-s1-2",
+            "session-1-abcdefgh",
+            "claude (main)",
+            "claude-sonnet-4-6",
+            _RECENT_ISO,
+            500,
+            100,
+            25,
+            50,
+            1500,
+            "2025-01-01",
+            0,
+        ),
     )
     # session-2 event-1: cost known
     conn.execute(
@@ -173,8 +230,20 @@ def _seed_db(conn: sqlite3.Connection) -> None:
         "  tokens_input, tokens_cache_read, tokens_cache_create, tokens_output,"
         "  cost_micro_usd, pricing_version, suspect)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        ("ev-s2-1", "session-2-abcdefgh", "claude (main)", "claude-sonnet-4-6",
-         _RECENT_ISO, 800, 150, 30, 80, 2000, "2025-01-01", 0),
+        (
+            "ev-s2-1",
+            "session-2-abcdefgh",
+            "claude (main)",
+            "claude-sonnet-4-6",
+            _RECENT_ISO,
+            800,
+            150,
+            30,
+            80,
+            2000,
+            "2025-01-01",
+            0,
+        ),
     )
     # session-3 event-1: cost NULL (codex-like)
     conn.execute(
@@ -183,18 +252,42 @@ def _seed_db(conn: sqlite3.Connection) -> None:
         "  tokens_input, tokens_cache_read, tokens_cache_create, tokens_output,"
         "  cost_micro_usd, pricing_version, suspect)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        ("ev-s3-1", "session-3-abcdefgh", "software-architect", "claude-opus-4-7",
-         _RECENT_ISO, 2000, 0, 0, 200, None, None, 0),
+        (
+            "ev-s3-1",
+            "session-3-abcdefgh",
+            "software-architect",
+            "claude-opus-4-7",
+            _RECENT_ISO,
+            2000,
+            0,
+            0,
+            200,
+            None,
+            None,
+            0,
+        ),
     )
     # Workflows
     conn.executemany(
         "INSERT OR REPLACE INTO workflows (name, source_path, description, apply_to, discovered_at, last_seen_at)"
         " VALUES (?,?,?,?,?,?)",
         [
-            ("wf-alpha", "/some/path/.claude/skills/wf-alpha/SKILL.md",
-             "Alpha workflow", None, _RECENT_ISO, _RECENT_ISO),
-            ("wf-beta", "/some/path/.agents/skills/wf-beta/SKILL.md",
-             "Beta workflow", None, _RECENT_ISO, _RECENT_ISO),
+            (
+                "wf-alpha",
+                "/some/path/.claude/skills/wf-alpha/SKILL.md",
+                "Alpha workflow",
+                None,
+                _RECENT_ISO,
+                _RECENT_ISO,
+            ),
+            (
+                "wf-beta",
+                "/some/path/.agents/skills/wf-beta/SKILL.md",
+                "Beta workflow",
+                None,
+                _RECENT_ISO,
+                _RECENT_ISO,
+            ),
         ],
     )
     # Workflow agents
@@ -212,6 +305,7 @@ def _seed_db(conn: sqlite3.Connection) -> None:
 # ---------------------------------------------------------------------------
 # Aggregator factory
 # ---------------------------------------------------------------------------
+
 
 def _make_aggregator(conn: sqlite3.Connection, scs: _FakeSCS | None = None) -> TelemetryAggregator:
     dao = TelemetryDao(conn)
@@ -262,9 +356,7 @@ def test_unassigned_bucket():
     result = agg.list_agents()
 
     arch = next(a for a in result.agents if a.agent_id == "software-architect")
-    unassigned = next(
-        cb for cb in arch.context_breakdown if cb.context_slug is None
-    )
+    unassigned = next(cb for cb in arch.context_breakdown if cb.context_slug is None)
     assert unassigned.context_name == "unassigned"
     assert unassigned.session_count == 1
 
@@ -278,9 +370,7 @@ def test_assigned_context_breakdown():
     result = agg.list_agents()
 
     main = next(a for a in result.agents if a.agent_id == "claude (main)")
-    dw_bucket = next(
-        cb for cb in main.context_breakdown if cb.context_slug == _CONTEXT_SLUG
-    )
+    dw_bucket = next(cb for cb in main.context_breakdown if cb.context_slug == _CONTEXT_SLUG)
     assert dw_bucket.session_count == 2
     # Cost in bucket should be sum of events from sessions 1 and 2.
     assert dw_bucket.cost_usd == pytest.approx((3000 + 1500 + 2000) / 1_000_000)
@@ -308,11 +398,7 @@ def test_cost_fractions_sum_to_one():
     result = agg.list_agents()
 
     main = next(a for a in result.agents if a.agent_id == "claude (main)")
-    fractions = [
-        cb.cost_fraction
-        for cb in main.context_breakdown
-        if cb.cost_fraction is not None
-    ]
+    fractions = [cb.cost_fraction for cb in main.context_breakdown if cb.cost_fraction is not None]
     if fractions:
         assert sum(fractions) == pytest.approx(1.0, abs=1e-6)
 
@@ -409,9 +495,18 @@ def test_window_days_excludes_old():
         "  is_sidechain, sub_slug, first_event_at, last_event_at, status)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (
-            "session-old-abcde", "claude", "claude (main)", None, "cli",
-            _KNOWN_ROOT, "old-branch",
-            0, None, _OLD_ISO, _OLD_ISO, "closed",
+            "session-old-abcde",
+            "claude",
+            "claude (main)",
+            None,
+            "cli",
+            _KNOWN_ROOT,
+            "old-branch",
+            0,
+            None,
+            _OLD_ISO,
+            _OLD_ISO,
+            "closed",
         ),
     )
     conn.execute(
@@ -420,8 +515,20 @@ def test_window_days_excludes_old():
         "  tokens_input, tokens_cache_read, tokens_cache_create, tokens_output,"
         "  cost_micro_usd, pricing_version, suspect)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        ("ev-old-1", "session-old-abcde", "claude (main)", "claude-sonnet-4-6",
-         _OLD_ISO, 9999999, 0, 0, 0, 9999000, "2025-01-01", 0),
+        (
+            "ev-old-1",
+            "session-old-abcde",
+            "claude (main)",
+            "claude-sonnet-4-6",
+            _OLD_ISO,
+            9999999,
+            0,
+            0,
+            0,
+            9999000,
+            "2025-01-01",
+            0,
+        ),
     )
     conn.commit()
 

@@ -13,9 +13,9 @@ Tests are sequenced around the three endpoints:
     Security headers: CSP on HTML, nosniff on JSON
     404 body: lists known endpoints
 """
+
 from __future__ import annotations
 
-import dataclasses
 import json
 import threading
 import urllib.error
@@ -28,7 +28,6 @@ import pytest
 # ---------------------------------------------------------------------------
 # Canned fixtures (minimal, shape-correct)
 # ---------------------------------------------------------------------------
-
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
     AgentSummary,
@@ -112,6 +111,7 @@ _CANNED_SESSIONS: list[RecentSession] = [
 # Stub TelemetryService
 # ---------------------------------------------------------------------------
 
+
 class StubTelemetryService:
     """Minimal TelemetryService stub returning canned fixtures.
 
@@ -150,15 +150,12 @@ class StubTelemetryService:
 # Server fixture
 # ---------------------------------------------------------------------------
 
+
 def _build_server(token: str, stub_telemetry: StubTelemetryService):
     """Build a ThreadingHTTPServer on port 0 with the panel handler."""
     from dadaia_workspace.features.panel.handler import make_handler_class
-    from dadaia_workspace.features.panel.service import PanelService
 
     # Minimal stub views for existing routes.
-    from dadaia_workspace.features.panel.views import (
-        _assets as assets_mod,
-    )
 
     # We only need stub callables for the existing routes; the new telemetry
     # routes are added by make_handler_class receiving telemetry view keys.
@@ -207,6 +204,7 @@ def panel_server():
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes]:
     """GET url, return (status, lowercase-keyed headers, body).
 
@@ -229,6 +227,7 @@ def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes
 # ---------------------------------------------------------------------------
 # T-AM-15 tests
 # ---------------------------------------------------------------------------
+
 
 class TestAgentsEndpoint:
     def test_agents_endpoint_401_without_token(self, panel_server) -> None:
@@ -297,8 +296,13 @@ class TestAgentSessionsEndpoint:
 
 class TestPrivacyAndSecurity:
     _FORBIDDEN_FIELDS = {
-        "content", "text", "messages", "snapshot",
-        "thinking", "prompt", "response",
+        "content",
+        "text",
+        "messages",
+        "snapshot",
+        "thinking",
+        "prompt",
+        "response",
     }
 
     def _check_no_forbidden_fields(self, data: Any, path: str = "") -> None:
@@ -362,6 +366,4 @@ class Test404:
         assert "/api/agents" in body_text, (
             "404 body must list /api/agents so callers know endpoint exists"
         )
-        assert "/api/workflows" in body_text, (
-            "404 body must list /api/workflows"
-        )
+        assert "/api/workflows" in body_text, "404 body must list /api/workflows"

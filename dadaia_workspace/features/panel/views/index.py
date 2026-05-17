@@ -29,9 +29,7 @@ def render_index(
 
         primary = next((c for c in contexts if c.is_primary), None)
         primary_badge = (
-            f'<div class="topbar-badge">'
-            f"primary: {html.escape(primary.slug)}"
-            f"</div>"
+            f'<div class="topbar-badge">primary: {html.escape(primary.slug)}</div>'
             if primary
             else ""
         )

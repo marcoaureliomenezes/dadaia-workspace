@@ -2,22 +2,21 @@
 
 Per TDD: tests written first. They will fail until auth.py is created.
 """
+
 from __future__ import annotations
 
-import hmac
 import inspect
 import os
 import pathlib
-
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _import_auth():
     from dadaia_workspace.features.panel import auth  # type: ignore[import]
+
     return auth
 
 
@@ -25,20 +24,23 @@ def _import_auth():
 # ensure_token tests
 # ---------------------------------------------------------------------------
 
+
 class TestEnsureToken:
     def test_ensure_token_creates_file_with_0o600(self, tmp_path: pathlib.Path) -> None:
         """Token file created with mode 0o600; parent dir created with mode 0o700."""
         auth = _import_auth()
         token_path = tmp_path / "state" / "panel.token"
 
-        token = auth.ensure_token(token_path)
+        auth.ensure_token(token_path)
 
         assert token_path.exists(), "Token file should be created"
         stat = os.stat(token_path)
         assert stat.st_mode & 0o777 == 0o600, f"File mode must be 0o600, got {oct(stat.st_mode)}"
 
         parent_stat = os.stat(token_path.parent)
-        assert parent_stat.st_mode & 0o777 == 0o700, f"Dir mode must be 0o700, got {oct(parent_stat.st_mode)}"
+        assert parent_stat.st_mode & 0o777 == 0o700, (
+            f"Dir mode must be 0o700, got {oct(parent_stat.st_mode)}"
+        )
 
     def test_ensure_token_existing_returned_as_is(self, tmp_path: pathlib.Path) -> None:
         """Pre-existing token file is returned as-is without regenerating."""
@@ -64,12 +66,16 @@ class TestEnsureToken:
 
         # URL-safe base64 charset: [A-Za-z0-9_-]
         import re
-        assert re.fullmatch(r"[A-Za-z0-9_\-]+", token), f"Token contains non-urlsafe chars: {token!r}"
+
+        assert re.fullmatch(r"[A-Za-z0-9_\-]+", token), (
+            f"Token contains non-urlsafe chars: {token!r}"
+        )
 
 
 # ---------------------------------------------------------------------------
 # validate tests
 # ---------------------------------------------------------------------------
+
 
 class TestValidate:
     def test_validate_valid_header(self) -> None:

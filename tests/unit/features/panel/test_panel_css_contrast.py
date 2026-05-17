@@ -9,23 +9,24 @@ Assertions cover:
   - Structural assertions that palette colors are NOT used as text `color:`
     values where they would fail contrast (accent / alert are decorative only).
 """
+
 from __future__ import annotations
 
 import re
 
-from dadaia_workspace.features.panel.views._assets import PANEL_CSS, PALETTE
-
+from dadaia_workspace.features.panel.views._assets import PALETTE, PANEL_CSS
 
 # ---------------------------------------------------------------------------
 # WCAG relative-luminance + contrast-ratio helpers (stdlib only)
 # ---------------------------------------------------------------------------
+
 
 def _luminance(hex_color: str) -> float:
     """Return the WCAG relative luminance of a hex colour string."""
     h = hex_color.lstrip("#")
     if len(h) == 3:
         h = "".join(c * 2 for c in h)
-    r, g, b = (int(h[i: i + 2], 16) / 255 for i in (0, 2, 4))
+    r, g, b = (int(h[i : i + 2], 16) / 255 for i in (0, 2, 4))
 
     def _channel(c: float) -> float:
         return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
@@ -44,6 +45,7 @@ def _contrast(fg: str, bg: str) -> float:
 # ---------------------------------------------------------------------------
 # Contrast assertions (WCAG AA = 4.5:1; AAA = 7:1)
 # ---------------------------------------------------------------------------
+
 
 def test_text_on_accent_aa() -> None:
     """Dark text on accent background meets WCAG AA (defensive; accent is decorative)."""
@@ -80,6 +82,7 @@ def test_dark_on_alert_aa() -> None:
 # Structural assertions: palette tokens used only as background/border, not text
 # ---------------------------------------------------------------------------
 
+
 def test_accent_not_used_as_text_color() -> None:
     """`#9cddc8` must not appear as a CSS `color:` property value in PANEL_CSS.
 
@@ -109,6 +112,7 @@ def test_alert_not_used_as_text_color() -> None:
 # ---------------------------------------------------------------------------
 # Palette completeness: all PALETTE values have a CSS token entry
 # ---------------------------------------------------------------------------
+
 
 def test_palette_tokens_present_in_root() -> None:
     """Every PALETTE hex value appears in the :root block of PANEL_CSS."""
