@@ -315,7 +315,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: 2 passed
     ```
 
-- [-] **T-MPP-2.12** `[parallel: yes]` Add 1 integration test for T-PB-1 (manager real on `tmp_path` with 2 fixture agents).
+- [x] **T-MPP-2.12** `[parallel: yes]` Add 1 integration test for T-PB-1 (manager real on `tmp_path` with 2 fixture agents).
   - **Owner:** software-engineer
   - **Effort:** M (~40 LoC test code)
   - **Files MODIFIED:**
