@@ -14,6 +14,8 @@ from collections.abc import Callable, Sequence
 
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._assets import LOGO_RHINO_24, PANEL_CSS, PANEL_JS
+from dadaia_workspace.features.panel.views.agents import render_agents_section
+from dadaia_workspace.features.panel.views.workflows import render_workflows_section
 
 
 def render_index(
@@ -48,6 +50,9 @@ def render_index(
             f"</p>"
         )
 
+        agents_section = render_agents_section()
+        workflows_section = render_workflows_section()
+
         body = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -67,7 +72,8 @@ def render_index(
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active" data-section="servers" aria-selected="true" role="tab" id="tab-servers">Servers</button>
     <button class="nav-tab" data-section="memories" aria-selected="false" role="tab" id="tab-memories">Memories</button>
-    <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents &amp; Workflows</button>
+    <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents</button>
+    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows">Workflows</button>
   </nav>
   <main class="main" role="main">
 
@@ -94,18 +100,9 @@ def render_index(
       </div>
     </section>
 
-    <section id="section-agents" class="section" aria-label="Agents and Workflows placeholder" role="tabpanel" tabindex="0" aria-labelledby="tab-agents">
-      <div class="section-header">
-        <h2>Agents &amp; Workflows</h2>
-        <p>Installed agents and multi-agent workflows &mdash; catalog and invocation surface.</p>
-      </div>
-      <div class="placeholder-card" role="note" aria-label="Feature not yet available">
-        <div class="placeholder-title">Em breve &#8212; Release-2</div>
-        <div class="placeholder-body">
-          The Agents &amp; Workflows section is planned for the next release.
-        </div>
-      </div>
-    </section>
+    {agents_section}
+
+    {workflows_section}
 
   </main>
   <script>{PANEL_JS}</script>
