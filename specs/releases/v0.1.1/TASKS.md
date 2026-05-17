@@ -71,7 +71,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-07 — Scan command core logic
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p4
 - **Owner:** software-engineer
 - **Precondições:** T-DSR-06 done.
 - **Files modified:**
@@ -82,7 +82,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-08 — `dadaia server scan` CLI subcommand
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p4
 - **Owner:** software-engineer
 - **Precondições:** T-DSR-07 done.
 - **Files modified:**
