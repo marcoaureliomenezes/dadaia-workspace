@@ -107,7 +107,7 @@ feat(public-assets): T-PB-3 — emit [not-applicable] doctor status for Codex wo
     # expect: 1 match around line 70-76, with style="cyan"
     ```
 
-- [ ] **T-MPP-1.3** `[parallel: yes]` Add 4 unit tests for `_classify_workflows()` (parametrize-on-dict, 4 quadrants).
+- [-] **T-MPP-1.3** `[parallel: yes]` Add 4 unit tests for `_classify_workflows()` (parametrize-on-dict, 4 quadrants).
   - **Owner:** software-engineer
   - **Effort:** S (~30 LoC test code)
   - **Files MODIFIED:**
