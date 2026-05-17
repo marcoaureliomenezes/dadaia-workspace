@@ -1,9 +1,5 @@
 """Static frontend assets for the Dadaia Workspace Panel.
 
-Both constants are plain Python strings — no filesystem reads, no importlib.resources.
-This is the R1 resolution from the software-engineer review: assets ship correctly in any
-installed wheel without pyproject.toml package-data declarations.
-
 PANEL_CSS  — design tokens from specs/memory/architecture.html + structural rules from
              the frontend mockup (index.html, memories.html, memory-view.html).
              Body-text links use --color-accent-dark (#2d7d9a, WCAG AA ~5:1 on #fafafa).
@@ -11,7 +7,17 @@ PANEL_CSS  — design tokens from specs/memory/architecture.html + structural ru
 
 PANEL_JS   — auto-refresh /api/servers every 5s; tab switching; TTL relative formatter.
              Vanilla JS, no frameworks, no eval().
+
+LOGO_RHINO_24 / LOGO_RHINO_16 — inline SVG for the rhino logomark, loaded at import
+             time from assets/. currentColor only; zero hardcoded hex.
+             (spec: dadaia-workspace-brand-identity-v1 T-BR-03/04/05)
 """
+
+from pathlib import Path
+
+_ASSETS_DIR = Path(__file__).parent / "assets"
+LOGO_RHINO_24: str = (_ASSETS_DIR / "logo-rhino-24.svg").read_text(encoding="utf-8")
+LOGO_RHINO_16: str = (_ASSETS_DIR / "logo-rhino-16.svg").read_text(encoding="utf-8")
 
 PALETTE: dict[str, str] = {
     "accent": "#9cddc8",
@@ -96,6 +102,9 @@ code {
   padding: 0 var(--space-lg);
   gap: var(--space-md);
 }
+
+.topbar-logo { color: var(--color-cost); display: inline-flex; align-items: center; margin-right: 0.5rem; }
+.topbar-logo svg { width: 24px; height: 24px; display: block; }
 
 .topbar-wordmark {
   font-size: 1.1rem;
