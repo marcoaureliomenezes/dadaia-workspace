@@ -63,18 +63,18 @@
 
 ## Phase 3 — Wordmark + tests
 
-- [ ] **T-BR-07** — Update `.topbar-wordmark` CSS to use `--color-cost`.
+- [-] **T-BR-07** — Update `.topbar-wordmark` CSS to use `--color-cost`. <!-- software-engineer-phase4 -->
   - In PANEL_CSS: `.topbar-wordmark { color: var(--color-cost); ... }` (keep existing spacing/weight).
   - Files: `dadaia_workspace/features/panel/views/_assets.py`.
   - Parallel-safe: yes after T-BR-02.
 
-- [ ] **T-BR-08** — Add `tests/unit/features/panel/test_palette.py`.
+- [-] **T-BR-08** — Add `tests/unit/features/panel/test_palette.py`. <!-- software-engineer-phase4 -->
   - Assert `PALETTE` has exactly 5 keys with the canonical hex values.
   - Assert no other hex from `PALETTE` is hardcoded in PANEL_CSS outside the token definition rules (regex grep across PANEL_CSS string).
   - Files: `tests/unit/features/panel/test_palette.py`.
   - Parallel-safe: yes after T-BR-01.
 
-- [ ] **T-BR-09** — Add `tests/unit/features/panel/test_contrast.py`.
+- [-] **T-BR-09** — Add `tests/unit/features/panel/test_contrast.py`. <!-- software-engineer-phase4 -->
   - Implement WCAG ratio computation (stdlib, ~10 lines).
   - Assert ratio ≥ 4.5:1 for: `#222` over `#9cddc8`; `#3d3600` over `#ddd9ab`; `#222` over `#bfd8ad`.
   - Assert ratio ≥ 7:1 for `#633d2e` over `#ffffff` (AAA target for cost token).
@@ -82,14 +82,14 @@
   - Files: `tests/unit/features/panel/test_contrast.py`.
   - Parallel-safe: yes after T-BR-02.
 
-- [ ] **T-BR-10** — Add `tests/unit/features/panel/test_svg_validity.py`.
+- [-] **T-BR-10** — Add `tests/unit/features/panel/test_svg_validity.py`. <!-- software-engineer-phase4 -->
   - Parse `LOGO_RHINO_24` and `LOGO_RHINO_16` via `xml.etree.ElementTree.fromstring`.
   - Assert no `fill`/`stroke` attribute matches `/^#[0-9a-fA-F]{3,8}$/` — all must be `currentColor` or `none`.
   - Assert each SVG has ≤ 3 path/circle elements (recursive count).
   - Files: `tests/unit/features/panel/test_svg_validity.py`.
   - Parallel-safe: yes after T-BR-05.
 
-- [ ] **T-BR-11** — Update memory: declare canonical palette in `specs/memory/product.html`.
+- [-] **T-BR-11** — Update memory: declare canonical palette in `specs/memory/product.html`. <!-- software-engineer-phase4 -->
   - Add a "Brand identity" section with the 5-color palette, mapped tokens, and link to this release SPEC.
   - This is an atomic memory edit (SPEC-DOC-008) — replace, not append.
   - Files: `specs/memory/product.html`.
