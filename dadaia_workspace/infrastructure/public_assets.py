@@ -40,6 +40,16 @@ _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
 _OPENCODE_DIRS = ("commands", "skills", "agents", "plugins", "workflows")
 _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
 
+# Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
+_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset({"name", "description", "model", "tools"})
+
+# Matches a YAML list item under `tools:` (e.g. "  - Read")
+_AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
+# Matches a simple `key: value` line in frontmatter (single-line value)
+_AGENT_FM_SIMPLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): (.+)$", re.MULTILINE)
+# Matches a folded/literal scalar intro: `key: >` or `key: |`
+_AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.MULTILINE)
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -58,6 +68,73 @@ def _package_version() -> str:
 
 def _json_dump(data: object) -> str:
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
+
+
+def _parse_agent_frontmatter(text: str) -> dict[str, object]:
+    """Parse YAML frontmatter from an agent .md file using stdlib regex only.
+
+    Extracts the block between the first pair of ``---`` fences. Supports:
+    - Simple ``key: value`` scalar fields (string values).
+    - Folded scalar ``key: >`` — continuation lines are joined with a space.
+    - YAML list under ``tools:`` — items prefixed with ``  - `` (two-space indent).
+
+    Unknown fields (outside ``_TOML_SAFE_AGENT_FIELDS``) are silently dropped.
+    Returns an empty dict if ``name`` is missing or frontmatter is absent.
+    """
+    if not text.startswith("---\n"):
+        return {}
+    end_idx = text.find("\n---\n", 4)
+    if end_idx == -1:
+        return {}
+    frontmatter = text[4 : end_idx + 1]
+
+    result: dict[str, object] = {}
+    lines = frontmatter.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Detect block scalar (folded `>` or literal `|`)
+        block_m = _AGENT_FM_BLOCK_SCALAR_RE.match(line)
+        if block_m:
+            key = block_m.group(1)
+            # Collect continuation lines (indented)
+            body_lines: list[str] = []
+            i += 1
+            while i < len(lines) and (lines[i].startswith("  ") or lines[i] == ""):
+                body_lines.append(lines[i].strip())
+                i += 1
+            # Join non-empty continuation lines with a space (folded scalar semantics)
+            value = " ".join(part for part in body_lines if part)
+            if key in _TOML_SAFE_AGENT_FIELDS:
+                result[key] = value
+            continue
+
+        # Detect tools list  (`tools:\n  - item\n  - item`)
+        if line == "tools:":
+            items: list[str] = []
+            i += 1
+            while i < len(lines) and _AGENT_FM_TOOLS_ITEM_RE.match(lines[i]):
+                m = _AGENT_FM_TOOLS_ITEM_RE.match(lines[i])
+                if m:
+                    items.append(m.group(1).strip())
+                i += 1
+            if "tools" in _TOML_SAFE_AGENT_FIELDS:
+                result["tools"] = items
+            continue
+
+        # Simple scalar
+        simple_m = _AGENT_FM_SIMPLE_RE.match(line)
+        if simple_m:
+            key = simple_m.group(1)
+            value_str = simple_m.group(2).strip()
+            if key in _TOML_SAFE_AGENT_FIELDS:
+                result[key] = value_str
+        i += 1
+
+    # Require `name` — without it, the block cannot be rendered
+    if "name" not in result:
+        return {}
+    return result
 
 
 def _atomic_write_text(dst: Path, content: str) -> None:
