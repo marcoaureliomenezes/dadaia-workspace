@@ -9,8 +9,9 @@ description: >
   NOT touch game code (use game-developer) or specs (use product-engineer).
 model: claude-sonnet-4-6
 skills:
-  - dadaia-workspace-spec-navigator
+  - dadaia-handoff-emitter
   - dadaia-task-manager
+  - dadaia-workspace-spec-navigator
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -235,6 +236,11 @@ Report format:
 ## QA validation
 [qa-engineer report reference or "pending"]
 ```
+
+### Artifact emission
+
+After finalizing any HTML report under `.dadaia/reports/`, invoke the `dadaia-handoff-emitter`
+skill to emit the `<stem>.handoff.json` sidecar in the same directory.
 
 ---
 

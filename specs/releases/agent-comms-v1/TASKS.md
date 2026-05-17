@@ -180,7 +180,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-09 — Skill `dadaia-handoff-emitter` + 3 pilot agent patches
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer (coordena com PE em body changes — ADR-006)
 - **Wave:** 2
 - **Precondições:** T-AC-04 [x]
