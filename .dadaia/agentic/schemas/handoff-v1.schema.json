@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Handoff Document v1",
+  "description": "Structured sidecar emitted by an agent after producing a report HTML. Validates the handoff contract between pipeline stages.",
+  "type": "object",
+  "required": ["schema_version", "agent", "context", "produced_at", "artifact"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["handoff-v1"],
+      "description": "Schema version identifier. Always 'handoff-v1' for this schema."
+    },
+    "agent": {
+      "type": "string",
+      "description": "Name of the agent that produced this handoff (e.g. 'software-engineer')."
+    },
+    "context": {
+      "type": "string",
+      "description": "Active dadaia context name (e.g. 'dadaia-workspace')."
+    },
+    "produced_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
+      "description": "ISO 8601 UTC timestamp when the handoff was produced."
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["type", "path", "content_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["report", "spec", "plan", "tasks", "closure", "memory", "other"],
+          "description": "Type of the artifact produced."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_./{}-]+$",
+          "description": "Relative path from workspace root to the artifact file. Supports {context} and {run_ts} templates."
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hex digest of the artifact file content."
+        }
+      }
+    },
+    "release_id": {
+      "type": "string",
+      "description": "Optional release identifier (e.g. 'agent-comms-v1')."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"],
+            "description": "Severity level of the finding."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable description of the finding."
+          }
+        }
+      },
+      "description": "Optional list of key findings from the agent's work."
+    },
+    "decisions_required": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional list of decisions or open questions the next agent or operator must resolve."
+    },
+    "next_handoff": {
+      "type": "object",
+      "required": ["agent", "context", "expected_artifact_type"],
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "type": "string",
+          "description": "Name of the next agent in the pipeline."
+        },
+        "context": {
+          "type": "string",
+          "description": "Context for the next handoff."
+        },
+        "expected_artifact_type": {
+          "type": "string",
+          "enum": ["report", "spec", "plan", "tasks", "closure", "memory", "other"],
+          "description": "Expected artifact type from the next agent."
+        }
+      },
+      "description": "Optional pointer to the expected next handoff in the pipeline."
+    }
+  }
+}
