@@ -17,7 +17,7 @@ Specs live under `specs/`. Load them in this order before making any change:
 1. `specs/constitution.md`
 2. `specs/SPEC.md`
 3. `specs/features/<affected-feature>/SPEC.md`
-4. `specs/z_bug_specs.md` — live unresolved gaps
+4. `specs/backlog/candidates.md` — live unresolved gaps and hotfix candidates
 
 Approval marker: `**Status:** Aprovado` in the spec header is required before implementation.
 

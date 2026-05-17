@@ -214,7 +214,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-11 — z_bug consumers patches + backlog appends + constitution L106
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer (coordena com PE em constitution edit — ADR-007)
 - **Wave:** 3
 - **Precondições:** T-AC-09 [x] (skill já patcheada antes que pilotos emitam handoff referenciando consumers atualizados)
