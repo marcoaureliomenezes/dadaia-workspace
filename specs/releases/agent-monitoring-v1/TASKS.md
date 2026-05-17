@@ -17,7 +17,7 @@
 
 ## Phase 1 — A11y fix (gating)
 
-- [-] **T-AM-01** — Fix nav-tabs accessibility in `dadaia_workspace/features/panel/views/index.py`. <!-- frontend-engineer-p1 -->
+- [x] **T-AM-01** — Fix nav-tabs accessibility in `dadaia_workspace/features/panel/views/index.py`. <!-- frontend-engineer-p1 -->
   - Add `role="tablist"` to the `<nav class="nav-tabs">` element.
   - Add `id="tab-{section}"` to each tab button.
   - Add `role="tabpanel"`, `tabindex="0"`, `aria-labelledby="tab-{section}"` to each `<section id="section-...">`.
