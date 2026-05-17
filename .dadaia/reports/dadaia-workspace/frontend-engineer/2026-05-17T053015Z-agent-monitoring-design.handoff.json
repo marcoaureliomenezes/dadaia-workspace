@@ -1,0 +1,53 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "frontend-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-17T05:30:15Z",
+  "release_id": "agent-monitoring-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/frontend-engineer/2026-05-17T053015Z-agent-monitoring-design.html",
+    "content_hash": "c16edbc65e4e784de1ccbd9bc615cabfe3398415118ad20459ecc4b899439e95"
+  },
+  "findings": [
+    {
+      "severity": "HIGH",
+      "message": "Panel atual falta role=tablist no nav e role=tabpanel nas sections — correcao obrigatoria para WCAG 2.1 AA antes da implementacao."
+    },
+    {
+      "severity": "HIGH",
+      "message": "--color-accent novo (#9cddc8) NAO pode ser usado como cor de texto sobre fundo branco (ratio 2.1:1 — falha AA). Uso restrito a decoracao e fundo de badge com texto escuro."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "Fonte canonica de workflows e open question #4 do Phase 1 — bloqueia populacao do campo agent_ids em /api/workflows. Frontend preparado mas precisa da decisao antes da implementacao."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "Schema SQLite final (software-architect) pode requerer ajuste no contrato JSON de /api/agents; contrato proposto e o target, nao um contrato fixo."
+    },
+    {
+      "severity": "LOW",
+      "message": "Sparklines de canvas inline descartados para v1 (sem lib = risco de manutencao). Custo como numero USD com tooltip de token breakdown e suficiente."
+    },
+    {
+      "severity": "INFO",
+      "message": "4 abas decididas: Servers, Memories, Agents, Workflows. Costs separado nao justificado para v1 — breakdown de custo vive dentro do card de agente."
+    },
+    {
+      "severity": "INFO",
+      "message": "Logo rinoceronte: spec definida (24x24, viewBox 0 0 24 24, currentColor, silhueta flat). SVG real depende de dadaia-workspace-brand-identity-v1 — fallback: sem logo ate spec aprovada."
+    }
+  ],
+  "decisions_required": [
+    "Fonte canonica de workflows (.claude/skills/ vs specs/releases/*/PLAN.md) — bloqueia /api/workflows.agent_ids.",
+    "Tratamento de sessoes com cwd fora de qualquer context: bucket 'unassigned' (recomendado) ou descarte.",
+    "opencode incluido na v1 ou deferido — afeta campo providers no card de agente.",
+    "Auth local (token HTTP ou 127.0.0.1 puro) — afeta headers do fetch no PANEL_JS."
+  ],
+  "next_handoff": {
+    "agent": "product-engineer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "spec"
+  }
+}

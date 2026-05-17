@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Monitoring — Phase 2 Design (frontend-engineer)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 980px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .93rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-decided  { background: #daffd0; color: #1a5c00; }
+  .badge-open     { background: #e0eaff; color: #0550ae; }
+  .badge-defer    { background: #fff0d0; color: #c05000; }
+  .badge-blocked  { background: #ffd7d7; color: #a00; }
+  .badge-info     { background: #eee6ff; color: #4b2a8a; }
+  .section-note {
+    background: #fffbe6;
+    border: 1px solid #e6c700;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    font-size: .9rem;
+    margin: 1rem 0;
+  }
+  .color-swatch {
+    display: inline-block;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,.15);
+    vertical-align: middle;
+    margin-right: .3em;
+  }
+  .ascii-block {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: .82rem;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> frontend-engineer</span>
+  <span><strong>Gerado em:</strong> 2026-05-17T05:30:15Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Tipo:</strong> <code>design</code></span>
+  <span><strong>Release:</strong> <code>agent-monitoring-v1</code> (proposta)</span>
+  <span><strong>Input:</strong> Phase 1 discovery by product-engineer (2026-05-17T052532Z)</span>
+</div>
+
+<h1>Phase 2 Design Report &mdash; Agent Monitoring Panel (frontend-engineer)</h1>
+
+<blockquote>
+  <p>Stack invariant: HTML/CSS/JS pure strings embedded in Python. Zero npm deps. Zero build step.
+  Bind 127.0.0.1 only. No transcript content ever served.</p>
+</blockquote>
+
+<h2>1. Decisoes de Design (tabela)</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Decisao</th>
+      <th>Escolha</th>
+      <th>Justificativa</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>D-01</td>
+      <td>Information architecture: split Agents / Workflows</td>
+      <td><strong>4 abas</strong>: Servers | Memories | Agents | Workflows</td>
+      <td>Agents acumulam tokens e custo; Workflows sao receitas sem metricas proprias. Contextos diferentes, densidade de informacao diferente. 5 abas (ex: Costs separado) seria prematuro sem dados de uso real; o breakdown de custo por contexto vive dentro do card de agente, nao precisa de aba propria nesta release.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-02</td>
+      <td>Densidade do grid de cards de agente</td>
+      <td><strong>minmax(360px, 1fr)</strong> com max-width 1024px (igual ao panel atual); ~2 cards por linha em 1440px</td>
+      <td>Cards de agente sao mais ricos que os de memoria (header + 3 metricas + breakdown por contexto + sparkline opcional). Minimo de 360px evita compressao de numeros. 2 colunas em 1440px e adequado; 3 colunas tornaria leitura de valores numericos dificil.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-03</td>
+      <td>Exibicao de custo</td>
+      <td>USD com 2 decimais (ex: <code>$0.04</code>); tooltip com breakdown de tokens ao hover/focus; sem sparkline na v1 (canvas sem lib e arriscado em manutencao futura)</td>
+      <td>2 decimais e suficiente para granularidade de sessoes individuais. Tooltip evita poluicao visual. Sparkline de canvas inline sem lib aumenta superficie de manutencao sem ganho claro para v1; pode ser adicionado em v1.1 se o operador pedir.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-04</td>
+      <td>Chips de agentes em cards de Workflow</td>
+      <td>Chips clicaveis que navegam para a aba Agents <strong>com filtro por nome de agente</strong> via hash fragment (<code>#agents?filter=software-architect</code>)</td>
+      <td>Interligacao sem endpoint extra: o JS da aba Agents le o hash na inicializacao e aplica filtro client-side sobre os dados ja carregados. Zero roundtrip adicional.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-05</td>
+      <td>Atualizacao dos dados de agentes</td>
+      <td><strong>Lazy on tab activation</strong>: fetch /api/agents quando o usuario ativa a aba; sem polling automatico</td>
+      <td>Dados de telemetria nao sao real-time como /api/servers. Polling a cada 5s seria gasto desnecessario de leitura de SQLite. O usuario clica na aba quando quer ver; a UI mostra timestamp do ultimo fetch.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-06</td>
+      <td>Token de paleta para estado de aba ativa</td>
+      <td>Usar <code>--color-accent</code> (mapear para <code>#9cddc8</code> da nova paleta) como underline ativo; manter contraste via <code>--color-heading</code> para texto ativo</td>
+      <td>O panel atual ja usa --color-accent para nav-tab ativo. A nova paleta mapeia exatamente esse token. Transicao nao quebra nada.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-07</td>
+      <td>Logo nas specs</td>
+      <td>SVG inline monocromatico, <strong>24x24px</strong>, viewBox 0 0 24 24, cor via <code>currentColor</code>, sem fill hardcoded</td>
+      <td>24x24 e o tamanho standard de icone de topbar. currentColor permite troca de tema sem alterar o SVG. Monocromatico garante legibilidade em fundos claros e escuros.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-08</td>
+      <td>ARIA e navegacao por teclado das abas</td>
+      <td><code>role="tablist"</code> no nav, <code>role="tab"</code> nos botoes, <code>role="tabpanel"</code> nas secoes; setas Left/Right navegam entre abas; Enter/Space ativam</td>
+      <td>WCAG 2.1 AA, padrao WAI-ARIA Tabs Pattern. O panel atual ja tem <code>aria-selected</code> e <code>role="tab"</code> nos botoes mas falta <code>role="tablist"</code> no nav e <code>role="tabpanel"</code> nas secoes. O JS de troca de aba precisara de keydown handler adicional.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-09</td>
+      <td>Paginacao de /api/agents</td>
+      <td><strong>Sem paginacao na v1</strong>; limite de 50 agentes no payload (parametro <code>limit</code> disponivel)</td>
+      <td>Numero de agentes unicos em um workspace e baixo (estimativa: &lt; 20). Paginacao adiciona complexidade de UI sem beneficio claro. Limite 50 e uma salvaguarda contra payloads excessivos.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+    <tr>
+      <td>D-10</td>
+      <td>Aviso de preco desatualizado</td>
+      <td>Banner amarelo na aba Agents quando <code>pricing_age_days &gt; 90</code> (campo vem do /api/agents payload)</td>
+      <td>Alinha com risco R2 do Phase 1 (tabela de precos defasada). Banner e o padrao menos intrusivo; sem bloquear a leitura de dados.</td>
+      <td><span class="badge badge-decided">DECIDIDO</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2. ASCII Mock &mdash; Card de Agente</h2>
+
+<p>Viewport referencia: 1440px com grid de 2 colunas. Largura do card: ~460px.</p>
+
+<div class="ascii-block">
++----------------------------------------------------------+
+|  [AGENT ICON 24x24]  software-architect                  |
+|                       role: software-architect            |
+|                       model: claude-opus-4-7             |
++----------------------------------------------------------+
+|  SESSIONS          TOTAL COST         LAST ACTIVITY      |
+|  24 sessions       $1.84              3h ago             |
+|  (180d window)     [!] price 94d old  2026-05-17 02:11   |
++----------------------------------------------------------+
+|  BREAKDOWN BY SPEC CONTEXT PROJECT                       |
+|                                                          |
+|  dadaia-workspace       12 sessions    $0.97    52.7%    |
+|  ||||||||||||||||||||||||||||||||||||                     |
+|                                                          |
+|  tauan-games             7 sessions    $0.54    29.3%    |
+|  ||||||||||||||||||                                      |
+|                                                          |
+|  (unassigned)            5 sessions    $0.33    17.9%    |
+|  |||||||||||                                             |
++----------------------------------------------------------+
+|  [v] Show session list                                   |
++----------------------------------------------------------+
+
+-- EXPANDIDO (apos clicar "Show session list") --
+
++----------------------------------------------------------+
+|  [^] Hide session list                                   |
+|                                                          |
+|  2026-05-17  sessionId: a1b2...  $0.14  cli             |
+|              dadaia-workspace | main                     |
+|              in: 12,441  cache_r: 8,201  out: 934 tok    |
+|                                                          |
+|  2026-05-16  sessionId: c3d4...  $0.09  vscode          |
+|              dadaia-workspace | feat/panel-r2            |
+|              in: 8,012  cache_r: 5,190  out: 621 tok     |
+|                                                          |
+|  [+ 22 more sessions — click to load]                   |
++----------------------------------------------------------+
+
+LEGENDA:
+  [!]  = aviso de preco desatualizado (badge amarelo inline)
+  |||  = barra de proporcao CSS (width inline calculado pelo JS)
+  v/^  = toggle aria-expanded
+</div>
+
+<h2>3. ASCII Mock &mdash; Card de Workflow</h2>
+
+<p>Grid de Workflows: minmax(280px, 1fr) — cards menores (sem metricas numericas).</p>
+
+<div class="ascii-block">
++----------------------------------------------+
+|  [WORKFLOW ICON 24x24]  discovery-pipeline   |
+|                          Phase 0-3            |
++----------------------------------------------+
+|  Orchestrates 4-agent parallel discovery     |
+|  pattern for SDD feature inception.          |
+|  Source: .claude/skills/ (4 skills matched)  |
++----------------------------------------------+
+|  AGENTES QUE COMPOEM                         |
+|                                              |
+|  [product-engineer]  [software-architect]    |
+|  [frontend-engineer] [software-engineer]     |
+|  [devops-engineer]                           |
+|                                              |
+|  (chips clicaveis — ativam aba Agents        |
+|   com filtro pelo nome do agente)            |
++----------------------------------------------+
+
++----------------------------------------------+
+|  [WORKFLOW ICON 24x24]  sdd-release-cycle    |
+|                          Release lifecycle   |
++----------------------------------------------+
+|  Full SDD lifecycle from candidate backlog   |
+|  to approval gate and implementation.        |
+|  Source: specs/releases/*/PLAN.md            |
++----------------------------------------------+
+|  AGENTES QUE COMPOEM                         |
+|                                              |
+|  [product-engineer]  [qa-engineer]           |
+|  [devops-engineer]   [frontend-engineer]     |
++----------------------------------------------+
+
+NOTA: cards de workflow NAO exibem custo total — workflows nao acumulam
+tokens, apenas os agentes que os compoem. Intencional per decisao D-01.
+</div>
+
+<h2>4. Contrato JSON dos Endpoints</h2>
+
+<h3>4.1 GET /api/agents</h3>
+
+<p>Retorna lista de agentes com metricas agregadas. <strong>Nenhum campo de conteudo de mensagem. Sem transcripts.</strong></p>
+
+<pre><code>{
+  "generated_at": "2026-05-17T05:28:00Z",
+  "window_days": 180,
+  "pricing_age_days": 94,
+  "pricing_model_date": "2026-02-12",
+  "agents": [
+    {
+      "agent_id": "software-architect",
+      "display_name": "software-architect",
+      "role": "software-architect",
+      "providers": ["claude"],
+      "dominant_model": "claude-opus-4-7",
+      "session_count": 24,
+      "total_cost_usd": 1.84,
+      "last_activity_at": "2026-05-17T02:11:00Z",
+      "token_totals": {
+        "input": 284310,
+        "cache_creation": 44120,
+        "cache_read": 198450,
+        "output": 21380
+      },
+      "context_breakdown": [
+        {
+          "context_slug": "dadaia-workspace",
+          "context_name": "dadaia-workspace",
+          "session_count": 12,
+          "cost_usd": 0.97,
+          "cost_fraction": 0.527
+        },
+        {
+          "context_slug": "tauan-games",
+          "context_name": "tauan-games",
+          "session_count": 7,
+          "cost_usd": 0.54,
+          "cost_fraction": 0.293
+        },
+        {
+          "context_slug": null,
+          "context_name": "unassigned",
+          "session_count": 5,
+          "cost_usd": 0.33,
+          "cost_fraction": 0.179
+        }
+      ],
+      "recent_sessions": [
+        {
+          "session_id": "a1b2c3d4e5f6",
+          "date": "2026-05-17",
+          "cost_usd": 0.14,
+          "entrypoint": "cli",
+          "git_branch": "main",
+          "context_slug": "dadaia-workspace",
+          "token_counts": {
+            "input": 12441,
+            "cache_creation": 0,
+            "cache_read": 8201,
+            "output": 934
+          }
+        }
+      ]
+    }
+  ]
+}</code></pre>
+
+<p><strong>Campos NUNCA presentes:</strong> <code>content</code>, <code>text</code>, <code>messages</code>, <code>prompt</code>, <code>response</code>, qualquer fragmento de mensagem.</p>
+
+<p><strong>Parametros de query opcionais:</strong></p>
+<ul>
+  <li><code>limit</code> (int, default 50): maximo de agentes no payload</li>
+  <li><code>context</code> (string): filtrar por slug de context (ex: <code>?context=dadaia-workspace</code>)</li>
+  <li><code>days</code> (int, default 180): janela de tempo em dias</li>
+</ul>
+
+<h3>4.2 GET /api/agents/{agent_id}/sessions</h3>
+
+<p>Paginacao de sessoes de um agente. Separado para carregamento lazy (o card mostra apenas 2 sessoes inicialmente).</p>
+
+<pre><code>{
+  "agent_id": "software-architect",
+  "total_sessions": 24,
+  "offset": 0,
+  "limit": 20,
+  "sessions": [
+    {
+      "session_id": "a1b2c3d4e5f6",
+      "date": "2026-05-17",
+      "cost_usd": 0.14,
+      "entrypoint": "cli",
+      "git_branch": "main",
+      "context_slug": "dadaia-workspace",
+      "token_counts": {
+        "input": 12441,
+        "cache_creation": 0,
+        "cache_read": 8201,
+        "output": 934
+      }
+    }
+  ]
+}</code></pre>
+
+<p><strong>Sem <code>/api/transcripts/</code>. Sem <code>/api/sessions/{id}/content</code>. Qualquer endpoint que sirva conteudo bruto e proibido por restricao #4 do Phase 1.</strong></p>
+
+<h3>4.3 GET /api/workflows</h3>
+
+<pre><code>{
+  "generated_at": "2026-05-17T05:28:00Z",
+  "source_hint": ".claude/skills/",
+  "workflows": [
+    {
+      "workflow_id": "discovery-pipeline",
+      "display_name": "discovery-pipeline",
+      "description": "Orchestrates 4-agent parallel discovery pattern for SDD feature inception.",
+      "source": ".claude/skills/",
+      "agent_ids": [
+        "product-engineer",
+        "software-architect",
+        "frontend-engineer",
+        "software-engineer",
+        "devops-engineer"
+      ]
+    }
+  ]
+}</code></pre>
+
+<p><strong>Nota:</strong> a fonte canonica de workflows (campo <code>source</code>) e uma open question do Phase 1 (#4). O frontend esta preparado para exibir <code>source_hint</code> qualquer que seja a decisao do software-architect.</p>
+
+<h2>5. Acessibilidade</h2>
+
+<h3>5.1 Correcoes necessarias no panel atual</h3>
+
+<p>O <code>views/index.py</code> atual tem lacunas em relacao ao padrao WAI-ARIA Tabs Pattern (WCAG 2.1 AA):</p>
+
+<table>
+  <thead>
+    <tr><th>Elemento atual</th><th>Problema</th><th>Correcao</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>&lt;nav class="nav-tabs"&gt;</code></td>
+      <td>Falta <code>role="tablist"</code></td>
+      <td>Adicionar <code>role="tablist"</code> ao elemento <code>nav</code></td>
+    </tr>
+    <tr>
+      <td><code>&lt;section id="section-..."&gt;</code></td>
+      <td>Falta <code>role="tabpanel"</code> e <code>aria-labelledby</code></td>
+      <td>Adicionar <code>role="tabpanel"</code> + <code>tabindex="0"</code> + <code>aria-labelledby="tab-{id}"</code></td>
+    </tr>
+    <tr>
+      <td>Botoes de aba</td>
+      <td>Falta <code>id</code> nos botoes (para aria-labelledby) e navegacao por setas</td>
+      <td>Adicionar <code>id="tab-{section}"</code>; JS deve capturar ArrowLeft/ArrowRight/Home/End</td>
+    </tr>
+    <tr>
+      <td>Cards de agente (futuros)</td>
+      <td>Toggle "Show sessions" precisa de <code>aria-expanded</code> + <code>aria-controls</code></td>
+      <td>Botao toggle: <code>aria-expanded="false"</code> + <code>aria-controls="sessions-{agent_id}"</code>; painel: <code>id="sessions-{agent_id}"</code></td>
+    </tr>
+    <tr>
+      <td>Barras de proporcao de custo</td>
+      <td>Elemento puramente visual sem equivalente textual</td>
+      <td>Adicionar <code>aria-label="X% do custo total"</code> no elemento da barra</td>
+    </tr>
+    <tr>
+      <td>Chips de agente em Workflows</td>
+      <td>Chips sao botoes de acao, nao links</td>
+      <td>Usar <code>&lt;button&gt;</code> com <code>aria-label="Filtrar por agente: {nome}"</code>; foco visivel obrigatorio</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>5.2 Contraste minimo (WCAG AA)</h3>
+
+<p>Com a paleta nova mapeada abaixo, verificacoes criticas de contraste:</p>
+
+<ul>
+  <li>Texto principal (<code>#222222</code>) sobre fundo (<code>#fafafa</code> ou branco): ratio ~14:1 — passa.</li>
+  <li>Texto de aba ativa (<code>#111111</code>) sobre branco: ~18:1 — passa.</li>
+  <li><code>--color-accent</code> = <code>#9cddc8</code>: NAO usar como cor de texto sobre branco (ratio ~2.1:1 — falha AA). Uso restrito a decoracao, borders, badges de fundo com texto escuro sobreposto.</li>
+  <li>Badges de texto sobre <code>#9cddc8</code>: texto deve ser <code>#111</code> (ratio ~7.1:1 — passa).</li>
+  <li>Muted text (<code>#666666</code>) sobre branco: ratio ~5.7:1 — passa AA.</li>
+  <li>Custo em destaque (<code>#633d2e</code> sobre branco): ratio ~8.1:1 — passa AAA.</li>
+</ul>
+
+<h2>6. Mapeamento de Tokens &mdash; Paleta Nova</h2>
+
+<p>Paleta aprovada pelo operador: <code>#9cddc8</code> <code>#bfd8ad</code> <code>#ddd9ab</code> <code>#f7af63</code> <code>#633d2e</code></p>
+
+<table>
+  <thead>
+    <tr><th>Token CSS</th><th>Valor Atual</th><th>Novo Valor</th><th>Swatchs</th><th>Uso semantico</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>--color-accent</code></td>
+      <td><code>#7ec8e3</code></td>
+      <td><code>#9cddc8</code></td>
+      <td><span class="color-swatch" style="background:#7ec8e3"></span>&rarr;<span class="color-swatch" style="background:#9cddc8"></span></td>
+      <td>Underline de aba ativa, borders de destaque, badges de fundo (texto escuro). Decorativo — nunca como cor de texto.</td>
+    </tr>
+    <tr>
+      <td><code>--color-accent-secondary</code></td>
+      <td>(nao existe)</td>
+      <td><code>#bfd8ad</code></td>
+      <td><span class="color-swatch" style="background:#bfd8ad"></span></td>
+      <td>Fundo de badges de estado verde (ex: agente "ativo hoje"), fundo de linha expandida de sessoes. Novo token a adicionar.</td>
+    </tr>
+    <tr>
+      <td><code>--color-warning-bg</code></td>
+      <td>(nao existe)</td>
+      <td><code>#ddd9ab</code></td>
+      <td><span class="color-swatch" style="background:#ddd9ab"></span></td>
+      <td>Fundo do banner de aviso de preco desatualizado (texto: <code>#3d3600</code> para garantir contraste). Novo token a adicionar.</td>
+    </tr>
+    <tr>
+      <td><code>--color-alert</code></td>
+      <td>(nao existe)</td>
+      <td><code>#f7af63</code></td>
+      <td><span class="color-swatch" style="background:#f7af63"></span></td>
+      <td>Icone/borda de alerta em linha (ex: badge inline [!] de preco desatualizado). Nunca como cor de texto — ratio insuficiente. Novo token.</td>
+    </tr>
+    <tr>
+      <td><code>--color-cost</code></td>
+      <td>(nao existe)</td>
+      <td><code>#633d2e</code></td>
+      <td><span class="color-swatch" style="background:#633d2e"></span></td>
+      <td>Valores de custo em USD (ex: <code>$1.84</code> no card). Alto contraste sobre branco (8:1). Novo token semantico para valores monetarios.</td>
+    </tr>
+    <tr>
+      <td><code>--color-primary-ring</code></td>
+      <td><code>#7ec8e3</code></td>
+      <td><code>#9cddc8</code></td>
+      <td><span class="color-swatch" style="background:#7ec8e3"></span>&rarr;<span class="color-swatch" style="background:#9cddc8"></span></td>
+      <td>Border-left do card primary. Acompanha --color-accent.</td>
+    </tr>
+    <tr>
+      <td><code>--color-primary-bg</code></td>
+      <td><code>#f0faff</code></td>
+      <td><code>#f0fbf7</code></td>
+      <td><span class="color-swatch" style="background:#f0faff"></span>&rarr;<span class="color-swatch" style="background:#f0fbf7"></span></td>
+      <td>Fundo do card primary em Memories. Derivado de #9cddc8 com 95% de luminosidade.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Tokens mantidos sem alteracao:</strong> <code>--color-bg</code>, <code>--color-surface</code>, <code>--color-text</code>, <code>--color-heading</code>, <code>--color-muted</code>, <code>--color-border</code>, <code>--color-border-strong</code>, <code>--color-code-bg</code>, <code>--color-th-bg</code>, <code>--color-active-dot</code>, <code>--color-stale-dot</code>, <code>--color-row-hover</code>, <code>--color-card-hover</code>, <code>--color-placeholder-bg</code>, <code>--color-accent-dark</code> (link color, nao alterado — requer audit separado de contraste se paleta mudar o bg).</p>
+
+<h2>7. Specs do Logo Rinoceronte</h2>
+
+<p>Esta especificacao define o que a skill <code>dadaia-workspace-brand-identity-v1</code> deve produzir. O SVG real sera criado na Phase 3.</p>
+
+<table>
+  <thead>
+    <tr><th>Atributo</th><th>Especificacao</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Dimensoes</td>
+      <td>24 &times; 24 pixels (intrinsic). Escalavel por CSS via <code>width</code>/<code>height</code>.</td>
+    </tr>
+    <tr>
+      <td>viewBox</td>
+      <td><code>0 0 24 24</code></td>
+    </tr>
+    <tr>
+      <td>Modo de cor</td>
+      <td>Monocromatico. Todos os <code>fill</code> e <code>stroke</code> usam <code>currentColor</code> — zero valores hexadecimais hardcoded no SVG.</td>
+    </tr>
+    <tr>
+      <td>Estilo</td>
+      <td>Minimalista. Silhueta plana (flat) de cabeca de rinoceronte de perfil, olhando para a direita. Chifre unico proeminente. Sem sombreamento, sem gradientes, sem texturas.</td>
+    </tr>
+    <tr>
+      <td>Paths esperados</td>
+      <td>1 ou 2 paths. Path principal: contorno da silhueta preenchido (<code>fill="currentColor"</code>). Path opcional: olho como circulo negativo (<code>fill="transparent"</code> ou <code>fill</code> com cor de fundo via variavel CSS). Total de elementos: &le; 3.</td>
+    </tr>
+    <tr>
+      <td>Uso no topbar</td>
+      <td>Inserido antes de <code>.topbar-wordmark</code>. Classe: <code>topbar-logo</code>. Tamanho: 24x24 fixo. <code>aria-hidden="true"</code> (decorativo — o wordmark adjacente e o label textual).</td>
+    </tr>
+    <tr>
+      <td>Uso em cards de agente/workflow</td>
+      <td>Cada tipo de card pode usar o mesmo SVG ou uma variante de 16x16 (viewBox 0 0 16 16) para icones de linha. Especificacao de variante: responsabilidade da brand-identity-v1 spec.</td>
+    </tr>
+    <tr>
+      <td>Acessibilidade</td>
+      <td>Quando usado como icone funcional (nao decorativo): deve ter <code>role="img"</code> + <code>aria-label="dadaia workspace"</code> + <code>&lt;title&gt;</code> interno.</td>
+    </tr>
+    <tr>
+      <td>Restricao</td>
+      <td>NAO criar o SVG neste report. NAO mockup inline. Apenas a spec que a brand-identity-v1 deve satisfazer.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>8. Grid e Densidade &mdash; Agents vs Memories</h2>
+
+<table>
+  <thead>
+    <tr><th>Secao</th><th>grid-template-columns</th><th>Cards @ 1440px</th><th>Altura estimada por card</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Memories (atual)</td>
+      <td><code>repeat(auto-fill, minmax(300px, 1fr))</code></td>
+      <td>~3 por linha</td>
+      <td>~160px (nome, meta, 3 links)</td>
+    </tr>
+    <tr>
+      <td>Agents (novo)</td>
+      <td><code>repeat(auto-fill, minmax(360px, 1fr))</code></td>
+      <td><strong>2 por linha</strong></td>
+      <td>~220px (header + 3 metricas + breakdown 3 contextos); ~380px expandido</td>
+    </tr>
+    <tr>
+      <td>Workflows (novo)</td>
+      <td><code>repeat(auto-fill, minmax(280px, 1fr))</code></td>
+      <td>3 por linha</td>
+      <td>~180px (header + descricao + chips)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Justificativa: cards de agente exibem dados numericos (token counts, custos, porcentagens) que requerem espaco horizontal minimo para leitura confortavel. 360px garante que valores como <code>$0.97 &mdash; 52.7%</code> nao se comprimem. Em viewports menores que 720px, o grid naturalmente cai para 1 coluna (comportamento auto-fill padrao).</p>
+
+<h2>9. Open Issues que Dependem de Outros Especialistas</h2>
+
+<table>
+  <thead>
+    <tr><th>Issue</th><th>Bloqueio de</th><th>Especialista responsavel</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Fonte canonica dos workflows (`.claude/skills/` vs `specs/releases/*/PLAN.md` vs outro)?</td>
+      <td>Popula campo <code>source</code> de /api/workflows e o campo <code>agent_ids</code></td>
+      <td>software-architect</td>
+      <td><span class="badge badge-open">OPEN #4 Phase 1</span></td>
+    </tr>
+    <tr>
+      <td>Tratamento de sessoes com <code>cwd</code> fora de qualquer context registrado</td>
+      <td>Campo <code>context_slug: null</code> em context_breakdown; label "unassigned" no card</td>
+      <td>software-architect / product-engineer</td>
+      <td><span class="badge badge-open">OPEN #5 Phase 1</span></td>
+    </tr>
+    <tr>
+      <td>Schema exato do SQLite (tabelas sessions, agents, costs): campos disponiveis para construir o payload de /api/agents</td>
+      <td>Contrato JSON de /api/agents depende do que o backend pode agregar eficientemente</td>
+      <td>software-architect + software-engineer</td>
+      <td><span class="badge badge-open">OPEN &mdash; aguarda report architecture</span></td>
+    </tr>
+    <tr>
+      <td>opencode incluido na v1 ou deferido para v1.1?</td>
+      <td>Se incluido, /api/agents deve expor agentes opencode; o card precisa tratar provider="opencode" sem crash</td>
+      <td>product-engineer (decision #3 do Phase 1)</td>
+      <td><span class="badge badge-open">OPEN #3 Phase 1</span></td>
+    </tr>
+    <tr>
+      <td>Auth local no panel (token ou 127.0.0.1 puro)?</td>
+      <td>Se adicionar token: o JS precisa de um header Authorization; sem token: nenhuma mudanca no frontend</td>
+      <td>devops-engineer</td>
+      <td><span class="badge badge-open">OPEN #7 Phase 1</span></td>
+    </tr>
+    <tr>
+      <td>Permissao de leitura de ~/.claude/projects/ (uid do operador vs uid do panel)?</td>
+      <td>Nao bloqueia o frontend, mas pode fazer /api/agents retornar array vazio se reader falhar</td>
+      <td>devops-engineer</td>
+      <td><span class="badge badge-open">OPEN &mdash; security review</span></td>
+    </tr>
+    <tr>
+      <td>SVG do logo rinoceronte: paths concretos</td>
+      <td>Topbar e cards de agente/workflow tem placeholder ate brand-identity-v1 spec ser aprovada</td>
+      <td>frontend-engineer (co-autor em Phase 3) + operador</td>
+      <td><span class="badge badge-defer">DEFER &mdash; brand-identity-v1</span></td>
+    </tr>
+    <tr>
+      <td>Breakpoints mobile (360px e 768px): testes de layout</td>
+      <td>Nao bloqueiam o design atual mas devem ser validados na implementacao</td>
+      <td>frontend-engineer (durante implementacao)</td>
+      <td><span class="badge badge-defer">DEFER &mdash; implementacao</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>10. Restricoes Cumpridas</h2>
+
+<ul>
+  <li><strong>Zero deps npm:</strong> todo o JS e vanilla, inline. Sem bibliotecas de charting, sem React, sem build.</li>
+  <li><strong>Sem build step:</strong> CSS e JS continuam como strings Python em <code>_assets.py</code>. Nenhuma mudanca no pipeline.</li>
+  <li><strong>Transcripts privados:</strong> nenhum endpoint proposto expoe <code>content</code>, <code>text</code>, ou mensagens. /api/agents e /api/workflows servem apenas agregados, contagens e metadados.</li>
+  <li><strong>Bind 127.0.0.1:</strong> nenhuma mudanca proposta no binding. O frontend nao tem opiniao sobre isso.</li>
+  <li><strong>OWASP A03:</strong> todos os valores inseridos no DOM pelo JS passam por <code>escHtml()</code> (ja implementado em PANEL_JS para /api/servers; padrao a seguir para /api/agents e /api/workflows).</li>
+  <li><strong>OWASP A07:</strong> nenhum link externo novo proposto. Se chips de workflow apontarem para URLs externas (improvavel), regra <code>rel="noopener noreferrer"</code> se aplica.</li>
+  <li><strong>Reuso de padrao de PANEL_JS:</strong> o JS de tab-switching sera estendido, nao reescrito. O fetch pattern de /api/servers e o template para /api/agents.</li>
+</ul>
+
+</body>
+</html>

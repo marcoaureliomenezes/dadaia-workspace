@@ -1,0 +1,98 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "devops-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-17T05:30:54Z",
+  "release_id": "agent-monitoring-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/devops-engineer/2026-05-17T053054Z-agent-monitoring-security.html",
+    "topic": "security-threat-model"
+  },
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "id": "T1",
+      "message": "jsonl contains operator input verbatim including potential secrets. Schema allowlist at the reader/aggregator layer is mandatory before any field reaches HTTP. Unit tests must assert content fields are absent from every JSON response."
+    },
+    {
+      "severity": "HIGH",
+      "id": "T2",
+      "message": "SQLite telemetry file must be chmod 600, parent directory chmod 700, enforced via os.chmod immediately after creation. Implementation must fail-closed if it cannot set permissions."
+    },
+    {
+      "severity": "HIGH",
+      "id": "T3",
+      "message": "Panel now exposes cost telemetry and session IDs. Recommend adding a local Bearer token (secrets.token_urlsafe(32), persisted to ~/.dadaia/state/panel.token chmod 600). Operator must make an explicit named decision on auth — silence is not acceptable."
+    },
+    {
+      "severity": "HIGH",
+      "id": "T4",
+      "message": "Reader must enforce budget limits: max 4 MB per file per polling tick, max 64 KB per JSONL line, byte-offset checkpoint in SQLite, in-memory event buffer capped at 10,000 events per cycle."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "T5",
+      "message": "JSONL parser must wrap each line in try/except; checkpoint must be byte-offset based. Parse failure logs must include path + offset only, never the line content."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "T6",
+      "message": "TelemetryService must assert os.getuid() != 0 at startup and exit 1 if running as root."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "T7",
+      "message": "Validate token count bounds: reject negative values or counts > 2,000,000; mark as suspect=True in SQLite rather than discarding. Surface UI warning banner when suspect events exist."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": "T8",
+      "message": "Add Content-Security-Policy header (default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline') to all HTML responses and X-Content-Type-Options: nosniff to all JSON responses. Implement as _security_headers() method in handler.py."
+    },
+    {
+      "severity": "LOW",
+      "id": "T9",
+      "message": "Display only first 8 characters of sessionId followed by ellipsis in all list/card UI views."
+    },
+    {
+      "severity": "LOW",
+      "id": "T10",
+      "message": "Run PRAGMA integrity_check at startup; on failure rename corrupt file and boot in no-telemetry mode returning 503 from telemetry endpoints."
+    }
+  ],
+  "supply_chain_decisions": [
+    { "dep": "ccusage", "decision": "BLOCKED", "reason": "Operator decision — zero Node deps." },
+    { "dep": "aiosqlite", "decision": "CONDITIONAL", "reason": "Only if software-engineer demonstrates measurable contention with stdlib sqlite3 + ThreadPoolExecutor. Default: stdlib only." },
+    { "dep": "watchdog", "decision": "BLOCKED", "reason": "Polling with os.stat is sufficient for human-timescale refresh. Native code supply-chain risk not justified." },
+    { "dep": "fastapi/flask", "decision": "BLOCKED", "reason": "Never. Existing regex-dispatch handler is adequate." },
+    { "dep": "sqlite3 (stdlib)", "decision": "APPROVED" },
+    { "dep": "json (stdlib)", "decision": "APPROVED" },
+    { "dep": "secrets (stdlib)", "decision": "APPROVED", "reason": "For auth token generation if auth is adopted." },
+    { "dep": "hashlib (stdlib)", "decision": "APPROVED", "reason": "For checkpoint integrity if needed." }
+  ],
+  "auth_recommendation": {
+    "verdict": "YES",
+    "model": "local Bearer token, secrets.token_urlsafe(32), persisted to ~/.dadaia/state/panel.token chmod 600, validated in do_GET before route dispatch",
+    "operator_decision_required": true
+  },
+  "decisions_required": [
+    "Auth token model: adopt Bearer token (recommended) or explicit risk-acceptance decline. Must appear as a named decision in SPEC.md.",
+    "Retention cap for SQLite aggregates: perpetual (Phase 1 default) or explicit maximum size/age.",
+    "Suspect event handling (T7): mark + UI warning (recommended) or silent discard."
+  ],
+  "open_issues": [
+    { "directed_to": "software-engineer", "issue": "Confirm WAL mode (PRAGMA journal_mode=WAL) is enabled in TelemetryService constructor." },
+    { "directed_to": "software-engineer", "issue": "Confirm Codex SQLite opened with ?mode=ro URI flag." },
+    { "directed_to": "software-engineer", "issue": "Confirm log output never includes JSONL line content — only path and byte offset." },
+    { "directed_to": "frontend-engineer", "issue": "Define and document the exact JSON schema for /api/agents and /api/sessions. Schema is the enforceable T1 boundary." },
+    { "directed_to": "software-architect", "issue": "Confirm polling interval is configurable with documented default (suggested: 60s)." },
+    { "directed_to": "product-engineer", "issue": "Auth token decision must be a named decision in the SPEC.md approval gate." }
+  ],
+  "next_handoff": {
+    "agent": "product-engineer",
+    "context": "dadaia-workspace",
+    "phase": "3-reconciliation",
+    "expected_artifact_type": "spec"
+  }
+}
