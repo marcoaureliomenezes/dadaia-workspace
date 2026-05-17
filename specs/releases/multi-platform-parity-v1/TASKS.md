@@ -355,7 +355,7 @@ feat(public-assets): T-PB-2 — stop copying workflows to .codex/workflows/ + sa
     # expect: only the cleanup rmtree call (from T-MPP-3.3), not _copy_tree
     ```
 
-- [-] **T-MPP-3.2** `[parallel: yes]` Add `_log_cleanup_error(func, path, exc_info)` module-level helper (concern #2 fix).
+- [x] **T-MPP-3.2** `[parallel: yes]` Add `_log_cleanup_error(func, path, exc_info)` module-level helper (concern #2 fix).
   - **Owner:** software-engineer
   - **Effort:** S (~5 LoC)
   - **Files MODIFIED:**
