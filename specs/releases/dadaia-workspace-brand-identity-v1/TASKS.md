@@ -95,7 +95,8 @@
   - Files: `specs/memory/product.html`.
   - Parallel-safe: yes; must coordinate with any other memory edits in flight.
 
-- [ ] **T-BR-12** — Acceptance pass.
+- [x] **T-BR-12** — Acceptance pass. <!-- claude-main -->
+  
   - All 9 acceptance criteria from SPEC.md green.
   - `dadaia doctor` passes.
   - Operator visually validates panel local with new branding (screenshot captured).
