@@ -28,11 +28,11 @@
 
 ## Phase 2 — Schema, migrations, telemetry service skeleton
 
-- [ ] **T-AM-02** — Create `dadaia_workspace/features/telemetry/` top-level package skeleton.
+- [-] **T-AM-02** — Create `dadaia_workspace/features/telemetry/` top-level package skeleton. <!-- software-engineer-p2 -->
   - Files: `features/telemetry/__init__.py`, `features/telemetry/service.py` (empty `TelemetryService` with DI constructor signature), `features/telemetry/store/__init__.py`, `features/telemetry/reader/__init__.py`, `features/telemetry/aggregator/__init__.py`.
   - Parallel-safe: yes (no other task touches these new files until T-AM-03).
 
-- [ ] **T-AM-03** — Implement `features/telemetry/store/schema.py` with the 5 migrations from SPEC § Schema (reader_state, sessions, agents, events, workflows, workflow_agents) + indices.
+- [-] **T-AM-03** — Implement `features/telemetry/store/schema.py` with the 5 migrations from SPEC § Schema (reader_state, sessions, agents, events, workflows, workflow_agents) + indices. <!-- software-engineer-p2 -->
   - `PRAGMA user_version` based migration runner.
   - Connection PRAGMAs: WAL, synchronous=NORMAL, foreign_keys=ON.
   - `apply_migrations(conn)` idempotent.
@@ -40,7 +40,7 @@
   - Files: `features/telemetry/store/schema.py`, `tests/unit/features/telemetry/test_schema.py`.
   - Parallel-safe: yes after T-AM-02.
 
-- [ ] **T-AM-04** — Implement `features/telemetry/store/dao.py` (repository pattern).
+- [-] **T-AM-04** — Implement `features/telemetry/store/dao.py` (repository pattern). <!-- software-engineer-p2 -->
   - Methods: `upsert_session`, `upsert_agent`, `insert_event`, `upsert_workflow`, `upsert_reader_state`, `get_reader_state`, plus read-side: `list_agents`, `list_workflows`, `list_sessions_by_agent`.
   - Returns dataclasses, never `sqlite3.Row`.
   - Tests: CRUD round-trip, idempotency on duplicate `event_id`.
