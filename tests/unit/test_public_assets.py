@@ -1,6 +1,7 @@
 """Unit tests for public asset staging and runtime projections."""
 
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     _parse_agent_frontmatter,
     _render_agent_toml_block,
+    _render_agents_into_codex_config,
 )
 
 
@@ -178,4 +180,103 @@ def test_render_agent_toml_block_emits_tools_array_literal() -> None:
     result = _render_agent_toml_block("dev", fm)
     assert 'tools = ["Read", "Edit", "Bash"]' in result, (
         f"Expected tools array in: {result!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# T-MPP-2.10 — T-PB-1 adversarial unit tests (#7, #8)
+# ---------------------------------------------------------------------------
+
+
+def test_render_agent_toml_block_escapes_quote_in_name() -> None:
+    """T-PB-1 #7 — adversarial: names with double-quote escape correctly; ] raises.
+
+    Defensive coding floor: even though agent names are lib-controlled (Q1), the
+    escape path must round-trip correctly for names containing special characters.
+    """
+    # Part A: name containing double-quote — must escape and round-trip
+    name_with_quote = 'my"agent'
+    fm: dict[str, object] = {"name": name_with_quote, "description": "x"}
+    rendered = _render_agent_toml_block(name_with_quote, fm)
+    parsed = tomllib.loads(rendered)
+    extracted_name = next(iter(parsed["agents"]))
+    assert extracted_name == name_with_quote, (
+        f"Round-trip name mismatch: expected {name_with_quote!r}, got {extracted_name!r}"
+    )
+
+    # Part B: name containing ] must raise ValueError
+    with pytest.raises(ValueError, match=r"\]"):
+        _render_agent_toml_block("bad]name", {"name": "bad]name"})
+
+    # Part C: name containing newline must raise ValueError
+    with pytest.raises(ValueError, match="newline"):
+        _render_agent_toml_block("bad\nname", {"name": "bad\nname"})
+
+
+def test_render_agent_toml_block_escapes_triple_quote_in_description() -> None:
+    """T-PB-1 #8 — adversarial: triple-quote in description must round-trip.
+
+    _toml_escape() uses triple-quoted TOML strings for multi-line values.
+    An embedded triple-quote must be escaped so the round-trip preserves
+    the original description bytes.
+    """
+    description_with_triple_quote = 'first line\nsecond with """embedded""" quotes\nthird'
+    fm: dict[str, object] = {"name": "agent-x", "description": description_with_triple_quote}
+    rendered = _render_agent_toml_block("agent-x", fm)
+    parsed = tomllib.loads(rendered)
+    extracted_description = parsed["agents"]["agent-x"]["description"]
+    assert extracted_description == description_with_triple_quote, (
+        f"Round-trip description mismatch:\n"
+        f"  expected: {description_with_triple_quote!r}\n"
+        f"  got:      {extracted_description!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# T-MPP-2.11 — T-PB-4 unit tests (#1, #2) for [skills] table emission
+# ---------------------------------------------------------------------------
+
+# Use a non-existent path so _render_agents_into_codex_config returns "" (no agent
+# blocks). The [skills] table must still be emitted unconditionally.
+_NONEXISTENT_AGENTIC_DIR = Path("/nonexistent/agentic")
+
+_SKILLS_TABLE_CASES = [
+    {
+        "id": "emits_skills_table",
+        "agentic_dir": _NONEXISTENT_AGENTIC_DIR,
+    },
+    {
+        "id": "skills_appears_after_agents",
+        # Use the real public/ dir so that [agents.*] blocks ARE present.
+        # FileSystemPublicAssetManager._public_dir points to dadaia_workspace/public/.
+        "agentic_dir": FileSystemPublicAssetManager()._public_dir,  # noqa: SLF001
+    },
+]
+
+
+@pytest.mark.parametrize("case", _SKILLS_TABLE_CASES, ids=[c["id"] for c in _SKILLS_TABLE_CASES])
+def test_codex_config_emits_skills_table(case: dict) -> None:  # type: ignore[type-arg]
+    """T-PB-4 #1 — _codex_config() always emits a [skills] section."""
+    manager = FileSystemPublicAssetManager()
+    output = manager._codex_config(case["agentic_dir"])  # noqa: SLF001
+    assert "[skills]" in output, f"Expected '[skills]' in output; got:\n{output}"
+    assert 'paths = [".agents/skills"]' in output, (
+        f"Expected 'paths = [\".agents/skills\"]' in output; got:\n{output}"
+    )
+
+
+@pytest.mark.parametrize("case", _SKILLS_TABLE_CASES[1:], ids=["skills_appears_after_agents"])
+def test_codex_config_skills_paths_array_ordering(case: dict) -> None:  # type: ignore[type-arg]
+    """T-PB-4 #2 — [skills] table appears AFTER the [agents.*] tables."""
+    manager = FileSystemPublicAssetManager()
+    output = manager._codex_config(case["agentic_dir"])  # noqa: SLF001
+
+    assert "[skills]" in output, "Expected '[skills]' in output"
+    assert "[agents." in output, "Expected at least one [agents.*] block in output"
+
+    agents_offset = output.find("[agents.")
+    skills_offset = output.find("[skills]")
+    assert agents_offset < skills_offset, (
+        f"Expected [agents.*] (offset {agents_offset}) to appear before "
+        f"[skills] (offset {skills_offset}) in output"
     )
