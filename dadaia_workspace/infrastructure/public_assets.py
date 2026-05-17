@@ -508,6 +508,14 @@ class FileSystemPublicAssetManager:
     ) -> None:
         codex_dir = workspace_root / ".codex"
         self._copy_tree(agentic_dir / "rules", codex_dir / "rules", force, installed)
+        workflows_dir = codex_dir / "workflows"
+        if workflows_dir.exists():
+            files = sorted(workflows_dir.rglob("*"))
+            sys.stderr.write(
+                f"[removed] {workflows_dir} (not-applicable: codex has no workflow runtime)"
+                f" — {len(files)} entries\n"
+            )
+            shutil.rmtree(workflows_dir, onerror=_log_cleanup_error)
         self._install_universal_skills(agentic_dir, workspace_root, force, installed)
         self._write_generated(
             codex_dir / "hooks.json",
