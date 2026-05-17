@@ -176,7 +176,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: ≥2 (function + whitelist constant)
     ```
 
-- [-] **T-MPP-2.3** `[parallel: yes]` Add `_toml_escape()` helper.
+- [x] **T-MPP-2.3** `[parallel: yes]` Add `_toml_escape()` helper.
   - **Owner:** software-engineer
   - **Effort:** S (~15 LoC)
   - **Files MODIFIED:**

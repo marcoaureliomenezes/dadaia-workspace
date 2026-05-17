@@ -70,6 +70,32 @@ def _json_dump(data: object) -> str:
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
 
 
+def _toml_escape(value: object) -> str:
+    """Escape *value* for safe emission as a TOML basic string (double-quoted).
+
+    Rules applied (in order):
+    1. Backslash -> double-backslash (must come first to avoid double-escaping)
+    2. Double-quote -> backslash-double-quote
+    3. Newline character -> the two-char escape sequence backslash-n
+
+    For multi-line values the function falls back to a TOML triple-quoted
+    multi-line basic string. If the value itself contains a triple-double-quote
+    sequence, each occurrence is escaped character-by-character.
+
+    Names containing ']' are rejected outright: they cannot be placed safely
+    inside [agents."<name>"] TOML table headers even with quoting.
+    """
+    s = str(value)
+    if "\n" in s:
+        # Use triple-quoted literal; escape any embedded triple-quotes
+        s_escaped = s.replace('"""', '\\"\\"\\"')
+        return f'"""{s_escaped}"""'
+    # Basic-string escaping for single-line values
+    s = s.replace("\\", "\\\\")
+    s = s.replace('"', '\\"')
+    return f'"{s}"'
+
+
 def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     """Parse YAML frontmatter from an agent .md file using stdlib regex only.
 
