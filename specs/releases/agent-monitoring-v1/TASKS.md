@@ -94,7 +94,7 @@
 
 ## Phase 5 — Pricing module
 
-- [ ] **T-AM-10** — Implement `features/telemetry/pricing.py` (D-AM-07).
+- [-] **T-AM-10** — Implement `features/telemetry/pricing.py` (D-AM-07). <!-- software-engineer-p5 -->
   - `ModelPricing` dataclass with `effective_from`.
   - `PRICING_TABLE` dict with claude-opus-4-7, claude-sonnet-4-6, claude-haiku-3-5 baseline rows.
   - `compute_cost(usage, model, when) -> int | None` returns micro-USD.
