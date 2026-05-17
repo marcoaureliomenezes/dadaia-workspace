@@ -200,7 +200,7 @@
   - Files: `dadaia_workspace/features/telemetry/service.py`, `tests/integration/test_telemetry_corrupt_db.py`.
   - Parallel-safe: yes after T-AM-12.
 
-- [ ] **T-AM-22** — Acceptance pass.
+- [x] **T-AM-22** — Acceptance pass.
   - All 13 acceptance criteria from SPEC.md § Acceptance criteria green.
   - `dadaia doctor` passes for this release (any pre-existing failures are not introduced by these tasks).
   - Performance budget validated on the real operator workspace (49.7 MB jsonl).
