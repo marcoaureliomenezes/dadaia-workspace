@@ -79,7 +79,7 @@ body {
 
 a { color: var(--color-accent-dark); text-decoration: none; }
 a:hover, a:focus { text-decoration: underline; }
-a:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 2px; }
+a:focus-visible { outline: 2px solid var(--color-accent, #9cddc8); outline-offset: 2px; border-radius: 2px; }
 
 code {
   font-family: var(--font-mono);
@@ -103,13 +103,13 @@ code {
   gap: var(--space-md);
 }
 
-.topbar-logo { color: var(--color-cost); display: inline-flex; align-items: center; margin-right: 0.5rem; }
+.topbar-logo { color: var(--color-cost, #633d2e); display: inline-flex; align-items: center; margin-right: 0.5rem; }
 .topbar-logo svg { width: 24px; height: 24px; display: block; }
 
 .topbar-wordmark {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-cost); /* brand-identity-v1 T-BR-07: high-contrast brown (AAA on white) */
+  color: var(--color-cost, #633d2e); /* brand-identity-v1 T-BR-07: high-contrast brown (AAA on white) */
   letter-spacing: -0.01em;
 }
 .topbar-wordmark span { color: var(--color-accent-dark); }
@@ -117,7 +117,7 @@ code {
 .topbar-subtitle { color: var(--color-muted); font-size: 0.9rem; }
 .topbar-badge {
   margin-left: auto;
-  background: var(--color-accent);
+  background: var(--color-accent, #9cddc8);
   color: var(--color-heading);
   font-size: 0.78rem;
   font-weight: 600;
@@ -151,11 +151,11 @@ code {
   white-space: nowrap;
 }
 .nav-tab:hover { color: var(--color-text); }
-.nav-tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.nav-tab:focus-visible { outline: 2px solid var(--color-accent, #9cddc8); outline-offset: -2px; }
 .nav-tab.active {
   color: var(--color-heading);
   font-weight: 600;
-  border-bottom-color: var(--color-accent);
+  border-bottom-color: var(--color-accent, #9cddc8);
 }
 
 /* ── Main content ───────────────────────────────── */
@@ -279,8 +279,8 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 }
 .context-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 .context-card.primary {
-  border-left: 4px solid var(--color-primary-ring);
-  background: var(--color-primary-bg);
+  border-left: 4px solid var(--color-primary-ring, #9cddc8);
+  background: var(--color-primary-bg, #f0fbf7);
 }
 
 .card-header {
@@ -296,7 +296,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  background: var(--color-accent);
+  background: var(--color-accent, #9cddc8);
   color: var(--color-heading);
   padding: 0.2em 0.5em;
   border-radius: 20px;
@@ -323,7 +323,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 }
 .memory-link:last-child { border-bottom: none; }
 .memory-link:hover, .memory-link:focus { background: var(--color-card-hover); text-decoration: none; }
-.memory-link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.memory-link:focus-visible { outline: 2px solid var(--color-accent, #9cddc8); outline-offset: -2px; }
 .memory-link-icon { font-size: 0.9em; color: var(--color-muted); flex-shrink: 0; width: 1.2em; text-align: center; }
 .memory-link-label { flex: 1; }
 .memory-link-arrow { color: var(--color-border); font-size: 0.9em; flex-shrink: 0; }
@@ -368,7 +368,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   align-items: baseline;
   margin-bottom: 0.5rem;
 }
-.agent-card-header h3 { margin: 0; font-size: 1rem; color: var(--color-cost); }
+.agent-card-header h3 { margin: 0; font-size: 1rem; color: var(--color-cost, #633d2e); }
 .agent-model { font-size: 0.85rem; color: #666; font-family: ui-monospace, monospace; }
 .agent-metrics {
   display: grid;
@@ -381,8 +381,8 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 .agent-metric .value { display: block; font-weight: 600; }
 .agent-cost-unknown { color: #999; font-style: italic; }
 .agent-suspect-badge {
-  background: var(--color-alert);
-  color: #fff;
+  background: var(--color-alert, #f7af63);
+  color: #3d2a00; /* dark on amber — WCAG AA contrast ~6.3:1 */
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -396,10 +396,10 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   margin: 0.25rem 0;
 }
 .context-bar { flex: 1; height: 0.5rem; background: #eee; border-radius: 4px; overflow: hidden; }
-.context-bar-fill { height: 100%; background: var(--color-accent); }
+.context-bar-fill { height: 100%; background: var(--color-accent, #9cddc8); }
 .warning-banner {
   padding: 0.75rem 1rem;
-  background: var(--color-warning-bg);
+  background: var(--color-warning-bg, #ddd9ab);
   color: #3d3600;
   border-radius: 6px;
   margin-bottom: 1rem;
@@ -411,16 +411,16 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 .sessions-drilldown button[aria-expanded] {
   background: none;
   border: none;
-  color: var(--color-accent-dark);
+  color: var(--color-accent-dark, #2d7d9a);
   cursor: pointer;
   font-size: 0.85rem;
   padding: 0.25rem 0;
   font-family: inherit;
   text-decoration: underline;
 }
-.sessions-drilldown button[aria-expanded]:hover { color: var(--color-cost); }
+.sessions-drilldown button[aria-expanded]:hover { color: var(--color-cost, #633d2e); }
 .sessions-drilldown button[aria-expanded]:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent, #9cddc8);
   outline-offset: 2px;
 }
 .error-state { color: #c0392b; font-size: 0.9rem; }
@@ -437,12 +437,12 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   padding: 1rem;
   background: var(--color-surface);
 }
-.workflow-card h3 { margin: 0 0 0.25rem 0; font-size: 1rem; color: var(--color-cost); }
+.workflow-card h3 { margin: 0 0 0.25rem 0; font-size: 1rem; color: var(--color-cost, #633d2e); }
 .workflow-source { font-size: 0.75rem; color: #666; font-family: ui-monospace, monospace; margin-bottom: 0.5rem; }
 .workflow-description { font-size: 0.9rem; margin: 0.5rem 0; }
 .workflow-agents { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.5rem; }
 .workflow-agent-chip {
-  background: var(--color-accent);
+  background: var(--color-accent, #9cddc8);
   color: #222;
   border: none;
   padding: 0.2rem 0.6rem;
@@ -450,8 +450,8 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   font-size: 0.75rem;
   cursor: pointer;
 }
-.workflow-agent-chip:hover { background: var(--color-accent-secondary); }
-.workflow-agent-chip:focus { outline: 2px solid var(--color-cost); outline-offset: 2px; }
+.workflow-agent-chip:hover { background: var(--color-accent-secondary, #bfd8ad); }
+.workflow-agent-chip:focus { outline: 2px solid var(--color-cost, #633d2e); outline-offset: 2px; }
 """
 
 PANEL_JS: str = """
