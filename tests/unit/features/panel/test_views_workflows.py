@@ -34,3 +34,22 @@ def test_section_has_empty_state() -> None:
     """Section must include empty-state element with id="workflows-empty"."""
     html = render_workflows_section()
     assert 'id="workflows-empty"' in html
+
+
+def test_section_has_workflows_list() -> None:
+    """panel-defects Bug 4: left pane must include workflows-list nav."""
+    html = render_workflows_section()
+    assert 'id="workflows-list"' in html
+
+
+def test_section_has_workflows_detail() -> None:
+    """panel-defects Bug 4: right pane must include workflows-detail region."""
+    html = render_workflows_section()
+    assert 'id="workflows-detail"' in html
+    assert 'role="region"' in html
+
+
+def test_section_detail_has_aria_live() -> None:
+    """panel-defects Bug 4: detail pane must have aria-live for dynamic updates."""
+    html = render_workflows_section()
+    assert 'aria-live="polite"' in html

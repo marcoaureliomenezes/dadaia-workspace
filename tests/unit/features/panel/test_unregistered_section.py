@@ -45,26 +45,31 @@ def _make_service() -> PanelService:
 # --- CSS / static assertions ----------------------------------------------
 
 
-def test_panel_css_includes_lan_warning_badge_with_color_alert_token() -> None:
-    """LAN-exposed badge MUST use the brand-identity-v1 alert token (with hex
-    fallback for safety)."""
-    assert ".lan-warning-badge" in PANEL_CSS
+def test_panel_css_has_alert_color_token() -> None:
+    """brand-identity-v1 alert token must still be defined in CSS
+    (used by agent-suspect-badge and other elements), even though
+    lan-warning-badge was removed in panel-defects hotfix."""
     assert "var(--color-alert" in PANEL_CSS
-    # Hex fallback must be the brand-identity-v1 alert hex (#f7af63).
+    # The CSS custom property must carry the brand-identity-v1 hex.
     assert "#f7af63" in PANEL_CSS
+    # lan-warning-badge itself is removed.
+    assert ".lan-warning-badge" not in PANEL_CSS
 
 
-def test_panel_css_includes_unregistered_section_styles() -> None:
-    assert ".unregistered-section" in PANEL_CSS
-    assert ".cmdline-cell" in PANEL_CSS
-    assert ".cwd-cell" in PANEL_CSS
+def test_panel_css_no_unregistered_section_styles() -> None:
+    """panel-defects hotfix: unregistered section removed from UI — CSS must
+    no longer carry its selectors."""
+    assert ".unregistered-section" not in PANEL_CSS
+    assert ".cmdline-cell" not in PANEL_CSS
+    assert ".cwd-cell" not in PANEL_CSS
 
 
-def test_panel_js_renders_unregistered_table() -> None:
-    """buildUnregisteredHTML must be wired in PANEL_JS."""
-    assert "buildUnregisteredHTML" in PANEL_JS
-    assert "unregistered-content" in PANEL_JS
-    assert "lan-warning-badge" in PANEL_JS
+def test_panel_js_no_unregistered_renderer() -> None:
+    """panel-defects hotfix: unregistered section removed — JS must not
+    contain buildUnregisteredHTML or the unregistered-content container ref."""
+    assert "buildUnregisteredHTML" not in PANEL_JS
+    assert "unregistered-content" not in PANEL_JS
+    assert "lan-warning-badge" not in PANEL_JS
 
 
 # --- API payload shape ----------------------------------------------------
@@ -87,37 +92,18 @@ def test_api_servers_includes_unregistered_key_in_payload() -> None:
     assert data["unregistered"] == []
 
 
-def test_api_servers_unregistered_payload_shape() -> None:
-    """Each unregistered item must have port/bind/pid/cmdline/cwd/lan_exposed."""
+def test_api_servers_unregistered_always_empty_after_hotfix() -> None:
+    """panel-defects hotfix: the UI section was removed so the endpoint
+    always returns unregistered=[] — the service scan is no longer invoked."""
     svc = _make_service()
-    fake = [
-        {
-            "port": 4000,
-            "bind": "0.0.0.0",
-            "pid": 12345,
-            "cmdline": "python -m http.server 4000",
-            "cwd": "/tmp",
-            "lan_exposed": True,
-        },
-        {
-            "port": 9999,
-            "bind": "127.0.0.1",
-            "pid": 67890,
-            "cmdline": "python -m http.server 9999 --bind 127.0.0.1",
-            "cwd": "/tmp",
-            "lan_exposed": False,
-        },
-    ]
-    with patch.object(svc, "list_unregistered_listeners", return_value=fake):
-        view = render_api_servers(svc)
-        _, _, body = view()
+    view = render_api_servers(svc)
+    _, _, body = view()
     import json
 
     data = json.loads(body)
-    assert len(data["unregistered"]) == 2
-    item = data["unregistered"][0]
-    for key in ("port", "bind", "pid", "cmdline", "cwd", "lan_exposed"):
-        assert key in item
+    # Back-compat key must still exist but is always empty.
+    assert "unregistered" in data
+    assert data["unregistered"] == []
 
 
 def test_api_servers_degrades_gracefully_when_scan_fails() -> None:
@@ -190,19 +176,16 @@ def test_service_list_unregistered_listeners_is_a11y_friendly_dict_shape() -> No
 # --- HTML structure -------------------------------------------------------
 
 
-def test_index_html_has_unregistered_section_with_a11y_attributes() -> None:
-    """The Servers tab must contain the Unregistered section with proper
-    a11y semantics: role=region, aria-label, aria-live=polite."""
+def test_index_html_has_no_unregistered_section() -> None:
+    """panel-defects hotfix: the Servers tab must NOT contain the Unregistered
+    section anymore — it was removed from the UI."""
     import inspect
 
     from dadaia_workspace.features.panel.views import index as index_module
 
     src = inspect.getsource(index_module)
-    assert 'id="unregistered-section"' in src
-    assert 'role="region"' in src
-    assert 'aria-label="Unregistered listeners"' in src
-    assert 'aria-live="polite"' in src
-    assert 'id="unregistered-content"' in src
+    assert 'id="unregistered-section"' not in src
+    assert 'id="unregistered-content"' not in src
 
 
 @pytest.mark.parametrize(
