@@ -1,13 +1,12 @@
 """dadaia academy subcommands."""
 
-from pathlib import Path
-
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import ContextAlreadyExistsError, ContextNotFoundError
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.academy.service import AcademyService
 
 app = typer.Typer(help="Manage Academy courses.")
@@ -15,16 +14,8 @@ console = Console()
 err_console = Console(stderr=True)
 
 
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
-
-
 def _academy_service() -> AcademyService:
-    workspace_root = _resolve_workspace()
+    workspace_root = resolve_workspace_root()
     return container.build_academy_service(workspace_root)
 
 

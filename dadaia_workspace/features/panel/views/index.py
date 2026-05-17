@@ -85,6 +85,11 @@ def render_index(
         <span id="refresh-label">Last updated just now</span>
       </div>
       <div id="servers-content">{servers_html}</div>
+      <section class="unregistered-section" id="unregistered-section" role="region" aria-label="Unregistered listeners" aria-live="polite">
+        <h3>Unregistered listeners</h3>
+        <p class="section-hint">TCP listeners detected on this host that are not in the registry. A yellow badge means the port is bound to <code>0.0.0.0</code> and reachable from the LAN.</p>
+        <div id="unregistered-content"></div>
+      </section>
     </section>
 
     <section id="section-memories" class="section" aria-label="Spec Context Project memories" role="tabpanel" tabindex="0" aria-labelledby="tab-memories">

@@ -179,6 +179,33 @@ class PanelService:
             result.append(groups["Outros"])
         return result
 
+    def list_unregistered_listeners(self) -> list[dict[str, object]]:
+        """Return TCP listeners owned by the current user that are NOT in the
+        registry (v0.1.1 / Bug D).
+
+        Each item is a dict ready for JSON serialisation in /api/servers.
+        Read-only: never kills, never registers. Linux-only (parses
+        ``ss -tlnp``).
+        """
+        from dadaia_workspace.features.server_registry.scan import (
+            scan_unregistered_listeners,
+        )
+
+        entries_with_status = self._registry.list_entries(include_stale=True)
+        registry_entries = [e for e, _ in entries_with_status]
+        findings = scan_unregistered_listeners(registry_entries)
+        return [
+            {
+                "port": f.port,
+                "bind": f.bind,
+                "pid": f.pid,
+                "cmdline": f.cmdline,
+                "cwd": f.cwd,
+                "lan_exposed": f.lan_exposed,
+            }
+            for f in findings
+        ]
+
     def list_active_contexts(self) -> list[PanelContext]:
         """Return all active Spec Context Projects as PanelContext dataclasses.
 
