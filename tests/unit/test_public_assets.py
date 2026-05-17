@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 
@@ -55,6 +57,49 @@ def test_install_overwrites_existing_files_with_force(tmp_path: Path) -> None:
     FileSystemPublicAssetManager().install(workspace, target="all", force=True)
 
     assert agents_md.read_text(encoding="utf-8").startswith("# dadaia Labs")
+
+
+_CLASSIFY_WORKFLOWS_CASES = [
+    {
+        "id": "codex_linear",
+        "content": "# linear workflow\nstep: do_something\n",
+        "expected_in": ["[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"],
+        "expected_not_in": ["[partial] opencode:workflows/sample.workflow.md"],
+    },
+    {
+        "id": "codex_parallel",
+        "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
+        "expected_in": ["[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"],
+        "expected_not_in": ["[ok] opencode:workflows/sample.workflow.md"],
+    },
+    {
+        "id": "opencode_linear",
+        "content": "# linear workflow\nstep: do_something\n",
+        "expected_in": ["[ok] opencode:workflows/sample.workflow.md"],
+        "expected_not_in": ["[partial] opencode:workflows/sample.workflow.md"],
+    },
+    {
+        "id": "opencode_parallel",
+        "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
+        "expected_in": ["[partial] opencode:workflows/sample.workflow.md (parallel_group sequentially)"],
+        "expected_not_in": ["[ok] opencode:workflows/sample.workflow.md"],
+    },
+]
+
+
+@pytest.mark.parametrize("case", _CLASSIFY_WORKFLOWS_CASES, ids=[str(c["id"]) for c in _CLASSIFY_WORKFLOWS_CASES])
+def test_classify_workflows_quadrants(tmp_path: Path, case: dict) -> None:  # type: ignore[type-arg]
+    agentic_dir = tmp_path / "agentic"
+    workflows_dir = agentic_dir / "workflows"
+    workflows_dir.mkdir(parents=True)
+    (workflows_dir / "sample.workflow.md").write_text(case["content"], encoding="utf-8")
+
+    result = FileSystemPublicAssetManager()._classify_workflows(agentic_dir)  # noqa: SLF001
+
+    for expected in case["expected_in"]:
+        assert expected in result, f"Expected {expected!r} in result; got {result}"
+    for not_expected in case["expected_not_in"]:
+        assert not_expected not in result, f"Did not expect {not_expected!r} in result; got {result}"
 
 
 def test_doctor_reports_drift_and_unsupported(tmp_path: Path) -> None:
