@@ -96,6 +96,37 @@ def _toml_escape(value: object) -> str:
     return f'"{s}"'
 
 
+def _render_agents_into_codex_config(agents_dir: Path) -> str:
+    """Scan *agents_dir* for ``.md`` agent files and render TOML ``[agents.*]`` blocks.
+
+    For each ``.md`` file (sorted for determinism):
+    1. Parse YAML frontmatter via ``_parse_agent_frontmatter()``.
+    2. If the result is non-empty (i.e., ``name`` key present), render via
+       ``_render_agent_toml_block()``.
+    3. Agents whose frontmatter cannot be parsed or are missing ``name`` are
+       silently skipped (defensive — never breaks install).
+
+    Returns the concatenated block string (may be empty string when no agents
+    are found).
+    """
+    if not agents_dir.exists():
+        return ""
+    blocks: list[str] = []
+    for md_file in sorted(agents_dir.glob("*.md")):
+        try:
+            text = md_file.read_text(encoding="utf-8")
+            fm = _parse_agent_frontmatter(text)
+            if not fm:
+                continue
+            name = str(fm.get("name", ""))
+            if not name:
+                continue
+            blocks.append(_render_agent_toml_block(name, fm))
+        except (OSError, ValueError):
+            continue
+    return "\n".join(blocks) + ("\n" if blocks else "")
+
+
 def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
     """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
 
