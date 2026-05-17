@@ -1,0 +1,223 @@
+"""Unit tests for PanelHandler dispatch — T-2.2 / T-2.3.
+
+Tests use a thin in-process driver that wires stub view callables into
+``make_handler_class`` and exercises the dispatch logic without spinning a
+real HTTP server.
+
+Stub views record which route was hit and which capture groups were passed;
+they return a minimal ``(status, content_type, body)`` triple.
+
+Assertions:
+  (a) ``/`` invokes the index view with no captured groups.
+  (b) ``/api/servers`` invokes the api_servers view with no captured groups.
+  (c) ``/memory/foo/bar.html`` invokes the memory view with
+      ``slug="foo"``, ``path="bar.html"``.
+  (d) ``/memory-view/foo/bar.html`` invokes the memory_view view with
+      ``slug="foo"``, ``path="bar.html"``.
+  (e) ``/static/panel.css`` invokes the static view with
+      ``name="panel.css"``.
+  (f) ``/unknown`` returns HTTP 404 with the error-contract body.
+"""
+
+from __future__ import annotations
+
+import io
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler
+
+from dadaia_workspace.features.panel.handler import _NOT_FOUND_BODY, make_handler_class
+
+# ---------------------------------------------------------------------------
+# Stub view infrastructure
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _StubView:
+    """Records calls made by the handler dispatch loop."""
+
+    name: str
+    call_count: int = 0
+    last_kwargs: dict[str, str] = field(default_factory=dict)
+    status: int = 200
+    content_type: str = "text/plain"
+    body: bytes = b"ok"
+
+    def __call__(self, **kwargs: str) -> tuple[int, str, bytes]:
+        self.call_count += 1
+        self.last_kwargs = dict(kwargs)
+        return (self.status, self.content_type, self.body)
+
+
+def _make_stubs() -> dict[str, _StubView]:
+    """Return a dict of stub views keyed by route name."""
+    names = ["index", "api_servers", "api_contexts", "memory", "memory_view", "static"]
+    return {n: _StubView(name=n) for n in names}
+
+
+# ---------------------------------------------------------------------------
+# In-process request driver
+# ---------------------------------------------------------------------------
+
+
+class _FakeSocket:
+    """Minimal socket-like object for BaseHTTPRequestHandler instantiation."""
+
+    def __init__(self, request_bytes: bytes) -> None:
+        self._rfile = io.BytesIO(request_bytes)
+        self._wfile = io.BytesIO()
+
+    def makefile(self, mode: str, *args: object, **kwargs: object) -> io.BytesIO:
+        if "r" in mode:
+            return self._rfile
+        return self._wfile
+
+    def getsockname(self) -> tuple[str, int]:
+        return ("127.0.0.1", 4999)
+
+    def getpeername(self) -> tuple[str, int]:
+        return ("127.0.0.1", 12345)
+
+    # BaseHTTPRequestHandler expects the socket to look like a real one.
+    def sendall(self, data: bytes) -> None:
+        self._wfile.write(data)
+
+    def recv(self, n: int) -> bytes:
+        return self._rfile.read(n)
+
+
+def _dispatch(
+    handler_class: type[BaseHTTPRequestHandler],
+    path: str,
+) -> tuple[int, bytes]:
+    """Drive a single GET request through *handler_class* for *path*.
+
+    Returns ``(status_code, response_body_bytes)`` by inspecting the raw bytes
+    written to the fake socket's wfile.
+    """
+    raw_request = f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
+    fake_sock = _FakeSocket(raw_request)
+
+    # Instantiate the handler; it will process the request in __init__.
+    handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
+
+    response = fake_sock._wfile.getvalue()
+
+    # Parse status line: "HTTP/1.1 <code> <reason>\r\n..."
+    status_line = response.split(b"\r\n", 1)[0]
+    status_code = int(status_line.split(b" ")[1])
+
+    # Body is after the double CRLF.
+    body = response.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in response else b""
+    return status_code, body
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+def test_dispatch_index() -> None:
+    """(a) GET / invokes the index stub."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/")
+
+    assert stubs["index"].call_count == 1
+    assert stubs["index"].last_kwargs == {}
+    # No other stub was called.
+    for name, stub in stubs.items():
+        if name != "index":
+            assert stub.call_count == 0, f"Unexpected call to stub '{name}'"
+
+
+def test_dispatch_api_servers() -> None:
+    """(b) GET /api/servers invokes the api_servers stub with no captured groups."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/api/servers")
+
+    assert stubs["api_servers"].call_count == 1
+    assert stubs["api_servers"].last_kwargs == {}
+
+
+def test_dispatch_api_contexts() -> None:
+    """GET /api/contexts invokes the api_contexts stub."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/api/contexts")
+
+    assert stubs["api_contexts"].call_count == 1
+    assert stubs["api_contexts"].last_kwargs == {}
+
+
+def test_dispatch_memory_with_named_groups() -> None:
+    """(c) GET /memory/foo/bar.html invokes memory view with slug="foo", path="bar.html"."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/memory/foo/bar.html")
+
+    assert stubs["memory"].call_count == 1
+    assert stubs["memory"].last_kwargs == {"slug": "foo", "path": "bar.html"}
+
+
+def test_dispatch_memory_view_with_named_groups() -> None:
+    """(d) GET /memory-view/foo/bar.html invokes memory_view with slug="foo", path="bar.html"."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/memory-view/foo/bar.html")
+
+    assert stubs["memory_view"].call_count == 1
+    assert stubs["memory_view"].last_kwargs == {"slug": "foo", "path": "bar.html"}
+
+
+def test_dispatch_static_with_named_group() -> None:
+    """(e) GET /static/panel.css invokes static view with name="panel.css"."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/static/panel.css")
+
+    assert stubs["static"].call_count == 1
+    assert stubs["static"].last_kwargs == {"name": "panel.css"}
+
+
+def test_dispatch_unknown_returns_404_with_error_contract_body() -> None:
+    """(f) GET /unknown returns HTTP 404 with the error-contract body (T-2.3)."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    status, body = _dispatch(handler_class, "/unknown")
+
+    assert status == 404
+    assert body == _NOT_FOUND_BODY
+
+    # No view stub should have been called.
+    for stub in stubs.values():
+        assert stub.call_count == 0, f"Stub '{stub.name}' was unexpectedly called"
+
+
+def test_dispatch_strips_query_string_before_matching() -> None:
+    """Route matching strips query string so /api/servers?x=1 still dispatches."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/api/servers?refresh=1")
+
+    assert stubs["api_servers"].call_count == 1
+
+
+def test_dispatch_memory_nested_path() -> None:
+    """Memory route captures multi-segment paths: /memory/foo/dir/file.html."""
+    stubs = _make_stubs()
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    _dispatch(handler_class, "/memory/foo/dir/file.html")
+
+    assert stubs["memory"].call_count == 1
+    assert stubs["memory"].last_kwargs == {"slug": "foo", "path": "dir/file.html"}

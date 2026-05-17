@@ -1,7 +1,7 @@
-"""Dashboard HTTP handler for the server registry."""
+"""DEPRECATED — removed in a future release. New code in features/panel/. See specs/releases/dadaia-workspace-panel-v1/."""
 
-import http.server
 import json
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 
@@ -64,7 +64,7 @@ def render_html(states_dir: Path) -> str:
 </html>"""
 
 
-class DashboardHandler(http.server.BaseHTTPRequestHandler):
+class DashboardHandler(BaseHTTPRequestHandler):
     states_dir: Path  # set as class attribute before serving
 
     def do_GET(self) -> None:

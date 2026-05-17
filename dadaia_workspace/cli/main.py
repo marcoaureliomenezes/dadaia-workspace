@@ -8,6 +8,7 @@ from dadaia_workspace.cli.commands import (
     doctor,
     init,
     orchestrate,
+    panel,
     public,
     repos,
     server,
@@ -36,6 +37,7 @@ app.add_typer(academy.app, name="academy")
 app.add_typer(orchestrate.app, name="orchestrate")
 app.add_typer(specs.app, name="specs")
 app.add_typer(server.app, name="server")
+app.add_typer(panel.app, name="panel")
 
 
 if __name__ == "__main__":

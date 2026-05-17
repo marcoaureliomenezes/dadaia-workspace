@@ -1,6 +1,7 @@
 """dadaia server subcommands — port registry management."""
 
 import json
+import sys
 import webbrowser
 from pathlib import Path
 
@@ -238,8 +239,25 @@ def dashboard(
     port: int = typer.Option(4999, "--port", help="Dashboard HTTP port"),
     no_open: bool = typer.Option(False, "--no-open", help="Do not open browser automatically"),
 ) -> None:
-    """Start the server registry dashboard (bookmarkable URL)."""
-    import http.server
+    """[DEPRECATED] Start the server registry dashboard (bookmarkable URL).
+
+    Use 'dadaia panel' instead. This command will be removed in the next release.
+    """
+    import warnings
+
+    warnings.warn(
+        "'dadaia server dashboard' is deprecated. Use 'dadaia panel' instead."
+        " This command will be removed in the next release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    print(
+        "[deprecation] 'dadaia server dashboard' will be removed in a future release."
+        " Use 'dadaia panel' instead.",
+        file=sys.stderr,
+    )
+
+    from http.server import ThreadingHTTPServer
 
     from dadaia_workspace.features.server_registry.dashboard import DashboardHandler
 
@@ -247,14 +265,14 @@ def dashboard(
     states_dir = ws / ".dadaia" / "states"
     DashboardHandler.states_dir = states_dir
 
-    url = f"http://localhost:{port}"
+    url = f"http://127.0.0.1:{port}"
     console.print(f"[green]►[/green] Serving registry dashboard at [bold]{url}[/bold]")
     console.print("  Press [bold]Ctrl+C[/bold] to stop.")
 
     if not no_open:
         webbrowser.open(url)
 
-    server = http.server.HTTPServer(("localhost", port), DashboardHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", port), DashboardHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
