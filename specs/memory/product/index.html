@@ -29,7 +29,7 @@
 <body>
 
 <h1>Product Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-16 · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">Última atualização: 2026-05-16 · Closure: dadaia-workspace-panel-v1</p>
 
 <section id="vision">
   <h2>Visão atômica</h2>
@@ -57,6 +57,9 @@
     <li><a href="workspace-doctor.html">workspace-doctor</a><span class="desc">— diagnóstico + repair de invariantes do workspace state com <code>--fix</code> opcional.</span></li>
     <li><a href="specs-doctor.html">specs-doctor</a><span class="desc">— 11 checks estruturais SDD release-lifecycle: memory HTML atômico, ACTIVE.md, CLOSURE evidence triples, broken images, Mermaid script presence.</span></li>
     <li><a href="sdd-gate-v3.html">sdd-gate-v3</a><span class="desc">— hook PreToolUse que enforça atomicidade do memory, archive read-only e exige task <code>[-]</code> ativa para edits de produção.</span></li>
+    <li><a href="sdd-hotfix-track.html">sdd-hotfix-track</a><span class="desc">— SemVer <code>vMAJOR.MINOR.PATCH</code> em <code>specs/releases/</code> com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via <code>## Hotfixes pendentes</code> do backlog).</span></li>
+    <li><a href="agent-sdd-alignment.html">agent-sdd-alignment</a><span class="desc">— agentes, skills, workflows e templates SDD release-aware (<code>specs/releases/&lt;active&gt;/</code> como primary; <code>features/&lt;feat&gt;/</code> apenas Legacy compat) + <code>dadaia specs init</code> + doctor SPEC-DOC-003/012 + CI <code>specs-doctor</code>.</span></li>
+    <li><a href="panel.html">panel</a><span class="desc">— UI local single-page em <code>http://127.0.0.1:4999/</code> via <code>dadaia panel</code>; 3 sections (Servers / Memories / Agents placeholder) com memory HTML servido verbatim via two-route reverse proxy (SPEC-DOC-008 preservado por construção).</span></li>
     <li><a href="academy.html">academy</a><span class="desc">— sistema de cursos copy-from-template para onboarding de contribuidores e agentes.</span></li>
     <li><a href="workspace-portability.html">workspace-portability</a><span class="desc">— export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas.</span></li>
     <li><a href="repos-catalog.html">repos-catalog</a><span class="desc">— lookup do <code>repos.xlsx</code> para discovery rápida de repos conhecidos com slug + URL.</span></li>
