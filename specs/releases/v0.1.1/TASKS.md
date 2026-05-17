@@ -53,7 +53,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-05 — Probe permission semantics fix
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p3
 - **Owner:** software-engineer
 - **Precondições:** T-DSR-04 done.
 - **Files modified:** `dadaia_workspace/core/protocols/process_probe.py`
@@ -62,7 +62,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-06 — Tests for probe semantics
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p3
 - **Owner:** software-engineer
 - **Precondições:** T-DSR-05 done.
 - **Files modified:** `tests/unit/core/test_process_probe.py` (novo)
