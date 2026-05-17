@@ -1,6 +1,7 @@
 """Unit tests for public asset staging and runtime projections."""
 
 import json
+import os
 import sys
 import tomllib
 from pathlib import Path
@@ -11,7 +12,6 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     _parse_agent_frontmatter,
     _render_agent_toml_block,
-    _render_agents_into_codex_config,
 )
 
 
@@ -338,3 +338,40 @@ def test_install_codex_emits_removed_log_line(tmp_path: Path, capsys: pytest.Cap
     assert str(workflows_dir) in captured.err, (
         f"Expected workflows dir path {workflows_dir!r} in stderr; got:\n{captured.err!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# T-MPP-3.5 — T-PB-2 adversarial test (#3) — permission-error path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only permission test")
+def test_cleanup_warns_on_permission_error_does_not_raise(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """T-PB-2 #3 — chmod 0o000 on workflows dir triggers [cleanup-warning] without raising.
+
+    Defensive coding policy floor #2: visible failure modes.
+    shutil.rmtree(..., onerror=_log_cleanup_error) must NOT propagate PermissionError;
+    it must write [cleanup-warning] to stderr instead.
+    """
+    manager, workspace_root = _make_codex_install_manager(tmp_path)
+
+    # Pre-create a legacy workflows dir with a file inside
+    workflows_dir = workspace_root / ".codex" / "workflows"
+    workflows_dir.mkdir(parents=True)
+    (workflows_dir / "legacy.workflow.md").write_text("old content\n", encoding="utf-8")
+
+    # Deny all access to the workflows directory so rmtree cannot list/remove its contents
+    os.chmod(workflows_dir, 0o000)
+    try:
+        # install must NOT raise despite permission error
+        manager.install(workspace_root, target="codex", force=True)
+
+        captured = capsys.readouterr()
+        assert "[cleanup-warning]" in captured.err, (
+            f"Expected '[cleanup-warning]' in stderr after permission error; got:\n{captured.err!r}"
+        )
+    finally:
+        # Restore permissions so pytest can clean up tmp_path
+        os.chmod(workflows_dir, 0o755)
