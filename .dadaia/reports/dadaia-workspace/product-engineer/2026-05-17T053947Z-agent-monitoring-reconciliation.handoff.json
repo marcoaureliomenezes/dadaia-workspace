@@ -1,0 +1,33 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "product-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-17T05:39:47Z",
+  "release_id": "agent-monitoring-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/product-engineer/2026-05-17T053947Z-agent-monitoring-reconciliation.html",
+    "content_hash": "sha256:51afc0028c08984f2123d3f431985ec48cc89316ce88840a172a96cdb65fec2b"
+  },
+  "findings": [
+    { "severity": "HIGH", "summary": "Schema correction adopted: usage lives at event.message.usage (software-engineer empirical observation beats Phase-1 assumption)." },
+    { "severity": "HIGH", "summary": "Agent identity via type=agent-name event (agentName field) + isSidechain — subagent_type does not exist in real jsonl." },
+    { "severity": "HIGH", "summary": "Bearer token auth locked by operator; secrets.token_urlsafe(32); panel.token chmod 600." },
+    { "severity": "MEDIUM", "summary": "Codex tokens_used is aggregated — no USD cost computable for Codex events; UI must surface this honestly." },
+    { "severity": "MEDIUM", "summary": "Panel nav-tabs accessibility fix (role=tablist, role=tabpanel, keyboard arrows) is gating prerequisite (T-AM-01) before any new tab work." },
+    { "severity": "INFO", "summary": "Two candidate releases drafted: agent-monitoring-v1 (Status: Em revisão) and dadaia-workspace-brand-identity-v1 (Status: Em revisão). ACTIVE.md untouched (multi-platform-parity-v1 keeps IMPLEMENTATION)." }
+  ],
+  "decisions_required": [
+    "Operator must transition agent-monitoring-v1/SPEC.md from 'Em revisão' to 'Aprovado'.",
+    "Operator must transition dadaia-workspace-brand-identity-v1/SPEC.md from 'Em revisão' to 'Aprovado'.",
+    "Confirm 180d raw + perpetual aggregates retention or set explicit TTL.",
+    "Confirm T7 suspect-event behavior: mark + UI warning (recommended) vs silently discard.",
+    "Confirm alert/threshold policy: numbers-only (default) vs cost-per-day alerts.",
+    "Confirm pricing-staleness banner threshold of 90 days.",
+    "Decide brand-identity-v1 implementation cadence: parallel with agent-monitoring-v1 or sequential."
+  ],
+  "next_handoff": {
+    "agent": "product-engineer",
+    "input": "Operator approval gate for both Em-revisão specs; on Aprovado, software-architect (architecture.html memory migration) + software-engineer (pricing.py + reader skeleton) become next agents."
+  }
+}
