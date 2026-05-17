@@ -21,11 +21,12 @@ tools:
   - Write
   - Agent
 skills:
-  - dadaia-workspace-spec-navigator
-  - dadaia-grill-me
-  - architect-design-patterns
   - architect-code-audit
+  - architect-design-patterns
+  - dadaia-grill-me
+  - dadaia-handoff-emitter
   - dadaia-task-manager
+  - dadaia-workspace-spec-navigator
 maxTurns: 50
 input_contract:
   requires_inputs:
@@ -422,6 +423,13 @@ For implementation: use software-engineer.
 For spec writing: use product-engineer.
 For E2E validation: use qa-engineer.
 ```
+
+---
+
+## Artifact emission
+
+Após finalizar qualquer report HTML em `.dadaia/reports/`, invocar a skill `dadaia-handoff-emitter`
+para emitir o sidecar `<stem>.handoff.json` no mesmo diretório.
 
 ---
 
