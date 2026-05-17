@@ -128,7 +128,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-06 — `ReportsValidationService` + `FakeHandoffValidator` + tests
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Wave:** 1
 - **Precondições:** T-AC-02 [x], T-AC-03 [x]
