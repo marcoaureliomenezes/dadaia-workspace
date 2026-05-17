@@ -324,7 +324,7 @@ class TestNoForbiddenFieldsInDb:
         # Check sessions table
         sessions = dao._conn.execute("SELECT * FROM sessions").fetchall()  # noqa: SLF001
         for row in sessions:
-            for col in row:
+            for col in row.keys():  # noqa: SIM118 — sqlite3.Row iter yields values, not keys
                 val = row[col]
                 if isinstance(val, str):
                     for forbidden in FORBIDDEN_SUBSTRINGS:
@@ -335,7 +335,7 @@ class TestNoForbiddenFieldsInDb:
         # Check events table
         events = dao._conn.execute("SELECT * FROM events").fetchall()  # noqa: SLF001
         for row in events:
-            for col in row:
+            for col in row.keys():  # noqa: SIM118 — sqlite3.Row iter yields values, not keys
                 val = row[col]
                 if isinstance(val, str):
                     for forbidden in FORBIDDEN_SUBSTRINGS:
@@ -346,7 +346,7 @@ class TestNoForbiddenFieldsInDb:
         # Check agents table
         agents = dao._conn.execute("SELECT * FROM agents").fetchall()  # noqa: SLF001
         for row in agents:
-            for col in row:
+            for col in row.keys():  # noqa: SIM118 — sqlite3.Row iter yields values, not keys
                 val = row[col]
                 if isinstance(val, str):
                     for forbidden in FORBIDDEN_SUBSTRINGS:
