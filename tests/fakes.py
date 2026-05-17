@@ -279,3 +279,26 @@ class FakeProcessProbe:
 
     def is_pid_alive(self, pid: int) -> bool:
         return pid in self._alive_pids
+
+
+class FakeHandoffValidator:
+    """Configurable fake implementing ``ValidatorPort``.
+
+    Accepts a list of canned ``HandoffValidationError`` instances that will be
+    returned on every call to ``validate()``.  Records all calls for inspection
+    in ``calls``.
+
+    Args:
+        canned_errors: List of ``HandoffValidationError`` instances to return.
+            Pass an empty list to simulate a valid document.
+    """
+
+    def __init__(self, canned_errors: list | None = None) -> None:
+        from dadaia_workspace.core.exceptions import HandoffValidationError as _HVE  # noqa: F401
+
+        self._canned: list = list(canned_errors or [])
+        self.calls: list[dict] = []
+
+    def validate(self, doc: dict) -> list:
+        self.calls.append({"doc": doc})
+        return list(self._canned)
