@@ -63,3 +63,26 @@ class PortConflictError(DadaiaError):
 
 class PortNotRegisteredError(DadaiaError):
     """Raised when an operation targets a port not present in the registry."""
+
+
+class HandoffSchemaError(DadaiaError):
+    """Raised when the schema file itself is invalid or contains unsupported keywords.
+
+    Example: StdlibHandoffValidator.__init__ encounters 'oneOf' which is outside
+    the supported keyword subset. This forces conscious schema evolution decisions
+    rather than silent misses.
+    """
+
+
+class HandoffValidationError(DadaiaError):
+    """Raised when a handoff document instance fails schema validation.
+
+    Carries structured information about the field that failed and why.
+    Returned (not raised) by ``ValidatorPort.validate()`` as a sequence of
+    per-violation descriptors; raised by higher-level code when strict mode is on.
+    """
+
+    def __init__(self, field_path: str, message: str) -> None:
+        self.field_path = field_path
+        self.message = message
+        super().__init__(f"{field_path}: {message}")
