@@ -190,7 +190,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: ≥1 (function definition)
     ```
 
-- [-] **T-MPP-2.4** `[parallel: no]` Add `_render_agent_toml_block(name, fm)` (assembles `[agents.<name>]` block).
+- [x] **T-MPP-2.4** `[parallel: no]` Add `_render_agent_toml_block(name, fm)` (assembles `[agents.<name>]` block).
   - **Owner:** software-engineer
   - **Effort:** M (~25 LoC)
   - **Files MODIFIED:**

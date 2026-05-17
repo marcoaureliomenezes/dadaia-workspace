@@ -96,6 +96,30 @@ def _toml_escape(value: object) -> str:
     return f'"{s}"'
 
 
+def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
+    """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
+
+    Keys are always quoted for safety (required for hyphenated names like
+    ``software-engineer``). Missing or None fields are omitted. The ``tools``
+    field, if present, is emitted as a TOML array of basic strings.
+
+    Names containing ``]`` are rejected (cannot appear safely in a TOML key).
+    """
+    if "]" in name:
+        raise ValueError(f"Agent name contains invalid character ']': {name!r}")
+    lines: list[str] = [f'[agents."{name}"]\n']
+    for field in ("name", "description", "model"):
+        val = fm.get(field)
+        if val is None:
+            continue
+        lines.append(f"{field} = {_toml_escape(val)}\n")
+    tools_val = fm.get("tools")
+    if tools_val is not None and isinstance(tools_val, list):
+        items = ", ".join(_toml_escape(t) for t in tools_val)
+        lines.append(f"tools = [{items}]\n")
+    return "".join(lines)
+
+
 def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     """Parse YAML frontmatter from an agent .md file using stdlib regex only.
 
