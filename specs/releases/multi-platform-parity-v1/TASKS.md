@@ -263,7 +263,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: 0
     ```
 
-- [-] **T-MPP-2.9** `[parallel: yes]` Add 6 unit tests for T-PB-1 (parse + render happy paths, no adversarial yet).
+- [x] **T-MPP-2.9** `[parallel: yes]` Add 6 unit tests for T-PB-1 (parse + render happy paths, no adversarial yet).
   - **Owner:** software-engineer
   - **Effort:** M (~60 LoC test code)
   - **Files MODIFIED:**
