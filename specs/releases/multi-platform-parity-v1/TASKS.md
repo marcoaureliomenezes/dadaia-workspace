@@ -341,7 +341,7 @@ feat(public-assets): T-PB-2 — stop copying workflows to .codex/workflows/ + sa
 
 ---
 
-- [ ] **T-MPP-3.1** `[parallel: no]` Remove `_copy_tree(... workflows ...)` from `_install_codex()`.
+- [-] **T-MPP-3.1** `[parallel: no]` Remove `_copy_tree(... workflows ...)` from `_install_codex()`.
   - **Owner:** software-engineer
   - **Effort:** S (~2 LoC removed)
   - **Files MODIFIED:**
