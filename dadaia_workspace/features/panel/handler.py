@@ -202,6 +202,16 @@ def make_handler_class(
                         )
                         return
 
+                    # T-AM-21: degraded mode — SQLite was corrupt and quarantined.
+                    # Auth is checked first (401 precedes 503 per ordering requirement).
+                    if getattr(_telemetry, "is_degraded", False):
+                        self._respond(
+                            503,
+                            "application/json",
+                            b'{"error": "telemetry_degraded", "message": "Telemetry database is corrupt and has been quarantined. Restart the panel after investigating ~/.dadaia/state/telemetry/telemetry.sqlite.corrupt.*"}',
+                        )
+                        return
+
                     self._dispatch_telemetry(route_name, m.groupdict(), qs)
                     return
 

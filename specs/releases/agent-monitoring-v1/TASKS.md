@@ -180,21 +180,21 @@
 
 ## Phase 9 — Integration with brand-identity-v1 + hardening
 
-- [-] **T-AM-19** — Consume brand-identity-v1 tokens with fallback. <!-- software-engineer-p9 -->
+- [x] **T-AM-19** — Consume brand-identity-v1 tokens with fallback. <!-- software-engineer-p9 -->
   - PANEL_CSS adds: `--color-cost`, `--color-warning-bg`, `--color-alert`, `--color-accent-secondary` mapped to new palette `#633d2e #ddd9ab #f7af63 #bfd8ad`. Existing `--color-accent` updated to `#9cddc8`.
   - If brand-identity-v1 is not yet on Aprovado, keep current values as fallback (release ships either way).
   - Tests: contrast assertions (WCAG AA) on text-over-token combinations from SPEC.
   - Files: `dadaia_workspace/features/panel/views/_assets.py`, `tests/unit/features/panel/test_panel_css_contrast.py`.
   - Parallel-safe: yes; coordinated with `dadaia-workspace-brand-identity-v1` tasks.
 
-- [-] **T-AM-20** — Hardening pass: chmod, fs permission checks, secure-delete docs. <!-- software-engineer-p9 -->
+- [x] **T-AM-20** — Hardening pass: chmod, fs permission checks, secure-delete docs. <!-- software-engineer-p9 -->
   - Verify `~/.dadaia/state/telemetry/` is created with `0o700`, file with `0o600` (devops T2).
   - Integration test: create service, inspect mode bits.
   - Document `shred -u` recovery procedure in `dadaia_workspace/features/panel/views/agents.py` help section (devops T12).
   - Files: `dadaia_workspace/features/telemetry/service.py` (mkdir mode), `tests/integration/test_telemetry_permissions.py`.
   - Parallel-safe: yes after T-AM-12.
 
-- [-] **T-AM-21** — Boot in no-telemetry mode on SQLite corruption (devops T10). <!-- software-engineer-p9 -->
+- [x] **T-AM-21** — Boot in no-telemetry mode on SQLite corruption (devops T10). <!-- software-engineer-p9 -->
   - `PRAGMA integrity_check` at startup; on failure rename to `telemetry.sqlite.corrupt.<ts>` and degrade endpoints to 503.
   - Tests: corrupted file fixture (truncated header) → service starts, endpoints return 503 with human-readable message.
   - Files: `dadaia_workspace/features/telemetry/service.py`, `tests/integration/test_telemetry_corrupt_db.py`.

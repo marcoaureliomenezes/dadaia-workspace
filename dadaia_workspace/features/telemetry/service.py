@@ -20,10 +20,12 @@ Refresh logic:
 """
 from __future__ import annotations
 
+import datetime
 import fcntl
 import logging
 import os
 import pathlib
+import sqlite3
 import time
 from typing import Any, Callable
 
@@ -104,11 +106,45 @@ class TelemetryService:
         self._scs = spec_context_service
         self._now_fn: Callable[[], float] = _now_fn or time.monotonic
 
-        # Ensure state directory exists with restricted permissions.
-        # Full permission hardening (chmod 0o700) is done in T-AM-20.
+        # Ensure state directory exists with strict permissions (T-AM-20 / devops T2).
+        # We create parents first, then chmod the leaf dir to 0o700 so that the
+        # telemetry state is only readable by the owning user.
         self._state_dir.mkdir(parents=True, exist_ok=True)
+        os.chmod(self._state_dir, 0o700)
+
+        # Verify the panel auth token file (written by auth.py) has 0o600 perms.
+        # If permissions have drifted (e.g. umask misconfiguration), log a warning
+        # but do not abort — the operator can remediate without restarting.
+        _token_path = self._state_dir.parent / "panel.token"
+        if _token_path.exists():
+            actual_mode = _token_path.stat().st_mode & 0o777
+            if actual_mode != 0o600:
+                logger.warning(
+                    "TelemetryService: auth token file %s has mode 0o%o "
+                    "(expected 0o600). Run: chmod 600 %s",
+                    _token_path,
+                    actual_mode,
+                    _token_path,
+                )
+
+        self._degraded = False
 
         self._last_refresh: float = 0.0  # monotonic seconds of last successful refresh
+
+    # ------------------------------------------------------------------
+    # Public state
+    # ------------------------------------------------------------------
+
+    @property
+    def is_degraded(self) -> bool:
+        """True when the SQLite database was found corrupt and quarantined.
+
+        While degraded, all telemetry read endpoints return 503.  The service
+        itself remains alive so that non-telemetry panel functionality continues.
+        To recover: investigate / shred the quarantined file (see
+        ``features/panel/views/agents.py`` module docstring), then restart.
+        """
+        return self._degraded
 
     # ------------------------------------------------------------------
     # Refresh
@@ -147,9 +183,69 @@ class TelemetryService:
             fcntl.flock(lock_fd, fcntl.LOCK_UN)
             os.close(lock_fd)
 
+    # ------------------------------------------------------------------
+    # Integrity check (T-AM-21)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _integrity_check(conn: sqlite3.Connection) -> bool:
+        """Run PRAGMA integrity_check; return True if the database is intact.
+
+        SQLite's integrity_check returns a single row with the text 'ok' when
+        the file is not corrupt.  Any other result (or an OperationalError) means
+        the database is damaged and should be quarantined.
+        """
+        try:
+            result = conn.execute("PRAGMA integrity_check").fetchone()
+            return result is not None and result[0] == "ok"
+        except sqlite3.OperationalError:
+            return False
+
+    def _quarantine_db(self) -> None:
+        """Rename the corrupt DB to telemetry.sqlite.corrupt.<utc_ts>.
+
+        Does not raise; only logs.  The service continues in degraded mode.
+        """
+        db_path = self._state_dir / _DEFAULT_SQLITE_FILENAME
+        ts = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        quarantine_path = self._state_dir / f"telemetry.sqlite.corrupt.{ts}"
+        try:
+            os.rename(db_path, quarantine_path)
+            logger.warning(
+                "TelemetryService: corrupt database quarantined as %s. "
+                "Service is now in degraded mode. "
+                "Investigate and then run: shred -u %s",
+                quarantine_path,
+                quarantine_path,
+            )
+        except OSError as exc:
+            logger.error(
+                "TelemetryService: could not quarantine corrupt DB %s → %s: %s",
+                db_path,
+                quarantine_path,
+                exc,
+            )
+
     def _do_refresh(self) -> None:
         """Inner refresh: open DAO, run readers, backfill costs."""
-        import datetime as _dt
+        # --- Integrity check on existing DB (T-AM-21 / devops T10) ---
+        # Open a temporary connection to check the existing file BEFORE
+        # the DAO factory opens it (which would apply migrations).
+        db_path = self._state_dir / _DEFAULT_SQLITE_FILENAME
+        if db_path.exists():
+            try:
+                _check_conn = sqlite3.connect(str(db_path))
+                try:
+                    intact = self._integrity_check(_check_conn)
+                finally:
+                    _check_conn.close()
+            except sqlite3.DatabaseError:
+                intact = False
+
+            if not intact:
+                self._quarantine_db()
+                self._degraded = True
+                return  # Skip all readers — service stays alive in degraded mode.
 
         dao = self._dao_factory()
 
@@ -157,8 +253,14 @@ class TelemetryService:
         from dadaia_workspace.features.telemetry.store.schema import apply_migrations
         apply_migrations(dao._conn)
 
+        # Harden SQLite file permissions to 0o600 (owner read/write only).
+        # This is done after every refresh since the DAO may create the file on
+        # first connection. os.chmod is idempotent and cheap. (T-AM-20 / devops T2)
+        if db_path.exists():
+            os.chmod(db_path, 0o600)
+
         claude_reader, codex_reader, workflows_reader = self._reader_factory()
-        now_iso = _dt.datetime.now(tz=_dt.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
 
         # --- Claude reader ---
         claude_projects = _CLAUDE_PROJECTS_DIR

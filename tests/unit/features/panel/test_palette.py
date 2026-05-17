@@ -22,13 +22,19 @@ def test_palette_values_are_canonical_hex() -> None:
 
 
 def test_palette_hex_only_in_token_definitions() -> None:
-    """Each PALETTE hex may only appear in lines that define a --color-* token."""
-    pattern = re.compile(r"^[^\n]*--color-[a-z-]+\s*:\s*", re.MULTILINE)
+    """Each PALETTE hex appears only in --color-* definitions or var(...) fallbacks.
+
+    The fallback form `var(--color-X, #hex)` is required by D-AM-22 (agent-monitoring-v1)
+    so the panel renders correctly even if brand-identity tokens are missing.
+    """
+    pattern = re.compile(
+        r"(--color-[a-z-]+\s*:\s*|var\(--color-[a-z-]+\s*,\s*)",
+    )
     for hex_value in PALETTE.values():
         occurrences = [
             line for line in PANEL_CSS.splitlines() if hex_value.lower() in line.lower()
         ]
         for line in occurrences:
             assert pattern.search(line), (
-                f"hex {hex_value} found outside token definition: {line!r}"
+                f"hex {hex_value} found outside token definition or var() fallback: {line!r}"
             )
