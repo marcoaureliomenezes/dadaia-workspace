@@ -28,6 +28,7 @@ _COPY_DIRS = (
     "commands",
     "agents",
     "scripts",
+    "schemas",
     "data",
     "scaffold",
     "templates",
