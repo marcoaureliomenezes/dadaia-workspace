@@ -398,7 +398,7 @@ feat(public-assets): T-PB-2 — stop copying workflows to .codex/workflows/ + sa
     # expect: 2 passed
     ```
 
-- [-] **T-MPP-3.5** `[parallel: yes]` Add 1 adversarial test for T-PB-2 #3 — permission-error path warns to stderr without raising.
+- [x] **T-MPP-3.5** `[parallel: yes]` Add 1 adversarial test for T-PB-2 #3 — permission-error path warns to stderr without raising.
   - **Owner:** software-engineer
   - **Effort:** M (~12 LoC test code)
   - **Files MODIFIED:**
