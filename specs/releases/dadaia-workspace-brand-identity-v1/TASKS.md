@@ -37,25 +37,25 @@
 
 ## Phase 2 — Logo rinoceronte SVG
 
-- [-] **T-BR-03** — Create `dadaia_workspace/features/panel/views/assets/logo-rhino-24.svg`. <!-- software-engineer-phase3 -->
+- [x] **T-BR-03** — Create `dadaia_workspace/features/panel/views/assets/logo-rhino-24.svg`. <!-- software-engineer-phase3 -->
   - viewBox `0 0 24 24`, ≤ 3 elementos, `currentColor` em todos os `fill`/`stroke`.
   - Silhueta plana de cabeça de rinoceronte de perfil, olhando para a direita, com chifre único.
   - No hex hardcoded.
   - Files: `dadaia_workspace/features/panel/views/assets/logo-rhino-24.svg`.
   - Parallel-safe: yes (isolated artifact). May require operator visual review before merging.
 
-- [-] **T-BR-04** — Create `dadaia_workspace/features/panel/views/assets/logo-rhino-16.svg`. <!-- software-engineer-phase3 -->
+- [x] **T-BR-04** — Create `dadaia_workspace/features/panel/views/assets/logo-rhino-16.svg`. <!-- software-engineer-phase3 -->
   - viewBox `0 0 16 16`, same style as 24×24 but with simplified paths.
   - `currentColor` em todos os elementos.
   - Files: `dadaia_workspace/features/panel/views/assets/logo-rhino-16.svg`.
   - Parallel-safe: yes after T-BR-03 (reuses silhouette).
 
-- [-] **T-BR-05** — Load SVGs at module init in `_assets.py`. <!-- software-engineer-phase3 -->
+- [x] **T-BR-05** — Load SVGs at module init in `_assets.py`. <!-- software-engineer-phase3 -->
   - Module-level constants `LOGO_RHINO_24` and `LOGO_RHINO_16` via `pathlib.Path(__file__).parent.joinpath("assets/logo-rhino-24.svg").read_text(encoding="utf-8")`.
   - Files: `dadaia_workspace/features/panel/views/_assets.py`.
   - Parallel-safe: yes after T-BR-03 + T-BR-04.
 
-- [-] **T-BR-06** — Insert logo in topbar in `views/index.py`. <!-- software-engineer-phase3 -->
+- [x] **T-BR-06** — Insert logo in topbar in `views/index.py`. <!-- software-engineer-phase3 -->
   - Before `.topbar-wordmark`: render `LOGO_RHINO_24` inline as raw HTML inside `<span class="topbar-logo" aria-hidden="true">{LOGO_RHINO_24}</span>`.
   - PANEL_CSS adds `.topbar-logo { color: var(--color-cost); display: inline-flex; align-items: center; margin-right: 0.5rem; }`.
   - Files: `dadaia_workspace/features/panel/views/index.py`, `dadaia_workspace/features/panel/views/_assets.py` (PANEL_CSS).
