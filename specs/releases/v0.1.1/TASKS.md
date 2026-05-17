@@ -106,7 +106,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-10 — Acceptance + PR
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p6
 - **Owner:** product-engineer (claude-main)
 - **Precondições:** T-DSR-01..09 done.
 - **Files modified:**
