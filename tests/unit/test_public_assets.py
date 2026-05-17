@@ -1,6 +1,7 @@
 """Unit tests for public asset staging and runtime projections."""
 
 import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -279,4 +280,61 @@ def test_codex_config_skills_paths_array_ordering(case: dict) -> None:  # type: 
     assert agents_offset < skills_offset, (
         f"Expected [agents.*] (offset {agents_offset}) to appear before "
         f"[skills] (offset {skills_offset}) in output"
+    )
+
+
+# ---------------------------------------------------------------------------
+# T-MPP-3.4 — T-PB-2 base unit tests (#1, #2)
+# ---------------------------------------------------------------------------
+
+
+def _make_codex_install_manager(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
+    """Return a manager pointed at a minimal public dir and a workspace root.
+
+    The public/ dir has only what _install_codex() strictly requires: a rules/
+    subdir and an agents/ subdir (both may be empty).
+    """
+    public_dir = tmp_path / "public"
+    (public_dir / "rules").mkdir(parents=True)
+    (public_dir / "agents").mkdir(parents=True)
+    workspace_root = tmp_path / "ws"
+    workspace_root.mkdir()
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+    return manager, workspace_root
+
+
+def test_install_codex_cleans_existing_workflows_dir(tmp_path: Path) -> None:
+    """T-PB-2 #1 — _install_codex() removes an existing .codex/workflows/ directory."""
+    manager, workspace_root = _make_codex_install_manager(tmp_path)
+
+    # Pre-create a legacy workflows dir with a file inside
+    workflows_dir = workspace_root / ".codex" / "workflows"
+    workflows_dir.mkdir(parents=True)
+    (workflows_dir / "legacy.workflow.md").write_text("old content\n", encoding="utf-8")
+
+    manager.install(workspace_root, target="codex", force=True)
+
+    assert not workflows_dir.exists(), (
+        f"Expected .codex/workflows/ to be removed after install, but it still exists at {workflows_dir}"
+    )
+
+
+def test_install_codex_emits_removed_log_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """T-PB-2 #2 — _install_codex() writes a [removed] line to stderr listing the workflows dir."""
+    manager, workspace_root = _make_codex_install_manager(tmp_path)
+
+    # Pre-create a legacy workflows dir
+    workflows_dir = workspace_root / ".codex" / "workflows"
+    workflows_dir.mkdir(parents=True)
+    (workflows_dir / "legacy.workflow.md").write_text("old content\n", encoding="utf-8")
+
+    manager.install(workspace_root, target="codex", force=True)
+
+    captured = capsys.readouterr()
+    assert "[removed]" in captured.err, (
+        f"Expected '[removed]' in stderr; got:\n{captured.err!r}"
+    )
+    assert str(workflows_dir) in captured.err, (
+        f"Expected workflows dir path {workflows_dir!r} in stderr; got:\n{captured.err!r}"
     )
