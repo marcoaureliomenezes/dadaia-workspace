@@ -148,3 +148,16 @@ def test_build_repos_service_returns_service() -> None:
 
     svc = container.build_repos_service()
     assert isinstance(svc, ReposService)
+
+
+def test_build_panel_service_raises_when_not_initialized(tmp_path: Path) -> None:
+    with pytest.raises(WorkspaceNotInitializedError):
+        container.build_panel_service(tmp_path)
+
+
+def test_build_panel_service_succeeds_when_initialized(tmp_path: Path) -> None:
+    _init_states(tmp_path)
+    from dadaia_workspace.features.panel.service import PanelService
+
+    svc = container.build_panel_service(tmp_path)
+    assert isinstance(svc, PanelService)
