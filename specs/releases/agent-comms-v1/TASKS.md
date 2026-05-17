@@ -199,7 +199,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-10 — E2E tests handoff pipeline
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Wave:** 2
 - **Precondições:** T-AC-08 [x], T-AC-09 [x]
