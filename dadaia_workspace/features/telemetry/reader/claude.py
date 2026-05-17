@@ -23,6 +23,7 @@ import pathlib
 from dataclasses import dataclass
 from typing import Optional
 
+from dadaia_workspace.features.telemetry import budget as _budget
 from dadaia_workspace.features.telemetry.reader.allowlist import allowlist_event
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.models import (
@@ -35,14 +36,12 @@ from dadaia_workspace.features.telemetry.store.models import (
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Budget constants — P4 (T-AM-08) will replace these with an import from
-# features/telemetry/budget.py.  For now they are defined locally so P3
-# is self-contained and importable before P4 lands.
+# Budget constants — imported from features/telemetry/budget.py (T-AM-08).
 # ---------------------------------------------------------------------------
 
-MAX_BYTES_PER_CYCLE: int = 4 * 1024 * 1024    # 4 MiB per read cycle
-MAX_LINE_LENGTH: int = 64 * 1024               # 64 KiB per line
-MAX_EVENTS_PER_CYCLE: int = 10_000
+MAX_BYTES_PER_CYCLE: int = _budget.MAX_BYTES_PER_FILE_PER_CYCLE
+MAX_LINE_LENGTH: int = _budget.MAX_LINE_LENGTH
+MAX_EVENTS_PER_CYCLE: int = _budget.MAX_EVENTS_PER_CYCLE
 
 
 # ---------------------------------------------------------------------------
