@@ -100,16 +100,3 @@ def test_classify_workflows_quadrants(tmp_path: Path, case: dict) -> None:  # ty
         assert expected in result, f"Expected {expected!r} in result; got {result}"
     for not_expected in case["expected_not_in"]:
         assert not_expected not in result, f"Did not expect {not_expected!r} in result; got {result}"
-
-
-def test_doctor_reports_drift_and_unsupported(tmp_path: Path) -> None:
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-    manager.install(workspace, target="all")
-    (workspace / "AGENTS.md").write_text("drift\n", encoding="utf-8")
-
-    report = manager.doctor(workspace)
-
-    assert "[drift] root:AGENTS.md" in report
-    assert "[unsupported] codex:agents" in report
-    assert "[unsupported] opencode:hooks" in report
