@@ -123,13 +123,11 @@ def test_index_contains_agents_section() -> None:
     assert "Agents" in html
 
 
-def test_index_placeholder_card_text() -> None:
-    """The placeholder card must contain the exact copy 'Em breve — Release-2'."""
+def test_index_agents_section_has_grid() -> None:
+    """T-AM-18: agents section replaced placeholder with real grid scaffold."""
     service = _build_service()
     html = _render(service)
-    # The em-dash in the HTML is encoded as &#8212;
-    assert "Em breve" in html
-    assert "Release-2" in html
+    assert 'id="agents-grid"' in html
 
 
 def test_index_primary_context_badge() -> None:
@@ -285,10 +283,10 @@ def test_sections_have_tabindex_zero() -> None:
 
 
 def test_tabpanel_count_is_three() -> None:
-    """T-AM-01: there must be exactly 3 role=tabpanel elements (Servers/Memories/Agents)."""
+    """T-AM-01/T-AM-18: there must be exactly 4 role=tabpanel elements after workflows tab added."""
     service = _build_service()
     html = _render(service)
-    assert html.count('role="tabpanel"') == 3
+    assert html.count('role="tabpanel"') == 4
 
 
 def test_panel_js_contains_keydown_handler() -> None:
@@ -300,3 +298,38 @@ def test_panel_js_contains_keydown_handler() -> None:
     assert "Home" in PANEL_JS
     assert "End" in PANEL_JS
     assert "keydown" in PANEL_JS
+
+
+# ---------------------------------------------------------------------------
+# T-AM-18: 4th nav-tab (Workflows) wired into index
+# ---------------------------------------------------------------------------
+
+
+def test_has_workflows_tab() -> None:
+    """T-AM-18: nav must contain a tab with id="tab-workflows"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-workflows"' in html
+
+
+def test_has_workflows_section() -> None:
+    """T-AM-18: rendered HTML must contain id="section-workflows"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="section-workflows"' in html
+
+
+def test_aria_pairs_workflows() -> None:
+    """T-AM-18: section has aria-labelledby="tab-workflows" and tab has id="tab-workflows"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-workflows"' in html
+    assert 'aria-labelledby="tab-workflows"' in html
+
+
+def test_nav_has_4_tabs() -> None:
+    """T-AM-18: nav-tabs must contain exactly 4 tab buttons."""
+    service = _build_service()
+    html = _render(service)
+    # Count role="tab" occurrences
+    assert html.count('role="tab"') == 4

@@ -150,7 +150,7 @@
 
 ## Phase 8 — Frontend
 
-- [-] **T-AM-16** — Implement `features/panel/views/agents.py`.
+- [x] **T-AM-16** — Implement `features/panel/views/agents.py`.
   - Card grid: `repeat(auto-fill, minmax(360px, 1fr))` (frontend D-02).
   - Header (name + dominant model + agent icon placeholder for brand-identity).
   - Metrics: session_count, total_cost_usd (or "—" when `cost_known=false`), last_activity.
@@ -163,7 +163,7 @@
   - Files: `dadaia_workspace/features/panel/views/agents.py`, PANEL_CSS additions in `_assets.py`, PANEL_JS fetch extensions, `tests/unit/features/panel/test_views_agents.py`.
   - Parallel-safe: yes after T-AM-15.
 
-- [-] **T-AM-17** — Implement `features/panel/views/workflows.py`.
+- [x] **T-AM-17** — Implement `features/panel/views/workflows.py`.
   - Card grid: `repeat(auto-fill, minmax(280px, 1fr))` (frontend D-02).
   - Header + description + source_hint.
   - Agent chips: `<button aria-label="Filtrar por agente: ...">` navigating to `#agents?filter=<name>` (frontend D-04).
@@ -172,7 +172,7 @@
   - Files: `dadaia_workspace/features/panel/views/workflows.py`, PANEL_JS hash filter handler, `tests/unit/features/panel/test_views_workflows.py`.
   - Parallel-safe: yes after T-AM-15.
 
-- [-] **T-AM-18** — Add Workflows tab to `views/index.py` (4th nav-tab) and wire both tabs into PANEL_JS lazy fetch on tab activation (frontend D-05).
+- [x] **T-AM-18** — Add Workflows tab to `views/index.py` (4th nav-tab) and wire both tabs into PANEL_JS lazy fetch on tab activation (frontend D-05).
   - Update tab list to: Servers, Memories, Agents, Workflows.
   - Hash-fragment routing reads `#agents?filter=<name>` on initial load.
   - Files: `dadaia_workspace/features/panel/views/index.py`, PANEL_JS.
