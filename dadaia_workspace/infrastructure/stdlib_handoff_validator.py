@@ -107,7 +107,9 @@ def _validate_node(
             if type_name == "boolean":
                 if not isinstance(value, bool):
                     errors.append(
-                        HandoffValidationError(path, f"expected boolean, got {type(value).__name__}")
+                        HandoffValidationError(
+                            path, f"expected boolean, got {type(value).__name__}"
+                        )
                     )
                     return
             elif type_name in ("integer", "number"):
@@ -119,15 +121,10 @@ def _validate_node(
                     )
                     return
             else:
-                if isinstance(value, bool) and type_name != "boolean":
+                if isinstance(value, bool) and type_name != "boolean" and type_name == "integer":
                     # bool is a subclass of int — reject for non-boolean schemas
-                    if type_name == "integer":
-                        errors.append(
-                            HandoffValidationError(
-                                path, f"expected {type_name}, got bool"
-                            )
-                        )
-                        return
+                    errors.append(HandoffValidationError(path, f"expected {type_name}, got bool"))
+                    return
                 if not isinstance(value, expected_py):
                     errors.append(
                         HandoffValidationError(
@@ -138,18 +135,14 @@ def _validate_node(
 
     # --- enum ---
     enum_values = schema.get("enum")
-    if enum_values is not None:
-        if value not in enum_values:
-            errors.append(
-                HandoffValidationError(path, f"{value!r} is not one of {enum_values!r}")
-            )
-            return
+    if enum_values is not None and value not in enum_values:
+        errors.append(HandoffValidationError(path, f"{value!r} is not one of {enum_values!r}"))
+        return
 
     # --- pattern ---
     pattern = schema.get("pattern")
-    if pattern is not None and isinstance(value, str):
-        if not re.fullmatch(pattern, value):
-            errors.append(HandoffValidationError(path, f"{value!r} does not match pattern {pattern!r}"))
+    if pattern is not None and isinstance(value, str) and not re.fullmatch(pattern, value):
+        errors.append(HandoffValidationError(path, f"{value!r} does not match pattern {pattern!r}"))
 
     # --- format: date-time ---
     fmt = schema.get("format")
@@ -162,17 +155,15 @@ def _validate_node(
 
     # --- minimum ---
     minimum = schema.get("minimum")
-    if minimum is not None and isinstance(value, (int, float)):
-        if value < minimum:
-            errors.append(HandoffValidationError(path, f"{value} is less than minimum {minimum}"))
+    if minimum is not None and isinstance(value, (int, float)) and value < minimum:
+        errors.append(HandoffValidationError(path, f"{value} is less than minimum {minimum}"))
 
     # --- minItems ---
     min_items = schema.get("minItems")
-    if min_items is not None and isinstance(value, list):
-        if len(value) < min_items:
-            errors.append(
-                HandoffValidationError(path, f"array has {len(value)} items, minimum is {min_items}")
-            )
+    if min_items is not None and isinstance(value, list) and len(value) < min_items:
+        errors.append(
+            HandoffValidationError(path, f"array has {len(value)} items, minimum is {min_items}")
+        )
 
     # --- object-specific checks ---
     if isinstance(value, dict):
@@ -190,7 +181,9 @@ def _validate_node(
                 if extra_key not in allowed_keys:
                     child_path = f"{path}.{extra_key}" if path else extra_key
                     errors.append(
-                        HandoffValidationError(child_path, f"additional property '{extra_key}' is not allowed")
+                        HandoffValidationError(
+                            child_path, f"additional property '{extra_key}' is not allowed"
+                        )
                     )
 
         # properties
@@ -225,9 +218,7 @@ class StdlibHandoffValidator:
 
     def __init__(self, schema_path: Path) -> None:
         if not schema_path.exists():
-            raise HandoffSchemaError(
-                f"Schema file not found: {schema_path}"
-            )
+            raise HandoffSchemaError(f"Schema file not found: {schema_path}")
         try:
             raw = schema_path.read_text(encoding="utf-8")
             self._schema: dict[str, Any] = json.loads(raw)

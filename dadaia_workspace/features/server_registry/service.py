@@ -131,16 +131,14 @@ class ServerRegistryService:
         max_port: int = _DEFAULT_MAX_PORT,
     ) -> tuple[int, bool]:
         active = [
-            e for e in self._store.list_all()
+            e
+            for e in self._store.list_all()
             if e.project == project and not _is_stale(e, self._probe)
         ]
         if active:
             return active[0].port, True
 
-        occupied = {
-            e.port for e in self._store.list_all()
-            if not _is_stale(e, self._probe)
-        }
+        occupied = {e.port for e in self._store.list_all() if not _is_stale(e, self._probe)}
         base = _base_port(project, min_port, max_port)
 
         if base not in occupied:

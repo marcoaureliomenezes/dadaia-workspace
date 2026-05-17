@@ -9,7 +9,8 @@ Protocol defined in ``core/``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, Sequence, runtime_checkable
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.exceptions import HandoffValidationError
@@ -28,7 +29,7 @@ class ValidatorPort(Protocol):
     a human-readable message.
     """
 
-    def validate(self, doc: dict[str, object]) -> Sequence["HandoffValidationError"]:
+    def validate(self, doc: dict[str, object]) -> Sequence[HandoffValidationError]:
         """Validate a handoff document dict against the schema.
 
         Args:

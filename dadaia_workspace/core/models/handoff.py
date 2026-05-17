@@ -79,7 +79,7 @@ class HandoffDocument:
     next_handoff: NextHandoff | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "HandoffDocument":
+    def from_dict(cls, data: dict[str, object]) -> HandoffDocument:
         """Parse a raw dictionary into a ``HandoffDocument``.
 
         Args:

@@ -12,6 +12,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 
@@ -237,7 +238,11 @@ def _atomic_write_text(dst: Path, content: str) -> None:
     os.replace(tmp, dst)
 
 
-def _log_cleanup_error(func: object, path: object, exc_info: object) -> None:
+def _log_cleanup_error(
+    func: object,
+    path: object,
+    exc_info: tuple[type[BaseException], BaseException, Any] | tuple[None, None, None],
+) -> None:
     """onerror= callback for shutil.rmtree — write a warning to stderr without re-raising.
 
     Replaces the anti-pattern ``ignore_errors=True`` (which silences real

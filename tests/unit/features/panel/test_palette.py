@@ -2,6 +2,7 @@
 
 Spec: dadaia-workspace-brand-identity-v1 SPEC.md.
 """
+
 from __future__ import annotations
 
 import re
@@ -31,9 +32,7 @@ def test_palette_hex_only_in_token_definitions() -> None:
         r"(--color-[a-z-]+\s*:\s*|var\(--color-[a-z-]+\s*,\s*)",
     )
     for hex_value in PALETTE.values():
-        occurrences = [
-            line for line in PANEL_CSS.splitlines() if hex_value.lower() in line.lower()
-        ]
+        occurrences = [line for line in PANEL_CSS.splitlines() if hex_value.lower() in line.lower()]
         for line in occurrences:
             assert pattern.search(line), (
                 f"hex {hex_value} found outside token definition or var() fallback: {line!r}"

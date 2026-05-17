@@ -186,9 +186,7 @@ def test_empty_registry_returns_no_groups() -> None:
 
 def test_no_active_context_returns_empty_contexts() -> None:
     """(e) When all contexts are inativo, list_active_contexts() returns []."""
-    inactive = _make_context(
-        name="Inactive", repo_slug="inactive", state=ContextState.INATIVO
-    )
+    inactive = _make_context(name="Inactive", repo_slug="inactive", state=ContextState.INATIVO)
 
     service = _build_service([], [inactive])
     result = service.list_active_contexts()

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.exceptions import HandoffSchemaError, HandoffValidationError
+from dadaia_workspace.core.exceptions import HandoffSchemaError
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 
 # ---------------------------------------------------------------------------

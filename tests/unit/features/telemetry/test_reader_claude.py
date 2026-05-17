@@ -6,22 +6,19 @@ the DAO behaves exactly as in production without touching the filesystem DB.
 Fixture files in tests/fixtures/telemetry/ contain ONLY synthesized/fictional
 data — no real operator content.
 """
+
 from __future__ import annotations
 
 import json
 import pathlib
 import sqlite3
 
-import pytest
-
 from dadaia_workspace.features.telemetry.reader.claude import (
-    ReadResult,
     read_session_file,
 )
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.schema import (
     apply_migrations,
-    open_connection,
 )
 
 # ---------------------------------------------------------------------------
@@ -153,7 +150,7 @@ class TestTruncatedLine:
 
         # Rewind the file to the saved offset and check what's there
         raw = target.read_bytes()
-        remainder = raw[state.byte_offset:]
+        remainder = raw[state.byte_offset :]
         # The remainder should start with the partial JSON line
         assert remainder.startswith(b"{"), (
             f"Expected partial JSON at offset {state.byte_offset}, got: {remainder[:40]!r}"
@@ -175,7 +172,7 @@ class TestMalformedMidFile:
         """Processing continues after a malformed line — subsequent valid events are ingested."""
         dao = _make_dao(tmp_path)
         path = FIXTURES_DIR / "sample_session_malformed_mid.jsonl"
-        result = read_session_file(path, dao, NOW_ISO)
+        read_session_file(path, dao, NOW_ISO)
 
         events = _get_all_events(dao)
         assert len(events) == 1, "The valid assistant event on line 3 must be ingested"
@@ -247,6 +244,7 @@ class TestInodeRotation:
         if old_inode == new_inode:
             # Manually set stored inode to a fake old value
             from dadaia_workspace.features.telemetry.store.models import ReaderState
+
             dao.upsert_reader_state(
                 ReaderState(
                     file_path=str(target),
@@ -274,36 +272,41 @@ class TestNoForbiddenFieldsInDb:
         dao = _make_dao(tmp_path)
 
         # Synthesize a jsonl with forbidden fields embedded at the raw level
-        adversarial_line = json.dumps({
-            "sessionId": "adv-session-001",
-            "timestamp": "2026-05-17T11:00:00.000Z",
-            "type": "assistant",
-            "uuid": "adv-uuid-001",
-            "cwd": "/home/operator/adv",
-            "gitBranch": "main",
-            "isSidechain": False,
-            "slug": "",
-            "entrypoint": "cli",
-            "agentName": None,
-            "aiTitle": None,
-            # Forbidden fields — must be stripped by allowlist
-            "content": "SECRET: adversarial content",
-            "thinking": "SECRET: chain of thought",
-            "prompt": "SECRET: system prompt",
-            "messages": ["SECRET: msg"],
-            "message": {
-                "model": "claude-opus-4-7",
-                "content": "SECRET: message.content",
-                "thinking": "SECRET: message.thinking",
-                "usage": {
-                    "input_tokens": 500,
-                    "output_tokens": 100,
-                    "cache_creation_input_tokens": 0,
-                    "cache_read_input_tokens": 0,
-                    "thinking": "SECRET: usage.thinking",
-                },
-            },
-        }) + "\n"
+        adversarial_line = (
+            json.dumps(
+                {
+                    "sessionId": "adv-session-001",
+                    "timestamp": "2026-05-17T11:00:00.000Z",
+                    "type": "assistant",
+                    "uuid": "adv-uuid-001",
+                    "cwd": "/home/operator/adv",
+                    "gitBranch": "main",
+                    "isSidechain": False,
+                    "slug": "",
+                    "entrypoint": "cli",
+                    "agentName": None,
+                    "aiTitle": None,
+                    # Forbidden fields — must be stripped by allowlist
+                    "content": "SECRET: adversarial content",
+                    "thinking": "SECRET: chain of thought",
+                    "prompt": "SECRET: system prompt",
+                    "messages": ["SECRET: msg"],
+                    "message": {
+                        "model": "claude-opus-4-7",
+                        "content": "SECRET: message.content",
+                        "thinking": "SECRET: message.thinking",
+                        "usage": {
+                            "input_tokens": 500,
+                            "output_tokens": 100,
+                            "cache_creation_input_tokens": 0,
+                            "cache_read_input_tokens": 0,
+                            "thinking": "SECRET: usage.thinking",
+                        },
+                    },
+                }
+            )
+            + "\n"
+        )
 
         target = tmp_path / "adversarial.jsonl"
         target.write_bytes(adversarial_line.encode())
@@ -321,7 +324,7 @@ class TestNoForbiddenFieldsInDb:
         # Check sessions table
         sessions = dao._conn.execute("SELECT * FROM sessions").fetchall()  # noqa: SLF001
         for row in sessions:
-            for col in row.keys():
+            for col in row:
                 val = row[col]
                 if isinstance(val, str):
                     for forbidden in FORBIDDEN_SUBSTRINGS:
@@ -332,7 +335,7 @@ class TestNoForbiddenFieldsInDb:
         # Check events table
         events = dao._conn.execute("SELECT * FROM events").fetchall()  # noqa: SLF001
         for row in events:
-            for col in row.keys():
+            for col in row:
                 val = row[col]
                 if isinstance(val, str):
                     for forbidden in FORBIDDEN_SUBSTRINGS:
@@ -343,7 +346,7 @@ class TestNoForbiddenFieldsInDb:
         # Check agents table
         agents = dao._conn.execute("SELECT * FROM agents").fetchall()  # noqa: SLF001
         for row in agents:
-            for col in row.keys():
+            for col in row:
                 val = row[col]
                 if isinstance(val, str):
                     for forbidden in FORBIDDEN_SUBSTRINGS:

@@ -3,26 +3,25 @@
 All tests use fakes injected via DI — no real filesystem paths, no real
 SQLite files, no real operator data.
 """
+
 from __future__ import annotations
 
 import os
 import pathlib
 import sqlite3
-import tempfile
 from datetime import date
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.service import TelemetryService
-
+from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
+from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
+
 
 class _FakeSCS:
     def list_all(self) -> list:
@@ -70,9 +69,7 @@ class _FakeWorkflowsReader:
     def __init__(self) -> None:
         self.call_count = 0
 
-    def read_workflows(
-        self, root: Any, dao: Any, agents: list, now_iso: str
-    ) -> None:
+    def read_workflows(self, root: Any, dao: Any, agents: list, now_iso: str) -> None:
         self.call_count += 1
 
 
@@ -94,6 +91,7 @@ class _FakeAggregator:
 # ---------------------------------------------------------------------------
 # Helper to build a service with injectable parts
 # ---------------------------------------------------------------------------
+
 
 def _make_service(
     *,
@@ -250,7 +248,6 @@ def test_list_agents_passthrough(tmp_path: pathlib.Path) -> None:
 
 def test_cost_backfill(tmp_path: pathlib.Path) -> None:
     """refresh() fills cost_micro_usd for events with known model and NULL cost."""
-    import datetime as _dt
 
     conn = sqlite3.connect(":memory:")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -296,8 +293,6 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
     svc.refresh()
 
     # Check that cost_micro_usd is now set.
-    row = conn.execute(
-        "SELECT cost_micro_usd FROM events WHERE event_id = 'ev-abc'"
-    ).fetchone()
+    row = conn.execute("SELECT cost_micro_usd FROM events WHERE event_id = 'ev-abc'").fetchone()
     assert row[0] is not None
     assert row[0] > 0

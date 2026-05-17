@@ -98,6 +98,7 @@ def test_atomic_write_no_tmp_file_remains(tmp_path: Path) -> None:
 
 def test_version_field_written_to_disk(tmp_path: Path) -> None:
     import json
+
     store = JsonServerRegistryStore(tmp_path)
     store.save(_entry(3000))
     raw = json.loads((tmp_path / "server_registry.json").read_text())

@@ -7,8 +7,12 @@ from pathlib import Path
 import jinja2
 import pytest
 
-from dadaia_workspace.features.specs.doctor import SpecsDoctor, Severity
-from dadaia_workspace.features.specs.scaffolder import ScaffoldResult, scaffold, scaffold_hotfix_release
+from dadaia_workspace.features.specs.doctor import Severity, SpecsDoctor
+from dadaia_workspace.features.specs.scaffolder import (
+    ScaffoldResult,
+    scaffold,
+    scaffold_hotfix_release,
+)
 
 # Templates directory — canonical location inside the package
 # File is at tests/unit/features/specs/test_scaffolder.py
@@ -164,9 +168,8 @@ def test_scaffolded_specs_passes_doctor(tmp_path: Path) -> None:
 
     issues = SpecsDoctor(specs_dir).check()
     errors = [i for i in issues if i.severity == Severity.ERROR]
-    assert errors == [], (
-        "Scaffolded specs/ should pass doctor with 0 errors. Got:\n"
-        + "\n".join(f"  {e.code}: {e.description}" for e in errors)
+    assert errors == [], "Scaffolded specs/ should pass doctor with 0 errors. Got:\n" + "\n".join(
+        f"  {e.code}: {e.description}" for e in errors
     )
 
 

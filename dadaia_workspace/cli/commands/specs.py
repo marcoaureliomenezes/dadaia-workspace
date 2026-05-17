@@ -116,16 +116,10 @@ def init(
 ) -> None:
     """Bootstrap a SDD release-lifecycle specs/ directory structure."""
     # Resolve specs_dir
-    if specs_dir:
-        target = Path(specs_dir).resolve()
-    else:
-        target = Path.cwd() / "specs"
+    target = Path(specs_dir).resolve() if specs_dir else Path.cwd() / "specs"
 
     # Resolve project name
-    if name:
-        project_name = name
-    else:
-        project_name = target.parent.name
+    project_name = name or target.parent.name
 
     result = scaffold(
         specs_dir=target,

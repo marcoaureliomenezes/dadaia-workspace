@@ -157,10 +157,7 @@ def test_serve_memory_content_type_sniffing(
 def test_serve_memory_byte_identity_fixture_file(tmp_path: Path) -> None:
     """Use the committed fixture file as additional canary input."""
     fixture_path = (
-        Path(__file__).parent.parent.parent.parent
-        / "fixtures"
-        / "memory"
-        / "architecture.html"
+        Path(__file__).parent.parent.parent.parent / "fixtures" / "memory" / "architecture.html"
     )
     assert fixture_path.exists(), f"Fixture file missing: {fixture_path}"
     data = fixture_path.read_bytes()
@@ -215,7 +212,8 @@ def test_serve_memory_resolves_under_specs_memory_subdir(tmp_path: Path) -> None
     assert content_type == "text/html; charset=utf-8"
     # Must match the file under specs/memory/, not the decoy under specs/
     assert body == correct_bytes, (
-        "render_memory served the wrong file: memory_root must point to "
-        "specs/memory/, not specs/"
+        "render_memory served the wrong file: memory_root must point to specs/memory/, not specs/"
     )
-    assert body != decoy_bytes, "render_memory served the decoy file under specs/ — bug reintroduced"
+    assert body != decoy_bytes, (
+        "render_memory served the decoy file under specs/ — bug reintroduced"
+    )

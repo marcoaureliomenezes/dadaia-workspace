@@ -12,6 +12,7 @@ Verifies that when the telemetry database file is corrupt (invalid SQLite header
 Uses tmp_path to avoid touching real state. The stub readers and aggregator
 ensure no real operator data is read.
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -30,10 +31,10 @@ import pytest
 from dadaia_workspace.features.telemetry.service import TelemetryService
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 
-
 # ---------------------------------------------------------------------------
 # Stubs
 # ---------------------------------------------------------------------------
+
 
 class _StubPricing:
     PRICING_TABLE: dict[str, list] = {}
@@ -82,6 +83,7 @@ class _StubSCS:
 # Service factory
 # ---------------------------------------------------------------------------
 
+
 def _make_service(state_dir: pathlib.Path, workspace_root: pathlib.Path) -> TelemetryService:
     """Build a TelemetryService using a real on-disk SQLite path under state_dir."""
     db_path = state_dir / "telemetry.sqlite"
@@ -106,6 +108,7 @@ def _make_service(state_dir: pathlib.Path, workspace_root: pathlib.Path) -> Tele
 # ---------------------------------------------------------------------------
 # HTTP helper
 # ---------------------------------------------------------------------------
+
 
 def _build_panel_server(token: str, svc: TelemetryService) -> ThreadingHTTPServer:
     from dadaia_workspace.features.panel.handler import make_handler_class
@@ -142,6 +145,7 @@ def _get(url: str, token: str | None = None) -> tuple[int, bytes]:
 # ---------------------------------------------------------------------------
 # Tests: degraded service (corrupt file fixture)
 # ---------------------------------------------------------------------------
+
 
 class TestCorruptDatabaseDegradation:
     """Service detects a corrupt DB, quarantines it, and enters degraded mode."""
@@ -206,6 +210,7 @@ class TestCorruptDatabaseDegradation:
 # Tests: handler returns correct HTTP status codes
 # ---------------------------------------------------------------------------
 
+
 class TestHandlerDegradedResponses:
     """Panel handler returns 503 when service is degraded, 401 when unauthenticated."""
 
@@ -238,9 +243,7 @@ class TestHandlerDegradedResponses:
         """GET /api/agents with valid Bearer → 503 when service is degraded."""
         base, token = degraded_panel
         status, body = _get(f"{base}/api/agents", token=token)
-        assert status == 503, (
-            f"Expected 503 for degraded service but got {status}. Body: {body!r}"
-        )
+        assert status == 503, f"Expected 503 for degraded service but got {status}. Body: {body!r}"
         data = json.loads(body)
         assert data.get("error") == "telemetry_degraded", (
             f"Response body must have error='telemetry_degraded', got: {data}"
@@ -289,6 +292,4 @@ class TestHandlerDegradedResponses:
         """GET / still returns 200 even when telemetry is degraded (panel stays up)."""
         base, token = degraded_panel
         status, body = _get(f"{base}/")
-        assert status == 200, (
-            f"GET / should return 200 even in degraded mode, got {status}."
-        )
+        assert status == 200, f"GET / should return 200 even in degraded mode, got {status}."

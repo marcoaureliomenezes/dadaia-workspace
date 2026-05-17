@@ -7,10 +7,10 @@ returned to callers.
 Write operations use INSERT OR REPLACE (upsert semantics) except for
 events which uses INSERT OR IGNORE to guarantee idempotency on event_id.
 """
+
 from __future__ import annotations
 
 import sqlite3
-from typing import Optional
 
 from dadaia_workspace.features.telemetry.store.models import (
     Agent,
@@ -165,7 +165,7 @@ class TelemetryDao:
     # Read methods — always return dataclass instances, never sqlite3.Row
     # ------------------------------------------------------------------
 
-    def get_reader_state(self, file_path: str) -> Optional[ReaderState]:
+    def get_reader_state(self, file_path: str) -> ReaderState | None:
         """Return the ReaderState for *file_path*, or None if not found."""
         row = self._conn.execute(
             "SELECT * FROM reader_state WHERE file_path = ?", (file_path,)
@@ -184,9 +184,7 @@ class TelemetryDao:
 
     def list_agents(self) -> list[Agent]:
         """Return all agents ordered by name."""
-        rows = self._conn.execute(
-            "SELECT * FROM agents ORDER BY name"
-        ).fetchall()
+        rows = self._conn.execute("SELECT * FROM agents ORDER BY name").fetchall()
         return [
             Agent(
                 name=r["name"],
@@ -200,9 +198,7 @@ class TelemetryDao:
 
     def list_workflows(self) -> list[Workflow]:
         """Return all workflows ordered by name."""
-        rows = self._conn.execute(
-            "SELECT * FROM workflows ORDER BY name"
-        ).fetchall()
+        rows = self._conn.execute("SELECT * FROM workflows ORDER BY name").fetchall()
         return [
             Workflow(
                 name=r["name"],

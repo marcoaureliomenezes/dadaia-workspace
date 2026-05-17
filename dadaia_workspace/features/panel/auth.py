@@ -5,6 +5,7 @@ with chmod 0o600. Validated on every request via constant-time compare.
 
 Per SPEC § Auth model (D-AM-06).
 """
+
 from __future__ import annotations
 
 import hmac
@@ -65,7 +66,7 @@ def validate(header_value: str | None, expected_token: str) -> bool:
         return False
     if not header_value.startswith(_BEARER_PREFIX):
         return False
-    candidate = header_value[len(_BEARER_PREFIX):]
+    candidate = header_value[len(_BEARER_PREFIX) :]
     if not candidate:
         return False
     return hmac.compare_digest(candidate, expected_token)

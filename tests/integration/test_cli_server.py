@@ -60,9 +60,7 @@ def test_server_list_json_returns_valid_array(workspace: Path) -> None:
 
 
 def test_server_register_conflict_exits_nonzero(workspace: Path) -> None:
-    _runner.invoke(
-        app, ["server", "register", "--port", "3000", "--project", "redacted-slug"]
-    )
+    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "redacted-slug"])
     result = _runner.invoke(
         app, ["server", "register", "--port", "3000", "--project", "redacted-slug-wave6"]
     )

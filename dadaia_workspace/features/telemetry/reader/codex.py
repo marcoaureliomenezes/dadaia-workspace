@@ -12,14 +12,15 @@ Design decisions:
 Privacy invariant: only whitelisted columns are read from the threads table.
 No content, no message bodies, no user-visible text beyond thread title.
 """
+
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import pathlib
 import sqlite3
 from dataclasses import dataclass
-from typing import Optional
 
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.models import (
@@ -76,14 +77,13 @@ def _compute_event_id(thread_id: str) -> str:
     return digest[:20]
 
 
-def _epoch_to_iso(epoch: Optional[int]) -> Optional[str]:
+def _epoch_to_iso(epoch: int | None) -> str | None:
     """Convert UNIX epoch integer (seconds) to ISO-8601 UTC string, or None."""
     if epoch is None:
         return None
     import datetime
-    return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+
+    return datetime.datetime.fromtimestamp(epoch, tz=datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # ---------------------------------------------------------------------------
@@ -130,10 +130,8 @@ def read_codex_db(
         logger.warning("Codex reader: error reading %s — %s", path, exc)
         return ReadResult()
     finally:
-        try:
+        with contextlib.suppress(Exception):
             conn.close()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def _ingest(
@@ -175,12 +173,12 @@ def _ingest(
         thread_id: str = r["id"]
 
         tokens_used: int = r.get("tokens_used") or 0
-        cwd: Optional[str] = r.get("cwd")
-        title: Optional[str] = r.get("title")
-        model: Optional[str] = r.get("model")
-        git_branch: Optional[str] = r.get("git_branch")
-        created_at_epoch: Optional[int] = r.get("created_at")
-        updated_at_epoch: Optional[int] = r.get("updated_at")
+        cwd: str | None = r.get("cwd")
+        title: str | None = r.get("title")
+        model: str | None = r.get("model")
+        git_branch: str | None = r.get("git_branch")
+        created_at_epoch: int | None = r.get("created_at")
+        updated_at_epoch: int | None = r.get("updated_at")
 
         first_event_at = _epoch_to_iso(created_at_epoch) or now_iso
         last_event_at = _epoch_to_iso(updated_at_epoch) or now_iso
@@ -190,7 +188,7 @@ def _ingest(
             Session(
                 session_id=thread_id,
                 provider=_CODEX_PROVIDER,
-                agent_name=None,          # Codex has no sub-agent concept yet
+                agent_name=None,  # Codex has no sub-agent concept yet
                 ai_title=title,
                 entrypoint=None,
                 cwd=cwd,
@@ -223,13 +221,13 @@ def _ingest(
                 agent_name=_CODEX_AGENT_NAME,
                 model=model or "codex",
                 occurred_at=last_event_at,
-                tokens_input=tokens_used,    # D-AM-16: aggregated, no split
+                tokens_input=tokens_used,  # D-AM-16: aggregated, no split
                 tokens_cache_read=0,
                 tokens_cache_create=0,
-                tokens_output=0,             # D-AM-16
-                cost_micro_usd=None,         # R9: NULL for Codex events
+                tokens_output=0,  # D-AM-16
+                cost_micro_usd=None,  # R9: NULL for Codex events
                 pricing_version=None,
-                suspect=0,                   # D-AM-19: Codex pre-aggregates
+                suspect=0,  # D-AM-19: Codex pre-aggregates
             )
         )
         result.sessions_ingested += 1

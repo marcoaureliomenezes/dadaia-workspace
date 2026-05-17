@@ -12,13 +12,13 @@ Design decisions:
 
 Privacy invariant: only frontmatter metadata is stored — no skill body content.
 """
+
 from __future__ import annotations
 
 import logging
 import pathlib
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.models import Workflow, WorkflowAgent
@@ -46,7 +46,7 @@ _FRONTMATTER_RE = re.compile(r"^---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 _KV_LINE_RE = re.compile(r"^(\w[\w\-]*)\s*:\s*(.*)$")
 
 
-def _parse_frontmatter(text: str) -> Optional[dict[str, object]]:
+def _parse_frontmatter(text: str) -> dict[str, object] | None:
     """Extract YAML-like frontmatter from *text*.
 
     Returns a dict of key→value if frontmatter is present, else None.
@@ -155,12 +155,10 @@ def read_workflows(
 
         name = name.strip()
         description_raw = frontmatter.get("description")
-        description: Optional[str] = (
-            str(description_raw).strip() if description_raw else None
-        )
+        description: str | None = str(description_raw).strip() if description_raw else None
 
         apply_to_raw = frontmatter.get("applyTo")
-        apply_to: Optional[str]
+        apply_to: str | None
         if apply_to_raw is None:
             apply_to = None
         elif isinstance(apply_to_raw, list):

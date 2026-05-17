@@ -146,7 +146,9 @@ def test_api_servers_shape_contract() -> None:
     assert isinstance(row["port"], int), "row.port must be int"
     assert isinstance(row["project"], str), "row.project must be str"
     assert isinstance(row["url"], str), "row.url must be str"
-    assert row["status"] in ("active", "stale"), f"row.status must be 'active'|'stale', got {row['status']!r}"
+    assert row["status"] in ("active", "stale"), (
+        f"row.status must be 'active'|'stale', got {row['status']!r}"
+    )
     assert row["pid"] is None or isinstance(row["pid"], int), "row.pid must be int or null"
     assert isinstance(row["expires_at"], str), "row.expires_at must be str"
 
@@ -214,9 +216,9 @@ def test_api_contexts_shape_contract() -> None:
     assert isinstance(context["slug"], str), "context.slug must be str"
     assert isinstance(context["name"], str), "context.name must be str"
     assert isinstance(context["repo_path"], str), "context.repo_path must be str"
-    assert context["branch"] is None or isinstance(
-        context["branch"], str
-    ), "context.branch must be str or null"
+    assert context["branch"] is None or isinstance(context["branch"], str), (
+        "context.branch must be str or null"
+    )
     assert isinstance(context["is_primary"], bool), "context.is_primary must be bool"
 
 

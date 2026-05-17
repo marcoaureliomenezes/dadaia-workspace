@@ -8,7 +8,9 @@ from dadaia_workspace.features.server_registry.service import ServerRegistryServ
 from tests.fakes import FakeProcessProbe, FakeServerRegistryStore
 
 
-def _svc(store: FakeServerRegistryStore | None = None, probe: FakeProcessProbe | None = None) -> ServerRegistryService:
+def _svc(
+    store: FakeServerRegistryStore | None = None, probe: FakeProcessProbe | None = None
+) -> ServerRegistryService:
     return ServerRegistryService(
         store=store or FakeServerRegistryStore(),
         probe=probe or FakeProcessProbe(),
@@ -26,6 +28,7 @@ def _entry(port: int = 3000, project: str = "redacted-slug", pid: int | None = N
 
 
 # ------------------------------------------------------------------ register
+
 
 def test_register_saves_entry() -> None:
     store = FakeServerRegistryStore()
@@ -90,6 +93,7 @@ def test_register_expired_ttl_entry_can_be_overwritten() -> None:
 
 # ------------------------------------------------------------------ release
 
+
 def test_release_removes_entry() -> None:
     store = FakeServerRegistryStore()
     store.save(_entry(3000, "redacted-slug"))
@@ -125,6 +129,7 @@ def test_release_all_for_project() -> None:
 
 
 # ------------------------------------------------------------------ list_entries
+
 
 def test_list_entries_returns_with_status() -> None:
     store = FakeServerRegistryStore()
@@ -164,6 +169,7 @@ def test_list_entries_filter_by_project() -> None:
 
 
 # ------------------------------------------------------------------ clean
+
 
 def test_clean_removes_stale_pid_entries() -> None:
     store = FakeServerRegistryStore()
@@ -213,6 +219,7 @@ def test_clean_keeps_alive_entries() -> None:
 
 # ------------------------------------------------------------------ next_port
 
+
 def test_next_port_returns_base_hash_port_when_free() -> None:
     svc = _svc()
     port, is_base = svc.next_port("redacted-slug")
@@ -236,12 +243,15 @@ def test_next_port_increments_when_base_occupied_by_other() -> None:
     probe = FakeProcessProbe()
     probe._alive_pids.add(99)
     # Occupy redacted-slug base port (3537) with a different project
-    store.save(PortEntry(
-        port=3537, project="other",
-        reserved_at="2026-05-16T10:00:00Z",
-        expires_at="2099-12-31T23:59:59Z",
-        pid=99,
-    ))
+    store.save(
+        PortEntry(
+            port=3537,
+            project="other",
+            reserved_at="2026-05-16T10:00:00Z",
+            expires_at="2099-12-31T23:59:59Z",
+            pid=99,
+        )
+    )
     svc = _svc(store, probe)
     port, is_base = svc.next_port("redacted-slug")
     assert port != 3537

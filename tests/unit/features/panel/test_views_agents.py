@@ -41,7 +41,7 @@ def test_section_has_empty_state() -> None:
     # Find the element and confirm hidden attribute
     idx = html.find('id="agents-empty"')
     # Get surrounding context (the element opening tag)
-    chunk = html[max(0, idx - 20):idx + 100]
+    chunk = html[max(0, idx - 20) : idx + 100]
     assert "hidden" in chunk
 
 
@@ -53,7 +53,7 @@ def test_section_has_staleness_banner() -> None:
     assert 'role="status"' in html
     # Must be hidden by default
     idx = html.find('id="agents-staleness-banner"')
-    chunk = html[max(0, idx - 20):idx + 120]
+    chunk = html[max(0, idx - 20) : idx + 120]
     assert "hidden" in chunk
 
 

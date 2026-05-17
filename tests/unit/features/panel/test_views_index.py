@@ -21,9 +21,7 @@ from dadaia_workspace.features.panel.views.index import render_index
 
 
 class FakeServerRegistryService:
-    def __init__(
-        self, entries: list[tuple[PortEntry, PortStatus]] | None = None
-    ) -> None:
+    def __init__(self, entries: list[tuple[PortEntry, PortStatus]] | None = None) -> None:
         self._entries = entries or []
 
     def list_entries(

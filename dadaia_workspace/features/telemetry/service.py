@@ -18,6 +18,7 @@ Refresh logic:
     8. Update last_refresh timestamp.
     9. Release lock.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -27,7 +28,8 @@ import os
 import pathlib
 import sqlite3
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any, cast
 
 from dadaia_workspace.features.telemetry import budget as _budget
 from dadaia_workspace.features.telemetry.aggregator.models import (
@@ -207,7 +209,7 @@ class TelemetryService:
         Does not raise; only logs.  The service continues in degraded mode.
         """
         db_path = self._state_dir / _DEFAULT_SQLITE_FILENAME
-        ts = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
         quarantine_path = self._state_dir / f"telemetry.sqlite.corrupt.{ts}"
         try:
             os.rename(db_path, quarantine_path)
@@ -251,6 +253,7 @@ class TelemetryService:
 
         # Apply migrations (idempotent).
         from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+
         apply_migrations(dao._conn)
 
         # Harden SQLite file permissions to 0o600 (owner read/write only).
@@ -260,7 +263,7 @@ class TelemetryService:
             os.chmod(db_path, 0o600)
 
         claude_reader, codex_reader, workflows_reader = self._reader_factory()
-        now_iso = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(tz=datetime.UTC).isoformat()
 
         # --- Claude reader ---
         claude_projects = _CLAUDE_PROJECTS_DIR
@@ -272,15 +275,11 @@ class TelemetryService:
                     try:
                         claude_reader.read_session_file(jsonl_file, dao, now_iso)
                     except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            "TelemetryService: error reading %s: %s", jsonl_file, exc
-                        )
+                        logger.warning("TelemetryService: error reading %s: %s", jsonl_file, exc)
 
         # --- Codex reader ---
         codex_path_env = os.environ.get("DADAIA_CODEX_DB_PATH")
-        codex_path = (
-            pathlib.Path(codex_path_env) if codex_path_env else _DEFAULT_CODEX_PATH
-        )
+        codex_path = pathlib.Path(codex_path_env) if codex_path_env else _DEFAULT_CODEX_PATH
         try:
             codex_reader.read_sessions(codex_path, dao, now_iso)
         except Exception as exc:  # noqa: BLE001
@@ -364,16 +363,19 @@ class TelemetryService:
     ) -> AgentListResult:
         """Return aggregated agent list. Triggers lazy refresh."""
         self.refresh()
-        return self._aggregator.list_agents(
-            window_days=window_days,
-            context_slug=context_slug,
-            limit=limit,
+        return cast(
+            AgentListResult,
+            self._aggregator.list_agents(
+                window_days=window_days,
+                context_slug=context_slug,
+                limit=limit,
+            ),
         )
 
     def list_workflows(self) -> WorkflowListResult:
         """Return workflow list. Triggers lazy refresh."""
         self.refresh()
-        return self._aggregator.list_workflows()
+        return cast(WorkflowListResult, self._aggregator.list_workflows())
 
     def list_sessions_by_agent(
         self,
@@ -383,8 +385,11 @@ class TelemetryService:
     ) -> list[RecentSession]:
         """Return paginated sessions for an agent. Triggers lazy refresh."""
         self.refresh()
-        return self._aggregator.list_sessions_by_agent(
-            agent_id=agent_id,
-            limit=limit,
-            offset=offset,
+        return cast(
+            "list[RecentSession]",
+            self._aggregator.list_sessions_by_agent(
+                agent_id=agent_id,
+                limit=limit,
+                offset=offset,
+            ),
         )

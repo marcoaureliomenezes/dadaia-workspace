@@ -60,8 +60,7 @@ class JsonServerRegistryStore:
     def update(self, entry: PortEntry) -> None:
         data = _load(self._path)
         data["entries"] = [
-            _to_dict(entry) if e["port"] == entry.port else e
-            for e in data["entries"]
+            _to_dict(entry) if e["port"] == entry.port else e for e in data["entries"]
         ]
         _dump(self._path, data)
 

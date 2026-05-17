@@ -7,6 +7,7 @@ Decision references:
     D-AM-08  — PRAGMA user_version + linear Python migrations
     D-AM-15  — WAL + synchronous=NORMAL + foreign_keys=ON
 """
+
 from __future__ import annotations
 
 import pathlib
