@@ -299,7 +299,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: 2 passed
     ```
 
-- [-] **T-MPP-2.11** `[parallel: yes]` Add 2 unit tests for T-PB-4 (`[skills]` table emit).
+- [x] **T-MPP-2.11** `[parallel: yes]` Add 2 unit tests for T-PB-4 (`[skills]` table emit).
   - **Owner:** software-engineer
   - **Effort:** S (~15 LoC test code)
   - **Files MODIFIED:**
