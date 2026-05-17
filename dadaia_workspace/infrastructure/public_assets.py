@@ -248,10 +248,9 @@ class FileSystemPublicAssetManager:
             tag = f"workflows/{wf.name}"
             if has_parallel:
                 out.append(f"[partial] opencode:{tag} (parallel_group sequentially)")
-                out.append(f"[unsupported] codex:{tag} (parallel_group not dispatchable)")
             else:
                 out.append(f"[ok] opencode:{tag}")
-                out.append(f"[ok] codex:{tag}")
+            out.append(f"[not-applicable] codex:{tag} (no workflow runtime)")
             out.append(f"[ok] claude:{tag}")
         return out
 

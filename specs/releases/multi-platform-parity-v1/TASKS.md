@@ -78,7 +78,7 @@ feat(public-assets): T-PB-3 — emit [not-applicable] doctor status for Codex wo
 
 ---
 
-- [-] **T-MPP-1.1** `[parallel: no]` Extend `_classify_workflows()` with `[not-applicable]` branch for Codex workflows.
+- [x] **T-MPP-1.1** `[parallel: no]` Extend `_classify_workflows()` with `[not-applicable]` branch for Codex workflows.
   - **Owner:** software-engineer
   - **Effort:** S (~12 LoC added, ~2 removed)
   - **Files MODIFIED:**
