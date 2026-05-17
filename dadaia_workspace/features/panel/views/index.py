@@ -13,7 +13,7 @@ import html
 from collections.abc import Callable, Sequence
 
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
-from dadaia_workspace.features.panel.views._assets import PANEL_CSS, PANEL_JS
+from dadaia_workspace.features.panel.views._assets import LOGO_RHINO_24, PANEL_CSS, PANEL_JS
 
 
 def render_index(
@@ -58,6 +58,7 @@ def render_index(
 </head>
 <body>
   <header class="topbar" role="banner">
+    <span class="topbar-logo" aria-hidden="true">{LOGO_RHINO_24}</span>
     <div class="topbar-wordmark">dadaia<span>&#183;</span>workspace</div>
     <div class="topbar-divider" aria-hidden="true"></div>
     <div class="topbar-subtitle">panel</div>
