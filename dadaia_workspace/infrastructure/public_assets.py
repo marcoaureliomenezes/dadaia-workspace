@@ -134,11 +134,18 @@ def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
     ``software-engineer``). Missing or None fields are omitted. The ``tools``
     field, if present, is emitted as a TOML array of basic strings.
 
-    Names containing ``]`` are rejected (cannot appear safely in a TOML key).
+    Names containing ``]`` or newline characters are rejected (cannot appear
+    safely inside a TOML table header, even with quoting). Double-quotes and
+    backslashes are escaped with a leading backslash so the header is valid
+    TOML (e.g. a name like ``a"b`` becomes ``[agents."a\\"b"]``).
     """
     if "]" in name:
         raise ValueError(f"Agent name contains invalid character ']': {name!r}")
-    lines: list[str] = [f'[agents."{name}"]\n']
+    if "\n" in name:
+        raise ValueError(f"Agent name contains newline character: {name!r}")
+    # Escape backslash first (must precede quote escape to avoid double-escaping)
+    key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
+    lines: list[str] = [f'[agents."{key_escaped}"]\n']
     for field in ("name", "description", "model"):
         val = fm.get(field)
         if val is None:
@@ -488,7 +495,6 @@ class FileSystemPublicAssetManager:
     ) -> None:
         codex_dir = workspace_root / ".codex"
         self._copy_tree(agentic_dir / "rules", codex_dir / "rules", force, installed)
-        self._copy_tree(agentic_dir / "workflows", codex_dir / "workflows", force, installed)
         self._install_universal_skills(agentic_dir, workspace_root, force, installed)
         self._write_generated(
             codex_dir / "hooks.json",
