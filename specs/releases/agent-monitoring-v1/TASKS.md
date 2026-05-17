@@ -49,7 +49,7 @@
 
 ## Phase 3 — Reader Claude Code
 
-- [ ] **T-AM-05** — Implement `features/telemetry/reader/allowlist.py` (CRITICAL T1).
+- [-] **T-AM-05** — Implement `features/telemetry/reader/allowlist.py` (CRITICAL T1). <!-- software-engineer-p3 -->
   - Function `allowlist_event(raw: dict) -> dict | None` returns dict with only approved keys; rejects events missing required fields.
   - Approved keys hardcoded: `sessionId`, `timestamp`, `cwd`, `entrypoint`, `gitBranch`, `isSidechain`, `slug`, `uuid`, `type`, `agentName`, `aiTitle`, plus `message.usage.*` and `message.model` for `type=assistant`.
   - Forbidden keys (asserted by tests): `content`, `text`, `messages`, `snapshot`, `thinking`, `prompt`, `response`.
@@ -57,7 +57,7 @@
   - Files: `features/telemetry/reader/allowlist.py`, `tests/unit/features/telemetry/test_allowlist.py`.
   - Parallel-safe: yes (no deps on T-AM-03/04 in module sense).
 
-- [ ] **T-AM-06** — Implement `features/telemetry/reader/claude.py`.
+- [-] **T-AM-06** — Implement `features/telemetry/reader/claude.py`. <!-- software-engineer-p3 -->
   - Incremental tail with byte-offset checkpoint in `reader_state`.
   - `_safe_parse_lines(raw)` handles truncated last line (rewinds offset).
   - Detects file rotation via inode change (devops T7).
