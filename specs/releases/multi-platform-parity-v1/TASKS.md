@@ -148,7 +148,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
 
 ---
 
-- [ ] **T-MPP-2.1** `[parallel: no]` Add `_atomic_write_text()` helper (ADR-ENG-6) and refactor `_write_generated()` to use it.
+- [-] **T-MPP-2.1** `[parallel: no]` Add `_atomic_write_text()` helper (ADR-ENG-6) and refactor `_write_generated()` to use it.
   - **Owner:** software-engineer
   - **Effort:** S (~10 LoC new helper + 3 LoC refactor)
   - **Files MODIFIED:**
