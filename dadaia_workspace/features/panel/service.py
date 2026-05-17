@@ -24,6 +24,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from typing import TYPE_CHECKING, Any
+
 from dadaia_workspace.core.models.server_registry import PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
@@ -93,10 +95,30 @@ class PanelService:
         registry: ServerRegistryService,
         spec_context: SpecContextService,
         workspace_root: Path,
+        telemetry: Any = None,
     ) -> None:
+        """Initialise PanelService.
+
+        Parameters
+        ----------
+        registry:
+            A ServerRegistryService instance (injected).
+        spec_context:
+            A SpecContextService instance (injected).
+        workspace_root:
+            Absolute path to the workspace root directory.
+        telemetry:
+            Optional TelemetryService instance (injected).  When None,
+            a default TelemetryService is NOT built automatically here —
+            wiring the default instance is the responsibility of the
+            boot layer (``dadaia_workspace/cli/commands/panel.py``).
+            Passing None is safe: telemetry endpoints will return 503
+            until a real TelemetryService is injected.
+        """
         self._registry = registry
         self._spec_context = spec_context
         self._workspace_root = workspace_root
+        self.telemetry = telemetry
 
     # ------------------------------------------------------------------
     # Public API
