@@ -64,7 +64,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-02 — `HandoffDocument` dataclass + sub-models
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Wave:** 0
 - **Precondições:** ACTIVE.md flipped
