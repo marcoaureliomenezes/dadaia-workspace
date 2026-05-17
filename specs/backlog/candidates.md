@@ -19,7 +19,9 @@ era uma feature SPEC.md em Draft sob o modelo antigo `specs/features/<name>/`, a
 arquivada em `specs/_archive/legacy-features/<name>/SPEC.md`. Promover para release exige
 nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 
+- multi-platform-parity-v1 — Close G1/G2/G3/G5 from the platform-boundaries analysis: render Codex agents as `[agents.<name>]` blocks in `.codex/config.toml`, stop copying inert workflows to `.codex/workflows/`, add `[not-applicable]` doctor status, install short-circuits on it. Confines new code to `infrastructure/public_assets.py`; preserves the `.dadaia/agentic/` SHA256 manifest and the `dadaia-workspace-dev-guardrail` rule. Promote to release only after `agent-comms-v1` reaches CLOSURE. (owner: product-engineer, contexto: `.dadaia/reports/dadaia-workspace/product-engineer/2026-05-16T233537Z-platform-boundaries-analysis.html` + `.dadaia/reports/dadaia-workspace/product-engineer/2026-05-17T011435Z-multi-platform-grill-me.html` + `.dadaia/reports/dadaia-workspace/software-architect/2026-05-17T012117Z-multi-platform-pillar-position.html` + `.dadaia/reports/dadaia-workspace/software-engineer/2026-05-17T012220Z-multi-platform-pillar-impact.html`)
 - agent-comms-v1 — handoff-v1.schema.json + `dadaia reports validate` CLI + `dadaia-handoff-emitter` skill; bridges the declared-but-empty `schema_ref: handoff-schema-v1` across 10 agents (82 references); includes z_bug_specs.md migration to backlog (owner: product-engineer, contexto: `.dadaia/reports/dadaia-workspace/software-architect/2026-05-16T220000Z-agent-comms-research.html`)
+- cli-asset-granular — Adicionar operações granulares de assets à CLI: `dadaia public list`, `dadaia public install --only rules`, etc.; mantido como baixa prioridade após encerramento do Spec Context v3.0. (owner: software-engineer, contexto: `z_bug_specs.md` G3 — discovery source `agent-comms-v1`)
 - dadaia-workspace-panel-r2-agents — Surface installed agents and multi-agent workflows in the panel; replaces the Release-1 placeholder card (owner: product-engineer, contexto: `_archive/releases/dadaia-workspace-panel-v1/SPEC.md` § Future)
 - panel-workspace-resolver-fix — Disambiguate `_resolve_workspace()` between workspace root and repo root so `dadaia panel` works from any cwd inside the workspace, not only from the workspace root (owner: software-engineer, contexto: drift documented em `_archive/releases/dadaia-workspace-panel-v1/CLOSURE.md § Drifts #2`)
 - panel-patch-terminology — Reconciliar uso colloquial de "PATCH" em `dadaia-workspace-panel-v1/PLAN.md` L76-78 com SemVer PATCH agora reservado para hotfix release (owner: product-engineer, contexto: SPEC `sdd-hotfix-track-v1` D18)
@@ -45,7 +47,7 @@ nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 
 ## Hotfixes pendentes
 
-(vazio — bullets neste formato: `- <YYYY-MM-DDTHHMMSSZ> <LOW|MEDIUM|HIGH|CRITICAL> <component> — <one-liner> (post-mortem: <link>)`)
+- 2026-05-17T000000Z MEDIUM import — BUG-003: `dadaia import` não detecta nem reescreve paths absolutos em arquivos não-lib-originated (ex.: hooks em `.claude/settings.json`) apontando para fora do novo `workspace_root`; próximo import em outra máquina pode reintroduzir hooks VPS. (post-mortem: `specs/z_bug_specs.md` — discovery source `agent-comms-v1`)
 
 ## Histórico (candidatas promovidas a release)
 

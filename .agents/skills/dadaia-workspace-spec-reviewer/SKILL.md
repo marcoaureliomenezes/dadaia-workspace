@@ -1,6 +1,6 @@
 ---
 name: dadaia-workspace-spec-reviewer
-description: "Use when: reviewing or refining dadaia-workspace specs before implementation or before declaring a refinement pass complete. Audits memory HTML atomicity, ACTIVE.md, status canonicity, CLOSURE evidence triples, broken image references, and the 300-line PLAN policy. Loads canonical owner docs first, detects duplicated ownership, and records unresolved gaps in z_bug_specs.md."
+description: "Use when: reviewing or refining dadaia-workspace specs before implementation or before declaring a refinement pass complete. Audits memory HTML atomicity, ACTIVE.md, status canonicity, CLOSURE evidence triples, broken image references, and the 300-line PLAN policy. Loads canonical owner docs first, detects duplicated ownership, and records unresolved gaps in specs/backlog/candidates.md."
 ---
 
 # dadaia-workspace-spec-reviewer
@@ -19,7 +19,7 @@ TASKS → CLOSURE) and the atomic memory contract.
 3. Read `<specs-dir>/releases/ACTIVE.md` and resolve the active release id.
 4. Load active release artifacts: `SPEC.md`, `PLAN.md`, `TASKS.md`, and `CLOSURE.md` if
    phase ∈ {CLOSURE, ARCHIVED}.
-5. Load `z_bug_specs.md`.
+5. Load `specs/backlog/candidates.md`.
 6. Load `report-specs-review.md` only if the operator explicitly asks for historical
    context.
 7. Compare the spec set across these dimensions:
@@ -60,7 +60,7 @@ TASKS → CLOSURE) and the atomic memory contract.
    - **Traceability** — every approved requirement maps into PLAN strategy and at least
      one TASKS entry.
 8. Report findings ordered by severity.
-9. If unresolved issues remain, update `z_bug_specs.md`.
+9. If unresolved issues remain, append to `specs/backlog/candidates.md` under `## Hotfixes pendentes`.
 
 ## Output rules
 

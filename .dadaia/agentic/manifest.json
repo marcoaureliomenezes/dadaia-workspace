@@ -62,7 +62,7 @@
     },
     {
       "path": "commands/dadaia-workspace-refine-specs.md",
-      "sha256": "43f3eec131655f0bd3054877454fe12e5e670f960d2600fa8999af833d369bed",
+      "sha256": "6be633c785630d44f9792321e0a81c72711ed7c6d805f2c14b9f30fb038586d7",
       "type": "commands"
     },
     {
@@ -197,7 +197,7 @@
     },
     {
       "path": "skills/dadaia-workspace-spec-reviewer/SKILL.md",
-      "sha256": "d6afebeec9e490d747617d4a5cd6863c024bbcbc7477d4f2239c3f62dbccc45a",
+      "sha256": "316fbc590f267bfc3865236030b00e2d7049a0ef2157eef96fd5169a87d2698b",
       "type": "skills"
     },
     {
@@ -322,7 +322,7 @@
     },
     {
       "path": "templates/repo-AGENTS.md",
-      "sha256": "2d7c96dfafd58c0f6261f88c0f7315544f16427e583275cd604f15454f17f2b4",
+      "sha256": "074561183fc4879b11be3f4b0e7b4728377c7abe292009dd732d0385073b4aed",
       "type": "templates"
     },
     {
@@ -386,7 +386,7 @@
       "type": "workflows"
     }
   ],
-  "generated_at": "2026-05-17T03:12:51.047089+00:00",
+  "generated_at": "2026-05-17T03:42:04.590094+00:00",
   "package_version": "0.1.0",
   "schema_version": "1"
 }
