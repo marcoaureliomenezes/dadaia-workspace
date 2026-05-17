@@ -97,7 +97,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-04 — Patch `_COPY_DIRS` em `public_assets.py`
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Wave:** 0
 - **Precondições:** ACTIVE.md flipped
