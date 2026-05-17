@@ -125,14 +125,14 @@
 
 ## Phase 7 — Endpoints + auth
 
-- [ ] **T-AM-13** — Implement Bearer token auth in `features/panel/auth.py`.
+- [-] **T-AM-13** — Implement Bearer token auth in `features/panel/auth.py`.
   - `ensure_token() -> str` generates via `secrets.token_urlsafe(32)`, persists to `~/.dadaia/state/panel.token` with `os.chmod(0o600)`.
   - `validate(header_value: str) -> bool` constant-time compare.
   - Tests: token file created with 0o600 perms; invalid header → False; missing header → False.
   - Files: `dadaia_workspace/features/panel/auth.py`, `tests/unit/features/panel/test_auth.py`.
   - Parallel-safe: yes.
 
-- [ ] **T-AM-14** — Add CSP + nosniff security headers in `features/panel/handler.py`.
+- [-] **T-AM-14** — Add CSP + nosniff security headers in `features/panel/handler.py`.
   - Private helper `_security_headers(content_type)`.
   - HTML: `Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'`.
   - JSON: `X-Content-Type-Options: nosniff`.
@@ -140,7 +140,7 @@
   - Files: `dadaia_workspace/features/panel/handler.py`, `tests/integration/test_panel_handler_headers.py`.
   - Parallel-safe: yes.
 
-- [ ] **T-AM-15** — Add `/api/agents`, `/api/workflows`, `/api/agents/{id}/sessions` routes in `handler.py`.
+- [-] **T-AM-15** — Add `/api/agents`, `/api/workflows`, `/api/agents/{id}/sessions` routes in `handler.py`.
   - Update `_RAW_ROUTES` and **synchronize `_NOT_FOUND_BODY`** (architect HIGH finding).
   - Auth check on every route via T-AM-13 middleware.
   - Wire to `PanelService.telemetry.*` methods.
