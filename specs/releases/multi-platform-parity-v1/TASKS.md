@@ -382,7 +382,7 @@ feat(public-assets): T-PB-2 — stop copying workflows to .codex/workflows/ + sa
     # expect: ≥1 (cleanup call wired)
     ```
 
-- [-] **T-MPP-3.4** `[parallel: yes]` Add 2 base unit tests for T-PB-2 (cleanup removes existing dir + log `[removed]` line emitted).
+- [x] **T-MPP-3.4** `[parallel: yes]` Add 2 base unit tests for T-PB-2 (cleanup removes existing dir + log `[removed]` line emitted).
   - **Owner:** software-engineer
   - **Effort:** M (~20 LoC test code)
   - **Files MODIFIED:**
