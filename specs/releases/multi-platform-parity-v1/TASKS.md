@@ -218,7 +218,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: ≥1 (definition)
     ```
 
-- [-] **T-MPP-2.6** `[parallel: no]` Wire T-PB-1 into `_codex_config()` + remove `(None, …, "codex:agents", False)` tuple + add `codex:config.toml` to `_compare_content()`.
+- [x] **T-MPP-2.6** `[parallel: no]` Wire T-PB-1 into `_codex_config()` + remove `(None, …, "codex:agents", False)` tuple + add `codex:config.toml` to `_compare_content()`.
   - **Owner:** software-engineer
   - **Effort:** M (~18 LoC modified across 3 sites)
   - **Files MODIFIED:**
@@ -235,7 +235,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: _render_agents_into_codex_config ≥1 call; "codex:agents" tuple removed (only the new key codex:config.toml remains)
     ```
 
-- [ ] **T-MPP-2.7** `[parallel: no]` Wire T-PB-4 into `_codex_config()` — `[skills]` table emission.
+- [x] **T-MPP-2.7** `[parallel: no]` Wire T-PB-4 into `_codex_config()` — `[skills]` table emission.
   - **Owner:** software-engineer
   - **Effort:** S (~6 LoC)
   - **Files MODIFIED:**
