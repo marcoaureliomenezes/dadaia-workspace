@@ -85,11 +85,6 @@ def render_index(
         <span id="refresh-label">Last updated just now</span>
       </div>
       <div id="servers-content">{servers_html}</div>
-      <section class="unregistered-section" id="unregistered-section" role="region" aria-label="Unregistered listeners" aria-live="polite">
-        <h3>Unregistered listeners</h3>
-        <p class="section-hint">TCP listeners detected on this host that are not in the registry. A yellow badge means the port is bound to <code>0.0.0.0</code> and reachable from the LAN.</p>
-        <div id="unregistered-content"></div>
-      </section>
     </section>
 
     <section id="section-memories" class="section" aria-label="Spec Context Project memories" role="tabpanel" tabindex="0" aria-labelledby="tab-memories">
@@ -183,17 +178,17 @@ def _render_context_card(ctx: PanelContext) -> str:
         f'<nav class="card-links">'
         f'<a class="memory-link" href="/memory-view/{slug}/architecture.html">'
         f'<span class="memory-link-icon" aria-hidden="true">&#9632;</span>'
-        f'<span class="memory-link-label">architecture.html</span>'
+        f'<span class="memory-link-label">Architecture</span>'
         f'<span class="memory-link-arrow" aria-hidden="true">&#8594;</span>'
         f"</a>"
         f'<a class="memory-link" href="/memory-view/{slug}/tech-stack.html">'
         f'<span class="memory-link-icon" aria-hidden="true">&#9632;</span>'
-        f'<span class="memory-link-label">tech-stack.html</span>'
+        f'<span class="memory-link-label">Tech Stack</span>'
         f'<span class="memory-link-arrow" aria-hidden="true">&#8594;</span>'
         f"</a>"
         f'<a class="memory-link" href="/memory-view/{slug}/product/index.html">'
         f'<span class="memory-link-icon" aria-hidden="true">&#9632;</span>'
-        f'<span class="memory-link-label">product/index.html</span>'
+        f'<span class="memory-link-label">Product</span>'
         f'<span class="memory-link-arrow" aria-hidden="true">&#8594;</span>'
         f"</a>"
         f"</nav>"

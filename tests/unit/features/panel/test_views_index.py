@@ -331,3 +331,122 @@ def test_nav_has_4_tabs() -> None:
     html = _render(service)
     # Count role="tab" occurrences
     assert html.count('role="tab"') == 4
+
+
+# ---------------------------------------------------------------------------
+# Bug 2 — memory link labels (panel-defects hotfix)
+# ---------------------------------------------------------------------------
+
+
+def test_memory_link_label_architecture() -> None:
+    """panel-defects Bug 2: architecture link must show 'Architecture', not filename."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    html = _render(service)
+    assert ">Architecture<" in html
+    assert ">architecture.html<" not in html
+
+
+def test_memory_link_label_tech_stack() -> None:
+    """panel-defects Bug 2: tech-stack link must show 'Tech Stack', not filename."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    html = _render(service)
+    assert ">Tech Stack<" in html
+    assert ">tech-stack.html<" not in html
+
+
+def test_memory_link_label_product() -> None:
+    """panel-defects Bug 2: product link must show 'Product', not filename."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    html = _render(service)
+    assert ">Product<" in html
+    assert ">product/index.html<" not in html
+
+
+def test_memory_link_hrefs_unchanged() -> None:
+    """panel-defects Bug 2: hrefs must remain unchanged after label fix."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    html = _render(service)
+    assert 'href="/memory-view/my-workspace/architecture.html"' in html
+    assert 'href="/memory-view/my-workspace/tech-stack.html"' in html
+    assert 'href="/memory-view/my-workspace/product/index.html"' in html
+
+
+# ---------------------------------------------------------------------------
+# Bug 3 — token management (panel-defects hotfix)
+# ---------------------------------------------------------------------------
+
+
+def test_panel_js_has_token_bootstrap() -> None:
+    """panel-defects Bug 3: PANEL_JS must include token bootstrap from URLSearchParams."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    assert "panel_token" in PANEL_JS
+    assert "sessionStorage" in PANEL_JS
+    assert "URLSearchParams" in PANEL_JS
+    assert "history.replaceState" in PANEL_JS
+
+
+def test_panel_js_has_authed_fetch_wrapper() -> None:
+    """panel-defects Bug 3: PANEL_JS must define authedFetch with Bearer header."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    assert "authedFetch" in PANEL_JS
+    assert "Authorization" in PANEL_JS
+    assert "Bearer" in PANEL_JS
+
+
+def test_panel_js_agents_uses_authed_fetch() -> None:
+    """panel-defects Bug 3: Agents.load must use authedFetch, not bare fetch."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    # authedFetch must be called for the agents endpoint
+    assert "authedFetch('/api/agents" in PANEL_JS
+
+
+def test_panel_js_workflows_uses_authed_fetch() -> None:
+    """panel-defects Bug 3+4: Workflows.load must use authedFetch."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    assert "authedFetch('/api/workflows')" in PANEL_JS
+
+
+def test_panel_js_sessions_uses_authed_fetch() -> None:
+    """panel-defects Bug 3: toggleSessions must use authedFetch."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    assert "authedFetch('/api/agents/" in PANEL_JS
+
+
+# ---------------------------------------------------------------------------
+# Bug 4 — Workflows 2-pane redesign (panel-defects hotfix)
+# ---------------------------------------------------------------------------
+
+
+def test_panel_js_workflows_has_stepper_svg() -> None:
+    """panel-defects Bug 4: PANEL_JS must build an inline SVG stepper."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    assert "buildStepperSVG" in PANEL_JS
+    assert "<svg" in PANEL_JS
+
+
+def test_panel_js_workflows_has_detail_pane() -> None:
+    """panel-defects Bug 4: PANEL_JS must reference workflows-detail."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+
+    assert "workflows-detail" in PANEL_JS
+    assert "workflows-list" in PANEL_JS
+
+
+def test_panel_css_has_workflows_pane_layout() -> None:
+    """panel-defects Bug 4: PANEL_CSS must contain 2-pane grid layout."""
+    from dadaia_workspace.features.panel.views._assets import PANEL_CSS
+
+    assert ".workflows-pane" in PANEL_CSS
+    assert ".workflows-list" in PANEL_CSS
+    assert ".workflows-detail" in PANEL_CSS
+    assert "workflow-list-item" in PANEL_CSS
