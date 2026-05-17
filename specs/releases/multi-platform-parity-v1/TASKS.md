@@ -204,7 +204,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: ≥1 (definition)
     ```
 
-- [ ] **T-MPP-2.5** `[parallel: no]` Add `_render_agents_into_codex_config(agents_dir)`.
+- [-] **T-MPP-2.5** `[parallel: no]` Add `_render_agents_into_codex_config(agents_dir)`.
   - **Owner:** software-engineer
   - **Effort:** S (~12 LoC)
   - **Files MODIFIED:**
