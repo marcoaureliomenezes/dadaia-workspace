@@ -71,7 +71,7 @@ def doctor() -> None:
             console.print(item, style="green", markup=False)
         elif item.startswith("[missing]") or item.startswith("[drift]"):
             console.print(item, style="yellow", markup=False)
-        elif item.startswith("[unsupported]"):
+        elif item.startswith("[not-applicable]") or item.startswith("[unsupported]"):
             console.print(item, style="cyan", markup=False)
         else:
             console.print(item, markup=False)
