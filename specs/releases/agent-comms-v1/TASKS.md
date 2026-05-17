@@ -80,7 +80,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-03 — `ValidatorPort` Protocol + exceptions
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Wave:** 0
 - **Precondições:** T-AC-02 [x] (importa `HandoffDocument` em type hints opcionais)
