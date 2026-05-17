@@ -64,14 +64,14 @@ def render_index(
     <div class="topbar-subtitle">panel</div>
     {primary_badge}
   </header>
-  <nav class="nav-tabs" aria-label="Panel sections">
-    <button class="nav-tab active" data-section="servers" aria-selected="true" role="tab">Servers</button>
-    <button class="nav-tab" data-section="memories" aria-selected="false" role="tab">Memories</button>
-    <button class="nav-tab" data-section="agents" aria-selected="false" role="tab">Agents &amp; Workflows</button>
+  <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
+    <button class="nav-tab active" data-section="servers" aria-selected="true" role="tab" id="tab-servers">Servers</button>
+    <button class="nav-tab" data-section="memories" aria-selected="false" role="tab" id="tab-memories">Memories</button>
+    <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents &amp; Workflows</button>
   </nav>
   <main class="main" role="main">
 
-    <section id="section-servers" class="section active" aria-label="Running development servers">
+    <section id="section-servers" class="section active" aria-label="Running development servers" role="tabpanel" tabindex="0" aria-labelledby="tab-servers">
       <div class="section-header">
         <h2>Servers</h2>
         <p>Dev servers running across active contexts. Auto-refreshes every 5 seconds.</p>
@@ -83,7 +83,7 @@ def render_index(
       <div id="servers-content">{servers_html}</div>
     </section>
 
-    <section id="section-memories" class="section" aria-label="Spec Context Project memories">
+    <section id="section-memories" class="section" aria-label="Spec Context Project memories" role="tabpanel" tabindex="0" aria-labelledby="tab-memories">
       <div class="section-header">
         <h2>Memories</h2>
         <p>Architecture, tech-stack and product memories for each active Spec Context Project.</p>
@@ -94,7 +94,7 @@ def render_index(
       </div>
     </section>
 
-    <section id="section-agents" class="section" aria-label="Agents and Workflows placeholder">
+    <section id="section-agents" class="section" aria-label="Agents and Workflows placeholder" role="tabpanel" tabindex="0" aria-labelledby="tab-agents">
       <div class="section-header">
         <h2>Agents &amp; Workflows</h2>
         <p>Installed agents and multi-agent workflows &mdash; catalog and invocation surface.</p>

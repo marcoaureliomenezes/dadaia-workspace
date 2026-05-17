@@ -370,6 +370,37 @@ PANEL_JS: str = """
     });
   });
 
+  // ── Tab keyboard navigation (ARIA APG: tabs pattern) ──────────────
+  // ArrowRight/ArrowLeft cycle; Home/End jump; Enter/Space activate.
+  var tabList = Array.prototype.slice.call(tabs);
+  tabList.forEach(function (tab, idx) {
+    tab.addEventListener('keydown', function (e) {
+      var key = e.key;
+      var total = tabList.length;
+      var targetIdx = -1;
+
+      if (key === 'ArrowRight') {
+        targetIdx = (idx + 1) % total;
+      } else if (key === 'ArrowLeft') {
+        targetIdx = (idx - 1 + total) % total;
+      } else if (key === 'Home') {
+        targetIdx = 0;
+      } else if (key === 'End') {
+        targetIdx = total - 1;
+      } else if (key === 'Enter' || key === ' ') {
+        tab.click();
+        e.preventDefault();
+        return;
+      }
+
+      if (targetIdx >= 0) {
+        e.preventDefault();
+        tabList[targetIdx].focus();
+        tabList[targetIdx].click();
+      }
+    });
+  });
+
   // ── TTL formatter ──────────────────────────────────────────────────
   // Given an ISO-8601 expiry string (e.g. "2026-05-16T18:00:00+00:00"),
   // returns a relative duration like "6h 42m" or "expired".
