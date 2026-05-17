@@ -256,6 +256,54 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 }
 .empty-state code { display: inline-block; margin-top: var(--space-sm); font-size: 0.85em; }
 
+/* ── Unregistered listeners section (v0.1.1 / Bug D) ─ */
+.unregistered-section {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px dashed var(--color-border);
+}
+.unregistered-section h3 {
+  font-size: 1rem;
+  color: var(--color-heading);
+  margin-bottom: var(--space-xs);
+}
+.unregistered-section .section-hint {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin-bottom: var(--space-md);
+}
+.lan-warning-badge {
+  display: inline-block;
+  padding: 0.1em 0.5em;
+  background: var(--color-alert, #f7af63);
+  color: #2a1a00;
+  font-size: 0.78em;
+  font-weight: 600;
+  border-radius: var(--radius);
+  margin-left: 0.3em;
+}
+.unregistered-section caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--space-xs);
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  font-weight: normal;
+}
+.unregistered-section .cmdline-cell {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  color: var(--color-text);
+  word-break: break-all;
+  max-width: 28em;
+}
+.unregistered-section .cwd-cell {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  color: var(--color-muted);
+  word-break: break-all;
+}
+
 /* ── Memory cards grid ───────────────────────────── */
 .context-count {
   font-size: 0.85rem;
@@ -597,6 +645,10 @@ PANEL_JS: str = """
       .then(function (data) {
         var container = document.getElementById('servers-content');
         if (container) { container.innerHTML = buildServersHTML(data); }
+        var unregContainer = document.getElementById('unregistered-content');
+        if (unregContainer) {
+          unregContainer.innerHTML = buildUnregisteredHTML(data.unregistered || []);
+        }
         lastUpdated = new Date();
         if (statusDot) { statusDot.classList.remove('updating'); }
         updateStatusLabel();
@@ -606,6 +658,40 @@ PANEL_JS: str = """
         lastUpdated = new Date();
         updateStatusLabel();
       });
+  }
+
+  // ── Unregistered listeners renderer (v0.1.1 / Bug D) ──────────────
+  function buildUnregisteredHTML(items) {
+    if (!items || items.length === 0) {
+      return '<div class="empty-state">'
+        + 'Nenhum listener não-registrado detectado.'
+        + '</div>';
+    }
+    var lanCount = 0;
+    items.forEach(function (it) { if (it.lan_exposed) { lanCount += 1; } });
+    var caption = lanCount > 0
+      ? items.length + ' listener(s), ' + lanCount + ' LAN-exposed ⚠'
+      : items.length + ' listener(s), all loopback-only';
+    var html = '<table class="servers-table">'
+      + '<caption>' + escHtml(caption) + '</caption>'
+      + '<thead><tr>'
+      + '<th>Port</th><th>Bind</th><th>PID</th><th>Cmd</th><th>CWD</th>'
+      + '</tr></thead><tbody>';
+    items.forEach(function (it) {
+      var lanBadge = it.lan_exposed
+        ? ' <span class="lan-warning-badge" title="bind=' + escHtml(it.bind) + ' is reachable from the LAN">LAN-exposed</span>'
+        : '';
+      var pid = it.pid != null ? '<code>' + escHtml(String(it.pid)) + '</code>' : '—';
+      html += '<tr>'
+        + '<td><span class="port-badge">' + escHtml(String(it.port)) + '</span></td>'
+        + '<td>' + escHtml(it.bind) + lanBadge + '</td>'
+        + '<td>' + pid + '</td>'
+        + '<td class="cmdline-cell">' + escHtml(it.cmdline || '—') + '</td>'
+        + '<td class="cwd-cell">' + escHtml(it.cwd || '—') + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
   }
 
   setInterval(fetchServers, 5000);
