@@ -419,7 +419,7 @@ feat(public-assets): T-PB-2 — stop copying workflows to .codex/workflows/ + sa
 These tasks run at PR-level once Phase 1 + 2 + 3 are all `[x]`. They are
 verification-only — no production code changes — and gate the merge into `main`.
 
-- [ ] **T-MPP-CC-1** `[parallel: yes]` AC-10 — verify zero new runtime dependencies.
+- [-] **T-MPP-CC-1** `[parallel: yes]` AC-10 — verify zero new runtime dependencies.
   - **Owner:** software-engineer
   - **Effort:** S (verification only)
   - **Verification:**
