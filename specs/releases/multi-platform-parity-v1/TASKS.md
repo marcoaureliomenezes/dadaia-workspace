@@ -162,7 +162,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: ≥2 (definition + call from _write_generated)
     ```
 
-- [ ] **T-MPP-2.2** `[parallel: yes]` Add `_parse_agent_frontmatter()` helper (regex stdlib-only, no pyyaml).
+- [-] **T-MPP-2.2** `[parallel: yes]` Add `_parse_agent_frontmatter()` helper (regex stdlib-only, no pyyaml).
   - **Owner:** software-engineer
   - **Effort:** M (~25 LoC)
   - **Files MODIFIED:**
