@@ -469,7 +469,7 @@ verification-only — no production code changes — and gate the merge into `ma
     ```
   - **Acceptance ref:** AC-14.
 
-- [-] **T-MPP-CC-6** `[parallel: no]` CLOSURE — author CLOSURE.md + flip ACTIVE.md.
+- [x] **T-MPP-CC-6** `[parallel: no]` CLOSURE — author CLOSURE.md + flip ACTIVE.md.
   - **Owner:** product-engineer (CLOSURE — gate v3 allows memory writes only during CLOSURE)
   - **Effort:** M
   - **Files NEW:**

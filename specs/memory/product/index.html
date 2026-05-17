@@ -29,7 +29,7 @@
 <body>
 
 <h1>Product Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-17 · Closure: agent-comms-v1</p>
+<p class="meta">Última atualização: 2026-05-17 · Closure: multi-platform-parity-v1</p>
 
 <section id="vision">
   <h2>Visão atômica</h2>
@@ -61,6 +61,7 @@
     <li><a href="agent-sdd-alignment.html">agent-sdd-alignment</a><span class="desc">— agentes, skills, workflows e templates SDD release-aware (<code>specs/releases/&lt;active&gt;/</code> como primary; <code>features/&lt;feat&gt;/</code> apenas Legacy compat) + <code>dadaia specs init</code> + doctor SPEC-DOC-003/012 + CI <code>specs-doctor</code>.</span></li>
     <li><a href="panel.html">panel</a><span class="desc">— UI local single-page em <code>http://127.0.0.1:4999/</code> via <code>dadaia panel</code>; 3 sections (Servers / Memories / Agents placeholder) com memory HTML servido verbatim via two-route reverse proxy (SPEC-DOC-008 preservado por construção).</span></li>
     <li><a href="agent-comms.html">agent-comms</a><span class="desc">— contrato <code>handoff-v1</code> que materializa o referente <code>schema_ref: handoff-schema-v1</code>; schema JSON Draft 2020-12 + CLI <code>dadaia reports validate</code> stdlib-only + skill <code>dadaia-handoff-emitter</code> + 3 pilotos (PE/SA/SE).</span></li>
+    <li><a href="multi-platform-parity.html">multi-platform-parity</a><span class="desc">— Pilar 3 entre Claude Code / Codex / OpenCode: Codex <code>[agents.&lt;name&gt;]</code> blocks + <code>[skills]</code> table em <code>.codex/config.toml</code>; doctor emite <code>[not-applicable]</code> cyan para Codex workflows; cleanup unconditional + atomic writes via <code>_atomic_write_text</code>.</span></li>
     <li><a href="academy.html">academy</a><span class="desc">— sistema de cursos copy-from-template para onboarding de contribuidores e agentes.</span></li>
     <li><a href="workspace-portability.html">workspace-portability</a><span class="desc">— export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas.</span></li>
     <li><a href="repos-catalog.html">repos-catalog</a><span class="desc">— lookup do <code>repos.xlsx</code> para discovery rápida de repos conhecidos com slug + URL.</span></li>
