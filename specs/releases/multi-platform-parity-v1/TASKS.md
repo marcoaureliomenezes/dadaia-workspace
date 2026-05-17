@@ -121,7 +121,7 @@ feat(public-assets): T-PB-3 — emit [not-applicable] doctor status for Codex wo
     # expect: 4 passed
     ```
 
-- [-] **T-MPP-1.4** `[parallel: no]` Phase 1 close — verify all AC slices, flip markers `[x]`, single Conventional Commit.
+- [x] **T-MPP-1.4** `[parallel: no]` Phase 1 close — verify all AC slices, flip markers `[x]`, single Conventional Commit.
   - **Owner:** software-engineer
   - **Effort:** S (verification only — no LoC delta)
   - **Files MODIFIED:**
