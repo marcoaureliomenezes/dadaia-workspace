@@ -16,6 +16,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.server_registry import PortStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.server_registry.scan import scan_unregistered_listeners
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 
 app = typer.Typer(help="Manage the dev server port registry.")
@@ -224,6 +225,72 @@ def clean(
     verb = "Would remove" if dry_run else "Removed"
     for e in removed:
         console.print(f"[yellow]{verb}:[/yellow] port {e.port} ('{e.project}')")
+
+
+@app.command()
+def scan(
+    json_output: bool = typer.Option(False, "--json", help="Output JSON array"),
+) -> None:
+    """Detect TCP listeners not in the registry (orphan dev servers).
+
+    Read-only diagnostic: parses ``ss -tlnp`` for the current user's
+    listeners, filters out ports already in the registry and privileged
+    ports (<1024), and reports the rest with bind / pid / cmdline / cwd /
+    lan_exposed.  Never kills processes, never registers anything.
+
+    Exit code is always 0 (informational).  An orphan with bind=0.0.0.0
+    flagged as LAN-exposed is a security concern the operator should
+    address.
+    """
+    entries_with_status = _svc().list_entries(include_stale=True)
+    registry_entries = [e for e, _ in entries_with_status]
+
+    findings = scan_unregistered_listeners(registry_entries)
+
+    if json_output:
+        data = [
+            {
+                "port": f.port,
+                "bind": f.bind,
+                "pid": f.pid,
+                "cmdline": f.cmdline,
+                "cwd": f.cwd,
+                "lan_exposed": f.lan_exposed,
+            }
+            for f in findings
+        ]
+        print(json.dumps(data, indent=2))
+        return
+
+    if not findings:
+        console.print("[dim]No unregistered listeners detected.[/dim]")
+        return
+
+    table = Table(title="Unregistered listeners")
+    table.add_column("Port", style="bold")
+    table.add_column("Bind")
+    table.add_column("PID")
+    table.add_column("Cmd")
+    table.add_column("CWD")
+    table.add_column("LAN-exposed?")
+
+    for f in findings:
+        bind_style = f"[yellow]{f.bind}[/yellow] ⚠" if f.lan_exposed else f.bind
+        lan_label = "[yellow]yes[/yellow]" if f.lan_exposed else "no"
+        table.add_row(
+            str(f.port),
+            bind_style,
+            str(f.pid) if f.pid is not None else "—",
+            f.cmdline or "—",
+            f.cwd or "—",
+            lan_label,
+        )
+    console.print(table)
+    lan_count = sum(1 for f in findings if f.lan_exposed)
+    if lan_count > 0:
+        console.print(
+            f"[yellow]⚠  {lan_count} listener(s) bound to 0.0.0.0 — reachable from the LAN.[/yellow]"
+        )
 
 
 @app.command()
