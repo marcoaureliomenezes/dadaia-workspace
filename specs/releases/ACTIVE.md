@@ -1,2 +1,2 @@
-release: none
-phase: none
+release: multi-platform-parity-v1
+phase: CLOSURE
