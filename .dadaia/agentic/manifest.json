@@ -32,7 +32,7 @@
     },
     {
       "path": "agents/product-engineer.md",
-      "sha256": "4af3c44a7ecf57cf198c5af5034de661e206a0082a0d1e0c71c472a49543c335",
+      "sha256": "ac3a8fadfdfb1b2aba70e98d7550a0b5653c060378c16f9edbd31c406cf30dbe",
       "type": "agents"
     },
     {
@@ -42,12 +42,12 @@
     },
     {
       "path": "agents/software-architect.md",
-      "sha256": "a629e9fb654531b1f35f970e12b35019e63b3b68636b2f3b25a26b71be7cad5e",
+      "sha256": "d462ccd10de505be9c22942f5faa038234f0c58da1eee1ca163e01d8fa0a62de",
       "type": "agents"
     },
     {
       "path": "agents/software-engineer.md",
-      "sha256": "058c011f050f922abde0a5825dee64be409434da0361d6b99d9958da4545188b",
+      "sha256": "cd2300b6d73f8ebc9373cbd3ae9db4e3140d4088fd8e0478ede6cb779744f1f4",
       "type": "agents"
     },
     {
@@ -136,6 +136,11 @@
       "type": "scaffold"
     },
     {
+      "path": "schemas/handoff-v1.schema.json",
+      "sha256": "fe70e3284c33a9d850861c76a3cf7c14663ac7a15700b123f408bde4e88bcc85",
+      "type": "schemas"
+    },
+    {
       "path": "scripts/ctx-inject.sh",
       "sha256": "4cfc5c7a15dbb9bba970fb1742236eb1c62f979c07b32d5f36d3a5a05ff42681",
       "type": "scripts"
@@ -158,6 +163,11 @@
     {
       "path": "skills/dadaia-grill-me/SKILL.md",
       "sha256": "7347c999b99f80af6d338f40999f046983cfdd6d0000b76562f5a0d98afd88f9",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-handoff-emitter/SKILL.md",
+      "sha256": "822e51ffb09142f8f0fd9f1a5d6798da864105616f3964e7a87a402517bb29da",
       "type": "skills"
     },
     {
@@ -376,7 +386,7 @@
       "type": "workflows"
     }
   ],
-  "generated_at": "2026-05-16T22:29:06.197310+00:00",
+  "generated_at": "2026-05-17T03:12:51.047089+00:00",
   "package_version": "0.1.0",
   "schema_version": "1"
 }

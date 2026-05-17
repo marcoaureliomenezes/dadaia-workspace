@@ -19,10 +19,11 @@ tools:
   - Edit
   - Agent
 skills:
-  - dadaia-workspace-spec-navigator
+  - dadaia-handoff-emitter
+  - dadaia-release-closure
   - dadaia-grill-me
   - dadaia-task-manager
-  - dadaia-release-closure
+  - dadaia-workspace-spec-navigator
 maxTurns: 50
 input_contract:
   requires_inputs:
@@ -462,6 +463,11 @@ I can start the proper sub-workflow now:
 - Conflicts between a report and memory are your responsibility to resolve in the release
   SPEC — either memory is wrong (and this release will fix it in CLOSURE) or the report is
   outdated (and this release will note that explicitly).
+
+### Artifact emission
+
+Após finalizar qualquer report HTML em `.dadaia/reports/`, invocar a skill `dadaia-handoff-emitter`
+para emitir o sidecar `<stem>.handoff.json` no mesmo diretório.
 
 ---
 
