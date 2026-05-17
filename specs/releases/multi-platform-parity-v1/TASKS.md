@@ -283,7 +283,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: 6 passed (T-PB-1 #1..#6)
     ```
 
-- [ ] **T-MPP-2.10** `[parallel: yes]` Add 2 unit tests for T-PB-1 adversarial inputs (concern #1).
+- [-] **T-MPP-2.10** `[parallel: yes]` Add 2 unit tests for T-PB-1 adversarial inputs (concern #1).
   - **Owner:** software-engineer
   - **Effort:** M (~30 LoC test code)
   - **Files MODIFIED:**
