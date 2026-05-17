@@ -12,7 +12,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-01 — Centralized workspace resolver (core module + tests)
 
-- [-] **Status:** IN_PROGRESS — software-engineer-p1
+- [x] **Status:** DONE — software-engineer-p1
 - **Owner:** software-engineer
 - **Precondições:** branch `hotfix/dev-server-registry-v0.1.1` criado, PR #9 mergeado em `main` (ou rebase posterior).
 - **Files modified:**
@@ -23,7 +23,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-02 — Substituir _resolve_workspace duplicates por import
 
-- [-] **Status:** IN_PROGRESS — software-engineer-p1
+- [x] **Status:** DONE — software-engineer-p1
 - **Owner:** software-engineer
 - **Precondições:** T-DSR-01 done.
 - **Files modified:**

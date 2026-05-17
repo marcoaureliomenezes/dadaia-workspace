@@ -10,24 +10,12 @@ from rich.console import Console
 
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.reports_validation.service import ValidationResult
 
 app = typer.Typer(help="Inspect and validate agent handoff reports.")
 console = Console()
 err_console = Console(stderr=True)
-
-
-# ---------------------------------------------------------------------------
-# Workspace resolution (follows same pattern as orchestrate.py)
-# ---------------------------------------------------------------------------
-
-
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +66,7 @@ def validate(
         err_console.print("[red]Error:[/red] provide one or more PATHS or use [bold]--all[/bold].")
         raise typer.Exit(3)
 
-    workspace_root = _resolve_workspace()
+    workspace_root = resolve_workspace_root()
 
     # Build service — schema must be staged
     try:

@@ -3,7 +3,6 @@
 import json
 import sys
 import webbrowser
-from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -16,6 +15,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.server_registry import PortStatus
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 
 app = typer.Typer(help="Manage the dev server port registry.")
@@ -23,17 +23,9 @@ console = Console()
 err_console = Console(stderr=True)
 
 
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
-
-
 def _svc() -> ServerRegistryService:
     try:
-        return container.build_server_registry_service(_resolve_workspace())
+        return container.build_server_registry_service(resolve_workspace_root())
     except WorkspaceNotInitializedError:
         err_console.print(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
@@ -261,7 +253,7 @@ def dashboard(
 
     from dadaia_workspace.features.server_registry.dashboard import DashboardHandler
 
-    ws = _resolve_workspace()
+    ws = resolve_workspace_root()
     states_dir = ws / ".dadaia" / "states"
     DashboardHandler.states_dir = states_dir
 
