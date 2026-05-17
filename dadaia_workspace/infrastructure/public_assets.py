@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import sys
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -234,6 +235,18 @@ def _atomic_write_text(dst: Path, content: str) -> None:
     tmp = dst.with_suffix(dst.suffix + ".tmp")
     tmp.write_text(content, encoding="utf-8")
     os.replace(tmp, dst)
+
+
+def _log_cleanup_error(func: object, path: object, exc_info: object) -> None:
+    """onerror= callback for shutil.rmtree — write a warning to stderr without re-raising.
+
+    Replaces the anti-pattern ``ignore_errors=True`` (which silences real
+    PermissionError / OSError) with a visible-but-non-fatal warning so that
+    operators can act on stale files while the install still succeeds.
+    """
+    exc_class = type(exc_info[1]).__name__ if exc_info and exc_info[1] else "UnknownError"
+    exc_msg = str(exc_info[1]) if exc_info and exc_info[1] else ""
+    sys.stderr.write(f"[cleanup-warning] {path}: {exc_class}: {exc_msg}\n")
 
 
 def _strip_tools_from_frontmatter(content: str) -> str:
