@@ -256,54 +256,6 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 }
 .empty-state code { display: inline-block; margin-top: var(--space-sm); font-size: 0.85em; }
 
-/* ── Unregistered listeners section (v0.1.1 / Bug D) ─ */
-.unregistered-section {
-  margin-top: var(--space-xl);
-  padding-top: var(--space-md);
-  border-top: 1px dashed var(--color-border);
-}
-.unregistered-section h3 {
-  font-size: 1rem;
-  color: var(--color-heading);
-  margin-bottom: var(--space-xs);
-}
-.unregistered-section .section-hint {
-  font-size: 0.85rem;
-  color: var(--color-muted);
-  margin-bottom: var(--space-md);
-}
-.lan-warning-badge {
-  display: inline-block;
-  padding: 0.1em 0.5em;
-  background: var(--color-alert, #f7af63);
-  color: #2a1a00;
-  font-size: 0.78em;
-  font-weight: 600;
-  border-radius: var(--radius);
-  margin-left: 0.3em;
-}
-.unregistered-section caption {
-  caption-side: top;
-  text-align: left;
-  padding-bottom: var(--space-xs);
-  color: var(--color-muted);
-  font-size: 0.85rem;
-  font-weight: normal;
-}
-.unregistered-section .cmdline-cell {
-  font-family: var(--font-mono);
-  font-size: 0.82em;
-  color: var(--color-text);
-  word-break: break-all;
-  max-width: 28em;
-}
-.unregistered-section .cwd-cell {
-  font-family: var(--font-mono);
-  font-size: 0.82em;
-  color: var(--color-muted);
-  word-break: break-all;
-}
-
 /* ── Memory cards grid ───────────────────────────── */
 .context-count {
   font-size: 0.85rem;
@@ -473,22 +425,102 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 }
 .error-state { color: #c0392b; font-size: 0.9rem; }
 
-/* ── workflows-grid ──────────────────────────────── */
-.card-grid.workflows-grid {
+/* ── Workflows 2-pane layout ─────────────────────── */
+.workflows-pane {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 260px 1fr;
+  gap: var(--space-md);
+  align-items: start;
 }
-.workflow-card {
+@media (max-width: 640px) {
+  .workflows-pane { grid-template-columns: 1fr; }
+  .workflows-detail { display: none; }
+  .workflows-detail.visible { display: block; }
+}
+
+/* Left list */
+.workflows-list {
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem;
+  border-radius: var(--radius-card);
   background: var(--color-surface);
+  overflow: hidden;
 }
-.workflow-card h3 { margin: 0 0 0.25rem 0; font-size: 1rem; color: var(--color-cost, #633d2e); }
-.workflow-source { font-size: 0.75rem; color: #666; font-family: ui-monospace, monospace; margin-bottom: 0.5rem; }
-.workflow-description { font-size: 0.9rem; margin: 0.5rem 0; }
-.workflow-agents { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.5rem; }
+.workflow-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem var(--space-md);
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  color: var(--color-text);
+  transition: background 0.1s;
+}
+.workflow-list-item:last-child { border-bottom: none; }
+.workflow-list-item:hover { background: var(--color-row-hover); }
+.workflow-list-item.selected {
+  background: var(--color-primary-bg, #f0fbf7);
+  border-left: 3px solid var(--color-accent, #9cddc8);
+  color: var(--color-heading);
+  font-weight: 600;
+}
+.workflow-list-item:focus-visible {
+  outline: 2px solid var(--color-accent, #9cddc8);
+  outline-offset: -2px;
+}
+.workflow-item-name { display: block; font-size: 0.88rem; font-weight: 600; }
+.workflow-item-source { display: block; font-size: 0.75rem; color: var(--color-muted); font-family: var(--font-mono); margin-top: 0.1rem; }
+
+/* Right detail panel */
+.workflows-detail {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: var(--space-md);
+  min-height: 240px;
+}
+.workflows-detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+.workflow-detail-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-cost, #633d2e);
+  margin-bottom: var(--space-xs);
+}
+.workflow-detail-source {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  margin-bottom: var(--space-sm);
+}
+.workflow-detail-description {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+.workflow-detail-description.no-desc { color: var(--color-muted); font-style: italic; }
+
+/* SVG stepper diagram */
+.workflow-diagram {
+  margin-top: var(--space-md);
+  overflow-x: auto;
+}
+.workflow-diagram svg { display: block; }
+
+/* Agent chips (detail pane) */
+.workflow-agent-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: var(--space-sm); }
 .workflow-agent-chip {
   background: var(--color-accent, #9cddc8);
   color: #222;
@@ -497,6 +529,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   border-radius: 12px;
   font-size: 0.75rem;
   cursor: pointer;
+  font-family: inherit;
 }
 .workflow-agent-chip:hover { background: var(--color-accent-secondary, #bfd8ad); }
 .workflow-agent-chip:focus { outline: 2px solid var(--color-cost, #633d2e); outline-offset: 2px; }
@@ -505,6 +538,35 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 PANEL_JS: str = """
 (function () {
   'use strict';
+
+  // ── Token bootstrap ───────────────────────────────────────────────
+  // On first load the panel URL carries ?token=<value>.
+  // Persist it to sessionStorage so auth survives tab navigation,
+  // then strip from the URL bar so it is not accidentally shared.
+  (function bootstrapToken() {
+    var params = new URLSearchParams(location.search);
+    var urlToken = params.get('token');
+    if (urlToken) {
+      sessionStorage.setItem('panel_token', urlToken);
+      params.delete('token');
+      var newSearch = params.toString();
+      var newUrl = location.pathname + (newSearch ? '?' + newSearch : '') + location.hash;
+      history.replaceState(null, '', newUrl);
+    }
+  })();
+
+  // ── Authenticated fetch wrapper ────────────────────────────────────
+  // All /api/* calls must carry Authorization: Bearer <token>.
+  // If the token is absent the call is still made so callers see the 401.
+  function authedFetch(url, opts) {
+    opts = opts || {};
+    var token = sessionStorage.getItem('panel_token') || '';
+    var headers = opts.headers ? Object.assign({}, opts.headers) : {};
+    if (token) {
+      headers['Authorization'] = 'Bearer ' + token;
+    }
+    return fetch(url, Object.assign({}, opts, { headers: headers }));
+  }
 
   // ── Tab switching ──────────────────────────────────────────────────
   var tabs = document.querySelectorAll('.nav-tab');
@@ -645,10 +707,6 @@ PANEL_JS: str = """
       .then(function (data) {
         var container = document.getElementById('servers-content');
         if (container) { container.innerHTML = buildServersHTML(data); }
-        var unregContainer = document.getElementById('unregistered-content');
-        if (unregContainer) {
-          unregContainer.innerHTML = buildUnregisteredHTML(data.unregistered || []);
-        }
         lastUpdated = new Date();
         if (statusDot) { statusDot.classList.remove('updating'); }
         updateStatusLabel();
@@ -658,40 +716,6 @@ PANEL_JS: str = """
         lastUpdated = new Date();
         updateStatusLabel();
       });
-  }
-
-  // ── Unregistered listeners renderer (v0.1.1 / Bug D) ──────────────
-  function buildUnregisteredHTML(items) {
-    if (!items || items.length === 0) {
-      return '<div class="empty-state">'
-        + 'Nenhum listener não-registrado detectado.'
-        + '</div>';
-    }
-    var lanCount = 0;
-    items.forEach(function (it) { if (it.lan_exposed) { lanCount += 1; } });
-    var caption = lanCount > 0
-      ? items.length + ' listener(s), ' + lanCount + ' LAN-exposed ⚠'
-      : items.length + ' listener(s), all loopback-only';
-    var html = '<table class="servers-table">'
-      + '<caption>' + escHtml(caption) + '</caption>'
-      + '<thead><tr>'
-      + '<th>Port</th><th>Bind</th><th>PID</th><th>Cmd</th><th>CWD</th>'
-      + '</tr></thead><tbody>';
-    items.forEach(function (it) {
-      var lanBadge = it.lan_exposed
-        ? ' <span class="lan-warning-badge" title="bind=' + escHtml(it.bind) + ' is reachable from the LAN">LAN-exposed</span>'
-        : '';
-      var pid = it.pid != null ? '<code>' + escHtml(String(it.pid)) + '</code>' : '—';
-      html += '<tr>'
-        + '<td><span class="port-badge">' + escHtml(String(it.port)) + '</span></td>'
-        + '<td>' + escHtml(it.bind) + lanBadge + '</td>'
-        + '<td>' + pid + '</td>'
-        + '<td class="cmdline-cell">' + escHtml(it.cmdline || '—') + '</td>'
-        + '<td class="cwd-cell">' + escHtml(it.cwd || '—') + '</td>'
-        + '</tr>';
-    });
-    html += '</tbody></table>';
-    return html;
   }
 
   setInterval(fetchServers, 5000);
@@ -781,7 +805,7 @@ PANEL_JS: str = """
       if (targetEl.dataset.loaded === '1') { return; }
       var agentId = btn.closest('.agent-card').dataset.agentId;
       targetEl.innerHTML = '<p>Carregando…</p>';
-      fetch('/api/agents/' + encodeURIComponent(agentId) + '/sessions?limit=10', { credentials: 'same-origin' })
+      authedFetch('/api/agents/' + encodeURIComponent(agentId) + '/sessions?limit=10')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           targetEl.innerHTML = renderSessionsTable(data.sessions || []);
@@ -826,7 +850,7 @@ PANEL_JS: str = """
       var grid = document.getElementById('agents-grid');
       if (!grid) { return; }
       grid.setAttribute('aria-busy', 'true');
-      fetch('/api/agents?window_days=180&limit=50', { credentials: 'same-origin' })
+      authedFetch('/api/agents?window_days=180&limit=50')
         .then(function (r) {
           if (!r.ok) { throw new Error('HTTP ' + r.status); }
           return r.json();
@@ -847,57 +871,161 @@ PANEL_JS: str = """
   // ── workflows tab ─────────────────────────────────────────────────────
   var Workflows = (function () {
     var loaded = false;
+    var _workflows = [];
     function escHtmlW(s) {
       return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
         return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c];
       });
     }
     function escAttrW(s) { return escHtmlW(s); }
+
+    // ── Agent cross-link ────────────────────────────────────────────────
     function filterAgent(agentId) {
       location.hash = '#agents?filter=' + encodeURIComponent(agentId);
       var agentsTab = document.getElementById('tab-agents');
       if (agentsTab) { agentsTab.click(); }
     }
-    function renderCard(w) {
+
+    // ── Inline SVG stepper diagram ───────────────────────────────────────
+    // Renders agent_ids as a horizontal stepper (left-to-right DAG).
+    // Vanilla SVG, no CDN, no Mermaid — CSP-safe.
+    function buildStepperSVG(agentIds) {
+      if (!agentIds || agentIds.length === 0) {
+        return '<svg width="120" height="40" aria-label="No steps" role="img">'
+          + '<text x="8" y="24" font-size="12" fill="#666">No agents</text>'
+          + '</svg>';
+      }
+      var nodeW = 120;
+      var nodeH = 36;
+      var arrowW = 28;
+      var padX = 12;
+      var padY = 12;
+      var totalW = padX * 2 + agentIds.length * nodeW + (agentIds.length - 1) * arrowW;
+      var totalH = nodeH + padY * 2;
+      var rects = '';
+      var labels = '';
+      var arrows = '';
+      for (var i = 0; i < agentIds.length; i++) {
+        var x = padX + i * (nodeW + arrowW);
+        var y = padY;
+        // Node box
+        rects += '<rect x="' + x + '" y="' + y + '" width="' + nodeW + '" height="' + nodeH + '"'
+          + ' rx="4" ry="4" fill="#f0fbf7" stroke="#9cddc8" stroke-width="1.5"/>';
+        // Label (truncate to fit)
+        var label = agentIds[i];
+        if (label.length > 14) { label = label.slice(0, 13) + '…'; }
+        labels += '<text x="' + (x + nodeW / 2) + '" y="' + (y + nodeH / 2 + 5) + '"'
+          + ' text-anchor="middle" font-size="11" fill="#222" font-family="ui-monospace,monospace"'
+          + ' aria-hidden="true">' + escHtmlW(label) + '</text>';
+        // Arrow (not after last node)
+        if (i < agentIds.length - 1) {
+          var ax = x + nodeW;
+          var ay = padY + nodeH / 2;
+          arrows += '<line x1="' + ax + '" y1="' + ay + '" x2="' + (ax + arrowW - 6) + '" y2="' + ay + '"'
+            + ' stroke="#9cddc8" stroke-width="2"/>'
+            + '<polygon points="'
+            + (ax + arrowW - 6) + ',' + (ay - 5) + ' '
+            + (ax + arrowW) + ',' + ay + ' '
+            + (ax + arrowW - 6) + ',' + (ay + 5)
+            + '" fill="#9cddc8"/>';
+        }
+      }
+      var ariaLabel = 'Workflow steps: ' + agentIds.join(' → ');
+      return '<svg width="' + totalW + '" height="' + totalH + '"'
+        + ' viewBox="0 0 ' + totalW + ' ' + totalH + '"'
+        + ' role="img" aria-label="' + escAttrW(ariaLabel) + '">'
+        + '<title>' + escHtmlW(ariaLabel) + '</title>'
+        + rects + labels + arrows
+        + '</svg>';
+    }
+
+    // ── Detail panel renderer ────────────────────────────────────────────
+    function showDetail(w) {
+      var detail = document.getElementById('workflows-detail');
+      if (!detail) { return; }
+      var descClass = w.description ? 'workflow-detail-description' : 'workflow-detail-description no-desc';
+      var descText = w.description || 'No description';
       var chips = (w.agent_ids || []).map(function (id) {
         return '<button class="workflow-agent-chip" type="button" data-action="filter-agent"'
           + ' data-agent-id="' + escAttrW(id) + '"'
-          + ' aria-label="Filtrar Agents por: ' + escAttrW(id) + '">'
+          + ' aria-label="Filter Agents by: ' + escAttrW(id) + '">'
           + escHtmlW(id)
           + '</button>';
       }).join('');
-      return '<article class="workflow-card">'
-        + '<h3>' + escHtmlW(w.display_name) + '</h3>'
-        + '<div class="workflow-source">' + escHtmlW(w.source) + '</div>'
-        + '<p class="workflow-description">' + escHtmlW(w.description || '') + '</p>'
-        + '<div class="workflow-agents">' + chips + '</div>'
-        + '</article>';
+      detail.innerHTML =
+        '<div class="workflow-detail-name">' + escHtmlW(w.display_name) + '</div>'
+        + '<div class="workflow-detail-source">' + escHtmlW(w.source || '') + '</div>'
+        + '<p class="' + descClass + '">' + escHtmlW(descText) + '</p>'
+        + '<div class="workflow-diagram" aria-label="Workflow step diagram">'
+        + buildStepperSVG(w.agent_ids || [])
+        + '</div>'
+        + '<div class="workflow-agent-chips">' + chips + '</div>';
+      detail.querySelectorAll('[data-action=filter-agent]').forEach(function (btn) {
+        btn.addEventListener('click', function () { filterAgent(btn.dataset.agentId); });
+      });
+      detail.classList.add('visible');
     }
+
+    // ── Left list renderer ────────────────────────────────────────────────
+    function renderList(workflows) {
+      var list = document.getElementById('workflows-list');
+      if (!list) { return; }
+      if (workflows.length === 0) {
+        list.innerHTML = '';
+        return;
+      }
+      list.innerHTML = workflows.map(function (w, idx) {
+        return '<button class="workflow-list-item" type="button"'
+          + ' data-workflow-idx="' + idx + '"'
+          + ' aria-pressed="false"'
+          + ' aria-label="Workflow: ' + escAttrW(w.display_name) + '">'
+          + '<span class="workflow-item-name">' + escHtmlW(w.display_name) + '</span>'
+          + '<span class="workflow-item-source">' + escHtmlW(w.source || '') + '</span>'
+          + '</button>';
+      }).join('');
+      list.querySelectorAll('.workflow-list-item').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          list.querySelectorAll('.workflow-list-item').forEach(function (b) {
+            b.classList.remove('selected');
+            b.setAttribute('aria-pressed', 'false');
+          });
+          btn.classList.add('selected');
+          btn.setAttribute('aria-pressed', 'true');
+          var idx = parseInt(btn.dataset.workflowIdx, 10);
+          if (_workflows[idx]) { showDetail(_workflows[idx]); }
+        });
+      });
+      // Auto-select first item
+      var first = list.querySelector('.workflow-list-item');
+      if (first) { first.click(); }
+    }
+
     function render(data) {
+      _workflows = data.workflows || [];
       var meta = document.getElementById('workflows-meta');
       if (meta) {
-        meta.textContent = data.workflows.length + ' workflow' + (data.workflows.length === 1 ? '' : 's')
-          + ' (' + data.source_hint + ')';
+        meta.textContent = _workflows.length + ' workflow' + (_workflows.length === 1 ? '' : 's')
+          + ' (' + (data.source_hint || '') + ')';
       }
       var grid = document.getElementById('workflows-grid');
       var empty = document.getElementById('workflows-empty');
       if (!grid) { return; }
-      if (data.workflows.length === 0) {
-        grid.innerHTML = '';
+      grid.setAttribute('aria-busy', 'false');
+      if (_workflows.length === 0) {
+        grid.style.display = 'none';
         if (empty) { empty.hidden = false; }
         return;
       }
       if (empty) { empty.hidden = true; }
-      grid.innerHTML = data.workflows.map(renderCard).join('');
-      grid.querySelectorAll('[data-action=filter-agent]').forEach(function (btn) {
-        btn.addEventListener('click', function () { filterAgent(btn.dataset.agentId); });
-      });
+      grid.style.display = '';
+      renderList(_workflows);
     }
+
     function load() {
       var grid = document.getElementById('workflows-grid');
       if (!grid) { return; }
       grid.setAttribute('aria-busy', 'true');
-      fetch('/api/workflows', { credentials: 'same-origin' })
+      authedFetch('/api/workflows')
         .then(function (r) {
           if (!r.ok) { throw new Error('HTTP ' + r.status); }
           return r.json();
@@ -905,11 +1033,13 @@ PANEL_JS: str = """
         .then(function (data) {
           render(data);
           loaded = true;
-          grid.setAttribute('aria-busy', 'false');
         })
         .catch(function (e) {
-          grid.innerHTML = '<p class="error-state" role="alert">Falha: ' + escHtmlW(e.message) + '</p>';
-          grid.setAttribute('aria-busy', 'false');
+          var detail = document.getElementById('workflows-detail');
+          if (detail) {
+            detail.innerHTML = '<p class="error-state" role="alert">Falha: ' + escHtmlW(e.message) + '</p>';
+          }
+          if (grid) { grid.setAttribute('aria-busy', 'false'); }
         });
     }
     return { load: load, isLoaded: function () { return loaded; } };

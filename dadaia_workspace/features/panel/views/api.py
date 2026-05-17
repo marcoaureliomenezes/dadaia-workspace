@@ -65,12 +65,9 @@ def render_api_servers(
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         groups = service.list_servers_grouped()
-        try:
-            unregistered = service.list_unregistered_listeners()
-        except Exception:  # noqa: BLE001
-            # Scan failures (ss missing, /proc unreadable, etc.) must NEVER
-            # block the registered-servers view. Degrade gracefully.
-            unregistered = []
+        # Unregistered listeners section removed from UI (panel-defects hotfix).
+        # Key kept for back-compat with any client that reads it.
+        unregistered: list = []
         payload = {
             "groups": [
                 {
