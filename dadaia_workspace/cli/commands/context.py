@@ -1,7 +1,6 @@
 """dadaia context subcommands."""
 
 import json
-from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -16,6 +15,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.service import SpecContextService
 
 app = typer.Typer(help="Manage Spec Context Projects.")
@@ -23,17 +23,9 @@ console = Console()
 err_console = Console(stderr=True)
 
 
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
-
-
 def _ctx_service() -> SpecContextService:
     try:
-        return container.build_spec_context_service(_resolve_workspace())
+        return container.build_spec_context_service(resolve_workspace_root())
     except WorkspaceNotInitializedError:
         err_console.print(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
@@ -60,7 +52,7 @@ def create(
     repo: str = typer.Option(..., "--repo", help="Repo slug (directory name under repos/)"),
 ) -> None:
     """Create a new Spec Context Project in state 'inativo'."""
-    workspace_root = _resolve_workspace()
+    workspace_root = resolve_workspace_root()
     # Look up repo_url from whitelist; fall back gracefully if catalog unavailable
     repo_url = ""
     try:
@@ -156,7 +148,7 @@ def show(
 def activate(name: str = typer.Argument(..., help="Context name to activate")) -> None:
     """Activate a context (clone repo if absent; auto-promote if no primary)."""
     try:
-        ws = _resolve_workspace()
+        ws = resolve_workspace_root()
         ctx = container.build_spec_context_service(ws).activate(name)
         primary_note = " [bold yellow](primary)[/bold yellow]" if ctx.is_primary else ""
         console.print(
@@ -184,7 +176,7 @@ def deactivate(name: str = typer.Argument(..., help="Context name to deactivate"
 def promote(name: str = typer.Argument(..., help="Context name to promote as primary")) -> None:
     """Promote an active context as the workspace primary."""
     try:
-        ws = _resolve_workspace()
+        ws = resolve_workspace_root()
         ctx = container.build_spec_context_service(ws).promote(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now primary")
         container.build_public_service().install(ws, target="opencode", force=True)

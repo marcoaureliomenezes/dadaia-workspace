@@ -2,7 +2,6 @@
 
 import json as _json
 import os
-from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -16,6 +15,7 @@ from dadaia_workspace.core.exceptions import (
     WorkflowSchemaError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 
 app = typer.Typer(help="Run and manage multi-agent workflows.")
@@ -23,17 +23,9 @@ console = Console()
 err_console = Console(stderr=True)
 
 
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
-
-
 def _service(runtime: str | None = None) -> OrchestrationService:
     try:
-        return container.build_orchestration_service(_resolve_workspace(), runtime=runtime)
+        return container.build_orchestration_service(resolve_workspace_root(), runtime=runtime)
     except WorkspaceNotInitializedError:
         err_console.print(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
@@ -47,7 +39,7 @@ def _resolve_context(explicit: str | None) -> str:
     env = os.environ.get("DADAIA_CONTEXT")
     if env:
         return env
-    workspace = _resolve_workspace()
+    workspace = resolve_workspace_root()
     primary = workspace / ".dadaia" / "states" / "primary_context.json"
     if primary.exists():
         try:

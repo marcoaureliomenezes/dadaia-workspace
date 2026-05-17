@@ -11,6 +11,7 @@ from typing import Any
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.panel.auth import ensure_token
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.server import build_panel_http_server, serve_blocking
@@ -20,14 +21,6 @@ _LOOPBACK_ONLY: frozenset[str] = frozenset({"127.0.0.1"})
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(help="Start the Dadaia Workspace Panel (local UI).")
-
-
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
 
 
 def _try_build_telemetry(workspace_root: Path) -> object | None:
@@ -103,7 +96,7 @@ def panel(
         )
         raise typer.Exit(2)
 
-    workspace_root = _resolve_workspace()
+    workspace_root = resolve_workspace_root()
 
     # Ensure Bearer token exists (generates once with 0o600 if missing).
     token = ensure_token()

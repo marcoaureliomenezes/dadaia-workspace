@@ -9,17 +9,10 @@ from rich.console import Console
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.export import ExportOptions
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 console = Console()
 err_console = Console(stderr=True)
-
-
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
 
 
 def export(
@@ -46,7 +39,7 @@ def export(
     configs, .claude rules) needed to restore the workspace on a new VPS.
     Secrets (*.env), caches (.venv, .npm, linuxbrew) and repos/ are excluded.
     """
-    workspace_root = _resolve_workspace()
+    workspace_root = resolve_workspace_root()
     try:
         svc = container.build_export_service(workspace_root)
         options = ExportOptions(
