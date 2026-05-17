@@ -1,2 +1,2 @@
-release: dadaia-workspace-brand-identity-v1
-phase: CLOSURE
+release: v0.1.1
+phase: IMPLEMENTATION

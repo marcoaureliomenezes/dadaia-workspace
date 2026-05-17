@@ -55,6 +55,7 @@ nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 
 ## Hotfixes pendentes
 
+- 2026-05-17T200000Z HIGH dev-server-registry — 3 silent-failure bugs make registered servers invisible: (A) `_resolve_workspace` walks to child `.dadaia/` in sub-repos before workspace root → "Workspace not initialized"; (B) malformed JSON / missing keys in `server_registry.json` crash `list_all()` → entire registry blanked; (C) `OsProcessProbe.is_pid_alive` treats `PermissionError` as dead, so root-owned PIDs (docker-proxy) are auto-swept on next register. Plus structural gap: no reconciliation surface for unregistered listeners. Promoted to release `v0.1.1`. (post-mortem: .dadaia/reports/dadaia-workspace/software-engineer/2026-05-17T200000Z-dev-server-registry-rca.html)
 - 2026-05-17T064915Z MEDIUM spec-context — sessions share global primary_context.json, no DADAIA_CONTEXT auto-export (post-mortem: .dadaia/reports/dadaia-workspace/software-engineer/2026-05-17T064915Z-spec-context-isolation-rca.html)
 - 2026-05-17T000000Z MEDIUM import — BUG-003: `dadaia import` não detecta nem reescreve paths absolutos em arquivos não-lib-originated (ex.: hooks em `.claude/settings.json`) apontando para fora do novo `workspace_root`; próximo import em outra máquina pode reintroduzir hooks VPS. (post-mortem: `specs/z_bug_specs.md` — discovery source `agent-comms-v1`)
 
