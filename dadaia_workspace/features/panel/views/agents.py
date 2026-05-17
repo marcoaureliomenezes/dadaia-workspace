@@ -9,6 +9,26 @@ Security (OWASP A03):
   in PANEL_JS) after the auth handshake. This prevents any accidental injection of
   API payloads into HTML and keeps the server-side template free of user-controlled
   data.
+
+Recovery / Secure-Delete Procedure (devops T12):
+  If the telemetry database or the panel auth token are suspected to be compromised,
+  or if corruption is detected (503 on API endpoints with ``telemetry_degraded``),
+  use the following secure-delete recipe to purge all sensitive local state:
+
+      shred -u ~/.dadaia/state/telemetry/telemetry.sqlite
+      shred -u ~/.dadaia/state/panel.token
+
+  After shredding, restart the panel via ``dadaia panel start``.  A fresh SQLite
+  database and auth token will be generated on next startup.
+
+  Corrupt database quarantine files (``telemetry.sqlite.corrupt.<utc_ts>``) can be
+  found at ``~/.dadaia/state/telemetry/`` and should also be shredded:
+
+      shred -u ~/.dadaia/state/telemetry/telemetry.sqlite.corrupt.*
+
+  Note: ``shred`` is available on Linux (GNU coreutils).  On macOS, use
+  ``rm -P`` instead.  On encrypted filesystems (e.g. LUKS, FileVault), ordinary
+  ``rm`` is sufficient since the key protects at-rest data.
 """
 
 from __future__ import annotations
