@@ -255,7 +255,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-13 — CLOSURE desta release (`agent-comms-v1`)
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** product-engineer
 - **Wave:** 4
 - **Precondições:** T-AC-12 [x] + explicit operator approval
