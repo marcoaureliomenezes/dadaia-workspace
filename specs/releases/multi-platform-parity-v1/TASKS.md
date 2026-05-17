@@ -249,7 +249,7 @@ feat(public-assets): T-PB-1 + T-PB-4 — render Codex [agents.<name>] blocks + [
     # expect: ≥1
     ```
 
-- [ ] **T-MPP-2.8** `[parallel: yes]` DELETE the test at `tests/unit/test_public_assets.py:69` that locks `[unsupported] codex:agents` (per PLAN R5 — DELETE, NOT adjust).
+- [-] **T-MPP-2.8** `[parallel: yes]` DELETE the test at `tests/unit/test_public_assets.py:69` that locks `[unsupported] codex:agents` (per PLAN R5 — DELETE, NOT adjust).
   - **Owner:** software-engineer
   - **Effort:** S (~5 LoC removed)
   - **Files MODIFIED:**
