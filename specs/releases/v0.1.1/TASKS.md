@@ -35,7 +35,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-03 — Skip-and-log JSON store resilience
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p2
 - **Owner:** software-engineer
 - **Precondições:** T-DSR-02 done (resolver fix lands first, isolada).
 - **Files modified:** `dadaia_workspace/infrastructure/json_server_registry_store.py`
@@ -44,7 +44,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T-DSR-04 — Tests for store resilience
 
-- [ ] **Status:** OPEN
+- [x] **Status:** DONE — claude-main-p2
 - **Owner:** software-engineer
 - **Precondições:** T-DSR-03 done.
 - **Files modified:** `tests/unit/infrastructure/test_json_server_registry_store_resilience.py` (novo)
