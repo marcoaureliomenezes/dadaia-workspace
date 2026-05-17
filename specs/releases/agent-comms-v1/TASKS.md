@@ -165,7 +165,7 @@ Wave 4:  T-AC-13 (CLOSURE — operator-gated)
 
 ### T-AC-08 — Integration tests CLI `dadaia reports validate`
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** software-engineer
 - **Wave:** 2
 - **Precondições:** T-AC-04 [x], T-AC-07 [x]
