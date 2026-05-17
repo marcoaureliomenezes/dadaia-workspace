@@ -13,6 +13,15 @@ PANEL_JS   — auto-refresh /api/servers every 5s; tab switching; TTL relative f
              Vanilla JS, no frameworks, no eval().
 """
 
+PALETTE: dict[str, str] = {
+    "accent": "#9cddc8",
+    "accent_secondary": "#bfd8ad",
+    "warning_bg": "#ddd9ab",
+    "alert": "#f7af63",
+    "cost": "#633d2e",
+}
+"""Canonical brand palette (spec: dadaia-workspace-brand-identity-v1 SPEC.md)."""
+
 PANEL_CSS: str = """
 :root {
   --color-bg:            #fafafa;
@@ -22,12 +31,16 @@ PANEL_CSS: str = """
   --color-muted:         #666666;
   --color-border:        #dddddd;
   --color-border-strong: #333333;
-  --color-accent:        #7ec8e3;
+  --color-accent:        #9cddc8; /* was #7ec8e3 — brand-identity-v1 */
   --color-accent-dark:   #2d7d9a;
   --color-code-bg:       #f0f0f0;
   --color-th-bg:         #eeeeee;
-  --color-primary-ring:  #7ec8e3;
-  --color-primary-bg:    #f0faff;
+  --color-primary-ring:  #9cddc8; /* was #7ec8e3 — brand-identity-v1 */
+  --color-primary-bg:    #f0fbf7; /* was #f0faff — brand-identity-v1 */
+  --color-accent-secondary: #bfd8ad; /* brand-identity-v1 */
+  --color-warning-bg:    #ddd9ab; /* brand-identity-v1 */
+  --color-alert:         #f7af63; /* brand-identity-v1 */
+  --color-cost:          #633d2e; /* brand-identity-v1 */
   --color-active-dot:    #3aaa6e;
   --color-stale-dot:     #cc7700;
   --color-row-hover:     #f5f5f5;

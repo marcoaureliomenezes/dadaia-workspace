@@ -17,13 +17,13 @@
 
 ## Phase 1 — Paleta canônica + tokens CSS
 
-- [-] **T-BR-01** — Add `PALETTE` constant in `dadaia_workspace/features/panel/views/_assets.py`. <!-- software-engineer-phase2 -->
+- [x] **T-BR-01** — Add `PALETTE` constant in `dadaia_workspace/features/panel/views/_assets.py`. <!-- software-engineer-phase2 -->
   - Constant: `PALETTE: dict[str, str] = {"accent": "#9cddc8", "accent_secondary": "#bfd8ad", "warning_bg": "#ddd9ab", "alert": "#f7af63", "cost": "#633d2e"}`.
   - Top of file, with a docstring linking to `specs/releases/dadaia-workspace-brand-identity-v1/SPEC.md`.
   - Files: `dadaia_workspace/features/panel/views/_assets.py`.
   - Parallel-safe: yes (no deps).
 
-- [-] **T-BR-02** — Update PANEL_CSS tokens in `_assets.py`. <!-- software-engineer-phase2 -->
+- [x] **T-BR-02** — Update PANEL_CSS tokens in `_assets.py`. <!-- software-engineer-phase2 -->
   - Update `--color-accent: #7ec8e3` → `#9cddc8`.
   - Update `--color-primary-ring: #7ec8e3` → `#9cddc8`.
   - Update `--color-primary-bg: #f0faff` → `#f0fbf7`.
