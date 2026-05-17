@@ -55,6 +55,7 @@ nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 
 ## Hotfixes pendentes
 
+- 2026-05-17T064915Z MEDIUM spec-context — sessions share global primary_context.json, no DADAIA_CONTEXT auto-export (post-mortem: .dadaia/reports/dadaia-workspace/software-engineer/2026-05-17T064915Z-spec-context-isolation-rca.html)
 - 2026-05-17T000000Z MEDIUM import — BUG-003: `dadaia import` não detecta nem reescreve paths absolutos em arquivos não-lib-originated (ex.: hooks em `.claude/settings.json`) apontando para fora do novo `workspace_root`; próximo import em outra máquina pode reintroduzir hooks VPS. (post-mortem: `specs/z_bug_specs.md` — discovery source `agent-comms-v1`)
 
 ## Histórico (candidatas promovidas a release)
