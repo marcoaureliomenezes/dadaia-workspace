@@ -10,6 +10,15 @@ PR3-10 (FE): Full collapsed card design.
   - Hover/focus styles
   - All brand token usages include comma-separated fallbacks (test_brand_tokens_have_fallbacks)
   - Theme-responsive: Mint/Sage/Warm via tokens
+
+PR3-11 (FE): Expanded card panel.
+  - Expanded detail region: full skills, cost-by-context bars, scrollable system prompt
+  - System prompt: <pre><code> block with max-height + overflow-y: auto
+  - Copy-to-clipboard button for system prompt
+  - Total cost label with prominent styling
+  - Detail loading state (skeleton lines while prompt fetches)
+  - Error state for failed prompt fetch
+  - Expand/collapse transition respects prefers-reduced-motion
 """
 
 AGENTS_CSS: str = """
@@ -197,13 +206,149 @@ AGENTS_CSS: str = """
   opacity: 1;
 }
 
-/* ── Expanded detail region (PR3-11 fills this) ──────────────────── */
+/* ── Expanded detail region ──────────────────────────────────────── */
 .agent-card__detail {
   margin-top: 0.75rem;
   border-top: 1px solid var(--color-border, #dddddd);
   padding-top: 0.75rem;
 }
 .agent-card__detail[hidden] { display: none; }
+
+/* ── Agent detail inner wrapper ──────────────────────────────────── */
+.agent-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ── Section label (Skills / Cost by context / System prompt) ────── */
+.agent-detail__section-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted, #666666);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+/* ── Skills list (expanded — full list, not truncated) ───────────── */
+.agent-detail__section {
+  display: flex;
+  flex-direction: column;
+}
+.agent-detail__skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.skill-chip--expanded {
+  background: var(--color-accent-secondary, #bfd8ad);
+  color: var(--color-text, #222222);
+  opacity: 0.85;
+}
+.agent-detail__no-skills {
+  font-size: 0.82rem;
+  color: var(--color-muted, #666666);
+  font-style: italic;
+}
+
+/* ── Total cost row ──────────────────────────────────────────────── */
+.agent-detail__cost-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+}
+.agent-detail__cost-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-cost, #633d2e);
+}
+
+/* ── System prompt header (label + copy button) ───────────────────── */
+.agent-detail__prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+/* ── Copy-to-clipboard button ─────────────────────────────────────── */
+.agent-detail__copy-btn {
+  background: none;
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 3px;
+  color: var(--color-accent-dark, #2d7d9a);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  padding: 0.15em 0.5em;
+  transition: background 0.1s ease, color 0.1s ease;
+  white-space: nowrap;
+}
+.agent-detail__copy-btn:hover {
+  background: var(--color-placeholder-bg, #f7f7f7);
+  color: var(--color-cost, #633d2e);
+}
+.agent-detail__copy-btn:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-detail__copy-btn { transition: none; }
+}
+
+/* ── System prompt block ─────────────────────────────────────────── */
+.agent-prompt {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--color-placeholder-bg, #f7f7f7);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius-card, 6px);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--color-text, #222222);
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* Bounded height to prevent very long prompts from dominating the page */
+  max-height: 320px;
+  overflow-y: auto;
+  /* Custom scrollbar (subtle) */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border, #dddddd) transparent;
+}
+.agent-prompt code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ── Expand transition ───────────────────────────────────────────── */
+/* Chevron rotation is driven by inline style via JS;
+   the CSS transition on .agent-card__chevron handles the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-card__detail {
+    transition: none;
+  }
+}
+
+/* ── Detail loading state ────────────────────────────────────────── */
+.agent-detail--loading {
+  padding: 0.25rem 0;
+}
+.agent-detail__loading-row {
+  margin: 0.3rem 0;
+}
+
+/* ── Detail error state ──────────────────────────────────────────── */
+.agent-detail--error {
+  font-size: 0.85rem;
+  color: var(--color-cost, #633d2e);
+  background: #fef3ec;
+  border: 1px solid var(--color-alert, #f7af63);
+  border-radius: var(--radius-card, 6px);
+  padding: 0.6rem 0.75rem;
+}
 
 /* ── Loading skeleton ────────────────────────────────────────────── */
 .agent-card--skeleton {
