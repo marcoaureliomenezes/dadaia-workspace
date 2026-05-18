@@ -16,3 +16,10 @@ A file is lib-originated if its path appears in `.dadaia/agentic/manifest.json`.
 3. Run `dadaia public doctor` to verify — all entries must be `[ok]`
 
 To force-repair drift: `dadaia public install --target all --force`
+
+## Force-install authority
+
+`dadaia public install --force` is reserved for the **operator** and the
+**devops-engineer**. Agentic roles `project-manager` and `project-auditor`
+NEVER invoke `--force`; if they detect drift, they file a report and request
+the operator to repair.

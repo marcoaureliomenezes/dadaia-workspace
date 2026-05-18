@@ -19,7 +19,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-01 — Author rule `project-manager-scope.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.3
 - **Depends on:** none
@@ -31,7 +31,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-02 — Author rule `project-auditor-scope.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.3
 - **Depends on:** none
@@ -43,7 +43,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-03 — Author rule `design-specialist-scope.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.3
 - **Depends on:** none
@@ -55,7 +55,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-04 — Update rule `dadaia-workspace-dev-guardrail.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.4
 - **Depends on:** none
@@ -67,7 +67,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-05 — Update rule `game-agents-coordination.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.4
 - **Depends on:** none
@@ -79,7 +79,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-06 — Update rule `game-developer-scope.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.4
 - **Depends on:** none
@@ -91,7 +91,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-07 — Update `dadaia-grill-me` skill preamble
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.2
 - **Depends on:** none
@@ -103,7 +103,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-08 — Author 5 skill stubs (frontmatter + TODO body)
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P1
 - **SPEC acceptance:** §8.1 (declarative-only; bodies in P3)
 - **Depends on:** AGT-07 (skill folder convention sanity)
