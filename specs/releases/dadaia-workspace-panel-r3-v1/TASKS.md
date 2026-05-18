@@ -132,7 +132,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-06 — Tab rename + reorder + responsive label
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 3 (tab rename)
 - **SPEC acceptance:** Surface A (E2E-TAB-01..06)
 - **Depends on:** PR3-02
