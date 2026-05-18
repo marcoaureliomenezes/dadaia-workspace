@@ -1,7 +1,7 @@
 // agents.js — Agents tab UI (collapsed + expanded card grid, skeleton, error/empty states)
 // PR3-10 (collapsed layout) / PR3-11 (expand interaction + lazy prompt fetch)
 //
-// Depends on: authedFetch() defined in core.js (loaded before this script)
+// Depends on: window.authedFetch() defined in core.js (loaded before this script)
 //
 // API contracts (SPEC §5.1, §5.2 — normative):
 //   GET /api/agents → { agents: [ { agent_id, display_name, description, status,
@@ -354,7 +354,7 @@
     detailEl.innerHTML = renderDetailLoading();
 
     // Fetch system prompt (lazy, on first expand)
-    authedFetch('/api/agents/' + encodeURIComponent(agentId) + '/prompt')
+    window.authedFetch('/api/agents/' + encodeURIComponent(agentId) + '/prompt')
       .then(function (r) {
         if (!r.ok) {
           detailEl.innerHTML = renderDetailError(r.status);
@@ -504,7 +504,7 @@
     grid.setAttribute('aria-busy', 'true');
     grid.innerHTML = renderSkeletons(10);
 
-    authedFetch('/api/agents')
+    window.authedFetch('/api/agents')
       .then(function (r) {
         if (!r.ok) {
           renderError(r.status);

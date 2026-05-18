@@ -8,7 +8,7 @@
 //   #workflows               — activate Workflows tab, show card grid
 //   #workflows?detail=<name> — activate Workflows tab, fetch + show detail view
 //
-// Depends on: authedFetch() defined in core.js (loaded before this script)
+// Depends on: window.authedFetch() defined in core.js (loaded before this script)
 //
 // API contracts (SPEC §5.3 / §5.4 — normative):
 //   GET /api/workflows → {
@@ -398,7 +398,7 @@
     grid.setAttribute('tabindex', '-1');
     grid.focus({ preventScroll: true });
 
-    authedFetch('/api/workflows/' + encodeURIComponent(workflowName))
+    window.authedFetch('/api/workflows/' + encodeURIComponent(workflowName))
       .then(function (r) {
         if (!r.ok) {
           grid.setAttribute('aria-busy', 'false');
@@ -492,7 +492,7 @@
     grid.setAttribute('aria-busy', 'true');
     grid.innerHTML = renderSkeletons(6);
 
-    authedFetch('/api/workflows')
+    window.authedFetch('/api/workflows')
       .then(function (r) {
         if (!r.ok) {
           renderError(r.status);
