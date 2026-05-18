@@ -301,7 +301,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-23 — Refactor `spec-refinement.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P4
 - **SPEC acceptance:** §7.1
 - **Depends on:** AGT-09 (PM must exist)
@@ -312,7 +312,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-24 — Refactor `game-spec-definition.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P4
 - **SPEC acceptance:** §7.1
 - **Depends on:** AGT-09
@@ -323,7 +323,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-25 — Refactor `cross-cutting-feature.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P4
 - **SPEC acceptance:** §7.1
 - **Depends on:** AGT-09
@@ -334,7 +334,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-26 — Refactor `onboarding-new-repo.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P4
 - **SPEC acceptance:** §7.1
 - **Depends on:** AGT-09
@@ -345,7 +345,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-27 — Refactor `architecture-review.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P4
 - **SPEC acceptance:** §7.1
 - **Depends on:** AGT-09
@@ -356,7 +356,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-28 — Refactor `hotfix-release.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P4
 - **SPEC acceptance:** §7.1
 - **Depends on:** AGT-09
@@ -371,7 +371,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-29 — Author workflow `audit-cycle.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P5
 - **SPEC acceptance:** §7.2
 - **Depends on:** AGT-10, AGT-11, AGT-12, AGT-13 (auditor + 3 reviewers must exist)
@@ -382,7 +382,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-30 — Author workflow `code-review-fan-out.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P5
 - **SPEC acceptance:** §7.2
 - **Depends on:** AGT-11, AGT-13, AGT-14
@@ -393,7 +393,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-31 — Author workflow `design-validation.workflow.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P5
 - **SPEC acceptance:** §7.2
 - **Depends on:** AGT-14
