@@ -224,7 +224,13 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
   3-stat row, skills chips first 2 + "+N more", chevron, 3px left-border accent for
   active). Skeleton placeholder with `aria-busy`. Empty-state graceful (`Never`,
   `—`, `0`).
+  - Extract Agents IIFE block from `assets/js/core.js` into `assets/js/agents.js`
+    (placeholder landed in PR3-01); update `_assets.py` so `PANEL_JS` reads from
+    `agents.js`.
 - **Aceite:** E2E-AGT-01..03 pass; layout works at ≥1024px (2-col) and below (1-col).
+  - `assets/js/core.js` no longer contains the Agents IIFE block; `pytest
+    tests/features/panel/views/test_assets.py` confirms PANEL_JS still produces a
+    syntactically valid script.
 
 ---
 
@@ -359,7 +365,13 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
   - `dadaia_workspace/features/panel/views/assets/js/workflows.js`
 - **Mudanças:** 12-card grid (2-col ≥768px, 1-col below). Card layout: name,
   version pill, description clamp, agent chips, stats footer, "View DAG →" CTA.
+  - Extract Workflows IIFE block from `assets/js/core.js` into
+    `assets/js/workflows.js` (placeholder landed in PR3-01); update `_assets.py` so
+    `PANEL_JS` reads from `workflows.js`.
 - **Aceite:** E2E-WF-01, E2E-WF-02, E2E-WF-03 pass.
+  - `assets/js/core.js` no longer contains the Workflows IIFE block; `pytest
+    tests/features/panel/views/test_assets.py` confirms PANEL_JS still produces a
+    syntactically valid script.
 
 ---
 
