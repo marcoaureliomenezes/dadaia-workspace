@@ -401,7 +401,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-18 — Cleanup: drop dead field, dead method, dead reader, `# DEAD:` comment
 
-- [-] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 6 (cleanup)
 - **SPEC acceptance:** §4 SHRINK rows + §8.1
 - **Depends on:** PR3-08 (so `/api/servers` shrink does not break agents work)

@@ -26,16 +26,11 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     ContextBreakdown,
     RecentSession,
     TokenTotals,
-    WorkflowListResult,
-    WorkflowSummary,
 )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-_SOURCE_HINT = ".claude/skills/, .agents/skills/"
-
 
 def _now_iso() -> str:
     return datetime.now(tz=UTC).isoformat()
@@ -43,13 +38,6 @@ def _now_iso() -> str:
 
 def _micro_to_usd(micro: int) -> float:
     return micro / 1_000_000
-
-
-def _source_hint_for_path(source_path: str) -> str:
-    """Return a display-friendly source label from the raw source_path."""
-    if ".agents/skills" in source_path:
-        return ".agents/skills/"
-    return ".claude/skills/"
 
 
 # ---------------------------------------------------------------------------
@@ -579,44 +567,6 @@ class TelemetryAggregator:
             pricing_age_days=age_days,
             pricing_model_date=pricing_model_date,
             agents=summaries,
-        )
-
-    # ------------------------------------------------------------------
-
-    def list_workflows(self) -> WorkflowListResult:
-        """Return all workflows with their linked agent IDs."""
-        conn: sqlite3.Connection = self._dao._conn
-        conn.row_factory = sqlite3.Row
-
-        wf_rows = conn.execute(
-            "SELECT name, source_path, description FROM workflows ORDER BY name"
-        ).fetchall()
-
-        agent_rows = conn.execute(
-            "SELECT workflow_name, agent_name FROM workflow_agents ORDER BY workflow_name, agent_name"
-        ).fetchall()
-
-        # Build agent list per workflow.
-        wf_agents: dict[str, list[str]] = defaultdict(list)
-        for r in agent_rows:
-            wf_agents[r["workflow_name"]].append(r["agent_name"])
-
-        workflows: list[WorkflowSummary] = []
-        for r in wf_rows:
-            workflows.append(
-                WorkflowSummary(
-                    workflow_id=r["name"],
-                    display_name=r["name"],
-                    description=r["description"],
-                    source=_source_hint_for_path(r["source_path"]),
-                    agent_ids=wf_agents.get(r["name"], []),
-                )
-            )
-
-        return WorkflowListResult(
-            generated_at=_now_iso(),
-            source_hint=_SOURCE_HINT,
-            workflows=workflows,
         )
 
     # ------------------------------------------------------------------
