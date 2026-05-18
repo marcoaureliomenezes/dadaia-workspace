@@ -445,7 +445,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-34 — Consumer-repo `dadaia public doctor` sweep
 
-- [ ] **Owner:** devops-engineer
+- [x] **Owner:** devops-engineer
 - **Phase:** P7
 - **SPEC acceptance:** C9
 - **Depends on:** AGT-33
