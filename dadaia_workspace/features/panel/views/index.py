@@ -124,6 +124,7 @@ def render_index(
   </main>
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
+  <script src="/static/agents.js"></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
