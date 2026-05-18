@@ -317,7 +317,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-14 — `/api/workflows` rewrite: LIST card summaries only
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 5 backend
 - **SPEC acceptance:** §5.3 + Surface D (D11, D12) + Surface G (G4, G5, G9)
 - **Depends on:** PR3-12
@@ -336,7 +336,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-15 — `GET /api/workflows/<name>` (detail) + regex + defence-in-depth
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 5 backend
 - **SPEC acceptance:** §5.4 + Surface D (D8a/b, D12 companion) + Surface G (G6, G7, G12)
 - **Depends on:** PR3-12, PR3-13, PR3-14

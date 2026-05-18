@@ -44,7 +44,8 @@ from dadaia_workspace.features.panel.auth import validate as _validate_bearer
 _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/servers /api/contexts "
-    b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions /api/workflows "
+    b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
+    b"/api/workflows /api/workflows/<name> "
     b"/memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
@@ -63,6 +64,8 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt"),
     (r"^/api/agents/(?P<agent_id>[^/]+)/sessions$", "api_agent_sessions"),
     (r"^/api/agents$", "api_agents"),
+    # /api/workflows/<name> must come before /api/workflows (more specific first).
+    (r"^/api/workflows/(?P<workflow_name>[^/]+)$", "api_workflow_detail"),
     (r"^/api/workflows$", "api_workflows"),
     (r"^/api/servers$", "api_servers"),
     (r"^/api/contexts$", "api_contexts"),
@@ -76,7 +79,11 @@ _AUTH_REQUIRED_PREFIX = "/api/"
 
 # Routes that require Bearer auth but do NOT need the telemetry service.
 # These are dispatched after auth check, bypassing the telemetry-not-configured 503.
-_BEARER_ONLY_ROUTES: frozenset[str] = frozenset({"api_agent_prompt"})
+_BEARER_ONLY_ROUTES: frozenset[str] = frozenset({
+    "api_agent_prompt",
+    "api_workflows",
+    "api_workflow_detail",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +180,7 @@ def make_handler_class(
         "api_agent_prompt",
         "api_agent_sessions",
         "api_workflows",
+        "api_workflow_detail",
     )
     telemetry_patterns: list[tuple[re.Pattern[str], str]] = [
         (re.compile(pat), name)
@@ -310,9 +318,27 @@ def make_handler_class(
                     self._respond(200, "application/json", body)
 
                 elif route_name == "api_workflows":
-                    result = _telemetry.list_workflows()
-                    body = _to_json_bytes(result)
-                    self._respond(200, "application/json", body)
+                    # PR3-14: canonical workflow list (bearer-only, no telemetry needed).
+                    # Bearer-only dispatch is handled above; this branch is a fallback
+                    # for the legacy telemetry path when api_workflows is NOT in views.
+                    if "api_workflows" in views:
+                        status, content_type, body = views["api_workflows"]()
+                        self._respond(status, content_type, body)
+                    else:
+                        result = _telemetry.list_workflows()
+                        body = _to_json_bytes(result)
+                        self._respond(200, "application/json", body)
+
+                elif route_name == "api_workflow_detail":
+                    # PR3-15: workflow detail endpoint (bearer-only, no telemetry needed).
+                    workflow_name = groups.get("workflow_name", "")
+                    if "api_workflow_detail" in views:
+                        status, content_type, body = views["api_workflow_detail"](
+                            workflow_name=workflow_name,
+                        )
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
 
                 else:
                     self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)

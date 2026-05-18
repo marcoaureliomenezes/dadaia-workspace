@@ -31,6 +31,7 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.agents.reader import AgentDTO, read_canonical_agents
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.workflows.service import WorkflowSummaryDTO, WorkflowsService
 
 
 @dataclass
@@ -120,6 +121,7 @@ class PanelService:
         self._spec_context = spec_context
         self._workspace_root = workspace_root
         self.telemetry = telemetry
+        self._workflows_service = WorkflowsService(workspace_root)
 
     # ------------------------------------------------------------------
     # Public API
@@ -224,6 +226,19 @@ class PanelService:
             )
             for ctx in self._active_contexts()
         ]
+
+    def list_workflow_summaries(self) -> list[WorkflowSummaryDTO]:
+        """Return card summaries for all canonical workflow files.
+
+        Delegates to WorkflowsService.list_summaries(). Returns an empty list
+        when no workflows directory is found.
+
+        For testing, ``_workflows_service_override`` may be set on the instance
+        to bypass the real service and return a controlled result.
+        """
+        override = getattr(self, "_workflows_service_override", None)
+        svc = override if override is not None else self._workflows_service
+        return svc.list_summaries()
 
     def list_canonical_agents(self) -> list[AgentDTO]:
         """Return the canonical agent catalog.
