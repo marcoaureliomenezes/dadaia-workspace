@@ -152,7 +152,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-07 — Canonical agent reader (`features/agents/` + `markdown_agent_store.py`)
 
-- [-] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 4 backend (agents)
 - **SPEC acceptance:** §4 agents module + §5.1 shape
 - **Depends on:** PR3-06
