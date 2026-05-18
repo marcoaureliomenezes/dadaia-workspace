@@ -5,6 +5,10 @@ Covers:
   - Section carries role="tabpanel" and aria-labelledby="tab-workflows"
   - Grid container id="workflows-grid" is present
   - Empty-state id="workflows-empty" element is present
+
+AGT-33 note: render_workflows_section() is a static-HTML skeleton; workflow cards are
+populated client-side via JS fetch.  No hardcoded card count is asserted here.
+The 15-workflow topology (C2) is validated through /api/workflows LIST tests.
 """
 
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section

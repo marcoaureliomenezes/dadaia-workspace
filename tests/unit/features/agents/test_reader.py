@@ -589,6 +589,65 @@ def test_get_prompt_symlink_escape_raises_invalid(
         get_prompt("escape-agent", workspace_root=tmp_path)
 
 
+# ---------------------------------------------------------------------------
+# AGT-32 — paths field (declarative, forward-compatible)
+# ---------------------------------------------------------------------------
+
+
+def test_paths_field_loaded_when_present(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When 'paths' frontmatter key is present its value is forwarded to AgentDTO.paths."""
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
+    agentic_dir.mkdir(parents=True)
+    (agentic_dir / "pathed-agent.md").write_text(
+        "---\nname: pathed-agent\ndescription: Agent with paths.\n"
+        "paths:\n  write:\n    - repos/myrepo/src/\n  read:\n    - specs/\n"
+        "---\n# Pathed\n"
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path)
+    agent = next((a for a in agents if a.id == "pathed-agent"), None)
+    assert agent is not None
+    assert agent.paths is not None
+    assert "write" in agent.paths
+    assert agent.paths["write"] == ["repos/myrepo/src/"]
+    assert "read" in agent.paths
+    assert agent.paths["read"] == ["specs/"]
+
+
+def test_paths_field_defaults_to_none_when_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When 'paths' is absent from frontmatter, AgentDTO.paths defaults to None."""
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
+    agentic_dir.mkdir(parents=True)
+    (agentic_dir / "no-paths.md").write_text(
+        "---\nname: no-paths\ndescription: No paths field.\n---\n# NoPaths\n"
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path)
+    agent = next((a for a in agents if a.id == "no-paths"), None)
+    assert agent is not None
+    assert agent.paths is None
+
+
+def test_paths_field_non_dict_defaults_to_none(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When 'paths' is not a dict (e.g. a plain string), AgentDTO.paths is None."""
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
+    agentic_dir.mkdir(parents=True)
+    (agentic_dir / "bad-paths.md").write_text(
+        "---\nname: bad-paths\ndescription: Bad paths.\npaths: just-a-string\n---\n# BadPaths\n"
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path)
+    agent = next((a for a in agents if a.id == "bad-paths"), None)
+    assert agent is not None
+    assert agent.paths is None
+
+
 def test_get_prompt_unreadable_file_raises_not_found(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

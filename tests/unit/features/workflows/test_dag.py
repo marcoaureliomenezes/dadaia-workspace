@@ -835,3 +835,209 @@ def test_single_gate_node_has_correct_classes() -> None:
         if "dag-node" in e.get("class", "") and "dag-gate" in e.get("class", "")
     ]
     assert len(nodes_with_gate) == 1
+
+
+# ---------------------------------------------------------------------------
+# AGT-33 — audit-cycle fixture (gate + 4-way parallel group + synthesis)
+# ---------------------------------------------------------------------------
+
+_AUDIT_CYCLE_STAGES = [
+    StageDTO(
+        id="audit_intake",
+        agent="project-auditor",
+        needs=[],
+        parallel_group=None,
+        gate=True,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+    StageDTO(
+        id="code_review",
+        agent="code-reviewer",
+        needs=["audit_intake"],
+        parallel_group="audit",
+        gate=False,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+    StageDTO(
+        id="security_review",
+        agent="security-reviewer",
+        needs=["audit_intake"],
+        parallel_group="audit",
+        gate=False,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+    StageDTO(
+        id="research_review",
+        agent="researcher",
+        needs=["audit_intake"],
+        parallel_group="audit",
+        gate=False,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+    StageDTO(
+        id="qa_audit",
+        agent="qa-engineer",
+        needs=["audit_intake"],
+        parallel_group="audit",
+        gate=False,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+    StageDTO(
+        id="synthesis",
+        agent="project-auditor",
+        needs=["code_review", "security_review", "research_review", "qa_audit"],
+        parallel_group=None,
+        gate=False,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# AGT-33 — design-validation fixture (2 sequential stages)
+# ---------------------------------------------------------------------------
+
+_DESIGN_VALIDATION_STAGES = [
+    StageDTO(
+        id="capture_screens",
+        agent="qa-engineer",
+        needs=[],
+        parallel_group=None,
+        gate=False,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+    StageDTO(
+        id="ux_review",
+        agent="design-specialist",
+        needs=["capture_screens"],
+        parallel_group=None,
+        gate=False,
+        expected_output_path=None,
+        must_include=None,
+        on_failure="stop",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Tests: audit-cycle DAG
+# ---------------------------------------------------------------------------
+
+
+def test_audit_cycle_svg_is_well_formed_xml() -> None:
+    """audit-cycle SVG must parse as valid XML."""
+    svg = render_dag_svg(_AUDIT_CYCLE_STAGES)
+    root = _parse_svg(svg)
+    assert root is not None
+
+
+def test_audit_cycle_node_count() -> None:
+    """audit-cycle has 6 stages → 6 nodes."""
+    svg = render_dag_svg(_AUDIT_CYCLE_STAGES)
+    root = _parse_svg(svg)
+    assert _count_nodes(root) == 6
+
+
+def test_audit_cycle_parallel_group_same_layer() -> None:
+    """4-node audit parallel group must all share the same x-layer."""
+    svg = render_dag_svg(_AUDIT_CYCLE_STAGES)
+    root = _parse_svg(svg)
+    layers = _get_node_layers(root)
+    audit_ids = ["code_review", "security_review", "research_review", "qa_audit"]
+    audit_xs = [layers.get(sid) for sid in audit_ids]
+    assert all(x is not None for x in audit_xs), (
+        f"Some audit parallel-group nodes not found: {dict(zip(audit_ids, audit_xs))}"
+    )
+    assert len(set(audit_xs)) == 1, (  # type: ignore[arg-type]
+        f"audit parallel-group stages should share x-layer, got: {dict(zip(audit_ids, audit_xs))}"
+    )
+
+
+def test_audit_cycle_gate_node_has_dag_gate_class() -> None:
+    """audit_intake (gate=True) must carry dag-gate class."""
+    svg = render_dag_svg(_AUDIT_CYCLE_STAGES)
+    root = _parse_svg(svg)
+    intake_nodes = _find_nodes_with_attr(root, "data-stage-id", "audit_intake")
+    assert len(intake_nodes) == 1
+    assert "dag-gate" in intake_nodes[0].get("class", ""), (
+        "audit_intake gate node missing dag-gate class"
+    )
+
+
+def test_audit_cycle_non_gate_nodes_no_dag_gate() -> None:
+    """Non-gate nodes in audit-cycle must not carry dag-gate class."""
+    svg = render_dag_svg(_AUDIT_CYCLE_STAGES)
+    root = _parse_svg(svg)
+    non_gate_ids = ["code_review", "security_review", "research_review", "qa_audit", "synthesis"]
+    for sid in non_gate_ids:
+        nodes = _find_nodes_with_attr(root, "data-stage-id", sid)
+        if nodes:
+            assert "dag-gate" not in nodes[0].get("class", ""), (
+                f"Stage {sid!r} should not have dag-gate class"
+            )
+
+
+def test_audit_cycle_edge_count() -> None:
+    """audit-cycle: intake→4 parallel (4 edges) + 4 parallel→synthesis (4 edges) = 8."""
+    svg = render_dag_svg(_AUDIT_CYCLE_STAGES)
+    root = _parse_svg(svg)
+    assert _count_edges(root) == 8
+
+
+# ---------------------------------------------------------------------------
+# Tests: design-validation DAG
+# ---------------------------------------------------------------------------
+
+
+def test_design_validation_svg_is_well_formed_xml() -> None:
+    """design-validation SVG must parse as valid XML."""
+    svg = render_dag_svg(_DESIGN_VALIDATION_STAGES)
+    root = _parse_svg(svg)
+    assert root is not None
+
+
+def test_design_validation_node_count() -> None:
+    """design-validation has 2 stages → 2 nodes."""
+    svg = render_dag_svg(_DESIGN_VALIDATION_STAGES)
+    root = _parse_svg(svg)
+    assert _count_nodes(root) == 2
+
+
+def test_design_validation_edge_count() -> None:
+    """design-validation: capture_screens → ux_review = 1 edge."""
+    svg = render_dag_svg(_DESIGN_VALIDATION_STAGES)
+    root = _parse_svg(svg)
+    assert _count_edges(root) == 1
+
+
+def test_design_validation_layers_are_distinct() -> None:
+    """design-validation: sequential stages occupy distinct x-layers."""
+    svg = render_dag_svg(_DESIGN_VALIDATION_STAGES)
+    root = _parse_svg(svg)
+    layers = _get_node_layers(root)
+    assert len(set(layers.values())) == 2, (
+        f"Expected 2 distinct layers for design-validation, got: {layers}"
+    )
+
+
+def test_design_validation_all_nodes_have_data_agent() -> None:
+    """All design-validation nodes carry correct data-agent attributes."""
+    svg = render_dag_svg(_DESIGN_VALIDATION_STAGES)
+    root = _parse_svg(svg)
+    capture_nodes = _find_nodes_with_attr(root, "data-stage-id", "capture_screens")
+    ux_nodes = _find_nodes_with_attr(root, "data-stage-id", "ux_review")
+    assert len(capture_nodes) == 1 and capture_nodes[0].get("data-agent") == "qa-engineer"
+    assert len(ux_nodes) == 1 and ux_nodes[0].get("data-agent") == "design-specialist"
