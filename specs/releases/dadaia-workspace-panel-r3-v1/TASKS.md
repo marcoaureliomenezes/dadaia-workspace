@@ -377,7 +377,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-17 — Workflow detail view + hash routing + DAG skeleton — FE
 
-- [ ] **Owner:** frontend-engineer
+- [x] **Owner:** frontend-engineer
 - **Phase:** 5 UI
 - **SPEC acceptance:** §7.1 hash grammar + §7.5 detail view + DAG skeleton + Surface D (D4, D8, D10, D13, D14)
 - **Depends on:** PR3-16, PR3-15
