@@ -101,13 +101,15 @@ def panel(
     # Ensure Bearer token exists (generates once with 0o600 if missing).
     token = ensure_token()
 
+    # Build telemetry first so it can be injected into the panel service,
+    # enabling the canonical agent overlay (PR3-08).
+    telemetry = _try_build_telemetry(workspace_root)
+
     try:
-        views = container.build_panel_views(workspace_root)
+        views = container.build_panel_views(workspace_root, telemetry=telemetry)
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Failed to initialise panel: {exc}", err=True)
         raise typer.Exit(1) from None
-
-    telemetry = _try_build_telemetry(workspace_root)
 
     handler_cls = make_handler_class(views, token=token, telemetry=telemetry)
 

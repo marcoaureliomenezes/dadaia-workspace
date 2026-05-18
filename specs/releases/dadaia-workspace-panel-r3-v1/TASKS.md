@@ -172,7 +172,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-08 — `/api/agents` rewrite: canonical overlay + telemetry sub-object + window query
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 4 backend
 - **SPEC acceptance:** §5.1 + Surface C (C1, C9, C12) + Surface G (G1, G8)
 - **Depends on:** PR3-07
