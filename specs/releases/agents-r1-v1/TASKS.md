@@ -123,7 +123,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-09 — Author agent `project-manager.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §5.1
 - **Depends on:** AGT-08
@@ -135,7 +135,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-10 — Author agent `project-auditor.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §5.5
 - **Depends on:** AGT-08
@@ -147,7 +147,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-11 — Author agent `code-reviewer.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §5.2
 - **Depends on:** AGT-08
@@ -159,7 +159,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-12 — Author agent `researcher.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §5.3
 - **Depends on:** AGT-08
@@ -171,7 +171,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-13 — Author agent `security-reviewer.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §5.4
 - **Depends on:** AGT-08
@@ -183,7 +183,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-14 — Author agent `design-specialist.md`
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §5.6
 - **Depends on:** AGT-08
