@@ -160,6 +160,8 @@ def make_handler_class(
     # Telemetry routes are handled inline (not via views dict) because they
     # depend on the injected telemetry service and auth token — not a pure
     # view callable that can be passed in from outside.
+    # Exception: "api_agents" may be provided in views (PR3-08 canonical overlay)
+    # in which case it is dispatched from views with active_window_days kwarg.
     telemetry_patterns: list[tuple[re.Pattern[str], str]] = [
         (re.compile(pat), name)
         for pat, name in _RAW_ROUTES
@@ -242,16 +244,26 @@ def make_handler_class(
             """Route to the appropriate telemetry handler method."""
             try:
                 if route_name == "api_agents":
-                    window_days = _parse_int(qs, "window_days", 180)
-                    context = _parse_str(qs, "context")
-                    limit = _parse_int(qs, "limit", 50)
-                    result = _telemetry.list_agents(
-                        window_days=window_days,
-                        context_slug=context,
-                        limit=limit,
-                    )
-                    body = _to_json_bytes(result)
-                    self._respond(200, "application/json", body)
+                    # PR3-08: if the canonical overlay view is provided in views,
+                    # delegate to it with active_window_days kwarg.
+                    if "api_agents" in views:
+                        active_window_days = _parse_int(qs, "active_window_days", 30)
+                        status, content_type, body = views["api_agents"](
+                            active_window_days=active_window_days,
+                        )
+                        self._respond(status, content_type, body)
+                    else:
+                        # Legacy fallback: direct telemetry aggregation (pre-PR3-08).
+                        window_days = _parse_int(qs, "window_days", 180)
+                        context = _parse_str(qs, "context")
+                        limit = _parse_int(qs, "limit", 50)
+                        result = _telemetry.list_agents(
+                            window_days=window_days,
+                            context_slug=context,
+                            limit=limit,
+                        )
+                        body = _to_json_bytes(result)
+                        self._respond(200, "application/json", body)
 
                 elif route_name == "api_agent_sessions":
                     agent_id = groups["agent_id"]
