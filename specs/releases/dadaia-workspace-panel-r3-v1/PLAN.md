@@ -1,6 +1,8 @@
 # Plan: Release — dadaia-workspace-panel-r3-v1
 
-> **Status:** Draft
+> **Status:** Aprovado
+> **Approved:** 2026-05-17
+> **Approved-by:** operator
 > **Release ID:** dadaia-workspace-panel-r3-v1
 > **Owner:** product-engineer
 > **Created:** 2026-05-19
