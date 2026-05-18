@@ -4,7 +4,7 @@ description: >
   Discovery → 5-way parallel specialist analysis (arch + devops + game-developer +
   game-designer + game-tester) → synthesis. Replaces spec-refinement for game contexts.
   Optional web specialists (backend-engineer + frontend-engineer) via include_web_specialists=true.
-version: 0.1.0
+version: 0.2.0
 schema_version: "1"
 when_to_use: "Active context is a game project (tauan-games). For all other contexts, use spec-refinement."
 inputs:
@@ -24,9 +24,9 @@ inputs:
     description: When true, adds backend-engineer and frontend-engineer to the parallel analysis group.
 stages:
   - id: discovery
-    agent: product-engineer
+    agent: project-manager
     expected_output:
-      path: ".dadaia/reports/{context}/product-engineer/{run_ts}-game-discovery.html"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-game-discovery.html"
       must_include: ["Findings", "Decisões necessárias", "Acceptance Criteria Draft"]
     inputs:
       - kind: workflow_input
@@ -98,10 +98,10 @@ stages:
         as: discovery_report
 
   - id: synthesis
-    agent: product-engineer
+    agent: project-manager
     needs: [arch_review, devops_review, gameplay_analysis, design_analysis, qa_criteria]
     expected_output:
-      path: "specs/releases/{release_id}/SPEC.md"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-game-synthesis.html"
       must_include: ["Status", "Critérios de Aceite"]
     inputs:
       - kind: stage_output
@@ -121,7 +121,18 @@ stages:
         as: qa_report
     gate:
       kind: operator-approval
-      prompt: "Approve the synthesized GAME SPEC before promoting it to 'Em revisão'?"
+      prompt: "Approve the synthesized report before product-engineer authors the GAME SPEC?"
+
+  - id: spec_write
+    agent: product-engineer
+    needs: [synthesis]
+    expected_output:
+      path: "specs/releases/{release_id}/SPEC.md"
+      must_include: ["Status", "Critérios de Aceite"]
+    inputs:
+      - kind: stage_output
+        from: stages.synthesis.output
+        as: synthesis_report
 
 exit_criteria:
   - all_stages: completed
@@ -141,6 +152,10 @@ Para jogos com componentes de backend (leaderboard, matchmaking, EOS), use
 `include_web_specialists=true` para adicionar `backend-engineer` e `frontend-engineer`
 ao grupo paralelo de especialistas.
 
+Em v0.2.0 discovery e synthesis passaram de `product-engineer` para `project-manager`,
+que conduz a entrevista (grill-me) e monta o relatório consolidado. `product-engineer`
+agora é leaf e apenas autora o SPEC final. Segue o mesmo padrão do spec-refinement v0.3.0.
+
 **Coordenação:** todos os agentes seguem o Decision Authority Matrix definido em
-`game-agents-coordination.md`. Divergências são resolvidas via `product-engineer`;
+`game-agents-coordination.md`. Divergências são resolvidas via `project-manager`;
 conflitos não resolvidos disparam `dadaia-grill-me` com o operador.

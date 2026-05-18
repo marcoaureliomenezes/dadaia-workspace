@@ -1,7 +1,7 @@
 ---
 name: cross-cutting-feature
-description: Feature that spans frontend and backend simultaneously. product-engineer scopes, software-architect approves the API contract, qa runs parallel red tests, frontend-engineer and backend-engineer implement in parallel, qa validates the integration end-to-end.
-version: 0.1.0
+description: Feature that spans frontend and backend simultaneously. project-manager scopes, software-architect approves the API contract, qa runs parallel red tests, frontend-engineer and backend-engineer implement in parallel, qa validates the integration end-to-end.
+version: 0.2.0
 schema_version: "1"
 inputs:
   context:
@@ -22,9 +22,9 @@ inputs:
     description: Approved backend task identifier from TASKS.md.
 stages:
   - id: discovery
-    agent: product-engineer
+    agent: project-manager
     expected_output:
-      path: ".dadaia/reports/{context}/product-engineer/{run_ts}-{feature_topic}-cross-discovery.html"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-{feature_topic}-cross-discovery.html"
       must_include: ["API contract", "Frontend impact", "Backend impact"]
     inputs:
       - kind: workflow_input

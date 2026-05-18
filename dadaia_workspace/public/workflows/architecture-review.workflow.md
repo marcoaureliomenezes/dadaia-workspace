@@ -1,7 +1,7 @@
 ---
 name: architecture-review
-description: Formal REVIEW mode for software-architect. Architect audits a codebase against its declared architecture, surfaces violations, then product-engineer converts the improvement backlog into TASKS.md entries.
-version: 0.1.0
+description: Formal REVIEW mode for software-architect. Architect audits a codebase against its declared architecture, surfaces violations, then project-manager filters and prioritizes findings, and product-engineer converts approved items into TASKS.md entries.
+version: 0.2.0
 schema_version: "1"
 inputs:
   context:
@@ -35,16 +35,27 @@ stages:
       kind: operator-approval
       prompt: "Approve the architectural audit and improvement backlog before tasks creation?"
 
+  - id: backlog_filter
+    agent: project-manager
+    needs: [code_audit]
+    expected_output:
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-arch-backlog.html"
+      must_include: ["Accepted items", "Deferred items", "Priority order"]
+    inputs:
+      - kind: stage_output
+        from: stages.code_audit.output
+        as: arch_report
+
   - id: tasks_creation
     agent: product-engineer
-    needs: [code_audit]
+    needs: [backlog_filter]
     expected_output:
       path: ".dadaia/reports/{context}/product-engineer/{run_ts}-arch-tasks.html"
       must_include: ["TASKS.md updated"]
     inputs:
       - kind: stage_output
-        from: stages.code_audit.output
-        as: arch_report
+        from: stages.backlog_filter.output
+        as: backlog_report
 
 exit_criteria:
   - all_stages: completed
