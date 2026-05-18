@@ -359,7 +359,7 @@ def make_handler_class(
             if content_type.startswith("text/html"):
                 self.send_header(
                     "Content-Security-Policy",
-                    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'",
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
                 )
             if content_type.startswith("application/json"):
                 self.send_header("X-Content-Type-Options", "nosniff")
