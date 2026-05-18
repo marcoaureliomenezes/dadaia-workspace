@@ -29,7 +29,7 @@
 <body>
 
 <h1>Product Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-18 · Closure: dadaia-workspace-panel-r3-v1</p>
+<p class="meta">Última atualização: 2026-05-18 · Closure: agents-r1-v1</p>
 
 <section id="vision">
   <h2>Visão atômica</h2>
@@ -40,8 +40,10 @@
 <section id="users">
   <h2>Usuários</h2>
   <ul>
-    <li><strong>Operador (humano único)</strong> — orquestra trabalho entre 10+ agentes especialistas, ativa contextos, aprova specs, decide trade-offs em sessões grill-me.</li>
-    <li><strong>Agentes especialistas</strong> — product-engineer, software-engineer, software-architect, devops-engineer, qa-engineer, game-developer, game-designer, game-tester, frontend-engineer, backend-engineer. Consumem specs, implementam dentro do escopo das tasks, geram reports HTML.</li>
+    <li><strong>Operador (humano único)</strong> — orquestra trabalho entre 16 agentes em topologia de 3 tiers, ativa contextos, aprova specs, decide trade-offs em sessões grill-me normalmente via <code>project-manager</code>.</li>
+    <li><strong>Tier 1 — orquestradores (com tool <code>Agent</code>)</strong>: <code>project-manager</code> (intake + dispatch de workflows), <code>project-auditor</code> (drift detection + auditoria).</li>
+    <li><strong>Tier 2 — curator (sem tool <code>Agent</code>)</strong>: <code>product-engineer</code> autor de SPEC/PLAN/TASKS/CLOSURE e guardião exclusivo de <code>specs/memory/*.html</code> em phase CLOSURE.</li>
+    <li><strong>Tier 3 — leaf specialists (sem tool <code>Agent</code>)</strong>: <code>software-engineer</code>, <code>backend-engineer</code>, <code>frontend-engineer</code>, <code>qa-engineer</code>, <code>software-architect</code>, <code>devops-engineer</code>, <code>game-developer</code>, <code>game-designer</code>, <code>game-tester</code>, <code>code-reviewer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>design-specialist</code>. Consumem specs, implementam/auditam dentro do escopo, geram reports HTML.</li>
     <li><strong>Hooks/gate</strong> — PreToolUse <code>sdd-spec-gate.sh</code> que bloqueia Write/Edit em produção sem task <code>[-]</code> e atomicidade de memory.</li>
   </ul>
 </section>
@@ -52,7 +54,7 @@
   <ol class="catalog">
     <li><a href="workspace-init.html">workspace-init</a><span class="desc">— porta de entrada; cria <code>.dadaia/</code>, <code>.venv</code>, hooks e estrutura idempotente.</span></li>
     <li><a href="context-management.html">context-management</a><span class="desc">— multi-context lifecycle (criar, ativar, promover, desativar, deletar) com primary context tracking.</span></li>
-    <li><a href="agent-orchestration.html">agent-orchestration</a><span class="desc">— DAG runner que dispatcha agentes especialistas (cli/claude/codex/opencode) com parallel_groups + gates + 11 workflows pré-instalados.</span></li>
+    <li><a href="agent-orchestration.html">agent-orchestration</a><span class="desc">— DAG runner que dispatcha agentes especialistas (cli/claude/codex/opencode) com parallel_groups + gates + 15 workflows pré-instalados sobre topologia de 16 agentes em 3 tiers (orquestradores PM/auditor; curator PE; 13 leaf specialists incluindo code-reviewer, researcher, security-reviewer, design-specialist).</span></li>
     <li><a href="public-asset-distribution.html">public-asset-distribution</a><span class="desc">— canonical → <code>.dadaia/agentic/</code> → projeções multi-tool (<code>.claude/</code>, <code>.codex/</code>, <code>.opencode/</code>, <code>.agents/</code>).</span></li>
     <li><a href="workspace-doctor.html">workspace-doctor</a><span class="desc">— diagnóstico + repair de invariantes do workspace state com <code>--fix</code> opcional.</span></li>
     <li><a href="specs-doctor.html">specs-doctor</a><span class="desc">— 11 checks estruturais SDD release-lifecycle: memory HTML atômico, ACTIVE.md, CLOSURE evidence triples, broken images, Mermaid script presence.</span></li>
@@ -89,7 +91,7 @@ flowchart TB
     PUBLIC --> INSTALL[install --target all]
     PUBLIC --> PDOC[doctor]
     SPECS --> SDOC[doctor]
-    ORCH --> WF[11 workflows]
+    ORCH --> WF[15 workflows]
     INSTALL --> CC[.claude/]
     INSTALL --> CX[.codex/]
     INSTALL --> OC[.opencode/]
