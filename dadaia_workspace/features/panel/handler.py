@@ -44,7 +44,7 @@ from dadaia_workspace.features.panel.auth import validate as _validate_bearer
 _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/servers /api/contexts "
-    b"/api/agents /api/agents/<id>/sessions /api/workflows "
+    b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions /api/workflows "
     b"/memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
@@ -60,6 +60,7 @@ _FORBIDDEN_JSON_KEYS: frozenset[str] = frozenset(
 # Route patterns: order matters — more-specific patterns first.
 _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/$", "index"),
+    (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt"),
     (r"^/api/agents/(?P<agent_id>[^/]+)/sessions$", "api_agent_sessions"),
     (r"^/api/agents$", "api_agents"),
     (r"^/api/workflows$", "api_workflows"),
@@ -72,6 +73,10 @@ _RAW_ROUTES: list[tuple[str, str]] = [
 
 # Routes that require Bearer token auth (all /api/* routes).
 _AUTH_REQUIRED_PREFIX = "/api/"
+
+# Routes that require Bearer auth but do NOT need the telemetry service.
+# These are dispatched after auth check, bypassing the telemetry-not-configured 503.
+_BEARER_ONLY_ROUTES: frozenset[str] = frozenset({"api_agent_prompt"})
 
 
 # ---------------------------------------------------------------------------
@@ -162,10 +167,17 @@ def make_handler_class(
     # view callable that can be passed in from outside.
     # Exception: "api_agents" may be provided in views (PR3-08 canonical overlay)
     # in which case it is dispatched from views with active_window_days kwarg.
+    # Routes that require Bearer auth: telemetry routes + bearer-only (no telemetry needed).
+    _BEARER_AUTH_ROUTE_NAMES = (
+        "api_agents",
+        "api_agent_prompt",
+        "api_agent_sessions",
+        "api_workflows",
+    )
     telemetry_patterns: list[tuple[re.Pattern[str], str]] = [
         (re.compile(pat), name)
         for pat, name in _RAW_ROUTES
-        if name in ("api_agents", "api_agent_sessions", "api_workflows")
+        if name in _BEARER_AUTH_ROUTE_NAMES
     ]
 
     _token = token
@@ -196,6 +208,15 @@ def make_handler_class(
                             "application/json",
                             _UNAUTHORIZED_BODY,
                         )
+                        return
+
+                    # Bearer-only routes (e.g. api_agent_prompt) do not require
+                    # the telemetry service — dispatch them directly from views.
+                    if route_name in _BEARER_ONLY_ROUTES:
+                        if route_name in views:
+                            self._dispatch_telemetry(route_name, m.groupdict(), qs)
+                        else:
+                            self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
                         return
 
                     if _telemetry is None:
@@ -243,7 +264,16 @@ def make_handler_class(
         ) -> None:
             """Route to the appropriate telemetry handler method."""
             try:
-                if route_name == "api_agents":
+                if route_name == "api_agent_prompt":
+                    # PR3-09: path-traversal-guarded prompt endpoint.
+                    # The view callable performs all validation; handler just forwards.
+                    agent_id = groups.get("agent_id", "")
+                    status, content_type, body = views["api_agent_prompt"](
+                        agent_id=agent_id,
+                    )
+                    self._respond(status, content_type, body)
+
+                elif route_name == "api_agents":
                     # PR3-08: if the canonical overlay view is provided in views,
                     # delegate to it with active_window_days kwarg.
                     if "api_agents" in views:

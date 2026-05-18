@@ -17,6 +17,7 @@ a warning; they do not abort the read.
 
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -157,6 +158,131 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         max_turns=max_turns,
         input_contract=input_contract,
     )
+
+
+# ---------------------------------------------------------------------------
+# Prompt fetch helpers (PR3-09)
+# ---------------------------------------------------------------------------
+
+# ID validation regex per SPEC §5.2.
+# Must match ^[a-z0-9](?:[a-z0-9_-]{0,63}[a-z0-9])?$
+_AGENT_ID_RE: re.Pattern[str] = re.compile(
+    r"^[a-z0-9](?:[a-z0-9_-]{0,63}[a-z0-9])?$"
+)
+
+_FRONTMATTER_DELIM = "---"
+
+
+def _strip_frontmatter(text: str) -> str:
+    """Return the Markdown body with the YAML frontmatter block removed.
+
+    If the file does not start with a frontmatter delimiter, the full text is
+    returned unchanged.  Leading/trailing whitespace on the body is stripped.
+    """
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != _FRONTMATTER_DELIM:
+        return text.strip()
+    # Skip until the closing delimiter.
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == _FRONTMATTER_DELIM:
+            body = "".join(lines[idx + 1 :])
+            return body.strip()
+    # No closing delimiter — return text as-is.
+    return text.strip()
+
+
+class InvalidAgentIdError(ValueError):
+    """Raised when the agent ID fails the regex validation or path traversal check."""
+
+
+class AgentNotFoundError(LookupError):
+    """Raised when the agent ID is valid but no corresponding file exists."""
+
+
+def get_prompt(agent_id: str, workspace_root: Path) -> tuple[str, Path]:
+    """Resolve an agent ID to its system prompt and source path.
+
+    Resolution order mirrors read_canonical_agents():
+      1. $DADAIA_AGENTS_DIR env var
+      2. <workspace_root>/.dadaia/agentic/agents/
+      3. <workspace_root>/.claude/agents/
+
+    Parameters
+    ----------
+    agent_id:
+        The agent identifier string (e.g. ``"software-engineer"``).  Must match
+        ``_AGENT_ID_RE``.
+    workspace_root:
+        Absolute path to the workspace root.
+
+    Returns
+    -------
+    tuple[str, Path]
+        A ``(prompt_body, source_path)`` pair where ``prompt_body`` is the
+        plain-text body of the agent Markdown file with frontmatter stripped,
+        and ``source_path`` is the resolved path to the file.
+
+    Raises
+    ------
+    InvalidAgentIdError
+        If ``agent_id`` fails the regex check or the resolved path escapes
+        the base directory (path traversal attempt).
+    AgentNotFoundError
+        If the agent ID is valid but no ``.md`` file exists in any candidate
+        directory.
+    """
+    # --- Validate agent_id against the regex ---
+    if not _AGENT_ID_RE.match(agent_id):
+        raise InvalidAgentIdError(
+            f"agent_id {agent_id!r} does not match the required pattern"
+        )
+
+    # --- Resolve candidate directory ---
+    agents_dir = _resolve_agents_dir(workspace_root)
+    if agents_dir is None:
+        raise AgentNotFoundError(f"No agents directory found for agent_id={agent_id!r}")
+
+    # --- Construct candidate path ---
+    candidate = agents_dir / f"{agent_id}.md"
+
+    # --- Defence-in-depth: path traversal check ---
+    # Resolve both paths and assert candidate is inside agents_dir.
+    try:
+        resolved_candidate = candidate.resolve()
+        resolved_base = agents_dir.resolve()
+    except OSError as exc:
+        raise InvalidAgentIdError(
+            f"Path resolution failed for agent_id={agent_id!r}: {exc}"
+        ) from exc
+
+    if not resolved_candidate.is_relative_to(resolved_base):
+        logger.warning(
+            "get_prompt: path traversal attempt detected for agent_id=%r "
+            "(resolved %s escapes base %s)",
+            agent_id,
+            resolved_candidate,
+            resolved_base,
+        )
+        raise InvalidAgentIdError(
+            f"Path traversal attempt detected for agent_id={agent_id!r}"
+        )
+
+    # --- Check existence ---
+    if not resolved_candidate.exists():
+        raise AgentNotFoundError(
+            f"No agent file found for agent_id={agent_id!r} at {resolved_candidate}"
+        )
+
+    # --- Read and strip frontmatter ---
+    try:
+        text = resolved_candidate.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise AgentNotFoundError(
+            f"Cannot read agent file for agent_id={agent_id!r}: {exc}"
+        ) from exc
+
+    body = _strip_frontmatter(text)
+    return body, resolved_candidate
 
 
 def read_canonical_agents(workspace_root: Path) -> list[AgentDTO]:

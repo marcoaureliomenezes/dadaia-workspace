@@ -11,6 +11,7 @@ from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
+    render_api_agent_prompt,
     render_api_agents_canonical,
     render_api_contexts,
     render_api_servers,
@@ -213,6 +214,7 @@ def build_panel_views(
         "api_servers": render_api_servers(service),
         "api_contexts": render_api_contexts(service),
         "api_agents": render_api_agents_canonical(service),
+        "api_agent_prompt": render_api_agent_prompt(service),
         "memory": render_memory(workspace_root),
         "memory_view": render_memory_wrapper(workspace_root),
         "static": render_static(),
