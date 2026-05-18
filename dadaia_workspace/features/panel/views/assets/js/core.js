@@ -191,180 +191,9 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── workflows tab ─────────────────────────────────────────────────────
-  // FE-owned content (workflows.js Phase 5). Temporary placement in core.js
-  // during Phase 1 transition so authedFetch scope is shared.
-  // PR3-16/PR3-17: FE will replace this block entirely.
-  var Workflows = (function () {
-    var loaded = false;
-    var _workflows = [];
-    function escHtmlW(s) {
-      return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c];
-      });
-    }
-    function escAttrW(s) { return escHtmlW(s); }
-
-    function filterAgent(agentId) {
-      location.hash = '#agents?filter=' + encodeURIComponent(agentId);
-      var agentsTab = document.getElementById('tab-agents');
-      if (agentsTab) { agentsTab.click(); }
-    }
-
-    // ── Inline SVG stepper diagram ───────────────────────────────────────
-    // Renders agent_ids as a horizontal stepper (left-to-right DAG).
-    // Vanilla SVG, no CDN, no Mermaid — CSP-safe.
-    function buildStepperSVG(agentIds) {
-      if (!agentIds || agentIds.length === 0) {
-        return '<svg width="120" height="40" aria-label="No steps" role="img">'
-          + '<text x="8" y="24" font-size="12" fill="#666">No agents</text>'
-          + '</svg>';
-      }
-      var nodeW = 120;
-      var nodeH = 36;
-      var arrowW = 28;
-      var padX = 12;
-      var padY = 12;
-      var totalW = padX * 2 + agentIds.length * nodeW + (agentIds.length - 1) * arrowW;
-      var totalH = nodeH + padY * 2;
-      var rects = '';
-      var labels = '';
-      var arrows = '';
-      for (var i = 0; i < agentIds.length; i++) {
-        var x = padX + i * (nodeW + arrowW);
-        var y = padY;
-        rects += '<rect x="' + x + '" y="' + y + '" width="' + nodeW + '" height="' + nodeH + '"'
-          + ' rx="4" ry="4" fill="#f0fbf7" stroke="#9cddc8" stroke-width="1.5"/>';
-        var label = agentIds[i];
-        if (label.length > 14) { label = label.slice(0, 13) + '…'; }
-        labels += '<text x="' + (x + nodeW / 2) + '" y="' + (y + nodeH / 2 + 5) + '"'
-          + ' text-anchor="middle" font-size="11" fill="#222" font-family="ui-monospace,monospace"'
-          + ' aria-hidden="true">' + escHtmlW(label) + '</text>';
-        if (i < agentIds.length - 1) {
-          var ax = x + nodeW;
-          var ay = padY + nodeH / 2;
-          arrows += '<line x1="' + ax + '" y1="' + ay + '" x2="' + (ax + arrowW - 6) + '" y2="' + ay + '"'
-            + ' stroke="#9cddc8" stroke-width="2"/>'
-            + '<polygon points="'
-            + (ax + arrowW - 6) + ',' + (ay - 5) + ' '
-            + (ax + arrowW) + ',' + ay + ' '
-            + (ax + arrowW - 6) + ',' + (ay + 5)
-            + '" fill="#9cddc8"/>';
-        }
-      }
-      var ariaLabel = 'Workflow steps: ' + agentIds.join(' → ');
-      return '<svg width="' + totalW + '" height="' + totalH + '"'
-        + ' viewBox="0 0 ' + totalW + ' ' + totalH + '"'
-        + ' role="img" aria-label="' + escAttrW(ariaLabel) + '">'
-        + '<title>' + escHtmlW(ariaLabel) + '</title>'
-        + rects + labels + arrows
-        + '</svg>';
-    }
-
-    function showDetail(w) {
-      var detail = document.getElementById('workflows-detail');
-      if (!detail) { return; }
-      var descClass = w.description ? 'workflow-detail-description' : 'workflow-detail-description no-desc';
-      var descText = w.description || 'No description';
-      var chips = (w.agent_ids || []).map(function (id) {
-        return '<button class="workflow-agent-chip" type="button" data-action="filter-agent"'
-          + ' data-agent-id="' + escAttrW(id) + '"'
-          + ' aria-label="Filter Agents by: ' + escAttrW(id) + '">'
-          + escHtmlW(id)
-          + '</button>';
-      }).join('');
-      detail.innerHTML =
-        '<div class="workflow-detail-name">' + escHtmlW(w.display_name) + '</div>'
-        + '<div class="workflow-detail-source">' + escHtmlW(w.source || '') + '</div>'
-        + '<p class="' + descClass + '">' + escHtmlW(descText) + '</p>'
-        + '<div class="workflow-diagram" aria-label="Workflow step diagram">'
-        + buildStepperSVG(w.agent_ids || [])
-        + '</div>'
-        + '<div class="workflow-agent-chips">' + chips + '</div>';
-      detail.querySelectorAll('[data-action=filter-agent]').forEach(function (btn) {
-        btn.addEventListener('click', function () { filterAgent(btn.dataset.agentId); });
-      });
-      detail.classList.add('visible');
-    }
-
-    function renderList(workflows) {
-      var list = document.getElementById('workflows-list');
-      if (!list) { return; }
-      if (workflows.length === 0) {
-        list.innerHTML = '';
-        return;
-      }
-      list.innerHTML = workflows.map(function (w, idx) {
-        return '<button class="workflow-list-item" type="button"'
-          + ' data-workflow-idx="' + idx + '"'
-          + ' aria-pressed="false"'
-          + ' aria-label="Workflow: ' + escAttrW(w.display_name) + '">'
-          + '<span class="workflow-item-name">' + escHtmlW(w.display_name) + '</span>'
-          + '<span class="workflow-item-source">' + escHtmlW(w.source || '') + '</span>'
-          + '</button>';
-      }).join('');
-      list.querySelectorAll('.workflow-list-item').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          list.querySelectorAll('.workflow-list-item').forEach(function (b) {
-            b.classList.remove('selected');
-            b.setAttribute('aria-pressed', 'false');
-          });
-          btn.classList.add('selected');
-          btn.setAttribute('aria-pressed', 'true');
-          var idx = parseInt(btn.dataset.workflowIdx, 10);
-          if (_workflows[idx]) { showDetail(_workflows[idx]); }
-        });
-      });
-      var first = list.querySelector('.workflow-list-item');
-      if (first) { first.click(); }
-    }
-
-    function render(data) {
-      _workflows = data.workflows || [];
-      var meta = document.getElementById('workflows-meta');
-      if (meta) {
-        meta.textContent = _workflows.length + ' workflow' + (_workflows.length === 1 ? '' : 's')
-          + ' (' + (data.source_hint || '') + ')';
-      }
-      var grid = document.getElementById('workflows-grid');
-      var empty = document.getElementById('workflows-empty');
-      if (!grid) { return; }
-      grid.setAttribute('aria-busy', 'false');
-      if (_workflows.length === 0) {
-        grid.style.display = 'none';
-        if (empty) { empty.hidden = false; }
-        return;
-      }
-      if (empty) { empty.hidden = true; }
-      grid.style.display = '';
-      renderList(_workflows);
-    }
-
-    function load() {
-      var grid = document.getElementById('workflows-grid');
-      if (!grid) { return; }
-      grid.setAttribute('aria-busy', 'true');
-      authedFetch('/api/workflows')
-        .then(function (r) {
-          if (!r.ok) { throw new Error('HTTP ' + r.status); }
-          return r.json();
-        })
-        .then(function (data) {
-          render(data);
-          loaded = true;
-        })
-        .catch(function (e) {
-          var detail = document.getElementById('workflows-detail');
-          if (detail) {
-            detail.innerHTML = '<p class="error-state" role="alert">Falha: ' + escHtmlW(e.message) + '</p>';
-          }
-          if (grid) { grid.setAttribute('aria-busy', 'false'); }
-        });
-    }
-    return { load: load, isLoaded: function () { return loaded; } };
-  })();
-
   // ── Tab activation hook — lazy fetch for agents/workflows ─────────────
+  // Agents module: window.Agents (agents.js, loaded after this script).
+  // Workflows module: window.Workflows (workflows.js, loaded after this script).
   // Agents module is loaded by agents.js (separate script tag); accessed via
   // window.Agents. Workflows module remains inline (PR3-16/17 will extract it).
   tabs.forEach(function (tab) {
@@ -373,7 +202,9 @@
       if (target === 'agents' && window.Agents && !window.Agents.isLoaded()) {
         window.Agents.load();
       }
-      if (target === 'workflows' && !Workflows.isLoaded()) { Workflows.load(); }
+      if (target === 'workflows' && window.Workflows && !window.Workflows.isLoaded()) {
+        window.Workflows.load();
+      }
     });
   });
 

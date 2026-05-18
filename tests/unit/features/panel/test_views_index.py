@@ -534,20 +534,27 @@ def test_responsive_css_abbreviation_rule_present() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_panel_js_workflows_has_stepper_svg() -> None:
-    """panel-defects Bug 4: PANEL_JS must build an inline SVG stepper."""
+def test_panel_js_workflows_has_card_grid() -> None:
+    """PR3-16: PANEL_JS must render workflow-card elements in a card grid.
+
+    The old 2-pane stepper (buildStepperSVG) was replaced by the card-grid
+    layout in PR3-16. This test verifies the new card-grid JS is present
+    in workflows.js (included in PANEL_JS).
+    """
     from dadaia_workspace.features.panel.views._assets import PANEL_JS
 
-    assert "buildStepperSVG" in PANEL_JS
-    assert "<svg" in PANEL_JS
+    # The card grid renderer must reference the .workflow-card element class
+    assert "workflow-card" in PANEL_JS
+    # The CTA affordance must carry data-workflow-name for PR3-17 to wire
+    assert "data-workflow-name" in PANEL_JS
 
 
-def test_panel_js_workflows_has_detail_pane() -> None:
-    """panel-defects Bug 4: PANEL_JS must reference workflows-detail."""
+def test_panel_js_workflows_exposes_window_workflows() -> None:
+    """PR3-16: PANEL_JS must include window.Workflows from workflows.js."""
     from dadaia_workspace.features.panel.views._assets import PANEL_JS
 
-    assert "workflows-detail" in PANEL_JS
-    assert "workflows-list" in PANEL_JS
+    assert "window.Workflows" in PANEL_JS
+    assert "/api/workflows" in PANEL_JS
 
 
 def test_panel_css_has_workflows_pane_layout() -> None:

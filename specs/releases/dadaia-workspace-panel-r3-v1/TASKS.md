@@ -355,7 +355,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-16 — Workflow card grid UI — FE
 
-- [ ] **Owner:** frontend-engineer
+- [x] **Owner:** frontend-engineer
 - **Phase:** 5 UI
 - **SPEC acceptance:** §7.5 + Surface D (D1, D2, D3)
 - **Depends on:** PR3-04 (themes), PR3-14 (endpoint shape)
