@@ -522,7 +522,10 @@
 
   function handleHashOnActivation() {
     var parsed = parseWorkflowHash(location.hash);
-    if (!parsed) { return; }
+    if (!parsed) {
+      load();
+      return;
+    }
     var detail = parsed.params.get('detail');
     if (detail) {
       loadDetail(detail);
