@@ -128,7 +128,7 @@ WORKFLOWS_CSS: str = """
 .workflow-dag-cta {
   background: none;
   border: none;
-  color: var(--color-accent-secondary, #bfd8ad);
+  color: var(--color-accent-dark, #2d7d9a);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -187,7 +187,7 @@ WORKFLOWS_CSS: str = """
   gap: 0.35rem;
   background: none;
   border: none;
-  color: var(--color-accent-secondary, #bfd8ad);
+  color: var(--color-accent-dark, #2d7d9a);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -273,7 +273,7 @@ WORKFLOWS_CSS: str = """
 .workflow-stages-toggle {
   background: none;
   border: none;
-  color: var(--color-accent-secondary, #bfd8ad);
+  color: var(--color-accent-dark, #2d7d9a);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
