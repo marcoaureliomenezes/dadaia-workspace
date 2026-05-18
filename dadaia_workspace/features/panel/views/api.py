@@ -20,16 +20,6 @@ JSON shapes (stable contract — if changed, panel.js must be updated in lockste
           }
         ]
       }
-    ],
-    "unregistered": [                # v0.1.1: orphan listeners (Bug D)
-      {
-        "port":        int,
-        "bind":        str,          # "127.0.0.1" / "0.0.0.0" / "::" / etc.
-        "pid":         int,          # always set (pidless filtered out)
-        "cmdline":     str,
-        "cwd":         str,
-        "lan_exposed": bool          # bind in {"0.0.0.0", "::"}
-      }
     ]
   }
 
@@ -118,9 +108,6 @@ def render_api_servers(
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         groups = service.list_servers_grouped()
-        # Unregistered listeners section removed from UI (panel-defects hotfix).
-        # Key kept for back-compat with any client that reads it.
-        unregistered: list = []
         payload = {
             "groups": [
                 {
@@ -141,7 +128,6 @@ def render_api_servers(
                 }
                 for g in groups
             ],
-            "unregistered": unregistered,
         }
         body = json.dumps(payload).encode("utf-8")
         return (200, "application/json; charset=utf-8", body)
