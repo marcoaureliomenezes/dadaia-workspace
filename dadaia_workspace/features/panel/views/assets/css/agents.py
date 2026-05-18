@@ -183,14 +183,13 @@ AGENTS_CSS: str = """
   padding: 0.2em 0.55em;
   border-radius: 3px;
   background: var(--color-accent-secondary, #bfd8ad);
-  color: var(--color-text, #222222);
+  color: #525252; /* WCAG AA ≥5.0:1 on all accent-secondary chip backgrounds */
   font-size: 0.72rem;
   font-family: var(--font-mono, ui-monospace, monospace);
   white-space: nowrap;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 0.7;
 }
 .skill-chip--more {
   background: var(--color-placeholder-bg, #f7f7f7);
@@ -244,8 +243,7 @@ AGENTS_CSS: str = """
 }
 .skill-chip--expanded {
   background: var(--color-accent-secondary, #bfd8ad);
-  color: var(--color-text, #222222);
-  opacity: 0.85;
+  color: #525252; /* WCAG AA ≥5.0:1 on all accent-secondary chip backgrounds */
 }
 .agent-detail__no-skills {
   font-size: 0.82rem;
