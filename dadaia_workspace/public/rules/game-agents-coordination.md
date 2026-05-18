@@ -22,7 +22,9 @@ sub-domínio distinto:
 | Critérios de qualidade, test strategy | **game-tester** | game-developer, game-designer | product-engineer |
 | Arquitetura geral, code patterns | **software-architect** | game-developer (idiomas UE5) | game-developer vence em decisões UE5-específicas |
 | CI/CD, build, deploy | **devops-engineer** | game-developer, game-designer | devops-engineer |
-| Escopo, prioridades, SPEC | **product-engineer** | todos | product-engineer (palavra final) |
+| Escopo, prioridades, dispatch | **project-manager** | todos | operador (palavra final) |
+| Autoria de SPEC/PLAN/TASKS, memory atomicity | **product-engineer** | project-manager | product-engineer (memory é gate-locked) |
+| Audit de drift + dead code | **project-auditor** | todos | operador (escalation) |
 
 ## Protocolo Anti-Deadlock
 

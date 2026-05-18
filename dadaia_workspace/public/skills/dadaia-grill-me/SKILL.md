@@ -1,10 +1,13 @@
 ---
 name: dadaia-grill-me
 description: >
-  Modo de refinamento de backlog — entrevista o operador sobre as SPECs do projeto dadaia Labs
-  (ou sobre uma feature específica) até atingir entendimento compartilhado completo.
-  Resolve inconsistências, gaps de escopo e decisões em aberto.
-  Finaliza gerando um report em .dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html.
+  Modo de refinamento de backlog/intake — entrevista o operador sobre uma demanda, SPEC,
+  ou feature até atingir entendimento compartilhado completo. Resolve inconsistências,
+  gaps de escopo e decisões em aberto.
+  PRIMARY CALLER (post-agents-r1-v1): project-manager durante a fase de intake.
+  product-engineer pode invocar quando consultado como leaf specialist para uma dúvida
+  específica de spec. O report final vai para
+  .dadaia/reports/<context-name>/<caller-agent>/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html.
   Use quando o operador mencionar "grill", "refine specs", "revisar backlog" ou "/dadaia-grill-me".
 applyTo: "specs/**"
 ---
