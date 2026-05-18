@@ -1,66 +1,279 @@
 """Agent card CSS for the Dadaia Workspace Panel.
 
-Phase 1 (SE): placeholder card, agents-grid, agent-card, and related styles
-extracted from _assets.py PANEL_CSS. FE will replace / extend this with the
-full collapsed + expanded card design in Phase 4.
+PR3-10 (FE): Full collapsed card design.
+  - 2-column grid at >=1024px, 1-column below
+  - Collapsed card: status badge, name, description (2-line clamp), 3-stat row,
+    skills chips (first 2 + "+N more"), expand chevron
+  - Status badge variants: active (green dot) / inactive (gray)
+  - Active card: 3px left-border accent
+  - Loading skeleton with pulse animation (disabled under prefers-reduced-motion)
+  - Hover/focus styles
+  - All brand token usages include comma-separated fallbacks (test_brand_tokens_have_fallbacks)
+  - Theme-responsive: Mint/Sage/Warm via tokens
 """
 
 AGENTS_CSS: str = """
-/* ── Agents placeholder card ─────────────────────── */
-.placeholder-card {
-  background: var(--color-placeholder-bg);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-xl);
-  text-align: center;
-  color: var(--color-muted);
-  max-width: 480px;
-}
-.placeholder-card .placeholder-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-muted);
-  margin-bottom: var(--space-sm);
-}
-.placeholder-card .placeholder-body { font-size: 0.88rem; }
-
-/* ── agents-grid ─────────────────────────────────── */
+/* ── Agents grid ──────────────────────────────────────────────────── */
 .card-grid.agents-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   gap: 1rem;
+  align-items: start;
 }
+@media (max-width: 767px) {
+  .card-grid.agents-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Agent card (collapsed) ────────────────────────────────────────── */
 .agent-card {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem;
-  background: var(--color-surface);
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--color-border, #dddddd);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-card, 6px);
+  padding: 1rem 1rem 0.875rem;
+  background: var(--color-surface, #ffffff);
+  cursor: pointer;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  font-size: 1rem;
+  color: var(--color-text, #222222);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.agent-card-header {
+.agent-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-color: var(--color-accent, #9cddc8);
+  border-left-color: var(--color-accent, #9cddc8);
+}
+.agent-card:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
+/* Warm theme: double focus outline per SPEC §7.7 WCAG constraint */
+[data-theme="warm"] .agent-card:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  box-shadow: 0 0 0 4px var(--color-accent, #9cddc8);
+}
+
+/* Active agent: 3px left-border accent */
+.agent-card.agent-card--active {
+  border-left: 3px solid var(--color-accent, #9cddc8);
+}
+
+/* ── Card header ──────────────────────────────────────────────────── */
+.agent-card__header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
 }
-.agent-card-header h3 { margin: 0; font-size: 1rem; color: var(--color-cost, #633d2e); }
-.agent-model { font-size: 0.85rem; color: #666; font-family: ui-monospace, monospace; }
-.agent-metrics {
+
+/* ── Agent name ──────────────────────────────────────────────────── */
+.agent-card__name {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-cost, #633d2e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Expand chevron ──────────────────────────────────────────────── */
+.agent-card__chevron {
+  font-size: 0.85rem;
+  color: var(--color-muted, #666666);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-card__chevron {
+    transition: none;
+  }
+}
+
+/* ── Status badge ────────────────────────────────────────────────── */
+.agent-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15em 0.55em;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* Active: tinted green background, green text */
+.agent-status-badge--active {
+  background: #d4f5e5; /* light tint of active-dot green */
+  color: #1f7a46;      /* darker green — WCAG AA on the tinted bg */
+}
+/* Inactive: neutral */
+.agent-status-badge--inactive {
+  background: var(--color-placeholder-bg, #f7f7f7);
+  color: var(--color-muted, #666666);
+}
+.agent-status-badge__dot {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Description (2-line clamp) ──────────────────────────────────── */
+.agent-card__description {
+  font-size: 0.88rem;
+  color: var(--color-muted, #666666);
+  margin: 0 0 0.75rem;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.5;
+}
+
+/* ── Stat row (3 columns) ─────────────────────────────────────────── */
+.agent-card__stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
-  margin: 0.75rem 0;
+  margin-bottom: 0.75rem;
+}
+.agent-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.agent-stat__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--color-muted, #666666);
+  letter-spacing: 0.03em;
+}
+.agent-stat__value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text, #222222);
+}
+
+/* ── Skills chips ────────────────────────────────────────────────── */
+.agent-card__skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+.skill-chip {
+  display: inline-block;
+  padding: 0.2em 0.55em;
+  border-radius: 3px;
+  background: var(--color-accent-secondary, #bfd8ad);
+  color: var(--color-text, #222222);
+  font-size: 0.72rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+}
+.skill-chip--more {
+  background: var(--color-placeholder-bg, #f7f7f7);
+  color: var(--color-muted, #666666);
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  opacity: 1;
+}
+.skill-chip--none {
+  background: none;
+  color: var(--color-muted, #666666);
+  font-style: italic;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  opacity: 1;
+}
+
+/* ── Expanded detail region (PR3-11 fills this) ──────────────────── */
+.agent-card__detail {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--color-border, #dddddd);
+  padding-top: 0.75rem;
+}
+.agent-card__detail[hidden] { display: none; }
+
+/* ── Loading skeleton ────────────────────────────────────────────── */
+.agent-card--skeleton {
+  pointer-events: none;
+  cursor: default;
+}
+.skeleton-pulse {
+  background: linear-gradient(
+    90deg,
+    var(--color-placeholder-bg, #f7f7f7) 25%,
+    var(--color-border, #dddddd) 37%,
+    var(--color-placeholder-bg, #f7f7f7) 63%
+  );
+  background-size: 400px 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: 3px;
+  display: inline-block;
+  height: 1em;
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-pulse {
+    animation: none;
+    background: var(--color-placeholder-bg, #f7f7f7);
+  }
+}
+.skeleton-badge  { width: 64px;  height: 1.3em; }
+.skeleton-name   { flex: 1; height: 1em; }
+.skeleton-chevron { width: 16px; height: 1em; }
+.skeleton-line   { display: block; height: 0.85em; margin: 0.4rem 0; }
+
+/* ── Error / empty states ────────────────────────────────────────── */
+.error-state {
+  color: var(--color-cost, #633d2e);
+  background: #fef3ec; /* light amber tint */
+  border: 1px solid var(--color-alert, #f7af63);
+  border-radius: var(--radius-card, 6px);
+  padding: 1rem 1.25rem;
   font-size: 0.9rem;
 }
-.agent-metric .label { display: block; font-size: 0.7rem; text-transform: uppercase; color: #666; }
-.agent-metric .value { display: block; font-weight: 600; }
-.agent-cost-unknown { color: #999; font-style: italic; }
-.agent-suspect-badge {
-  background: var(--color-alert, #f7af63);
-  color: #3d2a00; /* dark on amber — WCAG AA contrast ~6.3:1 */
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
+.retry-link {
+  background: none;
+  border: none;
+  color: var(--color-accent-dark, #2d7d9a);
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  text-decoration: underline;
+  padding: 0;
 }
+.retry-link:hover { color: var(--color-cost, #633d2e); }
+.retry-link:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
+
+/* ── Warning / staleness banner ──────────────────────────────────── */
+.warning-banner {
+  padding: 0.75rem 1rem;
+  background: var(--color-warning-bg, #ddd9ab);
+  color: var(--color-cost, #633d2e);
+  border-radius: var(--radius-card, 6px);
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+}
+
+/* ── Context breakdown bars (expanded, PR3-11) ───────────────────── */
 .context-breakdown { margin: 0.5rem 0; }
 .context-breakdown-row {
   display: flex;
@@ -69,14 +282,45 @@ AGENTS_CSS: str = """
   font-size: 0.85rem;
   margin: 0.25rem 0;
 }
-.context-bar { flex: 1; height: 0.5rem; background: #eee; border-radius: 4px; overflow: hidden; }
-.context-bar-fill { height: 100%; background: var(--color-accent, #9cddc8); }
-.warning-banner {
-  padding: 0.75rem 1rem;
-  background: var(--color-warning-bg, #ddd9ab);
-  color: #3d3600;
-  border-radius: 6px;
-  margin-bottom: 1rem;
+.context-bar {
+  flex: 1;
+  height: 0.5rem;
+  background: var(--color-placeholder-bg, #f7f7f7);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.context-bar-fill {
+  height: 100%;
+  background: var(--color-accent, #9cddc8);
+  border-radius: 4px;
+}
+
+/* ── Placeholder card (legacy — kept for compat until fully removed) */
+.placeholder-card {
+  background: var(--color-placeholder-bg, #f7f7f7);
+  border: 1px dashed var(--color-border, #dddddd);
+  border-radius: var(--radius-card, 6px);
+  padding: var(--space-xl, 2rem);
+  text-align: center;
+  color: var(--color-muted, #666666);
+  max-width: 480px;
+}
+.placeholder-card .placeholder-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-muted, #666666);
+  margin-bottom: var(--space-sm, 0.6rem);
+}
+.placeholder-card .placeholder-body { font-size: 0.88rem; }
+
+/* ── Legacy agent-card styles (sessions drilldown, PR3-11 will clean up) */
+.agent-cost-unknown { color: #999; font-style: italic; }
+.agent-suspect-badge {
+  background: var(--color-alert, #f7af63);
+  color: #3d2a00;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
 }
 .sessions-drilldown { margin-top: 0.5rem; }
 .sessions-drilldown table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -97,5 +341,4 @@ AGENTS_CSS: str = """
   outline: 2px solid var(--color-accent, #9cddc8);
   outline-offset: 2px;
 }
-.error-state { color: #c0392b; font-size: 0.9rem; }
 """

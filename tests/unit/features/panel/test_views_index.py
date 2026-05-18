@@ -415,10 +415,16 @@ def test_panel_js_workflows_uses_authed_fetch() -> None:
 
 
 def test_panel_js_sessions_uses_authed_fetch() -> None:
-    """panel-defects Bug 3: toggleSessions must use authedFetch."""
+    """panel-defects Bug 3 (updated PR3-10): agents.js must call authedFetch for /api/agents.
+
+    The per-agent sessions endpoint (authedFetch('/api/agents/<id>/sessions'))
+    is scope of PR3-11 (expanded card). PR3-10 (collapsed card) calls
+    authedFetch('/api/agents') for the initial list load.
+    """
     from dadaia_workspace.features.panel.views._assets import PANEL_JS
 
-    assert "authedFetch('/api/agents/" in PANEL_JS
+    # agents.js (in PANEL_JS) calls authedFetch('/api/agents') for the list
+    assert "authedFetch('/api/agents')" in PANEL_JS
 
 
 # ---------------------------------------------------------------------------
