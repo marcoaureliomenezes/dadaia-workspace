@@ -509,7 +509,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-23 — CLOSURE.md + memory update + backlog returns + archive
 
-- [ ] **Owner:** product-engineer
+- [-] **Owner:** product-engineer
 - **Phase:** 8 (closure)
 - **SPEC acceptance:** §11 Memory + §13 Definition of Done #9, #10
 - **Depends on:** PR3-22
