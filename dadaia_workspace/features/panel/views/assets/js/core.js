@@ -202,8 +202,16 @@
       if (target === 'agents' && window.Agents && !window.Agents.isLoaded()) {
         window.Agents.load();
       }
-      if (target === 'workflows' && window.Workflows && !window.Workflows.isLoaded()) {
-        window.Workflows.load();
+      if (target === 'workflows' && window.Workflows) {
+        if (!window.Workflows.isLoaded()) {
+          // PR3-17: respect hash on tab activation (e.g. user clicks tab while
+          // #workflows?detail=<name> is in the hash from a previous navigation).
+          if (window.Workflows.handleHashOnActivation) {
+            window.Workflows.handleHashOnActivation();
+          } else {
+            window.Workflows.load();
+          }
+        }
       }
     });
   });
@@ -224,7 +232,12 @@
       }
     } else if (hash.startsWith('#workflows')) {
       var workflowsTab = document.getElementById('tab-workflows');
-      if (workflowsTab) { workflowsTab.click(); }
+      if (workflowsTab) {
+        // PR3-17: clicking the tab triggers the activation hook above, which
+        // will call handleHashOnActivation() — this handles both bare #workflows
+        // and #workflows?detail=<name> deep links in one code path.
+        workflowsTab.click();
+      }
     }
   })();
 
