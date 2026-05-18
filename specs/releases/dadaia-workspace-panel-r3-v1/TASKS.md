@@ -463,7 +463,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-21 — QA E2E Playwright suite (56 tests)
 
-- [-] **Owner:** qa-engineer
+- [x] **Owner:** qa-engineer
 - **Phase:** 7
 - **SPEC acceptance:** §10 Surfaces A–H + §13 Definition of Done #5
 - **Depends on:** PR3-19, PR3-20 (so unit/integration are green before E2E
