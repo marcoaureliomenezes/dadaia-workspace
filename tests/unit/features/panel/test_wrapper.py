@@ -5,6 +5,8 @@ Covers:
   - iframe src points at /memory/<slug>/<file>
   - slug and path are HTML-escaped (R3-A / OWASP A03)
   - Returns (200, "text/html; charset=utf-8", bytes)
+  - PR3-05: no hard-coded palette hex literals; var(--color-*) tokens used;
+    tokens.css linked; pre-paint theme script present (theme follows active theme)
 """
 
 from pathlib import Path
@@ -76,3 +78,52 @@ def test_wrapper_contains_iframe_tag() -> None:
     html = _render("slug", "path.html")
     assert "<iframe" in html
     assert "sandbox" in html
+
+
+# ── PR3-05: token consumption fix ────────────────────────────────────────────
+
+# Palette hex literals that lived in the old :root block and must be gone.
+_PALETTE_LITERALS = [
+    "#7ec8e3",  # old accent (replaced by #9cddc8 in brand-identity-v1)
+    "#2d7d9a",  # accent-dark (now via var(--color-accent-dark))
+    "#fafafa",  # bg (now via var(--color-bg))
+    "#ffffff",  # surface (now via var(--color-surface))
+    "#111111",  # heading (now via var(--color-heading))
+    "#666666",  # muted (now via var(--color-muted))
+    "#dddddd",  # border (now via var(--color-border))
+    "#333333",  # border-strong (now via var(--color-border-strong))
+    "#f0f0f0",  # code-bg (now via var(--color-code-bg))
+]
+
+
+def test_wrapper_no_hardcoded_palette_literals() -> None:
+    """PR3-05: wrapper HTML must not contain any hard-coded palette hex literals."""
+    rendered = _render("dadaia-workspace", "architecture.html")
+    for literal in _PALETTE_LITERALS:
+        assert literal not in rendered, (
+            f"Hard-coded palette literal {literal!r} found in wrapper output; "
+            "replace with the appropriate var(--color-*) reference."
+        )
+
+
+def test_wrapper_uses_color_tokens() -> None:
+    """PR3-05: wrapper CSS must reference var(--color-*) tokens, not hard-coded hex."""
+    rendered = _render("dadaia-workspace", "architecture.html")
+    assert "var(--color-accent" in rendered
+    assert "var(--color-surface" in rendered
+    assert "var(--color-border" in rendered
+
+
+def test_wrapper_links_tokens_css() -> None:
+    """PR3-05: wrapper must link /static/tokens.css so theme palettes are available."""
+    rendered = _render("dadaia-workspace", "architecture.html")
+    assert '/static/tokens.css' in rendered
+
+
+def test_wrapper_prepaint_theme_script() -> None:
+    """PR3-05: wrapper must include pre-paint inline script that reads localStorage
+    and applies data-theme before first contentful paint (no FOUC on theme)."""
+    rendered = _render("dadaia-workspace", "architecture.html")
+    assert "localStorage" in rendered
+    assert "dadaia-panel-theme" in rendered
+    assert "dataset.theme" in rendered
