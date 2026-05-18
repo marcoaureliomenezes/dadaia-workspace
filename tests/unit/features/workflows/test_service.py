@@ -430,3 +430,128 @@ def test_env_var_overrides_default_dir(
     svc = WorkflowsService(workspace_root=tmp_path)
     summaries = svc.list_summaries()
     assert any(s.name == "simple-wf" for s in summaries)
+
+
+# ---------------------------------------------------------------------------
+# Tests: .claude/workflows/ fallback branch (lines 43-46)
+# ---------------------------------------------------------------------------
+
+
+def test_claude_workflows_dir_used_when_agentic_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When .dadaia/agentic/workflows/ is absent, .claude/workflows/ is used."""
+    _cache.clear()
+    monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
+    claude_dir = tmp_path / ".claude" / "workflows"
+    claude_dir.mkdir(parents=True)
+    (claude_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
+
+    svc = WorkflowsService(workspace_root=tmp_path)
+    summaries = svc.list_summaries()
+    assert any(s.name == "simple-wf" for s in summaries)
+
+
+def test_claude_workflows_dir_used_when_agentic_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When .dadaia/agentic/workflows/ exists but has no .workflow.md, fall through to .claude/."""
+    _cache.clear()
+    monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
+    # Create empty agentic dir (no workflow files)
+    agentic_dir = tmp_path / ".dadaia" / "agentic" / "workflows"
+    agentic_dir.mkdir(parents=True)
+    claude_dir = tmp_path / ".claude" / "workflows"
+    claude_dir.mkdir(parents=True)
+    (claude_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
+
+    svc = WorkflowsService(workspace_root=tmp_path)
+    summaries = svc.list_summaries()
+    assert any(s.name == "simple-wf" for s in summaries)
+
+
+def test_agentic_dir_preferred_over_claude(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When .dadaia/agentic/workflows/ has workflow files, .claude/ is NOT used."""
+    _cache.clear()
+    monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
+    agentic_dir = _make_workflows_dir(tmp_path)
+    (agentic_dir / "agentic-wf.workflow.md").write_text(_SIMPLE_WF.replace("simple-wf", "agentic-wf"))
+    claude_dir = tmp_path / ".claude" / "workflows"
+    claude_dir.mkdir(parents=True)
+    (claude_dir / "claude-wf.workflow.md").write_text(_SIMPLE_WF.replace("simple-wf", "claude-wf"))
+
+    svc = WorkflowsService(workspace_root=tmp_path)
+    summaries = svc.list_summaries()
+    names = {s.name for s in summaries}
+    assert "agentic-wf" in names
+    assert "claude-wf" not in names
+
+
+# ---------------------------------------------------------------------------
+# Tests: malformed workflow YAML raises WorkflowSchemaError (store contract)
+# ---------------------------------------------------------------------------
+
+
+def test_malformed_workflow_yaml_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A workflow file with malformed YAML frontmatter causes list_summaries to raise.
+
+    The MarkdownWorkflowStore does not swallow parse errors — callers must handle them.
+    This is intentional: a broken workflow file is a configuration error that should
+    surface loudly rather than silently disappear.
+    """
+    from dadaia_workspace.core.exceptions import WorkflowSchemaError
+
+    _cache.clear()
+    monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
+    wf_dir = _make_workflows_dir(tmp_path)
+    (wf_dir / "bad.workflow.md").write_text("---\n: invalid: yaml: [\n---\n# Bad\n")
+
+    svc = WorkflowsService(workspace_root=tmp_path)
+    with pytest.raises(WorkflowSchemaError):
+        svc.list_summaries()
+
+
+# ---------------------------------------------------------------------------
+# Tests: empty workflow file raises WorkflowSchemaError
+# ---------------------------------------------------------------------------
+
+
+def test_empty_workflow_file_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An empty .workflow.md file (missing frontmatter) causes list_summaries to raise."""
+    from dadaia_workspace.core.exceptions import WorkflowSchemaError
+
+    _cache.clear()
+    monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
+    wf_dir = _make_workflows_dir(tmp_path)
+    (wf_dir / "empty.workflow.md").write_text("")
+
+    svc = WorkflowsService(workspace_root=tmp_path)
+    with pytest.raises(WorkflowSchemaError):
+        svc.list_summaries()
+
+
+# ---------------------------------------------------------------------------
+# Tests: get_detail with .claude/workflows/ source
+# ---------------------------------------------------------------------------
+
+
+def test_get_detail_from_claude_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """get_detail works when the workflow comes from .claude/workflows/."""
+    _cache.clear()
+    monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
+    claude_dir = tmp_path / ".claude" / "workflows"
+    claude_dir.mkdir(parents=True)
+    (claude_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
+
+    svc = WorkflowsService(workspace_root=tmp_path)
+    detail = svc.get_detail("simple-wf")
+    assert detail is not None
+    assert detail.name == "simple-wf"
