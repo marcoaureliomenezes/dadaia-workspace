@@ -49,7 +49,7 @@ class TestSecurityHeaders:
         csp = csp_headers[0]
         assert "default-src 'self'" in csp
         assert "script-src 'self' 'unsafe-inline'" in csp
-        assert "style-src 'unsafe-inline'" in csp
+        assert "style-src 'self' 'unsafe-inline'" in csp
 
     def test_json_response_sends_nosniff_header(self) -> None:
         """application/json content type causes X-Content-Type-Options: nosniff to be sent."""
