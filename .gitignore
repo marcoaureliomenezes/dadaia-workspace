@@ -40,3 +40,8 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Node / Playwright
+node_modules/
+playwright-report/
+test-results/
