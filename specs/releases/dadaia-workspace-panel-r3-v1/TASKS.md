@@ -63,7 +63,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-02 — Activate `/static/<name>` route + Content-Type table + unit test
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 1
 - **SPEC acceptance:** §6 Static asset Content-Type table
 - **Depends on:** PR3-01

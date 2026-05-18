@@ -226,7 +226,8 @@ def make_handler_class(
                 m = pattern.match(path)
                 if m is not None:
                     status, content_type, body = view(**m.groupdict())
-                    self._respond(status, content_type, body)
+                    is_static = path.startswith("/static/")
+                    self._respond(status, content_type, body, cache_control="no-cache" if is_static else None)
                     return
 
             # 404 fall-through (T-2.3)
@@ -295,10 +296,18 @@ def make_handler_class(
             if content_type.startswith("application/json"):
                 self.send_header("X-Content-Type-Options", "nosniff")
 
-        def _respond(self, status: int, content_type: str, body: bytes) -> None:
+        def _respond(
+            self,
+            status: int,
+            content_type: str,
+            body: bytes,
+            cache_control: str | None = None,
+        ) -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self._security_headers(content_type)
+            if cache_control is not None:
+                self.send_header("Cache-Control", cache_control)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
