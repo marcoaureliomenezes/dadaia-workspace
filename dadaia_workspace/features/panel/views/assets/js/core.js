@@ -191,156 +191,6 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── agents tab ────────────────────────────────────────────────────────
-  // FE-owned content (agents.js Phase 4). Temporary placement in core.js
-  // during Phase 1 transition so authedFetch scope is shared.
-  // PR3-10/PR3-11: FE will replace this block entirely.
-  var Agents = (function () {
-    var loaded = false;
-    var fmtUsd = function (v) { return v == null ? '—' : '$' + v.toFixed(2); };
-    function escHtmlA(s) {
-      return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c];
-      });
-    }
-    function escAttrA(s) { return escHtmlA(s); }
-    function fmtDate(iso) {
-      if (!iso) { return '—'; }
-      return iso.slice(0, 16).replace('T', ' ');
-    }
-    function renderCard(a) {
-      var costHtml = a.cost_known
-        ? escHtmlA(fmtUsd(a.total_cost_usd))
-        : '<span class="agent-cost-unknown">custo indisponível</span>';
-      var suspect = a.suspect_count > 0
-        ? '<span class="agent-suspect-badge" title="Eventos com tokens fora dos limites">' + a.suspect_count + ' suspeitos</span>'
-        : '';
-      var breakdown = (a.context_breakdown || []).map(function (cb) {
-        var pct = cb.cost_fraction != null ? (cb.cost_fraction * 100).toFixed(1) : '—';
-        var fillW = cb.cost_fraction != null ? (cb.cost_fraction * 100) : 0;
-        return '<div class="context-breakdown-row" aria-label="' + escAttrA(cb.context_name) + ': ' + pct + '% do custo total">'
-          + '<span>' + escHtmlA(cb.context_name) + '</span>'
-          + '<span class="context-bar"><span class="context-bar-fill" style="width: ' + fillW + '%"></span></span>'
-          + '<span>' + pct + '%</span>'
-          + '</div>';
-      }).join('');
-      return '<article class="agent-card" data-agent-id="' + escAttrA(a.agent_id) + '">'
-        + '<div class="agent-card-header">'
-        + '<h3>' + escHtmlA(a.display_name) + ' ' + suspect + '</h3>'
-        + '<span class="agent-model">' + escHtmlA(a.dominant_model || '—') + '</span>'
-        + '</div>'
-        + '<div class="agent-metrics">'
-        + '<div class="agent-metric"><span class="label">Sessões</span><span class="value">' + a.session_count + '</span></div>'
-        + '<div class="agent-metric"><span class="label">Custo total</span><span class="value">' + costHtml + '</span></div>'
-        + '<div class="agent-metric"><span class="label">Última atividade</span><span class="value">' + escHtmlA(fmtDate(a.last_activity_at)) + '</span></div>'
-        + '</div>'
-        + '<div class="context-breakdown">' + breakdown + '</div>'
-        + '<div class="sessions-drilldown">'
-        + '<button type="button" data-action="toggle-sessions" aria-expanded="false" aria-controls="sessions-' + escAttrA(a.agent_id) + '">'
-        + 'Mostrar sessões recentes'
-        + '</button>'
-        + '<div id="sessions-' + escAttrA(a.agent_id) + '" hidden></div>'
-        + '</div>'
-        + '</article>';
-    }
-    function renderSessionsTable(rows) {
-      if (rows.length === 0) { return '<p>Nenhuma sessão recente.</p>'; }
-      var head = '<thead><tr><th>Sessão</th><th>Data</th><th>Custo</th><th>Branch</th><th>Contexto</th></tr></thead>';
-      var body = rows.map(function (s) {
-        return '<tr>'
-          + '<td><code>' + escHtmlA(s.session_id_prefix) + '…</code></td>'
-          + '<td>' + escHtmlA(s.date) + '</td>'
-          + '<td>' + (s.cost_usd != null ? '$' + s.cost_usd.toFixed(2) : '—') + '</td>'
-          + '<td>' + escHtmlA(s.git_branch || '—') + '</td>'
-          + '<td>' + escHtmlA(s.context_slug || 'unassigned') + '</td>'
-          + '</tr>';
-      }).join('');
-      return '<table>' + head + '<tbody>' + body + '</tbody></table>';
-    }
-    function applyHashFilter() {
-      var m = location.hash.match(/^#agents[?]filter=(.+)$/);
-      if (!m) { return; }
-      var want = decodeURIComponent(m[1]);
-      document.querySelectorAll('.agent-card').forEach(function (card) {
-        card.style.display = card.dataset.agentId === want ? '' : 'none';
-      });
-    }
-    function toggleSessions(btn) {
-      var expanded = btn.getAttribute('aria-expanded') === 'true';
-      var targetEl = document.getElementById(btn.getAttribute('aria-controls'));
-      if (expanded) {
-        btn.setAttribute('aria-expanded', 'false');
-        targetEl.hidden = true;
-        return;
-      }
-      btn.setAttribute('aria-expanded', 'true');
-      targetEl.hidden = false;
-      if (targetEl.dataset.loaded === '1') { return; }
-      var agentId = btn.closest('.agent-card').dataset.agentId;
-      targetEl.innerHTML = '<p>Carregando…</p>';
-      authedFetch('/api/agents/' + encodeURIComponent(agentId) + '/sessions?limit=10')
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          targetEl.innerHTML = renderSessionsTable(data.sessions || []);
-          targetEl.dataset.loaded = '1';
-          btn.textContent = 'Ocultar sessões recentes';
-        })
-        .catch(function (e) {
-          targetEl.innerHTML = '<p class="error-state">Falha: ' + escHtmlA(e.message) + '</p>';
-        });
-    }
-    function render(data) {
-      var meta = document.getElementById('agents-meta');
-      if (meta) {
-        meta.textContent = data.agents.length + ' agente' + (data.agents.length === 1 ? '' : 's')
-          + ' · janela ' + data.window_days + 'd';
-      }
-      var banner = document.getElementById('agents-staleness-banner');
-      if (banner) {
-        if (data.pricing_age_days != null && data.pricing_age_days > 90) {
-          banner.hidden = false;
-          banner.textContent = 'Preços com ' + data.pricing_age_days + ' dias sem revisão — custos podem estar defasados.';
-        } else {
-          banner.hidden = true;
-        }
-      }
-      var grid = document.getElementById('agents-grid');
-      var empty = document.getElementById('agents-empty');
-      if (!grid) { return; }
-      if (data.agents.length === 0) {
-        grid.innerHTML = '';
-        if (empty) { empty.hidden = false; }
-        return;
-      }
-      if (empty) { empty.hidden = true; }
-      grid.innerHTML = data.agents.map(renderCard).join('');
-      grid.querySelectorAll('[data-action=toggle-sessions]').forEach(function (btn) {
-        btn.addEventListener('click', function () { toggleSessions(btn); });
-      });
-      applyHashFilter();
-    }
-    function load() {
-      var grid = document.getElementById('agents-grid');
-      if (!grid) { return; }
-      grid.setAttribute('aria-busy', 'true');
-      authedFetch('/api/agents?window_days=180&limit=50')
-        .then(function (r) {
-          if (!r.ok) { throw new Error('HTTP ' + r.status); }
-          return r.json();
-        })
-        .then(function (data) {
-          render(data);
-          loaded = true;
-          grid.setAttribute('aria-busy', 'false');
-        })
-        .catch(function (e) {
-          grid.innerHTML = '<p class="error-state" role="alert">Falha ao carregar dados: ' + escHtmlA(e.message) + '</p>';
-          grid.setAttribute('aria-busy', 'false');
-        });
-    }
-    return { load: load, applyHashFilter: applyHashFilter, isLoaded: function () { return loaded; } };
-  })();
-
   // ── workflows tab ─────────────────────────────────────────────────────
   // FE-owned content (workflows.js Phase 5). Temporary placement in core.js
   // during Phase 1 transition so authedFetch scope is shared.
@@ -515,10 +365,14 @@
   })();
 
   // ── Tab activation hook — lazy fetch for agents/workflows ─────────────
+  // Agents module is loaded by agents.js (separate script tag); accessed via
+  // window.Agents. Workflows module remains inline (PR3-16/17 will extract it).
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       var target = tab.getAttribute('data-section');
-      if (target === 'agents' && !Agents.isLoaded()) { Agents.load(); }
+      if (target === 'agents' && window.Agents && !window.Agents.isLoaded()) {
+        window.Agents.load();
+      }
       if (target === 'workflows' && !Workflows.isLoaded()) { Workflows.load(); }
     });
   });
@@ -533,7 +387,9 @@
         agentsTab.click();
         // applyHashFilter is called inside Agents.load() -> render() already,
         // but call it again after a tick in case load finishes asynchronously.
-        setTimeout(function () { Agents.applyHashFilter(); }, 300);
+        setTimeout(function () {
+          if (window.Agents) { window.Agents.applyHashFilter(); }
+        }, 300);
       }
     } else if (hash.startsWith('#workflows')) {
       var workflowsTab = document.getElementById('tab-workflows');

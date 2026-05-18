@@ -34,7 +34,13 @@ PALETTE: dict[str, str] = {
 # CSS assembled from slice modules (no inline CSS string literals remain here).
 PANEL_CSS: str = TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS
 
-# JS read from core.js (SE-owned, contains full IIFE including FE-owned blocks
-# as Phase 1 placeholders until FE fills agents.js / workflows.js).
+# JS concatenated from separate module files:
+#   1. core.js  — tab switching, token bootstrap, authedFetch, servers, workflows IIFE
+#   2. agents.js — FE-owned agents card grid (PR3-10/11); exposes window.Agents
+# workflows.js will be added when PR3-16/17 extracts the Workflows IIFE from core.js.
 _JS_DIR = Path(__file__).parent / "assets" / "js"
-PANEL_JS: str = (_JS_DIR / "core.js").read_text(encoding="utf-8")
+PANEL_JS: str = (
+    (_JS_DIR / "core.js").read_text(encoding="utf-8")
+    + "\n"
+    + (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+)

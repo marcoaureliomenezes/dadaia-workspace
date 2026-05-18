@@ -212,7 +212,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-10 — Agent card UI (collapsed) — FE
 
-- [ ] **Owner:** frontend-engineer
+- [x] **Owner:** frontend-engineer
 - **Phase:** 4 UI (agents)
 - **SPEC acceptance:** §7.4 + Surface C (C1, C2, C3)
 - **Depends on:** PR3-04 (themes), PR3-06 (tab rename)
