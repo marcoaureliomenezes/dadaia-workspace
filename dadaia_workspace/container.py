@@ -15,6 +15,8 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_agents_canonical,
     render_api_contexts,
     render_api_servers,
+    render_api_workflow_detail,
+    render_api_workflows_list,
 )
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
@@ -209,12 +211,16 @@ def build_panel_views(
         telemetry data on the canonical agent catalog (PR3-08).
     """
     service = build_panel_service(workspace_root, telemetry=telemetry)
+    # WorkflowsService is exposed via PanelService._workflows_service for the
+    # detail endpoint (get_detail needs name resolution against the filesystem).
     return {
         "index": render_index(service),
         "api_servers": render_api_servers(service),
         "api_contexts": render_api_contexts(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
+        "api_workflows": render_api_workflows_list(service),
+        "api_workflow_detail": render_api_workflow_detail(service._workflows_service),
         "memory": render_memory(workspace_root),
         "memory_view": render_memory_wrapper(workspace_root),
         "static": render_static(),
