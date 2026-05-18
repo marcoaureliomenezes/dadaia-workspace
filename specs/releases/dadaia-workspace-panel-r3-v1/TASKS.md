@@ -42,7 +42,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-01 — Asset split: create `views/assets/` and move CSS/JS slices
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 1 (asset split)
 - **SPEC acceptance:** §3 D-foundation + §6 Static asset Content-Type table
 - **Depends on:** PR3-00
