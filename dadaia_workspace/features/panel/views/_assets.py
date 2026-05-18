@@ -35,12 +35,14 @@ PALETTE: dict[str, str] = {
 PANEL_CSS: str = TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS
 
 # JS concatenated from separate module files:
-#   1. core.js  — tab switching, token bootstrap, authedFetch, servers, workflows IIFE
-#   2. agents.js — FE-owned agents card grid (PR3-10/11); exposes window.Agents
-# workflows.js will be added when PR3-16/17 extracts the Workflows IIFE from core.js.
+#   1. core.js      — tab switching, token bootstrap, authedFetch, servers
+#   2. agents.js    — FE-owned agents card grid (PR3-10/11); exposes window.Agents
+#   3. workflows.js — FE-owned workflows card grid (PR3-16); exposes window.Workflows
 _JS_DIR = Path(__file__).parent / "assets" / "js"
 PANEL_JS: str = (
     (_JS_DIR / "core.js").read_text(encoding="utf-8")
     + "\n"
     + (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+    + "\n"
+    + (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
 )
