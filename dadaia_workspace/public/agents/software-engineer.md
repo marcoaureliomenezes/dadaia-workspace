@@ -15,7 +15,6 @@ tools:
   - Bash
   - Glob
   - Grep
-  - Agent
 skills:
   - dadaia-handoff-emitter
   - dadaia-task-manager
