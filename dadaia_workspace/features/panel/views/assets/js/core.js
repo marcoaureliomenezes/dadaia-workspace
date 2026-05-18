@@ -37,6 +37,7 @@
     }
     return fetch(url, Object.assign({}, opts, { headers: headers }));
   }
+  window.authedFetch = authedFetch;
 
   // ── Tab switching ──────────────────────────────────────────────────
   var tabs = document.querySelectorAll('.nav-tab');
