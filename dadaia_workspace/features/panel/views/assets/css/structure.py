@@ -2,7 +2,8 @@
 
 Phase 1 (SE): reset, body, links, code, topbar, nav-tabs, main content area,
 section visibility, section-header, servers section, memory cards grid, and
-shared utility classes. FE will add the Warm focus-visible rule in Phase 2.
+shared utility classes.
+Phase 2 (FE / PR3-03): adds the Warm theme focus-visible override (E2E-THM-07).
 """
 
 STRUCTURE_CSS: str = """
@@ -270,4 +271,23 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 /* ── panel-section base ──────────────────────────── */
 .panel-section { display: none; }
 .panel-section.active { display: block; }
+
+/* ── Warm theme focus-visible override (E2E-THM-07) ─────────────────────────
+   Amber alone fails the WCAG 3:1 UI-component contrast threshold on white.
+   In the Warm theme the focus ring uses --color-accent-dark (brown) as the
+   primary outline so the focus indicator meets WCAG AA. A secondary amber
+   outline is added as a visual accent that does not carry the contrast burden.
+   See tokens.py for the amber hex value definition.
+   ─────────────────────────────────────────────────────────────────────────── */
+html[data-theme="warm"] a:focus-visible,
+html[data-theme="warm"] .nav-tab:focus-visible,
+html[data-theme="warm"] .memory-link:focus-visible,
+html[data-theme="warm"] button:focus-visible,
+html[data-theme="warm"] [role="button"]:focus-visible,
+html[data-theme="warm"] [role="menuitem"]:focus-visible,
+html[data-theme="warm"] [role="menuitemradio"]:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #633d2e),
+           1px solid var(--color-accent, #f7af63);
+  outline-offset: 2px;
+}
 """

@@ -81,7 +81,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-03 — Theme palettes (3 variants) in `css/tokens.py` + `css/structure.py`
 
-- [ ] **Owner:** frontend-engineer
+- [x] **Owner:** frontend-engineer
 - **Phase:** 2 (theme switcher)
 - **SPEC acceptance:** Surface E (E2E-THM-01..04, E2E-THM-07)
 - **Depends on:** PR3-02
