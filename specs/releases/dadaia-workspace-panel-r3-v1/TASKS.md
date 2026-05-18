@@ -296,7 +296,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-13 — DAG layout + SVG renderer (`features/workflows/dag.py`)
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 5 backend
 - **SPEC acceptance:** §4 dag.py + §7.5 DAG visual + Surface D (D5, D6, D7, D14)
 - **Depends on:** PR3-12
