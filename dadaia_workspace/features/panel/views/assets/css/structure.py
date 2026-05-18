@@ -272,6 +272,23 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 .panel-section { display: none; }
 .panel-section.active { display: block; }
 
+/* ── Responsive tab labels (<768px) ─────────────────────────────────────────
+   On narrow viewports the "Spec Context Projects" label is abbreviated to
+   "Spec Contexts" via CSS ::after replacement. The visible text is hidden with
+   font-size:0 and the short label is injected via ::after content so that the
+   aria-label on the button keeps the full string "Spec Context Projects" for
+   screen readers (PR3-06).
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .tab-memories-btn {
+    font-size: 0;
+  }
+  .tab-memories-btn::after {
+    content: "Spec Contexts";
+    font-size: 0.92rem;
+  }
+}
+
 /* ── Warm theme focus-visible override (E2E-THM-07) ─────────────────────────
    Amber alone fails the WCAG 3:1 UI-component contrast threshold on white.
    In the Warm theme the focus ring uses --color-accent-dark (brown) as the
