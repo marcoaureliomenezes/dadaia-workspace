@@ -445,7 +445,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-20 — SE integration tests (~12 new)
 
-- [ ] **Owner:** software-engineer
+- [-] **Owner:** software-engineer
 - **Phase:** 7
 - **SPEC acceptance:** §13 Definition of Done #2
 - **Depends on:** PR3-19
