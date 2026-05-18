@@ -116,7 +116,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-05 — `wrapper.py` token consumption fix
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 2
 - **SPEC acceptance:** §4 wrapper.py FIX + §7.7
 - **Depends on:** PR3-03

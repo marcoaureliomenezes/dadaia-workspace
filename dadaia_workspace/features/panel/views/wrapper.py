@@ -32,12 +32,10 @@ def render_memory_wrapper(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
+  <script>(function(){{var t=localStorage.getItem('dadaia-panel-theme');if(t&&(t==='mint'||t==='sage'||t==='warm')){{document.documentElement.dataset.theme=t;}}}})();</script>
+  <link rel="stylesheet" href="/static/tokens.css">
   <style>
     :root {{
-      --color-bg: #fafafa; --color-surface: #ffffff; --color-heading: #111111;
-      --color-muted: #666666; --color-border: #dddddd; --color-border-strong: #333333;
-      --color-accent: #7ec8e3; --color-accent-dark: #2d7d9a; --color-code-bg: #f0f0f0;
-      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       --topbar-h: 40px;
     }}
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
