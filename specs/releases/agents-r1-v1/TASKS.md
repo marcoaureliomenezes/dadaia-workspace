@@ -408,7 +408,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-32 — Extend `reader.py` with `paths` field
 
-- [ ] **Owner:** software-engineer
+- [-] **Owner:** software-engineer
 - **Phase:** P6
 - **SPEC acceptance:** §8.5
 - **Depends on:** AGT-09..AGT-17 (agents present so tests can iterate)
@@ -420,7 +420,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-33 — Update 10 panel/agents/workflows test files
 
-- [ ] **Owner:** software-engineer
+- [-] **Owner:** software-engineer
 - **Phase:** P6
 - **SPEC acceptance:** §9 (full test list)
 - **Depends on:** AGT-32, AGT-29, AGT-30, AGT-31
