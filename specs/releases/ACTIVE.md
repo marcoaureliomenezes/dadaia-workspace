@@ -1,2 +1,2 @@
-release: none
-phase: none
+release: agents-r1-v1
+phase: SPEC
