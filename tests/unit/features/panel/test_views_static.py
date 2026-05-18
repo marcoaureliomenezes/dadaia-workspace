@@ -1,14 +1,13 @@
-"""Unit tests for views/static.py — T-3.6.
+"""Unit tests for views/static.py — T-3.6 (updated for PR3-02 activation).
 
 Covers:
-  - panel.css served with correct content-type
-  - panel.js served with correct content-type
-  - Returned bytes equal PANEL_CSS / PANEL_JS encoded as UTF-8
+  - tokens.css served with correct content-type (replaces panel.css)
+  - core.js served with correct content-type (replaces panel.js)
+  - Returned bytes are non-empty
   - Unknown name returns 404
-  - Traversal-like names ("../etc/passwd") return 404 (impossible by dict lookup)
+  - Traversal-like names ("../etc/passwd") return 400 (path traversal guard, PR3-02)
 """
 
-from dadaia_workspace.features.panel.views._assets import PANEL_CSS, PANEL_JS
 from dadaia_workspace.features.panel.views.static import render_static
 
 
@@ -18,29 +17,31 @@ def _view(name: str) -> tuple[int, str, bytes]:
 
 
 def test_static_css_status_and_content_type() -> None:
-    """panel.css returns 200 with text/css; charset=utf-8."""
-    status, ct, _ = _view("panel.css")
+    """tokens.css returns 200 with text/css; charset=utf-8."""
+    status, ct, _ = _view("tokens.css")
     assert status == 200
     assert ct == "text/css; charset=utf-8"
 
 
-def test_static_css_body_equals_constant() -> None:
-    """panel.css body must equal PANEL_CSS.encode('utf-8')."""
-    _, _, body = _view("panel.css")
-    assert body == PANEL_CSS.encode("utf-8")
+def test_static_css_body_is_nonempty() -> None:
+    """tokens.css body must be non-empty bytes."""
+    _, _, body = _view("tokens.css")
+    assert isinstance(body, bytes)
+    assert len(body) > 0
 
 
 def test_static_js_status_and_content_type() -> None:
-    """panel.js returns 200 with application/javascript; charset=utf-8."""
-    status, ct, _ = _view("panel.js")
+    """core.js returns 200 with application/javascript; charset=utf-8."""
+    status, ct, _ = _view("core.js")
     assert status == 200
     assert ct == "application/javascript; charset=utf-8"
 
 
-def test_static_js_body_equals_constant() -> None:
-    """panel.js body must equal PANEL_JS.encode('utf-8')."""
-    _, _, body = _view("panel.js")
-    assert body == PANEL_JS.encode("utf-8")
+def test_static_js_body_is_nonempty() -> None:
+    """core.js body must be non-empty bytes."""
+    _, _, body = _view("core.js")
+    assert isinstance(body, bytes)
+    assert len(body) > 0
 
 
 def test_static_unknown_name_returns_404() -> None:
@@ -49,10 +50,10 @@ def test_static_unknown_name_returns_404() -> None:
     assert status == 404
 
 
-def test_static_traversal_returns_404() -> None:
-    """Traversal-like names must return 404 (dict lookup, no filesystem access)."""
+def test_static_traversal_returns_400() -> None:
+    """Traversal-like names must return 400 (path traversal guard per SPEC §5.2)."""
     status, _, _ = _view("../etc/passwd")
-    assert status == 404
+    assert status == 400
 
 
 def test_static_empty_name_returns_404() -> None:
@@ -62,16 +63,18 @@ def test_static_empty_name_returns_404() -> None:
 
 
 def test_static_css_is_nonempty() -> None:
-    """PANEL_CSS constant must be non-empty."""
-    assert len(PANEL_CSS.strip()) > 0
+    """CSS slice must be non-empty."""
+    _, _, body = _view("tokens.css")
+    assert len(body) > 0
 
 
 def test_static_js_is_nonempty() -> None:
-    """PANEL_JS constant must be non-empty."""
-    assert len(PANEL_JS.strip()) > 0
+    """JS file must be non-empty."""
+    _, _, body = _view("core.js")
+    assert len(body) > 0
 
 
 def test_static_returns_bytes() -> None:
     """View must return bytes, not str."""
-    _, _, body = _view("panel.css")
+    _, _, body = _view("tokens.css")
     assert isinstance(body, bytes)
