@@ -489,7 +489,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-22 — Visual evidence (21 screenshots) + axe-core ×3 themes
 
-- [-] **Owner:** qa-engineer
+- [x] **Owner:** qa-engineer
 - **Phase:** 7
 - **SPEC acceptance:** Surface H + §13 Definition of Done #6, #7
 - **Depends on:** PR3-21
