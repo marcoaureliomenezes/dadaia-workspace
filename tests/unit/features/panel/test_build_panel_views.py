@@ -134,17 +134,17 @@ def test_memory_view_wrapper_callable(tmp_path: Path) -> None:
 
 
 def test_static_css_callable(tmp_path: Path) -> None:
-    """static view must serve panel.css."""
+    """static view must serve tokens.css (activated PR3-02 slice)."""
     views = _build_views(tmp_path)
-    status, ct, _ = views["static"](name="panel.css")
+    status, ct, _ = views["static"](name="tokens.css")
     assert status == 200
     assert "text/css" in ct
 
 
 def test_static_js_callable(tmp_path: Path) -> None:
-    """static view must serve panel.js."""
+    """static view must serve core.js (activated PR3-02 slice)."""
     views = _build_views(tmp_path)
-    status, ct, _ = views["static"](name="panel.js")
+    status, ct, _ = views["static"](name="core.js")
     assert status == 200
     assert "javascript" in ct
 
