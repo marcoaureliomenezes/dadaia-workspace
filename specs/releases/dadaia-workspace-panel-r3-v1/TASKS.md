@@ -15,7 +15,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-00 — Close prerequisite releases (v0.1.1 + agent-monitoring-v1)
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** 0 (prerequisites)
 - **SPEC acceptance:** §9 Prerequisites
 - **Depends on:** none
