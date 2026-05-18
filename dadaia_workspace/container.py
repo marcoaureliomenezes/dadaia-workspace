@@ -10,7 +10,11 @@ from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import render_api_contexts, render_api_servers
+from dadaia_workspace.features.panel.views.api import (
+    render_api_agents_canonical,
+    render_api_contexts,
+    render_api_servers,
+)
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
@@ -154,11 +158,15 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
     )
 
 
-def build_panel_service(workspace_root: Path) -> PanelService:
+def build_panel_service(
+    workspace_root: Path,
+    telemetry: object | None = None,
+) -> PanelService:
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
+        telemetry=telemetry,
     )
 
 
@@ -183,17 +191,28 @@ def build_reports_validation_service(workspace_root: Path) -> ReportsValidationS
 
 def build_panel_views(
     workspace_root: Path,
+    telemetry: object | None = None,
 ) -> dict[str, Callable[..., tuple[int, str, bytes]]]:
     """Compose all panel view callables for injection into make_handler_class().
 
     Returns a dict mapping route names to view callables as required by
     ``features/panel/handler.py::make_handler_class(views)``.
+
+    Parameters
+    ----------
+    workspace_root:
+        Absolute path to the workspace root directory.
+    telemetry:
+        Optional TelemetryService instance.  When provided, it is injected
+        into PanelService so that ``render_api_agents_canonical`` can overlay
+        telemetry data on the canonical agent catalog (PR3-08).
     """
-    service = build_panel_service(workspace_root)
+    service = build_panel_service(workspace_root, telemetry=telemetry)
     return {
         "index": render_index(service),
         "api_servers": render_api_servers(service),
         "api_contexts": render_api_contexts(service),
+        "api_agents": render_api_agents_canonical(service),
         "memory": render_memory(workspace_root),
         "memory_view": render_memory_wrapper(workspace_root),
         "static": render_static(),

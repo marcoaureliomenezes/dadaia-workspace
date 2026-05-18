@@ -8,6 +8,7 @@ Responsibilities
 - Expose active Spec Context Projects as PanelContext dataclasses, including
   the cached current_branch field from SpecContextService (R4: no git subprocess
   per request — potential staleness is accepted for Release-1; see PLAN risks R4).
+- Expose the canonical agent catalog via list_canonical_agents() (PR3-08).
 
 Dataclasses
 -----------
@@ -27,6 +28,7 @@ from typing import Any
 
 from dadaia_workspace.core.models.server_registry import PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.features.agents.reader import AgentDTO, read_canonical_agents
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 
@@ -222,6 +224,22 @@ class PanelService:
             )
             for ctx in self._active_contexts()
         ]
+
+    def list_canonical_agents(self) -> list[AgentDTO]:
+        """Return the canonical agent catalog.
+
+        Resolution order (delegated to read_canonical_agents):
+          1. $DADAIA_AGENTS_DIR env var
+          2. <workspace_root>/.dadaia/agentic/agents/
+          3. <workspace_root>/.claude/agents/
+
+        For testing, ``_canonical_agents_override`` may be set on the instance
+        to bypass the filesystem read and return a controlled list directly.
+        """
+        override = getattr(self, "_canonical_agents_override", None)
+        if override is not None:
+            return list(override)
+        return read_canonical_agents(self._workspace_root)
 
     # ------------------------------------------------------------------
     # Private helpers
