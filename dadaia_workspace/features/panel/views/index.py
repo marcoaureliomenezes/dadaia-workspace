@@ -87,14 +87,14 @@ def render_index(
     </div>
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
-    <button class="nav-tab active" data-section="servers" aria-selected="true" role="tab" id="tab-servers">Servers</button>
-    <button class="nav-tab" data-section="memories" aria-selected="false" role="tab" id="tab-memories">Memories</button>
+    <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Spec Context Projects">Spec Context Projects</button>
     <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents</button>
     <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows">Workflows</button>
+    <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
   </nav>
   <main class="main" role="main">
 
-    <section id="section-servers" class="section active" aria-label="Running development servers" role="tabpanel" tabindex="0" aria-labelledby="tab-servers">
+    <section id="section-servers" class="section" aria-label="Running development servers" role="tabpanel" tabindex="0" aria-labelledby="tab-servers">
       <div class="section-header">
         <h2>Servers</h2>
         <p>Dev servers running across active contexts. Auto-refreshes every 5 seconds.</p>
@@ -106,7 +106,7 @@ def render_index(
       <div id="servers-content">{servers_html}</div>
     </section>
 
-    <section id="section-memories" class="section" aria-label="Spec Context Project memories" role="tabpanel" tabindex="0" aria-labelledby="tab-memories">
+    <section id="section-memories" class="section active" aria-label="Spec Context Project memories" role="tabpanel" tabindex="0" aria-labelledby="tab-memories">
       <div class="section-header">
         <h2>Memories</h2>
         <p>Architecture, tech-stack and product memories for each active Spec Context Project.</p>

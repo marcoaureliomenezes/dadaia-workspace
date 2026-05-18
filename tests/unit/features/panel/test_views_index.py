@@ -422,6 +422,108 @@ def test_panel_js_sessions_uses_authed_fetch() -> None:
 
 
 # ---------------------------------------------------------------------------
+# PR3-06 — Tab rename + reorder + responsive label
+# ---------------------------------------------------------------------------
+
+
+def test_tab_memories_visible_label_is_spec_context_projects() -> None:
+    """PR3-06: The visible label on #tab-memories must be 'Spec Context Projects'."""
+    service = _build_service()
+    html = _render(service)
+    # The button text must show the new label
+    assert "Spec Context Projects" in html
+    # The tab button must NOT use the old "Memories" label as its text
+    # (the word may still appear in the section <h2>, but the nav button must say
+    # "Spec Context Projects"). Check the button content specifically.
+    assert ">Spec Context Projects<" in html
+    # The tab-memories button must not still read ">Memories<" as its own label.
+    # Note: <h2>Memories</h2> is allowed inside the section — only the button label matters.
+    idx = html.find('id="tab-memories"')
+    # Grab the button tag up to the closing </button>
+    close_tag = html.find("</button>", idx)
+    button_fragment = html[idx:close_tag]
+    assert "Memories" not in button_fragment, (
+        "tab-memories button text must be 'Spec Context Projects', not 'Memories'"
+    )
+
+
+def test_tab_memories_aria_label_is_spec_context_projects() -> None:
+    """PR3-06: aria-label on tab-memories must be 'Spec Context Projects'."""
+    service = _build_service()
+    html = _render(service)
+    assert 'aria-label="Spec Context Projects"' in html
+
+
+def test_tab_memories_id_unchanged() -> None:
+    """PR3-06: Internal ID tab-memories must remain so #memories hash still works."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-memories"' in html
+
+
+def test_tab_spec_context_projects_is_active_default() -> None:
+    """PR3-06: Default-active tab must be Spec Context Projects (tab-memories)."""
+    service = _build_service()
+    html = _render(service)
+    # The tab-memories button must carry the 'active' class
+    assert 'id="tab-memories"' in html
+    # Verify active class and aria-selected=true are on tab-memories
+    # The active tab button must have aria-selected="true"
+    assert 'id="tab-memories"' in html
+    # Find the substring containing tab-memories and verify active class is present
+    idx = html.find('id="tab-memories"')
+    # Look for 'active' in the surrounding tag (within 200 chars before the id)
+    surrounding = html[max(0, idx - 200) : idx + 100]
+    assert "active" in surrounding, "tab-memories button must have active class"
+    assert 'aria-selected="true"' in surrounding
+
+
+def test_tab_order_spec_context_first_before_agents() -> None:
+    """PR3-06: Spec Context Projects tab must appear before Agents tab in DOM."""
+    service = _build_service()
+    html = _render(service)
+    pos_memories = html.find('id="tab-memories"')
+    pos_agents = html.find('id="tab-agents"')
+    assert pos_memories < pos_agents, "tab-memories must come before tab-agents"
+
+
+def test_tab_order_agents_before_workflows() -> None:
+    """PR3-06: Agents tab must appear before Workflows tab in DOM."""
+    service = _build_service()
+    html = _render(service)
+    pos_agents = html.find('id="tab-agents"')
+    pos_workflows = html.find('id="tab-workflows"')
+    assert pos_agents < pos_workflows, "tab-agents must come before tab-workflows"
+
+
+def test_tab_order_workflows_before_servers() -> None:
+    """PR3-06: Workflows tab must appear before Servers tab in DOM."""
+    service = _build_service()
+    html = _render(service)
+    pos_workflows = html.find('id="tab-workflows"')
+    pos_servers = html.find('id="tab-servers"')
+    assert pos_workflows < pos_servers, "tab-workflows must come before tab-servers"
+
+
+def test_servers_tab_not_active_by_default() -> None:
+    """PR3-06: Servers tab must NOT be the default-active tab."""
+    service = _build_service()
+    html = _render(service)
+    idx = html.find('id="tab-servers"')
+    surrounding = html[max(0, idx - 200) : idx + 100]
+    assert 'aria-selected="false"' in surrounding, "tab-servers must not be active"
+
+
+def test_responsive_css_abbreviation_rule_present() -> None:
+    """PR3-06: structure.py must contain a <768px CSS rule abbreviating the tab label."""
+    from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
+
+    assert "@media" in STRUCTURE_CSS
+    assert "768px" in STRUCTURE_CSS
+    assert "Spec Contexts" in STRUCTURE_CSS
+
+
+# ---------------------------------------------------------------------------
 # Bug 4 — Workflows 2-pane redesign (panel-defects hotfix)
 # ---------------------------------------------------------------------------
 
