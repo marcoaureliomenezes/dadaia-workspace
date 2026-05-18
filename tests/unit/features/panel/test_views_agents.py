@@ -7,6 +7,10 @@ Covers:
   - Empty-state id="agents-empty" element is present and hidden by default
   - Staleness banner id="agents-staleness-banner" is present, hidden, role="status"
   - No inline agent data serialized into HTML (data is JS-fetched)
+
+AGT-33 note: render_agents_section() is a static-HTML skeleton; agent cards are populated
+client-side via JS fetch.  There is no hardcoded card count to update when new agents are
+added (C1 — 16-agent topology).  The no-inline-data test below guards this invariant.
 """
 
 from dadaia_workspace.features.panel.views.agents import render_agents_section

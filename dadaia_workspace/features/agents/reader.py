@@ -39,6 +39,7 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "maxTurns",          # frontmatter key (camelCase)
         "max_turns",         # alternative snake_case spelling
         "input_contract",
+        "paths",             # declarative path allowlist (AGT-32; not enforced this release)
     }
 )
 
@@ -59,6 +60,7 @@ class AgentDTO:
     opencode_model: str | None = None
     max_turns: int | None = None
     input_contract: dict[str, Any] | None = None
+    paths: dict[str, list[str]] | None = None
 
 
 def _resolve_agents_dir(workspace_root: Path) -> Path | None:
@@ -147,6 +149,11 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         input_contract_raw if isinstance(input_contract_raw, dict) else None
     )
 
+    paths_raw = raw.get("paths")
+    paths: dict[str, list[str]] | None = (
+        paths_raw if isinstance(paths_raw, dict) else None
+    )
+
     return AgentDTO(
         id=name,
         name=name,
@@ -157,6 +164,7 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         opencode_model=opencode_model,
         max_turns=max_turns,
         input_contract=input_contract,
+        paths=paths,
     )
 
 

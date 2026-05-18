@@ -235,3 +235,92 @@ class TestApiWorkflowsListLeanliness:
         """LIST items should not contain 'inputs' (detail-only field)."""
         item = self._get_item()
         assert "inputs" not in item
+
+
+# ---------------------------------------------------------------------------
+# AGT-33 — 3 new workflows (audit-cycle, code-review-fan-out, design-validation)
+# ---------------------------------------------------------------------------
+
+_NEW_WORKFLOW_NAMES = [
+    "audit-cycle",
+    "code-review-fan-out",
+    "design-validation",
+]
+
+
+class TestNewWorkflowsInList:
+    """Assert the 3 new workflows (AGT-29..AGT-31) appear correctly in LIST responses."""
+
+    def _service_with_new_workflows(self) -> _FakeService:
+        summaries = [_make_summary(name=n) for n in _NEW_WORKFLOW_NAMES]
+        return _FakeService(summaries)
+
+    def test_all_new_workflows_present_in_list(self) -> None:
+        """All 3 new workflow names must appear in the LIST response."""
+        service = self._service_with_new_workflows()
+        view = render_api_workflows_list(service)  # type: ignore[arg-type]
+        _, _, body = view()
+        data = json.loads(body)
+        returned_names = {item["name"] for item in data["workflows"]}
+        for name in _NEW_WORKFLOW_NAMES:
+            assert name in returned_names, f"New workflow {name!r} missing from LIST"
+
+    def test_new_workflow_count_is_3(self) -> None:
+        """LIST with exactly the 3 new workflows returns 3 items."""
+        service = self._service_with_new_workflows()
+        view = render_api_workflows_list(service)  # type: ignore[arg-type]
+        _, _, body = view()
+        data = json.loads(body)
+        assert len(data["workflows"]) == 3
+
+    def test_full_15_workflow_topology_count(self) -> None:
+        """With 15-workflow topology the LIST response returns 15 entries."""
+        original_12 = [
+            "tdd-cycle", "cross-cutting-feature", "spec-refinement",
+            "hotfix", "release-closure", "feature-discovery",
+            "agent-onboarding", "security-audit", "refactor-cycle",
+            "research-spike", "multi-agent-collab", "onboarding-tour",
+        ]
+        all_15 = original_12 + _NEW_WORKFLOW_NAMES
+        summaries = [_make_summary(name=n) for n in all_15]
+        service = _FakeService(summaries)
+        view = render_api_workflows_list(service)  # type: ignore[arg-type]
+        _, _, body = view()
+        data = json.loads(body)
+        assert len(data["workflows"]) == 15
+
+    def test_audit_cycle_item_shape(self) -> None:
+        """audit-cycle LIST item must carry all required summary fields."""
+        service = _FakeService([_make_summary("audit-cycle", stage_count=6, has_parallel=True, has_gates=True)])
+        view = render_api_workflows_list(service)  # type: ignore[arg-type]
+        _, _, body = view()
+        data = json.loads(body)
+        item = data["workflows"][0]
+        assert item["name"] == "audit-cycle"
+        assert isinstance(item["stage_count"], int)
+        assert item["has_parallel"] is True
+        assert item["has_gates"] is True
+        assert "diagram_svg" not in item
+        assert "stages" not in item
+
+    def test_code_review_fan_out_item_shape(self) -> None:
+        """code-review-fan-out LIST item must carry all required summary fields."""
+        service = _FakeService([_make_summary("code-review-fan-out", stage_count=4, has_parallel=True)])
+        view = render_api_workflows_list(service)  # type: ignore[arg-type]
+        _, _, body = view()
+        data = json.loads(body)
+        item = data["workflows"][0]
+        assert item["name"] == "code-review-fan-out"
+        assert item["has_parallel"] is True
+        assert "stages" not in item
+
+    def test_design_validation_item_shape(self) -> None:
+        """design-validation LIST item must carry all required summary fields."""
+        service = _FakeService([_make_summary("design-validation", stage_count=2)])
+        view = render_api_workflows_list(service)  # type: ignore[arg-type]
+        _, _, body = view()
+        data = json.loads(body)
+        item = data["workflows"][0]
+        assert item["name"] == "design-validation"
+        assert item["stage_count"] == 2
+        assert "stages" not in item

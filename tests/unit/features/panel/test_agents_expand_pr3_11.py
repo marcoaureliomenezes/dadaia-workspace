@@ -244,3 +244,53 @@ def test_agents_css_expanded_detail_not_display_none_when_shown() -> None:
     assert "agent-card__detail[hidden]" in AGENTS_CSS, (
         "agents.css must include .agent-card__detail[hidden] { display: none; } rule"
     )
+
+
+# ---------------------------------------------------------------------------
+# AGT-33 — project-manager expansion case (skills: project-orchestration)
+# ---------------------------------------------------------------------------
+
+
+def test_agents_js_does_not_hardcode_agent_ids() -> None:
+    """agents.js must not hardcode a fixed list of agent IDs.
+
+    The 16-agent topology (AGT-33) requires that expanding any agent card works
+    dynamically.  A hardcoded agent-ID list would break when new agents are added.
+    """
+    agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+    # Hardcoded old-topology agent names MUST NOT appear as a fixed enum/array
+    # (individual string occurrences in comments / fetch paths are fine, but a
+    # JS array literal containing all the agent IDs is the anti-pattern we guard).
+    # We check that no JS array literal references the old-topology agent set exhaustively.
+    old_agents = [
+        "software-engineer", "frontend-engineer", "backend-engineer",
+        "qa-engineer", "devops-engineer",
+    ]
+    # If all 5 appear AND they're close together (within 500 chars), likely an array
+    indices = [agents_text.find(f'"{a}"') for a in old_agents]
+    if all(i >= 0 for i in indices):
+        span = max(indices) - min(indices)
+        assert span > 500 or span == -1, (
+            "agents.js appears to hardcode the original agent ID set as a list "
+            "(found all 5 original agents within a 500-char span). "
+            "Expand dynamically instead — new agents must not require JS changes."
+        )
+
+
+def test_agents_js_renders_skills_as_generic_list() -> None:
+    """agents.js must render skills from card data — not hardcode skill names.
+
+    This verifies that project-manager (skills: project-orchestration, dadaia-grill-me,
+    dadaia-workspace-manager, dadaia-workspace-spec-navigator, dadaia-task-manager)
+    and all other new agents can have their skills rendered without code changes.
+    """
+    agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+    # Skills must be read from the data object (agent.skills or similar)
+    assert "skills" in agents_text, (
+        "agents.js must reference 'skills' field from agent data for rendering"
+    )
+    # Verify no hardcoded skill name for the project-orchestration skill
+    # (its presence would indicate a non-generic renderer)
+    assert "project-orchestration" not in agents_text, (
+        "agents.js must NOT hardcode skill names — render from data generically"
+    )
