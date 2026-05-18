@@ -18,7 +18,6 @@ tools:
   - Bash
   - Glob
   - Grep
-  - Agent
 skills:
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
