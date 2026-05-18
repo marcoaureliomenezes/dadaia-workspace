@@ -236,7 +236,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-11 — Agent card UI (expanded + lazy prompt fetch + multi-open accordion) — FE
 
-- [ ] **Owner:** frontend-engineer
+- [x] **Owner:** frontend-engineer
 - **Phase:** 4 UI
 - **SPEC acceptance:** §7.4 + Surface C (C4..C8, C11)
 - **Depends on:** PR3-10, PR3-09 (endpoint for lazy fetch)
