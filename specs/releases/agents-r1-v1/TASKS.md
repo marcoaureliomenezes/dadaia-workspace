@@ -195,7 +195,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-15 — Slim agent `product-engineer.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §6.1
 - **Depends on:** AGT-08
@@ -207,7 +207,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-16 — Slim agent `frontend-engineer.md`
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §6.2
 - **Depends on:** AGT-08
@@ -219,7 +219,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-17 — Strip `Agent` tool from 8 leaf implementers
 
-- [ ] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P2
 - **SPEC acceptance:** §6.3
 - **Depends on:** AGT-08

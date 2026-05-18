@@ -19,7 +19,6 @@ tools:
   - Glob
   - Grep
   - Write
-  - Agent
 skills:
   - architect-code-audit
   - architect-design-patterns
