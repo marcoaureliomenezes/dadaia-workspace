@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR3-22 — Visual evidence + axe-core ×3 themes</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  a  { color: #0969da; }
+  code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 87.5%; background: #f6f8fa; padding: .15em .4em; border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  .meta {
+    background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px;
+    padding: .75rem 1rem; margin-bottom: 2rem; font-size: .9rem;
+    display: flex; flex-wrap: wrap; gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge { display: inline-block; padding: .15em .5em; border-radius: 3px; font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .badge-pass { background: #daffd0; color: #1a5c00; }
+  .badge-fail { background: #ffd7d7; color: #a00; }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+  .shot { border: 1px solid #d0d7de; border-radius: 6px; padding: .5rem; background: #fafafa; }
+  .shot img { width: 100%; height: auto; display: block; border-radius: 4px; }
+  .shot figcaption { font-size: .8rem; color: #555; margin-top: .35rem; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> qa-engineer</span>
+  <span><strong>Gerado em:</strong> 2026-05-18T160000Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Release:</strong> dadaia-workspace-panel-r3-v1</span>
+  <span><strong>Task:</strong> PR3-22</span>
+</div>
+
+<h1>PR3-22 — Visual evidence + axe-core ×3 themes <span class="badge badge-pass">PASS</span></h1>
+
+<h2>Summary</h2>
+<ul>
+  <li><strong>21 / 21</strong> screenshots captured per QA test plan §4.</li>
+  <li><strong>6 / 6</strong> axe-core scans pass with <strong>0 critical, 0 serious</strong> violations across Mint/Sage/Warm × Agents/Workflows.</li>
+  <li>2 WCAG AA color-contrast failures discovered during initial scan were fixed mid-PR3-22 in commit <code>b859d3f</code> (workflow CTA buttons + skill-chip text).</li>
+  <li>SPEC §13 DoD #6 (visual evidence) and #7 (axe-core zero critical/serious) satisfied.</li>
+</ul>
+
+<h2>axe-core scan results (6 combos)</h2>
+<table>
+  <thead>
+    <tr><th>Theme</th><th>Surface</th><th>Critical</th><th>Serious</th><th>Moderate</th><th>Minor</th><th>Verdict</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Mint</td><td>Agents</td><td>0</td><td>0</td><td>2</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr>
+    <tr><td>Mint</td><td>Workflows</td><td>0</td><td>0</td><td>2</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr>
+    <tr><td>Sage</td><td>Agents</td><td>0</td><td>0</td><td>2</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr>
+    <tr><td>Sage</td><td>Workflows</td><td>0</td><td>0</td><td>2</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr>
+    <tr><td>Warm</td><td>Agents</td><td>0</td><td>0</td><td>2</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr>
+    <tr><td>Warm</td><td>Workflows</td><td>0</td><td>0</td><td>2</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr>
+  </tbody>
+</table>
+<p>Moderate violations (2 per combo) are not blockers per SPEC §13 DoD #7 which gates only on <code>critical</code> and <code>serious</code>. They are filed in the post-release backlog for follow-up.</p>
+
+<h2>Screenshots (21)</h2>
+<p>Captured against the running panel at <code>http://127.0.0.1:4999/</code> with the panel-r3-v1 build (HEAD = <code>b859d3f</code>). Files in <code>screenshots/</code> sibling directory.</p>
+
+<div class="shots">
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/tab-bar-initial.png" alt="Tab bar initial state"><figcaption>tab-bar-initial.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/topbar-with-theme-switcher.png" alt="Topbar with theme switcher"><figcaption>topbar-with-theme-switcher.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/spec-context-tab.png" alt="Spec Context Projects tab"><figcaption>spec-context-tab.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/theme-switcher-dropdown-open.png" alt="Theme switcher dropdown"><figcaption>theme-switcher-dropdown-open.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/theme-mint-applied.png" alt="Theme Mint"><figcaption>theme-mint-applied.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/theme-sage-applied.png" alt="Theme Sage"><figcaption>theme-sage-applied.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/theme-warm-applied.png" alt="Theme Warm"><figcaption>theme-warm-applied.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/agents-grid-zero-telemetry.png" alt="Agents grid zero telemetry"><figcaption>agents-grid-zero-telemetry.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/agent-card-inactive-zero-telemetry.png" alt="Agent card inactive"><figcaption>agent-card-inactive-zero-telemetry.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/agent-card-collapsed-frontend-engineer.png" alt="Agent card collapsed FE"><figcaption>agent-card-collapsed-frontend-engineer.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/agent-card-collapsed-qa-engineer.png" alt="Agent card collapsed QA"><figcaption>agent-card-collapsed-qa-engineer.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/agent-card-expanded-frontend-engineer.png" alt="Agent card expanded FE"><figcaption>agent-card-expanded-frontend-engineer.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/agents-two-expanded.png" alt="Two agents expanded"><figcaption>agents-two-expanded.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflows-grid.png" alt="Workflows grid"><figcaption>workflows-grid.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflow-card-tdd-cycle.png" alt="Workflow card tdd-cycle"><figcaption>workflow-card-tdd-cycle.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflow-card-cross-cutting-feature.png" alt="Workflow card cross-cutting"><figcaption>workflow-card-cross-cutting-feature.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflow-detail-tdd-cycle-full.png" alt="Workflow detail full"><figcaption>workflow-detail-tdd-cycle-full.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflow-dag-tdd-cycle.png" alt="DAG tdd-cycle"><figcaption>workflow-dag-tdd-cycle.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflow-dag-cross-cutting-feature.png" alt="DAG cross-cutting"><figcaption>workflow-dag-cross-cutting-feature.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflow-dag-spec-refinement.png" alt="DAG spec-refinement"><figcaption>workflow-dag-spec-refinement.png</figcaption></figure>
+  <figure class="shot"><img src="2026-05-18T160000Z/screenshots/workflows-grid-after-back.png" alt="Workflows grid after back"><figcaption>workflows-grid-after-back.png</figcaption></figure>
+</div>
+
+<h2>Real regressions discovered + fixed during PR3-21/22 E2E pressure</h2>
+<table>
+  <thead><tr><th>Commit</th><th>Bug</th><th>Origin</th></tr></thead>
+  <tbody>
+    <tr><td><code>35e96ce</code></td><td>CSP <code>style-src</code> missing <code>'self'</code></td><td>PR3-01 regression</td></tr>
+    <tr><td><code>296ffcc</code></td><td><code>authedFetch</code> scoped inside core.js IIFE</td><td>PR3-10/16 regression</td></tr>
+    <tr><td><code>a802e44</code></td><td><code>TelemetryService</code> factory wired to deleted reader</td><td>PR3-18 cleanup gap</td></tr>
+    <tr><td><code>f074a0a</code></td><td><code>handleHashOnActivation</code> early return on empty hash</td><td>PR3-17 regression</td></tr>
+    <tr><td><code>b859d3f</code></td><td>WCAG AA contrast: workflow CTA + skill-chip text</td><td>PR3-04/10/16 (theme palette interplay)</td></tr>
+  </tbody>
+</table>
+
+<h2>Conclusion</h2>
+<p><strong>PASS.</strong> 21/21 screenshots captured; 6/6 axe-core scans return zero critical and zero serious WCAG violations across all three themes on both Agents and Workflows tabs. Five real application regressions discovered during E2E pressure were fixed and are documented above. Release panel-r3-v1 is ready for CLOSURE (PR3-23).</p>
+
+</body>
+</html>
