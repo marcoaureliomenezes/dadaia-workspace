@@ -166,10 +166,24 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
     def _stub_json(**kw: Any) -> tuple[int, str, bytes]:
         return (200, "application/json", b"{}")
 
+    # PR3-14: /api/workflows is now a bearer-only canonical-source view
+    # (no longer uses telemetry).  The integration test injects a stub that
+    # returns a minimal conforming payload so existing 200+shape assertions pass.
+    def _stub_workflows_list(**kw: Any) -> tuple[int, str, bytes]:
+        import json as _json
+        import datetime as _dt
+        payload = {
+            "generated_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
+            "source_hint": ".dadaia/agentic/workflows/",
+            "workflows": [],
+        }
+        return (200, "application/json; charset=utf-8", _json.dumps(payload).encode("utf-8"))
+
     stub_views = {
         "index": _stub_view,
         "api_servers": _stub_json,
         "api_contexts": _stub_json,
+        "api_workflows": _stub_workflows_list,
         "memory": _stub_view,
         "memory_view": _stub_view,
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
