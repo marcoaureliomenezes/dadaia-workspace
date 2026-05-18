@@ -173,3 +173,96 @@ def test_path_traversal_returns_400(name: str) -> None:
 def test_body_is_bytes(name: str) -> None:
     _, _, body = _view(name)
     assert isinstance(body, bytes)
+
+
+# ---------------------------------------------------------------------------
+# .map MIME type — Content-Type: application/json; charset=utf-8
+# ---------------------------------------------------------------------------
+
+
+def test_map_extension_returns_404_when_no_map_file_registered() -> None:
+    """A .map filename with an unknown name returns 404 (known ext, unknown file)."""
+    status, _, _ = _view("nonexistent.map")
+    assert status == 404
+
+
+def test_map_extension_content_type_in_mime_map() -> None:
+    """The .map extension is registered in the MIME map (application/json)."""
+    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
+
+    assert ".map" in _MIME_BY_EXT
+    assert _MIME_BY_EXT[".map"] == "application/json; charset=utf-8"
+
+
+# ---------------------------------------------------------------------------
+# logo-rhino-16.svg — second SVG asset
+# ---------------------------------------------------------------------------
+
+
+def test_logo_rhino_16_content_type() -> None:
+    """logo-rhino-16.svg returns 200 with image/svg+xml content type."""
+    status, ct, _ = _view("logo-rhino-16.svg")
+    assert status == 200
+    assert ct == "image/svg+xml; charset=utf-8"
+
+
+def test_logo_rhino_16_body_is_nonempty_bytes() -> None:
+    """logo-rhino-16.svg body is non-empty bytes."""
+    _, _, body = _view("logo-rhino-16.svg")
+    assert isinstance(body, bytes)
+    assert len(body) > 0
+
+
+# ---------------------------------------------------------------------------
+# Backslash traversal → 400
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "..\\etc\\passwd",
+        "tokens.css\\..\\..\\etc\\passwd",
+        "subdir\\tokens.css",
+    ],
+)
+def test_backslash_traversal_returns_400(name: str) -> None:
+    """Backslash path separators are treated as traversal attempts → 400."""
+    status, _, _ = _view(name)
+    assert status == 400
+
+
+# ---------------------------------------------------------------------------
+# MIME map coverage — verify all registered extensions
+# ---------------------------------------------------------------------------
+
+
+def test_css_mime_in_map() -> None:
+    """The .css extension is registered with correct MIME type."""
+    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
+
+    assert ".css" in _MIME_BY_EXT
+    assert _MIME_BY_EXT[".css"] == "text/css; charset=utf-8"
+
+
+def test_js_mime_in_map() -> None:
+    """The .js extension is registered with correct MIME type."""
+    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
+
+    assert ".js" in _MIME_BY_EXT
+    assert _MIME_BY_EXT[".js"] == "application/javascript; charset=utf-8"
+
+
+def test_svg_mime_in_map() -> None:
+    """The .svg extension is registered with correct MIME type."""
+    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
+
+    assert ".svg" in _MIME_BY_EXT
+    assert _MIME_BY_EXT[".svg"] == "image/svg+xml; charset=utf-8"
+
+
+def test_mime_map_has_exactly_four_entries() -> None:
+    """The MIME map contains exactly four extension entries (.css, .js, .svg, .map)."""
+    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
+
+    assert set(_MIME_BY_EXT.keys()) == {".css", ".js", ".svg", ".map"}

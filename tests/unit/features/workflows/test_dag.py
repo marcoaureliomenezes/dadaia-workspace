@@ -689,3 +689,149 @@ def test_placeholder_agent_node_has_dag_placeholder_class() -> None:
         if "dag-placeholder" in cls:
             placeholder_nodes.append(elem)
     assert len(placeholder_nodes) >= 1, "Placeholder agent stage missing dag-placeholder class"
+
+
+# ---------------------------------------------------------------------------
+# Tests: cycle / disconnected node fallback (line 136)
+# ---------------------------------------------------------------------------
+
+
+def test_cyclic_stages_render_without_exception() -> None:
+    """Stages with a cycle are handled gracefully — no exception, valid SVG."""
+    # A → B → A (cycle): Kahn's algorithm never drains the queue for these,
+    # so the disconnected-node fallback (line 136) is triggered.
+    cyclic_stages = [
+        StageDTO(
+            id="node_a",
+            agent="product-engineer",
+            needs=["node_b"],  # depends on node_b which depends back on node_a
+            parallel_group=None,
+            gate=False,
+            expected_output_path=None,
+            must_include=None,
+            on_failure="stop",
+        ),
+        StageDTO(
+            id="node_b",
+            agent="software-engineer",
+            needs=["node_a"],  # creates a cycle
+            parallel_group=None,
+            gate=False,
+            expected_output_path=None,
+            must_include=None,
+            on_failure="stop",
+        ),
+    ]
+    svg = render_dag_svg(cyclic_stages)
+    assert isinstance(svg, str)
+    root = _parse_svg(svg)
+    # Both nodes must still appear in the output (assigned to layer 0 fallback)
+    assert _count_nodes(root) == 2
+
+
+def test_cyclic_stages_nodes_have_required_attributes() -> None:
+    """Even cycle-affected nodes carry all required data attributes."""
+    cyclic_stages = [
+        StageDTO(
+            id="cycle_x",
+            agent="software-engineer",
+            needs=["cycle_y"],
+            parallel_group=None,
+            gate=False,
+            expected_output_path=None,
+            must_include=None,
+            on_failure="stop",
+        ),
+        StageDTO(
+            id="cycle_y",
+            agent="qa-engineer",
+            needs=["cycle_x"],
+            parallel_group=None,
+            gate=False,
+            expected_output_path=None,
+            must_include=None,
+            on_failure="stop",
+        ),
+    ]
+    svg = render_dag_svg(cyclic_stages)
+    root = _parse_svg(svg)
+    for elem in root.iter():
+        cls = elem.get("class", "")
+        if "dag-node" in cls:
+            assert elem.get("data-stage-id"), "Cyclic node missing data-stage-id"
+            assert elem.get("data-agent"), "Cyclic node missing data-agent"
+            assert elem.get("data-status") == "pending"
+
+
+def test_single_stage_no_edges() -> None:
+    """A single stage with no needs has no edges in the SVG."""
+    single = [
+        StageDTO(
+            id="solo",
+            agent="product-engineer",
+            needs=[],
+            parallel_group=None,
+            gate=False,
+            expected_output_path=None,
+            must_include=None,
+            on_failure="stop",
+        )
+    ]
+    svg = render_dag_svg(single)
+    root = _parse_svg(svg)
+    assert _count_nodes(root) == 1
+    assert _count_edges(root) == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: agent name HTML escape
+# ---------------------------------------------------------------------------
+
+
+def test_agent_name_xss_is_escaped() -> None:
+    """Agent name containing '<' is HTML-escaped in SVG output."""
+    malicious_stages = [
+        StageDTO(
+            id="stage-id",
+            agent="<evil>agent&name",
+            needs=[],
+            parallel_group=None,
+            gate=False,
+            expected_output_path=None,
+            must_include=None,
+            on_failure="stop",
+        )
+    ]
+    svg = render_dag_svg(malicious_stages)
+    assert "<evil>" not in svg
+    root = _parse_svg(svg)
+    assert root is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests: single-node workflow (no cycle, no parallel group)
+# ---------------------------------------------------------------------------
+
+
+def test_single_gate_node_has_correct_classes() -> None:
+    """A single gate stage produces one node with both dag-node and dag-gate classes."""
+    gate_only = [
+        StageDTO(
+            id="approval",
+            agent="qa-engineer",
+            needs=[],
+            parallel_group=None,
+            gate=True,
+            expected_output_path=None,
+            must_include=None,
+            on_failure="stop",
+        )
+    ]
+    svg = render_dag_svg(gate_only)
+    root = _parse_svg(svg)
+    assert _count_nodes(root) == 1
+    nodes_with_gate = [
+        e for e in root.iter()
+        if "dag-node" in e.get("class", "") and "dag-gate" in e.get("class", "")
+    ]
+    assert len(nodes_with_gate) == 1

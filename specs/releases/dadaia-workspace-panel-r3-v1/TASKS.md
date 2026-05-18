@@ -424,7 +424,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-19 — SE unit test suite (~38 new tests)
 
-- [-] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 7 (tests + evidence)
 - **SPEC acceptance:** §13 Definition of Done #2
 - **Depends on:** PR3-07..PR3-18
