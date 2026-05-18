@@ -1,4 +1,4 @@
-"""Panel API views — JSON endpoints for /api/servers, /api/contexts, /api/agents.
+"""Panel API views — JSON endpoints for /api/servers, /api/contexts, /api/agents, /api/agents/<id>/prompt.
 
 JSON shapes (stable contract — if changed, panel.js must be updated in lockstep):
 
@@ -98,6 +98,7 @@ import json
 import logging
 from collections.abc import Callable
 
+from dadaia_workspace.features.agents.reader import AgentNotFoundError, InvalidAgentIdError, get_prompt
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary
 
@@ -349,6 +350,68 @@ def _empty_telemetry_sub() -> dict[str, object]:
         "context_breakdown": [],
         "recent_sessions": [],
     }
+
+
+def render_api_agent_prompt(
+    service: PanelService,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """Return a closure that serves GET /api/agents/<id>/prompt.
+
+    Response shape (SPEC §5.2):
+        {
+            "agent_id": "<id>",
+            "system_prompt": "<body text, frontmatter stripped>",
+            "source_path": "<relative path hint>"
+        }
+
+    Status codes:
+        200  — agent found, body returned.
+        400  — id fails regex OR resolved path escapes the agents base dir.
+        404  — id is valid but no corresponding .md file exists.
+
+    Security (OWASP A03, A06):
+        - id validated against ^[a-z0-9](?:[a-z0-9_-]{0,63}[a-z0-9])?$ before any I/O.
+        - After resolution, Path.resolve().is_relative_to(base) is asserted (path traversal
+          defence-in-depth per architect note and SPEC §6).
+        - Error messages returned to clients are generic (A06); detail is only logged.
+    """
+
+    def _view(agent_id: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
+        try:
+            body, source_path = get_prompt(agent_id, service._workspace_root)
+        except InvalidAgentIdError as exc:
+            logger.warning("render_api_agent_prompt: invalid agent_id=%r: %s", agent_id, exc)
+            error_body = json.dumps(
+                {
+                    "error": "invalid_agent_id",
+                    "message": "Invalid agent ID format or path traversal attempt.",
+                }
+            ).encode("utf-8")
+            return (400, "application/json; charset=utf-8", error_body)
+        except AgentNotFoundError as exc:
+            logger.debug("render_api_agent_prompt: agent not found agent_id=%r: %s", agent_id, exc)
+            error_body = json.dumps(
+                {
+                    "error": "not_found",
+                    "message": f"Agent {agent_id!r} not found.",
+                }
+            ).encode("utf-8")
+            return (404, "application/json; charset=utf-8", error_body)
+
+        # Build a relative source_path hint for the response.
+        try:
+            relative_hint = str(source_path.relative_to(service._workspace_root))
+        except ValueError:
+            relative_hint = str(source_path)
+
+        payload = {
+            "agent_id": agent_id,
+            "system_prompt": body,
+            "source_path": relative_hint,
+        }
+        return (200, "application/json; charset=utf-8", json.dumps(payload).encode("utf-8"))
+
+    return _view
 
 
 def _compute_30d_cost(summary: AgentSummary) -> float | None:

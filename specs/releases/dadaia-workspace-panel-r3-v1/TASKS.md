@@ -192,7 +192,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-09 — `GET /api/agents/<id>/prompt` + regex + defence-in-depth path check
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 4 backend
 - **SPEC acceptance:** §5.2 + Surface G (G2, G3, G10, G11)
 - **Depends on:** PR3-07
