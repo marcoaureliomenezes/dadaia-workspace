@@ -58,11 +58,6 @@ class _StubCodexReader:
         pass
 
 
-class _StubWorkflowsReader:
-    def read_workflows(self, root: Any, dao: Any, agents: list, now_iso: str) -> None:
-        pass
-
-
 class _StubAggregator:
     def list_agents(self, **kwargs: Any) -> list:
         return []
@@ -96,7 +91,7 @@ def _make_service(state_dir: pathlib.Path, workspace_root: pathlib.Path) -> Tele
     return TelemetryService(
         dao_factory=_dao_factory,
         aggregator=_StubAggregator(),
-        reader_factory=lambda: (_StubClaudeReader(), _StubCodexReader(), _StubWorkflowsReader()),
+        reader_factory=lambda: (_StubClaudeReader(), _StubCodexReader()),
         pricing_module=_StubPricing(),
         workspace_root=workspace_root,
         state_dir=state_dir,
@@ -123,6 +118,7 @@ def _build_panel_server(token: str, svc: TelemetryService) -> ThreadingHTTPServe
         "index": _stub_view,
         "api_servers": _stub_json,
         "api_contexts": _stub_json,
+        "api_workflows": _stub_json,
         "memory": _stub_view,
         "memory_view": _stub_view,
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
@@ -258,11 +254,16 @@ class TestHandlerDegradedResponses:
             "Auth must be checked before the degraded-mode 503."
         )
 
-    def test_api_workflows_with_token_returns_503(self, degraded_panel: Any) -> None:
-        """GET /api/workflows with valid Bearer → 503 when service is degraded."""
+    def test_api_workflows_with_token_returns_200(self, degraded_panel: Any) -> None:
+        """GET /api/workflows with valid Bearer → 200 even when telemetry is degraded.
+
+        api_workflows is a bearer-only route (PR3-14) backed by the canonical
+        WorkflowsService — it does NOT go through the telemetry service, so
+        corrupt-DB degradation does not affect it.
+        """
         base, token = degraded_panel
         status, body = _get(f"{base}/api/workflows", token=token)
-        assert status == 503
+        assert status == 200
 
     def test_api_sessions_with_token_returns_503(self, degraded_panel: Any) -> None:
         """GET /api/agents/{id}/sessions with valid Bearer → 503 when degraded."""
