@@ -154,18 +154,13 @@ def test_api_servers_shape_contract() -> None:
 
 
 def test_api_servers_empty_registry() -> None:
-    """Empty registry returns groups: []. The `unregistered` key (v0.1.1) is
-    present but its content depends on the host's live listeners, so we only
-    assert the registered-server contract here."""
+    """Empty registry returns groups: []. The `unregistered` key was removed in panel-r3."""
     service = _build_service(entries=[], contexts=[])
     view = render_api_servers(service)
     _, _, body = view()
     data = json.loads(body)
     assert data["groups"] == []
-    # `unregistered` key exists (added in v0.1.1); shape is asserted in
-    # tests/unit/features/panel/test_unregistered_section.py.
-    assert "unregistered" in data
-    assert isinstance(data["unregistered"], list)
+    assert "unregistered" not in data
 
 
 def test_api_servers_content_type() -> None:

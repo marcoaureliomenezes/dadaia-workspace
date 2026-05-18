@@ -14,7 +14,6 @@ import pytest
 
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
-    WorkflowListResult,
 )
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
@@ -439,26 +438,6 @@ def test_pricing_age_days_surfaced():
 
     assert result.pricing_age_days is not None
     assert result.pricing_age_days > 0
-
-
-def test_workflow_list():
-    """list_workflows returns both workflows with linked agent IDs."""
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_workflows()
-
-    assert isinstance(result, WorkflowListResult)
-    assert len(result.workflows) == 2
-
-    alpha = next(w for w in result.workflows if w.workflow_id == "wf-alpha")
-    assert "claude (main)" in alpha.agent_ids
-    assert alpha.source == ".claude/skills/"
-
-    beta = next(w for w in result.workflows if w.workflow_id == "wf-beta")
-    assert "software-architect" in beta.agent_ids
-    assert beta.source == ".agents/skills/"
 
 
 def test_sessions_by_agent_pagination():

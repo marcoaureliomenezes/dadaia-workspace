@@ -89,23 +89,25 @@ CREATE INDEX IF NOT EXISTS idx_events_occurred
     ON events(occurred_at DESC);
 """
 
-_MIGRATION_5 = """
-CREATE TABLE IF NOT EXISTS workflows (
-    name           TEXT PRIMARY KEY,
-    source_path    TEXT NOT NULL,
-    description    TEXT,
-    apply_to       TEXT,
-    discovered_at  TEXT NOT NULL,
-    last_seen_at   TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS workflow_agents (
-    workflow_name  TEXT NOT NULL,
-    agent_name     TEXT NOT NULL,
-    PRIMARY KEY (workflow_name, agent_name),
-    FOREIGN KEY (workflow_name) REFERENCES workflows(name) ON DELETE CASCADE,
-    FOREIGN KEY (agent_name)    REFERENCES agents(name)
-);
-"""
+_MIGRATION_5 = (
+    # DEAD: replaced by canonical workflow reader in panel-r3; do not extend; see backlog/candidates.md
+    "CREATE TABLE IF NOT EXISTS workflows ("
+    "    name           TEXT PRIMARY KEY,"
+    "    source_path    TEXT NOT NULL,"
+    "    description    TEXT,"
+    "    apply_to       TEXT,"
+    "    discovered_at  TEXT NOT NULL,"
+    "    last_seen_at   TEXT NOT NULL"
+    ");\n"
+    # DEAD: replaced by canonical workflow reader in panel-r3; do not extend; see backlog/candidates.md
+    "CREATE TABLE IF NOT EXISTS workflow_agents ("
+    "    workflow_name  TEXT NOT NULL,"
+    "    agent_name     TEXT NOT NULL,"
+    "    PRIMARY KEY (workflow_name, agent_name),"
+    "    FOREIGN KEY (workflow_name) REFERENCES workflows(name) ON DELETE CASCADE,"
+    "    FOREIGN KEY (agent_name)    REFERENCES agents(name)"
+    ");\n"
+)
 
 _MIGRATIONS: list[str] = [
     _MIGRATION_1,
