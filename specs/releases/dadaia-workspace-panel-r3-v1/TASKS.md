@@ -98,7 +98,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-04 — Theme switcher JS (button + dropdown + persistence + pre-paint script)
 
-- [ ] **Owner:** frontend-engineer
+- [x] **Owner:** frontend-engineer
 - **Phase:** 2
 - **SPEC acceptance:** §7.7 + Surface E (E2E-THM-01, 02, 05, 06, 08, 09)
 - **Depends on:** PR3-03

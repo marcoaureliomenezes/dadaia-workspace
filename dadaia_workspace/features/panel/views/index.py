@@ -57,6 +57,7 @@ def render_index(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dadaia Workspace Panel</title>
+  <script>(function(){{var t=localStorage.getItem('dadaia-panel-theme');if(t&&(t==='mint'||t==='sage'||t==='warm')){{document.documentElement.dataset.theme=t;}}}})();</script>
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/agents.css">
@@ -68,7 +69,22 @@ def render_index(
     <div class="topbar-wordmark">dadaia<span>&#183;</span>workspace</div>
     <div class="topbar-divider" aria-hidden="true"></div>
     <div class="topbar-subtitle">panel</div>
+    <div class="topbar-right" style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;">
     {primary_badge}
+    <div class="theme-switcher" style="position:relative;">
+      <button id="theme-btn" type="button" class="theme-btn"
+        aria-haspopup="menu" aria-expanded="false"
+        aria-label="Switch colour theme" aria-controls="theme-menu">
+        <span class="theme-btn-icon" aria-hidden="true">&#9680;</span>
+        <span class="theme-btn-label">Theme</span>
+      </button>
+      <ul id="theme-menu" role="menu" aria-label="Colour themes" hidden>
+        <li role="menuitemradio" tabindex="-1" aria-checked="true" data-theme-value="mint">Mint</li>
+        <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="sage">Sage</li>
+        <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="warm">Warm</li>
+      </ul>
+    </div>
+    </div>
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active" data-section="servers" aria-selected="true" role="tab" id="tab-servers">Servers</button>
@@ -106,6 +122,7 @@ def render_index(
     {workflows_section}
 
   </main>
+  <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
 </body>
 </html>"""
