@@ -13,7 +13,7 @@ import html
 from collections.abc import Callable, Sequence
 
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
-from dadaia_workspace.features.panel.views._assets import LOGO_RHINO_24, PANEL_CSS, PANEL_JS
+from dadaia_workspace.features.panel.views._assets import LOGO_RHINO_24
 from dadaia_workspace.features.panel.views.agents import render_agents_section
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section
 
@@ -57,7 +57,10 @@ def render_index(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dadaia Workspace Panel</title>
-  <style>{PANEL_CSS}</style>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/structure.css">
+  <link rel="stylesheet" href="/static/agents.css">
+  <link rel="stylesheet" href="/static/workflows.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -103,7 +106,7 @@ def render_index(
     {workflows_section}
 
   </main>
-  <script>{PANEL_JS}</script>
+  <script src="/static/core.js"></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
