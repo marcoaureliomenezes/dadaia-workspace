@@ -357,3 +357,88 @@ class TestRenderApiAgentPromptView:
         assert status == 400
         data = json.loads(body_bytes)
         assert data["error"] == "invalid_agent_id"
+
+
+# ---------------------------------------------------------------------------
+# AGT-33 — 6 new agent prompts readable; path-traversal guard verified
+# ---------------------------------------------------------------------------
+
+_NEW_AGENT_IDS_PROMPT = [
+    "project-manager",
+    "project-auditor",
+    "code-reviewer",
+    "researcher",
+    "security-reviewer",
+    "design-specialist",
+]
+
+_TRAVERSAL_ATTEMPTS = [
+    "../etc/passwd",
+    "../../etc/passwd",
+    "/etc/passwd",
+    "agent.md",
+    "..",
+    "project-manager/../../../etc/passwd",
+]
+
+
+class TestNewAgentPromptsReadable:
+    """Each of the 6 new agents must be readable as a prompt (200); traversal blocked (400)."""
+
+    def _setup_agents_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                          agent_ids: list[str]) -> Path:
+        agents_dir = tmp_path / "agents"
+        agents_dir.mkdir()
+        monkeypatch.setenv("DADAIA_AGENTS_DIR", str(agents_dir))
+        for aid in agent_ids:
+            _write_agent(agents_dir, aid, body=f"You are the {aid} agent.")
+        return agents_dir
+
+    def test_all_new_agents_return_200(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Each of the 6 new agent IDs returns 200 from the prompt endpoint."""
+        self._setup_agents_dir(tmp_path, monkeypatch, _NEW_AGENT_IDS_PROMPT)
+        service = _FakeService(workspace_root=tmp_path)
+        view = render_api_agent_prompt(service)  # type: ignore[arg-type]
+        for aid in _NEW_AGENT_IDS_PROMPT:
+            status, _, body_bytes = view(agent_id=aid)
+            assert status == 200, f"Expected 200 for agent_id={aid!r}, got {status}"
+            data = json.loads(body_bytes)
+            assert data["agent_id"] == aid
+            assert f"You are the {aid} agent." in data["system_prompt"]
+
+    def test_new_agent_prompt_body_is_stripped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Returned prompt body must not include frontmatter."""
+        agents_dir = self._setup_agents_dir(tmp_path, monkeypatch, ["project-manager"])
+        service = _FakeService(workspace_root=tmp_path)
+        view = render_api_agent_prompt(service)  # type: ignore[arg-type]
+        _, _, body_bytes = view(agent_id="project-manager")
+        data = json.loads(body_bytes)
+        assert "name:" not in data["system_prompt"]
+        assert "---" not in data["system_prompt"]
+
+
+class TestPathTraversalGuardForNewAgents:
+    """Path-traversal patterns must return 400 even in the context of the new topology."""
+
+    @pytest.mark.parametrize("traversal_id", _TRAVERSAL_ATTEMPTS)
+    def test_traversal_id_returns_400(
+        self, traversal_id: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Path-traversal agent_id must be rejected with 400."""
+        agents_dir = tmp_path / "agents"
+        agents_dir.mkdir()
+        monkeypatch.setenv("DADAIA_AGENTS_DIR", str(agents_dir))
+        service = _FakeService(workspace_root=tmp_path)
+        view = render_api_agent_prompt(service)  # type: ignore[arg-type]
+        status, _, body_bytes = view(agent_id=traversal_id)
+        assert status == 400, (
+            f"Expected 400 for traversal attempt {traversal_id!r}, got {status}"
+        )
+        data = json.loads(body_bytes)
+        assert data["error"] == "invalid_agent_id", (
+            f"Expected error='invalid_agent_id' for {traversal_id!r}, got {data.get('error')!r}"
+        )

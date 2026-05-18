@@ -493,3 +493,78 @@ class TestContentType:
         view = render_api_agents_canonical(svc)
         _, content_type, _ = view()
         assert content_type == "application/json; charset=utf-8"
+
+
+# ---------------------------------------------------------------------------
+# AGT-33 — 6 new agents present in /api/agents LIST response
+# ---------------------------------------------------------------------------
+
+_NEW_AGENT_IDS = [
+    "project-manager",
+    "project-auditor",
+    "code-reviewer",
+    "researcher",
+    "security-reviewer",
+    "design-specialist",
+]
+
+
+class TestNewAgentsInList:
+    """Assert each of the 6 new agents (AGT-09..AGT-14) appears in the LIST response."""
+
+    def _build_service_with_agents(self, agent_ids: list[str]) -> "PanelService":
+        agents = [_make_dto(agent_id=aid) for aid in agent_ids]
+        summaries = [_make_agent_summary(agent_id=aid) for aid in agent_ids]
+        tel = FakeTelemetryService(agent_summaries=summaries)
+        return _make_service(agents=agents, telemetry_stub=tel)
+
+    def test_all_new_agents_present_in_list(self) -> None:
+        """All 6 new agent IDs must appear in the LIST response."""
+        svc = self._build_service_with_agents(_NEW_AGENT_IDS)
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+        returned_ids = {card["agent_id"] for card in data["agents"]}
+        for aid in _NEW_AGENT_IDS:
+            assert aid in returned_ids, f"New agent {aid!r} missing from LIST response"
+
+    def test_new_agent_count_is_6(self) -> None:
+        """LIST response with exactly the 6 new agents returns 6 entries."""
+        svc = self._build_service_with_agents(_NEW_AGENT_IDS)
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+        assert len(data["agents"]) == 6
+
+    def test_full_16_agent_topology_count(self) -> None:
+        """With 16-agent topology the LIST response returns 16 entries."""
+        all_16 = [
+            "software-engineer",
+            "frontend-engineer",
+            "backend-engineer",
+            "qa-engineer",
+            "devops-engineer",
+            "product-engineer",
+            "software-architect",
+            "game-developer",
+            "game-designer",
+            "game-tester",
+        ] + _NEW_AGENT_IDS
+        svc = self._build_service_with_agents(all_16)
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+        assert len(data["agents"]) == 16
+
+    def test_new_agent_card_has_required_keys(self) -> None:
+        """Each new-agent card must include all §5.1 required keys."""
+        svc = self._build_service_with_agents(["project-manager"])
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+        card = data["agents"][0]
+        required = {"agent_id", "display_name", "description", "status", "skills",
+                    "tools", "model", "opencode_model", "max_turns", "input_contract",
+                    "telemetry"}
+        missing = required - set(card.keys())
+        assert not missing, f"New agent card missing keys: {missing}"
