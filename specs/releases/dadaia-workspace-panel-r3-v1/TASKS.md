@@ -256,7 +256,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-12a — Pre-implementation: extend `MarkdownWorkflowStore` if gaps
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 5 backend (workflows) — pre-implementation gate
 - **SPEC acceptance:** §4 wrap directive + Risk #3
 - **Depends on:** PR3-06
@@ -277,7 +277,7 @@ tasks `parallel-safe: yes` (disjoint write sets, see PLAN §4).
 
 ## PR3-12 — `WorkflowsService` wrapping `MarkdownWorkflowStore` + mtime cache
 
-- [ ] **Owner:** software-engineer
+- [x] **Owner:** software-engineer
 - **Phase:** 5 backend
 - **SPEC acceptance:** §4 workflows module + §5.6 cache
 - **Depends on:** PR3-12a
