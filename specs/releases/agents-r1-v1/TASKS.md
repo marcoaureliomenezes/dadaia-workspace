@@ -242,7 +242,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-18 — Skill `project-orchestration` (full body)
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P3
 - **SPEC acceptance:** §8.1
 - **Depends on:** AGT-08
@@ -253,7 +253,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-19 — Skill `architecture-code-review` (full body)
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P3
 - **SPEC acceptance:** §8.1
 - **Depends on:** AGT-08
@@ -264,7 +264,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-20 — Skill `security-audit-protocol` (full body)
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P3
 - **SPEC acceptance:** §8.1
 - **Depends on:** AGT-08
@@ -275,7 +275,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-21 — Skill `drift-detection` (full body)
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P3
 - **SPEC acceptance:** §8.1
 - **Depends on:** AGT-08
@@ -286,7 +286,7 @@ Maximum **one `[-]` per agent at a time**, except when this table marks `paralle
 
 ### AGT-22 — Skill `ux-ui-review` (full body)
 
-- [-] **Owner:** product-engineer
+- [x] **Owner:** product-engineer
 - **Phase:** P3
 - **SPEC acceptance:** §8.1
 - **Depends on:** AGT-08
