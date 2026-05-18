@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.features.workflows.dag import render_dag_svg
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,8 @@ class WorkflowsService:
             }
             for inp in wf.inputs
         ]
+        stage_dtos = [_stage_to_dto(s) for s in wf.stages]
+        diagram = render_dag_svg(stage_dtos)
         dto = WorkflowDetailDTO(
             name=wf.name,
             display_name=wf.name,
@@ -234,8 +237,8 @@ class WorkflowsService:
             has_gates=any(s.gate is not None for s in wf.stages),
             source_path=str(source_file),
             inputs=inputs_list,
-            stages=[_stage_to_dto(s) for s in wf.stages],
-            diagram_svg="",  # populated by PR3-13 (DAG renderer)
+            stages=stage_dtos,
+            diagram_svg=diagram,  # server-rendered SVG from dag.py (PR3-13)
         )
 
         if key is not None:
