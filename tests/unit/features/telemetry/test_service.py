@@ -65,14 +65,6 @@ class _FakeCodexReader:
         self.call_count += 1
 
 
-class _FakeWorkflowsReader:
-    def __init__(self) -> None:
-        self.call_count = 0
-
-    def read_workflows(self, root: Any, dao: Any, agents: list, now_iso: str) -> None:
-        self.call_count += 1
-
-
 class _FakeAggregator:
     def __init__(self) -> None:
         self.list_agents_call_count = 0
@@ -101,17 +93,15 @@ def _make_service(
     aggregator: Any | None = None,
     claude_reader: _FakeClaudeReader | None = None,
     codex_reader: _FakeCodexReader | None = None,
-    workflows_reader: _FakeWorkflowsReader | None = None,
     now_fn: Any = None,
     getuid_fn: Any = None,
-) -> tuple[TelemetryService, _FakeClaudeReader, _FakeCodexReader, _FakeWorkflowsReader]:
+) -> tuple[TelemetryService, _FakeClaudeReader, _FakeCodexReader]:
     cr = claude_reader or _FakeClaudeReader()
     cdx = codex_reader or _FakeCodexReader()
-    wfr = workflows_reader or _FakeWorkflowsReader()
     pricing_mod = pricing or _FakePricing()
 
-    def _reader_factory() -> tuple[Any, Any, Any]:
-        return (cr, cdx, wfr)
+    def _reader_factory() -> tuple[Any, Any]:
+        return (cr, cdx)
 
     conn = sqlite3.connect(":memory:")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -135,7 +125,7 @@ def _make_service(
         _now_fn=now_fn,
         _getuid_fn=getuid_fn,
     )
-    return svc, cr, cdx, wfr
+    return svc, cr, cdx
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +164,7 @@ def test_refresh_cached_within_ttl(tmp_path: pathlib.Path) -> None:
     def _fake_now() -> float:
         return _time[0]
 
-    svc, cr, cdx, wfr = _make_service(
+    svc, cr, cdx = _make_service(
         state_dir=tmp_path / "state",
         workspace_root=tmp_path,
         now_fn=_fake_now,
@@ -193,16 +183,15 @@ def test_refresh_cached_within_ttl(tmp_path: pathlib.Path) -> None:
 
 
 def test_refresh_runs_all_readers(tmp_path: pathlib.Path) -> None:
-    """refresh() calls all three readers."""
-    svc, cr, cdx, wfr = _make_service(
+    """refresh() calls both readers."""
+    svc, cr, cdx = _make_service(
         state_dir=tmp_path / "state",
         workspace_root=tmp_path,
     )
     svc.refresh()
 
-    # codex and workflows readers are always called once per cycle.
+    # codex reader is always called once per cycle.
     assert cdx.call_count >= 1
-    assert wfr.call_count >= 1
 
 
 def test_concurrent_refresh_no_op(tmp_path: pathlib.Path) -> None:
@@ -218,7 +207,7 @@ def test_concurrent_refresh_no_op(tmp_path: pathlib.Path) -> None:
     fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
     try:
-        svc, cr, cdx, wfr = _make_service(
+        svc, cr, cdx = _make_service(
             state_dir=state_dir,
             workspace_root=tmp_path,
         )
@@ -226,7 +215,6 @@ def test_concurrent_refresh_no_op(tmp_path: pathlib.Path) -> None:
         # Lock was held externally, so no readers should have run.
         assert cr.call_count == 0
         assert cdx.call_count == 0
-        assert wfr.call_count == 0
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
         os.close(lock_fd)
@@ -235,7 +223,7 @@ def test_concurrent_refresh_no_op(tmp_path: pathlib.Path) -> None:
 def test_list_agents_passthrough(tmp_path: pathlib.Path) -> None:
     """service.list_agents() triggers refresh and delegates to aggregator."""
     fake_agg = _FakeAggregator()
-    svc, _, _, _ = _make_service(
+    svc, _, _ = _make_service(
         state_dir=tmp_path / "state",
         workspace_root=tmp_path,
         aggregator=fake_agg,
@@ -283,7 +271,7 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
     svc = TelemetryService(
         dao_factory=_dao_factory,
         aggregator=_FakeAggregator(),
-        reader_factory=lambda: (_FakeClaudeReader(), _FakeCodexReader(), _FakeWorkflowsReader()),
+        reader_factory=lambda: (_FakeClaudeReader(), _FakeCodexReader()),
         pricing_module=_FakePricing(),
         workspace_root=tmp_path,
         state_dir=tmp_path / "state",

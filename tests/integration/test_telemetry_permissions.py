@@ -46,11 +46,6 @@ class _StubCodexReader:
         pass  # no-op
 
 
-class _StubWorkflowsReader:
-    def read_workflows(self, root: Any, dao: Any, agents: list, now_iso: str) -> None:
-        pass  # no-op
-
-
 class _StubAggregator:
     def list_agents(self, **kwargs: Any) -> list:
         return []
@@ -88,7 +83,7 @@ def _make_service_on_disk(
     return TelemetryService(
         dao_factory=_dao_factory,
         aggregator=_StubAggregator(),
-        reader_factory=lambda: (_StubClaudeReader(), _StubCodexReader(), _StubWorkflowsReader()),
+        reader_factory=lambda: (_StubClaudeReader(), _StubCodexReader()),
         pricing_module=_StubPricing(),
         workspace_root=workspace_root,
         state_dir=state_dir,

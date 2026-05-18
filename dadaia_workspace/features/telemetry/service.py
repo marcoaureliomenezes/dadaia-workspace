@@ -60,9 +60,11 @@ class TelemetryService:
     aggregator:
         TelemetryAggregator instance (features/telemetry/aggregator/queries.py).
     reader_factory:
-        Callable returning a 3-tuple (claude_reader_module, codex_reader_module,
-        workflows_reader_module).  Each module must expose its read function
-        (read_session_file, read_sessions, read_workflows respectively).
+        Callable returning a 2-tuple (claude_reader_module, codex_reader_module).
+        Each module must expose its read function
+        (read_session_file, read_sessions respectively).
+        Workflow ingestion is no longer performed here — workflows are read
+        directly from the canonical store (PR3-18 cleanup).
     pricing_module:
         The features/telemetry/pricing module (or compatible stub).  Must
         expose compute_cost() and PRICING_TABLE.
@@ -83,7 +85,7 @@ class TelemetryService:
         self,
         dao_factory: Callable[[], Any],
         aggregator: Any,
-        reader_factory: Callable[[], tuple[Any, Any, Any]],
+        reader_factory: Callable[[], tuple[Any, Any]],
         pricing_module: Any,
         workspace_root: pathlib.Path,
         state_dir: pathlib.Path = _DEFAULT_STATE_DIR,
@@ -262,7 +264,7 @@ class TelemetryService:
         if db_path.exists():
             os.chmod(db_path, 0o600)
 
-        claude_reader, codex_reader, workflows_reader = self._reader_factory()
+        claude_reader, codex_reader = self._reader_factory()
         now_iso = datetime.datetime.now(tz=datetime.UTC).isoformat()
 
         # --- Claude reader ---
@@ -284,13 +286,6 @@ class TelemetryService:
             codex_reader.read_sessions(codex_path, dao, now_iso)
         except Exception as exc:  # noqa: BLE001
             logger.warning("TelemetryService: codex reader error: %s", exc)
-
-        # --- Workflows reader ---
-        try:
-            known_agents = [a.name for a in dao.list_agents()]
-            workflows_reader.read_workflows(self._workspace_root, dao, known_agents, now_iso)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("TelemetryService: workflows reader error: %s", exc)
 
         # --- Cost backfill ---
         self._backfill_costs(dao, now_iso)
