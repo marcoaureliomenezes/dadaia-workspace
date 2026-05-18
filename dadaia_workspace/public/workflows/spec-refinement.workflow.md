@@ -1,7 +1,7 @@
 ---
 name: spec-refinement
 description: Discovery → 5-way parallel specialist analysis (arch + devops + qa + frontend + backend) → synthesis with operator gates.
-version: 0.2.0
+version: 0.3.0
 schema_version: "1"
 inputs:
   context:
@@ -15,9 +15,9 @@ inputs:
     description: "Release ID under `specs/releases/` (alias of legacy `topic` — pass `release_id` for new callers)."
 stages:
   - id: discovery
-    agent: product-engineer
+    agent: project-manager
     expected_output:
-      path: ".dadaia/reports/{context}/product-engineer/{run_ts}-discovery.html"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.html"
       must_include: ["Findings", "Riscos", "Decisões necessárias"]
     inputs:
       - kind: workflow_input
@@ -86,10 +86,10 @@ stages:
         as: discovery_report
 
   - id: synthesis
-    agent: product-engineer
+    agent: project-manager
     needs: [arch_review, devops_review, qa_review, frontend_review, backend_review]
     expected_output:
-      path: "specs/releases/{release_id}/SPEC.md"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-synthesis.html"
       must_include: ["Status", "Critérios de Aceite"]
     inputs:
       - kind: stage_output
@@ -109,7 +109,18 @@ stages:
         as: backend_report
     gate:
       kind: operator-approval
-      prompt: "Approve the synthesized SPEC before promoting it to 'Em revisão'?"
+      prompt: "Approve the synthesized report before product-engineer authors the SPEC?"
+
+  - id: spec_write
+    agent: product-engineer
+    needs: [synthesis]
+    expected_output:
+      path: "specs/releases/{release_id}/SPEC.md"
+      must_include: ["Status", "Critérios de Aceite"]
+    inputs:
+      - kind: stage_output
+        from: stages.synthesis.output
+        as: synthesis_report
 
 exit_criteria:
   - all_stages: completed
@@ -118,9 +129,10 @@ exit_criteria:
 # spec-refinement
 
 This workflow runs the canonical SDD spec refinement pipeline for any feature topic:
-discovery by `product-engineer`, parallel analysis by five specialists
+discovery by `project-manager`, parallel analysis by five specialists
 (`software-architect`, `devops-engineer`, `qa-engineer`, `frontend-engineer`,
-`backend-engineer`), then synthesis back through `product-engineer`.
+`backend-engineer`), then synthesis by `project-manager`, and finally SPEC authoring
+by `product-engineer` as a leaf.
 
 `frontend-engineer` and `backend-engineer` were added in v0.2.0 to capture
 stack-specific concerns at spec time: the frontend agent reviews UX/UI
@@ -130,6 +142,12 @@ performance budgets. When a feature is purely backend or purely frontend, the
 non-relevant specialist produces a short "not applicable" report — but always
 runs, to make implicit decisions explicit.
 
+In v0.3.0 the discovery and synthesis stages moved from `product-engineer` to
+`project-manager`, who owns the intake interview (grill-me) and report assembly.
+`product-engineer` is now a leaf: it only authors the final SPEC artifact. This
+separation keeps PE's prompt focused on spec quality and memory atomicity rather
+than orchestration concerns.
+
 Operator gates are placed (a) after discovery — to validate that the right problem
-is framed — and (b) after synthesis — to validate the resulting SPEC before it is
-checked in.
+is framed — and (b) after synthesis — to validate the assembled findings before
+PE writes the SPEC.

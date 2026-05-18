@@ -1,7 +1,7 @@
 ---
 name: onboarding-new-repo
-description: Onboarding a new repo into the workspace. Parallel assessment by software-architect (ONBOARD), devops-engineer (SCAN), and qa-engineer (pyramid audit), then product-engineer synthesizes an initial SPEC and road-to-compliance TASKS.
-version: 0.1.0
+description: Onboarding a new repo into the workspace. Parallel assessment by software-architect (ONBOARD), devops-engineer (SCAN), and qa-engineer (pyramid audit), then project-manager synthesizes findings and product-engineer authors the initial SPEC and road-to-compliance TASKS.
+version: 0.2.0
 schema_version: "1"
 inputs:
   context:
@@ -48,10 +48,10 @@ stages:
         as: maturity_target
 
   - id: synthesis
-    agent: product-engineer
+    agent: project-manager
     needs: [arch_assessment, devops_assessment, qa_assessment]
     expected_output:
-      path: "specs/onboarding/SPEC.md"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-onboard-synthesis.html"
       must_include: ["Status", "Road to compliance"]
     inputs:
       - kind: stage_output
@@ -65,7 +65,18 @@ stages:
         as: qa_report
     gate:
       kind: operator-approval
-      prompt: "Approve onboarding SPEC and road-to-compliance plan?"
+      prompt: "Approve synthesis report before product-engineer authors the onboarding SPEC?"
+
+  - id: spec_write
+    agent: product-engineer
+    needs: [synthesis]
+    expected_output:
+      path: "specs/onboarding/SPEC.md"
+      must_include: ["Status", "Road to compliance"]
+    inputs:
+      - kind: stage_output
+        from: stages.synthesis.output
+        as: synthesis_report
 
 exit_criteria:
   - all_stages: completed

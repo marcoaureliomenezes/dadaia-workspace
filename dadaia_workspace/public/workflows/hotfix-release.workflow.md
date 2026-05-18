@@ -1,7 +1,7 @@
 ---
 name: hotfix-release
-description: "Hotfix release lifecycle. qa-engineer or operator files a candidate in specs/backlog/candidates.md `## Hotfixes pendentes`; product-engineer promotes it to a PATCH release (v<M>.<m>.<patch+1>); implementer applies the fix; product-engineer closes with smoke evidence. Memory updates are optional — required only if the fix changes operator-visible product behavior."
-version: 0.1.0
+description: "Hotfix release lifecycle. qa-engineer or operator files a candidate in specs/backlog/candidates.md `## Hotfixes pendentes`; project-manager promotes it to a PATCH release (v<M>.<m>.<patch+1>) and dispatches product-engineer for SPEC entry; implementer applies the fix; qa-engineer validates with smoke; product-engineer closes. Memory updates are optional — required only if the fix changes operator-visible product behavior."
+version: 0.2.0
 schema_version: "1"
 inputs:
   context:
@@ -36,32 +36,43 @@ stages:
         as: severity
 
   - id: promote_to_release
-    agent: product-engineer
+    agent: project-manager
     needs: [file_hotfix_candidate]
     expected_output:
-      path: "specs/releases/{run_version_id}/SPEC.md"
-      must_include: ["Patches release", "Incident summary"]
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-hotfix-promote.html"
+      must_include: ["PATCH version assigned", "ACTIVE.md updated"]
     inputs:
       - kind: stage_output
         from: stages.file_hotfix_candidate.output
         as: candidate_report
 
+  - id: spec_entry
+    agent: product-engineer
+    needs: [promote_to_release]
+    expected_output:
+      path: "specs/releases/{run_version_id}/SPEC.md"
+      must_include: ["Patches release", "Incident summary"]
+    inputs:
+      - kind: stage_output
+        from: stages.promote_to_release.output
+        as: promote_report
+
   - id: apply_fix
     agent: "{{implementer_agent}}"
-    needs: [promote_to_release]
+    needs: [spec_entry]
     expected_output:
       path: ".dadaia/reports/{context}/{implementer_agent}/{run_ts}-hotfix-implementation.html"
       must_include: ["Smoke test", "All tests pass"]
     inputs:
       - kind: stage_output
-        from: stages.promote_to_release.output
+        from: stages.spec_entry.output
         as: hotfix_spec
 
   - id: close_with_smoke
-    agent: product-engineer
+    agent: qa-engineer
     needs: [apply_fix]
     expected_output:
-      path: "specs/releases/{run_version_id}/CLOSURE.md"
+      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-hotfix-smoke.html"
       must_include: ["Validations", "post-deploy smoke"]
     inputs:
       - kind: stage_output
@@ -69,7 +80,18 @@ stages:
         as: implementation_report
     gate:
       kind: operator-approval
-      prompt: "Approve hotfix CLOSURE — post-deploy smoke evidence captured?"
+      prompt: "Approve hotfix smoke evidence before product-engineer writes CLOSURE?"
+
+  - id: closure_write
+    agent: product-engineer
+    needs: [close_with_smoke]
+    expected_output:
+      path: "specs/releases/{run_version_id}/CLOSURE.md"
+      must_include: ["Validations", "post-deploy smoke"]
+    inputs:
+      - kind: stage_output
+        from: stages.close_with_smoke.output
+        as: smoke_report
 
 exit_criteria:
   - all_stages: completed
@@ -82,26 +104,27 @@ Per `sdd-hotfix-track-v1` SPEC (D2/D3/D4): hotfix MUST come through backlog;
 folder name is `v<MAJOR>.<MINOR>.<PATCH>` with PATCH≥1; status ladder is the
 canonical `Draft → Em revisão → Aprovado` (no hotfix-specific ladder).
 
-The 4 stages map to the SDD hotfix flow:
+The 6 stages map to the SDD hotfix flow (v0.2.0: PM + PE separation):
 
 1. **file_hotfix_candidate** — `qa-engineer` (or operator manually) files a
    stub HTML report describing the incident: failing scenario, affected
    release, suggested PATCH bump, severity. A bullet must also be appended to
    `specs/backlog/candidates.md` under `## Hotfixes pendentes` (audited by
    `dadaia specs doctor` SPEC-DOC-012 extended).
-2. **promote_to_release** — `product-engineer` assigns the next PATCH version
+2. **promote_to_release** — `project-manager` assigns the next PATCH version
    (e.g. v1.1.0 → v1.1.1), moves the backlog bullet to `## Histórico`,
    scaffolds the release via `dadaia specs hotfix open <version-id>
    --patches <affected_release> --severity <severity>`, and updates
    `specs/releases/ACTIVE.md`.
-3. **apply_fix** — the chosen implementer reserves a task in
+3. **spec_entry** — `product-engineer` authors the formal `SPEC.md` for the
+   new hotfix release using the promote report as input.
+4. **apply_fix** — the chosen implementer reserves a task in
    `specs/releases/<version_id>/TASKS.md` (marker `[-]`), applies the minimum
    change, runs the local smoke test, commits, marks `[x]`.
-4. **close_with_smoke** — `product-engineer` writes `CLOSURE.md` with a
-   mandatory `## Validations` block containing a post-deploy smoke
-   evidence-triple (description, command, evidence). Memory updates are
-   optional per D16. Gated by operator-approval. After approval: `git mv` to
-   `specs/_archive/releases/` and reset `ACTIVE.md`.
+5. **close_with_smoke** — `qa-engineer` validates with a post-deploy smoke
+   evidence-triple (description, command, evidence). Gated by operator-approval.
+6. **closure_write** — `product-engineer` writes `CLOSURE.md`. After approval:
+   `git mv` to `specs/_archive/releases/` and reset `ACTIVE.md`.
 
 When to use `bug-fix-fastlane` instead:
 
