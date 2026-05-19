@@ -186,7 +186,7 @@
   Cost / Last activity / Status, detail drawer container). Owner:
   frontend-engineer. Done criterion: the function returns a valid HTML
   fragment importable by `index.py`; smoke import passes.
-- [-] **PR5-C2** — New file
+- [x] **PR5-C2** — New file
   `dadaia_workspace/features/panel/views/assets/css/sessions.py` exporting
   `SESSIONS_CSS`: table base styles, status-dot variants (`active`/`idle`/
   `ended`), drawer slide-in/out transitions. Owner: frontend-engineer. Done
