@@ -135,11 +135,13 @@ def _make_dto(
     tools: list[str] | None = None,
     model: str = "claude-sonnet-4-6",
     max_turns: int | None = 60,
+    tier: int = 3,
 ) -> AgentDTO:
     return AgentDTO(
         id=agent_id,
         name=name or agent_id,
         description=description,
+        tier=tier,
         skills=skills or [],
         tools=tools or [],
         model=model,
@@ -568,3 +570,108 @@ class TestNewAgentsInList:
                     "telemetry"}
         missing = required - set(card.keys())
         assert not missing, f"New agent card missing keys: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# PR4-15 — tier field in /api/agents response (C4)
+# ---------------------------------------------------------------------------
+
+# Full 16-agent topology with canonical tier assignments (PR4-11 mapping)
+_TIER1_IDS = ["project-manager", "project-auditor"]
+_TIER2_IDS = ["product-engineer"]
+_TIER3_IDS = [
+    "software-architect",
+    "software-engineer",
+    "backend-engineer",
+    "frontend-engineer",
+    "qa-engineer",
+    "devops-engineer",
+    "code-reviewer",
+    "security-reviewer",
+    "researcher",
+    "design-specialist",
+    "game-developer",
+    "game-designer",
+    "game-tester",
+]
+
+
+def _make_dto_with_tier(agent_id: str, tier: int) -> AgentDTO:
+    return _make_dto(agent_id=agent_id, tier=tier)
+
+
+def _build_full_topology_service() -> "PanelService":
+    """Build a PanelService with 16 agents using canonical tier assignments."""
+    agents = (
+        [_make_dto_with_tier(aid, 1) for aid in _TIER1_IDS]
+        + [_make_dto_with_tier(aid, 2) for aid in _TIER2_IDS]
+        + [_make_dto_with_tier(aid, 3) for aid in _TIER3_IDS]
+    )
+    all_ids = _TIER1_IDS + _TIER2_IDS + _TIER3_IDS
+    summaries = [_make_agent_summary(agent_id=aid) for aid in all_ids]
+    tel = FakeTelemetryService(agent_summaries=summaries)
+    return _make_service(agents=agents, telemetry_stub=tel)
+
+
+class TestTierFieldInResponse:
+    """PR4-15 — tier integer present and valid in /api/agents response (C4)."""
+
+    def test_tier_key_present_in_every_agent_card(self) -> None:
+        """Every agent card in the response must have a 'tier' key."""
+        svc = _build_full_topology_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+
+        for card in data["agents"]:
+            assert "tier" in card, (
+                f"Agent card for {card.get('agent_id')!r} is missing 'tier' key"
+            )
+
+    def test_tier_value_in_valid_set(self) -> None:
+        """Every agent's 'tier' must be an integer in {1, 2, 3}."""
+        svc = _build_full_topology_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+
+        for card in data["agents"]:
+            assert card["tier"] in {1, 2, 3}, (
+                f"Agent {card.get('agent_id')!r} has invalid tier {card.get('tier')!r}"
+            )
+
+    def test_tier_count_per_tier(self) -> None:
+        """With the canonical 16-agent topology: T1=2, T2=1, T3=13."""
+        svc = _build_full_topology_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+
+        from collections import Counter
+        tier_counts = Counter(card["tier"] for card in data["agents"])
+        assert tier_counts[1] == 2, f"Expected 2 T1 agents, got {tier_counts[1]}"
+        assert tier_counts[2] == 1, f"Expected 1 T2 agent, got {tier_counts[2]}"
+        assert tier_counts[3] == 13, f"Expected 13 T3 agents, got {tier_counts[3]}"
+
+    def test_tier_values_match_canonical_mapping(self) -> None:
+        """Specific agents have the correct canonical tier value."""
+        svc = _build_full_topology_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view()
+        data = json.loads(body)
+
+        by_id = {card["agent_id"]: card for card in data["agents"]}
+
+        for aid in _TIER1_IDS:
+            assert by_id[aid]["tier"] == 1, (
+                f"{aid!r} should be tier 1, got {by_id[aid]['tier']}"
+            )
+        for aid in _TIER2_IDS:
+            assert by_id[aid]["tier"] == 2, (
+                f"{aid!r} should be tier 2, got {by_id[aid]['tier']}"
+            )
+        # Sample 3 T3 agents
+        for aid in ["software-engineer", "qa-engineer", "devops-engineer"]:
+            assert by_id[aid]["tier"] == 3, (
+                f"{aid!r} should be tier 3, got {by_id[aid]['tier']}"
+            )
