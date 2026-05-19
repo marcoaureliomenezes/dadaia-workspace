@@ -1,2 +1,2 @@
 release: panel-r4-v1
-phase: TASKS
+phase: CLOSURE

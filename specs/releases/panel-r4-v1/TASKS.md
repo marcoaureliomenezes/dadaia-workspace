@@ -190,7 +190,7 @@
 
 ## P6 — CLOSURE *(product-engineer)*
 
-- [ ] **PR4-22** — Flip `specs/releases/ACTIVE.md` to `phase: CLOSURE` to unlock
+- [-] **PR4-22** — Flip `specs/releases/ACTIVE.md` to `phase: CLOSURE` to unlock
   memory writes. Owner: product-engineer. Done criterion: file reads exactly
   `release: panel-r4-v1` / `phase: CLOSURE`.
 - [ ] **PR4-23** — Finalize `specs/releases/panel-r4-v1/CLOSURE.md` with mandatory
