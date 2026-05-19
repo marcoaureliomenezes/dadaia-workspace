@@ -149,7 +149,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P8 — Stage + install + doctor checkpoint #1
 
-- [ ] AGT-r2-24 — `dadaia public stage && install --target all && doctor` (devops-engineer)
+- [-] AGT-r2-24 — `dadaia public stage && install --target all && doctor` (devops-engineer)
   - Pre-state: P1 trim, P3 paths blocks, P5 path-scope gate, P6/P7 tests landed.
   - Acceptance: `dadaia public doctor` `[ok]` everywhere; stale workflow projections deleted from each target (R4); consumer-repo sweep #1 reports `[ok]` for projected files.
   - Depends: AGT-r2-06, AGT-r2-09, AGT-r2-11, AGT-r2-20, AGT-r2-21, AGT-r2-23.
