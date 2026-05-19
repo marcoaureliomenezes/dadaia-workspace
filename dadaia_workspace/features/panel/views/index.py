@@ -60,6 +60,7 @@ def render_index(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dadaia Workspace Panel</title>
   <script>(function(){{var t=localStorage.getItem('dadaia-panel-theme');if(t&&(t==='mint'||t==='sage'||t==='warm')){{document.documentElement.dataset.theme=t;}}}})();</script>
+  <script>(function(){{var r=localStorage.getItem('dadaia-panel-runtime');if(r&&(r==='claude'||r==='codex')){{document.documentElement.dataset.runtime=r;}}}})();</script>
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/agents.css">
@@ -86,6 +87,28 @@ def render_index(
         <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="sage">Sage</li>
         <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="warm">Warm</li>
       </ul>
+    </div>
+    <div class="runtime-switcher" role="radiogroup" aria-label="Active runtime">
+      <button type="button"
+        class="runtime-btn runtime-btn--claude"
+        id="runtime-btn-claude"
+        role="radio"
+        aria-checked="true"
+        data-runtime-value="claude"
+        aria-label="Claude runtime">
+        <span class="runtime-btn-icon" aria-hidden="true">&#9672;</span>
+        <span class="runtime-btn-label">Claude</span>
+      </button>
+      <button type="button"
+        class="runtime-btn runtime-btn--codex"
+        id="runtime-btn-codex"
+        role="radio"
+        aria-checked="false"
+        data-runtime-value="codex"
+        aria-label="Codex runtime">
+        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>
+        <span class="runtime-btn-label">Codex</span>
+      </button>
     </div>
     </div>
   </header>
@@ -128,6 +151,7 @@ def render_index(
     {sessions_section}
 
   </main>
+  <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
   <script src="/static/agents.js"></script>
