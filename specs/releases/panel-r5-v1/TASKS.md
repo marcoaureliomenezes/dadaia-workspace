@@ -205,7 +205,7 @@
   the "Sessions" nav tab and a `<section id="section-sessions">` container.
   Owner: frontend-engineer. Done criterion: nav tab present in the panel
   topbar; clicking it shows the new section.
-- [ ] **PR5-C5** — Edit `dadaia_workspace/features/panel/views/static.py`:
+- [-] **PR5-C5** — Edit `dadaia_workspace/features/panel/views/static.py`:
   register `sessions.css` and `sessions.js` in `_ASSETS`. Owner:
   frontend-engineer. Done criterion: both assets served at their expected
   paths; the new module loads from a live panel start.
