@@ -66,7 +66,7 @@
   metadata). Owner: software-engineer. Done criterion: the three dataclasses
   import cleanly from `aggregator.models`; existing tests of `models.py` remain
   green.
-- [-] **PR5-A2** — Extend
+- [x] **PR5-A2** — Extend
   `dadaia_workspace/features/telemetry/aggregator/queries.py` with two new
   methods on `TelemetryAggregator`: `list_sessions(runtime, project=None,
   limit=None) -> SessionListResult` and `get_session(runtime, session_id) ->
