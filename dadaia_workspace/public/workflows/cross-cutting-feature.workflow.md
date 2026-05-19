@@ -1,7 +1,7 @@
 ---
 name: cross-cutting-feature
-description: Feature that spans frontend and backend simultaneously. project-manager scopes, software-architect approves the API contract, qa runs parallel red tests, frontend-engineer and backend-engineer implement in parallel, qa validates the integration end-to-end.
-version: 0.2.0
+description: Feature that spans two or more domain surfaces simultaneously (frontend↔backend, Python↔Node, pipeline↔dashboard, AI-entity↔runtime). project-manager scopes, software-architect approves the contract, qa runs parallel red tests, the chosen implementer pair (or trio) builds in parallel against the contract, qa validates the integration end-to-end. Implementer slot is selected from {frontend-engineer, backend-engineer, software-engineer-python, software-engineer-node, data-engineer, data-analyst, ai-engineer} based on the file paths the release touches.
+version: 0.3.0
 schema_version: "1"
 inputs:
   context:
@@ -122,19 +122,71 @@ exit_criteria:
 
 # cross-cutting-feature
 
-For features where the user-visible change AND the server-side change must ship together.
-Coordinates `frontend-engineer` and `backend-engineer` in parallel, around a single
-API contract that `software-architect` approves up front.
+For features where two or more domain surfaces must ship together against a single agreed
+contract. Coordinates the implementer pair (or trio) in parallel, around a contract that
+`software-architect` approves up front.
+
+The canonical example remains frontend↔backend — a new endpoint that the UI consumes,
+where shipping only one side leaves the system incoherent. But the same coordination
+shape applies whenever a release straddles surfaces owned by different specialists:
+Python↔Node, pipeline↔dashboard, AI-entity↔runtime.
 
 ## When to use
 
 - A new endpoint that the UI consumes — both sides need to be built and they must agree
   on the contract
 - A schema change that affects the rendered shape and the producing service
+- A Python CLI that shells out to a Node helper (twin specialists, disjoint write sets)
+- A new curated table that hydrates a new BI dashboard (data-engineer ⇄ data-analyst)
+- A new agent persona whose runtime adapter lives in Python (ai-engineer ⇄
+  software-engineer-python)
 - Anything where shipping only one side leaves the system in an incoherent state
 
 When in doubt, prefer two separate `tdd-cycle` runs (one per side) unless the contract
 risk is high.
+
+## Routing decision — pick the implementer pair (or trio)
+
+Before dispatch, project-manager (or product-engineer in spec entry) reads the release's
+SPEC.md to identify the file paths the cross-cutting feature will touch, then maps each
+path family to its owning specialist using the table below. The implementer slot is
+**always** filled by one or more of the seven leaf specialists listed below — never the
+retired generic implementer that the legacy lib used to expose.
+
+| Path family the feature touches | Implementer dispatched |
+|---|---|
+| Browser surfaces (`*.tsx`, `*.jsx`, browser `*.ts`/`*.js`, `*.css`, `*.html`, `*/frontend/`, `*/client/`, `*/web/`, `*/ui/`) | `frontend-engineer` |
+| Go services, `*.go`, `go.mod`, `go.sum`, production DB integrations | `backend-engineer` |
+| Python lib + scripts (`*.py`, `pyproject.toml`, `dadaia_workspace/{features,infrastructure,cli,core}/**`, Python-marked `repos/**`) | `software-engineer-python` |
+| Node tooling, server-side (`package.json` projects without browser bundler, CLIs, agent runtimes, npm tooling) | `software-engineer-node` |
+| Data pipelines (`*.sql`, `**/databricks/**`, `**/dabs/**` excluding `dashboards/`, `**/notebooks/**`, `**/pipelines/**`) | `data-engineer` |
+| BI dashboards (`**/dashboards/**`, `**/genie/**`, `**/bi/**`, `**/dabs/dashboards/**`) | `data-analyst` |
+| AI-entity surface (`dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**`) | `ai-engineer` |
+
+Dispatch rules:
+
+1. **One path family touched → single implementer**. Use `tdd-cycle` directly; this
+   workflow is overkill.
+2. **Exactly two path families → pair dispatch**. Both implementers run in parallel
+   inside the `green_impls` parallel group. Their `paths.write_allowlist` boundaries
+   guarantee no collision on disk.
+3. **Three or more path families → trio (or more) dispatch**. Same parallel group, same
+   disjoint-write-set guarantee. Watch maxTurns budget across qa-engineer (red + red +
+   ... + integration).
+4. **Python↔Node twin tasks** — when both lib languages are touched, dispatch both
+   `software-engineer-python` and `software-engineer-node` in parallel; each handles its
+   own file subset.
+5. **Data pipeline + BI dashboard** — dispatch `data-engineer` to produce the curated
+   table first, then `data-analyst` to consume it. If both ship in the same release, the
+   workflow stages them with `data-engineer` ahead of `data-analyst` (sequential, not
+   parallel — BI needs the table to exist).
+6. **AI-entity + Python runtime** — dispatch `ai-engineer` and `software-engineer-python`
+   in parallel; the persona file and the Python adapter ship together.
+
+The YAML stage graph below shows the canonical frontend↔backend instantiation. When the
+implementer pair is different (e.g. python↔node), the orchestrator substitutes the
+`green_frontend` / `green_backend` slots with the chosen implementer agents while keeping
+the same red-test-then-green-impl-then-integration shape.
 
 ## Stages
 

@@ -81,7 +81,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 
 ## Phase P3 — Workflow rewiring (W1, parallel-safe with P2 — disjoint write sets)
 
-- [-] R3-15 — Audit `cross-cutting-feature.workflow.md` for bare-SE references (`product-engineer`)
+- [x] R3-15 — Audit `cross-cutting-feature.workflow.md` for bare-SE references (`product-engineer`)
   - Touches: `dadaia_workspace/public/workflows/cross-cutting-feature.workflow.md` (read; edit only if grep is non-empty).
   - Done criterion: `grep -nE '\bsoftware-engineer\b' dadaia_workspace/public/workflows/cross-cutting-feature.workflow.md | grep -v 'software-engineer-python\|software-engineer-node'` → empty. If non-empty at task start, replace bare references with suffixed forms or the appropriate paired specialist (frontend-engineer/backend-engineer). Audit outcome recorded in CLOSURE Drifts section.
 - [ ] R3-16 — Rewire `hotfix-release.workflow.md` (`product-engineer`)
