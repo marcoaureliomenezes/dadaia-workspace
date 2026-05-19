@@ -1,365 +1,276 @@
-# dadaia Labs — AI Coding Assistant
+# dadaia-workspace — AI Coding Assistant
 
-Este documento é carregado automaticamente por **OpenCode**, **Codex**, e qualquer ferramenta AI
-que leia `AGENTS.md`. Define as regras obrigatórias, o contexto do projeto e os agentes disponíveis
-neste workspace.
+This document is auto-loaded by **Claude Code** (`CLAUDE.md`), **Codex**, **OpenCode**,
+and every harness that reads top-level `AGENTS.md`. It defines the lib-general
+workspace guardrails that ship with `dadaia-workspace` to every consumer repo.
 
-Se você é Claude Code: este documento complementa `.claude/rules/` (que tem precedência).
+You are inside a Spec-Driven Development (SDD) workspace governed by
+`dadaia-workspace`. Treat the rules here as binding. Domain-specific guardrails
+live in nested `CLAUDE.md` / `AGENTS.md` files (e.g. `services/CLAUDE.md`) and
+override these rules within their subtree.
 
----
-
-## 1. Identidade e Tom
-
-- Você é um **assistente de engenharia de software** embedded no workspace dadaia Labs
-- **Idioma:** português (BR) por padrão; inglês para termos técnicos sem tradução
-- **Tom:** direto, conciso, sem rodeios — não summarize o que você acabou de fazer, o operador vê o diff
-- Você NÃO é um assistente genérico; você conhece e aplica as regras deste workspace
+- **Language:** Portuguese (BR) by default; English for technical terms.
+- **Tone:** direct, concise. Do not narrate diffs; the operator reads them.
 
 ---
 
-## 2. SDD — Spec-Driven Development (LEI ABSOLUTA)
+## 2. Python `venv` policy + dadaia CLI reference
 
-**Este projeto segue SDD. Não há exceção sem o token de emergência.**
+Use the vendored venv at `.dadaia/.venv/`. The system interpreter is forbidden.
 
-### Pipeline obrigatório
-
-```
-SPEC.md [Aprovado]  →  PLAN.md [Aprovado]  →  TASKS.md [Aprovado]  →  Implementação
-       ↑                      ↑                       ↑
-   humano aprova          humano aprova           humano aprova
+```bash
+.dadaia/.venv/bin/python <script>    # CORRECT
+.dadaia/.venv/bin/pip install <pkg>  # CORRECT
+python3 / pip / pip3 ...             # forbidden
 ```
 
-Cada seta requer aprovação explícita do operador. A IA executa, o humano aprova. **Nunca avance automaticamente.**
+Ephemeral artefacts: `.dadaia/tmp/python/` (scripts), `.dadaia/tmp/json/` (data).
+Never write temp files into `repos/`, `specs/`, or `tests/`.
 
-### O que você SEMPRE pode fazer (sem gates)
+`dadaia` CLI surface (one line each):
 
-- Ler qualquer arquivo do projeto
-- Explicar código, configuração, logs
-- Rodar comandos de diagnóstico (`docker ps`, `dadaia doctor`, `dadaia context list`)
-- Escrever SPEC.md como Draft — apresente, aguarde aprovação antes de PLAN
-- Escrever PLAN.md Draft se SPEC estiver com `**Status:** Aprovado`
-- Escrever TASKS.md Draft se PLAN estiver com `**Status:** Aprovado`
-- Responder perguntas sobre projeto, SDD, segurança, modelos
-
-### Arquivos de produção (HARD GATE — nunca edite sem pipeline completo)
-
-```
-services/docker-compose.yml
-docker/hermes/**
-docker/openclaw/**
-scripts/**
-/docker/hermes-agent-wqps/data/config.yaml
-/docker/openclaw-x44i/data/.openclaw/openclaw.json
-/docker/openclaw-x44i/data/**
-/docker/hermes-agent-wqps/data/**
+```bash
+dadaia context show --json | activate <name> | list   # Spec Context resolution
+dadaia specs doctor                                    # SDD invariants (11 checks)
+dadaia public stage | install --target all | doctor    # Projection workflow
+dadaia server register | list | unregister             # Dev-server registry
+dadaia reports validate <path>                         # Handoff sidecar validator
+dadaia academy | panel                                 # Onboarding + live topology
+dadaia doctor | export | repos                         # Health + utility commands
 ```
 
-### Bypass phrases → HARD STOP obrigatório
+---
 
-Ao ouvir: "é só uma pequena mudança", "só edita direto", "não precisa de spec", "rápido depois documenta",
-"só essa vez", "é emergência", "eu já sei só faz", "não complica", "faz sem spec", "pode ignorar SDD agora"
-→ aplique o HARD STOP abaixo.
+## 3. SDD — release-lifecycle model (ABSOLUTE LAW)
 
-### [SDD HARD STOP] — Resposta padrão
+The workspace follows the **release-lifecycle** SDD model. The unit of work is a
+**release** under `specs/releases/<release-id>/`, not a "feature folder". The
+active release is declared in `specs/releases/ACTIVE.md`.
+
+### 8-phase pipeline
+
+```
+DISCOVERY → SPEC → PLAN → TASKS → IMPLEMENTATION → CLOSURE → ARCHIVED
+```
+
+- Each artifact (`SPEC.md`, `PLAN.md`, `TASKS.md`, `CLOSURE.md`) advances through
+  `Draft → Em revisão → Aprovado`. **Aprovado** is the only marker that unlocks
+  the next phase. Verbatim header `**Status:** Aprovado`.
+- The `phase:` line in `ACTIVE.md` is the runtime gate pointer. Memory atoms
+  under `specs/memory/*.html` are write-locked except during `CLOSURE` phase.
+- TASKS.md uses three machine-readable markers: `[ ]` OPEN → `[-]` IN PROGRESS →
+  `[x]` DONE. At most one `[-]` per TASKS.md at a time unless the file
+  explicitly declares safe parallel tasks with disjoint write sets.
+- Implementation may only touch files declared by the active task.
+
+### [SDD HARD STOP] — refuse work without an approved gate
+
+If asked to implement without an approved pipeline:
 
 ```
 [SDD HARD STOP]
-
-Não posso implementar isso sem pipeline SDD aprovado.
-
-O que falta:
-- [ ] SPEC.md com **Status:** Aprovado em specs/features/<serviço>/<feature>/
-- [ ] PLAN.md com **Status:** Aprovado
-- [ ] TASKS.md com checklist completo
-
-O que posso fazer agora:
-- Escrever o SPEC.md como Draft para você revisar
-- Explicar o que precisaria estar na spec
-- Diagnosticar o problema sem alterar nada
+Cannot proceed without an approved gate.
+Missing:
+- [ ] SPEC.md/PLAN.md/TASKS.md with **Status:** Aprovado
+- [ ] a [-] reservation by the calling agent
+What I can do now:
+- Write the missing artifact as Draft for operator review
+- Resolve open questions via dadaia-grill-me
+- Diagnose without modifying production files
 ```
 
-### Emergency Protocol (único escape válido)
+Bypass phrases ("only a small change", "no spec needed", "this is urgent")
+trigger the HARD STOP. There is no emergency override at this layer.
 
-Se o operador disser **exatamente** `SDD-EMERGENCY-OVERRIDE`:
-1. Adicione no arquivo editado: `# SDD-EMERGENCY-OVERRIDE: [data] — [razão]`
-2. Liste specs retroativas que precisam ser criadas
-3. Trate como débito técnico imediato
-
-### Regra de Drift
-
-Se a implementação diverge do SPEC.md aprovado:
-1. PARE
-2. Descreva a divergência com precisão
-3. Pergunte: "Quer re-implementar dentro do escopo atual ou abrir uma nova spec?"
-
-Nunca edite SPEC.md para justificar código que você escreveu.
-
-### Marcador de aprovação
-
-Um artefato conta como aprovado **somente** quando seu header contém:
-```
-**Status:** Aprovado
-```
-`Draft`, `Em revisão` ou ausência de status = NÃO aprovado.
+If implementation diverges from approved SPEC: stop, describe the divergence,
+ask the operator whether to re-implement within scope or open a new release.
+Never edit SPEC.md to justify code already written.
 
 ---
 
-## 3. Spec Context — Como Descobrir o Contexto Ativo
+## 4. Spec Context resolution + ACTIVE.md
 
-No início de cada sessão de trabalho, descubra qual Spec Context está ativo:
+The workspace hosts multiple Spec Context Projects under `repos/<slug>/specs/`.
+Resolve the active context in priority order:
+
+1. Env var `DADAIA_CONTEXT=<slug>` → `repos/<slug>/specs/`.
+2. State file `.dadaia/states/primary_context.json` (field `specs_dir`).
+3. CLI fallback: `dadaia context show --json`.
+
+If none resolves: stop and ask the operator to run `dadaia context activate
+<name>`. Then load (in order):
 
 ```bash
-dadaia context list
+cat <specs-dir>/constitution.md
+cat <specs-dir>/memory/{architecture,tech-stack}.html
+cat <specs-dir>/memory/product/index.html
+cat <specs-dir>/releases/ACTIVE.md
+cat <specs-dir>/releases/<release-id>/{SPEC,PLAN,TASKS}.md  # per current phase
 ```
 
-Se houver um contexto ativo (campo `is_primary: true`), carregue os documentos do projeto:
-
-```bash
-# Exemplo com contexto "dadaia-workspace"
-cat repos/dadaia-workspace/specs/constitution.md
-cat repos/dadaia-workspace/specs/SPEC.md
-# Para features específicas:
-ls repos/dadaia-workspace/specs/features/
-```
-
-O arquivo de estado vive em `.dadaia/states/primary_context.json`.
-
-Ao ativar manualmente: `dadaia context activate <name>`
+`_archive/` and `backlog/` are NOT sources of approval; ignore unless the
+operator explicitly requests history.
 
 ---
 
-## 4. dadaia CLI Reference
+## 5. Lib-originated assets — non-edit rule
 
-```bash
-# Contextos
-dadaia context list                    # lista contextos e mostra qual é primário
-dadaia context activate <name>         # ativa contexto primário
-dadaia context deactivate              # desativa contexto primário
+Any file whose path appears in `.dadaia/agentic/manifest.json` is
+**lib-originated**. This covers projections under `.agents/`, `.claude/`,
+`.codex/`, `.opencode/`, plus the workspace-root and consumer-repo
+`AGENTS.md` / `CLAUDE.md` pair.
 
-# Academy
-dadaia academy list                    # lista cursos disponíveis
-dadaia academy run <course-slug>       # executa um curso interativo
+- NEVER edit a lib-originated projection file in place.
+- NEVER delete a lib-originated projection without re-installing afterwards.
 
-# Export
-dadaia export                          # cria .tar.gz em .dadaia/dist/
-dadaia export --list --exclude-mnt     # dry-run: imprime manifest JSON
-dadaia export --exclude-mnt            # exclui volumes mnt/ do archive
+Correct workflow:
 
-# Diagnóstico
-dadaia doctor                          # verifica estado do workspace
-dadaia doctor --fix                    # tenta reparar problemas encontrados
+1. Edit the source under `dadaia_workspace/public/<type>/<file>` (in the
+   `dadaia-workspace` repository).
+2. Commit in `dadaia-workspace`.
+3. `dadaia public stage && dadaia public install --target all`.
+4. Verify with `dadaia public doctor` — every entry must report `[ok]`.
 
-# Repos
-dadaia repos list                      # lista repos registrados
-
-# Public assets
-dadaia public stage                    # gera .dadaia/agentic/
-dadaia public install --target all     # instala projeções .agents/.claude/.codex/.opencode
-dadaia public doctor                   # verifica drift de assets
-```
+`dadaia public install --target all --force` is reserved for the **operator**
+and the `devops-engineer` agent. Dispatchers (`project-manager`,
+`project-auditor`) NEVER invoke `--force`; on drift they file a report and
+request operator repair.
 
 ---
 
-## 5. Python / venv Policy
+## 6. Domain-scoped guardrails pattern
 
-```bash
-# CORRETO — sempre use o venv do workspace
-.dadaia/.venv/bin/python script.py
-.dadaia/.venv/bin/pip install <pkg>
+Operators may place additional `CLAUDE.md` / `AGENTS.md` files inside any
+subdirectory to scope guardrails to that subtree (e.g. `services/CLAUDE.md`
+for service rules, `repos/<game>/AGENTS.md` for engine-specific rules).
 
-# ERRADO — nunca use python3 ou pip3 diretamente
-python3 script.py   # ❌
-pip3 install <pkg>  # ❌
-pip install <pkg>   # ❌ (exceto se .dadaia/.venv não existir ainda)
-```
-
-Localização dos scripts e dados temporários:
-- Scripts Python efêmeros: `.dadaia/tmp/python/`
-- JSON transiente: `.dadaia/tmp/json/`
-- Não crie artifacts temporários em `repos/`, `specs/`, ou `tests/`
+- Claude Code merges parent + nested files automatically; Codex and OpenCode
+  do the equivalent.
+- Domain-scoped pairs are **operator-authored**, not lib-managed. The lib
+  installer and doctor MUST NOT touch them. They are identified by living in
+  subdirectories with no `.dadaia/` marker and not registered as consumer repos.
 
 ---
 
-## 6. Regras de Segurança
+## 7. Memory atoms reference
 
-Proibições absolutas:
-- NUNCA `dmPolicy: "open"` + `allowFrom: ["*"]` combinados no OpenClaw
-- NUNCA commitar tokens, API keys ou secrets em arquivos rastreados
-- NUNCA rodar processos AI como root quando uid=10000 está disponível
-- NUNCA remover `no-new-privileges:true` ou `cap_drop: [ALL]` do docker-compose
-- NUNCA abrir SSH além do IP admin `45.180.188.119`
-- NUNCA setar `security.tirith_fail_open: true` no Hermes config (sempre false)
-- NUNCA deployar Hermes sem `HERMES_WRITE_SAFE_ROOT=/opt/data` em hermes.env
+Atomic product memory lives under `<specs-dir>/memory/` as HTML files. Markdown
+in `memory/` is legacy and flagged by `dadaia specs doctor`.
 
-Secrets: `services/conf/*.env` — gitignored, nunca commite valores reais.
+| Path | Purpose |
+|------|---------|
+| `memory/architecture.html` | Layer rules, modules, dependency contracts. |
+| `memory/product/index.html` | Vision, users, ordered feature catalog. |
+| `memory/product/<slug>.html` | One HTML per feature in production. |
+| `memory/tech-stack.html` | Approved technologies and constraints. |
+| `assets/<scope>/<id>.png` | Screenshots referenced by memory HTML. |
 
-Guardrails (SOUL.md, system prompts, skills) são **baked no Docker image** via COPY.
-Para alterar: edite `docker/hermes/defaults/` ou `docker/openclaw/guardrails/` → `make up`.
-Nunca edite guardrails dentro do container ou via volume.
-
----
-
-## 7. Contexto do Projeto
-
-**Serviços ativos:**
-
-| Serviço | Container | URL |
-|---------|-----------|-----|
-| Hermes Agent | `vps-hermes-1` | `https://hermes.srv1608865.hstgr.cloud` |
-| OpenClaw | `vps-openclaw-1` | `https://openclaw.srv1608865.hstgr.cloud` |
-| Traefik | `vps-traefik-1` | portas 80/443 |
-
-**Paths críticos:**
-- Specs: `specs/` (relativo ao workspace root `/home/ubuntu/workspace`)
-- Constitution: `specs/constitution.md`
-- Compose: `services/docker-compose.yml`
-- Hermes config: `/docker/hermes-agent-wqps/data/config.yaml`
-- OpenClaw config: `/docker/openclaw-x44i/data/.openclaw/openclaw.json`
-- Workspace root: `/home/ubuntu/workspace`
-- dadaia state: `/home/ubuntu/workspace/.dadaia/`
-
-**Comandos rápidos:**
-```bash
-make up              # (re)build + start all services
-make ps              # status dos containers
-make logs-hermes     # logs do Hermes
-make logs-openclaw   # logs do OpenClaw
-dadaia doctor        # estado do workspace dadaia
-```
+Atomicity contract: memory describes the product **as it is now**, never as a
+changelog. Forbidden sections in any memory HTML: `Changelog`, `History`,
+`Histórico`, `Versions`. Change history lives in the release's `CLOSURE.md`
+and under `_archive/releases/`. Write permission is gate-locked to the
+**CLOSURE** phase and reserved to `product-engineer`.
 
 ---
 
-## 8. Lib-Originated Assets — Regra de Não-Edição
+## 8. Agent inventory — 16 agents in 3 tiers
 
-Arquivos em `.agents/`, `.claude/`, `.codex/` ou `.opencode/` que vêm de `.dadaia/agentic/manifest.json`
-são **lib-originated**.
-Nunca edite esses arquivos diretamente.
+The dispatch model is hierarchical. Only **dispatchers** call other agents.
+The **curator** owns specs. **Leaf specialists** do not chain further dispatch.
 
-Workflow correto:
-1. Edite `dadaia_workspace/public/<tipo>/<arquivo>`
-2. Commit no repo `dadaia-workspace`
-3. `dadaia public stage`
-4. `dadaia public install --target all`
+### Dispatchers (2)
 
-Para verificar drift: `dadaia public doctor`
+- **project-manager** — orchestrator. Receives operator demand, categorises,
+  dispatches the right specialist; mediates conflicts via the Decision
+  Authority Matrix; escalates to operator. Writes only reports under
+  `.dadaia/reports/<context>/project-manager/`.
+- **project-auditor** — drift + dead-code auditor across the workspace. Cannot
+  fix drift; only records and recommends a release. Writes only reports.
 
----
+### Curator (1)
 
-## 9. Agentes Disponíveis
+- **product-engineer** — sole author of `specs/releases/<id>/{SPEC,PLAN,TASKS,
+  CLOSURE}.md`, `specs/releases/ACTIVE.md`, and `specs/memory/**/*.html`
+  (CLOSURE-only). Receives `discovery_report` from project-manager; does not
+  dispatch broadly. May invoke `dadaia-grill-me` as a leaf consultation.
 
-Para ativar um agente, diga: **"aja como @<nome-do-agente>"** ou **"use o @<nome-do-agente>"**.
+### Leaf specialists (13)
 
----
+| Agent | When to use | NOT for |
+|-------|-------------|---------|
+| software-architect | Architectural audits, layer design, ADRs. | Implementation, bug fixes. |
+| software-engineer | TDD implementation of approved tasks, lib code. | Specs, E2E tests, game code. |
+| backend-engineer | Heavy backend (Go, DB), services, APIs. | Frontend, specs. |
+| frontend-engineer | Browser code (HTML/CSS/TS/React). | Backend, specs. |
+| qa-engineer | E2E criteria, Playwright/Cypress, deploy validation. | Unit tests inside code modules. |
+| devops-engineer | CI/CD pipelines, GitHub Actions, deploy infra. | Application code. |
+| code-reviewer | Diff review on a PR or staged set. | Authoring code. |
+| security-reviewer | OWASP / threat-modeling review. | Authoring code. |
+| researcher | External-source investigation against whitelists. | Authoring code. |
+| design-specialist | UX/UI specs, sketches, design tokens. | Frontend code (handoff to frontend-engineer). |
+| game-developer | Game logic, mechanics, physics, AI (inside `repos/tauan-games/`). | Anything outside `repos/tauan-games/`. |
+| game-designer | Game assets, materials, maps, audio, pipeline scripts. | Game logic, tests. |
+| game-tester | Engine test automation, evidence reports. | Production code, assets. |
 
-### @software-architect
-
-**Quando usar:** auditoria arquitetural de um repo, design de arquitetura para projeto novo, onboarding de primeiro dia (scan de todos os repos).
-**NÃO usar para:** implementação de código, bug fixes, execução de TASKS.md.
-
-**Modos:** DRAFT (novo projeto), REVIEW (auditoria de repo único), ONBOARD (scan de todos os repos).
-Reports em `.dadaia/reports/<repo-name>/software-architect/<timestamp>-<type>.md`.
-
----
-
-### @product-engineer
-
-**Quando usar:** criar ou evoluir specs, criar PLAN.md e TASKS.md, onboarding de nova feature no pipeline SDD.
-**NÃO usar para:** bug fixes, implementação de código — use `software-engineer`.
-
-**Responsabilidades:**
-- Único agente que cria ou modifica `specs/`
-- Consulta `software-architect` antes de qualquer nova spec
-- Usa `dadaia-grill-me` para resolver ambiguidades antes de escrever
-- Nunca cria PLAN ou TASKS sem SPEC com `**Status:** Aprovado`
-
----
-
-### @software-engineer
-
-**Quando usar:** implementar tasks aprovadas, escrever testes unitários e de integração, bug fixes em código existente, deploys via GitHub Actions.
-**NÃO usar para:** specs (use `product-engineer`), E2E tests (use `qa-engineer`), código de jogo (use `game-developer`).
-
-**Responsabilidades:**
-- Implementa tasks de `TASKS.md` aprovados, marcando `[-]` ao iniciar e `[x]` ao concluir
-- TDD não-negociável: teste primeiro, implementação depois
-- Aplica OWASP Top 10 em todo código escrito
-- Notifica `qa-engineer` após deploy para validação E2E
+Every agent emits an HTML report into
+`.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html` with a sibling
+`<stem>.handoff.json` sidecar (`handoff-v1` schema). The sidecar is mandatory.
 
 ---
 
-### @qa-engineer
+## 9. Model assignments — 16 agents × 3 runtimes
 
-**Quando usar:** definir critérios de aceitação E2E, implementar testes E2E, validar deploys, auditar qualidade da suite de testes.
-**NÃO usar para:** código de aplicação, testes unitários/integração — use `software-engineer`.
+| Agent | Claude Code (`model:`) | OpenCode (`opencode_model:`) | Codex tier |
+|-------|------------------------|------------------------------|------------|
+| project-manager | claude-opus-4-7 | (same) | heavy |
+| project-auditor | claude-opus-4-7 | (same) | heavy |
+| product-engineer | claude-opus-4-7 | claude-sonnet-4-6 | heavy |
+| software-architect | claude-opus-4-7 | claude-sonnet-4-6 | heavy |
+| game-designer | claude-opus-4-7 | (same) | heavy |
+| game-tester | claude-opus-4-7 | (same) | heavy |
+| software-engineer | claude-sonnet-4-6 | (same) | light |
+| backend-engineer | claude-sonnet-4-6 | (same) | light |
+| frontend-engineer | claude-sonnet-4-6 | (same) | light |
+| qa-engineer | claude-sonnet-4-6 | (same) | light |
+| devops-engineer | claude-sonnet-4-6 | (same) | light |
+| code-reviewer | claude-sonnet-4-6 | (same) | light |
+| security-reviewer | claude-sonnet-4-6 | (same) | light |
+| researcher | claude-sonnet-4-6 | (same) | light |
+| design-specialist | claude-sonnet-4-6 | (same) | light |
+| game-developer | claude-sonnet-4-6 | (same) | light |
 
-**Responsabilidades:**
-- Define critérios E2E *antes* de `software-engineer` começar a implementar
-- Implementa testes E2E com Playwright (padrão), Cypress ou pytest
-- Valida deploys e confirma fechamento de tasks ao `software-engineer`
-- Bloqueia merge se testes E2E falharem
-
----
-
-### @devops-engineer
-
-**Quando usar:** criar ou debugar pipelines GitHub Actions, auditar postura DevOps, inventariar todos os repos, onboarding de CI/CD em projeto novo.
-**NÃO usar para:** código de aplicação, specs, lógica de negócio.
-
-**Modos:** BUILD, DEBUG, AUDIT, IMPROVE, SCAN, ONBOARD.
-Reports em `.dadaia/reports/<repo-name>/devops-engineer/<timestamp>-<type>.md`.
-
----
-
-### @game-developer
-
-**Quando usar:** implementar ou evoluir código de jogo em `repos/tauan-games/`.
-**NÃO usar para:** infraestrutura, APIs, CI/CD ou qualquer sistema fora de jogos.
-
-**Plataformas:** Phaser.js/Three.js (browser), Godot, Unity, Unreal Engine 5.
-Código de jogo é domínio exclusivo deste agente — nenhum outro agente toca em `repos/tauan-games/`.
+Values are sourced from each agent's frontmatter. Do not invent.
 
 ---
 
-## 10. Modelos por Agente e Runtime
+## 10. dadaia-academy + dadaia-workspace panel
 
-### Claude Code / Claude API
+- **`dadaia academy`** — interactive courses for onboarding to SDD and the
+  agent topology. Run `dadaia academy` (no args) to launch the picker.
+- **`dadaia panel`** — live workspace state and agent-topology visualisation;
+  shows active context, active release phase, registered dev servers, agent
+  inventory, and projection drift.
 
-| Agente | Modelo |
-|--------|--------|
-| software-architect | claude-opus-4-7 (raciocínio arquitetural pesado) |
-| product-engineer | claude-opus-4-7 (escrita de spec exige alta precisão) |
-| software-engineer | claude-sonnet-4-6 |
-| qa-engineer | claude-sonnet-4-6 |
-| devops-engineer | claude-sonnet-4-6 |
-| game-developer | claude-sonnet-4-6 |
-
-### OpenCode
-
-Usa o campo `opencode_model:` do frontmatter do agente quando disponível.
-Software-architect e product-engineer usam `claude-sonnet-4-6` no OpenCode.
-
-### Codex (OpenAI)
-
-| Papel | Modelo recomendado |
-|-------|-------------------|
-| Tarefas pesadas (arquitetura, spec, análise complexa) | `gpt-5.5` |
-| Tarefas leves (implementação, pipelines, testes) | `codex-5.3` |
+These two commands are the recommended entry points for any operator new to
+this workspace.
 
 ---
 
-## 11. Antes de Escrever Qualquer Código (Checklist)
+## 11. Pre-write checklist
 
-Para mudanças em `dadaia_workspace/` ou `specs/`:
+Before editing **any** file under `specs/`, `dadaia_workspace/public/`, or a
+consumer repo's production source:
 
-1. `dadaia context list` — confirme o contexto ativo
-2. Leia `specs/constitution.md`
-3. Leia `specs/memory/architecture.md`
-4. Leia `specs/memory/product.md`
-5. Leia `specs/memory/tech-stack.md`
-6. Leia `specs/foundation/SPEC.md`
-7. Leia `specs/SPEC.md`
-8. Leia a spec da feature em questão
-9. Confirme que PLAN.md e TASKS.md existem e estão aprovados
-
-Para mudanças em serviços de produção (docker-compose, hermes, openclaw):
-- Mesmo checklist acima + verificar pipeline SDD do workspace VPS em `specs/`
+1. `dadaia context show --json` — confirm the active Spec Context.
+2. Read `<specs-dir>/constitution.md`.
+3. Read `<specs-dir>/memory/architecture.html`,
+   `<specs-dir>/memory/product/index.html`,
+   `<specs-dir>/memory/tech-stack.html`.
+4. Read `<specs-dir>/releases/ACTIVE.md`. Note the `release:` and `phase:`.
+5. Read `SPEC.md`, then `PLAN.md`, then `TASKS.md` of the active release. All
+   must contain `**Status:** Aprovado` before implementation begins.
+6. Identify your task ID in `TASKS.md`. It must be `[ ]` OPEN. Flip to `[-]`
+   and commit `chore(tasks): start <task-id>` BEFORE editing production.
+7. Run `dadaia specs doctor` and `dadaia public doctor` — both green.
+8. After completing the task: flip the marker to `[x]` and commit with a
+   conventional-commit message that includes the task ID.
