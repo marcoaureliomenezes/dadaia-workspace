@@ -215,11 +215,11 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P11b — Wire installer + doctor for Option C
 
-- [-] AGT-r2-35 — Dispatch install call site to `_install_workspace_guardrail_pair` (software-engineer)
+- [x] AGT-r2-35 — Dispatch install call site to `_install_workspace_guardrail_pair` (software-engineer)
   - Replace legacy `_install_agents_md` call for `data/AGENTS.md` only (templates scaffolder retains its own call).
   - Acceptance: a single call to `_install_workspace_guardrail_pair` per workspace; trace via test that 4 files write per round.
   - Depends: AGT-r2-25, AGT-r2-33.
-- [-] AGT-r2-36 — Update `.dadaia/agentic/manifest.json` for Option C (software-engineer)
+- [x] AGT-r2-36 — Update `.dadaia/agentic/manifest.json` for Option C (software-engineer)
   - Recompute SHA-256 of `data/AGENTS.md` post-P11a; manifest entry updated; **no** `data/CLAUDE.md` entry exists.
   - Acceptance: `grep -c '"data/CLAUDE.md"' .dadaia/agentic/manifest.json` → 0; `dadaia public doctor` reports `[ok]` for `data/AGENTS.md`; C24 + C25 satisfied.
   - Depends: AGT-r2-35.
