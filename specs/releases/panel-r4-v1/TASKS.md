@@ -32,6 +32,11 @@
 - [x] **PR4-04** — Land `specs/releases/panel-r4-v1/PLAN.md` with `**Status:**
   Aprovado`. Owner: product-engineer. Done criterion: file present, header carries
   the Aprovado status line, all 7 sections populated, ≤ 300 lines.
+- [-] **PR4-04b** — Emit P0 handoff report at
+  `.dadaia/reports/dadaia-workspace/product-engineer/<UTC>-panel-r4-v1-foundation.html`
+  with adjacent `.handoff.json` sidecar per `dadaia-handoff-emitter` skill. Owner:
+  product-engineer. Done criterion: report HTML + sidecar present; sidecar validates
+  against `handoff-v1` schema.
 
 ---
 
