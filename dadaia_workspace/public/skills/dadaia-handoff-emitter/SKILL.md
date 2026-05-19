@@ -46,7 +46,7 @@ Capture the hex digest (the first field). This is the value for `artifact.conten
 
 Example:
 ```bash
-sha256sum .dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T120000Z-task-green.html
+sha256sum .dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html
 # → a3f8c2... .dadaia/reports/.../task-green.html
 ```
 
@@ -61,11 +61,11 @@ listed below. All field semantics match the schema at
 | Field | Type | Description |
 |-------|------|-------------|
 | `schema_version` | string (literal) | Always `"handoff-v1"` |
-| `agent` | string | The `name` from your own frontmatter (e.g. `"software-engineer"`) |
+| `agent` | string | The `name` from your own frontmatter (e.g. `"software-engineer-python"`) |
 | `context` | string | Active Spec Context Project name (e.g. `"dadaia-workspace"`) |
 | `produced_at` | string (ISO 8601) | UTC timestamp when the report was finalised, e.g. `"2026-05-16T12:00:00Z"` |
 | `artifact.type` | string | One of `"report"`, `"spec"`, `"plan"`, `"tasks"`, `"closure"` |
-| `artifact.path` | string | Logical path to the HTML report, relative to workspace root, e.g. `.dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T120000Z-task-green.html` |
+| `artifact.path` | string | Logical path to the HTML report, relative to workspace root, e.g. `.dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html` |
 | `artifact.content_hash` | string | `sha256:<hex>` — prefix the hex digest from Step 1 with `sha256:` |
 
 #### Optional fields (include when applicable)
@@ -82,12 +82,12 @@ listed below. All field semantics match the schema at
 ```json
 {
   "schema_version": "handoff-v1",
-  "agent": "software-engineer",
+  "agent": "software-engineer-python",
   "context": "dadaia-workspace",
   "produced_at": "2026-05-16T12:00:00Z",
   "artifact": {
     "type": "report",
-    "path": ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T120000Z-task-green.html",
+    "path": ".dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html",
     "content_hash": "sha256:a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
   }
 }
@@ -98,13 +98,13 @@ listed below. All field semantics match the schema at
 ```json
 {
   "schema_version": "handoff-v1",
-  "agent": "software-engineer",
+  "agent": "software-engineer-python",
   "context": "dadaia-workspace",
   "produced_at": "2026-05-16T12:00:00Z",
   "release_id": "agent-comms-v1",
   "artifact": {
     "type": "report",
-    "path": ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T120000Z-T-AC-09-green.html",
+    "path": ".dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-T-AC-09-green.html",
     "content_hash": "sha256:a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
   },
   "findings": [
@@ -131,8 +131,8 @@ Rules:
 Example:
 
 ```
-HTML report:  .dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T120000Z-task-green.html
-Sidecar:      .dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T120000Z-task-green.handoff.json
+HTML report:  .dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html
+Sidecar:      .dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.handoff.json
 ```
 
 Use the `Write` tool with the assembled JSON as content:
