@@ -22,30 +22,35 @@
 
 ## P0 — Foundation *(product-engineer)*
 
-- [ ] **PR5-01** — Cut branch `release/panel-r5-v1` from `main`. Owner:
+- [x] **PR5-01** — Cut branch `release/panel-r5-v1` from `main`. Owner:
   product-engineer. Done criterion: `git rev-parse --abbrev-ref HEAD` returns
-  `release/panel-r5-v1` and branch base = `main`.
-- [ ] **PR5-02** — Maintain `specs/releases/ACTIVE.md` synchronized through the
+  `release/panel-r5-v1` and branch base = `main`. **Done** at commit `a5e4373`
+  (cut from `release/panel-r4-v1` tip since r5 depends on r4 ingestion
+  PR4-08+09+10; r4 is archived).
+- [x] **PR5-02** — Maintain `specs/releases/ACTIVE.md` synchronized through the
   release lifecycle. Owner: product-engineer. Sequence: operator flips ACTIVE.md
   from `panel-r4-v1` to `panel-r5-v1, phase: SPEC` only AFTER panel-r4-v1 reaches
   ARCHIVED. Then `phase: PLAN` → `phase: TASKS` → `phase: IMPLEMENTATION` →
   `phase: CLOSURE` → `phase: ARCHIVED` at the end. Done criterion: ACTIVE.md
-  always matches the live phase of this release.
-- [ ] **PR5-03** — Land `specs/releases/panel-r5-v1/SPEC.md` with `**Status:**
+  always matches the live phase of this release. **Done** — ACTIVE.md now at
+  `release: panel-r5-v1, phase: IMPLEMENTATION`.
+- [x] **PR5-03** — Land `specs/releases/panel-r5-v1/SPEC.md` with `**Status:**
   Aprovado`. Owner: product-engineer. Done criterion: file present, header
   carries the Aprovado status line, 6 mandatory sections (Context, FR, NFR, Out
   of Scope, Acceptance Criteria, Dependencies & Risks) all populated.
-- [ ] **PR5-04** — Land `specs/releases/panel-r5-v1/PLAN.md` with `**Status:**
+- [x] **PR5-04** — Land `specs/releases/panel-r5-v1/PLAN.md` with `**Status:**
   Aprovado`. Owner: product-engineer. Done criterion: file present, header
   carries the Aprovado status line, all sections populated, ≤ 300 lines.
-- [ ] **PR5-05** — Land `specs/releases/panel-r5-v1/TASKS.md` with `**Status:**
+- [x] **PR5-05** — Land `specs/releases/panel-r5-v1/TASKS.md` with `**Status:**
   Aprovado`. Owner: product-engineer. Done criterion: file present, header
   carries the Aprovado status line, every task has a Done criterion line.
-- [ ] **PR5-06** — Emit P0 handoff report at
+- [x] **PR5-06** — Emit P0 handoff report at
   `.dadaia/reports/dadaia-workspace/product-engineer/<UTC>-panel-r5-v1-foundation.html`
   with adjacent `.handoff.json` sidecar per `dadaia-handoff-emitter` skill.
   Owner: product-engineer. Done criterion: report HTML + sidecar present;
-  sidecar validates against `handoff-v1` schema.
+  sidecar validates against `handoff-v1` schema. **Done** —
+  `2026-05-19T180000Z-panel-r5-v1-foundation.html` + sidecar at workspace-root
+  `.dadaia/reports/`.
 
 ---
 
