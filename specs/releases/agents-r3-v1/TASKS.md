@@ -53,7 +53,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 - [x] R3-08 — Author `data-engineer.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/data-engineer.md`.
   - Done criterion: frontmatter + body; primary scope `repos/dd-chain-explorer/**`; Databricks/Spark/Airflow/Kafka surfaces declared; data-format vocabulary (CSV/AVRO/JSON/Parquet/Delta/Iceberg) referenced; forbidden actions block excludes dashboards (data-analyst territory).
-- [-] R3-09 — Author `data-analyst.md` persona (`product-engineer`)
+- [x] R3-09 — Author `data-analyst.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/data-analyst.md`.
   - Done criterion: frontmatter + body; pairing with `design-specialist` for visual review documented; Playwright dashboard-eval pattern referenced; forbidden actions exclude pipeline authorship (data-engineer territory).
 - [ ] R3-10 — Author `ai-engineer.md` persona (`product-engineer`)
