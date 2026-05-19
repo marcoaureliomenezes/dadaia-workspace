@@ -15,6 +15,8 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_agents_canonical,
     render_api_contexts,
     render_api_servers,
+    render_api_session_detail,
+    render_api_sessions,
     render_api_workflow_detail,
     render_api_workflows_list,
 )
@@ -221,6 +223,8 @@ def build_panel_views(
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
         "api_workflow_detail": render_api_workflow_detail(service._workflows_service),
+        "api_sessions": render_api_sessions(service),
+        "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),
         "memory_view": render_memory_wrapper(workspace_root),
         "static": render_static(),

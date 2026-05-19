@@ -25,6 +25,7 @@ Security headers (T-AM-14, T8):
 404 body (T-2.3, constitution error contract — updated for T-AM-15):
   "Route not found. The panel exposes / /api/servers /api/contexts
    /api/agents /api/agents/<id>/sessions /api/workflows
+   /api/sessions /api/sessions/<runtime>/<session_id>
    /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>.
    Open / for the index."
 """
@@ -46,6 +47,7 @@ _NOT_FOUND_BODY = (
     b"The panel exposes / /api/servers /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
     b"/api/workflows /api/workflows/<name> "
+    b"/api/sessions /api/sessions/<runtime>/<session_id> "
     b"/memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
@@ -67,6 +69,9 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     # /api/workflows/<name> must come before /api/workflows (more specific first).
     (r"^/api/workflows/(?P<workflow_name>[^/]+)$", "api_workflow_detail"),
     (r"^/api/workflows$", "api_workflows"),
+    # /api/sessions/<runtime>/<session_id> must come before /api/sessions (more specific first).
+    (r"^/api/sessions/(?P<runtime>[^/]+)/(?P<session_id>[^/]+)$", "api_session_detail"),
+    (r"^/api/sessions$", "api_sessions"),
     (r"^/api/servers$", "api_servers"),
     (r"^/api/contexts$", "api_contexts"),
     (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory"),
@@ -181,6 +186,8 @@ def make_handler_class(
         "api_agent_sessions",
         "api_workflows",
         "api_workflow_detail",
+        "api_sessions",
+        "api_session_detail",
     )
     telemetry_patterns: list[tuple[re.Pattern[str], str]] = [
         (re.compile(pat), name)
@@ -335,6 +342,27 @@ def make_handler_class(
                     if "api_workflow_detail" in views:
                         status, content_type, body = views["api_workflow_detail"](
                             workflow_name=workflow_name,
+                        )
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+                elif route_name == "api_sessions":
+                    # PR5-B2: session list endpoint — requires telemetry.
+                    if "api_sessions" in views:
+                        status, content_type, body = views["api_sessions"](qs=qs)
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+                elif route_name == "api_session_detail":
+                    # PR5-B2: session detail endpoint — requires telemetry.
+                    runtime = groups.get("runtime", "claude")
+                    session_id = groups.get("session_id", "")
+                    if "api_session_detail" in views:
+                        status, content_type, body = views["api_session_detail"](
+                            runtime=runtime,
+                            session_id=session_id,
                         )
                         self._respond(status, content_type, body)
                     else:
