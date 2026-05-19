@@ -131,7 +131,7 @@
   with mocked aggregator. Owner: software-engineer. Done criterion:
   `.dadaia/.venv/bin/python -m pytest
   tests/unit/features/panel/test_views_api_sessions.py -v` green.
-- [ ] **PR5-B4** — Create fixture
+- [-] **PR5-B4** — Create fixture
   `tests/fixtures/telemetry/sessions_seeded.sqlite` with a small set of seeded
   rows (≥3 Claude sessions across two projects; ≥2 Codex sessions; mix of
   active/idle/ended statuses; representative `events` rows so
