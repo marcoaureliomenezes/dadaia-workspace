@@ -403,7 +403,7 @@
 
 ### QA strand (qa-engineer)
 
-- [ ] **PR5-E4** — Extend
+- [-] **PR5-E4** — Extend
   `tests/integration/test_panel_sessions_endpoint.py` with Codex fixture rows
   sourced from `tests/fixtures/telemetry/sessions_seeded.sqlite`. Assertions:
   for every Codex row in the response, `cumulative_cost_usd is None` and
