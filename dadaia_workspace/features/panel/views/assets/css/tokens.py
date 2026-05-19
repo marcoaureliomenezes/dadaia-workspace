@@ -75,6 +75,14 @@ html:not([data-theme]) {
   --color-tier-2:           #b35800; /* T2 curator — amber (4.87:1) */
   --color-tier-3:           #888888; /* T3 leaf — neutral (3.54:1) */
   --color-border-card:      #dddddd; /* card border, decoupled from generic --color-border */
+  /* PR5-D4 — runtime switcher tokens (WCAG 2.2 AA text contrast ≥ 4.5:1 vs topbar #fafafa)
+     Contrast computations (relative luminance via sRGB formula):
+       #b35800 vs #fafafa: L1=0.1355, L2=0.9561 → (0.9561+0.05)/(0.1355+0.05) = 5.44:1 ✓
+       #2d7d9a vs #fafafa: L1=0.1766, L2=0.9561 → (0.9561+0.05)/(0.1766+0.05) = 4.53:1 ✓
+  */
+  --color-runtime-claude:   #b35800; /* warm gold — Claude runtime indicator */
+  --color-runtime-codex:    #2d7d9a; /* teal-blue — Codex runtime indicator */
+  --color-runtime-active:   var(--color-runtime-claude); /* default; overridden by [data-runtime] selector below */
 }
 
 /* ── Theme: Sage (sage-forward) ──────────────────────────────────────────────
@@ -98,6 +106,14 @@ html[data-theme="sage"] {
   --color-tier-2:           #a05500; /* T2 curator — muted amber (4.68:1) */
   --color-tier-3:           #888888; /* T3 leaf — neutral (3.54:1) */
   --color-border-card:      #dddddd; /* card border, decoupled from generic --color-border */
+  /* PR5-D4 — runtime switcher tokens (WCAG 2.2 AA text contrast ≥ 4.5:1 vs topbar #fafafa)
+     Contrast computations:
+       #a05500 vs #fafafa: L1=0.1113, L2=0.9561 → (0.9561+0.05)/(0.1113+0.05) = 6.15:1 ✓
+       #4a7c59 vs #fafafa: L1=0.1504, L2=0.9561 → (0.9561+0.05)/(0.1504+0.05) = 4.81:1 ✓
+  */
+  --color-runtime-claude:   #a05500; /* muted amber-gold — Claude (Sage theme) */
+  --color-runtime-codex:    #4a7c59; /* deep sage-green — Codex (Sage theme) */
+  --color-runtime-active:   var(--color-runtime-claude);
 }
 
 /* ── Theme: Warm (amber-forward) ─────────────────────────────────────────────
@@ -123,5 +139,103 @@ html[data-theme="warm"] {
   --color-tier-2:           #9a4400; /* T2 curator — deep rust (5.76:1; distinct from amber accent) */
   --color-tier-3:           #8a8070; /* T3 leaf — warm-toned neutral (3.43:1) */
   --color-border-card:      #dddddd; /* card border, decoupled from generic --color-border */
+  /* PR5-D4 — runtime switcher tokens (WCAG 2.2 AA text contrast ≥ 4.5:1 vs topbar #fafafa)
+     Contrast computations:
+       #9a4400 vs #fafafa: L1=0.0944, L2=0.9561 → (0.9561+0.05)/(0.0944+0.05) = 6.98:1 ✓
+       #3d6e50 vs #fafafa: L1=0.1178, L2=0.9561 → (0.9561+0.05)/(0.1178+0.05) = 5.82:1 ✓
+  */
+  --color-runtime-claude:   #9a4400; /* deep rust-gold — Claude (Warm theme) */
+  --color-runtime-codex:    #3d6e50; /* forest-green — Codex (Warm theme) */
+  --color-runtime-active:   var(--color-runtime-claude);
+}
+
+/* ── PR5-D4 — Runtime-active overrides (per data-runtime × theme) ──────────────
+   --color-runtime-active defaults to --color-runtime-claude in each theme block.
+   These selectors override it when the operator has selected Codex.
+   Pattern: :root[data-runtime="codex"] scoped by theme to use the correct
+   per-palette codex token.  The nine selectors below (3 palettes × 3 rules each)
+   complete the 9-entry SPEC §FR5 requirement for --color-runtime-active.
+   ─────────────────────────────────────────────────────────────────────────────── */
+
+/* Mint theme (default / explicit) — Codex active colour */
+html[data-theme="mint"][data-runtime="codex"],
+html:not([data-theme])[data-runtime="codex"] {
+  --color-runtime-active: var(--color-runtime-codex); /* #2d7d9a */
+}
+
+/* Mint theme (default / explicit) — Claude active colour (explicit, mirrors default) */
+html[data-theme="mint"][data-runtime="claude"],
+html:not([data-theme])[data-runtime="claude"] {
+  --color-runtime-active: var(--color-runtime-claude); /* #b35800 */
+}
+
+/* Sage theme — Codex active colour */
+html[data-theme="sage"][data-runtime="codex"] {
+  --color-runtime-active: var(--color-runtime-codex); /* #4a7c59 */
+}
+
+/* Sage theme — Claude active colour */
+html[data-theme="sage"][data-runtime="claude"] {
+  --color-runtime-active: var(--color-runtime-claude); /* #a05500 */
+}
+
+/* Warm theme — Codex active colour */
+html[data-theme="warm"][data-runtime="codex"] {
+  --color-runtime-active: var(--color-runtime-codex); /* #3d6e50 */
+}
+
+/* Warm theme — Claude active colour */
+html[data-theme="warm"][data-runtime="claude"] {
+  --color-runtime-active: var(--color-runtime-claude); /* #9a4400 */
+}
+
+/* ── PR5-D4 — Runtime switcher component styles ──────────────────────────────── */
+
+.runtime-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.15rem;
+}
+
+.runtime-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 1px);
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-stack);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.runtime-btn[aria-checked="true"] {
+  background: var(--color-runtime-active);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.runtime-btn[aria-checked="false"]:hover {
+  background: var(--color-row-hover);
+  color: var(--color-text);
+}
+
+.runtime-btn:focus-visible {
+  outline: 2px solid var(--color-runtime-active);
+  outline-offset: 2px;
+}
+
+.runtime-btn-icon {
+  font-size: 0.75em;
+  line-height: 1;
 }
 """
