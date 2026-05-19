@@ -312,6 +312,35 @@ class TestSessionsRuntimeFilter:
         for row in data["sessions"]:
             assert row["runtime"] == "claude"
 
+    def test_codex_rows_have_null_cost_and_cost_known_false(
+        self, sessions_server
+    ) -> None:
+        """PR5-E4: every Codex row has cumulative_cost_usd=None and cost_known=False.
+
+        Sourced from tests/fixtures/telemetry/sessions_seeded.sqlite Codex rows
+        (≥2 rows per PR5-B4 requirement, verified in test_codex_returns_at_least_2_sessions).
+
+        SPEC FR3, FR6, NFR: Codex cost tracking is not supported; the
+        CodexRuntimeAdapter must force cumulative_cost_usd=None and cost_known=False
+        regardless of any event-level data. This test asserts that invariant
+        end-to-end: fixture DB → aggregator → HTTP response.
+        """
+        base, token, _ = sessions_server
+        status, body = _get(f"{base}/api/sessions?runtime=codex", token=token)
+        assert status == 200
+        data = json.loads(body)
+        codex_rows = data["sessions"]
+        assert codex_rows, "Expected ≥1 Codex session in fixture (PR5-B4 placed ≥2)"
+        for row in codex_rows:
+            assert row["cumulative_cost_usd"] is None, (
+                f"PR5-E4: Codex row {row['session_id']!r} must have "
+                f"cumulative_cost_usd=None, got {row['cumulative_cost_usd']!r}"
+            )
+            assert row["cost_known"] is False, (
+                f"PR5-E4: Codex row {row['session_id']!r} must have "
+                f"cost_known=False, got {row['cost_known']!r}"
+            )
+
 
 # ---------------------------------------------------------------------------
 # Project filter test
@@ -362,6 +391,9 @@ class TestSessionsProjectFilter:
 # ---------------------------------------------------------------------------
 
 _CLAUDE_SESSION_ID = "claude-session-aaa111bbb222ccc3"
+# First Codex session from tests/fixtures/telemetry/sessions_seeded.sqlite
+# (PR5-B4 placed ≥2 Codex rows; verified by test_codex_returns_at_least_2_sessions)
+_CODEX_SESSION_ID = "codex-session-jjj000kkk111lll2"
 
 
 class TestSessionDetail:
@@ -444,6 +476,89 @@ class TestSessionDetail:
             token=token,
         )
         assert status == 404
+
+
+# ---------------------------------------------------------------------------
+# PR5-E4 — Codex detail endpoint assertions
+# ---------------------------------------------------------------------------
+
+
+class TestCodexDetailEndpoint:
+    """PR5-E4: /api/sessions/codex/<id> must return cumulative_cost_usd=None
+    and cost_known=False.
+
+    Picks one Codex session_id from the seeded fixture and asserts the
+    cost contract end-to-end: fixture DB → aggregator → HTTP response.
+    """
+
+    def test_codex_detail_endpoint_returns_none_cost(
+        self, sessions_server
+    ) -> None:
+        """PR5-E4: GET /api/sessions/codex/<id> → cumulative_cost_usd is None
+        and cost_known is False.
+
+        SPEC FR3, FR6: cost tracking is disabled for Codex.  The
+        CodexRuntimeAdapter must set both fields to None/False even on the
+        single-session detail path, not only on the list path.
+        """
+        base, token, _ = sessions_server
+        status, body = _get(
+            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
+            token=token,
+        )
+        assert status == 200, (
+            f"Expected 200 for Codex detail {_CODEX_SESSION_ID!r}, got {status}"
+        )
+        data = json.loads(body)
+
+        # Core PR5-E4 assertions
+        assert data["cumulative_cost_usd"] is None, (
+            f"PR5-E4: Codex detail must have cumulative_cost_usd=None, "
+            f"got {data['cumulative_cost_usd']!r}"
+        )
+        assert data["cost_known"] is False, (
+            f"PR5-E4: Codex detail must have cost_known=False, "
+            f"got {data['cost_known']!r}"
+        )
+
+    def test_codex_detail_has_all_required_keys(self, sessions_server) -> None:
+        """GET /api/sessions/codex/<id> response carries all SessionDetail keys."""
+        base, token, _ = sessions_server
+        _, body = _get(
+            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
+            token=token,
+        )
+        data = json.loads(body)
+        required = {
+            "session_id", "runtime", "project", "cwd", "model",
+            "started_at", "last_activity_at", "message_count",
+            "context_size_tokens", "cumulative_cost_usd", "cost_known",
+            "status", "agent_name", "ai_title", "event_timestamps",
+        }
+        missing = required - set(data.keys())
+        assert not missing, f"Missing Codex detail keys: {missing}"
+
+    def test_codex_detail_runtime_is_codex(self, sessions_server) -> None:
+        """GET /api/sessions/codex/<id> returns runtime='codex'."""
+        base, token, _ = sessions_server
+        _, body = _get(
+            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
+            token=token,
+        )
+        data = json.loads(body)
+        assert data["runtime"] == "codex", (
+            f"Expected runtime='codex', got {data['runtime']!r}"
+        )
+
+    def test_codex_detail_session_id_matches(self, sessions_server) -> None:
+        """Detail response session_id matches the requested Codex session_id."""
+        base, token, _ = sessions_server
+        _, body = _get(
+            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
+            token=token,
+        )
+        data = json.loads(body)
+        assert data["session_id"] == _CODEX_SESSION_ID
 
 
 # ---------------------------------------------------------------------------

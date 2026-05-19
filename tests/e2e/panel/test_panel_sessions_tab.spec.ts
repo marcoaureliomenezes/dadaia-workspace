@@ -63,6 +63,10 @@ const JS_ASSETS_DIR = path.join(
 //   python -c "from dadaia_workspace.features.panel.views.sessions \
 //              import render_sessions_section; print(render_sessions_section())"
 // ---------------------------------------------------------------------------
+// Updated to include #sessions-banner (added by PR5-E3 in sessions.py).
+// To regenerate:
+//   python -c "from dadaia_workspace.features.panel.views.sessions \
+//              import render_sessions_section; print(render_sessions_section())"
 const REAL_SESSIONS_SECTION_HTML = `<section id="section-sessions" class="section panel-section active" role="tabpanel" tabindex="0" aria-labelledby="tab-sessions">
   <header class="section-header">
     <h2>Sessions</h2>
@@ -77,6 +81,8 @@ const REAL_SESSIONS_SECTION_HTML = `<section id="section-sessions" class="sectio
     <span id="sessions-last-updated" class="sessions-last-updated"
           aria-live="polite" data-testid="sessions-last-updated">Never</span>
   </div>
+  <div id="sessions-banner" class="sessions-banner"
+       role="status" aria-live="polite" hidden></div>
   <div id="sessions-table-container" class="sessions-table-container"
        aria-busy="true">
     <table class="sessions-table" aria-label="Sessions">
@@ -1303,6 +1309,125 @@ test('E2E-RT-04 — localStorage persistence: runtime=codex survives page.reload
 
   await page.screenshot({
     path: path.join(SCREENSHOTS_DIR, 'runtime-localstorage-persist.png'),
+    fullPage: false,
+  });
+});
+
+// ============================================================================
+// Phase E — PR5-E4: Codex banner + Cost column "—" override
+// ============================================================================
+//
+// E2E-COD-01: When the runtime switcher is set to 'codex':
+//   - #sessions-banner is visible with text matching /Cost not tracked/i.
+//   - Every Cost cell in the sessions table contains "—" (not a dollar value).
+// When toggled back to 'claude':
+//   - #sessions-banner has the [hidden] attribute (not visible).
+//   - Cost cells contain "$" (dollar prefix from the formatter).
+//
+// Uses the multi-tab scaffold + runtime-aware mocks from installMultiTabRoutes()
+// so sessions.js receives MOCK_SESSIONS_CODEX on runtime=codex fetches and
+// MOCK_SESSIONS_LIST (Claude) on runtime=claude fetches.
+//
+// Verifies: PR5-E3 (FE) + PR5-E4 (QA) done criteria:
+//   - Banner element #sessions-banner visible with "Cost not tracked" text.
+//   - Cost column renders "—" for all Codex rows (cumulative_cost_usd=null).
+//   - Banner disappears and Cost cells show "$" when runtime reverts to claude.
+// ============================================================================
+
+test('E2E-COD-01 — Codex banner appears with "Cost not tracked" and Cost cells show "—"; reverts on claude toggle', async ({
+  page,
+}) => {
+  await loadMultiTabPanel(page);
+
+  // ── Part 1: Switch to Codex ──────────────────────────────────────────────
+
+  await page.evaluate(() => {
+    (window as any).Runtime.set('codex');
+  });
+
+  // Wait for sessions to refetch with runtime=codex (aria-busy flips back to false).
+  await page.waitForSelector('#sessions-table-container[aria-busy="false"]', {
+    timeout: 10_000,
+  });
+
+  // sessions.js calls updateBanner() immediately on dadaia:runtime-change, before the
+  // fetch completes. The banner must be visible as soon as the event fires.
+  // Wait for #sessions-banner to not have the [hidden] attribute.
+  await page.waitForFunction(
+    () => {
+      const banner = document.getElementById('sessions-banner');
+      return banner !== null && !banner.hasAttribute('hidden');
+    },
+    {},
+    { timeout: 8_000 }
+  );
+
+  // Banner must be visible and contain "Cost not tracked" text.
+  const bannerVisible = await page.isVisible('#sessions-banner');
+  expect(bannerVisible).toBe(true);
+
+  const bannerText = await page.textContent('#sessions-banner');
+  expect(bannerText).toBeTruthy();
+  expect(bannerText?.toLowerCase()).toContain('cost not tracked');
+
+  // All Cost cells in the Codex sessions table must render "—" (em dash or hyphen),
+  // not a dollar value.  MOCK_SESSIONS_CODEX has cumulative_cost_usd=null for all rows.
+  // sessions.js: cost = (runtime === 'codex') ? '—' : fmtCost(...)
+  const costTextsCodex = await page.$$eval(
+    '.sessions-table tbody tr.session-row .cell-cost',
+    (cells) => cells.map((el) => el.textContent?.trim() ?? '')
+  );
+  expect(costTextsCodex.length).toBeGreaterThan(0);
+  for (const costText of costTextsCodex) {
+    // Must not contain a dollar sign when runtime is codex.
+    expect(costText).not.toMatch(/\$/);
+    // Must be the em dash or hyphen placeholder.
+    expect(costText).toMatch(/^[—\-]$/);
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'codex-banner-visible.png'),
+    fullPage: false,
+  });
+
+  // ── Part 2: Switch back to Claude ───────────────────────────────────────
+
+  await page.evaluate(() => {
+    (window as any).Runtime.set('claude');
+  });
+
+  // Wait for sessions to refetch with runtime=claude.
+  await page.waitForSelector('#sessions-table-container[aria-busy="false"]', {
+    timeout: 10_000,
+  });
+
+  // Wait for banner to be hidden again.
+  await page.waitForFunction(
+    () => {
+      const banner = document.getElementById('sessions-banner');
+      return banner !== null && banner.hasAttribute('hidden');
+    },
+    {},
+    { timeout: 8_000 }
+  );
+
+  // Banner must now be hidden.
+  const bannerHidden = await page.getAttribute('#sessions-banner', 'hidden');
+  expect(bannerHidden).not.toBeNull(); // [hidden] attribute is present
+
+  // Cost cells must now contain "$" (Claude sessions have cost_known=true).
+  // MOCK_SESSIONS_LIST has cumulative_cost_usd: 0.45, 1.20, 0.08.
+  // sessions.js: fmtCost() renders "$0.45", "$1.20", "$0.08".
+  const costTextsClaude = await page.$$eval(
+    '.sessions-table tbody tr.session-row .cell-cost',
+    (cells) => cells.map((el) => el.textContent?.trim() ?? '')
+  );
+  expect(costTextsClaude.length).toBeGreaterThan(0);
+  const hasAtLeastOneDollarCell = costTextsClaude.some((t) => t.includes('$'));
+  expect(hasAtLeastOneDollarCell).toBe(true);
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'claude-banner-hidden-costs-restored.png'),
     fullPage: false,
   });
 });
