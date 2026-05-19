@@ -32,32 +32,24 @@ agent unsuitable.
 | `game-developer` | Unreal Engine C++, Blueprints, game mechanics, physics, AI | game-tester | Task lives outside `repos/tauan-games/` |
 | `game-designer` | Game assets, maps, audio, material pipelines, HDA scripts | game-developer | Task is code-level game logic |
 | `game-tester` | UE5 automation scripts, game test reports | — | Task is not game-related |
-| `software-architect` (ADR mode) | Architecture Decision Records, cross-cutting concerns | product-engineer | Micro-level impl decisions already settled |
 
 ---
 
 ## Workflow Inventory
 
-15 canonical workflows. Each row names the trigger event, the entry agent, and key
-intermediate stages.
+7 canonical workflows (post-`agents-r2-v1` trim; 8 deprecated workflows moved to
+`specs/_archive/legacy-workflows/` and replaced by PM Playbooks below). Each row
+names the trigger event, the entry agent, and key intermediate stages.
 
-| # | Workflow | Trigger | Entry Agent | Key Stages |
+| # | Workflow file | Trigger | Entry Agent | Key Stages |
 |---|---|---|---|---|
-| W-01 | Feature delivery | Product decision: new feature needed | product-engineer | SPEC → PLAN → TASKS → software-engineer impl → qa-engineer E2E → CLOSURE |
-| W-02 | Bug fix | Defect reported (user or monitor) | project-manager | triage → software-engineer patch → qa-engineer regression → deploy |
-| W-03 | Security patch | CVE or security-reviewer finding | security-reviewer | severity assessment → software-engineer fix → devops-engineer redeploy → security-reviewer verify |
-| W-04 | Architecture evolution | ADR proposal or tech-debt spike | software-architect | ADR draft → product-engineer approval → software-engineer migration → closure |
-| W-05 | Dependency upgrade | `pip-audit` / `npm audit` HIGH+ | software-engineer | audit → upgrade → test → deploy |
-| W-06 | CI/CD pipeline change | Build failure or new automation needed | devops-engineer | YAML edit → test run → software-engineer validate |
-| W-07 | Design review | New UI surface or redesign request | design-specialist | UX audit → design spec → frontend-engineer impl → qa-engineer E2E |
-| W-08 | PR code review | PR opened on monitored repo | code-reviewer | diff fetch → 6-axis review → report → approve/request-changes |
-| W-09 | Compliance drift audit | Release CLOSURE phase or scheduled audit | project-auditor | memory inventory → diff walk → scoring → report → project-manager |
-| W-10 | Game feature | New game mechanic or asset | game-developer / game-designer | spec → impl → game-tester report |
-| W-11 | Release closure | All TASKS.md tasks `[x]` | product-engineer | CLOSURE.md authoring → memory update → ACTIVE.md archive |
-| W-12 | Escalation / operator decision | 3+ unresolved agent conflicts | project-manager | positions documented → synthesis → `dadaia-grill-me` |
-| W-13 | Secrets leak response | Secret detected in repo | security-reviewer | rotate credential → force-push or BFG → audit trail |
-| W-14 | Infrastructure incident | Service down or Traefik failure | devops-engineer | root-cause → fix → verify → post-mortem |
-| W-15 | Memory atom update | product-engineer CLOSURE phase | product-engineer | HTML memory edit → `dadaia specs doctor` → commit |
+| W-01 | `spec-refinement` | New feature scope or spec ambiguity | project-manager | discovery → 5-way parallel specialist review → synthesis → product-engineer SPEC write |
+| W-02 | `hotfix-release` | Production defect requiring a versioned patch | project-manager | triage → implement → qa-engineer smoke → CLOSURE |
+| W-03 | `code-review-fan-out` | PR opened on monitored repo | code-reviewer | diff fetch → 6-axis review → report → approve/request-changes |
+| W-04 | `audit-cycle` | Release CLOSURE phase or scheduled compliance audit | project-auditor | memory inventory → diff walk → scoring → report → project-manager |
+| W-05 | `game-dev-cycle` | New game mechanic or asset for `repos/tauan-games/` | game-developer / game-designer | spec → impl → game-tester report |
+| W-06 | `cross-cutting-feature` | Full-stack feature requiring frontend + backend shipped together | software-architect (contract) | contract review → parallel FE + BE impl → integration validation |
+| W-07 | `onboarding-new-repo` | New repository requires baseline compliance assessment | project-manager | 3-way specialist audit → gap report → SPEC → remediation |
 
 ---
 
@@ -217,11 +209,19 @@ dadaia public install --target all  # propagate staged edits to all contexts
 
 ## PM Playbooks
 
+> **R3 — PM-only invocation:** These playbooks are dispatched only by
+> `project-manager`; no leaf-agent invokes them directly. Leaf agents (e.g.
+> `software-engineer`, `qa-engineer`) receive task prompts from PM — they never
+> select or trigger a playbook themselves.
+
 Playbooks consolidate the 8 workflow files removed in `agents-r2-v1` (P1).
-Each playbook is invoked **only** by `project-manager` (PM-only invocation per
-SPEC R3). No corresponding `*.workflow.md` file exists under
-`dadaia_workspace/public/workflows/` (NFR8: keeping a stale workflow file would
-re-introduce the surface that P1 deleted).
+No corresponding `*.workflow.md` file exists under
+`dadaia_workspace/public/workflows/` for any of these playbooks (NFR8:
+keeping a stale workflow file would re-introduce the surface that P1 deleted).
+Surviving workflow files (`spec-refinement`, `hotfix-release`, etc.) that contain
+textual references to former playbook names (e.g. `tdd-cycle`, `bug-fix-fastlane`)
+are using them as contextual labels only — they are not acting as live workflow
+definitions for the removed patterns (R6 cross-reference verified in AGT-r2-09).
 
 PM identifies the trigger, picks the playbook, dispatches the entry agent with
 the input contract above, then mediates if the playbook branches.
@@ -316,8 +316,8 @@ or operator-reported leak.
    updated posture report.
 
 **Stop conditions:** CRITICAL severity with active exploit → pause all other
-work (escalation trigger #4). Patch requires secret rotation → also dispatch
-W-13 (Secrets leak response).
+work (escalation trigger #4). Patch requires secret rotation → also invoke the
+secrets-leak response steps (rotate credential → force-push or BFG → audit trail).
 
 ### Playbook — deploy-validation-only
 
