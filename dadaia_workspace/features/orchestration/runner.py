@@ -94,6 +94,7 @@ def build_invocation(
         run_id=manifest.run_id,
         context=manifest.context,
         run_ts=run_ts,
+        extra=manifest.inputs if manifest.inputs else None,
     )
     inputs = resolve_stage_inputs(workflow, manifest, stage)
     invocation_path = f"{runs_dir}/{manifest.run_id}/{stage.id}/invocation.md"

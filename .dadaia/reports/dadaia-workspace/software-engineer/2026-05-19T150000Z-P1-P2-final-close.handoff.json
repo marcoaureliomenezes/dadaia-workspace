@@ -1,0 +1,31 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "software-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T15:00:00Z",
+  "release_id": "panel-r4-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-19T150000Z-P1-P2-final-close.html",
+    "content_hash": "sha256:b3e9ac7f99e168dac8e31db8ec532003b0a6ddea8cd752dc718152c4a96194e0"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "summary": "PR4-08..15 all complete. 1344 unit+integration tests passing. 2 pre-existing unrelated failures."
+    },
+    {
+      "severity": "INFO",
+      "summary": "MissingTierError semantics softened: missing tier defaults to 3 + stderr warning; invalid tier still raises."
+    },
+    {
+      "severity": "INFO",
+      "summary": "Backfill: 28/50 sessions have agent_name; 22 legitimately NULL (top-level main-Claude sessions)."
+    }
+  ],
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "qa-engineer",
+    "input": "P1+P2 implementation complete on branch release/panel-r4-v1. Please proceed with PR4-16 (Playwright screenshot of Agents tab baseline) to unblock P3 card-border work."
+  }
+}

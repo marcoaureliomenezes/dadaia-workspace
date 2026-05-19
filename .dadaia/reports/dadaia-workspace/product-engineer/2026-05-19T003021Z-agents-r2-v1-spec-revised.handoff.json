@@ -1,0 +1,26 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "product-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T00:30:21Z",
+  "release_id": "agents-r2-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/product-engineer/2026-05-19T003021Z-agents-r2-v1-spec-revised.html",
+    "content_hash": "2099569086442238ae044e4bc9476e68fa00917be1068f853adf28c9952c33f4"
+  },
+  "findings": [
+    { "severity": "INFO", "message": "SPEC revised: NS10 rescinded, FR7 expanded to lib identical-pair (CLAUDE.md + AGENTS.md), FR10 added for operator manual migration to services/." },
+    { "severity": "INFO", "message": "Six new acceptance criteria (C21-C26) and rewritten R10 risk codify the workspace-root unification + domain extraction model." },
+    { "severity": "INFO", "message": "dadaia specs doctor reports only the expected SPEC-DOC-004 errors (PLAN.md/TASKS.md absent in SPEC phase); no structural issues with SPEC itself." }
+  ],
+  "decisions_required": [
+    "Operator: confirm revised SPEC reflects intended architecture before PE begins PLAN authoring.",
+    "software-architect (during PLAN phase, P11b): pick the byte-identity mechanism for the lib CLAUDE.md/AGENTS.md pair (symlink vs parity doctor vs generated-from-source)."
+  ],
+  "next_handoff": {
+    "agent": "product-engineer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "plan"
+  }
+}

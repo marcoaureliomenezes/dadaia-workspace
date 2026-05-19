@@ -1,5 +1,6 @@
 """MarkdownWorkflowStore — reads and validates *.workflow.md files."""
 
+import re
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from dadaia_workspace.core.models.workflow import (
 
 _FRONTMATTER_DELIM = "---"
 _SUFFIX = ".workflow.md"
+_AGENT_PLACEHOLDER_RE = re.compile(r"^\{\{\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*\}\}$")
 
 
 def _split_frontmatter(text: str) -> str:
@@ -188,6 +190,7 @@ def _parse(text: str, filename: str, agent_catalog: Iterable[str] | None) -> Wor
     if not stages_raw or not isinstance(stages_raw, list):
         raise WorkflowSchemaError(f"{name}: 'stages' must be a non-empty list")
     stages = tuple(_coerce_stage(s, name) for s in stages_raw)
+    inputs = _coerce_inputs(data.get("inputs"), name)
 
     seen: set[str] = set()
     for s in stages:
@@ -195,9 +198,19 @@ def _parse(text: str, filename: str, agent_catalog: Iterable[str] | None) -> Wor
             raise WorkflowSchemaError(f"{name}: duplicate stage id '{s.id}'")
         seen.add(s.id)
 
+    input_names = {i.name for i in inputs}
     if agent_catalog is not None:
         catalog = set(agent_catalog)
         for s in stages:
+            placeholder = _AGENT_PLACEHOLDER_RE.match(s.agent)
+            if placeholder:
+                ref = placeholder.group(1)
+                if ref not in input_names:
+                    raise WorkflowSchemaError(
+                        f"{name}.{s.id}: agent placeholder '{{{{{ref}}}}}' references "
+                        f"unknown input — declare it under 'inputs'"
+                    )
+                continue
             if s.agent not in catalog:
                 raise WorkflowSchemaError(
                     f"{name}.{s.id}: agent '{s.agent}' not present in public/agents/"
@@ -211,7 +224,7 @@ def _parse(text: str, filename: str, agent_catalog: Iterable[str] | None) -> Wor
         description=str(data.get("description", "")),
         version=str(data.get("version", "0.0.0")),
         schema_version=str(data.get("schema_version", "1")),
-        inputs=_coerce_inputs(data.get("inputs"), name),
+        inputs=inputs,
         stages=stages,
         exit_criteria=_coerce_exit_criteria(data.get("exit_criteria")),
     )

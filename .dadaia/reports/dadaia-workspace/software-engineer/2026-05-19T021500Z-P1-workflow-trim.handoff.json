@@ -1,0 +1,27 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "software-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T02:15:00Z",
+  "release_id": "agents-r2-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-19T021500Z-P1-workflow-trim.html",
+    "content_hash": "sha256:927c65cd0ba634c9bd783ee88c3b5fb93dc413c5b7437913c882560f2c2f5e0b"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "summary": "AGT-r2-06: 8 deprecated workflows archived to specs/_archive/legacy-workflows/20260519T021402Z/. 7 workflows remain in dadaia_workspace/public/workflows/."
+    },
+    {
+      "severity": "INFO",
+      "summary": "AGT-r2-07: New test file tests/unit/features/public/test_workflows.py (4 tests, all pass). Panel topology test updated from 15 to 7. Integration test fixed (tdd-cycle -> hotfix-release). dadaia-grill-me skill has no deprecated workflow refs."
+    }
+  ],
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "devops-engineer",
+    "input": "P1 complete. Workflow trim from 15 to 7 is done. Run dadaia public stage && install --target all && doctor in Phase P8 to propagate the removed workflow files to all projection targets."
+  }
+}

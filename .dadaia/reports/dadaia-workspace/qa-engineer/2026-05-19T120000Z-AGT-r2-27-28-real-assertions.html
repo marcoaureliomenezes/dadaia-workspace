@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QA Report — AGT-r2-27 + AGT-r2-28 — Real Assertions</title>
+  <style>
+    body { font-family: sans-serif; max-width: 960px; margin: 2rem auto; color: #1a1a1a; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #ccc; margin-top: 2rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem 0.8rem; text-align: left; }
+    th { background: #f5f5f5; }
+    .pass { color: #256325; font-weight: bold; }
+    .fail { color: #c0392b; font-weight: bold; }
+    .warn { color: #8a6a00; font-weight: bold; }
+    pre { background: #f8f8f8; border: 1px solid #ddd; padding: 1rem; overflow-x: auto; font-size: 0.85em; }
+    .meta { color: #555; font-size: 0.9em; margin-bottom: 1.5rem; }
+    .note { background: #fffbea; border-left: 4px solid #e6a817; padding: 0.6rem 1rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>QA Report — AGT-r2-27 + AGT-r2-28</h1>
+<div class="meta">
+  <strong>Date:</strong> 2026-05-19T12:00:00Z<br>
+  <strong>Agent:</strong> qa-engineer<br>
+  <strong>Release:</strong> agents-r2-v1 (phase: IMPLEMENTATION / W3)<br>
+  <strong>Branch:</strong> release/agents-r2-v1<br>
+  <strong>Commits:</strong> f77ca49 (AGT-r2-27), 90fffe2 (AGT-r2-28)<br>
+  <strong>Context:</strong> dadaia-workspace
+</div>
+
+<h2>Summary</h2>
+<p>
+  Both tasks in Phase P9 / W3 are complete.
+  AGT-r2-27 replaced 6 <code>@pytest.mark.xfail</code> placeholder cases with real
+  assertions in <code>tests/unit/features/public/test_workspace_guardrail_pair.py</code>
+  — all 6 cases pass.
+  AGT-r2-28 created <code>tests/integration/test_public_install_e2e.py</code> with 3
+  end-to-end scenarios exercising nested-pair non-interference (FR10) and Option C
+  SHA-256 parity — all 3 pass.
+</p>
+<table>
+  <tr><th>Task</th><th>Marker</th><th>Result</th></tr>
+  <tr><td>AGT-r2-27</td><td>[x] DONE</td><td class="pass">6 passed</td></tr>
+  <tr><td>AGT-r2-28</td><td>[x] DONE</td><td class="pass">3 passed</td></tr>
+</table>
+
+<div class="note">
+  <strong>Known pre-existing failure (NOT in scope):</strong>
+  <code>tests/integration/test_install_all_projects_runtime_assets</code> expects
+  <code>dadaia-workspace-dev-guardrail.md</code> under <code>.codex/rules/</code> —
+  that rule file was archived in AGT-r2-32 and will be addressed in a separate ticket.
+  This failure is not caused by AGT-r2-27 or AGT-r2-28.
+</div>
+
+<h2>Per-case Implementation Notes</h2>
+
+<h3>AGT-r2-27 — Unit test real assertions</h3>
+<table>
+  <tr><th>Case</th><th>Key assertion</th><th>Result</th></tr>
+  <tr>
+    <td>test_four_target_projection_write</td>
+    <td>4 destinations exist; all 4 share source SHA-256; installed list has 4 [ok] entries</td>
+    <td class="pass">PASS</td>
+  </tr>
+  <tr>
+    <td>test_skip_no_dadaia_marker</td>
+    <td>Consumer without <code>.dadaia/</code> not written; stderr contains "[skip]...no .dadaia/ marker"</td>
+    <td class="pass">PASS</td>
+  </tr>
+  <tr>
+    <td>test_skip_no_agentic_marker</td>
+    <td>Consumer with <code>.dadaia/</code> but no <code>.dadaia/agentic/</code> not written; same skip log</td>
+    <td class="pass">PASS</td>
+  </tr>
+  <tr>
+    <td>test_skip_self_slug_package_version_match</td>
+    <td>Consumer matching own package_version skipped; no AGENTS.md or CLAUDE.md created; stderr contains "self-projection"</td>
+    <td class="pass">PASS</td>
+  </tr>
+  <tr>
+    <td>test_nested_pair_non_interference</td>
+    <td>services/AGENTS.md and services/CLAUDE.md byte-identical to pre-install operator content (FR10)</td>
+    <td class="pass">PASS</td>
+  </tr>
+  <tr>
+    <td>test_doctor_four_line_output</td>
+    <td>_doctor_guardrail_pair returns exactly 4 lines with correct labels; all [ok]</td>
+    <td class="pass">PASS</td>
+  </tr>
+</table>
+
+<p><strong>Implementation decision:</strong> Case 4 (self-slug) was extended to assert the
+  stderr log line contains "self-projection" (matching the actual log string in
+  <code>_install_workspace_guardrail_pair</code> line 386-389), and to assert both
+  AGENTS.md and CLAUDE.md are absent (not just AGENTS.md as in the placeholder).
+  The <code>capsys</code> fixture was added to cases 2, 3, and 4 to capture stderr output.
+  Case 6 switched from <code>capsys</code> to checking the return value of
+  <code>_doctor_guardrail_pair</code> directly, which is cleaner and avoids depending on
+  stderr format.</p>
+
+<h3>AGT-r2-28 — Integration test</h3>
+<table>
+  <tr><th>Scenario</th><th>What it verifies</th><th>Result</th></tr>
+  <tr>
+    <td>test_nested_services_pair_untouched_after_install</td>
+    <td>services/ files untouched; root + consumer pairs written byte-identical to source (1 consumer)</td>
+    <td class="pass">PASS</td>
+  </tr>
+  <tr>
+    <td>test_nested_services_pair_untouched_no_consumers</td>
+    <td>services/ files untouched even with no repos/ — minimal FR10 invariant</td>
+    <td class="pass">PASS</td>
+  </tr>
+  <tr>
+    <td>test_all_projected_pairs_share_single_sha256</td>
+    <td>2 consumers + root: all 6 projected files share exactly one SHA-256 (Option C parity)</td>
+    <td class="pass">PASS</td>
+  </tr>
+</table>
+
+<p><strong>Implementation decision:</strong> Tests use <code>_install_workspace_guardrail_pair</code>
+  directly rather than <code>FileSystemPublicAssetManager.install()</code>. This is correct at
+  phase P9 because <code>manager.install()</code> does not yet dispatch to
+  <code>_install_workspace_guardrail_pair</code> — that wiring lands in AGT-r2-35. Using the
+  function directly gives full coverage of the FR10 and Option C invariants without needing
+  the manager plumbing that is out of scope here.</p>
+
+<h2>pytest Output — AGT-r2-27</h2>
+<pre>
+============================= test session info ==============================
+platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0
+rootdir: /home/marco/workspace/dadaia/repos/dadaia-workspace
+configfile: pyproject.toml
+
+tests/unit/features/public/test_workspace_guardrail_pair.py::test_four_target_projection_write PASSED
+tests/unit/features/public/test_workspace_guardrail_pair.py::test_skip_no_dadaia_marker PASSED
+tests/unit/features/public/test_workspace_guardrail_pair.py::test_skip_no_agentic_marker PASSED
+tests/unit/features/public/test_workspace_guardrail_pair.py::test_skip_self_slug_package_version_match PASSED
+tests/unit/features/public/test_workspace_guardrail_pair.py::test_nested_pair_non_interference PASSED
+tests/unit/features/public/test_workspace_guardrail_pair.py::test_doctor_four_line_output PASSED
+
+============================== 6 passed in 0.11s ==============================
+</pre>
+
+<h2>pytest Output — AGT-r2-28</h2>
+<pre>
+============================= test session info ==============================
+platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0
+rootdir: /home/marco/workspace/dadaia/repos/dadaia-workspace
+configfile: pyproject.toml
+
+tests/integration/test_public_install_e2e.py::test_nested_services_pair_untouched_after_install PASSED
+tests/integration/test_public_install_e2e.py::test_nested_services_pair_untouched_no_consumers PASSED
+tests/integration/test_public_install_e2e.py::test_all_projected_pairs_share_single_sha256 PASSED
+
+============================== 3 passed in 0.04s ==============================
+</pre>
+
+<h2>Sidecar</h2>
+<pre id="sidecar">
+{
+  "schema": "handoff-v1",
+  "from": "qa-engineer",
+  "to": "software-engineer",
+  "release": "agents-r2-v1",
+  "tasks_closed": ["AGT-r2-27", "AGT-r2-28"],
+  "next_tasks": ["AGT-r2-35"],
+  "notes": [
+    "AGT-r2-35: wire _install_workspace_guardrail_pair into manager.install() — the integration tests in test_public_install_e2e.py currently test the function directly; after AGT-r2-35 lands, the tests remain valid (function is still the target) but a separate manager-level integration test may also be warranted.",
+    "Pre-existing failure in test_install_all_projects_runtime_assets (dadaia-workspace-dev-guardrail.md missing from .codex/rules/) is NOT caused by these tasks — separate ticket."
+  ]
+}
+</pre>
+
+</body>
+</html>

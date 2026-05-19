@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — workspace-portability (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>workspace-portability</h1>
+<p class="meta">CLI surface: <code>dadaia export [--output DIR] [--include-reports] [--exclude-mnt]</code> e <code>dadaia import &lt;archive&gt; [--workspace DEST] [--skip-activate]</code> · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>Empacota e restaura o estado durável do workspace (state files, academy, rules, skills, opencode config) como <code>.tar.gz</code> portável. Secretos (<code>.env</code>), caches e <code>repos/</code> clonados são excluídos por padrão; reports HTML opt-in via flag.</p>
+  <p>Restore patches absolute paths para a nova máquina, reativa contexts conforme estavam, e (a menos que <code>--skip-activate</code>) re-roda <code>workspace-init</code> para reconfigurar hooks.</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li><code>dadaia export</code> — gera <code>.dadaia/dist/workspace-&lt;timestamp&gt;.tar.gz</code> com state + academy + rules + skills + opencode config.</li>
+    <li>Operador transporta o arquivo (scp, upload, etc.) para a nova máquina.</li>
+    <li>Na nova máquina, em um diretório limpo: <code>dadaia import /path/to/archive.tar.gz</code>.</li>
+    <li>Import extrai, faz patch de paths absolutos, restaura contexts e (default) executa init.</li>
+    <li>Operador valida com <code>dadaia context list</code> e <code>dadaia doctor</code>.</li>
+  </ol>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Migração entre máquinas, backup periódico, ou sharing de workspace template para colega/equipe.</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Workspace reprodutível em alguns segundos sem rebuild manual — todas as configurações de contexts, regras, skills e materiais de academy preservadas. Sem essa feature, migrar workspace exigiria reproduzir manualmente dezenas de arquivos em vários runtime dirs.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li>Export: cria <code>.dadaia/dist/&lt;archive&gt;.tar.gz</code></li>
+    <li>Import: extrai sobre workspace destino, sobrescreve <code>.dadaia/states/*</code>, <code>.dadaia/academy/</code>, <code>.claude/rules/</code>, <code>.agents/skills/</code>, <code>.opencode/</code>, opencode.json</li>
+    <li>Repos clonados NÃO viajam — re-clone via <code>context activate</code> após import</li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Export depende de <a href="context-management.html">context-management</a> (lê <code>spec_contexts.json</code>).</li>
+    <li>Import dispara <a href="workspace-init.html">workspace-init</a> internamente para reconfigurar hooks.</li>
+  </ul>
+</section>
+
+</body>
+</html>

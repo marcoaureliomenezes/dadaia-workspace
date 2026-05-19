@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — agent-orchestration (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>agent-orchestration</h1>
+<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: agents-r3-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>Executa <strong>workflows</strong> (DAGs de stages) sobre uma topologia de <strong>20 agentes em 3 tiers</strong>: Tier 1 orquestradores com tool <code>Agent</code> — <code>project-manager</code> (intake + dispatch) e <code>project-auditor</code> (drift detection); Tier 2 curator (<code>product-engineer</code>) autor de SPEC/PLAN/TASKS/CLOSURE e guardião de <code>specs/memory/*.html</code> em phase CLOSURE; Tier 3 leaf specialists (17 agentes) sem tool <code>Agent</code>, em ordem alfabética: <code>ai-engineer</code>, <code>backend-engineer</code>, <code>code-reviewer</code>, <code>data-analyst</code>, <code>data-engineer</code>, <code>design-specialist</code>, <code>devops-engineer</code>, <code>frontend-engineer</code>, <code>game-designer</code>, <code>game-developer</code>, <code>game-tester</code>, <code>qa-engineer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>software-architect</code>, <code>software-engineer-node</code>, <code>software-engineer-python</code>. <code>product-engineer</code> e <code>software-architect</code> não declaram <code>Bash</code>; invocações de shell são delegadas ao PM.</p>
+  <p><strong>Split do software-engineer (r3):</strong> a persona genérica <code>software-engineer</code> foi retirada e dividida em dois especialistas focados — <code>software-engineer-python</code> (Python lib, scripts, pytest, FastAPI/Flask, Docker, AWS Lambda) e <code>software-engineer-node</code> (Node 20 LTS+, TypeScript/JavaScript server-side, security-conscious, sem superfície de browser). A motivação operacional foi a de que <code>software-engineer</code> havia se tornado genérico demais, absorvendo runtime concerns de duas linguagens distintas e bloqueando a clareza de dispatch.</p>
+  <p><strong>Novos especialistas r3 — data + BI + AI:</strong> três domínios ganharam personas próprias. <code>data-engineer</code> cobre SQL+NoSQL, OLTP/OLAP, Spark/Airflow/Kafka, Databricks (DABs, Delta Tables, notebooks, workflows) e file formats (CSV/AVRO/JSON/Parquet/Delta/Iceberg); escopo primário em <code>repos/dd-chain-explorer/**</code>, disponível cross-project. <code>data-analyst</code> é o BI specialist — Databricks Genie + Dashboards via DABs, data viz + storytelling, Playwright dashboard evaluation; pareia com <code>design-specialist</code> para review visual (mesmo padrão de <code>frontend-engineer</code> ↔ <code>design-specialist</code>). O pairing <code>data-engineer</code> → <code>data-analyst</code> segue o pattern de cadeia: o data-engineer cura pipelines e materializa tabelas Delta/Iceberg que o data-analyst consome para construir dashboards e relatórios BI.</p>
+  <p><strong>AI-entity surface authority:</strong> <code>ai-engineer</code> é o owner <strong>exclusivo</strong> do conjunto de arquivos markdown de entidades AI da lib — <code>dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**</code>. Conhece context engineering, prompt design, análise de eficiência de skill/rule/workflow/hook, e fundamentos de runtime do claude-code + codex + opencode. Gera reports de eficiência de prompt e cost vs output. Não toca implementação Python/Node nem specs. <code>product-engineer</code> retém autoria de SPEC/PLAN/TASKS/CLOSURE e memory atoms; perdeu autoridade <em>de facto</em> sobre <code>public/agents/*.md</code>, agora delegada ao <code>ai-engineer</code> (a primeira passada de autoria das 5 novas personas em r3 foi feita por <code>product-engineer</code> como bootstrap; a primeira passada recursiva do <code>ai-engineer</code> sobre sua própria superfície fica para uma release seguinte).</p>
+  <p>Cada stage dispatcha um agente em runtime escolhido (cli, Claude API, Codex, OpenCode). Suporta dependências, paralelização via <code>parallel_group</code>, gates de aprovação humana (<code>operator-approval</code>), binding de inputs e retomada após falhas/gates. Cada run produz <strong>manifest</strong> imutável + <strong>event log</strong> JSONL para auditoria completa.</p>
+  <p>O catálogo declarativo tem <strong>7 workflows</strong>; padrões de routing puro (classify → dispatch single agent → done) ficam como <strong>8 PM playbooks</strong> embedidos na skill <code>project-orchestration</code>, invocados nativamente pelo <code>project-manager</code> sem custo YAML. Não houve novos workflows em r3 (rewire-only); workflows para data/BI/AI ficam em backlog até demanda concreta do operador.</p>
+</section>
+
+<section id="dam-snapshot">
+  <h2>Decision Authority Matrix — domínios novos (r3)</h2>
+  <p>Snapshot dos 5 domínios introduzidos em r3, na ordem em que aparecem em <code>dadaia_workspace/public/skills/project-orchestration/SKILL.md</code>. Lista completa da matrix vive no SKILL.md.</p>
+  <table>
+    <thead>
+      <tr><th>Domínio</th><th>Autoridade primária</th><th>Pode objetar (com evidência)</th><th>Tie-breaker</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Python implementation</td><td><code>software-engineer-python</code></td><td><code>software-architect</code></td><td><code>software-architect</code></td></tr>
+      <tr><td>Node implementation (server-side)</td><td><code>software-engineer-node</code></td><td><code>software-architect</code>, <code>security-reviewer</code></td><td><code>software-architect</code></td></tr>
+      <tr><td>Data engineering / pipelines / DABs</td><td><code>data-engineer</code></td><td><code>software-architect</code></td><td><code>software-architect</code></td></tr>
+      <tr><td>BI / dashboards / data viz</td><td><code>data-analyst</code></td><td><code>design-specialist</code> (visual), <code>data-engineer</code> (source)</td><td><code>design-specialist</code> (visual), <code>data-engineer</code> (data)</td></tr>
+      <tr><td>AI entities / skills / rules / workflows / hooks / personas</td><td><code>ai-engineer</code></td><td><code>product-engineer</code></td><td><code>product-engineer</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li><code>dadaia orchestrate list</code> — lista os 7 workflows pré-instalados: <code>spec-refinement</code>, <code>cross-cutting-feature</code>, <code>onboarding-new-repo</code>, <code>hotfix-release</code>, <code>game-dev-cycle</code>, <code>audit-cycle</code>, <code>code-review-fan-out</code>. Todos justificam custo declarativo por prompt-chaining com gates ou paralelização. Padrões de routing puro vivem como PM playbooks na skill <code>project-orchestration</code>.</li>
+    <li><code>dadaia orchestrate show audit-cycle</code> — mostra o schema do workflow (inputs, stages com <code>needs</code>/<code>parallel_group</code>/<code>gate</code>, <code>expected_output</code>).</li>
+    <li><code>dadaia orchestrate run spec-refinement --input topic=auth</code> — cria run (id gerado), persiste <code>manifest.json</code>, emite <code>RUN_STARTED</code>, identifica stages prontas e despacha-as.</li>
+    <li>O <code>StageRunner</code> agrupa stages com mesmo <code>parallel_group</code> e despacha simultaneamente via <code>AgentDispatcher</code> (cli/claude/codex/opencode). Cada stage recebe seu <code>invocation.md</code> em <code>.dadaia/runs/&lt;run_id&gt;/&lt;stage_id&gt;/</code>.</li>
+    <li>Stages de orquestração (<code>discovery</code>, <code>synthesis</code>) rodam em <code>project-manager</code>; stage <code>spec_write</code> roda em <code>product-engineer</code> como leaf invocado pelo PM. Stages de implementação rodam nos leaf specialists do Tier 3.</li>
+    <li>Quando um stage termina, escreve seu output no caminho declarado em <code>expected_output</code>; o runner recalcula próximas stages prontas e despacha novamente. Gates pausam o run; <code>dadaia orchestrate status &lt;run_id&gt;</code> e <code>resume &lt;run_id&gt;</code> permitem inspeção e retomada.</li>
+  </ol>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Op as Operador
+    participant CLI as dadaia orchestrate run
+    participant Mgr as RunManifest
+    participant Runner as StageRunner
+    participant PM as project-manager (Tier 1)
+    participant Disp as AgentDispatcher
+    participant Leaf as Leaf specialists (Tier 3)
+    participant PE as product-engineer (Tier 2, leaf)
+    Op->>CLI: run spec-refinement --input topic=auth
+    CLI->>Mgr: cria manifest.json + events.jsonl
+    CLI->>Runner: _advance()
+    Runner->>Disp: dispatch discovery → PM
+    Disp->>PM: invocation.md (grill-me + intake)
+    PM->>Disp: dispatch parallel_group=specialists
+    par stages paralelas
+        Disp->>Leaf: software-architect (cli)
+        Disp->>Leaf: devops-engineer
+        Disp->>Leaf: qa-engineer
+        Disp->>Leaf: researcher
+        Disp->>Leaf: security-reviewer
+    end
+    Leaf-->>Mgr: report HTML em expected_output
+    Mgr-->>Runner: stages completed
+    Runner->>Disp: dispatch synthesis → PM
+    PM-->>Mgr: synthesis report
+    Runner->>Disp: dispatch spec_write → PE (leaf)
+    PE-->>Mgr: SPEC.md (Draft)
+    Disp->>Op: gate operator-approval (pausa)
+  </pre>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Quando o operador endereça <code>project-manager</code> com uma demanda — feature, bug, audit, release, research, design, security. PM categoriza, escolhe um dos 7 workflows ou aciona um dos 8 PM playbooks da skill <code>project-orchestration</code>, e despacha. Também usado por hooks/cron schedules para tarefas recorrentes (ex.: <code>audit-cycle</code> semanal).</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>A separação em 3 tiers elimina três problemas estruturais da topologia anterior: (1) <strong>product-engineer não é mais bottleneck</strong> — discovery/dispatch/synthesis foram movidos para <code>project-manager</code>, e PE volta a ser leaf invocável quando uma spec precisa ser escrita; (2) <strong>sub-agente nunca tenta spawnar sub-agente</strong> — apenas Tier 1 (PM/auditor) declara tool <code>Agent</code>, evitando silent failures no harness Claude; (3) <strong>design decoupled de implementação</strong> — <code>design-specialist</code> emite specs visuais que <code>frontend-engineer</code> consome, sem que FE arbitre UX. Adicionalmente, <code>project-auditor</code> traz drift detection de primeira classe entre <code>specs/memory/*.html</code> e o código, com compliance score 1–10 em 6 dimensões.</p>
+  <p><strong>Path-scope enforcement (r2 + r3):</strong> o gate PreToolUse <code>sdd-spec-gate.sh</code> valida <code>file_path</code> de Write/Edit/MultiEdit contra <code>paths.write_allowlist</code> declarado no frontmatter de cada agente; mismatch → bloqueio com mensagem <code>[PATH SCOPE ERROR]</code>. Os 20 agentes declaram <code>paths:</code>. Em r3, os allowlists das 5 novas personas seguem essa convenção: <code>ai-engineer</code> só escreve em <code>dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**</code> (e seu próprio diretório de reports); <code>software-engineer-python</code> e <code>software-engineer-node</code> são banidos de <code>public/**</code> (território do <code>ai-engineer</code>). Apenas 2 rule files canônicos sobrevivem (<code>game-agents-coordination.md</code>, <code>game-developer-scope.md</code>); rules per-agent inlined nos próprios corpos como seção <code>## Scope and forbidden actions</code>. <code>data/AGENTS.md</code> é fonte única (Option C) fanned-out para o par <code>AGENTS.md</code> + <code>CLAUDE.md</code> em workspace-root e em consumer-repos com marker <code>.dadaia/agentic/</code>.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li><code>.dadaia/runs/&lt;run_id&gt;/manifest.json</code> — registro imutável do run</li>
+    <li><code>.dadaia/runs/&lt;run_id&gt;/events.jsonl</code> — append-only log (RUN_STARTED, STAGE_DISPATCHED, STAGE_COMPLETED, GATE_AWAITING, RUN_COMPLETED, RUN_FAILED)</li>
+    <li><code>.dadaia/runs/&lt;run_id&gt;/&lt;stage_id&gt;/invocation.md</code> — prompt da stage</li>
+    <li><code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/&lt;ts&gt;-&lt;type&gt;.html</code> — reports HTML produzidos por cada um dos 20 agentes (diretórios <code>project-manager</code>, <code>project-auditor</code>, <code>product-engineer</code>, <code>software-engineer-python</code>, <code>software-engineer-node</code>, <code>backend-engineer</code>, <code>frontend-engineer</code>, <code>qa-engineer</code>, <code>software-architect</code>, <code>devops-engineer</code>, <code>data-engineer</code>, <code>data-analyst</code>, <code>ai-engineer</code>, <code>game-developer</code>, <code>game-designer</code>, <code>game-tester</code>, <code>code-reviewer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>design-specialist</code>) + sidecar <code>&lt;stem&gt;.handoff.json</code></li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Depende de <a href="context-management.html">context-management</a> (resolve context ativo para path templating).</li>
+    <li>Depende de <a href="public-asset-distribution.html">public-asset-distribution</a> (20 agentes + 7 workflows + Option C dual-name pair installer instalados a partir de <code>public/agents/</code>, <code>public/workflows/</code> e <code>public/data/AGENTS.md</code>).</li>
+    <li>Depende de <a href="agent-comms.html">agent-comms</a> (sidecars <code>handoff-v1</code> de cada report; consumido por <code>project-auditor</code> em auditorias).</li>
+    <li>Os 20 agentes + 7 workflows + 2 rules canônicos + 8 PM playbooks na skill <code>project-orchestration</code> vivem como assets canônicos versionados. Skills cross-cutting: <code>project-orchestration</code>, <code>architecture-code-review</code>, <code>security-audit-protocol</code>, <code>drift-detection</code>, <code>ux-ui-review</code>, <code>dadaia-workspace-doctor</code>, <code>dev-server-registry</code>.</li>
+  </ul>
+</section>
+
+</body>
+</html>

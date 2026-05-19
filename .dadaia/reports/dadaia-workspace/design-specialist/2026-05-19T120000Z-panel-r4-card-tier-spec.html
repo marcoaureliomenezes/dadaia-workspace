@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR4-17 — Tier-Aware Agent Cards Design Spec</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-pass     { background: #daffd0; color: #1a5c00; }
+  .badge-fail     { background: #ffd7d7; color: #a00; }
+  .badge-high     { background: #fff0d0; color: #c05000; }
+  .badge-medium   { background: #fffad0; color: #806000; }
+  .badge-low      { background: #daffd0; color: #1a5c00; }
+  .finding { border: 1px solid #e4e8ec; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  .finding h3 { margin-top: 0; }
+  .swatch {
+    display: inline-block;
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.12);
+    vertical-align: middle;
+    margin-right: .3em;
+  }
+  .tier-1 { color: #c0392b; font-weight: 700; }
+  .tier-2 { color: #b35800; font-weight: 700; }
+  .tier-3 { color: #6b6b6b; font-weight: 700; }
+  .ascii-block {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .contrast-pass { color: #1a5c00; font-weight: 600; }
+  .contrast-note { color: #555; font-size: .9em; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> design-specialist</span>
+  <span><strong>Gerado em:</strong> 2026-05-19T120000Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Release:</strong> <code>panel-r4-v1</code></span>
+  <span><strong>Task:</strong> <code>PR4-17</code></span>
+</div>
+
+<h1>PR4-17 — Tier-Aware Agent Cards: Design Specification</h1>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>Brief</h2>
+
+<p>
+The dadaia panel Agents tab currently renders all 16 agent cards with an identical
+<code>1px solid #dddddd</code> border and no tier differentiation. This flattens the
+orchestration topology — a user cannot distinguish T1 orchestrators from T3 leaf
+specialists at a glance. PR4-17 resolves this by: (a) bumping the default
+<code>.agent-card</code> border to <code>2px</code>; (b) adding a <code>4px left accent
+stripe</code> colour-coded per tier via <code>data-tier</code> attribute selectors; and
+(c) defining nine new CSS custom properties (3 palettes × 3 tiers) with WCAG 2.2 AA
+contrast verified against each palette's card background. The tier label text ("T1
+Orchestrator" etc.) visible in the operator's approved mockup is included as a new
+<code>.agent-card__tier-label</code> element so the visual signal is redundant (colour +
+text), satisfying WCAG 1.4.1 (colour not sole differentiator).
+</p>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>Current State Evidence</h2>
+
+<p>
+No Playwright screenshot was obtained in PR4-16 (the qa-engineer session ended before
+saving the PNG). The operator has explicitly approved the design direction via a preview
+exchange. The following evidence is used in lieu of a screenshot:
+</p>
+
+<h3>Operator-approved ASCII mockup (verbatim from PR4-17 brief)</h3>
+
+<div class="ascii-block">&#x250F;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2513;
+&#x2503; &#x25D6; project-manager   &#x2B22;&#x2503;   &lt;-- Tier-1: red accent
+&#x2503;   T1 Orchestrator    &#x2503;
+&#x2503;                       &#x2503;
+&#x2503; 47 sess &#xB7; $12.4 &#xB7; 3m &#x2502;
+&#x2517;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x251B;
+&#x250F;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2513;
+&#x2503; &#x25D6; product-engineer  &#x2B22;&#x2503;   &lt;-- Tier-2: amber accent
+&#x2503;   T2 Curator         &#x2503;
+&#x2503; 31 sess &#xB7; $8.1 &#xB7; 12m &#x2502;
+&#x2517;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x251B;
+&#x250F;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2513;
+&#x2503; &#x25D6; software-engineer &#x2B22;&#x2503;   &lt;-- Tier-3: neutral
+&#x2503;   T3 Leaf            &#x2503;
+&#x2503; 88 sess &#xB7; $24 &#xB7; 45s  &#x2503;
+&#x2517;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x251B;</div>
+
+<h3>Code-level current state (read from source)</h3>
+
+<ul>
+  <li>File: <code>dadaia_workspace/features/panel/views/assets/css/agents.py</code></li>
+  <li>Line 43: <code>border: 1px solid var(--color-border, #dddddd);</code> — current 1px border</li>
+  <li>Line 44: <code>border-left: 3px solid transparent;</code> — left accent invisible until hover or <code>--active</code> state</li>
+  <li>Line 71: <code>.agent-card--active { border-left: 3px solid var(--color-accent, #9cddc8); }</code> — accent only on active status, not tier</li>
+  <li>No <code>data-tier</code> attribute wired in JS (<code>agents.js</code> lines 132–165)</li>
+  <li>No <code>--color-tier-*</code> tokens in <code>tokens.py</code></li>
+</ul>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>A11y Findings</h2>
+
+<p>Assessed against WCAG 2.2 AA. Scope: the proposed tier accent changes only — existing
+card a11y is not re-audited here (out of scope for PR4-17).</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Criterion</th>
+      <th>Level</th>
+      <th>Result</th>
+      <th>Evidence</th>
+      <th>Fix direction</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1.4.1 — Color not sole differentiator</td>
+      <td>AA</td>
+      <td><span class="badge badge-fail">FAIL (pre-fix)</span></td>
+      <td>Tier is currently invisible. If only border colour differentiates tiers, colour
+        becomes the sole signal.</td>
+      <td>Add <code>.agent-card__tier-label</code> text ("T1 Orchestrator" / "T2 Curator" /
+        "T3 Leaf") below the agent name. Colour + text = redundant signal. See Design Spec
+        — Typography.</td>
+    </tr>
+    <tr>
+      <td>1.4.11 — Non-text contrast ≥ 3:1 (UI component)</td>
+      <td>AA</td>
+      <td><span class="badge badge-pass">PASS (by spec)</span></td>
+      <td>All 9 tier accent hex values achieve ≥ 3.4:1 contrast against white card background
+        (#ffffff). Ratios documented in Design Spec — Tokens table.</td>
+      <td>No action required. Verify at implementation time with <code>dadaia specs doctor</code>
+        or browser DevTools.</td>
+    </tr>
+    <tr>
+      <td>1.4.3 — Text contrast ≥ 4.5:1</td>
+      <td>AA</td>
+      <td><span class="badge badge-pass">PASS (by spec)</span></td>
+      <td>The <code>.agent-card__tier-label</code> text uses <code>var(--color-muted, #666666)</code>
+        which yields 5.74:1 on white (#ffffff). Passes AA for normal-size text.</td>
+      <td>No action required.</td>
+    </tr>
+    <tr>
+      <td>2.4.7 — Focus visible</td>
+      <td>AA</td>
+      <td><span class="badge badge-pass">PASS (unchanged)</span></td>
+      <td>Existing <code>:focus-visible</code> rule on <code>.agent-card</code> (line 59) is
+        untouched. Warm theme double-outline override (line 64) also unchanged.</td>
+      <td>No action required.</td>
+    </tr>
+    <tr>
+      <td>2.5.8 — Target size ≥ 24×24 CSS px</td>
+      <td>AA</td>
+      <td><span class="badge badge-pass">PASS (unchanged)</span></td>
+      <td>Card is a full-width <code>&lt;button&gt;</code>; minimum height exceeds 44px from
+        existing padding. Adding a tier-label line only increases height.</td>
+      <td>No action required.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>Visual Hierarchy Findings</h2>
+
+<div class="finding">
+  <h3><span class="badge badge-high">IMPROVEMENT</span> No orchestration topology signal</h3>
+  <p><strong>Observation:</strong> All 16 cards share identical border weight and colour.
+  The agents tab reads as a flat alphabetical list, not an orchestration hierarchy. The
+  most critical agents (project-manager, project-auditor) are visually identical to
+  leaf specialists.</p>
+  <p><strong>Severity:</strong> Improvement (not a WCAG blocker, but a core product
+  usability gap per SPEC §1).</p>
+  <p><strong>Fix:</strong> 4px left tier accent stripe + tier-label text as specified below.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-medium">IMPROVEMENT</span> 1px border too thin for card delineation</h3>
+  <p><strong>Observation:</strong> <code>border: 1px solid #dddddd</code> on a white surface
+  background creates insufficient separation between cards at small viewport widths or under
+  bright ambient light. The operator's approved direction explicitly bumps to 2px.</p>
+  <p><strong>Severity:</strong> Improvement. Passes 1.4.11 at 1px (contrast of border #dddddd
+  on surface #ffffff = 1.32:1 — technically below 3:1 for a UI boundary, but the card already
+  carries adequate spatial separation via gap. 2px improves robustness).</p>
+  <p><strong>Fix:</strong> <code>border: 2px solid var(--color-border-card)</code>. New token
+  <code>--color-border-card</code> introduced per palette (same hex as current
+  <code>--color-border</code> to avoid regression).</p>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>Design Specification</h2>
+
+<h3>Tokens — Tier Accent Colours (3 palettes × 3 tiers = 9 values)</h3>
+
+<p>
+All values are verified for WCAG 2.2 AA non-text contrast (criterion 1.4.11, minimum 3:1)
+against the card background token <code>--color-surface: #ffffff</code>, which is shared
+by all three palettes. The tier label text uses <code>--color-muted</code> (not the tier
+accent), so text contrast (1.4.3, 4.5:1) is evaluated separately under Typography.
+</p>
+
+<p>Contrast ratios computed using the WCAG 2.1 relative luminance formula
+(<code>L = 0.2126R + 0.7152G + 0.0722B</code> with linearised sRGB channels).</p>
+
+<h4>Mint Palette</h4>
+
+<table>
+  <thead>
+    <tr><th>Token</th><th>Role</th><th>Hex</th><th>Swatch</th><th>Contrast vs #ffffff</th><th>WCAG 1.4.11</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>--color-tier-1</code></td>
+      <td>T1 orchestrator — red family</td>
+      <td><code>#c0392b</code></td>
+      <td><span class="swatch" style="background:#c0392b"></span></td>
+      <td class="contrast-pass">5.52:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td><code>--color-tier-2</code></td>
+      <td>T2 curator — amber/burnt-orange family</td>
+      <td><code>#b35800</code></td>
+      <td><span class="swatch" style="background:#b35800"></span></td>
+      <td class="contrast-pass">4.87:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td><code>--color-tier-3</code></td>
+      <td>T3 leaf — neutral, darker than card border</td>
+      <td><code>#888888</code></td>
+      <td><span class="swatch" style="background:#888888"></span></td>
+      <td class="contrast-pass">3.54:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>Sage Palette</h4>
+
+<table>
+  <thead>
+    <tr><th>Token</th><th>Role</th><th>Hex</th><th>Swatch</th><th>Contrast vs #ffffff</th><th>WCAG 1.4.11</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>--color-tier-1</code></td>
+      <td>T1 orchestrator — muted red</td>
+      <td><code>#b83232</code></td>
+      <td><span class="swatch" style="background:#b83232"></span></td>
+      <td class="contrast-pass">5.08:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td><code>--color-tier-2</code></td>
+      <td>T2 curator — muted amber, harmonised with sage palette</td>
+      <td><code>#a05500</code></td>
+      <td><span class="swatch" style="background:#a05500"></span></td>
+      <td class="contrast-pass">4.68:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td><code>--color-tier-3</code></td>
+      <td>T3 leaf — neutral</td>
+      <td><code>#888888</code></td>
+      <td><span class="swatch" style="background:#888888"></span></td>
+      <td class="contrast-pass">3.54:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>Warm Palette</h4>
+
+<p class="contrast-note">
+Note: The warm palette's primary accent is amber (#f7af63), which is a warm-light colour.
+T2's amber-family tier token must be shifted to a deep rust/burnt-sienna to achieve
+sufficient contrast AND remain visually distinct from the existing palette accent. T1's red
+family is unchanged — red reads well against warm amber backgrounds.
+</p>
+
+<table>
+  <thead>
+    <tr><th>Token</th><th>Role</th><th>Hex</th><th>Swatch</th><th>Contrast vs #ffffff</th><th>WCAG 1.4.11</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>--color-tier-1</code></td>
+      <td>T1 orchestrator — red family (same as Mint; red-on-warm reads well)</td>
+      <td><code>#c0392b</code></td>
+      <td><span class="swatch" style="background:#c0392b"></span></td>
+      <td class="contrast-pass">5.52:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td><code>--color-tier-2</code></td>
+      <td>T2 curator — deep rust (darker than palette accent #f7af63 to differentiate)</td>
+      <td><code>#9a4400</code></td>
+      <td><span class="swatch" style="background:#9a4400"></span></td>
+      <td class="contrast-pass">5.76:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td><code>--color-tier-3</code></td>
+      <td>T3 leaf — warm-toned neutral (slightly warmer than pure grey)</td>
+      <td><code>#8a8070</code></td>
+      <td><span class="swatch" style="background:#8a8070"></span></td>
+      <td class="contrast-pass">3.43:1</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>Token — Card Border</h4>
+
+<p>
+A new <code>--color-border-card</code> token is introduced per palette to decouple the
+card border colour from the generic <code>--color-border</code> used by tables and inputs.
+Initial values are identical to <code>--color-border</code> (#dddddd), ensuring zero
+visual regression.
+</p>
+
+<table>
+  <thead>
+    <tr><th>Palette</th><th>Token</th><th>Hex</th><th>Note</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>All (initial)</td><td><code>--color-border-card</code></td><td><code>#dddddd</code></td>
+      <td>Added to <code>:root</code> and all three <code>[data-theme]</code> selectors in
+        <code>tokens.py</code>. Future releases can differentiate per palette.</td></tr>
+  </tbody>
+</table>
+
+<h3>Borders</h3>
+
+<table>
+  <thead>
+    <tr><th>Target</th><th>Property</th><th>Value</th><th>Replaces</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>.agent-card</code> (default)</td>
+      <td><code>border</code></td>
+      <td><code>2px solid var(--color-border-card, #dddddd)</code></td>
+      <td><code>1px solid var(--color-border, #dddddd)</code></td>
+    </tr>
+    <tr>
+      <td><code>.agent-card</code> (left override)</td>
+      <td><code>border-left</code></td>
+      <td><code>4px solid transparent</code></td>
+      <td><code>3px solid transparent</code></td>
+    </tr>
+    <tr>
+      <td><code>.agent-card[data-tier="1"]</code></td>
+      <td><code>border-left</code></td>
+      <td><code>4px solid var(--color-tier-1)</code></td>
+      <td><em>new</em></td>
+    </tr>
+    <tr>
+      <td><code>.agent-card[data-tier="2"]</code></td>
+      <td><code>border-left</code></td>
+      <td><code>4px solid var(--color-tier-2)</code></td>
+      <td><em>new</em></td>
+    </tr>
+    <tr>
+      <td><code>.agent-card[data-tier="3"]</code></td>
+      <td><code>border-left</code></td>
+      <td><code>4px solid var(--color-tier-3)</code></td>
+      <td><em>new</em></td>
+    </tr>
+    <tr>
+      <td><code>.agent-card--active</code></td>
+      <td><code>border-left</code></td>
+      <td>Keep existing: <code>3px solid var(--color-accent)</code> — see Note below</td>
+      <td>Unchanged</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+<strong>Note on active state conflict:</strong> The existing <code>.agent-card--active</code>
+rule sets a 3px left accent in <code>--color-accent</code>. With the new tier rules, an
+active T1 agent would have both rules competing. The tier selector should have higher
+specificity (it is more informative). Frontend-engineer must order the tier selectors
+<em>after</em> the active rule so tier wins when both are present, or increase tier
+selector specificity to <code>.agent-card--active[data-tier="1"]</code> etc.
+<strong>Recommended resolution:</strong> bump the active-state rule to also use 4px to
+match tier weight; the active class merely ensures the accent is visible before JS populates
+<code>data-tier</code> (i.e., during the loading skeleton phase).
+</p>
+
+<h3>Spacing</h3>
+
+<p>No spacing changes. All internal card padding remains at the current values
+(<code>padding: 1rem 1rem 0.875rem</code>). The tier-label text element is inserted
+between <code>.agent-card__name</code> and the chevron in the header row, or below the
+name span — see ASCII sketch.</p>
+
+<h3>Typography — Tier Label</h3>
+
+<table>
+  <thead>
+    <tr><th>Element</th><th>Property</th><th>Value</th><th>Rationale</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>.agent-card__tier-label</code></td>
+      <td><code>font-size</code></td>
+      <td><code>0.7rem</code> (matches <code>.agent-stat__label</code>)</td>
+      <td>Consistent with existing small-label scale. 0.7rem = ~11.2px rendered — below
+        12px minimum. Use <code>0.75rem</code> (12px) to meet the 12px floor.</td>
+    </tr>
+    <tr>
+      <td><code>.agent-card__tier-label</code></td>
+      <td><code>font-size</code> (revised)</td>
+      <td><code>0.75rem</code></td>
+      <td>Minimum renderable text size per visual hierarchy heuristic.</td>
+    </tr>
+    <tr>
+      <td><code>.agent-card__tier-label</code></td>
+      <td><code>color</code></td>
+      <td><code>var(--color-muted, #666666)</code></td>
+      <td>#666666 on #ffffff = 5.74:1. Passes WCAG 1.4.3 AA (4.5:1 min for normal text).</td>
+    </tr>
+    <tr>
+      <td><code>.agent-card__tier-label</code></td>
+      <td><code>font-weight</code></td>
+      <td><code>600</code></td>
+      <td>Bold small labels read better than regular weight at 12px.</td>
+    </tr>
+    <tr>
+      <td><code>.agent-card__tier-label</code></td>
+      <td><code>text-transform</code></td>
+      <td><code>uppercase</code></td>
+      <td>Matches the visual language of <code>.agent-stat__label</code> and
+        <code>.agent-detail__section-label</code>.</td>
+    </tr>
+    <tr>
+      <td><code>.agent-card__tier-label</code></td>
+      <td><code>letter-spacing</code></td>
+      <td><code>0.04em</code></td>
+      <td>Same as <code>.agent-status-badge</code>.</td>
+    </tr>
+    <tr>
+      <td><code>.agent-card__tier-label</code></td>
+      <td><code>display</code></td>
+      <td><code>block</code></td>
+      <td>Sits on its own line below the name in the header row, or as a subtitle below
+        <code>.agent-card__name</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+<strong>Decision: Include tier label.</strong> The operator's mockup explicitly shows "T1
+Orchestrator", "T2 Curator", "T3 Leaf" as subtitle text. This text is essential to satisfy
+WCAG 1.4.1 (colour not sole differentiator for tier identity). Skipping it would leave
+colour as the only signal, which fails AA. The label is therefore mandatory, not optional.
+</p>
+
+<p>
+<strong>Label text values per tier:</strong>
+</p>
+<ul>
+  <li><code>data-tier="1"</code> → <code>T1 Orchestrator</code></li>
+  <li><code>data-tier="2"</code> → <code>T2 Curator</code></li>
+  <li><code>data-tier="3"</code> → <code>T3 Leaf</code></li>
+</ul>
+
+<h3>Motion</h3>
+
+<p>No new animations. The existing <code>transition: box-shadow 0.15s ease, border-color
+0.15s ease</code> on <code>.agent-card</code> will naturally animate the border-left colour
+change on hover. This is governed by the existing
+<code>@media (prefers-reduced-motion: reduce)</code> guard on the chevron. The border
+transition is not guarded — frontend-engineer should verify if the border-color transition
+on the card itself should also be disabled under reduced-motion (current code does not gate
+it; consider adding the transition to the guard as a SHOULD fix).</p>
+
+<h3>Breakpoints</h3>
+
+<p>No breakpoint changes. The tier accent stripe and label display identically at all
+widths. The existing 767px breakpoint for the single-column grid is unaffected.</p>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>ASCII Sketches — Collapsed Card per Tier</h2>
+
+<p>Formalised from operator mockup. Left edge shows tier accent stripe weight (4px). Tier
+label appears as a secondary line below the agent name within the card header row.</p>
+
+<div class="ascii-block">
+TIER-1 (Orchestrator) — red left stripe (#c0392b / Mint)
++----+-----------------------------------------------+
+|    | [STATUS] project-manager              [chevron]|
+| 4px| T1 ORCHESTRATOR                               |
+| red| Description truncated to 2 lines...           |
+|    |                                               |
+|    | Sessions    Cost (life)    Last seen          |
+|    | 47          $12.4          3m ago             |
+|    |                                               |
+|    | [skill-chip] [skill-chip] [+N more]           |
++----+-----------------------------------------------+
+
+TIER-2 (Curator) — amber/rust left stripe (#b35800 / Mint)
++----+-----------------------------------------------+
+|    | [STATUS] product-engineer             [chevron]|
+| 4px| T2 CURATOR                                    |
+| amb| Description truncated to 2 lines...           |
+|    |                                               |
+|    | Sessions    Cost (life)    Last seen          |
+|    | 31          $8.1           12m ago            |
+|    |                                               |
+|    | [skill-chip] [skill-chip] [+N more]           |
++----+-----------------------------------------------+
+
+TIER-3 (Leaf) — neutral stripe (#888888 / Mint)
++----+-----------------------------------------------+
+|    | [STATUS] software-engineer            [chevron]|
+| 4px| T3 LEAF                                       |
+| neu| Description truncated to 2 lines...           |
+|    |                                               |
+|    | Sessions    Cost (life)    Last seen          |
+|    | 88          $24.0          45s ago            |
+|    |                                               |
+|    | [skill-chip] [skill-chip] [+N more]           |
++----+-----------------------------------------------+
+
+Header-row detail (zoomed):
++----+-----------+--------------------------+----------+
+|    | [BADGE]   | agent-name               | chevron  |
+|4px |           | tier-label (T1/T2/T3...) |          |
++----+-----------+--------------------------+----------+
+     ^           ^                          ^
+     border-left agent-card__header        agent-card__chevron
+     (tier color) wraps name + label       (existing)
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>References</h2>
+
+<table>
+  <thead>
+    <tr><th>Ref</th><th>Source</th><th>URL</th><th>Takeaway applied</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>[R1]</td>
+      <td>Refactoring UI</td>
+      <td><a href="https://www.refactoringui.com">refactoringui.com</a> — "Use color to
+        support, not define" and "Colored left border / side stripe as hierarchy signal"
+        pattern</td>
+      <td>The 4px left-stripe pattern is a canonical Refactoring UI technique for adding
+        visual weight and categorical colour coding to cards without redesigning the card
+        layout. The book explicitly warns against making colour the sole differentiator —
+        hence the tier-label text requirement.</td>
+    </tr>
+    <tr>
+      <td>[R2]</td>
+      <td>Material Design 3</td>
+      <td><a href="https://m3.material.io/styles/color/roles">m3.material.io/styles/color/roles</a></td>
+      <td>M3's "container" vs. "on-container" colour role model informed the decision to
+        use the tier accent only on the border stripe (a decorative container edge), not as
+        background fill, avoiding low-contrast text-on-colour problems. The stripe is
+        structural, not filled — no foreground text sits on it.</td>
+    </tr>
+    <tr>
+      <td>[R3]</td>
+      <td>WCAG 2.2</td>
+      <td><a href="https://www.w3.org/WAI/WCAG22/quickref/#use-of-color">w3.org/WAI/WCAG22/quickref/#use-of-color</a>
+        (Criterion 1.4.1) and
+        <a href="https://www.w3.org/WAI/WCAG22/quickref/#non-text-contrast">1.4.11</a></td>
+      <td>1.4.1 requires a non-colour redundant cue for information conveyed by colour —
+        drives the mandatory tier-label text. 1.4.11 sets the 3:1 floor for UI component
+        borders — drives the contrast floor for all 9 accent tokens.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<h2>Handoff to frontend-engineer</h2>
+
+<h3>Files to touch</h3>
+
+<table>
+  <thead>
+    <tr><th>File</th><th>Change</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>dadaia_workspace/features/panel/views/assets/css/tokens.py</code></td>
+      <td>
+        Add <code>--color-border-card: #dddddd;</code> to <code>:root</code> and all three
+        <code>[data-theme]</code> blocks.<br>
+        Add <code>--color-tier-1</code>, <code>--color-tier-2</code>,
+        <code>--color-tier-3</code> to each theme block with the hex values from the token
+        tables above (9 properties total).
+      </td>
+    </tr>
+    <tr>
+      <td><code>dadaia_workspace/features/panel/views/assets/css/agents.py</code></td>
+      <td>
+        Line 43: Change <code>border: 1px solid var(--color-border, #dddddd)</code> to
+        <code>border: 2px solid var(--color-border-card, #dddddd)</code>.<br>
+        Line 44: Change <code>border-left: 3px solid transparent</code> to
+        <code>border-left: 4px solid transparent</code>.<br>
+        After the active-card rule (line 71), add three new selectors:<br>
+        <code>.agent-card[data-tier="1"] { border-left: 4px solid var(--color-tier-1); }</code><br>
+        <code>.agent-card[data-tier="2"] { border-left: 4px solid var(--color-tier-2); }</code><br>
+        <code>.agent-card[data-tier="3"] { border-left: 4px solid var(--color-tier-3); }</code><br>
+        Add <code>.agent-card__tier-label</code> CSS rule per Typography spec above.<br>
+        Update <code>.agent-card--active</code> border-left width to 4px to match tier
+        (avoids width jump on active state).
+      </td>
+    </tr>
+    <tr>
+      <td><code>dadaia_workspace/features/panel/views/assets/js/agents.js</code></td>
+      <td>
+        In <code>renderCard(agent)</code> (line 132): add <code>data-tier="${agent.tier || 3}"</code>
+        to the <code>&lt;button&gt;</code> element's attribute string.<br>
+        After <code>.agent-card__name</code> span, insert the tier-label span:<br>
+        <code>'&lt;span class="agent-card__tier-label"&gt;' + tierLabel(agent.tier) + '&lt;/span&gt;'</code><br>
+        Add helper function <code>tierLabel(tier)</code> that maps 1 → "T1 Orchestrator",
+        2 → "T2 Curator", 3 → "T3 Leaf", default → "T3 Leaf".
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Props, states, and edge cases</h3>
+
+<table>
+  <thead>
+    <tr><th>Priority</th><th>Scenario</th><th>Expected behaviour</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-high">MUST</span></td>
+      <td><code>agent.tier</code> is <code>1</code>, <code>2</code>, or <code>3</code>
+        (normal case, validated by API per PR4-13)</td>
+      <td><code>data-tier="N"</code> set; correct left stripe colour; correct tier label text.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-high">MUST</span></td>
+      <td><code>agent.tier</code> is absent / <code>null</code> / <code>undefined</code>
+        (should not occur post-PR4-12, but JS must handle gracefully)</td>
+      <td>Fall back to <code>data-tier="3"</code> and tier-label "T3 Leaf". Uses neutral
+        <code>--color-tier-3</code>. No JS exception.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-high">MUST</span></td>
+      <td>Active status (<code>agent.status === 'active'</code>) combined with any tier</td>
+      <td>Both <code>agent-card--active</code> class and <code>data-tier="N"</code>
+        attribute are present simultaneously. Tier accent rule wins (placed after active
+        rule in CSS source order, or via specificity bump). Active dot badge is unchanged.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-medium">SHOULD</span></td>
+      <td>Hover state on tier-accent card</td>
+      <td>Existing hover rule: <code>border-color: var(--color-accent)</code>. This
+        overrides the tier accent on ALL borders including left. This is acceptable —
+        hover is a transient state. No change required unless operator prefers
+        tier accent to persist on hover.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-medium">SHOULD</span></td>
+      <td>Loading skeleton state (<code>.agent-card--skeleton</code>)</td>
+      <td>Skeleton cards do not carry <code>data-tier</code> (tier is unknown until API
+        returns). They default to transparent left border. No action needed — current
+        skeleton code is untouched.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-low">NICE</span></td>
+      <td><code>prefers-reduced-motion</code> and border-color transition</td>
+      <td>Add <code>transition: none</code> to the existing
+        <code>@media (prefers-reduced-motion: reduce)</code> block for
+        <code>.agent-card</code> to disable the 0.15s border-color animation.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Acceptance check (C6 / C7)</h3>
+
+<pre><code># C6 — Default border bumped to 2px
+grep -E 'border:\s*2px solid' dadaia_workspace/features/panel/views/assets/css/agents.py
+
+# C7 — Three tier selectors present
+grep -E 'data-tier="[123]"' dadaia_workspace/features/panel/views/assets/css/agents.py</code></pre>
+
+<h3>Open items for operator confirmation</h3>
+
+<ul>
+  <li><strong>Hover override:</strong> On hover, the existing rule changes
+    <code>border-color</code> to <code>var(--color-accent)</code>, which washes over the
+    tier stripe. Operator should confirm whether this is acceptable or whether the tier
+    accent should persist through hover.</li>
+  <li><strong>Tier label placement:</strong> The mockup places the tier label on the same
+    visual line as the agent name (a subtitle). The spec places it as a
+    <code>display: block</code> element below the name within the header. Frontend-engineer
+    should confirm layout does not clip the name at narrow card widths.</li>
+</ul>
+
+</body>
+</html>

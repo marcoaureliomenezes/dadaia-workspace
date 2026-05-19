@@ -12,6 +12,24 @@ dadaia-workspace é uma biblioteca Python e uma CLI que transforma um diretório
 
 ---
 
+## Pilares do Produto
+
+dadaia-workspace é definido por três pilares imutáveis. Toda decisão arquitetural ou de produto deve fortalecer pelo menos um pilar sem comprometer os outros dois. Esta seção precede a stack porque os pilares são invariantes; a stack é consequência.
+
+### Pilar 1 — SDD-native multi-projeto
+
+O workspace é gerenciado por Spec-Driven Development desde a raiz: cada repositório clonado é um Spec Context Project com `specs/constitution.md`, `specs/memory/`, `specs/foundation/SPEC.md` e a trilha atômica `specs/releases/<v-id>/` → `specs/_archive/releases/<v-id>/`. Enforcement: o gate `sdd-spec-gate.sh` projetado em `.dadaia/scripts/` exige uma task `[-]` em algum `TASKS.md` antes de qualquer edição de produção, e `dadaia specs doctor` valida as 11 invariantes estruturais. Floor mínimo: nenhuma feature pode ser implementada sem `SPEC.md` aprovado; nenhuma alteração em `specs/` pula a revisão de consistência; specs encerradas vivem apenas em `specs/_archive/releases/`.
+
+### Pilar 2 — Orquestração multi-agente nativa
+
+Workflows e agentes especialistas são primitivos de primeira classe, não convenções textuais: 10 agentes universais (`software-architect`, `software-engineer`, `product-engineer`, `qa-engineer`, `devops-engineer`, `frontend-engineer`, `backend-engineer`, `game-developer`, `game-designer`, `game-tester`) e workflows declarativos (`*.workflow.md` com `parallel_group` opcional) vivem em `dadaia_workspace/public/agents/` e `dadaia_workspace/public/workflows/`, são distribuídos via `dadaia public stage` + `dadaia public install`. Enforcement: rules de escopo (`game-developer-scope`, `dadaia-workspace-dev-guardrail`) garantem fronteiras de autoridade entre agentes; o handoff cross-agent é estruturado por reports HTML em `.dadaia/reports/<repo>/<agent>/`. Floor mínimo: Claude Code é o runtime de referência para orquestração — só nele `parallel_group` é dispatch real; nos demais runtimes a orquestração paralela degrada conforme o Pilar 3.
+
+### Pilar 3 — Multi-AI-platform (Claude Code, Codex, OpenCode)
+
+Os três runtimes oficialmente suportados — **Claude Code** (Anthropic), **Codex** (OpenAI) e **OpenCode** — consomem o mesmo conjunto de assets agentic através de uma pipeline única: `dadaia_workspace/public/` → `.dadaia/agentic/` (staging com manifest SHA256 em `.dadaia/agentic/manifest.json`) → projeções runtime-specific em `.claude/`, `.codex/`, `.opencode/` e `.agents/`. Enforcement: `dadaia public doctor` compara source × staging × projeção com cinco status (`ok`, `drift`, `missing`, `unsupported`, `not-applicable`) e a rule `dadaia-workspace-dev-guardrail`, sempre ativa, lê `.dadaia/agentic/manifest.json` para identificar arquivos lib-originated e proibir edição direta nas projeções. Floor mínimo da paridade: skills, agents, commands e rules têm projeção honesta em todos os runtimes que os suportam nativamente; workflows com `parallel_group` permanecem Claude-exclusive até existir runtime de orquestração paralela nos demais — em OpenCode degradam para sequencial (`[partial]`), em Codex são `[not-applicable]` (sem dispatch). A ampliação para um quarto runtime (Gemini CLI, Cursor, Aider, etc.) é uma emenda constitucional, não uma feature.
+
+---
+
 ## Stack Tecnológica (Obrigatória)
 
 | Componente | Tecnologia | Versão mínima |
@@ -103,7 +121,7 @@ A flag `is_primary` (`bool`) distingue, dentro de `ativo`, qual contexto é o pr
 - Artefatos efêmeros não devem ser criados em `dadaia-workspace/`, em `specs/`, em `tests/` ou na raiz do repositório.
 
 ### Artefatos de Agente
-- Neste repositório, `dadaia_workspace/public/` é a única localização versionada para rules, skills, commands, scripts, agents e templates universais do produto.
+- Neste repositório, `dadaia_workspace/public/` é a única localização versionada para rules, skills, commands, scripts, agents, templates, workflows, plugins, data e schemas universais do produto.
 - `dadaia-workspace/.agents/`, `dadaia-workspace/.claude/`, `dadaia-workspace/.codex/` e `dadaia-workspace/.opencode/` não fazem parte da arquitetura de authoring do produto e não devem ser usados como fonte canônica.
 - `<workspace-root>/.dadaia/agentic/` é uma área local gerada pela CLI a partir do pacote instalado. Ela contém manifest com versão do pacote, hashes, timestamp de geração e versão de schema.
 - `<workspace-root>/.agents/skills/` é o destino universal para skills reutilizáveis entre runtimes que suportam o padrão de Agent Skills.
@@ -145,7 +163,7 @@ A flag `is_primary` (`bool`) distingue, dentro de `ativo`, qual contexto é o pr
 - Toda alteração em `specs/` deve passar por uma revisão de consistência antes de ser considerada pronta.
 - Se restarem conflitos, ambiguidades ou buracos após a revisão, eles devem ser registrados em `z_bug_specs.md`.
 - Se a implementação divergir da spec, atualize a spec primeiro. Nunca ajuste a spec para justificar o código já escrito.
-- **Versão atômica**: specs devem representar apenas o estado atual do produto. Não arquive specs de features descartadas — delete-as.
+- **Versão atômica**: specs ativas em `specs/releases/<v-id>/` representam apenas o estado atual; specs encerradas vão para `specs/_archive/releases/<v-id>/`. Hotfix releases (PATCH≥1) seguem o mesmo caminho. Não há rascunhos órfãos fora dessas trilhas.
 
 ---
 

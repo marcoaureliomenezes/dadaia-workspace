@@ -1,0 +1,392 @@
+{
+  "assets": [
+    {
+      "path": "agents/backend-engineer.md",
+      "sha256": "4d9d1ec2b0b390771221c9a70002f12c3c7079a58fc3c754849068cfcd69a3ab",
+      "type": "agents"
+    },
+    {
+      "path": "agents/devops-engineer.md",
+      "sha256": "f4f4394d222bfb328a69b47456eb8444423a460965d2ade01a0057c9893d9923",
+      "type": "agents"
+    },
+    {
+      "path": "agents/frontend-engineer.md",
+      "sha256": "5c4e5f112972b62e56cccb62995340f8bfc19f2477c0d56cfd635622925d8872",
+      "type": "agents"
+    },
+    {
+      "path": "agents/game-designer.md",
+      "sha256": "9249e2e720339d8399470bfee6e5cc941e7f0a4ce3c01746e9f5c8f78dcb2a21",
+      "type": "agents"
+    },
+    {
+      "path": "agents/game-developer.md",
+      "sha256": "70c60f219801e1365f32aa2bca15af6e84d4230fa287a3f9fcf3af87dadccc0f",
+      "type": "agents"
+    },
+    {
+      "path": "agents/game-tester.md",
+      "sha256": "64e43eeb5fe42cc4a135258a43bb4ace562583453fb94f6cd7f4f8e4091e6fc8",
+      "type": "agents"
+    },
+    {
+      "path": "agents/product-engineer.md",
+      "sha256": "ac3a8fadfdfb1b2aba70e98d7550a0b5653c060378c16f9edbd31c406cf30dbe",
+      "type": "agents"
+    },
+    {
+      "path": "agents/qa-engineer.md",
+      "sha256": "3001f403e5d24a25e765c21601349e32a3d4e21dd40aa447c2c836974a59f80a",
+      "type": "agents"
+    },
+    {
+      "path": "agents/software-architect.md",
+      "sha256": "d462ccd10de505be9c22942f5faa038234f0c58da1eee1ca163e01d8fa0a62de",
+      "type": "agents"
+    },
+    {
+      "path": "agents/software-engineer.md",
+      "sha256": "cd2300b6d73f8ebc9373cbd3ae9db4e3140d4088fd8e0478ede6cb779744f1f4",
+      "type": "agents"
+    },
+    {
+      "path": "commands/dadaia-academy.md",
+      "sha256": "76701a07b8cfeb5aee6b1b1cbd74458b7b96b8c7decf07467645e2697fbda94b",
+      "type": "commands"
+    },
+    {
+      "path": "commands/dadaia-workspace-doctor.md",
+      "sha256": "ec7e571fa9af9c2b1012b9874bed2213d82ec7c207295996970dbfd41a57aff2",
+      "type": "commands"
+    },
+    {
+      "path": "commands/dadaia-workspace-refine-specs.md",
+      "sha256": "6be633c785630d44f9792321e0a81c72711ed7c6d805f2c14b9f30fb038586d7",
+      "type": "commands"
+    },
+    {
+      "path": "commands/spec-context.md",
+      "sha256": "58775c4983ffd36418ece269c171ecc35b85bbe902ce17221da7d8ebcdab9636",
+      "type": "commands"
+    },
+    {
+      "path": "data/AGENTS.md",
+      "sha256": "a6986f3ee014d57f3e332e0db028f4fc09a710247b6eeb328849e54760b553e9",
+      "type": "data"
+    },
+    {
+      "path": "data/reports-AGENTS.md",
+      "sha256": "75606243dc042ac42c9c68962182a97511d4cacbbec733d2876091aef425fae4",
+      "type": "data"
+    },
+    {
+      "path": "data/repos.xlsx",
+      "sha256": "ebde03108ed7444c4b893363200afe82a13e71034ccc1522daa8abdf9f55c3d2",
+      "type": "data"
+    },
+    {
+      "path": "plugins/ctx-inject.ts",
+      "sha256": "90f2b2fef8982cba27c975f18955d4231fdf9da4962b68e85e736e73d0d5270e",
+      "type": "plugins"
+    },
+    {
+      "path": "rules/dadaia-workspace-dev-guardrail.md",
+      "sha256": "7243c102f2a734ddc9eceb3500ce13288debde25a3f057ec9d5d1f6cb52bb90d",
+      "type": "rules"
+    },
+    {
+      "path": "rules/game-agents-coordination.md",
+      "sha256": "770a91a6390f3d2dadf1661b15e0da0c307c735c268235bf0f092b69b1a2ba74",
+      "type": "rules"
+    },
+    {
+      "path": "rules/game-developer-scope.md",
+      "sha256": "2b23c8a61c343a71299ae58100a244b1219886bd7884c405d17cd3251acbd39f",
+      "type": "rules"
+    },
+    {
+      "path": "scaffold/SPEC.md",
+      "sha256": "dffdb0399908fd55b9e2b39f939534068ff07097ab6d2f78f36516a14be486a3",
+      "type": "scaffold"
+    },
+    {
+      "path": "scaffold/constitution.md",
+      "sha256": "899e6246fbe71c953097244af28f4a16f12d3b7c6ffd0a7b1f7181560311a1c4",
+      "type": "scaffold"
+    },
+    {
+      "path": "scaffold/foundation/SPEC.md",
+      "sha256": "b5b165431a811df39804d373fdcc5882a20c374d07dba953f2a9992648555f5c",
+      "type": "scaffold"
+    },
+    {
+      "path": "scaffold/memory/architecture.md",
+      "sha256": "373dde5fec6f16cd307de75889b904476163f3e3c9ae29bf0b167645b5dce3f4",
+      "type": "scaffold"
+    },
+    {
+      "path": "scaffold/memory/product.md",
+      "sha256": "f52ebcaf5095bf76d4871dc099c8195391f8d99615fb31c36c3eff49d4d1bda3",
+      "type": "scaffold"
+    },
+    {
+      "path": "scaffold/memory/tech-stack.md",
+      "sha256": "da41f8a11bc5e8d657ea233ce22568eb9a8aec0e791faae757f1a69c5910c48f",
+      "type": "scaffold"
+    },
+    {
+      "path": "schemas/handoff-v1.schema.json",
+      "sha256": "fe70e3284c33a9d850861c76a3cf7c14663ac7a15700b123f408bde4e88bcc85",
+      "type": "schemas"
+    },
+    {
+      "path": "scripts/ctx-inject.sh",
+      "sha256": "4cfc5c7a15dbb9bba970fb1742236eb1c62f979c07b32d5f36d3a5a05ff42681",
+      "type": "scripts"
+    },
+    {
+      "path": "scripts/sdd-spec-gate.sh",
+      "sha256": "3996b3c631c76ee157e97fd49b48f11805f46beeafbbd28533b50d268451fe85",
+      "type": "scripts"
+    },
+    {
+      "path": "skills/architect-code-audit/SKILL.md",
+      "sha256": "6d7c62ddf3821fd4eeb3e836daf09301be8e71162202819644fe30faf34cef94",
+      "type": "skills"
+    },
+    {
+      "path": "skills/architect-design-patterns/SKILL.md",
+      "sha256": "a25d1b4d27ccfbe3498ae2f62ba3f97e14fe2612ae6c2c055df79b5d7af47522",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-grill-me/SKILL.md",
+      "sha256": "7347c999b99f80af6d338f40999f046983cfdd6d0000b76562f5a0d98afd88f9",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-handoff-emitter/SKILL.md",
+      "sha256": "822e51ffb09142f8f0fd9f1a5d6798da864105616f3964e7a87a402517bb29da",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-release-closure/SKILL.md",
+      "sha256": "8d672bf5e8e94ed02503a94d13a51026e0d777dec9d3621099fa38edb14fe283",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-task-manager/SKILL.md",
+      "sha256": "37a19d706cf05d011a771659069d21da20e6f0179bb3ca5a0dc2af3b27e33ea6",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-workspace-doctor/SKILL.md",
+      "sha256": "0b78f283d53f96a9c058e9b2c51259e60ceb4d045f9c1198d97b98e3aaa55940",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-workspace-manager/SKILL.md",
+      "sha256": "9b68be97ffad194fda50e287112cd99b3627c2c1921db8fbd07a0a6789fa48c7",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-workspace-spec-navigator/SKILL.md",
+      "sha256": "9917f7c8e856461bd4bb109a9845c38af9456af8c895202d27dcf7032f5fed65",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dadaia-workspace-spec-reviewer/SKILL.md",
+      "sha256": "316fbc590f267bfc3865236030b00e2d7049a0ef2157eef96fd5169a87d2698b",
+      "type": "skills"
+    },
+    {
+      "path": "skills/dev-server-registry/SKILL.md",
+      "sha256": "498868a07c999ff994e9fc6adcbf11e5932058f7af85966bc17098df15fd2777",
+      "type": "skills"
+    },
+    {
+      "path": "skills/devops-deploy-strategies/SKILL.md",
+      "sha256": "f85180dda1ecd2ad09750a9ce17ea9291cafe8f9fbdc617f77979b79766e4d0c",
+      "type": "skills"
+    },
+    {
+      "path": "skills/devops-gitflow-governance/SKILL.md",
+      "sha256": "e814e33fd0f158bd2e43c67996b6d69ff6d2949ba0cb72ca75a8cba5c54900d1",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-audio-design/SKILL.md",
+      "sha256": "c54ff3d26c0d9113da52b12c19d26600bb1c8616c40d26127cf0251c2583cade",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-flight-dynamics/SKILL.md",
+      "sha256": "a89c38eb9322d7fb6059ff710bc4534d6e32557846f3d16ce64c4a7d7b4049f8",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-geospatial-pipeline/SKILL.md",
+      "sha256": "8cb03b530ca569ee7141fcb34f36cf912f9e2921e47247001373e78910803299",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-map-architect/SKILL.md",
+      "sha256": "0f6e732af5d25709c20a5c45d10da85e217c0cba0e1cb77829df91b5c380f22d",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-packaging-distribution/SKILL.md",
+      "sha256": "98552037b0ba7739f70d004f9963bf8d8d807d74a5bf669e129bb7462255f7c0",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-physics-engine/SKILL.md",
+      "sha256": "c5a28b2c533c8262ceb60707dc24bd5fb7fba675f20165faf3811c1a9f0d606e",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-platform-browser/SKILL.md",
+      "sha256": "274dca8423b08894a4b7879c1dcc59152381a9420c50a22c0eb7f9ef0ee44699",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-platform-godot/SKILL.md",
+      "sha256": "67f253ccc84b31d2995c72ea8a75b8e8e4cdefafe92581ed0ee8fa25751d1ba8",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-platform-unity/SKILL.md",
+      "sha256": "51799d3a02644a7ed6a5c128cb43330d22c8446d6c09ab1796951fc681a646bf",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-platform-unreal/SKILL.md",
+      "sha256": "a80f877698809a030cff2ee98d4bff4cd97d5805e454a5494f442f2823d3d8f7",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-testing-ue5/SKILL.md",
+      "sha256": "225fb96316751a73e8d3a3623d6bfd0a31b300b3b599517930933b4e788c2cf2",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-unreal-designer/SKILL.md",
+      "sha256": "e203b724760d3baf244d737cece24bd9c0b994f8567e1be35c397cacb4e001d6",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-unreal-developer/SKILL.md",
+      "sha256": "ae98d5a2054734174320bfcb96e9e1a8f4b114f461c6b33da05063f3e6876c22",
+      "type": "skills"
+    },
+    {
+      "path": "skills/game-visual-design/SKILL.md",
+      "sha256": "7dd08726cac4e160757c39b4f7773b058742517594843f1e5c7224a593d87266",
+      "type": "skills"
+    },
+    {
+      "path": "skills/github-actions-pipelines/SKILL.md",
+      "sha256": "6242972abfbfbbed9d00fae5ad9cfd51db811415607aa87ce2abc16b60034a66",
+      "type": "skills"
+    },
+    {
+      "path": "templates/closure_hotfix.md.j2",
+      "sha256": "b3a07c51fdd97c104eee2f345f8551248d08ae2d938c42004ee7edb3a5e74fe1",
+      "type": "templates"
+    },
+    {
+      "path": "templates/memory-architecture.html.j2",
+      "sha256": "f084c5d0fb44b6efb12c40f8865cbd548232854b2a8f022611ebd92ec3d23cf9",
+      "type": "templates"
+    },
+    {
+      "path": "templates/memory-product-feature.html.j2",
+      "sha256": "64f55649cd02afc60d1da2d4d02066bea6382c9b3bd213da019ecfa10b4bf07e",
+      "type": "templates"
+    },
+    {
+      "path": "templates/memory-product-index.html.j2",
+      "sha256": "1e90eec86cdc0f45f2c254d35272c6cd6b9ab3992890f4d5e3702dbff07be725",
+      "type": "templates"
+    },
+    {
+      "path": "templates/memory-tech-stack.html.j2",
+      "sha256": "0c44eca41c79e3d6fd1377838da50c6f47d9c8076ee5f5bf26deda59d7c4566d",
+      "type": "templates"
+    },
+    {
+      "path": "templates/release_hotfix.md.j2",
+      "sha256": "723b5fc6d03196624cae32352a5718399f1b93263df21794942afb78782fbaf5",
+      "type": "templates"
+    },
+    {
+      "path": "templates/repo-AGENTS.md",
+      "sha256": "074561183fc4879b11be3f4b0e7b4728377c7abe292009dd732d0385073b4aed",
+      "type": "templates"
+    },
+    {
+      "path": "workflows/architecture-review.workflow.md",
+      "sha256": "fd217a6390ba98ddf60ce1e07edd75f169e16f9af6609edad020d75c8cbfd652",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/bug-fix-fastlane.workflow.md",
+      "sha256": "50ffb23b361e1f39ce7ec89666934098f97c2add727721949331baf04e479558",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/cross-cutting-feature.workflow.md",
+      "sha256": "62a9af9c2104a919846274e47c722b3a04d1382355fe22ede039d2c441c37f90",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/deploy-validation-only.workflow.md",
+      "sha256": "363685c88ba1baa7105aaf1f11eb23708f996756df25f54ca672efdc8c09a09d",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/game-bugfix.workflow.md",
+      "sha256": "a1468e6ba4ba6540a05be96a58f13d0b822a4d49cfc745c89557f305acc10a0a",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/game-dev-cycle.workflow.md",
+      "sha256": "8e713228c20b3beb1479c4a04f000ebee45b349701d9f97a2789ae5ae7655fb2",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/game-spec-definition.workflow.md",
+      "sha256": "1657ab3b5ebc4c366944596ee6b97a2cde494a1ebbf0ceb68aa60f5d2fe588e1",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/hotfix-release.workflow.md",
+      "sha256": "e3011d7df115c2db8d8224e48aa9801ac552dec5d207b646b4a3de7cceca3ecc",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/onboarding-new-repo.workflow.md",
+      "sha256": "9bc0ba129e70437358bab69175317daf87b81dc2589a7017ddcb2c19a0d8d685",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/security-patch.workflow.md",
+      "sha256": "fa72a549e14dc354bdfad78dea49039555b83b98668256b3604489a4759cb66a",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/spec-refinement.workflow.md",
+      "sha256": "57f795ad42253271838cc62ab055479b8a513d59fb39280407f5269a68047b31",
+      "type": "workflows"
+    },
+    {
+      "path": "workflows/tdd-cycle.workflow.md",
+      "sha256": "d839704c49861130bd2ba8f2449105ba0ffbdaf9b9f6ff158398419087efb395",
+      "type": "workflows"
+    }
+  ],
+  "generated_at": "2026-05-17T03:44:49.142224+00:00",
+  "package_version": "0.1.0",
+  "schema_version": "1"
+}
