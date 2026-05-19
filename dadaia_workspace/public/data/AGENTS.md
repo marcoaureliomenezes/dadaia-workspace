@@ -173,44 +173,44 @@ and under `_archive/releases/`. Write permission is gate-locked to the
 
 ---
 
-## 8. Agent inventory — 16 agents in 3 tiers
+## 8. Agent inventory — 20 agents in 3 tiers
 
 The dispatch model is hierarchical. Only **dispatchers** call other agents.
 The **curator** owns specs. **Leaf specialists** do not chain further dispatch.
 
-### Dispatchers (2)
+### Dispatchers — T1 (2)
 
-- **project-manager** — orchestrator. Receives operator demand, categorises,
-  dispatches the right specialist; mediates conflicts via the Decision
-  Authority Matrix; escalates to operator. Writes only reports under
-  `.dadaia/reports/<context>/project-manager/`.
-- **project-auditor** — drift + dead-code auditor across the workspace. Cannot
-  fix drift; only records and recommends a release. Writes only reports.
+- **project-manager** — orchestrator. Categorises operator demand, dispatches
+  the right specialist, mediates via the Decision Authority Matrix. Reports only.
+- **project-auditor** — drift + dead-code auditor. Records and recommends a
+  release; never fixes drift. Reports only.
 
-### Curator (1)
+### Curator — T2 (1)
 
 - **product-engineer** — sole author of `specs/releases/<id>/{SPEC,PLAN,TASKS,
-  CLOSURE}.md`, `specs/releases/ACTIVE.md`, and `specs/memory/**/*.html`
-  (CLOSURE-only). Receives `discovery_report` from project-manager; does not
-  dispatch broadly. May invoke `dadaia-grill-me` as a leaf consultation.
+  CLOSURE}.md`, `ACTIVE.md`, `specs/memory/**` (CLOSURE-only). No dispatch.
 
-### Leaf specialists (13)
+### Leaf specialists — T3 (17, alphabetical)
 
-| Agent | When to use | NOT for |
-|-------|-------------|---------|
-| software-architect | Architectural audits, layer design, ADRs. | Implementation, bug fixes. |
-| software-engineer | TDD implementation of approved tasks, lib code. | Specs, E2E tests, game code. |
-| backend-engineer | Heavy backend (Go, DB), services, APIs. | Frontend, specs. |
-| frontend-engineer | Browser code (HTML/CSS/TS/React). | Backend, specs. |
-| qa-engineer | E2E criteria, Playwright/Cypress, deploy validation. | Unit tests inside code modules. |
-| devops-engineer | CI/CD pipelines, GitHub Actions, deploy infra. | Application code. |
-| code-reviewer | Diff review on a PR or staged set. | Authoring code. |
-| security-reviewer | OWASP / threat-modeling review. | Authoring code. |
-| researcher | External-source investigation against whitelists. | Authoring code. |
-| design-specialist | UX/UI specs, sketches, design tokens. | Frontend code (handoff to frontend-engineer). |
-| game-developer | Game logic, mechanics, physics, AI (inside `repos/redacted-slug/`). | Anything outside `repos/redacted-slug/`. |
-| game-designer | Game assets, materials, maps, audio, pipeline scripts. | Game logic, tests. |
-| game-tester | Engine test automation, evidence reports. | Production code, assets. |
+| Agent | Scope (one line) | Write-allowlist roots |
+|-------|------------------|-----------------------|
+| ai-engineer | AI entities (skills/rules/workflows/commands/agents/hooks); prompt-efficiency | `public/{agents,skills,workflows,commands,rules,hooks}/**` |
+| backend-engineer | Heavy backend (Go, DB), services, APIs | `repos/<service>/**` |
+| code-reviewer | Diff review on a PR or staged set (no authoring) | `.dadaia/reports/<ctx>/code-reviewer/**` |
+| data-analyst | BI / dashboards / data viz; pairs with design-specialist | `repos/redacted-slug-explorer/{notebooks,dashboards}/**` |
+| data-engineer | Data pipelines (Spark/Delta/Iceberg/Kafka/Airflow) | `repos/redacted-slug-explorer/{pipelines,dbt,airflow}/**` |
+| design-specialist | UX/UI specs, sketches, design tokens (handoff to FE) | `.dadaia/reports/<ctx>/design-specialist/**` |
+| devops-engineer | CI/CD, GitHub Actions, deploy infra, `dadaia public install` | `.github/**`, `dadaia_workspace/infrastructure/**` |
+| frontend-engineer | Browser code (HTML/CSS/TS/React) | `repos/<web-app>/{src,public}/**` |
+| game-designer | Game assets, materials, maps, audio, pipeline scripts | `repos/redacted-slug/<game>/{Content,assets,scripts}/**` |
+| game-developer | Game logic, mechanics, physics, AI (UE5/Three/Phaser) | `repos/redacted-slug/<game>/{Source,src}/**` |
+| game-tester | Engine test automation, evidence reports | `repos/redacted-slug/<game>/Tests/**` |
+| qa-engineer | E2E criteria, Playwright/Cypress, deploy validation | `tests/e2e/**`, `repos/*/tests/e2e/**` |
+| researcher | External-source investigation against whitelists | `.dadaia/reports/<ctx>/researcher/**` |
+| security-reviewer | OWASP / threat-modeling review (no authoring) | `.dadaia/reports/<ctx>/security-reviewer/**` |
+| software-architect | Architectural audits, layer design, ADRs | `.dadaia/reports/<ctx>/software-architect/**` |
+| software-engineer-node | Server-side Node/TS tooling, CLIs, opencode glue | `dadaia_workspace/{features,infrastructure}/**`, `tests/**`, `scripts/**` |
+| software-engineer-python | Python implementation (CLI, lib, tooling), unit + integration tests | `dadaia_workspace/**`, `tests/**`, `scripts/**`, `data/AGENTS.md` |
 
 Every agent emits an HTML report into
 `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html` with a sibling
@@ -218,7 +218,7 @@ Every agent emits an HTML report into
 
 ---
 
-## 9. Model assignments — 16 agents × 3 runtimes
+## 9. Model assignments — 20 agents × 3 runtimes
 
 | Agent | Claude Code (`model:`) | OpenCode (`opencode_model:`) | Codex tier |
 |-------|------------------------|------------------------------|------------|
@@ -226,9 +226,11 @@ Every agent emits an HTML report into
 | project-auditor | claude-opus-4-7 | (same) | heavy |
 | product-engineer | claude-opus-4-7 | claude-sonnet-4-6 | heavy |
 | software-architect | claude-opus-4-7 | claude-sonnet-4-6 | heavy |
+| ai-engineer | claude-opus-4-7 | (same) | heavy |
 | game-designer | claude-opus-4-7 | (same) | heavy |
 | game-tester | claude-opus-4-7 | (same) | heavy |
-| software-engineer | claude-sonnet-4-6 | (same) | light |
+| software-engineer-python | claude-sonnet-4-6 | (same) | light |
+| software-engineer-node | claude-sonnet-4-6 | (same) | light |
 | backend-engineer | claude-sonnet-4-6 | (same) | light |
 | frontend-engineer | claude-sonnet-4-6 | (same) | light |
 | qa-engineer | claude-sonnet-4-6 | (same) | light |
@@ -237,6 +239,8 @@ Every agent emits an HTML report into
 | security-reviewer | claude-sonnet-4-6 | (same) | light |
 | researcher | claude-sonnet-4-6 | (same) | light |
 | design-specialist | claude-sonnet-4-6 | (same) | light |
+| data-engineer | claude-sonnet-4-6 | (same) | light |
+| data-analyst | claude-sonnet-4-6 | (same) | light |
 | game-developer | claude-sonnet-4-6 | (same) | light |
 
 Values are sourced from each agent's frontmatter. Do not invent.
