@@ -202,7 +202,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P11a — Rewrite `data/AGENTS.md` (W4, parallel with P11c + P12)
 
-- [ ] AGT-r2-33 — Rewrite `data/AGENTS.md` to ≤ 280 lines, lib-general scope only (product-engineer)
+- [-] AGT-r2-33 — Rewrite `data/AGENTS.md` to ≤ 280 lines, lib-general scope only (product-engineer)
   - File: `dadaia_workspace/public/data/AGENTS.md` — apply SPEC FR7.9 11-section structure; absorb `dadaia-workspace-dev-guardrail.md` content (per AGT-r2-32 note).
   - Forbidden strings (SPEC FR7.2): no occurrences of `Hostinger`, `redacted-infra`, `redacted-infra`, `Traefik`, `redacted-host`, `redacted-infra-jobs`, `redacted-infra-shopping`, `mistralai`, IP `0.0.0.0`, IP `0.0.0.0` — verified by pre-commit grep exiting 1 on hit.
   - Acceptance: `wc -l dadaia_workspace/public/data/AGENTS.md` ≤ 280; pre-commit forbidden-strings grep returns clean; C16 + C17 + C18 + C19 + C21 + C22 + C23 satisfied.
