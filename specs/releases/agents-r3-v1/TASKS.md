@@ -103,7 +103,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
   - Touches: `tests/unit/features/agents/fixtures/` (NO-OP).
   - Done criterion: 5 minimal frontmatter fixtures added (one per new persona) only if a test requires an isolated fixture; if all tests pass without isolated fixtures, this task is closed with a one-line note "no isolated fixtures required" and zero file changes.
   - Resolution (2026-05-19): R3-17/R3-18 assertions drive directly off `dadaia_workspace/public/agents/*.md` via `_PUBLIC_AGENTS_DIR`; no isolated fixture required. Existing `fixtures/software-engineer.md` (parser unit-test fixture, NOT a canonical-roster source) remains untouched. R3-19 closes as no-op.
-- [-] R3-20 — Add path-scope gate unit tests for new allowlists (`software-engineer-python`)
+- [x] R3-20 — Add path-scope gate unit tests for new allowlists (`software-engineer-python`)
   - Touches: `tests/unit/gate/test_path_scope.py` (extend) or new file under `tests/unit/gate/`.
   - Done criterion: `ai-engineer` → `dadaia_workspace/cli/main.py` rejected with `[PATH SCOPE ERROR]`; `software-engineer-python` → same path accepted; tests exit 0.
 - [ ] R3-21 — Rewrite `dadaia_workspace/public/data/AGENTS.md` for 20-agent inventory (`product-engineer`)
