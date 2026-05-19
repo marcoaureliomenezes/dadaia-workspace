@@ -14,20 +14,18 @@ Coverage (per TASKS.md PR3-09 acceptance):
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.features.agents.reader import (
+    _AGENT_ID_RE,
     AgentNotFoundError,
     InvalidAgentIdError,
-    _AGENT_ID_RE,
     _strip_frontmatter,
     get_prompt,
 )
 from dadaia_workspace.features.panel.views.api import render_api_agent_prompt
-
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers
@@ -324,7 +322,7 @@ class TestRenderApiAgentPromptView:
         """Content-Type must be application/json; charset=utf-8 for all responses."""
         view = self._make_view(tmp_path, monkeypatch)
 
-        for agent_id, expected_status in [
+        for agent_id, _expected_status in [
             ("software-engineer", 200),
             ("nonexistent-agent", 404),
             ("bad.id", 400),
@@ -413,7 +411,7 @@ class TestNewAgentPromptsReadable:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Returned prompt body must not include frontmatter."""
-        agents_dir = self._setup_agents_dir(tmp_path, monkeypatch, ["project-manager"])
+        self._setup_agents_dir(tmp_path, monkeypatch, ["project-manager"])
         service = _FakeService(workspace_root=tmp_path)
         view = render_api_agent_prompt(service)  # type: ignore[arg-type]
         _, _, body_bytes = view(agent_id="project-manager")

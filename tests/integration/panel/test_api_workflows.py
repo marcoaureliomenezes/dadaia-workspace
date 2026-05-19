@@ -17,6 +17,8 @@ import shutil
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -29,9 +31,6 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_workflow_detail,
     render_api_workflows_list,
 )
-
-import urllib.error
-import urllib.request
 
 # ---------------------------------------------------------------------------
 # Workspace root

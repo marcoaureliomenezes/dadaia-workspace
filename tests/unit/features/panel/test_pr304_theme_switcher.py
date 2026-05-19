@@ -19,11 +19,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import SpecContextProject
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.static import render_static
-
 
 # ---------------------------------------------------------------------------
 # Fakes (same pattern as test_views_index.py)

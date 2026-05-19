@@ -12,8 +12,8 @@ from dadaia_workspace.features.workflows.dag import render_dag_svg
 from dadaia_workspace.features.workflows.service import (
     StageDTO,
     WorkflowDetailDTO,
-    WorkflowSummaryDTO,
     WorkflowsService,
+    WorkflowSummaryDTO,
 )
 
 __all__ = [

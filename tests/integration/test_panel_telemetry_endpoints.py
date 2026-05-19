@@ -170,11 +170,11 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
     # (no longer uses telemetry).  The integration test injects a stub that
     # returns a minimal conforming payload so existing 200+shape assertions pass.
     def _stub_workflows_list(**kw: Any) -> tuple[int, str, bytes]:
-        import json as _json
         import datetime as _dt
+        import json as _json
 
         payload = {
-            "generated_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
+            "generated_at": _dt.datetime.now(tz=_dt.UTC).isoformat(),
             "source_hint": ".dadaia/agentic/workflows/",
             "workflows": [],
         }

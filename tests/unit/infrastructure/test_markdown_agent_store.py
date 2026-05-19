@@ -17,19 +17,13 @@ Defence-in-depth:
 
 from __future__ import annotations
 
-import os
-import stat
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from dadaia_workspace.infrastructure.markdown_agent_store import (
     MarkdownAgentStore,
     _parse_file,
     _split_frontmatter,
 )
-
 
 # ---------------------------------------------------------------------------
 # _split_frontmatter — unit tests

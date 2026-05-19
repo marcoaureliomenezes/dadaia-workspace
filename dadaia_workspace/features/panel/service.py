@@ -31,7 +31,7 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.agents.reader import AgentDTO, read_canonical_agents
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from dadaia_workspace.features.workflows.service import WorkflowSummaryDTO, WorkflowsService
+from dadaia_workspace.features.workflows.service import WorkflowsService, WorkflowSummaryDTO
 
 
 @dataclass

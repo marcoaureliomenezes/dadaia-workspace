@@ -17,7 +17,6 @@ import pytest
 from dadaia_workspace.features.telemetry.aggregator.models import (
     SessionDetail,
     SessionListResult,
-    SessionRow,
 )
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao

@@ -14,18 +14,14 @@ Coverage (per TASKS.md PR3-15 + SPEC §5.4 acceptance):
 
 from __future__ import annotations
 
-import dataclasses
 import json
 from pathlib import Path
-
-import pytest
 
 from dadaia_workspace.features.panel.views.api import render_api_workflow_detail
 from dadaia_workspace.features.workflows.service import (
     StageDTO,
     WorkflowDetailDTO,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fakes
