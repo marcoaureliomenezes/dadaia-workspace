@@ -51,23 +51,27 @@ def build_panel_http_server(
     return server
 
 
-def serve_blocking(server: ThreadingHTTPServer) -> None:
-    """Block until SIGINT or SIGTERM, then shut down *server* cleanly.
+def install_shutdown_handlers(server: ThreadingHTTPServer) -> None:
+    """Install SIGINT/SIGTERM handlers that shut *server* down cleanly.
+
+    Call this BEFORE the caller prints "ready" or yields any window in which
+    a signal could arrive — otherwise Python's default SIGINT handler raises
+    KeyboardInterrupt and the process exits 130 instead of 0 (AC-9).
 
     Signal handling discipline (R2 — locked):
     - Handlers spawn a *daemon* thread calling ``server.shutdown()``.
     - The handler frame returns immediately; it never calls ``shutdown()``
       directly (that would deadlock the serving loop running in the calling
       thread).
-    - ``signal.signal()`` is installed here, which requires the calling thread
-      to be the process main thread.  Tests that call ``serve_forever()``
-      directly in a background thread must not call this function.
+    - ``signal.signal()`` requires the calling thread to be the process main
+      thread. Tests that drive ``serve_forever()`` from a background thread
+      MUST NOT call this function (they install nothing and shut down via
+      direct ``server.shutdown()``).
 
     Raises
     ------
     ValueError
-        If called from a non-main thread (Python raises this when
-        ``signal.signal()`` is used outside the main thread).
+        If called from a non-main thread.
     """
 
     def _shutdown_in_thread() -> None:
@@ -80,4 +84,15 @@ def serve_blocking(server: ThreadingHTTPServer) -> None:
     signal.signal(signal.SIGINT, _handler)
     signal.signal(signal.SIGTERM, _handler)
 
+
+def serve_blocking(server: ThreadingHTTPServer) -> None:
+    """Install shutdown handlers, then block on ``server.serve_forever()``.
+
+    Kept for backward compatibility. New code should call
+    :func:`install_shutdown_handlers` *before* announcing readiness and then
+    call ``server.serve_forever()`` directly — closing the race in which a
+    SIGINT arriving between "ready" and signal-handler installation killed
+    the process with exit 130 (observed in CI under contention).
+    """
+    install_shutdown_handlers(server)
     server.serve_forever()
