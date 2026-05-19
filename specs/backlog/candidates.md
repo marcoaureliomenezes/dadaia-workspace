@@ -12,6 +12,10 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 - Quando uma candidata virar release ativa, mover linha para o histórico abaixo com
   data e release-id correspondente.
 
+## Próxima release (queued)
+
+- **`codex-agent-orchestration-parity-v1`** — escolhida pelo operador 2026-05-19 após fechamento de `agents-r3-v1`. Stacks após `release/panel-r5-v1` e `release/agents-r3-v1` mergearem em `main`. Inicia com cut-branch + product-engineer authoring SPEC/PLAN/TASKS em fase DISCOVERY. ACTIVE.md permanece `release: none` até P0 commit.
+
 ## Candidatas ativas
 
 Originadas da triagem de Phase 6 da meta-release `sdd-release-lifecycle-v1`. Cada uma
@@ -87,3 +91,4 @@ nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 - dadaia-workspace-panel-r2-agents → release `agent-monitoring-v1` (promovido em 2026-05-17, encerrado em 2026-05-17; SPEC final em `_archive/releases/agent-monitoring-v1/SPEC.md`; closes new `features/telemetry/` module + Agents/Workflows tabs do panel + allowlist gate + Bearer auth + CSP/nosniff; discovery inputs: 4 reports em `.dadaia/reports/dadaia-workspace/{product-engineer,software-architect,frontend-engineer,devops-engineer,software-engineer}/` + reconciliation `2026-05-17T053947Z-agent-monitoring-reconciliation.html`)
 - dadaia-workspace-brand-identity → release `dadaia-workspace-brand-identity-v1` (promovido em 2026-05-17 a partir de entrada não-estruturada em `backlog/backlog-future.md`; SPEC em `specs/releases/dadaia-workspace-brand-identity-v1/SPEC.md` Status: Em revisão; paleta `#9cddc8 #bfd8ad #ddd9ab #f7af63 #633d2e` + logo rinoceronte SVG; consumida pela `agent-monitoring-v1` via tokens CSS)
 - dev-server-registry (hotfix) → release `v0.1.1` (promovido 2026-05-17, encerrado 2026-05-17; SPEC final em `_archive/releases/v0.1.1/SPEC.md`; closes 3 silent-failure bugs + gap estrutural via `dadaia server scan` + painel "Unregistered" section)
+- agents-r3-v1 → release `agents-r3-v1` (promovido 2026-05-19, encerrado 2026-05-19; SPEC final em `_archive/releases/agents-r3-v1/SPEC.md`; PR #12 contra `release/panel-r5-v1`; closes 16→20 agent topology: software-engineer split em software-engineer-python + software-engineer-node, 3 novos T3 specialists data-engineer + data-analyst + ai-engineer (Opus 4.7, owner exclusivo de `public/{skills,rules,workflows,commands,agents,hooks}/**`), dispatchers + DAM + 2 workflows + topology guard + 3 memory atoms atualizados; 5 drifts documentados, 8 candidatas adicionadas; next release: `codex-agent-orchestration-parity-v1`)
