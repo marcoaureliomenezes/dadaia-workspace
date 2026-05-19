@@ -281,10 +281,10 @@ def test_sections_have_tabindex_zero() -> None:
 
 
 def test_tabpanel_count_is_three() -> None:
-    """T-AM-01/T-AM-18: there must be exactly 4 role=tabpanel elements after workflows tab added."""
+    """T-AM-01/T-AM-18/PR5-C4: there must be exactly 5 role=tabpanel elements after Sessions tab added."""
     service = _build_service()
     html = _render(service)
-    assert html.count('role="tabpanel"') == 4
+    assert html.count('role="tabpanel"') == 5
 
 
 def test_panel_js_contains_keydown_handler() -> None:
@@ -326,11 +326,52 @@ def test_aria_pairs_workflows() -> None:
 
 
 def test_nav_has_4_tabs() -> None:
-    """T-AM-18: nav-tabs must contain exactly 4 tab buttons."""
+    """T-AM-18/PR5-C4: nav-tabs must contain exactly 5 tab buttons after Sessions tab added."""
     service = _build_service()
     html = _render(service)
-    # Count role="tab" occurrences
-    assert html.count('role="tab"') == 4
+    # Count role="tab" occurrences (Memories, Agents, Workflows, Servers, Sessions)
+    assert html.count('role="tab"') == 5
+
+
+# ---------------------------------------------------------------------------
+# PR5-C4 — Sessions tab wired into index
+# ---------------------------------------------------------------------------
+
+
+def test_has_sessions_tab() -> None:
+    """PR5-C4: nav must contain a tab with id="tab-sessions"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-sessions"' in html
+
+
+def test_has_sessions_section() -> None:
+    """PR5-C4: rendered HTML must contain id="section-sessions"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="section-sessions"' in html
+
+
+def test_aria_pairs_sessions() -> None:
+    """PR5-C4: section has aria-labelledby="tab-sessions" and tab has id="tab-sessions"."""
+    service = _build_service()
+    html = _render(service)
+    assert 'id="tab-sessions"' in html
+    assert 'aria-labelledby="tab-sessions"' in html
+
+
+def test_sessions_css_link_present() -> None:
+    """PR5-C4: rendered HTML must include sessions.css link."""
+    service = _build_service()
+    html = _render(service)
+    assert '/static/sessions.css' in html
+
+
+def test_sessions_js_script_present() -> None:
+    """PR5-C4: rendered HTML must include sessions.js script tag."""
+    service = _build_service()
+    html = _render(service)
+    assert '/static/sessions.js' in html
 
 
 # ---------------------------------------------------------------------------
