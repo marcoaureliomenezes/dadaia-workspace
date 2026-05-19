@@ -13,6 +13,18 @@ Decision references:
     D-AM-11  — Lazy on-request, no daemon
     D-AM-13  — usage in event.message.usage.*; model in event.message.model
     D-AM-19  — Mark suspect events (not drop)
+
+PR4-05 — Discovered JSON path for dispatched-subagent persona (2026-05-19):
+    Canonical path (parent-session dispatch events):
+        event.message.content[i].input.subagent_type
+        where event.type == "assistant"
+          AND event.message.content[i].type == "tool_use"
+          AND event.message.content[i].name == "Agent"
+    Strategy: on first occurrence of subagent_type X for session S, record
+    S → X in _session_subagent_map. The session's agent_name is set to X.
+    Multiple dispatch events in the same session use the FIRST canonical
+    (non-Explore / non-Plan) subagent_type encountered.
+    Top-level operator sessions with no dispatch events → agent_name = None.
 """
 
 from __future__ import annotations
@@ -70,6 +82,52 @@ def _compute_event_id(session_id: str, uuid: str) -> str:
     """Compute the idempotent event_id = sha1(sessionId||uuid)[:20]."""
     digest = hashlib.sha1(f"{session_id}||{uuid}".encode()).hexdigest()
     return digest[:20]
+
+
+# Non-canonical subagent types (internal Claude Code built-ins); sessions that
+# only dispatch these do not receive a named agent_name.
+_NON_CANONICAL_SUBTYPES: frozenset[str] = frozenset({"Explore", "Plan"})
+
+
+def _extract_subagent_type_from_raw(raw_event: dict[str, Any]) -> str | None:
+    """Return the first canonical subagent_type from a raw (pre-allowlist) event.
+
+    JSON path (PR4-05):
+        event.message.content[i].input.subagent_type
+        where event.type == "assistant"
+          AND event.message.content[i].type == "tool_use"
+          AND event.message.content[i].name == "Agent"
+
+    Returns None when:
+    - The event type is not "assistant".
+    - No Agent tool_use content item is present.
+    - The subagent_type value is a non-canonical built-in ("Explore", "Plan").
+
+    This function reads raw event data BEFORE the allowlist filter so that the
+    agent persona can be captured from message.content which the allowlist
+    otherwise strips (T1 CRITICAL — no content reaches the DB via this path;
+    only the persona string is retained, not any prompt/response text).
+    """
+    if not isinstance(raw_event, dict):
+        return None
+    if raw_event.get("type") != "assistant":
+        return None
+    message = raw_event.get("message")
+    if not isinstance(message, dict):
+        return None
+    content = message.get("content")
+    if not isinstance(content, list):
+        return None
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") == "tool_use" and item.get("name") == "Agent":
+            inp = item.get("input")
+            if isinstance(inp, dict):
+                val = inp.get("subagent_type")
+                if val is not None and str(val) not in _NON_CANONICAL_SUBTYPES:
+                    return str(val)
+    return None
 
 
 def _derive_agent_name(
@@ -254,6 +312,12 @@ def read_session_file(
                 result.events_skipped += 1
                 continue
 
+            # PR4-06: Extract subagent_type from raw event BEFORE allowlist.
+            # The allowlist strips message.content so we must read the persona
+            # from the raw dict.  Only the persona string (not any prompt/response
+            # text) is retained — T1 CRITICAL invariant is preserved.
+            raw_subagent_type = _extract_subagent_type_from_raw(raw_event)
+
             # Allowlist filter (T1 CRITICAL — must come before any DB write)
             clean = allowlist_event(raw_event)
             if clean is None:
@@ -289,8 +353,19 @@ def read_session_file(
 
             sc = session_acc[session_id]
 
+            # PR4-06: Record the first canonical subagent_type for this session.
+            # Only the first occurrence is kept (first canonical wins).
+            if raw_subagent_type is not None and sc.agent_name is None:
+                sc.agent_name = raw_subagent_type
+
             if event_type == "agent-name":
-                sc.agent_name = clean.get("agentName")
+                # agent-name events carry the project slug (e.g. "portfolio-fix"),
+                # not a canonical agent persona.  Only set agent_name from this
+                # event if no subagent_type has already been captured; if a
+                # subagent_type was already recorded, the dispatch persona takes
+                # precedence.
+                if sc.agent_name is None:
+                    sc.agent_name = clean.get("agentName")
             elif event_type == "ai-title":
                 sc.ai_title = clean.get("aiTitle")
 
