@@ -166,7 +166,7 @@
 
 ## P4 — Doctor checkpoint *(devops-engineer)*
 
-- [ ] **PR4-20** — Run `dadaia public stage && dadaia public install --target all &&
+- [-] **PR4-20** — Run `dadaia public stage && dadaia public install --target all &&
   dadaia public doctor`. Capture output. All entries `[ok]` except known
   `[unsupported]`, `[partial]`, or `[not-applicable]` (which must be documented in
   the devops report). Owner: devops-engineer. Done criterion: doctor output
