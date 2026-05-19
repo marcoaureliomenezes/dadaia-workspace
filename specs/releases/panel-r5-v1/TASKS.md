@@ -260,7 +260,7 @@
   switcher pattern (`views/index.py:60`). Owner: frontend-engineer. Done
   criterion: from the panel JS console, `Runtime.set('codex')` persists across
   reload and fires the event.
-- [ ] **PR5-D3** — Edit `dadaia_workspace/features/panel/views/index.py`:
+- [-] **PR5-D3** — Edit `dadaia_workspace/features/panel/views/index.py`:
   add `.runtime-switcher` topbar control beside the theme switcher (Claude /
   Codex toggle, accessible labelling). Owner: frontend-engineer. Done
   criterion: visible toggle in the topbar; clicking it calls
