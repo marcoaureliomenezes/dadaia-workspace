@@ -178,7 +178,7 @@
 
 ## P5 — Live panel smoke *(qa-engineer)*
 
-- [ ] **PR4-21** — Start `dadaia panel`; navigate to the Agents tab; capture a
+- [-] **PR4-21** — Start `dadaia panel`; navigate to the Agents tab; capture a
   Playwright screenshot showing (a) non-zero `Sessions` / `Cost` / `Last seen`
   values on at least one tier-1, one tier-2, and one tier-3 card; (b) visibly
   differentiated tier borders (2px default + 4px left accent in distinct colors).
