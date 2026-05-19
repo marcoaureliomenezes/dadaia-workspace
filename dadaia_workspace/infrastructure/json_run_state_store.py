@@ -2,10 +2,8 @@
 
 import json
 import os
-import secrets
 from collections.abc import Iterable
 from dataclasses import asdict
-from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import RunNotFoundError
@@ -20,12 +18,6 @@ from dadaia_workspace.core.models.run_state import (
 
 _MANIFEST = "manifest.json"
 _EVENTS = "events.jsonl"
-
-
-def make_run_id(now: datetime | None = None) -> str:
-    """ULID-like: UTC timestamp compact + 6-char random suffix."""
-    ts = (now or datetime.now(UTC)).strftime("%Y%m%dT%H%M%SZ")
-    return f"{ts}-{secrets.token_hex(3)}"
 
 
 def _manifest_to_dict(m: RunManifest) -> dict[str, object]:

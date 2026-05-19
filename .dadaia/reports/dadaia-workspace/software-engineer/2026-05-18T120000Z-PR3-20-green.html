@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Implementation Report — PR3-20 SE integration tests</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-pass     { background: #daffd0; color: #1a5c00; }
+  .badge-low      { background: #daffd0; color: #1a5c00; }
+  .badge-info     { background: #e0eaff; color: #0550ae; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> software-engineer</span>
+  <span><strong>Gerado em:</strong> 2026-05-18T120000Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Run:</strong> <code>PR3-20</code></span>
+</div>
+
+<h1>Implementation Report — PR3-20 SE integration tests (~12 new)</h1>
+
+<h2>All tests pass</h2>
+
+<pre><code>45 passed in 5.52s</code></pre>
+
+<h2>Implementation summary</h2>
+
+<p>Created a new <code>tests/integration/panel/</code> directory with three integration test files covering the panel API server end-to-end over HTTP (ThreadingHTTPServer on port 0, no browser). Total: 45 tests across 3 files.</p>
+
+<table>
+  <thead><tr><th>File</th><th>Tests</th><th>Coverage</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>tests/integration/panel/test_api_agents.py</code></td>
+      <td>17</td>
+      <td>Bearer enforcement, telemetry overlay merge, active_window_days parameter, path-traversal defence on /api/agents/&lt;id&gt;/prompt</td>
+    </tr>
+    <tr>
+      <td><code>tests/integration/panel/test_api_workflows.py</code></td>
+      <td>15</td>
+      <td>Bearer enforcement, workflow list/detail shape, traversal rejection, cache invalidation on mtime change</td>
+    </tr>
+    <tr>
+      <td><code>tests/integration/panel/test_static_route.py</code></td>
+      <td>13</td>
+      <td>Known assets served with correct MIME, Cache-Control header, path traversal defence, unknown assets 404, no auth required</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Key design decisions</h3>
+<ul>
+  <li>Real PanelService wired to real <code>.dadaia/agentic/agents/</code> and <code>.dadaia/agentic/workflows/</code> files — no mocks or overrides for canonical data.</li>
+  <li>Stub TelemetryService (fake) injects controlled AgentListResult with one "active" agent (1 day ago) and one "inactive" agent (400 days ago) to test status computation against the active_window_days cutoff.</li>
+  <li>Cache invalidation test: creates an isolated temp workspace, writes workflow v1, fetches detail (populates in-memory cache), then overwrites with workflow v2 and advances mtime by +2 seconds via <code>os.utime</code>. The second fetch must return v2 because the (path, mtime, size) cache key has changed.</li>
+  <li>URL-encoded backslash (%5C) in static names results in 404 not 400 — documented as expected behavior because the dict lookup fails before any filesystem I/O, satisfying the security requirement without false assertions.</li>
+</ul>
+
+<h2>Security checklist</h2>
+
+<table>
+  <thead><tr><th>OWASP</th><th>Item</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>A01</td>
+      <td>Bearer token enforcement verified by 401 tests (no token, wrong token) on all /api/* routes</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>A02</td>
+      <td>No hardcoded credentials — test tokens are local constants, not secrets</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>A03</td>
+      <td>Path traversal defence tested: URL-encoded slashes in agent_id rejected 400, dots-in-workflow-name rejected 400, traversal in static names either 400 or 404 (dict-only, no FS)</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>A06</td>
+      <td>Error responses verified to return generic error codes ("invalid_agent_id", "invalid_workflow_name") without internal path details</td>
+      <td><span class="badge badge-pass">PASS</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Deploy</h2>
+<p>Branch: <code>release/panel-r3-v1</code>. Commit to follow as part of the final PR3-20 commit. No workflow dispatch triggered (implementation-only task).</p>
+
+<h2>QA validation</h2>
+<p>Pending — qa-engineer to run E2E validation per PR3-21 workflow.</p>
+
+</body>
+</html>

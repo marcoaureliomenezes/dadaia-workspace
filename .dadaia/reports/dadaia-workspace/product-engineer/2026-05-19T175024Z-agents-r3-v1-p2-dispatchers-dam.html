@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agents-r3-v1 — P2 — Dispatchers + DAM rewire</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2em auto; padding: 0 1em; line-height: 1.5; color: #1a1a1a; }
+  h1 { border-bottom: 2px solid #444; padding-bottom: .3em; }
+  h2 { margin-top: 2em; border-bottom: 1px solid #ccc; padding-bottom: .2em; }
+  table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: .4em .6em; text-align: left; vertical-align: top; }
+  th { background: #f4f4f4; }
+  code, pre { background: #f6f8fa; padding: .1em .3em; border-radius: 3px; font-family: ui-monospace, monospace; }
+  pre { padding: .8em; overflow-x: auto; }
+  .ok { color: #0a7c2a; font-weight: 600; }
+  .meta { color: #555; font-size: .9em; }
+</style>
+</head>
+<body>
+
+<h1>agents-r3-v1 — P2 — Dispatchers + Decision Authority Matrix rewire</h1>
+
+<p class="meta">
+  <strong>Agent:</strong> product-engineer<br>
+  <strong>Context:</strong> dadaia-workspace<br>
+  <strong>Release:</strong> agents-r3-v1<br>
+  <strong>Phase:</strong> IMPLEMENTATION<br>
+  <strong>Branch:</strong> release/agents-r3-v1<br>
+  <strong>Produced at:</strong> 2026-05-19T17:50:24Z<br>
+  <strong>Tasks covered:</strong> R3-12, R3-13, R3-14
+</p>
+
+<h2>Summary</h2>
+
+<p>
+  Phase P2 of release <code>agents-r3-v1</code> teaches the two dispatchers
+  (<code>project-manager</code>, <code>project-auditor</code>) and the
+  authoritative <code>project-orchestration</code> skill about the post-r3
+  agent topology: <strong>20 personas</strong> = 2 dispatchers (T1) + 1 curator
+  (T2) + 17 leaf specialists (T3), including the five new agents introduced in
+  P1 — <code>software-engineer-python</code>, <code>software-engineer-node</code>,
+  <code>data-engineer</code>, <code>data-analyst</code>, <code>ai-engineer</code> —
+  and the retirement of the legacy <code>software-engineer</code> persona.
+</p>
+
+<h2>Tasks completed</h2>
+
+<table>
+  <thead>
+    <tr><th>Task ID</th><th>Description</th><th>Start SHA</th><th>Done SHA</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>R3-12</td>
+      <td><code>project-manager.md</code> dispatch list updated: dropped bare <code>software-engineer</code>, added 5 new leaf agents, added explicit routing-notes block.</td>
+      <td><code>1eb67bf</code></td>
+      <td><code>26ae89b</code></td>
+    </tr>
+    <tr>
+      <td>R3-13</td>
+      <td><code>project-auditor.md</code> Step-3 evidence dispatch + Collaboration "Dispatches" + scope-rule "Despachar especialistas" extended with 4 new evidence sources (Python, Node, data-engineer, ai-engineer); <code>data-analyst</code> explicitly marked as non-routine.</td>
+      <td><code>9c50192</code></td>
+      <td><code>ba95a36</code></td>
+    </tr>
+    <tr>
+      <td>R3-14</td>
+      <td><code>project-orchestration/SKILL.md</code>: Agent Inventory table grown from 15 to 20 rows; DAM single Python/Node row replaced by 5 new rows (Python, Node, Data, BI, AI); 6 prose mentions of bare <code>software-engineer</code> in the PM Playbooks rewritten as explicit surface→specialist routing decisions.</td>
+      <td><code>57bd8d0</code></td>
+      <td><code>4f0a1e6</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Validations</h2>
+
+<table>
+  <thead>
+    <tr><th>Description</th><th>Command</th><th>Evidence</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Dispatcher files contain zero bare <code>software-engineer</code> references.</td>
+      <td><code>grep -nE '\bsoftware-engineer\b' dadaia_workspace/public/agents/project-manager.md dadaia_workspace/public/agents/project-auditor.md | grep -v 'software-engineer-python\|software-engineer-node'</code></td>
+      <td><span class="ok">OK: no bare matches</span></td>
+    </tr>
+    <tr>
+      <td>PM names all 5 new agents.</td>
+      <td><code>for agent in software-engineer-python software-engineer-node data-engineer data-analyst ai-engineer; do grep -q "$agent" project-manager.md && echo "PM mentions $agent"; done</code></td>
+      <td><span class="ok">PM mentions software-engineer-python / software-engineer-node / data-engineer / data-analyst / ai-engineer</span></td>
+    </tr>
+    <tr>
+      <td>DAM contains the 5 new domain rows.</td>
+      <td><code>for d in 'Python implementation' 'Node implementation' 'Data engineering' 'BI / dashboards' 'AI entities'; do grep -q "$d" SKILL.md && echo "DAM has '$d'"; done</code></td>
+      <td><span class="ok">DAM has 'Python implementation' / 'Node implementation' / 'Data engineering' / 'BI / dashboards' / 'AI entities'</span></td>
+    </tr>
+    <tr>
+      <td>Legacy DAM row "Python/Node implementation" removed.</td>
+      <td><code>grep -c 'Python/Node implementation' SKILL.md</code></td>
+      <td><span class="ok">0</span></td>
+    </tr>
+    <tr>
+      <td>SDD invariants remain green.</td>
+      <td><code>dadaia specs doctor</code></td>
+      <td><span class="ok">[ok] specs — 0 errors, 0 warnings</span></td>
+    </tr>
+    <tr>
+      <td>TASKS.md markers flip <code>[ ]</code> → <code>[-]</code> → <code>[x]</code> across two commits per task.</td>
+      <td><code>git log --oneline release/agents-r3-v1 -6</code></td>
+      <td>6 commits in expected cadence: <code>1eb67bf</code>, <code>26ae89b</code>, <code>9c50192</code>, <code>ba95a36</code>, <code>57bd8d0</code>, <code>4f0a1e6</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Drifts</h2>
+
+<h3>skill-md-playbook-prose-cleanup</h3>
+
+<p>
+  <strong>Description:</strong> The R3-14 done criterion explicitly mandates the
+  legacy DAM row removal, the 5 new DAM rows, and the inventory-table update. It
+  does not list the six bare <code>software-engineer</code> mentions inside the
+  PM Playbooks block of the same SKILL.md (lines ~224, ~252, ~262, ~279, ~284,
+  ~323).
+</p>
+
+<p>
+  <strong>Resolution:</strong> Rewrote all six bare mentions as explicit
+  surface→specialist routing decisions (Python →
+  <code>software-engineer-python</code>, Node →
+  <code>software-engineer-node</code>, Go → <code>backend-engineer</code>,
+  browser → <code>frontend-engineer</code>). Leaving bare references inside the
+  same file that authoritatively defines the DAM would silently teach PM the
+  retired persona name. The scope expansion is contained to SKILL.md and
+  consistent with the spirit of R3-12/R3-13. To be recorded in CLOSURE.md
+  Drifts section.
+</p>
+
+<p><strong>Memory updates:</strong> None at this phase. Memory writes are gated
+to CLOSURE (P6, task R3-29). Architecture and agent-orchestration memory atoms
+will reflect the 20-agent topology at that time.</p>
+
+<h3>auditor-evidence-broader-than-strict-criterion</h3>
+
+<p>
+  <strong>Description:</strong> R3-13 done criterion lists only
+  <code>data-engineer</code> and <code>ai-engineer</code> as new evidence
+  sources. The R3 brief in the parent invocation also lists
+  <code>software-engineer-python</code> and <code>software-engineer-node</code>
+  as evidence agents (omitting <code>data-analyst</code>, which is correct).
+</p>
+
+<p>
+  <strong>Resolution:</strong> Followed the broader brief: PA now dispatches
+  <code>code-reviewer</code>, <code>security-reviewer</code>,
+  <code>researcher</code>, <code>qa-engineer</code>,
+  <code>design-specialist</code>, <code>software-engineer-python</code>,
+  <code>software-engineer-node</code>, <code>data-engineer</code>,
+  <code>ai-engineer</code>. <code>data-analyst</code> remains explicitly
+  non-routine. Justification: the brief is more recent and consistent with the
+  new persona allowlists.
+</p>
+
+<p><strong>Memory updates:</strong> None at this phase (gate-locked).</p>
+
+<h2>Memory updates</h2>
+
+<p>None. P2 only touches dispatcher personas and the orchestration skill —
+those live under <code>dadaia_workspace/public/</code> and are out of the
+memory-atom gate. Memory atoms (architecture, agent-orchestration, product
+index) will be updated by task R3-29 during CLOSURE (P6).</p>
+
+<h2>Backlog returns</h2>
+
+<p>None.</p>
+
+<h2>Files touched</h2>
+
+<ul>
+  <li><code>dadaia_workspace/public/agents/project-manager.md</code></li>
+  <li><code>dadaia_workspace/public/agents/project-auditor.md</code></li>
+  <li><code>dadaia_workspace/public/skills/project-orchestration/SKILL.md</code></li>
+  <li><code>specs/releases/agents-r3-v1/TASKS.md</code> (marker flips for R3-12, R3-13, R3-14)</li>
+</ul>
+
+<h2>Next handoff</h2>
+
+<p>
+  Phase P2 complete. Next P2/P3 parallel-safe window continues with R3-15 and
+  R3-16 (workflow rewiring) — still owned by <code>product-engineer</code>.
+  Phase remains IMPLEMENTATION; no ACTIVE.md change.
+</p>
+
+</body>
+</html>

@@ -1,7 +1,15 @@
 """Run-state domain models — durable representation of orchestrate runs."""
 
+import secrets
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import StrEnum
+
+
+def make_run_id(now: datetime | None = None) -> str:
+    """ULID-like: UTC timestamp compact + 6-char random suffix."""
+    ts = (now or datetime.now(UTC)).strftime("%Y%m%dT%H%M%SZ")
+    return f"{ts}-{secrets.token_hex(3)}"
 
 
 class RunStatus(StrEnum):

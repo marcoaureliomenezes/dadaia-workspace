@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Monitoring — Phase 1 Discovery</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-critical { background: #ffd7d7; color: #a00; }
+  .badge-high     { background: #fff0d0; color: #c05000; }
+  .badge-medium   { background: #fffad0; color: #806000; }
+  .badge-low      { background: #daffd0; color: #1a5c00; }
+  .badge-pass     { background: #daffd0; color: #1a5c00; }
+  .badge-fail     { background: #ffd7d7; color: #a00; }
+  .badge-pending  { background: #e0eaff; color: #0550ae; }
+  .badge-default  { background: #eee6ff; color: #4b2a8a; }
+  .finding { border: 1px solid #e4e8ec; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  .finding h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> product-engineer</span>
+  <span><strong>Gerado em:</strong> 2026-05-17T05:25:32Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Run:</strong> <code>phase-1-discovery</code></span>
+  <span><strong>Release:</strong> <code>agent-monitoring-v1</code> (proposta)</span>
+</div>
+
+<h1>Phase 1 Discovery — Monitoramento de Agentes via dadaia-workspace Panel</h1>
+
+<h2>Visão</h2>
+
+<blockquote>
+<p><strong>Lema do operador:</strong> "Users will use the dadaia-workspace in its own environment.
+The dadaia-workspace panel must be secure. And the workspace resilient."</p>
+</blockquote>
+
+<p>
+O dadaia-workspace panel hoje é uma superfície read-only de 3 abas (Servers, Memories, Agents &amp; Workflows).
+A aba "Agents &amp; Workflows" é um placeholder (<code>features/panel/views/index.py:96-107</code>).
+A release <code>agent-monitoring-v1</code> evolui essa superfície para observabilidade real de agentes locais
+(Claude Code + Codex + opencode), consumindo apenas <strong>arquivos locais do operador</strong> — sem APIs remotas,
+sem dependências Node, sem <code>ccusage</code>.
+</p>
+
+<p><strong>Objetivos do release:</strong></p>
+<ul>
+  <li>Separar as abas <strong>Agents</strong> e <strong>Workflows</strong> (hoje acopladas no nav).</li>
+  <li>Por agente: descrição, sessões trabalhadas, custos por sessão, tokens por tipo (input / cache_read / cache_creation / output), e custo total por Spec Context Project.</li>
+  <li>Por workflow: card descritivo + lista de agentes que o compõem.</li>
+  <li>Manter o bind <code>127.0.0.1:4999</code> e o caráter read-only do panel.</li>
+  <li>Princípio de supply chain: <strong>se conseguirmos tudo a partir dos providers locais, é a opção mais segura</strong>.</li>
+</ul>
+
+<p>
+Identidade visual nova (paleta <code>#9cddc8 #bfd8ad #ddd9ab #f7af63 #633d2e</code> + logo rinoceronte
+monocromático) sai como spec <strong>paralela</strong> <code>dadaia-workspace-brand-identity-v1</code> e não bloqueia
+<code>agent-monitoring-v1</code> — fallback para tokens atuais do panel se ainda não estiver pronta.
+</p>
+
+<h2>Findings</h2>
+
+<ul>
+  <li><strong>Fonte primária Claude Code</strong>: <code>~/.claude/projects/-home-marco-workspace-dadaia/*.jsonl</code> — um arquivo por sessão. Campos chave: <code>sessionId</code>, <code>cwd</code>, <code>model</code>, <code>usage.{input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens}</code>, <code>entrypoint</code>, <code>gitBranch</code>, <code>timestamp</code>. <strong>Sem campo <code>cost</code>.</strong></li>
+  <li><strong>Fonte primária Codex</strong>: <code>~/.codex/state_5.sqlite</code> tabela <code>threads.tokens_used</code> (agregado, sem split in/out); <code>history.jsonl</code> para prompts. Codex usa <code>thread_id</code>, não correlaciona 1:1 com <code>sessionId</code> do Claude Code.</li>
+  <li><strong>Sem Anthropic Admin API disponível</strong>: cálculo de custo precisa de tabela de preços versionada no repo (<code>dadaia_workspace/features/telemetry/pricing.py</code> proposto), com suite de testes para reproducibilidade do cálculo.</li>
+  <li><strong>Panel atual é Python stdlib only</strong> (<code>http.server.ThreadingHTTPServer</code>, ~1.450 LOC). Qualquer dep nova precisa de justificativa forte do <code>software-engineer</code>.</li>
+  <li><strong>Granularidade tem 4 dimensões úteis</strong>: sessão, agente, dia, Spec Context Project. Todas estão acessíveis nos jsonl (cwd identifica o Spec Context).</li>
+  <li><strong>"Agente" não é trivial de definir nos jsonl</strong>: o campo <code>subagent_type</code> aparece quando o main thread invoca um sub-agente (ex: <code>software-architect</code>); para o main thread não há esse campo. Defaults registrados abaixo cobrem ambos os casos.</li>
+  <li><strong>jsonl contém input verbatim do operador</strong> — risco de privacidade alto se o panel servir conteúdo bruto. Política: painel <em>nunca</em> serve texto de prompt/response.</li>
+  <li><strong>Workflows não são agentes</strong> — são receitas (skills/plans) que orquestram agentes. Modelagem deve refletir isso (tabelas separadas).</li>
+</ul>
+
+<h2>Decisões travadas (não re-perguntar)</h2>
+
+<table>
+  <thead>
+    <tr><th>Pergunta</th><th>Resposta locked</th><th>Data</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Quem cobre security review?</td>
+      <td><strong><code>devops-engineer</code></strong> (não existe <code>cyber-engineer</code> no workspace)</td>
+      <td>2026-05-17</td>
+    </tr>
+    <tr>
+      <td>Como ler dados de custo / uso?</td>
+      <td><strong>Reader Python nativo</strong> dos jsonl + sqlite locais. <strong>Zero deps Node. Zero <code>ccusage</code>.</strong></td>
+      <td>2026-05-17</td>
+    </tr>
+    <tr>
+      <td>Admin API da Anthropic disponível?</td>
+      <td><strong>Não.</strong> Fonte única = arquivos locais (Claude Code jsonl + Codex sqlite/history).</td>
+      <td>2026-05-17</td>
+    </tr>
+    <tr>
+      <td>Identidade visual no mesmo spec?</td>
+      <td><strong>Não.</strong> Spec separada e paralela <code>dadaia-workspace-brand-identity-v1</code> (paleta <code>#9cddc8 #bfd8ad #ddd9ab #f7af63 #633d2e</code> + logo rinoceronte monocromático minimalista).</td>
+      <td>2026-05-17</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Defaults registrados</h2>
+
+<p>
+O operador pediu para trabalhar sem pausas. Os 5 itens abaixo são <strong>defaults explícitos</strong> que
+substituem temporariamente uma rodada de <code>dadaia-grill-me</code>. Cada um é marcado
+<span class="badge badge-default">DEFAULT — OPERATOR MAY OVERRIDE</span>. Ficam vinculados à proposta de
+<code>SPEC.md</code> em Phase 3 e podem ser revistos no approval gate.
+</p>
+
+<h3>1. Granularidade <span class="badge badge-default">DEFAULT — OPERATOR MAY OVERRIDE</span></h3>
+<ul>
+  <li><strong>Dimensões agregadas simultaneamente</strong>: (sessão, agente, dia, Spec Context Project). Todas computadas e expostas pelo backend.</li>
+  <li><strong>UI default</strong>: <em>por agente</em>, com breakdown secundário <em>por Spec Context Project</em>.</li>
+  <li><strong>Drill-down</strong>: clicar em um agente abre painel de sessões; clicar em sessão expõe metadados (sem conteúdo bruto). Datas filtráveis via faixa.</li>
+  <li><strong>Justificativa</strong>: estas 4 dimensões saem de graça do parsing dos jsonl (campos <code>sessionId</code>, <code>subagent_type</code> ou <code>entrypoint</code>, <code>timestamp</code>, <code>cwd</code>). Reduzir agora amputaria visões úteis.</li>
+</ul>
+
+<h3>2. Retenção <span class="badge badge-default">DEFAULT — OPERATOR MAY OVERRIDE</span></h3>
+<ul>
+  <li><strong>Raw events</strong>: 180 dias.</li>
+  <li><strong>Agregados (por sessão, agente, dia, contexto)</strong>: perpétuos.</li>
+  <li><strong>Compactação</strong>: o reader processa jsonl <em>in-place</em>; SQLite local armazena agregados; jsonl raw permanece sob controle do provider (Claude Code / Codex), não copiamos.</li>
+  <li><strong>Justificativa supply-chain</strong>: não introduzimos dependência de log-rotation externa (logrotate, journald). O panel só lê o que já existe. Retenção raw é limite de <em>quanto</em> processamos, não de quanto guardamos — Claude Code controla a vida do jsonl.</li>
+</ul>
+
+<h3>3. O que conta como "agente" <span class="badge badge-default">DEFAULT — OPERATOR MAY OVERRIDE</span></h3>
+<ul>
+  <li><strong>Quando <code>subagent_type</code> está presente no evento jsonl</strong>: <code>agente = subagent_type</code> (ex: <code>software-architect</code>, <code>frontend-engineer</code>).</li>
+  <li><strong>Quando ausente (main thread)</strong>: <code>agente = "claude (main)"</code>, com <code>entrypoint</code> exposto como dimensão secundária (cli vs vscode vs web).</li>
+  <li><strong>Codex</strong>: <code>agente = "codex (main)"</code> sempre — Codex não expõe subagent_type. <code>thread_id</code> é o identificador de sessão.</li>
+  <li><strong>opencode</strong> (se aparecer): <code>agente = "opencode (main)"</code> com mesma regra de fallback.</li>
+  <li><strong>Workflows NÃO são agentes</strong>: são receitas (skills/plans) e têm modelagem independente — uma tabela <code>workflows</code> referencia os agentes que ela compõe, mas não acumula tokens.</li>
+</ul>
+
+<h3>4. Whitelist de entrypoints <span class="badge badge-default">DEFAULT — OPERATOR MAY OVERRIDE</span></h3>
+<ul>
+  <li><strong>Sem filtro inicial</strong>: registramos todos os <code>entrypoint</code> encontrados nos jsonl (<code>cli</code>, <code>vscode</code>, <code>web</code>, etc.).</li>
+  <li><strong>Exposto como facet/filter na UI</strong>: o operador filtra se quiser, mas dados completos ficam disponíveis.</li>
+  <li><strong>Justificativa</strong>: cardinalidade baixa (≤ 5 valores observados); filtrar agora é prematuro e descarta informação que custa zero coletar.</li>
+</ul>
+
+<h3>5. Privacidade — política ESTRITA <span class="badge badge-default">DEFAULT — OPERATOR MAY OVERRIDE</span></h3>
+<ul>
+  <li><strong>Painel NUNCA serve texto de prompt ou response.</strong> Sem exceção.</li>
+  <li><strong>Campos permitidos via API</strong>: counts (token counts), sums (custos calculados), names (agent name, model name), <code>sessionId</code>, <code>thread_id</code>, timestamps, <code>cwd</code>, <code>entrypoint</code>, <code>gitBranch</code>.</li>
+  <li><strong>Campos proibidos via API</strong>: <code>content</code>, <code>text</code>, qualquer fragmento de mensagem do operador ou resposta do modelo.</li>
+  <li><strong>Sem endpoint <code>/api/transcripts/&lt;id&gt;</code></strong>. Sem download de jsonl bruto via panel.</li>
+  <li><strong>Justificativa</strong>: jsonl contém input verbatim do operador, incluindo potencialmente segredos digitados em prompts. Expor isso via HTTP local viola o lema "panel must be secure".</li>
+</ul>
+
+<h2>Restrições para especialistas (Phase 2)</h2>
+
+<p>Estas restrições são herdadas do plano aprovado e <strong>não negociáveis</strong> em Phase 2:</p>
+
+<ol>
+  <li><strong>Zero novas deps npm.</strong> Nada de <code>ccusage</code>, nada de Node.</li>
+  <li><strong>Minimizar deps Python.</strong> Hoje stdlib only no panel; qualquer adição precisa de justificativa explícita do <code>software-engineer</code>.</li>
+  <li><strong>Bind <code>127.0.0.1</code> permanece.</strong> Sem exposição remota nesta release.</li>
+  <li><strong>Transcripts são privados.</strong> Painel nunca serve conteúdo bruto de jsonl — apenas agregados (counts, sums, names). Sem <code>/api/transcripts/&lt;id&gt;</code>.</li>
+  <li><strong>Memory atomicity (SPEC-DOC-008).</strong> Diagramas e decisões vão para <code>specs/memory/architecture.html</code>; sem changelog inline.</li>
+  <li><strong>Naming SemVer não obrigatório</strong> (releases vintage ≤ 2026-05-17 isentas via SPEC-DOC-016) — <code>agent-monitoring-v1</code> é OK.</li>
+  <li><strong>SQLite local</strong> é a proposta default. Especialistas podem desafiar com justificativa forte (ex: file-per-day jsonl agregado é suficiente). <strong>Decisão final do <code>software-architect</code>.</strong></li>
+  <li><strong>Brand identity desacoplada.</strong> O spec de monitoring referencia tokens da <code>dadaia-workspace-brand-identity-v1</code>, mas não bloqueia se eles ainda não existirem (fallback aos tokens atuais).</li>
+  <li><strong>Reuso obrigatório:</strong> <code>PanelService</code>, <code>ServerRegistryService</code>, <code>SpecContextService</code> em <code>features/panel/service.py</code>. Novo <code>TelemetryService</code> deve seguir o mesmo padrão read-only com DI.</li>
+  <li><strong>PLAN.md ≤ 300 linhas</strong> (regra SPEC-DOC-005 ativa a partir de 2026-05-17).</li>
+</ol>
+
+<h2>Riscos</h2>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Risco</th><th>Severidade</th><th>Mitigação proposta</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>R1</td>
+      <td>jsonl gigantes (sessões longas, MB+) podem degradar reader.</td>
+      <td><span class="badge badge-medium">MEDIUM</span></td>
+      <td>Tail incremental + checkpoint em SQLite (offset por arquivo). Decisão do <code>software-architect</code>.</td>
+    </tr>
+    <tr>
+      <td>R2</td>
+      <td>Tabela de preços fica defasada — custos calculados ficam errados sem aviso.</td>
+      <td><span class="badge badge-high">HIGH</span></td>
+      <td>Tabela versionada <code>pricing.py</code> com <code>effective_from</code>; testes de cálculo; banner na UI quando preço usado é &gt; 90 dias antigo.</td>
+    </tr>
+    <tr>
+      <td>R3</td>
+      <td>jsonl contém segredos digitados em prompts; vazamento via API local.</td>
+      <td><span class="badge badge-critical">CRITICAL</span></td>
+      <td>Política ESTRITA (default #5): nenhum endpoint expõe conteúdo. <code>devops-engineer</code> revisa todos os endpoints adicionados.</td>
+    </tr>
+    <tr>
+      <td>R4</td>
+      <td>Codex <code>thread_id</code> não correlaciona com Claude Code <code>sessionId</code> — agregação cross-provider impossível.</td>
+      <td><span class="badge badge-low">LOW</span></td>
+      <td>Aceitar: duas dimensões separadas no painel ("Claude Code sessions" / "Codex threads"). Não tentar fundir.</td>
+    </tr>
+    <tr>
+      <td>R5</td>
+      <td>SQLite single-writer pode bloquear o panel se reader escrever durante leitura HTTP.</td>
+      <td><span class="badge badge-medium">MEDIUM</span></td>
+      <td>WAL mode + lock curto na escrita. <code>software-engineer</code> valida.</td>
+    </tr>
+    <tr>
+      <td>R6</td>
+      <td>Permissões cross-user em <code>~/.claude/projects/</code> — outro usuário do SO poderia ler.</td>
+      <td><span class="badge badge-medium">MEDIUM</span></td>
+      <td><code>chmod 600</code> no SQLite local; reader roda no uid do operador; <code>devops-engineer</code> audita.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Open questions for next grill-me iteration</h2>
+
+<p>
+Defaults acima são opiniões fundamentadas, mas as perguntas abaixo são <strong>verdadeiramente abertas</strong>
+e devem ir para <code>dadaia-grill-me</code> antes da redação final do <code>SPEC.md</code> em Phase 3:
+</p>
+
+<ol>
+  <li><strong>Política de retenção real</strong>: 180 dias é palpite. O operador prefere "tudo o que existe no disco hoje" (sem TTL no reader) ou um limite explícito? Impacta o tamanho do SQLite agregado.</li>
+  <li><strong>Tabela de preços — fonte da verdade</strong>: hard-coded no repo (auditável, requer PR pra atualizar) ou um JSON em <code>~/.dadaia/config/pricing.json</code> editável pelo operador sem rebuild? Trade-off auditabilidade vs ergonomia.</li>
+  <li><strong>Inclusão de opencode</strong>: Phase 0 mapeou Claude Code + Codex. opencode tem dir de telemetria local (similar a <code>~/.opencode/</code>)? Se sim, é escopo desta release ou de uma <code>v1.1</code>?</li>
+  <li><strong>Mapa de workflows</strong>: workflows vivem onde? <code>.claude/skills/</code>? <code>specs/releases/*/PLAN.md</code>? Precisamos do mapa fonte canônico para popular a aba Workflows — definição em Phase 3.</li>
+  <li><strong>Custo "por Spec Context Project"</strong>: o jsonl tem <code>cwd</code>. Mapeamos <code>cwd → spec_context</code> via <code>.dadaia/states/spec_contexts.json</code>? Eventos com <code>cwd</code> fora de qualquer context (ex: <code>/tmp</code>) viram bucket <em>"unassigned"</em> ou são descartados?</li>
+  <li><strong>Alertas / thresholds</strong>: o painel deve apenas mostrar números, ou também alertar quando agente X excede $Y/dia? Default atual: só números. Confirmar ou expandir.</li>
+  <li><strong>Auth no panel local</strong>: hoje <code>127.0.0.1</code> sem auth. Com telemetria de custos disponível, mantém ou adiciona token local? <code>devops-engineer</code> deve avaliar threat model.</li>
+</ol>
+
+<h2>Handoff para Phase 2</h2>
+
+<p>
+Phase 2 roda <strong>4 especialistas em paralelo</strong>. Cada um consome este report + o plano aprovado
+(<code>/home/marco/.claude/plans/monitoramento-de-linear-milner.md</code>) e emite seu próprio report HTML +
+handoff sidecar em <code>.dadaia/reports/dadaia-workspace/&lt;agent&gt;/</code>.
+</p>
+
+<h3>software-architect — tipo <code>architecture</code></h3>
+<ul>
+  <li>Onde mora o novo módulo: <code>dadaia_workspace/features/telemetry/</code>? Camadas: <code>reader → store → aggregator → view</code> com direção de dependência clara.</li>
+  <li>Schema SQLite proposto: tabelas <code>sessions</code>, <code>events</code>, <code>agents</code>, <code>costs</code>, <code>contexts</code>, <code>workflows</code>. Chaves primárias e índices.</li>
+  <li>Padrão de ingestão: polling (cron interno) vs watcher (inotify) vs lazy-on-request. Trade-offs e recomendação.</li>
+  <li>Atomicidade da escrita: WAL? lock? versionamento de migrations?</li>
+  <li>Avaliar se <strong>SQLite local</strong> é justificável ou se file-per-day jsonl agregado serve. Decisão final é sua.</li>
+  <li>Como o reader correlaciona <code>cwd → spec_context</code>: ler <code>.dadaia/states/spec_contexts.json</code> na ingestão ou em lookup-time.</li>
+  <li><strong>Não mudar</strong>: read-only public-facing do panel; bind 127.0.0.1; reuso de <code>PanelService</code>.</li>
+</ul>
+
+<h3>frontend-engineer — tipo <code>design</code></h3>
+<ul>
+  <li>Split de <strong>Agents</strong> e <strong>Workflows</strong> em duas abas distintas no nav-tabs (<code>views/index.py:69</code>).</li>
+  <li>Layout de card de agente: header (nome + modelo dominante), mini-painel de sessões recentes, breakdown de custo por Spec Context, totais.</li>
+  <li>Layout de card de workflow: descrição + chips de agentes que compõem; sem números (workflows não acumulam tokens).</li>
+  <li>Contrato JSON consumido: definir formato de <code>/api/agents</code> e <code>/api/workflows</code> (campos exatos, paginação se aplicável). Cumprir restrição #4 (sem conteúdo bruto).</li>
+  <li>Integração com tokens da <code>dadaia-workspace-brand-identity-v1</code> (paleta + rinoceronte); fallback aos tokens atuais se brand spec ainda não aprovada.</li>
+  <li>A11y: contraste mínimo WCAG AA, navegação por teclado nas abas.</li>
+  <li>Cumprir restrição #4: <strong>nenhum campo de conteúdo bruto</strong> em nenhum endpoint frontend.</li>
+</ul>
+
+<h3>software-engineer — tipo <code>feasibility</code></h3>
+<ul>
+  <li>Leitura segura de <code>*.jsonl</code>: file locking? incremental tail com checkpoint? recovery em arquivo truncado?</li>
+  <li>Parsing tolerante a versões: schema do jsonl pode mudar; <code>usage.*</code> campos podem aparecer/sumir.</li>
+  <li>Implementar <code>dadaia_workspace/features/telemetry/pricing.py</code>: tabela versionada (modelo → preço in/out/cache), suite de testes, função <code>compute_cost(usage, model, when)</code>.</li>
+  <li>Strategy de schema migration do SQLite (qual ferramenta? versionamento via <code>PRAGMA user_version</code>?).</li>
+  <li>Listar dependências Python <strong>inevitáveis</strong> com justificativa (ex: <code>aiosqlite</code> só se assíncrono for justificado). Default: stdlib only.</li>
+  <li>Cobertura de Codex: <code>sqlite3</code> stdlib + parsing de <code>history.jsonl</code>; mapeamento <code>thread_id → agent="codex (main)"</code>.</li>
+  <li>Endpoint contracts no <code>handler.py</code>: respeitar regex dispatch existente; <strong>nunca</strong> servir <code>content</code>.</li>
+</ul>
+
+<h3>devops-engineer — tipo <code>security</code></h3>
+<ul>
+  <li><strong>Threat model</strong> dos jsonl: contém input verbatim do operador, potencialmente segredos. Documentar superfície de ataque.</li>
+  <li>SQLite local deve ter <code>chmod 600</code>; localização (<code>~/.dadaia/state/telemetry.sqlite</code>?); owner = uid do operador.</li>
+  <li>Confirmar bind <code>127.0.0.1</code> permanece; sem auth adicional ou adicionar token local (open question #7).</li>
+  <li>DoS por jsonl gigante: políticas de read-budget (max bytes / max events por ciclo).</li>
+  <li>Rotação / compactação: o reader não copia raw — mas SQLite agregado precisa de política de tamanho máximo.</li>
+  <li>Supply-chain: revisar a lista de deps novas que <code>software-engineer</code> propuser; vetar tudo que não tiver justificativa forte.</li>
+  <li>Permissões cross-user: <code>~/.claude/projects/</code> é per-user. Garantir que o reader roda como o operador, não como root.</li>
+  <li>Logs do reader: sem PII, sem token counts por mensagem (apenas por sessão agregada).</li>
+</ul>
+
+<h3>Convergência (Phase 3)</h3>
+
+<p>
+Quando os 4 reports chegarem, <code>product-engineer</code>:
+</p>
+<ol>
+  <li>Lê os 4 + este Phase 1.</li>
+  <li>Identifica divergências materiais — se houver, abre <strong>segunda rodada de <code>dadaia-grill-me</code></strong> com o operador, focada nas <em>open questions</em> acima + novas levantadas pelos especialistas.</li>
+  <li>Promove ambas as candidatas em <code>specs/backlog/candidates.md</code> para <code>## Histórico</code> e cria:
+    <ul>
+      <li><code>specs/releases/agent-monitoring-v1/{SPEC,PLAN,TASKS}.md</code></li>
+      <li><code>specs/releases/dadaia-workspace-brand-identity-v1/{SPEC,PLAN,TASKS}.md</code></li>
+    </ul>
+  </li>
+  <li>Atualiza <code>specs/releases/ACTIVE.md</code> com fase <code>SPEC</code> em ambas, aguardando approval gate do operador.</li>
+</ol>
+
+<h2>Decisões necessárias do operador (antes ou durante Phase 3)</h2>
+
+<ul>
+  <li>Override de qualquer um dos 5 defaults acima (granularidade, retenção, definição de agente, whitelist de entrypoints, privacidade) — silêncio = aprovação dos defaults.</li>
+  <li>Respostas às 7 <em>open questions</em> acima — podem ser respondidas em uma única rodada de <code>dadaia-grill-me</code> em Phase 3, ou inline aqui.</li>
+  <li>Confirmação de que <code>devops-engineer</code> de fato cobre o threat model (sem cyber-engineer) — já travada por contexto, mas marca aqui para evitar regressão.</li>
+</ul>
+
+</body>
+</html>

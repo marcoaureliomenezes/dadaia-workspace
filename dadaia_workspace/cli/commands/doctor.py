@@ -1,21 +1,12 @@
 """CLI command: dadaia doctor [--fix]."""
 
-from pathlib import Path
-
 import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 app = typer.Typer(help="Diagnose and repair workspace state.")
-
-
-def _resolve_workspace() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia").exists():
-            return parent
-    return cwd
 
 
 err_console = typer.echo
@@ -26,7 +17,7 @@ def doctor(
     fix: bool = typer.Option(False, "--fix", help="Apply automatic repairs."),
 ) -> None:
     """Diagnose workspace state invariants and optionally repair them."""
-    workspace_root = _resolve_workspace()
+    workspace_root = resolve_workspace_root()
     try:
         dr = container.build_doctor_service(workspace_root)
     except WorkspaceNotInitializedError:

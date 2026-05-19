@@ -1,14 +1,33 @@
 """Composition root — builds services with concrete infrastructure."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
+from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
+from dadaia_workspace.features.panel.service import PanelService
+from dadaia_workspace.features.panel.views.api import (
+    render_api_agent_prompt,
+    render_api_agents_canonical,
+    render_api_contexts,
+    render_api_servers,
+    render_api_session_detail,
+    render_api_sessions,
+    render_api_workflow_detail,
+    render_api_workflows_list,
+)
+from dadaia_workspace.features.panel.views.index import render_index
+from dadaia_workspace.features.panel.views.memory import render_memory
+from dadaia_workspace.features.panel.views.static import render_static
+from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
+from dadaia_workspace.features.reports_validation.service import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
+from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.workspace.service import WorkspaceService
@@ -24,9 +43,11 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_primary_context_store import JsonPrimaryContextStore
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
+from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 
 
 def _states_dir(workspace_root: Path) -> Path:
@@ -131,3 +152,80 @@ def build_orchestration_service(
         dispatcher=_select_dispatcher(runtime),
         workspace_root=workspace_root,
     )
+
+
+def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
+    _guard_initialized(workspace_root)
+    states = _states_dir(workspace_root)
+    return ServerRegistryService(
+        store=JsonServerRegistryStore(states),
+        probe=OsProcessProbe(),
+    )
+
+
+def build_panel_service(
+    workspace_root: Path,
+    telemetry: object | None = None,
+) -> PanelService:
+    return PanelService(
+        registry=build_server_registry_service(workspace_root),
+        spec_context=build_spec_context_service(workspace_root),
+        workspace_root=workspace_root,
+        telemetry=telemetry,
+    )
+
+
+def build_reports_validation_service(workspace_root: Path) -> ReportsValidationService:
+    """Compose ``ReportsValidationService`` with ``StdlibHandoffValidator``.
+
+    Schema is read from the staged location:
+    ``workspace_root/.dadaia/agentic/schemas/handoff-v1.schema.json``.
+    Reports root is ``workspace_root/.dadaia/reports``.
+
+    Args:
+        workspace_root: Root directory of the initialized dadaia workspace.
+
+    Returns:
+        A fully wired ``ReportsValidationService`` instance.
+    """
+    schema_path = workspace_root / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
+    reports_root = workspace_root / ".dadaia" / "reports"
+    validator = StdlibHandoffValidator(schema_path)
+    return ReportsValidationService(validator=validator, reports_root=reports_root)
+
+
+def build_panel_views(
+    workspace_root: Path,
+    telemetry: object | None = None,
+) -> dict[str, Callable[..., tuple[int, str, bytes]]]:
+    """Compose all panel view callables for injection into make_handler_class().
+
+    Returns a dict mapping route names to view callables as required by
+    ``features/panel/handler.py::make_handler_class(views)``.
+
+    Parameters
+    ----------
+    workspace_root:
+        Absolute path to the workspace root directory.
+    telemetry:
+        Optional TelemetryService instance.  When provided, it is injected
+        into PanelService so that ``render_api_agents_canonical`` can overlay
+        telemetry data on the canonical agent catalog (PR3-08).
+    """
+    service = build_panel_service(workspace_root, telemetry=telemetry)
+    # WorkflowsService is exposed via PanelService._workflows_service for the
+    # detail endpoint (get_detail needs name resolution against the filesystem).
+    return {
+        "index": render_index(service),
+        "api_servers": render_api_servers(service),
+        "api_contexts": render_api_contexts(service),
+        "api_agents": render_api_agents_canonical(service),
+        "api_agent_prompt": render_api_agent_prompt(service),
+        "api_workflows": render_api_workflows_list(service),
+        "api_workflow_detail": render_api_workflow_detail(service._workflows_service),
+        "api_sessions": render_api_sessions(service),
+        "api_session_detail": render_api_session_detail(service),
+        "memory": render_memory(workspace_root),
+        "memory_view": render_memory_wrapper(workspace_root),
+        "static": render_static(),
+    }

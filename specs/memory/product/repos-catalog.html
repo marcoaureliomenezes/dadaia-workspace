@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — repos-catalog (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>repos-catalog</h1>
+<p class="meta">CLI surface: <code>dadaia repos list</code> · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>Consulta o catálogo estático de repos conhecidos em <code>.dadaia/src/repos.xlsx</code> e exibe slug, URL, descrição. Serve como discovery rápida para o operador criar novos contexts sem memorizar URLs.</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li><code>dadaia repos list</code> — mostra tabela com todos os repos do catálogo.</li>
+    <li>Operador identifica o slug desejado e usa em <code>dadaia context create &lt;name&gt; --repo &lt;slug&gt;</code>.</li>
+    <li>Para atualizar o catálogo: editar manualmente o XLSX (ou regenerar via release dedicada).</li>
+  </ol>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Quando o operador vai criar um context para um repo que não lembra a URL exata.</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Sem o catálogo, criar context exigia colar URL completa cada vez. O slug curto encurta o caminho e centraliza descoberta.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li>Read-only: <code>.dadaia/src/repos.xlsx</code></li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Depende de <a href="workspace-init.html">workspace-init</a> (instala o XLSX em <code>.dadaia/src/</code>).</li>
+    <li>Consumido pela <a href="context-management.html">context-management</a> (operador olha repos list antes de criar context).</li>
+  </ul>
+</section>
+
+</body>
+</html>

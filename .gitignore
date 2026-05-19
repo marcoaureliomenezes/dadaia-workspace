@@ -18,6 +18,7 @@ build/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 coverage.xml
 
@@ -39,3 +40,8 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Node / Playwright
+node_modules/
+playwright-report/
+test-results/

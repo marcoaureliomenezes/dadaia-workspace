@@ -1,0 +1,30 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "project-manager",
+  "context": "dadaia-workspace",
+  "release_id": "panel-r5-v1",
+  "produced_at": "2026-05-19T12:42:27Z",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/project-manager/2026-05-19T124227Z-panel-r5-v1-phase-a-dispatch.html",
+    "content_hash": "a08554cab3be06375a1d0922ce25813608395d1f112b6bfd2cc6c382da7ded09"
+  },
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "message": "Agent tool not exposed in this PM session; software-engineer dispatch could not be transmitted. Pre-dispatch context verification all green; prompt fully prepared and embedded in the report."
+    },
+    {
+      "severity": "LOW",
+      "message": "dadaia context show --json returns stale current_branch (hotfix/agent-monitoring-v1-panel-defects) while live HEAD is release/panel-r5-v1. Non-blocking for Phase A; flag for next dadaia state-machine sync."
+    }
+  ],
+  "decisions_required": [
+    "Operator chooses remediation: (a) re-run PM with Agent tool enabled, or (b) forward the prepared software-engineer prompt embedded in the report HTML to a fresh software-engineer session."
+  ],
+  "next_handoff": {
+    "agent": "software-engineer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
+  }
+}

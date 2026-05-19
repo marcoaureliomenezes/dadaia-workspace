@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PM Orchestration — agents-r2-v1 (W1 dispatch)</title>
+</head>
+<body>
+<header>
+  <h1>Project Manager — agents-r2-v1 release orchestration</h1>
+  <p><strong>Context:</strong> dadaia-workspace</p>
+  <p><strong>Release:</strong> agents-r2-v1 (phase: TASKS)</p>
+  <p><strong>Branch:</strong> release/agents-r2-v1</p>
+  <p><strong>Produced:</strong> 2026-05-19T02:10:17Z</p>
+  <p><strong>Workflow:</strong> ad-hoc — release-implementation drive (PLAN §4 parallel windows)</p>
+</header>
+
+<section id="demand">
+<h2>Demand</h2>
+<p>Operator briefed: "implement, test, validate and finish the tasks" for release
+<code>agents-r2-v1</code>. Non-stop authorisation granted. SPEC + PLAN + TASKS all
+<strong>Status: Aprovado</strong>; P0 (AGT-r2-01..05) DONE on disk; 48 tasks remaining
+(AGT-r2-06..AGT-r2-53) across phases P1..P14.</p>
+<p><strong>Classification:</strong> release-implementation drive — not a single workflow.
+PLAN.md prescribes 14 phases with explicit parallel windows W1..W4 and sequential
+checkpoints (P5 → P8 → P13 → P14). Each phase has a designated owner agent.</p>
+<p>Architect ADR consumed (Option C — single-source dual-name projection):
+<code>.dadaia/reports/dadaia-workspace/software-architect/2026-05-19T003956Z-adr-claude-agents-parity.html</code>.</p>
+</section>
+
+<section id="workflow-chosen">
+<h2>Workflow chosen</h2>
+<p>PLAN §4 phased drive. This report covers <strong>W1 dispatch</strong> — the
+post-P0 parallel window comprising P1, P2, P3, P4. Subsequent windows (W2..W4)
+and sequential phases will be dispatched in follow-up actions of this PM session
+and recorded in dispatch addenda below as each window closes.</p>
+<h3>Window roadmap (from PLAN §4)</h3>
+<ul>
+  <li><strong>W1</strong> = {P1, P2, P3, P4} — dispatched in this report</li>
+  <li><strong>P5</strong> — sequential after P3 + P4</li>
+  <li><strong>W2</strong> = {P6, P7} — post-P5</li>
+  <li><strong>P8</strong> — devops checkpoint #1 (after P1, P3, P5, P6, P7)</li>
+  <li><strong>W3</strong> = {P9, P10} — post-P8</li>
+  <li><strong>W4</strong> = {P11a, P11c, P12} — post-P10</li>
+  <li><strong>P11b</strong> — sequential after P11a + P9</li>
+  <li><strong>P13</strong> — devops checkpoint #2 + PR</li>
+  <li><strong>P14</strong> — CLOSURE</li>
+</ul>
+</section>
+
+<section id="dispatch-graph">
+<h2>Dispatch graph — W1</h2>
+<pre>
+W1 (post-P0, parallel)
+├── P1 — software-engineer   → AGT-r2-06, AGT-r2-07 (workflow trim 15→7)
+├── P2 — product-engineer    → AGT-r2-08 (8 PM playbook drafts in SKILL.md)
+│        ↓ (sequential after AGT-r2-08 returns)
+│        software-engineer  → AGT-r2-09 (lint/wrap; will be dispatched next message)
+├── P3 — software-engineer   → AGT-r2-10, AGT-r2-11 (strip Bash from PE + SA)
+└── P4 — software-architect  → AGT-r2-12 (path-scope gate-pattern ADR)
+</pre>
+<p>Disjoint write sets (per PLAN §4 parallel-safe declaration):</p>
+<ul>
+  <li>P1 writes <code>dadaia_workspace/public/workflows/*</code> + <code>tests/unit/features/public/test_workflows.py</code></li>
+  <li>P2 writes <code>dadaia_workspace/public/skills/project-orchestration/SKILL.md</code></li>
+  <li>P3 writes <code>dadaia_workspace/public/agents/{product-engineer,software-architect}.md</code></li>
+  <li>P4 writes <code>.dadaia/reports/dadaia-workspace/software-architect/&lt;UTC&gt;-path-scope-gate-pattern.html</code></li>
+</ul>
+<p>No overlap → parallel dispatch is safe.</p>
+</section>
+
+<section id="outcomes-per-agent">
+<h2>Outcomes per agent — W1</h2>
+<p>To be filled in as each leaf-agent returns. Initial dispatch status: <strong>INVOKED</strong>.</p>
+<table border="1" cellpadding="6">
+<thead>
+<tr><th>Phase</th><th>Agent</th><th>Tasks</th><th>Status</th><th>Report path (expected)</th></tr>
+</thead>
+<tbody>
+<tr><td>P1</td><td>software-engineer</td><td>AGT-r2-06, AGT-r2-07</td><td>INVOKED</td>
+<td><code>.dadaia/reports/dadaia-workspace/software-engineer/&lt;UTC&gt;-P1-workflow-trim.html</code></td></tr>
+<tr><td>P2</td><td>product-engineer</td><td>AGT-r2-08</td><td>INVOKED</td>
+<td><code>.dadaia/reports/dadaia-workspace/product-engineer/&lt;UTC&gt;-P2-pm-playbook-drafts.html</code></td></tr>
+<tr><td>P3</td><td>software-engineer</td><td>AGT-r2-10, AGT-r2-11</td><td>INVOKED</td>
+<td><code>.dadaia/reports/dadaia-workspace/software-engineer/&lt;UTC&gt;-P3-bash-removal.html</code></td></tr>
+<tr><td>P4</td><td>software-architect</td><td>AGT-r2-12</td><td>INVOKED</td>
+<td><code>.dadaia/reports/dadaia-workspace/software-architect/&lt;UTC&gt;-path-scope-gate-pattern.html</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="open-issues">
+<h2>Open issues for operator</h2>
+<p>None at W1 dispatch. Operator review questions from PLAN §10 (W1 parallelism approval,
+R14 self-skip strategy, backlog destinations) are already authorised via "implement,
+test, validate and finish" non-stop directive.</p>
+<p>Risk callouts (per dispatch brief) carried forward to relevant phases:</p>
+<ul>
+  <li><strong>AGT-r2-19</strong> (P5) — path-scope gate fail-open path; verify <code>/tmp/sdd-gate.log</code> emission</li>
+  <li><strong>AGT-r2-25/27</strong> (P9) — <code>_install_workspace_guardrail_pair</code> R14 self-skip; two fixture scenarios</li>
+  <li><strong>AGT-r2-33</strong> (P11a) — forbidden-strings invariant on data/AGENTS.md</li>
+  <li><strong>AGT-r2-37/44</strong> (P11c/P13) — FR10 manual operator step; literal copy-paste commands</li>
+</ul>
+</section>
+
+<section id="hard-rules-acknowledged">
+<h2>PM hard-rule compliance</h2>
+<ul>
+  <li>PM writes only to <code>.dadaia/reports/dadaia-workspace/project-manager/**</code> — this report</li>
+  <li>PM does NOT chain sub-agents (leaf-agents do their work and report back to PM)</li>
+  <li>Each leaf-agent will claim its tasks via TASKS.md marker flip <code>[ ]</code> → <code>[-]</code> with a <code>chore(tasks): start AGT-r2-NN</code> commit before any production-file edit</li>
+  <li>Public install discipline: <code>dadaia public stage/install/doctor</code> runs in P8 (devops-engineer) and P13 (devops-engineer); per-task verify with pytest + <code>dadaia specs doctor</code> is leaf-agent responsibility</li>
+  <li>dadaia CLI absolute path: <code>/home/marco/workspace/dadaia/.dadaia/.venv/bin/dadaia</code> (passed in every leaf-agent prompt)</li>
+</ul>
+</section>
+
+</body>
+</html>
+</content>
+</invoke>

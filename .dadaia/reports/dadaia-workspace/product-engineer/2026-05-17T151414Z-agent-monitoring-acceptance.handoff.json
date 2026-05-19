@@ -1,0 +1,23 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "product-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-17T15:14:14Z",
+  "release_id": "agent-monitoring-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/product-engineer/2026-05-17T151414Z-agent-monitoring-acceptance.html",
+    "content_hash": "12f2dce49f6730122443cee740cf2ca24d123b37e25d841560b3e584216cd749"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "All 22 tasks (T-AM-01..22) marked [x]. 291 panel + telemetry + integration tests passing. dadaia doctor green. End-to-end smoke confirms: 401 without token, 200 with token, CSP+nosniff headers, T1 PRIVACY zero forbidden keys in any endpoint, fs perms 0o600/0o700, cold ingest 379ms, warm query 45ms. 4 tabs render; 28 workflows discovered; 43 sessions ingested for claude (main); pricing_age_days=501 triggers staleness banner."
+    }
+  ],
+  "decisions_required": [
+    "Operator visually validates the 4-tab panel (Servers, Memories, Agents, Workflows) via `dadaia panel`.",
+    "Operator merges PR feat/agent-monitoring-v1 -> main when satisfied.",
+    "Operator optionally elects spec-context-isolation hotfix as next ACTIVE release (registered as MEDIUM in candidates.md)."
+  ]
+}

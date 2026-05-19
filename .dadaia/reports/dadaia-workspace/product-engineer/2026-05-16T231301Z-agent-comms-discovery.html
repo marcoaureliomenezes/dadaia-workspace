@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discovery — agent-comms-v1 (dadaia-workspace)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-critical { background: #ffd7d7; color: #a00; }
+  .badge-high     { background: #fff0d0; color: #c05000; }
+  .badge-medium   { background: #fffad0; color: #806000; }
+  .badge-low      { background: #daffd0; color: #1a5c00; }
+  .badge-pass     { background: #daffd0; color: #1a5c00; }
+  .badge-fail     { background: #ffd7d7; color: #a00; }
+  .badge-pending  { background: #e0eaff; color: #0550ae; }
+  .finding { border: 1px solid #e4e8ec; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  .finding h3 { margin-top: 0; }
+  .fr { border-left: 4px solid #0969da; background: #f6faff; padding: .6rem 1rem; margin: .9rem 0; border-radius: 0 6px 6px 0; }
+  .nfr { border-left: 4px solid #6f42c1; background: #f9f4ff; padding: .6rem 1rem; margin: .9rem 0; border-radius: 0 6px 6px 0; }
+  .decision { border-left: 4px solid #c05000; background: #fff8f0; padding: .6rem 1rem; margin: .9rem 0; border-radius: 0 6px 6px 0; }
+  .resolved { color: #1a5c00; font-weight: 600; }
+  .escalate { color: #c05000; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> product-engineer</span>
+  <span><strong>Fase:</strong> Phase 1 — Discovery</span>
+  <span><strong>Gerado em:</strong> 2026-05-16T23:13:01Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Release id:</strong> <code>agent-comms-v1</code></span>
+  <span><strong>Status:</strong> <span class="badge badge-pending">Draft</span></span>
+</div>
+
+<h1>Discovery — agent-comms-v1</h1>
+
+<blockquote>
+  Phase 1 do pipeline <strong>PE Discovery → architect impact → SE rec → PE Synthesis → SE impl</strong>
+  (D4). Este report é o input que o software-architect consumirá em sua análise de impacto;
+  o software-engineer o usará em conjunto com o report do arquiteto para emitir sua
+  recomendação técnica antes da Synthesis em Phase 5.
+</blockquote>
+
+<h2>1. Executive Summary</h2>
+
+<p>
+  Hoje, <strong>10 dos 10 agentes</strong> em
+  <code>dadaia_workspace/public/agents/*.md</code> declaram em frontmatter
+  <code>schema_ref: handoff-schema-v1</code> para os artefatos que produzem
+  (<strong>21 ocorrências</strong> no canonical + projeções totalizando <strong>82 ocorrências
+  em 42 arquivos</strong> de assets distribuídos). Apesar disso,
+  <strong>nenhum arquivo de schema existe</strong> no workspace
+  (<code>find dadaia-workspace/ -name "*.schema.json"</code> retorna vazio;
+  <code>find dadaia-workspace/ -name "handoff*"</code> retorna vazio). O
+  <code>input_contract</code> introduzido no fechamento de <code>GAP-INPUT-001</code>
+  (ver <code>specs/z_bug_specs.md</code> linhas 126–131) prometeu um contrato declarado
+  e referência ao <code>handoff-schema-v1</code> — mas a referência aponta para vácuo.
+  Pior: a feature de orquestração multi-agente (auditoria
+  <code>2026-05-15-orchestration-audit.md</code> finding HIGH "<code>must_include</code>
+  declarado mas não validado") já carrega um campo análogo
+  (<code>must_include</code>) sem enforcement; agentes downstream consomem outputs
+  upstream sem validação de contrato. <strong>agent-comms-v1</strong> resolve a dor
+  funcional de "handoff prometido mas não verificável": materializa o schema,
+  entrega o validador CLI <code>dadaia reports validate</code>, instala a skill
+  <code>dadaia-handoff-emitter</code> e migra 2–3 agentes pilotos para emitir um
+  sidecar <code>*.handoff.json</code> ao lado do report HTML. Além disso, esta release
+  encerra a dívida do <code>z_bug_specs.md</code> dual (duas localizações,
+  ambas referenciadas por skill+command+template) migrando todo o conteúdo aberto
+  para <code>specs/backlog/candidates.md</code> e o histórico para
+  <code>specs/_archive/legacy-bug-specs/</code>, eliminando uma das duas fontes de
+  verdade paralela do projeto.
+</p>
+
+<h2>2. Functional Requirements (FRs)</h2>
+
+<p>
+  Lista atomicamente verificável dos requisitos funcionais que este release deve cumprir.
+  Cada FR é declarado de modo que possa virar um critério de aceite no SPEC de Phase 5.
+</p>
+
+<h3>FR1 — Schema JSON canônico do handoff existe e é projetado</h3>
+<div class="fr">
+  <p><strong>O que:</strong> criar arquivo
+  <code>dadaia_workspace/public/schemas/handoff-v1.schema.json</code> — JSON Schema
+  Draft 2020-12 — descrevendo a estrutura mínima do sidecar
+  <code>*.handoff.json</code>. Conteúdo mínimo (a refinar em SPEC): campos
+  <code>schema_version</code>, <code>agent</code>, <code>context</code>, <code>release_id</code>,
+  <code>produced_at</code> (ISO 8601), <code>artifact</code> (objeto com <code>type</code>,
+  <code>path</code>, <code>content_hash</code>), <code>findings</code> (array opcional com
+  severity), <code>decisions_required</code> (array opcional), <code>next_handoff</code>
+  (objeto opcional com <code>target_agent</code>, <code>expected_output_path</code>).</p>
+
+  <p><strong>Projeção:</strong> o pacote já distribui assets via
+  <code>dadaia_workspace/public/</code> &rarr; staging &rarr;
+  <code>.dadaia/agentic/</code> &rarr; <code>.claude/</code> + <code>.codex/</code> +
+  <code>.opencode/</code> + <code>.agents/</code> (ref: constitution.md L106–119).
+  O schema precisa de um novo subdiretório <code>public/schemas/</code> além dos 6
+  existentes (<code>agents/</code>, <code>commands/</code>, <code>rules/</code>,
+  <code>skills/</code>, <code>scripts/</code>, <code>workflows/</code>,
+  <code>templates/</code>). Decisão de projeção a confirmar com o arquiteto em Phase 2:
+  staging-only? ou também projetar em <code>.claude/schemas/</code>?</p>
+
+  <p><strong>Critério de aceite:</strong>
+  <code>jq '.["$schema"]' dadaia_workspace/public/schemas/handoff-v1.schema.json</code>
+  retorna URL válida do meta-schema; <code>dadaia public stage</code> propaga o arquivo
+  para <code>.dadaia/agentic/schemas/</code>; doctor verde.</p>
+</div>
+
+<h3>FR2 — CLI <code>dadaia reports validate</code></h3>
+<div class="fr">
+  <p><strong>O que:</strong> novo subcomando Typer
+  <code>dadaia reports validate [&lt;path&gt;|--all] [--strict]</code> que recebe
+  ou (a) caminho explícito de um <code>*.handoff.json</code> ou um diretório, ou
+  (b) <code>--all</code> que itera
+  <code>.dadaia/reports/&lt;context&gt;/**/*.handoff.json</code>. Valida cada arquivo
+  contra <code>public/schemas/handoff-v1.schema.json</code>. Exit code 0 quando
+  todos passam; exit code 2 quando algum falha em modo strict; exit code 0 com warnings
+  em stderr quando <code>--strict=false</code> (NFR2). Output JSON via <code>--json</code>
+  (alinha com padrão das demais CLIs do produto, ex.
+  <code>dadaia context show --json</code>).</p>
+
+  <p><strong>Arquitetura:</strong> seguindo a regra
+  <code>CLI &rarr; Features &rarr; Core &larr; Infrastructure</code>
+  (constitution L52–69), o comando vive em
+  <code>dadaia_workspace/cli/commands/reports.py</code>, a feature em
+  <code>dadaia_workspace/features/reports_validation/service.py</code>, com
+  Protocol em <code>core/protocols/handoff_validator.py</code> e implementação em
+  <code>infrastructure/jsonschema_handoff_validator.py</code>. Adapter usa
+  <code>jsonschema</code> (já não está na lista da constitution L17–28; <strong>requer
+  decisão no Phase 5 grill-me</strong>: usar stdlib-only com check manual ou adicionar
+  <code>jsonschema</code> ao tech-stack).</p>
+
+  <p><strong>Critério de aceite:</strong> CLI listada em <code>dadaia --help</code>;
+  comando passa em uma fixture válida e falha (exit 2) em uma fixture inválida;
+  cobertura ≥ 80% na camada feature (constitution L131).</p>
+</div>
+
+<h3>FR3 — Skill <code>dadaia-handoff-emitter</code></h3>
+<div class="fr">
+  <p><strong>O que:</strong> criar
+  <code>dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md</code> seguindo o
+  padrão das skills existentes
+  (<code>ls dadaia_workspace/public/skills/</code> mostra 27 skills hoje). A skill
+  documenta o protocolo de "ao terminar um report HTML, emitir o sidecar
+  <code>&lt;mesmo-stem&gt;.handoff.json</code> populado com os metadados estruturados
+  (agent, artifact.path, content_hash do HTML, findings detectados, decisions_required)".
+  Skill projetada em <code>.agents/skills/dadaia-handoff-emitter/</code> e via
+  projeções runtime-specific (constitution L117).</p>
+
+  <p><strong>Critério de aceite:</strong> arquivo materializado;
+  <code>dadaia public stage &amp;&amp; dadaia public install --target all</code>
+  projeta para 4 runtimes; <code>dadaia public doctor</code> retorna <code>[ok]</code>
+  em todas as projeções da skill.</p>
+</div>
+
+<h3>FR4 — Pilot agents emitem handoff.json</h3>
+<div class="fr">
+  <p><strong>O que:</strong> 2–3 agentes pilotos (proposta em §6) recebem instrução
+  explícita no system prompt (markdown body) para invocar a skill
+  <code>dadaia-handoff-emitter</code> ao final de cada produção. Não há mudança no
+  bloco <code>input_contract</code> do frontmatter — o
+  <code>schema_ref: handoff-schema-v1</code> já está lá hoje e passa a ter referente
+  real após FR1.</p>
+
+  <p><strong>Critério de aceite:</strong> ao rodar um workflow real que dispatcha
+  cada um dos pilotos, todos os reports do piloto vêm acompanhados de
+  <code>.handoff.json</code> ao lado; <code>dadaia reports validate --all</code>
+  passa em modo non-strict (NFR2) e reporta os reports legados (de agentes não-piloto)
+  como "missing handoff" mas sem falhar.</p>
+</div>
+
+<h3>FR5 — Migração e deleção de <code>z_bug_specs.md</code></h3>
+<div class="fr">
+  <p><strong>O que:</strong> dois arquivos
+  (<code>z_bug_specs.md</code> em raiz, <code>specs/z_bug_specs.md</code>) deixam de
+  existir. Conteúdo classificado e movido conforme plano detalhado em §4. Skill,
+  command e template que referenciam o arquivo (4 referências em 3 arquivos) são
+  patcheados para apontar para <code>specs/backlog/candidates.md</code> antes da
+  deleção.</p>
+
+  <p><strong>Critério de aceite:</strong>
+  <code>find dadaia-workspace/ -name "z_bug_specs.md"</code> retorna vazio;
+  <code>grep -rn "z_bug_specs" dadaia_workspace/public/</code> retorna vazio;
+  <code>grep -rn "z_bug_specs" .claude/ .opencode/ .codex/ .agents/ .dadaia/agentic/</code>
+  retorna vazio depois de <code>dadaia public install --target all --force</code>.</p>
+</div>
+
+<h2>3. Non-Functional Requirements (NFRs)</h2>
+
+<h3>NFR1 — Backwards compatibility total com reports legados</h3>
+<div class="nfr">
+  Reports HTML existentes em <code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/*.html</code>
+  permanecem válidos. A introdução do sidecar <code>.handoff.json</code> é puramente
+  aditiva: nenhum consumer atual de reports HTML quebra. Isso inclui o
+  <code>OrchestrationService</code>
+  (<code>features/orchestration/service.py</code>) que hoje passa
+  <code>output_path</code> entre stages como string — continua funcionando.
+</div>
+
+<h3>NFR2 — Janela de transição: <code>--strict=false</code> default em v1</h3>
+<div class="nfr">
+  <code>dadaia reports validate</code> tem flag <code>--strict</code> com default
+  <code>false</code> em v1. Reports sem sidecar emitem warning, não erro. Em v2
+  (release futuro, fora do escopo D1) o default passa a <code>true</code> e o CI gate
+  bloqueia merges com sidecars inválidos. Isso evita big-bang: os 8 agentes
+  não-piloto migram em releases subsequentes sem bloquear este.
+</div>
+
+<h3>NFR3 — Zero novas dependências de runtime obrigatórias</h3>
+<div class="nfr">
+  A validação pode usar <code>jsonschema</code> (PyPI, maduro) ou check manual em stdlib.
+  Como <code>jsonschema</code> <strong>não está na tech-stack approved</strong>
+  (constitution L17–28), a decisão é entre: (a) adicionar à constitution via update
+  formal (requires explicit operator confirmation per L451 do
+  <code>product-engineer.md</code>) ou (b) implementar check manual sobre stdlib
+  <code>json</code> (custo: ~80 linhas, sem capacidade de meta-schema). <strong>Decidir
+  em Phase 5 grill-me.</strong>
+</div>
+
+<h3>NFR4 — Sem hook em CI para o validate em v1</h3>
+<div class="nfr">
+  Esta release <strong>não</strong> adiciona um job em
+  <code>.github/workflows/ci.yml</code> que rode
+  <code>dadaia reports validate --strict</code>. O escopo D1 limita à entrega de
+  schema + CLI + skill + pilotos. Adicionar gate em CI é v2 (depende de NFR2: precisamos
+  primeiro garantir que todos os 10 agentes emitem handoff confiavelmente, senão CI
+  vermelho permanente).
+</div>
+
+<h3>NFR5 — Token-overhead budget &lt;3%</h3>
+<div class="nfr">
+  O sidecar <code>.handoff.json</code> deve ser tipicamente &lt; 2 KB. Para um report
+  HTML médio de 50–70 KB
+  (ref: <code>2026-05-15-orchestration-audit.md</code> tem 46675 bytes,
+  <code>2026-05-16T214645Z-hotfix-track.md</code> tem 41339 bytes), o overhead é
+  ~3% no pior caso. Limite verificável no validate via warning quando
+  <code>stat -c%s &lt;file&gt;.handoff.json &gt; 4096</code>. Esse warning não falha
+  o validate, apenas sinaliza inflation.
+</div>
+
+<h3>NFR6 — Migração de <code>z_bug_specs.md</code> não quebra refine-specs flow</h3>
+<div class="nfr">
+  A ordem é estrita (ver §4 deletion order): primeiro patchear os 3 consumers
+  para apontar a <code>candidates.md</code>, validar com
+  <code>dadaia public install --target all &amp;&amp; dadaia public doctor</code>,
+  só então <code>git rm</code> os dois <code>.md</code>. Em nenhum ponto intermediário
+  o fluxo de refine-specs deve apontar para arquivo inexistente.
+</div>
+
+<h3>NFR7 — Idempotência da projeção de assets</h3>
+<div class="nfr">
+  Adicionar <code>public/schemas/</code> e a skill <code>dadaia-handoff-emitter</code>
+  exige que <code>FileSystemPublicAssetManager</code> reconheça o novo tipo
+  <code>schemas</code> (caso atualmente trate apenas os 7 tipos enumerados acima).
+  Verificável: rodar <code>dadaia public install --target all --force</code> duas vezes
+  e confirmar diff zero.
+</div>
+
+<h2>4. Plano de Migração de <code>z_bug_specs.md</code></h2>
+
+<h3>4.1 Classificação do conteúdo</h3>
+
+<p>Existem dois arquivos com o mesmo nome e propósito declarado, mas conteúdos
+distintos:</p>
+
+<ul>
+  <li><strong>Raiz:</strong>
+  <code>/home/marco/workspace/dadaia/repos/dadaia-workspace/z_bug_specs.md</code>
+  (38 linhas). Atualizado em 2026-05-08. Contém gaps GAP-001 a GAP-005 e G3, todos
+  marcados como FECHADO ou MANTIDO. Linha 31:
+  "<em>Nenhum gap bloqueante no momento. Esta versão das specs está pronta para
+  revisão e aprovação.</em>" Conclusão: 100% histórico encerrado.</li>
+
+  <li><strong>specs/:</strong>
+  <code>/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/z_bug_specs.md</code>
+  (181 linhas). Contém:
+    <ul>
+      <li>BUG-003 <em>(L10–14)</em>: 🟡 FIX PARCIAL — <strong>pendência aberta</strong>
+      sobre rewriting de paths absolutos em <code>dadaia import</code>;</li>
+      <li>BUG-003 histórico original <em>(L18–39)</em>: contexto histórico;</li>
+      <li>BUG-002 <em>(L43–84)</em>: ✅ RESOLVIDO em 2026-05-14, com histórico;</li>
+      <li>BUG-001 <em>(L88–103)</em>: ✅ RESOLVIDO em 2026-05-12;</li>
+      <li>GAP-DRIFT-001, GAP-ORCH-001, GAP-CICD-001, GAP-INPUT-001 <em>(L108–131)</em>:
+      todos FECHADOS;</li>
+      <li>GAP-013, GAP-001 a 012 <em>(L134–180)</em>: todos FECHADOS.</li>
+    </ul>
+  </li>
+</ul>
+
+<h3>4.2 Destino por bloco</h3>
+
+<table>
+  <thead><tr><th>Origem</th><th>Bloco</th><th>Destino</th><th>Linha-âncora candidata</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>specs/z_bug_specs.md</code> L10–14</td>
+      <td>BUG-003 pendência aberta — <code>dadaia import</code> não reescreve paths absolutos</td>
+      <td><strong><code>specs/backlog/candidates.md</code> § Hotfixes pendentes</strong>
+      (hoje vazia — ver L46 da candidates.md)</td>
+      <td>
+        <code>- 2026-05-14T000000Z MEDIUM dadaia_workspace/features/import_/service.py — `dadaia import` não reescreve paths absolutos em `.claude/settings.json` (post-mortem: specs/_archive/legacy-bug-specs/z_bug_specs-specs-2026-05-08.md L10-14)</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>specs/z_bug_specs.md</code> L18–39 + L43–84 + L88–103</td>
+      <td>Históricos resolvidos de BUG-001, BUG-002, BUG-003 com causa raiz + fix</td>
+      <td><code>specs/_archive/legacy-bug-specs/z_bug_specs-specs-2026-05-08.md</code> (arquivo único, snapshot íntegro)</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>specs/z_bug_specs.md</code> L108–180</td>
+      <td>GAPs todos fechados (GAP-001…013, GAP-DRIFT-001, GAP-ORCH-001, GAP-CICD-001, GAP-INPUT-001)</td>
+      <td>idem — mesmo arquivo de archive (parte do snapshot)</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>z_bug_specs.md</code> (raiz) L1–38</td>
+      <td>Todo o conteúdo da raiz: GAP-001 a GAP-005, G3 — todos FECHADOS/MANTIDOS</td>
+      <td><code>specs/_archive/legacy-bug-specs/z_bug_specs-root-2026-05-08.md</code> (arquivo separado por origem)</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  <strong>Decisão a tomar em Phase 5:</strong> deve haver linha em
+  <code>## Candidatas ativas</code> para "low-prio G3 — CLI granular para assets"?
+  Inspeção: G3 (raiz L23–25) diz "MANTIDO como baixa prioridade ... pode ser abordado em
+  feature separada após aprovação". <strong>Respondida via inspeção:</strong> sim,
+  promover para <code>## Candidatas ativas</code> como bullet:
+  <code>- cli-asset-granular — CLI granular para assets (`list`, `install --only rules`, etc.); G3 mantido baixa prio em 2026-05-08 (owner: software-engineer, contexto: specs/_archive/legacy-bug-specs/z_bug_specs-root-2026-05-08.md L23-25)</code>.
+</p>
+
+<h3>4.3 Patches em consumers (linha por linha)</h3>
+
+<h4>Consumer 1 — <code>dadaia_workspace/public/skills/dadaia-workspace-spec-reviewer/SKILL.md</code></h4>
+<pre><code>L3 (description):  troca trailing "...records unresolved gaps in z_bug_specs.md." por
+                   "...records unresolved gaps in specs/backlog/candidates.md (## Hotfixes pendentes
+                   for production bugs; ## Candidatas ativas for spec gaps)."
+
+L22 (passo 5 do workflow):  "Load `z_bug_specs.md`."
+                            &rarr; "Load `specs/backlog/candidates.md` (sections `## Hotfixes pendentes`
+                                  and `## Candidatas ativas`)."
+
+L63 (passo 9 do workflow):  "If unresolved issues remain, update `z_bug_specs.md`."
+                            &rarr; "If unresolved issues remain, append to `specs/backlog/candidates.md`
+                                  under `## Hotfixes pendentes` (production bugs) or
+                                  `## Candidatas ativas` (spec/feature gaps)."
+</code></pre>
+
+<h4>Consumer 2 — <code>dadaia_workspace/public/commands/dadaia-workspace-refine-specs.md</code></h4>
+<pre><code>L2 (description):   troca "...records unresolved gaps in z_bug_specs.md." pelo mesmo
+                    novo wording acima.
+
+L21 (passo 1):      "- `z_bug_specs.md`"
+                    &rarr; "- `specs/backlog/candidates.md`"
+
+L28 (passo 8):      "...record the remaining gaps in `z_bug_specs.md`."
+                    &rarr; "...record the remaining gaps in `specs/backlog/candidates.md`
+                          (under `## Hotfixes pendentes` for production bugs and
+                          `## Candidatas ativas` for spec/feature gaps)."
+</code></pre>
+
+<h4>Consumer 3 — <code>dadaia_workspace/public/templates/repo-AGENTS.md</code></h4>
+<pre><code>L20 (passo 4 do "Spec Structure"):
+        "4. `specs/z_bug_specs.md` — live unresolved gaps"
+        &rarr; "4. `specs/backlog/candidates.md` — live backlog and unresolved gaps"
+</code></pre>
+
+<h3>4.4 Ordem de execução (atomicidade preservada)</h3>
+
+<ol>
+  <li><strong>Snapshot:</strong>
+    <code>git mv specs/z_bug_specs.md specs/_archive/legacy-bug-specs/z_bug_specs-specs-2026-05-08.md</code>
+    e
+    <code>git mv z_bug_specs.md specs/_archive/legacy-bug-specs/z_bug_specs-root-2026-05-08.md</code>
+    — <strong>não</strong> faz parte deste passo (apenas após patches; ver passo 5).
+    Nesta etapa: criar diretório <code>specs/_archive/legacy-bug-specs/</code>.
+  </li>
+  <li><strong>Append:</strong> adicionar o bullet de hotfix em
+    <code>specs/backlog/candidates.md</code> § Hotfixes pendentes (linha 46
+    abre a seção vazia). Adicionar bullet <code>cli-asset-granular</code> em § Candidatas ativas.
+  </li>
+  <li><strong>Patch consumers</strong> nos 3 arquivos source em
+    <code>dadaia_workspace/public/</code> (skill, command, template) conforme §4.3.
+  </li>
+  <li><strong>Propagar:</strong>
+    <code>dadaia public stage &amp;&amp; dadaia public install --target all --force</code>
+    e validar com <code>dadaia public doctor</code> — todas as projeções devem retornar
+    <code>[ok]</code>. Esse step garante que <code>.claude/</code>, <code>.codex/</code>,
+    <code>.opencode/</code> e <code>.agents/</code> recebem os patches.
+  </li>
+  <li><strong>Mover originais para archive</strong> (passo deferred do item 1):
+    o <code>git mv</code> dos dois <code>z_bug_specs.md</code> para
+    <code>specs/_archive/legacy-bug-specs/</code> — <strong>somente depois</strong>
+    que doctor passou no passo 4. Esta é a operação que define o "delete in-release"
+    (D2): o ato de mover para <code>_archive/</code> é o equivalente a deletar do
+    fluxo vivo, mantendo histórico inspecionável (constitution L148).
+  </li>
+  <li><strong>Verificação final:</strong>
+    <ul>
+      <li><code>find dadaia-workspace/ -name "z_bug_specs.md" -not -path "*/_archive/*"</code> &rarr; vazio</li>
+      <li><code>grep -rn "z_bug_specs" dadaia_workspace/public/ .claude/ .opencode/ .codex/ .agents/ .dadaia/agentic/</code> &rarr; vazio</li>
+      <li><code>dadaia public doctor</code> &rarr; tudo <code>[ok]</code></li>
+    </ul>
+  </li>
+</ol>
+
+<p>
+  <strong>Por que patches antes de deletes:</strong> entre os passos 3 e 5 existe uma
+  janela em que os 3 consumers já apontam para <code>candidates.md</code> e os dois
+  <code>z_bug_specs.md</code> originais ainda existem em disco. Qualquer agente que
+  rode <code>dadaia-workspace-refine-specs</code> nesta janela trabalha contra a fonte
+  nova (<code>candidates.md</code>) sem encontrar arquivo ausente. Se invertêssemos
+  (deletar primeiro, patchear depois), um agente rodando no meio da janela tentaria
+  ler um arquivo que não existe e quebraria.
+</p>
+
+<h2>5. Stakeholders &amp; Impact</h2>
+
+<table>
+  <thead><tr><th>Stakeholder / Componente</th><th>Tipo de impacto</th><th>Severidade</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>10 agentes em <code>dadaia_workspace/public/agents/*.md</code></td>
+      <td>21 referências a <code>handoff-schema-v1</code> deixam de apontar para vácuo. Pilotos (FR4) recebem 1 bloco novo no markdown body instruindo emissão. Não-pilotos: sem mudança em v1; migrados em releases futuros.</td>
+      <td>Alta — desbloqueia a promessa de input_contract feita em GAP-INPUT-001</td>
+    </tr>
+    <tr>
+      <td>Projeções runtime (<code>.claude/agents/</code>, <code>.codex/agents/</code>, <code>.opencode/agents/</code>, <code>.dadaia/agentic/agents/</code>)</td>
+      <td>32 arquivos projetados (10 agentes × 3+ runtimes + agentic) refletem o release automaticamente via <code>dadaia public install</code>. Nenhum override manual permitido (rule <code>dadaia-workspace-dev-guardrail</code>).</td>
+      <td>Média — passivo, mecanismo de projeção é maduro</td>
+    </tr>
+    <tr>
+      <td>CLI <code>dadaia</code> (Typer)</td>
+      <td>Novo grupo de comandos <code>dadaia reports {validate}</code>. Adicionado em <code>cli/commands/reports.py</code>. Cobre apenas o subcomando <code>validate</code>; outros virão em v2/v3 (<code>next</code>, etc.) fora deste escopo.</td>
+      <td>Média</td>
+    </tr>
+    <tr>
+      <td>Feature de orquestração (<code>features/orchestration/</code>)</td>
+      <td>Indireto: a auditoria 2026-05-15 lista HIGH "<code>must_include</code> não validado". <strong>Não</strong> resolvido neste release (escopo D1 estrito), mas a infraestrutura de validate criada aqui é o building block para v2 fazer o enforcement em <code>_resolve_awaiting_gates</code>.</td>
+      <td>Baixa — sem mudança no orchestration nesta release</td>
+    </tr>
+    <tr>
+      <td>Skill <code>dadaia-workspace-spec-reviewer</code></td>
+      <td>3 linhas patcheadas (L3, L22, L63 do SKILL.md). Reprojetada para todos os runtimes.</td>
+      <td>Baixa — patch mecânico</td>
+    </tr>
+    <tr>
+      <td>Command <code>dadaia-workspace-refine-specs</code></td>
+      <td>3 linhas patcheadas (L2, L21, L28). Reprojetada para todos os runtimes.</td>
+      <td>Baixa</td>
+    </tr>
+    <tr>
+      <td>Template <code>repo-AGENTS.md</code></td>
+      <td>1 linha patcheada (L20). Reprojetada.</td>
+      <td>Baixa</td>
+    </tr>
+    <tr>
+      <td>Operador / autor de specs</td>
+      <td>O fluxo "registrar gap remanescente" muda de "editar <code>z_bug_specs.md</code>" para "append em <code>specs/backlog/candidates.md</code> § Hotfixes pendentes ou § Candidatas ativas". Reduz fragmentação (uma única fonte de verdade de backlog + bugs). Aprendizado: ~2 min.</td>
+      <td>Média — mudança de hábito, pequena curva</td>
+    </tr>
+    <tr>
+      <td><code>dadaia public doctor</code></td>
+      <td>Verifica novo tipo <code>schemas/</code> (NFR7). Se o <code>FileSystemPublicAssetManager</code> hoje enumera tipos hard-coded, precisa de update.</td>
+      <td>Média — dependência técnica a confirmar em Phase 2 com arquiteto</td>
+    </tr>
+    <tr>
+      <td><code>specs/backlog/candidates.md</code></td>
+      <td>Ganha 1 bullet em § Candidatas ativas (cli-asset-granular) e 1 em § Hotfixes pendentes (BUG-003 import-rewrite). Linha 22 (entrada agent-comms-v1 da candidates) é o ponto de partida deste release.</td>
+      <td>Baixa</td>
+    </tr>
+    <tr>
+      <td><code>tech-stack.md</code> (constitution stack)</td>
+      <td><strong>Possível impacto</strong> caso a decisão NFR3 seja "adicionar <code>jsonschema</code> ao tech-stack". Update da constitution requires explicit operator confirmation (product-engineer.md L451).</td>
+      <td>Média — decisão pendente</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. Pilot agents proposal</h2>
+
+<p>
+  A pergunta é: dos 10 agentes que declaram <code>schema_ref: handoff-schema-v1</code>
+  (ver inspeção L46 do <code>software-architect.md</code>, L43–59 do
+  <code>product-engineer.md</code>, etc.), quais 2–3 emitem
+  <code>.handoff.json</code> primeiro?
+</p>
+
+<h3>Critérios de seleção</h3>
+<ol>
+  <li><strong>Volume de handoffs por release:</strong> agentes que produzem &gt; 1 artefato
+  por release dão mais signal por unidade de esforço.</li>
+  <li><strong>Posição no pipeline canônico:</strong> agentes que sentam em pontos
+  de fan-in/fan-out (i.e., consumem inputs múltiplos e produzem para múltiplos
+  consumers) maximizam a utilidade do contrato verificável.</li>
+  <li><strong>Cobertura de fluxos críticos:</strong> agentes que estão envolvidos no
+  workflow <code>spec-refinement</code> (o seed workflow mais usado, ver
+  <code>memory/product/agent-orchestration.html</code> L46) são pilotos naturais.</li>
+  <li><strong>Risco de regressão:</strong> agentes que escrevem muitos arquivos
+  diferentes (ex: <code>product-engineer</code> escreve discovery + SPEC + PLAN + TASKS
+  + CLOSURE) têm mais variabilidade de output — bom para validar robustez do schema.</li>
+</ol>
+
+<h3>Análise por agente candidato</h3>
+
+<table>
+  <thead><tr><th>Agente</th><th>produces_outputs</th><th>Posição</th><th>Aptidão piloto</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>product-engineer</code></td>
+      <td>5 outputs (discovery, spec, plan, tasks, closure)</td>
+      <td>Fan-in (consome reports de 4–5 specialists) + fan-out (entrega para todos os implementers)</td>
+      <td><strong>SIM — alto signal, alta variabilidade</strong></td>
+    </tr>
+    <tr>
+      <td><code>software-architect</code></td>
+      <td>1 output (arch_report)</td>
+      <td>Pivô analítico do pipeline — consome discovery do PE, produz para SE</td>
+      <td><strong>SIM — handoff direto crítico no D4 pipeline order</strong></td>
+    </tr>
+    <tr>
+      <td><code>software-engineer</code></td>
+      <td>2 outputs (green_report, refactor_report)</td>
+      <td>Terminal — produz para <code>qa-engineer</code> validar</td>
+      <td><strong>SIM — fecha o ciclo TDD; cobre 2/3 dos casos com 1 agente</strong></td>
+    </tr>
+    <tr>
+      <td><code>qa-engineer</code></td>
+      <td>2 outputs (red_report, validation_report)</td>
+      <td>Bookend do TDD — inputs do SE e do PE</td>
+      <td>Não — relevante para v2 (tdd-cycle workflow), pode esperar</td>
+    </tr>
+    <tr>
+      <td><code>devops-engineer</code></td>
+      <td>1 output (audit_report)</td>
+      <td>Lateral — não é fan-in</td>
+      <td>Não — sem fan-in/fan-out crítico</td>
+    </tr>
+    <tr>
+      <td><code>game-*</code> (3 agentes)</td>
+      <td>Variável</td>
+      <td>Domínio segregado (<code>repos/tauan-games/</code>)</td>
+      <td>Não — fora do pipeline canônico de dadaia-workspace</td>
+    </tr>
+    <tr>
+      <td><code>backend-engineer</code>, <code>frontend-engineer</code></td>
+      <td>2 outputs cada</td>
+      <td>Análogos a <code>software-engineer</code> mas em escopo menos exercitado neste workspace</td>
+      <td>Não — cobertos pelo padrão validado em SE</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Recomendação</h3>
+
+<p>
+  <strong>Os 3 agentes pilotos são: <code>product-engineer</code>,
+  <code>software-architect</code>, <code>software-engineer</code>.</strong>
+</p>
+
+<p><strong>Justificativa:</strong></p>
+<ul>
+  <li>Os 3 cobrem o pipeline canônico definido em D4
+  (PE Discovery → architect → SE rec → PE Synthesis → SE impl) —
+  validar este trio significa que o pipeline canônico está integralmente coberto
+  por handoff verificável em v1.</li>
+  <li>Os 3 são os agentes invocados em <strong>todos</strong> os workflows seed
+  (<code>spec-refinement</code> e <code>tdd-cycle</code>, ver
+  <code>public/workflows/</code>), garantindo amostragem em produção em vez de exercício
+  hipotético.</li>
+  <li>Produzem juntos 8 tipos distintos de output
+  (5 do PE + 1 do arquiteto + 2 do SE) — variabilidade suficiente para estressar o schema
+  sem big-bang.</li>
+  <li>É exatamente a sugestão do briefing — mas a verificação por inspeção confirma
+  que essa escolha é tecnicamente correta, não apenas convencional.</li>
+</ul>
+
+<p>
+  <em>Revisão considerada e rejeitada:</em> trocar
+  <code>software-engineer</code> por <code>qa-engineer</code> daria cobertura de
+  red-phase + validation, mas perderia a validação do agente que mais frequentemente
+  fecha tasks no workspace hoje (a auditoria orchestration 2026-05-15 lista
+  software-engineer como o consumidor final do <code>output_path</code> bug — é o
+  agente que mais se beneficia do handoff verificável).
+</p>
+
+<h2>Findings</h2>
+
+<p>
+  Surpresas encontradas durante a inspeção que podem reorientar a análise do
+  arquiteto em Phase 2.
+</p>
+
+<div class="finding">
+  <h3><span class="badge badge-high">HIGH</span> F1 — A referência <code>handoff-schema-v1</code> é massivamente projetada mas o schema nunca existiu</h3>
+  <p><strong>Location:</strong>
+  <code>dadaia_workspace/public/agents/*.md</code> (21 ocorrências canônicas);
+  <code>.claude/agents/*.md</code> + <code>.codex/agents/*.md</code> +
+  <code>.opencode/agents/*.md</code> + <code>.dadaia/agentic/agents/*.md</code> (61
+  ocorrências projetadas adicionais).</p>
+  <p><strong>Inspeção:</strong>
+  <code>grep -rln "handoff-schema-v1" dadaia-workspace/ | wc -l</code> &rarr; 44 arquivos;
+  <code>find dadaia-workspace/ -name "*.schema.json"</code> &rarr; <strong>vazio</strong>;
+  <code>find dadaia-workspace/ -name "handoff*"</code> &rarr; <strong>vazio</strong>.</p>
+  <p><strong>Implicação:</strong> o fechamento de GAP-INPUT-001 declarou que o
+  contrato estava resolvido, mas o referencer (<code>schema_ref</code>) aponta para
+  um referent que não existe. É o mesmo padrão "build-on-stale-layer" que a auditoria
+  software-architect rejeita no orchestration. <strong>Este release transforma a
+  referência simbólica em referência operacional.</strong></p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-medium">MEDIUM</span> F2 — A constitution não enumera <code>public/schemas/</code> como tipo de asset</h3>
+  <p><strong>Location:</strong>
+  <code>specs/constitution.md</code> L106 — "Neste repositório, <code>dadaia_workspace/public/</code> é a única localização versionada para rules, skills, commands, scripts, agents e templates universais do produto."</p>
+  <p><strong>Inspeção:</strong> a lista enumerada explicitamente é: rules, skills,
+  commands, scripts, agents, templates (6 tipos). O diretório real hoje contém também
+  <code>workflows/</code> (já fora da lista da constitution) — drift documental
+  paralelo ao GAP-DRIFT-001 fechado em <code>z_bug_specs.md</code> L108–112.</p>
+  <p><strong>Implicação:</strong> adicionar <code>schemas/</code> exige update da
+  constitution (operator confirmation). Se decidir não tocar a constitution agora, o
+  schema pode ir para outro caminho — mas isso quebra a uniformidade do mecanismo de
+  projeção. <strong>Tema de decisão para Phase 5 grill-me.</strong></p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-medium">MEDIUM</span> F3 — Pipeline order D4 inverte expectativa do workflow seed</h3>
+  <p><strong>Location:</strong>
+  <code>specs/memory/product/agent-orchestration.html</code> L46–52 descreve
+  spec-refinement como "1 discovery → 5 specialists paralelos → 1 synthesis".
+  <strong>D4 declara</strong> "PE Discovery → architect impact → SE rec → PE Synthesis → SE impl"
+  — pipeline serial 5-step, não paralelo.</p>
+  <p><strong>Inspeção:</strong> não há workflow seed específico para
+  <code>agent-comms-v1</code>. O D4 é o pipeline desta release, não um workflow
+  reutilizável. <strong>Respondida via inspeção:</strong> D4 é específico desta
+  release; o workflow seed não muda.</p>
+  <p><strong>Implicação:</strong> ok, mas Phase 2 deve confirmar se o software-architect
+  vai gerar um workflow novo seed para esse pattern serial, ou apenas executar D4
+  inline. Se o arquiteto recomenda gerar um seed, isso é escopo adicional —
+  <strong>decisão para arquiteto em Phase 2</strong>.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-medium">MEDIUM</span> F4 — Há um release ATIVO concorrente</h3>
+  <p><strong>Location:</strong> <code>specs/releases/ACTIVE.md</code>:
+  <code>release: dadaia-workspace-panel-v1</code> /
+  <code>phase: TASKS</code>.</p>
+  <p><strong>Inspeção:</strong>
+  <code>cat specs/releases/ACTIVE.md</code> mostra que
+  <code>dadaia-workspace-panel-v1</code> está em phase TASKS.</p>
+  <p><strong>Implicação:</strong> Phase 5 (PE Synthesis desta release) deve resolver
+  como o operador quer lidar: (a) terminar panel-v1 antes de flipar ACTIVE.md para
+  agent-comms-v1, ou (b) abrir agent-comms-v1 como sucessor enfileirado.
+  <strong>Pergunta para Phase 5 grill-me.</strong> A regra geral
+  (<code>product-engineer.md</code> L407–423) é que apenas 1 release ativo por vez —
+  então não há shortcut.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-medium">MEDIUM</span> F5 — Backlog L22 já antecipou a release id e o escopo</h3>
+  <p><strong>Location:</strong>
+  <code>specs/backlog/candidates.md</code> L22:</p>
+  <pre><code>- agent-comms-v1 — handoff-v1.schema.json + `dadaia reports validate` CLI +
+  `dadaia-handoff-emitter` skill; bridges the declared-but-empty `schema_ref:
+  handoff-schema-v1` across 10 agents (82 references); includes z_bug_specs.md
+  migration to backlog (owner: product-engineer, contexto:
+  .dadaia/reports/dadaia-workspace/software-architect/2026-05-16T220000Z-agent-comms-research.html)</code></pre>
+  <p><strong>Inspeção:</strong> o contexto referenciado
+  (<code>2026-05-16T220000Z-agent-comms-research.html</code>) <strong>não existe em disco</strong> —
+  ver
+  <code>ls .dadaia/reports/dadaia-workspace/software-architect/</code>:
+  apenas <code>2026-05-15-orchestration-audit.md</code> e
+  <code>2026-05-16T214645Z-hotfix-track.md</code>.</p>
+  <p><strong>Implicação:</strong> a research report referenciada como input desta
+  Discovery foi <strong>declarada no briefing operacional mas não materializada</strong>.
+  Esta Discovery substitui sua função (o operador instruiu produzir uma Discovery
+  baseada no briefing). <strong>Decisão de Phase 2:</strong> o arquiteto deve decidir
+  se produz a research report ausente como parte do impact analysis, ou trata este
+  Discovery como o input canônico do pipeline. <strong>Recomendação:</strong> arquiteto
+  produz impact-analysis.html que cita esta Discovery como fonte; nenhuma research
+  paralela precisa ser regenerada em retroatividade.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-low">LOW</span> F6 — Skill name conflito potencial com pattern existente</h3>
+  <p><strong>Location:</strong>
+  <code>dadaia_workspace/public/skills/</code> (lista de 27 skills).</p>
+  <p><strong>Inspeção:</strong> nome proposto <code>dadaia-handoff-emitter</code>
+  não conflita com nenhuma skill existente. Os patterns observados:
+  <code>dadaia-grill-me</code>, <code>dadaia-release-closure</code>,
+  <code>dadaia-task-manager</code>, <code>dadaia-workspace-*</code> (5 ocorrências).
+  Sem conflito.</p>
+  <p><strong>Implicação:</strong> nenhuma — apenas confirmação de safe naming.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-low">LOW</span> F7 — z_bug_specs root tem 0 conteúdo aberto</h3>
+  <p><strong>Location:</strong> <code>/home/marco/workspace/dadaia/repos/dadaia-workspace/z_bug_specs.md</code> L31.</p>
+  <p><strong>Inspeção:</strong> "<em>Nenhum gap bloqueante no momento. Esta versão das specs está pronta para revisão e aprovação.</em>"</p>
+  <p><strong>Implicação:</strong> o arquivo raiz não migra nada para
+  <code>## Candidatas ativas</code> ou <code>## Hotfixes pendentes</code> além do
+  bullet <code>cli-asset-granular</code> derivado do G3 mantido em baixa prioridade.
+  Migração é 100% arquival.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-low">LOW</span> F8 — sdd-spec-gate.sh referencia <code>z_bug_specs.md</code></h3>
+  <p><strong>Location:</strong>
+  <code>dadaia_workspace/public/scripts/sdd-spec-gate.sh:117</code>:</p>
+  <pre><code>*/TASKS.md|*/PLAN.md|*/SPEC.md|*/CLOSURE.md|*/ACTIVE.md|*/z_bug_specs.md|*/backlog/*.md)</code></pre>
+  <p><strong>Inspeção:</strong> 1 referência adicional fora dos 3 consumers listados
+  no briefing — o gate de proteção SDD inclui <code>z_bug_specs.md</code> em sua
+  allowlist de paths que requerem task <code>[-]</code>.</p>
+  <p><strong>Implicação:</strong> <strong>Quarto patch necessário</strong> além dos 3
+  consumers. Após a migração, a entrada <code>*/z_bug_specs.md</code> deve ser
+  <strong>removida</strong> do glob (não substituída — <code>backlog/*.md</code> já
+  está no glob). Adicionar como TASK separada no Phase 6.</p>
+</div>
+
+<h2>Riscos</h2>
+
+<p>
+  Riscos a nível de release (não de implementação — esses ficam na recomendação técnica
+  do SE em Phase 3 do pipeline D4).
+</p>
+
+<table>
+  <thead><tr><th>#</th><th>Risco</th><th>Probabilidade</th><th>Impacto</th><th>Mitigação</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>R1</td>
+      <td><strong>Conflito de active release</strong>: <code>dadaia-workspace-panel-v1</code>
+      em TASKS bloqueia abertura de agent-comms-v1 ativa (1 release ativo per
+      <code>product-engineer.md</code> L407).</td>
+      <td>Alta</td>
+      <td>Alto</td>
+      <td>Decidir em Phase 5 grill-me se panel-v1 fecha (CLOSURE → ARCHIVED) antes
+      de flipar ACTIVE.md, ou se agent-comms-v1 aguarda em backlog até panel-v1
+      arquivar.</td>
+    </tr>
+    <tr>
+      <td>R2</td>
+      <td><strong>Decisão pendente sobre <code>jsonschema</code> na tech-stack</strong>:
+      adicionar dep nova exige update da constitution (NFR3 + F2).
+      Sem decisão, schema check fica em stdlib manual.</td>
+      <td>Média</td>
+      <td>Médio</td>
+      <td>Resolver no grill-me Phase 5 com pergunta direta. Default proposto: stdlib
+      manual (zero dep nova mantém NFR3 limpo).</td>
+    </tr>
+    <tr>
+      <td>R3</td>
+      <td><strong>Drift entre canonical e projeções</strong> durante a janela §4.4
+      (entre passos 3 e 4): se algum agente roda <code>dadaia public install</code>
+      no meio da migração, projeções podem ficar inconsistentes.</td>
+      <td>Baixa</td>
+      <td>Alto</td>
+      <td>SE implementa a migração como uma única task atômica
+      (T-MIGRATE-Z-BUG-001) que faz passos 2–5 em sequência sem yield. Doctor obrigatório
+      no fim.</td>
+    </tr>
+    <tr>
+      <td>R4</td>
+      <td><strong>Pilot agents não cobrem qa-engineer</strong> — ciclo TDD
+      (tdd-cycle.workflow) fica sem handoff verificável em v1. Operadores que rodam
+      tdd-cycle não recebem validação.</td>
+      <td>Média</td>
+      <td>Baixo</td>
+      <td>NFR2 (strict=false) tolera reports sem handoff. Aceitar e migrar
+      qa-engineer em v2.</td>
+    </tr>
+    <tr>
+      <td>R5</td>
+      <td><strong>Token-overhead acima do budget</strong> em reports pequenos (e.g.
+      red-phase reports de qa, que podem ter &lt; 5 KB). 2 KB de handoff seria 40%
+      de overhead.</td>
+      <td>Média</td>
+      <td>Baixo</td>
+      <td>NFR5 fala em "tipicamente &lt; 2 KB" — handoff pode ser menor para reports
+      pequenos. Schema permite campos opcionais; validate aceita handoff minimal.</td>
+    </tr>
+    <tr>
+      <td>R6</td>
+      <td><strong>Esquecer 4º consumer</strong> (<code>sdd-spec-gate.sh:117</code>,
+      finding F8): deletar os <code>z_bug_specs.md</code> sem remover o glob do gate
+      deixa pattern "morto" no script — não quebra nada, mas é dead code.</td>
+      <td>Média (se F8 não for adicionado às TASKS)</td>
+      <td>Baixo</td>
+      <td>Adicionar T-MIGRATE-Z-BUG-002 explicitamente removendo a entrada do glob.</td>
+    </tr>
+    <tr>
+      <td>R7</td>
+      <td><strong>Software-engineer não consegue migrar pilotos sem produto-engineer
+      patchear o markdown body</strong> dos 3 agentes pilotos: o body são specs (in
+      <code>dadaia_workspace/public/agents/</code>) e PE é o único autorizado a
+      escrever especs (constitution L143). Mas a regra <code>game-developer-scope</code>
+      e <code>dadaia-workspace-dev-guardrail</code> sugerem que esses arquivos são
+      lib-originated e o source canonical é <code>public/</code> — PE pode editar
+      <code>public/agents/*.md</code> em Phase 5? <strong>Inspeção:</strong> o
+      product-engineer.md L443 declara permissão de Write em
+      <code>specs/releases/...</code> e em <code>specs/memory/</code>, mas é
+      <strong>silente</strong> sobre <code>dadaia_workspace/public/agents/</code>.
+      O SE escreve esses arquivos como código-fonte? Ou PE como especificação?</td>
+      <td>Alta</td>
+      <td>Médio</td>
+      <td><strong>Pergunta para Phase 5 grill-me.</strong> Recomendação preliminar:
+      tratar como code-as-config — owner é PE (são instruções comportamentais, não
+      lógica executável), implementação é SE com PR aprovado por PE. Confirmar.</td>
+    </tr>
+    <tr>
+      <td>R8</td>
+      <td><strong>Pacote ainda não conhece <code>schemas/</code> como tipo</strong>:
+      se <code>FileSystemPublicAssetManager</code> enumera hard-coded os tipos
+      (NFR7), adicionar <code>schemas/</code> não é zero-cost.</td>
+      <td>Média</td>
+      <td>Médio</td>
+      <td>Arquiteto valida em Phase 2; SE recomendação técnica detalha o esforço.
+      Pode ser necessário split numa sub-task.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Decisões necessárias</h2>
+
+<p>
+  Lista das questões abertas com status. Cada item ou foi <strong>respondido por
+  inspeção</strong> (e a resposta é registrada) ou <strong>escalado para grill-me em
+  Phase 5</strong> (PE Synthesis).
+</p>
+
+<div class="decision">
+  <p><strong>DN1 — Conflito de active release</strong> (R1).</p>
+  <p>Status: <span class="escalate">ESCALADO para Phase 5 grill-me</span>.</p>
+  <p>Pergunta ao operador: "O release <code>dadaia-workspace-panel-v1</code> está em
+  phase TASKS. Como você quer prosseguir com <code>agent-comms-v1</code>?
+  (a) Fechar panel-v1 (CLOSURE + ARCHIVED) antes de abrir agent-comms-v1; ou
+  (b) Manter agent-comms-v1 em backlog até panel-v1 arquivar; ou
+  (c) Outra estratégia explícita."</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN2 — Dependência <code>jsonschema</code> ou stdlib manual</strong>
+  (R2, NFR3, F2).</p>
+  <p>Status: <span class="escalate">ESCALADO para Phase 5 grill-me</span> (depende
+  da recomendação do SE em Phase 3 do pipeline D4).</p>
+  <p>Pergunta ao operador: "Para validate, prefere (a) adicionar
+  <code>jsonschema</code> à tech-stack approved (requer atualização da constitution)
+  ou (b) implementar verificação manual em stdlib (sem dep nova, ~80 LoC, sem suporte
+  a meta-schema)?"</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN3 — Adicionar <code>public/schemas/</code> à enumeração da
+  constitution</strong> (F2).</p>
+  <p>Status: <span class="escalate">ESCALADO para Phase 5 grill-me</span>.</p>
+  <p>Pergunta ao operador: "Adicionar <code>schemas/</code> como tipo de asset
+  oficialmente reconhecido em <code>constitution.md</code> L106 (junto de rules,
+  skills, commands, scripts, agents, templates, workflows)? Em caso afirmativo
+  o release fará o update da constitution."</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN4 — Ownership de <code>public/agents/*.md</code></strong> (R7).</p>
+  <p>Status: <span class="escalate">ESCALADO para Phase 5 grill-me</span>.</p>
+  <p>Pergunta ao operador: "Quem escreve no <code>dadaia_workspace/public/agents/*.md</code>?
+  (a) product-engineer (como especificação de comportamento) ou (b) software-engineer
+  (como código-fonte da projeção)?"</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN5 — A migração de <code>z_bug_specs.md</code> é uma TASK isolada ou
+  parte da migração de cada consumer?</strong></p>
+  <p>Status: <span class="resolved">Respondida via inspeção.</span></p>
+  <p>Resposta: migração é uma única task atômica T-MIGRATE-Z-BUG-001 (R3) com sub-step
+  T-MIGRATE-Z-BUG-002 cobrindo a remoção do entry do glob em
+  <code>sdd-spec-gate.sh:117</code> (R6). Razão: a ordem §4.4 garante atomicidade só
+  se executada sem yield — split em N tasks introduz janela de drift.</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN6 — Pilot agents finais</strong>.</p>
+  <p>Status: <span class="resolved">Respondida via inspeção.</span></p>
+  <p>Resposta: <code>product-engineer</code>, <code>software-architect</code>,
+  <code>software-engineer</code>. Razão completa em §6. Sujeito a override do
+  arquiteto em Phase 2 se identificar fundamento técnico para mudança.</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN7 — Conteúdo mínimo do schema (campos obrigatórios)</strong>.</p>
+  <p>Status: <span class="escalate">ESCALADO para Phase 5 grill-me</span> (depende
+  do arquiteto em Phase 2 propor a estrutura de detalhe).</p>
+  <p>Pergunta para o arquiteto em Phase 2: "Quais campos do schema são obrigatórios
+  (<code>required</code>) e quais opcionais? Proposta inicial em FR1: schema_version,
+  agent, context, release_id, produced_at, artifact (path + content_hash) como
+  obrigatórios; findings, decisions_required, next_handoff como opcionais.
+  Refine ou contradiga."</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN8 — Workflow seed para pipeline D4</strong> (F3).</p>
+  <p>Status: <span class="escalate">ESCALADO para arquiteto em Phase 2</span>.</p>
+  <p>Pergunta para arquiteto: "O pipeline D4 (PE Discovery → architect impact →
+  SE rec → PE Synthesis → SE impl) merece um workflow seed reutilizável em
+  <code>public/workflows/</code>? Ou é específico desta release apenas e roda inline?"</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN9 — research report ausente</strong> (F5).</p>
+  <p>Status: <span class="resolved">Respondida via inspeção.</span></p>
+  <p>Resposta: o arquiteto em Phase 2 produz <code>impact-analysis.html</code> que
+  cita esta Discovery como source. Não há retroactive generation da research report
+  ausente referenciada na <code>candidates.md</code> L22 — pode-se atualizar a
+  referência da candidates.md em Phase 5 para apontar para este Discovery após o
+  flip de ACTIVE.md.</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN10 — Projeção do schema</strong>.</p>
+  <p>Status: <span class="escalate">ESCALADO para arquiteto em Phase 2</span>.</p>
+  <p>Pergunta para arquiteto: "O <code>handoff-v1.schema.json</code> deve ser
+  projetado para todos os runtimes (<code>.claude/schemas/</code>, etc.) ou
+  apenas para <code>.dadaia/agentic/schemas/</code> (staging)? Runtimes externos
+  precisam ler o schema, ou só a CLI valida?"</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN11 — Atualização do bullet <code>agent-comms-v1</code> em <code>candidates.md</code></strong>.</p>
+  <p>Status: <span class="resolved">Respondida via inspeção.</span></p>
+  <p>Resposta: durante o flip de ACTIVE.md em Phase 5, mover o bullet L22 de
+  <code>## Candidatas ativas</code> para <code>## Histórico (candidatas promovidas a release)</code>
+  com a linha:
+  <code>- agent-comms → release `agent-comms-v1` (promovido em 2026-05-16; source SPEC em specs/releases/agent-comms-v1/SPEC.md)</code>.
+  Atualizar a referência do contexto para o Discovery atual.</p>
+</div>
+
+<div class="decision">
+  <p><strong>DN12 — Bullet <code>cli-asset-granular</code> origem G3</strong>.</p>
+  <p>Status: <span class="resolved">Respondida via inspeção.</span></p>
+  <p>Resposta: durante migração §4.2, adicionar como novo item em
+  <code>## Candidatas ativas</code> apontando o archive como contexto histórico.</p>
+</div>
+
+<h2>Anexos</h2>
+
+<h3>Arquivos consultados</h3>
+<ul>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/constitution.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/memory/product/agent-orchestration.html</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/backlog/candidates.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/releases/ACTIVE.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/z_bug_specs.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/z_bug_specs.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/.dadaia/reports/dadaia-workspace/software-architect/2026-05-15-orchestration-audit.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/.dadaia/reports/AGENTS.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/agents/product-engineer.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/agents/software-architect.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/agents/software-engineer.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/skills/dadaia-workspace-spec-reviewer/SKILL.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/commands/dadaia-workspace-refine-specs.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/templates/repo-AGENTS.md</code></li>
+  <li><code>/home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/scripts/sdd-spec-gate.sh</code> (apenas L117)</li>
+</ul>
+
+<h3>Comandos de inspeção usados</h3>
+<pre><code>grep -rn "handoff-schema-v1\|handoff_schema\|handoff-v1\|handoff-emitter" \
+  /home/marco/workspace/dadaia/repos/dadaia-workspace/ \
+  --include="*.md" --include="*.json" --include="*.html"
+# &rarr; 78 ocorrências em 44 arquivos
+
+grep -rln "handoff-schema-v1" \
+  /home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/agents/
+# &rarr; 10 agentes (21 ocorrências no canonical)
+
+find /home/marco/workspace/dadaia/repos/dadaia-workspace/ -name "*.schema.json"
+# &rarr; vazio
+
+find /home/marco/workspace/dadaia/repos/dadaia-workspace/ -name "handoff*"
+# &rarr; vazio
+
+grep -rn "z_bug_specs" /home/marco/workspace/dadaia/repos/dadaia-workspace/dadaia_workspace/public/
+# &rarr; 3 arquivos com 6 referências + 1 referência adicional em sdd-spec-gate.sh:117
+
+cat /home/marco/workspace/dadaia/repos/dadaia-workspace/specs/releases/ACTIVE.md
+# &rarr; release: dadaia-workspace-panel-v1
+# &rarr; phase: TASKS
+</code></pre>
+
+<h3>Próximo gate</h3>
+<p>
+  Este Discovery alimenta <strong>Phase 2 (software-architect impact analysis)</strong>
+  do pipeline D4. O arquiteto deve produzir
+  <code>.dadaia/reports/dadaia-workspace/software-architect/&lt;ts&gt;-agent-comms-impact.html</code>
+  abordando explicitamente DN3, DN7, DN8, DN10, R7 e R8.
+</p>
+
+</body>
+</html>

@@ -43,9 +43,20 @@ def resolve_stage_inputs(
     return out
 
 
-def render_output_path(template: str, *, run_id: str, context: str, run_ts: str) -> str:
-    return (
+def render_output_path(
+    template: str,
+    *,
+    run_id: str,
+    context: str,
+    run_ts: str,
+    extra: dict[str, str] | None = None,
+) -> str:
+    result = (
         template.replace("{run_id}", run_id)
         .replace("{context}", context)
         .replace("{run_ts}", run_ts)
     )
+    if extra:
+        for key, value in extra.items():
+            result = result.replace(f"{{{key}}}", value)
+    return result

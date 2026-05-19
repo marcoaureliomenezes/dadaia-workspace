@@ -76,3 +76,17 @@ def test_is_initialized_false_before_init(service: WorkspaceService, workspace_r
 def test_is_initialized_true_after_init(service: WorkspaceService, workspace_root: Path) -> None:
     service.init(workspace_root, skip_assets=True)
     assert service.is_initialized(workspace_root)
+
+
+def test_init_creates_server_registry_json(tmp_path: Path) -> None:
+    WorkspaceService(
+        public_assets=FakePublicAssetManager(),
+        python_env=FakePythonEnvironmentManager(),
+    ).init(tmp_path)
+    registry = tmp_path / ".dadaia" / "states" / "server_registry.json"
+    assert registry.exists()
+    import json
+
+    data = json.loads(registry.read_text())
+    assert data["version"] == "1"
+    assert data["entries"] == []

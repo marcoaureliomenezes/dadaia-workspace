@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — multi-platform-parity (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>multi-platform-parity</h1>
+<p class="meta">CLI surface: <code>dadaia public install --target codex --force</code> · <code>dadaia public doctor</code> · Closure: multi-platform-parity-v1 · 2026-05-17</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p><strong>Multi-platform parity</strong> fecha o <em>Pilar 3</em> da constituição entre as três tools agentic suportadas — <strong>Claude Code</strong>, <strong>Codex</strong> e <strong>OpenCode</strong> — no nível do <code>.codex/config.toml</code> e do reporting de <code>dadaia public doctor</code>. Antes desta release, o Codex recebia <code>.codex/agents/</code> via copy-tree (não consumido pelo runtime do Codex) e <code>.codex/workflows/</code> (também não consumido), enquanto o doctor reportava <code>[unsupported] codex:agents</code> — uma mentira fria: o slot existia, só estava no formato errado. Agora a paridade é estrutural: Codex carrega 10 blocos <code>[agents.&lt;name&gt;]</code> nativos em <code>.codex/config.toml</code> (com quoted keys para nomes hifenados), uma tabela <code>[skills]</code> com <code>paths = [".agents/skills"]</code>, e workflows reportados como <code>[not-applicable]</code> em cyan (Codex não tem runtime de workflow). OpenCode mantém <code>[partial]</code> para os 5 workflows com <code>parallel_group</code> (limite runtime documentado, G3 do platform-boundaries analysis).</p>
+  <p>Resolve um gap de honestidade: o produto deixa de afirmar "Codex não suporta agentes" (falso — suporta via <code>[agents.&lt;name&gt;]</code>) e passa a afirmar "Codex não tem runtime de workflow" (verdadeiro). O doctor vira fonte de verdade legível: cyan para diferença estrutural intrínseca da tool, yellow para drift corrigível, green para parity completa.</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li><strong>Install</strong>: operador roda <code>dadaia public install --target codex --force</code>. <code>_install_codex()</code> em <code>infrastructure/public_assets.py</code> chama <code>_codex_config()</code> que monta <code>config.toml</code> em três partes: header preservado verbatim, depois <code>_render_agents_into_codex_config(agents_dir)</code> que itera <code>.dadaia/agentic/agents/*.md</code> e por agent chama <code>_parse_agent_frontmatter()</code> (regex stdlib, whitelist <code>_TOML_SAFE_AGENT_FIELDS = {"name", "description", "model", "tools"}</code>) + <code>_render_agent_toml_block(name, fm)</code> (que aplica <code>_toml_escape()</code> em nomes com hifen e descrições em <code>"""..."""</code>), depois append da tabela <code>[skills]\npaths = [".agents/skills"]</code>.</li>
+    <li><strong>Atomic write</strong>: <code>_write_generated()</code> delega para <code>_atomic_write_text(dst, content)</code> que escreve em <code>dst.with_suffix(dst.suffix + ".tmp")</code> e faz <code>os.replace()</code> — constitution L105 enforce. <code>find .codex -name "*.tmp"</code> empty após install (smoke ADR-ENG-6).</li>
+    <li><strong>Cleanup unconditional</strong>: antes do install propagar, <code>_install_codex()</code> emite linha <code>[removed] {path} (not-applicable: codex has no workflow runtime) — N entries</code> em stderr e roda <code>shutil.rmtree(codex_dir / "workflows", onerror=_log_cleanup_error)</code>. O helper <code>_log_cleanup_error</code> grava <code>[cleanup-warning] {path}: {exc}</code> em stderr sem re-raise (Defensive coding policy floor #2 — substitui o anti-pattern <code>ignore_errors=True</code>).</li>
+    <li><strong>Doctor</strong>: <code>dadaia public doctor</code> usa <code>_classify_workflows()</code> que agora reconhece o branch Codex-específico: para todo workflow em <code>public/workflows/*.workflow.md</code>, emite <code>[not-applicable] codex:workflows/&lt;wf&gt;</code> (linear ou parallel — não importa, Codex não tem runtime). OpenCode mantém <code>[ok]</code>/<code>[partial]</code> conforme presença de <code>parallel_group</code>. CLI styling em <code>cli/commands/public.py:74</code> aplica <code>style="cyan"</code> a <code>[not-applicable]</code> e <code>[unsupported]</code> (color reuse via ADR-ENG-1).</li>
+    <li><strong>Roundtrip TOML</strong>: <code>python3 -c "import tomllib; tomllib.loads(open('.codex/config.toml').read())"</code> não levanta — adversarial inputs em <code>_toml_escape()</code> (aspas, brackets, newlines no name; triple-quote na description) cobertos pelos testes T-PB-1 #7/#8.</li>
+  </ol>
+  <pre class="mermaid">
+flowchart LR
+    OP[operador] -->|dadaia public install --target codex --force| CMD[cli/commands/public.py]
+    CMD --> SVC[features/public/service.py]
+    SVC -->|target=codex| IC[infrastructure/public_assets.py _install_codex]
+    IC -->|cleanup| RM[shutil.rmtree codex/workflows<br/>onerror=_log_cleanup_error]
+    IC -->|build config.toml| CC[_codex_config]
+    CC -->|10 agents| RA[_render_agents_into_codex_config]
+    RA -->|per agent| PF[_parse_agent_frontmatter]
+    RA -->|per agent| RT[_render_agent_toml_block<br/>+ _toml_escape]
+    CC -->|skills table| SK["[skills]<br/>paths = .agents/skills"]
+    IC -->|atomic write| AW[_atomic_write_text<br/>tmp + os.replace]
+    AW --> OUT[.codex/config.toml]
+    OP -->|dadaia public doctor| DOC[doctor]
+    DOC -->|_classify_workflows| CL{tool?}
+    CL -->|codex| NA["[not-applicable] cyan"]
+    CL -->|opencode + parallel_group| PA["[partial] yellow"]
+    CL -->|opencode linear| OK["[ok] green"]
+  </pre>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Sessão de operador que onboarding nova máquina ou sincroniza assets agentic depois de mudança em <code>dadaia_workspace/public/agents/*.md</code>: <code>dadaia public stage &amp;&amp; dadaia public install --target all</code>. Critério mecânico: <strong>se houve mudança em <code>public/agents/</code> ou <code>public/skills/</code>, rodar install. Para auditar sincronia: <code>dadaia public doctor</code> — verde geral, cyan para Codex workflows (intencional), yellow apenas se algo derivou.</strong></p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Sem esta release, o produto mentia ao Codex: o slot <code>.codex/agents/</code> existia como copy-tree mas o runtime do Codex nunca o lia (Codex lê <code>[agents.&lt;name&gt;]</code> em <code>config.toml</code>, não diretórios). Workflows idem — copiados, nunca executados. O doctor reportava <code>[unsupported] codex:agents</code>, o que confundia: <em>era</em> suportado, só estava no formato errado. A release substitui essa mentira por uma verdade estrutural em três camadas: (a) <code>[agents.&lt;name&gt;]</code> blocks emitidos no formato que o Codex de fato consome; (b) <code>[skills]</code> table com <code>paths = [".agents/skills"]</code> (acordo com o lookup do Codex para o slot skills); (c) doctor honest com <code>[not-applicable]</code> + cyan para o que é genuinamente fora do escopo do runtime do Codex (workflows), distinto de <code>[partial]</code> + yellow para limites de runtime do OpenCode (parallel sequentialization). O conjunto desbloqueia Codex sessions com persona-per-agent + skills acessíveis sem tocar em <code>core/</code>, <code>features/</code> ou introduzir runtime deps (stdlib-only, constitution L33+ preserved).</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li>Read: <code>.dadaia/agentic/agents/*.md</code> (10 agentes), <code>dadaia_workspace/public/workflows/*.workflow.md</code> (12+ workflows) — via <code>Path.read_text()</code> ASCII safe.</li>
+    <li>Write: <code>.codex/config.toml</code> (atomic via <code>_atomic_write_text</code>); <code>.codex/workflows/</code> é unconditionally removido via <code>shutil.rmtree(onerror=_log_cleanup_error)</code>; <code>.codex/agents/</code> não é mais criado (removido do <code>_install_codex</code> tuple).</li>
+    <li>Stderr: <code>[removed] {path} ... — N entries</code> antes do rmtree; <code>[cleanup-warning] {path}: {exc}</code> em caso de <code>PermissionError</code> / <code>OSError</code> (sem re-raise — install completa).</li>
+    <li>Helpers privados novos em <code>infrastructure/public_assets.py</code> (~89 LoC novas): <code>_atomic_write_text</code>, <code>_parse_agent_frontmatter</code>, <code>_toml_escape</code>, <code>_render_agent_toml_block</code>, <code>_render_agents_into_codex_config</code>, <code>_log_cleanup_error</code>, branch novo em <code>_classify_workflows</code> para Codex.</li>
+    <li>Whitelist: <code>_TOML_SAFE_AGENT_FIELDS = {"name", "description", "model", "tools"}</code> — frontmatter fields fora dela são <em>dropped silently</em> (R4 mitigation). Bloco inteiro é dropped se <code>name</code> ausente.</li>
+    <li>Cobertura: 76% no módulo (97 linhas não cobertas — todas pré-existentes ao escopo da release; ver <a href="../../_archive/releases/multi-platform-parity-v1/CLOSURE.md">CLOSURE Drift §1</a>).</li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Roda sobre <a href="public-asset-distribution.html">public-asset-distribution</a> (canonical → <code>.dadaia/agentic/</code> → projeções multi-tool); o stage step alimenta <code>.dadaia/agentic/agents/*.md</code> que esta release lê.</li>
+    <li><a href="specs-doctor.html">specs-doctor</a> não é tocado — multi-platform parity opera no <code>public</code> doctor (<code>dadaia public doctor</code>), separate plane.</li>
+    <li>Zero novas runtime deps: <code>re</code>, <code>pathlib</code>, <code>shutil</code>, <code>os</code>, <code>sys</code>, <code>tomllib</code> (apenas em testes via roundtrip) — tudo stdlib (NFR-4, constitution L33+).</li>
+    <li>Zero overlap com <a href="agent-comms.html">agent-comms</a>: <code>handoff_validator.py</code>, <code>handoff-v1.schema.json</code> e <code>specs/_archive/releases/agent-comms-v1/</code> intocados (AC-13, AC-15 PASS).</li>
+    <li>Pilar 3 da constituição (<code>specs/constitution.md</code> L15–31, amended 2026-05-16) é o mandato binding — pillar text fixa o floor: workflows com <code>parallel_group</code> são Claude-exclusive; OpenCode <code>[partial]</code>; Codex <code>[not-applicable]</code>.</li>
+  </ul>
+</section>
+
+<section id="next-steps">
+  <h2>Próximos passos</h2>
+  <ul>
+    <li><strong><code>agents-md-hierarchical-v1</code></strong> (candidato em <code>specs/backlog/candidates.md</code>) — G4 deferido: introduzir Codex hierarchical AGENTS.md rendering (múltiplos <code>AGENTS.md</code> em sub-dirs com herança), substituindo a abordagem single-file persona atual. Mantido fora de escopo nesta release para preservar delta gerenciável (~148 LoC) e evitar mistura de mudança de modelo (G4) com paridade de runtime atual (G1/G2/G3/G5 fechados). Owner sugerido: product-engineer (discovery) + software-engineer (impl).</li>
+    <li><strong><code>public-assets-coverage-lift-v1</code></strong> (candidato em <code>specs/backlog/candidates.md</code>) — fecha o drift AC-12: cobrir testes para os trechos pré-existentes não cobertos em <code>infrastructure/public_assets.py</code> (ranges 378–433 em <code>doctor()</code>, 595–650 em <code>_runtime_expectations</code>, 675–696 nos helpers utilitários), elevando cobertura de 76% para ≥80% (idealmente ≥90% para headroom). Owner sugerido: software-engineer.</li>
+    <li><strong>Codex schema drift monitoring</strong> (R3 mitigation residual) — manter watch no Codex changelog para sub-table semantics drift; pin schema version em code comment já documenta a assumption. Revisitar via grill-me se Codex shippar mudança breaking.</li>
+  </ul>
+</section>
+
+</body>
+</html>

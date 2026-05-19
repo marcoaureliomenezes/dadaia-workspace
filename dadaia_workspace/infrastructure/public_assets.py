@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
+import sys
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 
@@ -28,6 +31,7 @@ _COPY_DIRS = (
     "commands",
     "agents",
     "scripts",
+    "schemas",
     "data",
     "scaffold",
     "templates",
@@ -37,6 +41,16 @@ _COPY_DIRS = (
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
 _OPENCODE_DIRS = ("commands", "skills", "agents", "plugins", "workflows")
 _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
+
+# Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
+_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset({"name", "description", "model", "tools"})
+
+# Matches a YAML list item under `tools:` (e.g. "  - Read")
+_AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
+# Matches a simple `key: value` line in frontmatter (single-line value)
+_AGENT_FM_SIMPLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): (.+)$", re.MULTILINE)
+# Matches a folded/literal scalar intro: `key: >` or `key: |`
+_AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.MULTILINE)
 
 
 def _sha256(path: Path) -> str:
@@ -56,6 +70,188 @@ def _package_version() -> str:
 
 def _json_dump(data: object) -> str:
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
+
+
+def _toml_escape(value: object) -> str:
+    """Escape *value* for safe emission as a TOML basic string (double-quoted).
+
+    Rules applied (in order):
+    1. Backslash -> double-backslash (must come first to avoid double-escaping)
+    2. Double-quote -> backslash-double-quote
+    3. Newline character -> the two-char escape sequence backslash-n
+
+    For multi-line values the function falls back to a TOML triple-quoted
+    multi-line basic string. If the value itself contains a triple-double-quote
+    sequence, each occurrence is escaped character-by-character.
+
+    Names containing ']' are rejected outright: they cannot be placed safely
+    inside [agents."<name>"] TOML table headers even with quoting.
+    """
+    s = str(value)
+    if "\n" in s:
+        # Use triple-quoted literal; escape any embedded triple-quotes
+        s_escaped = s.replace('"""', '\\"\\"\\"')
+        return f'"""{s_escaped}"""'
+    # Basic-string escaping for single-line values
+    s = s.replace("\\", "\\\\")
+    s = s.replace('"', '\\"')
+    return f'"{s}"'
+
+
+def _render_agents_into_codex_config(agents_dir: Path) -> str:
+    """Scan *agents_dir* for ``.md`` agent files and render TOML ``[agents.*]`` blocks.
+
+    For each ``.md`` file (sorted for determinism):
+    1. Parse YAML frontmatter via ``_parse_agent_frontmatter()``.
+    2. If the result is non-empty (i.e., ``name`` key present), render via
+       ``_render_agent_toml_block()``.
+    3. Agents whose frontmatter cannot be parsed or are missing ``name`` are
+       silently skipped (defensive — never breaks install).
+
+    Returns the concatenated block string (may be empty string when no agents
+    are found).
+    """
+    if not agents_dir.exists():
+        return ""
+    blocks: list[str] = []
+    for md_file in sorted(agents_dir.glob("*.md")):
+        try:
+            text = md_file.read_text(encoding="utf-8")
+            fm = _parse_agent_frontmatter(text)
+            if not fm:
+                continue
+            name = str(fm.get("name", ""))
+            if not name:
+                continue
+            blocks.append(_render_agent_toml_block(name, fm))
+        except (OSError, ValueError):
+            continue
+    return "\n".join(blocks) + ("\n" if blocks else "")
+
+
+def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
+    """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
+
+    Keys are always quoted for safety (required for hyphenated names like
+    ``software-engineer``). Missing or None fields are omitted. The ``tools``
+    field, if present, is emitted as a TOML array of basic strings.
+
+    Names containing ``]`` or newline characters are rejected (cannot appear
+    safely inside a TOML table header, even with quoting). Double-quotes and
+    backslashes are escaped with a leading backslash so the header is valid
+    TOML (e.g. a name like ``a"b`` becomes ``[agents."a\\"b"]``).
+    """
+    if "]" in name:
+        raise ValueError(f"Agent name contains invalid character ']': {name!r}")
+    if "\n" in name:
+        raise ValueError(f"Agent name contains newline character: {name!r}")
+    # Escape backslash first (must precede quote escape to avoid double-escaping)
+    key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
+    lines: list[str] = [f'[agents."{key_escaped}"]\n']
+    for field in ("name", "description", "model"):
+        val = fm.get(field)
+        if val is None:
+            continue
+        lines.append(f"{field} = {_toml_escape(val)}\n")
+    tools_val = fm.get("tools")
+    if tools_val is not None and isinstance(tools_val, list):
+        items = ", ".join(_toml_escape(t) for t in tools_val)
+        lines.append(f"tools = [{items}]\n")
+    return "".join(lines)
+
+
+def _parse_agent_frontmatter(text: str) -> dict[str, object]:
+    """Parse YAML frontmatter from an agent .md file using stdlib regex only.
+
+    Extracts the block between the first pair of ``---`` fences. Supports:
+    - Simple ``key: value`` scalar fields (string values).
+    - Folded scalar ``key: >`` — continuation lines are joined with a space.
+    - YAML list under ``tools:`` — items prefixed with ``  - `` (two-space indent).
+
+    Unknown fields (outside ``_TOML_SAFE_AGENT_FIELDS``) are silently dropped.
+    Returns an empty dict if ``name`` is missing or frontmatter is absent.
+    """
+    if not text.startswith("---\n"):
+        return {}
+    end_idx = text.find("\n---\n", 4)
+    if end_idx == -1:
+        return {}
+    frontmatter = text[4 : end_idx + 1]
+
+    result: dict[str, object] = {}
+    lines = frontmatter.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Detect block scalar (folded `>` or literal `|`)
+        block_m = _AGENT_FM_BLOCK_SCALAR_RE.match(line)
+        if block_m:
+            key = block_m.group(1)
+            # Collect continuation lines (indented)
+            body_lines: list[str] = []
+            i += 1
+            while i < len(lines) and (lines[i].startswith("  ") or lines[i] == ""):
+                body_lines.append(lines[i].strip())
+                i += 1
+            # Join non-empty continuation lines with a space (folded scalar semantics)
+            value = " ".join(part for part in body_lines if part)
+            if key in _TOML_SAFE_AGENT_FIELDS:
+                result[key] = value
+            continue
+
+        # Detect tools list  (`tools:\n  - item\n  - item`)
+        if line == "tools:":
+            items: list[str] = []
+            i += 1
+            while i < len(lines) and _AGENT_FM_TOOLS_ITEM_RE.match(lines[i]):
+                m = _AGENT_FM_TOOLS_ITEM_RE.match(lines[i])
+                if m:
+                    items.append(m.group(1).strip())
+                i += 1
+            if "tools" in _TOML_SAFE_AGENT_FIELDS:
+                result["tools"] = items
+            continue
+
+        # Simple scalar
+        simple_m = _AGENT_FM_SIMPLE_RE.match(line)
+        if simple_m:
+            key = simple_m.group(1)
+            value_str = simple_m.group(2).strip()
+            if key in _TOML_SAFE_AGENT_FIELDS:
+                result[key] = value_str
+        i += 1
+
+    # Require `name` — without it, the block cannot be rendered
+    if "name" not in result:
+        return {}
+    return result
+
+
+def _atomic_write_text(dst: Path, content: str) -> None:
+    """Write *content* to *dst* atomically via a sibling .tmp file + os.replace().
+
+    Guarantees the destination either contains the full new content or is
+    unchanged — prevents readers from observing a partially-written file.
+    """
+    tmp = dst.with_suffix(dst.suffix + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, dst)
+
+
+def _log_cleanup_error(
+    func: object,
+    path: object,
+    exc_info: tuple[type[BaseException], BaseException, Any] | tuple[None, None, None],
+) -> None:
+    """onerror= callback for shutil.rmtree — write a warning to stderr without re-raising.
+
+    Replaces the anti-pattern ``ignore_errors=True`` (which silences real
+    PermissionError / OSError) with a visible-but-non-fatal warning so that
+    operators can act on stale files while the install still succeeds.
+    """
+    exc_class = type(exc_info[1]).__name__ if exc_info and exc_info[1] else "UnknownError"
+    exc_msg = str(exc_info[1]) if exc_info and exc_info[1] else ""
+    sys.stderr.write(f"[cleanup-warning] {path}: {exc_class}: {exc_msg}\n")
 
 
 def _strip_tools_from_frontmatter(content: str) -> str:
@@ -93,6 +289,144 @@ def _prepare_agent_for_opencode(content: str) -> str:
     frontmatter = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
     frontmatter = _FRONTMATTER_OPENCODE_MODEL_FIELD_RE.sub("", frontmatter)
     return f"---\n{frontmatter}---\n{body}"
+
+
+def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
+    """Return marker-bearing consumer repo directories under ``workspace_root/repos/``.
+
+    A directory qualifies when BOTH markers are present (R13):
+    - ``<repo>/.dadaia/`` directory
+    - ``<repo>/.dadaia/agentic/`` directory
+
+    Non-qualifying directories emit a ``[skip]`` line to stderr.
+    """
+    repos_dir = workspace_root / "repos"
+    if not repos_dir.is_dir():
+        return []
+    result: list[Path] = []
+    for p in sorted(repos_dir.iterdir()):
+        if not p.is_dir():
+            continue
+        if (p / ".dadaia").is_dir() and (p / ".dadaia" / "agentic").is_dir():
+            result.append(p)
+        else:
+            sys.stderr.write(f"[skip] {p / 'AGENTS.md'} (no .dadaia/ marker)\n")
+    return result
+
+
+def _is_self_repo(consumer: Path) -> bool:
+    """Return True when *consumer* is the dadaia-workspace repo itself (R14).
+
+    Compares ``package_version`` in the consumer's manifest against the
+    currently installed package version.  A match means the consumer IS the
+    dadaia-workspace source tree — we must never overwrite its source files.
+    """
+    manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
+    if not manifest_path.exists():
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        consumer_version = manifest.get("package_version", "")
+        return bool(consumer_version and consumer_version == _package_version())
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
+def _install_workspace_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str] | None = None,
+) -> None:
+    """Fan ``source`` (``data/AGENTS.md``) out to workspace root + all consumer repos.
+
+    Projection targets per call (Option C, ADR):
+    1. ``workspace_root / "AGENTS.md"``
+    2. ``workspace_root / "CLAUDE.md"``
+    3. ``<consumer> / "AGENTS.md"`` — for each marker-bearing consumer (R13)
+    4. ``<consumer> / "CLAUDE.md"`` — same consumer
+
+    Self-skip (R14): if a consumer's manifest ``package_version`` matches our
+    own, that consumer is the dadaia-workspace source repo — skip both files
+    to avoid overwriting the source.
+
+    Marker-less repos under ``repos/`` emit ``[skip]`` to stderr and are never
+    written.  The function never raises on missing/unexpected paths.
+
+    Args:
+        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
+        workspace_root: Workspace root directory.
+        force: When True, overwrite existing files; when False, skip if present.
+        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+    """
+    if installed is None:
+        installed = []
+
+    # Read source bytes once; compute SHA-256 for integrity tracking.
+    source_bytes = source.read_bytes()
+    _src_sha = hashlib.sha256(source_bytes).hexdigest()  # available for callers
+
+    def _write_pair(target_dir: Path) -> None:
+        for filename in ("AGENTS.md", "CLAUDE.md"):
+            dst = target_dir / filename
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if dst.exists() and not force:
+                installed.append(f"[skip] {dst}")
+                return
+            shutil.copy2(source, dst)
+            installed.append(f"[ok]   {dst}")
+
+    # Workspace-root write set (always).
+    _write_pair(workspace_root)
+
+    # Consumer-repo enumeration (R13).
+    for consumer in _consumer_repos_for_root(workspace_root):
+        if _is_self_repo(consumer):
+            v = _package_version()
+            sys.stderr.write(
+                f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
+            )
+            continue
+        _write_pair(consumer)
+
+
+def _doctor_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+) -> list[str]:
+    """Return doctor parity lines for the guardrail pair projection.
+
+    Emits 2 root lines + 2 lines per marker-bearing consumer (R13).
+    Each line is ``[ok] <label>`` or ``[drift] <label>`` or ``[missing] <label>``.
+    Lines are also written to stderr for CLI visibility.
+
+    Labels: ``root:AGENTS.md``, ``root:CLAUDE.md``,
+    ``repos/<slug>:AGENTS.md``, ``repos/<slug>:CLAUDE.md``.
+    """
+    source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+
+    def _check(dst: Path, label: str) -> str:
+        if not dst.exists():
+            line = f"[missing] {label}"
+        elif hashlib.sha256(dst.read_bytes()).hexdigest() != source_sha:
+            line = f"[drift] {label}"
+        else:
+            line = f"[ok] {label}"
+        sys.stderr.write(line + "\n")
+        return line
+
+    lines: list[str] = []
+    lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
+    lines.append(_check(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
+
+    for consumer in _consumer_repos_for_root(workspace_root):
+        if _is_self_repo(consumer):
+            continue
+        slug = consumer.name
+        lines.append(_check(consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md"))
+        lines.append(_check(consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md"))
+
+    return lines
 
 
 class FileSystemPublicAssetManager:
@@ -160,7 +494,16 @@ class FileSystemPublicAssetManager:
             installed.extend(self.stage(workspace_root))
 
         targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
-        self._install_agents_md(agentic_dir, workspace_root, force, installed)
+        data_agents_md = agentic_dir / "data" / "AGENTS.md"
+        if data_agents_md.exists():
+            # Option C (ADR): single source fans out to workspace-root pair +
+            # one pair per marker-bearing consumer repo.  Replaces the legacy
+            # _install_agents_md path for data/AGENTS.md.
+            _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
+        else:
+            # Legacy / scaffold path: templates/AGENTS.md → workspace-root only.
+            self._install_agents_md(agentic_dir, workspace_root, force, installed)
+        self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
             if item == "agents":
@@ -218,7 +561,7 @@ class FileSystemPublicAssetManager:
         )
         reports.append(
             self._compare_content(
-                self._codex_config(),
+                self._codex_config(agentic_dir),
                 workspace_root / ".codex" / "config.toml",
                 "codex:config.toml",
             )
@@ -246,10 +589,9 @@ class FileSystemPublicAssetManager:
             tag = f"workflows/{wf.name}"
             if has_parallel:
                 out.append(f"[partial] opencode:{tag} (parallel_group sequentially)")
-                out.append(f"[unsupported] codex:{tag} (parallel_group not dispatchable)")
             else:
                 out.append(f"[ok] opencode:{tag}")
-                out.append(f"[ok] codex:{tag}")
+            out.append(f"[not-applicable] codex:{tag} (no workflow runtime)")
             out.append(f"[ok] claude:{tag}")
         return out
 
@@ -274,6 +616,15 @@ class FileSystemPublicAssetManager:
         src = self._agents_md_source(agentic_dir)
         if src is not None:
             self._copy_file(src, workspace_root / "AGENTS.md", force, installed)
+
+    def _install_reports_agents_md(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        src = agentic_dir / "data" / "reports-AGENTS.md"
+        if src.exists():
+            reports_dir = workspace_root / ".dadaia" / "reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            self._copy_file(src, reports_dir / "AGENTS.md", force, installed)
 
     def _install_universal_skills(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -308,7 +659,14 @@ class FileSystemPublicAssetManager:
     ) -> None:
         codex_dir = workspace_root / ".codex"
         self._copy_tree(agentic_dir / "rules", codex_dir / "rules", force, installed)
-        self._copy_tree(agentic_dir / "workflows", codex_dir / "workflows", force, installed)
+        workflows_dir = codex_dir / "workflows"
+        if workflows_dir.exists():
+            files = sorted(workflows_dir.rglob("*"))
+            sys.stderr.write(
+                f"[removed] {workflows_dir} (not-applicable: codex has no workflow runtime)"
+                f" — {len(files)} entries\n"
+            )
+            shutil.rmtree(workflows_dir, onerror=_log_cleanup_error)
         self._install_universal_skills(agentic_dir, workspace_root, force, installed)
         self._write_generated(
             codex_dir / "hooks.json",
@@ -318,7 +676,7 @@ class FileSystemPublicAssetManager:
         )
         self._write_generated(
             codex_dir / "config.toml",
-            self._codex_config(),
+            self._codex_config(agentic_dir),
             force,
             installed,
         )
@@ -379,6 +737,33 @@ class FileSystemPublicAssetManager:
         agents_md = self._agents_md_source(agentic_dir)
         if agents_md is not None:
             yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md", False)
+            yield (agents_md, workspace_root / "CLAUDE.md", "root:CLAUDE.md", False)
+            # Consumer-repo parity (R13 + R14): one pair per marker-bearing repo.
+            for consumer in _consumer_repos_for_root(workspace_root):
+                if _is_self_repo(consumer):
+                    continue
+                slug = consumer.name
+                yield (
+                    agents_md,
+                    consumer / "AGENTS.md",
+                    f"repos/{slug}:AGENTS.md",
+                    False,
+                )
+                yield (
+                    agents_md,
+                    consumer / "CLAUDE.md",
+                    f"repos/{slug}:CLAUDE.md",
+                    False,
+                )
+
+        reports_agents_md = agentic_dir / "data" / "reports-AGENTS.md"
+        if reports_agents_md.exists():
+            yield (
+                reports_agents_md,
+                workspace_root / ".dadaia" / "reports" / "AGENTS.md",
+                "reports:AGENTS.md",
+                False,
+            )
 
         for src in self._iter_files(agentic_dir / "skills"):
             rel = src.relative_to(agentic_dir / "skills")
@@ -409,8 +794,6 @@ class FileSystemPublicAssetManager:
                 False,
             )
 
-        yield (None, workspace_root / ".codex" / "agents", "codex:agents", False)
-
         for name in _OPENCODE_DIRS:
             base = agentic_dir / name
             for src in self._iter_files(base):
@@ -432,6 +815,46 @@ class FileSystemPublicAssetManager:
                 return path
         return None
 
+    def _consumer_repos(self, workspace_root: Path) -> list[Path]:
+        """Return marker-bearing consumer repo directories under ``repos/``.
+
+        A directory qualifies when BOTH markers are present:
+        - ``<repo>/.dadaia/`` directory (signals dadaia-aware consumer)
+        - ``<repo>/.dadaia/agentic/`` directory (signals full agentic setup)
+
+        Non-qualifying directories emit a ``[skip]`` line to stderr.
+        """
+        repos_dir = workspace_root / "repos"
+        if not repos_dir.is_dir():
+            return []
+        result: list[Path] = []
+        for p in sorted(repos_dir.iterdir()):
+            if not p.is_dir():
+                continue
+            if (p / ".dadaia").is_dir() and (p / ".dadaia" / "agentic").is_dir():
+                result.append(p)
+            else:
+                sys.stderr.write(f"[skip] {p}/AGENTS.md (no .dadaia/ marker)\n")
+        return result
+
+    def _is_self_repo(self, consumer: Path) -> bool:
+        """Return True when *consumer* is the dadaia-workspace repo itself.
+
+        R14 self-skip: compare ``package_version`` in the consumer's own
+        manifest against the currently installed package version.  A match
+        means the consumer IS the dadaia-workspace source tree — we must
+        never overwrite ``data/AGENTS.md`` by projecting back onto ourselves.
+        """
+        manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
+        if not manifest_path.exists():
+            return False
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            consumer_version = manifest.get("package_version", "")
+            return bool(consumer_version and consumer_version == _package_version())
+        except (json.JSONDecodeError, OSError):
+            return False
+
     def _copy_tree(self, src_dir: Path, dst_dir: Path, force: bool, installed: list[str]) -> None:
         if not src_dir.exists():
             return
@@ -451,7 +874,7 @@ class FileSystemPublicAssetManager:
         if dst.exists() and not force:
             installed.append(f"[skip] {dst}")
             return
-        dst.write_text(content, encoding="utf-8")
+        _atomic_write_text(dst, content)
         installed.append(f"[ok]   {dst}")
 
     def _compare(self, src: Path, dst: Path, label: str) -> str:
@@ -505,7 +928,7 @@ class FileSystemPublicAssetManager:
             }
         }
 
-    def _codex_config(self) -> str:
+    def _codex_config(self, agentic_dir: Path) -> str:
         lines = ['# Generated by "dadaia public install --target codex".\n', "\n"]
         lines.append("approved_commands = [\n")
         for cmd in (
@@ -523,6 +946,15 @@ class FileSystemPublicAssetManager:
         ):
             lines.append(f'  "{cmd}",\n')
         lines.append("]\n")
+        # T-PB-1: emit [agents.<name>] blocks from the agentic agents directory
+        agents_blocks = _render_agents_into_codex_config(agentic_dir / "agents")
+        if agents_blocks:
+            lines.append("\n")
+            lines.append(agents_blocks)
+        # T-PB-4: emit [skills] table after all [agents.*] blocks
+        lines.append("\n")
+        lines.append("[skills]\n")
+        lines.append('paths = [".agents/skills"]\n')
         return "".join(lines)
 
     def _codex_hooks(self, workspace_root: Path) -> dict[str, object]:

@@ -1,0 +1,45 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "software-architect",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T02:13:10Z",
+  "release_id": "agents-r2-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/software-architect/2026-05-19T021310Z-path-scope-gate-pattern.html",
+    "content_hash": "f2195c2239ed12aab8975b2ec5ea40bf5008e5163bfd40d8dd184fff50d11303"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "Decision: Option D (layered chain) — DADAIA_AGENT_PERSONA env var > harness-specific env vars (CLAUDE_/CODEX_/OPENCODE_AGENT_PERSONA) > tool_input._meta.agent_persona payload field > fail-open. Persona resolution is harness-agnostic at the gate level; shim is one-line per harness."
+    },
+    {
+      "severity": "INFO",
+      "message": "Cache strategy: per-invocation in-process only (single frontmatter read per hook process). No file-backed cache, no daemon. Cost well under NFR2's 50 ms budget."
+    },
+    {
+      "severity": "INFO",
+      "message": "Fail-open log line literal: '[<iso8601>] sdd-gate: FAIL-OPEN path-scope: no agent persona detected (env=unset payload=unset) tool=<TOOL> path=<FPATH>'. Retention inherits /tmp/ auto-purge; gate must not rotate."
+    },
+    {
+      "severity": "HIGH",
+      "message": "Trade-off accepted: fail-open at step 6 bypasses the step-7 TASKS-marker gate for top-level human invocations. Humans no longer need a [-] marker for production-path edits. This is intentional per SPEC §FR2.4; document operator-visibly."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "Until each harness's sub-agent runner exports DADAIA_AGENT_PERSONA (one-line shim), path-scope protection is dormant — every agent invocation fails open. Software-engineer is unblocked to land AGT-r2-19; PE must document the shim in data/AGENTS.md §'Agent persona contract' under AGT-r2-33."
+    }
+  ],
+  "decisions_required": [
+    "software-engineer (AGT-r2-19): implement the layered-chain resolver and the step-6 path-scope branch in dadaia_workspace/public/scripts/sdd-spec-gate.sh per §3 §7 §8 of this report.",
+    "software-engineer (AGT-r2-20): land tests/unit/gate/test_path_scope.py with the 9 mandatory cases T1–T9 (T10 optional) per §9 of this report.",
+    "product-engineer (AGT-r2-33): document the DADAIA_AGENT_PERSONA env var contract in data/AGENTS.md §'Agent persona contract' so each harness's sub-agent runner knows what to set.",
+    "product-engineer (AGT-r2-49): record in specs/memory/architecture.html §'layers' that the path-scope gate is a fail-open guardrail (not a security boundary)."
+  ],
+  "next_handoff": {
+    "agent": "software-engineer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
+  }
+}
