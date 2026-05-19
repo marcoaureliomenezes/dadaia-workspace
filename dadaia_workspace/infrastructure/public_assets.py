@@ -291,6 +291,145 @@ def _prepare_agent_for_opencode(content: str) -> str:
     return f"---\n{frontmatter}---\n{body}"
 
 
+def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
+    """Return marker-bearing consumer repo directories under ``workspace_root/repos/``.
+
+    A directory qualifies when BOTH markers are present (R13):
+    - ``<repo>/.dadaia/`` directory
+    - ``<repo>/.dadaia/agentic/`` directory
+
+    Non-qualifying directories emit a ``[skip]`` line to stderr.
+    """
+    repos_dir = workspace_root / "repos"
+    if not repos_dir.is_dir():
+        return []
+    result: list[Path] = []
+    for p in sorted(repos_dir.iterdir()):
+        if not p.is_dir():
+            continue
+        if (p / ".dadaia").is_dir() and (p / ".dadaia" / "agentic").is_dir():
+            result.append(p)
+        else:
+            sys.stderr.write(f"[skip] {p / 'AGENTS.md'} (no .dadaia/ marker)\n")
+    return result
+
+
+def _is_self_repo(consumer: Path) -> bool:
+    """Return True when *consumer* is the dadaia-workspace repo itself (R14).
+
+    Compares ``package_version`` in the consumer's manifest against the
+    currently installed package version.  A match means the consumer IS the
+    dadaia-workspace source tree — we must never overwrite its source files.
+    """
+    manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
+    if not manifest_path.exists():
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        consumer_version = manifest.get("package_version", "")
+        return bool(consumer_version and consumer_version == _package_version())
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
+def _install_workspace_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str] | None = None,
+) -> None:
+    """Fan ``source`` (``data/AGENTS.md``) out to workspace root + all consumer repos.
+
+    Projection targets per call (Option C, ADR):
+    1. ``workspace_root / "AGENTS.md"``
+    2. ``workspace_root / "CLAUDE.md"``
+    3. ``<consumer> / "AGENTS.md"`` — for each marker-bearing consumer (R13)
+    4. ``<consumer> / "CLAUDE.md"`` — same consumer
+
+    Self-skip (R14): if a consumer's manifest ``package_version`` matches our
+    own, that consumer is the dadaia-workspace source repo — skip both files
+    to avoid overwriting the source.
+
+    Marker-less repos under ``repos/`` emit ``[skip]`` to stderr and are never
+    written.  The function never raises on missing/unexpected paths.
+
+    Args:
+        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
+        workspace_root: Workspace root directory.
+        force: When True, overwrite existing files; when False, skip if present.
+        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+    """
+    if installed is None:
+        installed = []
+
+    # Read source bytes once; compute SHA-256 for integrity tracking.
+    source_bytes = source.read_bytes()
+    _src_sha = hashlib.sha256(source_bytes).hexdigest()  # available for callers
+
+    def _write_pair(target_dir: Path) -> None:
+        for filename in ("AGENTS.md", "CLAUDE.md"):
+            dst = target_dir / filename
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if dst.exists() and not force:
+                installed.append(f"[skip] {dst}")
+                return
+            shutil.copy2(source, dst)
+            installed.append(f"[ok]   {dst}")
+
+    # Workspace-root write set (always).
+    _write_pair(workspace_root)
+
+    # Consumer-repo enumeration (R13).
+    for consumer in _consumer_repos_for_root(workspace_root):
+        if _is_self_repo(consumer):
+            v = _package_version()
+            sys.stderr.write(
+                f"[skip] {consumer / 'AGENTS.md'}"
+                f" (self-projection — package_version={v})\n"
+            )
+            continue
+        _write_pair(consumer)
+
+
+def _doctor_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+) -> list[str]:
+    """Return doctor parity lines for the guardrail pair projection.
+
+    Emits 2 root lines + 2 lines per marker-bearing consumer (R13).
+    Each line is ``[ok] <label>`` or ``[drift] <label>`` or ``[missing] <label>``.
+    Lines are also written to stderr for CLI visibility.
+
+    Labels: ``root:AGENTS.md``, ``root:CLAUDE.md``,
+    ``repos/<slug>:AGENTS.md``, ``repos/<slug>:CLAUDE.md``.
+    """
+    source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+
+    def _check(dst: Path, label: str) -> str:
+        if not dst.exists():
+            line = f"[missing] {label}"
+        elif hashlib.sha256(dst.read_bytes()).hexdigest() != source_sha:
+            line = f"[drift] {label}"
+        else:
+            line = f"[ok] {label}"
+        sys.stderr.write(line + "\n")
+        return line
+
+    lines: list[str] = []
+    lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
+    lines.append(_check(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
+
+    for consumer in _consumer_repos_for_root(workspace_root):
+        if _is_self_repo(consumer):
+            continue
+        slug = consumer.name
+        lines.append(_check(consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md"))
+        lines.append(_check(consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md"))
+
+    return lines
+
+
 class FileSystemPublicAssetManager:
     def __init__(self) -> None:
         self._public_dir = Path(__file__).parent.parent / "public"
@@ -591,6 +730,24 @@ class FileSystemPublicAssetManager:
         agents_md = self._agents_md_source(agentic_dir)
         if agents_md is not None:
             yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md", False)
+            yield (agents_md, workspace_root / "CLAUDE.md", "root:CLAUDE.md", False)
+            # Consumer-repo parity (R13 + R14): one pair per marker-bearing repo.
+            for consumer in _consumer_repos_for_root(workspace_root):
+                if _is_self_repo(consumer):
+                    continue
+                slug = consumer.name
+                yield (
+                    agents_md,
+                    consumer / "AGENTS.md",
+                    f"repos/{slug}:AGENTS.md",
+                    False,
+                )
+                yield (
+                    agents_md,
+                    consumer / "CLAUDE.md",
+                    f"repos/{slug}:CLAUDE.md",
+                    False,
+                )
 
         reports_agents_md = agentic_dir / "data" / "reports-AGENTS.md"
         if reports_agents_md.exists():
@@ -650,6 +807,46 @@ class FileSystemPublicAssetManager:
             if path.exists():
                 return path
         return None
+
+    def _consumer_repos(self, workspace_root: Path) -> list[Path]:
+        """Return marker-bearing consumer repo directories under ``repos/``.
+
+        A directory qualifies when BOTH markers are present:
+        - ``<repo>/.dadaia/`` directory (signals dadaia-aware consumer)
+        - ``<repo>/.dadaia/agentic/`` directory (signals full agentic setup)
+
+        Non-qualifying directories emit a ``[skip]`` line to stderr.
+        """
+        repos_dir = workspace_root / "repos"
+        if not repos_dir.is_dir():
+            return []
+        result: list[Path] = []
+        for p in sorted(repos_dir.iterdir()):
+            if not p.is_dir():
+                continue
+            if (p / ".dadaia").is_dir() and (p / ".dadaia" / "agentic").is_dir():
+                result.append(p)
+            else:
+                sys.stderr.write(f"[skip] {p}/AGENTS.md (no .dadaia/ marker)\n")
+        return result
+
+    def _is_self_repo(self, consumer: Path) -> bool:
+        """Return True when *consumer* is the dadaia-workspace repo itself.
+
+        R14 self-skip: compare ``package_version`` in the consumer's own
+        manifest against the currently installed package version.  A match
+        means the consumer IS the dadaia-workspace source tree — we must
+        never overwrite ``data/AGENTS.md`` by projecting back onto ourselves.
+        """
+        manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
+        if not manifest_path.exists():
+            return False
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            consumer_version = manifest.get("package_version", "")
+            return bool(consumer_version and consumer_version == _package_version())
+        except (json.JSONDecodeError, OSError):
+            return False
 
     def _copy_tree(self, src_dir: Path, dst_dir: Path, force: bool, installed: list[str]) -> None:
         if not src_dir.exists():
