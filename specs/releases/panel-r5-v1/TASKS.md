@@ -277,7 +277,7 @@
   `dadaia:runtime-change`; on change, drop cache and refetch with `?runtime=`
   appended. Owner: frontend-engineer. Done criterion: toggling the switcher
   re-renders the Agents tab against the right backend filter.
-- [-] **PR5-D6** — Edit
+- [x] **PR5-D6** — Edit
   `dadaia_workspace/features/panel/views/assets/js/workflows.js`: same
   retrofit as `agents.js`. Owner: frontend-engineer. Done criterion: toggling
   the switcher re-renders the Workflows tab against the right backend filter.
