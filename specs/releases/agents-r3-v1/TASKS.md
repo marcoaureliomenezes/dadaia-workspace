@@ -50,7 +50,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 - [x] R3-07 — Author `software-engineer-node.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/software-engineer-node.md`.
   - Done criterion: same shape as R3-06; body explicitly excludes browser surfaces (frontend-engineer territory); security-conscious clauses (no `is_even`-style deps, OWASP-aware) present.
-- [ ] R3-08 — Author `data-engineer.md` persona (`product-engineer`)
+- [-] R3-08 — Author `data-engineer.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/data-engineer.md`.
   - Done criterion: frontmatter + body; primary scope `repos/redacted-slug-explorer/**`; Databricks/Spark/Airflow/Kafka surfaces declared; data-format vocabulary (CSV/AVRO/JSON/Parquet/Delta/Iceberg) referenced; forbidden actions block excludes dashboards (data-analyst territory).
 - [ ] R3-09 — Author `data-analyst.md` persona (`product-engineer`)
