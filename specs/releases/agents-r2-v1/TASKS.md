@@ -59,7 +59,7 @@ local with `pytest` and `dadaia specs doctor`).
   - One playbook per dropped workflow (≤ 20 lines each). `game-spec-definition` becomes a `scope=game` sub-entry of the `spec-refinement` playbook (per PLAN P2).
   - Acceptance: `grep -c '^### Playbook' dadaia_workspace/public/skills/project-orchestration/SKILL.md` → 8.
   - Depends: AGT-r2-05. Parallel with: P1, P3, P4.
-- [ ] AGT-r2-09 — Wrap playbooks into skill body + lint pass (software-engineer)
+- [-] AGT-r2-09 — Wrap playbooks into skill body + lint pass (software-engineer)
   - Acceptance: file passes `dadaia public doctor`'s skill checks; cross-reference to PM-only invocation noted (R3). No external workflow file under `public/workflows/` references these playbooks (R6 / NFR8 note).
   - Depends: AGT-r2-08.
 
