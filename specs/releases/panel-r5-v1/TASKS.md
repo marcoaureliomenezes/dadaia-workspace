@@ -335,7 +335,7 @@
   in the `/api/agents?runtime=claude` response carries BOTH the `tier` key
   (from r4) and is filtered by `provider="claude"` (from r5); response shape
   is a superset of r4's, never a replacement.
-- [ ] **PR5-D12** — Rebase guard for
+- [-] **PR5-D12** — Rebase guard for
   `tests/unit/features/panel/test_api_agents.py`. Confirm r4 PR4-15/PR4-19
   assertions (every agent has `tier ∈ {1, 2, 3}` and `data-tier` attribute
   rendered) remain present and green AFTER the r5 runtime-filter assertions
