@@ -90,7 +90,7 @@
   discriminator) and `get_session` (hit + miss). Owner: software-engineer. Done
   criterion: `.dadaia/.venv/bin/python -m pytest
   tests/unit/features/telemetry/test_aggregator_sessions.py -v` green.
-- [-] **PR5-A5** — Author unit test
+- [x] **PR5-A5** — Author unit test
   `tests/unit/features/telemetry/test_runtime_adapters.py` covering
   `ClaudeRuntimeAdapter.enrich_row` (cost computed via `pricing.compute_cost`)
   and `CodexRuntimeAdapter.enrich_row` (`cumulative_cost_usd is None`,
