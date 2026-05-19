@@ -47,7 +47,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
   - Touches: `dadaia_workspace/public/agents/software-engineer-python.md`.
   - Preconditions: SPEC §5 boundary row 1; retired SE body available as base.
   - Done criterion: file present with frontmatter (`tier: 3`, `model: claude-sonnet-4-6`, `paths.write_allowlist` per SPEC §5, `skills`, `input_contract` with `requires_inputs` + `produces_outputs`, `tools`); body has Scope / Forbidden / Workflow protocol / Skills / Report contract sections; reader parses without raising.
-- [-] R3-07 — Author `software-engineer-node.md` persona (`product-engineer`)
+- [x] R3-07 — Author `software-engineer-node.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/software-engineer-node.md`.
   - Done criterion: same shape as R3-06; body explicitly excludes browser surfaces (frontend-engineer territory); security-conscious clauses (no `is_even`-style deps, OWASP-aware) present.
 - [ ] R3-08 — Author `data-engineer.md` persona (`product-engineer`)
