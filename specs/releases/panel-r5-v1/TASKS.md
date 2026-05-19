@@ -125,7 +125,7 @@
   Done criterion: hitting `/api/sessions?runtime=claude` without a bearer token
   returns `401`; with a valid bearer returns `200` and a JSON envelope; same for
   `/api/sessions/<runtime>/<session_id>`.
-- [ ] **PR5-B3** — Author unit test
+- [-] **PR5-B3** — Author unit test
   `tests/unit/features/panel/test_views_api_sessions.py` covering: envelope
   shape, auth-missing → 401, telemetry-unavailable → 503, successful list
   with mocked aggregator. Owner: software-engineer. Done criterion:
