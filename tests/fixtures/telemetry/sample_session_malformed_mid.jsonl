@@ -1,0 +1,3 @@
+{"sessionId":"test-session-003","timestamp":"2026-05-17T10:00:00.000Z","type":"agent-name","uuid":"uuid-agent-003","agentName":"frontend-engineer","cwd":"/home/operator/frontend","gitBranch":"ui/tabs","isSidechain":false,"slug":"","entrypoint":"cli","aiTitle":null}
+THIS IS NOT VALID JSON {{{broken line
+{"sessionId":"test-session-003","timestamp":"2026-05-17T10:02:00.000Z","type":"assistant","uuid":"uuid-assist-003","cwd":"/home/operator/frontend","gitBranch":"ui/tabs","isSidechain":false,"slug":"","entrypoint":"cli","agentName":null,"aiTitle":null,"message":{"model":"claude-haiku-3-5","usage":{"input_tokens":400,"output_tokens":100,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}

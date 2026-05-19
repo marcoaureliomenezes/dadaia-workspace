@@ -30,13 +30,13 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
 
     workflows = service.list_workflows()
     names = {w.name for w in workflows}
-    assert {"spec-refinement", "tdd-cycle"}.issubset(names)
+    assert {"spec-refinement", "audit-cycle"}.issubset(names)
 
     manifest, invocations = service.start_run(
         "spec-refinement",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "topic": "smoke"},
+        inputs={"context": "demo-ctx", "topic": "smoke", "release_id": "smoke-r1"},
     )
     assert len(invocations) == 1
     assert invocations[0].stage_id == "discovery"
@@ -44,15 +44,46 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
     assert (tmp_path / ".dadaia" / "runs" / manifest.run_id / "manifest.json").exists()
     assert (tmp_path / ".dadaia" / "runs" / manifest.run_id / "events.jsonl").exists()
 
-    # discovery → 3 specialists in one parallel batch
-    _, parallel = service.resume_run(manifest.run_id)
-    assert {inv.stage_id for inv in parallel} == {"arch_review", "devops_review", "qa_review"}
+    # Simulate agent output for discovery (has must_include validation)
+    disc_out = tmp_path / invocations[0].expected_output_path
+    disc_out.parent.mkdir(parents=True, exist_ok=True)
+    disc_out.write_text(
+        "<!DOCTYPE html><html><body>"
+        "<h2>Findings</h2><p>ok</p>"
+        "<h2>Riscos</h2><p>ok</p>"
+        "<h2>Decisões necessárias</h2><p>ok</p>"
+        "</body></html>"
+    )
 
-    # specialists → synthesis
+    # discovery → 5 specialists in one parallel batch (multi-platform-parity-v1 expansion)
+    _, parallel = service.resume_run(manifest.run_id)
+    assert {inv.stage_id for inv in parallel} == {
+        "arch_review",
+        "devops_review",
+        "qa_review",
+        "frontend_review",
+        "backend_review",
+    }
+
+    # specialists → synthesis (no must_include on specialists)
     _, synth = service.resume_run(manifest.run_id)
     assert {inv.stage_id for inv in synth} == {"synthesis"}
 
-    # synthesis → completed
+    # Simulate agent output for synthesis (has must_include validation)
+    synth_out = tmp_path / synth[0].expected_output_path
+    synth_out.parent.mkdir(parents=True, exist_ok=True)
+    synth_out.write_text("# SPEC\n\n## Status\nDraft\n\n## Critérios de Aceite\n...\n")
+
+    # synthesis → spec_write (post-r5 workflow added spec_write stage with gate)
+    _, spec_inv = service.resume_run(manifest.run_id)
+    assert {inv.stage_id for inv in spec_inv} == {"spec_write"}
+
+    # Simulate agent output for spec_write (has must_include validation)
+    spec_out = tmp_path / spec_inv[0].expected_output_path
+    spec_out.parent.mkdir(parents=True, exist_ok=True)
+    spec_out.write_text("# SPEC\n\n## Status\nDraft\n\n## Critérios de Aceite\n...\n")
+
+    # spec_write → completed
     final, more = service.resume_run(manifest.run_id)
     assert final.status.value == "completed"
     assert more == ()
@@ -66,10 +97,10 @@ def test_events_jsonl_records_full_lifecycle(tmp_path: Path) -> None:
     _bootstrap(tmp_path)
     service = container.build_orchestration_service(tmp_path, runtime="cli")
     manifest, _ = service.start_run(
-        "tdd-cycle",
+        "audit-cycle",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "task_id": "T999"},
+        inputs={"context": "demo-ctx", "scope": "full"},
     )
     events_path = tmp_path / ".dadaia" / "runs" / manifest.run_id / "events.jsonl"
     lines = [ln for ln in events_path.read_text().splitlines() if ln.strip()]
@@ -83,20 +114,20 @@ def test_status_listing_and_lookup(tmp_path: Path) -> None:
     _bootstrap(tmp_path)
     service = container.build_orchestration_service(tmp_path, runtime="cli")
     m1, _ = service.start_run(
-        "tdd-cycle",
+        "audit-cycle",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "task_id": "T1"},
+        inputs={"context": "demo-ctx", "scope": "full"},
     )
     m2, _ = service.start_run(
-        "tdd-cycle",
+        "audit-cycle",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "task_id": "T2"},
+        inputs={"context": "demo-ctx", "scope": "partial"},
     )
     ids = {r.run_id for r in service.list_runs()}
     assert {m1.run_id, m2.run_id}.issubset(ids)
 
     loaded = service.get_run_status(m1.run_id)
-    assert loaded.workflow_name == "tdd-cycle"
+    assert loaded.workflow_name == "audit-cycle"
     assert loaded.run_id == m1.run_id

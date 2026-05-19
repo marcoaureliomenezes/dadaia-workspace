@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'">
+<title>Security Threat Model — Agent Monitoring (agent-monitoring-v1)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 980px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .93rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .3rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .55em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    white-space: nowrap;
+  }
+  .sev-critical { background: #ffd7d7; color: #a00000; }
+  .sev-high     { background: #fff0d0; color: #c05000; }
+  .sev-medium   { background: #fffad0; color: #806000; }
+  .sev-low      { background: #e6f4e6; color: #1a5c00; }
+  .sev-info     { background: #e0eaff; color: #0550ae; }
+  .dec-block    { background: #ffd7d7; color: #a00000; }
+  .dec-approve  { background: #e6f4e6; color: #1a5c00; }
+  .dec-cond     { background: #fffad0; color: #806000; }
+  .finding {
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+  }
+  .finding-critical { border-left: 4px solid #a00000; }
+  .finding-high     { border-left: 4px solid #c05000; }
+  .finding-medium   { border-left: 4px solid #806000; }
+  .finding-low      { border-left: 4px solid #1a5c00; }
+  .finding h3 { margin-top: 0; }
+  .checklist li { list-style: none; padding-left: .25rem; }
+  .checklist li::before { content: "[ ] "; font-family: monospace; color: #555; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agent:</strong> devops-engineer</span>
+  <span><strong>Generated:</strong> 2026-05-17T053054Z</span>
+  <span><strong>Context:</strong> dadaia-workspace</span>
+  <span><strong>Phase:</strong> 2 — Specialist Security Review</span>
+  <span><strong>Release:</strong> <code>agent-monitoring-v1</code> (proposed)</span>
+  <span><strong>Input:</strong> Phase 1 discovery report + approved plan</span>
+</div>
+
+<h1>Security Threat Model — Agent Monitoring via dadaia-workspace Panel</h1>
+
+<blockquote>
+<p><strong>Operator lema:</strong> "Users will use the dadaia-workspace in its own environment.
+The dadaia-workspace panel must be secure. And the workspace resilient."</p>
+<p><strong>Supply-chain principle:</strong> "If we can get all we need from the providers, it is the
+better and safest solution." Every proposed new dependency is evaluated against this bar.</p>
+</blockquote>
+
+<h2>1. Threat Matrix</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Threat</th>
+      <th>Severity</th>
+      <th>Attack Vector</th>
+      <th>Mitigation</th>
+      <th>Owner</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>T1</td>
+      <td><strong>Sensitive content leak via new endpoint</strong> — jsonl lines contain operator input verbatim, including potential API keys, credentials, and private paths. A new endpoint that reads jsonl without a strict allowlist exposes this over HTTP.</td>
+      <td><span class="badge sev-critical">CRITICAL</span></td>
+      <td>Malicious or miscoded endpoint in <code>handler.py</code>; local process POSTing to panel; developer accidentally wiring a <code>/api/sessions/&lt;id&gt;/content</code> route.</td>
+      <td>Schema allowlist enforced at the reader layer before any data reaches HTTP. Only fields in the approved set (<code>sessionId</code>, <code>timestamp</code>, <code>model</code>, token counts, calculated cost, <code>cwd</code>, <code>entrypoint</code>, <code>gitBranch</code>, <code>subagent_type</code>) may be stored in SQLite or returned by any endpoint. The aggregator layer must strip all other fields before insertion. Unit tests must assert that <code>content</code>, <code>text</code>, <code>messages</code>, and any key containing the substring <code>input</code> or <code>output</code> in the raw text sense are absent from every JSON response.</td>
+      <td>software-engineer (implementation) + devops-engineer (endpoint review gate)</td>
+    </tr>
+    <tr>
+      <td>T2</td>
+      <td><strong>SQLite telemetry file readable by another OS user</strong> — on a multi-user host, world-readable <code>~/.dadaia/state/telemetry.sqlite</code> exposes aggregated session metadata to any local user.</td>
+      <td><span class="badge sev-high">HIGH</span></td>
+      <td>Another OS user reads the file directly; backup script runs as a different uid and copies the file with relaxed permissions.</td>
+      <td><code>chmod 600 ~/.dadaia/state/telemetry.sqlite</code> enforced on creation via <code>os.chmod</code> before the first write. Parent directory <code>~/.dadaia/state/</code> must be <code>chmod 700</code>. Reader code must fail-open on permission check failure (refuse to create the file rather than create it with open permissions). Document this constraint in the implementation spec so it cannot be omitted.</td>
+      <td>software-engineer (implementation)</td>
+    </tr>
+    <tr>
+      <td>T3</td>
+      <td><strong>Local malware enumerates session IDs and cost data</strong> — panel binds <code>127.0.0.1:4999</code> without any auth token. Any process on the host can query <code>/api/agents</code> and <code>/api/sessions</code> to enumerate session IDs and infer operator activity patterns and cumulative spend.</td>
+      <td><span class="badge sev-high">HIGH</span></td>
+      <td>Malware, rogue browser extension, or compromised dev tool that can make HTTP requests to <code>localhost:4999</code>.</td>
+      <td>See Section 3 (Auth Recommendation). Short answer: add a single shared secret token for this release, given cost telemetry is now exposed. Session ID prefix-truncation (first 8 chars + ellipsis) reduces the value of enumeration even if the token is absent.</td>
+      <td>software-engineer (implementation) + product-engineer (decision)</td>
+    </tr>
+    <tr>
+      <td>T4</td>
+      <td><strong>DoS via oversized jsonl</strong> — a session jsonl file of 1 GB or more causes the reader to consume unbounded memory, hang the panel process, or lock the event loop for multiple seconds per request.</td>
+      <td><span class="badge sev-high">HIGH</span></td>
+      <td>Long Claude Code sessions with many tool calls; accidental log accumulation over months; adversarial file placed in <code>~/.claude/projects/</code>.</td>
+      <td>Reader must enforce: (a) max bytes read per cycle (suggested: 4 MB per file per polling tick); (b) max line length (suggested: 64 KB per JSONL line — silently skip and log a warning if exceeded); (c) checkpoint offset stored in SQLite so already-processed bytes are never re-read; (d) total in-memory event buffer capped (suggested: 10,000 events per cycle). These are not hard-coded constants in the business logic — expose them as named module-level configuration with documented defaults so the spec can adjust them.</td>
+      <td>software-engineer</td>
+    </tr>
+    <tr>
+      <td>T5</td>
+      <td><strong>Malformed or adversarial JSONL line causes reader crash or infinite loop</strong> — a truncated, malformed, or crafted line triggers an exception in the reader that either crashes the aggregator or, if swallowed silently, causes repeated retry on the same offset.</td>
+      <td><span class="badge sev-medium">MEDIUM</span></td>
+      <td>Network filesystem truncation; Claude Code bug writing partial JSON; an agent writing to the file maliciously (see T7).</td>
+      <td>Each line must be parsed inside a <code>try/except</code> block; parse failures skip the line and advance the checkpoint. Checkpoint must be byte-offset based, not line-number based, to survive truncation. Log the failure (without echoing the line content, which may contain secrets) with the file path and byte offset only.</td>
+      <td>software-engineer</td>
+    </tr>
+    <tr>
+      <td>T6</td>
+      <td><strong>Reader process running as root</strong> — if the panel or reader daemon is started as root (e.g., via a system service), it can read all users' <code>~/.claude/</code> directories, violating the per-user isolation guarantee.</td>
+      <td><span class="badge sev-medium">MEDIUM</span></td>
+      <td>Operator inadvertently runs <code>sudo dadaia panel start</code>; cron job runs as root.</td>
+      <td>Reader must assert <code>os.getuid() != 0</code> at startup and refuse to proceed if running as root. This is a one-line guard; add it to the <code>TelemetryService</code> constructor. Document in the CLI that the panel must be started as the operator's own user.</td>
+      <td>software-engineer</td>
+    </tr>
+    <tr>
+      <td>T7</td>
+      <td><strong>Malicious agent writes forged lines into jsonl</strong> — a compromised or prompt-injected agent appends fabricated <code>usage</code> events to the session jsonl file, inflating token counts and computed costs, causing the operator to distrust the monitoring data.</td>
+      <td><span class="badge sev-medium">MEDIUM</span></td>
+      <td>A rogue agent (running as the same uid as the operator) with write access to <code>~/.claude/projects/</code> appends crafted JSONL lines with inflated token counts.</td>
+      <td>Full cryptographic signing of each jsonl line is not feasible (Claude Code is a provider black box — we do not control what it writes). Practical mitigations: (a) reader validates that <code>usage.*</code> fields are non-negative integers within plausible bounds (e.g., max 2,000,000 tokens per event — above this, mark event as suspect and log without accumulating); (b) UI surfaces a "data integrity warning" banner if any session contains a suspect event; (c) reader records the file modification time and inode at checkpoint creation — if the file is modified backwards (truncation followed by appending), flag the session. These are detective controls, not preventive. The threat model must document that an agent running as the operator uid is a trusted principal for purposes of file integrity.</td>
+      <td>software-engineer (validation bounds) + product-engineer (UI warning design)</td>
+    </tr>
+    <tr>
+      <td>T8</td>
+      <td><strong>Missing CSP on panel HTTP responses</strong> — the current panel (<code>handler.py:_respond</code>) sends no <code>Content-Security-Policy</code> header. New endpoints serving JSON inline data or future JS changes could enable XSS if a script tag is injected into a template.</td>
+      <td><span class="badge sev-medium">MEDIUM</span></td>
+      <td>Inline JavaScript with attacker-controlled data rendered in the index template; future template regression where a field value is rendered unescaped.</td>
+      <td>Add <code>Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'</code> to the <code>_respond</code> method in <code>handler.py</code> for all <code>text/html</code> responses. Note: <code>'unsafe-inline'</code> is required because the current panel embeds all JS and CSS inline in the HTML template. This is an acceptable trade-off for a local-only, no-external-content panel. Do not add <code>'unsafe-eval'</code>. For JSON API responses, add <code>X-Content-Type-Options: nosniff</code> to prevent content-type sniffing.</td>
+      <td>software-engineer</td>
+    </tr>
+    <tr>
+      <td>T9</td>
+      <td><strong>sessionId leak via screenshot / screen share</strong> — the panel UI displays full sessionId values. While these IDs do not expose content, they are persistent identifiers that could enable session enumeration if a screenshot is shared.</td>
+      <td><span class="badge sev-low">LOW</span></td>
+      <td>Operator shares a screenshot of the panel in a public channel (Slack, GitHub issue, etc.).</td>
+      <td>Display only the first 8 characters of the sessionId followed by an ellipsis in all list and card views (e.g., <code>abc12345...</code>). The full sessionId may be exposed in a detail view accessible only on explicit interaction. This is sufficient to prevent trivial enumeration while preserving debugging utility.</td>
+      <td>frontend-engineer</td>
+    </tr>
+    <tr>
+      <td>T10</td>
+      <td><strong>SQLite corruption leaves panel unbootable</strong> — if the SQLite file is corrupted (e.g., mid-write crash, disk full, filesystem error), the panel crashes on startup rather than degrading gracefully.</td>
+      <td><span class="badge sev-low">LOW</span></td>
+      <td>Disk full event during aggregation write; OS crash mid-WAL-commit; filesystem corruption.</td>
+      <td>At startup, run <code>PRAGMA integrity_check</code> against the SQLite file. If it fails, rename the corrupt file to <code>telemetry.sqlite.corrupt.&lt;timestamp&gt;</code> and boot in "no-telemetry" mode where the panel functions but all telemetry endpoints return a 503 with a human-readable message. Document the recovery path: delete or move the corrupt file and restart; the reader will re-ingest from jsonl. This ensures resilience per the operator lema.</td>
+      <td>software-engineer</td>
+    </tr>
+    <tr>
+      <td>T11</td>
+      <td><strong>Rate limiting absent on local HTTP API</strong> — no rate limiting on <code>127.0.0.1:4999</code> means a tight local loop can exhaust the ThreadingHTTPServer's thread pool (or Python's GIL scheduling), degrading the panel for all consumers.</td>
+      <td><span class="badge sev-low">LOW</span></td>
+      <td>A buggy script or browser tab polling <code>/api/agents</code> in a tight loop.</td>
+      <td>At this stage, a simple in-process request counter per 10-second window with a 429 response if exceeded (e.g., 60 requests/10s per IP — but since the binding is <code>127.0.0.1</code>, all clients are <code>127.0.0.1</code>, so a global rate limiter on the handler class is sufficient) is adequate. Implement only if the panel becomes measurably degraded in practice; document it as a known gap for now. Do not add a framework dependency for this.</td>
+      <td>software-engineer (if prioritized)</td>
+    </tr>
+    <tr>
+      <td>T12</td>
+      <td><strong>Log rotation / deletion of aggregated SQLite</strong> — secure deletion of the SQLite file via <code>rm</code> only removes the directory entry; on most Linux filesystems data blocks are not overwritten, leaving telemetry recoverable from disk.</td>
+      <td><span class="badge sev-low">LOW</span></td>
+      <td>Operator "deletes" the SQLite to reset telemetry; data is later recovered from disk forensics.</td>
+      <td>Document in the operator guide that <code>shred -u ~/.dadaia/state/telemetry.sqlite</code> (or <code>wipe</code>) should be used for secure deletion, not plain <code>rm</code>. For a local single-user developer tool, this is informational rather than a blocking requirement. The SQLite file contains aggregated metadata only (no raw prompts), so the risk is low by design.</td>
+      <td>product-engineer (documentation)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2. Supply-Chain Verdict</h2>
+
+<p>
+The supply-chain principle is the primary filter: if the Python standard library (or providers'
+own output) can satisfy the requirement, it must. Every new dependency is a potential
+attack vector and a maintenance liability. The bar is high.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Dependency</th>
+      <th>Proposed by</th>
+      <th>Purpose</th>
+      <th>Stdlib alternative</th>
+      <th>Supply-chain risk</th>
+      <th>Decision</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>ccusage</code></td>
+      <td>—</td>
+      <td>Cost calculation from Claude jsonl</td>
+      <td><code>json</code> + <code>sqlite3</code> + <code>pricing.py</code> (in-repo)</td>
+      <td>npm package with extensive transitive dep tree. Node runtime required. Completely outside the Python panel stack.</td>
+      <td><span class="badge dec-block">BLOCKED</span> — operator decision, confirmed. Zero Node deps.</td>
+    </tr>
+    <tr>
+      <td><code>aiosqlite</code></td>
+      <td>software-engineer (possible suggestion)</td>
+      <td>Async SQLite access to avoid blocking the event loop</td>
+      <td><code>sqlite3</code> stdlib in a worker thread (<code>concurrent.futures.ThreadPoolExecutor</code>), or synchronous reads since the panel uses <code>ThreadingHTTPServer</code> (each request gets its own thread)</td>
+      <td>Single-file pure-Python wrapper; low transitive risk. However, introduces an async programming model into a sync codebase.</td>
+      <td><span class="badge dec-cond">CONDITIONAL</span> — approved only if software-engineer demonstrates that <code>ThreadPoolExecutor + sqlite3</code> produces measurable contention at realistic loads. Default is stdlib only. If async is chosen, the entire panel handler must be converted — which is out of scope for v1. Lean toward: <strong>stdlib</strong>.</td>
+    </tr>
+    <tr>
+      <td><code>watchdog</code></td>
+      <td>software-architect (possible suggestion for inotify-based watcher)</td>
+      <td>Filesystem watcher to detect new jsonl lines in real time</td>
+      <td>Polling on a fixed interval (e.g., every 30s) using <code>os.stat</code> and byte-offset checkpoint in SQLite</td>
+      <td>Medium-sized library with platform-specific native code (<code>inotify</code> on Linux, <code>kqueue</code> on macOS, <code>ReadDirectoryChangesW</code> on Windows). Native code = supply-chain risk.</td>
+      <td><span class="badge dec-block">BLOCKED</span> — polling with <code>os.stat</code> and checkpoint offset is sufficient for a panel refreshed at a human timescale (minutes). Real-time streaming is not a stated requirement. If required in a future release, evaluate at that time.</td>
+    </tr>
+    <tr>
+      <td><code>cryptography</code> / <code>hashlib</code> extensions</td>
+      <td>This report (for jsonl integrity)</td>
+      <td>HMAC signatures on jsonl lines to detect tampering (T7)</td>
+      <td><code>hashlib</code> is stdlib. HMAC is also stdlib (<code>hmac</code> module).</td>
+      <td>Not applicable — stdlib covers the need if signing were adopted.</td>
+      <td><span class="badge dec-block">NOT RECOMMENDED</span> — jsonl is written by the provider (Claude Code), not by us. We cannot sign lines we do not write. Signing requires a key, and managing a local signing key introduces more complexity than it solves. Use validation bounds (T7 mitigation) instead. No new dep needed.</td>
+    </tr>
+    <tr>
+      <td><code>fastapi</code> / <code>flask</code></td>
+      <td>Not proposed, pre-empted</td>
+      <td>Replace <code>http.server.ThreadingHTTPServer</code> for routing and middleware</td>
+      <td>Existing regex-dispatch <code>handler.py</code> already handles routing. CSP and auth can be added to <code>_respond</code> without a framework.</td>
+      <td>High transitive dep trees (<code>starlette</code>, <code>uvicorn</code>, <code>pydantic</code>, etc.).</td>
+      <td><span class="badge dec-block">BLOCKED</span> — never. The existing handler is adequate and carries zero external deps. Adding a web framework for a local developer panel is the definition of a bazooka aimed at an ant.</td>
+    </tr>
+    <tr>
+      <td><code>sqlite3</code> (stdlib)</td>
+      <td>Plan approved default</td>
+      <td>Persistent storage for aggregated telemetry</td>
+      <td>N/A — this is the stdlib itself</td>
+      <td>Zero supply-chain risk. Ships with Python.</td>
+      <td><span class="badge dec-approve">APPROVED</span> — stdlib, no action required.</td>
+    </tr>
+    <tr>
+      <td><code>json</code> (stdlib)</td>
+      <td>Plan approved default</td>
+      <td>JSONL line parsing</td>
+      <td>N/A — stdlib</td>
+      <td>Zero.</td>
+      <td><span class="badge dec-approve">APPROVED</span></td>
+    </tr>
+    <tr>
+      <td><code>hashlib</code> (stdlib)</td>
+      <td>This report (checkpoint integrity)</td>
+      <td>SHA-256 of checkpoint state to detect external file modification</td>
+      <td>N/A — stdlib</td>
+      <td>Zero.</td>
+      <td><span class="badge dec-approve">APPROVED</span> — use only if the software-architect decides inode + mtime is insufficient for file-modification detection (T7).</td>
+    </tr>
+    <tr>
+      <td><code>secrets</code> (stdlib)</td>
+      <td>This report (local auth token)</td>
+      <td>Generate a cryptographically secure random token for the panel auth header</td>
+      <td>N/A — stdlib</td>
+      <td>Zero.</td>
+      <td><span class="badge dec-approve">APPROVED</span> — use if auth token is adopted (see Section 3).</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Summary verdict:</strong> Zero new PyPI dependencies are required or justified for
+<code>agent-monitoring-v1</code>. All functionality can be delivered with <code>sqlite3</code>, <code>json</code>,
+<code>hashlib</code>, <code>hmac</code>, <code>secrets</code>, <code>os</code>, and <code>concurrent.futures</code> — all stdlib.
+The software-engineer report must reflect this constraint. Any dep proposal not in the
+approved list above requires this agent's explicit sign-off before the spec is closed.</p>
+
+<h2>3. Local Auth Recommendation</h2>
+
+<blockquote>
+<p>Open question #7 from Phase 1: "Whether the local panel adds an auth token now that cost telemetry is exposed, or keeps 127.0.0.1 unauthenticated."</p>
+</blockquote>
+
+<p><strong>Recommendation: YES — add a shared-secret Bearer token for this release.</strong></p>
+
+<p><strong>Rationale:</strong> The scope of what the panel exposes is fundamentally changing. The existing
+panel serves only static server status and memory files — data that an attacker could also
+read from the filesystem. The new panel will expose: sessionIds, cumulative token costs per
+agent per day, model usage patterns, and cwd paths that reveal workspace structure. This
+is a qualitatively different data class. The threat (T3) is real: any process running as
+the operator's uid (or connecting to localhost) can poll these endpoints silently.</p>
+
+<p><strong>Proposed model — minimal local token:</strong></p>
+<ul>
+  <li>On first panel start, generate a random 32-byte token using <code>secrets.token_urlsafe(32)</code>.</li>
+  <li>Persist the token in <code>~/.dadaia/state/panel.token</code> with <code>chmod 600</code>.</li>
+  <li>Panel reads this file on startup and validates every request for a matching <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
+  <li>Requests without a valid token receive <code>401 Unauthorized</code> with no body.</li>
+  <li>The browser opens the panel via <code>dadaia panel open</code>, which reads <code>panel.token</code> and appends it as a query parameter on the initial redirect (<code>?token=...&lt;redirect to session cookie&gt;</code>) or sets it in a session cookie on first load.</li>
+  <li>Alternatively, the simpler path: the panel UI is served only after the browser supplies the token as a query parameter on first load; the token is embedded in the URL printed by <code>dadaia panel start</code> (<code>http://127.0.0.1:4999/?token=ABC...</code>).</li>
+</ul>
+
+<p><strong>What this does NOT protect against:</strong></p>
+<ul>
+  <li>A process running as the operator's uid that reads <code>panel.token</code> directly — but such a process already has full filesystem access to all telemetry sources, so the marginal risk is nil.</li>
+  <li>A keylogger that intercepts the browser URL — but this is out of scope for a local developer tool.</li>
+</ul>
+
+<p><strong>Implementation cost:</strong> approximately 20 lines in <code>handler.py</code>'s <code>do_GET</code> method, plus
+a token-generation step in the service startup sequence. Zero new dependencies (<code>secrets</code> is
+stdlib). This is proportionate — not a bazooka.</p>
+
+<p><strong>If the operator overrides to "no auth":</strong> the fallback mitigation is session ID prefix
+truncation (T9) + documented risk acceptance. Document the override as an explicit operator
+decision in the spec approval gate.</p>
+
+<h2>4. Hardening Recommendations (Prioritized)</h2>
+
+<ol>
+  <li>
+    <strong>[CRITICAL — T1] Schema allowlist at the reader/aggregator layer.</strong>
+    Before any data is written to SQLite or returned by any HTTP handler, pass every parsed
+    event through an explicit allowlist function that retains only the approved fields.
+    Fail closed: if a field is not in the allowlist, drop it silently. This is the single
+    most important hardening measure in this release. The allowlist function must have
+    its own unit tests.
+  </li>
+  <li>
+    <strong>[HIGH — T2] Enforce <code>chmod 600</code> on SQLite and parent directory on creation.</strong>
+    Use <code>os.chmod(path, 0o600)</code> immediately after <code>open(path, "w")</code> or after the
+    first <code>sqlite3.connect(path)</code>. Check that the parent directory is <code>0o700</code>.
+    Add an assertion in the test suite.
+  </li>
+  <li>
+    <strong>[HIGH — T3] Add local Bearer token auth.</strong>
+    See Section 3 above. Use <code>secrets.token_urlsafe(32)</code>, persist to <code>~/.dadaia/state/panel.token</code>
+    with <code>chmod 600</code>, validate in <code>do_GET</code> before dispatch to any route.
+  </li>
+  <li>
+    <strong>[HIGH — T4] Enforce reader budget limits.</strong>
+    Max 4 MB per file per polling tick. Max 64 KB per JSONL line (skip + warn if exceeded).
+    Checkpoint byte offsets in SQLite. Cap in-memory event buffer at 10,000 events per cycle.
+    These values must be named constants, not magic numbers.
+  </li>
+  <li>
+    <strong>[MEDIUM — T5] Fault-tolerant JSONL line parsing with per-line <code>try/except</code>.</strong>
+    Checkpoint must be byte-offset based. Log parse failures as:
+    <code>WARN: skipped malformed line at &lt;path&gt;:offset=&lt;N&gt;</code> — never log the line content.
+  </li>
+  <li>
+    <strong>[MEDIUM — T6] Refuse to start if <code>os.getuid() == 0</code>.</strong>
+    One-line guard in <code>TelemetryService.__init__</code>. Print a clear error and exit 1.
+  </li>
+  <li>
+    <strong>[MEDIUM — T8] Add CSP and <code>X-Content-Type-Options</code> headers.</strong>
+    In <code>handler.py:_respond</code>, add for HTML responses:
+    <code>Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'</code>.
+    For JSON responses: <code>X-Content-Type-Options: nosniff</code>.
+    No new dependency; three additional <code>send_header</code> calls.
+  </li>
+  <li>
+    <strong>[MEDIUM — T7] Validate token count bounds.</strong>
+    Reject events where any token count is negative or exceeds 2,000,000. Mark such events
+    as <code>suspect=True</code> in SQLite rather than discarding them (preserves auditability).
+    Surface a UI warning banner if any suspect events exist in the current view.
+  </li>
+  <li>
+    <strong>[LOW — T9] Truncate sessionIds in all list/card views.</strong>
+    Display <code>sessionId[:8] + "..."</code> in list views. Full ID only in a detail/tooltip context
+    on explicit user interaction.
+  </li>
+  <li>
+    <strong>[LOW — T10] Boot in no-telemetry mode on SQLite corruption.</strong>
+    Run <code>PRAGMA integrity_check</code> at startup. On failure: rename corrupt file, log error,
+    return 503 from all telemetry endpoints with a human-readable message.
+  </li>
+  <li>
+    <strong>[LOW — T12] Document secure deletion in operator guide.</strong>
+    <code>shred -u ~/.dadaia/state/telemetry.sqlite</code> for secure wipe. Plain <code>rm</code> is not secure
+    on ext4/HFS+. This is documentation, not code.
+  </li>
+</ol>
+
+<h2>5. Filesystem and Permission Map</h2>
+
+<table>
+  <thead>
+    <tr><th>Path</th><th>Permissions</th><th>Owner</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>~/.dadaia/state/</code></td>
+      <td><code>700</code> (rwx------)</td>
+      <td>operator uid</td>
+      <td>Parent directory. Must be created with <code>0o700</code>; check at reader startup.</td>
+    </tr>
+    <tr>
+      <td><code>~/.dadaia/state/telemetry.sqlite</code></td>
+      <td><code>600</code> (rw-------)</td>
+      <td>operator uid</td>
+      <td>Set immediately after creation. WAL files (<code>-wal</code>, <code>-shm</code>) inherit same permissions automatically on Linux ext4.</td>
+    </tr>
+    <tr>
+      <td><code>~/.dadaia/state/panel.token</code></td>
+      <td><code>600</code> (rw-------)</td>
+      <td>operator uid</td>
+      <td>32-byte random Bearer token. If absent on startup: generate. Never log the token value.</td>
+    </tr>
+    <tr>
+      <td><code>~/.claude/projects/</code></td>
+      <td>Managed by Claude Code (typically <code>700</code>)</td>
+      <td>operator uid</td>
+      <td>Reader accesses read-only. Do not chmod. Verify read access at startup; if absent, skip Claude Code sources with a logged warning.</td>
+    </tr>
+    <tr>
+      <td><code>~/.codex/state_5.sqlite</code></td>
+      <td>Managed by Codex</td>
+      <td>operator uid</td>
+      <td>Open read-only (<code>sqlite3.connect("...?mode=ro", uri=True)</code>). Never write to provider files.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. Resilience Checklist</h2>
+
+<p>Per the operator lema: "the workspace resilient." These items must be verified before
+closing the implementation spec.</p>
+
+<ul class="checklist">
+  <li>Panel starts successfully even if <code>~/.claude/projects/</code> does not exist (warn, no crash).</li>
+  <li>Panel starts successfully even if <code>~/.codex/state_5.sqlite</code> does not exist (warn, no crash).</li>
+  <li>Panel starts in no-telemetry mode if <code>telemetry.sqlite</code> is corrupt (see T10).</li>
+  <li>Reader resumes correctly after an abrupt kill (checkpoint byte offset persisted before crash).</li>
+  <li>Reader handles a jsonl file that is actively being written by Claude Code (open in append mode) — use read-only open, do not lock the file.</li>
+  <li>Reader handles a jsonl file that is replaced (rotated by Claude Code) — detect via inode change on next polling tick, reset checkpoint for that file.</li>
+  <li>SQLite can be reconstructed from scratch by re-running the reader against all existing jsonl files — idempotent ingestion required (event deduplication by sessionId + timestamp + type).</li>
+  <li>Backup of SQLite: document that <code>sqlite3 ~/.dadaia/state/telemetry.sqlite .dump &gt; backup.sql</code> is the correct method. No automated backup required in v1; document the manual procedure.</li>
+  <li>Panel HTTP endpoints return 503 (not 500/crash) when the telemetry service is unavailable.</li>
+  <li>Disk-full condition during SQLite write: reader catches the exception, logs it, and retries on the next polling tick without crashing the panel.</li>
+</ul>
+
+<h2>7. Specific Notes on Existing Code</h2>
+
+<h3>handler.py — current state</h3>
+<p>
+The current <code>handler.py</code> has two relevant security controls already in place:
+</p>
+<ul>
+  <li><strong>Path traversal guard</strong>: present in <code>views/memory.py</code> (referenced in the plan). The new
+    <code>/api/agents</code> and <code>/api/sessions</code> endpoints do not serve filesystem paths and therefore
+    do not require a path traversal guard. However, if any new endpoint accepts a <code>slug</code> or
+    <code>path</code> capture group used to read a file, the existing guard from <code>memory.py</code> must be reused.</li>
+  <li><strong><code>html.escape</code></strong>: already used in memory views. Any new HTML template fragment that
+    includes user-derived data (e.g., agent name, model name, cwd path) must use <code>html.escape</code>.
+    The current JSON API endpoints return bytes from <code>json.dumps</code> — this is safe, as
+    <code>json.dumps</code> handles escaping for JSON context. Do not render JSON data directly into
+    HTML strings without escaping.</li>
+</ul>
+
+<h3>_NOT_FOUND_BODY</h3>
+<p>
+The 404 body currently lists all valid routes. When new endpoints are added
+(<code>/api/agents</code>, <code>/api/sessions</code>, <code>/api/workflows</code>), update this constant to include them.
+This is a documentation gap, not a security issue, but omitting it causes confusing
+404 messages for developers.
+</p>
+
+<h3>Missing security headers in <code>_respond</code></h3>
+<p>
+The <code>_respond</code> method currently sends only <code>Content-Type</code> and <code>Content-Length</code>. It must
+be extended (not replaced) with the security headers described in hardening item #7 above.
+The extension should be conditional on content type: CSP only for HTML, <code>nosniff</code> for
+JSON. Implement as a separate private method <code>_security_headers(content_type)</code> to keep
+<code>_respond</code> readable.
+</p>
+
+<h2>8. Open Issues for Other Specialists</h2>
+
+<table>
+  <thead>
+    <tr><th>Issue</th><th>Directed to</th><th>Why it blocks or informs</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Confirm the SQLite WAL mode is enabled by default (<code>PRAGMA journal_mode=WAL</code>) in the <code>TelemetryService</code> constructor. WAL mode is required for concurrent readers + writer without locking the panel HTTP thread.</td>
+      <td>software-engineer</td>
+      <td>Without WAL, concurrent reads during a write transaction will return "database is locked" errors to the HTTP handler.</td>
+    </tr>
+    <tr>
+      <td>Confirm that the Codex SQLite is opened with <code>?mode=ro</code> URI flag to prevent accidental writes to a provider-owned file.</td>
+      <td>software-engineer</td>
+      <td>Writing to Codex's database could corrupt Codex's own state. Read-only open is the correct contract.</td>
+    </tr>
+    <tr>
+      <td>Define the exact JSON schema for <code>/api/agents</code> and <code>/api/sessions</code> responses, with explicit documentation of which fields are and are not included. This schema is the enforceable boundary for T1.</td>
+      <td>frontend-engineer + software-engineer</td>
+      <td>Without a documented schema, a future refactor could inadvertently add a content field. The schema is the contract that security tests validate against.</td>
+    </tr>
+    <tr>
+      <td>Decide: auth token model (see Section 3) — adopt or explicitly decline with documented rationale. This decision must appear in the SPEC.md as a named decision with justification.</td>
+      <td>product-engineer (decision) + software-engineer (implementation)</td>
+      <td>If adopted, auth token generation must be part of the panel startup sequence before the first request is served. If declined, document the risk acceptance.</td>
+    </tr>
+    <tr>
+      <td>Confirm that the polling interval for the reader is configurable (not hard-coded) and that the default (suggested: 60 seconds for v1) is acceptable for the operator's use case.</td>
+      <td>software-architect</td>
+      <td>Polling interval affects DoS surface (T4) — a very short interval increases CPU and SQLite write load.</td>
+    </tr>
+    <tr>
+      <td>Confirm that log output from the reader (warning about skipped lines, suspect events, permission errors) goes to a file under <code>~/.dadaia/logs/</code> with <code>chmod 600</code> and not to stdout/stderr in a way that leaks content to a terminal session log.</td>
+      <td>software-engineer</td>
+      <td>The warning messages must never include the content of the skipped line — only the path and byte offset. If this is guaranteed in the implementation, the log file's sensitivity level is low (metadata only).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>9. Decisions Required from Operator</h2>
+
+<ul>
+  <li><strong>Auth token (Section 3):</strong> adopt the Bearer token model, or explicitly decline and document risk acceptance. Silence is not acceptable here — this is a named security decision in the spec.</li>
+  <li><strong>Retention policy for SQLite aggregates:</strong> the Phase 1 report proposes perpetual retention for aggregates (only raw events capped at 180d). Confirm or set a different cap. No cap = unbounded SQLite growth on long-running workspaces.</li>
+  <li><strong>Suspect event behavior (T7):</strong> mark as suspect and show UI warning, or silently discard? The recommendation is to mark + warn, but this is a product decision.</li>
+</ul>
+
+</body>
+</html>

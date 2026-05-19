@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>agents-r2-v1 — SPEC revision (NS10 → FR10 swap, FR7 expansion)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 980px; margin: 2em auto; padding: 0 1em; color: #1a1a1a; line-height: 1.55; }
+  h1 { border-bottom: 2px solid #1a1a1a; padding-bottom: 0.3em; }
+  h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.2em; margin-top: 2em; }
+  h3 { margin-top: 1.5em; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #bbb; padding: 0.5em 0.75em; text-align: left; vertical-align: top; }
+  th { background: #f3f3f3; }
+  code { background: #f5f5f5; padding: 0.1em 0.35em; border-radius: 3px; font-size: 0.92em; }
+  pre { background: #f5f5f5; padding: 0.8em; border-radius: 4px; overflow-x: auto; font-size: 0.88em; }
+  .pill { display: inline-block; padding: 0.1em 0.55em; border-radius: 10px; font-size: 0.82em; font-weight: 600; }
+  .pill.rescinded { background: #fdecea; color: #a02525; }
+  .pill.added { background: #e7f5ec; color: #1f7a3e; }
+  .pill.expanded { background: #fff4d6; color: #8a6300; }
+  blockquote { border-left: 3px solid #888; margin: 0.8em 0; padding: 0.3em 1em; color: #444; background: #fafafa; }
+</style>
+</head>
+<body>
+
+<h1>agents-r2-v1 — SPEC revision report</h1>
+
+<p>
+<strong>Produced:</strong> 2026-05-19T00:30:21Z<br>
+<strong>Agent:</strong> product-engineer<br>
+<strong>Context:</strong> dadaia-workspace<br>
+<strong>Release:</strong> agents-r2-v1 (phase: SPEC)<br>
+<strong>Branch:</strong> release/agents-r2-v1<br>
+<strong>Trigger:</strong> Operator architectural clarification rescinded prior NS10 and reshaped the scope of CLAUDE.md / AGENTS.md.<br>
+<strong>Source SPEC:</strong> <code>/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/releases/agents-r2-v1/SPEC.md</code> (revised in place; status remains "Aprovado" — design pre-approved in dispatch brief).
+</p>
+
+<h2>Executive Summary</h2>
+
+<p>
+The prior SPEC framed workspace-root <code>CLAUDE.md</code> as out-of-scope
+(NS10) and treated lib <code>AGENTS.md</code> as the only doc to rewrite. The
+operator clarified the architecture: both files are <em>lib-projections</em>,
+must be <em>byte-identical</em>, and must contain <em>lib-general workspace
+guardrails only</em>. Hostinger / redacted-infra / redacted-infra / Traefik content is
+<em>excluded</em> from both — that domain content migrates to operator-managed
+<code>services/CLAUDE.md</code> + <code>services/AGENTS.md</code>, which are
+NOT lib-projected.
+</p>
+
+<p>
+This revision rescinds NS10, expands FR7 from "rewrite AGENTS.md" to
+"rewrite lib pair (CLAUDE.md + AGENTS.md identical-pair)", and adds FR10
+declaring the operator-managed migration to <code>services/</code>. Six
+new acceptance criteria (C21–C26) and a rewritten R10 risk codify the new
+scope.
+</p>
+
+<h2>Delta summary</h2>
+
+<table>
+  <thead>
+    <tr><th>Change</th><th>Type</th><th>SPEC sections touched</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>NS10 rescinded (no-op → not-in-scope clarification for <code>services/</code> pair)</td>
+      <td><span class="pill rescinded">rescinded</span></td>
+      <td>§6 Fora de Escopo</td>
+    </tr>
+    <tr>
+      <td>FR7 expanded: AGENTS.md rewrite → lib identical-pair (CLAUDE.md + AGENTS.md) + manifest update + forbidden-strings list + domain-scoped guardrails pattern</td>
+      <td><span class="pill expanded">expanded</span></td>
+      <td>§3 FR7.0–FR7.11 (was FR7.1–FR7.9)</td>
+    </tr>
+    <tr>
+      <td>FR10 added: workspace operator migration of redacted-infra/redacted-infra/Traefik content to <code>services/CLAUDE.md</code> + <code>services/AGENTS.md</code> (coordinated, manual, NOT lib-managed)</td>
+      <td><span class="pill added">added</span></td>
+      <td>§3 FR10.0–FR10.7</td>
+    </tr>
+    <tr>
+      <td>§1 Sumário updated to reflect 4 consolidated FRs (FR6–FR10) and the workspace-root unification + domain extraction model</td>
+      <td><span class="pill expanded">expanded</span></td>
+      <td>§1 Sumário</td>
+    </tr>
+    <tr>
+      <td>§5 Acceptance: C16 widened (covers both files + Traefik / SRV1608865 / 0.0.0.0); C21–C26 added (byte-identity, lib-general content presence, domain-scope pattern, manifest tracking, projection parity, FR10 CLOSURE checklist)</td>
+      <td><span class="pill added">added</span></td>
+      <td>§5 Critérios de Aceitação</td>
+    </tr>
+    <tr>
+      <td>§7 R10 rewritten: from "workspace CLAUDE.md drift" (LOW, irrelevant) to "operator forgets FR10 migration step, domain rules lost from view" (HIGH, with explicit mitigation + recovery)</td>
+      <td><span class="pill expanded">expanded</span></td>
+      <td>§7 R10</td>
+    </tr>
+    <tr>
+      <td>§8 Phase plan: P11 split into P11a (AGENTS.md rewrite), P11b (CLAUDE.md identical creation + manifest), P11c (FR10 operator-checklist authoring); P13 adds C21 + C25 verification; P14 adds C26 confirmation</td>
+      <td><span class="pill expanded">expanded</span></td>
+      <td>§8 Phase plan</td>
+    </tr>
+    <tr>
+      <td>§9 Discovery report: post-draft revision section added quoting operator's literal scope words and explaining the NS10 → FR10 + FR7 expansion mapping</td>
+      <td><span class="pill added">added</span></td>
+      <td>§9 Discovery report</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Operator's literal scope words (recorded in SPEC §9)</h2>
+
+<blockquote>
+"The general rules CLAUDE.md and AGENTS.md must be resumed to the rules,
+guardrail about the features of dadaia-workspace. [...] AGENTS.md and
+CLAUDE.md should even contain the same information. GUARDRAILS for the
+workspace, like using venv, SDD pattern enforced, endorsement of the use
+of dadaia-workspace CLI to operate it, and more. dadaia-academy.
+dadaia-workspace panel. we have features from dadaia-workspace. What we
+cannot have in this rules / guardrail are things that are stricted to a
+domain. redacted-infra and redacted-infra clearly are these cases."
+</blockquote>
+
+<p>This maps cleanly into:</p>
+<ul>
+  <li><strong>FR7.0</strong> — lib source-of-truth pair, byte-identical, manifest-tracked.</li>
+  <li><strong>FR7.1</strong> — lib content scope: venv, SDD, CLI, dadaia-academy, dadaia-workspace panel, 16-agent inventory, lib-projection invariant, memory atoms, <em>domain-scoped guardrails pattern</em>.</li>
+  <li><strong>FR7.2</strong> — forbidden strings: redacted-infra, redacted-infra, Traefik, Hostinger, tirith, dmPolicy, REDACTED_CONFIG, redacted-host, IPs, hstgr, vps-.</li>
+  <li><strong>FR10</strong> — domain rules move to operator-managed <code>services/</code> pair.</li>
+</ul>
+
+<h2>NS10 rescission rationale</h2>
+
+<p>
+The prior NS10 stated "workspace CLAUDE.md stays untouched, contains redacted-infra/redacted-infra".
+This was architecturally wrong: it conflated the file's <em>contents</em> with
+the file's <em>ownership</em>. The correct model:
+</p>
+
+<ul>
+  <li>Workspace-root <code>CLAUDE.md</code> is <em>lib-owned</em> (projection from <code>dadaia_workspace/public/data/CLAUDE.md</code>) — it IS touched by this release, but only via the projection mechanism, not by hand-edit.</li>
+  <li>Workspace-root <code>AGENTS.md</code> is also lib-owned (already manifest-tracked today; CLAUDE.md is added in this release).</li>
+  <li>Both files contain lib-general guardrails ONLY; domain content lives in operator-managed <code>services/</code>.</li>
+</ul>
+
+<p>
+The replacement NS10 text now clarifies the actual not-in-scope item: the
+<code>services/CLAUDE.md</code> + <code>services/AGENTS.md</code> pair is NOT
+lib-projected. It lives in operator-owned space, never in
+<code>dadaia_workspace/public/</code>, never in
+<code>.dadaia/agentic/manifest.json</code>, never overwritten by
+<code>dadaia public install</code>.
+</p>
+
+<h2>FR7 expansion summary</h2>
+
+<table>
+  <thead>
+    <tr><th>Sub-item</th><th>Subject</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>FR7.0</td><td>Source-of-truth and identical-content invariant; PLAN picks mechanism (symlink / parity doctor / generated-from-source); manifest update.</td></tr>
+    <tr><td>FR7.1</td><td>Lib content scope: lib-general workspace guardrails ONLY (venv, SDD, CLI, dadaia-academy, dadaia-workspace panel, 16-agent inventory, lib-projection invariant, memory atoms, domain-scoped pattern).</td></tr>
+    <tr><td>FR7.2</td><td>Forbidden content (case-insensitive grep list) for both files.</td></tr>
+    <tr><td>FR7.3</td><td>SDD pipeline section uses release-lifecycle paths.</td></tr>
+    <tr><td>FR7.4</td><td>Lib-projection invariant section consolidates the rule (sourced from dadaia-workspace-dev-guardrail).</td></tr>
+    <tr><td>FR7.5</td><td>16-agent inventory in 3 tiers.</td></tr>
+    <tr><td>FR7.6</td><td>Model assignments table for 16 agents x 3 runtimes.</td></tr>
+    <tr><td>FR7.7</td><td>Checklist update for HTML memory atoms.</td></tr>
+    <tr><td>FR7.8</td><td>CLI reference section: context, specs, public, server, reports, academy, panel, doctor, export, repos.</td></tr>
+    <tr><td>FR7.9</td><td>Final shape ≤ 280 lines, byte-identical, 11-section structure.</td></tr>
+    <tr><td>FR7.10</td><td>Projection parity (sha256sum check).</td></tr>
+    <tr><td>FR7.11</td><td>Manifest update tracking <code>data/CLAUDE.md</code>.</td></tr>
+  </tbody>
+</table>
+
+<h2>FR10 new sub-items</h2>
+
+<table>
+  <thead>
+    <tr><th>Sub-item</th><th>Subject</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>FR10.0</td><td>Operator-owned manual migration step, lib-coordinated via CLOSURE checklist.</td></tr>
+    <tr><td>FR10.1</td><td>Target file pair: <code>services/CLAUDE.md</code> + <code>services/AGENTS.md</code> (byte-identical).</td></tr>
+    <tr><td>FR10.2</td><td>Domain-scope semantics; harnesses merge parent + nested automatically.</td></tr>
+    <tr><td>FR10.3</td><td>Pair is NOT lib-managed (not in manifest, not in <code>public/</code>, never overwritten by install).</td></tr>
+    <tr><td>FR10.4</td><td>Migration coordination protocol: operator migrates BEFORE lib install, runs install, runs post-condition checks.</td></tr>
+    <tr><td>FR10.5</td><td>Acceptance: <code>services/</code> pair byte-identical and contains domain content; workspace-root pair byte-identical and forbidden-strings-clean.</td></tr>
+    <tr><td>FR10.6</td><td>CLOSURE.md MUST include literal operator commands; PR description links to the CLOSURE section.</td></tr>
+    <tr><td>FR10.7</td><td>Out-of-band relative to lib CI — operator-verified at CLOSURE, not CI-gated.</td></tr>
+  </tbody>
+</table>
+
+<h2>Acceptance criteria added</h2>
+
+<table>
+  <thead>
+    <tr><th>ID</th><th>What it verifies</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>C16 (rewritten)</td><td>Forbidden-strings grep over BOTH lib pair files (adds Traefik, redacted-host, 0.0.0.0, REDACTED_CONFIG).</td></tr>
+    <tr><td>C21</td><td>Lib pair byte-identity (<code>sha256sum</code> single unique hash).</td></tr>
+    <tr><td>C22</td><td>Lib-general content presence (<code>dadaia-academy</code>, <code>panel</code>, <code>venv</code>, <code>Status: Aprovado</code>) in each file.</td></tr>
+    <tr><td>C23</td><td>Domain-scoped guardrails pattern documented in both files.</td></tr>
+    <tr><td>C24</td><td>Manifest tracks both <code>data/CLAUDE.md</code> and <code>data/AGENTS.md</code>.</td></tr>
+    <tr><td>C25</td><td>Workspace-root projection byte-identity after <code>dadaia public install</code>.</td></tr>
+    <tr><td>C26</td><td>CLOSURE.md includes <code>## Operator manual migration (FR10)</code> section (CLOSURE-phase criterion).</td></tr>
+  </tbody>
+</table>
+
+<h2>Risks updated</h2>
+
+<p>
+R10 rewritten from a LOW "workspace CLAUDE.md drift" framing to a HIGH
+"operator forgets FR10 migration step, domain rules lost from view" framing.
+Mitigation is layered: (a) PR description with explicit checklist, (b)
+CLOSURE.md with literal commands, (c) documented order-of-operations
+(migrate FIRST, install SECOND), (d) recovery path via
+<code>git show &lt;pre-release-sha&gt;:CLAUDE.md</code>. The gate cannot
+enforce a step that happens outside the lib repo's tree (FR10.7) — so the
+mitigation is documentation + recovery, not enforcement.
+</p>
+
+<h2>Phase plan updates</h2>
+
+<p>
+P11 split into three sub-phases:
+</p>
+
+<ul>
+  <li><strong>P11a</strong> — Rewrite <code>dadaia_workspace/public/data/AGENTS.md</code> (lib-general scope, no domain content). Owner: PE.</li>
+  <li><strong>P11b</strong> — Create <code>dadaia_workspace/public/data/CLAUDE.md</code> byte-identical to AGENTS.md (mechanism: PLAN picks). Update manifest. Owner: software-engineer + software-architect (mechanism decision).</li>
+  <li><strong>P11c</strong> — Author PR-description operator checklist + CLOSURE.md <code>## Operator manual migration (FR10)</code> template content. Owner: PE.</li>
+</ul>
+
+<p>
+P13 adds C21 (lib pair byte-identity) + C25 (workspace-root projection
+byte-identity) verifications. P14 (CLOSURE) adds C26 confirmation when the
+operator completes FR10.
+</p>
+
+<h2>Open architect questions for PLAN</h2>
+
+<p>
+FR7.0 explicitly flags one open question for software-architect to decide in
+PLAN: which mechanism guarantees the byte-identical-pair invariant?
+</p>
+
+<ol>
+  <li>Symlink <code>CLAUDE.md → AGENTS.md</code> in <code>dadaia_workspace/public/data/</code>; installer materialises both sides as regular files.</li>
+  <li>Both as regular files in source tree, with a <code>dadaia public doctor</code> invariant that diffs them.</li>
+  <li>One authoritative, the other auto-generated at <code>stage</code> time.</li>
+</ol>
+
+<p>
+The FR mandates the end state (byte-identity); PLAN picks the mechanism.
+</p>
+
+<h2>Final dadaia specs doctor output</h2>
+
+<pre>$ dadaia specs doctor
+[fail] /home/marco/workspace/dadaia/repos/dadaia-workspace/specs — 2 error(s), 0 warning(s):
+  [ERR ] SPEC-DOC-004: Active release missing PLAN.md (/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/releases/agents-r2-v1/PLAN.md)
+  [ERR ] SPEC-DOC-004: Active release missing TASKS.md (/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/releases/agents-r2-v1/TASKS.md)
+</pre>
+
+<p>
+Both errors are <strong>expected and correct</strong>: the release is in
+phase <code>SPEC</code>; PLAN.md and TASKS.md are deliberately absent until
+the SPEC is approved and the operator advances the phase. No SPEC-structural
+errors (would-be SPEC-DOC-001/002/003) are reported, confirming the SPEC
+itself is well-formed.
+</p>
+
+<h2>SPEC line count</h2>
+
+<p>
+Pre-revision: 685 lines. Post-revision: 953 lines (+268 lines).
+The growth is concentrated in FR7 (expanded from ~95 lines to ~175 lines),
+the new FR10 (~100 lines), and six new acceptance criteria. The SPEC
+remains well-scoped — no line cap applies to SPEC.md (only PLAN.md has
+the ≤ 300 line warning), and the additional content directly serves the
+architectural clarification the operator requested.
+</p>
+
+<h2>Preserved verbatim</h2>
+
+<p>
+All other FRs (FR1, FR2, FR3, FR4, FR5, FR6, FR8, FR9) are preserved verbatim.
+NFRs unchanged. Acceptance criteria C1–C15 unchanged; C17–C20 unchanged.
+Risks R1–R9 and R11–R12 unchanged. Phase plan P0–P10, P12 unchanged.
+Discovery findings A–E unchanged; the post-draft revision section is purely
+additive.
+</p>
+
+<h2>Decisions required</h2>
+
+<ul>
+  <li>Operator: confirm the revised SPEC reflects the intended architecture before PE begins PLAN authoring.</li>
+  <li>software-architect (during PLAN phase, P11b): pick the byte-identity mechanism (symlink / parity doctor / generated-from-source).</li>
+</ul>
+
+<h2>Next handoff</h2>
+
+<p>
+Upon operator confirmation, PE proceeds to PLAN.md authoring (Phase 5 of
+the 8-phase release lifecycle). software-architect is consulted in PLAN
+for: (a) FR2 path-scope gate pattern (existing requirement); (b) FR7.0
+byte-identity mechanism (new requirement). No grill-me round is required —
+the operator's literal scope words are precise enough.
+</p>
+
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "project-manager",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T02:10:17Z",
+  "release_id": "agents-r2-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/project-manager/2026-05-19T021017Z-agents-r2-v1-orchestration.html",
+    "content_hash": "sha256:3c8644ff53ccdbbc0539150366e8c5f0666fbd1b53d9f91d0976cc257a9a8571"
+  },
+  "findings": [
+    { "severity": "INFO", "summary": "W1 dispatched: 4 leaf-agents in parallel (P1, P2, P3, P4) per PLAN §4." }
+  ],
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "software-engineer",
+    "input": "W1 leaf-agent dispatches in parallel; AGT-r2-09 sequential after AGT-r2-08; P5 sequential after P3+P4."
+  }
+}

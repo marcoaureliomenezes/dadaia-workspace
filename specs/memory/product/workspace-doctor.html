@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — workspace-doctor (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>workspace-doctor</h1>
+<p class="meta">CLI surface: <code>dadaia doctor [--fix]</code> · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>Valida invariantes do estado do workspace — consistência entre <code>spec_contexts.json</code> e <code>primary_context.json</code>, presença de arquivos esperados em <code>.dadaia/</code>, estado das branches dos repos clonados em <code>repos/</code>. Quando passado <code>--fix</code>, aplica reparos automáticos para issues marcados como fixable (recria arquivos faltantes, normaliza primary flag, etc.).</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li><code>dadaia doctor</code> — executa checklist de invariantes (INV-1..INV-N) e lista issues com flag <code>[fixable]</code> ou <code>[manual]</code>.</li>
+    <li>Operador inspeciona os issues; se todos forem <code>[fixable]</code>, roda <code>dadaia doctor --fix</code>.</li>
+    <li>Doctor aplica os reparos e mostra a lista de ações realizadas.</li>
+    <li>Re-rodar <code>dadaia doctor</code> deve retornar "All invariants OK".</li>
+  </ol>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Após interrupção de processo (Ctrl+C no meio de um activate, kill de processos), upgrade da versão do dadaia-workspace, ou para sanity check antes de demos.</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Sem este guardrail, drift silencioso em <code>.dadaia/states/</code> levaria a comportamentos inesperados (mais de um primary context, repo sem state, etc.). O <code>--fix</code> torna a recuperação um one-liner em vez de edição manual de JSON.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li>Leitura: todo <code>.dadaia/states/*.json</code> e <code>repos/</code>.</li>
+    <li>Escrita (apenas com <code>--fix</code>): correções em arquivos de state.</li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Standalone. Não depende de nenhuma outra feature além da estrutura criada por <a href="workspace-init.html">workspace-init</a>.</li>
+    <li>Complementar a <a href="specs-doctor.html">specs-doctor</a> (este valida workspace state; specs-doctor valida estrutura SDD).</li>
+  </ul>
+</section>
+
+</body>
+</html>

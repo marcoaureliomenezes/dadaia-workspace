@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Implementation Report — P2-skill-lint (AGT-r2-09)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-pass     { background: #daffd0; color: #1a5c00; }
+  .badge-info     { background: #e0eaff; color: #0550ae; }
+  .badge-low      { background: #daffd0; color: #1a5c00; }
+  .finding { border: 1px solid #e4e8ec; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  .finding h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> software-engineer</span>
+  <span><strong>Gerado em:</strong> 2026-05-18T140000Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Release:</strong> <code>agents-r2-v1</code></span>
+  <span><strong>Task:</strong> <code>AGT-r2-09</code></span>
+</div>
+
+<h1>Implementation Report — P2 Skill Lint (AGT-r2-09)</h1>
+
+<h2>Summary</h2>
+
+<p>AGT-r2-09 (Phase P2, W1) wrapped the 8 PM playbooks drafted by <code>product-engineer</code>
+(AGT-r2-08) into the <code>project-orchestration</code> skill body and applied a lint pass
+to <code>dadaia_workspace/public/skills/project-orchestration/SKILL.md</code>.</p>
+
+<p>Changes made:</p>
+<ol>
+  <li>Workflow Inventory trimmed from 15 rows to 7, reflecting the surviving workflow files
+      post-P1 trim. Each row now names the actual <code>*.workflow.md</code> filename.</li>
+  <li>Duplicate <code>software-architect (ADR mode)</code> row removed from Agent Inventory
+      (was listed twice; the canonical row at line 21 was retained).</li>
+  <li>R3 PM-only invocation callout block added at the top of <code>## PM Playbooks</code>.</li>
+  <li>NFR8/R6 cross-reference note added documenting that surviving workflow files
+      referencing former playbook names (e.g. <code>tdd-cycle</code>, <code>bug-fix-fastlane</code>)
+      do so as contextual labels only, not as live workflow definitions.</li>
+  <li>Stale <code>W-13 (Secrets leak response)</code> reference in the <code>security-patch</code>
+      playbook stop-conditions replaced with inline step description (the W-13 row
+      no longer exists in the revised inventory).</li>
+</ol>
+
+<h2>Lint changes (diff summary)</h2>
+
+<h3>Workflow Inventory — before</h3>
+<pre><code>15 canonical workflows. Each row names the trigger event, the entry agent, and key
+intermediate stages.
+| W-01 | Feature delivery | ...
+| W-02 | Bug fix | ...
+... (15 rows total including 8 removed workflow patterns)</code></pre>
+
+<h3>Workflow Inventory — after</h3>
+<pre><code>7 canonical workflows (post-`agents-r2-v1` trim; 8 deprecated workflows moved to
+`specs/_archive/legacy-workflows/` and replaced by PM Playbooks below).
+| W-01 | `spec-refinement`         | ...
+| W-02 | `hotfix-release`          | ...
+| W-03 | `code-review-fan-out`     | ...
+| W-04 | `audit-cycle`             | ...
+| W-05 | `game-dev-cycle`          | ...
+| W-06 | `cross-cutting-feature`   | ...
+| W-07 | `onboarding-new-repo`     | ...
+(7 rows, names match *.workflow.md filenames)</code></pre>
+
+<h3>Agent Inventory — duplicate row removed</h3>
+<pre><code>- `software-architect` (ADR mode) | Architecture Decision Records ... | product-engineer | Micro-level impl decisions already settled
+# removed — duplicate of the canonical software-architect row above</code></pre>
+
+<h3>PM Playbooks — R3 callout added</h3>
+<pre><code>&gt; **R3 — PM-only invocation:** These playbooks are dispatched only by
+&gt; `project-manager`; no leaf-agent invokes them directly. Leaf agents (e.g.
+&gt; `software-engineer`, `qa-engineer`) receive task prompts from PM — they never
+&gt; select or trigger a playbook themselves.</code></pre>
+
+<h3>security-patch playbook — stale W-13 reference fixed</h3>
+<pre><code>- Before: "also dispatch W-13 (Secrets leak response)"
+- After:  "also invoke the secrets-leak response steps (rotate credential → force-push or BFG → audit trail)"</code></pre>
+
+<h2>R3 / R6 Cross-references</h2>
+
+<div class="finding">
+  <h3><span class="badge badge-pass">PASS</span> R3 — PM-only invocation noted</h3>
+  <p><strong>Location:</strong> <code>SKILL.md:212-215</code></p>
+  <p>Blockquote callout added immediately after the <code>## PM Playbooks</code> heading.
+  States that no leaf-agent selects or triggers a playbook directly.</p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge badge-pass">PASS</span> R6 / NFR8 — No external workflow file acts as duplicate</h3>
+  <p><strong>Verification command:</strong></p>
+  <pre><code>grep -rn "PM Playbook\|spec-refinement" dadaia_workspace/public/workflows/</code></pre>
+  <p><strong>Findings:</strong> Only <code>spec-refinement.workflow.md</code> matched (its own
+  <code>name:</code> field and body). This is the surviving W-01 workflow — it is a structured
+  multi-stage pipeline (discovery → synthesis → PE SPEC write), not a duplicate of the
+  <code>spec-refinement</code> playbook (which is PM's simpler recipe for resolving open
+  spec questions mid-impl).</p>
+  <p>Other matches in <code>onboarding-new-repo.workflow.md</code>,
+  <code>hotfix-release.workflow.md</code>, and <code>cross-cutting-feature.workflow.md</code>
+  reference <code>tdd-cycle</code> and <code>bug-fix-fastlane</code> as contextual labels
+  in body prose — no <code>*.workflow.md</code> file defines or dispatches these patterns
+  as live workflows. NFR8 is satisfied.</p>
+  <p><strong>NFR8 note</strong> embedded in SKILL.md at lines 218-224 for future readers.</p>
+</div>
+
+<h2>Acceptance evidence — dadaia public doctor</h2>
+
+<p>Run after edits to <code>dadaia_workspace/public/skills/project-orchestration/SKILL.md</code>:</p>
+
+<pre><code>[drift] stage:skills/project-orchestration/SKILL.md   # source edited; awaiting P8 stage
+[ok] agents:skills/project-orchestration/SKILL.md
+[ok] claude:skills/project-orchestration/SKILL.md
+[ok] opencode:skills/project-orchestration/SKILL.md</code></pre>
+
+<p>The <code>[drift]</code> on <code>stage:</code> is expected and intentional — the source file
+in <code>dadaia_workspace/public/</code> has been updated but not yet staged/installed.
+Staging and installation is deferred to P8 (<code>devops-engineer</code>, AGT-r2-24).
+All three projection targets (<code>agents:</code>, <code>claude:</code>, <code>opencode:</code>)
+remain <code>[ok]</code>. The skill checks pass.</p>
+
+<p>Additional <code>[drift]</code> entries for <code>stage:agents/product-engineer.md</code>,
+<code>stage:agents/software-architect.md</code>, and <code>stage:agents/project-manager.md</code>
+are pre-existing from P3 (AGT-r2-10, AGT-r2-11, already <code>[x]</code>) and P5 parallel
+work — not introduced by this task.</p>
+
+<h2>Deploy</h2>
+
+<p>Branch: <code>release/agents-r2-v1</code>. Commit: <code>6724ba8</code>.<br>
+No deploy triggered — this is a lib source edit. Deploy is P8 (<code>dadaia public stage &amp;&amp; install --target all &amp;&amp; doctor</code> by <code>devops-engineer</code>, AGT-r2-24).</p>
+
+<h2>QA validation</h2>
+
+<p>Pending — no E2E criteria were defined for a lint-only skill edit. The P8 doctor
+checkpoint (AGT-r2-24) serves as the integration verification gate for all P1-P7 changes
+including this one. QA smoke (AGT-r2-47) will confirm <code>dadaia panel</code> surface
+post-P13.</p>
+
+</body>
+</html>

@@ -18,12 +18,26 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 # ---------------------------------------------------------------------------
 
 EXPECTED_AGENTS = {
+    "ai-engineer",
+    "backend-engineer",
+    "code-reviewer",
+    "data-analyst",
+    "data-engineer",
+    "design-specialist",
     "devops-engineer",
+    "frontend-engineer",
+    "game-designer",
     "game-developer",
+    "game-tester",
     "product-engineer",
+    "project-auditor",
+    "project-manager",
     "qa-engineer",
+    "researcher",
+    "security-reviewer",
     "software-architect",
-    "software-engineer",
+    "software-engineer-node",
+    "software-engineer-python",
 }
 
 # These must NEVER appear in any staging or runtime target
@@ -36,14 +50,22 @@ STALE_AGENTS = {
 EXPECTED_SKILLS = {
     "architect-code-audit",
     "architect-design-patterns",
+    "architecture-code-review",
     "dadaia-grill-me",
+    "dadaia-handoff-emitter",
+    "dadaia-release-closure",
     "dadaia-task-manager",
     "dadaia-workspace-doctor",
     "dadaia-workspace-manager",
     "dadaia-workspace-spec-navigator",
     "dadaia-workspace-spec-reviewer",
+    "dev-server-registry",
     "devops-deploy-strategies",
     "devops-gitflow-governance",
+    "drift-detection",
+    "game-audio-design",
+    "game-flight-dynamics",
+    "game-geospatial-pipeline",
     "game-map-architect",
     "game-packaging-distribution",
     "game-physics-engine",
@@ -51,7 +73,14 @@ EXPECTED_SKILLS = {
     "game-platform-godot",
     "game-platform-unity",
     "game-platform-unreal",
+    "game-testing-ue5",
+    "game-unreal-designer",
+    "game-unreal-developer",
+    "game-visual-design",
     "github-actions-pipelines",
+    "project-orchestration",
+    "security-audit-protocol",
+    "ux-ui-review",
 }
 
 # Required YAML fields in every agent's frontmatter
@@ -225,8 +254,8 @@ class TestInstallAll:
 
         assert (workspace / ".codex" / "hooks.json").exists(), ".codex/hooks.json not created"
         assert (workspace / ".codex" / "config.toml").exists(), ".codex/config.toml not created"
-        assert (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists(), (
-            ".codex/rules/dadaia-workspace-dev-guardrail.md not installed"
+        assert (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists(), (
+            ".codex/rules/game-agents-coordination.md not installed"
         )
 
     def test_install_no_stale_agents_in_claude(self, tmp_path: Path) -> None:
@@ -340,14 +369,16 @@ class TestDoctor:
         mgr.install(workspace, target="all", force=True)
 
         # Introduce drift in a Claude agent file
-        target = workspace / ".claude" / "agents" / "software-engineer.md"
+        target = workspace / ".claude" / "agents" / "software-engineer-python.md"
         target.write_text(target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8")
 
         report = mgr.doctor(workspace)
 
-        drift_lines = [line for line in report if "[drift]" in line and "software-engineer" in line]
+        drift_lines = [
+            line for line in report if "[drift]" in line and "software-engineer-python" in line
+        ]
         assert drift_lines, (
-            "Doctor did not detect drift in .claude/agents/software-engineer.md.\n"
+            "Doctor did not detect drift in .claude/agents/software-engineer-python.md.\n"
             "Full report:\n" + "\n".join(report)
         )
 
@@ -373,7 +404,15 @@ class TestDoctor:
 # ---------------------------------------------------------------------------
 
 
-EXPECTED_WORKFLOWS = {"spec-refinement", "tdd-cycle"}
+EXPECTED_WORKFLOWS = {
+    "audit-cycle",
+    "code-review-fan-out",
+    "cross-cutting-feature",
+    "game-dev-cycle",
+    "hotfix-release",
+    "onboarding-new-repo",
+    "spec-refinement",
+}
 
 
 class TestWorkflows:
@@ -388,7 +427,9 @@ class TestWorkflows:
     def test_install_all_projects_workflows_to_every_runtime(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
-        for runtime in (".agents", ".claude", ".opencode", ".codex"):
+        # Codex has no workflow runtime (multi-platform-parity-v1): workflows are
+        # projected only to .agents, .claude, and .opencode.
+        for runtime in (".agents", ".claude", ".opencode"):
             for stem in EXPECTED_WORKFLOWS:
                 projected = workspace / runtime / "workflows" / f"{stem}.workflow.md"
                 assert projected.exists(), f"workflow not projected to {projected}"
@@ -405,17 +446,21 @@ class TestWorkflows:
             "Full report:\n" + "\n".join(report)
         )
 
-    def test_doctor_reports_unsupported_for_codex_when_parallel_group(self, tmp_path: Path) -> None:
+    def test_doctor_reports_not_applicable_for_codex_when_parallel_group(
+        self, tmp_path: Path
+    ) -> None:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
         report = _manager().doctor(workspace)
-        unsupported_lines = [
+        # multi-platform-parity-v1: codex has no workflow runtime, so doctor
+        # emits [not-applicable] for ALL codex workflows (parallel or serial).
+        not_applicable_lines = [
             line
             for line in report
-            if line.startswith("[unsupported]") and "codex:workflows/spec-refinement" in line
+            if line.startswith("[not-applicable]") and "codex:workflows/spec-refinement" in line
         ]
-        assert unsupported_lines, (
-            "Doctor did not emit [unsupported] for codex:spec-refinement.\n"
+        assert not_applicable_lines, (
+            "Doctor did not emit [not-applicable] for codex:spec-refinement.\n"
             "Full report:\n" + "\n".join(report)
         )
 
@@ -423,15 +468,22 @@ class TestWorkflows:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
         report = _manager().doctor(workspace)
-        # tdd-cycle has no parallel_group → both opencode and codex should be [ok]
+        # game-dev-cycle has no parallel_group → opencode and claude should be [ok];
+        # codex emits [not-applicable] (multi-platform-parity-v1: no workflow runtime).
         ok_lines = [
             line
             for line in report
-            if line.startswith("[ok]") and "tdd-cycle" in line and ":workflows/" in line
+            if line.startswith("[ok]") and "game-dev-cycle" in line and ":workflows/" in line
         ]
         assert any("opencode" in line for line in ok_lines)
-        assert any("codex" in line for line in ok_lines)
         assert any("claude" in line for line in ok_lines)
+        # Codex check moved to a [not-applicable] assertion below.
+        na_lines = [
+            line
+            for line in report
+            if line.startswith("[not-applicable]") and "codex:workflows/game-dev-cycle" in line
+        ]
+        assert na_lines, "Doctor did not emit [not-applicable] for codex:tdd-cycle"
 
     def test_seed_workflows_pass_schema_validation(self, tmp_path: Path) -> None:
         """`dadaia public stage` aborts if any workflow fails schema validation."""

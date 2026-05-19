@@ -1,0 +1,25 @@
+{
+  "schema": "handoff-v1",
+  "generated_at": "2026-05-19T04:55:00Z",
+  "agent": "qa-engineer",
+  "task_id": "AGT-r2-47",
+  "release": "agents-r2-v1",
+  "context": "dadaia-workspace",
+  "report": "2026-05-19T045500Z-AGT-r2-47-agents-r2-v1-panel-smoke.html",
+  "result": "PASS",
+  "summary": "Panel smoke test complete. 16 agents and 7 workflows confirmed via live API (GET /api/agents, GET /api/workflows). All 5 FR10 operator-migration command groups validated as syntactically correct in dry-run mode. No state mutations executed. C8 satisfied.",
+  "acceptance_criteria": {
+    "agents_count": { "expected": 16, "actual": 16, "pass": true },
+    "workflows_count": { "expected": 7, "actual": 7, "pass": true },
+    "fr10_group1_valid": true,
+    "fr10_group2_valid": true,
+    "fr10_group3_valid": true,
+    "fr10_group4_valid": true,
+    "fr10_group5_valid": true,
+    "no_state_mutations": true,
+    "panel_torn_down": true
+  },
+  "blockers": [],
+  "next_task": "AGT-r2-48",
+  "next_agent": "product-engineer"
+}

@@ -17,6 +17,7 @@ from dadaia_workspace.core.models.run_state import (
     StageResult,
     StageStatus,
 )
+from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
 from dadaia_workspace.core.models.workflow import WorkflowDefinition
 
@@ -216,7 +217,7 @@ class FakeAgentDispatcher:
             run_id=invocation.run_id,
             stage_id=invocation.stage_id,
             status=StageStatus.AWAITING_GATE,
-            output_path=invocation.invocation_path,
+            output_path=invocation.expected_output_path,
         )
 
     def dispatch_parallel(
@@ -243,3 +244,61 @@ class FakePythonEnvironmentManager:
 
     def pip_executable(self, workspace_root: str) -> str:
         return f"{workspace_root}/.dadaia/.venv/bin/pip"
+
+
+class FakeServerRegistryStore:
+    """In-memory ServerRegistryStore — keyed by port number."""
+
+    def __init__(self) -> None:
+        self._store: dict[int, PortEntry] = {}
+
+    def save(self, entry: PortEntry) -> None:
+        self._store[entry.port] = entry
+
+    def update(self, entry: PortEntry) -> None:
+        self._store[entry.port] = entry
+
+    def get(self, port: int) -> PortEntry | None:
+        return self._store.get(port)
+
+    def list_all(self) -> list[PortEntry]:
+        return sorted(self._store.values(), key=lambda e: e.port)
+
+    def delete(self, port: int) -> None:
+        self._store.pop(port, None)
+
+    def count(self) -> int:
+        return len(self._store)
+
+
+class FakeProcessProbe:
+    """Controllable probe — add PIDs to _alive_pids to simulate live processes."""
+
+    def __init__(self) -> None:
+        self._alive_pids: set[int] = set()
+
+    def is_pid_alive(self, pid: int) -> bool:
+        return pid in self._alive_pids
+
+
+class FakeHandoffValidator:
+    """Configurable fake implementing ``ValidatorPort``.
+
+    Accepts a list of canned ``HandoffValidationError`` instances that will be
+    returned on every call to ``validate()``.  Records all calls for inspection
+    in ``calls``.
+
+    Args:
+        canned_errors: List of ``HandoffValidationError`` instances to return.
+            Pass an empty list to simulate a valid document.
+    """
+
+    def __init__(self, canned_errors: list | None = None) -> None:
+        from dadaia_workspace.core.exceptions import HandoffValidationError as _HVE  # noqa: F401
+
+        self._canned: list = list(canned_errors or [])
+        self.calls: list[dict] = []
+
+    def validate(self, doc: dict) -> list:
+        self.calls.append({"doc": doc})
+        return list(self._canned)

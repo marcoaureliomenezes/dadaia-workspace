@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory — Product — sdd-gate-v3 (dadaia-workspace)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .meta { color: #666; font-size: .9em; }
+    nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
+    nav.crumbs a { color: #444; text-decoration: none; }
+    nav.crumbs a:hover { text-decoration: underline; }
+    ol.flow { padding-left: 1.6rem; }
+    ol.flow li { margin: .5rem 0; }
+  </style>
+</head>
+<body>
+
+<nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
+
+<h1>sdd-gate-v3</h1>
+<p class="meta">Asset: <code>.dadaia/scripts/sdd-spec-gate.sh</code> · Hook tipo: <code>PreToolUse</code> · Closure: sdd-release-lifecycle-v1</p>
+
+<section id="purpose">
+  <h2>Propósito</h2>
+  <p>PreToolUse hook bash que intercepta toda invocação de <code>Write</code>/<code>Edit</code>/<code>MultiEdit</code> (Claude Code, Codex e equivalentes) e decide <strong>allow</strong> ou <strong>block</strong> com base em três regras em camadas: (A) atomicidade do memory — bloqueia edits em <code>memory/*.html</code> e <code>memory/product/**/*.html</code> a menos que <code>releases/ACTIVE.md</code> tenha <code>phase: CLOSURE</code>; (B) archive read-only — bloqueia qualquer write em <code>specs/_archive/**</code>; (C) production paths — exige que exista pelo menos uma task <code>[-]</code> em <code>specs/releases/&lt;active-release&gt;/TASKS.md</code> (ou em legacy <code>features/*/TASKS.md</code> quando <code>SDD_LEGACY_FEATURES=1</code>).</p>
+  <p>Fail-open: qualquer erro interno → allow (nunca bloqueia trabalho legítimo por crash).</p>
+</section>
+
+<section id="flow">
+  <h2>Fluxo de uso</h2>
+  <ol class="flow">
+    <li>Agente invoca uma tool de escrita (ex. <code>Write</code> em <code>dadaia_workspace/foo.py</code>).</li>
+    <li>Claude Code (ou Codex/OpenCode) executa o hook <code>sdd-spec-gate.sh</code> passando JSON em stdin com tool_name + file_path.</li>
+    <li>O gate resolve <code>WORKSPACE_ROOT</code>, <code>PRIMARY_SLUG</code>, <code>PRIMARY_SPECS</code> a partir de <code>primary_context.json</code>; lê <code>releases/ACTIVE.md</code> para descobrir release e phase atuais.</li>
+    <li>Aplica regras A, B, C nessa ordem. A primeira regra que decida block-or-allow encerra o gate.</li>
+    <li>Allow → exit 0 (silencioso); Block → STDOUT JSON <code>{"decision":"block","reason":"..."}</code> com mensagem orientada.</li>
+    <li>Logs em <code>/tmp/sdd-gate.log</code> registram cada decisão com timestamp, tool, path, release-id e motivo.</li>
+  </ol>
+  <pre class="mermaid">
+sequenceDiagram
+    participant T as Tool Write/Edit
+    participant H as Hook runtime
+    participant G as sdd-spec-gate.sh v3
+    participant A as releases/ACTIVE.md
+    participant K as releases/&lt;id&gt;/TASKS.md
+    T->>H: file_path = /path/to/file
+    H->>G: stdin JSON
+    G->>G: resolve PRIMARY_SPECS, ACTIVE_RELEASE, ACTIVE_PHASE
+    alt path matches memory/**.html or memory/product/**.html
+        G->>A: read phase
+        alt phase = CLOSURE
+            G-->>H: exit 0 (allow)
+        else
+            G-->>H: {block: memory atômico}
+        end
+    else path matches _archive/**
+        G-->>H: {block: archive read-only}
+    else path is meta (TASKS/PLAN/SPEC/CLOSURE/ACTIVE/backlog)
+        G-->>H: exit 0 (allow meta-edit)
+    else path is production
+        G->>K: grep [-] marker
+        alt task [-] encontrada
+            G-->>H: exit 0 (allow)
+        else
+            G-->>H: {block: nenhuma task [-]}
+        end
+    end
+  </pre>
+</section>
+
+<section id="trigger">
+  <h2>Trigger típico</h2>
+  <p>Automaticamente invocado a cada Write/Edit/MultiEdit em sessões de agente. Operador raramente interage com ele diretamente — só quando recebe um <code>{"decision":"block"}</code> que precisa ser entendido e resolvido.</p>
+</section>
+
+<section id="differential">
+  <h2>Diferencial</h2>
+  <p>Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — memory vira changelog, archive ganha edits acidentais, código de produção é editado sem rastreabilidade (qual task autorizou?). O gate é a camada mecânica do tripé de atomicidade do memory (junto com o contrato no agente product-engineer e o doctor post-hoc). É o que torna o modelo release-lifecycle observável e enforceável, não apenas documentado.</p>
+</section>
+
+<section id="runtime-state">
+  <h2>Estado runtime tocado</h2>
+  <ul>
+    <li>Read-only: <code>primary_context.json</code>, <code>releases/ACTIVE.md</code>, todos os <code>TASKS.md</code> sob <code>specs/</code>.</li>
+    <li>Write: <code>/tmp/sdd-gate.log</code> (append-only audit log).</li>
+    <li>Saída: STDOUT JSON quando bloqueia; exit 0 (silencioso) quando permite.</li>
+  </ul>
+</section>
+
+<section id="dependencies">
+  <h2>Dependências</h2>
+  <ul>
+    <li>Depende de <a href="context-management.html">context-management</a> (<code>primary_context.json</code>).</li>
+    <li>Depende de <a href="agent-orchestration.html">agent-orchestration</a> indiretamente (releases ativas geradas pelo product-engineer durante orchestration).</li>
+    <li>Projetado para <code>.dadaia/scripts/</code> via <a href="public-asset-distribution.html">public-asset-distribution</a>.</li>
+    <li>Variáveis de ambiente: <code>WORKSPACE_ROOT</code> (override), <code>DADAIA_CONTEXT</code> (override de primary), <code>SDD_LEGACY_FEATURES</code> (habilita fallback para features/*).</li>
+  </ul>
+</section>
+
+</body>
+</html>

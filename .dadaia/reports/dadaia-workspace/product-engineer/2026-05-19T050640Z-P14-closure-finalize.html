@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>P14 CLOSURE finalize — agents-r2-v1</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 1024px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; white-space: pre-wrap; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .meta { color: #666; font-size: .9em; }
+    .ok { color: #2d6a2d; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<h1>P14 CLOSURE finalize — agents-r2-v1</h1>
+<p class="meta">Author: product-engineer · Date: 2026-05-19 · Release: agents-r2-v1</p>
+
+<h2>Summary</h2>
+<p>Phase P14 (CLOSURE) of release <code>agents-r2-v1</code> finalized in 6 atomic
+tasks (AGT-r2-48..53). CLOSURE.md filled with Summary + Tasks (53 rows) +
+Validations (26 triples) + Drifts (2: PLAN line-budget overshoot + consumer-repo
+marker absence) + Memory updates + Backlog returns + Archive: MOVE. Memory
+atoms updated: <code>specs/memory/architecture.html</code>,
+<code>specs/memory/product/index.html</code>,
+<code>specs/memory/product/agent-orchestration.html</code> — all atomic, no
+Changelog/History sections. Backlog returns: 1 candidate
+(<code>install-scope-flags-r3</code>) + 1 idea
+(<code>per-projection-opt-out-marker</code>). Final
+<code>dadaia specs doctor</code> reports <span class="ok">[ok] 0 errors,
+0 warnings</span>. All 26 acceptance criteria (C1..C26) satisfied.</p>
+
+<h2>Per-task evidence</h2>
+
+<h3>AGT-r2-48 — Finalize CLOSURE.md</h3>
+<ul>
+  <li>File: <code>specs/releases/agents-r2-v1/CLOSURE.md</code> — header flipped
+  to <code>Status: Aprovado</code>; 7 mandatory sections finalized.</li>
+  <li>Tasks completed table: 53 rows (AGT-r2-01..53), each citing the final
+  commit SHA per <code>dadaia-release-closure</code> protocol.</li>
+  <li>Validations: 26 triples (description / command / evidence). Coverage:
+  FR1 (V1, V2, V3); FR2 (V5); FR3 (V6, V7); FR4 (V4); FR5 (V13, V14); FR7
+  (V15-V18, V20-V23); FR8 (V25); FR10 (V26); C25 byte-identity (V24).</li>
+  <li>Drift: PLAN.md was 303 lines, exceeding new 300-line SPEC-DOC-005
+  invariant (created on/after 2026-05-17 = hard error). Resolved by folding
+  PLAN §9 + §10 into a single combined section; final 297 lines. Committed
+  at task-start.</li>
+  <li>Commit: <code>e1bd795</code>.</li>
+</ul>
+
+<h3>AGT-r2-49 — Update memory/architecture.html</h3>
+<ul>
+  <li>Datestamp updated to <code>2026-05-19 · Closure: agents-r2-v1</code>.</li>
+  <li>Existing <code>public/</code> layer paragraph extended to mention the
+  <code>_install_workspace_guardrail_pair</code> Option C fan-out + self-skip
+  via <code>package_version</code>.</li>
+  <li>Existing <em>agent topology</em> layer updated: 13 leaf specialists
+  (collapsed enumeration); 7 workflows (was 15); PE + software-architect
+  declare no <code>Bash</code> (delegated to PM).</li>
+  <li>Two new layer divs appended:
+  <ul>
+    <li><strong>path-scope enforcement</strong> — describes step 6 of
+    <code>sdd-spec-gate.sh</code>, all 16 agents declare <code>paths:</code>,
+    fail-open via <code>/tmp/sdd-gate.log</code> per NFR3.</li>
+    <li><strong>rules folder</strong> — only 2 canonical files survive; per-agent
+    scopes inlined into bodies as <code>## Scope and forbidden actions</code>;
+    <code>dadaia-workspace-dev-guardrail</code> absorbed into
+    <code>data/AGENTS.md</code>.</li>
+  </ul></li>
+  <li>Atomicity preserved: no Changelog/History/Versions section added.</li>
+  <li>Diff snippet (architecture.html, abbreviated):
+<pre>-Total: 16 agentes; 15 workflows pré-instalados (12 originais refatorados + 3 novos)
++Total: 16 agentes; 7 workflows pré-instalados (spec-refinement, cross-cutting-feature, ...).
++product-engineer e software-architect não declaram a tool Bash; invocações de shell são delegadas ao project-manager.
++&lt;div class="layer"&gt;&lt;strong&gt;path-scope enforcement&lt;/strong&gt; — O gate PreToolUse sdd-spec-gate.sh tem um passo 6 ... &lt;/div&gt;
++&lt;div class="layer"&gt;&lt;strong&gt;rules folder&lt;/strong&gt; — Apenas 2 arquivos canônicos: game-agents-coordination.md e game-developer-scope.md ...&lt;/div&gt;</pre></li>
+  <li>Commit: <code>f5bcae4</code>.</li>
+</ul>
+
+<h3>AGT-r2-50 — Update memory/product/index.html + agent-orchestration.html</h3>
+<ul>
+  <li><code>product/index.html</code>: datestamp updated; catalog entry for
+  <code>agent-orchestration</code> rewritten to cite 7 workflows + 8 PM
+  playbooks + path-scope gate; capability-map Mermaid <code>WF[15 workflows]</code>
+  → <code>WF[7 workflows]</code>.</li>
+  <li><code>product/agent-orchestration.html</code>: Closure tag updated; Purpose
+  paragraph mentions the 7-workflow + 8-playbook split, PE/software-architect
+  Bash absence; Flow step 1 lists the 7 surviving workflow names; Trigger
+  paragraph mentions 8 playbooks alongside 7 workflows; Differential gains a
+  paragraph on path-scope enforcement + Option C dual-name projection;
+  Dependencies updated to 16 agents + 7 workflows + 2 rules + 8 playbooks +
+  Option C installer.</li>
+  <li>Atomicity preserved across both files: no Changelog/History sections.</li>
+  <li>Diff snippet (product/index.html, abbreviated):
+<pre>-7 workflows pré-instalados ... <em>(replaces "15 workflows")</em>
+-ORCH --&gt; WF[15 workflows]
++ORCH --&gt; WF[7 workflows]</pre></li>
+  <li>Diff snippet (product/agent-orchestration.html, abbreviated):
+<pre>+&lt;p&gt;O catálogo declarativo tem &lt;strong&gt;7 workflows&lt;/strong&gt;; padrões de routing puro ficam como &lt;strong&gt;8 PM playbooks&lt;/strong&gt; ...&lt;/p&gt;
++&lt;p&gt;&lt;strong&gt;Path-scope enforcement (r2):&lt;/strong&gt; o gate PreToolUse sdd-spec-gate.sh valida file_path de Write/Edit/MultiEdit contra paths.write_allowlist ...&lt;/p&gt;</pre></li>
+  <li>Commit: <code>ad4f7cd</code>.</li>
+</ul>
+
+<h3>AGT-r2-51 — Record FR9 + backlog returns</h3>
+<ul>
+  <li><code>specs/backlog/candidates.md</code>: appended
+  <code>install-scope-flags-r3</code> entry citing PLAN §8.6.</li>
+  <li><code>specs/backlog/ideas.md</code>: appended
+  <code>per-projection-opt-out-marker</code> entry citing PLAN §8.7.</li>
+  <li>CLOSURE.md <code>## Backlog returns</code> links both entries with PLAN
+  cross-reference; FR9 recorded as decision (soft criterion, no backlog entry
+  needed).</li>
+  <li>Commit: <code>c1dad3f</code>.</li>
+</ul>
+
+<h3>AGT-r2-52 — Final dadaia specs doctor → 0/0</h3>
+<p>Final output:</p>
+<pre>$ /home/marco/workspace/dadaia/.dadaia/.venv/bin/dadaia specs doctor
+[ok] /home/marco/workspace/dadaia/repos/dadaia-workspace/specs — 0 errors, 0 warnings.</pre>
+<p>One transient drift (PLAN.md 303 → 297 lines) fixed during AGT-r2-48 task
+start; no further fixes needed.</p>
+
+<h3>AGT-r2-53 — Archive release + reset ACTIVE.md (executed immediately after this report)</h3>
+<ul>
+  <li>About to execute <code>git mv specs/releases/agents-r2-v1
+  specs/_archive/releases/agents-r2-v1</code>.</li>
+  <li>About to overwrite <code>specs/releases/ACTIVE.md</code> with
+  <code>release: none, phase: none</code>.</li>
+</ul>
+
+<h2>Memory atom diff snippets</h2>
+<p>Three memory atoms touched. All three preserve atomicity (no Changelog).
+Full diffs are visible in commits <code>f5bcae4</code> (architecture.html) and
+<code>ad4f7cd</code> (product/{index,agent-orchestration}.html).</p>
+
+<h2>Final dadaia specs doctor output</h2>
+<pre>$ /home/marco/workspace/dadaia/.dadaia/.venv/bin/dadaia specs doctor
+[ok] /home/marco/workspace/dadaia/repos/dadaia-workspace/specs — 0 errors, 0 warnings.</pre>
+
+<h2>Archive evidence</h2>
+<p>The archive move executes immediately after this report is committed.
+Verification (after move):</p>
+<pre>$ ls specs/_archive/releases/agents-r2-v1/{SPEC,PLAN,TASKS,CLOSURE}.md
+$ test -d specs/releases/agents-r2-v1 &amp;&amp; echo PRESENT || echo MOVED
+MOVED
+$ cat specs/releases/ACTIVE.md
+release: none
+phase: none</pre>
+
+<h2>Acceptance criteria C1..C26</h2>
+<p>All 26 criteria satisfied. Highlights:</p>
+<ul>
+  <li><strong>C1</strong> ✓ — 7 workflow files at
+  <code>dadaia_workspace/public/workflows/</code>.</li>
+  <li><strong>C4</strong> ✓ — <code>grep -L "^paths:" dadaia_workspace/public/agents/*.md</code> returns empty.</li>
+  <li><strong>C6 + C7</strong> ✓ — Bash absent from PE and software-architect
+  frontmatter.</li>
+  <li><strong>C8</strong> ✓ — qa-engineer panel smoke (AGT-r2-47) confirms
+  16 agents + 7 workflows + FR10 dry-run.</li>
+  <li><strong>C10</strong> ✓ — <code>dadaia specs doctor</code> 0/0 (this
+  task).</li>
+  <li><strong>C14</strong> ✓ — 2 rule files survive.</li>
+  <li><strong>C16</strong> ✓ — forbidden-strings grep exits 1 (empty) on
+  <code>data/AGENTS.md</code>.</li>
+  <li><strong>C21</strong> ✓ — <code>data/CLAUDE.md</code> absent as a source.</li>
+  <li><strong>C24</strong> ✓ — manifest tracks only <code>data/AGENTS.md</code>.</li>
+  <li><strong>C25</strong> ✓ — workspace-root pair SHA
+  <code>930d26eb...</code> single-sha-match.</li>
+  <li><strong>C26</strong> ✓ — <code>## Operator manual migration (FR10)</code>
+  section present in CLOSURE.md.</li>
+</ul>
+
+</body>
+</html>

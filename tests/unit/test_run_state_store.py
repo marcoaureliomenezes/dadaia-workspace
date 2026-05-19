@@ -9,11 +9,9 @@ from dadaia_workspace.core.models.run_state import (
     RunStatus,
     StageState,
     StageStatus,
-)
-from dadaia_workspace.infrastructure.json_run_state_store import (
-    JsonRunStateStore,
     make_run_id,
 )
+from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 
 
 def _manifest(run_id: str) -> RunManifest:

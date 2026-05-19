@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agent-monitoring-v1 — Acceptance Pass — 2026-05-17</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #222; max-width: 980px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+  h1 { color: #111; border-bottom: 4px solid #9cddc8; padding-bottom: 0.5rem; }
+  h2 { color: #111; margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+  th { background: #f0fbf7; }
+  code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+  .ok { color: #3aaa6e; font-weight: 600; }
+  .crit { color: #633d2e; font-weight: 700; }
+  .meta { color: #666; font-size: 0.9rem; }
+  pre { background: #f7f7f7; padding: 0.75rem; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<h1>agent-monitoring-v1 — Acceptance Pass</h1>
+
+<p class="meta">
+  Release: <code>agent-monitoring-v1</code><br>
+  Acceptance run: <code>2026-05-17T151414Z</code><br>
+  Owner: <code>claude-main</code> (Phase 9 T-AM-22 of orchestrated execution)<br>
+  Branch: <code>feat/agent-monitoring-v1</code><br>
+  Spec: <a href="../../../../specs/releases/agent-monitoring-v1/SPEC.md">SPEC.md</a>
+</p>
+
+<h2>Summary</h2>
+
+<p>All 22 tasks (T-AM-01..22) of <code>agent-monitoring-v1</code> are <span class="ok">complete</span>. All 13 acceptance criteria from <code>SPEC.md § Acceptance criteria</code> are <span class="ok">green</span>. Implementation delivered as 9 orchestrated phases via fresh specialist agents per phase. Privacy gate (T1 CRITICAL) verified end-to-end: zero forbidden content fields appear in any API endpoint payload. Performance budget exceeded with margin: cold ingest 379ms ≪ 10s target, warm query 45ms within 50ms target.</p>
+
+<h2>Acceptance criteria status (SPEC § 1–13)</h2>
+
+<table>
+<thead><tr><th>#</th><th>Criterion</th><th>Status</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>GET /api/agents</code> valid payload + 401 without token</td><td class="ok">green</td><td>Smoke: <code>HTTP=401</code> sem header; <code>HTTP=200</code> com <code>Authorization: Bearer $TOKEN</code>; payload tem <code>generated_at</code>, <code>window_days</code>, <code>pricing_age_days</code>, <code>agents</code></td></tr>
+<tr><td>2</td><td><code>GET /api/workflows</code> similarly</td><td class="ok">green</td><td>401 sem token; 200 com token; 28 workflows discovered de <code>.claude/skills/</code> + <code>.agents/skills/</code></td></tr>
+<tr><td>3</td><td>Aba Agents renderiza cards + breakdown + drill-down</td><td class="ok">green</td><td><code>views/agents.py</code> emite scaffold; PANEL_JS Agents module faz lazy fetch + render cards com header/métricas/context-breakdown bars + sessions drill-down via <code>aria-expanded</code></td></tr>
+<tr><td>4</td><td>Aba Workflows renderiza cards + agent chips</td><td class="ok">green</td><td><code>views/workflows.py</code> + PANEL_JS Workflows module renderiza chips com <code>aria-label="Filtrar Agents por: ..."</code> que navegam para <code>#agents?filter=&lt;name&gt;</code></td></tr>
+<tr><td>5</td><td>WCAG 2.1 AA + keyboard nav</td><td class="ok">green</td><td>P1 T-AM-01 entregou <code>role=tablist/tab/tabpanel</code>, <code>aria-labelledby</code>, keyboard ArrowLeft/Right/Home/End/Enter/Space; P9 T-AM-19 entregou <code>test_panel_css_contrast.py</code> assertando WCAG AA em todas combinações texto/fundo</td></tr>
+<tr><td>6</td><td>SQLite chmod 600, parent 700, reader fails uid=0</td><td class="ok">green</td><td><code>stat ~/.dadaia/state/telemetry/telemetry.sqlite</code> → <code>600</code>; parent dir → <code>700</code>; <code>panel.token</code> → <code>600</code>; <code>TelemetryService</code> guard <code>os.getuid() != 0</code> testado em <code>test_service.py::test_refuses_uid_zero</code></td></tr>
+<tr><td>7</td><td>CSP + nosniff headers</td><td class="ok">green</td><td>Smoke <code>curl -v /</code>: <code>Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'</code>; <code>curl -v /api/agents</code>: <code>X-Content-Type-Options: nosniff</code></td></tr>
+<tr><td>8</td><td><strong>T1 CRITICAL — Allowlist</strong>: no content fields in any API</td><td class="crit ok">green</td><td>Smoke: <code>curl /api/agents | grep -oE '"(content|prompt|thinking|messages|snapshot|response)":' | wc -l</code> → <strong>0</strong>; mesmo em <code>/api/workflows</code> → <strong>0</strong>. Integration test <code>test_no_forbidden_fields_in_payload</code> passes</td></tr>
+<tr><td>9</td><td>pricing.py 5 scenarios</td><td class="ok">green</td><td><code>test_pricing.py</code>: 20 tests passing, cobrindo modelo conhecido em janela atual / histórica, modelo desconhecido (<code>None</code>), usage zero (<code>0</code>), Codex sem split (<code>None</code> com flag aggregated)</td></tr>
+<tr><td>10</td><td>Schema migration PRAGMA user_version idempotent</td><td class="ok">green</td><td><code>test_schema.py</code> aplica migrações 2× → <code>user_version</code> estável em 5; todas as 5 tabelas + 7 índices criados</td></tr>
+<tr><td>11</td><td>Performance: cold ingest &lt; 10s, query &lt; 50ms</td><td class="ok">green</td><td>Workspace real (3.3MB SQLite, 9435 events, 43 sessions, 28 workflows): <strong>cold ingest 379ms</strong> ≪ 10s target. <strong>Warm query 45-47ms</strong> dentro do target de 50ms. /api/workflows warm = 1ms</td></tr>
+<tr><td>12</td><td><code>dadaia doctor</code> green</td><td class="ok">green</td><td><em>All invariants OK — workspace is healthy.</em></td></tr>
+<tr><td>13</td><td>SPEC Status → Aprovado</td><td class="ok">green</td><td>Já <code>Aprovado: 2026-05-17</code> (pre-implementation)</td></tr>
+</tbody>
+</table>
+
+<h2>Test suites</h2>
+
+<table>
+<thead><tr><th>Suite</th><th>Cases</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td><code>tests/unit/features/panel/</code> (palette, contrast, svg, auth, security_headers, views_index/agents/workflows, css_contrast)</td><td>~140</td><td class="ok">passed</td></tr>
+<tr><td><code>tests/unit/features/telemetry/</code> (schema, dao, allowlist, reader_claude/codex/workflows, budget, pricing, aggregator, service)</td><td>~135</td><td class="ok">passed</td></tr>
+<tr><td><code>tests/integration/test_panel_telemetry_endpoints.py</code></td><td>10</td><td class="ok">passed</td></tr>
+<tr><td><code>tests/integration/test_telemetry_permissions.py</code></td><td>~5</td><td class="ok">passed</td></tr>
+<tr><td><code>tests/integration/test_telemetry_corrupt_db.py</code></td><td>~6</td><td class="ok">passed</td></tr>
+<tr><td><strong>Total panel + telemetry + new integration</strong></td><td><strong>291</strong></td><td class="ok"><strong>291 passed in 2.66s</strong></td></tr>
+</tbody>
+</table>
+
+<h2>Live panel smoke (end-to-end)</h2>
+
+<pre>=== 1. /api/agents — 401 without token ===  HTTP=401
+=== 1b. /api/agents — 200 with token ===    HTTP=200 time=0.379s
+  agent_count=1
+  pricing_age_days=501 (banner triggers >90)
+=== 2. /api/workflows — auth + count ===
+  401 no-token HTTP=401
+  workflows_count= 28
+  source_hint= .claude/skills/, .agents/skills/
+=== 3-4. Tabs render ===
+  tabs: id=tab-agents id=tab-memories id=tab-servers id=tab-workflows
+=== 7. Headers CSP+nosniff ===
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'
+  X-Content-Type-Options: nosniff
+=== 8. T1 PRIVACY GREP — must be 0 ===
+  /api/agents forbidden_keys=0 (must=0)
+  /api/workflows forbidden_keys=0 (must=0)
+=== 6. fs perms ===
+  600 /home/marco/.dadaia/state/panel.token
+  700 /home/marco/.dadaia/state/telemetry
+  600 /home/marco/.dadaia/state/telemetry/telemetry.sqlite
+=== Performance ===
+  cold ingest: 0.379s (target &lt; 10s)
+  warm query 1: 0.045s (target &lt; 50ms)
+  warm query 2: 0.047s
+  /api/workflows warm: 0.001s
+  DB size: 3.3M for 43 sessions / 9435 events / 1 agent / 28 workflows</pre>
+
+<h2>Orchestrated execution log (9 phases, fresh agent per phase)</h2>
+
+<table>
+<thead><tr><th>Phase</th><th>Agent type</th><th>Tasks</th><th>Commit SHA</th></tr></thead>
+<tbody>
+<tr><td>P1</td><td>frontend-engineer</td><td>T-AM-01 (a11y nav-tabs)</td><td><code>6e88331</code></td></tr>
+<tr><td>P2</td><td>software-engineer</td><td>T-AM-02..04 (schema + DAO + skeleton)</td><td><code>9242552</code></td></tr>
+<tr><td>P3</td><td>software-engineer</td><td>T-AM-05, 06 (allowlist T1 + Claude reader)</td><td><code>f2c2ad9</code></td></tr>
+<tr><td>P4</td><td>software-engineer</td><td>T-AM-07..09 (Codex + budget + workflows)</td><td><code>028c388</code></td></tr>
+<tr><td>P5</td><td>software-engineer</td><td>T-AM-10 (pricing)</td><td><code>c926bf8</code></td></tr>
+<tr><td>P6</td><td>software-engineer</td><td>T-AM-11, 12 (aggregator + service)</td><td><code>d119264</code></td></tr>
+<tr><td>P7</td><td>software-engineer + claude-main wrap</td><td>T-AM-13..15 (auth + headers + endpoints)</td><td><code>e67ce0a</code></td></tr>
+<tr><td>P8</td><td>frontend-engineer + claude-main wrap</td><td>T-AM-16..18 (Agents + Workflows views)</td><td><code>541223e</code></td></tr>
+<tr><td>P9</td><td>software-engineer + claude-main wrap</td><td>T-AM-19..21 (brand tokens + fs perms + corrupt-DB)</td><td><code>5255941</code></td></tr>
+<tr><td>P9</td><td>claude-main</td><td>T-AM-22 (acceptance)</td><td>this commit</td></tr>
+</tbody>
+</table>
+
+<h2>Security posture (Threat matrix coverage)</h2>
+
+<table>
+<thead><tr><th>#</th><th>Threat</th><th>Severity</th><th>Coverage</th></tr></thead>
+<tbody>
+<tr><td>T1</td><td>Sensitive content leak via new endpoint</td><td class="crit">CRITICAL</td><td><span class="ok">verified</span> — allowlist gate enforces approved-only top-level keys; nested <code>message.usage.*</code> + <code>message.model</code> permitted; FORBIDDEN_KEYS = <code>{content, text, messages, snapshot, thinking, prompt, response}</code>; integration grep on actual responses returns 0 matches</td></tr>
+<tr><td>T2</td><td>SQLite legível por outro user</td><td>HIGH</td><td><span class="ok">verified</span> — <code>chmod 0o600</code> file, <code>0o700</code> dir; integration test inspects mode bits</td></tr>
+<tr><td>T3</td><td>Malware local enumera sessionIds</td><td>HIGH</td><td><span class="ok">verified</span> — Bearer token required; sessionId truncado a 8 chars + <code>...</code> em todas as respostas</td></tr>
+<tr><td>T4</td><td>DoS via jsonl gigante</td><td>HIGH</td><td><span class="ok">verified</span> — <code>budget.py</code> constraints: 4MB/file/cycle, 64KB/line, 10k events/cycle</td></tr>
+<tr><td>T6</td><td>Reader rodando como root</td><td>MEDIUM</td><td><span class="ok">verified</span> — <code>os.getuid() != 0</code> guard no <code>TelemetryService.__init__</code>; testado em <code>test_refuses_uid_zero</code></td></tr>
+<tr><td>T7</td><td>Forged events (tokens fora dos limites)</td><td>MEDIUM</td><td><span class="ok">verified</span> — D-AM-19: events flagged <code>suspect=1</code> when <code>tokens &gt; MAX_TOKEN_COUNT_PER_EVENT</code> ou negativos; UI mostra badge</td></tr>
+<tr><td>T8</td><td>Security headers absent</td><td>MEDIUM</td><td><span class="ok">verified</span> — CSP em HTML, nosniff em JSON</td></tr>
+<tr><td>T10</td><td>Corrupt SQLite crashes service</td><td>MEDIUM</td><td><span class="ok">verified</span> — <code>PRAGMA integrity_check</code>; corrupt DB renomeado para <code>telemetry.sqlite.corrupt.&lt;ts&gt;</code>; endpoints retornam 503 graceful</td></tr>
+</tbody>
+</table>
+
+<h2>Out of scope reminders (deferred)</h2>
+
+<ul>
+<li>Spec-context cross-session isolation bug — Hotfix candidate, registered Phase 1 RCA (em <code>candidates.md</code>).</li>
+<li>opencode telemetry — defer para v1.1 (D-AM-14).</li>
+<li>Anthropic Admin API integration — sem dependência externa.</li>
+<li>Multi-host / admin API / real-time push / threshold alerts — todos diferidos para releases sucessoras.</li>
+<li>Cookie handoff do Bearer token para HTML root — TODO em hotfix futuro (atualmente HTML root é aberto; JS faz fetch com <code>credentials: same-origin</code> mas o cookie ainda não é setado).</li>
+<li>Recompute de costs quando pricing.py muda — denormalização aceita (D-AM-07 trade-off).</li>
+</ul>
+
+<h2>Next steps for operator</h2>
+
+<ol>
+<li>Run <code>dadaia panel</code> locally e validar visualmente: 4 abas (Servers, Memories, Agents, Workflows); aba Agents lista <code>claude (main)</code> com 43 sessões + breakdown <code>dadaia-workspace</code> vs <code>unassigned</code>; aba Workflows lista 28 skills com chips clicáveis; banner amarelo aparece (<code>pricing_age_days=501 &gt; 90</code>).</li>
+<li>Validar drill-down: clicar "Mostrar sessões recentes" em <code>claude (main)</code> → tabela com session_id_prefix de 8 chars + branch + contexto.</li>
+<li>Validar chip filter: clicar um chip em Workflows → navega para Agents filtrado.</li>
+<li>Validar keyboard nav: Arrow/Home/End/Enter funcionam nas tabs.</li>
+<li>Opcional: capturar screenshots e anexar ao PR.</li>
+<li>Merge do PR <code>feat/agent-monitoring-v1</code> → <code>main</code> quando satisfeito.</li>
+<li>Após merge: archive <code>agent-monitoring-v1</code>; eleger próxima release (Hotfix spec-context-isolation seria o candidato natural).</li>
+</ol>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/home/marco/workspace/dadaia/repos/dadaia-workspace/.dadaia/scripts/sdd-spec-gate.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "/home/marco/workspace/dadaia/repos/dadaia-workspace/.dadaia/scripts/ctx-inject.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  }
+}

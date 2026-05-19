@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'hotfix/v*'
   pull_request:
     branches: [main]
 
@@ -88,6 +90,30 @@ jobs:
       - name: pytest
         run: poetry run pytest -q
 
+  specs-doctor:
+    name: Specs Doctor (SDD structural checks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+      - name: Cache poetry deps
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install dev deps
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: specs doctor
+        run: poetry run dadaia specs doctor --specs-dir specs
+
   pr-title:
     name: PR title (conventional commits)
     runs-on: ubuntu-latest
@@ -101,5 +127,24 @@ jobs:
         run: |
           if ! echo "$PR_TITLE" | grep -Eq '^(feat|fix|chore|docs|test|refactor|build|ci|perf|revert)(\([^)]+\))?(!)?: .+'; then
             echo "::error::PR title must follow Conventional Commits, got: $PR_TITLE"
+            exit 1
+          fi
+
+  hotfix-branch-name:
+    name: Hotfix branch SemVer (PATCH>=1)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/hotfix/')
+    timeout-minutes: 1
+    steps:
+      - name: Validate hotfix branch name
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          BRANCH="${REF#refs/heads/}"
+          # Required: hotfix/v<MAJOR>.<MINOR>.<PATCH>[-<slug>]  where PATCH >= 1
+          if ! echo "$BRANCH" | grep -Eq '^hotfix/v[0-9]+\.[0-9]+\.[1-9][0-9]*(-[a-z0-9._-]+)?$'; then
+            echo "::error::Hotfix branch must be hotfix/v<M>.<m>.<p> with PATCH>=1 (optional -slug). Got: $BRANCH"
+            echo "::error::Examples accepted: hotfix/v1.0.1, hotfix/v0.2.3-fix-auth-crash"
+            echo "::error::Examples rejected: hotfix/v1.0 (no patch), hotfix/v1.0.0 (patch=0 reserved for feature releases), hotfix/v1.0.0-beta (pre-release tag)"
             exit 1
           fi

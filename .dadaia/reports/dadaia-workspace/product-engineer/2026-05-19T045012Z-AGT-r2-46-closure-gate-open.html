@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AGT-r2-46 — CLOSURE gate opened for agents-r2-v1</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; color: #1f2328; line-height: 1.55; }
+    h1 { border-bottom: 2px solid #d0d7de; padding-bottom: 0.4rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #d8dee4; padding-bottom: 0.25rem; }
+    code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    pre { background: #f6f8fa; padding: 0.85rem 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88rem; }
+    .meta { background: #f6f8fa; border-left: 4px solid #0969da; padding: 0.65rem 1rem; border-radius: 0 6px 6px 0; }
+    .meta dt { font-weight: 600; display: inline-block; min-width: 9rem; }
+    .meta dd { display: inline; margin: 0; }
+    .meta dd::after { content: ""; display: block; }
+    table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; font-size: 0.92rem; }
+    th, td { border: 1px solid #d0d7de; padding: 0.45rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: #f6f8fa; }
+    .ok { color: #1a7f37; font-weight: 600; }
+    .diff-add { color: #1a7f37; }
+    .diff-del { color: #cf222e; }
+  </style>
+</head>
+<body>
+  <h1>AGT-r2-46 — CLOSURE gate opened for agents-r2-v1</h1>
+
+  <div class="meta">
+    <dl>
+      <dt>Release:</dt> <dd>agents-r2-v1</dd>
+      <dt>Phase transition:</dt> <dd>TASKS → CLOSURE</dd>
+      <dt>Task:</dt> <dd>AGT-r2-46 (Phase P14, first task)</dd>
+      <dt>Owner:</dt> <dd>product-engineer</dd>
+      <dt>Branch:</dt> <dd>release/agents-r2-v1</dd>
+      <dt>Produced at:</dt> <dd>2026-05-19T04:50:12Z</dd>
+      <dt>Final commit:</dt> <dd><code>55570e2</code></dd>
+    </dl>
+  </div>
+
+  <h2>Summary</h2>
+  <p>
+    Executed the closure-gate flip for release <code>agents-r2-v1</code>. All P13 tasks
+    (AGT-r2-26..45) were marked <code>[x]</code> DONE prior to this dispatch, including
+    the merge-readiness check (AGT-r2-44) and PR opening (AGT-r2-45 → PR #11). The gate
+    file <code>specs/releases/ACTIVE.md</code> was flipped from <code>phase: TASKS</code>
+    to <code>phase: CLOSURE</code>, which is the prerequisite that
+    <code>sdd-enforcement</code> uses to authorize writes under
+    <code>specs/memory/**</code> for subsequent tasks (AGT-r2-49 architecture.html;
+    AGT-r2-50 product catalog).
+  </p>
+  <p>
+    Following the <code>dadaia-task-manager</code> 4-step protocol, AGT-r2-46 was
+    reserved via <code>[ ] → [-]</code> commit (<code>5763cf5</code>), the gate file was
+    updated, and the task was finalized via <code>[-] → [x]</code> commit
+    (<code>55570e2</code>). No other release files were touched.
+  </p>
+
+  <h2>Pre/post ACTIVE.md content</h2>
+
+  <h3>Pre (before flip)</h3>
+  <pre>release: agents-r2-v1
+phase: TASKS</pre>
+
+  <h3>Post (after flip — verified via <code>cat</code>)</h3>
+  <pre>release: agents-r2-v1
+phase: CLOSURE</pre>
+
+  <p>
+    File contains exactly 2 lines (verified by <code>wc -l</code> → <code>2</code>) plus
+    a file-final newline. No trailing whitespace. The acceptance criterion
+    <em>"<code>cat specs/releases/ACTIVE.md</code> shows exactly the 2 lines above"</em>
+    is satisfied.
+  </p>
+
+  <h3>Diff</h3>
+  <pre>--- a/specs/releases/ACTIVE.md
++++ b/specs/releases/ACTIVE.md
+@@ -1,2 +1,2 @@
+ release: agents-r2-v1
+<span class="diff-del">-phase: TASKS</span>
+<span class="diff-add">+phase: CLOSURE</span></pre>
+
+  <h2>Marker flip evidence</h2>
+
+  <h3>TASKS.md transitions</h3>
+  <table>
+    <thead>
+      <tr><th>Step</th><th>Marker</th><th>Commit SHA</th><th>Commit message</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1. Reserve</td>
+        <td><code>[ ] → [-]</code></td>
+        <td><code>5763cf5</code></td>
+        <td><code>chore(tasks): start AGT-r2-46</code></td>
+      </tr>
+      <tr>
+        <td>2. Execute + Finalize</td>
+        <td><code>[-] → [x]</code></td>
+        <td><code>55570e2</code></td>
+        <td><code>chore(release): open CLOSURE gate for agents-r2-v1 (AGT-r2-46)</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Final marker line (verified)</h3>
+  <pre>specs/releases/agents-r2-v1/TASKS.md:282:
+- [x] AGT-r2-46 — Flip `ACTIVE.md` to `phase: CLOSURE` to unlock memory writes (product-engineer)</pre>
+
+  <h3>Git log (last 5)</h3>
+  <pre>55570e2 chore(release): open CLOSURE gate for agents-r2-v1 (AGT-r2-46)
+5763cf5 chore(tasks): start AGT-r2-46
+5dff38c chore(reports): P13 finalize report + handoff sidecar (AGT-r2-44, AGT-r2-45)
+8f0cf07 chore(tasks): done AGT-r2-45 — PR opened at #11
+2af7d69 chore(tasks): done AGT-r2-44, start AGT-r2-45</pre>
+
+  <h2>Outcome</h2>
+  <p class="ok">AGT-r2-46 [x] DONE. ACTIVE.md phase = CLOSURE confirmed.</p>
+  <p>
+    The memory-write gate is now open. Subsequent P14 dispatches (AGT-r2-47..53) may
+    proceed. In particular:
+  </p>
+  <ul>
+    <li>AGT-r2-49 — write <code>specs/memory/architecture.html</code> (now authorized).</li>
+    <li>AGT-r2-50 — write <code>specs/memory/product/index.html</code> and any catalog
+        updates (now authorized).</li>
+    <li>AGT-r2-47 — qa-engineer smoke (no gate dependency).</li>
+    <li>AGT-r2-48 — devops projection doctor (no gate dependency).</li>
+  </ul>
+  <p>
+    The release directory will remain at <code>specs/releases/agents-r2-v1/</code> until
+    AGT-r2-53 performs the final <code>git mv</code> to
+    <code>specs/_archive/releases/agents-r2-v1/</code>.
+  </p>
+</body>
+</html>

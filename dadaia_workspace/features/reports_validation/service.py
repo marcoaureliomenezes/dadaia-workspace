@@ -1,0 +1,147 @@
+"""Reports validation feature service.
+
+This module is intentionally free of any infrastructure imports (constitution
+L67).  It only knows about ``core/`` protocols, models, and exceptions, plus
+the Python standard library.
+
+The concrete ``StdlibHandoffValidator`` adapter is wired in by
+``dadaia_workspace.container.build_reports_validation_service`` — never here.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from dadaia_workspace.core.exceptions import HandoffValidationError
+from dadaia_workspace.core.protocols.handoff_validator import ValidatorPort
+
+if TYPE_CHECKING:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Result dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ValidationResult:
+    """Outcome of validating a single handoff file.
+
+    Attributes:
+        path: Absolute path to the ``.handoff.json`` file.
+        valid: ``True`` if the document passed all checks.
+        errors: Tuple of ``HandoffValidationError`` instances (empty when valid).
+        hash_status: One of ``"match"``, ``"mismatch"``, ``"missing_artifact"``,
+            or ``None`` when hash was not checked.
+    """
+
+    path: Path
+    valid: bool
+    errors: tuple[HandoffValidationError, ...] = field(default_factory=tuple)
+    hash_status: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Service
+# ---------------------------------------------------------------------------
+
+
+class ReportsValidationService:
+    """Validates agent handoff documents using a pluggable ``ValidatorPort``.
+
+    This service discovers, reads, and validates ``.handoff.json`` files under
+    ``reports_root``.  It does **not** couple itself to any concrete validator
+    implementation — callers inject the adapter via ``validator``.
+
+    Args:
+        validator: Any object implementing ``ValidatorPort``.
+        reports_root: Root directory where agent report sidecars are stored
+            (typically ``<workspace>/.dadaia/reports``).
+    """
+
+    def __init__(self, validator: ValidatorPort, reports_root: Path) -> None:
+        self._validator = validator
+        self._reports_root = reports_root
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def validate_file(self, path: Path) -> ValidationResult:
+        """Validate a single handoff JSON file.
+
+        Reads the JSON, calls the validator, and returns a ``ValidationResult``.
+        Malformed JSON is treated as a structural violation — the validator is
+        NOT called for such documents.
+
+        Args:
+            path: Absolute (or relative) path to the ``.handoff.json`` file.
+
+        Returns:
+            A ``ValidationResult`` capturing validity and any errors.
+        """
+        try:
+            raw = path.read_text(encoding="utf-8")
+            doc: dict[str, object] = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            malformed_error = HandoffValidationError("$root", f"malformed JSON: {exc}")
+            return ValidationResult(path=path, valid=False, errors=(malformed_error,))
+
+        errors = list(self._validator.validate(doc))
+        return ValidationResult(
+            path=path,
+            valid=len(errors) == 0,
+            errors=tuple(errors),
+        )
+
+    def validate_all(self, context: str | None = None) -> list[ValidationResult]:
+        """Discover and validate all ``*.handoff.json`` files under ``reports_root``.
+
+        Args:
+            context: If provided, only files under ``reports_root/<context>/``
+                are included.
+
+        Returns:
+            A list of ``ValidationResult`` — one per discovered file.
+        """
+        search_root = self._reports_root / context if context else self._reports_root
+        results: list[ValidationResult] = []
+        for handoff_path in sorted(search_root.rglob("*.handoff.json")):
+            results.append(self.validate_file(handoff_path))
+        return results
+
+    def check_hash(self, handoff_path: Path) -> str:
+        """Compare the artifact's actual sha256 against the handoff's ``content_hash``.
+
+        The artifact file is resolved relative to the directory that contains
+        ``handoff_path``.
+
+        Args:
+            handoff_path: Path to the ``.handoff.json`` file.
+
+        Returns:
+            - ``"match"`` — hashes are identical.
+            - ``"mismatch"`` — hashes differ.
+            - ``"missing_artifact"`` — the artifact file referenced in the handoff
+              does not exist on disk.
+        """
+        raw = handoff_path.read_text(encoding="utf-8")
+        doc: dict[str, object] = json.loads(raw)
+        artifact_info = doc.get("artifact", {})
+        assert isinstance(artifact_info, dict)
+        artifact_rel = str(artifact_info.get("path", ""))
+        expected_hash = str(artifact_info.get("content_hash", ""))
+
+        handoff_dir = handoff_path.parent
+        artifact_path = handoff_dir / artifact_rel
+
+        if not artifact_path.exists():
+            return "missing_artifact"
+
+        actual_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        return "match" if actual_hash == expected_hash else "mismatch"
