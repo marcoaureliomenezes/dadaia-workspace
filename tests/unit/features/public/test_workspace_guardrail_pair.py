@@ -1,34 +1,29 @@
-"""Placeholder test suite — AGT-r2-23.
+"""Real assertions for `_install_workspace_guardrail_pair` — AGT-r2-27.
 
-Tests for `_install_workspace_guardrail_pair` in
+Tests for `_install_workspace_guardrail_pair` and `_doctor_guardrail_pair` in
 `dadaia_workspace.infrastructure.public_assets`.
 
-The installer function does NOT yet exist (it is authored in P9 — AGT-r2-25).
-All 6 cases below are marked xfail or skipped with the reason
-"implemented in P9: AGT-r2-27", where real assertions will land once the
-installer is built and the integration test phase (AGT-r2-27) executes.
-
-When P9 lands:
-1. Remove the xfail / skip decorators from each case.
-2. Fill in the assertion bodies following the scenario descriptions.
-3. Confirm all 6 cases go green under pytest.
+Six cases covering:
+1. 4-target projection write (byte-identical, single SHA-256).
+2. Skip when consumer has no `.dadaia/` marker.
+3. Skip when consumer has `.dadaia/` but no `.dadaia/agentic/` marker.
+4. Self-slug skip via `package_version` match (R14).
+5. Nested-pair non-interference: `services/CLAUDE.md` + `services/AGENTS.md` untouched (FR10).
+6. Doctor produces exactly 4 parity labels per source.
 """
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Module-level import guard
-# ---------------------------------------------------------------------------
-# The target function does not exist yet; importing it here would crash the
-# entire module at collection time.  We defer the import into each test body
-# so pytest can still collect all 6 cases and report them as xfail / skip.
-# ---------------------------------------------------------------------------
-
-_REASON = "implemented in P9: AGT-r2-27"
+from dadaia_workspace.infrastructure.public_assets import (
+    _doctor_guardrail_pair,
+    _install_workspace_guardrail_pair,
+    _package_version,
+)
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
@@ -38,17 +33,17 @@ _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason=_REASON, strict=False, raises=(ImportError, NotImplementedError))
 def test_four_target_projection_write(tmp_path: Path) -> None:
     """Single source `data/AGENTS.md` fans out to 4 destinations.
 
     Given:
       - A source file at `<agentic_dir>/data/AGENTS.md` with known content.
       - A workspace root directory.
-      - One consumer repo directory under `repos/`.
+      - One consumer repo directory under `repos/` with `.dadaia/agentic/` markers
+        and a distinct `package_version` (so it is NOT self-skipped).
 
     When:
-      - `_install_workspace_guardrail_pair` is called.
+      - `_install_workspace_guardrail_pair` is called with force=True.
 
     Then:
       - All 4 destination files are written:
@@ -58,10 +53,6 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
           * workspace-root / repos/<slug> / CLAUDE.md
       - All 4 files are byte-identical to the source (verified via SHA-256).
     """
-    from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
-        _install_workspace_guardrail_pair,
-    )
-
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"# AGENTS\n\nGuardrail content.\n")
@@ -76,9 +67,8 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
         '{"package_version": "0.0.0"}\n', encoding="utf-8"
     )
 
-    _install_workspace_guardrail_pair(source, workspace_root, force=True)
-
-    import hashlib
+    installed: list[str] = []
+    _install_workspace_guardrail_pair(source, workspace_root, force=True, installed=installed)
 
     def sha256(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -90,6 +80,7 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
         consumer / "AGENTS.md",
         consumer / "CLAUDE.md",
     ]
+    assert len(destinations) == 4, "Fixture must define exactly 4 destination paths."
     for dest in destinations:
         assert dest.exists(), f"Expected destination missing: {dest}"
         assert sha256(dest) == expected, (
@@ -98,13 +89,18 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
             f"  dest   sha256: {sha256(dest)}"
         )
 
+    ok_entries = [e for e in installed if e.startswith("[ok]")]
+    assert len(ok_entries) == 4, (
+        f"Expected exactly 4 '[ok]' entries in installed list, got {len(ok_entries)}.\n"
+        f"  installed: {installed}"
+    )
+
 
 # ---------------------------------------------------------------------------
 # Case 2 — Skip variant: no `.dadaia/` marker
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason=_REASON, strict=False, raises=(ImportError, NotImplementedError))
 def test_skip_no_dadaia_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Consumer dir without `.dadaia/` is silently skipped.
 
@@ -116,12 +112,8 @@ def test_skip_no_dadaia_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str
 
     Then:
       - The consumer directory is not written to.
-      - The installer logs: `[skip] <path> (no .dadaia/ marker)`.
+      - The installer logs: `[skip] <path> (no .dadaia/ marker)` to stderr.
     """
-    from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
-        _install_workspace_guardrail_pair,
-    )
-
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"# AGENTS\n")
@@ -151,7 +143,6 @@ def test_skip_no_dadaia_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason=_REASON, strict=False, raises=(ImportError, NotImplementedError))
 def test_skip_no_agentic_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Consumer dir with `.dadaia/` but no `.dadaia/agentic/` is silently skipped.
 
@@ -163,12 +154,8 @@ def test_skip_no_agentic_marker(tmp_path: Path, capsys: pytest.CaptureFixture[st
 
     Then:
       - The consumer directory is not written to.
-      - The installer logs: `[skip] <path> (no .dadaia/ marker)`.
+      - The installer logs: `[skip] <path> (no .dadaia/ marker)` to stderr.
     """
-    from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
-        _install_workspace_guardrail_pair,
-    )
-
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"# AGENTS\n")
@@ -199,8 +186,7 @@ def test_skip_no_agentic_marker(tmp_path: Path, capsys: pytest.CaptureFixture[st
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason=_REASON, strict=False, raises=(ImportError, NotImplementedError))
-def test_skip_self_slug_package_version_match(tmp_path: Path) -> None:
+def test_skip_self_slug_package_version_match(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """dadaia-workspace's own repo is self-skipped via package_version match.
 
     R14: When the `package_version` in `<repo>/.dadaia/agentic/manifest.json`
@@ -216,14 +202,9 @@ def test_skip_self_slug_package_version_match(tmp_path: Path) -> None:
       - `_install_workspace_guardrail_pair` processes that consumer.
 
     Then:
-      - The consumer directory is not written to.
-      - The installer does NOT raise; it silently self-skips.
+      - The consumer directory is not written to (no AGENTS.md or CLAUDE.md created).
+      - The installer does NOT raise; it silently self-skips with a log line.
     """
-    from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
-        _install_workspace_guardrail_pair,
-        _package_version,
-    )
-
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"# AGENTS\n")
@@ -241,14 +222,21 @@ def test_skip_self_slug_package_version_match(tmp_path: Path) -> None:
         f'{{"package_version": "{own_version}"}}\n', encoding="utf-8"
     )
 
-    agents_before = (consumer / "AGENTS.md").exists()
-
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
 
-    agents_after = (consumer / "AGENTS.md").exists()
-    assert agents_before == agents_after, (
-        "Installer must NOT write to the self-slug consumer (package_version match).\n"
-        f"  AGENTS.md existed before: {agents_before}, after: {agents_after}"
+    assert not (consumer / "AGENTS.md").exists(), (
+        "Installer must NOT write AGENTS.md to the self-slug consumer (package_version match).\n"
+        f"  own_version: {own_version}"
+    )
+    assert not (consumer / "CLAUDE.md").exists(), (
+        "Installer must NOT write CLAUDE.md to the self-slug consumer (package_version match).\n"
+        f"  own_version: {own_version}"
+    )
+
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "[skip]" in combined and "self-projection" in combined, (
+        f"Expected self-projection skip log line not found in output.\n  Output: {combined!r}"
     )
 
 
@@ -257,28 +245,24 @@ def test_skip_self_slug_package_version_match(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason=_REASON, strict=False, raises=(ImportError, NotImplementedError))
 def test_nested_pair_non_interference(tmp_path: Path) -> None:
     """Operator-authored services/CLAUDE.md + services/AGENTS.md are NOT touched.
 
     FR10: Files at `services/CLAUDE.md` and `services/AGENTS.md` are
     operator-authored (not lib-originated). The guardrail installer must not
-    modify them.
+    modify them — it only writes to workspace-root and consumer-repo roots.
 
     Given:
-      - `services/CLAUDE.md` and `services/AGENTS.md` exist with known content.
+      - `services/CLAUDE.md` and `services/AGENTS.md` exist with known content
+        BEFORE `_install_workspace_guardrail_pair` is called.
 
     When:
-      - `_install_workspace_guardrail_pair` is called.
+      - `_install_workspace_guardrail_pair` is called with force=True.
 
     Then:
       - `services/CLAUDE.md` and `services/AGENTS.md` remain byte-identical to
         their pre-call content.
     """
-    from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
-        _install_workspace_guardrail_pair,
-    )
-
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"# AGENTS guardrail\n")
@@ -313,30 +297,25 @@ def test_nested_pair_non_interference(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason=_REASON, strict=False, raises=(ImportError, NotImplementedError))
-def test_doctor_four_line_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """`dadaia public doctor` emits exactly 4 parity lines per source.
+def test_doctor_four_line_output(tmp_path: Path) -> None:
+    """`_doctor_guardrail_pair` emits exactly 4 parity lines for 1 consumer.
 
     Given:
       - A fully installed guardrail pair (4 destinations written).
       - One consumer repo slug (e.g., `some-consumer`).
 
     When:
-      - The doctor parity check runs (exercised here via the public_assets API).
+      - `_doctor_guardrail_pair` is called against the same workspace.
 
     Then:
-      - The output contains exactly 4 lines of the form:
+      - The returned list contains exactly 4 lines.
+      - The 4 labels are exactly:
           `root:AGENTS.md`
           `root:CLAUDE.md`
           `repos/<slug>:AGENTS.md`
           `repos/<slug>:CLAUDE.md`
-      - No extra parity lines appear; no lines are missing.
+      - All 4 lines report `[ok]` (files are byte-identical to source).
     """
-    from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
-        _install_workspace_guardrail_pair,
-        _doctor_guardrail_pair,
-    )
-
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"# AGENTS\n")
@@ -354,29 +333,23 @@ def test_doctor_four_line_output(tmp_path: Path, capsys: pytest.CaptureFixture[s
 
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
 
-    _doctor_guardrail_pair(source, workspace_root)
+    lines = _doctor_guardrail_pair(source, workspace_root)
 
-    captured = capsys.readouterr()
-    combined = captured.out + captured.err
-
-    expected_lines = {
+    expected_labels = {
         "root:AGENTS.md",
         "root:CLAUDE.md",
         f"repos/{slug}:AGENTS.md",
         f"repos/{slug}:CLAUDE.md",
     }
-    for line_key in expected_lines:
-        assert line_key in combined, (
-            f"Doctor output missing expected parity line: {line_key!r}\n"
-            f"  Full output: {combined!r}"
-        )
+    actual_labels = {ln.split(" ", 1)[1] for ln in lines if " " in ln}
 
-    parity_lines = [
-        ln for ln in combined.splitlines()
-        if any(k in ln for k in expected_lines)
-    ]
-    assert len(parity_lines) == 4, (
-        f"Expected exactly 4 parity lines, found {len(parity_lines)}.\n"
-        f"  Parity lines: {parity_lines}\n"
-        f"  Full output: {combined!r}"
+    assert actual_labels == expected_labels, (
+        f"Doctor labels mismatch.\n  Expected: {expected_labels}\n  Got: {actual_labels}"
+    )
+    assert len(lines) == 4, (
+        f"Expected exactly 4 parity lines, found {len(lines)}.\n"
+        f"  Lines: {lines}"
+    )
+    assert all(ln.startswith("[ok]") for ln in lines), (
+        f"All parity lines should be [ok] after install.\n  Lines: {lines}"
     )
