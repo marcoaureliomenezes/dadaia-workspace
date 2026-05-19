@@ -128,7 +128,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P6 — Audit-verify Bash removal closure (W2, parallel with P7)
 
-- [-] AGT-r2-21 — Verify PE + software-architect body has no leftover Bash invocations (software-engineer)
+- [x] AGT-r2-21 — Verify PE + software-architect body has no leftover Bash invocations (software-engineer)
   - Acceptance: ripgrep for fenced shell blocks attributed to PE or software-architect persona → empty; SPEC C6 + C7 satisfied.
   - Depends: AGT-r2-19. Parallel with: AGT-r2-22..AGT-r2-23.
 
@@ -136,7 +136,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P7 — Test updates (W2)
 
-- [-] AGT-r2-22 — Update agent + workflow test fixtures (software-engineer)
+- [x] AGT-r2-22 — Update agent + workflow test fixtures (software-engineer)
   - Files: `tests/unit/features/public/test_workflows.py` (count 7), `tests/unit/features/agents/test_agent_reader.py` (parses `paths.write_allowlist`), any panel test asserting workflow count.
   - Acceptance: full unit test sweep `pytest -q tests/` green.
   - Depends: AGT-r2-07, AGT-r2-20.
