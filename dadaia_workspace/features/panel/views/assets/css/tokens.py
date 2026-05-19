@@ -21,6 +21,7 @@ TOKENS_CSS: str = """
   --color-heading:       #111111;
   --color-muted:         #666666;
   --color-border:        #dddddd;
+  --color-border-card:   #dddddd; /* card-specific border — decoupled from generic --color-border */
   --color-border-strong: #333333;
   --color-accent:        #9cddc8; /* was #7ec8e3 — brand-identity-v1 */
   --color-accent-dark:   #2d7d9a;
@@ -69,6 +70,11 @@ html:not([data-theme]) {
   --color-cost:             #633d2e; /* brown — headings, wordmark (WCAG AAA ~7.5:1 on white) */
   --color-active-dot:       #3aaa6e;
   --color-card-hover:       #f8feff;
+  /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
+  --color-tier-1:           #c0392b; /* T1 orchestrator — red  (5.52:1) */
+  --color-tier-2:           #b35800; /* T2 curator — amber (4.87:1) */
+  --color-tier-3:           #888888; /* T3 leaf — neutral (3.54:1) */
+  --color-border-card:      #dddddd; /* card border, decoupled from generic --color-border */
 }
 
 /* ── Theme: Sage (sage-forward) ──────────────────────────────────────────────
@@ -87,6 +93,11 @@ html[data-theme="sage"] {
   --color-cost:             #633d2e; /* brown — unchanged (WCAG AAA on white) */
   --color-active-dot:       #4a7c59; /* matches accent-dark */
   --color-card-hover:       #f6faf3;
+  /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
+  --color-tier-1:           #b83232; /* T1 orchestrator — muted red  (5.08:1) */
+  --color-tier-2:           #a05500; /* T2 curator — muted amber (4.68:1) */
+  --color-tier-3:           #888888; /* T3 leaf — neutral (3.54:1) */
+  --color-border-card:      #dddddd; /* card border, decoupled from generic --color-border */
 }
 
 /* ── Theme: Warm (amber-forward) ─────────────────────────────────────────────
@@ -107,5 +118,10 @@ html[data-theme="warm"] {
   --color-cost:             #4a3020; /* deeper brown — headings (WCAG AA ~10:1 on white) */
   --color-active-dot:       #b36a00; /* darkened amber — status dots (WCAG AA ~4.8:1 on white) */
   --color-card-hover:       #fffaf2;
+  /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
+  --color-tier-1:           #c0392b; /* T1 orchestrator — red  (5.52:1) */
+  --color-tier-2:           #9a4400; /* T2 curator — deep rust (5.76:1; distinct from amber accent) */
+  --color-tier-3:           #8a8070; /* T3 leaf — warm-toned neutral (3.43:1) */
+  --color-border-card:      #dddddd; /* card border, decoupled from generic --color-border */
 }
 """

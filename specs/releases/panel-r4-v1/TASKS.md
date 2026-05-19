@@ -147,7 +147,7 @@
   + states + edge cases handoff section for frontend-engineer. Owner: design-specialist.
   Done criterion: design report present and references PR4-16 baseline.
   Report: `.dadaia/reports/dadaia-workspace/design-specialist/2026-05-19T120000Z-panel-r4-card-tier-spec.html`
-- [-] **PR4-18** — frontend-engineer implements per PR4-17 spec. Edit
+- [x] **PR4-18** — frontend-engineer implements per PR4-17 spec. Edit
   `dadaia_workspace/features/panel/views/assets/css/agents.py` (lines ~39-72): bump
   `.agent-card` default border to `2px solid var(--color-border-card)`; add
   selectors `.agent-card[data-tier="1"]`, `[data-tier="2"]`, `[data-tier="3"]` with
@@ -157,7 +157,7 @@
   set `data-tier="${agent.tier}"` on each card element. Owner: frontend-engineer.
   Done criterion: grep on the CSS module returns the 3 selectors with distinct
   accent colors per palette (C6, C7).
-- [-] **PR4-19** — Extend `tests/unit/features/panel/test_api_agents.py` (or add a
+- [x] **PR4-19** — Extend `tests/unit/features/panel/test_api_agents.py` (or add a
   new file `test_agents_render.py` in the same directory) to assert the JS renders
   the `data-tier` attribute on collapsed agent cards. Owner: frontend-engineer.
   Done criterion: pytest green.
