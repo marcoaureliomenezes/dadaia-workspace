@@ -119,19 +119,19 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 
 ## Phase P5 — Doctor checkpoint + projection cleanup + pytest sweep (serial after P4)
 
-- [ ] R3-23 — `dadaia public stage` + `install --target all` propagation (`devops-engineer`)
+- [-] R3-23 — `dadaia public stage` + `install --target all` propagation (`devops-engineer`)
   - Touches: `.agents/`, `.claude/`, `.codex/`, `.opencode/` projections (lib-managed; never hand-edited).
   - Done criterion: 5 new persona files projected into all four projection roots; commands exit 0.
-- [ ] R3-24 — Clean stale `software-engineer` projection across all targets (`devops-engineer`)
+- [-] R3-24 — Clean stale `software-engineer` projection across all targets (`devops-engineer`)
   - Touches: residual `software-engineer.md` files under `.agents/`, `.claude/`, `.codex/`, `.opencode/`.
   - Done criterion: if `dadaia public install --target all` leaves stale projections, run `dadaia public install --target all --force` (operator + devops-engineer authorised — R4 cleanup pattern); afterwards no `software-engineer.md` projection remains anywhere. Verify: `find .agents .claude .codex .opencode -name 'software-engineer.md' 2>/dev/null` returns nothing.
-- [ ] R3-25 — `dadaia public doctor` green (`devops-engineer`)
+- [-] R3-25 — `dadaia public doctor` green (`devops-engineer`)
   - Touches: read-only.
   - Done criterion: command exits 0; all rows `[ok]`; no drift line.
-- [ ] R3-26 — `dadaia specs doctor` pre-CLOSURE green (`devops-engineer`)
+- [-] R3-26 — `dadaia specs doctor` pre-CLOSURE green (`devops-engineer`)
   - Touches: read-only.
   - Done criterion: command exits 0, `0 errors / 0 warnings`.
-- [ ] R3-27 — Full `pytest -q tests/` sweep (`devops-engineer`)
+- [-] R3-27 — Full `pytest -q tests/` sweep (`devops-engineer`)
   - Touches: read-only.
   - Done criterion: `.dadaia/.venv/bin/pytest -q tests/` exits 0; no skips for the 5 new personas.
 
