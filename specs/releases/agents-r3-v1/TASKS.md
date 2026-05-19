@@ -139,7 +139,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 
 ## Phase P6 — CLOSURE (serial after P5)
 
-- [-] R3-28 — Author `CLOSURE.md` with full evidence triples (`product-engineer`)
+- [x] R3-28 — Author `CLOSURE.md` with full evidence triples (`product-engineer`)
   - Touches: `specs/releases/agents-r3-v1/CLOSURE.md`; `specs/releases/ACTIVE.md` flipped phase → `CLOSURE` before write.
   - Preconditions: P5 complete; all P0–P4 tasks `[x] DONE`.
   - Done criterion: file present with sections Summary / Tasks completed / Validations / Drifts / Memory updates / Backlog returns / Archive decision per `dadaia-release-closure` skill template; Validations table contains a row per acceptance criterion C1–C10 with command + evidence (SHA, stdout snippet, or report path); header `**Status:** Aprovado`.
