@@ -167,7 +167,7 @@
 
 ### QA strand (qa-engineer) — START FIRST
 
-- [-] **PR5-C6** — Author Playwright e2e spec
+- [x] **PR5-C6** — Author Playwright e2e spec
   `tests/e2e/test_panel_sessions_tab.spec.ts`. Cases: (a) Sessions tab
   populates from `/api/sessions?runtime=claude`; (b) row click opens drawer
   with `SessionDetail` content; (c) sort by Cost (desc) reorders rows; (d)
