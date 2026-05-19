@@ -78,3 +78,40 @@ def test_static_returns_bytes() -> None:
     """View must return bytes, not str."""
     _, _, body = _view("tokens.css")
     assert isinstance(body, bytes)
+
+
+# ---------------------------------------------------------------------------
+# PR5-D7 — runtime.js registered in _ASSETS
+# ---------------------------------------------------------------------------
+
+
+def test_static_runtime_js_status_and_content_type() -> None:
+    """PR5-D7: runtime.js must return 200 with application/javascript; charset=utf-8."""
+    status, ct, _ = _view("runtime.js")
+    assert status == 200
+    assert ct == "application/javascript; charset=utf-8"
+
+
+def test_static_runtime_js_body_is_nonempty() -> None:
+    """PR5-D7: runtime.js body must be non-empty bytes."""
+    _, _, body = _view("runtime.js")
+    assert isinstance(body, bytes)
+    assert len(body) > 0
+
+
+def test_static_runtime_js_load_order() -> None:
+    """PR5-D7: load-order invariant — runtime.js must appear in _ASSETS before agents.js.
+
+    The _ASSETS dict insertion order mirrors the intended static-serving
+    registration. runtime.js must be registered before agents.js, workflows.js,
+    and sessions.js because window.Runtime must be defined before those modules
+    subscribe to dadaia:runtime-change or call Runtime.get().
+    """
+    from dadaia_workspace.features.panel.views.static import _ASSETS
+
+    keys = list(_ASSETS.keys())
+    idx_runtime = keys.index("runtime.js")
+    for dependent in ("agents.js", "workflows.js", "sessions.js"):
+        assert idx_runtime < keys.index(dependent), (
+            f"runtime.js ({idx_runtime}) must precede {dependent} ({keys.index(dependent)}) in _ASSETS"
+        )
