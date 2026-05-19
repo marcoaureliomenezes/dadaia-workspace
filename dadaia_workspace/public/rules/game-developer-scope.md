@@ -16,7 +16,7 @@ Código de jogo inclui qualquer arquivo dentro de `repos/redacted-slug/`.
 ## Proibido para Outros Agentes
 
 Nenhum dos agentes abaixo deve modificar arquivos em `repos/redacted-slug/`:
-`product-engineer`, `software-architect`, `software-engineer`, `frontend-engineer`,
+`product-engineer`, `software-architect`, `software-engineer-python`, `software-engineer-node`, `frontend-engineer`,
 `backend-engineer`, `qa-engineer`, `devops-engineer`, `project-manager`,
 `project-auditor`, `code-reviewer`, `security-reviewer`, `researcher`,
 `design-specialist`.
