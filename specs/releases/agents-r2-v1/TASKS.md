@@ -304,10 +304,10 @@ local with `pytest` and `dadaia specs doctor`).
   - Files written: `specs/backlog/candidates.md` (append), `specs/backlog/ideas.md` (append).
   - Acceptance: both backlog files contain the new bullets; CLOSURE links them.
   - Depends: AGT-r2-48.
-- [-] AGT-r2-52 — Final `dadaia specs doctor` → 0/0 (product-engineer)
+- [x] AGT-r2-52 — Final `dadaia specs doctor` → 0/0 (product-engineer)
   - Acceptance: `dadaia specs doctor` exits clean (0 errors, 0 warnings); output captured into the PE report.
   - Depends: AGT-r2-49, AGT-r2-50, AGT-r2-51.
-- [ ] AGT-r2-53 — Archive release + reset `ACTIVE.md` (product-engineer)
+- [x] AGT-r2-53 — Archive release + reset `ACTIVE.md` (product-engineer)
   - `git mv specs/releases/agents-r2-v1 specs/_archive/releases/agents-r2-v1`.
   - Update `specs/releases/ACTIVE.md` → `release: none, phase: none`.
   - Acceptance: archive dir exists; `specs/releases/` no longer contains the release; ACTIVE.md reset; all 26 acceptance criteria satisfied (C1–C26).
