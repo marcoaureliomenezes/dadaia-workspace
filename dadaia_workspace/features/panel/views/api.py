@@ -185,6 +185,13 @@ def render_api_agents_canonical(
         active_window_days: int = _ACTIVE_WINDOW_DAYS_DEFAULT,
         **_kwargs: object,
     ) -> tuple[int, str, bytes]:
+        # Parse runtime filter from query-string (NFR5: default to "claude").
+        qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
+        _runtime_vals = qs.get("runtime")
+        runtime = (_runtime_vals[0].strip().lower() if _runtime_vals else "").strip()
+        if runtime not in ("claude", "codex"):
+            runtime = "claude"
+
         # Validate active_window_days range.
         if not (_ACTIVE_WINDOW_DAYS_MIN <= active_window_days <= _ACTIVE_WINDOW_DAYS_MAX):
             body = json.dumps(
@@ -241,9 +248,22 @@ def render_api_agents_canonical(
         canonical_agents = service.list_canonical_agents()
 
         # Build output — one entry per canonical agent.
+        # Filter by runtime: include agent if its telemetry providers list contains
+        # the requested runtime.  When runtime="claude" and the agent has no telemetry
+        # entry, it is included (all canonical agents default to claude).
         agent_entries = []
         for dto in canonical_agents:
             tel_summary: AgentSummary | None = tel_by_id.get(dto.id)
+
+            # Runtime-scoped filter (FR5 / NFR5).
+            if runtime == "claude":
+                # Include agents with no telemetry (canonical-only) or providers containing "claude".
+                if tel_summary is not None and "claude" not in tel_summary.providers:
+                    continue
+            else:
+                # For any non-claude runtime, only include agents explicitly associated with it.
+                if tel_summary is None or runtime not in tel_summary.providers:
+                    continue
 
             # Determine status and telemetry overlay.
             if tel_summary is not None:
@@ -445,6 +465,16 @@ def render_api_workflows_list(
     """
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
+        # Parse runtime filter from query-string (NFR5: default to "claude").
+        # Canonical workflow definitions carry no per-provider discriminator;
+        # all workflows are returned regardless of runtime.  The param is parsed
+        # here so that ?runtime=codex requests are accepted without error.
+        qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
+        _runtime_vals = qs.get("runtime")
+        _runtime = (_runtime_vals[0].strip().lower() if _runtime_vals else "").strip()
+        if _runtime not in ("claude", "codex"):
+            _runtime = "claude"
+
         summaries = service.list_workflow_summaries()
         generated_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
         # Use a stable source_hint; the actual directory is opaque to the client.
