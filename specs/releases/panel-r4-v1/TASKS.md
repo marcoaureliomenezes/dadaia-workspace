@@ -200,7 +200,7 @@
   (list of memory files written + 1-liner per file); Backlog returns; Archive
   decision: MOVE. Owner: product-engineer. Done criterion: file present with
   `**Status:** Aprovado` header and all sections populated.
-- [-] **PR4-24** — Update `specs/memory/product/panel.html` (or current panel
+- [x] **PR4-24** — Update `specs/memory/product/panel.html` (or current panel
   product memory file — markdown if HTML migration has not yet happened): agents-tab
   section now describes (a) cards showing real telemetry stats sourced from the
   Claude reader; (b) tier-aware borders with `data-tier` attribute and 3 tier color
