@@ -46,7 +46,7 @@
 > `scripts/inspect_jsonl_agent_field.py` (or similar), `tests/unit/features/telemetry/`,
 > `tests/integration/features/telemetry/`.
 
-- [ ] **PR4-05** — Investigate jsonl event format. Write a 1-shot script
+- [-] **PR4-05** — Investigate jsonl event format. Write a 1-shot script
   `scripts/inspect_jsonl_agent_field.py` that reads
   `~/.claude/projects/-home-marco-workspace-dadaia/*.jsonl`, finds Task tool
   invocations carrying a `subagent_type` parameter (or equivalent field), and prints
