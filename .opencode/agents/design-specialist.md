@@ -8,7 +8,6 @@ description: >
 tier: 3
 model: claude-sonnet-4-6
 skills:
-  - frontend-design
   - ux-ui-review
   - dadaia-handoff-emitter
 maxTurns: 40

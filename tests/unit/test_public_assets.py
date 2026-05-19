@@ -67,7 +67,7 @@ def test_install_overwrites_existing_files_with_force(tmp_path: Path) -> None:
 
     FileSystemPublicAssetManager().install(workspace, target="all", force=True)
 
-    assert agents_md.read_text(encoding="utf-8").startswith("# dadaia Labs")
+    assert agents_md.read_text(encoding="utf-8").startswith("# dadaia-workspace")
 
 
 _CLASSIFY_WORKFLOWS_CASES = [
