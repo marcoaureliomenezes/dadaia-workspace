@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Report — product-engineer — panel-r5-v1 closure</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    section { margin-bottom: 2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .meta { color: #666; font-size: .9em; }
+    .severity-info { color: #0a6; font-weight: 600; }
+    .severity-low { color: #c80; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<h1>Closure handoff — panel-r5-v1</h1>
+<p class="meta">Agent: product-engineer · Context: dadaia-workspace · Release: panel-r5-v1 · Produced: 2026-05-19T20:00:00Z</p>
+
+<section id="summary">
+  <h2>Summary</h2>
+  <p>Release <code>panel-r5-v1</code> is closed end-to-end. PR5-Z1 (CLOSURE.md authored with <code>**Status:** Aprovado</code> + 38 tasks completed table + 9 validations triples + 3 drifts + 4 memory updates list + 4 backlog returns + archive decision MOVE), PR5-Z2 (memory atom updates: <code>panel.html</code> + <code>index.html</code> + <code>architecture.html</code>; <code>tech-stack.html</code> unchanged per SPEC declaration), and PR5-Z3 (marker flipped to <code>[x]</code> in TASKS.md; ACTIVE.md reset to <code>release: none / phase: none</code>) all marked DONE in TASKS.md.</p>
+  <p>What shipped: Sessions tab (table, sortable, drawer, 10s refresh paused on <code>document.hidden</code>), global Claude/Codex runtime switcher (<code>window.Runtime</code> + <code>localStorage["dadaia-panel-runtime"]</code> + <code>dadaia:runtime-change</code> event fanning out to Agents/Workflows/Sessions), <code>/api/sessions?runtime=…</code> + <code>/api/sessions/&lt;runtime&gt;/&lt;id&gt;</code> bearer-authed endpoints with reused 200/401/503 envelope, <code>RuntimeAdapter</code> protocol with Claude (cost via <code>pricing.compute_cost</code>) and Codex (cost <code>None</code> + liveness via <code>state_5.sqlite</code> + <code>history.jsonl</code> with graceful degrade) implementations, Codex "Cost not tracked" banner + <code>—</code> Cost cells, four cross-release rebase guards (PR5-D9..D12) preserving r4 <code>tier</code> co-existence, and NFR5 parity test (PR5-D13) codifying default-to-<code>claude</code> backward-compat byte-identically.</p>
+</section>
+
+<section id="actions-taken">
+  <h2>Actions taken</h2>
+  <ol>
+    <li>Read <code>specs/releases/ACTIVE.md</code> → confirmed <code>release: panel-r5-v1, phase: CLOSURE</code> (memory atoms write-unlocked).</li>
+    <li>Read <code>specs/releases/panel-r5-v1/TASKS.md</code> → confirmed PR5-01..PR5-E4 all <code>[x]</code>.</li>
+    <li>Read <code>specs/_archive/releases/panel-r4-v1/CLOSURE.md</code> → mirrored structure (Summary / Tasks table / Validations table / Drifts / Memory updates / Backlog returns / Archive decision).</li>
+    <li>Flipped PR5-Z1 <code>[ ]</code> → <code>[-]</code>; authored <code>specs/releases/panel-r5-v1/CLOSURE.md</code>; flipped PR5-Z1 → <code>[x]</code>.</li>
+    <li>Flipped PR5-Z2 <code>[ ]</code> → <code>[-]</code>; updated <code>specs/memory/product/panel.html</code> (Sessions tab + runtime switcher + Codex banner + 5-tab nav order; closure bump to <code>panel-r5-v1</code>); updated <code>specs/memory/product/index.html</code> (catalog entry extended + closure bump); updated <code>specs/memory/architecture.html</code> (telemetry feature description extended with <code>aggregator/runtimes.py</code> + <code>RuntimeAdapter</code> protocol; new contracts row); <code>specs/memory/tech-stack.html</code> NOT touched per SPEC. Verified no forbidden sections (Changelog/History/Histórico/Versions <code>&lt;h2&gt;</code>). Flipped PR5-Z2 → <code>[x]</code>.</li>
+    <li>Flipped PR5-Z3 <code>[ ]</code> → <code>[-]</code> → <code>[x]</code>; reset <code>specs/releases/ACTIVE.md</code> to <code>release: none / phase: none</code>.</li>
+    <li>Surfaced deferred shell commands to project-manager (commits and <code>git mv</code> — PE has no Bash tool).</li>
+  </ol>
+</section>
+
+<section id="findings">
+  <h2>Findings</h2>
+  <table>
+    <thead><tr><th>Severity</th><th>Summary</th></tr></thead>
+    <tbody>
+      <tr><td class="severity-info">INFO</td><td>CLOSURE.md authored with <code>**Status:** Aprovado</code>; 38 tasks tabulated with final commit SHAs from briefing; 9 validation triples; 3 drifts documented (DRIFT-1 LOW probe 29 vs 50; DRIFT-2 LOW branch cut from r4 tip; DRIFT-3 INFO PR5-C7 sidecar missing).</td></tr>
+      <tr><td class="severity-info">INFO</td><td>Memory atoms updated atomically: <code>panel.html</code> describes current 5-tab product (Sessions tab + global runtime switcher + Codex banner are now part of "what the product is now"); <code>index.html</code> catalog entry refreshed; <code>architecture.html</code> features/contracts updated for <code>RuntimeAdapter</code> protocol; no <code>Changelog</code>/<code>History</code> sections introduced.</td></tr>
+      <tr><td class="severity-info">INFO</td><td>ACTIVE.md reset to <code>release: none / phase: none</code>; workspace ready for next release planning.</td></tr>
+      <tr><td class="severity-low">LOW</td><td>SQLite probe at closure time returned 29 sessions with non-NULL <code>agent_name</code> against the gated threshold of ≥50 (DRIFT-1). Mechanism verified; only volume hadn't accrued. Backlog entry filed for natural re-probe; no follow-up release needed.</td></tr>
+      <tr><td class="severity-low">LOW</td><td>r5 branch cut from <code>release/panel-r4-v1</code> tip instead of <code>main</code> (DRIFT-2) because r4 was archived but had not merged to main at cut time and r5 hard-depends on r4 PR4-08/09/10 backfill trio + PR4-13/18 tier plumbing. History will flow transitively when r4 merges to main.</td></tr>
+      <tr><td class="severity-info">INFO</td><td>PR5-C7 handoff sidecar was not emitted by the qa-engineer sub-session that ran the Playwright e2e (DRIFT-3). Functional acceptance independently met (5/5 cases green, commit <code>a0023aa</code>). Optional backfill in <code>backlog/ideas.md</code>.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="deferred-shell">
+  <h2>Deferred shell commands (PE has no Bash; project-manager runs)</h2>
+  <p>PE used Write/Edit tools to flip task markers and update CLOSURE/memory/ACTIVE files. The following shell commands need to be executed by project-manager (or surfaced to operator) to finalize the release:</p>
+  <pre>
+# 1) After Write of PR5-Z1 marker flip [ ]-&gt;[-]:
+git add specs/releases/panel-r5-v1/TASKS.md
+git commit -m 'chore(tasks): start PR5-Z1 — CLOSURE.md'
+
+# 2) After PE wrote CLOSURE.md and flipped PR5-Z1 to [x]:
+git add specs/releases/panel-r5-v1/CLOSURE.md specs/releases/panel-r5-v1/TASKS.md
+git commit -m 'docs(closure): PR5-Z1 — CLOSURE.md authored (PR5-Z1)'
+
+# 3) After PR5-Z2 marker [ ]-&gt;[-]:
+git add specs/releases/panel-r5-v1/TASKS.md
+git commit -m 'chore(tasks): start PR5-Z2 — memory atom updates'
+
+# 4) After PE wrote memory atom updates and flipped PR5-Z2 to [x]:
+git add specs/memory/product/panel.html specs/memory/product/index.html specs/memory/architecture.html specs/releases/panel-r5-v1/TASKS.md
+git commit -m 'docs(memory): PR5-Z2 — Sessions tab + runtime switcher + Codex banner (PR5-Z2)'
+
+# 5) Verify gate green:
+dadaia specs doctor   # must report 0 errors, 0 warnings
+
+# 6) After PR5-Z3 marker [ ]-&gt;[-]-&gt;[x]:
+git add specs/releases/panel-r5-v1/TASKS.md
+git commit -m 'chore(tasks): start PR5-Z3 — archive release'
+
+# 7) git mv to archive (delegated to devops-engineer per PE delegation rule):
+git mv specs/releases/panel-r5-v1 specs/_archive/releases/panel-r5-v1
+
+# 8) After PE reset ACTIVE.md:
+git add specs/releases/ACTIVE.md
+git commit -m 'chore(release): finalize panel-r5-v1 — archive + ACTIVE.md reset (PR5-Z3)'
+
+# 9) Final verification:
+dadaia specs doctor
+  </pre>
+  <p>Note: PE has already performed all Edit/Write operations; only the staging+commit+<code>git mv</code> steps remain. Do NOT push to remote per dispatch hard rules.</p>
+</section>
+
+<section id="memory-updates">
+  <h2>Memory atom updates (PR5-Z2)</h2>
+  <table>
+    <thead><tr><th>File</th><th>Delta</th></tr></thead>
+    <tbody>
+      <tr><td><code>specs/memory/product/panel.html</code></td><td>nav refreshed from 4 to 5 tabs (Sessions added between Workflows and Servers); new Sessions flow bullet (table, sortable, drawer, 10s refresh paused on document.hidden, Codex banner + <code>—</code> Cost cells); new Runtime switcher flow bullet (window.Runtime + localStorage["dadaia-panel-runtime"] + dadaia:runtime-change CustomEvent fan-out + NFR5 default-to-claude); Mermaid flowchart extended with <code>/api/sessions</code> + <code>/api/sessions/&lt;runtime&gt;/&lt;id&gt;</code> nodes + aggregator delegation; HTTP routes list extended; localStorage runtime persistence noted; agent-monitoring dependency clarified for Sessions; next-steps adds Synthetic Codex cost estimation + sessions.provider index; closure bumped to panel-r5-v1.</td></tr>
+      <tr><td><code>specs/memory/product/index.html</code></td><td>panel catalog entry extended in-place (5 tabs now; Sessions table + drawer + auto-refresh; runtime switcher with localStorage + dadaia:runtime-change; BE default-to-claude preserves NFR5 byte-identical backward-compat); closure bumped to panel-r5-v1.</td></tr>
+      <tr><td><code>specs/memory/architecture.html</code></td><td>features/ layer description for <code>telemetry</code> extended with <code>aggregator/queries.py</code> (<code>list_sessions</code> + <code>get_session</code>) and <code>aggregator/runtimes.py</code> (<code>RuntimeAdapter</code> protocol + Claude/Codex implementations); new Contracts table row for <code>queries.py → runtimes.py</code> (RuntimeAdapter protocol + registry, classification thresholds, graceful degrade); closure bumped to panel-r5-v1.</td></tr>
+      <tr><td><code>specs/memory/tech-stack.html</code></td><td>NO CHANGE — release did not touch dependencies (Codex liveness uses stdlib <code>sqlite3</code> already declared; pricing already declared; no new Python or browser package).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="active-md">
+  <h2>ACTIVE.md after closure</h2>
+  <pre>
+release: none
+phase: none
+  </pre>
+</section>
+
+</body>
+</html>
