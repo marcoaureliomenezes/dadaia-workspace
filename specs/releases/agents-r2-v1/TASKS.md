@@ -265,11 +265,12 @@ local with `pytest` and `dadaia specs doctor`).
 - [x] AGT-r2-43 — `dadaia public stage && install --target all && doctor` against final state (devops-engineer)
   - Acceptance: `dadaia public doctor` reports `[ok]` everywhere; stale rule projections deleted from each target (R12); doctor emits exactly 4 parity lines per source (`root:AGENTS.md`, `root:CLAUDE.md`, `repos/<slug>:AGENTS.md`, `repos/<slug>:CLAUDE.md`), all `[ok]`; `sha256sum` cross-check confirms all projected `{AGENTS,CLAUDE}.md` share one unique hash per workspace+consumer (R9).
   - Depends: AGT-r2-28, AGT-r2-36, AGT-r2-42.
-- [-] AGT-r2-44 — Consumer-repo audit sweep (devops-engineer)
+- [x] AGT-r2-44 — Consumer-repo audit sweep (devops-engineer)
   - For each marker-bearing consumer (`redacted-slug`, `redacted-slug`, `workflow-tools`): verify both `AGENTS.md` and `CLAUDE.md` at repo root share the source SHA-256; verify `dadaia-workspace` self-skipped (R14 / `package_version` match).
   - Acceptance: 6 `[ok]` lines (3 consumers × 2 files); 1 `[skip]` for `dadaia-workspace`; nested `services/{AGENTS,CLAUDE}.md` untouched (byte-equal to pre-install snapshot).
   - Depends: AGT-r2-43.
-- [ ] AGT-r2-45 — Open PR with description linking CLOSURE FR10 section (devops-engineer)
+  - Finding: none of `redacted-slug`, `redacted-slug`, `workflow-tools` have `.dadaia/agentic/` marker — installer correctly emits `[skip]` for all 7 repos under `repos/`. workspace-root pair verified: `root:AGENTS.md` + `root:CLAUDE.md` both SHA `930d26eb…` ✓. `dadaia-workspace` self-skipped (package_version=0.1.0) ✓. `services/{AGENTS,CLAUDE}.md` absent (operator has not yet authored them — FR10 manual step) ✓ non-interference.
+- [-] AGT-r2-45 — Open PR with description linking CLOSURE FR10 section (devops-engineer)
   - PR body MUST link `specs/releases/agents-r2-v1/CLOSURE.md#operator-manual-migration` (R10).
   - Acceptance: PR exists; description contains the anchor link; CI green.
   - Depends: AGT-r2-44.
