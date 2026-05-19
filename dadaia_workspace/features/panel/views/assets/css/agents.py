@@ -5,7 +5,7 @@ PR3-10 (FE): Full collapsed card design.
   - Collapsed card: status badge, name, description (2-line clamp), 3-stat row,
     skills chips (first 2 + "+N more"), expand chevron
   - Status badge variants: active (green dot) / inactive (gray)
-  - Active card: 3px left-border accent
+  - Active card: 4px left-border accent
   - Loading skeleton with pulse animation (disabled under prefers-reduced-motion)
   - Hover/focus styles
   - All brand token usages include comma-separated fallbacks (test_brand_tokens_have_fallbacks)
@@ -40,8 +40,8 @@ AGENTS_CSS: str = """
   display: block;
   width: 100%;
   text-align: left;
-  border: 1px solid var(--color-border, #dddddd);
-  border-left: 3px solid transparent;
+  border: 2px solid var(--color-border-card, #dddddd);
+  border-left: 4px solid transparent;
   border-radius: var(--radius-card, 6px);
   padding: 1rem 1rem 0.875rem;
   background: var(--color-surface, #ffffff);
@@ -66,9 +66,42 @@ AGENTS_CSS: str = """
   box-shadow: 0 0 0 4px var(--color-accent, #9cddc8);
 }
 
-/* Active agent: 3px left-border accent */
+/* Active agent: 4px left-border accent (matches tier accent weight).
+   Active accent is visible before JS populates data-tier (loading/skeleton phase).
+   When both agent-card--active and data-tier are present, the tier selectors below
+   win by CSS source order (they come after this rule), so the tier colour is always
+   the authoritative left-stripe signal once tier data is available. */
 .agent-card.agent-card--active {
-  border-left: 3px solid var(--color-accent, #9cddc8);
+  border-left: 4px solid var(--color-accent, #9cddc8);
+}
+
+/* ── Tier-aware left-border accent (PR4-18) ─────────────────────────────────
+   Tier selectors are placed AFTER .agent-card--active so they take precedence
+   when both class and attribute are present (same specificity, later wins).
+   This means an active T1 card shows the red tier accent, not the mint accent.
+   The active class is still visible via the status badge and overall border tint. */
+.agent-card[data-tier="1"] {
+  border-left: 4px solid var(--color-tier-1);
+}
+.agent-card[data-tier="2"] {
+  border-left: 4px solid var(--color-tier-2);
+}
+.agent-card[data-tier="3"] {
+  border-left: 4px solid var(--color-tier-3);
+}
+
+/* ── Tier label (PR4-18) ─────────────────────────────────────────────────────
+   Mandatory per WCAG 1.4.1: colour must not be the sole tier differentiator.
+   Text "T1 ORCHESTRATOR" / "T2 CURATOR" / "T3 LEAF" provides a redundant signal.
+   Displayed as a subtitle line below .agent-card__name in the card header row. */
+.agent-card__tier-label {
+  display: block;
+  font-size: 0.75rem;     /* 12px — minimum renderable size; matches revised spec */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, #666666); /* #666666 on #fff = 5.74:1 — WCAG AA (4.5:1 min) */
+  line-height: 1.2;
 }
 
 /* ── Card header ──────────────────────────────────────────────────── */

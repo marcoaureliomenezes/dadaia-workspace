@@ -70,6 +70,16 @@
     return '$' + Number(v).toFixed(2);
   }
 
+  // ── Tier label helper ────────────────────────────────────────────────────────
+
+  // Maps a tier number to its human-readable label text.
+  // Default (missing / null / unexpected value): "T3 Leaf" (neutral, harmless fallback).
+  function tierLabel(tier) {
+    if (tier === 1) { return 'T1 Orchestrator'; }
+    if (tier === 2) { return 'T2 Curator'; }
+    return 'T3 Leaf';
+  }
+
   // ── Skeleton rendering ───────────────────────────────────────────────────────
 
   function renderSkeletons(count) {
@@ -129,9 +139,16 @@
     var description = agent.description || '';
     var detailId = 'agent-detail-' + escAttr(agent.agent_id);
 
+    // data-tier drives the CSS left-accent colour per the tier-aware design spec (PR4-18).
+    // Defensive fallback: if agent.tier is absent/null/undefined, default to 3 (T3 Leaf).
+    var tierNum = (agent.tier === 1 || agent.tier === 2 || agent.tier === 3)
+      ? agent.tier
+      : 3;
+
     return '<button type="button"'
       + ' class="agent-card ' + escAttr(borderClass) + '"'
       + ' data-agent-id="' + escAttr(agent.agent_id) + '"'
+      + ' data-tier="' + tierNum + '"'
       + ' aria-expanded="false"'
       + ' aria-controls="' + escAttr(detailId) + '"'
       + ' aria-label="' + escAttr(agent.display_name || agent.agent_id) + ', ' + statusLabel + '"'
@@ -141,7 +158,10 @@
       + '<span class="agent-status-badge__dot" aria-hidden="true"></span>'
       + escHtml(statusLabel)
       + '</span>'
+      + '<span class="agent-card__name-block">'
       + '<span class="agent-card__name">' + escHtml(agent.display_name || agent.agent_id) + '</span>'
+      + '<span class="agent-card__tier-label">' + escHtml(tierLabel(tierNum)) + '</span>'
+      + '</span>'
       + '<span class="agent-card__chevron" aria-hidden="true">&#9660;</span>'
       + '</div>'
       + '<p class="agent-card__description">' + escHtml(description) + '</p>'
