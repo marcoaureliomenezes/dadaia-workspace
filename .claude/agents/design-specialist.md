@@ -15,7 +15,6 @@ tools:
   - WebSearch
   - Write
 skills:
-  - frontend-design
   - ux-ui-review
   - dadaia-handoff-emitter
 maxTurns: 40
