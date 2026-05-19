@@ -158,7 +158,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P9 — Build `_install_workspace_guardrail_pair` (W3, parallel with P10)
 
-- [ ] AGT-r2-25 — Implement `_install_workspace_guardrail_pair` in `infrastructure/public_assets.py` (software-engineer)
+- [-] AGT-r2-25 — Implement `_install_workspace_guardrail_pair` in `infrastructure/public_assets.py` (software-engineer)
   - Function signature: `(agentic_dir, workspace_root, force, installed)`.
   - Reads single source `data/AGENTS.md`; enumerates `(workspace_root/"repos").iterdir()` filtered by `(p/".dadaia").is_dir() and (p/".dadaia"/"agentic").is_dir()` (R13); self-skips via `package_version` match in `<repo>/.dadaia/agentic/manifest.json` (R14); writes 4 files per round (workspace root × 2 + each consumer × 2) via existing `_copy_file`.
   - Marker-less consumer → emit `[skip] <path> (no .dadaia/ marker)`; never raises.
