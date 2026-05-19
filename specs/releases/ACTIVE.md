@@ -1,2 +1,2 @@
-release: none
-phase: none
+release: panel-r5-v1
+phase: IMPLEMENTATION
