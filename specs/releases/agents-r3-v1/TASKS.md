@@ -99,9 +99,10 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 - [x] R3-18 — Update `tests/unit/features/panel/test_api_agents.py` card-count + tier-count assertions (`software-engineer-python`)
   - Touches: `tests/unit/features/panel/test_api_agents.py`.
   - Done criterion: card-count assertion 16 → 20; tier-count assertions `T1=2, T2=1, T3=17`; `pytest -q tests/unit/features/panel/test_api_agents.py` exits 0.
-- [ ] R3-19 — Add fixture stubs for the 5 new personas (`software-engineer-python`)
-  - Touches: `tests/unit/features/agents/fixtures/`.
+- [x] R3-19 — Add fixture stubs for the 5 new personas (`software-engineer-python`)
+  - Touches: `tests/unit/features/agents/fixtures/` (NO-OP).
   - Done criterion: 5 minimal frontmatter fixtures added (one per new persona) only if a test requires an isolated fixture; if all tests pass without isolated fixtures, this task is closed with a one-line note "no isolated fixtures required" and zero file changes.
+  - Resolution (2026-05-19): R3-17/R3-18 assertions drive directly off `dadaia_workspace/public/agents/*.md` via `_PUBLIC_AGENTS_DIR`; no isolated fixture required. Existing `fixtures/software-engineer.md` (parser unit-test fixture, NOT a canonical-roster source) remains untouched. R3-19 closes as no-op.
 - [ ] R3-20 — Add path-scope gate unit tests for new allowlists (`software-engineer-python`)
   - Touches: `tests/unit/gate/test_path_scope.py` (extend) or new file under `tests/unit/gate/`.
   - Done criterion: `ai-engineer` → `dadaia_workspace/cli/main.py` rejected with `[PATH SCOPE ERROR]`; `software-engineer-python` → same path accepted; tests exit 0.
