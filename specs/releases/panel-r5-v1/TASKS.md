@@ -192,7 +192,7 @@
   `ended`), drawer slide-in/out transitions. Owner: frontend-engineer. Done
   criterion: CSS string non-empty, valid CSS, and includes a `.sessions-table`
   selector plus `.status-dot[data-status=...]` selectors.
-- [ ] **PR5-C3** — New file
+- [-] **PR5-C3** — New file
   `dadaia_workspace/features/panel/views/assets/js/sessions.js`: Sessions
   module that subscribes to `dadaia:runtime-change` (no-op in Phase C — only
   Claude is wired live), appends `?runtime=` + `Runtime.get()` on `authedFetch`
