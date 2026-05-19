@@ -46,14 +46,14 @@
 > `scripts/inspect_jsonl_agent_field.py` (or similar), `tests/unit/features/telemetry/`,
 > `tests/integration/features/telemetry/`.
 
-- [-] **PR4-05** — Investigate jsonl event format. Write a 1-shot script
+- [x] **PR4-05** — Investigate jsonl event format. Write a 1-shot script
   `scripts/inspect_jsonl_agent_field.py` that reads
   `~/.claude/projects/-home-marco-workspace-dadaia/*.jsonl`, finds Task tool
   invocations carrying a `subagent_type` parameter (or equivalent field), and prints
   the exact field path. Owner: software-engineer. Done criterion: script runs without
   error against the live jsonl files, prints the field path, and the path is
   documented as a comment at the top of `reader/claude.py` for future maintainers.
-- [ ] **PR4-06** — Patch `dadaia_workspace/features/telemetry/reader/claude.py`:
+- [-] **PR4-06** — Patch `dadaia_workspace/features/telemetry/reader/claude.py`:
   extract `agent_name` from the field path discovered in PR4-05; pass it to the DAO
   on session insert/update. Owner: software-engineer. Done criterion: a synthetic
   jsonl event carrying a `subagent_type` produces a sessions row with `agent_name`
