@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PM Dispatch — panel-r5-v1 Phase A</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #222; }
+h1, h2, h3 { color: #1a1a1a; }
+h1 { border-bottom: 2px solid #d4a017; padding-bottom: 0.3rem; }
+h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.2rem; margin-top: 2rem; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
+th { background: #f4f4f4; }
+code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em; }
+pre { background: #f6f8fa; padding: 0.8rem; border-radius: 4px; overflow-x: auto; font-size: 0.85em; }
+.status-blocked { color: #b00020; font-weight: bold; }
+.status-ready { color: #1e7e34; font-weight: bold; }
+.callout { background: #fff3cd; border-left: 4px solid #d4a017; padding: 0.8rem 1rem; margin: 1rem 0; }
+.callout-error { background: #fde7e9; border-left: 4px solid #b00020; padding: 0.8rem 1rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Project Manager Dispatch Report — <code>panel-r5-v1</code> Phase A</h1>
+
+<p><strong>Run timestamp:</strong> 2026-05-19T12:42:27Z<br>
+<strong>Context:</strong> dadaia-workspace<br>
+<strong>Active release:</strong> panel-r5-v1 (phase IMPLEMENTATION)<br>
+<strong>Active branch:</strong> release/panel-r5-v1 (HEAD <code>b1dc147</code>)<br>
+<strong>Overall status:</strong> <span class="status-blocked">FAILED — Agent tool unavailable; dispatch could not be executed</span></p>
+
+<h2>Demand</h2>
+
+<p>Operator authorized end-to-end orchestration of <code>panel-r5-v1</code> Phase A:
+single-threaded software-engineer ownership of write set
+<code>dadaia_workspace/features/telemetry/aggregator/</code> and
+<code>tests/unit/features/telemetry/</code>, comprising tasks PR5-A1 through PR5-A5.</p>
+
+<h2>Resolved intent</h2>
+
+<p>Dispatch one software-engineer session with the full Phase A scope, enforcing:
+marker discipline (one <code>[-]</code> at a time), venv usage
+(<code>.dadaia/.venv/bin/python</code>), reuse of existing
+<code>pricing.compute_cost</code>, hand-rolled SQLite fixture (per refinement
+LOW finding on silent invariant inversion), per-task conventional commits, and
+post-task <code>dadaia specs doctor</code> green. Emit a software-engineer
+handoff report + sidecar at termination. PM does not advance to Phase B in this
+run.</p>
+
+<h2>Classification</h2>
+
+<table>
+<tr><th>Category</th><td>tdd-cycle (PM Playbook) on an approved single-threaded release phase</td></tr>
+<tr><th>Workflow chosen</th><td>PM Playbook — <strong>tdd-cycle</strong> (Phase A in PLAN.md is backend-pure; new dataclasses + queries + adapter protocol + two test files)</td></tr>
+<tr><th>Entry agent</th><td><code>software-engineer</code></td></tr>
+<tr><th>Decision Authority Matrix</th><td>Python implementation domain — software-engineer is primary; software-architect tie-breaker (not invoked, no architectural decision in scope)</td></tr>
+</table>
+
+<h2>Pre-dispatch context verification (PASSED)</h2>
+
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td><code>dadaia context show --json</code></td><td>name = dadaia-workspace, is_primary = true, state = ativo (NOTE: state-file <code>current_branch</code> reads <code>hotfix/agent-monitoring-v1-panel-defects</code> — stale; live <code>git branch --show-current</code> = <code>release/panel-r5-v1</code>; not blocking for Phase A but should be re-synced before the next dadaia state-machine handoff)</td></tr>
+<tr><td><code>specs/releases/ACTIVE.md</code></td><td>release: panel-r5-v1 / phase: IMPLEMENTATION</td></tr>
+<tr><td>SPEC.md status</td><td><code>**Status:** Aprovado</code> — verified line 3</td></tr>
+<tr><td>PLAN.md status</td><td><code>**Status:** Aprovado</code> — verified line 3</td></tr>
+<tr><td>TASKS.md status</td><td><code>**Status:** Aprovado</code> — verified line 3</td></tr>
+<tr><td>P0 foundation</td><td>PR5-01..06 all <code>[x]</code> at commit <code>b1dc147</code></td></tr>
+<tr><td>Phase A entry condition</td><td>PR5-A1 currently <code>[ ]</code> OPEN — ready to flip to <code>[-]</code> by software-engineer</td></tr>
+<tr><td>Reuse contract</td><td><code>pricing.compute_cost(usage, model, when)</code> verified to exist at <code>dadaia_workspace/features/telemetry/pricing.py:54</code></td></tr>
+<tr><td>Aggregator pattern reference</td><td><code>TelemetryAggregator.list_agents</code> and <code>list_sessions_by_agent</code> verified in <code>aggregator/queries.py</code> — convention for new <code>list_sessions</code>/<code>get_session</code> available</td></tr>
+<tr><td>Existing unit test directory</td><td><code>tests/unit/features/telemetry/</code> exists with 8 test files; new tests will live alongside</td></tr>
+<tr><td>Commit-style reference</td><td>From <code>git log release/panel-r4-v1 --oneline</code>: <code>feat(&lt;scope&gt;): &lt;subject&gt; (&lt;TASK-ID&gt;)</code> and <code>chore(tasks): start &lt;TASK-ID&gt;</code> patterns confirmed</td></tr>
+</table>
+
+<h2>Dispatch attempted</h2>
+
+<div class="callout-error">
+<strong>BLOCKER:</strong> the <code>Agent</code> tool described in the
+project-manager identity contract and in the <code>project-orchestration</code>
+skill is <strong>not exposed in the current tool surface</strong>. Only
+<code>Read</code>, <code>Bash</code>, and <code>Write</code> are available in
+this session. Per PM hard rule, I do not write source code; per the
+<code>game-developer-scope</code> and core PM rules I do not chain
+implementation work myself. The dispatch could therefore not be transmitted to
+a sub-agent.
+</div>
+
+<h3>Why the PM refuses to execute the work locally</h3>
+
+<ul>
+<li>PM identity contract: <em>"You do NOT write source code, tests, or infrastructure code (that is the implementer agents)."</em></li>
+<li>Decision Authority Matrix row "Python/Node implementation" — primary = <code>software-engineer</code>; PM is not a tie-breaker.</li>
+<li>Forbidden actions list: <em>"Edit any file outside <code>.dadaia/reports/</code>"</em>.</li>
+</ul>
+
+<h2>Prepared dispatch prompt (ready to hand to software-engineer)</h2>
+
+<p>The following is the complete self-contained prompt that would have been sent
+via the <code>Agent</code> tool to <code>subagent_type: software-engineer</code>.
+The operator may forward this verbatim to a fresh software-engineer session, or
+re-run this PM session with the <code>Agent</code> tool exposed.</p>
+
+<pre>## Input Contract
+- context: dadaia-workspace
+- specs_dir: /home/marco/workspace/dadaia/repos/dadaia-workspace/specs
+- release_id: panel-r5-v1
+- phase: A (single-threaded, IMPLEMENTATION phase, your write set only)
+- branch: release/panel-r5-v1 (HEAD b1dc147)
+- task_ids: PR5-A1, PR5-A2, PR5-A3, PR5-A4, PR5-A5 (execute in order)
+- report_dir: .dadaia/reports/dadaia-workspace/software-engineer/
+
+## Mission
+
+Execute Phase A of release panel-r5-v1 end-to-end. Phase A is single-threaded;
+you own all 5 tasks. Write set is bounded to:
+  - dadaia_workspace/features/telemetry/aggregator/{models.py, queries.py, runtimes.py}
+  - tests/unit/features/telemetry/{test_aggregator_sessions.py, test_runtime_adapters.py}
+No other paths may be touched. If you find yourself needing to edit outside
+this set, STOP and escalate to project-manager.
+
+## Verbatim Done criteria from TASKS.md
+
+PR5-A1 — Extend dadaia_workspace/features/telemetry/aggregator/models.py with
+three frozen dataclasses: SessionRow (fields per SPEC §FR1), SessionDetail
+(extends SessionRow), SessionListResult (wraps sessions: list[SessionRow] +
+query metadata). Owner: software-engineer. Done criterion: the three
+dataclasses import cleanly from aggregator.models; existing tests of models.py
+remain green.
+
+PR5-A2 — Extend dadaia_workspace/features/telemetry/aggregator/queries.py with
+two new methods on TelemetryAggregator: list_sessions(runtime, project=None,
+limit=None) -> SessionListResult and get_session(runtime, session_id) ->
+SessionDetail | None. Mirror the patterns of the existing recent_sessions and
+agent_summary queries. Owner: software-engineer. Done criterion: both methods
+callable from an instance; list_sessions honors project and limit; get_session
+returns None for unknown ids.
+
+PR5-A3 — Create new file
+dadaia_workspace/features/telemetry/aggregator/runtimes.py defining the
+RuntimeAdapter protocol with enrich_row, enrich_detail, and liveness(session_id,
+cwd). Add stub ClaudeRuntimeAdapter and CodexRuntimeAdapter implementations:
+Claude wires pricing.compute_cost for cumulative_cost_usd and reads
+~/.claude/sessions/*.json for liveness; Codex stubs return
+cumulative_cost_usd = None, cost_known = False (full liveness implementation
+lives in Phase E). Owner: software-engineer. Done criterion: protocol
+importable; both adapters instantiable; smoke-import passes.
+
+PR5-A4 — Author unit test
+tests/unit/features/telemetry/test_aggregator_sessions.py covering
+list_sessions (with and without project and limit filters; per-runtime
+discriminator) and get_session (hit + miss). Owner: software-engineer. Done
+criterion: .dadaia/.venv/bin/python -m pytest
+tests/unit/features/telemetry/test_aggregator_sessions.py -v green.
+
+PR5-A5 — Author unit test
+tests/unit/features/telemetry/test_runtime_adapters.py covering
+ClaudeRuntimeAdapter.enrich_row (cost computed via pricing.compute_cost) and
+CodexRuntimeAdapter.enrich_row (cumulative_cost_usd is None, cost_known is
+False). Owner: software-engineer. Done criterion: .dadaia/.venv/bin/python -m
+pytest tests/unit/features/telemetry/test_runtime_adapters.py -v green;
+dadaia panel start still boots without error.
+
+## SPEC §FR1 dataclass fields (locked, do not invent)
+
+SessionRow fields:
+  session_id, runtime, project, cwd, model, started_at, last_activity_at,
+  message_count, context_size_tokens, cumulative_cost_usd (Optional[float]),
+  cost_known (bool), status ("active"|"idle"|"ended"), agent_name
+  (Optional[str]), ai_title (Optional[str]).
+SessionDetail = SessionRow plus full event timeline references.
+SessionListResult = wraps sessions: list[SessionRow] plus query metadata
+  (runtime, project, limit, generated_at).
+
+Locked formulas:
+  context_size_tokens = input_tokens + cache_creation_input_tokens +
+                        cache_read_input_tokens
+  of the MOST RECENT assistant event for the session.
+  message_count = COUNT(events) for the session (rendered as "AI Turns").
+
+## Reuse-or-die contract — DO NOT REIMPLEMENT
+
+- dadaia_workspace/features/telemetry/pricing.py::compute_cost(usage, model,
+  when_date) -> int (micro-USD) ALREADY EXISTS. ClaudeRuntimeAdapter MUST call
+  this directly. Any new cost-computation code is a violation — stop and
+  escalate.
+- ~/.dadaia/state/telemetry/telemetry.sqlite schema is canonical
+  (features/telemetry/store/schema.py). Provider discriminator: provider IN
+  ('claude','codex').
+- Mirror conventions from existing query patterns in aggregator/queries.py
+  (list_agents, list_sessions_by_agent) for connection access, row_factory,
+  parameter binding.
+
+## PR5-A4 fixture rule (HARD)
+
+Per refinement report LOW finding (silent invariant inversion risk), the
+SQLite fixture used by test_aggregator_sessions.py MUST be hand-rolled by you
+inside the test (or under tests/fixtures/ if shared). It MUST NOT be sliced
+from the live ~/.dadaia/state/telemetry/telemetry.sqlite (which still contains
+pre-r4-backfill rows where agent_name IS NULL). Create the SQLite in-memory or
+to a tmp_path with schema.py's CREATE TABLE DDL, then insert your seed rows
+explicitly. Document this choice in a top-of-file comment.
+
+## PR5-A5 test coverage (HARD)
+
+The runtime-adapter test must cover BOTH branches:
+  (a) Claude branch — assert ClaudeRuntimeAdapter.enrich_row calls
+      pricing.compute_cost (use unittest.mock.patch on pricing.compute_cost
+      or verify the resulting cumulative_cost_usd is the expected float and
+      cost_known is True).
+  (b) Codex branch — assert CodexRuntimeAdapter.enrich_row returns a SessionRow
+      whose cumulative_cost_usd is None and cost_known is False, regardless of
+      raw input.
+
+## Marker discipline (dadaia-task-manager protocol)
+
+For EACH task PR5-Ax in order A1 -> A2 -> A3 -> A4 -> A5:
+
+  1. Open specs/releases/panel-r5-v1/TASKS.md, find PR5-Ax. It must be [ ].
+     Flip [ ] -> [-]. Commit ONLY that change:
+        git add specs/releases/panel-r5-v1/TASKS.md
+        git commit -m "chore(tasks): start PR5-Ax — &lt;slug&gt;"
+     where &lt;slug&gt; is a 2-4 word kebab-case summary of the task
+     (e.g. "session-dataclasses", "list-and-get-session", "runtime-adapter-stubs",
+     "test-aggregator-sessions", "test-runtime-adapters").
+  2. INVARIANT CHECK: grep -c '^\- \[\-\]' specs/releases/panel-r5-v1/TASKS.md
+     must return exactly 1 across all of Phase A (no parallel [-] permitted).
+  3. Do the implementation work. Multiple intermediate commits are allowed
+     during the work phase; use conventional-commit messages.
+  4. When the Done criterion of the task is satisfied:
+       - Run the specific test for that task (or smoke import for A1/A3).
+       - Flip [-] -> [x] in TASKS.md.
+       - Commit the final change. Use a conventional-commit message in the
+         style of release/panel-r4-v1:
+            feat(telemetry): PR5-Ax — &lt;short subject&gt;
+         or
+            test(telemetry): PR5-Ax — &lt;short subject&gt;
+         (choose feat/test/refactor per the actual change).
+  5. After the [x] commit lands, run:
+        dadaia specs doctor
+     and confirm 0 errors, 0 warnings. If it goes red, STOP and escalate
+     (do not flip the next task).
+
+## Tooling rules
+
+- venv: ALWAYS use .dadaia/.venv/bin/python and .dadaia/.venv/bin/pytest. The
+  system python3 / pip are forbidden.
+- Test runs:
+    .dadaia/.venv/bin/python -m pytest tests/unit/features/telemetry/test_aggregator_sessions.py -v
+    .dadaia/.venv/bin/python -m pytest tests/unit/features/telemetry/test_runtime_adapters.py -v
+- Smoke (after PR5-A5):
+    .dadaia/.venv/bin/python -c "from dadaia_workspace.features.telemetry.aggregator import runtimes, models, queries; print('ok')"
+    dadaia panel start  # boot smoke — must come up without error; tear down after
+
+## Final acceptance (all must be true before you write the handoff report)
+
+  1. All 5 tasks PR5-A1..A5 in TASKS.md are [x].
+  2. .dadaia/.venv/bin/python -m pytest tests/unit/features/telemetry/test_aggregator_sessions.py -v -> green.
+  3. .dadaia/.venv/bin/python -m pytest tests/unit/features/telemetry/test_runtime_adapters.py -v -> green.
+  4. dadaia specs doctor -> 0 errors, 0 warnings.
+  5. dadaia panel start boots without error (smoke; not a long-running test).
+  6. git log --oneline release/panel-r5-v1 shows 10 new commits (5 start + 5 close, in order).
+  7. ~/.dadaia/state/telemetry/telemetry.sqlite was NOT modified (write set check).
+
+## Handoff report
+
+Emit:
+  .dadaia/reports/dadaia-workspace/software-engineer/&lt;UTC&gt;-panel-r5-v1-phase-a.html
+  .dadaia/reports/dadaia-workspace/software-engineer/&lt;UTC&gt;-panel-r5-v1-phase-a.handoff.json
+
+Sidecar requirements per dadaia-handoff-emitter skill:
+  - schema_version: "handoff-v1"
+  - agent: "software-engineer"
+  - context: "dadaia-workspace"
+  - release_id: "panel-r5-v1"
+  - produced_at: ISO 8601 UTC with trailing Z
+  - artifact.type: "report"
+  - artifact.path: relative report path
+  - artifact.content_hash: sha256 hex of the HTML, 64 hex chars, NO "sha256:" prefix
+    (operator brief explicitly overrides skill default for this dispatch)
+  - findings: array of objects with keys "severity" and "message" (NOT "summary").
+    Severities allowed: CRITICAL, HIGH, MEDIUM, LOW, INFO.
+  - decisions_required: array (may be empty)
+  - next_handoff: object with keys "agent" and "expected_artifact_type"
+    (NOT "input"). Suggested: agent="software-engineer", expected_artifact_type
+    ="report" pointing to Phase B start.
+  - Validate with: dadaia reports validate &lt;path-to-handoff.json&gt; before
+    returning.
+
+Report HTML must include:
+  - Summary table of the 5 tasks with commit SHAs.
+  - Evidence block per task: pytest output, doctor output, smoke output.
+  - Any deviations from the dispatch prompt (must be zero).
+  - Hash check: sha256sum of the new aggregator/runtimes.py file as
+    additional evidence.
+
+## Hard stops — escalate to project-manager immediately if
+
+  - SPEC, PLAN, or TASKS would need editing to make a task feasible.
+  - pricing.compute_cost signature appears different from what SPEC §6 declares.
+  - Two [-] markers appear simultaneously in TASKS.md.
+  - dadaia specs doctor goes red and the fix would require touching files
+    outside your write set.
+  - Any task's Done criterion cannot be satisfied with the documented approach.
+
+Do NOT push to remote. Local commits only.
+</pre>
+
+<h2>Dispatch log</h2>
+
+<table>
+<tr><th>Stage</th><th>Agent</th><th>Inputs prepared</th><th>Outputs produced</th><th>Status</th></tr>
+<tr>
+  <td>Phase A — all 5 tasks PR5-A1..A5</td>
+  <td>software-engineer</td>
+  <td>Prompt above; resolved Spec Context; SPEC/PLAN/TASKS read; pricing.compute_cost signature confirmed; r4 commit-style sampled; venv path confirmed</td>
+  <td>None — dispatch could not transmit (Agent tool unavailable)</td>
+  <td><span class="status-blocked">NOT DISPATCHED</span></td>
+</tr>
+</table>
+
+<h2>Deviations from workflow spec</h2>
+
+<p>The PM Playbook <em>tdd-cycle</em> expects PM → Agent dispatch via the
+<code>Agent</code> tool. The tool was not present in this session's surface;
+the dispatch was therefore not sent. No code was written, no markers were
+flipped, no commits were created. The workspace state is unchanged from
+<code>b1dc147</code>.</p>
+
+<h2>Overall status</h2>
+
+<p><span class="status-blocked">FAILED — orchestration could not complete</span>.
+The PM has produced the full dispatch payload and verified all pre-conditions,
+but cannot itself execute the implementation per the hard rules in the PM
+identity contract. Two remediations are available to the operator:</p>
+
+<ol>
+<li><strong>Re-run the PM with the <code>Agent</code> tool enabled</strong> —
+    PM forwards the prepared prompt above verbatim and proceeds with sidecar
+    validation + closure as described in the operator brief.</li>
+<li><strong>Forward the prepared prompt to a fresh software-engineer session</strong>
+    — operator copies the &lt;pre&gt; block above into a new software-engineer
+    session as its entry prompt; on return, operator (or a re-run PM)
+    validates the sidecar via <code>dadaia reports validate</code> and confirms
+    Phase A closure.</li>
+</ol>
+
+<h2>Phase B note (per operator instruction)</h2>
+
+<p>PM does NOT proceed to Phase B in this run; control returns to the operator
+after Phase A closes. This report is the boundary marker.</p>
+
+</body>
+</html>
