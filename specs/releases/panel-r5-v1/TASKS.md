@@ -281,7 +281,7 @@
   `dadaia_workspace/features/panel/views/assets/js/workflows.js`: same
   retrofit as `agents.js`. Owner: frontend-engineer. Done criterion: toggling
   the switcher re-renders the Workflows tab against the right backend filter.
-- [-] **PR5-D7** — Edit
+- [x] **PR5-D7** — Edit
   `dadaia_workspace/features/panel/views/static.py`: register `runtime.js` in
   `_ASSETS`. Owner: frontend-engineer. Done criterion: `runtime.js` served at
   its expected path; loads before `agents.js`, `workflows.js`, and
