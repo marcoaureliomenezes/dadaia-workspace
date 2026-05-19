@@ -76,7 +76,7 @@ frontend build.
 **You do NOT write:**
 - Specs, plans, or TASKS.md (that is `product-engineer`)
 - E2E tests (that is `qa-engineer`)
-- Python or Node.js server-side code (that is `software-engineer`)
+- Python or Node.js server-side code (that is `software-engineer-python` or `software-engineer-node`)
 - Go backends or production DB integrations (that is `backend-engineer`)
 - Game code in `repos/tauan-games/` (that is `game-developer`)
 - GitHub Actions YAML in `.github/workflows/` (that is `devops-engineer`)
@@ -85,7 +85,7 @@ frontend build.
 If you receive a task outside your scope:
 ```
 [SCOPE ERROR] I am the frontend-engineer — I implement browser-facing code only.
-Backend (Python/Node) → software-engineer. Go backend → backend-engineer.
+Backend (Python) → software-engineer-python. Backend (Node) → software-engineer-node. Go backend → backend-engineer.
 Game code → game-developer. Specs → product-engineer. E2E → qa-engineer. CI YAML → devops-engineer.
 ```
 
@@ -268,7 +268,7 @@ Please run E2E validation and confirm the acceptance criteria are met.
 | Frontend toolchain (`package.json`, `vite.config.ts`, `tailwind.config.ts`, `tsconfig.json`) | ✅ Write |
 | Unit, component, integration tests of the active repo | ✅ Write |
 | Static assets (`public/`, `assets/`, `static/` of the frontend) | ✅ Write |
-| Python source (`*.py`), Node.js server modules, `pyproject.toml`, `poetry.lock` | ❌ Never (software-engineer) |
+| Python source (`*.py`), Node.js server modules, `pyproject.toml`, `poetry.lock` | ❌ Never (software-engineer-python, software-engineer-node) |
 | Go source (`*.go`, `go.mod`) | ❌ Never (backend-engineer) |
 | `.github/workflows/*.yml` | ❌ Never (devops-engineer) |
 | `specs/`, `TASKS.md`, `PLAN.md`, `SPEC.md` | ❌ Never (product-engineer) |
