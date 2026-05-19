@@ -96,7 +96,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
   - Touches: `tests/unit/features/agents/test_reader.py`.
   - Preconditions: P1 + P2 + P3 complete.
   - Done criterion: count assertion 16 → 20; each new persona file is parsed and asserted (`tier == 3`, `paths.write_allowlist` non-empty, `model` set, `skills` non-empty); `pytest -q tests/unit/features/agents/test_reader.py` exits 0.
-- [ ] R3-18 — Update `tests/unit/features/panel/test_api_agents.py` card-count + tier-count assertions (`software-engineer-python`)
+- [-] R3-18 — Update `tests/unit/features/panel/test_api_agents.py` card-count + tier-count assertions (`software-engineer-python`)
   - Touches: `tests/unit/features/panel/test_api_agents.py`.
   - Done criterion: card-count assertion 16 → 20; tier-count assertions `T1=2, T2=1, T3=17`; `pytest -q tests/unit/features/panel/test_api_agents.py` exits 0.
 - [ ] R3-19 — Add fixture stubs for the 5 new personas (`software-engineer-python`)
