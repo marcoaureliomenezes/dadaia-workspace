@@ -1,7 +1,7 @@
 ---
 name: hotfix-release
-description: "Hotfix release lifecycle. qa-engineer or operator files a candidate in specs/backlog/candidates.md `## Hotfixes pendentes`; project-manager promotes it to a PATCH release (v<M>.<m>.<patch+1>) and dispatches product-engineer for SPEC entry; implementer applies the fix; qa-engineer validates with smoke; product-engineer closes. Memory updates are optional — required only if the fix changes operator-visible product behavior."
-version: 0.2.0
+description: "Hotfix release lifecycle. qa-engineer or operator files a candidate in specs/backlog/candidates.md `## Hotfixes pendentes`; project-manager promotes it to a PATCH release (v<M>.<m>.<patch+1>) and dispatches product-engineer for SPEC entry; the chosen implementer applies the fix; qa-engineer validates with smoke; product-engineer closes. Implementer slot is selected from {software-engineer-python, software-engineer-node, data-engineer, data-analyst, ai-engineer, frontend-engineer, backend-engineer, devops-engineer, game-developer, game-designer, game-tester} based on the file paths the fix touches. Memory updates are optional — required only if the fix changes operator-visible product behavior."
+version: 0.3.0
 schema_version: "1"
 inputs:
   context:
@@ -19,8 +19,8 @@ inputs:
   implementer_agent:
     type: string
     required: false
-    default: software-engineer
-    description: Which engineer applies the fix. One of frontend-engineer, backend-engineer, software-engineer, game-developer.
+    default: software-engineer-python
+    description: "Which engineer applies the fix. Selected by project-manager (or operator) from the path → agent triage table in the workflow body. Allowed values: software-engineer-python, software-engineer-node, data-engineer, data-analyst, ai-engineer, frontend-engineer, backend-engineer, devops-engineer, game-developer, game-designer, game-tester."
 stages:
   - id: file_hotfix_candidate
     agent: qa-engineer
@@ -114,8 +114,11 @@ The 6 stages map to the SDD hotfix flow (v0.2.0: PM + PE separation):
 2. **promote_to_release** — `project-manager` assigns the next PATCH version
    (e.g. v1.1.0 → v1.1.1), moves the backlog bullet to `## Histórico`,
    scaffolds the release via `dadaia specs hotfix open <version-id>
-   --patches <affected_release> --severity <severity>`, and updates
-   `specs/releases/ACTIVE.md`.
+   --patches <affected_release> --severity <severity>`, updates
+   `specs/releases/ACTIVE.md`, **and triages the implementer slot** by
+   inspecting the file paths the fix will touch and matching them against the
+   path → agent table below. The chosen agent name is passed to the
+   `apply_fix` stage via the `implementer_agent` workflow input.
 3. **spec_entry** — `product-engineer` authors the formal `SPEC.md` for the
    new hotfix release using the promote report as input.
 4. **apply_fix** — the chosen implementer reserves a task in
@@ -126,7 +129,44 @@ The 6 stages map to the SDD hotfix flow (v0.2.0: PM + PE separation):
 6. **closure_write** — `product-engineer` writes `CLOSURE.md`. After approval:
    `git mv` to `specs/_archive/releases/` and reset `ACTIVE.md`.
 
-When to use `bug-fix-fastlane` instead:
+## Triage — pick the implementer
+
+The `apply_fix` stage instantiates exactly one of the eleven leaf implementer agents.
+Selection is driven by the file paths the hotfix touches. project-manager runs the
+triage during `promote_to_release` and records the chosen agent in the promote report so
+the dispatch in `apply_fix` is unambiguous.
+
+| Path family the fix touches | Implementer dispatched |
+|---|---|
+| `*.py`, `pyproject.toml`, `poetry.lock`, Python scripts, `dadaia_workspace/{features,infrastructure,cli,core}/**` | `software-engineer-python` |
+| Node server-side (`package.json` without browser bundler, CLIs, agent runtimes, `*.mjs`, server-side `*.ts`/`*.js`) | `software-engineer-node` |
+| `*.sql`, `**/databricks/**`, `**/dabs/**` excluding `**/dabs/dashboards/**`, `**/notebooks/**`, `**/pipelines/**` | `data-engineer` |
+| `**/dashboards/**`, `**/genie/**`, `**/bi/**`, `**/dabs/dashboards/**` | `data-analyst` |
+| `dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**` (AI-entity surface) | `ai-engineer` |
+| `*.tsx`, `*.jsx`, browser-targeted `*.ts`/`*.js`, `*.css`, `*.html`, `*/frontend/`, `*/client/`, `*/web/`, `*/ui/` | `frontend-engineer` |
+| `*.go`, `go.mod`, `go.sum`, production DB integrations (non data-pipeline) | `backend-engineer` |
+| `.github/workflows/*.yml`, CI/CD config, Docker base-image bumps that change pipeline shape | `devops-engineer` |
+| `repos/tauan-games/**` — gameplay logic, mechanics, IA, physics | `game-developer` |
+| `repos/tauan-games/**` — assets, materials, maps, audio | `game-designer` |
+| `repos/tauan-games/**` — engine test automation + evidence reports | `game-tester` |
+
+Triage rules:
+
+1. **Exactly one path family touched → single implementer**. Standard hotfix flow.
+2. **Two or more path families touched → reconsider scope**. A multi-surface fix usually
+   indicates the operator should open a regular feature release (use
+   `cross-cutting-feature` workflow) rather than a hotfix. If the operator confirms
+   single-release urgency, project-manager dispatches the implementers sequentially —
+   never in parallel inside a hotfix, because the smoke evidence must remain coherent.
+3. **Game subdomain conflicts** — when a hotfix touches `repos/tauan-games/**` and spans
+   logic + assets, the three game agents triage among themselves per
+   `game-agents-coordination` rule; one of them owns the `apply_fix` stage and the
+   others are consulted via report.
+4. **Default** — if the path family is ambiguous, project-manager defaults to
+   `software-engineer-python` (the workflow input default) and documents the choice in
+   the promote report. The operator may override before `apply_fix` starts.
+
+## When to use `bug-fix-fastlane` instead
 
 - Fix does NOT touch `specs/memory/product/*.html`
 - No release versioning needed (no PATCH bump)
