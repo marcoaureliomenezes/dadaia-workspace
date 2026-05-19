@@ -14,7 +14,7 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 
 ## Próxima release (queued)
 
-- **`codex-agent-orchestration-parity-v1`** — escolhida pelo operador 2026-05-19 após fechamento de `agents-r3-v1`. Stacks após `release/panel-r5-v1` e `release/agents-r3-v1` mergearem em `main`. Inicia com cut-branch + product-engineer authoring SPEC/PLAN/TASKS em fase DISCOVERY. ACTIVE.md permanece `release: none` até P0 commit.
+_None — `codex-agent-orchestration-parity-v1` was promoted to active release on 2026-05-19 (P0 commit). See `specs/releases/ACTIVE.md`._
 
 ## Candidatas ativas
 
