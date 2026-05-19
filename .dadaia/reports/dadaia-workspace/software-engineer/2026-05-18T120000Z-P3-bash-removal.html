@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Implementation Report — P3-bash-removal</title>
+</head>
+<body>
+
+<h1>Implementation Report — P3-bash-removal</h1>
+<p>
+  <strong>Date:</strong> 2026-05-18T12:00:00Z<br>
+  <strong>Context:</strong> dadaia-workspace<br>
+  <strong>Release:</strong> agents-r2-v1<br>
+  <strong>Tasks:</strong> AGT-r2-10, AGT-r2-11 (Phase P3)<br>
+  <strong>Agent:</strong> software-engineer
+</p>
+
+<h2>Summary</h2>
+<p>
+  Phase P3 strips the <code>Bash</code> tool from two agent frontmatters
+  (<code>product-engineer</code> and <code>software-architect</code>) and updates their
+  body text to delegate all shell invocations to <code>project-manager</code>, which
+  holds the orchestrator role and retains <code>Bash</code>.
+</p>
+<p>
+  This aligns the agent definitions with SPEC FR3.1 and FR3.2: PE's Bash usage was
+  limited to occasional CLI checks (<code>cat ACTIVE.md</code>, <code>dadaia specs
+  doctor</code>, <code>dadaia context show</code>); SA's Bash was idle in the audit flow
+  (inspection uses Read/Glob/Grep only). Both removals are "documentation-truth
+  alignment" as declared in the SPEC.
+</p>
+
+<h2>Before / After frontmatter snippet</h2>
+
+<h3>product-engineer.md — before</h3>
+<pre>
+tools:
+  - Read
+  - Bash
+  - Glob
+  - Grep
+  - Write
+  - Edit
+</pre>
+
+<h3>product-engineer.md — after</h3>
+<pre>
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Write
+  - Edit
+</pre>
+
+<h3>software-architect.md — before</h3>
+<pre>
+tools:
+  - Read
+  - Bash
+  - Glob
+  - Grep
+  - Write
+</pre>
+
+<h3>software-architect.md — after</h3>
+<pre>
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Write
+</pre>
+
+<h2>Body delegation changes</h2>
+
+<h3>product-engineer.md</h3>
+<ul>
+  <li>
+    <strong>Active release pointer section:</strong> removed the
+    <code>```bash\ncat &lt;specs-dir&gt;/releases/ACTIVE.md\n```</code> fenced block.
+    Replaced with a delegation note: PM reads <code>ACTIVE.md</code> and passes content
+    in the dispatch briefing; PE asks PM to re-run if missing.
+  </li>
+  <li>
+    <strong>Phase 8 — Closure:</strong> removed the
+    <code>```bash\ngit mv specs/releases/...\n```</code> block. Replaced with a plain
+    code fence (no language tag) showing the command the operator/devops-engineer runs,
+    plus a delegation note.
+  </li>
+  <li>
+    <strong>Hotfix scaffolding:</strong> converted <code>```bash</code> fence to a plain
+    fence and added a delegation note directing PE to ask PM or the operator to run
+    <code>dadaia specs hotfix open</code>.
+  </li>
+  <li>
+    <strong>dadaia CLI reference section:</strong> replaced the
+    <code>```bash</code> block with a delegation table: each CLI command lists "Who runs
+    it" (PM, operator, or devops-engineer). PE now explicitly asks PM to surface command
+    output when needed.
+  </li>
+</ul>
+
+<h3>software-architect.md</h3>
+<ul>
+  <li>
+    <strong>ONBOARD workflow body (line 108 area):</strong>
+    changed "not inspectable via Read/Bash/Glob/Grep" to "not inspectable via
+    Read/Glob/Grep".
+  </li>
+  <li>
+    <strong>ONBOARD inspect-before-asking rule:</strong>
+    changed "Read, Bash, Glob, or Grep can answer" to "Read, Glob, or Grep can answer".
+  </li>
+  <li>
+    <strong>REVIEW mode step 1:</strong>
+    changed inline <code>dadaia context show --json</code> invocation to a delegation
+    note — SA reads the context from the PM dispatch briefing; asks PM to provide if
+    missing.
+  </li>
+  <li>
+    <strong>REVIEW mode step 3:</strong>
+    changed "Use Glob, Grep, Read, and Bash" to "Use Glob, Grep, and Read".
+  </li>
+  <li>
+    <strong>Tooling Reference section:</strong>
+    replaced the <code>```bash</code> block (ls repos/, dadaia context show, find, grep,
+    dadaia doctor) with a tool/delegation table listing each task, the appropriate SA
+    tool (Glob/Grep/Read), and when to ask PM to run a shell command.
+  </li>
+</ul>
+
+<h2>Acceptance evidence (grep output)</h2>
+
+<h3>AGT-r2-10 — product-engineer.md</h3>
+<pre>
+$ grep -E '^\s*-\s*Bash' dadaia_workspace/public/agents/product-engineer.md
+(no output — empty, acceptance criteria met)
+
+$ grep -n '```bash' dadaia_workspace/public/agents/product-engineer.md
+(no output — empty, no bash fenced blocks remain)
+</pre>
+
+<h3>AGT-r2-11 — software-architect.md</h3>
+<pre>
+$ grep -E '^\s*-\s*Bash' dadaia_workspace/public/agents/software-architect.md
+(no output — empty, acceptance criteria met)
+
+$ grep -n '```bash' dadaia_workspace/public/agents/software-architect.md
+(no output — empty, no bash fenced blocks remain)
+</pre>
+
+<h2>Security checklist</h2>
+<ul>
+  <li><strong>A02 (hardcoded credentials):</strong> Not applicable — only agent markdown files modified.</li>
+  <li><strong>A03 (input validation):</strong> Not applicable — no runtime code changed.</li>
+  <li><strong>A04 (insecure design):</strong> Delegation to PM is safe — PM has Bash and is the orchestrator role; narrowing SA/PE tool surfaces reduces attack surface.</li>
+  <li><strong>A06 (verbose errors):</strong> Not applicable — no error handling code.</li>
+</ul>
+<p>No security concerns introduced. Removal of Bash tool reduces agent capability surface (positive security posture).</p>
+
+<h2>Tests written</h2>
+<p>
+  No unit tests required for this task: the changes are purely to agent definition
+  markdown files (no runtime code). Acceptance is verified by the grep commands above.
+  Runtime test coverage for agent frontmatter parsing is addressed in AGT-r2-22
+  (<code>tests/unit/features/agents/test_agent_reader.py</code>).
+</p>
+
+<h2>Deploy</h2>
+<p>
+  Branch: <code>release/agents-r2-v1</code><br>
+  Commit: <code>4073fca</code><br>
+  Workflow: <code>dadaia public stage &amp;&amp; install --target all</code> — deferred to
+  devops-engineer in Phase P8 (AGT-r2-24). No workflow dispatch triggered at this step.
+</p>
+
+<h2>QA validation</h2>
+<p>
+  Pending. qa-engineer E2E validation will be requested after Phase P8 install checkpoint
+  (AGT-r2-24) completes. Acceptance evidence above (grep commands returning empty output)
+  confirms the structural changes are correct.
+</p>
+
+</body>
+</html>
