@@ -44,6 +44,9 @@ input_contract:
       path: .dadaia/reports/{context}/software-architect/{ts}-arch.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - .dadaia/reports/<ctx>/software-architect/**
 ---
 
 # Software Architect

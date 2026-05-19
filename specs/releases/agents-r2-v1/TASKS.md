@@ -241,15 +241,15 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P12 — Skill orphan wiring + verification script (W4)
 
-- [-] AGT-r2-39 — Wire `dadaia-workspace-doctor` skill into devops-engineer + project-manager (software-engineer)
+- [x] AGT-r2-39 — Wire `dadaia-workspace-doctor` skill into devops-engineer + project-manager (software-engineer)
   - Files: `dadaia_workspace/public/agents/{devops-engineer,project-manager}.md` — `skills:` frontmatter gains `dadaia-workspace-doctor`.
   - Acceptance: `grep "dadaia-workspace-doctor" dadaia_workspace/public/agents/devops-engineer.md dadaia_workspace/public/agents/project-manager.md` → ≥ 2 hits.
   - Depends: AGT-r2-32. Parallel with: P11a, P11c.
-- [-] AGT-r2-40 — Wire `dev-server-registry` skill into frontend-engineer (software-engineer)
+- [x] AGT-r2-40 — Wire `dev-server-registry` skill into frontend-engineer (software-engineer)
   - File: `dadaia_workspace/public/agents/frontend-engineer.md` — `skills:` frontmatter gains `dev-server-registry`.
   - Acceptance: `grep "dev-server-registry" dadaia_workspace/public/agents/frontend-engineer.md` → 1 hit.
   - Depends: AGT-r2-32.
-- [-] AGT-r2-41 — Author orphan-skill detection script (software-engineer)
+- [x] AGT-r2-41 — Author orphan-skill detection script (software-engineer)
   - File: `tests/scripts/check_skill_orphans.py` (≤ 50 lines). Asserts every skill in `dadaia_workspace/public/skills/<name>/` is referenced by ≥ 1 agent frontmatter in `dadaia_workspace/public/agents/*.md`.
   - Acceptance: script exits 0 against the post-P11a/P12 tree; exits 1 if a seeded orphan is present.
   - Depends: AGT-r2-39, AGT-r2-40.

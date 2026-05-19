@@ -46,6 +46,11 @@ input_contract:
       path: .dadaia/reports/{context}/backend-engineer/{ts}-{task_id}-refactor.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - repos/**
+    - tests/**
+    - .dadaia/reports/<ctx>/backend-engineer/**
 ---
 
 # Backend Engineer

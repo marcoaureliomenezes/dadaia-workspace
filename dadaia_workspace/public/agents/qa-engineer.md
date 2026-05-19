@@ -49,6 +49,10 @@ input_contract:
       path: .dadaia/reports/{context}/qa-engineer/{ts}-qa.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - tests/**
+    - .dadaia/reports/<ctx>/qa-engineer/**
 ---
 
 # QA Engineer

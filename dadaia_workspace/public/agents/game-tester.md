@@ -40,6 +40,10 @@ input_contract:
       path: .dadaia/reports/{context}/game-tester/{ts}-quality.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - repos/redacted-slug/**
+    - .dadaia/reports/<ctx>/game-tester/**
 ---
 
 # Game Tester

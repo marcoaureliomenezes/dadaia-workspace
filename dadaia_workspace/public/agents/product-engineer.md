@@ -54,6 +54,10 @@ input_contract:
       path: specs/releases/{release_id}/CLOSURE.md
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - specs/**
+    - .dadaia/reports/<ctx>/product-engineer/**
 ---
 
 # Product Engineer

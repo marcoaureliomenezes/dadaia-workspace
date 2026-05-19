@@ -36,6 +36,9 @@ input_contract:
       path: .dadaia/reports/{context}/code-reviewer/{ts}-review.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - .dadaia/reports/<ctx>/code-reviewer/**
 ---
 
 # Code Reviewer
