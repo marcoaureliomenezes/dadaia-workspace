@@ -158,14 +158,14 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P9 — Build `_install_workspace_guardrail_pair` (W3, parallel with P10)
 
-- [-] AGT-r2-25 — Implement `_install_workspace_guardrail_pair` in `infrastructure/public_assets.py` (software-engineer)
+- [x] AGT-r2-25 — Implement `_install_workspace_guardrail_pair` in `infrastructure/public_assets.py` (software-engineer)
   - Function signature: `(agentic_dir, workspace_root, force, installed)`.
   - Reads single source `data/AGENTS.md`; enumerates `(workspace_root/"repos").iterdir()` filtered by `(p/".dadaia").is_dir() and (p/".dadaia"/"agentic").is_dir()` (R13); self-skips via `package_version` match in `<repo>/.dadaia/agentic/manifest.json` (R14); writes 4 files per round (workspace root × 2 + each consumer × 2) via existing `_copy_file`.
   - Marker-less consumer → emit `[skip] <path> (no .dadaia/ marker)`; never raises.
   - Legacy `_install_agents_md` / `_agents_md_source` remain in place for the `templates/AGENTS.md` scaffolder.
   - Acceptance: function importable; unit test `test_workspace_guardrail_pair.py` (real assertions) passes its 6 cases.
   - Depends: AGT-r2-24. Parallel with: P10 (AGT-r2-29..AGT-r2-32).
-- [ ] AGT-r2-26 — Wire `_runtime_expectations` to emit 4 tuples per call (software-engineer)
+- [-] AGT-r2-26 — Wire `_runtime_expectations` to emit 4 tuples per call (software-engineer)
   - Labels: `root:AGENTS.md`, `root:CLAUDE.md`, `repos/<slug>:AGENTS.md`, `repos/<slug>:CLAUDE.md`.
   - Acceptance: doctor harness produces exactly 4 lines per source; cross-checked by `tests/integration/test_public_doctor_parity.py` (added in this task).
   - Depends: AGT-r2-25.
