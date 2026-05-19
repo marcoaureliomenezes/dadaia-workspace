@@ -110,7 +110,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
   - Touches: `dadaia_workspace/public/data/AGENTS.md`.
   - Preconditions: P1 + P2 complete.
   - Done criterion: agent-inventory table lists 20 rows (model + tier + one-line scope); `wc -l` ≤ 280; forbidden-strings grep (`grep -iE 'Hostinger|redacted-infra|redacted-infra|Traefik' dadaia_workspace/public/data/AGENTS.md`) exits 1.
-- [-] R3-22 — Optional: author `scripts/check_agent_topology.py` (`software-engineer-python`)
+- [x] R3-22 — Optional: author `scripts/check_agent_topology.py` (`software-engineer-python`)
   - Touches: `scripts/check_agent_topology.py`.
   - Done criterion: script asserts exactly 20 persona files, no orphan dispatch references in PM body, all five new agents named in auditor evidence list, no orphan agent names in matrix; exits 0 on current tree; exits non-zero when an agent is deleted (smoke-tested manually).
   - Note: If P5 doctor checkpoint passes cleanly without the script, this task may close with a documentation note deferring the script to backlog.
