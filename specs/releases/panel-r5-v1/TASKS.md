@@ -116,7 +116,7 @@
   `render_api_workflows_list` convention. Owner: software-engineer. Done
   criterion: both closures return the standard 200/401/503 envelope shape; unit
   smoke import passes.
-- [ ] **PR5-B2** — Register the new routes in
+- [-] **PR5-B2** — Register the new routes in
   `dadaia_workspace/features/panel/handler.py`: add `api_sessions` and
   `api_session_detail` to `_RAW_ROUTES`; add both to
   `_BEARER_AUTH_ROUTE_NAMES`; extend `_dispatch_telemetry` switch with the new
