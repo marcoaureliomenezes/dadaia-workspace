@@ -113,7 +113,7 @@ echo "exit=$?"   # may print exit=0 if operator put those keywords; exit=1 also 
 ```
 
 After all three checks pass, the operator pastes the `sha256sum` output and the
-`grep` exit codes into `## Validations` below (finalised in P14 / AGT-r2-48).
+`grep` exit codes into the Validations section below (finalised in P14 / AGT-r2-48).
 
 ---
 
