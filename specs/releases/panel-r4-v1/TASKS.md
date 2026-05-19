@@ -92,7 +92,7 @@
 > or equivalent), `dadaia_workspace/features/panel/views/api.py`,
 > `tests/unit/features/agents/`, `tests/unit/features/panel/`.
 
-- [ ] **PR4-11** — Add `tier:` frontmatter to every agent markdown under
+- [-] **PR4-11** — Add `tier:` frontmatter to every agent markdown under
   `dadaia_workspace/public/agents/`. Mapping: **T1** = `project-manager`,
   `project-auditor`. **T2** = `product-engineer`. **T3** = the 13 leaf specialists
   (`software-architect`, `software-engineer`, `backend-engineer`, `frontend-engineer`,
@@ -100,19 +100,19 @@
   `researcher`, `design-specialist`, `game-developer`, `game-designer`,
   `game-tester`). Owner: software-engineer. Done criterion:
   `grep -L "^tier:" dadaia_workspace/public/agents/*.md` returns no files (C5).
-- [ ] **PR4-12** — Extend the agent frontmatter parser (locate the canonical reader
+- [-] **PR4-12** — Extend the agent frontmatter parser (locate the canonical reader
   in `dadaia_workspace/infrastructure/markdown_agent_store.py` or
   `dadaia_workspace/features/agents/...`; whichever surfaces the agent model to
   panel) to parse and surface `tier: int`. Owner: software-engineer. Done criterion:
   the agent model carries `tier` and unit test in PR4-14 passes.
-- [ ] **PR4-13** — Extend `/api/agents` at
+- [-] **PR4-13** — Extend `/api/agents` at
   `dadaia_workspace/features/panel/views/api.py` (around lines 163-321) to include
   the `tier` integer per agent in each response item. Owner: software-engineer.
   Done criterion: response shape contract test in PR4-15 passes.
-- [ ] **PR4-14** — Extend `tests/unit/features/agents/test_reader.py` to assert
+- [-] **PR4-14** — Extend `tests/unit/features/agents/test_reader.py` to assert
   `tier` is parsed for all 16 agents and the value is the canonical mapping per
   PR4-11. Owner: software-engineer. Done criterion: pytest green.
-- [ ] **PR4-15** — Extend `tests/unit/features/panel/test_api_agents.py` to assert
+- [-] **PR4-15** — Extend `tests/unit/features/panel/test_api_agents.py` to assert
   every agent in the response has `tier ∈ {1, 2, 3}` (C4). Owner: software-engineer.
   Done criterion: pytest green.
 
