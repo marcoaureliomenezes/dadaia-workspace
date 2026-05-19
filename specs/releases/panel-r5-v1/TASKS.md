@@ -324,7 +324,7 @@
   returns ≥ 9 AND
   `grep -c 'color-runtime' dadaia_workspace/features/panel/views/assets/css/tokens.py`
   returns ≥ 9.
-- [-] **PR5-D11** — Rebase guard for
+- [x] **PR5-D11** — Rebase guard for
   `dadaia_workspace/features/panel/views/api.py`. The file goes through three
   delta layers: (a) r4 PR4-13 adds `tier: int` to each item in
   `render_api_agents_canonical`; (b) r5 Phase B adds new closure factories
