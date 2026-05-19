@@ -182,7 +182,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P10 — Inline scope rules + archive 4 rule files (W3)
 
-- [ ] AGT-r2-29 — Inline `project-manager-scope.md` into `project-manager.md` body (software-engineer)
+- [-] AGT-r2-29 — Inline `project-manager-scope.md` into `project-manager.md` body (software-engineer)
   - Add `## Scope and forbidden actions` section copied verbatim from the rule file.
   - Acceptance: `## Scope and forbidden actions` present in `dadaia_workspace/public/agents/project-manager.md`; `wc -l` ≤ 300.
   - Depends: AGT-r2-05. Parallel with: P9 (AGT-r2-25..AGT-r2-28).
