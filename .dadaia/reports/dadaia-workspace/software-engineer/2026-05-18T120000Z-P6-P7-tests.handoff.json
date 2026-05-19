@@ -1,0 +1,28 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "software-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-18T12:00:00Z",
+  "release_id": "agents-r2-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-18T120000Z-P6-P7-tests.html",
+    "content_hash": "2718eead29160377c7f651abc74e26f2fe916633bf040c8e46dee632b7bcd5b1"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "AGT-r2-21: No fenced bash blocks or inline $ patterns found in product-engineer.md or software-architect.md. SPEC C6+C7 satisfied."
+    },
+    {
+      "severity": "INFO",
+      "message": "AGT-r2-22: Unit test sweep green — 1140 passed, 1 xpassed. Workflow count 7, agent count 16, paths.write_allowlist coverage all confirmed."
+    }
+  ],
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "qa-engineer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
+  }
+}
