@@ -130,14 +130,14 @@
 > Depends on P2 (`tier` field landed in `/api/agents`). The frontend cannot wire
 > `data-tier="${agent.tier}"` until the backend ships `tier`.
 
-- [-] **PR4-16** — qa-engineer captures a Playwright screenshot of the current Agents
+- [x] **PR4-16** — qa-engineer captures a Playwright screenshot of the current Agents
   tab. Procedure: start `dadaia panel`; navigate to the Agents tab; capture
   screenshot; stop panel. Save the screenshot inline-referenced in the qa-engineer
   report at
   `.dadaia/reports/dadaia-workspace/qa-engineer/<UTC>-panel-r4-baseline.html`
   (with the PNG either as a sibling asset or embedded base64). Owner: qa-engineer.
   Done criterion: report HTML + screenshot exist and are linked to PR4-17.
-- [ ] **PR4-17** — design-specialist consumes PR4-16 screenshot and emits a design
+- [x] **PR4-17** — design-specialist consumes PR4-16 screenshot and emits a design
   spec at
   `.dadaia/reports/dadaia-workspace/design-specialist/<UTC>-panel-r4-card-tier-spec.html`.
   Spec defines: (a) border weights (2px default for `.agent-card`); (b) tier color
@@ -146,7 +146,8 @@
   token against its palette's card background; (d) ASCII sketch per tier; (e) props
   + states + edge cases handoff section for frontend-engineer. Owner: design-specialist.
   Done criterion: design report present and references PR4-16 baseline.
-- [ ] **PR4-18** — frontend-engineer implements per PR4-17 spec. Edit
+  Report: `.dadaia/reports/dadaia-workspace/design-specialist/2026-05-19T120000Z-panel-r4-card-tier-spec.html`
+- [-] **PR4-18** — frontend-engineer implements per PR4-17 spec. Edit
   `dadaia_workspace/features/panel/views/assets/css/agents.py` (lines ~39-72): bump
   `.agent-card` default border to `2px solid var(--color-border-card)`; add
   selectors `.agent-card[data-tier="1"]`, `[data-tier="2"]`, `[data-tier="3"]` with
@@ -156,7 +157,7 @@
   set `data-tier="${agent.tier}"` on each card element. Owner: frontend-engineer.
   Done criterion: grep on the CSS module returns the 3 selectors with distinct
   accent colors per palette (C6, C7).
-- [ ] **PR4-19** — Extend `tests/unit/features/panel/test_api_agents.py` (or add a
+- [-] **PR4-19** — Extend `tests/unit/features/panel/test_api_agents.py` (or add a
   new file `test_agents_render.py` in the same directory) to assert the JS renders
   the `data-tier` attribute on collapsed agent cards. Owner: frontend-engineer.
   Done criterion: pytest green.
