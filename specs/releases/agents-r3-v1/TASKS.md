@@ -106,7 +106,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 - [x] R3-20 — Add path-scope gate unit tests for new allowlists (`software-engineer-python`)
   - Touches: `tests/unit/gate/test_path_scope.py` (extend) or new file under `tests/unit/gate/`.
   - Done criterion: `ai-engineer` → `dadaia_workspace/cli/main.py` rejected with `[PATH SCOPE ERROR]`; `software-engineer-python` → same path accepted; tests exit 0.
-- [-] R3-21 — Rewrite `dadaia_workspace/public/data/AGENTS.md` for 20-agent inventory (`product-engineer`)
+- [x] R3-21 — Rewrite `dadaia_workspace/public/data/AGENTS.md` for 20-agent inventory (`product-engineer`)
   - Touches: `dadaia_workspace/public/data/AGENTS.md`.
   - Preconditions: P1 + P2 complete.
   - Done criterion: agent-inventory table lists 20 rows (model + tier + one-line scope); `wc -l` ≤ 280; forbidden-strings grep (`grep -iE 'Hostinger|Hermes|OpenClaw|Traefik' dadaia_workspace/public/data/AGENTS.md`) exits 1.
