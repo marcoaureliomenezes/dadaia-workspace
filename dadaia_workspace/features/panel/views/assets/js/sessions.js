@@ -1,5 +1,6 @@
 // sessions.js — Sessions tab UI (sortable table, detail drawer, filter, auto-refresh)
 // PR5-C3 (FE): Claude-only path live.
+// PR5-E3 (FE): Codex banner + Cost column override.
 //
 // Depends on: window.authedFetch() defined in core.js (loaded before this script)
 //
@@ -24,11 +25,14 @@
 //   - Sort: clicking th[data-sort-key] toggles asc/desc on that column.
 //   - Filter: #sessions-filter debounced 200ms; client-side substring filter.
 //   - Auto-refresh: setInterval 10s; checks document.hidden before each tick.
-//   - Listens for 'dadaia:runtime-change' CustomEvent (no-op stub in Phase C;
-//     Phase D ships window.Runtime dispatcher).
+//   - Listens for 'dadaia:runtime-change' CustomEvent; calls updateBanner() then
+//     refetches (Phase E: banner and Cost column override for Codex).
 //   - Updates #sessions-last-updated badge via updateStatusLabel pattern.
 //
-// Phase C: no Codex banner (Phase E ships that branch).
+// Phase E: Codex banner — when runtime === 'codex':
+//   - #sessions-banner shows "Cost not tracked for Codex" (aria-live="polite").
+//   - Cost column renders '—' for every row regardless of row.cost_known.
+//   When runtime flips back to 'claude', banner is hidden and Cost re-populates.
 
 (function () {
   'use strict';
@@ -37,6 +41,7 @@
   var AUTO_REFRESH_MS = 10000;
   var FILTER_DEBOUNCE_MS = 200;
   var DEFAULT_RUNTIME = 'claude';
+  var CODEX_BANNER_TEXT = 'Cost not tracked for Codex';
 
   // ── Module state ─────────────────────────────────────────────────────────────
   var _allRows = [];           // last fetched SessionRow array (full set, pre-filter)
@@ -61,6 +66,23 @@
       return window.Runtime.get();
     }
     return DEFAULT_RUNTIME;
+  }
+
+  // ── Banner: show/hide the "Cost not tracked for Codex" notice ────────────────
+  // Called after each fetchSessions() resolution and on every dadaia:runtime-change.
+  // The #sessions-banner element starts with the HTML [hidden] attribute (set in the
+  // scaffold); JS shows it only when runtime === 'codex'.
+  function updateBanner() {
+    var banner = document.getElementById('sessions-banner');
+    if (!banner) { return; }
+    var runtime = getRuntime();
+    if (runtime === 'codex') {
+      banner.textContent = CODEX_BANNER_TEXT;
+      banner.removeAttribute('hidden');
+    } else {
+      banner.textContent = '';
+      banner.setAttribute('hidden', '');
+    }
   }
 
   // ── Relative date formatter ────────────────────────────────────────────────────
@@ -131,7 +153,10 @@
     var model = session.model ? escHtml(session.model) : '—';
     var turns = session.message_count != null ? escHtml(String(session.message_count)) : '—';
     var ctx = fmtTokens(session.context_size_tokens);
-    var cost = fmtCost(session.cumulative_cost_usd, session.cost_known);
+    // Phase E: when runtime is 'codex', Cost column always renders '—' because
+    // cost tracking is not available for Codex sessions (SPEC §FR6, §4 out-of-scope).
+    var runtime = getRuntime();
+    var cost = (runtime === 'codex') ? '—' : fmtCost(session.cumulative_cost_usd, session.cost_known);
     var lastActivity = fmtRelativeDate(session.last_activity_at);
     var status = session.status || 'ended';
 
@@ -477,6 +502,7 @@
         _allRows = data.sessions || [];
         _loaded = true;
 
+        updateBanner();
         renderTable(_allRows);
 
         var filtered = applyFilter(_allRows);
@@ -559,12 +585,15 @@
     var tbody = document.getElementById('sessions-tbody');
     if (tbody) { tbody.innerHTML = renderSkeletonRows(8); }
 
-    // Phase D ships window.Runtime — subscribe to runtime changes as no-op stub
-    // so the event listener contract is in place before Phase D wires the dispatcher.
+    // Phase E: set banner state before first fetch so it's immediately visible
+    // if the persisted runtime is 'codex'.
+    updateBanner();
+
+    // Subscribe to runtime changes. Phase E: call updateBanner() immediately so
+    // the banner (or its absence) is visible before the fetch round-trip completes.
+    // Then drop cached rows and refetch with the new runtime.
     document.addEventListener('dadaia:runtime-change', function () {
-      // Drop cached rows and refetch with the new runtime.
-      // In Phase C this is effectively a no-op because Runtime is not defined yet
-      // and getRuntime() always returns 'claude'.
+      updateBanner();
       _allRows = [];
       _sortKey = null;
       _sortDir = 'none';

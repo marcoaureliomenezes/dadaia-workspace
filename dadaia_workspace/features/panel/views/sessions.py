@@ -51,6 +51,11 @@ def render_sessions_section() -> str:
         '          aria-live="polite" data-testid="sessions-last-updated">Never</span>\n'
         "  </div>\n"
 
+        # Codex cost banner — hidden by default; JS shows it when runtime === 'codex'.
+        # aria-live="polite" so screen readers announce it when it appears.
+        '  <div id="sessions-banner" class="sessions-banner"\n'
+        '       role="status" aria-live="polite" hidden></div>\n'
+
         # Sessions table container — aria-busy="true" until first fetch completes
         '  <div id="sessions-table-container" class="sessions-table-container"\n'
         '       aria-busy="true">\n'
