@@ -648,6 +648,84 @@ def test_paths_field_non_dict_defaults_to_none(
     assert agent.paths is None
 
 
+# ---------------------------------------------------------------------------
+# AGT-r2-18 — paths.write_allowlist coverage across all 16 public agents
+# ---------------------------------------------------------------------------
+
+_PUBLIC_AGENTS_DIR = (
+    Path(__file__).parent.parent.parent.parent.parent
+    / "dadaia_workspace"
+    / "public"
+    / "agents"
+)
+
+
+def test_all_public_agents_have_paths_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every agent in dadaia_workspace/public/agents/ must have a 'paths' block."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    without_paths = [a.id for a in agents if a.paths is None]
+    assert without_paths == [], (
+        f"Agents missing 'paths' block: {without_paths}. "
+        "Every public agent must declare paths.write_allowlist per SPEC FR2.1."
+    )
+
+
+def test_all_public_agents_have_write_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every public agent's paths block must contain a non-empty 'write_allowlist' list."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    missing_allowlist: list[str] = []
+    empty_allowlist: list[str] = []
+    for agent in agents:
+        if agent.paths is None:
+            missing_allowlist.append(agent.id)
+            continue
+        wl = agent.paths.get("write_allowlist")
+        if not wl:
+            empty_allowlist.append(agent.id)
+    assert missing_allowlist == [], (
+        f"Agents with no 'paths' block at all: {missing_allowlist}"
+    )
+    assert empty_allowlist == [], (
+        f"Agents with empty or absent 'write_allowlist': {empty_allowlist}"
+    )
+
+
+def test_all_public_agents_write_allowlist_entries_are_strings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every entry in paths.write_allowlist must be a non-empty string."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    bad: list[tuple[str, object]] = []
+    for agent in agents:
+        if agent.paths is None:
+            continue
+        wl = agent.paths.get("write_allowlist", [])
+        for entry in wl:
+            if not isinstance(entry, str) or not entry.strip():
+                bad.append((agent.id, entry))
+    assert bad == [], (
+        f"Non-string or empty entries in write_allowlist: {bad}"
+    )
+
+
+def test_public_agents_count_is_16(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exactly 16 public agents must be loadable (SPEC FR2.1 — 16-agent roster)."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    assert len(agents) == 16, (
+        f"Expected 16 public agents, got {len(agents)}: {[a.id for a in agents]}"
+    )
+
+
 def test_get_prompt_unreadable_file_raises_not_found(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

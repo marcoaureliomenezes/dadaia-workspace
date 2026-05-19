@@ -46,6 +46,10 @@ input_contract:
       path: .dadaia/reports/{context}/game-developer/{ts}-impl.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - repos/tauan-games/**
+    - .dadaia/reports/<ctx>/game-developer/**
 ---
 
 # Game Developer

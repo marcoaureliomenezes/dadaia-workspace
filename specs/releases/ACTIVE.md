@@ -1,2 +1,2 @@
-release: none
-phase: none
+release: agents-r2-v1
+phase: TASKS

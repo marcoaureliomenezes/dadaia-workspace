@@ -34,6 +34,9 @@ input_contract:
       path: .dadaia/reports/{context}/security-reviewer/{ts}-security.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - .dadaia/reports/<ctx>/security-reviewer/**
 ---
 
 # Security Reviewer

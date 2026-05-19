@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Report — agents-r2-v1 SPEC expanded (FR6–FR9)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55;
+           color: #222; background: #fafafa; }
+    h1, h2, h3 { color: #111; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
+    h2 { margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+    code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
+    pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .meta { color: #666; font-size: .9em; }
+    .ok { color: #2a7a2a; font-weight: 600; }
+    .expected { color: #886500; font-weight: 600; }
+    .added { color: #2a7a2a; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<h1>Report — agents-r2-v1 SPEC expanded (FR6–FR9)</h1>
+<p class="meta">Agent: product-engineer · Context: dadaia-workspace · Phase: SPEC ·
+Release: <code>agents-r2-v1</code> · Branch: <code>release/agents-r2-v1</code> ·
+Predecessor report: <code>2026-05-19T000601Z-agents-r2-v1-spec-drafted.html</code> ·
+Produced at: 2026-05-19T00:15:56Z</p>
+
+<h2>Demand</h2>
+<p>Operator widened the scope of <code>agents-r2-v1</code> after the initial SPEC
+(FR1–FR5) was drafted. Expansion brief covers four audit findings that translate
+into four new functional requirements:</p>
+<ul>
+  <li><strong>FR6</strong> — Rules folder reorganization (6 → 2 files); inline
+  per-agent scope rules into agent bodies; move workspace-wide invariant into
+  <code>AGENTS.md</code>; keep only genuine cross-agent boundaries as rule files.</li>
+  <li><strong>FR7</strong> — Lib <code>AGENTS.md</code> rewrite: split Hostinger /
+  Hermes / OpenClaw content OUT (stays in workspace <code>CLAUDE.md</code>);
+  rewrite for 16-agent topology, release-lifecycle SDD model, HTML memory atoms,
+  current CLI surface. Target ≤ 280 lines.</li>
+  <li><strong>FR8</strong> — Wire 2 orphan skills (<code>dadaia-workspace-doctor</code>,
+  <code>dev-server-registry</code>) to their correct owners. Add CI verification
+  script.</li>
+  <li><strong>FR9</strong> — Workspace operator-notes archival decision recorded
+  at CLOSURE (operator-driven; not a hard FR).</li>
+</ul>
+<p>Constraint: do NOT rewrite the SPEC. Preserve FR1–FR5 verbatim. Append FR6–FR9,
+extend acceptance criteria + risks + out-of-scope + phase plan tables, update
+Sumário + Discovery sections.</p>
+
+<h2>Deliverables emitted</h2>
+<table>
+  <thead><tr><th>Path</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>specs/releases/agents-r2-v1/SPEC.md</code></td>
+      <td>Spec (expanded)</td>
+      <td>385 lines → <strong>685 lines</strong> (delta: +301). Status:
+      <strong>Aprovado</strong> (pending operator review per dispatch contract).
+      FR1–FR5 preserved verbatim; FR6/FR7/FR8/FR9 added; C1–C13 preserved + C14–C20
+      added; NS1–NS9 preserved + NS10–NS13 added; R1–R7 preserved + R8–R12 added;
+      P0–P10 phase plan extended to P14; §1 Sumário + §9 Discovery rewritten to
+      reflect expanded scope.</td>
+    </tr>
+    <tr>
+      <td><code>.dadaia/reports/dadaia-workspace/product-engineer/2026-05-19T001556Z-agents-r2-v1-spec-expanded.html</code></td>
+      <td>Report</td>
+      <td>This file — expansion summary, delta vs initial SPEC, audit findings
+      digest, doctor output.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Delta vs initial SPEC (line-level)</h2>
+<table>
+  <thead><tr><th>Section</th><th>Initial</th><th>After expansion</th><th>Delta</th></tr></thead>
+  <tbody>
+    <tr><td>§1 Sumário</td><td>3 numbered points</td><td>7 numbered points (3 "Lean" + 4 "Consolidated")</td><td><span class="added">+25 lines</span></td></tr>
+    <tr><td>§3 Functional Requirements</td><td>FR1–FR5</td><td>FR1–FR9</td><td><span class="added">+185 lines</span> (FR6+FR7+FR8+FR9)</td></tr>
+    <tr><td>§4 NFR</td><td>NFR1–NFR10</td><td>NFR1–NFR10 (unchanged)</td><td>0</td></tr>
+    <tr><td>§5 Acceptance Criteria</td><td>C1–C13</td><td>C1–C20</td><td><span class="added">+7 criteria</span></td></tr>
+    <tr><td>§6 Fora de Escopo</td><td>NS1–NS9</td><td>NS1–NS13</td><td><span class="added">+4 non-scope items</span></td></tr>
+    <tr><td>§7 Riscos</td><td>R1–R7</td><td>R1–R12</td><td><span class="added">+5 risks</span> (R8 agent-body bloat; R9 AGENTS.md projection drift; R10 workspace CLAUDE.md sync; R11 orphan-script self-test; R12 rules cleanup-on-absence)</td></tr>
+    <tr><td>§8 Phase plan</td><td>P0–P10</td><td>P0–P14</td><td><span class="added">+4 phases</span> (P10 FR6 inlining; P11 FR7 AGENTS.md rewrite; P12 FR8 skill wiring; P13 second projection sweep)</td></tr>
+    <tr><td>§9 Discovery</td><td>1 ambiguity resolved internally; 0 grill-me passes</td><td>2 ambiguities resolved internally; 5 audit findings (A–E) digested</td><td><span class="added">+35 lines</span></td></tr>
+  </tbody>
+</table>
+
+<h2>Audit findings incorporated</h2>
+<p>The operator-authored expansion brief contained 5 audit findings, all incorporated
+verbatim into the SPEC:</p>
+<table>
+  <thead><tr><th>Finding</th><th>SPEC home</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>A — Rules folder reorganization (6 → 2)</td><td>FR6</td><td>Inline 3 per-agent rules into agent bodies; move 1 workspace-wide rule into <code>AGENTS.md</code>; keep 2 cross-agent rules.</td></tr>
+    <tr><td>B — AGENTS.md drift (8 issues)</td><td>FR7</td><td>Rewrite §2 (release-lifecycle), §6/§7 removed (operator content), §8 consolidated, §9 expanded to 16 agents, §10 rewritten, §11 updated for HTML memory atoms, §4 updated with current CLI.</td></tr>
+    <tr><td>C — 2 orphan skills</td><td>FR8</td><td>Wire <code>dadaia-workspace-doctor</code> to devops-engineer + project-manager; wire <code>dev-server-registry</code> to frontend-engineer; add CI verification script.</td></tr>
+    <tr><td>D — Tool-call audit</td><td>(already covered by FR3)</td><td>No expansion; only PE + software-architect have unused Bash.</td></tr>
+    <tr><td>E — Workspace operator notes</td><td>FR9 (optional)</td><td>Record CLOSURE-time decision; no auto-archive.</td></tr>
+  </tbody>
+</table>
+
+<h2>Verification of audit findings</h2>
+<p>Before amending the SPEC, PE verified two factual claims from the dispatch brief
+to ensure FR6/FR8 are grounded:</p>
+<table>
+  <thead><tr><th>Claim</th><th>Verification</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Finding A: <code>public/rules/</code> contains 6 files</td>
+      <td><code>ls dadaia_workspace/public/rules/</code></td>
+      <td><span class="ok">CONFIRMED</span> — 6 files: <code>dadaia-workspace-dev-guardrail.md</code>, <code>design-specialist-scope.md</code>, <code>game-agents-coordination.md</code>, <code>game-developer-scope.md</code>, <code>project-auditor-scope.md</code>, <code>project-manager-scope.md</code>.</td>
+    </tr>
+    <tr>
+      <td>Finding C orphan 1: no agent references <code>dadaia-workspace-doctor</code></td>
+      <td><code>grep -l "dadaia-workspace-doctor" dadaia_workspace/public/agents/*.md</code></td>
+      <td><span class="ok">CONFIRMED</span> — empty match (no agent file references the skill).</td>
+    </tr>
+    <tr>
+      <td>Finding C orphan 2: no agent references <code>dev-server-registry</code></td>
+      <td><code>grep -l "dev-server-registry" dadaia_workspace/public/agents/*.md</code></td>
+      <td><span class="ok">CONFIRMED</span> — empty match.</td>
+    </tr>
+    <tr>
+      <td>Finding B: lib <code>AGENTS.md</code> contains workspace-specific content</td>
+      <td><code>grep -cE 'Hostinger|Hermes|OpenClaw|dmPolicy|tirith|vps-' dadaia_workspace/public/data/AGENTS.md</code></td>
+      <td><span class="ok">CONFIRMED</span> — multiple matches across §6/§7 (security section + project context section).</td>
+    </tr>
+    <tr>
+      <td>Finding B: §9 lists only 6 agents</td>
+      <td><code>grep -cE '^### @' dadaia_workspace/public/data/AGENTS.md</code></td>
+      <td><span class="ok">CONFIRMED</span> — 6 matches; expected 16 in post-r1 topology.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Outstanding work (not in this dispatch)</h2>
+<ul>
+  <li><strong>PLAN.md</strong> — Not written. Awaits operator approval of expanded SPEC.</li>
+  <li><strong>TASKS.md</strong> — Not written. Awaits PLAN approval.</li>
+  <li><strong>Memory updates</strong> — Deferred to CLOSURE phase (gate-locked).</li>
+  <li><strong>FR9 operator decision</strong> — To be elicited at CLOSURE: keep <code>multi-agent-orchestration-v{1,2}.md</code> in workspace root, or archive to <code>.dadaia/reports/dadaia-workspace/operator-notes/</code>.</li>
+</ul>
+
+<h2>Open issues for operator</h2>
+<table>
+  <thead><tr><th>#</th><th>Question</th><th>Default if no answer</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Approve expanded SPEC (FR6–FR9 added) so PE can proceed to PLAN.md authoring?</td>
+      <td>Wait — block PLAN until explicit approval.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Confirm scope of FR9: ask at CLOSURE only, do not silently archive
+      <code>multi-agent-orchestration-v{1,2}.md</code> during implementation?</td>
+      <td>Per FR9.1: ask at CLOSURE; no silent move.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>FR7 boundary: confirm that workspace <code>CLAUDE.md</code> (Hostinger /
+      Hermes / OpenClaw content) is OUT-OF-SCOPE for this release and stays
+      untouched?</td>
+      <td>Per NS10 + R10: untouched. Future release if sync needed.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Doctor output</h2>
+<pre>$ /home/marco/workspace/dadaia/.dadaia/.venv/bin/dadaia specs doctor
+[fail] /home/marco/workspace/dadaia/repos/dadaia-workspace/specs — 2 error(s), 0 warning(s):
+  [ERR ] SPEC-DOC-004: Active release missing PLAN.md (/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/releases/agents-r2-v1/PLAN.md)
+  [ERR ] SPEC-DOC-004: Active release missing TASKS.md (/home/marco/workspace/dadaia/repos/dadaia-workspace/specs/releases/agents-r2-v1/TASKS.md)</pre>
+<p><span class="expected">Expected</span> — PLAN.md and TASKS.md were intentionally
+deferred per dispatch contract (SPEC-only expansion). Both will be written in
+subsequent dispatches after operator approves expanded SPEC. The two errors will
+clear once PLAN.md is authored.</p>
+
+<h2>Next handoff</h2>
+<p>Recipient: <strong>operator</strong> — read expanded SPEC, decide on the 3 open
+issues above, then either:</p>
+<ul>
+  <li>Approve → PE drafts PLAN.md (P1 in phase plan), software-architect consulted
+  on path-scope gate pattern.</li>
+  <li>Request changes → PE revises SPEC; status remains <code>Aprovado</code>
+  (pending) until operator confirms.</li>
+</ul>
+
+</body>
+</html>

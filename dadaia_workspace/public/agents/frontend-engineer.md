@@ -16,6 +16,7 @@ tools:
 skills:
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
+  - dev-server-registry
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -44,6 +45,12 @@ input_contract:
       path: .dadaia/reports/{context}/frontend-engineer/{ts}-{task_id}-refactor.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - repos/**
+    - tests/**
+    - specs/assets/**
+    - .dadaia/reports/<ctx>/frontend-engineer/**
 ---
 
 # Frontend Engineer

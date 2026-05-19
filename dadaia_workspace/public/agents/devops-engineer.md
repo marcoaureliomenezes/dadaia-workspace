@@ -25,6 +25,7 @@ skills:
   - devops-gitflow-governance
   - devops-deploy-strategies
   - dadaia-task-manager
+  - dadaia-workspace-doctor
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -44,6 +45,12 @@ input_contract:
       path: .dadaia/reports/{context}/devops-engineer/{ts}-devops.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - .github/**
+    - dadaia_workspace/**
+    - services/**
+    - .dadaia/reports/<ctx>/devops-engineer/**
 ---
 
 # DevOps Engineer
