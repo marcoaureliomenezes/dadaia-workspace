@@ -252,7 +252,7 @@
 
 ### FE strand (frontend-engineer)
 
-- [-] **PR5-D2** — New file
+- [x] **PR5-D2** — New file
   `dadaia_workspace/features/panel/views/assets/js/runtime.js`: define
   `window.Runtime` with `get()` / `set(value)`; localStorage key exactly
   `dadaia-panel-runtime`; emit `dadaia:runtime-change` `CustomEvent` on set;
