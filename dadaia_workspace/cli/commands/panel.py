@@ -14,7 +14,10 @@ from dadaia_workspace import container
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.panel.auth import ensure_token
 from dadaia_workspace.features.panel.handler import make_handler_class
-from dadaia_workspace.features.panel.server import build_panel_http_server, serve_blocking
+from dadaia_workspace.features.panel.server import (
+    build_panel_http_server,
+    install_shutdown_handlers,
+)
 
 _LOOPBACK_ONLY: frozenset[str] = frozenset({"127.0.0.1"})
 
@@ -121,6 +124,12 @@ def panel(
         )
         raise typer.Exit(1) from None
 
+    # Install SIGINT/SIGTERM handlers BEFORE announcing readiness, otherwise
+    # a SIGINT arriving between the "Panel running at" print and the
+    # serve_forever call would hit Python's default handler and exit with
+    # code 130 (observed flake in CI; AC-9 requires clean exit 0).
+    install_shutdown_handlers(server)
+
     # Print URL with ?token=<value> for browser convenience (SPEC § Auth model).
     # SECURITY NOTE: the token appears in the URL only for the first browser load;
     # JS migrates it to a session cookie after the first fetch (P8 implementation).
@@ -131,5 +140,5 @@ def panel(
     if not no_open:
         webbrowser.open(f"http://{bind}:{port}/?token={token}")
 
-    serve_blocking(server)
+    server.serve_forever()
     sys.exit(0)
