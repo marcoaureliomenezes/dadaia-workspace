@@ -67,12 +67,12 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P3 — Bash removal from product-engineer + software-architect (W1)
 
-- [ ] AGT-r2-10 — Strip `Bash` from product-engineer agent frontmatter (software-engineer)
+- [-] AGT-r2-10 — Strip `Bash` from product-engineer agent frontmatter (software-engineer)
   - File: `dadaia_workspace/public/agents/product-engineer.md`.
   - Body changes: delegate `dadaia specs doctor`, `dadaia context show`, `cat ACTIVE.md` invocations to PM (operator surfaces results in dispatch).
   - Acceptance: `grep -E '^\s*-\s*Bash' dadaia_workspace/public/agents/product-engineer.md` → empty; body has no `bash` fenced shell-call paragraphs initiated by PE itself.
   - Depends: AGT-r2-05. Parallel with: P1, P2, P4.
-- [ ] AGT-r2-11 — Strip `Bash` from software-architect agent frontmatter (software-engineer)
+- [-] AGT-r2-11 — Strip `Bash` from software-architect agent frontmatter (software-engineer)
   - File: `dadaia_workspace/public/agents/software-architect.md`.
   - Acceptance: `grep -E '^\s*-\s*Bash' dadaia_workspace/public/agents/software-architect.md` → empty; R7 body audit confirms no shell calls.
   - Depends: AGT-r2-05.
