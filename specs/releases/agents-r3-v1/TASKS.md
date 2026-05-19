@@ -43,7 +43,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 
 ## Phase P1 — New agent personas + retire SE (serial after P0)
 
-- [ ] R3-06 — Author `software-engineer-python.md` persona (`product-engineer`)
+- [-] R3-06 — Author `software-engineer-python.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/software-engineer-python.md`.
   - Preconditions: SPEC §5 boundary row 1; retired SE body available as base.
   - Done criterion: file present with frontmatter (`tier: 3`, `model: claude-sonnet-4-6`, `paths.write_allowlist` per SPEC §5, `skills`, `input_contract` with `requires_inputs` + `produces_outputs`, `tools`); body has Scope / Forbidden / Workflow protocol / Skills / Report contract sections; reader parses without raising.
