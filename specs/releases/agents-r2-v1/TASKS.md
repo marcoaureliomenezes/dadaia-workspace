@@ -192,7 +192,7 @@ local with `pytest` and `dadaia specs doctor`).
 - [x] AGT-r2-31 — Inline `design-specialist-scope.md` into `design-specialist.md` body (software-engineer)
   - Acceptance: `## Scope and forbidden actions` section present; rule content preserved verbatim.
   - Depends: AGT-r2-05.
-- [-] AGT-r2-32 — Archive 4 deprecated rule files (software-engineer)
+- [x] AGT-r2-32 — Archive 4 deprecated rule files (software-engineer)
   - `git mv` to `specs/_archive/legacy-rules/<UTC>/`: `project-manager-scope.md`, `project-auditor-scope.md`, `design-specialist-scope.md`, `dadaia-workspace-dev-guardrail.md`.
   - Note: `dadaia-workspace-dev-guardrail.md` content folds into the P11a AGENTS.md rewrite (not into an agent).
   - Acceptance: `ls dadaia_workspace/public/rules/ | wc -l` → 2 (only `game-agents-coordination.md` + `game-developer-scope.md` remain); archived directory contains the 4 moved files.
