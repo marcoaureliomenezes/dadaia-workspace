@@ -11,6 +11,7 @@ description: >
   project's complexity — no over-engineering. Use when: building a new pipeline, debugging a failing
   job, auditing governance, improving an existing workflow, scanning all repos, or onboarding a
   project to CI/CD. Do NOT use for application code, specs, or business logic.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

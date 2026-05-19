@@ -5,6 +5,7 @@ description: >
   mecânicas, IA de inimigos, física de voo (JSBSim), balística e sistemas de gameplay
   em Phaser.js, Three.js, Godot, Unity e Unreal Engine 5. NÃO toca em design visual,
   áudio, mapas ou testes.
+tier: 3
 model: claude-sonnet-4-6
 color: orange
 tools:

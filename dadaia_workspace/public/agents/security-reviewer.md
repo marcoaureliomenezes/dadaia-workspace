@@ -5,6 +5,7 @@ description: >
   (pip-audit, npm audit, go list), IaC review. Findings include CWE id, file:line,
   redacted evidence, fix recommendation. NEVER writes fixes. NEVER runs exploits.
   NEVER logs raw secret values.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

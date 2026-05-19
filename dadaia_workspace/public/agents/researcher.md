@@ -5,6 +5,7 @@ description: >
   whitelisted web sources, synthesises findings with citations (file:line or URL on every
   claim). NEVER speculates without citation. NEVER writes source files. Use for deep-dives,
   version checks, API compat, OWASP lookups.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

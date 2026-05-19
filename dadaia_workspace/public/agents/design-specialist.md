@@ -5,6 +5,7 @@ description: >
   Mobbin, Refactoring UI, HIG, Material 3), emits design specs (tokens, typography,
   spacing, motion, a11y) plus ASCII sketches. NEVER writes HTML/CSS/JS/TSX. NEVER
   generates raster images.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

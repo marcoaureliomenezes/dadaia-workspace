@@ -6,6 +6,7 @@ description: >
   Gauntlet, captura PIE screenshots como evidência e emite quality reports HTML.
   Pesquisa ativamente bugs conhecidos e padrões de teste em UE5. NÃO escreve
   código de produção ou assets.
+tier: 3
 model: claude-opus-4-7
 color: yellow
 tools:

@@ -10,6 +10,7 @@ description: >
   interaction and the Playwright library for persistent test suites. NEVER writes
   application code or unit/integration tests. Use when E2E test implementation, test quality
   audit, or deploy validation is needed.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

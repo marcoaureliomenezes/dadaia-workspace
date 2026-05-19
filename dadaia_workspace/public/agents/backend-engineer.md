@@ -7,6 +7,7 @@ description: >
   owns unit + integration + load tests; qa-engineer owns E2E. Does NOT touch Python or Node tooling
   (software-engineer), frontend (frontend-engineer), game code (game-developer), GitHub Actions
   YAML (devops-engineer), or specs (product-engineer).
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

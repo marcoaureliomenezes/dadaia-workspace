@@ -5,6 +5,7 @@ description: >
   qa-engineer (E2E). Receives design specs from design-specialist; NEVER owns UX/UI
   judgment — that is design-specialist. Does NOT touch server code, Go backends, game
   code, CI YAML, or specs.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read
