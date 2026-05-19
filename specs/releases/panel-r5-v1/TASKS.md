@@ -109,7 +109,7 @@
 > `tests/unit/features/panel/`, `tests/integration/`,
 > `tests/fixtures/telemetry/`.
 
-- [ ] **PR5-B1** — Extend
+- [-] **PR5-B1** — Extend
   `dadaia_workspace/features/panel/views/api.py` with closure factories
   `render_api_sessions(service)` and `render_api_session_detail(service)`
   following the existing `render_api_agents_canonical` /
