@@ -242,7 +242,7 @@
 
 ### BE strand (software-engineer)
 
-- [ ] **PR5-D1** — Edit `dadaia_workspace/features/panel/views/api.py`:
+- [-] **PR5-D1** — Edit `dadaia_workspace/features/panel/views/api.py`:
   `render_api_agents_canonical` reads `runtime = qs.get("runtime", "claude")`
   and filters the response by `provider`. Same change to
   `render_api_workflows_list`. Default of `"claude"` preserves backward compat
