@@ -53,19 +53,19 @@
   the exact field path. Owner: software-engineer. Done criterion: script runs without
   error against the live jsonl files, prints the field path, and the path is
   documented as a comment at the top of `reader/claude.py` for future maintainers.
-- [-] **PR4-06** — Patch `dadaia_workspace/features/telemetry/reader/claude.py`:
+- [x] **PR4-06** — Patch `dadaia_workspace/features/telemetry/reader/claude.py`:
   extract `agent_name` from the field path discovered in PR4-05; pass it to the DAO
   on session insert/update. Owner: software-engineer. Done criterion: a synthetic
   jsonl event carrying a `subagent_type` produces a sessions row with `agent_name`
   matching the persona; no regression in existing reader tests.
-- [ ] **PR4-07** — Author unit test
+- [x] **PR4-07** — Author unit test
   `tests/unit/features/telemetry/reader/test_claude_reader.py::test_agent_name_extracted_from_dispatched_subagent`
   with a synthetic jsonl fixture (small ad-hoc fixture inline in the test or a
   fixture file under `tests/unit/features/telemetry/reader/fixtures/`). Owner:
   software-engineer. Done criterion: `pytest -q
   tests/unit/features/telemetry/reader/test_claude_reader.py::test_agent_name_extracted_from_dispatched_subagent`
   green.
-- [ ] **PR4-08** — Implement idempotent backfill. Add a CLI command (preferred under
+- [-] **PR4-08** — Implement idempotent backfill. Add a CLI command (preferred under
   `dadaia_workspace/cli/commands/telemetry.py` if a telemetry sub-CLI exists, else
   a one-off script under `scripts/`) that re-scans all jsonl files and UPDATEs the
   existing 50 NULL `sessions.agent_name` rows. **Hard requirement:** the operation
