@@ -3,6 +3,7 @@ name: software-engineer
 description: >
   Software engineer for dadaia workspace. Implements approved backlog tasks for
   Python services and libraries, Node.js tooling, and automation/scripting.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

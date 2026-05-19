@@ -3,6 +3,7 @@ name: frontend-engineer
 description: >
   Frontend engineer for dadaia workspace. Implements approved backlog tasks across
   HTML, CSS, browser JavaScript, TypeScript, and React.
+tier: 3
 model: claude-sonnet-4-6
 opencode_model: claude-sonnet-4-6
 tools:
