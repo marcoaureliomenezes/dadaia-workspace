@@ -40,12 +40,12 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P1 — Workflow trim 15 → 7 (W1, parallel with P2/P3/P4)
 
-- [-] AGT-r2-06 — `git mv` 8 deprecated workflows to `_archive/legacy-workflows/<UTC>/` (software-engineer)
+- [x] AGT-r2-06 — `git mv` 8 deprecated workflows to `_archive/legacy-workflows/<UTC>/` (software-engineer)
   - Files moved (from `dadaia_workspace/public/workflows/`): `game-spec-definition`, `architecture-review`, `tdd-cycle`, `bug-fix-fastlane`, `game-bugfix`, `security-patch`, `deploy-validation-only`, `design-validation` (all `*.workflow.md`).
   - Acceptance: `ls dadaia_workspace/public/workflows/*.workflow.md | wc -l` → 7; archived files reachable under `specs/_archive/legacy-workflows/<UTC>/`.
   - Depends: AGT-r2-05.
   - Parallel with: P2 (AGT-r2-08..09), P3 (AGT-r2-10..11), P4 (AGT-r2-12).
-- [-] AGT-r2-07 — Update workflow count fixture/test (software-engineer)
+- [x] AGT-r2-07 — Update workflow count fixture/test (software-engineer)
   - Files: `tests/unit/features/public/test_workflows.py` (or current schema test) + any panel test fixture asserting workflow count.
   - Acceptance: tests assert exactly 7 surviving workflows; `pytest -q tests/unit/features/public/test_workflows.py` passes; no broken refs to the 8 removed workflows in `dadaia-grill-me` skill body (`grep -rn "game-spec-definition\|architecture-review\|tdd-cycle\|bug-fix-fastlane\|game-bugfix\|security-patch\|deploy-validation-only\|design-validation" dadaia_workspace/public/skills/dadaia-grill-me/` → empty).
   - Depends: AGT-r2-06.
@@ -67,12 +67,12 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P3 — Bash removal from product-engineer + software-architect (W1)
 
-- [-] AGT-r2-10 — Strip `Bash` from product-engineer agent frontmatter (software-engineer)
+- [x] AGT-r2-10 — Strip `Bash` from product-engineer agent frontmatter (software-engineer)
   - File: `dadaia_workspace/public/agents/product-engineer.md`.
   - Body changes: delegate `dadaia specs doctor`, `dadaia context show`, `cat ACTIVE.md` invocations to PM (operator surfaces results in dispatch).
   - Acceptance: `grep -E '^\s*-\s*Bash' dadaia_workspace/public/agents/product-engineer.md` → empty; body has no `bash` fenced shell-call paragraphs initiated by PE itself.
   - Depends: AGT-r2-05. Parallel with: P1, P2, P4.
-- [-] AGT-r2-11 — Strip `Bash` from software-architect agent frontmatter (software-engineer)
+- [x] AGT-r2-11 — Strip `Bash` from software-architect agent frontmatter (software-engineer)
   - File: `dadaia_workspace/public/agents/software-architect.md`.
   - Acceptance: `grep -E '^\s*-\s*Bash' dadaia_workspace/public/agents/software-architect.md` → empty; R7 body audit confirms no shell calls.
   - Depends: AGT-r2-05.
