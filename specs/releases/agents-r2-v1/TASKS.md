@@ -54,7 +54,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P2 — PM Playbooks in `project-orchestration` skill (W1)
 
-- [-] AGT-r2-08 — Draft 8 PM playbook stubs (product-engineer)
+- [x] AGT-r2-08 — Draft 8 PM playbook stubs (product-engineer)
   - File: `dadaia_workspace/public/skills/project-orchestration/SKILL.md` — append `## PM Playbooks` section after the existing inventory.
   - One playbook per dropped workflow (≤ 20 lines each). `game-spec-definition` becomes a `scope=game` sub-entry of the `spec-refinement` playbook (per PLAN P2).
   - Acceptance: `grep -c '^### Playbook' dadaia_workspace/public/skills/project-orchestration/SKILL.md` → 8.

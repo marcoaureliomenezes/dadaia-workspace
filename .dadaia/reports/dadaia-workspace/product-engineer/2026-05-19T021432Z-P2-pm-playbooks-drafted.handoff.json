@@ -1,0 +1,20 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "product-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T02:14:32Z",
+  "release_id": "agents-r2-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/product-engineer/2026-05-19T021432Z-P2-pm-playbooks-drafted.html",
+    "content_hash": "sha256:82e37668ecda23c714c03b8565a9fd1110c744eb63391e0d29b87de1e5914b2a"
+  },
+  "findings": [
+    { "severity": "INFO", "summary": "8 PM playbook stubs appended to project-orchestration SKILL.md; grep acceptance returns 8." }
+  ],
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "software-engineer",
+    "input": "AGT-r2-09 — wrap playbooks into skill body + lint pass (dadaia public doctor skill checks). No external workflow file references these playbooks (R6 / NFR8)."
+  }
+}
