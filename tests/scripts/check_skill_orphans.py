@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Detect skill dirs unreferenced by any agent frontmatter. Exit 0=ok, 1=orphan."""
+import os
 import re
 import sys
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent.parent
+_ROOT = Path(os.environ.get("DADAIA_WORKSPACE_ROOT", Path(__file__).resolve().parent.parent.parent))
 _SKILLS_DIR = _ROOT / "dadaia_workspace" / "public" / "skills"
 _AGENTS_DIR = _ROOT / "dadaia_workspace" / "public" / "agents"
 
