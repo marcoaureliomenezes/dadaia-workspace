@@ -63,7 +63,7 @@ def test_env_var_branch_supersedes_fallback_dirs(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "sentinel-agent.md").write_text(
-        "---\nname: sentinel-agent\ndescription: should not appear\n---\n# Sentinel\n"
+        "---\nname: sentinel-agent\ntier: 3\ndescription: should not appear\n---\n# Sentinel\n"
     )
     # But DADAIA_AGENTS_DIR points at fixtures — sentinel must NOT appear
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
@@ -85,7 +85,7 @@ def test_agentic_branch_loads_agents(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "alpha.md").write_text(
-        "---\nname: alpha\ndescription: Alpha agent.\n---\n# Alpha\n"
+        "---\nname: alpha\ntier: 3\ndescription: Alpha agent.\n---\n# Alpha\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     assert any(a.id == "alpha" for a in agents)
@@ -99,13 +99,13 @@ def test_agentic_branch_preferred_over_claude(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "alpha.md").write_text(
-        "---\nname: alpha\ndescription: Alpha agent.\n---\n# Alpha\n"
+        "---\nname: alpha\ntier: 3\ndescription: Alpha agent.\n---\n# Alpha\n"
     )
     # Place a competing agent in .claude/agents/
     claude_dir = tmp_path / ".claude" / "agents"
     claude_dir.mkdir(parents=True)
     (claude_dir / "beta.md").write_text(
-        "---\nname: beta\ndescription: Beta agent.\n---\n# Beta\n"
+        "---\nname: beta\ntier: 3\ndescription: Beta agent.\n---\n# Beta\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     names = {a.id for a in agents}
@@ -126,7 +126,7 @@ def test_claude_branch_used_when_agentic_missing(
     claude_dir = tmp_path / ".claude" / "agents"
     claude_dir.mkdir(parents=True)
     (claude_dir / "gamma.md").write_text(
-        "---\nname: gamma\ndescription: Gamma agent.\n---\n# Gamma\n"
+        "---\nname: gamma\ntier: 3\ndescription: Gamma agent.\n---\n# Gamma\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     assert any(a.id == "gamma" for a in agents)
@@ -143,7 +143,7 @@ def test_claude_branch_used_when_agentic_empty(
     claude_dir = tmp_path / ".claude" / "agents"
     claude_dir.mkdir(parents=True)
     (claude_dir / "delta.md").write_text(
-        "---\nname: delta\ndescription: Delta agent.\n---\n# Delta\n"
+        "---\nname: delta\ntier: 3\ndescription: Delta agent.\n---\n# Delta\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     assert any(a.id == "delta" for a in agents)
@@ -205,7 +205,7 @@ def test_optional_fields_default_to_none_or_empty(
     agentic_dir.mkdir(parents=True)
     # Minimal agent: only name + description
     (agentic_dir / "minimal.md").write_text(
-        "---\nname: minimal\ndescription: Minimal agent.\n---\n# Minimal\n"
+        "---\nname: minimal\ntier: 3\ndescription: Minimal agent.\n---\n# Minimal\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     minimal = next((a for a in agents if a.id == "minimal"), None)
@@ -245,7 +245,7 @@ def test_missing_frontmatter_skipped(
         "# No Frontmatter\n\nThis file has no YAML frontmatter.\n"
     )
     (agentic_dir / "valid.md").write_text(
-        "---\nname: valid\ndescription: Valid agent.\n---\n# Valid\n"
+        "---\nname: valid\ntier: 3\ndescription: Valid agent.\n---\n# Valid\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     names = {a.id for a in agents}
@@ -262,7 +262,7 @@ def test_empty_frontmatter_skipped(
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "empty-fm.md").write_text("---\n---\n# Empty\n")
     (agentic_dir / "valid.md").write_text(
-        "---\nname: valid\ndescription: Valid agent.\n---\n# Valid\n"
+        "---\nname: valid\ntier: 3\ndescription: Valid agent.\n---\n# Valid\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     names = {a.id for a in agents}
@@ -311,7 +311,7 @@ def test_raw_to_dto_missing_name_returns_empty_agent_list(
     agentic_dir.mkdir(parents=True)
     # File has description but no name
     (agentic_dir / "nameless.md").write_text(
-        "---\ndescription: Agent without a name field.\n---\n# Nameless\n"
+        "---\ntier: 3\ndescription: Agent without a name field.\n---\n# Nameless\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     names = {a.id for a in agents}
@@ -340,7 +340,7 @@ def test_raw_to_dto_missing_description_defaults_empty(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "no-desc.md").write_text(
-        "---\nname: no-desc\n---\n# No description\n"
+        "---\nname: no-desc\ntier: 3\n---\n# No description\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "no-desc"), None)
@@ -356,7 +356,7 @@ def test_raw_to_dto_bad_max_turns_ignored(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "bad-turns.md").write_text(
-        "---\nname: bad-turns\ndescription: Bad maxTurns.\nmaxTurns: 'not-a-number'\n---\n# Bad\n"
+        "---\nname: bad-turns\ntier: 3\ndescription: Bad maxTurns.\nmaxTurns: 'not-a-number'\n---\n# Bad\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "bad-turns"), None)
@@ -372,7 +372,7 @@ def test_raw_to_dto_max_turns_snake_case(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "snake-turns.md").write_text(
-        "---\nname: snake-turns\ndescription: Snake case turns.\nmax_turns: 42\n---\n# Snake\n"
+        "---\nname: snake-turns\ntier: 3\ndescription: Snake case turns.\nmax_turns: 42\n---\n# Snake\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "snake-turns"), None)
@@ -388,7 +388,7 @@ def test_raw_to_dto_maxtturns_camelcase_priority(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "both-turns.md").write_text(
-        "---\nname: both-turns\ndescription: Both maxTurns and max_turns.\nmaxTurns: 10\nmax_turns: 99\n---\n# Both\n"
+        "---\nname: both-turns\ntier: 3\ndescription: Both maxTurns and max_turns.\nmaxTurns: 10\nmax_turns: 99\n---\n# Both\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "both-turns"), None)
@@ -404,7 +404,7 @@ def test_raw_to_dto_non_dict_input_contract_ignored(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "bad-contract.md").write_text(
-        "---\nname: bad-contract\ndescription: Bad contract.\ninput_contract: just-a-string\n---\n# Bad\n"
+        "---\nname: bad-contract\ntier: 3\ndescription: Bad contract.\ninput_contract: just-a-string\n---\n# Bad\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "bad-contract"), None)
@@ -420,7 +420,7 @@ def test_raw_to_dto_unicode_emoji_name(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "unicode-agent.md").write_text(
-        "---\nname: unicode-agent\ndescription: '🤖 Agente com emoji e português'\n---\n# Unicode\n",
+        "---\nname: unicode-agent\ntier: 3\ndescription: '🤖 Agente com emoji e português'\n---\n# Unicode\n",
         encoding="utf-8",
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
@@ -602,7 +602,7 @@ def test_paths_field_loaded_when_present(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "pathed-agent.md").write_text(
-        "---\nname: pathed-agent\ndescription: Agent with paths.\n"
+        "---\nname: pathed-agent\ntier: 3\ndescription: Agent with paths.\n"
         "paths:\n  write:\n    - repos/myrepo/src/\n  read:\n    - specs/\n"
         "---\n# Pathed\n"
     )
@@ -624,7 +624,7 @@ def test_paths_field_defaults_to_none_when_absent(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "no-paths.md").write_text(
-        "---\nname: no-paths\ndescription: No paths field.\n---\n# NoPaths\n"
+        "---\nname: no-paths\ntier: 3\ndescription: No paths field.\n---\n# NoPaths\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "no-paths"), None)
@@ -640,7 +640,7 @@ def test_paths_field_non_dict_defaults_to_none(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     (agentic_dir / "bad-paths.md").write_text(
-        "---\nname: bad-paths\ndescription: Bad paths.\npaths: just-a-string\n---\n# BadPaths\n"
+        "---\nname: bad-paths\ntier: 3\ndescription: Bad paths.\npaths: just-a-string\n---\n# BadPaths\n"
     )
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "bad-paths"), None)
@@ -724,6 +724,115 @@ def test_public_agents_count_is_16(
     assert len(agents) == 16, (
         f"Expected 16 public agents, got {len(agents)}: {[a.id for a in agents]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# PR4-14 — tier field tests
+# ---------------------------------------------------------------------------
+
+# Canonical tier mapping (per TASKS.md PR4-11)
+_TIER1_AGENTS = {"project-manager", "project-auditor"}
+_TIER2_AGENTS = {"product-engineer"}
+_TIER3_SAMPLE = {"software-engineer", "frontend-engineer", "qa-engineer"}
+
+
+def test_all_agents_have_tier_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every loaded public agent must have a tier ∈ {1, 2, 3}."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    assert len(agents) > 0, "Expected at least one public agent to be loaded"
+    for agent in agents:
+        assert agent.tier in {1, 2, 3}, (
+            f"Agent {agent.id!r} has invalid tier {agent.tier!r} — must be 1, 2, or 3"
+        )
+
+
+def test_tier_mapping_matches_topology(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PM + auditor → tier 1; product-engineer → tier 2; sample leaf agents → tier 3."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    by_id = {a.id: a for a in agents}
+
+    for aid in _TIER1_AGENTS:
+        assert aid in by_id, f"Expected T1 agent {aid!r} in public roster"
+        assert by_id[aid].tier == 1, (
+            f"Agent {aid!r} should be tier 1, got {by_id[aid].tier}"
+        )
+
+    for aid in _TIER2_AGENTS:
+        assert aid in by_id, f"Expected T2 agent {aid!r} in public roster"
+        assert by_id[aid].tier == 2, (
+            f"Agent {aid!r} should be tier 2, got {by_id[aid].tier}"
+        )
+
+    for aid in _TIER3_SAMPLE:
+        assert aid in by_id, f"Expected T3 agent {aid!r} in public roster"
+        assert by_id[aid].tier == 3, (
+            f"Agent {aid!r} should be tier 3, got {by_id[aid].tier}"
+        )
+
+
+def test_invalid_tier_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An agent file with a present-but-invalid 'tier' value raises MissingTierError.
+
+    Invalid means: non-integer (e.g. 'foo') or out-of-range (e.g. 5, 0).
+    The agent is skipped (not raised) when read_canonical_agents is called.
+    """
+    from dadaia_workspace.features.agents.reader import MissingTierError, _raw_to_dto
+
+    # Non-integer tier → raises
+    with pytest.raises(MissingTierError, match="non-integer 'tier'"):
+        _raw_to_dto({"name": "bad-tier-agent", "description": "Bad tier.", "tier": "foo"})
+
+    # Out-of-range tier → raises
+    with pytest.raises(MissingTierError, match="invalid 'tier' value"):
+        _raw_to_dto({"name": "bad-tier-agent", "description": "Bad tier.", "tier": 7})
+
+    # Via read_canonical_agents with invalid tier: must be skipped (not raised)
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
+    agentic_dir.mkdir(parents=True)
+    (agentic_dir / "bad-tier-agent.md").write_text(
+        "---\nname: bad-tier-agent\ndescription: Invalid tier.\ntier: 99\n---\n# BadTier\n"
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path)
+    names = {a.id for a in agents}
+    assert "bad-tier-agent" not in names
+
+
+def test_missing_tier_defaults_to_3(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An agent file with no 'tier' frontmatter field defaults to tier=3 with a warning.
+
+    This tolerates stale staged files that pre-date the tier field, while still
+    producing a stderr warning so the operator knows to add the field.
+    """
+    from dadaia_workspace.features.agents.reader import _raw_to_dto
+
+    # Direct call: missing tier → tier == 3 (no exception)
+    dto = _raw_to_dto({"name": "no-tier-agent", "description": "No tier."})
+    assert dto is not None
+    assert dto.tier == 3
+
+    # Via read_canonical_agents: agent is present (not skipped), tier == 3
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
+    agentic_dir.mkdir(parents=True)
+    (agentic_dir / "no-tier-agent.md").write_text(
+        "---\nname: no-tier-agent\ndescription: Missing tier.\n---\n# NoTier\n"
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path)
+    names = {a.id for a in agents}
+    assert "no-tier-agent" in names
+    agent = next(a for a in agents if a.id == "no-tier-agent")
+    assert agent.tier == 3
 
 
 def test_get_prompt_unreadable_file_raises_not_found(
