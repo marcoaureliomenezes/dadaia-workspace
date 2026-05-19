@@ -270,7 +270,7 @@ local with `pytest` and `dadaia specs doctor`).
   - Acceptance: 6 `[ok]` lines (3 consumers × 2 files); 1 `[skip]` for `dadaia-workspace`; nested `services/{AGENTS,CLAUDE}.md` untouched (byte-equal to pre-install snapshot).
   - Depends: AGT-r2-43.
   - Finding: none of `redacted-slug`, `redacted-slug`, `workflow-tools` have `.dadaia/agentic/` marker — installer correctly emits `[skip]` for all 7 repos under `repos/`. workspace-root pair verified: `root:AGENTS.md` + `root:CLAUDE.md` both SHA `930d26eb…` ✓. `dadaia-workspace` self-skipped (package_version=0.1.0) ✓. `services/{AGENTS,CLAUDE}.md` absent (operator has not yet authored them — FR10 manual step) ✓ non-interference.
-- [-] AGT-r2-45 — Open PR with description linking CLOSURE FR10 section (devops-engineer)
+- [x] AGT-r2-45 — Open PR with description linking CLOSURE FR10 section (devops-engineer)
   - PR body MUST link `specs/releases/agents-r2-v1/CLOSURE.md#operator-manual-migration` (R10).
   - Acceptance: PR exists; description contains the anchor link; CI green.
   - Depends: AGT-r2-44.
