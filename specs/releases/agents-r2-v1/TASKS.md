@@ -169,7 +169,7 @@ local with `pytest` and `dadaia specs doctor`).
   - Labels: `root:AGENTS.md`, `root:CLAUDE.md`, `repos/<slug>:AGENTS.md`, `repos/<slug>:CLAUDE.md`.
   - Acceptance: doctor harness produces exactly 4 lines per source; cross-checked by `tests/integration/test_public_doctor_parity.py` (added in this task).
   - Depends: AGT-r2-25.
-- [ ] AGT-r2-27 — Replace placeholder cases in `test_workspace_guardrail_pair.py` with real assertions (qa-engineer)
+- [-] AGT-r2-27 — Replace placeholder cases in `test_workspace_guardrail_pair.py` with real assertions (qa-engineer)
   - Cases: 4-target write (byte-identical, single SHA-256); no-`.dadaia/` skip; no-`.dadaia/agentic/` skip; self-slug `package_version` skip; nested-pair non-interference fixture (`services/CLAUDE.md` untouched); doctor 4-line output exactly.
   - Acceptance: `pytest -q tests/unit/features/public/test_workspace_guardrail_pair.py` green; ADR items 2, 4, 5 covered.
   - Depends: AGT-r2-26.
