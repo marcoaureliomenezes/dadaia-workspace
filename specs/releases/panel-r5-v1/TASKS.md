@@ -59,7 +59,7 @@
 > **Single-threaded.** Write set: `dadaia_workspace/features/telemetry/aggregator/`,
 > `tests/unit/features/telemetry/`. One `[-]` at a time across Phase A.
 
-- [ ] **PR5-A1** — Extend
+- [-] **PR5-A1** — Extend
   `dadaia_workspace/features/telemetry/aggregator/models.py` with three frozen
   dataclasses: `SessionRow` (fields per SPEC §FR1), `SessionDetail` (extends
   `SessionRow`), `SessionListResult` (wraps `sessions: list[SessionRow]` + query
