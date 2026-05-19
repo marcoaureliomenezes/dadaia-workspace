@@ -228,10 +228,25 @@ Both reports must have `<stem>.handoff.json` sidecars.
 
 **Dispatched by:** operator directly (primary entry point for all complex work).
 
-**Dispatches:** `product-engineer`, `software-engineer`, `backend-engineer`,
-`frontend-engineer`, `qa-engineer`, `software-architect`, `devops-engineer`,
-`code-reviewer`, `researcher`, `security-reviewer`, `design-specialist`,
-`game-developer`, `game-designer`, `game-tester`, `project-auditor`.
+**Dispatches (17 leaf specialists + curator):** `product-engineer`,
+`software-engineer-python`, `software-engineer-node`, `backend-engineer`,
+`frontend-engineer`, `data-engineer`, `data-analyst`, `ai-engineer`,
+`qa-engineer`, `software-architect`, `devops-engineer`, `code-reviewer`,
+`researcher`, `security-reviewer`, `design-specialist`, `game-developer`,
+`game-designer`, `game-tester`, `project-auditor`.
+
+Routing notes for the split implementer specialists:
+
+- When the task is a Python implementation (CLI surface, lib code under
+  `dadaia_workspace/`, tooling scripts), dispatch to `software-engineer-python`.
+- When the task is server-side Node tooling (e.g. opencode harness scripts,
+  Node CLIs outside the browser boundary), dispatch to `software-engineer-node`.
+- Browser-bound HTML/CSS/TS/React stays with `frontend-engineer`.
+- Data pipelines / Spark / Delta / Airflow / Kafka land with `data-engineer`.
+- BI dashboards / data viz land with `data-analyst` (paired with
+  `design-specialist` for visual review).
+- AI entities (skills, rules, workflows, commands, agents, hooks) land with
+  `ai-engineer`; persona-scope conflicts route to `product-engineer`.
 
 **Outputs flow to:** operator (final summary) + any agent that needs the dispatch report
 as an upstream input.

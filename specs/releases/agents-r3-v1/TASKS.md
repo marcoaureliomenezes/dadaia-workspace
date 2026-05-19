@@ -67,7 +67,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 
 ## Phase P2 — Dispatchers + Decision Authority Matrix (W1, parallel-safe with P3 — disjoint write sets)
 
-- [-] R3-12 — Update `project-manager.md` dispatch list (`product-engineer`)
+- [x] R3-12 — Update `project-manager.md` dispatch list (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/project-manager.md`.
   - Preconditions: P1 complete (5 new persona files exist).
   - Done criterion: dispatch line drops `software-engineer`; lists `software-engineer-python`, `software-engineer-node`, `data-engineer`, `data-analyst`, `ai-engineer` in the appropriate dispatch group; prose mentions of bare `software-engineer` rewritten or removed.
