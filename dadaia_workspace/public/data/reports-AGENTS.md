@@ -188,7 +188,7 @@ For `review` reports also include: `<h2>Stale and Dead Code</h2>`, `<h2>OOP &amp
 <!-- where the test files were written -->
 ```
 
-### software-engineer / frontend-engineer — green-phase report
+### software-engineer-python / software-engineer-node / frontend-engineer — green-phase report
 
 ```html
 <h2>All tests pass</h2>
@@ -199,7 +199,7 @@ For `review` reports also include: `<h2>Stale and Dead Code</h2>`, `<h2>OOP &amp
 <!-- what was changed and why -->
 ```
 
-### software-engineer / frontend-engineer — refactor report
+### software-engineer-python / software-engineer-node / frontend-engineer — refactor report
 
 ```html
 <h2>Refactor summary</h2>

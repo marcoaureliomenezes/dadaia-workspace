@@ -80,6 +80,12 @@ SCAN_DIRS_FOR_BARE_SE = (
 # Word boundary preceding to avoid matching e.g. `python-software-engineer`.
 BARE_SE_RE = re.compile(r"\bsoftware-engineer\b(?!-(?:python|node))")
 
+# Lines that intentionally mention the legacy `software-engineer` agent to
+# explain the split (in software-engineer-python.md / software-engineer-node.md
+# persona bodies) are allowlisted. The marker is the word "legacy" followed
+# by an optional backtick and then "software-engineer".
+LEGACY_SE_RE = re.compile(r"legacy\s+`?software-engineer`?")
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -210,7 +216,7 @@ def check_i5_no_bare_se(errors: list[str]) -> None:
             except (OSError, UnicodeDecodeError):
                 continue
             for line_no, line in enumerate(text.splitlines(), 1):
-                if BARE_SE_RE.search(line):
+                if BARE_SE_RE.search(line) and not LEGACY_SE_RE.search(line):
                     hits.append(
                         f"{path.relative_to(REPO_ROOT)}:{line_no}: {line.strip()}"
                     )
