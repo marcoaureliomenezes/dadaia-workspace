@@ -97,7 +97,7 @@ curator T2 accent vs. leaf T3 accent). The operator's complaint is resolved.
 | V7 | C7 — Selectors `[data-tier="1\|2\|3"]` present in CSS with 9 hex tokens | `grep -c 'agent-card\[data-tier=' dadaia_workspace/features/panel/views/assets/css/agents.py` | 3 selectors + 9 hex tokens (3 palettes × 3 tiers) at commit `583f0d9` per design spec at `.dadaia/reports/dadaia-workspace/design-specialist/2026-05-19T120000Z-panel-r4-card-tier-spec.html` |
 | V8 | C8 — Live screenshot shows visibly differentiated tier borders | qa-engineer Playwright capture | `.dadaia/reports/dadaia-workspace/qa-engineer/2026-05-19T071230Z-PR4-21-agents-tab-final.png` (referenced in PR4-21 report) |
 | V9 | C9 — Full pytest sweep no new failures | `pytest -q tests/` | `1348 passed, 2 failed` per PR4-21 smoke report; both failures pre-existing on `main` (`test_install_overwrites_existing_files_with_force`, `test_10_workspace_not_initialized_exits_3`); neither in this release's write set |
-| V10 | C10 — `dadaia public doctor` clean + `dadaia specs doctor` 0/0 | `dadaia public doctor` + `dadaia specs doctor` | `dadaia public doctor` 256 [ok] / 0 [drift] / 0 [fail] per devops report at `.dadaia/reports/dadaia-workspace/devops-engineer/2026-05-19T070247Z-P4-doctor-checkpoint.html`; `dadaia specs doctor` result appended below at PR4-26 |
+| V10 | C10 — `dadaia public doctor` clean + `dadaia specs doctor` 0/0 | `dadaia public doctor` + `dadaia specs doctor` | `dadaia public doctor` 256 [ok] / 0 [drift] / 0 [fail] per devops report at `.dadaia/reports/dadaia-workspace/devops-engineer/2026-05-19T070247Z-P4-doctor-checkpoint.html`; final `dadaia specs doctor` run at PR4-26 returns `[ok] /home/marco/workspace/dadaia/repos/dadaia-workspace/specs — 0 errors, 0 warnings.` |
 
 ---
 
