@@ -305,7 +305,7 @@
 > tasks below are explicit rebase guards: r5 must layer **on top**, never
 > clobber.
 
-- [ ] **PR5-D9** — Rebase guard for
+- [-] **PR5-D9** — Rebase guard for
   `dadaia_workspace/features/panel/views/assets/js/agents.js`. Confirm r4
   PR4-18's `data-tier="${agent.tier}"` element wiring is still present after
   PR5-D5's `dadaia:runtime-change` subscription + `?runtime=` refetch is
