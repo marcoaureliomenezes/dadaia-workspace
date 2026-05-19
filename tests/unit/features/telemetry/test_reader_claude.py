@@ -363,3 +363,241 @@ class TestMissingFile:
         result = read_session_file(path, dao, NOW_ISO)
         assert result.events_ingested == 0
         assert result.events_skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# PR4-07 — Dispatched subagent persona extraction tests
+# ---------------------------------------------------------------------------
+
+# Minimal jsonl fixture helpers for PR4-07 (inline synthetic data).
+# No real operator content — all values are fictional.
+
+
+def _make_dispatch_jsonl(
+    session_id: str,
+    subagent_type: str,
+) -> bytes:
+    """Build a synthetic jsonl file with:
+
+    1. An assistant event that dispatches a subagent (Agent tool_use with
+       subagent_type = *subagent_type*).
+    2. An assistant event with usage (so 1 event row is inserted).
+
+    The dispatch event carries the subagent persona.  The usage event
+    carries usage tokens that satisfy the event-insertion path.
+    """
+    dispatch_event = json.dumps(
+        {
+            "sessionId": session_id,
+            "timestamp": "2026-05-19T08:00:00.000Z",
+            "type": "assistant",
+            "uuid": f"uuid-dispatch-{session_id}",
+            "cwd": "/home/operator/workspace",
+            "gitBranch": "main",
+            "isSidechain": False,
+            "slug": "",
+            "entrypoint": "cli",
+            "agentName": None,
+            "aiTitle": None,
+            "message": {
+                "role": "assistant",
+                "model": "claude-opus-4-7",
+                # content carries the Agent tool_use; allowlist will strip this
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_test_001",
+                        "name": "Agent",
+                        "input": {
+                            "subagent_type": subagent_type,
+                            "description": "Implement the feature",
+                            "prompt": "Please implement...",
+                        },
+                    }
+                ],
+                "usage": {
+                    "input_tokens": 800,
+                    "output_tokens": 50,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                },
+            },
+        }
+    )
+
+    usage_event = json.dumps(
+        {
+            "sessionId": session_id,
+            "timestamp": "2026-05-19T08:01:00.000Z",
+            "type": "assistant",
+            "uuid": f"uuid-usage-{session_id}",
+            "cwd": "/home/operator/workspace",
+            "gitBranch": "main",
+            "isSidechain": False,
+            "slug": "",
+            "entrypoint": "cli",
+            "agentName": None,
+            "aiTitle": None,
+            "message": {
+                "model": "claude-opus-4-7",
+                "usage": {
+                    "input_tokens": 1200,
+                    "output_tokens": 400,
+                    "cache_creation_input_tokens": 300,
+                    "cache_read_input_tokens": 150,
+                },
+            },
+        }
+    )
+
+    return (dispatch_event + "\n" + usage_event + "\n").encode()
+
+
+def _make_top_level_jsonl(session_id: str) -> bytes:
+    """Build a synthetic jsonl file with only top-level (non-dispatching) events.
+
+    Contains one agent-name event (project slug) and one assistant+usage event.
+    No Agent tool_use → agent_name should remain None.
+    """
+    agent_name_event = json.dumps(
+        {
+            "sessionId": session_id,
+            "timestamp": "2026-05-19T09:00:00.000Z",
+            "type": "agent-name",
+            "uuid": f"uuid-agentname-{session_id}",
+            "cwd": "/home/operator/workspace",
+            "gitBranch": "main",
+            "isSidechain": False,
+            "slug": "",
+            "entrypoint": "cli",
+            "agentName": None,
+            "aiTitle": None,
+        }
+    )
+
+    usage_event = json.dumps(
+        {
+            "sessionId": session_id,
+            "timestamp": "2026-05-19T09:01:00.000Z",
+            "type": "assistant",
+            "uuid": f"uuid-top-usage-{session_id}",
+            "cwd": "/home/operator/workspace",
+            "gitBranch": "main",
+            "isSidechain": False,
+            "slug": "",
+            "entrypoint": "cli",
+            "agentName": None,
+            "aiTitle": None,
+            "message": {
+                "model": "claude-opus-4-7",
+                "usage": {
+                    "input_tokens": 500,
+                    "output_tokens": 200,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                },
+            },
+        }
+    )
+
+    return (agent_name_event + "\n" + usage_event + "\n").encode()
+
+
+class TestDispatchedSubagentExtraction:
+    """PR4-07 — Agent name extracted from dispatched subagent persona."""
+
+    def test_agent_name_extracted_from_dispatched_subagent(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Synthetic jsonl with an Agent tool_use carrying subagent_type='software-engineer'
+        must yield a session row where agent_name == 'software-engineer'.
+
+        Acceptance criterion: C2 (FR1).
+        """
+        dao = _make_dao(tmp_path)
+        session_id = "dispatch-session-se-001"
+        target = tmp_path / "dispatch_se.jsonl"
+        target.write_bytes(_make_dispatch_jsonl(session_id, "software-engineer"))
+
+        result = read_session_file(target, dao, NOW_ISO)
+
+        assert result.events_ingested >= 1, (
+            f"Expected at least 1 ingested event, got {result.events_ingested}"
+        )
+
+        session_row = _get_session(dao, session_id)
+        assert session_row is not None, f"Session '{session_id}' not found in DB"
+        assert session_row["agent_name"] == "software-engineer", (
+            f"Expected agent_name='software-engineer', got {session_row['agent_name']!r}"
+        )
+
+    def test_agent_name_extracted_various_subagent_types(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Verify extraction works for multiple distinct canonical agent names."""
+        dao = _make_dao(tmp_path)
+
+        cases = [
+            ("dispatch-session-pm-001", "project-manager"),
+            ("dispatch-session-pe-001", "product-engineer"),
+            ("dispatch-session-qa-001", "qa-engineer"),
+        ]
+
+        for session_id, agent_type in cases:
+            target = tmp_path / f"dispatch_{agent_type.replace('-', '_')}.jsonl"
+            target.write_bytes(_make_dispatch_jsonl(session_id, agent_type))
+            read_session_file(target, dao, NOW_ISO)
+
+        for session_id, agent_type in cases:
+            row = _get_session(dao, session_id)
+            assert row is not None, f"Session '{session_id}' missing"
+            assert row["agent_name"] == agent_type, (
+                f"For {agent_type}: expected agent_name={agent_type!r}, "
+                f"got {row['agent_name']!r}"
+            )
+
+    def test_explore_plan_subagent_types_not_used_as_agent_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Non-canonical subtypes 'Explore' and 'Plan' must NOT populate agent_name.
+
+        These are internal Claude Code built-ins, not persona agents.
+        """
+        dao = _make_dao(tmp_path)
+
+        for non_canonical in ("Explore", "Plan"):
+            sid = f"dispatch-session-{non_canonical.lower()}-001"
+            target = tmp_path / f"dispatch_{non_canonical.lower()}.jsonl"
+            target.write_bytes(_make_dispatch_jsonl(sid, non_canonical))
+            read_session_file(target, dao, NOW_ISO)
+
+            row = _get_session(dao, sid)
+            assert row is not None, f"Session '{sid}' missing"
+            assert row["agent_name"] is None, (
+                f"Expected agent_name=None for subagent_type={non_canonical!r}, "
+                f"got {row['agent_name']!r}"
+            )
+
+    def test_top_level_session_has_null_agent_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Top-level Claude events with no Agent tool_use → agent_name must be None.
+
+        The agent-name event carries a project slug (not a persona), and
+        agent_name=None is intentional for operator/main-Claude sessions.
+
+        Acceptance criterion: PR4-07 second case.
+        """
+        dao = _make_dao(tmp_path)
+        session_id = "toplevel-session-001"
+        target = tmp_path / "toplevel.jsonl"
+        target.write_bytes(_make_top_level_jsonl(session_id))
+
+        read_session_file(target, dao, NOW_ISO)
+
+        row = _get_session(dao, session_id)
+        assert row is not None, f"Session '{session_id}' missing"
+        assert row["agent_name"] is None, (
+            f"Expected agent_name=None for top-level session, "
+            f"got {row['agent_name']!r}"
+        )
