@@ -74,7 +74,7 @@
   and `agent_summary` queries. Owner: software-engineer. Done criterion: both
   methods callable from an instance; `list_sessions` honors `project` and
   `limit`; `get_session` returns `None` for unknown ids.
-- [-] **PR5-A3** — Create new file
+- [x] **PR5-A3** — Create new file
   `dadaia_workspace/features/telemetry/aggregator/runtimes.py` defining the
   `RuntimeAdapter` protocol with `enrich_row`, `enrich_detail`, and
   `liveness(session_id, cwd)`. Add stub `ClaudeRuntimeAdapter` and
