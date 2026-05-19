@@ -6,6 +6,7 @@ description: >
   Gauntlet, captura PIE screenshots como evidência e emite quality reports HTML.
   Pesquisa ativamente bugs conhecidos e padrões de teste em UE5. NÃO escreve
   código de produção ou assets.
+tier: 3
 model: claude-opus-4-7
 color: yellow
 skills:
@@ -31,6 +32,10 @@ input_contract:
       path: .dadaia/reports/{context}/game-tester/{ts}-quality.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - repos/redacted-slug/**
+    - .dadaia/reports/<ctx>/game-tester/**
 ---
 
 # Game Tester

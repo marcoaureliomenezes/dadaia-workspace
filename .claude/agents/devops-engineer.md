@@ -11,6 +11,7 @@ description: >
   project's complexity — no over-engineering. Use when: building a new pipeline, debugging a failing
   job, auditing governance, improving an existing workflow, scanning all repos, or onboarding a
   project to CI/CD. Do NOT use for application code, specs, or business logic.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read
@@ -25,6 +26,7 @@ skills:
   - devops-gitflow-governance
   - devops-deploy-strategies
   - dadaia-task-manager
+  - dadaia-workspace-doctor
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -44,6 +46,12 @@ input_contract:
       path: .dadaia/reports/{context}/devops-engineer/{ts}-devops.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - .github/**
+    - dadaia_workspace/**
+    - services/**
+    - .dadaia/reports/<ctx>/devops-engineer/**
 ---
 
 # DevOps Engineer
@@ -561,7 +569,7 @@ When creating a new pipeline, always output this before the workflow YAML:
 | Request | Right agent |
 |---|---|
 | Application code | **product-engineer** |
-| Bug in app logic | **software-engineer** |
+| Bug in app logic | **software-engineer-python or software-engineer-node** (depends on language) |
 | App architecture | **software-architect** |
 | CI/CD, GitHub Actions, deployments | **devops-engineer** ← here |
 | Branch protection, CODEOWNERS, PR governance | **devops-engineer** ← here |
@@ -572,7 +580,7 @@ When creating a new pipeline, always output this before the workflow YAML:
 ```
 [SCOPE ERROR] I am the devops-engineer — pipelines, deployments, repository governance.
 For application code: use product-engineer.
-For bug fixes: use software-engineer.
+For bug fixes: use software-engineer-python or software-engineer-node (depends on language).
 ```
 
 ---

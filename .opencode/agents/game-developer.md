@@ -5,6 +5,7 @@ description: >
   mecânicas, IA de inimigos, física de voo (JSBSim), balística e sistemas de gameplay
   em Phaser.js, Three.js, Godot, Unity e Unreal Engine 5. NÃO toca em design visual,
   áudio, mapas ou testes.
+tier: 3
 model: claude-sonnet-4-6
 color: orange
 skills:
@@ -37,6 +38,10 @@ input_contract:
       path: .dadaia/reports/{context}/game-developer/{ts}-impl.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - repos/redacted-slug/**
+    - .dadaia/reports/<ctx>/game-developer/**
 ---
 
 # Game Developer
@@ -175,7 +180,7 @@ Data: <ISO 8601>
 ## Proibições absolutas
 
 - Infraestrutura, Docker, CI/CD — use `devops-engineer`
-- APIs de negócio, pipelines de dados — use `software-engineer`
+- APIs de negócio, pipelines de dados — use `software-engineer-python` para APIs ou `data-engineer` para pipelines
 - Specs e planos — use `product-engineer`
 - Testes E2E fora do domínio de jogos — use `qa-engineer`
 - Qualquer arquivo fora de `repos/redacted-slug/`
