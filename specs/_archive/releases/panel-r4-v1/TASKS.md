@@ -218,7 +218,7 @@
   (ACTIVE.md canonicity; SPEC/PLAN/TASKS/CLOSURE Aprovado markers; memory atomicity;
   CLOSURE evidence triples). Owner: product-engineer. Done criterion: doctor output
   (or manual review note) attached to CLOSURE.md `## Validations`.
-- [ ] **PR4-27** — Archive the release and reset ACTIVE.md.
+- [x] **PR4-27** — Archive the release and reset ACTIVE.md.
   Commands: `git mv specs/releases/panel-r4-v1
   specs/_archive/releases/panel-r4-v1`; then edit `specs/releases/ACTIVE.md` to
   `release: none` / `phase: none`. Owner: product-engineer. Done criterion: release
