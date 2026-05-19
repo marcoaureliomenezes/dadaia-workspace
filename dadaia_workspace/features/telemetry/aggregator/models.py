@@ -8,6 +8,7 @@ the privacy invariant (D-AM-03, T1) is enforced here.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal, Optional
 
 
 @dataclass(frozen=True)
@@ -92,3 +93,72 @@ class WorkflowListResult:
     generated_at: str
     source_hint: str
     workflows: list[WorkflowSummary]
+
+
+# ---------------------------------------------------------------------------
+# Session-level dataclasses (panel-r5-v1 FR1)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SessionRow:
+    """One session row for the Sessions panel tab.
+
+    Fields per SPEC §FR1.  No content fields — privacy invariant enforced.
+
+    context_size_tokens: input + cache_creation + cache_read tokens from the
+        most recent assistant event for the session (the working set the model
+        received; naked input_tokens is misleading once cache warms).
+    message_count: COUNT(events) for the session — rendered as "AI Turns".
+    cumulative_cost_usd: None when cost is not tracked (Codex).
+    cost_known: False for Codex rows or when cost cannot be computed.
+    status: "active" | "idle" | "ended" — resolved by the RuntimeAdapter.
+    agent_name: None for pre-backfill historical rows.
+    ai_title: operator-generated label for the session, None when absent.
+    """
+
+    session_id: str
+    runtime: str
+    project: Optional[str]
+    cwd: Optional[str]
+    model: Optional[str]
+    started_at: str
+    last_activity_at: str
+    message_count: int
+    context_size_tokens: int
+    cumulative_cost_usd: Optional[float]
+    cost_known: bool
+    status: Literal["active", "idle", "ended"]
+    agent_name: Optional[str]
+    ai_title: Optional[str]
+
+
+@dataclass(frozen=True)
+class SessionDetail(SessionRow):
+    """Enriched detail for a single session — extends SessionRow.
+
+    Adds a summary of recent event references (timestamps only; no content).
+    event_count mirrors message_count for consumers that need the raw integer.
+    """
+
+    event_timestamps: tuple[str, ...]  # ISO timestamps of all events, asc
+
+
+@dataclass(frozen=True)
+class SessionListResult:
+    """Top-level response for list_sessions().
+
+    sessions: ordered by last_activity_at DESC.
+    runtime: the runtime filter that was applied.
+    project: the project filter that was applied (None = no filter).
+    limit: the limit that was applied (None = no limit).
+    generated_at: ISO UTC timestamp when the result was built.
+    total_count: total rows before limit was applied.
+    """
+
+    sessions: list[SessionRow]
+    runtime: str
+    project: Optional[str]
+    limit: Optional[int]
+    generated_at: str
+    total_count: int
