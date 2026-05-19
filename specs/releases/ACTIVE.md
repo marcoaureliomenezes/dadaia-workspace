@@ -1,2 +1,2 @@
-release: none
-phase: none
+release: panel-r4-v1
+phase: TASKS
