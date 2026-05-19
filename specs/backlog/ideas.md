@@ -11,7 +11,7 @@ implementação.
 
 ## Ideias atuais
 
-(vazio — popular conforme operador ou agentes especialistas tragam ideias)
+- per-projection-opt-out-marker — Allow a consumer repo that already carries `.dadaia/agentic/` (and therefore normally receives the workspace `AGENTS.md`+`CLAUDE.md` pair via `_install_workspace_guardrail_pair`) to explicitly refuse the pair via an opt-out marker file (working name: `.dadaia/agentic/.no-guardrail-pair`). The installer would honour the marker by emitting `[skip] <repo> (opt-out marker present)` and writing nothing. Context: `_archive/releases/agents-r2-v1/PLAN.md §8.7`; deferred from r2 as too speculative to justify the contract complexity until at least one consumer requests it.
 
 ###############################################################################################
 ###############################################################################################

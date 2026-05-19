@@ -299,12 +299,12 @@ local with `pytest` and `dadaia specs doctor`).
   - `product/agent-orchestration.html`: 16 agents + 7 workflows + 8 PM playbooks + path-scope gate + 2 rules + Option C dual-name projection note.
   - Acceptance: both HTMLs render with current state only; no history sections; `dadaia specs doctor` clean.
   - Depends: AGT-r2-48.
-- [-] AGT-r2-51 — Record FR9 decision + backlog returns (product-engineer)
+- [x] AGT-r2-51 — Record FR9 decision + backlog returns (product-engineer)
   - `CLOSURE.md` `## Backlog returns` adds: `--repos-only` / `--workspace-only` flags → `specs/backlog/candidates.md`; per-projection opt-out marker → `specs/backlog/ideas.md`.
   - Files written: `specs/backlog/candidates.md` (append), `specs/backlog/ideas.md` (append).
   - Acceptance: both backlog files contain the new bullets; CLOSURE links them.
   - Depends: AGT-r2-48.
-- [ ] AGT-r2-52 — Final `dadaia specs doctor` → 0/0 (product-engineer)
+- [-] AGT-r2-52 — Final `dadaia specs doctor` → 0/0 (product-engineer)
   - Acceptance: `dadaia specs doctor` exits clean (0 errors, 0 warnings); output captured into the PE report.
   - Depends: AGT-r2-49, AGT-r2-50, AGT-r2-51.
 - [ ] AGT-r2-53 — Archive release + reset `ACTIVE.md` (product-engineer)
