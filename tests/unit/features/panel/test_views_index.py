@@ -449,10 +449,14 @@ def test_panel_js_agents_uses_authed_fetch() -> None:
 
 
 def test_panel_js_workflows_uses_authed_fetch() -> None:
-    """panel-defects Bug 3+4: Workflows.load must use authedFetch."""
+    """panel-defects Bug 3+4 (updated PR5-D6): Workflows.load must use authedFetch.
+
+    PR5-D6 (runtime retrofit): URL now includes ?runtime= query param so the
+    fetch reads authedFetch('/api/workflows?runtime=' + ...).
+    """
     from dadaia_workspace.features.panel.views._assets import PANEL_JS
 
-    assert "authedFetch('/api/workflows')" in PANEL_JS
+    assert "authedFetch('/api/workflows?runtime='" in PANEL_JS
 
 
 def test_panel_js_sessions_uses_authed_fetch() -> None:

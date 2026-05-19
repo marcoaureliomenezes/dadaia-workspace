@@ -482,6 +482,15 @@
     }
   }
 
+  // ── Runtime helper ─────────────────────────────────────────────────────────────
+  // Phase D ships window.Runtime; fall back to 'claude' if not yet available.
+  function getRuntime() {
+    if (window.Runtime && typeof window.Runtime.get === 'function') {
+      return window.Runtime.get();
+    }
+    return 'claude';
+  }
+
   // ── Load (card grid) ───────────────────────────────────────────────────────────
 
   function load() {
@@ -492,7 +501,7 @@
     grid.setAttribute('aria-busy', 'true');
     grid.innerHTML = renderSkeletons(6);
 
-    window.authedFetch('/api/workflows')
+    window.authedFetch('/api/workflows?runtime=' + encodeURIComponent(getRuntime()))
       .then(function (r) {
         if (!r.ok) {
           renderError(r.status);
@@ -551,6 +560,21 @@
 
   // ── Escape key listener (document-level, guards inDetailView flag) ─────────────
   document.addEventListener('keydown', onEscapeKey);
+
+  // ── Runtime-change subscription (PR5-D6) ─────────────────────────────────────
+  // When the operator switches runtimes, drop cached grid HTML and refetch so the
+  // Workflows tab reflects the newly selected runtime's workflows.
+
+  document.addEventListener('dadaia:runtime-change', function () {
+    loaded = false;
+    _cachedGrid = '';
+    inDetailView = false;
+    // Only refetch if the Workflows section is currently active
+    var section = document.getElementById('section-workflows');
+    if (section && section.classList.contains('active')) {
+      load();
+    }
+  });
 
   // ── Public API ─────────────────────────────────────────────────────────────────
 
