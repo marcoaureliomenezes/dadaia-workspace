@@ -11,21 +11,27 @@ applyTo: ".dadaia/reports/**"
 
 ## Agent Inventory
 
-All 16 agents active in this workspace. Column "Dispatches to" lists agents this agent
-commonly calls as sub-agents. Column "Do NOT call when" lists conditions that make the
-agent unsuitable.
+All 20 agents active in this workspace (post `agents-r3-v1`: 2 dispatchers T1 +
+1 curator T2 + 17 leaf specialists T3). Column "Dispatches to" lists agents this
+agent commonly calls as sub-agents. Column "Do NOT call when" lists conditions
+that make the agent unsuitable.
 
 | Agent | Primary Mission | Dispatches to | Do NOT call when |
 |---|---|---|---|
 | `product-engineer` | Own spec lifecycle; write SPEC, PLAN, TASKS, CLOSURE; guardian of `specs/` | software-architect, project-manager | Implementation is already DONE; task is code-level only |
-| `software-architect` | Architecture decisions, ADRs, pattern selection, cross-repo dependency mapping | software-engineer, backend-engineer | Task is pure feature impl without architectural trade-off |
-| `software-engineer` | Python/Node.js implementation, unit tests, integration tests, deploy trigger | qa-engineer | Task involves Go backend, game code, or frontend |
+| `software-architect` | Architecture decisions, ADRs, pattern selection, cross-repo dependency mapping | software-engineer-python, software-engineer-node, backend-engineer | Task is pure feature impl without architectural trade-off |
+| `software-engineer-python` | Python implementation (CLI, lib, tooling); unit + integration tests; deploy trigger | qa-engineer | Task is Node tooling, Go backend, frontend, game code, data pipeline, BI, or AI entities |
+| `software-engineer-node` | Server-side Node/TS tooling (CLIs, harnesses, opencode glue); unit + integration tests | qa-engineer | Task is Python implementation, browser-bound frontend, Go backend, game code, data pipeline, BI, or AI entities |
 | `frontend-engineer` | Browser HTML/CSS/TS/React, design-system token consumption | design-specialist, qa-engineer | Task is backend, CLI, or server-side only |
-| `backend-engineer` | Go HTTP services, production DB integrations, high-perf infra | software-engineer | Task is Python tooling or Node.js scripts |
-| `qa-engineer` | E2E test strategy, acceptance criteria, E2E test files | — | Unit or integration tests only; those belong to software-engineer |
-| `devops-engineer` | GitHub Actions YAML, CI/CD pipelines, container orchestration | software-engineer | No CI change is in scope |
-| `security-reviewer` | OWASP audit, CVE scanning, STRIDE threat model, IaC security review | software-engineer, devops-engineer | No security-relevant change; pure docs task |
+| `backend-engineer` | Go HTTP services, production DB integrations, high-perf infra | software-engineer-python, software-engineer-node | Task is Python/Node tooling or scripting |
+| `data-engineer` | Data pipelines (Spark, Airflow, Kafka), Delta/Iceberg/Parquet, DABs, ETL/ELT | software-engineer-python (for tooling glue) | Task is BI dashboards, browser UI, or non-data backend |
+| `data-analyst` | BI dashboards, data visualisation, KPI specs; paired with `design-specialist` for visual review | — | Task is data-pipeline authorship (data-engineer territory) or production code |
+| `ai-engineer` | AI entities (skills, rules, workflows, commands, agents, hooks); prompt-efficiency analysis | — | Task is Python or Node implementation, specs, or game code |
+| `qa-engineer` | E2E test strategy, acceptance criteria, E2E test files | — | Unit or integration tests only; those belong to software-engineer-python / software-engineer-node |
+| `devops-engineer` | GitHub Actions YAML, CI/CD pipelines, container orchestration | software-engineer-python | No CI change is in scope |
+| `security-reviewer` | OWASP audit, CVE scanning, STRIDE threat model, IaC security review | software-engineer-python, software-engineer-node, devops-engineer | No security-relevant change; pure docs task |
 | `code-reviewer` | PR architecture review, SOLID/pattern audit, complexity report | — | No PR or branch diff to review |
+| `researcher` | External-source investigation against whitelisted sources | — | Task can be answered by reading local specs/code |
 | `project-manager` | Cross-agent dispatch, workflow orchestration, conflict mediation | any agent | Single-agent task; no cross-domain coordination needed |
 | `project-auditor` | Memory↔implementation drift, compliance scoring, dead-code detection | project-manager | Active release is mid-implementation (wait for CLOSURE phase) |
 | `design-specialist` | UX/UI review, WCAG audit, design spec authoring, visual hierarchy analysis | frontend-engineer | Task is purely functional with no UI surface |
@@ -104,13 +110,17 @@ for the dadaia workspace. For game-domain disputes, see `game-agents-coordinatio
 | Domain | Primary Authority | May Object (with evidence) | Tie-breaker |
 |---|---|---|---|
 | Feature scope, SPEC, TASKS | **product-engineer** | all agents | product-engineer (final word) |
-| Architecture, ADRs, patterns | **software-architect** | software-engineer, backend-engineer | software-architect |
-| Python/Node implementation | **software-engineer** | software-architect | software-architect |
-| Go backend, prod DB | **backend-engineer** | software-engineer, software-architect | software-architect |
+| Architecture, ADRs, patterns | **software-architect** | software-engineer-python, software-engineer-node, backend-engineer | software-architect |
+| Python implementation | **software-engineer-python** | software-architect, security-reviewer | software-architect |
+| Node implementation (server-side) | **software-engineer-node** | software-architect, security-reviewer, frontend-engineer (if browser boundary contested) | software-architect |
+| Data engineering / pipelines / DABs / Delta | **data-engineer** | software-architect, backend-engineer (if pipeline feeds Go service) | software-architect |
+| BI / dashboards / data viz | **data-analyst** | design-specialist (visual), data-engineer (source-data correctness) | design-specialist on visual; data-engineer on data |
+| AI entities (skills, rules, workflows, commands, agents, hooks) | **ai-engineer** | product-engineer (when persona scope conflicts with SPEC authority) | product-engineer |
+| Go backend, prod DB | **backend-engineer** | software-engineer-python, software-engineer-node, software-architect | software-architect |
 | Browser UI, design tokens | **frontend-engineer** | design-specialist | design-specialist |
-| Security posture | **security-reviewer** | software-engineer, devops-engineer | security-reviewer |
-| CI/CD, pipelines | **devops-engineer** | software-engineer | devops-engineer |
-| E2E acceptance criteria | **qa-engineer** | software-engineer | qa-engineer |
+| Security posture | **security-reviewer** | software-engineer-python, software-engineer-node, devops-engineer | security-reviewer |
+| CI/CD, pipelines | **devops-engineer** | software-engineer-python | devops-engineer |
+| E2E acceptance criteria | **qa-engineer** | software-engineer-python, software-engineer-node | qa-engineer |
 | UX/UI design spec | **design-specialist** | frontend-engineer | design-specialist |
 | Compliance / drift scoring | **project-auditor** | product-engineer | product-engineer |
 | Orchestration, mediation | **project-manager** | any | operator via `dadaia-grill-me` |
@@ -211,8 +221,8 @@ dadaia public install --target all  # propagate staged edits to all contexts
 
 > **R3 — PM-only invocation:** These playbooks are dispatched only by
 > `project-manager`; no leaf-agent invokes them directly. Leaf agents (e.g.
-> `software-engineer`, `qa-engineer`) receive task prompts from PM — they never
-> select or trigger a playbook themselves.
+> `software-engineer-python`, `software-engineer-node`, `qa-engineer`) receive
+> task prompts from PM — they never select or trigger a playbook themselves.
 
 Playbooks consolidate the 8 workflow files removed in `agents-r2-v1` (P1).
 No corresponding `*.workflow.md` file exists under
@@ -239,8 +249,11 @@ the input contract above, then mediates if the playbook branches.
    `.dadaia/reports/<context>/software-architect/<UTC>-adr-<slug>.html`.
 3. PM forwards ADR to `product-engineer` for SPEC integration (if release-bound)
    or to `backlog/candidates.md` (if speculative).
-4. If ADR proposes migration: dispatch `software-engineer` (or `backend-engineer`
-   for Go surfaces) for impl planning; CLOSURE updates `memory/architecture.html`.
+4. If ADR proposes migration: dispatch the right implementer for the surface —
+   `software-engineer-python` for Python migrations, `software-engineer-node` for
+   Node tooling migrations, `backend-engineer` for Go surfaces, `data-engineer`
+   for data-pipeline migrations — for impl planning; CLOSURE updates
+   `memory/architecture.html`.
 
 **Stop conditions:** architect declines (out-of-scope) → backlog. Two valid
 options remain → escalate to operator via `dadaia-grill-me`.
@@ -249,7 +262,8 @@ options remain → escalate to operator via `dadaia-grill-me`.
 
 **Trigger:** feature task with non-trivial logic where red-green-refactor is mandated.
 
-**Entry:** `software-engineer` (or `backend-engineer` for Go).
+**Entry:** `software-engineer-python` (Python tasks), `software-engineer-node`
+(Node tooling tasks), or `backend-engineer` (Go).
 
 **Steps:**
 1. PM confirms TASKS.md item is `[-]` and dispatches engineer with TDD intent
@@ -266,13 +280,16 @@ options remain → escalate to operator via `dadaia-grill-me`.
 
 **Trigger:** reproducible defect with narrow blast radius; no SPEC change needed.
 
-**Entry:** `software-engineer`.
+**Entry:** `software-engineer-python` (Python surface) or `software-engineer-node`
+(Node surface); `backend-engineer` for Go bugs; `frontend-engineer` for browser
+bugs.
 
 **Steps:**
 1. PM captures the bug report (operator message or `qa-engineer` finding) and
-   classifies severity.
-2. PM dispatches `software-engineer` with: reproduction command, expected vs.
-   actual, target file(s).
+   classifies severity + surface.
+2. PM dispatches the surface-appropriate implementer (Python → software-engineer-python,
+   Node → software-engineer-node, Go → backend-engineer, browser → frontend-engineer)
+   with: reproduction command, expected vs. actual, target file(s).
 3. Engineer reproduces locally → writes regression test → patches → commits.
 4. PM dispatches `qa-engineer` for verification when patch is non-trivial; skip
    when fix is one-line + has regression test.
@@ -310,7 +327,9 @@ or operator-reported leak.
 1. PM dispatches `security-reviewer` with the advisory ID, affected surface, and
    severity hint.
 2. Reviewer emits triage report (severity, blast radius, mitigation options).
-3. If patch is code: PM dispatches `software-engineer` (or `backend-engineer`).
+3. If patch is code: PM dispatches the surface-appropriate implementer
+   (`software-engineer-python` for Python, `software-engineer-node` for Node,
+   `backend-engineer` for Go, `frontend-engineer` for browser).
    If patch is CI/CD or infra: PM dispatches `devops-engineer`.
 4. After fix lands, PM re-dispatches `security-reviewer` for verification +
    updated posture report.
