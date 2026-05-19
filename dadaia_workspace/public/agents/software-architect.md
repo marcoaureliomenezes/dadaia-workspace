@@ -11,6 +11,7 @@ description: >
   In every mode: uses dadaia-grill-me for questions that cannot be answered by inspection.
   Never writes production code, tests, specs, or TASKS.md. All output goes to
   .dadaia/reports/<repo-name>/software-architect/<timestamp>-<type>.html.
+tier: 3
 model: claude-opus-4-7
 opencode_model: claude-sonnet-4-6
 tools:

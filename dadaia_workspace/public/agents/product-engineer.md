@@ -5,6 +5,7 @@ description: >
   for an active release; writes specs/memory/*.html only in CLOSURE phase. Invoked by
   project-manager when a spec is needed. NEVER dispatches other agents; NEVER implements
   code. Do NOT use for bug fixes (use project-manager → software-engineer).
+tier: 2
 model: claude-opus-4-7
 opencode_model: claude-sonnet-4-6
 tools:

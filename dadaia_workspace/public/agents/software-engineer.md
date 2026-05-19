@@ -7,6 +7,7 @@ description: >
   qa-engineer owns E2E tests and deploy validation. Frontend (HTML/CSS/TS/React) is owned
   by frontend-engineer; high-performance Go backends are owned by backend-engineer. Does
   NOT touch game code (use game-developer) or specs (use product-engineer).
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read
