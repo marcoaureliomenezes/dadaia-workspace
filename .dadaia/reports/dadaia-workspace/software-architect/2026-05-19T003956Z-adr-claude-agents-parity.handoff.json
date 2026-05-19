@@ -1,0 +1,32 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "software-architect",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T00:39:56Z",
+  "release_id": "agents-r2-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/software-architect/2026-05-19T003956Z-adr-claude-agents-parity.html",
+    "content_hash": "sha256:5673046c212f6f884a353c5a3af5e425aa33593223d7f1837cd016c8461e7d97"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "summary": "ADR decision: Option C (single source data/AGENTS.md, generated to four projection roots at install time). Parity becomes a structural property, not a process property."
+    },
+    {
+      "severity": "MEDIUM",
+      "summary": "FR7.11 wording must be revised under Option C: manifest tracks only data/AGENTS.md, not data/CLAUDE.md. PE must update SPEC text when authoring PLAN."
+    }
+  ],
+  "decisions_required": [
+    "PE: revise FR7.11 wording in SPEC to reflect single-source manifest model under Option C",
+    "PE: specify consumer-repo slug discovery contract in PLAN (recommended: presence of .dadaia/ marker)",
+    "PE: include explicit operator-visible parity line in doctor output even though structurally redundant",
+    "PE: include nested-pair (services/CLAUDE.md) safety test in TASKS to verify lib installer does not hash-lock nested files"
+  ],
+  "next_handoff": {
+    "agent": "product-engineer",
+    "input": "ADR for FR7.0 finalized — Option C selected (single source data/AGENTS.md projected to four roots). PE: use this ADR while writing PLAN.md for release agents-r2-v1; reconcile FR7.11 wording; specify consumer-repo slug discovery; emit doctor parity line per root."
+  }
+}

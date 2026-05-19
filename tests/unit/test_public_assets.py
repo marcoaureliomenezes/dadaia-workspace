@@ -39,7 +39,11 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
-    assert (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists()
+    # dadaia-workspace-dev-guardrail.md was inlined into data/AGENTS.md (AGT-r2-32);
+    # only 2 standalone rule files remain in the projection:
+    assert (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
+    assert (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
+    assert not (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists()
     assert (workspace / ".opencode" / "commands" / "spec-context.md").exists()
     assert (workspace / "opencode.json").exists()
 

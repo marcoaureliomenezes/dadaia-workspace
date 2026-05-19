@@ -20,6 +20,7 @@ skills:
   - dadaia-task-manager
   - project-orchestration
   - dadaia-handoff-emitter
+  - dadaia-workspace-doctor
 maxTurns: 60
 input_contract:
   requires_inputs:
