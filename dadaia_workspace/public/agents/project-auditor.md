@@ -127,9 +127,16 @@ For a full audit, dispatch in parallel:
 - `qa-engineer` — test pyramid health, coverage vs declared acceptance criteria
 - `software-engineer-python` — Python-surface drift evidence (CLI, lib, tooling) when memory claims diverge from Python code
 - `software-engineer-node` — Node-surface drift evidence (server-side tooling) when memory claims diverge from Node code
+- `software-architect` — architecture / layer-boundary drift evidence when memory's architecture atom diverges from on-disk module dependencies
+- `backend-engineer` — Go-backend / DB drift evidence when memory's data layer claims diverge from Go services or migrations
+- `frontend-engineer` — browser-surface drift evidence when memory's frontend claims diverge from TS/CSS/JSX modules
+- `devops-engineer` — CI/CD / deployment drift evidence when memory's pipeline claims diverge from `.github/workflows/`
 - `data-engineer` — data-pipeline drift evidence (Spark/Airflow/Delta/Kafka) when memory's data layer claims diverge from pipeline code
 - `ai-engineer` — prompt-efficiency / persona-shape drift evidence when memory's agent topology diverges from on-disk personas/skills/rules
 - `design-specialist` — visual / UX drift evidence
+- `game-developer` — game-logic drift evidence inside `repos/tauan-games/` when memory's game-feature claims diverge from gameplay code
+- `game-designer` — game-asset / pipeline drift evidence inside `repos/tauan-games/` when memory's asset claims diverge from artefacts on disk
+- `game-tester` — game test-pyramid drift evidence inside `repos/tauan-games/` when declared acceptance diverges from automated coverage
 
 Note: `data-analyst` is NOT a routine drift-evidence source (it authors BI artifacts, not
 production code). Dispatch only when an audit specifically needs visual evidence on a
