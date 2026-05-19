@@ -382,7 +382,7 @@
   backend-engineer. Done criterion: against the operator's live
   `~/.codex/state_5.sqlite`, the adapter classifies threads correctly; failure
   modes do not crash the aggregator.
-- [ ] **PR5-E2** — Audit any pricing-related touchpoints in
+- [-] **PR5-E2** — Audit any pricing-related touchpoints in
   `dadaia_workspace/features/telemetry/pricing.py` and confirm no Codex branch
   is mis-firing. The function `compute_cost` MUST NOT be called for Codex rows
   (the adapter sets `cumulative_cost_usd = None`). If a defensive `if runtime
