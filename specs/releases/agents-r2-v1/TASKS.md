@@ -173,7 +173,7 @@ local with `pytest` and `dadaia specs doctor`).
   - Cases: 4-target write (byte-identical, single SHA-256); no-`.dadaia/` skip; no-`.dadaia/agentic/` skip; self-slug `package_version` skip; nested-pair non-interference fixture (`services/CLAUDE.md` untouched); doctor 4-line output exactly.
   - Acceptance: `pytest -q tests/unit/features/public/test_workspace_guardrail_pair.py` green; ADR items 2, 4, 5 covered.
   - Depends: AGT-r2-26.
-- [-] AGT-r2-28 — Add nested-pair integration fixture (qa-engineer)
+- [x] AGT-r2-28 — Add nested-pair integration fixture (qa-engineer)
   - File: `tests/integration/test_public_install_e2e.py` — verifies `services/CLAUDE.md` + `services/AGENTS.md` exist before install and are byte-identical after install (i.e. NOT overwritten); also asserts byte-identical pair at every projection target (single SHA-256).
   - Acceptance: integration suite green; covers ADR item 5 end-to-end.
   - Depends: AGT-r2-27.
