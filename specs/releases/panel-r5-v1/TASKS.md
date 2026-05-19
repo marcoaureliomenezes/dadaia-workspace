@@ -201,7 +201,7 @@
   auto-refresh loop that checks `document.hidden` before each tick. Owner:
   frontend-engineer. Done criterion: module loads without error; manual smoke
   in `dadaia panel` shows real sessions populated.
-- [ ] **PR5-C4** — Edit `dadaia_workspace/features/panel/views/index.py`: add
+- [-] **PR5-C4** — Edit `dadaia_workspace/features/panel/views/index.py`: add
   the "Sessions" nav tab and a `<section id="section-sessions">` container.
   Owner: frontend-engineer. Done criterion: nav tab present in the panel
   topbar; clicking it shows the new section.
