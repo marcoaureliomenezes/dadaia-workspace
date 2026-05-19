@@ -75,7 +75,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 - [x] R3-13 — Update `project-auditor.md` evidence list (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/project-auditor.md`.
   - Done criterion: evidence list extended to include `data-engineer` (data-drift evidence) and `ai-engineer` (prompt-efficiency evidence); same zero-bare-SE grep acceptance as R3-12.
-- [ ] R3-14 — Replace Decision Authority Matrix Python/Node row with 5 new rows (`product-engineer`)
+- [-] R3-14 — Replace Decision Authority Matrix Python/Node row with 5 new rows (`product-engineer`)
   - Touches: `dadaia_workspace/public/skills/project-orchestration/SKILL.md`.
   - Done criterion: legacy `Python/Node implementation` row removed (grep `-c` → 0); 5 new rows present in the order declared in SPEC §FR5 (Python, Node, Data, BI, AI); leaf-agents-inventory table (line ~22 of same file) also updated.
 
