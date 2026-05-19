@@ -265,7 +265,7 @@
   Codex toggle, accessible labelling). Owner: frontend-engineer. Done
   criterion: visible toggle in the topbar; clicking it calls
   `Runtime.set(...)`.
-- [-] **PR5-D4** — Extend
+- [x] **PR5-D4** — Extend
   `dadaia_workspace/features/panel/views/assets/css/tokens.py` with
   `--color-runtime-claude` (warm gold), `--color-runtime-codex` (sage green),
   `--color-runtime-active` (resolved by `[data-runtime="..."]` selectors).
