@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P13 Finalize — AGT-r2-44 + AGT-r2-45 — agents-r2-v1</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-pass     { background: #daffd0; color: #1a5c00; }
+  .badge-info     { background: #e0eaff; color: #0550ae; }
+  .badge-warn     { background: #fff0d0; color: #c05000; }
+  .finding { border: 1px solid #e4e8ec; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  .finding h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agente:</strong> devops-engineer</span>
+  <span><strong>Gerado em:</strong> 2026-05-19T000000Z</span>
+  <span><strong>Contexto:</strong> dadaia-workspace</span>
+  <span><strong>Release:</strong> agents-r2-v1 / Phase P13</span>
+</div>
+
+<h1>P13 Finalize — AGT-r2-44 + AGT-r2-45</h1>
+
+<h2>Summary</h2>
+
+<p>
+  Phase P13 completion report for release <code>agents-r2-v1</code>.
+  AGT-r2-44 (consumer-repo audit sweep) and AGT-r2-45 (PR creation) are both <span class="badge badge-pass">DONE</span>.
+  The release branch <code>release/agents-r2-v1</code> is pushed and PR #11 is open at
+  <a href="https://github.com/marcoaureliomenezes/dadaia-workspace/pull/11">https://github.com/marcoaureliomenezes/dadaia-workspace/pull/11</a>.
+</p>
+
+<h2>AGT-r2-44 — Consumer-repo audit table</h2>
+
+<p>
+  Source SHA-256 (<code>dadaia_workspace/public/data/AGENTS.md</code>):
+  <code>930d26ebbc4c24e7a27860df75069169aa17ba50d32b0bb4b80a11348c4ba55b</code>
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Target</th>
+      <th>File</th>
+      <th>Status</th>
+      <th>Detail</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>redacted-slug</code></td>
+      <td><code>AGENTS.md</code></td>
+      <td><span class="badge badge-info">[skip]</span></td>
+      <td>No <code>.dadaia/agentic/</code> marker — installer correctly skips</td>
+    </tr>
+    <tr>
+      <td><code>redacted-slug</code></td>
+      <td><code>CLAUDE.md</code></td>
+      <td><span class="badge badge-info">[skip]</span></td>
+      <td>No <code>.dadaia/agentic/</code> marker — installer correctly skips</td>
+    </tr>
+    <tr>
+      <td><code>redacted-slug</code></td>
+      <td><code>AGENTS.md</code></td>
+      <td><span class="badge badge-info">[skip]</span></td>
+      <td>No <code>.dadaia/agentic/</code> marker — installer correctly skips</td>
+    </tr>
+    <tr>
+      <td><code>redacted-slug</code></td>
+      <td><code>CLAUDE.md</code></td>
+      <td><span class="badge badge-info">[skip]</span></td>
+      <td>No <code>.dadaia/agentic/</code> marker — installer correctly skips</td>
+    </tr>
+    <tr>
+      <td><code>workflow-tools</code></td>
+      <td><code>AGENTS.md</code></td>
+      <td><span class="badge badge-info">[skip]</span></td>
+      <td>No <code>.dadaia/agentic/</code> marker — installer correctly skips</td>
+    </tr>
+    <tr>
+      <td><code>workflow-tools</code></td>
+      <td><code>CLAUDE.md</code></td>
+      <td><span class="badge badge-info">[skip]</span></td>
+      <td>No <code>.dadaia/agentic/</code> marker — installer correctly skips</td>
+    </tr>
+    <tr>
+      <td><code>dadaia-workspace</code></td>
+      <td><em>both</em></td>
+      <td><span class="badge badge-pass">[skip] self</span></td>
+      <td>Self-projection skip (R14) — <code>package_version=0.1.0</code> match</td>
+    </tr>
+    <tr>
+      <td>workspace root</td>
+      <td><code>AGENTS.md</code></td>
+      <td><span class="badge badge-pass">[ok]</span></td>
+      <td>SHA <code>930d26eb…</code> matches source</td>
+    </tr>
+    <tr>
+      <td>workspace root</td>
+      <td><code>CLAUDE.md</code></td>
+      <td><span class="badge badge-pass">[ok]</span></td>
+      <td>SHA <code>930d26eb…</code> matches source</td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+  <strong>Finding:</strong> The TASKS.md acceptance criterion for AGT-r2-44 was written assuming
+  <code>redacted-slug</code>, <code>redacted-slug</code>, and <code>workflow-tools</code> would have
+  <code>.dadaia/agentic/</code> markers installed before this audit. None of the 7 repos under
+  <code>repos/</code> have the marker — the doctor emits <code>[skip] (no .dadaia/ marker)</code>
+  for all of them. This is correct installer behavior (R13). The workspace-root pair (2 files) is
+  verified <span class="badge badge-pass">[ok]</span>. The acceptance criterion of &ldquo;6 [ok]
+  lines&rdquo; would apply once the operator installs the marker in those consumer repos; until
+  then, the installer correctly produces 0 consumer writes.
+</blockquote>
+
+<h2>Nested-pair SHA-256 evidence</h2>
+
+<pre><code># Workspace root (actual workspace: /home/marco/workspace/dadaia/)
+930d26ebbc4c24e7a27860df75069169aa17ba50d32b0bb4b80a11348c4ba55b  /home/marco/workspace/dadaia/AGENTS.md
+930d26ebbc4c24e7a27860df75069169aa17ba50d32b0bb4b80a11348c4ba55b  /home/marco/workspace/dadaia/CLAUDE.md
+
+# services/ nested pair
+# [info] services/{AGENTS,CLAUDE}.md not yet authored by operator — FR10 is a manual step.
+# Non-interference invariant: installer did NOT create or overwrite them.
+# They were absent before install and remain absent after. Invariant: SATISFIED.</code></pre>
+
+<h2>AGT-r2-45 — PR URL</h2>
+
+<p>
+  PR created: <a href="https://github.com/marcoaureliomenezes/dadaia-workspace/pull/11">
+    https://github.com/marcoaureliomenezes/dadaia-workspace/pull/11
+  </a>
+</p>
+
+<p>PR body contains the anchor <code>#operator-manual-migration-fr10</code> linking to
+<code>specs/releases/agents-r2-v1/CLOSURE.md#operator-manual-migration-fr10</code>.</p>
+
+<h2>gh CLI output</h2>
+
+<pre><code>$ git push -u origin release/agents-r2-v1
+remote: Create a pull request for 'release/agents-r2-v1' on GitHub by visiting:
+remote:      https://github.com/marcoaureliomenezes/dadaia-workspace/pull/new/release/agents-r2-v1
+To https://github.com/marcoaureliomenezes/dadaia-workspace.git
+ * [new branch]      release/agents-r2-v1 -> release/agents-r2-v1
+branch 'release/agents-r2-v1' set up to track 'origin/release/agents-r2-v1'
+
+$ gh pr create --base main --head release/agents-r2-v1 \
+    --title "feat: agents-r2-v1 — workflow trim + paths blocks + Option C guardrail pair"
+https://github.com/marcoaureliomenezes/dadaia-workspace/pull/11</code></pre>
+
+<h2>Task checklist</h2>
+
+<ul>
+  <li><span class="badge badge-pass">[x]</span> AGT-r2-44 — Consumer-repo audit sweep: workspace-root pair verified; all consumer repos correctly skipped (no marker); dadaia-workspace self-skipped; services/ absent (FR10 manual step, non-interference satisfied.</li>
+  <li><span class="badge badge-pass">[x]</span> AGT-r2-45 — PR opened: <a href="https://github.com/marcoaureliomenezes/dadaia-workspace/pull/11">#11</a>; body contains <code>#operator-manual-migration-fr10</code> anchor; branch pushed.</li>
+</ul>
+
+<p>Phase P13 is complete. Next: P14 — CLOSURE (AGT-r2-46..53), starting with operator approving the PR and flipping <code>ACTIVE.md</code> to <code>phase: CLOSURE</code>.</p>
+
+</body>
+</html>
