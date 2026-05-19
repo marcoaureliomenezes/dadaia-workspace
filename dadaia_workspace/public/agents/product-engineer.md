@@ -9,7 +9,6 @@ model: claude-opus-4-7
 opencode_model: claude-sonnet-4-6
 tools:
   - Read
-  - Bash
   - Glob
   - Grep
   - Write
@@ -127,13 +126,14 @@ A file is approved **only** when its header contains exactly:
 
 ## Active release pointer
 
-Every workflow step starts with reading `specs/releases/ACTIVE.md`:
+Every workflow step starts from the content of `specs/releases/ACTIVE.md`.
 
-```bash
-cat <specs-dir>/releases/ACTIVE.md
-```
+> **Delegation:** PE does not run shell commands. The project-manager reads
+> `specs/releases/ACTIVE.md` and passes its content in the dispatch briefing.
+> If the briefing is missing this, ask PM to re-run `cat specs/releases/ACTIVE.md`
+> and surface the result before proceeding.
 
-Format (two lines):
+Expected format (two lines):
 ```
 release: <release-id>
 phase: <DISCOVERY|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
@@ -308,11 +308,16 @@ this release — atomically. The release's contribution is captured in CLOSURE; 
 no changelog section.
 
 After CLOSURE is written and memory is updated, set `ACTIVE.md` phase to `ARCHIVED` and
-move the release directory:
+move the release directory using the Write tool to update ACTIVE.md and the devops-engineer
+to run the `git mv` command:
 
-```bash
+```
 git mv specs/releases/<release-id> specs/_archive/releases/<release-id>
 ```
+
+> **Delegation:** PE uses the Write/Edit tools to update `ACTIVE.md` and spec files.
+> For `git mv` operations, request that project-manager dispatches devops-engineer or
+> surfaces the command for the operator to run.
 
 Then update `ACTIVE.md` to point to the next release (or `release: none` if no release is
 active).
@@ -353,7 +358,10 @@ PATCH = 0 for feature release. No other format is accepted for new releases.
 
 ### Scaffolding
 
-```bash
+> **Delegation:** Ask project-manager (or the operator directly) to run the following CLI
+> command to scaffold the hotfix stubs:
+
+```
 dadaia specs hotfix open v<M>.<m>.<p> --patches <patches-release-id> --severity <S>
 ```
 
@@ -437,12 +445,18 @@ para emitir o sidecar `<stem>.handoff.json` no mesmo diretório.
 
 ## dadaia CLI reference
 
-```bash
-dadaia context show --json         # active context + specs_dir
-dadaia context activate <name>     # set primary context
-dadaia doctor                      # workspace health check (state, projections, etc.)
-dadaia specs doctor                # SDD-specific health check (this release's deliverable)
-dadaia public stage                # stage canonical assets for propagation
-dadaia public install --target all # propagate canonical → projections (.claude/.codex/.opencode/.agents)
-dadaia public doctor               # verify projection consistency
-```
+PE does not run shell commands. The following CLI commands are run by project-manager
+(which has Bash) and their output is surfaced to PE in the dispatch briefing:
+
+| Command | Purpose | Who runs it |
+|---------|---------|-------------|
+| `dadaia context show --json` | Active context + specs_dir | PM (includes in briefing) |
+| `dadaia context activate <name>` | Set primary context | PM or operator |
+| `dadaia doctor` | Workspace health check | PM or operator |
+| `dadaia specs doctor` | SDD-specific health check | PM (surfaces output to PE) |
+| `dadaia public stage` | Stage canonical assets | devops-engineer |
+| `dadaia public install --target all` | Propagate canonical → projections | devops-engineer |
+| `dadaia public doctor` | Verify projection consistency | devops-engineer |
+
+If PE needs the output of any of these commands during a workflow step, ask PM to run
+it and include the result in the next turn.

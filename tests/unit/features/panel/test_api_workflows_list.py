@@ -273,21 +273,28 @@ class TestNewWorkflowsInList:
         data = json.loads(body)
         assert len(data["workflows"]) == 3
 
-    def test_full_15_workflow_topology_count(self) -> None:
-        """With 15-workflow topology the LIST response returns 15 entries."""
-        original_12 = [
-            "tdd-cycle", "cross-cutting-feature", "spec-refinement",
-            "hotfix", "release-closure", "feature-discovery",
-            "agent-onboarding", "security-audit", "refactor-cycle",
-            "research-spike", "multi-agent-collab", "onboarding-tour",
+    def test_full_7_workflow_topology_count(self) -> None:
+        """With the post-AGT-r2-06 7-workflow topology the LIST response returns 7 entries.
+
+        The 8 deprecated workflows (tdd-cycle, game-spec-definition, architecture-review,
+        bug-fix-fastlane, game-bugfix, security-patch, deploy-validation-only,
+        design-validation) have been trimmed. The surviving 7 are listed below.
+        """
+        all_7 = [
+            "audit-cycle",
+            "code-review-fan-out",
+            "cross-cutting-feature",
+            "game-dev-cycle",
+            "hotfix-release",
+            "onboarding-new-repo",
+            "spec-refinement",
         ]
-        all_15 = original_12 + _NEW_WORKFLOW_NAMES
-        summaries = [_make_summary(name=n) for n in all_15]
+        summaries = [_make_summary(name=n) for n in all_7]
         service = _FakeService(summaries)
         view = render_api_workflows_list(service)  # type: ignore[arg-type]
         _, _, body = view()
         data = json.loads(body)
-        assert len(data["workflows"]) == 15
+        assert len(data["workflows"]) == 7
 
     def test_audit_cycle_item_shape(self) -> None:
         """audit-cycle LIST item must carry all required summary fields."""

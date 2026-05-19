@@ -36,7 +36,7 @@ def test_orchestrate_list_returns_seed_workflows(tmp_path: Path, monkeypatch) ->
     result = _runner.invoke(app, ["orchestrate", "list"])
     assert result.exit_code == 0, result.output
     assert "spec-refinement" in result.output
-    assert "tdd-cycle" in result.output
+    assert "hotfix-release" in result.output
 
 
 def test_orchestrate_show_unknown_workflow_errors(tmp_path: Path, monkeypatch) -> None:
