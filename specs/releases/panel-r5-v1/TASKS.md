@@ -314,7 +314,7 @@
   returns the r4 wiring AND
   `grep -n 'dadaia:runtime-change' dadaia_workspace/features/panel/views/assets/js/agents.js`
   returns the r5 subscription; both are in the same file.
-- [ ] **PR5-D10** — Rebase guard for
+- [-] **PR5-D10** — Rebase guard for
   `dadaia_workspace/features/panel/views/assets/css/tokens.py`. Confirm the 9
   r4 `--color-tier-1/2/3` tokens × Mint/Sage/Warm coexist with the 9 r5
   `--color-runtime-claude` / `--color-runtime-codex` / `--color-runtime-active`
