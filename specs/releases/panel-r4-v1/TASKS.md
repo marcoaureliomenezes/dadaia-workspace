@@ -212,7 +212,7 @@
   dispatched-subagent persona on the jsonl event stream. Owner: product-engineer.
   Done criterion: atomic description of the reader's contract, no historical
   narrative.
-- [-] **PR4-26** — Run final `dadaia specs doctor`. Target: 0 errors / 0 warnings.
+- [x] **PR4-26** — Run final `dadaia specs doctor`. Target: 0 errors / 0 warnings.
   If the CLI command is not yet installed in the active build, the artefact check
   is satisfied by manual review against `dadaia-workspace-spec-reviewer` invariants
   (ACTIVE.md canonicity; SPEC/PLAN/TASKS/CLOSURE Aprovado markers; memory atomicity;
