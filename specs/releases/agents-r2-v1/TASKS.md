@@ -91,35 +91,35 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P5 — `paths:` block on 16 agents + path-scope gate
 
-- [-] AGT-r2-13 — Add `paths:` block to PM, auditor, code-reviewer, security-reviewer, researcher (software-engineer)
+- [x] AGT-r2-13 — Add `paths:` block to PM, auditor, code-reviewer, security-reviewer, researcher (software-engineer)
   - Files: `dadaia_workspace/public/agents/{project-manager,project-auditor,code-reviewer,security-reviewer,researcher}.md` — frontmatter gains `paths.write_allowlist` per SPEC FR2.1 row.
   - Acceptance: all 5 files contain `^paths:` + `write_allowlist:` block; values match SPEC table verbatim.
   - Depends: AGT-r2-10, AGT-r2-11.
-- [ ] AGT-r2-14 — Add `paths:` block to design-specialist, product-engineer, software-engineer (software-engineer)
+- [x] AGT-r2-14 — Add `paths:` block to design-specialist, product-engineer, software-engineer (software-engineer)
   - Files: `…/design-specialist.md`, `…/product-engineer.md`, `…/software-engineer.md`.
   - Acceptance: 3 files have `paths:` block; PE includes `specs/**` (except `_archive/`) and PE/SE include `.dadaia/reports/<ctx>/<self>/**` per SPEC table.
   - Depends: AGT-r2-13.
-- [ ] AGT-r2-15 — Add `paths:` block to backend-engineer, frontend-engineer, qa-engineer (software-engineer)
+- [x] AGT-r2-15 — Add `paths:` block to backend-engineer, frontend-engineer, qa-engineer (software-engineer)
   - Files: `…/backend-engineer.md`, `…/frontend-engineer.md`, `…/qa-engineer.md`.
   - Acceptance: FE includes `specs/assets/**`; QA includes `tests/**` + own report dir.
   - Depends: AGT-r2-13.
-- [ ] AGT-r2-16 — Add `paths:` block to devops-engineer, software-architect (software-engineer)
+- [x] AGT-r2-16 — Add `paths:` block to devops-engineer, software-architect (software-engineer)
   - Files: `…/devops-engineer.md`, `…/software-architect.md`.
   - Acceptance: devops gains `.github/**`, `services/**`; software-architect restricted to own report dir.
   - Depends: AGT-r2-13.
-- [ ] AGT-r2-17 — Add `paths:` block to game-developer, game-designer, game-tester (software-engineer)
+- [x] AGT-r2-17 — Add `paths:` block to game-developer, game-designer, game-tester (software-engineer)
   - Files: `…/game-{developer,designer,tester}.md`.
   - Acceptance: all 3 scoped to `repos/tauan-games/**` (per sub-domain globs) + own report dir.
   - Depends: AGT-r2-13.
-- [ ] AGT-r2-18 — Audit `paths:` coverage across all 16 agents (software-engineer)
+- [x] AGT-r2-18 — Audit `paths:` coverage across all 16 agents (software-engineer)
   - Acceptance: `grep -L "^paths:" dadaia_workspace/public/agents/*.md` → empty; `tests/unit/features/agents/test_agent_reader.py` parses `paths.write_allowlist` from each frontmatter.
   - Depends: AGT-r2-13..AGT-r2-17.
-- [ ] AGT-r2-19 — Implement path-scope check in `sdd-spec-gate.sh` (software-engineer)
+- [x] AGT-r2-19 — Implement path-scope check in `sdd-spec-gate.sh` (software-engineer)
   - File: `dadaia_workspace/public/scripts/sdd-spec-gate.sh` — add path-scope step **after** the TASKS-marker step per ADR pattern (AGT-r2-12).
   - Behaviour: mismatch → `{"decision":"block","reason":"[PATH SCOPE ERROR] agent <X> cannot write to <path>. write_allowlist: <list>."}`; fail-open with `/tmp/sdd-gate.log` warning when no agent persona is detected (NFR3 / SPEC FR2.4).
   - Acceptance: shellcheck passes; gate's new branch is reachable from `Write/Edit/MultiEdit` PreToolUse path.
   - Depends: AGT-r2-12, AGT-r2-18.
-- [ ] AGT-r2-20 — Author `tests/unit/gate/test_path_scope.py` (software-engineer)
+- [x] AGT-r2-20 — Author `tests/unit/gate/test_path_scope.py` (software-engineer)
   - File: `tests/unit/gate/test_path_scope.py` covering: (a) accept inside allowlist, (b) reject outside allowlist with exact error string, (c) fail-open when agent persona absent + log line written.
   - Acceptance: `pytest -q tests/unit/gate/test_path_scope.py` green; coverage hits the new path-scope branch.
   - Depends: AGT-r2-19.
@@ -128,7 +128,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P6 — Audit-verify Bash removal closure (W2, parallel with P7)
 
-- [ ] AGT-r2-21 — Verify PE + software-architect body has no leftover Bash invocations (software-engineer)
+- [-] AGT-r2-21 — Verify PE + software-architect body has no leftover Bash invocations (software-engineer)
   - Acceptance: ripgrep for fenced shell blocks attributed to PE or software-architect persona → empty; SPEC C6 + C7 satisfied.
   - Depends: AGT-r2-19. Parallel with: AGT-r2-22..AGT-r2-23.
 
@@ -136,7 +136,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P7 — Test updates (W2)
 
-- [ ] AGT-r2-22 — Update agent + workflow test fixtures (software-engineer)
+- [-] AGT-r2-22 — Update agent + workflow test fixtures (software-engineer)
   - Files: `tests/unit/features/public/test_workflows.py` (count 7), `tests/unit/features/agents/test_agent_reader.py` (parses `paths.write_allowlist`), any panel test asserting workflow count.
   - Acceptance: full unit test sweep `pytest -q tests/` green.
   - Depends: AGT-r2-07, AGT-r2-20.
