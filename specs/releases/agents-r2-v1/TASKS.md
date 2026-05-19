@@ -253,7 +253,7 @@ local with `pytest` and `dadaia specs doctor`).
   - File: `tests/scripts/check_skill_orphans.py` (≤ 50 lines). Asserts every skill in `dadaia_workspace/public/skills/<name>/` is referenced by ≥ 1 agent frontmatter in `dadaia_workspace/public/agents/*.md`.
   - Acceptance: script exits 0 against the post-P11a/P12 tree; exits 1 if a seeded orphan is present.
   - Depends: AGT-r2-39, AGT-r2-40.
-- [ ] AGT-r2-42 — Self-test for orphan-detection script (qa-engineer)
+- [-] AGT-r2-42 — Self-test for orphan-detection script (qa-engineer)
   - File: `tests/unit/scripts/test_check_skill_orphans.py` — seeds a fake-orphan and a fake-wired skill in a tmp tree, asserts detector flags only the orphan (R11).
   - Acceptance: `pytest -q tests/unit/scripts/test_check_skill_orphans.py` green; CI hook (pytest collection) catches future orphans.
   - Depends: AGT-r2-41.
