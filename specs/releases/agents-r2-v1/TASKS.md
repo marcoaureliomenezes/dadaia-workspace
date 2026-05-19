@@ -40,12 +40,12 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P1 — Workflow trim 15 → 7 (W1, parallel with P2/P3/P4)
 
-- [ ] AGT-r2-06 — `git mv` 8 deprecated workflows to `_archive/legacy-workflows/<UTC>/` (software-engineer)
+- [-] AGT-r2-06 — `git mv` 8 deprecated workflows to `_archive/legacy-workflows/<UTC>/` (software-engineer)
   - Files moved (from `dadaia_workspace/public/workflows/`): `game-spec-definition`, `architecture-review`, `tdd-cycle`, `bug-fix-fastlane`, `game-bugfix`, `security-patch`, `deploy-validation-only`, `design-validation` (all `*.workflow.md`).
   - Acceptance: `ls dadaia_workspace/public/workflows/*.workflow.md | wc -l` → 7; archived files reachable under `specs/_archive/legacy-workflows/<UTC>/`.
   - Depends: AGT-r2-05.
   - Parallel with: P2 (AGT-r2-08..09), P3 (AGT-r2-10..11), P4 (AGT-r2-12).
-- [ ] AGT-r2-07 — Update workflow count fixture/test (software-engineer)
+- [-] AGT-r2-07 — Update workflow count fixture/test (software-engineer)
   - Files: `tests/unit/features/public/test_workflows.py` (or current schema test) + any panel test fixture asserting workflow count.
   - Acceptance: tests assert exactly 7 surviving workflows; `pytest -q tests/unit/features/public/test_workflows.py` passes; no broken refs to the 8 removed workflows in `dadaia-grill-me` skill body (`grep -rn "game-spec-definition\|architecture-review\|tdd-cycle\|bug-fix-fastlane\|game-bugfix\|security-patch\|deploy-validation-only\|design-validation" dadaia_workspace/public/skills/dadaia-grill-me/` → empty).
   - Depends: AGT-r2-06.
