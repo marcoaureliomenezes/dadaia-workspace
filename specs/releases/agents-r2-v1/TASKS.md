@@ -233,7 +233,7 @@ local with `pytest` and `dadaia specs doctor`).
   - Section content (literal commands): (1) capture pre-r2 workspace-root `CLAUDE.md` SHA; (2) author `services/CLAUDE.md` with redacted-infra / redacted-infra / Traefik sections; (3) mirror to `services/AGENTS.md`, verify byte-identical via `sha256sum`; (4) run `dadaia public stage && install --target all && doctor`; (5) post-verify: workspace-root pair sha256-match, forbidden-strings grep on root `CLAUDE.md` exits 1, same grep on `services/CLAUDE.md` exits 0.
   - Acceptance: section present with the 5 numbered command groups; PR description (AGT-r2-44) cross-references this section.
   - Depends: AGT-r2-05. Parallel with: P11a, P12.
-- [ ] AGT-r2-38 — Cross-reference FR10 section from SPEC + PLAN (product-engineer)
+- [-] AGT-r2-38 — Cross-reference FR10 section from SPEC + PLAN (product-engineer)
   - Acceptance: `grep "Operator manual migration" specs/releases/agents-r2-v1/{SPEC,PLAN}.md` → at least 1 hit each (links to CLOSURE section).
   - Depends: AGT-r2-37.
 
