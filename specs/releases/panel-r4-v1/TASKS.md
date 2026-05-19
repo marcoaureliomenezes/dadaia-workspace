@@ -207,7 +207,7 @@
   tokens. Owner: product-engineer. Done criterion: memory atom describes the
   product as it is after this release; no changelog narrative ("we used to ..."),
   per atomicity contract.
-- [ ] **PR4-25** — Update `specs/memory/architecture.html` (or markdown equivalent):
+- [-] **PR4-25** — Update `specs/memory/architecture.html` (or markdown equivalent):
   telemetry section clarifies that the Claude reader extracts `agent_name` from the
   dispatched-subagent persona on the jsonl event stream. Owner: product-engineer.
   Done criterion: atomic description of the reader's contract, no historical
