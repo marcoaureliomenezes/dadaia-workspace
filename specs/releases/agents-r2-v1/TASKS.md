@@ -186,10 +186,10 @@ local with `pytest` and `dadaia specs doctor`).
   - Add `## Scope and forbidden actions` section copied verbatim from the rule file.
   - Acceptance: `## Scope and forbidden actions` present in `dadaia_workspace/public/agents/project-manager.md`; `wc -l` ≤ 300.
   - Depends: AGT-r2-05. Parallel with: P9 (AGT-r2-25..AGT-r2-28).
-- [-] AGT-r2-30 — Inline `project-auditor-scope.md` into `project-auditor.md` body (software-engineer)
+- [x] AGT-r2-30 — Inline `project-auditor-scope.md` into `project-auditor.md` body (software-engineer)
   - Acceptance: `## Scope and forbidden actions` section present; rule content preserved verbatim.
   - Depends: AGT-r2-05.
-- [ ] AGT-r2-31 — Inline `design-specialist-scope.md` into `design-specialist.md` body (software-engineer)
+- [-] AGT-r2-31 — Inline `design-specialist-scope.md` into `design-specialist.md` body (software-engineer)
   - Acceptance: `## Scope and forbidden actions` section present; rule content preserved verbatim.
   - Depends: AGT-r2-05.
 - [ ] AGT-r2-32 — Archive 4 deprecated rule files (software-engineer)
