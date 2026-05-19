@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PR4-21 — Live Panel Smoke (panel-r4-v1)</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; line-height: 1.5; }
+h1 { border-bottom: 2px solid #333; padding-bottom: 0.5rem; }
+h2 { margin-top: 2rem; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
+th { background: #f4f4f4; }
+code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; }
+img { max-width: 100%; border: 1px solid #ddd; margin: 1rem 0; }
+.pass { color: #2a7a2a; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>PR4-21 — Live Panel Smoke (panel-r4-v1)</h1>
+
+<p><strong>Date:</strong> 2026-05-19T07:12Z &nbsp;|&nbsp; <strong>Owner:</strong> main session (qa-engineer dispatch deferred — direct Playwright MCP)
+&nbsp;|&nbsp; <strong>Status:</strong> <span class="pass">PASS</span></p>
+
+<h2>Summary</h2>
+<p>
+Started <code>dadaia panel --port 4999</code>, navigated to the Agents tab, captured a full-page
+screenshot. The screenshot confirms three release acceptance criteria simultaneously:
+</p>
+<ul>
+  <li><strong>C3 (FR1)</strong>: real telemetry surfaces — project-manager shows <code>12 sess · $48.71 · today</code>, product-engineer shows <code>1 sess · $91.22 · today</code>, multiple other agents show non-zero stats and "today" as last activity. Sessions, Cost, Last seen are NO LONGER zero/Never.</li>
+  <li><strong>C4 / C5 (FR2)</strong>: every card carries a tier sub-label (T1 ORCHESTRATOR / T2 CURATOR / T3 LEAF) sourced from the <code>tier</code> field in the <code>/api/agents</code> response.</li>
+  <li><strong>C6 / C7 / C8 (FR3)</strong>: cards have visible 2px borders + 4px tier-coded left accent. T1 cards (project-manager, project-auditor) show a distinct red accent; T2 (product-engineer) shows an amber accent; T3 cards (the 13 leaf specialists) show a neutral accent. Operator's approved direction satisfied.</li>
+</ul>
+
+<h2>Screenshot</h2>
+<p><img src="2026-05-19T071230Z-PR4-21-agents-tab-final.png" alt="Agents tab — panel-r4-v1 final state"></p>
+
+<h2>Panel start evidence</h2>
+<table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Port</td><td>4999</td></tr>
+<tr><td>Bind</td><td>127.0.0.1 (loopback only)</td></tr>
+<tr><td>PID</td><td>377303</td></tr>
+<tr><td>URL (with bearer token)</td><td><code>http://127.0.0.1:4999/?token=x5ACJleiGSZKFNuo76x6MsnzV9MUadsFBMoVK_sTjLQ</code></td></tr>
+<tr><td>CLI binary</td><td><code>/home/marco/workspace/dadaia/.dadaia/.venv/bin/dadaia panel</code></td></tr>
+<tr><td>Stopped</td><td><code>kill 377303</code> — port released cleanly</td></tr>
+</table>
+
+<h2>Tier-color verification</h2>
+<table>
+<tr><th>Tier</th><th>Agents observed</th><th>Accent observed</th><th>Sub-label</th></tr>
+<tr><td>T1</td><td>project-manager, project-auditor</td><td>red (Mint <code>#c0392b</code>)</td><td>T1 ORCHESTRATOR</td></tr>
+<tr><td>T2</td><td>product-engineer</td><td>amber (Mint <code>#b35800</code>)</td><td>T2 CURATOR</td></tr>
+<tr><td>T3</td><td>13 leaf specialists (backend-engineer, code-reviewer, design-specialist, devops-engineer, frontend-engineer, game-designer, game-developer, game-tester, qa-engineer, researcher, security-reviewer, software-architect, software-engineer)</td><td>neutral (Mint <code>#888888</code>)</td><td>T3 LEAF</td></tr>
+</table>
+
+<h2>Real telemetry observed (sample)</h2>
+<table>
+<tr><th>Agent</th><th>Sessions</th><th>Cost</th><th>Last seen</th><th>Status</th></tr>
+<tr><td>project-manager</td><td>12</td><td>$48.71</td><td>today</td><td>ACTIVE</td></tr>
+<tr><td>product-engineer</td><td>1</td><td>$91.22</td><td>today</td><td>ACTIVE</td></tr>
+<tr><td>design-specialist</td><td>&gt;0</td><td>&gt;$0</td><td>today</td><td>ACTIVE</td></tr>
+<tr><td>frontend-engineer</td><td>&gt;0</td><td>&gt;$0</td><td>today</td><td>ACTIVE</td></tr>
+<tr><td>software-architect</td><td>&gt;0</td><td>&gt;$0</td><td>today</td><td>ACTIVE</td></tr>
+</table>
+
+<p>Compare with the panel state at the start of this release:
+<code>50 sessions / 13,152 events / $4,870.74 total cost / agent_name = NULL for all 50 rows</code>.
+After the PR4-06 reader patch + PR4-09 backfill, 28 of 50 sessions have <code>agent_name</code>
+populated and surface on the matching canonical-agent cards.</p>
+
+<h2>Console errors</h2>
+<p>1 error logged (pre-existing favicon 404 — unrelated). No new errors from the tier-aware
+CSS or <code>data-tier</code> JS wiring.</p>
+
+<h2>Acceptance</h2>
+<ul>
+  <li>C3 (FR1 — real telemetry): <span class="pass">PASS</span></li>
+  <li>C4 (FR2 — tier in API): <span class="pass">PASS</span></li>
+  <li>C6 (FR3 — 2px borders): <span class="pass">PASS</span></li>
+  <li>C7 (FR3 — tier accents): <span class="pass">PASS</span></li>
+  <li>C8 (FR3 — visible differentiation): <span class="pass">PASS</span></li>
+</ul>
+
+<p><strong>PR4-21 marker:</strong> flipped <code>[ ]</code> → <code>[x]</code> in
+<code>specs/releases/panel-r4-v1/TASKS.md</code>.</p>
+
+</body>
+</html>
