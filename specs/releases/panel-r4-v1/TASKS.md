@@ -130,7 +130,7 @@
 > Depends on P2 (`tier` field landed in `/api/agents`). The frontend cannot wire
 > `data-tier="${agent.tier}"` until the backend ships `tier`.
 
-- [ ] **PR4-16** — qa-engineer captures a Playwright screenshot of the current Agents
+- [-] **PR4-16** — qa-engineer captures a Playwright screenshot of the current Agents
   tab. Procedure: start `dadaia panel`; navigate to the Agents tab; capture
   screenshot; stop panel. Save the screenshot inline-referenced in the qa-engineer
   report at
