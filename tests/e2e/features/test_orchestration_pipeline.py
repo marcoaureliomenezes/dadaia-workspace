@@ -36,7 +36,7 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
         "spec-refinement",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "topic": "smoke"},
+        inputs={"context": "demo-ctx", "topic": "smoke", "release_id": "smoke-r1"},
     )
     assert len(invocations) == 1
     assert invocations[0].stage_id == "discovery"
@@ -74,7 +74,16 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
     synth_out.parent.mkdir(parents=True, exist_ok=True)
     synth_out.write_text("# SPEC\n\n## Status\nDraft\n\n## Critérios de Aceite\n...\n")
 
-    # synthesis → completed
+    # synthesis → spec_write (post-r5 workflow added spec_write stage with gate)
+    _, spec_inv = service.resume_run(manifest.run_id)
+    assert {inv.stage_id for inv in spec_inv} == {"spec_write"}
+
+    # Simulate agent output for spec_write (has must_include validation)
+    spec_out = tmp_path / spec_inv[0].expected_output_path
+    spec_out.parent.mkdir(parents=True, exist_ok=True)
+    spec_out.write_text("# SPEC\n\n## Status\nDraft\n\n## Critérios de Aceite\n...\n")
+
+    # spec_write → completed
     final, more = service.resume_run(manifest.run_id)
     assert final.status.value == "completed"
     assert more == ()
