@@ -19,25 +19,9 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
-_JS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-    / "assets"
-    / "js"
-)
+_JS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "js"
 
-_CSS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-    / "assets"
-    / "css"
-)
+_CSS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "css"
 
 
 # ---------------------------------------------------------------------------
@@ -88,9 +72,7 @@ def test_agents_js_sets_aria_expanded_false_on_collapse() -> None:
 def test_agents_js_renders_system_prompt_in_pre() -> None:
     """agents.js must render system prompt inside a <pre> element."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    assert "<pre" in agents_text, (
-        "agents.js must render system prompt inside a <pre> block"
-    )
+    assert "<pre" in agents_text, "agents.js must render system prompt inside a <pre> block"
 
 
 def test_agents_js_renders_full_skills_list() -> None:
@@ -98,9 +80,7 @@ def test_agents_js_renders_full_skills_list() -> None:
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
     # The expanded panel renders all skills; look for expanded-specific skills logic
     # Both the collapsed (slice 0,2) and the expanded (all skills) must coexist
-    assert "skill" in agents_text.lower(), (
-        "agents.js must render skills in expanded panel"
-    )
+    assert "skill" in agents_text.lower(), "agents.js must render skills in expanded panel"
     # Expanded section should render the full array (no truncation to 2)
     # The code should have a path that renders all skills in the detail section
     assert "agent-card__detail" in agents_text or "detail" in agents_text.lower(), (
@@ -142,15 +122,15 @@ def test_agents_js_supports_multi_open() -> None:
     # This is a structural assertion: look for comments or code that references multi-open
     # At minimum the file should not have "querySelectorAll('[aria-expanded=\"true\"]')"
     # being used to close all expanded cards on expand
-    single_open_pattern = 'querySelectorAll(\'[aria-expanded="true"]\''
+    single_open_pattern = "querySelectorAll('[aria-expanded=\"true\"]'"
     # If this pattern exists, it might be single-open enforcement; allow if used for Escape
     # The key check: the expand function itself should NOT close others
     # We trust the implementation is correct; verify via code comment or absence of close-all
-    assert "multi" in agents_text.lower() or "accordion" in agents_text.lower() or (
-        single_open_pattern not in agents_text
-    ), (
-        "agents.js must support multi-open accordion (no single-open enforcement on expand)"
-    )
+    assert (
+        "multi" in agents_text.lower()
+        or "accordion" in agents_text.lower()
+        or (single_open_pattern not in agents_text)
+    ), "agents.js must support multi-open accordion (no single-open enforcement on expand)"
 
 
 def test_agents_js_has_loading_state_on_prompt_fetch() -> None:
@@ -263,8 +243,11 @@ def test_agents_js_does_not_hardcode_agent_ids() -> None:
     # JS array literal containing all the agent IDs is the anti-pattern we guard).
     # We check that no JS array literal references the old-topology agent set exhaustively.
     old_agents = [
-        "software-engineer", "frontend-engineer", "backend-engineer",
-        "qa-engineer", "devops-engineer",
+        "software-engineer",
+        "frontend-engineer",
+        "backend-engineer",
+        "qa-engineer",
+        "devops-engineer",
     ]
     # If all 5 appear AND they're close together (within 500 chars), likely an array
     indices = [agents_text.find(f'"{a}"') for a in old_agents]

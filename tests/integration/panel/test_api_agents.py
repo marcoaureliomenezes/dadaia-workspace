@@ -24,7 +24,10 @@ import pytest
 
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import render_api_agents_canonical, render_api_agent_prompt
+from dadaia_workspace.features.panel.views.api import (
+    render_api_agents_canonical,
+    render_api_agent_prompt,
+)
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
     AgentSummary,

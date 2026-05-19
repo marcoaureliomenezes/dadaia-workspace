@@ -39,9 +39,7 @@ def test_sessions_banner_has_sessions_banner_class() -> None:
     from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 
     html = render_sessions_section()
-    assert 'class="sessions-banner"' in html, (
-        "Banner slot must carry class='sessions-banner'"
-    )
+    assert 'class="sessions-banner"' in html, "Banner slot must carry class='sessions-banner'"
 
 
 def test_sessions_banner_starts_hidden() -> None:
@@ -54,10 +52,10 @@ def test_sessions_banner_starts_hidden() -> None:
     # Find the banner element specifically and confirm `hidden` is there
     banner_start = html.index('id="sessions-banner"')
     # Grab the tag region: from the opening < before banner_start to the first >
-    tag_start = html.rfind('<', 0, banner_start)
-    tag_end = html.index('>', banner_start)
-    banner_tag = html[tag_start:tag_end + 1]
-    assert 'hidden' in banner_tag, (
+    tag_start = html.rfind("<", 0, banner_start)
+    tag_end = html.index(">", banner_start)
+    banner_tag = html[tag_start : tag_end + 1]
+    assert "hidden" in banner_tag, (
         "The #sessions-banner element must carry the `hidden` attribute in the scaffold"
     )
 
@@ -68,12 +66,10 @@ def test_sessions_banner_has_role_status() -> None:
 
     html = render_sessions_section()
     banner_start = html.index('id="sessions-banner"')
-    tag_start = html.rfind('<', 0, banner_start)
-    tag_end = html.index('>', banner_start)
-    banner_tag = html[tag_start:tag_end + 1]
-    assert 'role="status"' in banner_tag, (
-        "The #sessions-banner element must carry role='status'"
-    )
+    tag_start = html.rfind("<", 0, banner_start)
+    tag_end = html.index(">", banner_start)
+    banner_tag = html[tag_start : tag_end + 1]
+    assert 'role="status"' in banner_tag, "The #sessions-banner element must carry role='status'"
 
 
 def test_sessions_banner_has_aria_live_polite() -> None:
@@ -82,9 +78,9 @@ def test_sessions_banner_has_aria_live_polite() -> None:
 
     html = render_sessions_section()
     banner_start = html.index('id="sessions-banner"')
-    tag_start = html.rfind('<', 0, banner_start)
-    tag_end = html.index('>', banner_start)
-    banner_tag = html[tag_start:tag_end + 1]
+    tag_start = html.rfind("<", 0, banner_start)
+    tag_end = html.index(">", banner_start)
+    banner_tag = html[tag_start : tag_end + 1]
     assert 'aria-live="polite"' in banner_tag, (
         "The #sessions-banner element must carry aria-live='polite'"
     )
@@ -159,18 +155,14 @@ def test_sessions_css_banner_uses_token_background() -> None:
 
 
 def _read_sessions_js() -> str:
-    js_path = Path(
-        "dadaia_workspace/features/panel/views/assets/js/sessions.js"
-    )
+    js_path = Path("dadaia_workspace/features/panel/views/assets/js/sessions.js")
     return js_path.read_text(encoding="utf-8")
 
 
 def test_sessions_js_codex_banner_text_constant() -> None:
     """sessions.js must define CODEX_BANNER_TEXT with the exact required string."""
     js = _read_sessions_js()
-    assert "CODEX_BANNER_TEXT" in js, (
-        "sessions.js must declare CODEX_BANNER_TEXT constant"
-    )
+    assert "CODEX_BANNER_TEXT" in js, "sessions.js must declare CODEX_BANNER_TEXT constant"
     assert "Cost not tracked for Codex" in js, (
         "CODEX_BANNER_TEXT must equal 'Cost not tracked for Codex'"
     )
@@ -179,9 +171,7 @@ def test_sessions_js_codex_banner_text_constant() -> None:
 def test_sessions_js_update_banner_function() -> None:
     """sessions.js must define an updateBanner function."""
     js = _read_sessions_js()
-    assert "function updateBanner()" in js, (
-        "sessions.js must define updateBanner() function"
-    )
+    assert "function updateBanner()" in js, "sessions.js must define updateBanner() function"
 
 
 def test_sessions_js_update_banner_shows_on_codex() -> None:
@@ -209,15 +199,11 @@ def test_sessions_js_update_banner_called_on_runtime_change() -> None:
     listener_marker = "addEventListener('dadaia:runtime-change'"
     listener_start = js.index(listener_marker)
     # Take a 400-char window after the addEventListener declaration
-    window = js[listener_start:listener_start + 400]
+    window = js[listener_start : listener_start + 400]
     pos_update = window.find("updateBanner()")
     pos_fetch = window.find("fetchSessions()")
-    assert pos_update != -1, (
-        "The dadaia:runtime-change listener must call updateBanner()"
-    )
-    assert pos_fetch != -1, (
-        "The dadaia:runtime-change listener must call fetchSessions()"
-    )
+    assert pos_update != -1, "The dadaia:runtime-change listener must call updateBanner()"
+    assert pos_fetch != -1, "The dadaia:runtime-change listener must call fetchSessions()"
     assert pos_update < pos_fetch, (
         "updateBanner() must be called before fetchSessions() in the runtime-change listener"
     )
@@ -238,15 +224,11 @@ def test_sessions_js_update_banner_called_after_fetch() -> None:
     # Find the fetch success handler (after _allRows = data.sessions)
     marker = "_allRows = data.sessions || [];"
     fetch_success_start = js.index(marker)
-    window = js[fetch_success_start:fetch_success_start + 300]
+    window = js[fetch_success_start : fetch_success_start + 300]
     pos_update = window.find("updateBanner()")
     pos_render = window.find("renderTable(")
-    assert pos_update != -1, (
-        "fetchSessions success handler must call updateBanner()"
-    )
-    assert pos_render != -1, (
-        "fetchSessions success handler must call renderTable()"
-    )
+    assert pos_update != -1, "fetchSessions success handler must call updateBanner()"
+    assert pos_render != -1, "fetchSessions success handler must call renderTable()"
     assert pos_update < pos_render, (
         "updateBanner() must be called before renderTable() in the fetch success handler"
     )

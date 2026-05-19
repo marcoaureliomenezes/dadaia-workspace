@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Detect skill dirs unreferenced by any agent frontmatter. Exit 0=ok, 1=orphan."""
+
 import os
 import re
 import sys

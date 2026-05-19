@@ -89,7 +89,11 @@ import logging
 import re
 from collections.abc import Callable
 
-from dadaia_workspace.features.agents.reader import AgentNotFoundError, InvalidAgentIdError, get_prompt
+from dadaia_workspace.features.agents.reader import (
+    AgentNotFoundError,
+    InvalidAgentIdError,
+    get_prompt,
+)
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
@@ -299,12 +303,10 @@ def render_api_agents_canonical(
                     "suspect_count": tel_summary.suspect_count,
                     "token_totals": dataclasses.asdict(tel_summary.token_totals),
                     "context_breakdown": [
-                        dataclasses.asdict(cb)
-                        for cb in tel_summary.context_breakdown
+                        dataclasses.asdict(cb) for cb in tel_summary.context_breakdown
                     ],
                     "recent_sessions": [
-                        dataclasses.asdict(rs)
-                        for rs in tel_summary.recent_sessions
+                        dataclasses.asdict(rs) for rs in tel_summary.recent_sessions
                     ],
                 }
             else:
@@ -558,9 +560,7 @@ def render_api_workflow_detail(
         # --- Call the service ---
         detail = workflows_service.get_detail(workflow_name)  # type: ignore[attr-defined]
         if detail is None:
-            logger.debug(
-                "render_api_workflow_detail: workflow not found name=%r", workflow_name
-            )
+            logger.debug("render_api_workflow_detail: workflow not found name=%r", workflow_name)
             error_body = json.dumps(
                 {
                     "error": "not_found",
@@ -668,7 +668,7 @@ def render_api_sessions(
                 pass
 
         try:
-            result = service.telemetry.list_sessions(  # type: ignore[attr-defined]
+            result = service.telemetry.list_sessions(
                 runtime=runtime,
                 project=project,
                 limit=limit,
@@ -751,7 +751,7 @@ def render_api_session_detail(
             return (503, "application/json; charset=utf-8", body)
 
         try:
-            detail = service.telemetry.get_session(  # type: ignore[attr-defined]
+            detail = service.telemetry.get_session(
                 runtime=runtime,
                 session_id=session_id,
             )
@@ -766,9 +766,9 @@ def render_api_session_detail(
             return (503, "application/json; charset=utf-8", body)
 
         if detail is None:
-            body = json.dumps(
-                {"error": "not_found", "message": "Session not found."}
-            ).encode("utf-8")
+            body = json.dumps({"error": "not_found", "message": "Session not found."}).encode(
+                "utf-8"
+            )
             return (404, "application/json; charset=utf-8", body)
 
         # Apply runtime adapter enrichment.
@@ -811,9 +811,7 @@ def _compute_30d_cost(summary: AgentSummary) -> float | None:
 
     for rs in summary.recent_sessions:
         try:
-            session_date = datetime.datetime.fromisoformat(rs.date).replace(
-                tzinfo=datetime.UTC
-            )
+            session_date = datetime.datetime.fromisoformat(rs.date).replace(tzinfo=datetime.UTC)
         except ValueError:
             continue
         if session_date >= cutoff_30d and rs.cost_usd is not None:

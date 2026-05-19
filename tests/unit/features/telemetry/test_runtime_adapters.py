@@ -153,9 +153,7 @@ def test_claude_enrich_row_compute_cost_not_called() -> None:
     adapter = ClaudeRuntimeAdapter()
     row = _make_row(cumulative_cost_usd=0.0065, cost_known=False)
 
-    with patch(
-        "dadaia_workspace.features.telemetry.pricing.compute_cost"
-    ) as mock_compute:
+    with patch("dadaia_workspace.features.telemetry.pricing.compute_cost") as mock_compute:
         adapter.enrich_row(row)
         mock_compute.assert_not_called()
 
@@ -209,9 +207,7 @@ def test_codex_enrich_row_compute_cost_not_called() -> None:
     adapter = CodexRuntimeAdapter()
     row = _make_row(runtime="codex", cumulative_cost_usd=None, cost_known=False)
 
-    with patch(
-        "dadaia_workspace.features.telemetry.pricing.compute_cost"
-    ) as mock_compute:
+    with patch("dadaia_workspace.features.telemetry.pricing.compute_cost") as mock_compute:
         adapter.enrich_row(row)
         mock_compute.assert_not_called()
 
@@ -305,6 +301,7 @@ def test_claude_liveness_old_mtime_returns_ended(tmp_path: pathlib.Path) -> None
     # Set mtime to 90 minutes ago.
     old_ts = (datetime.now(tz=UTC) - timedelta(minutes=90)).timestamp()
     import os
+
     os.utime(session_file, (old_ts, old_ts))
 
     adapter = ClaudeRuntimeAdapter()
@@ -324,6 +321,7 @@ def test_claude_liveness_idle_mtime_returns_idle(tmp_path: pathlib.Path) -> None
     # Set mtime to 30 minutes ago (> 5 min, <= 60 min → idle).
     idle_ts = (datetime.now(tz=UTC) - timedelta(minutes=30)).timestamp()
     import os
+
     os.utime(session_file, (idle_ts, idle_ts))
 
     adapter = ClaudeRuntimeAdapter()
@@ -347,6 +345,7 @@ def test_codex_liveness_returns_idle_stub() -> None:
     adapter = CodexRuntimeAdapter()
     # Patch Path.home() to an empty tmp dir — no state_5.sqlite, no history.jsonl.
     import tempfile
+
     with tempfile.TemporaryDirectory() as empty_home:
         with patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)):
             result = adapter.liveness("any-session", "/workspace")
@@ -457,7 +456,7 @@ def test_codex_liveness_history_ts_wins_if_more_recent(tmp_path: pathlib.Path) -
         "sess-hist-wins",
         updated_at_offset_seconds=-3600,  # 1 hour ago in threads
         archived=0,
-        history_ts_offset_seconds=-30,   # 30 seconds ago in history.jsonl
+        history_ts_offset_seconds=-30,  # 30 seconds ago in history.jsonl
     )
     adapter = CodexRuntimeAdapter()
     with patch("pathlib.Path.home", return_value=tmp_path):
@@ -496,6 +495,7 @@ def test_codex_liveness_90min_delta_returns_ended(tmp_path: pathlib.Path) -> Non
 def test_codex_liveness_missing_files_returns_idle() -> None:
     """liveness returns 'idle' when ~/.codex does not exist (graceful degradation)."""
     import tempfile
+
     adapter = CodexRuntimeAdapter()
     with tempfile.TemporaryDirectory() as empty_home:
         with patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)):
@@ -567,9 +567,7 @@ def test_codex_enrich_row_compute_cost_not_called_e2() -> None:
     adapter = CodexRuntimeAdapter()
     row = _make_row(runtime="codex", cumulative_cost_usd=None, cost_known=False)
 
-    with patch(
-        "dadaia_workspace.features.telemetry.pricing.compute_cost"
-    ) as mock_compute:
+    with patch("dadaia_workspace.features.telemetry.pricing.compute_cost") as mock_compute:
         enriched = adapter.enrich_row(row)
         mock_compute.assert_not_called()
 

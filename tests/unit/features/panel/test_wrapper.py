@@ -117,7 +117,7 @@ def test_wrapper_uses_color_tokens() -> None:
 def test_wrapper_links_tokens_css() -> None:
     """PR3-05: wrapper must link /static/tokens.css so theme palettes are available."""
     rendered = _render("dadaia-workspace", "architecture.html")
-    assert '/static/tokens.css' in rendered
+    assert "/static/tokens.css" in rendered
 
 
 def test_wrapper_prepaint_theme_script() -> None:

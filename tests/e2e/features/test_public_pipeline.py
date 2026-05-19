@@ -374,7 +374,9 @@ class TestDoctor:
 
         report = mgr.doctor(workspace)
 
-        drift_lines = [line for line in report if "[drift]" in line and "software-engineer-python" in line]
+        drift_lines = [
+            line for line in report if "[drift]" in line and "software-engineer-python" in line
+        ]
         assert drift_lines, (
             "Doctor did not detect drift in .claude/agents/software-engineer-python.md.\n"
             "Full report:\n" + "\n".join(report)

@@ -191,8 +191,18 @@ class TestWorkflowsListShape:
         _, _, body = _get(f"{base}/api/workflows", token=token)
         data = json.loads(body)
         item = next(w for w in data["workflows"] if w["name"] == "hotfix-release")
-        for key in ("name", "display_name", "description", "version", "schema_version",
-                    "stage_count", "agent_ids", "has_parallel", "has_gates", "source_path"):
+        for key in (
+            "name",
+            "display_name",
+            "description",
+            "version",
+            "schema_version",
+            "stage_count",
+            "agent_ids",
+            "has_parallel",
+            "has_gates",
+            "source_path",
+        ):
             assert key in item, f"missing workflow item key: {key}"
         # LIST is lean (D1 synthesis decision) — no stages[] or diagram_svg
         assert "stages" not in item
@@ -282,7 +292,9 @@ stages:
         wf_dir = tmp / ".dadaia" / "agentic" / "workflows"
         wf_dir.mkdir(parents=True)
         wf_file = wf_dir / "cache-test-workflow.workflow.md"
-        wf_file.write_text(self._WORKFLOW_TEMPLATE.format(description="version-one"), encoding="utf-8")
+        wf_file.write_text(
+            self._WORKFLOW_TEMPLATE.format(description="version-one"), encoding="utf-8"
+        )
         return tmp
 
     def test_cache_invalidated_on_mtime_change(self) -> None:
@@ -297,13 +309,17 @@ stages:
 
             try:
                 # First fetch — must see "version-one"
-                status, _, body = _get(f"{base}/api/workflows/cache-test-workflow", token="cache-token")
+                status, _, body = _get(
+                    f"{base}/api/workflows/cache-test-workflow", token="cache-token"
+                )
                 assert status == 200
                 data = json.loads(body)
                 assert "version-one" in data["description"]
 
                 # Overwrite with new description and advance mtime
-                wf_file = tmp / ".dadaia" / "agentic" / "workflows" / "cache-test-workflow.workflow.md"
+                wf_file = (
+                    tmp / ".dadaia" / "agentic" / "workflows" / "cache-test-workflow.workflow.md"
+                )
                 wf_file.write_text(
                     self._WORKFLOW_TEMPLATE.format(description="version-two"),
                     encoding="utf-8",

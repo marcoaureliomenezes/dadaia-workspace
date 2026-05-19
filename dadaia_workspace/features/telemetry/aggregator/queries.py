@@ -35,6 +35,7 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _now_iso() -> str:
     return datetime.now(tz=UTC).isoformat()
 

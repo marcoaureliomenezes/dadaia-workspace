@@ -16,23 +16,9 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
-_JS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-    / "assets"
-    / "js"
-)
+_JS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "js"
 
-_VIEWS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-)
+_VIEWS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views"
 
 
 # ---------------------------------------------------------------------------
@@ -75,17 +61,13 @@ def test_workflows_js_is_nonempty() -> None:
 def test_workflows_js_fetches_api_workflows() -> None:
     """workflows.js must call /api/workflows to load the card grid."""
     wf_text = (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
-    assert "/api/workflows" in wf_text, (
-        "workflows.js must fetch /api/workflows"
-    )
+    assert "/api/workflows" in wf_text, "workflows.js must fetch /api/workflows"
 
 
 def test_workflows_js_uses_authed_fetch() -> None:
     """workflows.js must use authedFetch (defined in core.js) to call the API."""
     wf_text = (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
-    assert "authedFetch" in wf_text, (
-        "workflows.js must call authedFetch() to send the Bearer token"
-    )
+    assert "authedFetch" in wf_text, "workflows.js must call authedFetch() to send the Bearer token"
 
 
 def test_workflows_js_renders_card_per_workflow() -> None:
@@ -132,9 +114,7 @@ def test_workflows_js_has_empty_state() -> None:
 def test_workflows_js_has_error_state() -> None:
     """workflows.js must handle fetch errors and show an error state."""
     wf_text = (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
-    assert "error" in wf_text.lower(), (
-        "workflows.js must contain error state handling"
-    )
+    assert "error" in wf_text.lower(), "workflows.js must contain error state handling"
 
 
 def test_workflows_js_has_view_dag_affordance() -> None:
@@ -160,12 +140,10 @@ def test_workflows_js_cards_are_keyboard_accessible() -> None:
     # Either proper button element usage or explicit keydown handling
     assert (
         "keydown" in wf_text
-        or '<button' in wf_text
-        or "type=\"button\"" in wf_text
+        or "<button" in wf_text
+        or 'type="button"' in wf_text
         or "type='button'" in wf_text
-    ), (
-        "workflows.js must render cards/affordances as <button> or handle keyboard events"
-    )
+    ), "workflows.js must render cards/affordances as <button> or handle keyboard events"
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +156,9 @@ def test_panel_js_includes_workflows_js_content() -> None:
     from dadaia_workspace.features.panel.views._assets import PANEL_JS
 
     wf_text = (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
-    lines = [ln.strip() for ln in wf_text.splitlines() if ln.strip() and not ln.strip().startswith("//")]
+    lines = [
+        ln.strip() for ln in wf_text.splitlines() if ln.strip() and not ln.strip().startswith("//")
+    ]
     assert len(lines) > 0, "workflows.js has no non-comment content"
     first_code_line = lines[0]
     assert first_code_line in PANEL_JS, (
@@ -211,7 +191,7 @@ def test_index_py_includes_workflows_js_script_tag() -> None:
     """index.py must include <script src="/static/workflows.js"> in the HTML output."""
     index_text = (_VIEWS_DIR / "index.py").read_text(encoding="utf-8")
     assert "/static/workflows.js" in index_text, (
-        "index.py must include a <script src=\"/static/workflows.js\"> tag"
+        'index.py must include a <script src="/static/workflows.js"> tag'
     )
 
 
@@ -240,9 +220,7 @@ def test_workflows_css_defines_card_grid() -> None:
     assert "workflow-card" in WORKFLOWS_CSS, (
         "workflows.css must define .workflow-card styles for the card grid"
     )
-    assert "grid" in WORKFLOWS_CSS.lower(), (
-        "workflows.css must use CSS grid for the card layout"
-    )
+    assert "grid" in WORKFLOWS_CSS.lower(), "workflows.css must use CSS grid for the card layout"
 
 
 def test_workflows_css_uses_var_color_tokens() -> None:

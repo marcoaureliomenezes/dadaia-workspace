@@ -170,27 +170,83 @@ def _seed_mixed(conn: sqlite3.Connection) -> None:
     _insert_agent(conn, "agent-a", "claude")
     _insert_agent(conn, "agent-b", "codex")
 
-    _insert_session(conn, "claude-s1", "claude", "agent-a", sub_slug="alpha",
-                    first_event_at=_T1, last_event_at=_T3)
-    _insert_session(conn, "claude-s2", "claude", "agent-a", sub_slug="alpha",
-                    first_event_at=_T2, last_event_at=_T4)
-    _insert_session(conn, "claude-s3", "claude", "agent-a", sub_slug="beta",
-                    first_event_at=_T2, last_event_at=_T5)
-    _insert_session(conn, "codex-s1", "codex", "agent-b", sub_slug="alpha",
-                    first_event_at=_T1, last_event_at=_T2)
-    _insert_session(conn, "codex-s2", "codex", "agent-b", sub_slug="beta",
-                    first_event_at=_T3, last_event_at=_T4)
+    _insert_session(
+        conn,
+        "claude-s1",
+        "claude",
+        "agent-a",
+        sub_slug="alpha",
+        first_event_at=_T1,
+        last_event_at=_T3,
+    )
+    _insert_session(
+        conn,
+        "claude-s2",
+        "claude",
+        "agent-a",
+        sub_slug="alpha",
+        first_event_at=_T2,
+        last_event_at=_T4,
+    )
+    _insert_session(
+        conn,
+        "claude-s3",
+        "claude",
+        "agent-a",
+        sub_slug="beta",
+        first_event_at=_T2,
+        last_event_at=_T5,
+    )
+    _insert_session(
+        conn,
+        "codex-s1",
+        "codex",
+        "agent-b",
+        sub_slug="alpha",
+        first_event_at=_T1,
+        last_event_at=_T2,
+    )
+    _insert_session(
+        conn, "codex-s2", "codex", "agent-b", sub_slug="beta", first_event_at=_T3, last_event_at=_T4
+    )
 
-    _insert_event(conn, "ev-c1-1", "claude-s1", "agent-a", occurred_at=_T2,
-                  tokens_input=500, cost_micro_usd=3000)
-    _insert_event(conn, "ev-c1-2", "claude-s1", "agent-a", occurred_at=_T3,
-                  tokens_input=200, cost_micro_usd=1500)
-    _insert_event(conn, "ev-c2-1", "claude-s2", "agent-a", occurred_at=_T4,
-                  tokens_input=300, cost_micro_usd=2000)
-    _insert_event(conn, "ev-c3-1", "claude-s3", "agent-a", occurred_at=_T5,
-                  tokens_input=100, cost_micro_usd=800)
-    _insert_event(conn, "ev-x1-1", "codex-s1", "agent-b", occurred_at=_T2,
-                  cost_micro_usd=None)
+    _insert_event(
+        conn,
+        "ev-c1-1",
+        "claude-s1",
+        "agent-a",
+        occurred_at=_T2,
+        tokens_input=500,
+        cost_micro_usd=3000,
+    )
+    _insert_event(
+        conn,
+        "ev-c1-2",
+        "claude-s1",
+        "agent-a",
+        occurred_at=_T3,
+        tokens_input=200,
+        cost_micro_usd=1500,
+    )
+    _insert_event(
+        conn,
+        "ev-c2-1",
+        "claude-s2",
+        "agent-a",
+        occurred_at=_T4,
+        tokens_input=300,
+        cost_micro_usd=2000,
+    )
+    _insert_event(
+        conn,
+        "ev-c3-1",
+        "claude-s3",
+        "agent-a",
+        occurred_at=_T5,
+        tokens_input=100,
+        cost_micro_usd=800,
+    )
+    _insert_event(conn, "ev-x1-1", "codex-s1", "agent-b", occurred_at=_T2, cost_micro_usd=None)
     conn.commit()
 
 

@@ -507,9 +507,7 @@ def _make_top_level_jsonl(session_id: str) -> bytes:
 class TestDispatchedSubagentExtraction:
     """PR4-07 — Agent name extracted from dispatched subagent persona."""
 
-    def test_agent_name_extracted_from_dispatched_subagent(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_agent_name_extracted_from_dispatched_subagent(self, tmp_path: pathlib.Path) -> None:
         """Synthetic jsonl with an Agent tool_use carrying subagent_type='software-engineer'
         must yield a session row where agent_name == 'software-engineer'.
 
@@ -532,9 +530,7 @@ class TestDispatchedSubagentExtraction:
             f"Expected agent_name='software-engineer', got {session_row['agent_name']!r}"
         )
 
-    def test_agent_name_extracted_various_subagent_types(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_agent_name_extracted_various_subagent_types(self, tmp_path: pathlib.Path) -> None:
         """Verify extraction works for multiple distinct canonical agent names."""
         dao = _make_dao(tmp_path)
 
@@ -553,8 +549,7 @@ class TestDispatchedSubagentExtraction:
             row = _get_session(dao, session_id)
             assert row is not None, f"Session '{session_id}' missing"
             assert row["agent_name"] == agent_type, (
-                f"For {agent_type}: expected agent_name={agent_type!r}, "
-                f"got {row['agent_name']!r}"
+                f"For {agent_type}: expected agent_name={agent_type!r}, got {row['agent_name']!r}"
             )
 
     def test_explore_plan_subagent_types_not_used_as_agent_name(
@@ -579,9 +574,7 @@ class TestDispatchedSubagentExtraction:
                 f"got {row['agent_name']!r}"
             )
 
-    def test_top_level_session_has_null_agent_name(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_top_level_session_has_null_agent_name(self, tmp_path: pathlib.Path) -> None:
         """Top-level Claude events with no Agent tool_use → agent_name must be None.
 
         The agent-name event carries a project slug (not a persona), and
@@ -599,6 +592,5 @@ class TestDispatchedSubagentExtraction:
         row = _get_session(dao, session_id)
         assert row is not None, f"Session '{session_id}' missing"
         assert row["agent_name"] is None, (
-            f"Expected agent_name=None for top-level session, "
-            f"got {row['agent_name']!r}"
+            f"Expected agent_name=None for top-level session, got {row['agent_name']!r}"
         )

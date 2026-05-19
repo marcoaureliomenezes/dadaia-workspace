@@ -48,17 +48,14 @@ _DEPRECATED_WORKFLOWS: frozenset[str] = frozenset(
 def _workflow_names() -> frozenset[str]:
     """Return the set of workflow names present in public/workflows/."""
     return frozenset(
-        p.name.removesuffix(".workflow.md")
-        for p in _WORKFLOWS_DIR.glob("*.workflow.md")
+        p.name.removesuffix(".workflow.md") for p in _WORKFLOWS_DIR.glob("*.workflow.md")
     )
 
 
 def test_exactly_7_workflows_survive() -> None:
     """After AGT-r2-06 trim, exactly 7 workflows must remain in public/workflows/."""
     names = _workflow_names()
-    assert len(names) == 7, (
-        f"Expected 7 workflows, found {len(names)}: {sorted(names)}"
-    )
+    assert len(names) == 7, f"Expected 7 workflows, found {len(names)}: {sorted(names)}"
 
 
 def test_surviving_workflow_names_match_expected_set() -> None:

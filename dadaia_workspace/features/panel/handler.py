@@ -84,11 +84,13 @@ _AUTH_REQUIRED_PREFIX = "/api/"
 
 # Routes that require Bearer auth but do NOT need the telemetry service.
 # These are dispatched after auth check, bypassing the telemetry-not-configured 503.
-_BEARER_ONLY_ROUTES: frozenset[str] = frozenset({
-    "api_agent_prompt",
-    "api_workflows",
-    "api_workflow_detail",
-})
+_BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
+    {
+        "api_agent_prompt",
+        "api_workflows",
+        "api_workflow_detail",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -190,9 +192,7 @@ def make_handler_class(
         "api_session_detail",
     )
     telemetry_patterns: list[tuple[re.Pattern[str], str]] = [
-        (re.compile(pat), name)
-        for pat, name in _RAW_ROUTES
-        if name in _BEARER_AUTH_ROUTE_NAMES
+        (re.compile(pat), name) for pat, name in _RAW_ROUTES if name in _BEARER_AUTH_ROUTE_NAMES
     ]
 
     _token = token
@@ -265,7 +265,9 @@ def make_handler_class(
                 if m is not None:
                     status, content_type, body = view(**m.groupdict())
                     is_static = path.startswith("/static/")
-                    self._respond(status, content_type, body, cache_control="no-cache" if is_static else None)
+                    self._respond(
+                        status, content_type, body, cache_control="no-cache" if is_static else None
+                    )
                     return
 
             # 404 fall-through (T-2.3)
