@@ -29,7 +29,7 @@
 <body>
 
 <h1>Product Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-19 · Closure: panel-r5-v1</p>
+<p class="meta">Última atualização: 2026-05-19 · Closure: agents-r3-v1</p>
 
 <section id="vision">
   <h2>Visão atômica</h2>
@@ -40,10 +40,10 @@
 <section id="users">
   <h2>Usuários</h2>
   <ul>
-    <li><strong>Operador (humano único)</strong> — orquestra trabalho entre 16 agentes em topologia de 3 tiers, ativa contextos, aprova specs, decide trade-offs em sessões grill-me normalmente via <code>project-manager</code>.</li>
+    <li><strong>Operador (humano único)</strong> — orquestra trabalho entre 20 agentes em topologia de 3 tiers, ativa contextos, aprova specs, decide trade-offs em sessões grill-me normalmente via <code>project-manager</code>.</li>
     <li><strong>Tier 1 — orquestradores (com tool <code>Agent</code>)</strong>: <code>project-manager</code> (intake + dispatch de workflows), <code>project-auditor</code> (drift detection + auditoria).</li>
     <li><strong>Tier 2 — curator (sem tool <code>Agent</code>)</strong>: <code>product-engineer</code> autor de SPEC/PLAN/TASKS/CLOSURE e guardião exclusivo de <code>specs/memory/*.html</code> em phase CLOSURE.</li>
-    <li><strong>Tier 3 — leaf specialists (sem tool <code>Agent</code>)</strong>: <code>software-engineer</code>, <code>backend-engineer</code>, <code>frontend-engineer</code>, <code>qa-engineer</code>, <code>software-architect</code>, <code>devops-engineer</code>, <code>game-developer</code>, <code>game-designer</code>, <code>game-tester</code>, <code>code-reviewer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>design-specialist</code>. Consumem specs, implementam/auditam dentro do escopo, geram reports HTML.</li>
+    <li><strong>Tier 3 — leaf specialists (17, sem tool <code>Agent</code>)</strong>: <code>ai-engineer</code>, <code>backend-engineer</code>, <code>code-reviewer</code>, <code>data-analyst</code>, <code>data-engineer</code>, <code>design-specialist</code>, <code>devops-engineer</code>, <code>frontend-engineer</code>, <code>game-designer</code>, <code>game-developer</code>, <code>game-tester</code>, <code>qa-engineer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>software-architect</code>, <code>software-engineer-node</code>, <code>software-engineer-python</code>. Consumem specs, implementam/auditam dentro do escopo, geram reports HTML.</li>
     <li><strong>Hooks/gate</strong> — PreToolUse <code>sdd-spec-gate.sh</code> que bloqueia Write/Edit em produção sem task <code>[-]</code> e atomicidade de memory.</li>
   </ul>
 </section>
@@ -54,7 +54,7 @@
   <ol class="catalog">
     <li><a href="workspace-init.html">workspace-init</a><span class="desc">— porta de entrada; cria <code>.dadaia/</code>, <code>.venv</code>, hooks e estrutura idempotente.</span></li>
     <li><a href="context-management.html">context-management</a><span class="desc">— multi-context lifecycle (criar, ativar, promover, desativar, deletar) com primary context tracking.</span></li>
-    <li><a href="agent-orchestration.html">agent-orchestration</a><span class="desc">— DAG runner que dispatcha agentes especialistas (cli/claude/codex/opencode) com parallel_groups + gates + 7 workflows pré-instalados (<code>spec-refinement</code>, <code>cross-cutting-feature</code>, <code>onboarding-new-repo</code>, <code>hotfix-release</code>, <code>game-dev-cycle</code>, <code>audit-cycle</code>, <code>code-review-fan-out</code>) + 8 PM playbooks na skill <code>project-orchestration</code> sobre topologia de 16 agentes em 3 tiers (orquestradores PM/auditor; curator PE; 13 leaf specialists). Path-scope gate enforça <code>paths.write_allowlist</code> de cada agente em runtime.</span></li>
+    <li><a href="agent-orchestration.html">agent-orchestration</a><span class="desc">— DAG runner que dispatcha agentes especialistas (cli/claude/codex/opencode) com parallel_groups + gates + 7 workflows pré-instalados (<code>spec-refinement</code>, <code>cross-cutting-feature</code>, <code>onboarding-new-repo</code>, <code>hotfix-release</code>, <code>game-dev-cycle</code>, <code>audit-cycle</code>, <code>code-review-fan-out</code>) + 8 PM playbooks na skill <code>project-orchestration</code> sobre topologia de 20 agentes em 3 tiers (2 orquestradores PM/auditor; curator PE; 17 leaf specialists, incluindo as 5 personas adicionadas em r3 — <code>software-engineer-python</code>, <code>software-engineer-node</code>, <code>data-engineer</code>, <code>data-analyst</code>, <code>ai-engineer</code> — após retirada do <code>software-engineer</code> genérico). Path-scope gate enforça <code>paths.write_allowlist</code> de cada agente em runtime. Domínios cobertos: data engineering (SQL+NoSQL pipelines, Spark/Airflow/Kafka, Databricks DABs/Delta Tables/notebooks); business intelligence (Databricks Genie + Dashboards via DABs, dashboard evaluation via Playwright); AI-entity authoring (owner exclusivo das markdowns de skills/rules/workflows/commands/agents/hooks da lib).</span></li>
     <li><a href="public-asset-distribution.html">public-asset-distribution</a><span class="desc">— canonical → <code>.dadaia/agentic/</code> → projeções multi-tool (<code>.claude/</code>, <code>.codex/</code>, <code>.opencode/</code>, <code>.agents/</code>).</span></li>
     <li><a href="workspace-doctor.html">workspace-doctor</a><span class="desc">— diagnóstico + repair de invariantes do workspace state com <code>--fix</code> opcional.</span></li>
     <li><a href="specs-doctor.html">specs-doctor</a><span class="desc">— 11 checks estruturais SDD release-lifecycle: memory HTML atômico, ACTIVE.md, CLOSURE evidence triples, broken images, Mermaid script presence.</span></li>
