@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import re
 
-from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
-
+from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
 
 # ---------------------------------------------------------------------------
 # WCAG helpers

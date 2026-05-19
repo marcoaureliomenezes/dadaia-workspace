@@ -8,7 +8,7 @@ the privacy invariant (D-AM-03, T1) is enforced here.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -119,18 +119,18 @@ class SessionRow:
 
     session_id: str
     runtime: str
-    project: Optional[str]
-    cwd: Optional[str]
-    model: Optional[str]
+    project: str | None
+    cwd: str | None
+    model: str | None
     started_at: str
     last_activity_at: str
     message_count: int
     context_size_tokens: int
-    cumulative_cost_usd: Optional[float]
+    cumulative_cost_usd: float | None
     cost_known: bool
     status: Literal["active", "idle", "ended"]
-    agent_name: Optional[str]
-    ai_title: Optional[str]
+    agent_name: str | None
+    ai_title: str | None
 
 
 @dataclass(frozen=True)
@@ -158,7 +158,7 @@ class SessionListResult:
 
     sessions: list[SessionRow]
     runtime: str
-    project: Optional[str]
-    limit: Optional[int]
+    project: str | None
+    limit: int | None
     generated_at: str
     total_count: int

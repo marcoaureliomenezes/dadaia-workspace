@@ -20,10 +20,7 @@ import json
 import os
 import re
 import subprocess
-import time
 from pathlib import Path
-
-import pytest
 
 # Absolute path to the gate script (source of truth — not the installed projection)
 _GATE = (
@@ -263,7 +260,7 @@ def test_t3_fail_open_no_persona_log_warning(tmp_path: Path) -> None:
     assert "FAIL-OPEN path-scope: no agent persona detected" in log
     assert "env=unset" in log
     assert "payload=unset" in log
-    assert f"tool=Write" in log
+    assert "tool=Write" in log
 
 
 # ---------------------------------------------------------------------------

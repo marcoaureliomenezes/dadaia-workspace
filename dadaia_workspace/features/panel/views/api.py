@@ -508,7 +508,7 @@ def render_api_workflows_list(
 
 
 def render_api_workflow_detail(
-    workflows_service: "object",
+    workflows_service: object,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """Return a closure that serves GET /api/workflows/<name>.
 

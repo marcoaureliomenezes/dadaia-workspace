@@ -15,8 +15,6 @@ import sqlite3
 from datetime import date
 from typing import Any
 
-import pytest
-
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.reader.claude import read_session_file
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao

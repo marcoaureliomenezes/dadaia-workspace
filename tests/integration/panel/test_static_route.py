@@ -11,18 +11,15 @@ Coverage areas (PR3-20 spec):
 from __future__ import annotations
 
 import threading
+import urllib.error
+import urllib.request
 from http.server import ThreadingHTTPServer
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.views.static import render_static
-
-import urllib.error
-import urllib.request
-
 
 # ---------------------------------------------------------------------------
 # Helpers

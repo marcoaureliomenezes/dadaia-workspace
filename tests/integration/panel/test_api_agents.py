@@ -25,8 +25,8 @@ import pytest
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
-    render_api_agents_canonical,
     render_api_agent_prompt,
+    render_api_agents_canonical,
 )
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
@@ -183,8 +183,8 @@ def _build_agents_server(
 # Helpers
 # ---------------------------------------------------------------------------
 
-import urllib.error
-import urllib.request
+import urllib.error  # noqa: E402
+import urllib.request  # noqa: E402
 
 
 def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes]:

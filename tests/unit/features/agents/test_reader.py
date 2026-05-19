@@ -12,7 +12,6 @@ Coverage:
   agent not found, no agents dir
 """
 
-import os
 from pathlib import Path
 
 import pytest
