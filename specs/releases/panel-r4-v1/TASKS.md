@@ -193,7 +193,7 @@
 - [x] **PR4-22** — Flip `specs/releases/ACTIVE.md` to `phase: CLOSURE` to unlock
   memory writes. Owner: product-engineer. Done criterion: file reads exactly
   `release: panel-r4-v1` / `phase: CLOSURE`.
-- [-] **PR4-23** — Finalize `specs/releases/panel-r4-v1/CLOSURE.md` with mandatory
+- [x] **PR4-23** — Finalize `specs/releases/panel-r4-v1/CLOSURE.md` with mandatory
   sections: Summary; Tasks completed (table of PR4-01..27 with final commit SHA);
   Validations (triple `{description, command, evidence}` per acceptance criterion
   C1..C10); Drifts (one per place reality diverged from PLAN.md); Memory updates
