@@ -212,7 +212,7 @@
 
 ### Phase-C close
 
-- [-] **PR5-C7** — Run the Playwright e2e spec against the live FE
+- [x] **PR5-C7** — Run the Playwright e2e spec against the live FE
   implementation. Owner: qa-engineer. Done criterion: all five cases (a)–(e)
   green; manual smoke per SPEC §5 acceptance #4 passes.
 
