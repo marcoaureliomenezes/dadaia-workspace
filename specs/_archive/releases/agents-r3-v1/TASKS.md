@@ -147,7 +147,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
   - Touches: `specs/memory/product/agent-orchestration.html`, `specs/memory/architecture.html`, `specs/memory/product/index.html`.
   - Preconditions: ACTIVE.md phase = `CLOSURE` (gate enforces).
   - Done criterion: agent-orchestration HTML reflects 20-agent topology, Python/Node split, AI-entity authority paragraph, data + BI surfaces; architecture HTML reflects refreshed agent-topology layer + Decision Authority Matrix rows; product/index HTML adds data + BI + AI capability bullets; no forbidden sections (Changelog/History/Histórico/Versions) anywhere; `dadaia specs doctor` final run `0/0`.
-- [-] R3-30 — Update backlog candidate + archive release + reset ACTIVE.md (`product-engineer`)
+- [x] R3-30 — Update backlog candidate + archive release + reset ACTIVE.md (`product-engineer`)
   - Touches: `specs/backlog/candidates.md`; `git mv specs/releases/agents-r3-v1 specs/_archive/releases/agents-r3-v1`; `specs/releases/ACTIVE.md` reset (`release: none` or next release per operator).
   - Done criterion: `codex-agent-orchestration-parity-v1` candidate entry updated from "16 canonical agents" → "20 canonical agents" with a note "post-agents-r3-v1 closure"; release directory moved under `_archive/`; ACTIVE.md reset; final `dadaia specs doctor` exits 0; commit chain recorded in CLOSURE Tasks-completed table.
 
