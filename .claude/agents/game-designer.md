@@ -5,6 +5,7 @@ description: >
   assets estáticos, direção de arte, mapas, iluminação, áudio e pipeline geoespacial
   (QGIS → GDAL → Cesium → UE5). Pesquisa ativamente referências e dados públicos em
   fontes confiáveis. NÃO toca em lógica de jogo, IA de inimigos ou testes.
+tier: 3
 model: claude-opus-4-7
 color: purple
 tools:
@@ -43,6 +44,10 @@ input_contract:
       path: .dadaia/reports/{context}/game-designer/{ts}-design.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
+paths:
+  write_allowlist:
+    - repos/tauan-games/**
+    - .dadaia/reports/<ctx>/game-designer/**
 ---
 
 # Game Designer
