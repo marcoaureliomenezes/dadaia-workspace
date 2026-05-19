@@ -456,16 +456,18 @@ def test_panel_js_workflows_uses_authed_fetch() -> None:
 
 
 def test_panel_js_sessions_uses_authed_fetch() -> None:
-    """panel-defects Bug 3 (updated PR3-10): agents.js must call authedFetch for /api/agents.
+    """panel-defects Bug 3 (updated PR3-10 + PR5-D5): agents.js must call authedFetch for /api/agents.
 
-    The per-agent sessions endpoint (authedFetch('/api/agents/<id>/sessions'))
-    is scope of PR3-11 (expanded card). PR3-10 (collapsed card) calls
-    authedFetch('/api/agents') for the initial list load.
+    PR3-10 (collapsed card): initial list fetch via authedFetch('/api/agents').
+    PR5-D5 (runtime retrofit): URL now includes ?runtime= query param so the
+    fetch reads authedFetch('/api/agents?runtime=' + ...).
+    The assertion checks the URL prefix which is stable regardless of the query
+    string appended dynamically at runtime.
     """
     from dadaia_workspace.features.panel.views._assets import PANEL_JS
 
-    # agents.js (in PANEL_JS) calls authedFetch('/api/agents') for the list
-    assert "authedFetch('/api/agents')" in PANEL_JS
+    # agents.js (in PANEL_JS) calls authedFetch with /api/agents base URL (PR5-D5 appends ?runtime=)
+    assert "authedFetch('/api/agents?runtime='" in PANEL_JS
 
 
 # ---------------------------------------------------------------------------
