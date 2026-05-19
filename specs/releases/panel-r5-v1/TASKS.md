@@ -180,7 +180,7 @@
 
 ### FE strand (frontend-engineer)
 
-- [ ] **PR5-C1** — New file `dadaia_workspace/features/panel/views/sessions.py`
+- [-] **PR5-C1** — New file `dadaia_workspace/features/panel/views/sessions.py`
   exporting `render_sessions_section() -> str` (HTML scaffold: filter input,
   sortable table with columns Session / Project / Model / AI Turns / Context /
   Cost / Last activity / Status, detail drawer container). Owner:
