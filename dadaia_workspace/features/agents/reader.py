@@ -18,6 +18,7 @@ a warning; they do not abort the read.
 import logging
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
     {
         "name",
         "description",
+        "tier",              # orchestration tier: 1 = orchestrator, 2 = curator, 3 = leaf specialist
         "skills",
         "tools",
         "model",
@@ -40,8 +42,18 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "max_turns",         # alternative snake_case spelling
         "input_contract",
         "paths",             # declarative path allowlist (AGT-32; not enforced this release)
+        "color",             # optional display hint (game agents); not enforced
     }
 )
+
+
+class MissingTierError(ValueError):
+    """Raised when an agent frontmatter has an invalid (non-int or out-of-range) 'tier' value.
+
+    Note: a *missing* tier field is tolerated — it defaults to 3 with a stderr warning.
+    This error is only raised when 'tier' is present but invalid (non-integer or not in
+    {1, 2, 3}), so that typos produce loud failures while stale staged files are tolerated.
+    """
 
 
 @dataclass
@@ -54,6 +66,7 @@ class AgentDTO:
     id: str
     name: str
     description: str
+    tier: int = 0  # 1 = orchestrator, 2 = curator, 3 = leaf specialist
     skills: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
     model: str | None = None
@@ -113,6 +126,27 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
     if not description or not isinstance(description, str):
         description = ""
 
+    # tier: int in {1, 2, 3}; missing → default 3 with warning; invalid → MissingTierError
+    tier_raw = raw.get("tier")
+    if tier_raw is None:
+        sys.stderr.write(
+            f"agent_reader: WARNING — '{name}' is missing the 'tier' frontmatter field; "
+            "defaulting to tier=3 (leaf specialist). "
+            "Add 'tier: 3' (or 1/2) to silence this warning.\n"
+        )
+        tier = 3
+    else:
+        try:
+            tier = int(tier_raw)
+        except (ValueError, TypeError) as exc:
+            raise MissingTierError(
+                f"agent_reader: '{name}' has non-integer 'tier' value {tier_raw!r}"
+            ) from exc
+        if tier not in {1, 2, 3}:
+            raise MissingTierError(
+                f"agent_reader: '{name}' has invalid 'tier' value {tier!r} — must be 1, 2, or 3"
+            )
+
     # maxTurns (camelCase) takes priority over max_turns (snake_case)
     max_turns_raw = raw.get("maxTurns") or raw.get("max_turns")
     max_turns: int | None = None
@@ -158,6 +192,7 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         id=name,
         name=name,
         description=description.strip(),
+        tier=tier,
         skills=skills,
         tools=tools,
         model=model,
@@ -308,7 +343,11 @@ def read_canonical_agents(workspace_root: Path) -> list[AgentDTO]:
 
     result: list[AgentDTO] = []
     for raw in raw_list:
-        dto = _raw_to_dto(raw)
+        try:
+            dto = _raw_to_dto(raw)
+        except MissingTierError as exc:
+            logger.warning("agent_reader: skipping agent — %s", exc)
+            continue
         if dto is not None:
             result.append(dto)
 

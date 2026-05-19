@@ -6,12 +6,14 @@ Public API:
     get_prompt            — fetch raw body (frontmatter stripped) for a single agent
     InvalidAgentIdError   — raised when agent_id fails validation or path traversal check
     AgentNotFoundError    — raised when agent_id is valid but file does not exist
+    MissingTierError      — raised when an agent frontmatter has an invalid 'tier' value (present but non-int or out of {1,2,3})
 """
 
 from dadaia_workspace.features.agents.reader import (
     AgentDTO,
     AgentNotFoundError,
     InvalidAgentIdError,
+    MissingTierError,
     get_prompt,
     read_canonical_agents,
 )
@@ -20,6 +22,7 @@ __all__ = [
     "AgentDTO",
     "AgentNotFoundError",
     "InvalidAgentIdError",
+    "MissingTierError",
     "get_prompt",
     "read_canonical_agents",
 ]
