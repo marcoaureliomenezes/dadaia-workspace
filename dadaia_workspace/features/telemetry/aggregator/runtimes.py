@@ -29,8 +29,6 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     SessionDetail,
     SessionRow,
 )
-from dadaia_workspace.features.telemetry import pricing as _pricing_module
-
 
 # ---------------------------------------------------------------------------
 # Protocol

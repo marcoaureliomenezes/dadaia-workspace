@@ -13,7 +13,6 @@ Coverage:
 """
 
 import os
-import time
 from pathlib import Path
 
 import pytest
@@ -21,11 +20,10 @@ import pytest
 from dadaia_workspace.features.workflows.service import (
     StageDTO,
     WorkflowDetailDTO,
-    WorkflowSummaryDTO,
     WorkflowsService,
+    WorkflowSummaryDTO,
     _cache,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures — minimal .workflow.md files written to tmp_path

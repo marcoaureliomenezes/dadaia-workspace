@@ -18,11 +18,8 @@ Coverage:
 import time
 import xml.etree.ElementTree as ET
 
-import pytest
-
 from dadaia_workspace.features.workflows.dag import render_dag_svg
 from dadaia_workspace.features.workflows.service import StageDTO
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -36,7 +33,6 @@ def _parse_svg(svg: str) -> ET.Element:
 
 def _count_nodes(root: ET.Element) -> int:
     """Count <g class="dag-node ..."> elements at any depth."""
-    ns = {"svg": "http://www.w3.org/2000/svg"}
     # ElementTree uses Clark notation for namespaced elements.
     # SVG elements have the SVG namespace.
     count = 0
@@ -962,10 +958,10 @@ def test_audit_cycle_parallel_group_same_layer() -> None:
     audit_ids = ["code_review", "security_review", "research_review", "qa_audit"]
     audit_xs = [layers.get(sid) for sid in audit_ids]
     assert all(x is not None for x in audit_xs), (
-        f"Some audit parallel-group nodes not found: {dict(zip(audit_ids, audit_xs))}"
+        f"Some audit parallel-group nodes not found: {dict(zip(audit_ids, audit_xs, strict=False))}"
     )
     assert len(set(audit_xs)) == 1, (  # type: ignore[arg-type]
-        f"audit parallel-group stages should share x-layer, got: {dict(zip(audit_ids, audit_xs))}"
+        f"audit parallel-group stages should share x-layer, got: {dict(zip(audit_ids, audit_xs, strict=False))}"
     )
 
 

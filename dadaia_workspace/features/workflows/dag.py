@@ -89,7 +89,7 @@ class _NodeLayout:
 # ---------------------------------------------------------------------------
 
 
-def _compute_layers(stages: list["StageDTO"]) -> dict[str, int]:
+def _compute_layers(stages: list[StageDTO]) -> dict[str, int]:
     """Assign a layer (column index) to each stage.
 
     Uses longest-path layering:
@@ -150,7 +150,7 @@ def _compute_layers(stages: list["StageDTO"]) -> dict[str, int]:
 
 
 def _compute_positions(
-    stages: list["StageDTO"],
+    stages: list[StageDTO],
     layer: dict[str, int],
 ) -> list[_NodeLayout]:
     """Compute pixel (x, y) for each node given its layer and row assignment.
@@ -159,7 +159,7 @@ def _compute_positions(
     input list, preserving workflow intent.
     """
     # Group stages by layer, preserving original order within each layer
-    layer_members: dict[int, list["StageDTO"]] = defaultdict(list)
+    layer_members: dict[int, list[StageDTO]] = defaultdict(list)
     for s in stages:
         layer_members[layer[s.id]].append(s)
 
@@ -244,8 +244,8 @@ def _render_node(node: _NodeLayout) -> str:
     aria_label_escaped = _esc(aria_label_text)
 
     # Center of the node rectangle
-    cx = node.x + NODE_W // 2
-    cy = node.y + NODE_H // 2
+    node.x + NODE_W // 2
+    node.y + NODE_H // 2
 
     # Gate marker (⊙) positioned top-right of node
     gate_marker = ""
@@ -294,7 +294,7 @@ def _render_edge(
 
 
 def _render_parallel_bands(
-    stages: list["StageDTO"],
+    stages: list[StageDTO],
     nodes_by_id: dict[str, _NodeLayout],
 ) -> list[str]:
     """Render dashed background bands for parallel groups."""
@@ -331,7 +331,7 @@ def _render_parallel_bands(
 # ---------------------------------------------------------------------------
 
 
-def render_dag_svg(stages: list["StageDTO"]) -> str:
+def render_dag_svg(stages: list[StageDTO]) -> str:
     """Render a workflow DAG as an SVG string.
 
     Pure function: given the same input list of StageDTO objects, returns the
@@ -365,7 +365,7 @@ def render_dag_svg(stages: list["StageDTO"]) -> str:
     max_y = max(n.y + NODE_H for n in nodes) + MARGIN_Y
 
     # 4. Collect edges
-    id_to_stage = {s.id: s for s in stages}
+    {s.id: s for s in stages}
     edge_pairs: list[tuple[str, str]] = []
     for s in stages:
         for dep_id in s.needs:

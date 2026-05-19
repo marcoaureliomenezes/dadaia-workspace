@@ -16,11 +16,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
-    _consumer_repos_for_root,
     _doctor_guardrail_pair,
     _install_workspace_guardrail_pair,
 )

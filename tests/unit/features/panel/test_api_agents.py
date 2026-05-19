@@ -16,8 +16,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.features.agents.reader import AgentDTO
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import render_api_agents_canonical
@@ -55,11 +53,9 @@ def _make_service(
 # Telemetry stub
 # ---------------------------------------------------------------------------
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.features.telemetry.aggregator.models import (  # noqa: E402
     AgentListResult,
     AgentSummary,
-    ContextBreakdown,
-    RecentSession,
     TokenTotals,
 )
 
@@ -512,7 +508,7 @@ _NEW_AGENT_IDS = [
 class TestNewAgentsInList:
     """Assert each of the 6 new agents (AGT-09..AGT-14) appears in the LIST response."""
 
-    def _build_service_with_agents(self, agent_ids: list[str]) -> "PanelService":
+    def _build_service_with_agents(self, agent_ids: list[str]) -> PanelService:
         agents = [_make_dto(agent_id=aid) for aid in agent_ids]
         summaries = [_make_agent_summary(agent_id=aid) for aid in agent_ids]
         tel = FakeTelemetryService(agent_summaries=summaries)
@@ -626,7 +622,7 @@ def _make_dto_with_tier(agent_id: str, tier: int) -> AgentDTO:
     return _make_dto(agent_id=agent_id, tier=tier)
 
 
-def _build_full_topology_service() -> "PanelService":
+def _build_full_topology_service() -> PanelService:
     """Build a PanelService with 16 agents using canonical tier assignments."""
     agents = (
         [_make_dto_with_tier(aid, 1) for aid in _TIER1_IDS]
@@ -733,7 +729,7 @@ def _make_agent_summary_with_provider(
     )
 
 
-def _build_mixed_runtime_service() -> "PanelService":
+def _build_mixed_runtime_service() -> PanelService:
     """Build a service with 3 canonical agents:
 
     - 'agent-claude'  → telemetry providers=["claude"]
@@ -893,7 +889,7 @@ class TestRuntimeFilterBackwardCompatParity:
             f"  claude: {ids_claude}"
         )
 
-        for card_no_qs, card_claude in zip(agents_no_qs, agents_claude):
+        for card_no_qs, card_claude in zip(agents_no_qs, agents_claude, strict=False):
             # Compare all keys except time-sensitive generated_at.
             keys_to_compare = set(card_no_qs.keys()) - {"telemetry"}
             for key in keys_to_compare:

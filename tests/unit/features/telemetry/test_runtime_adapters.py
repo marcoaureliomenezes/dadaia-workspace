@@ -16,9 +16,8 @@ Tests verify:
 from __future__ import annotations
 
 import pathlib
-import time
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -300,7 +299,6 @@ def test_claude_liveness_old_mtime_returns_ended(tmp_path: pathlib.Path) -> None
 
     # Set mtime to 90 minutes ago.
     old_ts = (datetime.now(tz=UTC) - timedelta(minutes=90)).timestamp()
-    import os
 
     os.utime(session_file, (old_ts, old_ts))
 
@@ -320,7 +318,6 @@ def test_claude_liveness_idle_mtime_returns_idle(tmp_path: pathlib.Path) -> None
 
     # Set mtime to 30 minutes ago (> 5 min, <= 60 min → idle).
     idle_ts = (datetime.now(tz=UTC) - timedelta(minutes=30)).timestamp()
-    import os
 
     os.utime(session_file, (idle_ts, idle_ts))
 
@@ -344,11 +341,12 @@ def test_codex_liveness_returns_idle_stub() -> None:
     """
     adapter = CodexRuntimeAdapter()
     # Patch Path.home() to an empty tmp dir — no state_5.sqlite, no history.jsonl.
-    import tempfile
 
-    with tempfile.TemporaryDirectory() as empty_home:
-        with patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)):
-            result = adapter.liveness("any-session", "/workspace")
+    with (
+        tempfile.TemporaryDirectory() as empty_home,
+        patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)),
+    ):
+        result = adapter.liveness("any-session", "/workspace")
     assert result == "idle"
 
 
@@ -356,11 +354,11 @@ def test_codex_liveness_returns_idle_stub() -> None:
 # CodexRuntimeAdapter.liveness — Phase E full implementation
 # ---------------------------------------------------------------------------
 
-import json
-import os
-import sqlite3
-import tempfile
-import time as _time
+import json  # noqa: E402
+import os  # noqa: E402
+import sqlite3  # noqa: E402
+import tempfile  # noqa: E402
+import time as _time  # noqa: E402
 
 
 def _make_codex_home(
@@ -494,12 +492,13 @@ def test_codex_liveness_90min_delta_returns_ended(tmp_path: pathlib.Path) -> Non
 
 def test_codex_liveness_missing_files_returns_idle() -> None:
     """liveness returns 'idle' when ~/.codex does not exist (graceful degradation)."""
-    import tempfile
 
     adapter = CodexRuntimeAdapter()
-    with tempfile.TemporaryDirectory() as empty_home:
-        with patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)):
-            result = adapter.liveness("any-id", "/workspace")
+    with (
+        tempfile.TemporaryDirectory() as empty_home,
+        patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)),
+    ):
+        result = adapter.liveness("any-id", "/workspace")
     assert result == "idle"
 
 
