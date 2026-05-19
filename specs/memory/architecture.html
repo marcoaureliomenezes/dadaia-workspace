@@ -27,7 +27,7 @@
 <body>
 
 <h1>Architecture Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-19 · Closure: agents-r2-v1</p>
+<p class="meta">Última atualização: 2026-05-19 · Closure: panel-r4-v1</p>
 
 <section id="overview">
   <h2>Visão geral</h2>
@@ -120,6 +120,7 @@ sequenceDiagram
       <tr><td>features/specs/doctor</td><td>specs/ filesystem</td><td>Path-based, read-only</td><td>Recebe specs_dir absoluto; nunca escreve</td></tr>
       <tr><td>infrastructure/public_assets</td><td>public/ ↔ .dadaia/agentic/ ↔ projeções</td><td>Manifest + file copy</td><td>Manifest.json é o cache do que foi propagado</td></tr>
       <tr><td>PreToolUse hook</td><td>sdd-spec-gate.sh</td><td>JSON stdin / stdout</td><td>Fail-open: erros internos → allow</td></tr>
+      <tr><td>features/telemetry/reader/claude.py</td><td>features/telemetry/store DAO</td><td>Event stream → SQLite UPDATE</td><td>Extrai <code>agent_name</code> de <code>tool_use.input.subagent_type</code> em Task tool invocations de subagents despachados; propaga a persona via mapa <code>session_id → agent_name</code> a todos eventos subsequentes da mesma session; persiste via <code>UPDATE sessions WHERE session_id = ?</code> (idempotente). Backfill histórico via <code>scripts/backfill_telemetry_agent_name.py [--db PATH] [--dry-run]</code> — UPDATE em rows existentes, nunca INSERT, rodar duas vezes é no-op.</td></tr>
     </tbody>
   </table>
 </section>
