@@ -59,7 +59,7 @@ local with `pytest` and `dadaia specs doctor`).
   - One playbook per dropped workflow (≤ 20 lines each). `game-spec-definition` becomes a `scope=game` sub-entry of the `spec-refinement` playbook (per PLAN P2).
   - Acceptance: `grep -c '^### Playbook' dadaia_workspace/public/skills/project-orchestration/SKILL.md` → 8.
   - Depends: AGT-r2-05. Parallel with: P1, P3, P4.
-- [-] AGT-r2-09 — Wrap playbooks into skill body + lint pass (software-engineer)
+- [x] AGT-r2-09 — Wrap playbooks into skill body + lint pass (software-engineer)
   - Acceptance: file passes `dadaia public doctor`'s skill checks; cross-reference to PM-only invocation noted (R3). No external workflow file under `public/workflows/` references these playbooks (R6 / NFR8 note).
   - Depends: AGT-r2-08.
 
@@ -91,7 +91,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P5 — `paths:` block on 16 agents + path-scope gate
 
-- [ ] AGT-r2-13 — Add `paths:` block to PM, auditor, code-reviewer, security-reviewer, researcher (software-engineer)
+- [-] AGT-r2-13 — Add `paths:` block to PM, auditor, code-reviewer, security-reviewer, researcher (software-engineer)
   - Files: `dadaia_workspace/public/agents/{project-manager,project-auditor,code-reviewer,security-reviewer,researcher}.md` — frontmatter gains `paths.write_allowlist` per SPEC FR2.1 row.
   - Acceptance: all 5 files contain `^paths:` + `write_allowlist:` block; values match SPEC table verbatim.
   - Depends: AGT-r2-10, AGT-r2-11.
