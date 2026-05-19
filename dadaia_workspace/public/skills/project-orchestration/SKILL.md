@@ -212,3 +212,183 @@ dadaia public doctor              # verify all public lib projections are [ok]
 dadaia public stage               # stage local public/ edits
 dadaia public install --target all  # propagate staged edits to all contexts
 ```
+
+---
+
+## PM Playbooks
+
+Playbooks consolidate the 8 workflow files removed in `agents-r2-v1` (P1).
+Each playbook is invoked **only** by `project-manager` (PM-only invocation per
+SPEC R3). No corresponding `*.workflow.md` file exists under
+`dadaia_workspace/public/workflows/` (NFR8: keeping a stale workflow file would
+re-introduce the surface that P1 deleted).
+
+PM identifies the trigger, picks the playbook, dispatches the entry agent with
+the input contract above, then mediates if the playbook branches.
+
+### Playbook — architecture-review
+
+**Trigger:** ADR proposal, cross-cutting tech-debt spike, or new pattern adoption.
+
+**Entry:** `software-architect`.
+
+**Steps:**
+1. PM dispatches `software-architect` with the architectural question + relevant
+   memory atoms (`memory/architecture.html`, `memory/tech-stack.html`).
+2. Architect emits ADR report under
+   `.dadaia/reports/<context>/software-architect/<UTC>-adr-<slug>.html`.
+3. PM forwards ADR to `product-engineer` for SPEC integration (if release-bound)
+   or to `backlog/candidates.md` (if speculative).
+4. If ADR proposes migration: dispatch `software-engineer` (or `backend-engineer`
+   for Go surfaces) for impl planning; CLOSURE updates `memory/architecture.html`.
+
+**Stop conditions:** architect declines (out-of-scope) → backlog. Two valid
+options remain → escalate to operator via `dadaia-grill-me`.
+
+### Playbook — tdd-cycle
+
+**Trigger:** feature task with non-trivial logic where red-green-refactor is mandated.
+
+**Entry:** `software-engineer` (or `backend-engineer` for Go).
+
+**Steps:**
+1. PM confirms TASKS.md item is `[-]` and dispatches engineer with TDD intent
+   stated in the prompt.
+2. Engineer writes failing test first → commit (red).
+3. Engineer implements → commit (green).
+4. Engineer refactors → commit (refactor).
+5. PM dispatches `qa-engineer` for E2E coverage on the new behaviour.
+
+**Stop conditions:** engineer cannot reproduce a red test → spec gap → return to
+`product-engineer`. Refactor introduces regression → revert + re-plan.
+
+### Playbook — bug-fix-fastlane
+
+**Trigger:** reproducible defect with narrow blast radius; no SPEC change needed.
+
+**Entry:** `software-engineer`.
+
+**Steps:**
+1. PM captures the bug report (operator message or `qa-engineer` finding) and
+   classifies severity.
+2. PM dispatches `software-engineer` with: reproduction command, expected vs.
+   actual, target file(s).
+3. Engineer reproduces locally → writes regression test → patches → commits.
+4. PM dispatches `qa-engineer` for verification when patch is non-trivial; skip
+   when fix is one-line + has regression test.
+
+**Stop conditions:** root cause crosses sub-domain (e.g. spec drift) → escalate
+to `product-engineer`. Fix requires schema change → promote to feature delivery.
+
+### Playbook — game-bugfix
+
+**Trigger:** defect inside `repos/tauan-games/` (any of the 3 active games).
+
+**Entry:** `game-tester` (for triage) → `game-developer` or `game-designer`.
+
+**Steps:**
+1. PM dispatches `game-tester` with reproduction notes; tester classifies the
+   bug as logic (→ developer) or asset/design (→ designer).
+2. If tester emits two sub-reports (cross-domain), PM dispatches both
+   `game-developer` and `game-designer` in parallel using disjoint write sets.
+3. Each game-* agent patches its sub-domain; commits land in
+   `repos/tauan-games/` only.
+4. `game-tester` re-runs UE5 automation and emits the verification report.
+
+**Stop conditions:** bug requires engine upgrade → escalate to operator (engine
+upgrades are not in-domain for `game-*`). Visual regression unconfirmed → request
+new screenshot evidence from tester before re-dispatch.
+
+### Playbook — security-patch
+
+**Trigger:** CVE published against a dependency, `security-reviewer` finding,
+or operator-reported leak.
+
+**Entry:** `security-reviewer`.
+
+**Steps:**
+1. PM dispatches `security-reviewer` with the advisory ID, affected surface, and
+   severity hint.
+2. Reviewer emits triage report (severity, blast radius, mitigation options).
+3. If patch is code: PM dispatches `software-engineer` (or `backend-engineer`).
+   If patch is CI/CD or infra: PM dispatches `devops-engineer`.
+4. After fix lands, PM re-dispatches `security-reviewer` for verification +
+   updated posture report.
+
+**Stop conditions:** CRITICAL severity with active exploit → pause all other
+work (escalation trigger #4). Patch requires secret rotation → also dispatch
+W-13 (Secrets leak response).
+
+### Playbook — deploy-validation-only
+
+**Trigger:** deploy already happened; operator wants validation-only sweep
+(no code change in scope).
+
+**Entry:** `qa-engineer`.
+
+**Steps:**
+1. PM dispatches `qa-engineer` with the deploy target, expected behaviour, and
+   smoke-test scope (URL, container name, or panel surface).
+2. QA runs the smoke (Playwright, `dadaia panel`, container probe) and captures
+   evidence (screenshots, logs, sha256 of critical files).
+3. QA emits validation report at
+   `.dadaia/reports/<context>/qa-engineer/<UTC>-deploy-validation.html`.
+4. PM reads report and either closes the dispatch ([ok]) or opens a bugfix
+   fastlane (defect found).
+
+**Stop conditions:** QA finds CRITICAL drift between deployed state and
+`memory/*.html` → escalate to `project-auditor` for drift audit.
+
+### Playbook — design-validation
+
+**Trigger:** new UI surface or redesign request; visual/UX evidence needed
+before implementation.
+
+**Entry:** `design-specialist` (consumes screenshots from `qa-engineer`).
+
+**Steps:**
+1. PM dispatches `qa-engineer` first to capture current-state screenshots via
+   Playwright MCP under `.dadaia/reports/<context>/qa-engineer/<UTC>-*.png`.
+2. PM dispatches `design-specialist` with the screenshot paths + design brief.
+3. Designer emits spec report with tokens, sketches, WCAG audit, and handoff
+   block at
+   `.dadaia/reports/<context>/design-specialist/<UTC>-design-spec.html`.
+4. PM forwards the design report to `frontend-engineer` for implementation.
+   FE refuses to implement without a fresh design report (see
+   `design-specialist-scope` rule).
+
+**Stop conditions:** design conflict with `memory/product/*.html` semantics →
+route to `product-engineer` for spec arbitration.
+
+### Playbook — spec-refinement
+
+**Trigger:** open question on an existing SPEC, ambiguity discovered mid-impl,
+or operator request to crystalise a backlog item.
+
+**Entry:** `product-engineer`.
+
+**Steps:**
+1. PM dispatches `product-engineer` with the SPEC path (or backlog item) and
+   the open question.
+2. PE runs `dadaia-grill-me` (skill) on the operator for the irresolvable
+   slice; resolves the answerable slice by code inspection.
+3. PE emits refine-specs report at
+   `.dadaia/reports/<context>/product-engineer/<UTC>-refine-specs.html` and
+   updates the SPEC/PLAN/TASKS as required (gate-permitted writes only).
+4. PM routes the refined SPEC back to the original workflow (impl, deploy, etc.).
+
+#### scope=game
+
+Replaces the pre-r2 `game-spec-definition` workflow. When the refinement scope
+is a game SPEC under `specs/releases/<id>/` whose deliverables live in
+`repos/tauan-games/`, the protocol adds two steps:
+
+- PE consults `game-developer` and/or `game-designer` (read-only via report
+  reference) for engine-specific constraints before drafting FRs.
+- The CLOSURE phase routes memory updates through
+  `memory/product/<game-feature-slug>.html` and the relevant
+  `memory/architecture.html` UE5/Phaser/Three.js section, not generic memory.
+
+**Stop conditions:** refinement reveals a missing release entirely → PE files
+a new candidate in `backlog/candidates.md` and surfaces to operator.
+
