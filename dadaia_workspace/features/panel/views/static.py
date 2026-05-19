@@ -18,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
 from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
@@ -37,6 +38,7 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "structure.css": ("text/css; charset=utf-8", STRUCTURE_CSS.encode("utf-8")),
     "agents.css": ("text/css; charset=utf-8", AGENTS_CSS.encode("utf-8")),
     "workflows.css": ("text/css; charset=utf-8", WORKFLOWS_CSS.encode("utf-8")),
+    "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
     "core.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "core.js").read_bytes(),
@@ -52,6 +54,10 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "workflows.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "workflows.js").read_bytes(),
+    ),
+    "sessions.js": (
+        "application/javascript; charset=utf-8",
+        (_JS_DIR / "sessions.js").read_bytes(),
     ),
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",
