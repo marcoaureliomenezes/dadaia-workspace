@@ -5,6 +5,7 @@ description: >
   perf smells, dead code. Reads CI logs via gh CLI. Emits review report with severity
   badges and recommendation (approve/request-changes/comment). NEVER edits code. NEVER
   approves a PR.
+tier: 3
 model: claude-sonnet-4-6
 tools:
   - Read

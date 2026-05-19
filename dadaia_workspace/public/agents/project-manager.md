@@ -5,6 +5,7 @@ description: >
   workflow, dispatches agents via Agent tool. Mediates Decision Authority Matrix; escalates
   conflicts. NEVER writes code, specs, memory, tests, or CI. Output only to
   .dadaia/reports/<ctx>/project-manager/*.
+tier: 1
 model: claude-opus-4-7
 tools:
   - Read

@@ -92,7 +92,7 @@
 > or equivalent), `dadaia_workspace/features/panel/views/api.py`,
 > `tests/unit/features/agents/`, `tests/unit/features/panel/`.
 
-- [-] **PR4-11** — Add `tier:` frontmatter to every agent markdown under
+- [x] **PR4-11** — Add `tier:` frontmatter to every agent markdown under
   `dadaia_workspace/public/agents/`. Mapping: **T1** = `project-manager`,
   `project-auditor`. **T2** = `product-engineer`. **T3** = the 13 leaf specialists
   (`software-architect`, `software-engineer`, `backend-engineer`, `frontend-engineer`,

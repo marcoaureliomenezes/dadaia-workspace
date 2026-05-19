@@ -5,6 +5,7 @@ description: >
   assets estáticos, direção de arte, mapas, iluminação, áudio e pipeline geoespacial
   (QGIS → GDAL → Cesium → UE5). Pesquisa ativamente referências e dados públicos em
   fontes confiáveis. NÃO toca em lógica de jogo, IA de inimigos ou testes.
+tier: 3
 model: claude-opus-4-7
 color: purple
 tools:
