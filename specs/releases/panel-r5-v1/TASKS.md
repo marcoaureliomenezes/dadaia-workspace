@@ -372,7 +372,7 @@
 
 ### BE strand (backend-engineer)
 
-- [ ] **PR5-E1** — Flesh out `CodexRuntimeAdapter` in
+- [-] **PR5-E1** — Flesh out `CodexRuntimeAdapter` in
   `dadaia_workspace/features/telemetry/aggregator/runtimes.py`:
   `liveness(session_id, cwd)` reads `~/.codex/state_5.sqlite`
   `threads.updated_at` and tails `~/.codex/history.jsonl` for the most recent
