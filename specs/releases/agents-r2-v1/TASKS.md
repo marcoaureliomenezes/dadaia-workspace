@@ -262,7 +262,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P13 — Stage + install + doctor checkpoint #2 + consumer-repo audit
 
-- [ ] AGT-r2-43 — `dadaia public stage && install --target all && doctor` against final state (devops-engineer)
+- [-] AGT-r2-43 — `dadaia public stage && install --target all && doctor` against final state (devops-engineer)
   - Acceptance: `dadaia public doctor` reports `[ok]` everywhere; stale rule projections deleted from each target (R12); doctor emits exactly 4 parity lines per source (`root:AGENTS.md`, `root:CLAUDE.md`, `repos/<slug>:AGENTS.md`, `repos/<slug>:CLAUDE.md`), all `[ok]`; `sha256sum` cross-check confirms all projected `{AGENTS,CLAUDE}.md` share one unique hash per workspace+consumer (R9).
   - Depends: AGT-r2-28, AGT-r2-36, AGT-r2-42.
 - [ ] AGT-r2-44 — Consumer-repo audit sweep (devops-engineer)
