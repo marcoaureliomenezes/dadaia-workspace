@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Implementation Report - P11b Wire Installer (AGT-r2-35, AGT-r2-36)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: .5rem; margin-top: 0; }
+  h2 { font-size: 1.3rem; border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  a  { color: #0969da; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 87.5%;
+    background: #f6f8fa;
+    padding: .15em .4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e4e8ec;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; font-size: 90%; }
+  table { border-collapse: collapse; width: 100%; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) { background: #fafafa; }
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    margin: 1rem 0;
+    padding: .5rem 1rem;
+    color: #555;
+  }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .25rem 0; }
+  .meta {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    margin-bottom: 2rem;
+    font-size: .9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+  .meta span { color: #555; }
+  .meta strong { color: #1a1a1a; }
+  .badge {
+    display: inline-block;
+    padding: .15em .5em;
+    border-radius: 3px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-pass     { background: #daffd0; color: #1a5c00; }
+  .badge-pending  { background: #e0eaff; color: #0550ae; }
+  .badge-low      { background: #daffd0; color: #1a5c00; }
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <span><strong>Agent:</strong> software-engineer</span>
+  <span><strong>Generated:</strong> 2026-05-19T000000Z</span>
+  <span><strong>Context:</strong> dadaia-workspace</span>
+  <span><strong>Release:</strong> agents-r2-v1</span>
+  <span><strong>Phase:</strong> P11b</span>
+  <span><strong>Tasks:</strong> AGT-r2-35, AGT-r2-36</span>
+</div>
+
+<h1>Implementation Report - P11b Wire Installer</h1>
+
+<h2>Summary</h2>
+
+<p>Phase P11b wires the Option C install call site and verifies manifest parity for
+<code>data/AGENTS.md</code>.</p>
+
+<h3>AGT-r2-35 - Dispatch install call site to <code>_install_workspace_guardrail_pair</code></h3>
+<p>The <code>install()</code> method in <code>FileSystemPublicAssetManager</code>
+previously called <code>self._install_agents_md()</code>, which wrote only one file
+(<code>workspace-root/AGENTS.md</code>) via the legacy path. Under Option C, when
+<code>agentic_dir/data/AGENTS.md</code> is present, the method now calls
+<code>_install_workspace_guardrail_pair()</code> instead, which fans the single source
+out to all four required destinations: workspace-root pair plus one pair per
+marker-bearing consumer repo.</p>
+
+<p>The templates/AGENTS.md scaffolder path is preserved intact via an
+<code>else</code> branch that falls back to the legacy <code>_install_agents_md()</code>
+call when <code>data/AGENTS.md</code> is absent.</p>
+
+<h3>AGT-r2-36 - Manifest update for Option C</h3>
+<p>After P11a rewrote <code>data/AGENTS.md</code>, running <code>dadaia public stage</code>
+recomputed the SHA-256. The manifest now reflects the post-P11a content hash.
+<code>data/CLAUDE.md</code> is absent from the manifest (Option C invariant: there is
+no second source file).</p>
+
+<h2>Call-site diff</h2>
+
+<p>File: <code>dadaia_workspace/infrastructure/public_assets.py</code>, method <code>install()</code></p>
+
+<pre><code>-        targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
+-        self._install_agents_md(agentic_dir, workspace_root, force, installed)
+-        self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
++        targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
++        data_agents_md = agentic_dir / "data" / "AGENTS.md"
++        if data_agents_md.exists():
++            # Option C (ADR): single source fans out to workspace-root pair +
++            # one pair per marker-bearing consumer repo.  Replaces the legacy
++            # _install_agents_md path for data/AGENTS.md.
++            _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
++        else:
++            # Legacy / scaffold path: templates/AGENTS.md -> workspace-root only.
++            self._install_agents_md(agentic_dir, workspace_root, force, installed)
++        self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)</code></pre>
+
+<h2>Tests written</h2>
+
+<table>
+  <thead>
+    <tr><th>File</th><th>Test</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>tests/unit/features/public/test_workspace_guardrail_pair.py</code></td>
+      <td><code>test_install_dispatches_to_workspace_guardrail_pair</code> (Case 8)</td>
+      <td>Asserts that <code>FileSystemPublicAssetManager.install()</code> writes all 4 guardrail
+          files when <code>data/AGENTS.md</code> is present in staged agentic dir (AGT-r2-35 acceptance)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>All tests pass</h3>
+<pre><code>$ pytest tests/unit/features/public/test_workspace_guardrail_pair.py tests/integration/test_public_install_e2e.py -q
+11 passed in 3.42s</code></pre>
+
+<h2>Pre/post install file counts</h2>
+
+<table>
+  <thead>
+    <tr><th>Target</th><th>Pre-install</th><th>Post-install</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>workspace-root/AGENTS.md</code></td>
+      <td>[drift] (stale from before P11a)</td>
+      <td>[ok]</td>
+      <td><span class="badge badge-pass">OK</span></td>
+    </tr>
+    <tr>
+      <td><code>workspace-root/CLAUDE.md</code></td>
+      <td>[drift]</td>
+      <td>[ok]</td>
+      <td><span class="badge badge-pass">OK</span></td>
+    </tr>
+    <tr>
+      <td>Consumer repos (all non-marker)</td>
+      <td>[skip] no .dadaia/ marker</td>
+      <td>[skip] no .dadaia/ marker</td>
+      <td><span class="badge badge-pass">EXPECTED SKIP</span></td>
+    </tr>
+    <tr>
+      <td><code>repos/dadaia-workspace</code> (self)</td>
+      <td>[skip] self-projection</td>
+      <td>[skip] self-projection (package_version=0.1.0)</td>
+      <td><span class="badge badge-pass">R14 SELF-SKIP OK</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Install command run: <code>dadaia public install --target all --force</code></p>
+<pre><code>[ok]   /home/marco/workspace/dadaia/AGENTS.md
+[ok]   /home/marco/workspace/dadaia/CLAUDE.md
+[ok]   /home/marco/workspace/dadaia/.dadaia/reports/AGENTS.md</code></pre>
+
+<h2>Doctor output for <code>data/AGENTS.md</code></h2>
+
+<pre><code>$ dadaia public doctor (post-install)
+
+[ok] stage:data/AGENTS.md
+[ok] stage:data/reports-AGENTS.md
+[ok] stage:data/repos.xlsx
+[ok] root:AGENTS.md
+[ok] root:CLAUDE.md
+[ok] reports:AGENTS.md
+# No [drift] or [missing] entries found.</code></pre>
+
+<h2>Manifest grep evidence</h2>
+
+<pre><code>$ grep -c '"data/CLAUDE.md"' .dadaia/agentic/manifest.json
+0
+
+$ grep -A3 '"data/AGENTS.md"' .dadaia/agentic/manifest.json
+      "path": "data/AGENTS.md",
+      "sha256": "930d26ebbc4c24e7a27860df75069169aa17ba50d32b0bb4b80a11348c4ba55b",
+      "type": "data"
+
+$ sha256sum .dadaia/agentic/data/AGENTS.md
+930d26ebbc4c24e7a27860df75069169aa17ba50d32b0bb4b80a11348c4ba55b  .dadaia/agentic/data/AGENTS.md</code></pre>
+
+<p>The manifest SHA-256 matches the staged file. No <code>data/CLAUDE.md</code> entry exists (Option C invariant satisfied).</p>
+
+<h2>Security checklist</h2>
+
+<table>
+  <thead>
+    <tr><th>OWASP Item</th><th>Relevance</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A01 - Broken Access Control</td>
+      <td>File writes to workspace root and consumer repos</td>
+      <td>Self-skip (R14) prevents overwriting the source tree; marker check prevents writing to non-dadaia repos. No user input drives paths.</td>
+    </tr>
+    <tr>
+      <td>A02 - Hardcoded Credentials</td>
+      <td>Not applicable</td>
+      <td>No secrets or credentials involved.</td>
+    </tr>
+    <tr>
+      <td>A03 - Input Validation</td>
+      <td>File paths constructed from workspace_root</td>
+      <td>Paths are constructed from trusted Path objects, not user-supplied strings. No shell injection surface.</td>
+    </tr>
+    <tr>
+      <td>A08 - Software Integrity</td>
+      <td>SHA-256 used for manifest tracking</td>
+      <td>Manifest SHA verified to match staged file after <code>dadaia public stage</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Deploy</h2>
+
+<p>Branch: <code>release/agents-r2-v1</code></p>
+<p>Commit: <code>6c5c2e3</code> - feat(public-assets): dispatch install to _install_workspace_guardrail_pair for data/AGENTS.md (AGT-r2-35, AGT-r2-36)</p>
+<p>No separate workflow dispatch required for this phase; changes are in library code and tests.</p>
+
+<h2>QA validation</h2>
+
+<p><span class="badge badge-pending">PENDING</span> qa-engineer validation for E2E acceptance criteria. Tasks AGT-r2-35 and AGT-r2-36 marked <code>[x]</code> in TASKS.md after unit + integration test confirmation.</p>
+
+</body>
+</html>
