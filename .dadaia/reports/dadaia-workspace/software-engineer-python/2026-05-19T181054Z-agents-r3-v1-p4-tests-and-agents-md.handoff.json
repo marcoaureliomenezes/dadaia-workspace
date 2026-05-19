@@ -1,0 +1,62 @@
+{
+  "schema_version": "handoff-v1",
+  "agent": "software-engineer-python",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-05-19T18:10:54Z",
+  "release_id": "agents-r3-v1",
+  "artifact": {
+    "type": "report",
+    "path": ".dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-19T181054Z-agents-r3-v1-p4-tests-and-agents-md.html",
+    "content_hash": "d2eecf46daa7a8286cbc9fd916bf33dc8b7aee016057542248234e30791cb2d2"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "P4 of agents-r3-v1 complete; 6 tasks (R3-17..R3-22) closed as DONE. Phase: IMPLEMENTATION. Status: green."
+    },
+    {
+      "severity": "INFO",
+      "message": "R3-17: tests/unit/features/agents/test_reader.py — count assertion 16->20; 4 new tests cover the 5 new personas (parse, tier=3, model, skills, write_allowlist)."
+    },
+    {
+      "severity": "INFO",
+      "message": "R3-18: tests/unit/features/panel/test_api_agents.py — card count 16->20; tier rollup T3=13->17; sample T3 swapped from software-engineer to software-engineer-python."
+    },
+    {
+      "severity": "INFO",
+      "message": "R3-19: NO-OP — tests drive directly off _PUBLIC_AGENTS_DIR; no isolated fixtures required for the 5 new personas."
+    },
+    {
+      "severity": "INFO",
+      "message": "R3-20: tests/unit/gate/test_path_scope.py +5 tests — SE-Python accepts cli/main.py; AI-engineer rejects same path; SE-Node accepts features/, rejects public/agents/."
+    },
+    {
+      "severity": "INFO",
+      "message": "R3-21: data/AGENTS.md rewritten — 20-agent inventory (T1=2, T2=1, T3=17 alphabetical); 280 lines (≤280); zero forbidden-string hits; zero bare software-engineer refs."
+    },
+    {
+      "severity": "INFO",
+      "message": "R3-22: scripts/check_agent_topology.py authored — 5 invariants (count, frontmatter, dispatcher mentions, DAM rows, no bare SE). Exits 0 on green, 1 on drift."
+    },
+    {
+      "severity": "LOW",
+      "message": "Drift surfaced by R3-22 guard: project-auditor.md does not name 7 T3 leaves (backend-engineer, devops-engineer, frontend-engineer, game-{designer,developer,tester}, software-architect). Outside SE-Python write_allowlist — owners: ai-engineer or product-engineer in P5/hotfix."
+    },
+    {
+      "severity": "LOW",
+      "message": "Drift surfaced by R3-22 guard: 37 bare `software-engineer` prose references remain in agents/skills/rules (qa-engineer.md, backend-engineer.md, frontend-engineer.md, product-engineer.md, devops-engineer.md, game-developer.md, software-architect.md, two prose mentions in SE-Python/SE-Node themselves, skills/dadaia-handoff-emitter/SKILL.md examples, rules/game-developer-scope.md, data/reports-AGENTS.md). No dispatch breakage — owners: ai-engineer in P5/hotfix."
+    },
+    {
+      "severity": "INFO",
+      "message": "Validations green: 628 agents+panel unit tests pass; 24 path-scope gate tests pass; dadaia specs doctor 0 errors / 0 warnings."
+    }
+  ],
+  "decisions_required": [
+    "Operator: schedule a cleanup task (ai-engineer or product-engineer) to close I3 (auditor leaf mentions) and I5 (37 bare SE prose refs) before R3-22 guard can be wired into CI."
+  ],
+  "next_handoff": {
+    "agent": "devops-engineer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
+  }
+}
