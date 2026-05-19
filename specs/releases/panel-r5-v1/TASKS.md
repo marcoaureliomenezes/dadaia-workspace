@@ -343,7 +343,7 @@
   `pytest tests/unit/features/panel/test_api_agents.py -v` green; the test
   file contains BOTH the tier assertions and the new runtime-filter
   assertions; no r4 assertion was deleted or weakened.
-- [-] **PR5-D13** — Backward-compatibility parity test (NFR5). Extend
+- [x] **PR5-D13** — Backward-compatibility parity test (NFR5). Extend
   `tests/unit/features/panel/test_api_agents.py` with an assertion that
   `/api/agents?runtime=claude` returns a response whose item shape is
   byte-identical (modulo `provider`-scoped filtering) to `/api/agents` with no
