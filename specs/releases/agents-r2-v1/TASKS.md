@@ -294,12 +294,12 @@ local with `pytest` and `dadaia specs doctor`).
   - `<section id="layers">` gains 3 notes per SPEC FR5: path-scope gate is now active; `paths:` is enforced per-agent; rule-file inlining moved 3 scopes into agent bodies.
   - Acceptance: rendered HTML lints clean (`dadaia specs doctor`); memory atomicity preserved (no Changelog section).
   - Depends: AGT-r2-48.
-- [-] AGT-r2-50 — Update `specs/memory/product/index.html` + `agent-orchestration.html` (product-engineer)
+- [x] AGT-r2-50 — Update `specs/memory/product/index.html` + `agent-orchestration.html` (product-engineer)
   - `product/index.html`: catalog reflects workflow count = 7.
   - `product/agent-orchestration.html`: 16 agents + 7 workflows + 8 PM playbooks + path-scope gate + 2 rules + Option C dual-name projection note.
   - Acceptance: both HTMLs render with current state only; no history sections; `dadaia specs doctor` clean.
   - Depends: AGT-r2-48.
-- [ ] AGT-r2-51 — Record FR9 decision + backlog returns (product-engineer)
+- [-] AGT-r2-51 — Record FR9 decision + backlog returns (product-engineer)
   - `CLOSURE.md` `## Backlog returns` adds: `--repos-only` / `--workspace-only` flags → `specs/backlog/candidates.md`; per-projection opt-out marker → `specs/backlog/ideas.md`.
   - Files written: `specs/backlog/candidates.md` (append), `specs/backlog/ideas.md` (append).
   - Acceptance: both backlog files contain the new bullets; CLOSURE links them.

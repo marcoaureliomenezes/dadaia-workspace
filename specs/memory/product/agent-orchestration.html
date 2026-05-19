@@ -32,18 +32,19 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>agent-orchestration</h1>
-<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: agents-r1-v1</p>
+<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: agents-r2-v1</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
-  <p>Executa <strong>workflows</strong> (DAGs de stages) sobre uma topologia de <strong>16 agentes em 3 tiers</strong>: Tier 1 orquestradores com tool <code>Agent</code> (<code>project-manager</code>, <code>project-auditor</code>) que despacham; Tier 2 curator (<code>product-engineer</code>) autor de SPEC/PLAN/TASKS/CLOSURE e guardião de memory; Tier 3 leaf specialists (13 agentes — 9 implementers + <code>code-reviewer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>design-specialist</code>) sem tool <code>Agent</code>.</p>
+  <p>Executa <strong>workflows</strong> (DAGs de stages) sobre uma topologia de <strong>16 agentes em 3 tiers</strong>: Tier 1 orquestradores com tool <code>Agent</code> (<code>project-manager</code>, <code>project-auditor</code>) que despacham; Tier 2 curator (<code>product-engineer</code>) autor de SPEC/PLAN/TASKS/CLOSURE e guardião de memory; Tier 3 leaf specialists (13 agentes — 9 implementers + <code>code-reviewer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>design-specialist</code>) sem tool <code>Agent</code>. <code>product-engineer</code> e <code>software-architect</code> não declaram <code>Bash</code>; invocações de shell são delegadas ao PM.</p>
   <p>Cada stage dispatcha um agente em runtime escolhido (cli, Claude API, Codex, OpenCode). Suporta dependências, paralelização via <code>parallel_group</code>, gates de aprovação humana (<code>operator-approval</code>), binding de inputs e retomada após falhas/gates. Cada run produz <strong>manifest</strong> imutável + <strong>event log</strong> JSONL para auditoria completa.</p>
+  <p>O catálogo declarativo tem <strong>7 workflows</strong>; padrões de routing puro (classify → dispatch single agent → done) ficam como <strong>8 PM playbooks</strong> embedidos na skill <code>project-orchestration</code>, invocados nativamente pelo <code>project-manager</code> sem custo YAML.</p>
 </section>
 
 <section id="flow">
   <h2>Fluxo de uso</h2>
   <ol class="flow">
-    <li><code>dadaia orchestrate list</code> — lista os 15 workflows pré-instalados. Refatorados nesta release: <code>spec-refinement</code>, <code>game-spec-definition</code>, <code>cross-cutting-feature</code>, <code>onboarding-new-repo</code>, <code>architecture-review</code>, <code>hotfix-release</code> (PE → PM nos stages de discovery/synthesis). Inalterados: <code>tdd-cycle</code>, <code>bug-fix-fastlane</code>, <code>game-bugfix</code>, <code>security-patch</code>, <code>game-dev-cycle</code>, <code>deploy-validation-only</code>. Novos: <code>audit-cycle</code>, <code>code-review-fan-out</code>, <code>design-validation</code>.</li>
+    <li><code>dadaia orchestrate list</code> — lista os 7 workflows pré-instalados: <code>spec-refinement</code>, <code>cross-cutting-feature</code>, <code>onboarding-new-repo</code>, <code>hotfix-release</code>, <code>game-dev-cycle</code>, <code>audit-cycle</code>, <code>code-review-fan-out</code>. Todos justificam custo declarativo por prompt-chaining com gates ou paralelização. Padrões de routing puro vivem como PM playbooks na skill <code>project-orchestration</code>.</li>
     <li><code>dadaia orchestrate show audit-cycle</code> — mostra o schema do workflow (inputs, stages com <code>needs</code>/<code>parallel_group</code>/<code>gate</code>, <code>expected_output</code>).</li>
     <li><code>dadaia orchestrate run spec-refinement --input topic=auth</code> — cria run (id gerado), persiste <code>manifest.json</code>, emite <code>RUN_STARTED</code>, identifica stages prontas e despacha-as.</li>
     <li>O <code>StageRunner</code> agrupa stages com mesmo <code>parallel_group</code> e despacha simultaneamente via <code>AgentDispatcher</code> (cli/claude/codex/opencode). Cada stage recebe seu <code>invocation.md</code> em <code>.dadaia/runs/&lt;run_id&gt;/&lt;stage_id&gt;/</code>.</li>
@@ -85,12 +86,13 @@ sequenceDiagram
 
 <section id="trigger">
   <h2>Trigger típico</h2>
-  <p>Quando o operador endereça <code>project-manager</code> com uma demanda — feature, bug, audit, release, research, design, security. PM categoriza, escolhe um dos 15 workflows e despacha. Também usado por hooks/cron schedules para tarefas recorrentes (ex.: <code>audit-cycle</code> semanal).</p>
+  <p>Quando o operador endereça <code>project-manager</code> com uma demanda — feature, bug, audit, release, research, design, security. PM categoriza, escolhe um dos 7 workflows ou aciona um dos 8 PM playbooks da skill <code>project-orchestration</code>, e despacha. Também usado por hooks/cron schedules para tarefas recorrentes (ex.: <code>audit-cycle</code> semanal).</p>
 </section>
 
 <section id="differential">
   <h2>Diferencial</h2>
   <p>A separação em 3 tiers elimina três problemas estruturais da topologia anterior: (1) <strong>product-engineer não é mais bottleneck</strong> — discovery/dispatch/synthesis foram movidos para <code>project-manager</code>, e PE volta a ser leaf invocável quando uma spec precisa ser escrita; (2) <strong>sub-agente nunca tenta spawnar sub-agente</strong> — apenas Tier 1 (PM/auditor) declara tool <code>Agent</code>, evitando silent failures no harness Claude; (3) <strong>design decoupled de implementação</strong> — <code>design-specialist</code> emite specs visuais que <code>frontend-engineer</code> consome, sem que FE arbitre UX. Adicionalmente, <code>project-auditor</code> traz drift detection de primeira classe entre <code>specs/memory/*.html</code> e o código, com compliance score 1–10 em 6 dimensões.</p>
+  <p><strong>Path-scope enforcement (r2):</strong> o gate PreToolUse <code>sdd-spec-gate.sh</code> valida <code>file_path</code> de Write/Edit/MultiEdit contra <code>paths.write_allowlist</code> declarado no frontmatter de cada agente; mismatch → bloqueio com mensagem <code>[PATH SCOPE ERROR]</code>. Os 16 agentes declaram <code>paths:</code>. Apenas 2 rule files canônicos sobrevivem (<code>game-agents-coordination.md</code>, <code>game-developer-scope.md</code>); rules per-agent inlined nos próprios corpos como seção <code>## Scope and forbidden actions</code>. <code>data/AGENTS.md</code> é fonte única (Option C) fanned-out para o par <code>AGENTS.md</code> + <code>CLAUDE.md</code> em workspace-root e em consumer-repos com marker <code>.dadaia/agentic/</code>.</p>
 </section>
 
 <section id="runtime-state">
@@ -107,9 +109,9 @@ sequenceDiagram
   <h2>Dependências</h2>
   <ul>
     <li>Depende de <a href="context-management.html">context-management</a> (resolve context ativo para path templating).</li>
-    <li>Depende de <a href="public-asset-distribution.html">public-asset-distribution</a> (16 agentes + 15 workflows instalados a partir de <code>public/agents/</code> e <code>public/workflows/</code>).</li>
+    <li>Depende de <a href="public-asset-distribution.html">public-asset-distribution</a> (16 agentes + 7 workflows + Option C dual-name pair installer instalados a partir de <code>public/agents/</code>, <code>public/workflows/</code> e <code>public/data/AGENTS.md</code>).</li>
     <li>Depende de <a href="agent-comms.html">agent-comms</a> (sidecars <code>handoff-v1</code> de cada report; consumido por <code>project-auditor</code> em auditorias).</li>
-    <li>Os 16 agentes + 15 workflows + 5 novas skills (<code>project-orchestration</code>, <code>architecture-code-review</code>, <code>security-audit-protocol</code>, <code>drift-detection</code>, <code>ux-ui-review</code>) vivem como assets canônicos versionados.</li>
+    <li>Os 16 agentes + 7 workflows + 2 rules canônicos + 8 PM playbooks na skill <code>project-orchestration</code> vivem como assets canônicos versionados. Skills cross-cutting: <code>project-orchestration</code>, <code>architecture-code-review</code>, <code>security-audit-protocol</code>, <code>drift-detection</code>, <code>ux-ui-review</code>, <code>dadaia-workspace-doctor</code>, <code>dev-server-registry</code>.</li>
   </ul>
 </section>
 
