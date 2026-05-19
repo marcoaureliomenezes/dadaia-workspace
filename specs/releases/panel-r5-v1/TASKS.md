@@ -289,7 +289,7 @@
 
 ### QA strand (qa-engineer)
 
-- [ ] **PR5-D8** — Extend
+- [-] **PR5-D8** — Extend
   `tests/e2e/test_panel_sessions_tab.spec.ts` to cover the three-tab × two-
   runtime matrix: toggling the switcher reloads Agents, Workflows, AND
   Sessions; localStorage persistence verified by `page.reload()` then
