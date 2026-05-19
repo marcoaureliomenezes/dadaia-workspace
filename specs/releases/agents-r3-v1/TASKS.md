@@ -72,7 +72,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
   - Preconditions: P1 complete (5 new persona files exist).
   - Done criterion: dispatch line drops `software-engineer`; lists `software-engineer-python`, `software-engineer-node`, `data-engineer`, `data-analyst`, `ai-engineer` in the appropriate dispatch group; prose mentions of bare `software-engineer` rewritten or removed.
   - Acceptance grep: `grep -nE '\bsoftware-engineer\b' dadaia_workspace/public/agents/project-manager.md | grep -v 'software-engineer-python\|software-engineer-node'` → empty.
-- [-] R3-13 — Update `project-auditor.md` evidence list (`product-engineer`)
+- [x] R3-13 — Update `project-auditor.md` evidence list (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/project-auditor.md`.
   - Done criterion: evidence list extended to include `data-engineer` (data-drift evidence) and `ai-engineer` (prompt-efficiency evidence); same zero-bare-SE grep acceptance as R3-12.
 - [ ] R3-14 — Replace Decision Authority Matrix Python/Node row with 5 new rows (`product-engineer`)

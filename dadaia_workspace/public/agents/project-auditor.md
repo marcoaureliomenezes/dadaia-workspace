@@ -125,6 +125,15 @@ For a full audit, dispatch in parallel:
 - `security-reviewer` — OWASP scan, CVEs, secrets, IaC
 - `researcher` — fact-check claims in memory atoms against current reality (versions, APIs)
 - `qa-engineer` — test pyramid health, coverage vs declared acceptance criteria
+- `software-engineer-python` — Python-surface drift evidence (CLI, lib, tooling) when memory claims diverge from Python code
+- `software-engineer-node` — Node-surface drift evidence (server-side tooling) when memory claims diverge from Node code
+- `data-engineer` — data-pipeline drift evidence (Spark/Airflow/Delta/Kafka) when memory's data layer claims diverge from pipeline code
+- `ai-engineer` — prompt-efficiency / persona-shape drift evidence when memory's agent topology diverges from on-disk personas/skills/rules
+- `design-specialist` — visual / UX drift evidence
+
+Note: `data-analyst` is NOT a routine drift-evidence source (it authors BI artifacts, not
+production code). Dispatch only when an audit specifically needs visual evidence on a
+BI artifact.
 
 Collect their reports before proceeding to Step 4.
 
@@ -234,7 +243,10 @@ Stop and alert the operator when:
 directly for an ad-hoc audit.
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `researcher`, `qa-engineer`,
-`design-specialist` (for design dimension evidence).
+`design-specialist` (visual/UX evidence), `software-engineer-python` (Python-surface
+drift evidence), `software-engineer-node` (Node-surface drift evidence), `data-engineer`
+(data-pipeline drift evidence), `ai-engineer` (prompt-efficiency / persona-shape drift
+evidence). `data-analyst` is not a routine evidence source.
 
 **Outputs flow to:** operator + `project-manager` for remediation dispatch + `product-engineer`
 if memory updates are warranted.
@@ -268,7 +280,9 @@ conformidade com os padrões SDD.
 
 - Ler todo `specs/**`, `dadaia_workspace/**`, qualquer projeto sob `repos/**`.
 - Despachar especialistas para evidência: `researcher`, `code-reviewer`,
-  `security-reviewer`, `qa-engineer`, `design-specialist`.
+  `security-reviewer`, `qa-engineer`, `design-specialist`,
+  `software-engineer-python`, `software-engineer-node`, `data-engineer`,
+  `ai-engineer`. (`data-analyst` não é fonte rotineira de evidência.)
 - Escrever apenas em `.dadaia/reports/<context>/project-auditor/<ts>-*.html`
   (audit reports + handoff sidecars).
 - Recomendar a abertura de hotfix/feature release quando drift severo for
