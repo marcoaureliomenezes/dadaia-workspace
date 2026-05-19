@@ -228,7 +228,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P11c — Author FR10 operator manual-migration checklist (W4)
 
-- [ ] AGT-r2-37 — Create CLOSURE.md stub with `## Operator manual migration (FR10)` section (product-engineer)
+- [-] AGT-r2-37 — Create CLOSURE.md stub with `## Operator manual migration (FR10)` section (product-engineer)
   - File: `specs/releases/agents-r2-v1/CLOSURE.md` (stub; full sections finalised in P14).
   - Section content (literal commands): (1) capture pre-r2 workspace-root `CLAUDE.md` SHA; (2) author `services/CLAUDE.md` with Hermes / OpenClaw / Traefik sections; (3) mirror to `services/AGENTS.md`, verify byte-identical via `sha256sum`; (4) run `dadaia public stage && install --target all && doctor`; (5) post-verify: workspace-root pair sha256-match, forbidden-strings grep on root `CLAUDE.md` exits 1, same grep on `services/CLAUDE.md` exits 0.
   - Acceptance: section present with the 5 numbered command groups; PR description (AGT-r2-44) cross-references this section.
