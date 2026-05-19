@@ -81,7 +81,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P4 — Architect consult for path-scope gate pattern (W1)
 
-- [-] AGT-r2-12 — Software-architect emits path-scope gate-pattern report (software-architect)
+- [x] AGT-r2-12 — Software-architect emits path-scope gate-pattern report (software-architect)
   - File: `.dadaia/reports/dadaia-workspace/software-architect/<UTC>-path-scope-gate-pattern.html` + sidecar.
   - Content: runtime agent-detection mechanism (env var / PreToolUse payload field / fallback per harness) + cache strategy; covers R2 fail-open.
   - Acceptance: report + `.handoff.json` sidecar emitted; sidecar validates against `handoff-v1`.
