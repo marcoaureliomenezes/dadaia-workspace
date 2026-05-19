@@ -140,7 +140,7 @@ local with `pytest` and `dadaia specs doctor`).
   - Files: `tests/unit/features/public/test_workflows.py` (count 7), `tests/unit/features/agents/test_agent_reader.py` (parses `paths.write_allowlist`), any panel test asserting workflow count.
   - Acceptance: full unit test sweep `pytest -q tests/` green.
   - Depends: AGT-r2-07, AGT-r2-20.
-- [ ] AGT-r2-23 — Author `tests/unit/features/public/test_workspace_guardrail_pair.py` placeholder (qa-engineer)
+- [-] AGT-r2-23 — Author `tests/unit/features/public/test_workspace_guardrail_pair.py` placeholder (qa-engineer)
   - Skeleton with 6 placeholder cases (4-target projection write; 3 skip variants — no-marker / no-`agentic/` / self-slug; nested-pair non-interference; doctor 4-line output). Real assertions land in P9 once installer is built.
   - Acceptance: file imports and collects under pytest; cases marked `@pytest.mark.xfail(reason="implemented in P9")` or `pytest.skip()` with clear reason.
   - Depends: AGT-r2-22. Parallel with: AGT-r2-21.
