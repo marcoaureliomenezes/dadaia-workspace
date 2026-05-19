@@ -47,13 +47,13 @@ if TYPE_CHECKING:
 # Layout constants
 # ---------------------------------------------------------------------------
 
-NODE_W: int = 140        # node width in px
-NODE_H: int = 40         # node height in px
-GAP_X: int = 80          # horizontal gap between columns
-GAP_Y: int = 20          # vertical gap between nodes in same column
-MARGIN_X: int = 20       # left margin
-MARGIN_Y: int = 20       # top margin
-BAND_PAD: int = 8        # padding around parallel-group band
+NODE_W: int = 140  # node width in px
+NODE_H: int = 40  # node height in px
+GAP_X: int = 80  # horizontal gap between columns
+GAP_Y: int = 20  # vertical gap between nodes in same column
+MARGIN_X: int = 20  # left margin
+MARGIN_Y: int = 20  # top margin
+BAND_PAD: int = 8  # padding around parallel-group band
 
 # ---------------------------------------------------------------------------
 # Internal layout types
@@ -219,12 +219,12 @@ def _svg_style() -> str:
 def _arrowhead_marker() -> str:
     """SVG <defs> block containing the arrowhead marker for edges."""
     return (
-        '<defs>'
+        "<defs>"
         '<marker id="dag-arrow" markerWidth="8" markerHeight="8" '
         'refX="6" refY="3" orient="auto" markerUnits="strokeWidth">'
         '<path d="M0,0 L0,6 L8,3 z" fill="#8090b0"/>'
-        '</marker>'
-        '</defs>'
+        "</marker>"
+        "</defs>"
     )
 
 
@@ -264,11 +264,11 @@ def _render_node(node: _NodeLayout) -> str:
         f'transform="translate({node.x},{node.y})">'
         f'<rect width="{NODE_W}" height="{NODE_H}" rx="6" ry="6"/>'
         f'<text class="stage-id" x="{NODE_W // 2}" y="16" text-anchor="middle">'
-        f'{stage_id_escaped}</text>'
+        f"{stage_id_escaped}</text>"
         f'<text class="agent-name" x="{NODE_W // 2}" y="30" text-anchor="middle">'
-        f'{agent_escaped}</text>'
-        f'{gate_marker}'
-        f'</g>'
+        f"{agent_escaped}</text>"
+        f"{gate_marker}"
+        f"</g>"
     )
 
 
@@ -348,9 +348,9 @@ def render_dag_svg(stages: list["StageDTO"]) -> str:
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" '
             'width="200" height="60" role="img">'
-            '<title>Workflow DAG (empty)</title>'
+            "<title>Workflow DAG (empty)</title>"
             '<text x="10" y="30" font-size="12" fill="#888">No stages</text>'
-            '</svg>'
+            "</svg>"
         )
 
     # 1. Assign layers
@@ -380,7 +380,7 @@ def render_dag_svg(stages: list["StageDTO"]) -> str:
         f'width="{max_x}" height="{max_y}" role="img" '
         f'viewBox="0 0 {max_x} {max_y}">'
     )
-    parts.append(f'<title>Workflow DAG — {len(stages)} stage(s)</title>')
+    parts.append(f"<title>Workflow DAG — {len(stages)} stage(s)</title>")
     parts.append(_svg_style())
     parts.append(_arrowhead_marker())
 

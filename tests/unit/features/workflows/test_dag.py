@@ -454,9 +454,7 @@ def test_all_nodes_have_data_stage_id() -> None:
     for elem in root.iter():
         cls = elem.get("class", "")
         if "dag-node" in cls:
-            assert elem.get("data-stage-id"), (
-                "Node missing data-stage-id"
-            )
+            assert elem.get("data-stage-id"), "Node missing data-stage-id"
 
 
 def test_all_nodes_have_data_agent() -> None:
@@ -489,9 +487,7 @@ def test_all_nodes_have_aria_label() -> None:
     for elem in root.iter():
         cls = elem.get("class", "")
         if "dag-node" in cls:
-            assert elem.get("aria-label"), (
-                f"Node {elem.get('data-stage-id')!r} missing aria-label"
-            )
+            assert elem.get("aria-label"), f"Node {elem.get('data-stage-id')!r} missing aria-label"
 
 
 # ---------------------------------------------------------------------------
@@ -611,7 +607,13 @@ def test_spec_refinement_wide_parallel_group_same_layer() -> None:
     root = _parse_svg(svg)
     layers = _get_node_layers(root)
 
-    specialist_ids = ["arch_review", "devops_review", "qa_review", "frontend_review", "backend_review"]
+    specialist_ids = [
+        "arch_review",
+        "devops_review",
+        "qa_review",
+        "frontend_review",
+        "backend_review",
+    ]
     specialist_xs = {sid: layers.get(sid) for sid in specialist_ids}
     assert all(x is not None for x in specialist_xs.values()), (
         f"Some specialist nodes not found in SVG: {specialist_xs}"
@@ -831,7 +833,8 @@ def test_single_gate_node_has_correct_classes() -> None:
     root = _parse_svg(svg)
     assert _count_nodes(root) == 1
     nodes_with_gate = [
-        e for e in root.iter()
+        e
+        for e in root.iter()
         if "dag-node" in e.get("class", "") and "dag-gate" in e.get("class", "")
     ]
     assert len(nodes_with_gate) == 1

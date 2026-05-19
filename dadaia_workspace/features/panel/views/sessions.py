@@ -39,7 +39,6 @@ def render_sessions_section() -> str:
         "    <h2>Sessions</h2>\n"
         '    <p class="section-meta" id="sessions-meta" aria-live="polite"></p>\n'
         "  </header>\n"
-
         # Last-updated badge — updated by JS after each auto-refresh tick
         '  <div class="sessions-toolbar">\n'
         '    <label for="sessions-filter" class="sr-only">Filter sessions</label>\n'
@@ -50,18 +49,16 @@ def render_sessions_section() -> str:
         '    <span id="sessions-last-updated" class="sessions-last-updated"\n'
         '          aria-live="polite" data-testid="sessions-last-updated">Never</span>\n'
         "  </div>\n"
-
         # Codex cost banner — hidden by default; JS shows it when runtime === 'codex'.
         # aria-live="polite" so screen readers announce it when it appears.
         '  <div id="sessions-banner" class="sessions-banner"\n'
         '       role="status" aria-live="polite" hidden></div>\n'
-
         # Sessions table container — aria-busy="true" until first fetch completes
         '  <div id="sessions-table-container" class="sessions-table-container"\n'
         '       aria-busy="true">\n'
         '    <table class="sessions-table" aria-label="Sessions">\n'
-        '      <thead>\n'
-        '        <tr>\n'
+        "      <thead>\n"
+        "        <tr>\n"
         '          <th scope="col" data-sort-key="session_id">Session</th>\n'
         '          <th scope="col" data-sort-key="project">Project</th>\n'
         '          <th scope="col" data-sort-key="model">Model</th>\n'
@@ -71,14 +68,13 @@ def render_sessions_section() -> str:
         '              data-sort="cost" data-sort-dir="none">Cost</th>\n'
         '          <th scope="col" data-sort-key="last_activity_at">Last activity</th>\n'
         '          <th scope="col" data-sort-key="status">Status</th>\n'
-        '        </tr>\n'
-        '      </thead>\n'
+        "        </tr>\n"
+        "      </thead>\n"
         '      <tbody id="sessions-tbody">\n'
         # Skeleton rows injected here by JS during initial load
-        '      </tbody>\n'
-        '    </table>\n'
+        "      </tbody>\n"
+        "    </table>\n"
         "  </div>\n"
-
         # Detail drawer — hidden by default, opened by JS on row click.
         # Starts empty; JS populates from /api/sessions/<runtime>/<session_id>.
         # focus management: JS focuses the first focusable element inside on open.
@@ -88,7 +84,7 @@ def render_sessions_section() -> str:
         '         aria-label="Session detail">\n'
         '    <div class="session-drawer__header">\n'
         '      <h3 class="session-drawer__title" id="session-drawer-title">'
-        'Session detail</h3>\n'
+        "Session detail</h3>\n"
         '      <button type="button" id="drawer-close"\n'
         '              class="session-drawer__close-btn"\n'
         '              aria-label="Close session detail">'
@@ -98,6 +94,5 @@ def render_sessions_section() -> str:
         "      <!-- Populated by JS after /api/sessions/<runtime>/<id> fetch -->\n"
         "    </div>\n"
         "  </aside>\n"
-
         "</section>"
     )

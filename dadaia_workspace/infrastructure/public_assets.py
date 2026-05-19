@@ -384,8 +384,7 @@ def _install_workspace_guardrail_pair(
         if _is_self_repo(consumer):
             v = _package_version()
             sys.stderr.write(
-                f"[skip] {consumer / 'AGENTS.md'}"
-                f" (self-projection — package_version={v})\n"
+                f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
             )
             continue
         _write_pair(consumer)

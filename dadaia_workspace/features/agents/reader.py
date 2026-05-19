@@ -33,16 +33,16 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
     {
         "name",
         "description",
-        "tier",              # orchestration tier: 1 = orchestrator, 2 = curator, 3 = leaf specialist
+        "tier",  # orchestration tier: 1 = orchestrator, 2 = curator, 3 = leaf specialist
         "skills",
         "tools",
         "model",
         "opencode_model",
-        "maxTurns",          # frontmatter key (camelCase)
-        "max_turns",         # alternative snake_case spelling
+        "maxTurns",  # frontmatter key (camelCase)
+        "max_turns",  # alternative snake_case spelling
         "input_contract",
-        "paths",             # declarative path allowlist (AGT-32; not enforced this release)
-        "color",             # optional display hint (game agents); not enforced
+        "paths",  # declarative path allowlist (AGT-32; not enforced this release)
+        "color",  # optional display hint (game agents); not enforced
     }
 )
 
@@ -161,22 +161,16 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
             )
 
     skills_raw = raw.get("skills")
-    skills: list[str] = (
-        [str(s) for s in skills_raw] if isinstance(skills_raw, list) else []
-    )
+    skills: list[str] = [str(s) for s in skills_raw] if isinstance(skills_raw, list) else []
 
     tools_raw = raw.get("tools")
-    tools: list[str] = (
-        [str(t) for t in tools_raw] if isinstance(tools_raw, list) else []
-    )
+    tools: list[str] = [str(t) for t in tools_raw] if isinstance(tools_raw, list) else []
 
     model_raw = raw.get("model")
     model: str | None = str(model_raw) if model_raw is not None else None
 
     opencode_model_raw = raw.get("opencode_model")
-    opencode_model: str | None = (
-        str(opencode_model_raw) if opencode_model_raw is not None else None
-    )
+    opencode_model: str | None = str(opencode_model_raw) if opencode_model_raw is not None else None
 
     input_contract_raw = raw.get("input_contract")
     input_contract: dict[str, Any] | None = (
@@ -184,9 +178,7 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
     )
 
     paths_raw = raw.get("paths")
-    paths: dict[str, list[str]] | None = (
-        paths_raw if isinstance(paths_raw, dict) else None
-    )
+    paths: dict[str, list[str]] | None = paths_raw if isinstance(paths_raw, dict) else None
 
     return AgentDTO(
         id=name,
@@ -209,9 +201,7 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
 
 # ID validation regex per SPEC §5.2.
 # Must match ^[a-z0-9](?:[a-z0-9_-]{0,63}[a-z0-9])?$
-_AGENT_ID_RE: re.Pattern[str] = re.compile(
-    r"^[a-z0-9](?:[a-z0-9_-]{0,63}[a-z0-9])?$"
-)
+_AGENT_ID_RE: re.Pattern[str] = re.compile(r"^[a-z0-9](?:[a-z0-9_-]{0,63}[a-z0-9])?$")
 
 _FRONTMATTER_DELIM = "---"
 
@@ -276,9 +266,7 @@ def get_prompt(agent_id: str, workspace_root: Path) -> tuple[str, Path]:
     """
     # --- Validate agent_id against the regex ---
     if not _AGENT_ID_RE.match(agent_id):
-        raise InvalidAgentIdError(
-            f"agent_id {agent_id!r} does not match the required pattern"
-        )
+        raise InvalidAgentIdError(f"agent_id {agent_id!r} does not match the required pattern")
 
     # --- Resolve candidate directory ---
     agents_dir = _resolve_agents_dir(workspace_root)
@@ -306,9 +294,7 @@ def get_prompt(agent_id: str, workspace_root: Path) -> tuple[str, Path]:
             resolved_candidate,
             resolved_base,
         )
-        raise InvalidAgentIdError(
-            f"Path traversal attempt detected for agent_id={agent_id!r}"
-        )
+        raise InvalidAgentIdError(f"Path traversal attempt detected for agent_id={agent_id!r}")
 
     # --- Check existence ---
     if not resolved_candidate.exists():

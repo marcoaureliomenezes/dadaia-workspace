@@ -34,7 +34,9 @@ from dadaia_workspace.features.workflows.service import WorkflowSummaryDTO
 class _FakeService:
     """Minimal PanelService fake that allows injecting workflow summaries."""
 
-    def __init__(self, summaries: list[WorkflowSummaryDTO], workflows_dir: str = ".dadaia/agentic/workflows/") -> None:
+    def __init__(
+        self, summaries: list[WorkflowSummaryDTO], workflows_dir: str = ".dadaia/agentic/workflows/"
+    ) -> None:
         self._summaries = summaries
         self._workflows_dir = workflows_dir
         self._workspace_root = Path("/fake/workspace")
@@ -298,7 +300,9 @@ class TestNewWorkflowsInList:
 
     def test_audit_cycle_item_shape(self) -> None:
         """audit-cycle LIST item must carry all required summary fields."""
-        service = _FakeService([_make_summary("audit-cycle", stage_count=6, has_parallel=True, has_gates=True)])
+        service = _FakeService(
+            [_make_summary("audit-cycle", stage_count=6, has_parallel=True, has_gates=True)]
+        )
         view = render_api_workflows_list(service)  # type: ignore[arg-type]
         _, _, body = view()
         data = json.loads(body)
@@ -312,7 +316,9 @@ class TestNewWorkflowsInList:
 
     def test_code_review_fan_out_item_shape(self) -> None:
         """code-review-fan-out LIST item must carry all required summary fields."""
-        service = _FakeService([_make_summary("code-review-fan-out", stage_count=4, has_parallel=True)])
+        service = _FakeService(
+            [_make_summary("code-review-fan-out", stage_count=4, has_parallel=True)]
+        )
         view = render_api_workflows_list(service)  # type: ignore[arg-type]
         _, _, body = view()
         data = json.loads(body)

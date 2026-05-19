@@ -108,9 +108,7 @@ def _make_workflows_dir(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def test_list_returns_all_workflows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_list_returns_all_workflows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -124,9 +122,7 @@ def test_list_returns_all_workflows(
     assert names == {"simple-wf", "parallel-wf"}
 
 
-def test_list_returns_empty_when_no_dir(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_list_returns_empty_when_no_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     # no workflows dir under tmp_path
@@ -134,9 +130,7 @@ def test_list_returns_empty_when_no_dir(
     assert svc.list_summaries() == []
 
 
-def test_summary_shape_matches_spec(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_summary_shape_matches_spec(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -181,9 +175,7 @@ def test_summary_detects_parallel_and_gates(
     assert p.stage_count == 4
 
 
-def test_summary_agent_ids_deduped(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_summary_agent_ids_deduped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -243,9 +235,7 @@ def test_get_detail_returns_none_when_no_dir(
     assert svc.get_detail("simple-wf") is None
 
 
-def test_detail_shape_matches_spec(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_detail_shape_matches_spec(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -271,9 +261,7 @@ def test_detail_shape_matches_spec(
     assert isinstance(detail.diagram_svg, str)  # stub "" until PR3-13
 
 
-def test_detail_stage_dto_fields(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_detail_stage_dto_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -296,9 +284,7 @@ def test_detail_stage_dto_fields(
     assert stage.on_failure == "stop"
 
 
-def test_detail_stage_gate_bool_true(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_detail_stage_gate_bool_true(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -314,9 +300,7 @@ def test_detail_stage_gate_bool_true(
     assert review_stage.needs == ["parallel_a", "parallel_b"]
 
 
-def test_detail_parallel_stage_fields(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_detail_parallel_stage_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -337,9 +321,7 @@ def test_detail_parallel_stage_fields(
 # ---------------------------------------------------------------------------
 
 
-def test_detail_inputs_mapped(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_detail_inputs_mapped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -360,9 +342,7 @@ def test_detail_inputs_mapped(
 # ---------------------------------------------------------------------------
 
 
-def test_cache_hit_on_second_call(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_cache_hit_on_second_call(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -377,9 +357,7 @@ def test_cache_hit_on_second_call(
     assert detail_second is detail_first  # same object from cache
 
 
-def test_cache_invalidated_on_mtime_change(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_cache_invalidated_on_mtime_change(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -401,9 +379,7 @@ def test_cache_invalidated_on_mtime_change(
     assert detail_second is not detail_first
 
 
-def test_cache_eviction_on_file_deletion(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_cache_eviction_on_file_deletion(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)
@@ -418,9 +394,7 @@ def test_cache_eviction_on_file_deletion(
     assert svc.get_detail("simple-wf") is None
 
 
-def test_env_var_overrides_default_dir(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_env_var_overrides_default_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _cache.clear()
     custom_dir = tmp_path / "custom_workflows"
     custom_dir.mkdir()
@@ -470,14 +444,14 @@ def test_claude_workflows_dir_used_when_agentic_empty(
     assert any(s.name == "simple-wf" for s in summaries)
 
 
-def test_agentic_dir_preferred_over_claude(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_agentic_dir_preferred_over_claude(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """When .dadaia/agentic/workflows/ has workflow files, .claude/ is NOT used."""
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     agentic_dir = _make_workflows_dir(tmp_path)
-    (agentic_dir / "agentic-wf.workflow.md").write_text(_SIMPLE_WF.replace("simple-wf", "agentic-wf"))
+    (agentic_dir / "agentic-wf.workflow.md").write_text(
+        _SIMPLE_WF.replace("simple-wf", "agentic-wf")
+    )
     claude_dir = tmp_path / ".claude" / "workflows"
     claude_dir.mkdir(parents=True)
     (claude_dir / "claude-wf.workflow.md").write_text(_SIMPLE_WF.replace("simple-wf", "claude-wf"))
@@ -494,9 +468,7 @@ def test_agentic_dir_preferred_over_claude(
 # ---------------------------------------------------------------------------
 
 
-def test_malformed_workflow_yaml_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_malformed_workflow_yaml_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A workflow file with malformed YAML frontmatter causes list_summaries to raise.
 
     The MarkdownWorkflowStore does not swallow parse errors — callers must handle them.
@@ -520,9 +492,7 @@ def test_malformed_workflow_yaml_raises(
 # ---------------------------------------------------------------------------
 
 
-def test_empty_workflow_file_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_empty_workflow_file_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """An empty .workflow.md file (missing frontmatter) causes list_summaries to raise."""
     from dadaia_workspace.core.exceptions import WorkflowSchemaError
 
@@ -541,9 +511,7 @@ def test_empty_workflow_file_raises(
 # ---------------------------------------------------------------------------
 
 
-def test_get_detail_from_claude_dir(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_detail_from_claude_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """get_detail works when the workflow comes from .claude/workflows/."""
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)

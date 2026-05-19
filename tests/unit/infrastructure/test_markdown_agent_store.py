@@ -205,9 +205,7 @@ def test_store_list_raw_skips_files_without_frontmatter(tmp_path: Path) -> None:
     agents_dir = tmp_path / "agents"
     agents_dir.mkdir()
     (agents_dir / "no-fm.md").write_text("# No frontmatter here\n")
-    (agents_dir / "valid.md").write_text(
-        "---\nname: valid\ndescription: OK.\n---\n# Body\n"
-    )
+    (agents_dir / "valid.md").write_text("---\nname: valid\ndescription: OK.\n---\n# Body\n")
     store = MarkdownAgentStore(agents_dir)
     results = store.list_raw()
     assert len(results) == 1
@@ -239,9 +237,7 @@ def test_store_glob_does_not_produce_traversal_paths(tmp_path: Path) -> None:
     """glob('*.md') never yields paths with '..' components."""
     agents_dir = tmp_path / "agents"
     agents_dir.mkdir()
-    (agents_dir / "normal.md").write_text(
-        "---\nname: normal\ndescription: OK.\n---\n"
-    )
+    (agents_dir / "normal.md").write_text("---\nname: normal\ndescription: OK.\n---\n")
     store = MarkdownAgentStore(agents_dir)
     for path in store._files():
         assert ".." not in path.parts, f"Traversal path returned by glob: {path}"

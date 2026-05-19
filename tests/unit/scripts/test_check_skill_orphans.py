@@ -6,6 +6,7 @@ Two test cases:
   2. All wired — after wiring the orphan into the fake agent;
      script must exit 0 with no output on stderr or stdout.
 """
+
 import subprocess
 import sys
 from pathlib import Path
