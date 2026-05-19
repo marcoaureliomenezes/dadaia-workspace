@@ -215,11 +215,11 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P11b — Wire installer + doctor for Option C
 
-- [ ] AGT-r2-35 — Dispatch install call site to `_install_workspace_guardrail_pair` (software-engineer)
+- [-] AGT-r2-35 — Dispatch install call site to `_install_workspace_guardrail_pair` (software-engineer)
   - Replace legacy `_install_agents_md` call for `data/AGENTS.md` only (templates scaffolder retains its own call).
   - Acceptance: a single call to `_install_workspace_guardrail_pair` per workspace; trace via test that 4 files write per round.
   - Depends: AGT-r2-25, AGT-r2-33.
-- [ ] AGT-r2-36 — Update `.dadaia/agentic/manifest.json` for Option C (software-engineer)
+- [-] AGT-r2-36 — Update `.dadaia/agentic/manifest.json` for Option C (software-engineer)
   - Recompute SHA-256 of `data/AGENTS.md` post-P11a; manifest entry updated; **no** `data/CLAUDE.md` entry exists.
   - Acceptance: `grep -c '"data/CLAUDE.md"' .dadaia/agentic/manifest.json` → 0; `dadaia public doctor` reports `[ok]` for `data/AGENTS.md`; C24 + C25 satisfied.
   - Depends: AGT-r2-35.
@@ -253,7 +253,7 @@ local with `pytest` and `dadaia specs doctor`).
   - File: `tests/scripts/check_skill_orphans.py` (≤ 50 lines). Asserts every skill in `dadaia_workspace/public/skills/<name>/` is referenced by ≥ 1 agent frontmatter in `dadaia_workspace/public/agents/*.md`.
   - Acceptance: script exits 0 against the post-P11a/P12 tree; exits 1 if a seeded orphan is present.
   - Depends: AGT-r2-39, AGT-r2-40.
-- [-] AGT-r2-42 — Self-test for orphan-detection script (qa-engineer)
+- [x] AGT-r2-42 — Self-test for orphan-detection script (qa-engineer)
   - File: `tests/unit/scripts/test_check_skill_orphans.py` — seeds a fake-orphan and a fake-wired skill in a tmp tree, asserts detector flags only the orphan (R11).
   - Acceptance: `pytest -q tests/unit/scripts/test_check_skill_orphans.py` green; CI hook (pytest collection) catches future orphans.
   - Depends: AGT-r2-41.
