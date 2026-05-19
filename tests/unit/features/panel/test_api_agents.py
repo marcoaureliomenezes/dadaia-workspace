@@ -675,3 +675,229 @@ class TestTierFieldInResponse:
             assert by_id[aid]["tier"] == 3, (
                 f"{aid!r} should be tier 3, got {by_id[aid]['tier']}"
             )
+
+
+# ---------------------------------------------------------------------------
+# PR5-D12 / PR5-D13 — runtime-filter assertions + backward-compat parity
+# ---------------------------------------------------------------------------
+#
+# These tests layer ON TOP of the PR4-15/PR4-19 tier assertions above.
+# No existing assertion is modified or deleted.
+#
+# Fixture helpers
+# ---------------
+# _make_agent_summary_with_provider: builds an AgentSummary whose providers list
+# carries the requested runtime value, so the runtime filter in the view can
+# discriminate between claude-only, codex-only, and mixed agents.
+
+
+def _make_agent_summary_with_provider(
+    agent_id: str,
+    providers: list[str],
+) -> AgentSummary:
+    """Return an AgentSummary with the specified providers list."""
+    return AgentSummary(
+        agent_id=agent_id,
+        display_name=agent_id,
+        providers=providers,
+        dominant_model="claude-sonnet-4-6",
+        is_subagent=False,
+        session_count=2,
+        total_cost_usd=0.50,
+        cost_known=True,
+        last_activity_at="2026-05-17T10:00:00Z",
+        token_totals=TokenTotals(
+            input=500, cache_creation=100, cache_read=400, output=200
+        ),
+        context_breakdown=[],
+        recent_sessions=[],
+        suspect_count=0,
+    )
+
+
+def _build_mixed_runtime_service() -> "PanelService":
+    """Build a service with 3 canonical agents:
+
+    - 'agent-claude'  → telemetry providers=["claude"]
+    - 'agent-codex'   → telemetry providers=["codex"]
+    - 'agent-both'    → telemetry providers=["claude", "codex"]
+    """
+    agents = [
+        _make_dto(agent_id="agent-claude", tier=3),
+        _make_dto(agent_id="agent-codex", tier=3),
+        _make_dto(agent_id="agent-both", tier=3),
+    ]
+    summaries = [
+        _make_agent_summary_with_provider("agent-claude", ["claude"]),
+        _make_agent_summary_with_provider("agent-codex", ["codex"]),
+        _make_agent_summary_with_provider("agent-both", ["claude", "codex"]),
+    ]
+    tel = FakeTelemetryService(agent_summaries=summaries)
+    return _make_service(agents=agents, telemetry_stub=tel)
+
+
+class TestRuntimeFilter:
+    """PR5-D12 — runtime filter assertions layered on top of r4 tier tests."""
+
+    def test_runtime_claude_default_includes_claude_agents(self) -> None:
+        """?runtime=claude returns agents with providers=['claude'] and providers=['claude','codex']."""
+        svc = _build_mixed_runtime_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view(qs={"runtime": ["claude"]})
+        data = json.loads(body)
+        ids = {card["agent_id"] for card in data["agents"]}
+        assert "agent-claude" in ids, "claude-only agent should appear in runtime=claude response"
+        assert "agent-both" in ids, "mixed-provider agent should appear in runtime=claude response"
+
+    def test_runtime_claude_excludes_codex_only_agents(self) -> None:
+        """?runtime=claude excludes agents whose telemetry providers is ['codex'] only."""
+        svc = _build_mixed_runtime_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view(qs={"runtime": ["claude"]})
+        data = json.loads(body)
+        ids = {card["agent_id"] for card in data["agents"]}
+        assert "agent-codex" not in ids, (
+            "codex-only agent must be excluded from runtime=claude response"
+        )
+
+    def test_runtime_codex_includes_codex_agents(self) -> None:
+        """?runtime=codex returns agents with providers=['codex'] and providers=['claude','codex']."""
+        svc = _build_mixed_runtime_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view(qs={"runtime": ["codex"]})
+        data = json.loads(body)
+        ids = {card["agent_id"] for card in data["agents"]}
+        assert "agent-codex" in ids, "codex-only agent should appear in runtime=codex response"
+        assert "agent-both" in ids, "mixed-provider agent should appear in runtime=codex response"
+
+    def test_runtime_codex_excludes_claude_only_agents(self) -> None:
+        """?runtime=codex excludes agents whose telemetry providers is ['claude'] only."""
+        svc = _build_mixed_runtime_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body = view(qs={"runtime": ["codex"]})
+        data = json.loads(body)
+        ids = {card["agent_id"] for card in data["agents"]}
+        assert "agent-claude" not in ids, (
+            "claude-only agent must be excluded from runtime=codex response"
+        )
+
+    def test_unknown_runtime_falls_back_to_claude(self) -> None:
+        """An unrecognised ?runtime= value falls back to claude (NFR5 safety net)."""
+        svc = _build_mixed_runtime_service()
+        view = render_api_agents_canonical(svc)
+        _, _, body_unknown = view(qs={"runtime": ["unknown-runtime"]})
+        data_unknown = json.loads(body_unknown)
+        ids_unknown = {card["agent_id"] for card in data_unknown["agents"]}
+
+        _, _, body_claude = view(qs={"runtime": ["claude"]})
+        data_claude = json.loads(body_claude)
+        ids_claude = {card["agent_id"] for card in data_claude["agents"]}
+
+        assert ids_unknown == ids_claude, (
+            "Unknown runtime should fall back to claude-scoped response"
+        )
+
+    def test_runtime_filter_preserves_tier_key(self) -> None:
+        """Each agent card returned by ?runtime=claude still carries a 'tier' key (r4 compat)."""
+        svc = _build_full_topology_service()
+        view = render_api_agents_canonical(svc)
+        # All topology agents have providers=["claude"] in _make_agent_summary,
+        # so runtime=claude should return all of them.
+        _, _, body = view(qs={"runtime": ["claude"]})
+        data = json.loads(body)
+        for card in data["agents"]:
+            assert "tier" in card, (
+                f"Agent card for {card.get('agent_id')!r} missing 'tier' key "
+                f"after runtime filter (r4 rebase guard)"
+            )
+
+    def test_no_telemetry_agent_included_in_claude_default(self) -> None:
+        """Canonical agents with no telemetry entry are included when runtime=claude."""
+        agents = [_make_dto(agent_id="ghost-agent", tier=3)]
+        tel = FakeTelemetryService(agent_summaries=[])  # no telemetry for ghost-agent
+        svc = _make_service(agents=agents, telemetry_stub=tel)
+        view = render_api_agents_canonical(svc)
+        _, _, body = view(qs={"runtime": ["claude"]})
+        data = json.loads(body)
+        ids = {card["agent_id"] for card in data["agents"]}
+        assert "ghost-agent" in ids, (
+            "Canonical agent with no telemetry must be included when runtime=claude"
+        )
+
+    def test_no_telemetry_agent_excluded_from_codex(self) -> None:
+        """Canonical agents with no telemetry entry are excluded when runtime=codex."""
+        agents = [_make_dto(agent_id="ghost-agent", tier=3)]
+        tel = FakeTelemetryService(agent_summaries=[])  # no telemetry for ghost-agent
+        svc = _make_service(agents=agents, telemetry_stub=tel)
+        view = render_api_agents_canonical(svc)
+        _, _, body = view(qs={"runtime": ["codex"]})
+        data = json.loads(body)
+        ids = {card["agent_id"] for card in data["agents"]}
+        assert "ghost-agent" not in ids, (
+            "Canonical agent with no telemetry must be excluded when runtime=codex"
+        )
+
+
+class TestRuntimeFilterBackwardCompatParity:
+    """PR5-D13 — NFR5 backward-compat parity: no ?runtime= == ?runtime=claude.
+
+    This test codifies the 'default to claude' guarantee and prevents a silent
+    regression where the default branch starts emitting a different envelope
+    than the explicit runtime=claude branch.
+    """
+
+    def test_no_runtime_param_equals_runtime_claude(self) -> None:
+        """Response with no ?runtime= must be identical to ?runtime=claude."""
+        svc = _build_full_topology_service()
+        view = render_api_agents_canonical(svc)
+
+        # Drive the view with no qs (simulates ?runtime= omitted).
+        _, _, body_no_qs = view()
+        data_no_qs = json.loads(body_no_qs)
+
+        # Drive the view with explicit ?runtime=claude.
+        _, _, body_claude = view(qs={"runtime": ["claude"]})
+        data_claude = json.loads(body_claude)
+
+        # Compare agent lists key-by-key and item-by-item.
+        agents_no_qs = data_no_qs["agents"]
+        agents_claude = data_claude["agents"]
+
+        assert len(agents_no_qs) == len(agents_claude), (
+            f"Agent count differs: no-qs={len(agents_no_qs)}, "
+            f"runtime=claude={len(agents_claude)}"
+        )
+
+        ids_no_qs = [card["agent_id"] for card in agents_no_qs]
+        ids_claude = [card["agent_id"] for card in agents_claude]
+        assert ids_no_qs == ids_claude, (
+            f"Agent ID lists differ between no-qs and runtime=claude:\n"
+            f"  no-qs:  {ids_no_qs}\n"
+            f"  claude: {ids_claude}"
+        )
+
+        for card_no_qs, card_claude in zip(agents_no_qs, agents_claude):
+            # Compare all keys except time-sensitive generated_at.
+            keys_to_compare = set(card_no_qs.keys()) - {"telemetry"}
+            for key in keys_to_compare:
+                assert card_no_qs[key] == card_claude[key], (
+                    f"Agent {card_no_qs['agent_id']!r}: key {key!r} differs "
+                    f"between no-qs ({card_no_qs[key]!r}) and "
+                    f"runtime=claude ({card_claude[key]!r})"
+                )
+
+    def test_top_level_envelope_shape_identical(self) -> None:
+        """Top-level envelope keys are identical between no-?runtime= and ?runtime=claude."""
+        svc = _make_service(agents=[], telemetry_stub=FakeTelemetryService())
+        view = render_api_agents_canonical(svc)
+
+        _, _, body_no_qs = view()
+        _, _, body_claude = view(qs={"runtime": ["claude"]})
+
+        data_no_qs = json.loads(body_no_qs)
+        data_claude = json.loads(body_claude)
+
+        # Top-level keys must be identical.
+        assert set(data_no_qs.keys()) == set(data_claude.keys()), (
+            "Top-level envelope keys differ between no-qs and runtime=claude"
+        )
