@@ -1,0 +1,32 @@
+{
+  "schema": "handoff-v1",
+  "generated_at": "2026-05-19T070247Z",
+  "agent": "devops-engineer",
+  "context": "dadaia-workspace",
+  "task_id": "PR4-20",
+  "release": "panel-r4-v1",
+  "report": ".dadaia/reports/dadaia-workspace/devops-engineer/2026-05-19T070247Z-P4-doctor-checkpoint.html",
+  "verdict": "PASS",
+  "summary": "Doctor checkpoint for panel-r4-v1 P4. Stage+install pipeline ran clean. Force install resolved 32 agent-projection drift entries caused by tier: frontmatter additions in P2. Final doctor: 256 [ok], 0 [drift], 0 [fail]. pytest: 1348 passed, 2 pre-existing failures.",
+  "doctor_counts": {
+    "ok": 256,
+    "drift": 0,
+    "fail": 0,
+    "partial": 5,
+    "unsupported": 1,
+    "not_applicable": 7
+  },
+  "pytest": {
+    "passed": 1348,
+    "failed": 2,
+    "xpassed": 1,
+    "pre_existing_failures": [
+      "tests/unit/test_public_assets.py::test_install_overwrites_existing_files_with_force",
+      "tests/integration/test_cli_reports.py::test_10_workspace_not_initialized_exits_3"
+    ]
+  },
+  "force_install_justification": "First pass showed all [skip]; doctor detected 32 [drift] for 16 agents in claude:agents/ and opencode:agents/. --force is the canonical repair command per workspace guardrail. devops-engineer has explicit authority.",
+  "projection_commit": null,
+  "projection_commit_note": "Projection targets live outside the dadaia-workspace git boundary (/home/marco/workspace/dadaia/.claude/ and .opencode/). No tracked files changed.",
+  "next_task": "PR4-21 (qa-engineer P5 live panel smoke)"
+}
