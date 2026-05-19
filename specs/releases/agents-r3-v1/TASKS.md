@@ -143,7 +143,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
   - Touches: `specs/releases/agents-r3-v1/CLOSURE.md`; `specs/releases/ACTIVE.md` flipped phase → `CLOSURE` before write.
   - Preconditions: P5 complete; all P0–P4 tasks `[x] DONE`.
   - Done criterion: file present with sections Summary / Tasks completed / Validations / Drifts / Memory updates / Backlog returns / Archive decision per `dadaia-release-closure` skill template; Validations table contains a row per acceptance criterion C1–C10 with command + evidence (SHA, stdout snippet, or report path); header `**Status:** Aprovado`.
-- [ ] R3-29 — Update the 3 memory atoms (`product-engineer`)
+- [-] R3-29 — Update the 3 memory atoms (`product-engineer`)
   - Touches: `specs/memory/product/agent-orchestration.html`, `specs/memory/architecture.html`, `specs/memory/product/index.html`.
   - Preconditions: ACTIVE.md phase = `CLOSURE` (gate enforces).
   - Done criterion: agent-orchestration HTML reflects 20-agent topology, Python/Node split, AI-entity authority paragraph, data + BI surfaces; architecture HTML reflects refreshed agent-topology layer + Decision Authority Matrix rows; product/index HTML adds data + BI + AI capability bullets; no forbidden sections (Changelog/History/Histórico/Versions) anywhere; `dadaia specs doctor` final run `0/0`.
