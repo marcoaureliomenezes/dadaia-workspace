@@ -4,7 +4,7 @@ description: >
   Spec author and memory guardian for dadaia workspace. Writes SPEC/PLAN/TASKS/CLOSURE
   for an active release; writes specs/memory/*.html only in CLOSURE phase. Invoked by
   project-manager when a spec is needed. NEVER dispatches other agents; NEVER implements
-  code. Do NOT use for bug fixes (use project-manager → software-engineer).
+  code. Do NOT use for bug fixes (use project-manager → software-engineer-python or software-engineer-node).
 tier: 2
 model: claude-opus-4-7
 opencode_model: claude-sonnet-4-6
@@ -287,7 +287,7 @@ unblock implementer agents.
 
 ### Phase 7 — Implementation (no-write for product-engineer)
 
-Implementer agents (software-engineer, game-developer, devops-engineer, etc.) follow
+Implementer agents (software-engineer-python, software-engineer-node, game-developer, devops-engineer, etc.) follow
 `dadaia-task-manager` protocol: pick `[ ]`, flip to `[-]`, commit, work, flip to `[x]`,
 commit. Product-engineer **does not implement** — only answers questions and updates
 specs if the operator approves changes.
@@ -405,7 +405,7 @@ I can start the proper sub-workflow now:
 
 | Request | Right agent |
 |---------|------------|
-| Bug fix or Python/Node tooling implementation | **software-engineer** |
+| Bug fix or Python/Node tooling implementation | **software-engineer-python or software-engineer-node** |
 | Frontend (HTML/CSS/TS/React) implementation | **frontend-engineer** |
 | Go backend / DB-heavy service implementation | **backend-engineer** |
 | Game code in `repos/redacted-slug/` | **game-developer / game-designer / game-tester** |

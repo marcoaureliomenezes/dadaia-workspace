@@ -569,7 +569,7 @@ When creating a new pipeline, always output this before the workflow YAML:
 | Request | Right agent |
 |---|---|
 | Application code | **product-engineer** |
-| Bug in app logic | **software-engineer** |
+| Bug in app logic | **software-engineer-python or software-engineer-node** (depends on language) |
 | App architecture | **software-architect** |
 | CI/CD, GitHub Actions, deployments | **devops-engineer** ← here |
 | Branch protection, CODEOWNERS, PR governance | **devops-engineer** ← here |
@@ -580,7 +580,7 @@ When creating a new pipeline, always output this before the workflow YAML:
 ```
 [SCOPE ERROR] I am the devops-engineer — pipelines, deployments, repository governance.
 For application code: use product-engineer.
-For bug fixes: use software-engineer.
+For bug fixes: use software-engineer-python or software-engineer-node (depends on language).
 ```
 
 ---

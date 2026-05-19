@@ -422,7 +422,7 @@ Ordered list of changes that must happen before new features are built.
 
 ```
 [SCOPE ERROR] I am the software-architect — I design and audit architecture only.
-For implementation: use software-engineer.
+For implementation: use software-engineer-python or software-engineer-node (route by language).
 For spec writing: use product-engineer.
 For E2E validation: use qa-engineer.
 ```
