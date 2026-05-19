@@ -715,14 +715,116 @@ def test_all_public_agents_write_allowlist_entries_are_strings(
     )
 
 
-def test_public_agents_count_is_16(
+def test_public_agents_count_is_20(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Exactly 16 public agents must be loadable (SPEC FR2.1 — 16-agent roster)."""
+    """Exactly 20 public agents must be loadable (SPEC agents-r3-v1 §FR2 — 20-agent roster).
+
+    Topology breakdown:
+      T1 dispatchers (2): project-manager, project-auditor
+      T2 curator     (1): product-engineer
+      T3 leaves     (17): ai-engineer, backend-engineer, code-reviewer,
+                          data-analyst, data-engineer, design-specialist,
+                          devops-engineer, frontend-engineer, game-designer,
+                          game-developer, game-tester, qa-engineer,
+                          researcher, security-reviewer, software-architect,
+                          software-engineer-node, software-engineer-python
+    """
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
-    assert len(agents) == 16, (
-        f"Expected 16 public agents, got {len(agents)}: {[a.id for a in agents]}"
+    assert len(agents) == 20, (
+        f"Expected 20 public agents, got {len(agents)}: {[a.id for a in agents]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# agents-r3-v1 — 5 new personas (Python/Node split + Data/BI + AI)
+# ---------------------------------------------------------------------------
+
+_R3_NEW_AGENTS = {
+    "software-engineer-python": "claude-sonnet-4-6",
+    "software-engineer-node":   "claude-sonnet-4-6",
+    "data-engineer":            "claude-sonnet-4-6",
+    "data-analyst":             "claude-sonnet-4-6",
+    "ai-engineer":              "claude-opus-4-7",
+}
+
+
+def test_r3_new_personas_parse_with_tier3(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each of the 5 new personas (agents-r3-v1 P1) parses from public/agents/.
+
+    Asserts frontmatter loads cleanly, tier == 3 (T3 leaf), and the
+    write_allowlist is non-empty per SPEC §5.
+    """
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    by_id = {a.id: a for a in agents}
+
+    for new_id in _R3_NEW_AGENTS:
+        assert new_id in by_id, (
+            f"R3 new persona {new_id!r} missing from public/agents/ roster"
+        )
+        agent = by_id[new_id]
+        assert agent.tier == 3, (
+            f"R3 persona {new_id!r} must be tier 3 (T3 leaf), got {agent.tier}"
+        )
+        assert agent.paths is not None, (
+            f"R3 persona {new_id!r} must declare paths block"
+        )
+        wl = agent.paths.get("write_allowlist") if agent.paths else None
+        assert wl, (
+            f"R3 persona {new_id!r} must have non-empty write_allowlist"
+        )
+
+
+def test_r3_new_personas_have_expected_models(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ai-engineer rides on claude-opus-4-7; the other 4 new personas on claude-sonnet-4-6."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    by_id = {a.id: a for a in agents}
+
+    for new_id, expected_model in _R3_NEW_AGENTS.items():
+        agent = by_id.get(new_id)
+        assert agent is not None, f"R3 persona {new_id!r} missing"
+        assert agent.model == expected_model, (
+            f"R3 persona {new_id!r}: expected model {expected_model!r}, "
+            f"got {agent.model!r}"
+        )
+
+
+def test_r3_new_personas_have_skills(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each new persona must declare a non-empty skills list (SPEC §5 — workflow protocol)."""
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    by_id = {a.id: a for a in agents}
+
+    for new_id in _R3_NEW_AGENTS:
+        agent = by_id.get(new_id)
+        assert agent is not None, f"R3 persona {new_id!r} missing"
+        assert isinstance(agent.skills, list) and len(agent.skills) > 0, (
+            f"R3 persona {new_id!r} must declare a non-empty skills list, "
+            f"got {agent.skills!r}"
+        )
+
+
+def test_legacy_software_engineer_archived(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The legacy `software-engineer` persona is archived (R3-11) — must not load
+    from public/agents/. The Python/Node split (R3-06, R3-07) replaces it.
+    """
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    ids = {a.id for a in agents}
+    assert "software-engineer" not in ids, (
+        "Legacy `software-engineer` must be archived after agents-r3-v1 P1; "
+        f"got roster: {sorted(ids)}"
     )
 
 
@@ -730,10 +832,12 @@ def test_public_agents_count_is_16(
 # PR4-14 — tier field tests
 # ---------------------------------------------------------------------------
 
-# Canonical tier mapping (per TASKS.md PR4-11)
+# Canonical tier mapping (per TASKS.md PR4-11; updated for agents-r3-v1 — 20-agent topology)
 _TIER1_AGENTS = {"project-manager", "project-auditor"}
 _TIER2_AGENTS = {"product-engineer"}
-_TIER3_SAMPLE = {"software-engineer", "frontend-engineer", "qa-engineer"}
+# Sample of T3 leaf agents — software-engineer was archived in R3-11 and replaced
+# by the Python/Node split; software-engineer-python is the canonical Python leaf.
+_TIER3_SAMPLE = {"software-engineer-python", "frontend-engineer", "qa-engineer"}
 
 
 def test_all_agents_have_tier_field(
