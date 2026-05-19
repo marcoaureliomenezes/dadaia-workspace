@@ -15,6 +15,7 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._assets import LOGO_RHINO_24
 from dadaia_workspace.features.panel.views.agents import render_agents_section
+from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section
 
 
@@ -50,6 +51,7 @@ def render_index(
 
         agents_section = render_agents_section()
         workflows_section = render_workflows_section()
+        sessions_section = render_sessions_section()
 
         body = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -62,6 +64,7 @@ def render_index(
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/agents.css">
   <link rel="stylesheet" href="/static/workflows.css">
+  <link rel="stylesheet" href="/static/sessions.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -91,6 +94,7 @@ def render_index(
     <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents</button>
     <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows">Workflows</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
+    <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
   </nav>
   <main class="main" role="main">
 
@@ -121,11 +125,14 @@ def render_index(
 
     {workflows_section}
 
+    {sessions_section}
+
   </main>
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
   <script src="/static/agents.js"></script>
   <script src="/static/workflows.js"></script>
+  <script src="/static/sessions.js" defer></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
