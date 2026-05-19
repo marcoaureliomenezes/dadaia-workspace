@@ -296,6 +296,7 @@ def render_api_agents_canonical(
                     "agent_id": dto.id,
                     "display_name": dto.name,
                     "description": dto.description,
+                    "tier": dto.tier,
                     "status": status,
                     "skills": list(dto.skills),
                     "tools": list(dto.tools),
