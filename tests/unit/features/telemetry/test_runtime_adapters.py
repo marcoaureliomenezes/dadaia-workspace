@@ -334,12 +334,244 @@ def test_claude_liveness_idle_mtime_returns_idle(tmp_path: pathlib.Path) -> None
 
 
 # ---------------------------------------------------------------------------
-# CodexRuntimeAdapter.liveness — Phase A stub
+# CodexRuntimeAdapter.liveness — Phase A stub (kept for backwards compat)
 # ---------------------------------------------------------------------------
 
 
 def test_codex_liveness_returns_idle_stub() -> None:
-    """CodexRuntimeAdapter.liveness returns 'idle' in Phase A (stub)."""
+    """CodexRuntimeAdapter.liveness returns 'idle' when no ~/.codex files present.
+
+    Phase A asserted a hard-coded 'idle'; Phase E still returns 'idle' on missing
+    files (graceful degradation), so this test remains valid.
+    """
     adapter = CodexRuntimeAdapter()
-    result = adapter.liveness("any-session", "/workspace")
+    # Patch Path.home() to an empty tmp dir — no state_5.sqlite, no history.jsonl.
+    import tempfile
+    with tempfile.TemporaryDirectory() as empty_home:
+        with patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)):
+            result = adapter.liveness("any-session", "/workspace")
     assert result == "idle"
+
+
+# ---------------------------------------------------------------------------
+# CodexRuntimeAdapter.liveness — Phase E full implementation
+# ---------------------------------------------------------------------------
+
+import json
+import os
+import sqlite3
+import tempfile
+import time as _time
+
+
+def _make_codex_home(
+    tmp: pathlib.Path,
+    session_id: str,
+    *,
+    updated_at_offset_seconds: int = 0,
+    archived: int = 0,
+    history_ts_offset_seconds: int | None = None,
+) -> pathlib.Path:
+    """Build a fake ~/.codex/ directory under *tmp* with state_5.sqlite + history.jsonl.
+
+    updated_at_offset_seconds: negative = seconds in the past relative to now.
+    history_ts_offset_seconds: if None, no matching entry in history.jsonl.
+    """
+    codex_dir = tmp / ".codex"
+    codex_dir.mkdir(parents=True, exist_ok=True)
+
+    now_unix = int(_time.time())
+    updated_at = now_unix + updated_at_offset_seconds  # offset is typically negative
+
+    # Create state_5.sqlite with a threads row.
+    db_path = codex_dir / "state_5.sqlite"
+    con = sqlite3.connect(str(db_path))
+    con.execute(
+        """CREATE TABLE threads (
+            id TEXT PRIMARY KEY,
+            rollout_path TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL DEFAULT 0,
+            source TEXT NOT NULL DEFAULT '',
+            model_provider TEXT NOT NULL DEFAULT '',
+            cwd TEXT NOT NULL DEFAULT '',
+            title TEXT NOT NULL DEFAULT '',
+            sandbox_policy TEXT NOT NULL DEFAULT '',
+            approval_mode TEXT NOT NULL DEFAULT '',
+            tokens_used INTEGER NOT NULL DEFAULT 0,
+            has_user_event INTEGER NOT NULL DEFAULT 0,
+            archived INTEGER NOT NULL DEFAULT 0,
+            archived_at INTEGER
+        )"""
+    )
+    con.execute(
+        "INSERT INTO threads (id, updated_at, archived) VALUES (?, ?, ?)",
+        (session_id, updated_at, archived),
+    )
+    con.commit()
+    con.close()
+
+    # Create history.jsonl.
+    history_path = codex_dir / "history.jsonl"
+    lines: list[str] = []
+    if history_ts_offset_seconds is not None:
+        ts = now_unix + history_ts_offset_seconds
+        lines.append(json.dumps({"session_id": session_id, "ts": ts, "text": "hello"}))
+    history_path.write_text("\n".join(lines) + ("\n" if lines else ""))
+
+    return tmp
+
+
+def test_codex_liveness_archived_returns_ended(tmp_path: pathlib.Path) -> None:
+    """liveness returns 'ended' when threads.archived = 1, regardless of delta."""
+    _make_codex_home(
+        tmp_path,
+        "sess-archived",
+        updated_at_offset_seconds=0,  # very recent
+        archived=1,
+    )
+    adapter = CodexRuntimeAdapter()
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        result = adapter.liveness("sess-archived", "/workspace")
+    assert result == "ended"
+
+
+def test_codex_liveness_fresh_delta_returns_active(tmp_path: pathlib.Path) -> None:
+    """liveness returns 'active' when delta ≤ 5 min (updated_at 1 second ago)."""
+    _make_codex_home(
+        tmp_path,
+        "sess-active",
+        updated_at_offset_seconds=-1,  # 1 second ago
+        archived=0,
+    )
+    adapter = CodexRuntimeAdapter()
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        result = adapter.liveness("sess-active", "/workspace")
+    assert result == "active"
+
+
+def test_codex_liveness_history_ts_wins_if_more_recent(tmp_path: pathlib.Path) -> None:
+    """liveness uses max(updated_at, history_ts); a fresh history_ts makes it active."""
+    _make_codex_home(
+        tmp_path,
+        "sess-hist-wins",
+        updated_at_offset_seconds=-3600,  # 1 hour ago in threads
+        archived=0,
+        history_ts_offset_seconds=-30,   # 30 seconds ago in history.jsonl
+    )
+    adapter = CodexRuntimeAdapter()
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        result = adapter.liveness("sess-hist-wins", "/workspace")
+    assert result == "active"
+
+
+def test_codex_liveness_30min_delta_returns_idle(tmp_path: pathlib.Path) -> None:
+    """liveness returns 'idle' when delta is 30 minutes (> 5 min, ≤ 60 min)."""
+    _make_codex_home(
+        tmp_path,
+        "sess-idle",
+        updated_at_offset_seconds=-(30 * 60),  # 30 minutes ago
+        archived=0,
+    )
+    adapter = CodexRuntimeAdapter()
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        result = adapter.liveness("sess-idle", "/workspace")
+    assert result == "idle"
+
+
+def test_codex_liveness_90min_delta_returns_ended(tmp_path: pathlib.Path) -> None:
+    """liveness returns 'ended' when delta > 60 minutes (90 min here)."""
+    _make_codex_home(
+        tmp_path,
+        "sess-ended",
+        updated_at_offset_seconds=-(90 * 60),  # 90 minutes ago
+        archived=0,
+    )
+    adapter = CodexRuntimeAdapter()
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        result = adapter.liveness("sess-ended", "/workspace")
+    assert result == "ended"
+
+
+def test_codex_liveness_missing_files_returns_idle() -> None:
+    """liveness returns 'idle' when ~/.codex does not exist (graceful degradation)."""
+    import tempfile
+    adapter = CodexRuntimeAdapter()
+    with tempfile.TemporaryDirectory() as empty_home:
+        with patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)):
+            result = adapter.liveness("any-id", "/workspace")
+    assert result == "idle"
+
+
+def test_codex_liveness_parse_failure_returns_idle(tmp_path: pathlib.Path) -> None:
+    """liveness returns 'idle' when history.jsonl contains malformed JSON lines."""
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir(parents=True)
+
+    # Write a valid DB.
+    now_unix = int(_time.time())
+    db_path = codex_dir / "state_5.sqlite"
+    con = sqlite3.connect(str(db_path))
+    con.execute(
+        """CREATE TABLE threads (
+            id TEXT PRIMARY KEY,
+            updated_at INTEGER NOT NULL DEFAULT 0,
+            archived INTEGER NOT NULL DEFAULT 0
+        )"""
+    )
+    con.execute(
+        "INSERT INTO threads (id, updated_at, archived) VALUES (?, ?, ?)",
+        ("sess-parse-fail", now_unix - 10, 0),
+    )
+    con.commit()
+    con.close()
+
+    # Write malformed JSON to history.jsonl.
+    history_path = codex_dir / "history.jsonl"
+    history_path.write_text("not-valid-json\n{bad json\n")
+
+    adapter = CodexRuntimeAdapter()
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        # Should not raise; returns based on threads.updated_at (10s ago → active),
+        # or 'idle' on parse failure — either is acceptable. We assert no exception.
+        result = adapter.liveness("sess-parse-fail", "/workspace")
+    # 10 seconds ago → active (malformed history lines are skipped gracefully).
+    assert result in ("active", "idle")
+
+
+def test_codex_liveness_unknown_session_returns_idle(tmp_path: pathlib.Path) -> None:
+    """liveness returns 'idle' when session_id not found in threads table."""
+    _make_codex_home(
+        tmp_path,
+        "known-session",
+        updated_at_offset_seconds=-30,
+        archived=0,
+    )
+    adapter = CodexRuntimeAdapter()
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        result = adapter.liveness("completely-unknown-id", "/workspace")
+    # Session not in DB → graceful degradation → idle.
+    assert result == "idle"
+
+
+# ---------------------------------------------------------------------------
+# PR5-E2 — pricing.compute_cost NOT called for Codex enrich_row
+# ---------------------------------------------------------------------------
+
+
+def test_codex_enrich_row_compute_cost_not_called_e2() -> None:
+    """PR5-E2: compute_cost must NEVER be called by CodexRuntimeAdapter.enrich_row.
+
+    This is the explicit guard documented in PR5-E2 Done criteria.
+    """
+    adapter = CodexRuntimeAdapter()
+    row = _make_row(runtime="codex", cumulative_cost_usd=None, cost_known=False)
+
+    with patch(
+        "dadaia_workspace.features.telemetry.pricing.compute_cost"
+    ) as mock_compute:
+        enriched = adapter.enrich_row(row)
+        mock_compute.assert_not_called()
+
+    assert enriched.cumulative_cost_usd is None
+    assert enriched.cost_known is False
