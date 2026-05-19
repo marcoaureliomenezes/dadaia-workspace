@@ -84,7 +84,7 @@
   (full liveness implementation lives in Phase E). Owner: software-engineer.
   Done criterion: protocol importable; both adapters instantiable; smoke-import
   passes.
-- [-] **PR5-A4** — Author unit test
+- [x] **PR5-A4** — Author unit test
   `tests/unit/features/telemetry/test_aggregator_sessions.py` covering
   `list_sessions` (with and without `project` and `limit` filters; per-runtime
   discriminator) and `get_session` (hit + miss). Owner: software-engineer. Done
