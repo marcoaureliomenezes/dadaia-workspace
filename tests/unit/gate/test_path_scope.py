@@ -692,3 +692,170 @@ def test_empty_stdin_passes_through(tmp_path: Path) -> None:
     )
     assert result.returncode == 0
     assert '"decision":"block"' not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# agents-r3-v1 R3-20 — new persona allowlists
+#
+# Asserts that the 3 new "implementer" personas (Python/Node split + AI) honour
+# their write_allowlist scopes from SPEC §5:
+#
+#   software-engineer-python → may write dadaia_workspace/** and tests/**
+#   software-engineer-node   → may write dadaia_workspace/** and tests/**
+#   ai-engineer              → may write dadaia_workspace/public/{agents,skills,
+#                              workflows,commands,rules,hooks}/** only — NOT
+#                              dadaia_workspace/cli/, services/, etc.
+#
+# These tests run the live sdd-spec-gate.sh against a tmp workspace, the same
+# pattern used by T1..T9 above.
+# ---------------------------------------------------------------------------
+
+
+_SE_PYTHON_ALLOWLIST = [
+    "dadaia_workspace/features/**",
+    "dadaia_workspace/infrastructure/**",
+    "dadaia_workspace/cli/**",
+    "dadaia_workspace/core/**",
+    "tests/**",
+    "scripts/**",
+    "dadaia_workspace/public/data/AGENTS.md",
+    ".dadaia/reports/<ctx>/software-engineer-python/**",
+]
+
+_SE_NODE_ALLOWLIST = [
+    "dadaia_workspace/features/**",
+    "dadaia_workspace/infrastructure/**",
+    "tests/**",
+    "scripts/**",
+    ".dadaia/reports/<ctx>/software-engineer-node/**",
+]
+
+_AI_ENGINEER_ALLOWLIST = [
+    "dadaia_workspace/public/agents/**",
+    "dadaia_workspace/public/skills/**",
+    "dadaia_workspace/public/workflows/**",
+    "dadaia_workspace/public/commands/**",
+    "dadaia_workspace/public/rules/**",
+    "dadaia_workspace/public/hooks/**",
+    ".dadaia/reports/<ctx>/ai-engineer/**",
+]
+
+
+def test_r3_software_engineer_python_can_write_cli(tmp_path: Path) -> None:
+    """R3-20: software-engineer-python may write dadaia_workspace/cli/main.py."""
+    ws = _build_workspace(
+        tmp_path,
+        agents={"software-engineer-python": _SE_PYTHON_ALLOWLIST},
+        context_name="dadaia-workspace",
+    )
+    log_path = tmp_path / "gate.log"
+    target = str(ws / "dadaia_workspace" / "cli" / "main.py")
+
+    stdout, rc, log = _run_gate(
+        ws,
+        tool="Write",
+        file_path=target,
+        env_overrides={"DADAIA_AGENT_PERSONA": "software-engineer-python"},
+        log_path=log_path,
+    )
+    assert rc == 0
+    assert '"decision":"block"' not in stdout
+    assert "path-scope ok" in log
+
+
+def test_r3_ai_engineer_blocked_from_cli(tmp_path: Path) -> None:
+    """R3-20: ai-engineer must be REJECTED when writing dadaia_workspace/cli/main.py.
+
+    AI-engineer's allowlist is restricted to AI-entity surfaces (agents/skills/
+    workflows/commands/rules/hooks). Python implementation is software-engineer-
+    python's territory.
+    """
+    ws = _build_workspace(
+        tmp_path,
+        agents={"ai-engineer": _AI_ENGINEER_ALLOWLIST},
+        context_name="dadaia-workspace",
+    )
+    log_path = tmp_path / "gate.log"
+    target = str(ws / "dadaia_workspace" / "cli" / "main.py")
+
+    stdout, rc, log = _run_gate(
+        ws,
+        tool="Write",
+        file_path=target,
+        env_overrides={"DADAIA_AGENT_PERSONA": "ai-engineer"},
+        log_path=log_path,
+    )
+    assert rc == 0
+    assert '"decision":"block"' in stdout
+    assert "[PATH SCOPE ERROR]" in stdout
+    assert "ai-engineer" in stdout
+    assert "main.py" in stdout
+
+
+def test_r3_ai_engineer_can_write_skill(tmp_path: Path) -> None:
+    """R3-20 (positive control): ai-engineer may write to public/skills/**."""
+    ws = _build_workspace(
+        tmp_path,
+        agents={"ai-engineer": _AI_ENGINEER_ALLOWLIST},
+        context_name="dadaia-workspace",
+    )
+    log_path = tmp_path / "gate.log"
+    target = str(ws / "dadaia_workspace" / "public" / "skills" / "example" / "SKILL.md")
+
+    stdout, rc, log = _run_gate(
+        ws,
+        tool="Write",
+        file_path=target,
+        env_overrides={"DADAIA_AGENT_PERSONA": "ai-engineer"},
+        log_path=log_path,
+    )
+    assert rc == 0
+    assert '"decision":"block"' not in stdout
+    assert "path-scope ok" in log
+
+
+def test_r3_software_engineer_node_can_write_features(tmp_path: Path) -> None:
+    """R3-20: software-engineer-node may write under dadaia_workspace/features/**."""
+    ws = _build_workspace(
+        tmp_path,
+        agents={"software-engineer-node": _SE_NODE_ALLOWLIST},
+        context_name="dadaia-workspace",
+    )
+    log_path = tmp_path / "gate.log"
+    target = str(ws / "dadaia_workspace" / "features" / "harness" / "node_glue.ts")
+
+    stdout, rc, log = _run_gate(
+        ws,
+        tool="Write",
+        file_path=target,
+        env_overrides={"DADAIA_AGENT_PERSONA": "software-engineer-node"},
+        log_path=log_path,
+    )
+    assert rc == 0
+    assert '"decision":"block"' not in stdout
+    assert "path-scope ok" in log
+
+
+def test_r3_software_engineer_node_blocked_from_agents(tmp_path: Path) -> None:
+    """R3-20: software-engineer-node must NOT write under public/agents/**
+    (that's ai-engineer territory).
+    """
+    ws = _build_workspace(
+        tmp_path,
+        agents={"software-engineer-node": _SE_NODE_ALLOWLIST},
+        context_name="dadaia-workspace",
+    )
+    log_path = tmp_path / "gate.log"
+    target = str(ws / "dadaia_workspace" / "public" / "agents" / "rogue.md")
+
+    stdout, rc, log = _run_gate(
+        ws,
+        tool="Write",
+        file_path=target,
+        env_overrides={"DADAIA_AGENT_PERSONA": "software-engineer-node"},
+        log_path=log_path,
+    )
+    assert rc == 0
+    assert '"decision":"block"' in stdout
+    assert "[PATH SCOPE ERROR]" in stdout
+    assert "software-engineer-node" in stdout
