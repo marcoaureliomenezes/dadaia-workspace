@@ -416,14 +416,14 @@
 
 ## P-Closure — Release closure *(product-engineer)*
 
-- [ ] **PR5-Z1** — Author
+- [x] **PR5-Z1** — Author
   `specs/releases/panel-r5-v1/CLOSURE.md` per `dadaia-release-closure` skill.
   Includes: Summary, Tasks completed table with final commit SHAs,
   Validations triples (each with evidence), Drifts (if any), Memory updates
   list, Backlog returns, Archive decision = `MOVE`. Owner: product-engineer.
   Done criterion: file present with `**Status:** Aprovado`; `dadaia specs
   doctor` green.
-- [ ] **PR5-Z2** — Update memory atoms during CLOSURE phase only:
+- [x] **PR5-Z2** — Update memory atoms during CLOSURE phase only:
   `specs/memory/product/index.html` (add Sessions tab + global runtime
   switcher to catalog if applicable); `specs/memory/product/<panel-slug>.html`
   (refresh the panel feature page with Sessions tab + multi-runtime delta);
@@ -434,7 +434,7 @@
   HTML is rendered from the canonical templates at
   `dadaia_workspace/public/templates/memory-*.html.j2`; `dadaia specs doctor`
   passes the memory atomicity + broken-image checks.
-- [ ] **PR5-Z3** — Move the release directory to archive:
+- [x] **PR5-Z3** — Move the release directory to archive:
   `git mv specs/releases/panel-r5-v1 specs/_archive/releases/panel-r5-v1`
   (executed by devops-engineer per PE-delegation rule). Update
   `specs/releases/ACTIVE.md` to the next release or `release: none`. Owner:
