@@ -26,6 +26,24 @@ SESSIONS_CSS: str = """
   border-width: 0;
 }
 
+/* ── Codex cost banner ────────────────────────────────────────────── */
+/* Shown by JS when runtime === 'codex'; hidden by default via [hidden] attribute. */
+.sessions-banner {
+  padding: 0.55rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--color-placeholder-bg, #f7f7f7);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius-card, 6px);
+  font-size: 0.875rem;
+  color: var(--color-muted, #666666);
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  /* Contrast: #666666 on #f7f7f7 → 4.56:1 (WCAG 2.1 AA ≥ 4.5:1 satisfied) */
+}
+/* Ensure [hidden] attribute is respected over display rules */
+.sessions-banner[hidden] {
+  display: none !important;
+}
+
 /* ── Sessions toolbar (filter + last-updated badge) ───────────────── */
 .sessions-toolbar {
   display: flex;
