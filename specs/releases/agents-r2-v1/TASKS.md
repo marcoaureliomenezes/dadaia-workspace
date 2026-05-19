@@ -279,7 +279,7 @@ local with `pytest` and `dadaia specs doctor`).
 
 ## Phase P14 — CLOSURE (final phase)
 
-- [ ] AGT-r2-46 — Flip `ACTIVE.md` to `phase: CLOSURE` to unlock memory writes (product-engineer)
+- [-] AGT-r2-46 — Flip `ACTIVE.md` to `phase: CLOSURE` to unlock memory writes (product-engineer)
   - Acceptance: `cat specs/releases/ACTIVE.md` reports `phase: CLOSURE` for `release: agents-r2-v1`.
   - Depends: AGT-r2-45.
 - [ ] AGT-r2-47 — Dispatch qa-engineer for `dadaia panel` smoke (qa-engineer via product-engineer)
