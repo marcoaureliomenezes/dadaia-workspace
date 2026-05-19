@@ -30,7 +30,7 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
 
     workflows = service.list_workflows()
     names = {w.name for w in workflows}
-    assert {"spec-refinement", "tdd-cycle"}.issubset(names)
+    assert {"spec-refinement", "audit-cycle"}.issubset(names)
 
     manifest, invocations = service.start_run(
         "spec-refinement",
@@ -88,10 +88,10 @@ def test_events_jsonl_records_full_lifecycle(tmp_path: Path) -> None:
     _bootstrap(tmp_path)
     service = container.build_orchestration_service(tmp_path, runtime="cli")
     manifest, _ = service.start_run(
-        "tdd-cycle",
+        "audit-cycle",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "task_id": "T999"},
+        inputs={"context": "demo-ctx", "scope": "full"},
     )
     events_path = tmp_path / ".dadaia" / "runs" / manifest.run_id / "events.jsonl"
     lines = [ln for ln in events_path.read_text().splitlines() if ln.strip()]
@@ -105,20 +105,20 @@ def test_status_listing_and_lookup(tmp_path: Path) -> None:
     _bootstrap(tmp_path)
     service = container.build_orchestration_service(tmp_path, runtime="cli")
     m1, _ = service.start_run(
-        "tdd-cycle",
+        "audit-cycle",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "task_id": "T1"},
+        inputs={"context": "demo-ctx", "scope": "full"},
     )
     m2, _ = service.start_run(
-        "tdd-cycle",
+        "audit-cycle",
         context="demo-ctx",
         runtime="cli",
-        inputs={"context": "demo-ctx", "task_id": "T2"},
+        inputs={"context": "demo-ctx", "scope": "partial"},
     )
     ids = {r.run_id for r in service.list_runs()}
     assert {m1.run_id, m2.run_id}.issubset(ids)
 
     loaded = service.get_run_status(m1.run_id)
-    assert loaded.workflow_name == "tdd-cycle"
+    assert loaded.workflow_name == "audit-cycle"
     assert loaded.run_id == m1.run_id

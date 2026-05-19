@@ -169,7 +169,7 @@ def test_invalid_handoff_fails_strict(tmp_path: Path) -> None:
 def test_schema_projection_idempotent(tmp_path: Path) -> None:
     """Run public install --force twice; second run produces zero git diff."""
     workspace = tmp_path / "ws"
-    workspace.mkdir(parents=True)
+    _bootstrap(workspace)
 
     # First install
     first = subprocess.run(
@@ -227,7 +227,7 @@ def test_schema_projection_idempotent(tmp_path: Path) -> None:
 def test_doctor_reports_schema_ok_after_install(tmp_path: Path) -> None:
     """After install, `dadaia public doctor` includes [ok] for handoff-v1.schema.json."""
     workspace = tmp_path / "ws"
-    workspace.mkdir(parents=True)
+    _bootstrap(workspace)
 
     install = subprocess.run(
         [*_CLI, "public", "install", "--target", "all", "--force"],
