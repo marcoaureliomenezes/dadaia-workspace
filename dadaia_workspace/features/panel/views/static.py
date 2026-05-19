@@ -47,6 +47,15 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
         "application/javascript; charset=utf-8",
         (_JS_DIR / "themes.js").read_bytes(),
     ),
+    # runtime.js MUST be registered before agents.js, workflows.js, and
+    # sessions.js (load-order invariant, PR5-D7).  window.Runtime must be
+    # defined before any module calls Runtime.get() or subscribes to
+    # dadaia:runtime-change.  The dict insertion order here mirrors the
+    # <script> order enforced in index.py.
+    "runtime.js": (
+        "application/javascript; charset=utf-8",
+        (_JS_DIR / "runtime.js").read_bytes(),
+    ),
     "agents.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "agents.js").read_bytes(),
