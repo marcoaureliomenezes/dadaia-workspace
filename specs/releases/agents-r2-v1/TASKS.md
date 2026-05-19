@@ -207,7 +207,7 @@ local with `pytest` and `dadaia specs doctor`).
   - Forbidden strings (SPEC FR7.2): no occurrences of `Hostinger`, `redacted-infra`, `redacted-infra`, `Traefik`, `redacted-host`, `redacted-infra-jobs`, `redacted-infra-shopping`, `mistralai`, IP `0.0.0.0`, IP `0.0.0.0` — verified by pre-commit grep exiting 1 on hit.
   - Acceptance: `wc -l dadaia_workspace/public/data/AGENTS.md` ≤ 280; pre-commit forbidden-strings grep returns clean; C16 + C17 + C18 + C19 + C21 + C22 + C23 satisfied.
   - Depends: AGT-r2-32. Parallel with: P11c (AGT-r2-37..AGT-r2-38), P12 (AGT-r2-39..AGT-r2-42).
-- [ ] AGT-r2-34 — Assert absence of `data/CLAUDE.md` source (product-engineer)
+- [-] AGT-r2-34 — Assert absence of `data/CLAUDE.md` source (product-engineer)
   - Acceptance: `! test -e dadaia_workspace/public/data/CLAUDE.md` (Option C invariant). Captured as a unit assertion in `tests/unit/features/public/test_workspace_guardrail_pair.py`.
   - Depends: AGT-r2-33.
 
