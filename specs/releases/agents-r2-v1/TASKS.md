@@ -290,11 +290,11 @@ local with `pytest` and `dadaia specs doctor`).
   - Sections per `dadaia-release-closure` skill: Summary, Tasks completed (SHAs), Validations (triples), Drifts (per-slug), Memory updates, Backlog returns, Archive: MOVE.
   - Acceptance: file passes `dadaia specs doctor` CLOSURE-evidence invariant; FR10 manual-migration evidence (operator's before/after `sha256sum`) embedded in `## Validations`.
   - Depends: AGT-r2-47.
-- [-] AGT-r2-49 — Update `specs/memory/architecture.html` (product-engineer)
+- [x] AGT-r2-49 — Update `specs/memory/architecture.html` (product-engineer)
   - `<section id="layers">` gains 3 notes per SPEC FR5: path-scope gate is now active; `paths:` is enforced per-agent; rule-file inlining moved 3 scopes into agent bodies.
   - Acceptance: rendered HTML lints clean (`dadaia specs doctor`); memory atomicity preserved (no Changelog section).
   - Depends: AGT-r2-48.
-- [ ] AGT-r2-50 — Update `specs/memory/product/index.html` + `agent-orchestration.html` (product-engineer)
+- [-] AGT-r2-50 — Update `specs/memory/product/index.html` + `agent-orchestration.html` (product-engineer)
   - `product/index.html`: catalog reflects workflow count = 7.
   - `product/agent-orchestration.html`: 16 agents + 7 workflows + 8 PM playbooks + path-scope gate + 2 rules + Option C dual-name projection note.
   - Acceptance: both HTMLs render with current state only; no history sections; `dadaia specs doctor` clean.
