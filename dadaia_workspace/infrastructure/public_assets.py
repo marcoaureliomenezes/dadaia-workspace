@@ -495,7 +495,15 @@ class FileSystemPublicAssetManager:
             installed.extend(self.stage(workspace_root))
 
         targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
-        self._install_agents_md(agentic_dir, workspace_root, force, installed)
+        data_agents_md = agentic_dir / "data" / "AGENTS.md"
+        if data_agents_md.exists():
+            # Option C (ADR): single source fans out to workspace-root pair +
+            # one pair per marker-bearing consumer repo.  Replaces the legacy
+            # _install_agents_md path for data/AGENTS.md.
+            _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
+        else:
+            # Legacy / scaffold path: templates/AGENTS.md → workspace-root only.
+            self._install_agents_md(agentic_dir, workspace_root, force, installed)
         self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
