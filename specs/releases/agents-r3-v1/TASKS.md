@@ -56,7 +56,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 - [x] R3-09 — Author `data-analyst.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/data-analyst.md`.
   - Done criterion: frontmatter + body; pairing with `design-specialist` for visual review documented; Playwright dashboard-eval pattern referenced; forbidden actions exclude pipeline authorship (data-engineer territory).
-- [ ] R3-10 — Author `ai-engineer.md` persona (`product-engineer`)
+- [-] R3-10 — Author `ai-engineer.md` persona (`product-engineer`)
   - Touches: `dadaia_workspace/public/agents/ai-engineer.md`.
   - Done criterion: frontmatter sets `model: claude-opus-4-7` (NOT sonnet); `paths.write_allowlist` lists the 6 AI-entity globs from SPEC §5; body includes prompt-efficiency analysis protocol; forbidden actions block excludes Python/Node implementation and specs; explicit clause notes bootstrapping by `product-engineer` in r3 with `ai-engineer`-led maintenance deferred to a follow-up release.
 - [ ] R3-11 — Archive `software-engineer.md` (`product-engineer`)
