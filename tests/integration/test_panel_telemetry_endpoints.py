@@ -172,6 +172,7 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
     def _stub_workflows_list(**kw: Any) -> tuple[int, str, bytes]:
         import json as _json
         import datetime as _dt
+
         payload = {
             "generated_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
             "source_hint": ".dadaia/agentic/workflows/",

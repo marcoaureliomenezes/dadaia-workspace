@@ -364,14 +364,14 @@ def test_sessions_css_link_present() -> None:
     """PR5-C4: rendered HTML must include sessions.css link."""
     service = _build_service()
     html = _render(service)
-    assert '/static/sessions.css' in html
+    assert "/static/sessions.css" in html
 
 
 def test_sessions_js_script_present() -> None:
     """PR5-C4: rendered HTML must include sessions.js script tag."""
     service = _build_service()
     html = _render(service)
-    assert '/static/sessions.js' in html
+    assert "/static/sessions.js" in html
 
 
 # ---------------------------------------------------------------------------

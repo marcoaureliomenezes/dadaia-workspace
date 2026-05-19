@@ -67,9 +67,7 @@ def test_warm_theme_selector_present() -> None:
 
 def test_mint_accent_is_brand_mint() -> None:
     """Mint theme accent must be #9cddc8 (original brand value)."""
-    mint_block_match = re.search(
-        r'\[data-theme="mint"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL
-    )
+    mint_block_match = re.search(r'\[data-theme="mint"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL)
     assert mint_block_match, "No [data-theme='mint'] block found"
     mint_block = mint_block_match.group(1)
     assert "#9cddc8" in mint_block
@@ -77,9 +75,7 @@ def test_mint_accent_is_brand_mint() -> None:
 
 def test_mint_accent_dark_is_teal_blue() -> None:
     """Mint theme accent-dark must be #2d7d9a."""
-    mint_block_match = re.search(
-        r'\[data-theme="mint"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL
-    )
+    mint_block_match = re.search(r'\[data-theme="mint"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL)
     assert mint_block_match, "No [data-theme='mint'] block found"
     mint_block = mint_block_match.group(1)
     assert "#2d7d9a" in mint_block
@@ -92,9 +88,7 @@ def test_mint_accent_dark_is_teal_blue() -> None:
 
 def test_sage_accent_is_sage_green() -> None:
     """Sage theme accent must be #bfd8ad."""
-    sage_block_match = re.search(
-        r'\[data-theme="sage"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL
-    )
+    sage_block_match = re.search(r'\[data-theme="sage"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL)
     assert sage_block_match, "No [data-theme='sage'] block found"
     sage_block = sage_block_match.group(1)
     assert "#bfd8ad" in sage_block
@@ -102,9 +96,7 @@ def test_sage_accent_is_sage_green() -> None:
 
 def test_sage_accent_dark_is_deep_sage() -> None:
     """Sage theme accent-dark must be #4a7c59 (deep sage-green links)."""
-    sage_block_match = re.search(
-        r'\[data-theme="sage"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL
-    )
+    sage_block_match = re.search(r'\[data-theme="sage"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL)
     assert sage_block_match, "No [data-theme='sage'] block found"
     sage_block = sage_block_match.group(1)
     assert "#4a7c59" in sage_block
@@ -117,9 +109,7 @@ def test_sage_accent_dark_is_deep_sage() -> None:
 
 def test_warm_accent_is_amber() -> None:
     """Warm theme accent must be #f7af63 (amber)."""
-    warm_block_match = re.search(
-        r'\[data-theme="warm"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL
-    )
+    warm_block_match = re.search(r'\[data-theme="warm"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL)
     assert warm_block_match, "No [data-theme='warm'] block found"
     warm_block = warm_block_match.group(1)
     assert "#f7af63" in warm_block
@@ -127,9 +117,7 @@ def test_warm_accent_is_amber() -> None:
 
 def test_warm_accent_dark_is_brown() -> None:
     """Warm theme accent-dark must be #633d2e (brown links / CTA text)."""
-    warm_block_match = re.search(
-        r'\[data-theme="warm"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL
-    )
+    warm_block_match = re.search(r'\[data-theme="warm"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL)
     assert warm_block_match, "No [data-theme='warm'] block found"
     warm_block = warm_block_match.group(1)
     assert "#633d2e" in warm_block
@@ -137,9 +125,7 @@ def test_warm_accent_dark_is_brown() -> None:
 
 def test_warm_cost_is_deeper_brown() -> None:
     """Warm theme --color-cost must be #4a3020 (deeper brown for headings on warm bg)."""
-    warm_block_match = re.search(
-        r'\[data-theme="warm"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL
-    )
+    warm_block_match = re.search(r'\[data-theme="warm"\][^{]*\{([^}]+)\}', TOKENS_CSS, re.DOTALL)
     assert warm_block_match, "No [data-theme='warm'] block found"
     warm_block = warm_block_match.group(1)
     assert "#4a3020" in warm_block
@@ -217,7 +203,7 @@ def test_warm_focus_visible_uses_accent_dark() -> None:
         # Alternative: selector may span multiple lines differently
         # Look for any focus-visible context that mentions warm and accent-dark
         combined = re.search(
-            r'data-theme.*warm|warm.*data-theme',
+            r"data-theme.*warm|warm.*data-theme",
             STRUCTURE_CSS,
             re.DOTALL,
         )
@@ -291,7 +277,9 @@ def test_all_themes_define_primary_ring() -> None:
     """All three theme blocks define --color-primary-ring."""
     for theme in ("mint", "sage", "warm"):
         block = _get_theme_block(theme, TOKENS_CSS)
-        assert "--color-primary-ring" in block, f"[data-theme='{theme}'] missing --color-primary-ring"
+        assert "--color-primary-ring" in block, (
+            f"[data-theme='{theme}'] missing --color-primary-ring"
+        )
 
 
 def test_all_themes_define_primary_bg() -> None:

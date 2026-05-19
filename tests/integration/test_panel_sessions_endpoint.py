@@ -42,10 +42,7 @@ from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 # ---------------------------------------------------------------------------
 
 _FIXTURE_DB = (
-    pathlib.Path(__file__).parents[1]
-    / "fixtures"
-    / "telemetry"
-    / "sessions_seeded.sqlite"
+    pathlib.Path(__file__).parents[1] / "fixtures" / "telemetry" / "sessions_seeded.sqlite"
 )
 
 # ---------------------------------------------------------------------------
@@ -312,9 +309,7 @@ class TestSessionsRuntimeFilter:
         for row in data["sessions"]:
             assert row["runtime"] == "claude"
 
-    def test_codex_rows_have_null_cost_and_cost_known_false(
-        self, sessions_server
-    ) -> None:
+    def test_codex_rows_have_null_cost_and_cost_known_false(self, sessions_server) -> None:
         """PR5-E4: every Codex row has cumulative_cost_usd=None and cost_known=False.
 
         Sourced from tests/fixtures/telemetry/sessions_seeded.sqlite Codex rows
@@ -415,10 +410,21 @@ class TestSessionDetail:
         )
         data = json.loads(body)
         required = {
-            "session_id", "runtime", "project", "cwd", "model",
-            "started_at", "last_activity_at", "message_count",
-            "context_size_tokens", "cumulative_cost_usd", "cost_known",
-            "status", "agent_name", "ai_title", "event_timestamps",
+            "session_id",
+            "runtime",
+            "project",
+            "cwd",
+            "model",
+            "started_at",
+            "last_activity_at",
+            "message_count",
+            "context_size_tokens",
+            "cumulative_cost_usd",
+            "cost_known",
+            "status",
+            "agent_name",
+            "ai_title",
+            "event_timestamps",
         }
         missing = required - set(data.keys())
         assert not missing, f"Missing detail keys: {missing}"
@@ -491,9 +497,7 @@ class TestCodexDetailEndpoint:
     cost contract end-to-end: fixture DB → aggregator → HTTP response.
     """
 
-    def test_codex_detail_endpoint_returns_none_cost(
-        self, sessions_server
-    ) -> None:
+    def test_codex_detail_endpoint_returns_none_cost(self, sessions_server) -> None:
         """PR5-E4: GET /api/sessions/codex/<id> → cumulative_cost_usd is None
         and cost_known is False.
 
@@ -506,9 +510,7 @@ class TestCodexDetailEndpoint:
             f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
             token=token,
         )
-        assert status == 200, (
-            f"Expected 200 for Codex detail {_CODEX_SESSION_ID!r}, got {status}"
-        )
+        assert status == 200, f"Expected 200 for Codex detail {_CODEX_SESSION_ID!r}, got {status}"
         data = json.loads(body)
 
         # Core PR5-E4 assertions
@@ -517,8 +519,7 @@ class TestCodexDetailEndpoint:
             f"got {data['cumulative_cost_usd']!r}"
         )
         assert data["cost_known"] is False, (
-            f"PR5-E4: Codex detail must have cost_known=False, "
-            f"got {data['cost_known']!r}"
+            f"PR5-E4: Codex detail must have cost_known=False, got {data['cost_known']!r}"
         )
 
     def test_codex_detail_has_all_required_keys(self, sessions_server) -> None:
@@ -530,10 +531,21 @@ class TestCodexDetailEndpoint:
         )
         data = json.loads(body)
         required = {
-            "session_id", "runtime", "project", "cwd", "model",
-            "started_at", "last_activity_at", "message_count",
-            "context_size_tokens", "cumulative_cost_usd", "cost_known",
-            "status", "agent_name", "ai_title", "event_timestamps",
+            "session_id",
+            "runtime",
+            "project",
+            "cwd",
+            "model",
+            "started_at",
+            "last_activity_at",
+            "message_count",
+            "context_size_tokens",
+            "cumulative_cost_usd",
+            "cost_known",
+            "status",
+            "agent_name",
+            "ai_title",
+            "event_timestamps",
         }
         missing = required - set(data.keys())
         assert not missing, f"Missing Codex detail keys: {missing}"
@@ -546,9 +558,7 @@ class TestCodexDetailEndpoint:
             token=token,
         )
         data = json.loads(body)
-        assert data["runtime"] == "codex", (
-            f"Expected runtime='codex', got {data['runtime']!r}"
-        )
+        assert data["runtime"] == "codex", f"Expected runtime='codex', got {data['runtime']!r}"
 
     def test_codex_detail_session_id_matches(self, sessions_server) -> None:
         """Detail response session_id matches the requested Codex session_id."""
@@ -584,10 +594,20 @@ class TestSessionsEnvelope:
         assert data["sessions"]
         row = data["sessions"][0]
         required = {
-            "session_id", "runtime", "project", "cwd", "model",
-            "started_at", "last_activity_at", "message_count",
-            "context_size_tokens", "cumulative_cost_usd", "cost_known",
-            "status", "agent_name", "ai_title",
+            "session_id",
+            "runtime",
+            "project",
+            "cwd",
+            "model",
+            "started_at",
+            "last_activity_at",
+            "message_count",
+            "context_size_tokens",
+            "cumulative_cost_usd",
+            "cost_known",
+            "status",
+            "agent_name",
+            "ai_title",
         }
         missing = required - set(row.keys())
         assert not missing, f"Missing session row keys: {missing}"

@@ -22,30 +22,15 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
-_JS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-    / "assets"
-    / "js"
-)
+_JS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "js"
 
-_CSS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-    / "assets"
-    / "css"
-)
+_CSS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "css"
 
 
 # ---------------------------------------------------------------------------
 # Helper: read file text once per test
 # ---------------------------------------------------------------------------
+
 
 def _wf_js() -> str:
     return (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
@@ -53,6 +38,7 @@ def _wf_js() -> str:
 
 def _wf_css() -> str:
     from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
+
     return WORKFLOWS_CSS
 
 
@@ -169,9 +155,7 @@ def test_workflows_js_skeleton_back_button_operative() -> None:
 def test_workflows_js_has_navigate_back_function() -> None:
     """workflows.js must define a navigateBack() function."""
     text = _wf_js()
-    assert "navigateBack" in text, (
-        "workflows.js must define a navigateBack() function"
-    )
+    assert "navigateBack" in text, "workflows.js must define a navigateBack() function"
 
 
 # ---------------------------------------------------------------------------
@@ -182,9 +166,7 @@ def test_workflows_js_has_navigate_back_function() -> None:
 def test_workflows_js_has_escape_key_handler() -> None:
     """workflows.js must listen for Escape key to close the detail view."""
     text = _wf_js()
-    assert "Escape" in text, (
-        "workflows.js must handle Escape key to close the detail view"
-    )
+    assert "Escape" in text, "workflows.js must handle Escape key to close the detail view"
 
 
 def test_workflows_js_escape_checks_inDetailView_flag() -> None:
@@ -235,9 +217,7 @@ def test_workflows_js_hash_uses_hashtag_workflows_detail() -> None:
 def test_workflows_js_uses_history_push_state() -> None:
     """workflows.js must use history.pushState for hash navigation (no page reload)."""
     text = _wf_js()
-    assert "history.pushState" in text, (
-        "workflows.js must use history.pushState for hash routing"
-    )
+    assert "history.pushState" in text, "workflows.js must use history.pushState for hash routing"
 
 
 def test_workflows_js_has_popstate_listener() -> None:
@@ -291,9 +271,7 @@ def test_workflows_js_detail_has_error_state() -> None:
 def test_workflows_js_detail_error_has_role_alert() -> None:
     """Detail error state must have role='alert' for screen readers."""
     text = _wf_js()
-    assert 'role="alert"' in text, (
-        "workflows.js must use role='alert' on error state markup"
-    )
+    assert 'role="alert"' in text, "workflows.js must use role='alert' on error state markup"
 
 
 # ---------------------------------------------------------------------------
@@ -312,25 +290,19 @@ def test_workflows_js_exposes_load_detail() -> None:
 def test_workflows_js_exposes_parse_workflow_hash_on_window() -> None:
     """window.Workflows must expose parseWorkflowHash."""
     text = _wf_js()
-    assert "parseWorkflowHash" in text, (
-        "window.Workflows must expose parseWorkflowHash"
-    )
+    assert "parseWorkflowHash" in text, "window.Workflows must expose parseWorkflowHash"
 
 
 def test_workflows_js_exposes_build_detail_hash_on_window() -> None:
     """window.Workflows must expose buildDetailHash."""
     text = _wf_js()
-    assert "buildDetailHash" in text, (
-        "window.Workflows must expose buildDetailHash"
-    )
+    assert "buildDetailHash" in text, "window.Workflows must expose buildDetailHash"
 
 
 def test_workflows_js_exposes_handle_hash_on_activation_on_window() -> None:
     """window.Workflows must expose handleHashOnActivation."""
     text = _wf_js()
-    assert "handleHashOnActivation" in text, (
-        "window.Workflows must expose handleHashOnActivation"
-    )
+    assert "handleHashOnActivation" in text, "window.Workflows must expose handleHashOnActivation"
 
 
 # ---------------------------------------------------------------------------
@@ -386,9 +358,7 @@ def test_workflows_css_has_detail_view_class() -> None:
 def test_workflows_css_has_dag_container() -> None:
     """WORKFLOWS_CSS must define .workflow-dag container styles."""
     css = _wf_css()
-    assert ".workflow-dag" in css, (
-        "workflows.css must define .workflow-dag container styles"
-    )
+    assert ".workflow-dag" in css, "workflows.css must define .workflow-dag container styles"
 
 
 def test_workflows_css_has_dag_skeleton() -> None:
@@ -402,9 +372,7 @@ def test_workflows_css_has_dag_skeleton() -> None:
 def test_workflows_css_has_back_button_styles() -> None:
     """WORKFLOWS_CSS must define .workflow-back-btn styles."""
     css = _wf_css()
-    assert "workflow-back-btn" in css, (
-        "workflows.css must define .workflow-back-btn styles"
-    )
+    assert "workflow-back-btn" in css, "workflows.css must define .workflow-back-btn styles"
 
 
 def test_workflows_css_has_inline_error_styles() -> None:
@@ -440,8 +408,7 @@ def test_workflows_css_status_rules_use_color_tokens() -> None:
     status_section = css[status_section_start:]
     var_count = status_section.count("var(--color-")
     assert var_count >= 3, (
-        f"data-status CSS rules must use at least 3 var(--color-*) tokens "
-        f"(found {var_count})"
+        f"data-status CSS rules must use at least 3 var(--color-*) tokens (found {var_count})"
     )
 
 

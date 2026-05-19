@@ -31,9 +31,7 @@ def render_workflows_section() -> str:
         "    <h2>Workflows</h2>\n"
         '    <p class="section-meta" id="workflows-meta" aria-live="polite"></p>\n'
         "  </header>\n"
-        '  <p id="workflows-empty" class="empty-state" hidden>'
-        + empty_msg
-        + "</p>\n"
+        '  <p id="workflows-empty" class="empty-state" hidden>' + empty_msg + "</p>\n"
         # Card grid container — workflows.js renders .workflow-card elements inside.
         # aria-busy="false" is the default; workflows.js sets it to "true" during fetch.
         '  <div id="workflows-grid" class="workflows-card-grid" '

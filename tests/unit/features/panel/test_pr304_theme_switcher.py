@@ -122,25 +122,19 @@ def test_topbar_has_theme_button() -> None:
 def test_theme_button_has_aria_haspopup_menu() -> None:
     """PR3-04: theme-switcher button must have aria-haspopup='menu'."""
     html = _render()
-    assert 'aria-haspopup="menu"' in html, (
-        "Theme button must carry aria-haspopup='menu'"
-    )
+    assert 'aria-haspopup="menu"' in html, "Theme button must carry aria-haspopup='menu'"
 
 
 def test_theme_button_has_aria_expanded() -> None:
     """PR3-04: theme-switcher button must have aria-expanded attribute."""
     html = _render()
-    assert "aria-expanded=" in html, (
-        "Theme button must carry aria-expanded attribute"
-    )
+    assert "aria-expanded=" in html, "Theme button must carry aria-expanded attribute"
 
 
 def test_theme_button_aria_expanded_default_false() -> None:
     """PR3-04: theme-switcher button aria-expanded must default to 'false'."""
     html = _render()
-    assert 'aria-expanded="false"' in html, (
-        "Theme button aria-expanded must default to 'false'"
-    )
+    assert 'aria-expanded="false"' in html, "Theme button aria-expanded must default to 'false'"
 
 
 # ---------------------------------------------------------------------------
@@ -151,9 +145,7 @@ def test_theme_button_aria_expanded_default_false() -> None:
 def test_theme_dropdown_has_role_menu() -> None:
     """PR3-04: dropdown container must have role='menu'."""
     html = _render()
-    assert 'role="menu"' in html, (
-        "Theme dropdown must carry role='menu'"
-    )
+    assert 'role="menu"' in html, "Theme dropdown must carry role='menu'"
 
 
 def test_theme_dropdown_has_three_menuitemradio_items() -> None:
@@ -184,9 +176,7 @@ def test_theme_dropdown_has_warm_option() -> None:
 def test_theme_items_have_aria_checked() -> None:
     """PR3-04: menuitemradio items must have aria-checked attribute."""
     html = _render()
-    assert "aria-checked=" in html, (
-        "menuitemradio items must carry aria-checked attribute"
-    )
+    assert "aria-checked=" in html, "menuitemradio items must carry aria-checked attribute"
 
 
 # ---------------------------------------------------------------------------
@@ -215,9 +205,7 @@ def test_themes_js_is_iife() -> None:
     view = render_static()
     _, _, body = view(name="themes.js")
     js = body.decode("utf-8")
-    assert "(function" in js or "(function(" in js, (
-        "themes.js must be wrapped as an IIFE"
-    )
+    assert "(function" in js or "(function(" in js, "themes.js must be wrapped as an IIFE"
 
 
 def test_themes_js_references_localstorage_key() -> None:
@@ -225,9 +213,7 @@ def test_themes_js_references_localstorage_key() -> None:
     view = render_static()
     _, _, body = view(name="themes.js")
     js = body.decode("utf-8")
-    assert "dadaia-panel-theme" in js, (
-        "themes.js must use localStorage key 'dadaia-panel-theme'"
-    )
+    assert "dadaia-panel-theme" in js, "themes.js must use localStorage key 'dadaia-panel-theme'"
 
 
 def test_themes_js_handles_escape_key() -> None:
@@ -243,9 +229,7 @@ def test_themes_js_handles_arrow_keys() -> None:
     view = render_static()
     _, _, body = view(name="themes.js")
     js = body.decode("utf-8")
-    assert "ArrowDown" in js or "ArrowUp" in js, (
-        "themes.js must handle arrow keys for item cycling"
-    )
+    assert "ArrowDown" in js or "ArrowUp" in js, "themes.js must handle arrow keys for item cycling"
 
 
 def test_themes_js_sets_dataset_theme() -> None:
@@ -282,6 +266,4 @@ def test_themes_js_no_global_pollution() -> None:
 def test_index_includes_themes_js_script_tag() -> None:
     """PR3-04: index.py must include a <script src='/static/themes.js'> tag."""
     html = _render()
-    assert '/static/themes.js' in html, (
-        "index.py must include <script src='/static/themes.js'>"
-    )
+    assert "/static/themes.js" in html, "index.py must include <script src='/static/themes.js'>"

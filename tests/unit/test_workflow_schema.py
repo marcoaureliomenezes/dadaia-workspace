@@ -282,8 +282,13 @@ stages:
 """
 
 _NEW_WORKFLOW_CATALOG = [
-    "project-auditor", "code-reviewer", "security-reviewer",
-    "researcher", "qa-engineer", "project-manager", "design-specialist",
+    "project-auditor",
+    "code-reviewer",
+    "security-reviewer",
+    "researcher",
+    "qa-engineer",
+    "project-manager",
+    "design-specialist",
 ]
 
 
@@ -351,11 +356,14 @@ def test_design_validation_sequential_stages(tmp_path: Path) -> None:
     assert "capture_screens" in ux_review.needs
 
 
-@pytest.mark.parametrize("wf_name,wf_yaml,stage_count", [
-    ("audit-cycle", _AUDIT_CYCLE_YAML, 6),
-    ("code-review-fan-out", _CODE_REVIEW_FAN_OUT_YAML, 4),
-    ("design-validation", _DESIGN_VALIDATION_YAML, 2),
-])
+@pytest.mark.parametrize(
+    "wf_name,wf_yaml,stage_count",
+    [
+        ("audit-cycle", _AUDIT_CYCLE_YAML, 6),
+        ("code-review-fan-out", _CODE_REVIEW_FAN_OUT_YAML, 4),
+        ("design-validation", _DESIGN_VALIDATION_YAML, 2),
+    ],
+)
 def test_new_workflow_stage_counts(
     tmp_path: Path, wf_name: str, wf_yaml: str, stage_count: int
 ) -> None:

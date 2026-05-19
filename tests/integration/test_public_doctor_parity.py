@@ -131,12 +131,8 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
         f"repos/{slug}:AGENTS.md",
         f"repos/{slug}:CLAUDE.md",
     }
-    assert labels == expected, (
-        f"Doctor labels mismatch.\n  Expected: {expected}\n  Got: {labels}"
-    )
-    assert len(lines) == 4, (
-        f"Expected exactly 4 parity lines, got {len(lines)}.\n  Lines: {lines}"
-    )
+    assert labels == expected, f"Doctor labels mismatch.\n  Expected: {expected}\n  Got: {labels}"
+    assert len(lines) == 4, f"Expected exactly 4 parity lines, got {len(lines)}.\n  Lines: {lines}"
     assert all(ln.startswith("[ok]") for ln in lines), (
         f"All labels should be [ok] after install. Lines: {lines}"
     )
@@ -236,6 +232,4 @@ def test_no_marker_consumer_does_not_appear_in_doctor_labels(tmp_path: Path) -> 
     assert "repos/no-marker-repo:AGENTS.md" not in labels, (
         f"Marker-less consumer must not appear in doctor labels. Labels: {labels}"
     )
-    assert len(lines) == 2, (
-        f"Expected exactly 2 lines (root pair only). Got {len(lines)}: {lines}"
-    )
+    assert len(lines) == 2, f"Expected exactly 2 lines (root pair only). Got {len(lines)}: {lines}"

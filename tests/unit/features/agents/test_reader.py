@@ -77,9 +77,7 @@ def test_env_var_branch_supersedes_fallback_dirs(
 # ---------------------------------------------------------------------------
 
 
-def test_agentic_branch_loads_agents(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_agentic_branch_loads_agents(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """When DADAIA_AGENTS_DIR is absent, .dadaia/agentic/agents/ is used."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -234,9 +232,7 @@ def test_malformed_frontmatter_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "software-engineer" in names
 
 
-def test_missing_frontmatter_skipped(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_missing_frontmatter_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A .md file with no frontmatter delimiters is skipped gracefully."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -253,9 +249,7 @@ def test_missing_frontmatter_skipped(
     assert "valid" in names
 
 
-def test_empty_frontmatter_skipped(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_empty_frontmatter_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A .md file with empty/null frontmatter (just delimiters) is skipped."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -282,8 +276,17 @@ def test_agent_dto_is_dataclass_or_typed(monkeypatch: pytest.MonkeyPatch) -> Non
     assert len(agents) > 0
     dto = agents[0]
     assert isinstance(dto, AgentDTO)
-    required_fields = {"id", "name", "description", "skills", "tools",
-                       "model", "opencode_model", "max_turns", "input_contract"}
+    required_fields = {
+        "id",
+        "name",
+        "description",
+        "skills",
+        "tools",
+        "model",
+        "opencode_model",
+        "max_turns",
+        "input_contract",
+    }
     for field in required_fields:
         assert hasattr(dto, field), f"AgentDTO missing field: {field}"
 
@@ -318,9 +321,7 @@ def test_raw_to_dto_missing_name_returns_empty_agent_list(
     assert "nameless" not in names
 
 
-def test_raw_to_dto_empty_name_skipped(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_raw_to_dto_empty_name_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Agent file with empty string name is skipped."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -339,18 +340,14 @@ def test_raw_to_dto_missing_description_defaults_empty(
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
-    (agentic_dir / "no-desc.md").write_text(
-        "---\nname: no-desc\ntier: 3\n---\n# No description\n"
-    )
+    (agentic_dir / "no-desc.md").write_text("---\nname: no-desc\ntier: 3\n---\n# No description\n")
     agents = read_canonical_agents(workspace_root=tmp_path)
     agent = next((a for a in agents if a.id == "no-desc"), None)
     assert agent is not None
     assert agent.description == ""
 
 
-def test_raw_to_dto_bad_max_turns_ignored(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_raw_to_dto_bad_max_turns_ignored(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Non-integer maxTurns value is silently ignored; max_turns remains None."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -364,9 +361,7 @@ def test_raw_to_dto_bad_max_turns_ignored(
     assert agent.max_turns is None
 
 
-def test_raw_to_dto_max_turns_snake_case(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_raw_to_dto_max_turns_snake_case(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """max_turns (snake_case) is accepted as a fallback when maxTurns absent."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -412,9 +407,7 @@ def test_raw_to_dto_non_dict_input_contract_ignored(
     assert agent.input_contract is None
 
 
-def test_raw_to_dto_unicode_emoji_name(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_raw_to_dto_unicode_emoji_name(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Agent with unicode/emoji in description is loaded without error."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -470,9 +463,7 @@ def test_strip_frontmatter_empty_body_returns_empty_string() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_get_prompt_returns_body_and_path(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_prompt_returns_body_and_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """get_prompt returns (body, path) for a valid agent in the fixtures dir."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -494,27 +485,21 @@ def test_get_prompt_invalid_id_regex_raises(
         get_prompt("INVALID_ID!", workspace_root=tmp_path)
 
 
-def test_get_prompt_uppercase_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_prompt_uppercase_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Uppercase letters in agent_id fail the regex validation."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     with pytest.raises(InvalidAgentIdError):
         get_prompt("SoftwareEngineer", workspace_root=tmp_path)
 
 
-def test_get_prompt_space_in_id_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_prompt_space_in_id_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Spaces in agent_id fail the regex validation."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     with pytest.raises(InvalidAgentIdError):
         get_prompt("software engineer", workspace_root=tmp_path)
 
 
-def test_get_prompt_no_agents_dir_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_prompt_no_agents_dir_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """When no agents directory can be resolved, AgentNotFoundError is raised."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     # No dirs under tmp_path
@@ -522,9 +507,7 @@ def test_get_prompt_no_agents_dir_raises(
         get_prompt("software-engineer", workspace_root=tmp_path)
 
 
-def test_get_prompt_agent_not_found_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_prompt_agent_not_found_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Valid id but no corresponding file raises AgentNotFoundError."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -536,15 +519,11 @@ def test_get_prompt_agent_not_found_raises(
         get_prompt("missing-agent", workspace_root=tmp_path)
 
 
-def test_get_prompt_uses_env_var_dir(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_prompt_uses_env_var_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """get_prompt respects DADAIA_AGENTS_DIR env var for directory resolution."""
     custom_dir = tmp_path / "custom_agents"
     custom_dir.mkdir()
-    (custom_dir / "se.md").write_text(
-        "---\nname: se\ndescription: SE.\n---\n\n# SE prompt body.\n"
-    )
+    (custom_dir / "se.md").write_text("---\nname: se\ndescription: SE.\n---\n\n# SE prompt body.\n")
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(custom_dir))
     body, path = get_prompt("se", workspace_root=tmp_path)
     assert "SE prompt body" in body
@@ -578,9 +557,7 @@ def test_get_prompt_symlink_escape_raises_invalid(
     agentic_dir.mkdir(parents=True)
     # Target outside the agents dir
     outside = tmp_path / "outside.md"
-    outside.write_text(
-        "---\nname: escape-agent\ndescription: Outside agent.\n---\n# Escape\n"
-    )
+    outside.write_text("---\nname: escape-agent\ndescription: Outside agent.\n---\n# Escape\n")
     # Symlink named "escape-agent.md" inside the dir, pointing outside
     link = agentic_dir / "escape-agent.md"
     link.symlink_to(outside)
@@ -594,9 +571,7 @@ def test_get_prompt_symlink_escape_raises_invalid(
 # ---------------------------------------------------------------------------
 
 
-def test_paths_field_loaded_when_present(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_paths_field_loaded_when_present(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """When 'paths' frontmatter key is present its value is forwarded to AgentDTO.paths."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
@@ -653,10 +628,7 @@ def test_paths_field_non_dict_defaults_to_none(
 # ---------------------------------------------------------------------------
 
 _PUBLIC_AGENTS_DIR = (
-    Path(__file__).parent.parent.parent.parent.parent
-    / "dadaia_workspace"
-    / "public"
-    / "agents"
+    Path(__file__).parent.parent.parent.parent.parent / "dadaia_workspace" / "public" / "agents"
 )
 
 
@@ -688,9 +660,7 @@ def test_all_public_agents_have_write_allowlist(
         wl = agent.paths.get("write_allowlist")
         if not wl:
             empty_allowlist.append(agent.id)
-    assert missing_allowlist == [], (
-        f"Agents with no 'paths' block at all: {missing_allowlist}"
-    )
+    assert missing_allowlist == [], f"Agents with no 'paths' block at all: {missing_allowlist}"
     assert empty_allowlist == [], (
         f"Agents with empty or absent 'write_allowlist': {empty_allowlist}"
     )
@@ -710,9 +680,7 @@ def test_all_public_agents_write_allowlist_entries_are_strings(
         for entry in wl:
             if not isinstance(entry, str) or not entry.strip():
                 bad.append((agent.id, entry))
-    assert bad == [], (
-        f"Non-string or empty entries in write_allowlist: {bad}"
-    )
+    assert bad == [], f"Non-string or empty entries in write_allowlist: {bad}"
 
 
 def test_public_agents_count_is_20(
@@ -743,10 +711,10 @@ def test_public_agents_count_is_20(
 
 _R3_NEW_AGENTS = {
     "software-engineer-python": "claude-sonnet-4-6",
-    "software-engineer-node":   "claude-sonnet-4-6",
-    "data-engineer":            "claude-sonnet-4-6",
-    "data-analyst":             "claude-sonnet-4-6",
-    "ai-engineer":              "claude-opus-4-7",
+    "software-engineer-node": "claude-sonnet-4-6",
+    "data-engineer": "claude-sonnet-4-6",
+    "data-analyst": "claude-sonnet-4-6",
+    "ai-engineer": "claude-opus-4-7",
 }
 
 
@@ -763,20 +731,12 @@ def test_r3_new_personas_parse_with_tier3(
     by_id = {a.id: a for a in agents}
 
     for new_id in _R3_NEW_AGENTS:
-        assert new_id in by_id, (
-            f"R3 new persona {new_id!r} missing from public/agents/ roster"
-        )
+        assert new_id in by_id, f"R3 new persona {new_id!r} missing from public/agents/ roster"
         agent = by_id[new_id]
-        assert agent.tier == 3, (
-            f"R3 persona {new_id!r} must be tier 3 (T3 leaf), got {agent.tier}"
-        )
-        assert agent.paths is not None, (
-            f"R3 persona {new_id!r} must declare paths block"
-        )
+        assert agent.tier == 3, f"R3 persona {new_id!r} must be tier 3 (T3 leaf), got {agent.tier}"
+        assert agent.paths is not None, f"R3 persona {new_id!r} must declare paths block"
         wl = agent.paths.get("write_allowlist") if agent.paths else None
-        assert wl, (
-            f"R3 persona {new_id!r} must have non-empty write_allowlist"
-        )
+        assert wl, f"R3 persona {new_id!r} must have non-empty write_allowlist"
 
 
 def test_r3_new_personas_have_expected_models(
@@ -791,8 +751,7 @@ def test_r3_new_personas_have_expected_models(
         agent = by_id.get(new_id)
         assert agent is not None, f"R3 persona {new_id!r} missing"
         assert agent.model == expected_model, (
-            f"R3 persona {new_id!r}: expected model {expected_model!r}, "
-            f"got {agent.model!r}"
+            f"R3 persona {new_id!r}: expected model {expected_model!r}, got {agent.model!r}"
         )
 
 
@@ -808,8 +767,7 @@ def test_r3_new_personas_have_skills(
         agent = by_id.get(new_id)
         assert agent is not None, f"R3 persona {new_id!r} missing"
         assert isinstance(agent.skills, list) and len(agent.skills) > 0, (
-            f"R3 persona {new_id!r} must declare a non-empty skills list, "
-            f"got {agent.skills!r}"
+            f"R3 persona {new_id!r} must declare a non-empty skills list, got {agent.skills!r}"
         )
 
 
@@ -863,26 +821,18 @@ def test_tier_mapping_matches_topology(
 
     for aid in _TIER1_AGENTS:
         assert aid in by_id, f"Expected T1 agent {aid!r} in public roster"
-        assert by_id[aid].tier == 1, (
-            f"Agent {aid!r} should be tier 1, got {by_id[aid].tier}"
-        )
+        assert by_id[aid].tier == 1, f"Agent {aid!r} should be tier 1, got {by_id[aid].tier}"
 
     for aid in _TIER2_AGENTS:
         assert aid in by_id, f"Expected T2 agent {aid!r} in public roster"
-        assert by_id[aid].tier == 2, (
-            f"Agent {aid!r} should be tier 2, got {by_id[aid].tier}"
-        )
+        assert by_id[aid].tier == 2, f"Agent {aid!r} should be tier 2, got {by_id[aid].tier}"
 
     for aid in _TIER3_SAMPLE:
         assert aid in by_id, f"Expected T3 agent {aid!r} in public roster"
-        assert by_id[aid].tier == 3, (
-            f"Agent {aid!r} should be tier 3, got {by_id[aid].tier}"
-        )
+        assert by_id[aid].tier == 3, f"Agent {aid!r} should be tier 3, got {by_id[aid].tier}"
 
 
-def test_invalid_tier_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_invalid_tier_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """An agent file with a present-but-invalid 'tier' value raises MissingTierError.
 
     Invalid means: non-integer (e.g. 'foo') or out-of-range (e.g. 5, 0).
@@ -910,9 +860,7 @@ def test_invalid_tier_raises(
     assert "bad-tier-agent" not in names
 
 
-def test_missing_tier_defaults_to_3(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_missing_tier_defaults_to_3(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """An agent file with no 'tier' frontmatter field defaults to tier=3 with a warning.
 
     This tolerates stale staged files that pre-date the tier field, while still
@@ -950,9 +898,7 @@ def test_get_prompt_unreadable_file_raises_not_found(
     agentic_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agentic_dir.mkdir(parents=True)
     agent_file = agentic_dir / "locked-agent.md"
-    agent_file.write_text(
-        "---\nname: locked-agent\ndescription: Locked.\n---\n# Locked\n"
-    )
+    agent_file.write_text("---\nname: locked-agent\ndescription: Locked.\n---\n# Locked\n")
     agent_file.chmod(0o000)
     try:
         with pytest.raises(AgentNotFoundError, match="Cannot read"):

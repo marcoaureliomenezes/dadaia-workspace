@@ -192,7 +192,9 @@ def test_skip_no_agentic_marker(tmp_path: Path, capsys: pytest.CaptureFixture[st
 # ---------------------------------------------------------------------------
 
 
-def test_skip_self_slug_package_version_match(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_skip_self_slug_package_version_match(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """dadaia-workspace's own repo is self-skipped via package_version match.
 
     R14: When the `package_version` in `<repo>/.dadaia/agentic/manifest.json`
@@ -353,8 +355,7 @@ def test_doctor_four_line_output(tmp_path: Path) -> None:
         f"Doctor labels mismatch.\n  Expected: {expected_labels}\n  Got: {actual_labels}"
     )
     assert len(lines) == 4, (
-        f"Expected exactly 4 parity lines, found {len(lines)}.\n"
-        f"  Lines: {lines}"
+        f"Expected exactly 4 parity lines, found {len(lines)}.\n  Lines: {lines}"
     )
     assert all(ln.startswith("[ok]") for ln in lines), (
         f"All parity lines should be [ok] after install.\n  Lines: {lines}"
@@ -434,9 +435,7 @@ def test_install_dispatches_to_workspace_guardrail_pair(tmp_path: Path) -> None:
         "generated_at": "2026-01-01T00:00:00+00:00",
         "assets": [{"path": "data/AGENTS.md", "sha256": "aa", "type": "data"}],
     }
-    (agentic_dir / "manifest.json").write_text(
-        __import__("json").dumps(manifest), encoding="utf-8"
-    )
+    (agentic_dir / "manifest.json").write_text(__import__("json").dumps(manifest), encoding="utf-8")
 
     # One marker-bearing consumer with a distinct (non-self) package_version
     consumer = workspace_root / "repos" / "redacted-slug"
@@ -459,6 +458,7 @@ def test_install_dispatches_to_workspace_guardrail_pair(tmp_path: Path) -> None:
 
     # All 4 guardrail destinations must exist and be byte-identical to source
     import hashlib
+
     expected_sha = hashlib.sha256(guardrail_content).hexdigest()
 
     destinations = [
@@ -477,10 +477,7 @@ def test_install_dispatches_to_workspace_guardrail_pair(tmp_path: Path) -> None:
             f"  dest   sha256: {actual_sha}"
         )
 
-    ok_guardrail = [
-        e for e in installed
-        if "AGENTS.md" in e or "CLAUDE.md" in e
-    ]
+    ok_guardrail = [e for e in installed if "AGENTS.md" in e or "CLAUDE.md" in e]
     assert len(ok_guardrail) >= 4, (
         f"Expected at least 4 guardrail entries in installed list, got {len(ok_guardrail)}.\n"
         f"  installed: {installed}"

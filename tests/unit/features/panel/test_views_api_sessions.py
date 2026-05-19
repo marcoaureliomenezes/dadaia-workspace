@@ -161,11 +161,13 @@ class _FakeTelemetry:
             total_count=len(rows),
         )
 
-    def get_session(
-        self, runtime: str, session_id: str
-    ) -> SessionDetail | None:
+    def get_session(self, runtime: str, session_id: str) -> SessionDetail | None:
         self.last_get_kwargs = {"runtime": runtime, "session_id": session_id}
-        if self._detail and self._detail.session_id == session_id and self._detail.runtime == runtime:
+        if (
+            self._detail
+            and self._detail.session_id == session_id
+            and self._detail.runtime == runtime
+        ):
             return self._detail
         return None
 
@@ -236,9 +238,7 @@ def _dispatch(
 ) -> tuple[int, bytes]:
     """Drive a single GET request through handler_class for path."""
     auth_header = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = (
-        f"GET {path} HTTP/1.1\r\nHost: localhost\r\n{auth_header}\r\n"
-    ).encode()
+    raw_request = (f"GET {path} HTTP/1.1\r\nHost: localhost\r\n{auth_header}\r\n").encode()
     fake_sock = _FakeSocket(raw_request)
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
     response = fake_sock._wfile.getvalue()
@@ -354,10 +354,20 @@ class TestSessionsList:
         assert len(data["sessions"]) >= 1
         row = data["sessions"][0]
         required_keys = {
-            "session_id", "runtime", "project", "cwd", "model",
-            "started_at", "last_activity_at", "message_count",
-            "context_size_tokens", "cumulative_cost_usd", "cost_known",
-            "status", "agent_name", "ai_title",
+            "session_id",
+            "runtime",
+            "project",
+            "cwd",
+            "model",
+            "started_at",
+            "last_activity_at",
+            "message_count",
+            "context_size_tokens",
+            "cumulative_cost_usd",
+            "cost_known",
+            "status",
+            "agent_name",
+            "ai_title",
         }
         missing = required_keys - set(row.keys())
         assert not missing, f"Missing session row keys: {missing}"
@@ -466,10 +476,21 @@ class TestSessionDetail:
         )
         data = json.loads(body)
         required = {
-            "session_id", "runtime", "project", "cwd", "model",
-            "started_at", "last_activity_at", "message_count",
-            "context_size_tokens", "cumulative_cost_usd", "cost_known",
-            "status", "agent_name", "ai_title", "event_timestamps",
+            "session_id",
+            "runtime",
+            "project",
+            "cwd",
+            "model",
+            "started_at",
+            "last_activity_at",
+            "message_count",
+            "context_size_tokens",
+            "cumulative_cost_usd",
+            "cost_known",
+            "status",
+            "agent_name",
+            "ai_title",
+            "event_timestamps",
         }
         missing = required - set(data.keys())
         assert not missing, f"Missing detail keys: {missing}"

@@ -18,23 +18,9 @@ from pathlib import Path
 # Navigate from tests/unit/features/panel/ up to the repo root, then into source
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
-_JS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-    / "assets"
-    / "js"
-)
+_JS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "js"
 
-_VIEWS_DIR = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-)
+_VIEWS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views"
 
 
 # ---------------------------------------------------------------------------
@@ -121,9 +107,7 @@ def test_agents_js_has_loading_skeleton() -> None:
 def test_agents_js_has_error_state() -> None:
     """agents.js must handle fetch errors and show an error state."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    assert "error" in agents_text.lower(), (
-        "agents.js must contain error state handling"
-    )
+    assert "error" in agents_text.lower(), "agents.js must contain error state handling"
 
 
 def test_agents_js_has_skills_chips() -> None:
@@ -156,7 +140,11 @@ def test_panel_js_includes_agents_js_content() -> None:
     # PANEL_JS should be a concatenation that includes agents.js content
     # We verify by checking that agents.js content (or part of it) appears in PANEL_JS
     # Use the first substantial line of agents.js as a marker
-    lines = [ln.strip() for ln in agents_text.splitlines() if ln.strip() and not ln.strip().startswith("//")]
+    lines = [
+        ln.strip()
+        for ln in agents_text.splitlines()
+        if ln.strip() and not ln.strip().startswith("//")
+    ]
     assert len(lines) > 0, "agents.js has no non-comment content"
     first_code_line = lines[0]
     assert first_code_line in PANEL_JS, (
@@ -170,12 +158,8 @@ def test_panel_js_still_contains_core_js_content() -> None:
     from dadaia_workspace.features.panel.views._assets import PANEL_JS
 
     # core.js contains the authedFetch helper — it must still be in PANEL_JS
-    assert "authedFetch" in PANEL_JS, (
-        "PANEL_JS no longer contains authedFetch from core.js"
-    )
-    assert "bootstrapToken" in PANEL_JS, (
-        "PANEL_JS no longer contains bootstrapToken from core.js"
-    )
+    assert "authedFetch" in PANEL_JS, "PANEL_JS no longer contains authedFetch from core.js"
+    assert "bootstrapToken" in PANEL_JS, "PANEL_JS no longer contains bootstrapToken from core.js"
 
 
 def test_panel_js_agents_section_not_in_core_js_portion() -> None:
@@ -193,8 +177,8 @@ def test_panel_js_agents_section_not_in_core_js_portion() -> None:
 def test_index_py_includes_agents_js_script_tag() -> None:
     """index.py must include <script src="/static/agents.js"> in the HTML output."""
     index_text = (_VIEWS_DIR / "index.py").read_text(encoding="utf-8")
-    assert '/static/agents.js' in index_text, (
-        "index.py must include a <script src=\"/static/agents.js\"> tag"
+    assert "/static/agents.js" in index_text, (
+        'index.py must include a <script src="/static/agents.js"> tag'
     )
 
 

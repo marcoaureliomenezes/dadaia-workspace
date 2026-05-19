@@ -253,8 +253,6 @@ class TestEndToEndAggregation:
             pricing_module=_StubPricing(),
         )
         agent_result = aggregator.list_agents(window_days=365)
-        fe = next(
-            (s for s in agent_result.agents if s.agent_id == "frontend-engineer"), None
-        )
+        fe = next((s for s in agent_result.agents if s.agent_id == "frontend-engineer"), None)
         assert fe is not None
         assert fe.session_count == result1.events_ingested or fe.session_count >= 1

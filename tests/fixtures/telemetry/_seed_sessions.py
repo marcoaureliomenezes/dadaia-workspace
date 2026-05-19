@@ -117,12 +117,27 @@ _SESSIONS: list[dict] = [
 
 # agent_name must be registered in agents table (FK constraint)
 _AGENTS: list[dict] = [
-    {"name": "software-engineer", "provider": "claude", "is_subagent": 0,
-     "first_seen_at": "2026-05-01T00:00:00Z", "last_seen_at": "2026-05-19T09:55:00Z"},
-    {"name": "product-engineer", "provider": "claude", "is_subagent": 0,
-     "first_seen_at": "2026-05-01T00:00:00Z", "last_seen_at": "2026-05-19T06:00:00Z"},
-    {"name": "game-developer", "provider": "claude", "is_subagent": 0,
-     "first_seen_at": "2026-05-01T00:00:00Z", "last_seen_at": "2026-05-18T12:30:00Z"},
+    {
+        "name": "software-engineer",
+        "provider": "claude",
+        "is_subagent": 0,
+        "first_seen_at": "2026-05-01T00:00:00Z",
+        "last_seen_at": "2026-05-19T09:55:00Z",
+    },
+    {
+        "name": "product-engineer",
+        "provider": "claude",
+        "is_subagent": 0,
+        "first_seen_at": "2026-05-01T00:00:00Z",
+        "last_seen_at": "2026-05-19T06:00:00Z",
+    },
+    {
+        "name": "game-developer",
+        "provider": "claude",
+        "is_subagent": 0,
+        "first_seen_at": "2026-05-01T00:00:00Z",
+        "last_seen_at": "2026-05-18T12:30:00Z",
+    },
 ]
 
 # Events — each session gets multiple events with token counts.
@@ -328,7 +343,9 @@ def seed(db_path: pathlib.Path) -> None:
     conn.commit()
     conn.close()
     print(f"Seeded fixture: {db_path}")
-    print(f"  Sessions: {len(_SESSIONS)} ({sum(1 for s in _SESSIONS if s['provider']=='claude')} claude, {sum(1 for s in _SESSIONS if s['provider']=='codex')} codex)")
+    print(
+        f"  Sessions: {len(_SESSIONS)} ({sum(1 for s in _SESSIONS if s['provider'] == 'claude')} claude, {sum(1 for s in _SESSIONS if s['provider'] == 'codex')} codex)"
+    )
     print(f"  Events:   {len(_EVENTS)}")
 
 

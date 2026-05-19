@@ -265,9 +265,7 @@ class CodexRuntimeAdapter:
         except Exception:  # noqa: BLE001 — catch-all for graceful degradation
             return "idle"
 
-    def _classify_liveness(
-        self, session_id: str
-    ) -> Literal["active", "idle", "ended"]:
+    def _classify_liveness(self, session_id: str) -> Literal["active", "idle", "ended"]:
         """Inner liveness logic; caller wraps in try/except for degradation."""
         home = pathlib.Path.home()
         db_path = home / ".codex" / "state_5.sqlite"
@@ -320,9 +318,7 @@ class CodexRuntimeAdapter:
         return "ended"
 
     @staticmethod
-    def _tail_history_ts(
-        history_path: pathlib.Path, session_id: str
-    ) -> int | None:
+    def _tail_history_ts(history_path: pathlib.Path, session_id: str) -> int | None:
         """Return the most recent `ts` value in history.jsonl for *session_id*.
 
         Reads the last _CODEX_HISTORY_TAIL_LINES lines using a deque (O(1) memory

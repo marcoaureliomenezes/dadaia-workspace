@@ -205,7 +205,9 @@ class TestApiWorkflowDetailDiagramSvg:
 
     def test_diagram_svg_is_non_empty(self) -> None:
         """diagram_svg must be a non-empty string (not '' or None)."""
-        svc = _FakeWorkflowsService({"tdd-cycle": _make_detail(diagram_svg="<svg role='img'><g/></svg>")})
+        svc = _FakeWorkflowsService(
+            {"tdd-cycle": _make_detail(diagram_svg="<svg role='img'><g/></svg>")}
+        )
         view = render_api_workflow_detail(svc)  # type: ignore[arg-type]
         _, _, body = view(workflow_name="tdd-cycle")
         data = json.loads(body)
@@ -214,7 +216,9 @@ class TestApiWorkflowDetailDiagramSvg:
 
     def test_diagram_svg_starts_with_svg_tag(self) -> None:
         """diagram_svg must start with '<svg' (server-rendered, not placeholder)."""
-        svc = _FakeWorkflowsService({"tdd-cycle": _make_detail(diagram_svg="<svg role='img' width='100'><g/></svg>")})
+        svc = _FakeWorkflowsService(
+            {"tdd-cycle": _make_detail(diagram_svg="<svg role='img' width='100'><g/></svg>")}
+        )
         view = render_api_workflow_detail(svc)  # type: ignore[arg-type]
         _, _, body = view(workflow_name="tdd-cycle")
         data = json.loads(body)
@@ -425,8 +429,13 @@ def _make_audit_cycle_detail() -> WorkflowDetailDTO:
         version="0.1.0",
         schema_version="1",
         stage_count=len(audit_stages),
-        agent_ids=["project-auditor", "code-reviewer", "security-reviewer",
-                   "researcher", "qa-engineer"],
+        agent_ids=[
+            "project-auditor",
+            "code-reviewer",
+            "security-reviewer",
+            "researcher",
+            "qa-engineer",
+        ],
         has_parallel=True,
         has_gates=True,
         source_path=".dadaia/agentic/workflows/audit-cycle.workflow.md",

@@ -58,10 +58,7 @@ def _make_agent_md(name: str, write_allowlist: list[str] | None = None) -> str:
     if write_allowlist is not None:
         entries = "\n".join(f"    - {g}" for g in write_allowlist)
         wl_yaml = f"paths:\n  write_allowlist:\n{entries}\n"
-    return (
-        f"---\nname: {name}\ndescription: Test agent {name}.\n"
-        f"{wl_yaml}---\n\n# {name.title()}\n"
-    )
+    return f"---\nname: {name}\ndescription: Test agent {name}.\n{wl_yaml}---\n\n# {name.title()}\n"
 
 
 def _build_workspace(
@@ -92,8 +89,7 @@ def _build_workspace(
 
     # TASKS.md with optional [-] marker
     tasks_content = (
-        "# Tasks\n\n"
-        "- [-] T001 — in-progress task (software-engineer)\n"
+        "# Tasks\n\n- [-] T001 — in-progress task (software-engineer)\n"
         if with_tasks_marker
         else "# Tasks\n\n- [ ] T001 — open task\n"
     )
@@ -137,9 +133,14 @@ def _run_gate(
 
     env = os.environ.copy()
     # Unset all persona vars by default for isolation
-    for key in ["DADAIA_AGENT_PERSONA", "CLAUDE_AGENT_PERSONA",
-                "CODEX_AGENT_PERSONA", "OPENCODE_AGENT_PERSONA",
-                "DADAIA_CONTEXT", "SDD_LEGACY_FEATURES"]:
+    for key in [
+        "DADAIA_AGENT_PERSONA",
+        "CLAUDE_AGENT_PERSONA",
+        "CODEX_AGENT_PERSONA",
+        "OPENCODE_AGENT_PERSONA",
+        "DADAIA_CONTEXT",
+        "SDD_LEGACY_FEATURES",
+    ]:
         env.pop(key, None)
     env["WORKSPACE_ROOT"] = str(ws)
     env["SDD_GATE_LOG"] = str(log_path)
@@ -278,8 +279,13 @@ def test_t4_harness_specific_env_claude(tmp_path: Path) -> None:
     """
     ws = _build_workspace(
         tmp_path,
-        agents={"software-engineer": ["dadaia_workspace/**", "tests/**",
-                                       ".dadaia/reports/<ctx>/software-engineer/**"]},
+        agents={
+            "software-engineer": [
+                "dadaia_workspace/**",
+                "tests/**",
+                ".dadaia/reports/<ctx>/software-engineer/**",
+            ]
+        },
         context_name="dadaia-workspace",
     )
     log_path = tmp_path / "gate.log"
@@ -301,8 +307,13 @@ def test_t4_harness_specific_env_codex(tmp_path: Path) -> None:
     """T4 variant: CODEX_AGENT_PERSONA used when DADAIA_ and CLAUDE_ are unset."""
     ws = _build_workspace(
         tmp_path,
-        agents={"software-engineer": ["dadaia_workspace/**", "tests/**",
-                                       ".dadaia/reports/<ctx>/software-engineer/**"]},
+        agents={
+            "software-engineer": [
+                "dadaia_workspace/**",
+                "tests/**",
+                ".dadaia/reports/<ctx>/software-engineer/**",
+            ]
+        },
         context_name="dadaia-workspace",
     )
     log_path = tmp_path / "gate.log"
@@ -323,8 +334,13 @@ def test_t4_harness_specific_env_opencode(tmp_path: Path) -> None:
     """T4 variant: OPENCODE_AGENT_PERSONA used when higher-priority vars are unset."""
     ws = _build_workspace(
         tmp_path,
-        agents={"software-engineer": ["dadaia_workspace/**", "tests/**",
-                                       ".dadaia/reports/<ctx>/software-engineer/**"]},
+        agents={
+            "software-engineer": [
+                "dadaia_workspace/**",
+                "tests/**",
+                ".dadaia/reports/<ctx>/software-engineer/**",
+            ]
+        },
         context_name="dadaia-workspace",
     )
     log_path = tmp_path / "gate.log"
@@ -347,8 +363,11 @@ def test_t4_dadaia_takes_priority_over_harness_specific(tmp_path: Path) -> None:
         tmp_path,
         agents={
             "code-reviewer": [".dadaia/reports/<ctx>/code-reviewer/**"],
-            "software-engineer": ["dadaia_workspace/**", "tests/**",
-                                   ".dadaia/reports/<ctx>/software-engineer/**"],
+            "software-engineer": [
+                "dadaia_workspace/**",
+                "tests/**",
+                ".dadaia/reports/<ctx>/software-engineer/**",
+            ],
         },
         context_name="dadaia-workspace",
     )
@@ -361,7 +380,7 @@ def test_t4_dadaia_takes_priority_over_harness_specific(tmp_path: Path) -> None:
         tool="Write",
         file_path=target,
         env_overrides={
-            "DADAIA_AGENT_PERSONA": "code-reviewer",   # priority 1 wins
+            "DADAIA_AGENT_PERSONA": "code-reviewer",  # priority 1 wins
             "CLAUDE_AGENT_PERSONA": "software-engineer",  # would allow, but not picked
         },
         log_path=log_path,
@@ -385,8 +404,13 @@ def test_t5_payload_field_used_when_env_unset(tmp_path: Path) -> None:
     """
     ws = _build_workspace(
         tmp_path,
-        agents={"software-engineer": ["dadaia_workspace/**", "tests/**",
-                                       ".dadaia/reports/<ctx>/software-engineer/**"]},
+        agents={
+            "software-engineer": [
+                "dadaia_workspace/**",
+                "tests/**",
+                ".dadaia/reports/<ctx>/software-engineer/**",
+            ]
+        },
         context_name="dadaia-workspace",
     )
     log_path = tmp_path / "gate.log"
@@ -584,8 +608,7 @@ def test_archive_path_blocked_before_path_scope(tmp_path: Path) -> None:
     """Archive paths are blocked by RULE B (step 4) before path-scope (step 6)."""
     ws = _build_workspace(
         tmp_path,
-        agents={"software-engineer": ["specs/_archive/**", "dadaia_workspace/**",
-                                       "tests/**"]},
+        agents={"software-engineer": ["specs/_archive/**", "dadaia_workspace/**", "tests/**"]},
         context_name="dadaia-workspace",
     )
     log_path = tmp_path / "gate.log"
@@ -609,8 +632,13 @@ def test_glob_double_star_matches_nested_paths(tmp_path: Path) -> None:
     """** in write_allowlist matches nested subdirectories."""
     ws = _build_workspace(
         tmp_path,
-        agents={"software-engineer": ["dadaia_workspace/**", "tests/**",
-                                       ".dadaia/reports/<ctx>/software-engineer/**"]},
+        agents={
+            "software-engineer": [
+                "dadaia_workspace/**",
+                "tests/**",
+                ".dadaia/reports/<ctx>/software-engineer/**",
+            ]
+        },
         context_name="dadaia-workspace",
     )
     log_path = tmp_path / "gate.log"

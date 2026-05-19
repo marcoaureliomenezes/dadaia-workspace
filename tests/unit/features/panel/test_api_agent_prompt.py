@@ -385,8 +385,9 @@ _TRAVERSAL_ATTEMPTS = [
 class TestNewAgentPromptsReadable:
     """Each of the 6 new agents must be readable as a prompt (200); traversal blocked (400)."""
 
-    def _setup_agents_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-                          agent_ids: list[str]) -> Path:
+    def _setup_agents_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent_ids: list[str]
+    ) -> Path:
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
         monkeypatch.setenv("DADAIA_AGENTS_DIR", str(agents_dir))
@@ -435,9 +436,7 @@ class TestPathTraversalGuardForNewAgents:
         service = _FakeService(workspace_root=tmp_path)
         view = render_api_agent_prompt(service)  # type: ignore[arg-type]
         status, _, body_bytes = view(agent_id=traversal_id)
-        assert status == 400, (
-            f"Expected 400 for traversal attempt {traversal_id!r}, got {status}"
-        )
+        assert status == 400, f"Expected 400 for traversal attempt {traversal_id!r}, got {status}"
         data = json.loads(body_bytes)
         assert data["error"] == "invalid_agent_id", (
             f"Expected error='invalid_agent_id' for {traversal_id!r}, got {data.get('error')!r}"

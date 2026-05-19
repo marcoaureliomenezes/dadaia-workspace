@@ -81,9 +81,7 @@ def _make_agent_summary(
         total_cost_usd=total_cost_usd,
         cost_known=cost_known,
         last_activity_at=last_activity_at,
-        token_totals=TokenTotals(
-            input=1000, cache_creation=200, cache_read=800, output=400
-        ),
+        token_totals=TokenTotals(input=1000, cache_creation=200, cache_read=800, output=400),
         context_breakdown=[],
         recent_sessions=[],
         suspect_count=0,
@@ -544,24 +542,27 @@ class TestNewAgentsInList:
         Replaces the legacy 16-agent assertion. `software-engineer` is archived
         and replaced by the Python/Node split + Data/BI + AI personas.
         """
-        all_20 = [
-            # T3 leaves not in _NEW_AGENT_IDS — 11 of them
-            "software-architect",
-            "software-engineer-python",
-            "software-engineer-node",
-            "backend-engineer",
-            "frontend-engineer",
-            "qa-engineer",
-            "devops-engineer",
-            "data-engineer",
-            "data-analyst",
-            "ai-engineer",
-            "game-developer",
-            "game-designer",
-            "game-tester",
-            # T2 curator
-            "product-engineer",
-        ] + _NEW_AGENT_IDS  # 6 entries: PM, PA, code-reviewer, researcher, security-reviewer, design-specialist
+        all_20 = (
+            [
+                # T3 leaves not in _NEW_AGENT_IDS — 11 of them
+                "software-architect",
+                "software-engineer-python",
+                "software-engineer-node",
+                "backend-engineer",
+                "frontend-engineer",
+                "qa-engineer",
+                "devops-engineer",
+                "data-engineer",
+                "data-analyst",
+                "ai-engineer",
+                "game-developer",
+                "game-designer",
+                "game-tester",
+                # T2 curator
+                "product-engineer",
+            ]
+            + _NEW_AGENT_IDS
+        )  # 6 entries: PM, PA, code-reviewer, researcher, security-reviewer, design-specialist
         svc = self._build_service_with_agents(all_20)
         view = render_api_agents_canonical(svc)
         _, _, body = view()
@@ -575,9 +576,19 @@ class TestNewAgentsInList:
         _, _, body = view()
         data = json.loads(body)
         card = data["agents"][0]
-        required = {"agent_id", "display_name", "description", "status", "skills",
-                    "tools", "model", "opencode_model", "max_turns", "input_contract",
-                    "telemetry"}
+        required = {
+            "agent_id",
+            "display_name",
+            "description",
+            "status",
+            "skills",
+            "tools",
+            "model",
+            "opencode_model",
+            "max_turns",
+            "input_contract",
+            "telemetry",
+        }
         missing = required - set(card.keys())
         assert not missing, f"New agent card missing keys: {missing}"
 
@@ -639,9 +650,7 @@ class TestTierFieldInResponse:
         data = json.loads(body)
 
         for card in data["agents"]:
-            assert "tier" in card, (
-                f"Agent card for {card.get('agent_id')!r} is missing 'tier' key"
-            )
+            assert "tier" in card, f"Agent card for {card.get('agent_id')!r} is missing 'tier' key"
 
     def test_tier_value_in_valid_set(self) -> None:
         """Every agent's 'tier' must be an integer in {1, 2, 3}."""
@@ -663,6 +672,7 @@ class TestTierFieldInResponse:
         data = json.loads(body)
 
         from collections import Counter
+
         tier_counts = Counter(card["tier"] for card in data["agents"])
         assert tier_counts[1] == 2, f"Expected 2 T1 agents, got {tier_counts[1]}"
         assert tier_counts[2] == 1, f"Expected 1 T2 agent, got {tier_counts[2]}"
@@ -678,19 +688,13 @@ class TestTierFieldInResponse:
         by_id = {card["agent_id"]: card for card in data["agents"]}
 
         for aid in _TIER1_IDS:
-            assert by_id[aid]["tier"] == 1, (
-                f"{aid!r} should be tier 1, got {by_id[aid]['tier']}"
-            )
+            assert by_id[aid]["tier"] == 1, f"{aid!r} should be tier 1, got {by_id[aid]['tier']}"
         for aid in _TIER2_IDS:
-            assert by_id[aid]["tier"] == 2, (
-                f"{aid!r} should be tier 2, got {by_id[aid]['tier']}"
-            )
+            assert by_id[aid]["tier"] == 2, f"{aid!r} should be tier 2, got {by_id[aid]['tier']}"
         # Sample 3 T3 agents (agents-r3-v1: software-engineer archived,
         # software-engineer-python is the canonical Python leaf)
         for aid in ["software-engineer-python", "qa-engineer", "devops-engineer"]:
-            assert by_id[aid]["tier"] == 3, (
-                f"{aid!r} should be tier 3, got {by_id[aid]['tier']}"
-            )
+            assert by_id[aid]["tier"] == 3, f"{aid!r} should be tier 3, got {by_id[aid]['tier']}"
 
 
 # ---------------------------------------------------------------------------
@@ -722,9 +726,7 @@ def _make_agent_summary_with_provider(
         total_cost_usd=0.50,
         cost_known=True,
         last_activity_at="2026-05-17T10:00:00Z",
-        token_totals=TokenTotals(
-            input=500, cache_creation=100, cache_read=400, output=200
-        ),
+        token_totals=TokenTotals(input=500, cache_creation=100, cache_read=400, output=200),
         context_breakdown=[],
         recent_sessions=[],
         suspect_count=0,
@@ -880,8 +882,7 @@ class TestRuntimeFilterBackwardCompatParity:
         agents_claude = data_claude["agents"]
 
         assert len(agents_no_qs) == len(agents_claude), (
-            f"Agent count differs: no-qs={len(agents_no_qs)}, "
-            f"runtime=claude={len(agents_claude)}"
+            f"Agent count differs: no-qs={len(agents_no_qs)}, runtime=claude={len(agents_claude)}"
         )
 
         ids_no_qs = [card["agent_id"] for card in agents_no_qs]
