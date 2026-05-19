@@ -290,14 +290,8 @@ P11a · C20 P12 · C24 P11b · C25 P11b+P13 · C26 P11c (drafted) + P14
 6. `--repos-only` / `--workspace-only` flags → backlog candidate (P14).
 7. Per-projection opt-out marker → backlog idea (P14).
 
-## 9. Out of scope
+## 9. Out of scope + operator review questions
 
-- TASKS.md authoring and source-tree edits — separate dispatches.
-- Memory atom rewrites — gate-locked to P14.
-- `--repos-only` / `--workspace-only` flags + per-projection opt-out marker (backlog).
+Out of scope: TASKS.md authoring + source-tree edits (separate dispatches); memory atom rewrites (gate-locked to P14); `--repos-only` / `--workspace-only` flags + per-projection opt-out marker (backlog).
 
-## 10. Operator review questions
-
-1. **Phasing.** Approve W1 parallelism (P1 + P2 + P3 + P4)?
-2. **R14 self-projection.** `package_version` match vs always-skip `repos/dadaia-workspace/`?
-3. **Backlog destinations.** `--repos-only` / `--workspace-only` → `candidates.md`; opt-out marker → `ideas.md`. Confirm or relocate.
+Operator review questions: (1) Approve W1 parallelism (P1+P2+P3+P4)? (2) R14 self-projection — `package_version` match vs always-skip `repos/dadaia-workspace/`? (3) Backlog destinations — flags → `candidates.md`; opt-out marker → `ideas.md`.

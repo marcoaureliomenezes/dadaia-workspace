@@ -286,7 +286,7 @@ local with `pytest` and `dadaia specs doctor`).
   - Validates: 16 agents visible, 7 workflows visible, FR10 operator-migration commands executed in dry-run.
   - Acceptance: smoke report at `.dadaia/reports/dadaia-workspace/qa-engineer/<UTC>-agents-r2-v1-panel-smoke.html` + sidecar; screenshot embedded; C8 satisfied.
   - Depends: AGT-r2-46.
-- [ ] AGT-r2-48 — Finalize `CLOSURE.md` Summary + Tasks + Validations + Drifts (product-engineer)
+- [-] AGT-r2-48 — Finalize `CLOSURE.md` Summary + Tasks + Validations + Drifts (product-engineer)
   - Sections per `dadaia-release-closure` skill: Summary, Tasks completed (SHAs), Validations (triples), Drifts (per-slug), Memory updates, Backlog returns, Archive: MOVE.
   - Acceptance: file passes `dadaia specs doctor` CLOSURE-evidence invariant; FR10 manual-migration evidence (operator's before/after `sha256sum`) embedded in `## Validations`.
   - Depends: AGT-r2-47.
