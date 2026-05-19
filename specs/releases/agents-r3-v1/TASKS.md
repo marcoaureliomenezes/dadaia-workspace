@@ -92,7 +92,7 @@ Every public/ change MUST close with `dadaia public stage && install --target al
 
 ## Phase P4 — Tests + `data/AGENTS.md` + optional script (serial after P3)
 
-- [-] R3-17 — Update `tests/unit/features/agents/test_reader.py` count + parse assertions (`software-engineer-python`)
+- [x] R3-17 — Update `tests/unit/features/agents/test_reader.py` count + parse assertions (`software-engineer-python`)
   - Touches: `tests/unit/features/agents/test_reader.py`.
   - Preconditions: P1 + P2 + P3 complete.
   - Done criterion: count assertion 16 → 20; each new persona file is parsed and asserted (`tier == 3`, `paths.write_allowlist` non-empty, `model` set, `skills` non-empty); `pytest -q tests/unit/features/agents/test_reader.py` exits 0.
