@@ -1,15 +1,17 @@
-"""Real assertions for `_install_workspace_guardrail_pair` — AGT-r2-27.
+"""Real assertions for `_install_workspace_guardrail_pair` — AGT-r2-27 + AGT-r2-34.
 
 Tests for `_install_workspace_guardrail_pair` and `_doctor_guardrail_pair` in
-`dadaia_workspace.infrastructure.public_assets`.
+`dadaia_workspace.infrastructure.public_assets`, plus the Option C absence
+invariant for `dadaia_workspace/public/data/CLAUDE.md` (AGT-r2-34).
 
-Six cases covering:
+Seven cases covering:
 1. 4-target projection write (byte-identical, single SHA-256).
 2. Skip when consumer has no `.dadaia/` marker.
 3. Skip when consumer has `.dadaia/` but no `.dadaia/agentic/` marker.
 4. Self-slug skip via `package_version` match (R14).
 5. Nested-pair non-interference: `services/CLAUDE.md` + `services/AGENTS.md` untouched (FR10).
 6. Doctor produces exactly 4 parity labels per source.
+7. Option C invariant: `data/CLAUDE.md` MUST NOT exist as a source file.
 """
 
 from __future__ import annotations
@@ -352,4 +354,32 @@ def test_doctor_four_line_output(tmp_path: Path) -> None:
     )
     assert all(ln.startswith("[ok]") for ln in lines), (
         f"All parity lines should be [ok] after install.\n  Lines: {lines}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Case 7 — Option C invariant: data/CLAUDE.md MUST NOT exist as a source
+# ---------------------------------------------------------------------------
+
+
+def test_no_data_claude_md_source() -> None:
+    """Option C invariant: ``data/CLAUDE.md`` MUST NOT EXIST in the lib.
+
+    The architect ADR ``2026-05-19T003956Z-adr-claude-agents-parity`` resolved
+    the lib pair to **Option C** — a single source file
+    (``dadaia_workspace/public/data/AGENTS.md``) projected under two filenames
+    (``AGENTS.md`` and ``CLAUDE.md``) at every target. The companion
+    ``data/CLAUDE.md`` source file MUST NOT exist; if it did, two divergent
+    sources of truth would race for the same projection targets.
+
+    This test anchors the invariant at unit-test layer so future refactors
+    cannot reintroduce ``data/CLAUDE.md`` silently.
+    """
+    repo_root = Path(__file__).resolve().parents[4]  # → dadaia-workspace repo root
+    forbidden = repo_root / "dadaia_workspace" / "public" / "data" / "CLAUDE.md"
+    assert not forbidden.exists(), (
+        "Option C invariant violated: dadaia_workspace/public/data/CLAUDE.md "
+        "MUST NOT EXIST. The single source of truth is data/AGENTS.md, "
+        "projected under both filenames at install time.\n"
+        f"  Unexpected path: {forbidden}"
     )
