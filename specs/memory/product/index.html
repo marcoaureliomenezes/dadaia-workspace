@@ -29,7 +29,7 @@
 <body>
 
 <h1>Product Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-18 · Closure: agents-r1-v1</p>
+<p class="meta">Última atualização: 2026-05-19 · Closure: agents-r2-v1</p>
 
 <section id="vision">
   <h2>Visão atômica</h2>
@@ -54,7 +54,7 @@
   <ol class="catalog">
     <li><a href="workspace-init.html">workspace-init</a><span class="desc">— porta de entrada; cria <code>.dadaia/</code>, <code>.venv</code>, hooks e estrutura idempotente.</span></li>
     <li><a href="context-management.html">context-management</a><span class="desc">— multi-context lifecycle (criar, ativar, promover, desativar, deletar) com primary context tracking.</span></li>
-    <li><a href="agent-orchestration.html">agent-orchestration</a><span class="desc">— DAG runner que dispatcha agentes especialistas (cli/claude/codex/opencode) com parallel_groups + gates + 15 workflows pré-instalados sobre topologia de 16 agentes em 3 tiers (orquestradores PM/auditor; curator PE; 13 leaf specialists incluindo code-reviewer, researcher, security-reviewer, design-specialist).</span></li>
+    <li><a href="agent-orchestration.html">agent-orchestration</a><span class="desc">— DAG runner que dispatcha agentes especialistas (cli/claude/codex/opencode) com parallel_groups + gates + 7 workflows pré-instalados (<code>spec-refinement</code>, <code>cross-cutting-feature</code>, <code>onboarding-new-repo</code>, <code>hotfix-release</code>, <code>game-dev-cycle</code>, <code>audit-cycle</code>, <code>code-review-fan-out</code>) + 8 PM playbooks na skill <code>project-orchestration</code> sobre topologia de 16 agentes em 3 tiers (orquestradores PM/auditor; curator PE; 13 leaf specialists). Path-scope gate enforça <code>paths.write_allowlist</code> de cada agente em runtime.</span></li>
     <li><a href="public-asset-distribution.html">public-asset-distribution</a><span class="desc">— canonical → <code>.dadaia/agentic/</code> → projeções multi-tool (<code>.claude/</code>, <code>.codex/</code>, <code>.opencode/</code>, <code>.agents/</code>).</span></li>
     <li><a href="workspace-doctor.html">workspace-doctor</a><span class="desc">— diagnóstico + repair de invariantes do workspace state com <code>--fix</code> opcional.</span></li>
     <li><a href="specs-doctor.html">specs-doctor</a><span class="desc">— 11 checks estruturais SDD release-lifecycle: memory HTML atômico, ACTIVE.md, CLOSURE evidence triples, broken images, Mermaid script presence.</span></li>
@@ -91,7 +91,7 @@ flowchart TB
     PUBLIC --> INSTALL[install --target all]
     PUBLIC --> PDOC[doctor]
     SPECS --> SDOC[doctor]
-    ORCH --> WF[15 workflows]
+    ORCH --> WF[7 workflows]
     INSTALL --> CC[.claude/]
     INSTALL --> CX[.codex/]
     INSTALL --> OC[.opencode/]
