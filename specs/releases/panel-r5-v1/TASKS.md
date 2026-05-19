@@ -272,7 +272,7 @@
   Define values for all three palettes (Mint / Sage / Warm); verify WCAG 2.2 AA
   against the topbar background. Owner: frontend-engineer. Done criterion:
   nine hex values defined; contrast check documented in commit body.
-- [-] **PR5-D5** — Edit
+- [x] **PR5-D5** — Edit
   `dadaia_workspace/features/panel/views/assets/js/agents.js`: subscribe to
   `dadaia:runtime-change`; on change, drop cache and refetch with `?runtime=`
   appended. Owner: frontend-engineer. Done criterion: toggling the switcher

@@ -516,6 +516,15 @@
 
   // ── Load ─────────────────────────────────────────────────────────────────────
 
+  // ── Runtime helper ────────────────────────────────────────────────────────────
+  // Phase D ships window.Runtime; fall back to 'claude' if not yet available.
+  function getRuntime() {
+    if (window.Runtime && typeof window.Runtime.get === 'function') {
+      return window.Runtime.get();
+    }
+    return 'claude';
+  }
+
   var loaded = false;
 
   function load() {
@@ -524,7 +533,7 @@
     grid.setAttribute('aria-busy', 'true');
     grid.innerHTML = renderSkeletons(10);
 
-    window.authedFetch('/api/agents')
+    window.authedFetch('/api/agents?runtime=' + encodeURIComponent(getRuntime()))
       .then(function (r) {
         if (!r.ok) {
           renderError(r.status);
@@ -547,6 +556,21 @@
         }
       });
   }
+
+  // ── Runtime-change subscription (PR5-D5) ─────────────────────────────────────
+  // When the operator switches runtimes, drop the prompt cache and refetch so the
+  // Agents tab reflects the newly selected runtime's agents.
+  // data-tier wiring (PR4-18) is preserved in renderCard() above — both coexist.
+
+  document.addEventListener('dadaia:runtime-change', function () {
+    promptCache.clear();
+    loaded = false;
+    // Only refetch if the Agents section is currently active (avoid background load)
+    var section = document.getElementById('section-agents');
+    if (section && section.classList.contains('active')) {
+      load();
+    }
+  });
 
   // ── Public API ───────────────────────────────────────────────────────────────
 
