@@ -1,0 +1,20 @@
+{
+  "schema": "handoff-v1",
+  "task_id": "AGT-r2-42",
+  "release": "agents-r2-v1",
+  "agent": "qa-engineer",
+  "timestamp": "2026-05-19T000000Z",
+  "status": "done",
+  "report": ".dadaia/reports/dadaia-workspace/qa-engineer/2026-05-19T000000Z-AGT-r2-42-orphan-script-self-test.html",
+  "files_written": [
+    "tests/scripts/check_skill_orphans.py",
+    "tests/unit/scripts/__init__.py",
+    "tests/unit/scripts/test_check_skill_orphans.py"
+  ],
+  "test_results": {
+    "passed": 2,
+    "failed": 0,
+    "command": "pytest -q tests/unit/scripts/test_check_skill_orphans.py"
+  },
+  "blockers": []
+}
