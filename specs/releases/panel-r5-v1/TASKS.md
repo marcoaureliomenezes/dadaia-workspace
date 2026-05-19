@@ -392,7 +392,7 @@
 
 ### FE strand (frontend-engineer)
 
-- [ ] **PR5-E3** — Edit
+- [-] **PR5-E3** — Edit
   `dadaia_workspace/features/panel/views/assets/js/sessions.js`: when
   `Runtime.get() === "codex"`, render a top-of-table banner *"Cost not tracked
   for Codex"* and render the Cost column as `—` for every row. When runtime
