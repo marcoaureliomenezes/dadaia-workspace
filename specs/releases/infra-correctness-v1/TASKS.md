@@ -19,8 +19,8 @@
 ## P2 — I6 topology guard
 
 - [x] T-05 `[ai-engineer]` Ler `check_agent_topology.py` — entender `SKILLS_DIR`, `AGENTS_DIR`, padrão `check_i*`
-- [-] T-06 `[ai-engineer]` Implementar `check_i6_skill_links(agents, errors)` — valida que `SKILLS_DIR / skill_name` existe
-- [ ] T-07 `[ai-engineer]` Conectar `check_i6_skill_links` em `main()` após I5; adicionar linha de summary
+- [x] T-06 `[ai-engineer]` Implementar `check_i6_skill_links(agents, errors)` — valida que `SKILLS_DIR / skill_name` existe
+- [-] T-07 `[ai-engineer]` Conectar `check_i6_skill_links` em `main()` após I5; adicionar linha de summary
 - [ ] T-08 `[ai-engineer]` Rodar `python scripts/check_agent_topology.py` — I6 passa para todos os agentes atuais
 - [ ] T-09 `[ai-engineer]` Teste negativo manual: skill ref fictícia → I6 FAIL confirmado
 
