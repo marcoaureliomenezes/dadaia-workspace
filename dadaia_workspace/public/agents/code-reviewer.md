@@ -1,10 +1,6 @@
 ---
 name: code-reviewer
-description: >
-  PR/branch code reviewer. 6-axis review: architecture, patterns, tests, security smells,
-  perf smells, dead code. Reads CI logs via gh CLI. Emits review report with severity
-  badges and recommendation (approve/request-changes/comment). NEVER edits code. NEVER
-  approves a PR.
+description: PR/branch reviewer. 6-axis review (architecture/patterns/tests/security/perf/dead code) via gh CLI. Emits report with severity + recommendation. NEVER edits code or approves PRs.
 tier: 3
 model: claude-sonnet-4-6
 tools:

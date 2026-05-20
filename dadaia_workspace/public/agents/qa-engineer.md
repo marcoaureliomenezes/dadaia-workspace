@@ -1,15 +1,6 @@
 ---
 name: qa-engineer
-description: >
-  Test quality enforcer and E2E specialist for dadaia workspace. Multi-paradigm and
-  multi-language by design — tests observable behavior, not implementation. Owns all E2E
-  tests across projects, audits test architecture (unit/integration/E2E pyramid), and
-  validates deploys. Pairs with every implementer agent — frontend-engineer, backend-engineer,
-  software-engineer-python, software-engineer-node, game-developer — defining E2E acceptance criteria BEFORE implementation
-  and validating deploys AFTER. Uses the `playwright` MCP plugin for live browser
-  interaction and the Playwright library for persistent test suites. NEVER writes
-  application code or unit/integration tests. Use when E2E test implementation, test quality
-  audit, or deploy validation is needed.
+description: QA + E2E specialist. Multi-language E2E owner across repos. Audits test pyramid, validates deploys. Pairs with every implementer agent to define E2E criteria before implementation.
 tier: 3
 model: claude-sonnet-4-6
 tools:

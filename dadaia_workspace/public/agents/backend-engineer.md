@@ -1,12 +1,6 @@
 ---
 name: backend-engineer
-description: >
-  Backend engineer for dadaia workspace. Implements high-performance, production-grade backends
-  in Go, with deep expertise in PostgreSQL, DynamoDB, and MongoDB. Owns API design (HTTP/gRPC),
-  data modeling, observability, and performance budgets. Pairs with qa-engineer: backend-engineer
-  owns unit + integration + load tests; qa-engineer owns E2E. Does NOT touch Python or Node tooling
-  (software-engineer-python, software-engineer-node), frontend (frontend-engineer), game code (game-developer), GitHub Actions
-  YAML (devops-engineer), or specs (product-engineer).
+description: Backend engineer. Go services, APIs (HTTP/gRPC), Postgres/Dynamo/Mongo, observability. Owns unit+integration+load tests; qa-engineer owns E2E. No Python/Node/frontend/game code.
 tier: 3
 model: claude-sonnet-4-6
 tools:

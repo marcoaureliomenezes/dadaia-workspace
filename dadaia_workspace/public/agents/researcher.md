@@ -1,10 +1,6 @@
 ---
 name: researcher
-description: >
-  Read-only deep explorer. Scopes a question, harvests evidence from codebase and
-  whitelisted web sources, synthesises findings with citations (file:line or URL on every
-  claim). NEVER speculates without citation. NEVER writes source files. Use for deep-dives,
-  version checks, API compat, OWASP lookups.
+description: Read-only deep explorer. Scopes question, harvests codebase + whitelisted web sources, synthesises findings with file:line/URL citations. NEVER speculates. NEVER writes source.
 tier: 3
 model: claude-haiku-4-5-20251001
 tools:

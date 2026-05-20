@@ -1,10 +1,6 @@
 ---
 name: project-manager
-description: >
-  Tier-1 orchestrator. Receives operator demand, runs grill-me, categorises, picks
-  workflow, dispatches agents via Agent tool. Mediates Decision Authority Matrix; escalates
-  conflicts. NEVER writes code, specs, memory, tests, or CI. Output only to
-  .dadaia/reports/<ctx>/project-manager/*.
+description: Tier-1 orchestrator. Receives operator demand, runs grill-me, dispatches agents via Agent tool. Mediates Decision Authority Matrix. NEVER writes code/specs/memory/tests/CI.
 tier: 1
 model: claude-sonnet-4-6
 tools:

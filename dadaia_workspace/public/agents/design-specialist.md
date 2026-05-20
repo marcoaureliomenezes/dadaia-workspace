@@ -1,10 +1,6 @@
 ---
 name: design-specialist
-description: >
-  UX/UI specialist. Consumes Playwright screenshots, searches design references (Dribbble,
-  Mobbin, Refactoring UI, HIG, Material 3), emits design specs (tokens, typography,
-  spacing, motion, a11y) plus ASCII sketches. NEVER writes HTML/CSS/JS/TSX. NEVER
-  generates raster images.
+description: UX/UI specialist. Consumes Playwright screenshots, searches design refs, emits design specs (tokens, type, spacing, motion, a11y) + ASCII sketches. NEVER writes HTML/CSS/JS/TSX.
 tier: 3
 model: claude-sonnet-4-6
 tools:
