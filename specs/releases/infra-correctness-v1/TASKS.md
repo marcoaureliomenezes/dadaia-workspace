@@ -22,7 +22,7 @@
 - [x] T-06 `[ai-engineer]` Implementar `check_i6_skill_links(agents, errors)` — valida que `SKILLS_DIR / skill_name` existe
 - [x] T-07 `[ai-engineer]` Conectar `check_i6_skill_links` em `main()` após I5; adicionar linha de summary
 - [x] T-08 `[ai-engineer]` Rodar `python scripts/check_agent_topology.py` — I6 passa para todos os agentes atuais
-- [-] T-09 `[ai-engineer]` Teste negativo manual: skill ref fictícia → I6 FAIL confirmado
+- [x] T-09 `[ai-engineer]` Teste negativo manual: skill ref fictícia → I6 FAIL confirmado
 
 ---
 
