@@ -117,8 +117,8 @@
 - [x] **T-30** `product-engineer` — Atualizar `specs/memory/architecture.html`: bloco no agent-topology layer descrevendo renderer split (canonical → Claude/Codex adapters) (AC11)
 - [x] **T-31** `product-engineer` — Atualizar `specs/memory/product/agent-orchestration.html`: capability matrix de ADR-3 (AC11)
 - [x] **T-32** `product-engineer` — Atualizar `specs/memory/tech-stack.html`: parity guard para Codex registrado (AC11)
-- [-] **T-33** `product-engineer` — Registrar OK do operador nas 6 ADRs lidas end-to-end em `CLOSURE.md` (AC12)
-- [ ] **T-34** `product-engineer` — Flip `ACTIVE.md` → `phase: CLOSURE`; arquivar release em `specs/_archive/releases/codex-agent-orchestration-parity-v1/` após CLOSURE completa
+- [x] **T-33** `product-engineer` — Registrar OK do operador nas 6 ADRs lidas end-to-end em `CLOSURE.md` (AC12)
+- [-] **T-34** `product-engineer` — Flip `ACTIVE.md` → `phase: CLOSURE`; arquivar release em `specs/_archive/releases/codex-agent-orchestration-parity-v1/` após CLOSURE completa
 
 ---
 
