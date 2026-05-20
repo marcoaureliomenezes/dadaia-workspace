@@ -108,7 +108,7 @@
   - **Done criterion:** `public_assets.py` updated; clean workspace install yields canonical `AGENTS.md` + 1-line `CLAUDE.md` stub + symlinked skills tree.
   - **Deps:** T-34
 
-- [ ] **T-42** — Run `dadaia public stage && dadaia public install --target all` in a clean workspace clone. Verify `dadaia public doctor` reports all entries `[ok]`.
+- [-] **T-42** — Run `dadaia public stage && dadaia public install --target all` in a clean workspace clone. Verify `dadaia public doctor` reports all entries `[ok]`.
   - **Owner:** devops-engineer
   - **Write-allowlist:** none (verification only)
   - **Done criterion:** `dadaia public doctor` exits 0 with every entry `[ok]`; stdout snippet captured for CLOSURE evidence.
