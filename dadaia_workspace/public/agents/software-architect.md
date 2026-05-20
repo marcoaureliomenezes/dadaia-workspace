@@ -12,7 +12,7 @@ description: >
   Never writes production code, tests, specs, or TASKS.md. All output goes to
   .dadaia/reports/<repo-name>/software-architect/<timestamp>-<type>.html.
 tier: 3
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 opencode_model: claude-sonnet-4-6
 tools:
   - Read

@@ -6,7 +6,7 @@ description: >
   claim). NEVER speculates without citation. NEVER writes source files. Use for deep-dives,
   version checks, API compat, OWASP lookups.
 tier: 3
-model: claude-sonnet-4-6
+model: claude-haiku-4-5-20251001
 tools:
   - Read
   - Glob
