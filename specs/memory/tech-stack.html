@@ -25,7 +25,7 @@
 <body>
 
 <h1>Tech Stack Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-20 · Closure: token-cost-bigbang-v1</p>
+<p class="meta">Última atualização: 2026-05-20 · Closure: codex-agent-orchestration-parity-v1</p>
 
 <section id="languages">
   <h2>Linguagens</h2>
@@ -59,6 +59,16 @@
       <tr><td>git</td><td>2.x</td><td>VCS; <code>git_subprocess.py</code> wrapeia comandos</td></tr>
     </tbody>
   </table>
+</section>
+
+<section id="agent-runtimes">
+  <h2>Agent runtimes</h2>
+  <ul>
+    <li><strong>Claude (Anthropic)</strong>: runtime nativo; agents projetados verbatim para <code>.claude/agents/</code> via <code>dadaia public install --target claude</code>.</li>
+    <li><strong>Codex (OpenAI)</strong>: parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..5. 20 agentes TOML em <code>.codex/agents/</code>. Zero leak <code>claude-*</code>. Workflows em <code>.codex/workflows/</code>.</li>
+    <li><strong>OpenCode</strong>: projeção via strip de frontmatter de tools; workflows e skills projetados em <code>.opencode/</code>.</li>
+    <li><strong>CLI</strong>: agentes invocados via <code>claude --agent &lt;name&gt;</code> ou equivalente; modo manual sem paralelização automática.</li>
+  </ul>
 </section>
 
 <section id="model-assignments">
