@@ -12,7 +12,7 @@
 - [x] T-01 `[software-engineer-python]` Ler `reports.py:130–160`, confirmar posição da linha 138
 - [x] T-02 `[software-engineer-python]` Mover `workspace_root = resolve_workspace_root()` para dentro do bloco `try` (linha 141)
 - [x] T-03 `[software-engineer-python]` Remover `@pytest.mark.xfail` de `test_10_workspace_not_initialized_exits_3`
-- [-] T-04 `[software-engineer-python]` Rodar `pytest tests/integration/test_cli_reports.py -v` — todos passam
+- [x] T-04 `[software-engineer-python]` Rodar `pytest tests/integration/test_cli_reports.py -v` — todos passam
 
 ---
 
@@ -39,9 +39,9 @@
 
 - [x] T-14 `[software-engineer-python]` Extrair texto literal dos scripts inline em `index.py` e `wrapper.py`
 - [x] T-15 `[software-engineer-python]` Computar SHA-256 base64 de cada script distinto
-- [-] T-16 `[software-engineer-python]` Editar `handler.py:392` — substituir `'unsafe-inline'` em `script-src` pelos tokens `'sha256-<hash>'`
-- [ ] T-17 `[software-engineer-python]` Adicionar constantes `_CSP_SCRIPT_HASH_*` nomeadas em `handler.py`
-- [ ] T-18 `[software-engineer-python]` Adicionar/estender teste unitário: `script-src` sem `unsafe-inline`, com pelo menos um token `sha256-`
+- [x] T-16 `[software-engineer-python]` Editar `handler.py:392` — substituir `'unsafe-inline'` em `script-src` pelos tokens `'sha256-<hash>'`
+- [x] T-17 `[software-engineer-python]` Adicionar constantes `_CSP_SCRIPT_HASH_*` nomeadas em `handler.py`
+- [-] T-18 `[software-engineer-python]` Adicionar/estender teste unitário: `script-src` sem `unsafe-inline`, com pelo menos um token `sha256-`
 - [ ] T-19 `[software-engineer-python]` Rodar `pytest tests/unit/features/panel/ -v`
 
 ---

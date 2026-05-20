@@ -244,15 +244,6 @@ def test_09_schema_not_in_claude_schemas_dir(tmp_path: Path, monkeypatch) -> Non
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "CLI returns exit code 1 (WorkspaceNotInitializedError) instead of 3. "
-        "Pre-existing mismatch tracked in backlog candidate "
-        "`cli-reports-exit-code-alignment-v1` — decide between aligning the CLI "
-        "to emit exit 3 or updating this test to expect the current behavior."
-    ),
-    strict=True,
-)
 def test_10_workspace_not_initialized_exits_3(tmp_path: Path, monkeypatch) -> None:
     """Test 10: running validate in a directory with no .dadaia/agentic/schemas/ → exit 3."""
     # tmp_path has no workspace init — no .dadaia directory at all
