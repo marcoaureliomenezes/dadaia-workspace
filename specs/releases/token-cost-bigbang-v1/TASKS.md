@@ -102,7 +102,7 @@
   - **Done criterion:** All 7 workflows declare `consumes:` with sidecar paths; 4 read-heavy workflows carry dispatch-to-researcher stages.
   - **Deps:** T-37
 
-- [ ] **T-41** — Re-architect `dadaia public install`: emit single `AGENTS.md` as canonical at workspace root; `CLAUDE.md` becomes 1-line stub (`@AGENTS.md` include). Skills live in `.agents/skills/` with symlinks at `.claude/skills/`, `.codex/skills/`, `.opencode/skills/`.
+- [-] **T-41** — Re-architect `dadaia public install`: emit single `AGENTS.md` as canonical at workspace root; `CLAUDE.md` becomes 1-line stub (`@AGENTS.md` include). Skills live in `.agents/skills/` with symlinks at `.claude/skills/`, `.codex/skills/`, `.opencode/skills/`.
   - **Owner:** devops-engineer
   - **Write-allowlist:** `dadaia_workspace/infrastructure/`
   - **Done criterion:** `public_assets.py` updated; clean workspace install yields canonical `AGENTS.md` + 1-line `CLAUDE.md` stub + symlinked skills tree.
