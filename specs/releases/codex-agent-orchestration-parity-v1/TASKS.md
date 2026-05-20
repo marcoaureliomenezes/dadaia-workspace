@@ -113,7 +113,7 @@
 > Depende de: T-28 `[x]` (todos os ACs verdes)
 > Owner exclusivo: `product-engineer` (memory atomicity — workspace-protocol §5)
 
-- [ ] **T-29** `product-engineer` — Redigir `CLOSURE.md` com evidências de AC1–AC10 (diff output, pytest output, grep output, doctor output)
+- [-] **T-29** `product-engineer` — Redigir `CLOSURE.md` com evidências de AC1–AC10 (diff output, pytest output, grep output, doctor output)
 - [ ] **T-30** `product-engineer` — Atualizar `specs/memory/architecture.html`: bloco no agent-topology layer descrevendo renderer split (canonical → Claude/Codex adapters) (AC11)
 - [ ] **T-31** `product-engineer` — Atualizar `specs/memory/product/agent-orchestration.html`: capability matrix de ADR-3 (AC11)
 - [ ] **T-32** `product-engineer` — Atualizar `specs/memory/tech-stack.html`: parity guard para Codex registrado (AC11)
