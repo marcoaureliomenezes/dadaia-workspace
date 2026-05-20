@@ -43,10 +43,10 @@
 
 > Depende de: T-03 `[x]`
 
-- [ ] **T-09** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/codex_agent_dispatcher.py` implementando `core/protocols/agent_dispatcher.py`: `capabilities()` → `DispatcherCapabilities(supports_parallel=True, mode=DispatcherMode.CODEX)`; `dispatch()` → sequential; `dispatch_parallel()` → parallel best-effort; capability ausente → `OrchestrationUnsupportedError` com motivo legível (FR8 / ADR-3)
-- [ ] **T-10** `software-engineer-python` — Escrever `tests/unit/features/agents/test_codex_dispatcher_sequential.py`: dispatcher resolve um agente e produz invocação Codex correta (AC4)
-- [ ] **T-11** `software-engineer-python` — Escrever `tests/unit/features/agents/test_codex_dispatcher_parallel.py`: fan-out múltiplo respeita a capability matrix de ADR-3 (AC5)
-- [ ] **T-12** `software-engineer-python` — Escrever `tests/unit/features/agents/test_codex_dispatcher_unsupported.py`: capability ausente devolve `OrchestrationUnsupportedError` com motivo legível; não falha silenciosamente (AC6)
+- [-] **T-09** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/codex_agent_dispatcher.py` implementando `core/protocols/agent_dispatcher.py`: `capabilities()` → `DispatcherCapabilities(supports_parallel=True, mode=DispatcherMode.CODEX)`; `dispatch()` → sequential; `dispatch_parallel()` → parallel best-effort; capability ausente → `OrchestrationUnsupportedError` com motivo legível (FR8 / ADR-3)
+- [-] **T-10** `software-engineer-python` — Escrever `tests/unit/features/agents/test_codex_dispatcher_sequential.py`: dispatcher resolve um agente e produz invocação Codex correta (AC4)
+- [-] **T-11** `software-engineer-python` — Escrever `tests/unit/features/agents/test_codex_dispatcher_parallel.py`: fan-out múltiplo respeita a capability matrix de ADR-3 (AC5)
+- [-] **T-12** `software-engineer-python` — Escrever `tests/unit/features/agents/test_codex_dispatcher_unsupported.py`: capability ausente devolve `OrchestrationUnsupportedError` com motivo legível; não falha silenciosamente (AC6)
 
 ---
 
