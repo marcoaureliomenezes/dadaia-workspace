@@ -1,10 +1,10 @@
 # Spec: Release — infra-correctness-v1
 
-> **Status:** Draft
+> **Status:** Aprovado
 > **Release ID:** infra-correctness-v1
 > **Owner:** product-engineer
 > **Created:** 2026-05-20
-> **Phase:** DISCOVERY
+> **Phase:** SPEC
 > **Branch:** `release/infra-correctness-v1` (cut from `main` after `codex-agent-orchestration-parity-v1` CLOSURE)
 > **Predecessor:** `codex-agent-orchestration-parity-v1` (CLOSED + ARCHIVED 2026-05-20)
 > **Discovery inputs:**
