@@ -1,5 +1,5 @@
-release: none
-phase: DISCOVERY
+release: codex-agent-orchestration-parity-v1
+phase: CLOSURE
 
 # History
 # 2026-05-20 — token-cost-bigbang-v1 CLOSED + ARCHIVED. ADRs X1..X7 em constitution. P3 validation (T-50..T-54) em aberto — operador controla.
