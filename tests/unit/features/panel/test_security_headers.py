@@ -40,7 +40,7 @@ class TestSecurityHeaders:
         )
 
     def test_html_csp_value(self) -> None:
-        """CSP value matches SPEC § Threat matrix T8."""
+        """CSP value matches SPEC § Threat matrix T8 (hardened: no unsafe-inline in script-src)."""
         handler, headers_sent = _make_handler_with_spy()
         handler._security_headers("text/html")  # type: ignore[attr-defined]
 
@@ -48,8 +48,20 @@ class TestSecurityHeaders:
         assert csp_headers, "No CSP header found"
         csp = csp_headers[0]
         assert "default-src 'self'" in csp
-        assert "script-src 'self' 'unsafe-inline'" in csp
         assert "style-src 'self' 'unsafe-inline'" in csp
+        # script-src must NOT contain 'unsafe-inline' (T-16)
+        script_src_part = next(
+            (d.strip() for d in csp.split(";") if d.strip().startswith("script-src")),
+            None,
+        )
+        assert script_src_part is not None, "script-src directive missing from CSP"
+        assert "'unsafe-inline'" not in script_src_part, (
+            "script-src must not contain 'unsafe-inline' — use SHA-256 hashes instead"
+        )
+        # At least one sha256 token must be present in script-src (T-18)
+        assert "sha256-" in script_src_part, (
+            "script-src must contain at least one 'sha256-...' hash token"
+        )
 
     def test_json_response_sends_nosniff_header(self) -> None:
         """application/json content type causes X-Content-Type-Options: nosniff to be sent."""
@@ -85,3 +97,39 @@ class TestSecurityHeaders:
             k for k, v in headers_sent if k in ("Content-Security-Policy", "X-Content-Type-Options")
         ]
         assert not security_headers
+
+    def test_script_src_no_unsafe_inline_has_sha256_tokens(self) -> None:
+        """T-18: script-src must not contain 'unsafe-inline'; must include sha256 tokens."""
+        handler, headers_sent = _make_handler_with_spy()
+        handler._security_headers("text/html; charset=utf-8")  # type: ignore[attr-defined]
+
+        csp_headers = [v for k, v in headers_sent if k == "Content-Security-Policy"]
+        assert csp_headers, "Content-Security-Policy header not emitted for text/html"
+        csp = csp_headers[0]
+
+        # Isolate script-src directive
+        directives = {
+            d.strip().split(None, 1)[0]: d.strip()
+            for d in csp.split(";")
+            if d.strip()
+        }
+        assert "script-src" in directives, "script-src directive must be present in CSP"
+        script_src = directives["script-src"]
+
+        assert "'unsafe-inline'" not in script_src, (
+            "script-src MUST NOT contain 'unsafe-inline' (hardened CSP, T-16)"
+        )
+        assert "sha256-" in script_src, (
+            "script-src MUST contain at least one 'sha256-...' token (T-16)"
+        )
+        # Verify both known hash tokens are present (theme + runtime switchers)
+        from dadaia_workspace.features.panel.handler import (
+            _CSP_SCRIPT_HASH_1,
+            _CSP_SCRIPT_HASH_2,
+        )
+        assert _CSP_SCRIPT_HASH_1 in script_src, (
+            f"Theme-switcher hash {_CSP_SCRIPT_HASH_1} missing from script-src"
+        )
+        assert _CSP_SCRIPT_HASH_2 in script_src, (
+            f"Runtime-switcher hash {_CSP_SCRIPT_HASH_2} missing from script-src"
+        )
