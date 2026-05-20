@@ -32,7 +32,7 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>agent-orchestration</h1>
-<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: token-cost-bigbang-v1</p>
+<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: codex-agent-orchestration-parity-v1</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
@@ -177,6 +177,19 @@ sequenceDiagram
   design-pattern leakage fora da superfície UI/UX. <code>playwright</code> permanece universal
   (sem restrição de escopo) — usado por <code>qa-engineer</code> (E2E),
   <code>data-analyst</code> (dashboard evaluation) e <code>frontend-engineer</code>.</p>
+</section>
+
+<section id="codex-capability-matrix">
+  <h2>Codex Dispatcher Capability Matrix (ADR-3)</h2>
+  <p>Introduzida em <code>codex-agent-orchestration-parity-v1</code> (2026-05-20). O <code>CodexAgentDispatcher</code> suporta sequential e parallel em modo best-effort; capabilities ausentes lançam <code>OrchestrationUnsupportedError</code> com motivo legível. Implementado em <code>dadaia_workspace/infrastructure/codex_agent_dispatcher.py</code>.</p>
+  <table>
+    <tr><th>Capability</th><th>ClaudeAgentDispatcher</th><th>CodexAgentDispatcher</th><th>CliAgentDispatcher</th></tr>
+    <tr><td>sequential</td><td>NATIVE</td><td>NATIVE</td><td>CLI (manual)</td></tr>
+    <tr><td>parallel</td><td>NATIVE</td><td>best-effort</td><td>CLI (manual)</td></tr>
+    <tr><td>fan-out</td><td>NATIVE</td><td>best-effort</td><td>CLI (manual)</td></tr>
+    <tr><td>audit-loop</td><td>NATIVE</td><td>best-effort</td><td>unsupported</td></tr>
+    <tr><td>UserPromptSubmit</td><td>NATIVE</td><td>not-applicable</td><td>not-applicable</td></tr>
+  </table>
 </section>
 
 <section id="dependencies">
