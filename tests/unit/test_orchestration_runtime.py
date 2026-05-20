@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.exceptions import OrchestrationUnsupportedError
 from dadaia_workspace.core.models.run_state import (
     DispatcherCapabilities,
     DispatcherMode,
@@ -14,9 +13,9 @@ from dadaia_workspace.core.models.run_state import (
 from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
 from dadaia_workspace.infrastructure.cli_agent_dispatcher import (
     CliAgentDispatcher,
-    CodexAgentDispatcher,
     OpenCodeAgentDispatcher,
 )
+from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 
 
 def _make_invocation(tmp_path: Path, *, parallel_group: str | None = None) -> StageInvocation:
@@ -39,7 +38,7 @@ def _make_invocation(tmp_path: Path, *, parallel_group: str | None = None) -> St
         (ClaudeAgentDispatcher, "claude", DispatcherMode.NATIVE, True),
         (CliAgentDispatcher, "cli", DispatcherMode.CLI_ONLY, False),
         (OpenCodeAgentDispatcher, "opencode", DispatcherMode.BEST_EFFORT_SEQUENTIAL, False),
-        (CodexAgentDispatcher, "codex", DispatcherMode.UNSUPPORTED, False),
+        (CodexAgentDispatcher, "codex", DispatcherMode.CODEX, True),
     ],
 )
 def test_capabilities_match_runtime(
@@ -75,10 +74,12 @@ def test_opencode_marks_parallel_group_as_best_effort(tmp_path: Path) -> None:
     assert "OpenCode does not support true parallel agent dispatch" in content
 
 
-def test_codex_rejects_parallel_group_dispatch(tmp_path: Path) -> None:
+def test_codex_accepts_parallel_group_dispatch_best_effort(tmp_path: Path) -> None:
+    """New CodexAgentDispatcher supports parallel_group — best-effort, no exception raised."""
     inv = _make_invocation(tmp_path, parallel_group="specialists")
-    with pytest.raises(OrchestrationUnsupportedError):
-        CodexAgentDispatcher().dispatch_parallel((inv,))
+    results = CodexAgentDispatcher().dispatch_parallel((inv,))
+    assert len(results) == 1
+    assert results[0].status == StageStatus.AWAITING_GATE
 
 
 def test_codex_accepts_sequential_dispatch(tmp_path: Path) -> None:

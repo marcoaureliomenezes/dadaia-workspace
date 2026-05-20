@@ -1,8 +1,7 @@
-"""CliAgentDispatcher — default fallback; also covers OpenCode (best-effort) and Codex (unsupported)."""
+"""CliAgentDispatcher — default fallback; also covers OpenCode (best-effort sequential)."""
 
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import OrchestrationUnsupportedError
 from dadaia_workspace.core.models.run_state import (
     DispatcherCapabilities,
     DispatcherMode,
@@ -102,28 +101,3 @@ class OpenCodeAgentDispatcher(CliAgentDispatcher):
             status=StageStatus.AWAITING_GATE,
             output_path=str(path),
         )
-
-
-class CodexAgentDispatcher(CliAgentDispatcher):
-    """Codex has no Agent-style delegation tool; rejects workflows with parallel groups."""
-
-    def __init__(self) -> None:
-        super().__init__(runtime_label="codex")
-
-    def capabilities(self) -> DispatcherCapabilities:
-        return DispatcherCapabilities(
-            runtime_name=self._runtime_label,
-            supports_parallel=False,
-            supports_gates_inline=False,
-            mode=DispatcherMode.UNSUPPORTED,
-        )
-
-    def dispatch_parallel(
-        self, invocations: tuple[StageInvocation, ...]
-    ) -> tuple[StageResult, ...]:
-        if any(inv.parallel_group for inv in invocations):
-            raise OrchestrationUnsupportedError(
-                "runtime 'codex' does not support parallel_group dispatch. "
-                "Use --runtime claude or rewrite the workflow without parallel_group."
-            )
-        return super().dispatch_parallel(invocations)

@@ -34,9 +34,9 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
 from dadaia_workspace.infrastructure.cli_agent_dispatcher import (
     CliAgentDispatcher,
-    CodexAgentDispatcher,
     OpenCodeAgentDispatcher,
 )
+from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
