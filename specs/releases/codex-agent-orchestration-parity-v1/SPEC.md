@@ -1,6 +1,6 @@
 # Spec: Release — codex-agent-orchestration-parity-v1
 
-> **Status:** Draft
+> **Status:** Aprovado
 > **Release ID:** codex-agent-orchestration-parity-v1
 > **Owner:** product-engineer
 > **Created:** 2026-05-19
@@ -120,8 +120,12 @@ obrigatórios: agent persona canônica markdown + frontmatter (`tier`, `model`, 
   forem suportados pelo runtime Codex e se a ADR aprovar — sem campos Codex-only sem
   ADR registrada.
 
-A ADR vive em `dadaia_workspace/public/docs/adrs/` ou em `specs/releases/<id>/adrs/`
-(decisão em P1). Deve ser citada em todos os testes de parsing.
+A ADR vive em `specs/releases/codex-agent-orchestration-parity-v1/adrs/` (release-local,
+arquivadas no CLOSURE com a release). Deve ser citada em todos os testes de parsing.
+
+**Decisão (grill-me 2026-05-20):** Rules classificadas por critério mecânico — prose
+normativa = comportamental; diretivas executáveis (bash inline, regex gate, script
+paths) = executável. As 4 rules canônicas atuais são todas comportamentais.
 
 ### FR2 — ADR-2: Runtime-Specific Prompt Transform
 
@@ -142,18 +146,30 @@ do dispatcher.
 
 ### FR4 — ADR-4: Workflow Runtime Boundary
 
-Decidir quem renderiza workflows para Codex: (a) o `_install_codex` em
-`public_assets.py` (renderer estático no install time) ou (b) um adapter runtime que
-gera invocations on-demand a partir de um `WorkflowDefinition` neutro. Em qualquer caso,
-**não há campos Codex-only no workflow canônico sem ADR aprovada** (non-goal #2).
+**Decisão (grill-me 2026-05-20):** Opção A — render-at-install. O `_install_codex` em
+`public_assets.py` gera os arquivos `.codex/workflows/` estáticos no install time. Zero
+infraestrutura nova para workflows; `WorkflowDefinition` neutro permanece inalterado
+(non-goal #5).
+
+O delta desta release: adicionar `audit-cycle.workflow.md` e
+`code-review-fan-out.workflow.md` ao install path, e fazer o doctor detectar drift em
+ambos os sentidos. **Não há campos Codex-only no workflow canônico sem ADR aprovada**
+(non-goal #2).
 
 ### FR5 — ADR-5: Model Mapping
 
-Tabela explícita `claude-opus-4-7 → <codex-id>` e `claude-sonnet-4-6 → <codex-id>` (e
-quaisquer outros models presentes na frontmatter dos 20 agentes). Mapping vive em
-`dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py` (ou equivalente).
+**Decisão (grill-me 2026-05-20):** Mapping explícito (inspecionado de
+`07_codex/02_codex_models.md`, consultado 2026-05-09):
+
+| Claude identifier | Codex identifier | Rationale |
+|---|---|---|
+| `claude-opus-4-7` | `gpt-5.5` | Modelo topo Codex; reservado para override Opus |
+| `claude-sonnet-4-6` | `gpt-5.3-codex` | Especializado em software engineering; default dos 19 agentes |
+| `claude-haiku-4-5-20251001` | `gpt-5.4-mini` | Rápido/leve; researcher e subagents |
+
+Mapping vive em `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py`.
 Acceptance: nenhum identificador `claude-*` aparece em `.codex/**` após install
-(grep returns ZERO).
+(grep returns ZERO — AC3).
 
 ### FR6 — ADR-6: Null Claude Regression Suite
 
@@ -174,9 +190,14 @@ Gerar 20 arquivos TOML, um por agente canônico. Cada arquivo:
 
 ### FR8 — Dispatchers Codex hardening
 
-`dadaia_workspace/features/agents/dispatcher/CodexAgentDispatcher`:
+**Correção de path (grill-me 2026-05-20):** `CodexAgentDispatcher` não existia — é um
+NEW. Path correto: `dadaia_workspace/infrastructure/codex_agent_dispatcher.py`,
+implementando `core/protocols/agent_dispatcher.py` (mesmo Protocol de
+`ClaudeAgentDispatcher` e `CliAgentDispatcher`).
+
+`dadaia_workspace/infrastructure/codex_agent_dispatcher.py` (NEW):
 - Testes sequenciais: dispatcher resolve um agente e produz a invocação Codex correta.
-- Testes paralelos (best-effort): fan-out múltiplo respeita capability matrix.
+- Testes paralelos (best-effort): fan-out múltiplo respeita capability matrix de ADR-3.
 - Testes de capability ausente: dispatcher devolve `unsupported-capability` com motivo
   legível, **sem** falhar silenciosamente.
 
@@ -209,8 +230,18 @@ Inventariar `dadaia_workspace/public/rules/**` em duas categorias:
   raiz ou no corpo do agente Codex correspondente.
 - **Executável** (`.rules` consumido por runtime) → projetada como arquivo `.rules`.
 
-Critério de classificação e mapeamento vive em ADR (parte de FR1 ou ADR-7 a critério
-de P1). Acceptance: `.codex/rules/` contém apenas rules **executáveis**; rules
+**Decisão (grill-me 2026-05-20):** Critério mecânico — prose normativa = comportamental;
+diretivas executáveis (bash inline, regex gate, script paths) = executável. Critério
+documentado na ADR-1.
+
+**Classificação das 4 rules canônicas atuais (todas comportamentais):**
+- `game-agents-coordination.md` → comportamental
+- `game-developer-scope.md` → comportamental
+- `plugin-scope.md` → comportamental
+- `workspace-protocol.md` → comportamental
+
+`.codex/rules/` receberá apenas rules que eventualmente se tornarem executáveis em
+releases futuras. Acceptance: `.codex/rules/` contém apenas rules **executáveis**; rules
 comportamentais aparecem inline no surface Codex que as consome.
 
 ### FR12 — Skills projetadas via `.agents/skills`
@@ -219,6 +250,21 @@ Projetar `dadaia_workspace/public/skills/**` para `.agents/skills/` no consumer 
 Codex, com hash-equivalência ao conteúdo canônico (não há divergência de texto entre
 Claude/Codex no nível de skill — diferenças ficam em rules + agente).
 
+### FR13 — Deleção de commands não utilizados
+
+**Escopo adicionado (grill-me 2026-05-20):** Os 4 commands em
+`dadaia_workspace/public/commands/` (`dadaia-academy.md`, `dadaia-workspace-doctor.md`,
+`dadaia-workspace-refine-specs.md`, `spec-context.md`) são lib-originados e não estão
+sendo utilizados. Remover da fonte canônica e re-projetar.
+
+Passos:
+1. Deletar os 4 arquivos de `dadaia_workspace/public/commands/`.
+2. Re-executar `dadaia public install --target claude` para limpar `.claude/commands/`.
+3. Re-executar `dadaia public install --target opencode` para limpar `.opencode/commands/` se aplicável.
+4. Capturar o golden snapshot de AC1 **após** este passo (ponto zero do guard).
+
+Acceptance: `dadaia_workspace/public/commands/` vazio (ou diretório removido); `.claude/commands/` sem os 4 arquivos.
+
 ---
 
 ## 4. Acceptance Criteria (minimum gates from backlog line 26)
@@ -226,11 +272,16 @@ Claude/Codex no nível de skill — diferenças ficam em rules + agente).
 Os gates abaixo são citação direta do backlog canônico. Cada um é máquina-verificável
 e tem evidência registrada na CLOSURE.
 
-- **AC1 — Golden tests for `.claude/agents` and `.claude/workflows`.** Snapshot SHA-256
-  by-file de `.claude/agents/**` e `.claude/workflows/**` pré-release MUST igualar o
-  pós-release. Comando: `find .claude/{agents,workflows} -type f -print0 | xargs -0
-  sha256sum | sort > /tmp/post.txt && diff /tmp/pre.txt /tmp/post.txt`. Evidência:
-  diff vazio + ambos hashes commitados em `.dadaia/reports/dadaia-workspace/product-engineer/<...>.html`.
+- **AC1 — Golden tests for `.claude/**`.** Snapshot SHA-256 by-file de `.claude/**`
+  pré-release MUST igualar o pós-release, exceto pelas mudanças intencionais declaradas
+  (FR13 — deleção de commands). **Timing do baseline (grill-me 2026-05-20):** capturado
+  imediatamente após FR13 (deleção dos commands + re-projeção), antes de qualquer mudança
+  Codex. Esse é o ponto zero do guard — todo trabalho Codex subsequente não deve alterar
+  `.claude/**`. Comando: `find .claude -type f -print0 | xargs -0 sha256sum | sort >
+  /tmp/pre.txt` (capturado pós-FR13); após trabalho Codex: `find .claude -type f -print0
+  | xargs -0 sha256sum | sort > /tmp/post.txt && diff /tmp/pre.txt /tmp/post.txt`.
+  Evidência: diff vazio + ambos hashes commitados em
+  `.dadaia/reports/dadaia-workspace/product-engineer/<...>.html`.
 - **AC2 — `.codex/agents/*.toml` parseável com `developer_instructions` não-vazio.**
   Para cada arquivo: `tomllib.load(open(f, "rb"))` retorna sem erro; o campo
   `developer_instructions` existe e `.strip() != ""`.
@@ -299,11 +350,12 @@ em CLOSURE):
 | `dadaia_workspace/public/workflows/**` | READ-ONLY (`WorkflowDefinition` neutro inalterado) |
 | `dadaia_workspace/public/skills/**` | READ-ONLY (re-projetado para `.agents/skills`) |
 | `dadaia_workspace/public/rules/**` | READ-ONLY (classificação executável vs comportamental é metadata, não edição) |
+| `dadaia_workspace/public/commands/**` | DELETE (FR13 — 4 arquivos não utilizados; re-projetar após) |
 | `dadaia_workspace/infrastructure/public_assets.py` | EDIT (novo `_install_codex_agents`, fortalece `_install_codex_workflows`, hardens `doctor()` checks) |
 | `dadaia_workspace/infrastructure/runtime_transforms/codex.py` | NEW (ADR-2 transform) |
-| `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py` | NEW (ADR-5 mapping) |
-| `dadaia_workspace/features/agents/dispatcher/CodexAgentDispatcher` | EDIT (hardening) |
-| `dadaia_workspace/features/agents/dispatcher/ClaudeAgentDispatcher` | READ-ONLY (FR6 guard) |
+| `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py` | NEW (ADR-5 mapping — `sonnet→gpt-5.3-codex`, `haiku→gpt-5.4-mini`, `opus→gpt-5.5`) |
+| `dadaia_workspace/infrastructure/codex_agent_dispatcher.py` | NEW (implements `core/protocols/agent_dispatcher.py`; sequential, parallel best-effort, unsupported-capability — FR8) |
+| `dadaia_workspace/infrastructure/claude_agent_dispatcher.py` | READ-ONLY (FR6 guard) |
 | `.codex/agents/**` | NEW (20 TOML files) |
 | `.codex/config.toml` | EDIT (gain 20 `[agents.<name>]` registrations) |
 | `.codex/workflows/**` | EDIT (gain `audit-cycle`, `code-review-fan-out` — final list per ADR-4) |
@@ -338,43 +390,48 @@ em CLOSURE):
 
 ---
 
-## 8. Open Questions (DISCOVERY phase — must be resolved before SPEC flips to Aprovado)
+## 8. Open Questions — RESOLVIDAS (grill-me 2026-05-20T02:24:07Z)
 
-These are the grill-me topics. Each MUST have a recorded answer (operator or via
-inspection) before SPEC moves to `**Status:** Aprovado`.
+Todos os OQs foram resolvidos via inspeção de código ou decisão explícita do operador.
+Report completo: `.dadaia/reports/dadaia-workspace/product-engineer/2026-05-20T022407Z-refine-specs.html`.
 
-- **OQ1 — ADR storage location.** ADRs (FR1–FR6) live in `dadaia_workspace/public/docs/
-  adrs/` (workspace-canonical, projected to consumers) or `specs/releases/<id>/adrs/`
-  (release-local, archived with the release)? Trade-off: canonical → discoverable
-  long-term; release-local → atomicity preserved per release.
-- **OQ2 — Codex model identifiers.** Quais são os identifiers Codex válidos hoje (Codex
-  CLI version pinned in `tech-stack.html`) para mapear `claude-opus-4-7` e
-  `claude-sonnet-4-6`? Inspecionar `.codex/config.toml` atual ou Codex docs.
-- **OQ3 — Workflow runtime boundary** (ADR-4). Render-at-install (estático) ou
-  render-at-dispatch (dinâmico via `WorkflowDefinition`)? Decisão arquitetural com
-  impacto em PLAN.
-- **OQ4 — Rules classification authority.** Quem classifica cada arquivo em
-  `public/rules/` como comportamental vs executável: `ai-engineer` (owner do surface),
-  `product-engineer` (curator do delta), ou critério mecânico (e.g. presença de
-  diretivas executáveis)?
-- **OQ5 — Capability matrix granularity.** ADR-3 lista capabilities como
-  `{sequential, parallel, fan-out, audit-loop, unsupported}` — esta lista está
-  completa para os 2 dispatchers, ou faltam capabilities (e.g. `escalation`,
-  `delegation-chain`)?
-- **OQ6 — `.codex/hooks.json` parity.** Hooks atual em `.codex/hooks.json` mirror `.claude/`
-  ou tem divergência? Se diverge, é proposital (capability gap) ou drift?
-- **OQ7 — Commands surface.** `.claude/commands/` está populado por `agents-r3-v1`?
-  Se sim, `.codex/commands/` precisa parity nesta release ou fica deferido?
-- **OQ8 — Backlog dependency `agent-topology-guard-i6-skill-link-validation-v1`.** Esta
-  release deve esperar I6 land (skill-link validation) antes de doctor hardening, ou
-  doctor hardening aqui já é suficiente?
-- **OQ9 — `data/AGENTS.md` mention of Codex parity.** Após esta release, o lib's source
-  `data/AGENTS.md` (≤ 280-line invariant) deve ganhar uma seção mencionando Codex
-  parity guards, ou parity é detalhe de infrastructure invisível para consumer repos?
-- **OQ10 — Golden snapshot baseline.** Quando o pre-release `.claude/**` hash baseline
-  é capturado: no P0 commit, no SPEC approval, ou no início do P3 (implementation)?
-  Impacto: define o "antes" do FR6 / AC1.
+- **OQ1 — ADR storage location.** ✅ **Release-local.** ADRs em
+  `specs/releases/codex-agent-orchestration-parity-v1/adrs/`, arquivadas no CLOSURE.
+
+- **OQ2 — Codex model identifiers.** ✅ **Resolvido via inspeção + operador.**
+  Mapping: `claude-opus-4-7→gpt-5.5`, `claude-sonnet-4-6→gpt-5.3-codex`,
+  `claude-haiku-4-5-20251001→gpt-5.4-mini`. Ver FR5 para tabela completa.
+
+- **OQ3 — Workflow runtime boundary.** ✅ **Render-at-install (Opção A).** Ver FR4.
+
+- **OQ4 — Rules classification authority.** ✅ **Critério mecânico.** Prose normativa =
+  comportamental; diretivas executáveis = executável. As 4 rules canônicas atuais são
+  todas comportamentais. Ver FR11.
+
+- **OQ5 — Capability matrix granularity.** ✅ **Lista completa para esta release.**
+  `{sequential, parallel, fan-out, audit-loop, unsupported}` cobre todas as capabilities
+  implementadas. `escalation` e `delegation-chain` não existem no codebase — deferidos.
+
+- **OQ6 — `.codex/hooks.json` parity.** ✅ **Gap proposital (capability gap).**
+  Inspeção: `.claude/` tem `PreToolUse` (sdd-spec-gate) + `UserPromptSubmit`
+  (ctx-inject). `.codex/hooks.json` tem apenas `PreToolUse`. `UserPromptSubmit` é
+  evento Claude-específico — `[not-applicable]` para Codex. Em Codex o contexto é
+  provido por `DADAIA_CONTEXT` env var + `AGENTS.md`. Documentado na ADR-3.
+
+- **OQ7 — Commands surface.** ✅ **Deletar da fonte canônica (FR13).** Inspeção:
+  `.claude/commands/` tem 4 arquivos lib-originados. Operador decidiu deletá-los por
+  não estarem em uso. Escopo adicionado como FR13. `.codex/commands/` não se aplica.
+
+- **OQ8 — Backlog dependency I6.** ✅ **Não é hard dependency.** SPEC §7 já respondia.
+  I6 é guardrail de skills, não de Codex parity. Pode rodar em release paralela.
+
+- **OQ9 — `data/AGENTS.md` mention.** ✅ **Sem menção.** Codex parity é detalhe de
+  infrastructure invisível para consumer repos. `data/AGENTS.md` permanece inalterado.
+
+- **OQ10 — Golden snapshot baseline.** ✅ **Capturado após FR13.** Snapshot de
+  `.claude/**` é tirado imediatamente após deleção dos commands (FR13) + re-projeção,
+  antes de qualquer mudança Codex. Ver AC1 para comando exato.
 
 ---
 
-**Status:** Draft
+**Status:** Aprovado
