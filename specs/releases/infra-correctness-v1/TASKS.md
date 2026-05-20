@@ -37,7 +37,7 @@
 
 ## P4 — CSP script-src harden
 
-- [ ] T-14 `[software-engineer-python]` Extrair texto literal dos scripts inline em `index.py` e `wrapper.py`
+- [-] T-14 `[software-engineer-python]` Extrair texto literal dos scripts inline em `index.py` e `wrapper.py`
 - [ ] T-15 `[software-engineer-python]` Computar SHA-256 base64 de cada script distinto
 - [ ] T-16 `[software-engineer-python]` Editar `handler.py:392` — substituir `'unsafe-inline'` em `script-src` pelos tokens `'sha256-<hash>'`
 - [ ] T-17 `[software-engineer-python]` Adicionar constantes `_CSP_SCRIPT_HASH_*` nomeadas em `handler.py`
