@@ -65,8 +65,8 @@
 - [x] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
 - [x] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
 - [x] T-31 `[software-engineer-python]` Derivar e passar `scope` para `manager.install()`
-- [-] T-32 `[software-engineer-python]` Adicionar testes para cada scope (all, repos-only, workspace-only, exclusividade)
-- [ ] T-33 `[software-engineer-python]` Rodar `pytest tests/integration/` relacionados a `dadaia public install`
+- [x] T-32 `[software-engineer-python]` Adicionar testes para cada scope (all, repos-only, workspace-only, exclusividade)
+- [-] T-33 `[software-engineer-python]` Rodar `pytest tests/integration/` relacionados a `dadaia public install`
 
 ---
 
