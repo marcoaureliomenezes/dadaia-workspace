@@ -82,7 +82,7 @@
 
 > Depende de: T-15 `[x]` (TOMLs gerados) + T-17 `[x]` (workflows completos)
 
-- [ ] **T-20** `software-engineer-python` — Adicionar checks D-CX-1..5 em `doctor()` de `public_assets.py`: (D-CX-1) agente canônico sem TOML; (D-CX-2) TOML sem registro em `config.toml`; (D-CX-3) `.codex/workflows/` drift vs canônico; (D-CX-4) string `claude-*` em `.codex/**`; (D-CX-5) `developer_instructions` vazio; retorna não-zero com mensagem nomeando o agente/workflow (FR10)
+- [-] **T-20** `software-engineer-python` — Adicionar checks D-CX-1..5 em `doctor()` de `public_assets.py`: (D-CX-1) agente canônico sem TOML; (D-CX-2) TOML sem registro em `config.toml`; (D-CX-3) `.codex/workflows/` drift vs canônico; (D-CX-4) string `claude-*` em `.codex/**`; (D-CX-5) `developer_instructions` vazio; retorna não-zero com mensagem nomeando o agente/workflow (FR10)
 
 ---
 
