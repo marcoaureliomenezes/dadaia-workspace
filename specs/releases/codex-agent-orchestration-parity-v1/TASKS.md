@@ -90,7 +90,7 @@
 
 > Depende de: T-20 `[x]` (doctor com novos checks)
 
-- [ ] **T-21** `qa-engineer` — Escrever `tests/integration/features/public/test_doctor_codex_checks.py`: AC7 (remoção artificial de workflow → doctor não-zero); AC8 (corrupção de TOML → doctor não-zero nomeando agente); AC9 (TOML ausente → doctor não reporta `[ok]`)
+- [-] **T-21** `qa-engineer` — Escrever `tests/integration/features/public/test_doctor_codex_checks.py`: AC7 (remoção artificial de workflow → doctor não-zero); AC8 (corrupção de TOML → doctor não-zero nomeando agente); AC9 (TOML ausente → doctor não reporta `[ok]`)
 - [ ] **T-22** `qa-engineer` — Verificar cobertura ≥ 80% para `runtime_transforms/` e `codex_agent_dispatcher.py`; ajustar testes se necessário
 
 ---
