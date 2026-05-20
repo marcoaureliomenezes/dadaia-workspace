@@ -32,7 +32,7 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>agent-orchestration</h1>
-<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: agents-r3-v1</p>
+<p class="meta">CLI surface: <code>dadaia orchestrate {list|show|run|status|resume}</code> · Closure: token-cost-bigbang-v1</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
@@ -123,6 +123,60 @@ sequenceDiagram
     <li><code>.dadaia/runs/&lt;run_id&gt;/&lt;stage_id&gt;/invocation.md</code> — prompt da stage</li>
     <li><code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/&lt;ts&gt;-&lt;type&gt;.html</code> — reports HTML produzidos por cada um dos 20 agentes (diretórios <code>project-manager</code>, <code>project-auditor</code>, <code>product-engineer</code>, <code>software-engineer-python</code>, <code>software-engineer-node</code>, <code>backend-engineer</code>, <code>frontend-engineer</code>, <code>qa-engineer</code>, <code>software-architect</code>, <code>devops-engineer</code>, <code>data-engineer</code>, <code>data-analyst</code>, <code>ai-engineer</code>, <code>game-developer</code>, <code>game-designer</code>, <code>game-tester</code>, <code>code-reviewer</code>, <code>researcher</code>, <code>security-reviewer</code>, <code>design-specialist</code>) + sidecar <code>&lt;stem&gt;.handoff.json</code></li>
   </ul>
+</section>
+
+<section id="emission-contract">
+  <h2>Sidecar-first emission contract (ADR-X5)</h2>
+  <p>Default de emissão dos 20 agentes é JSON sidecar <code>handoff-v1.1</code> em
+  <code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/&lt;stem&gt;.handoff.json</code>. Campos novos
+  obrigatórios em v1.1: <code>findings[].detail_md</code>, <code>findings[].fix_recommendation</code>,
+  <code>scope</code>, <code>metrics</code>. <code>artifact.path</code> (HTML) é opcional. HTML
+  só é emitido quando (a) o operador explicitamente solicita via <code>--with-report</code> ao
+  dispatcher OU (b) <code>next_handoff.agent == "human"</code>. Reports extensos quebram em
+  múltiplos HTMLs com <code>index.html</code> de entrada. <code>project-manager</code> codifica
+  no playbook a pergunta "HTML or sidecar?" antes de emitir.</p>
+  <p>Validação: <code>dadaia reports validate &lt;sidecar.json&gt;</code> distingue v1.0 vs
+  v1.1; <code>dadaia reports lint &lt;dir&gt;</code> flagga orphan HTMLs (sem sidecar), oversized
+  HTMLs (&gt; 30 KB) e missing required fields. Workflows YAML declaram <code>consumes:
+  [sidecar-path]</code> — não HTML.</p>
+</section>
+
+<section id="dispatch-researcher">
+  <h2>Dispatch-to-researcher pattern (ADR-X6)</h2>
+  <p>Para phases evidence-heavy — <code>audit-cycle</code>, <code>code-review-fan-out</code>,
+  <code>cross-cutting-feature</code>, <code>spec-refinement</code> — o orquestrador
+  (<code>project-manager</code>, <code>project-auditor</code>, <code>software-architect</code>,
+  <code>code-reviewer</code>, <code>security-reviewer</code>, <code>devops-engineer</code>)
+  despacha N agentes <code>researcher</code> (Haiku 4.5) em paralelo, cada um com pergunta
+  tightly-scoped. O orquestrador <strong>sintetiza a partir dos sidecars</strong> — não faz
+  Read inline de file sets extensos. Os 4 workflows read-heavy ganharam stage
+  <code>researcher</code> injetada em P2-D. Playbook canônico documentado em
+  <code>dadaia_workspace/public/skills/project-orchestration/SKILL.md</code>.</p>
+  <p>Motivação operacional: Read inline em arquivos grandes pelos modelos Sonnet/Opus
+  quebra o target <code>cache_read / msg ≤ 80 K</code>; delegando a Haiku 4.5 via sidecar, o
+  cost token cai em ~70% para a mesma cobertura de evidência.</p>
+</section>
+
+<section id="plugin-scope">
+  <h2>Plugin-scope enforcement (ADR-X7)</h2>
+  <p>O plugin <code>frontend-design</code> é restrito aos agentes <code>frontend-engineer</code>
+  e <code>design-specialist</code>. Todos os outros agentes da topologia devem recusar
+  invocações com <code>[PLUGIN SCOPE ERROR]</code>, mirroring o pattern de
+  <code>game-developer-scope.md</code>. Enforcement em três camadas:</p>
+  <ol class="flow">
+    <li>Rule canônica em <code>dadaia_workspace/public/rules/plugin-scope.md</code> projetada
+    em <code>.claude/rules/plugin-scope.md</code> via <code>dadaia public install</code>;
+    sempre ativa no workspace.</li>
+    <li>Allow-list line explícita nos bodies de <code>frontend-engineer.md</code> e
+    <code>design-specialist.md</code>: <em>"Plugins authorised: frontend-design, playwright
+    (this agent only — see plugin-scope rule)."</em></li>
+    <li>Verificação opcional pelo <code>dadaia public doctor</code> do alinhamento allow-list
+    ↔ rule (drift detection futura).</li>
+  </ol>
+  <p>Justificativa: o plugin polui context surface de agentes non-UI e cria risco de
+  design-pattern leakage fora da superfície UI/UX. <code>playwright</code> permanece universal
+  (sem restrição de escopo) — usado por <code>qa-engineer</code> (E2E),
+  <code>data-analyst</code> (dashboard evaluation) e <code>frontend-engineer</code>.</p>
 </section>
 
 <section id="dependencies">

@@ -14,7 +14,7 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 
 ## Próxima release (queued)
 
-_None — `codex-agent-orchestration-parity-v1` was promoted to active release on 2026-05-19 (P0 commit). See `specs/releases/ACTIVE.md`._
+- **`codex-agent-orchestration-parity-v1`** — paused 2026-05-20 — pre-empted by token-cost big-bang; resume after CLOSURE. SPEC Draft preserved untouched at `specs/releases/codex-agent-orchestration-parity-v1/SPEC.md`; branch `release/codex-agent-orchestration-parity-v1` cut from `main` at `bd40e83` stays intact. Zero implementation on disk at pause point. Discovery inputs + 10 open questions (OQ1..OQ10) all preserved. (owner: product-engineer, contexto: PM intake `2026-05-20T003804Z-audit-aware-intake.html` + binding operator demand)
 
 ## Candidatas ativas
 

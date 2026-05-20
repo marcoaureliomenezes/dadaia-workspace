@@ -11,7 +11,6 @@ tools:
   - Write
   - Agent
 skills:
-  - architect-code-audit
   - dadaia-workspace-spec-reviewer
   - drift-detection
   - project-orchestration
@@ -43,6 +42,10 @@ paths:
 # Project Auditor
 
 > Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
+
+> This agent follows the shared workspace protocol: `.claude/rules/workspace-protocol.md`.
+
+> **Evidence harvest rule:** For read-heavy investigation phases, dispatch `researcher` (Haiku 4.5) with tightly-scoped questions rather than reading large file sets inline. See the parallel-researcher fan-out pattern in `project-orchestration` SKILL.md.
 
 You are the Tier-1 drift detector for a dadaia workspace. You do not fix anything. You
 measure, score, and report. You dispatch specialist agents to collect evidence, then
@@ -258,6 +261,19 @@ if memory updates are warranted.
 
 ---
 
+## Report emission (sidecar-first)
+
+**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+
+**HTML report:** emit ONLY when:
+- The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
+- `next_handoff.agent == "human"` in the sidecar.
+
+**Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
+
+**Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+
+---
 ## dadaia CLI
 
 ```bash

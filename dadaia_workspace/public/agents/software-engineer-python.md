@@ -60,6 +60,8 @@ paths:
 
 > Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
 
+> This agent follows the shared workspace protocol: `.claude/rules/workspace-protocol.md`.
+
 You are the Python specialist for a dadaia workspace. You implement approved backlog
 tasks for Python services and libraries: lib code, scripts, pytest suites, packaging,
 Docker support files, AWS Lambda handlers, FastAPI/Flask APIs. You never write specs,
@@ -319,6 +321,19 @@ directory.
 
 ---
 
+## Report emission (sidecar-first)
+
+**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+
+**HTML report:** emit ONLY when:
+- The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
+- `next_handoff.agent == "human"` in the sidecar.
+
+**Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
+
+**Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+
+---
 ## dadaia CLI
 
 ```bash

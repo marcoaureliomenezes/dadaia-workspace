@@ -114,7 +114,7 @@
   - **Done criterion:** `dadaia public doctor` exits 0 with every entry `[ok]`; stdout snippet captured for CLOSURE evidence.
   - **Deps:** T-41
 
-- [ ] **T-43** — CLOSURE phase only: update `specs/constitution.md` with ADRs X1..X7. Render/update memory atoms (`specs/memory/architecture.html`, `specs/memory/tech-stack.html`, `specs/memory/product/agent-orchestration.html`, `specs/memory/product/index.html` if catalog changed).
+- [x] **T-43** — CLOSURE phase only: update `specs/constitution.md` with ADRs X1..X7. Render/update memory atoms (`specs/memory/architecture.html`, `specs/memory/tech-stack.html`, `specs/memory/product/agent-orchestration.html`, `specs/memory/product/index.html` if catalog changed).
   - **Owner:** product-engineer
   - **Write-allowlist:** `specs/constitution.md`, `specs/memory/`
   - **Done criterion:** Constitution carries ADRs X1..X7; memory atoms reflect post-release state atomically (no Changelog/History sections); `dadaia specs doctor` green.
