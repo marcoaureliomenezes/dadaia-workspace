@@ -14,10 +14,28 @@ inputs:
     default: "next-evolution"
     description: "Release ID under `specs/releases/` (alias of legacy `topic` — pass `release_id` for new callers)."
 stages:
+  - id: research_evidence
+    name: research-evidence
+    agent: researcher
+    description: "Evidence harvest — dispatch researcher to gather facts before main analysis."
+    consumes: []
+    expected_output:
+      path: ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+    inputs:
+      - kind: workflow_input
+        from: "$.inputs.context"
+        as: context
+      - kind: workflow_input
+        from: "$.inputs.release_id"
+        as: release_id
+
   - id: discovery
     agent: project-manager
+    needs: [research_evidence]
+    consumes:
+      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.html"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.handoff.json"
       must_include: ["Findings", "Riscos", "Decisões necessárias"]
     inputs:
       - kind: workflow_input
@@ -26,6 +44,9 @@ stages:
       - kind: workflow_input
         from: "$.inputs.topic"
         as: topic
+      - kind: stage_output
+        from: stages.research_evidence.output
+        as: evidence_report
     gate:
       kind: operator-approval
       prompt: "Approve discovery report before triggering 3-way parallel analysis?"
@@ -34,8 +55,10 @@ stages:
     agent: software-architect
     needs: [discovery]
     parallel_group: specialists
+    consumes:
+      - ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/software-architect/{run_ts}-arch.html"
+      path: ".dadaia/reports/{context}/software-architect/{run_ts}-arch.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.discovery.output
@@ -45,8 +68,10 @@ stages:
     agent: devops-engineer
     needs: [discovery]
     parallel_group: specialists
+    consumes:
+      - ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/devops-engineer/{run_ts}-devops.html"
+      path: ".dadaia/reports/{context}/devops-engineer/{run_ts}-devops.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.discovery.output
@@ -56,8 +81,10 @@ stages:
     agent: qa-engineer
     needs: [discovery]
     parallel_group: specialists
+    consumes:
+      - ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-qa.html"
+      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-qa.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.discovery.output
@@ -67,8 +94,10 @@ stages:
     agent: frontend-engineer
     needs: [discovery]
     parallel_group: specialists
+    consumes:
+      - ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/frontend-engineer/{run_ts}-spec-review.html"
+      path: ".dadaia/reports/{context}/frontend-engineer/{run_ts}-spec-review.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.discovery.output
@@ -78,8 +107,10 @@ stages:
     agent: backend-engineer
     needs: [discovery]
     parallel_group: specialists
+    consumes:
+      - ".dadaia/reports/{context}/project-manager/{run_ts}-discovery.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/backend-engineer/{run_ts}-spec-review.html"
+      path: ".dadaia/reports/{context}/backend-engineer/{run_ts}-spec-review.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.discovery.output
@@ -88,8 +119,14 @@ stages:
   - id: synthesis
     agent: project-manager
     needs: [arch_review, devops_review, qa_review, frontend_review, backend_review]
+    consumes:
+      - ".dadaia/reports/{context}/software-architect/{run_ts}-arch.handoff.json"
+      - ".dadaia/reports/{context}/devops-engineer/{run_ts}-devops.handoff.json"
+      - ".dadaia/reports/{context}/qa-engineer/{run_ts}-qa.handoff.json"
+      - ".dadaia/reports/{context}/frontend-engineer/{run_ts}-spec-review.handoff.json"
+      - ".dadaia/reports/{context}/backend-engineer/{run_ts}-spec-review.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/project-manager/{run_ts}-synthesis.html"
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-synthesis.handoff.json"
       must_include: ["Status", "Critérios de Aceite"]
     inputs:
       - kind: stage_output
@@ -114,6 +151,8 @@ stages:
   - id: spec_write
     agent: product-engineer
     needs: [synthesis]
+    consumes:
+      - ".dadaia/reports/{context}/project-manager/{run_ts}-synthesis.handoff.json"
     expected_output:
       path: "specs/releases/{release_id}/SPEC.md"
       must_include: ["Status", "Critérios de Aceite"]
