@@ -18,8 +18,8 @@
 
 ## P2 — I6 topology guard
 
-- [-] T-05 `[ai-engineer]` Ler `check_agent_topology.py` — entender `SKILLS_DIR`, `AGENTS_DIR`, padrão `check_i*`
-- [ ] T-06 `[ai-engineer]` Implementar `check_i6_skill_links(agents, errors)` — valida que `SKILLS_DIR / skill_name` existe
+- [x] T-05 `[ai-engineer]` Ler `check_agent_topology.py` — entender `SKILLS_DIR`, `AGENTS_DIR`, padrão `check_i*`
+- [-] T-06 `[ai-engineer]` Implementar `check_i6_skill_links(agents, errors)` — valida que `SKILLS_DIR / skill_name` existe
 - [ ] T-07 `[ai-engineer]` Conectar `check_i6_skill_links` em `main()` após I5; adicionar linha de summary
 - [ ] T-08 `[ai-engineer]` Rodar `python scripts/check_agent_topology.py` — I6 passa para todos os agentes atuais
 - [ ] T-09 `[ai-engineer]` Teste negativo manual: skill ref fictícia → I6 FAIL confirmado
@@ -61,8 +61,8 @@
 ## P6 — Install scope flags
 
 - [x] T-27 `[software-engineer-python]` Ler `public_assets.py` — localizar `install()`, `_install_workspace_guardrail_pair`, loop de repos
-- [-] T-28 `[software-engineer-python]` Adicionar `scope: Literal["all","repos-only","workspace-only"] = "all"` a `FileSystemPublicAssetManager.install()`
-- [ ] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
+- [x] T-28 `[software-engineer-python]` Adicionar `scope: Literal["all","repos-only","workspace-only"] = "all"` a `FileSystemPublicAssetManager.install()`
+- [-] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
 - [ ] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
 - [ ] T-31 `[software-engineer-python]` Derivar e passar `scope` para `manager.install()`
 - [ ] T-32 `[software-engineer-python]` Adicionar testes para cada scope (all, repos-only, workspace-only, exclusividade)
