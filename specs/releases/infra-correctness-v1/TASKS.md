@@ -20,8 +20,8 @@
 
 - [x] T-05 `[ai-engineer]` Ler `check_agent_topology.py` — entender `SKILLS_DIR`, `AGENTS_DIR`, padrão `check_i*`
 - [x] T-06 `[ai-engineer]` Implementar `check_i6_skill_links(agents, errors)` — valida que `SKILLS_DIR / skill_name` existe
-- [-] T-07 `[ai-engineer]` Conectar `check_i6_skill_links` em `main()` após I5; adicionar linha de summary
-- [ ] T-08 `[ai-engineer]` Rodar `python scripts/check_agent_topology.py` — I6 passa para todos os agentes atuais
+- [x] T-07 `[ai-engineer]` Conectar `check_i6_skill_links` em `main()` após I5; adicionar linha de summary
+- [-] T-08 `[ai-engineer]` Rodar `python scripts/check_agent_topology.py` — I6 passa para todos os agentes atuais
 - [ ] T-09 `[ai-engineer]` Teste negativo manual: skill ref fictícia → I6 FAIL confirmado
 
 ---
@@ -50,8 +50,8 @@
 
 - [x] T-20 `[software-engineer-python]` Ler `workspace_resolver.py` — entender `resolve_workspace_root` e `_SENTINEL`
 - [x] T-21 `[software-engineer-python]` Adicionar `resolve_workspace_root_for_init(cwd)` em `workspace_resolver.py` (sentinel walk + fallback para cwd)
-- [-] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
-- [ ] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
+- [x] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
+- [-] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
 - [ ] T-24 `[software-engineer-python]` Adicionar import de `resolve_workspace_root_for_init` em `init.py`
 - [ ] T-25 `[software-engineer-python]` Escrever 2 unit tests em `test_workspace_resolver.py` (com sentinel; sem sentinel → retorna cwd)
 - [ ] T-26 `[software-engineer-python]` Rodar `pytest tests/unit/core/ -v`
