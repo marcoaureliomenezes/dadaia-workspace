@@ -124,7 +124,13 @@ class FakePublicAssetManager:
         (workspace_root / ".dadaia" / "agentic").mkdir(parents=True, exist_ok=True)
         return [str(workspace_root / ".dadaia" / "agentic")]
 
-    def install(self, workspace_root: Path, target: str = "all", force: bool = False) -> list[str]:
+    def install(
+        self,
+        workspace_root: Path,
+        target: str = "all",
+        force: bool = False,
+        scope: str = "all",
+    ) -> list[str]:
         self.installed.append((workspace_root, target, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
 
