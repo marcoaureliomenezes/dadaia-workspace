@@ -60,7 +60,7 @@
 
 ## P6 — Install scope flags
 
-- [ ] T-27 `[software-engineer-python]` Ler `public_assets.py` — localizar `install()`, `_install_workspace_guardrail_pair`, loop de repos
+- [-] T-27 `[software-engineer-python]` Ler `public_assets.py` — localizar `install()`, `_install_workspace_guardrail_pair`, loop de repos
 - [ ] T-28 `[software-engineer-python]` Adicionar `scope: Literal["all","repos-only","workspace-only"] = "all"` a `FileSystemPublicAssetManager.install()`
 - [ ] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
 - [ ] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
