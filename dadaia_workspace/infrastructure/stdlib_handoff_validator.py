@@ -44,6 +44,7 @@ from dadaia_workspace.core.exceptions import HandoffSchemaError, HandoffValidati
 SUPPORTED_KEYWORDS: frozenset[str] = frozenset(
     {
         "$schema",
+        "$id",
         "type",
         "required",
         "enum",

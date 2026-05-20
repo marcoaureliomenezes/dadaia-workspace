@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json as _json
+import os
 from pathlib import Path
 
 import typer
@@ -16,6 +17,74 @@ from dadaia_workspace.features.reports_validation.service import ValidationResul
 app = typer.Typer(help="Inspect and validate agent handoff reports.")
 console = Console()
 err_console = Console(stderr=True)
+
+# Maximum HTML file size (bytes) before flagging as oversized
+_OVERSIZED_THRESHOLD_BYTES = 30 * 1024  # 30 KB
+
+
+# ---------------------------------------------------------------------------
+# Version detection helpers (T-21)
+# ---------------------------------------------------------------------------
+
+
+def _detect_sidecar_version(doc: dict) -> str:
+    """Return '1.1' if doc declares handoff-v1.1, else '1.0'."""
+    schema_version = doc.get("schema_version", "")
+    schema_id = doc.get("$id", "")
+    if schema_version == "handoff-v1.1" or "v1.1" in str(schema_id):
+        return "1.1"
+    return "1.0"
+
+
+def _check_v10_compat(path: Path, doc: dict) -> tuple[bool, list[str]]:
+    """Check a v1.0 sidecar for missing required v1.1 fields.
+
+    Returns:
+        (is_error, messages) — is_error=True triggers exit 1;
+        is_error=False means warnings only (exit 0).
+    """
+    messages: list[str] = []
+    is_error = False
+
+    # Missing findings[] entirely → hard error
+    if "findings" not in doc:
+        messages.append(
+            f"ERROR: Missing required field 'findings[]'. "
+            f"This sidecar appears to be v1.0 and is incompatible with v1.1."
+        )
+        is_error = True
+        return is_error, messages
+
+    # findings[] present but items missing detail_md or fix_recommendation → warning
+    findings = doc.get("findings", [])
+    if isinstance(findings, list):
+        for idx, finding in enumerate(findings):
+            if isinstance(finding, dict):
+                missing_subfields = []
+                if "detail_md" not in finding:
+                    missing_subfields.append("detail_md")
+                if "fix_recommendation" not in finding:
+                    missing_subfields.append("fix_recommendation")
+                if missing_subfields:
+                    messages.append(
+                        f"WARNING: findings[{idx}] missing "
+                        f"{' or '.join(repr(f) for f in missing_subfields)}. "
+                        f"Sidecar is v1.0-incomplete — consider upgrading to v1.1."
+                    )
+
+    # Missing scope or metrics → warning
+    missing_root = []
+    if "scope" not in doc:
+        missing_root.append("scope")
+    if "metrics" not in doc:
+        missing_root.append("metrics")
+    if missing_root:
+        messages.append(
+            f"WARNING: Missing {' or '.join(repr(f) for f in missing_root)} fields. "
+            f"Sidecar is v1.0-incomplete."
+        )
+
+    return is_error, messages
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +119,7 @@ def validate(
     \b
     Exit codes:
       0  All files valid (or violations found in non-strict mode)
-      1  One or more violations in strict mode
+      1  One or more violations in strict mode, or v1.0 sidecar missing findings[]
       2  One or more file paths not found
       3  Bad invocation (no paths and not --all) or workspace not initialized
 
@@ -83,19 +152,47 @@ def validate(
         )
         raise typer.Exit(3) from None
 
-    # Collect results
-    results: list[ValidationResult] = []
-
+    # Collect paths to validate
+    target_paths: list[Path] = []
     if all_:
-        results.extend(service.validate_all())
+        results_root = workspace_root / ".dadaia" / "reports"
+        target_paths = sorted(results_root.rglob("*.handoff.json")) if results_root.exists() else []
     elif paths:
-        # Check for missing files first
         missing = [p for p in paths if not p.exists()]
         if missing:
             for m in missing:
                 err_console.print(f"[red]Error:[/red] File not found: {m}")
             raise typer.Exit(2)
-        for p in paths:
+        target_paths = list(paths)
+
+    # Per-file: detect version and apply appropriate validation
+    results: list[ValidationResult] = []
+    compat_errors: list[str] = []  # v1.0 hard errors (missing findings[])
+    compat_warnings: list[tuple[Path, list[str]]] = []  # v1.0 soft warnings
+    has_v10_error = False
+
+    for p in target_paths:
+        try:
+            raw = p.read_text(encoding="utf-8")
+            doc = _json.loads(raw)
+        except (_json.JSONDecodeError, OSError):
+            # Let the schema validator handle structural issues
+            results.append(service.validate_file(p))
+            continue
+
+        version = _detect_sidecar_version(doc)
+        if version == "1.0":
+            is_error, messages = _check_v10_compat(p, doc)
+            if is_error:
+                has_v10_error = True
+                for msg in messages:
+                    compat_errors.append(f"{p}: {msg}")
+            elif messages:
+                compat_warnings.append((p, messages))
+            # Also run schema validation so errors are reported
+            results.append(service.validate_file(p))
+        else:
+            # v1.1: full schema validation
             results.append(service.validate_file(p))
 
     # Apply release filter if requested
@@ -103,7 +200,6 @@ def validate(
         filtered: list[ValidationResult] = []
         for r in results:
             if r.valid:
-                # Re-read to inspect release_id
                 try:
                     doc = _json.loads(r.path.read_text(encoding="utf-8"))
                     if doc.get("release_id") == release:
@@ -137,11 +233,113 @@ def validate(
                 console.print(f"[red]INVALID[/red] {r.path}")
                 for err in r.errors:
                     console.print(f"         [yellow]{err.field_path}[/yellow]: {err.message}")
+
+        # Print v1.0 compat errors
+        for msg in compat_errors:
+            err_console.print(f"[red]{msg}[/red]")
+
+        # Print v1.0 compat warnings
+        for warn_path, warn_msgs in compat_warnings:
+            for msg in warn_msgs:
+                console.print(f"[yellow]{warn_path}: {msg}[/yellow]")
+
         console.print(
             f"\nSummary: [green]{n_valid} valid[/green], [red]{n_invalid} invalid[/red] "
             f"(of {len(results)} files)"
         )
 
-    # Exit code logic
+    # Exit code logic: hard error if v1.0 missing findings[], or strict mode violations
+    if has_v10_error:
+        raise typer.Exit(1)
     if strict and n_invalid > 0:
         raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# lint subcommand (T-22)
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="lint")
+def lint(
+    directory: Path | None = typer.Argument(
+        default=None,
+        help="Directory to lint recursively. Defaults to .dadaia/reports/ in the workspace root.",
+    ),
+) -> None:
+    """Lint the reports directory for orphaned HTMLs, oversized files, and missing sidecar fields.
+
+    \b
+    Flags emitted:
+      ORPHAN: <path>              HTML file with no adjacent .handoff.json sidecar
+      OVERSIZED: <path> (<size>KB) HTML file larger than 30 KB
+      MISSING_FIELDS: <path>      Sidecar missing findings, scope, or metrics fields
+
+    \b
+    Exit code is always 0 (lint, not blocker). Summary printed at end.
+
+    \b
+    Examples:
+      dadaia reports lint
+      dadaia reports lint .dadaia/reports/
+      dadaia reports lint /path/to/reports/
+    """
+    workspace_root = resolve_workspace_root()
+
+    if directory is None:
+        directory = workspace_root / ".dadaia" / "reports"
+
+    if not directory.exists():
+        err_console.print(f"[yellow]Warning:[/yellow] Directory not found: {directory}")
+        raise typer.Exit(0)
+
+    flags: list[str] = []
+
+    for dirpath_str, _dirnames, filenames in os.walk(directory):
+        dirpath = Path(dirpath_str)
+        for filename in filenames:
+            filepath = dirpath / filename
+
+            # --- Check HTML files ---
+            if filename.lower().endswith(".html"):
+                # Check for orphaned HTML (no adjacent sidecar)
+                stem = filepath.stem
+                sidecar = dirpath / f"{stem}.handoff.json"
+                if not sidecar.exists():
+                    flags.append(f"ORPHAN: {filepath}")
+
+                # Check for oversized HTML
+                size_bytes = filepath.stat().st_size
+                if size_bytes > _OVERSIZED_THRESHOLD_BYTES:
+                    size_kb = size_bytes / 1024
+                    flags.append(f"OVERSIZED: {filepath} ({size_kb:.1f}KB)")
+
+            # --- Check sidecar JSON files ---
+            elif filename.lower().endswith(".handoff.json"):
+                try:
+                    raw = filepath.read_text(encoding="utf-8")
+                    doc = _json.loads(raw)
+                except (_json.JSONDecodeError, OSError):
+                    flags.append(f"MISSING_FIELDS: {filepath} (malformed JSON)")
+                    continue
+
+                missing_fields: list[str] = []
+                if "findings" not in doc:
+                    missing_fields.append("findings")
+                if "scope" not in doc:
+                    missing_fields.append("scope")
+                if "metrics" not in doc:
+                    missing_fields.append("metrics")
+
+                if missing_fields:
+                    fields_str = ", ".join(missing_fields)
+                    flags.append(f"MISSING_FIELDS: {filepath} (missing: {fields_str})")
+
+    if flags:
+        for flag in flags:
+            console.print(flag)
+        console.print(f"\n{len(flags)} issue(s) found.")
+    else:
+        console.print("OK: No issues found.")
+
+    raise typer.Exit(0)

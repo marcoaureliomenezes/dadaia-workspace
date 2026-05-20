@@ -16,7 +16,7 @@
   - **Done criterion:** `dadaia reports validate` accepts a v1.1 sidecar; schema file has `"$schema"` bumped to v1.1.
   - **Deps:** T-12
 
-- [-] **T-21** — Update `dadaia reports validate` CLI: accept v1.1, reject v1.0 with missing `detail_md` (warning) or missing `findings[]` (error).
+- [x] **T-21** — Update `dadaia reports validate` CLI: accept v1.1, reject v1.0 with missing `detail_md` (warning) or missing `findings[]` (error).
   - **Owner:** devops-engineer
   - **Write-allowlist:** `dadaia_workspace/cli/`, `dadaia_workspace/features/`
   - **Done criterion:** `dadaia reports validate <v1.0-sidecar>` exits non-zero with clear error message.
