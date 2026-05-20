@@ -91,7 +91,7 @@
 > Depende de: T-20 `[x]` (doctor com novos checks)
 
 - [x] **T-21** `qa-engineer` — Escrever `tests/integration/features/public/test_doctor_codex_checks.py`: AC7 (remoção artificial de workflow → doctor não-zero); AC8 (corrupção de TOML → doctor não-zero nomeando agente); AC9 (TOML ausente → doctor não reporta `[ok]`)
-- [ ] **T-22** `qa-engineer` — Verificar cobertura ≥ 80% para `runtime_transforms/` e `codex_agent_dispatcher.py`; ajustar testes se necessário
+- [x] **T-22** `qa-engineer` — Verificar cobertura ≥ 80% para `runtime_transforms/` e `codex_agent_dispatcher.py`; ajustar testes se necessário
 
 ---
 
@@ -99,12 +99,12 @@
 
 > Depende de: T-22 `[x]` (toda suite de testes pronta)
 
-- [ ] **T-23** `software-engineer-python` — Executar AC1: `find .claude -type f -print0 | xargs -0 sha256sum | sort > /tmp/post-codex.txt && diff /tmp/pre-codex.txt /tmp/post-codex.txt` → diff vazio
-- [ ] **T-24** `software-engineer-python` — Executar AC2: todos os 20 TOMLs parseáveis por `tomllib` sem exceção
-- [ ] **T-25** `software-engineer-python` — Executar AC3: `grep -rE '(^|[^a-zA-Z0-9_-])claude-' .codex/` → zero linhas
-- [ ] **T-26** `qa-engineer` — Executar AC4–AC6: `pytest -q tests/unit/features/agents/test_codex_dispatcher_*.py` → exit 0
-- [ ] **T-27** `qa-engineer` — Executar AC7–AC9: `pytest -q tests/integration/features/public/test_doctor_codex_checks.py` → exit 0
-- [ ] **T-28** `software-engineer-python` — Executar AC10: `dadaia specs doctor` → 0 errors / 0 warnings
+- [x] **T-23** `software-engineer-python` — Executar AC1: `find .claude -type f -print0 | xargs -0 sha256sum | sort > /tmp/post-codex.txt && diff /tmp/pre-codex.txt /tmp/post-codex.txt` → diff vazio
+- [x] **T-24** `software-engineer-python` — Executar AC2: todos os 20 TOMLs parseáveis por `tomllib` sem exceção
+- [x] **T-25** `software-engineer-python` — Executar AC3: `grep -rE '(^|[^a-zA-Z0-9_-])claude-' .codex/` → zero linhas
+- [x] **T-26** `qa-engineer` — Executar AC4–AC6: `pytest -q tests/unit/features/agents/test_codex_dispatcher_*.py` → exit 0
+- [x] **T-27** `qa-engineer` — Executar AC7–AC9: `pytest -q tests/integration/features/public/test_doctor_codex_checks.py` → exit 0
+- [x] **T-28** `software-engineer-python` — Executar AC10: `dadaia specs doctor` → 0 errors / 0 warnings
 
 ---
 
