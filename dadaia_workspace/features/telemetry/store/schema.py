@@ -1,7 +1,7 @@
 """SQLite schema migrations for the telemetry store.
 
-Uses PRAGMA user_version to track applied migrations linearly (1 → 5).
-Every migration step is idempotent: CREATE TABLE IF NOT EXISTS, etc.
+Uses PRAGMA user_version to track applied migrations linearly (1 → 6).
+Every migration step is idempotent: CREATE TABLE IF NOT EXISTS, DROP TABLE IF EXISTS, etc.
 
 Decision references:
     D-AM-08  — PRAGMA user_version + linear Python migrations
@@ -13,7 +13,7 @@ from __future__ import annotations
 import pathlib
 import sqlite3
 
-SCHEMA_VERSION: int = 5
+SCHEMA_VERSION: int = 6
 
 # ---------------------------------------------------------------------------
 # Individual migration SQL blocks — indexed by the version they produce.
@@ -109,12 +109,21 @@ _MIGRATION_5 = (
     ");\n"
 )
 
+_MIGRATION_6 = (
+    # Drop the DEAD tables created in migration 5 (replaced by canonical workflow
+    # reader in panel-r3). FK child (workflow_agents) must be dropped before parent
+    # (workflows) to satisfy referential integrity constraints.
+    "DROP TABLE IF EXISTS workflow_agents;\n"
+    "DROP TABLE IF EXISTS workflows;\n"
+)
+
 _MIGRATIONS: list[str] = [
     _MIGRATION_1,
     _MIGRATION_2,
     _MIGRATION_3,
     _MIGRATION_4,
     _MIGRATION_5,
+    _MIGRATION_6,
 ]
 
 

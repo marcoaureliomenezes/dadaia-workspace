@@ -12,8 +12,6 @@ from dadaia_workspace.features.telemetry.store.models import (
     Event,
     ReaderState,
     Session,
-    Workflow,
-    WorkflowAgent,
 )
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 
@@ -283,67 +281,20 @@ class TestEvent:
 
 
 # ---------------------------------------------------------------------------
-# Workflow
+# Migration 6 — dead table drop (T-12)
 # ---------------------------------------------------------------------------
 
 
-class TestWorkflow:
-    def test_upsert_and_list_workflows(self, dao: TelemetryDao) -> None:
-        wf = Workflow(
-            name="discovery-pipeline",
-            source_path=".claude/skills/discovery-pipeline/SKILL.md",
-            description="Orchestrates 4-agent parallel discovery pattern.",
-            apply_to="product-engineer",
-            discovered_at="2026-05-17T00:00:00Z",
-            last_seen_at="2026-05-17T00:00:00Z",
-        )
-        dao.upsert_workflow(wf)
-        workflows = dao.list_workflows()
-        assert len(workflows) == 1
-        assert workflows[0] == wf
-
-    def test_list_workflows_returns_dataclasses(self, dao: TelemetryDao) -> None:
-        dao.upsert_workflow(
-            Workflow(
-                name="some-skill",
-                source_path=".agents/skills/some-skill/SKILL.md",
-                description=None,
-                apply_to=None,
-                discovered_at="2026-05-17T00:00:00Z",
-                last_seen_at="2026-05-17T00:00:00Z",
+class TestMigration6:
+    def test_workflows_table_absent_after_migrations(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        apply_migrations(conn)
+        tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
             )
-        )
-        workflows = dao.list_workflows()
-        assert isinstance(workflows[0], Workflow)
-
-    def test_upsert_workflow_agent_link(self, dao: TelemetryDao) -> None:
-        # Need agent and workflow to satisfy FKs (foreign_keys=ON in schema).
-        # In test we use in-memory with migrations so FK is active only if
-        # the connection had PRAGMA foreign_keys=ON.  apply_migrations does
-        # not set it; we set it here for correctness.
-        dao._conn.execute("PRAGMA foreign_keys=ON")
-        agent = Agent(
-            name="se-agent",
-            provider="claude",
-            is_subagent=0,
-            first_seen_at="2026-05-01T00:00:00Z",
-            last_seen_at="2026-05-01T00:00:00Z",
-        )
-        dao.upsert_agent(agent)
-        wf = Workflow(
-            name="wf-link-test",
-            source_path=".claude/skills/wf-link-test/SKILL.md",
-            description=None,
-            apply_to=None,
-            discovered_at="2026-05-17T00:00:00Z",
-            last_seen_at="2026-05-17T00:00:00Z",
-        )
-        dao.upsert_workflow(wf)
-        link = WorkflowAgent(workflow_name="wf-link-test", agent_name="se-agent")
-        dao.upsert_workflow_agent(link)
-        row = dao._conn.execute(
-            "SELECT * FROM workflow_agents WHERE workflow_name = ?",
-            ("wf-link-test",),
-        ).fetchone()
-        assert row is not None
-        assert row["agent_name"] == "se-agent"
+        }
+        assert "workflows" not in tables
+        assert "workflow_agents" not in tables
