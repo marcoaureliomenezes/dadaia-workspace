@@ -76,12 +76,11 @@ nova passagem de discovery + grill-me + SPEC Aprovado pelo product-engineer.
 - foundation — Foundation spec workspace-level (owner: software-architect, contexto: `_archive/legacy-features/foundation/SPEC.md`)
 - security — Security spec workspace-level (owner: software-architect, contexto: `_archive/legacy-features/security/SPEC.md`)
 
-## Hotfixes pendentes
-
-- 2026-05-17T064915Z MEDIUM spec-context — sessions share global primary_context.json, no DADAIA_CONTEXT auto-export (post-mortem: .dadaia/reports/dadaia-workspace/software-engineer/2026-05-17T064915Z-spec-context-isolation-rca.html)
-- 2026-05-17T000000Z MEDIUM import — BUG-003: `dadaia import` não detecta nem reescreve paths absolutos em arquivos não-lib-originated (ex.: hooks em `.claude/settings.json`) apontando para fora do novo `workspace_root`; próximo import em outra máquina pode reintroduzir hooks VPS. (post-mortem: `specs/z_bug_specs.md` — discovery source `agent-comms-v1`)
-
 ## Histórico (candidatas promovidas a release)
+
+<!-- Hotfixes migrados em 2026-05-20 — monitorados via specs/z_bug_specs.md -->
+<!-- spec-context — sessions share global primary_context.json, no DADAIA_CONTEXT auto-export (2026-05-17T064915Z) -->
+<!-- import BUG-003 — paths absolutos não reescritos em import (2026-05-17T000000Z) -->
 
 - sdd-release-lifecycle → release `sdd-release-lifecycle-v1` (promovido em 2026-05-16; source SPEC em `_archive/legacy-features/sdd-release-lifecycle/SPEC.md`)
 - sdd-hotfix-track → release `sdd-hotfix-track-v1` (promovido em 2026-05-16, encerrado em 2026-05-16; contexto: `.claude/plans/devemos-melhorar-o-streamed-snail.md`; SPEC final em `_archive/releases/sdd-hotfix-track-v1/SPEC.md`)
