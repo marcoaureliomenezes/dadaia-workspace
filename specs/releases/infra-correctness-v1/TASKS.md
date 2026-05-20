@@ -53,8 +53,8 @@
 - [x] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
 - [x] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
 - [x] T-24 `[software-engineer-python]` Adicionar import de `resolve_workspace_root_for_init` em `init.py`
-- [-] T-25 `[software-engineer-python]` Escrever 2 unit tests em `test_workspace_resolver.py` (com sentinel; sem sentinel → retorna cwd)
-- [ ] T-26 `[software-engineer-python]` Rodar `pytest tests/unit/core/ -v`
+- [x] T-25 `[software-engineer-python]` Escrever 2 unit tests em `test_workspace_resolver.py` (com sentinel; sem sentinel → retorna cwd)
+- [x] T-26 `[software-engineer-python]` Rodar `pytest tests/unit/core/ -v`
 
 ---
 
