@@ -135,10 +135,9 @@ def validate(
         err_console.print("[red]Error:[/red] provide one or more PATHS or use [bold]--all[/bold].")
         raise typer.Exit(3)
 
-    workspace_root = resolve_workspace_root()
-
     # Build service — schema must be staged
     try:
+        workspace_root = resolve_workspace_root()
         service = container.build_reports_validation_service(workspace_root)
     except HandoffSchemaError as exc:
         err_console.print(
