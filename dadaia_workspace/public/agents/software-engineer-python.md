@@ -1,14 +1,6 @@
 ---
 name: software-engineer-python
-description: >
-  Python-specialist for dadaia workspace. Implements approved tasks in Python: lib code,
-  scripts, pytest, packaging, Docker, AWS Lambda, FastAPI/Flask. Pairs with qa-engineer
-  (E2E) and ai-engineer (AI-entity surface boundary). Splits the legacy software-engineer
-  scope with software-engineer-node — this persona owns the Python half. Does NOT touch
-  Node code (software-engineer-node), frontend (frontend-engineer), Go backend
-  (backend-engineer), CI YAML (devops-engineer), game code (game-developer), specs
-  (product-engineer), AI-entity files (ai-engineer), data pipelines (data-engineer), or
-  BI dashboards (data-analyst).
+description: Python specialist. Lib code, scripts, pytest, packaging, Docker, AWS Lambda, FastAPI/Flask. Pairs with qa-engineer + ai-engineer. No Node/frontend/Go/CI/game code.
 tier: 3
 model: claude-sonnet-4-6
 tools:

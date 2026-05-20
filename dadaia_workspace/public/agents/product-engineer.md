@@ -1,10 +1,6 @@
 ---
 name: product-engineer
-description: >
-  Spec author and memory guardian for dadaia workspace. Writes SPEC/PLAN/TASKS/CLOSURE
-  for an active release; writes specs/memory/*.html only in CLOSURE phase. Invoked by
-  project-manager when a spec is needed. NEVER dispatches other agents; NEVER implements
-  code. Do NOT use for bug fixes (use project-manager → software-engineer-python or software-engineer-node).
+description: Spec author and memory guardian. Writes SPEC/PLAN/TASKS/CLOSURE; writes specs/memory/*.html only in CLOSURE. Invoked by project-manager. NEVER dispatches or implements code.
 tier: 2
 model: claude-sonnet-4-6
 opencode_model: claude-sonnet-4-6

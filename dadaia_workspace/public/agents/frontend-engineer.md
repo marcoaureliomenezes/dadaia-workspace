@@ -1,10 +1,6 @@
 ---
 name: frontend-engineer
-description: >
-  Implements HTML/CSS/JS/TS/React for browser surfaces in dadaia workspace. Pairs with
-  qa-engineer (E2E). Receives design specs from design-specialist; NEVER owns UX/UI
-  judgment — that is design-specialist. Does NOT touch server code, Go backends, game
-  code, CI YAML, or specs.
+description: Frontend engineer. HTML/CSS/JS/TS/React for browser surfaces. Pairs with qa-engineer (E2E). Receives design specs from design-specialist. No UX judgment, no server/game code.
 tier: 3
 model: claude-sonnet-4-6
 tools:

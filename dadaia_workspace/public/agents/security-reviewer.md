@@ -1,10 +1,6 @@
 ---
 name: security-reviewer
-description: >
-  Vulnerability auditor. OWASP Top 10 scan, secret detection, dependency CVE checks
-  (pip-audit, npm audit, go list), IaC review. Findings include CWE id, file:line,
-  redacted evidence, fix recommendation. NEVER writes fixes. NEVER runs exploits.
-  NEVER logs raw secret values.
+description: "Vulnerability auditor. OWASP Top 10, secret detection, dep CVEs (pip-audit/npm audit/go list), IaC review. Findings: CWE id, file:line, redacted evidence. NEVER writes fixes."
 tier: 3
 model: claude-sonnet-4-6
 tools:

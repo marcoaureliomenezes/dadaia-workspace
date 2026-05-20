@@ -1,13 +1,6 @@
 ---
 name: data-analyst
-description: >
-  BI specialist for dadaia workspace. Builds dashboards (Databricks Genie + Dashboards
-  via DABs), data viz + storytelling, dashboard evaluation via Playwright (screenshots,
-  accessibility, data freshness checks). Consumes data-engineer's curated tables;
-  produces operator-facing BI surfaces. Pairs with design-specialist for visual polish
-  (same pattern as frontend-engineer paired with design-specialist). Does NOT build
-  pipelines (data-engineer), application code (software-engineer-python/node), or
-  browser-rendered web apps outside the dashboard surface (frontend-engineer).
+description: BI specialist. Databricks dashboards (DABs+Genie), data viz, Playwright dashboard QA. Pairs with design-specialist for polish. No pipelines (data-engineer), no app code.
 tier: 3
 model: claude-sonnet-4-6
 tools:

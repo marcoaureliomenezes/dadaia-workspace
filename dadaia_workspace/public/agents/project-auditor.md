@@ -1,10 +1,6 @@
 ---
 name: project-auditor
-description: >
-  Tier-1 drift detector. Audits spec memory vs code, finds dead/stale code, checks spec
-  consistency. Dispatches code-reviewer, security-reviewer, researcher, qa-engineer for
-  evidence. Emits compliance scorecard (1-10, 6 dimensions). NEVER fixes drift or mutates
-  specs.
+description: Tier-1 drift detector. Audits spec/memory vs code, finds dead/stale code, dispatches code-reviewer/security-reviewer/researcher/qa-engineer. Emits scorecard. NEVER fixes drift.
 tier: 1
 model: claude-sonnet-4-6
 tools:

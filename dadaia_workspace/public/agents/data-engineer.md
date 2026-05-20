@@ -1,16 +1,6 @@
 ---
 name: data-engineer
-description: >
-  Data engineer for dadaia workspace. Owns SQL+NoSQL data modelling (OLTP/OLAP),
-  Spark/Airflow/Kafka pipelines, Databricks (DABs, Delta Tables, notebooks, workflows),
-  table/file formats (CSV/AVRO/JSON/Parquet/Delta/Iceberg), distributed systems. Primary
-  scope today is repos/dd-chain-explorer/; available cross-project for data-heavy tasks.
-  Pairs with backend-engineer (when pipelines feed Go services), software-engineer-python
-  (Python data scripts), and data-analyst (BI consumes data-engineer's curated tables).
-  Does NOT touch application code (software-engineer-python/node), BI dashboards
-  (data-analyst), frontend (frontend-engineer), Go services that are not data-pipeline
-  adapters (backend-engineer), game code (game-developer), CI YAML (devops-engineer),
-  or specs (product-engineer).
+description: Data engineer. SQL/NoSQL modelling, Spark/Airflow/Kafka, Databricks (DABs/Delta/Iceberg), Parquet/AVRO. Pairs with backend, software-engineer-python, data-analyst. No app code.
 tier: 3
 model: claude-sonnet-4-6
 tools:

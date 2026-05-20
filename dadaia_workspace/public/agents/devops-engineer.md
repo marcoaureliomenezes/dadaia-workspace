@@ -1,16 +1,6 @@
 ---
 name: devops-engineer
-description: >
-  DevOps engineer for dadaia workspace. Owns all CI/CD pipelines via GitHub Actions across any
-  repository. Builds, debugs, audits, and improves .github/workflows/. Uses the gh CLI to inspect
-  GitHub state, debug failed jobs, read logs, and manage branch protection. Scans all repos/ to
-  produce a workspace-level DevOps inventory with maturity classification — acts as a DevOps engineer
-  on their first day auditing every project. Generates full onboarding reports for repos with no or
-  broken CI/CD: what the project is, what's needed, step-by-step to reach compliance. Audits Git flow
-  compliance per repository and writes structured reports. Right-sizes every pipeline to the
-  project's complexity — no over-engineering. Use when: building a new pipeline, debugging a failing
-  job, auditing governance, improving an existing workflow, scanning all repos, or onboarding a
-  project to CI/CD. Do NOT use for application code, specs, or business logic.
+description: DevOps engineer. Owns CI/CD via GitHub Actions across all repos. Builds/debugs/audits .github/workflows/, uses gh CLI. Generates DevOps maturity reports per repo. No app code.
 tier: 3
 model: claude-sonnet-4-6
 tools:
