@@ -42,6 +42,24 @@ from typing import Any
 
 from dadaia_workspace.features.panel.auth import validate as _validate_bearer
 
+# ---------------------------------------------------------------------------
+# CSP script-src SHA-256 hashes (T-14..T-17).
+# These must exactly match the inline <script> content in index.py / wrapper.py.
+# Recompute with:
+#   import hashlib, base64
+#   base64.b64encode(hashlib.sha256(content.encode()).digest()).decode()
+# ---------------------------------------------------------------------------
+# Theme-switcher snippet (used in index.py and wrapper.py):
+#   (function(){var t=localStorage.getItem('dadaia-panel-theme');
+#    if(t&&(t==='mint'||t==='sage'||t==='warm')){
+#    document.documentElement.dataset.theme=t;}})();
+_CSP_SCRIPT_HASH_1 = "'sha256-GRTndW6m1zCm5uxB5kEDoOXw05c1c9MDdem3TFqSMfQ='"
+# Runtime-switcher snippet (used in index.py only):
+#   (function(){var r=localStorage.getItem('dadaia-panel-runtime');
+#    if(r&&(r==='claude'||r==='codex')){
+#    document.documentElement.dataset.runtime=r;}})();
+_CSP_SCRIPT_HASH_2 = "'sha256-u9QKVWf5nJ6CpgKA7eHqzt+KvUm6M4dcZhYWRxJuAbA='"
+
 _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/servers /api/contexts "
@@ -389,7 +407,11 @@ def make_handler_class(
             if content_type.startswith("text/html"):
                 self.send_header(
                     "Content-Security-Policy",
-                    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
+                    (
+                        "default-src 'self'; "
+                        f"script-src 'self' {_CSP_SCRIPT_HASH_1} {_CSP_SCRIPT_HASH_2}; "
+                        "style-src 'self' 'unsafe-inline'"
+                    ),
                 )
             if content_type.startswith("application/json"):
                 self.send_header("X-Content-Type-Options", "nosniff")
