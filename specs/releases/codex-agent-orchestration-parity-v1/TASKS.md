@@ -31,11 +31,11 @@
 
 > Depende de: T-03 `[x]`
 
-- [-] **T-04** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/runtime_transforms/__init__.py` (módulo vazio)
-- [-] **T-05** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py` com `MODEL_MAP` (3 entradas de ADR-5) e `map_model(claude_id: str) -> str` que lança `ValueError` em identifier desconhecido (FR5 / ADR-5)
-- [-] **T-06** `software-engineer-python` — Escrever `tests/unit/infrastructure/runtime_transforms/test_model_mapping.py`: testa `claude-sonnet-4-6→gpt-5.3-codex`, `claude-haiku-4-5-20251001→gpt-5.4-mini`, `claude-opus-4-7→gpt-5.5`, e `ValueError` em identifier inválido
-- [-] **T-07** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/runtime_transforms/codex.py` com `transform_for_codex(canonical_body: str, agent_id: str) -> str` implementando as substituições de ADR-2: `Agent tool` → `subagent`; remoção de hooks Claude-específicos; preservação verbatim do restante (FR2 / ADR-2)
-- [-] **T-08** `software-engineer-python` — Escrever `tests/unit/infrastructure/runtime_transforms/test_codex_transform.py`: golden tests para `project-manager` (substituição Agent tool), `project-auditor` (idem), agente genérico sem Agent tool (output verbatim), e output não-vazio para todos os 20 agentes
+- [x] **T-04** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/runtime_transforms/__init__.py` (módulo vazio)
+- [x] **T-05** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py` com `MODEL_MAP` (3 entradas de ADR-5) e `map_model(claude_id: str) -> str` que lança `ValueError` em identifier desconhecido (FR5 / ADR-5)
+- [x] **T-06** `software-engineer-python` — Escrever `tests/unit/infrastructure/runtime_transforms/test_model_mapping.py`: testa `claude-sonnet-4-6→gpt-5.3-codex`, `claude-haiku-4-5-20251001→gpt-5.4-mini`, `claude-opus-4-7→gpt-5.5`, e `ValueError` em identifier inválido
+- [x] **T-07** `software-engineer-python` — Criar `dadaia_workspace/infrastructure/runtime_transforms/codex.py` com `transform_for_codex(canonical_body: str, agent_id: str) -> str` implementando as substituições de ADR-2: `Agent tool` → `subagent`; remoção de hooks Claude-específicos; preservação verbatim do restante (FR2 / ADR-2)
+- [x] **T-08** `software-engineer-python` — Escrever `tests/unit/infrastructure/runtime_transforms/test_codex_transform.py`: golden tests para `project-manager` (substituição Agent tool), `project-auditor` (idem), agente genérico sem Agent tool (output verbatim), e output não-vazio para todos os 20 agentes
 
 ---
 
