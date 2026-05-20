@@ -29,8 +29,8 @@
 ## P3 — SQLite workflows drop
 
 - [x] T-10 `[software-engineer-python]` Ler `schema.py` — confirmar `SCHEMA_VERSION=5`, `# DEAD:` nas tabelas
-- [-] T-11 `[software-engineer-python]` Incrementar `SCHEMA_VERSION = 6`; adicionar migration 6 (`DROP TABLE IF EXISTS workflow_agents; DROP TABLE IF EXISTS workflows;`)
-- [ ] T-12 `[software-engineer-python]` Adicionar teste de migration 6: aplicar sobre banco com migration 5; verificar tabelas ausentes
+- [x] T-11 `[software-engineer-python]` Incrementar `SCHEMA_VERSION = 6`; adicionar migration 6 (`DROP TABLE IF EXISTS workflow_agents; DROP TABLE IF EXISTS workflows;`)
+- [-] T-12 `[software-engineer-python]` Adicionar teste de migration 6: aplicar sobre banco com migration 5; verificar tabelas ausentes
 - [ ] T-13 `[software-engineer-python]` Rodar `pytest` nos testes de telemetry — sem regressão
 
 ---
@@ -51,9 +51,9 @@
 - [x] T-20 `[software-engineer-python]` Ler `workspace_resolver.py` — entender `resolve_workspace_root` e `_SENTINEL`
 - [x] T-21 `[software-engineer-python]` Adicionar `resolve_workspace_root_for_init(cwd)` em `workspace_resolver.py` (sentinel walk + fallback para cwd)
 - [x] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
-- [-] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
-- [ ] T-24 `[software-engineer-python]` Adicionar import de `resolve_workspace_root_for_init` em `init.py`
-- [ ] T-25 `[software-engineer-python]` Escrever 2 unit tests em `test_workspace_resolver.py` (com sentinel; sem sentinel → retorna cwd)
+- [x] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
+- [x] T-24 `[software-engineer-python]` Adicionar import de `resolve_workspace_root_for_init` em `init.py`
+- [-] T-25 `[software-engineer-python]` Escrever 2 unit tests em `test_workspace_resolver.py` (com sentinel; sem sentinel → retorna cwd)
 - [ ] T-26 `[software-engineer-python]` Rodar `pytest tests/unit/core/ -v`
 
 ---
@@ -63,8 +63,8 @@
 - [x] T-27 `[software-engineer-python]` Ler `public_assets.py` — localizar `install()`, `_install_workspace_guardrail_pair`, loop de repos
 - [x] T-28 `[software-engineer-python]` Adicionar `scope: Literal["all","repos-only","workspace-only"] = "all"` a `FileSystemPublicAssetManager.install()`
 - [x] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
-- [-] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
-- [ ] T-31 `[software-engineer-python]` Derivar e passar `scope` para `manager.install()`
+- [x] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
+- [-] T-31 `[software-engineer-python]` Derivar e passar `scope` para `manager.install()`
 - [ ] T-32 `[software-engineer-python]` Adicionar testes para cada scope (all, repos-only, workspace-only, exclusividade)
 - [ ] T-33 `[software-engineer-python]` Rodar `pytest tests/integration/` relacionados a `dadaia public install`
 
