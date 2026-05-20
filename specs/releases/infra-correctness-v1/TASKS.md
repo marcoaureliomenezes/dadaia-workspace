@@ -28,7 +28,7 @@
 
 ## P3 — SQLite workflows drop
 
-- [ ] T-10 `[software-engineer-python]` Ler `schema.py` — confirmar `SCHEMA_VERSION=5`, `# DEAD:` nas tabelas
+- [-] T-10 `[software-engineer-python]` Ler `schema.py` — confirmar `SCHEMA_VERSION=5`, `# DEAD:` nas tabelas
 - [ ] T-11 `[software-engineer-python]` Incrementar `SCHEMA_VERSION = 6`; adicionar migration 6 (`DROP TABLE IF EXISTS workflow_agents; DROP TABLE IF EXISTS workflows;`)
 - [ ] T-12 `[software-engineer-python]` Adicionar teste de migration 6: aplicar sobre banco com migration 5; verificar tabelas ausentes
 - [ ] T-13 `[software-engineer-python]` Rodar `pytest` nos testes de telemetry — sem regressão
@@ -41,8 +41,8 @@
 - [x] T-15 `[software-engineer-python]` Computar SHA-256 base64 de cada script distinto
 - [x] T-16 `[software-engineer-python]` Editar `handler.py:392` — substituir `'unsafe-inline'` em `script-src` pelos tokens `'sha256-<hash>'`
 - [x] T-17 `[software-engineer-python]` Adicionar constantes `_CSP_SCRIPT_HASH_*` nomeadas em `handler.py`
-- [-] T-18 `[software-engineer-python]` Adicionar/estender teste unitário: `script-src` sem `unsafe-inline`, com pelo menos um token `sha256-`
-- [ ] T-19 `[software-engineer-python]` Rodar `pytest tests/unit/features/panel/ -v`
+- [x] T-18 `[software-engineer-python]` Adicionar/estender teste unitário: `script-src` sem `unsafe-inline`, com pelo menos um token `sha256-`
+- [x] T-19 `[software-engineer-python]` Rodar `pytest tests/unit/features/panel/ -v`
 
 ---
 
