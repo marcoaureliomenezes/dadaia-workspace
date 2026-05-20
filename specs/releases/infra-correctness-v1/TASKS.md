@@ -72,7 +72,7 @@
 
 ## P7 — Coverage lift  *(após P6)*
 
-- [ ] T-34 `[software-engineer-python]` **Passo 0:** Rodar `pytest --cov=dadaia_workspace/infrastructure/public_assets --cov-report=term-missing` — capturar linhas não cobertas
+- [-] T-34 `[software-engineer-python]` **Passo 0:** Rodar `pytest --cov=dadaia_workspace/infrastructure/public_assets --cov-report=term-missing` — capturar linhas não cobertas
 - [ ] T-35 `[software-engineer-python]` Criar `tests/unit/infrastructure/__init__.py` se ausente
 - [ ] T-36 `[software-engineer-python]` Criar `tests/unit/infrastructure/test_public_assets.py`
 - [ ] T-37 `[software-engineer-python]` Escrever testes para `doctor()` happy path + D-CX-1..5 drift checks
