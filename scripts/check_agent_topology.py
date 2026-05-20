@@ -48,7 +48,8 @@ except ImportError as exc:  # pragma: no cover - env-dependent
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = REPO_ROOT / "dadaia_workspace" / "public"
 AGENTS_DIR = PUBLIC / "agents"
-DAM_SKILL = PUBLIC / "skills" / "project-orchestration" / "SKILL.md"
+SKILLS_DIR = PUBLIC / "skills"
+DAM_SKILL = SKILLS_DIR / "project-orchestration" / "SKILL.md"
 
 EXPECTED_AGENT_COUNT = 20
 
@@ -228,6 +229,24 @@ def check_i5_no_bare_se(errors: list[str]) -> None:
         )
 
 
+def check_i6_skill_links(agents: dict[str, dict], errors: list[str]) -> None:
+    """I6: Every skill name in each agent's frontmatter skills: list must
+    resolve to an existing directory under dadaia_workspace/public/skills/.
+    """
+    for stem, fm in agents.items():
+        skills = fm.get("skills", [])
+        if not isinstance(skills, list):
+            errors.append(f"I6 FAIL: {stem}: 'skills' frontmatter is not a list")
+            continue
+        for skill_name in skills:
+            skill_dir = SKILLS_DIR / skill_name
+            if not skill_dir.is_dir():
+                errors.append(
+                    f"I6 FAIL: {stem}: skill ref {skill_name!r} not found"
+                    f" (expected {skill_dir})"
+                )
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -240,6 +259,7 @@ def main() -> int:
     check_i3_dispatchers_name_leaves(by_stem, errors)
     check_i4_dam_rows(errors)
     check_i5_no_bare_se(errors)
+    check_i6_skill_links(by_stem, errors)
 
     if errors:
         print("AGENT TOPOLOGY DRIFT DETECTED")
@@ -256,6 +276,7 @@ def main() -> int:
     print(f"  I3: PM + auditor reference {len(by_stem) - len(T1) - len(T2)} T3 leaves")
     print(f"  I4: DAM contains {len(REQUIRED_DAM_ROWS)} required rows")
     print(f"  I5: no bare software-engineer references")
+    print(f"  I6: {len(by_stem)} agents x skill refs validated")
     return 0
 
 
