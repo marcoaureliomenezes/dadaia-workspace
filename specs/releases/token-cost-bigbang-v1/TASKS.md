@@ -44,7 +44,7 @@
   - **Done criterion:** No agent has `description:` length > 200 chars (verified via script).
   - **Deps:** T-30
 
-- [ ] **T-32** — Template extraction: for every agent body > 350 lines, extract report templates to `docs/agent-knowledge/<agent>/templates/*.md`. Agent body keeps a one-liner pointer.
+- [-] **T-32** — Template extraction: for every agent body > 350 lines, extract report templates to `docs/agent-knowledge/<agent>/templates/*.md`. Agent body keeps a one-liner pointer.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/agents/`, `docs/agent-knowledge/`
   - **Done criterion:** No agent body > 350 lines after extraction; affected agents reference `docs/agent-knowledge/<agent>/templates/` via one-liner.
