@@ -44,49 +44,49 @@
   - **Done criterion:** No agent has `description:` length > 200 chars (verified via script).
   - **Deps:** T-30
 
-- [-] **T-32** — Template extraction: for every agent body > 350 lines, extract report templates to `docs/agent-knowledge/<agent>/templates/*.md`. Agent body keeps a one-liner pointer.
+- [x] **T-32** — Template extraction: for every agent body > 350 lines, extract report templates to `docs/agent-knowledge/<agent>/templates/*.md`. Agent body keeps a one-liner pointer.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/agents/`, `docs/agent-knowledge/`
   - **Done criterion:** No agent body > 350 lines after extraction; affected agents reference `docs/agent-knowledge/<agent>/templates/` via one-liner.
   - **Deps:** T-31
 
-- [ ] **T-33** — Shared workspace-protocol: create `dadaia_workspace/public/rules/workspace-protocol.md` containing SDD gate + context discovery + task lifecycle + report path. Factor out from each agent body.
+- [x] **T-33** — Shared workspace-protocol: create `dadaia_workspace/public/rules/workspace-protocol.md` containing SDD gate + context discovery + task lifecycle + report path. Factor out from each agent body.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/rules/`, `dadaia_workspace/public/agents/`
   - **Done criterion:** New `workspace-protocol.md` exists; each agent body references it instead of duplicating the protocol inline.
   - **Deps:** T-32
 
-- [ ] **T-34** — Skill Tier-A/B split: migrate 22 Tier-B `SKILL.md` files to `docs/agent-knowledge/<agent>/<topic>.md`. Update owning agent body with new reference BEFORE deleting the `SKILL.md` source.
+- [x] **T-34** — Skill Tier-A/B split: migrate 22 Tier-B `SKILL.md` files to `docs/agent-knowledge/<agent>/<topic>.md`. Update owning agent body with new reference BEFORE deleting the `SKILL.md` source.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/skills/`, `docs/agent-knowledge/`, `dadaia_workspace/public/agents/`
   - **Done criterion:** 11 Tier-A skills remain in `public/skills/`; 22 Tier-B skills live under `docs/agent-knowledge/<agent>/`; owning agents updated.
   - **Deps:** T-33
 
-- [ ] **T-35** — Legacy `software-engineer` sweep: `grep -rl 'subagent_type.*software-engineer\b' dadaia_workspace/public/ .claude/` → rewrite each occurrence to `-python` or `-node` per call site. Add lint rule in `dadaia public doctor` rejecting the legacy alias.
+- [x] **T-35** — Legacy `software-engineer` sweep: `grep -rl 'subagent_type.*software-engineer\b' dadaia_workspace/public/ .claude/` → rewrite each occurrence to `-python` or `-node` per call site. Add lint rule in `dadaia public doctor` rejecting the legacy alias.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/`, `.claude/`
   - **Done criterion:** `grep -r 'subagent_type: software-engineer\b' dadaia_workspace/public/ .claude/` returns zero results; `dadaia public doctor` flags any reintroduction.
   - **Deps:** T-34
 
-- [ ] **T-36** — Sidecar-first contract: rewrite every agent prompt so emission default is JSON sidecar v1.1 only. HTML emission requires explicit `--with-report` flag in dispatch prompt OR `next_handoff.agent == "human"`.
+- [x] **T-36** — Sidecar-first contract: rewrite every agent prompt so emission default is JSON sidecar v1.1 only. HTML emission requires explicit `--with-report` flag in dispatch prompt OR `next_handoff.agent == "human"`.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/agents/`
   - **Done criterion:** All 20 agents updated with sidecar-first emission language; 5 spot-checked dispatches confirm no surprise HTML.
   - **Deps:** T-20, T-35
 
-- [ ] **T-37** — Dispatch-to-researcher playbooks: update `project-orchestration` SKILL.md with parallel-researcher fan-out pattern. Add standing instruction to `software-architect`, `project-auditor`, `code-reviewer`, `security-reviewer`, `devops-engineer` to dispatch researcher for evidence harvest.
+- [x] **T-37** — Dispatch-to-researcher playbooks: update `project-orchestration` SKILL.md with parallel-researcher fan-out pattern. Add standing instruction to `software-architect`, `project-auditor`, `code-reviewer`, `security-reviewer`, `devops-engineer` to dispatch researcher for evidence harvest.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/skills/`, `dadaia_workspace/public/agents/`
   - **Done criterion:** `project-orchestration/SKILL.md` documents fan-out pattern; 5 listed agents carry the standing instruction in body.
   - **Deps:** T-36
 
-- [ ] **T-38** — Operator-facing report logic: codify in `project-manager` dispatcher playbook the question "HTML or sidecar?" before emitting. If report > 30 KB, agent splits into multi-HTML with `index.html`.
+- [x] **T-38** — Operator-facing report logic: codify in `project-manager` dispatcher playbook the question "HTML or sidecar?" before emitting. If report > 30 KB, agent splits into multi-HTML with `index.html`.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/agents/`
   - **Done criterion:** `project-manager.md` body contains the HTML/sidecar prompt + multi-HTML split rule; spot-check confirms dispatcher asks before emitting.
   - **Deps:** T-37
 
-- [ ] **T-39** — D-20 enforcement (frontend-design plugin scope): (a) create `dadaia_workspace/public/rules/plugin-scope.md` with `[PLUGIN SCOPE ERROR]` refusal pattern mirroring `game-developer-scope.md`; (b) add allow-list line to `frontend-engineer.md` and `design-specialist.md` body declaring `Plugins authorised: frontend-design, playwright (this agent only — see plugin-scope rule).`; (c) request devops-engineer to stage + install + verify via `dadaia public doctor` green.
+- [x] **T-39** — D-20 enforcement (frontend-design plugin scope): (a) create `dadaia_workspace/public/rules/plugin-scope.md` with `[PLUGIN SCOPE ERROR]` refusal pattern mirroring `game-developer-scope.md`; (b) add allow-list line to `frontend-engineer.md` and `design-specialist.md` body declaring `Plugins authorised: frontend-design, playwright (this agent only — see plugin-scope rule).`; (c) request devops-engineer to stage + install + verify via `dadaia public doctor` green.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/rules/`, `dadaia_workspace/public/agents/`
   - **Done criterion:** `plugin-scope.md` exists with refusal pattern; both authorised agents carry allow-list line; doctor green after install.
@@ -96,7 +96,7 @@
 
 ## P2-D — Workflows + projection (devops-engineer + product-engineer)
 
-- [ ] **T-40** — Workflows YAML: update all 7 workflow files. Each stage declares `consumes: [path-to-upstream-sidecar.json]` (not HTML). The 4 read-heavy workflows (`audit-cycle`, `code-review-fan-out`, `cross-cutting-feature`, `spec-refinement`) get dispatch-to-researcher injected.
+- [-] **T-40** — Workflows YAML: update all 7 workflow files. Each stage declares `consumes: [path-to-upstream-sidecar.json]` (not HTML). The 4 read-heavy workflows (`audit-cycle`, `code-review-fan-out`, `cross-cutting-feature`, `spec-refinement`) get dispatch-to-researcher injected.
   - **Owner:** devops-engineer
   - **Write-allowlist:** `dadaia_workspace/public/workflows/`
   - **Done criterion:** All 7 workflows declare `consumes:` with sidecar paths; 4 read-heavy workflows carry dispatch-to-researcher stages.
