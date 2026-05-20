@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import re
 import shutil
 import sys
+import tomllib
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -670,8 +672,172 @@ class FileSystemPublicAssetManager:
 
         reports.extend(self._classify_workflows(agentic_dir))
         reports.extend(self._lint_legacy_software_engineer())
+        reports.extend(self._check_codex_drift(agentic_dir, workspace_root))
 
         return reports
+
+    # ------------------------------------------------------------------
+    # Codex drift checks (D-CX-1 … D-CX-5)
+    # ------------------------------------------------------------------
+
+    # Matches the bare identifier `claude-` only when it is NOT immediately
+    # preceded by an alphanumeric character, hyphen, or underscore.  This
+    # avoids false positives inside words like `config_claude_sonnet` while
+    # still catching standalone references such as `claude-sonnet-4-6`.
+    _CODEX_CLAUDE_RE: re.Pattern[str] = re.compile(
+        r"(?:^|[^a-zA-Z0-9_-])claude-", re.MULTILINE
+    )
+    # File extensions considered "text" for D-CX-4 scanning.
+    _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
+
+    def _check_codex_drift(self, agentic_dir: Path, workspace_root: Path) -> list[str]:
+        """Run codex-parity drift checks D-CX-1 through D-CX-5.
+
+        Returns a list of ``[missing]``, ``[extra]``, or ``[error]`` report
+        strings.  An empty list means no drift was detected.  The caller
+        extends the main doctor report with these strings so that ``any(r
+        .startswith(("[missing", "[extra", "[error")) for r in reports)``
+        reliably signals a non-zero exit.
+        """
+        codex_dir = workspace_root / ".codex"
+        out: list[str] = []
+        out.extend(self._dcx1_missing_toml(agentic_dir, codex_dir))
+        out.extend(self._dcx2_config_toml_entries(agentic_dir, codex_dir))
+        out.extend(self._dcx3_workflow_drift(agentic_dir, codex_dir))
+        out.extend(self._dcx4_claude_strings(codex_dir))
+        out.extend(self._dcx5_empty_developer_instructions(codex_dir))
+        return out
+
+    def _dcx1_missing_toml(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+        """D-CX-1: every canonical agent .md must have a matching TOML in .codex/agents/.
+
+        For each ``<agent-name>.md`` in the agentic agents directory the
+        corresponding ``.codex/agents/<agent-name>.toml`` must exist.  Uses
+        ``_parse_agent_frontmatter()`` to extract the canonical ``name`` field;
+        agents whose frontmatter lacks ``name`` are skipped (defensive — they
+        are already flagged by other checks).
+        """
+        agents_src = agentic_dir / "agents"
+        codex_agents = codex_dir / "agents"
+        out: list[str] = []
+        if not agents_src.exists():
+            return out
+        for md_file in sorted(agents_src.glob("*.md")):
+            try:
+                text = md_file.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            fm = _parse_agent_frontmatter(text)
+            name = str(fm.get("name", "")) if fm else ""
+            if not name:
+                # Use stem as fallback for the report label so the operator
+                # can locate the offending file even without a valid name.
+                name = md_file.stem
+            toml_path = codex_agents / f"{name}.toml"
+            if not toml_path.exists():
+                out.append(f"[missing] codex:agents/{name}.toml (D-CX-1)")
+        return out
+
+    def _dcx2_config_toml_entries(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+        """D-CX-2: every .codex/agents/*.toml must have a config_file entry in config.toml.
+
+        Reads ``.codex/config.toml`` as plain text and checks for the literal
+        string ``config_file = "agents/<name>.toml"`` for each TOML found in
+        ``.codex/agents/``.  Plain-text matching avoids parsing the full TOML
+        table structure (which is complex given quoted-key headers).
+        """
+        codex_agents = codex_dir / "agents"
+        config_toml = codex_dir / "config.toml"
+        out: list[str] = []
+        if not codex_agents.exists():
+            return out
+        config_text = ""
+        if config_toml.exists():
+            with contextlib.suppress(OSError):
+                config_text = config_toml.read_text(encoding="utf-8")
+        for toml_file in sorted(codex_agents.glob("*.toml")):
+            name = toml_file.stem
+            needle = f'config_file = "agents/{name}.toml"'
+            if needle not in config_text:
+                out.append(f"[missing] codex:config.toml entry for {name} (D-CX-2)")
+        return out
+
+    def _dcx3_workflow_drift(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+        """D-CX-3: .codex/workflows/ must mirror the canonical workflow set exactly.
+
+        Compares file names (not content) between the agentic canonical
+        workflows directory and ``.codex/workflows/``.  Both missing files
+        (canonical present, codex absent) and extra files (codex present,
+        canonical absent) are reported as drift.
+        """
+        canonical_dir = agentic_dir / "workflows"
+        codex_wf = codex_dir / "workflows"
+        out: list[str] = []
+
+        canonical_names: set[str] = set()
+        if canonical_dir.exists():
+            canonical_names = {f.name for f in canonical_dir.glob("*.workflow.md")}
+
+        codex_names: set[str] = set()
+        if codex_wf.exists():
+            codex_names = {f.name for f in codex_wf.glob("*.workflow.md")}
+
+        for name in sorted(canonical_names - codex_names):
+            out.append(f"[missing] codex:workflows/{name} (D-CX-3)")
+        for name in sorted(codex_names - canonical_names):
+            out.append(f"[extra] codex:workflows/{name} (D-CX-3)")
+        return out
+
+    def _dcx4_claude_strings(self, codex_dir: Path) -> list[str]:
+        """D-CX-4: no file inside .codex/ may contain the bare string ``claude-``.
+
+        Scans all text files (by extension) under ``.codex/`` recursively.
+        Any match of the pattern ``(?:^|[^a-zA-Z0-9_-])claude-`` is reported.
+        Binary files and non-text extensions are skipped to avoid false
+        positives from compiled artifacts.
+        """
+        out: list[str] = []
+        if not codex_dir.exists():
+            return out
+        for path in sorted(codex_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            if path.suffix not in self._CODEX_TEXT_SUFFIXES:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if self._CODEX_CLAUDE_RE.search(text):
+                rel = path.relative_to(codex_dir).as_posix()
+                out.append(f"[error] codex:claude-string in {rel} (D-CX-4)")
+        return out
+
+    def _dcx5_empty_developer_instructions(self, codex_dir: Path) -> list[str]:
+        """D-CX-5: every .codex/agents/*.toml must have a non-empty developer_instructions.
+
+        Parses each TOML file via ``tomllib.loads()`` (stdlib, Python 3.11+)
+        and checks that ``developer_instructions`` is present and non-empty
+        after stripping leading/trailing whitespace.
+        """
+        codex_agents = codex_dir / "agents"
+        out: list[str] = []
+        if not codex_agents.exists():
+            return out
+        for toml_file in sorted(codex_agents.glob("*.toml")):
+            name = toml_file.stem
+            try:
+                text = toml_file.read_text(encoding="utf-8")
+                data = tomllib.loads(text)
+            except (OSError, tomllib.TOMLDecodeError):
+                out.append(f"[error] codex:{name}.toml: unparseable TOML (D-CX-5)")
+                continue
+            instructions = data.get("developer_instructions", "")
+            if not isinstance(instructions, str) or not instructions.strip():
+                out.append(
+                    f"[error] codex:{name}.toml: developer_instructions is empty (D-CX-5)"
+                )
+        return out
 
     def _lint_legacy_software_engineer(self) -> list[str]:
         """T-35: reject the legacy `software-engineer` subagent alias in public/.
