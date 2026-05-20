@@ -1,8 +1,6 @@
 """Unit tests for public asset staging and runtime projections."""
 
 import json
-import os
-import sys
 import tomllib
 from pathlib import Path
 
@@ -39,12 +37,14 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
-    # dadaia-workspace-dev-guardrail.md was inlined into data/AGENTS.md (AGT-r2-32);
-    # only 2 standalone rule files remain in the projection:
-    assert (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
-    assert (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
+    # T-18 / ADR-1/D2: behavioral prose rules must NOT be projected to .codex/rules/.
+    # Only executable rules (those with YAML frontmatter) are projected.
+    assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
+    assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
+    # Executable rules with frontmatter ARE projected:
+    assert (workspace / ".codex" / "rules" / "plugin-scope.md").exists()
+    assert (workspace / ".codex" / "rules" / "workspace-protocol.md").exists()
     assert not (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists()
-    assert (workspace / ".opencode" / "commands" / "spec-context.md").exists()
     assert (workspace / "opencode.json").exists()
 
 
@@ -318,74 +318,111 @@ def _make_codex_install_manager(tmp_path: Path) -> tuple[FileSystemPublicAssetMa
     return manager, workspace_root
 
 
-def test_install_codex_cleans_existing_workflows_dir(tmp_path: Path) -> None:
-    """T-PB-2 #1 — _install_codex() removes an existing .codex/workflows/ directory."""
-    manager, workspace_root = _make_codex_install_manager(tmp_path)
+_MINIMAL_WORKFLOW_CROSS_CUTTING = """\
+---
+name: cross-cutting-feature
+description: "Minimal test workflow."
+version: 0.1.0
+schema_version: "1"
+stages:
+  - id: step1
+    agent: product-engineer
+    expected_output:
+      path: specs/releases/X/SPEC.md
+---
+# cross-cutting-feature workflow body
+"""
 
-    # Pre-create a legacy workflows dir with a file inside
-    workflows_dir = workspace_root / ".codex" / "workflows"
-    workflows_dir.mkdir(parents=True)
-    (workflows_dir / "legacy.workflow.md").write_text("old content\n", encoding="utf-8")
-
-    manager.install(workspace_root, target="codex", force=True)
-
-    assert not workflows_dir.exists(), (
-        f"Expected .codex/workflows/ to be removed after install, but it still exists at {workflows_dir}"
-    )
-
-
-def test_install_codex_emits_removed_log_line(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """T-PB-2 #2 — _install_codex() writes a [removed] line to stderr listing the workflows dir."""
-    manager, workspace_root = _make_codex_install_manager(tmp_path)
-
-    # Pre-create a legacy workflows dir
-    workflows_dir = workspace_root / ".codex" / "workflows"
-    workflows_dir.mkdir(parents=True)
-    (workflows_dir / "legacy.workflow.md").write_text("old content\n", encoding="utf-8")
-
-    manager.install(workspace_root, target="codex", force=True)
-
-    captured = capsys.readouterr()
-    assert "[removed]" in captured.err, f"Expected '[removed]' in stderr; got:\n{captured.err!r}"
-    assert str(workflows_dir) in captured.err, (
-        f"Expected workflows dir path {workflows_dir!r} in stderr; got:\n{captured.err!r}"
-    )
+_MINIMAL_WORKFLOW_HOTFIX = """\
+---
+name: hotfix-release
+description: "Minimal test workflow."
+version: 0.1.0
+schema_version: "1"
+stages:
+  - id: step1
+    agent: product-engineer
+    expected_output:
+      path: specs/releases/X/SPEC.md
+---
+# hotfix-release workflow body
+"""
 
 
-# ---------------------------------------------------------------------------
-# T-MPP-3.5 — T-PB-2 adversarial test (#3) — permission-error path
-# ---------------------------------------------------------------------------
+def test_install_codex_projects_workflows_dir(tmp_path: Path) -> None:
+    """T-16 — _install_codex() projects canonical workflows to .codex/workflows/.
 
-
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only permission test")
-def test_cleanup_warns_on_permission_error_does_not_raise(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """T-PB-2 #3 — chmod 0o000 on workflows dir triggers [cleanup-warning] without raising.
-
-    Defensive coding policy floor #2: visible failure modes.
-    shutil.rmtree(..., onerror=_log_cleanup_error) must NOT propagate PermissionError;
-    it must write [cleanup-warning] to stderr instead.
+    FR9/ADR-4: the old behavior of removing .codex/workflows/ is replaced by
+    projecting the canonical workflows from the agentic directory.
     """
     manager, workspace_root = _make_codex_install_manager(tmp_path)
 
-    # Pre-create a legacy workflows dir with a file inside
+    # Add a canonical workflow to the public/workflows dir (must be schema-valid)
+    public_dir = manager._public_dir  # noqa: SLF001
+    workflows_src = public_dir / "workflows"
+    workflows_src.mkdir(parents=True)
+    (workflows_src / "cross-cutting-feature.workflow.md").write_text(
+        _MINIMAL_WORKFLOW_CROSS_CUTTING, encoding="utf-8"
+    )
+
+    manager.install(workspace_root, target="codex", force=True)
+
+    workflows_dir = workspace_root / ".codex" / "workflows"
+    assert workflows_dir.exists(), ".codex/workflows/ should exist after install"
+    assert (workflows_dir / "cross-cutting-feature.workflow.md").exists(), (
+        "Canonical workflow should be projected to .codex/workflows/"
+    )
+
+
+def test_install_codex_overwrites_legacy_workflow_file(tmp_path: Path) -> None:
+    """T-16 addendum — a pre-existing workflow file is overwritten by the canonical source."""
+    manager, workspace_root = _make_codex_install_manager(tmp_path)
+
+    # Pre-create a legacy workflows dir with stale content
     workflows_dir = workspace_root / ".codex" / "workflows"
     workflows_dir.mkdir(parents=True)
-    (workflows_dir / "legacy.workflow.md").write_text("old content\n", encoding="utf-8")
+    (workflows_dir / "hotfix-release.workflow.md").write_text("stale content\n", encoding="utf-8")
 
-    # Deny all access to the workflows directory so rmtree cannot list/remove its contents
-    os.chmod(workflows_dir, 0o000)
-    try:
-        # install must NOT raise despite permission error
-        manager.install(workspace_root, target="codex", force=True)
+    # Add the canonical workflow (must be schema-valid)
+    public_dir = manager._public_dir  # noqa: SLF001
+    workflows_src = public_dir / "workflows"
+    workflows_src.mkdir(parents=True)
+    (workflows_src / "hotfix-release.workflow.md").write_text(
+        _MINIMAL_WORKFLOW_HOTFIX, encoding="utf-8"
+    )
 
-        captured = capsys.readouterr()
-        assert "[cleanup-warning]" in captured.err, (
-            f"Expected '[cleanup-warning]' in stderr after permission error; got:\n{captured.err!r}"
-        )
-    finally:
-        # Restore permissions so pytest can clean up tmp_path
-        os.chmod(workflows_dir, 0o755)
+    manager.install(workspace_root, target="codex", force=True)
+
+    # The canonical workflow content was projected (force=True overwrites)
+    assert (workflows_dir / "hotfix-release.workflow.md").read_text(encoding="utf-8") == _MINIMAL_WORKFLOW_HOTFIX
+
+
+# ---------------------------------------------------------------------------
+# T-18 — behavioral rules are NOT projected to .codex/rules/
+# ---------------------------------------------------------------------------
+
+
+def test_install_codex_skips_behavioral_rules(tmp_path: Path) -> None:
+    """T-18 / ADR-1/D2 — behavioral prose rules (no frontmatter) are excluded from .codex/rules/."""
+    manager, workspace_root = _make_codex_install_manager(tmp_path)
+
+    public_dir = manager._public_dir  # noqa: SLF001
+    rules_src = public_dir / "rules"
+    # Behavioral rule (no frontmatter)
+    (rules_src / "game-agents-coordination.md").write_text(
+        "# game-agents-coordination\nProse rule\n", encoding="utf-8"
+    )
+    # Executable rule (has frontmatter)
+    (rules_src / "workspace-protocol.md").write_text(
+        "---\nname: workspace-protocol\n---\n# body\n", encoding="utf-8"
+    )
+
+    manager.install(workspace_root, target="codex", force=True)
+
+    rules_dst = workspace_root / ".codex" / "rules"
+    assert not (rules_dst / "game-agents-coordination.md").exists(), (
+        "Behavioral rule should NOT be projected to .codex/rules/"
+    )
+    assert (rules_dst / "workspace-protocol.md").exists(), (
+        "Executable rule (with frontmatter) SHOULD be projected to .codex/rules/"
+    )

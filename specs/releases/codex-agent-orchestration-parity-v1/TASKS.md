@@ -54,9 +54,9 @@
 
 > Depende de: T-08 `[x]` (transform pronto) + T-06 `[x]` (model mapping pronto)
 
-- [-] **T-13** `software-engineer-python` — Adicionar `_install_codex_agents()` em `dadaia_workspace/infrastructure/public_assets.py`: lê os 20 `.md` de `public/agents/`, remove frontmatter, passa por `transform_for_codex()`, mapeia `model:` via `map_model()`, serializa TOML com `name`/`model`/`developer_instructions`, escreve `.codex/agents/<agent-id>.toml` (FR1 / FR7)
-- [-] **T-14** `software-engineer-python` — Atualizar `_install_codex()` em `public_assets.py` para chamar `_install_codex_agents()`; atualizar `.codex/config.toml` com 20 blocos `[agents.<name>] config_file = "agents/<name>.toml"` (FR7)
-- [-] **T-15** `software-engineer-python` — Executar `dadaia public install --target codex` e verificar: 20 arquivos em `.codex/agents/`; todos parseáveis por `tomllib`; `developer_instructions` não-vazio; zero strings `claude-*` em `.codex/**` (AC2 + AC3)
+- [x] **T-13** `software-engineer-python` — Adicionar `_install_codex_agents()` em `dadaia_workspace/infrastructure/public_assets.py`: lê os 20 `.md` de `public/agents/`, remove frontmatter, passa por `transform_for_codex()`, mapeia `model:` via `map_model()`, serializa TOML com `name`/`model`/`developer_instructions`, escreve `.codex/agents/<agent-id>.toml` (FR1 / FR7)
+- [x] **T-14** `software-engineer-python` — Atualizar `_install_codex()` em `public_assets.py` para chamar `_install_codex_agents()`; atualizar `.codex/config.toml` com 20 blocos `[agents.<name>] config_file = "agents/<name>.toml"` (FR7)
+- [x] **T-15** `software-engineer-python` — Executar `dadaia public install --target codex` e verificar: 20 arquivos em `.codex/agents/`; todos parseáveis por `tomllib`; `developer_instructions` não-vazio; zero strings `claude-*` em `.codex/**` (AC2 + AC3)
 
 ---
 
@@ -64,8 +64,8 @@
 
 > Depende de: T-03 `[x]`
 
-- [-] **T-16** `software-engineer-python` — Atualizar `_install_codex_workflows()` em `public_assets.py` para projetar todos os 7 workflows canônicos; hoje faltam `audit-cycle.workflow.md` e `code-review-fan-out.workflow.md` (FR9 / ADR-4)
-- [-] **T-17** `software-engineer-python` — Executar `dadaia public install --target codex` e verificar que `.codex/workflows/` tem exatamente os 7 arquivos canônicos (FR9)
+- [x] **T-16** `software-engineer-python` — Atualizar `_install_codex_workflows()` em `public_assets.py` para projetar todos os 7 workflows canônicos; hoje faltam `audit-cycle.workflow.md` e `code-review-fan-out.workflow.md` (FR9 / ADR-4)
+- [x] **T-17** `software-engineer-python` — Executar `dadaia public install --target codex` e verificar que `.codex/workflows/` tem exatamente os 7 arquivos canônicos (FR9)
 
 ---
 
@@ -73,8 +73,8 @@
 
 > Depende de: T-03 `[x]`
 
-- [-] **T-18** `software-engineer-python` — Auditar `.codex/rules/`: os 2 arquivos existentes (`game-agents-coordination.md`, `game-developer-scope.md`) são comportamentais (ADR-1/D2) — remover de `.codex/rules/`; verificar que `.codex/rules/` fica vazio ou contém apenas arquivos executáveis (FR11)
-- [-] **T-19** `software-engineer-python` — Verificar se `public/skills/**` já é projetado para `.agents/skills/` via `_install_agents_skills()` ou equivalente; se não, implementar projeção Tier-A; executar install e verificar hash-equivalência canônico ↔ projeção (FR12)
+- [x] **T-18** `software-engineer-python` — Auditar `.codex/rules/`: os 2 arquivos existentes (`game-agents-coordination.md`, `game-developer-scope.md`) são comportamentais (ADR-1/D2) — remover de `.codex/rules/`; verificar que `.codex/rules/` fica vazio ou contém apenas arquivos executáveis (FR11)
+- [x] **T-19** `software-engineer-python` — Verificar se `public/skills/**` já é projetado para `.agents/skills/` via `_install_agents_skills()` ou equivalente; se não, implementar projeção Tier-A; executar install e verificar hash-equivalência canônico ↔ projeção (FR12)
 
 ---
 

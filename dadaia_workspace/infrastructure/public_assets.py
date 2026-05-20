@@ -140,6 +140,67 @@ def _render_agents_into_codex_config(agents_dir: Path) -> str:
     return "\n".join(blocks) + ("\n" if blocks else "")
 
 
+def _render_codex_agent_toml(name: str, model: str, developer_instructions: str) -> str:
+    """Serialize an agent as a TOML file for the Codex runtime.
+
+    Emits three fields:
+    - ``name`` — basic string
+    - ``model`` — basic string
+    - ``developer_instructions`` — triple-quoted multiline basic string
+
+    The function avoids external TOML serialiser dependencies; it builds the
+    content manually and is safe for all printable Unicode in instructions text.
+
+    In a TOML triple-quoted basic string, backslashes are escape characters.
+    All literal backslashes in the body must be doubled (``\\``), and any
+    embedded triple-double-quote sequences must be escaped character-by-character
+    to prevent premature string termination.
+    """
+    # Step 1: escape backslashes first (must precede triple-quote escaping).
+    escaped = developer_instructions.replace("\\", "\\\\")
+    # Step 2: escape any embedded triple-double-quote sequences.
+    escaped = escaped.replace('"""', '\\"\\"\\"')
+    lines: list[str] = [
+        f"name = {_toml_escape(name)}\n",
+        f"model = {_toml_escape(model)}\n",
+        f'developer_instructions = """\n{escaped}\n"""\n',
+    ]
+    return "".join(lines)
+
+
+def _render_agents_config_file_blocks(agents_dir: Path) -> str:
+    """Generate ``[agents."<name>"] config_file = ...`` TOML blocks.
+
+    Replaces the inline agent block rendering.  For each canonical agent
+    (determined by the ``.md`` file listing) a two-line TOML block is emitted:
+
+    .. code-block:: toml
+
+        [agents."<name>"]
+        config_file = "agents/<name>.toml"
+
+    Agents whose ``.md`` cannot be parsed (missing ``name``) are skipped.
+    """
+    if not agents_dir.exists():
+        return ""
+    blocks: list[str] = []
+    for md_file in sorted(agents_dir.glob("*.md")):
+        try:
+            text = md_file.read_text(encoding="utf-8")
+            fm = _parse_agent_frontmatter(text)
+            if not fm:
+                continue
+            name = str(fm.get("name", ""))
+            if not name:
+                continue
+            key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
+            blocks.append(f'[agents."{key_escaped}"]\n')
+            blocks.append(f'config_file = "agents/{name}.toml"\n')
+        except (OSError, ValueError):
+            continue
+    return "".join(blocks)
+
+
 def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
     """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
 
@@ -717,16 +778,10 @@ class FileSystemPublicAssetManager:
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
     ) -> None:
         codex_dir = workspace_root / ".codex"
-        self._copy_tree(agentic_dir / "rules", codex_dir / "rules", force, installed)
-        workflows_dir = codex_dir / "workflows"
-        if workflows_dir.exists():
-            files = sorted(workflows_dir.rglob("*"))
-            sys.stderr.write(
-                f"[removed] {workflows_dir} (not-applicable: codex has no workflow runtime)"
-                f" — {len(files)} entries\n"
-            )
-            shutil.rmtree(workflows_dir, onerror=_log_cleanup_error)
+        self._install_codex_rules(agentic_dir, workspace_root, force, installed)
+        self._install_codex_workflows(agentic_dir, workspace_root, force, installed)
         self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+        self._install_codex_agents(agentic_dir, workspace_root, force, installed)
         self._write_generated(
             codex_dir / "hooks.json",
             _json_dump(self._codex_hooks(workspace_root)),
@@ -739,6 +794,110 @@ class FileSystemPublicAssetManager:
             force,
             installed,
         )
+
+    def _install_codex_rules(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Copy only executable rules (those with YAML frontmatter) to .codex/rules/.
+
+        Behavioral prose rules (ADR-1/D2) — i.e. files without frontmatter — are
+        excluded from the Codex projection.  This prevents rules like
+        ``game-agents-coordination.md`` and ``game-developer-scope.md`` from
+        polluting the Codex rule surface.
+        """
+        src_dir = agentic_dir / "rules"
+        dst_dir = workspace_root / ".codex" / "rules"
+        if not src_dir.exists():
+            return
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for src in sorted(src_dir.glob("*.md")):
+            try:
+                text = src.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            # Only project rules that start with YAML frontmatter (executable rules).
+            if not text.startswith("---\n"):
+                installed.append(f"[skip-behavioral] {src.name}")
+                continue
+            dst = dst_dir / src.name
+            self._copy_file(src, dst, force, installed)
+
+    def _install_codex_workflows(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Project all canonical workflows to .codex/workflows/.
+
+        FR9/ADR-4: the Codex runtime receives the full canonical workflow set so
+        that operators can reference them.  Previously the workflows directory was
+        removed; that behaviour is replaced by this projection.
+        """
+        self._copy_tree(
+            agentic_dir / "workflows",
+            workspace_root / ".codex" / "workflows",
+            force,
+            installed,
+        )
+
+    def _install_codex_agents(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Generate .codex/agents/<agent-id>.toml for each canonical agent.
+
+        For each ``.md`` file in ``agentic_dir/agents/``:
+        1. Parse frontmatter to extract ``name`` and ``model``.
+        2. Extract the body (everything after the second ``---`` fence).
+        3. Pass the body through ``transform_for_codex()`` to replace Claude-
+           specific references.
+        4. Map the model via ``map_model()`` (raises ``ValueError`` on unknown
+           identifier — fail loudly rather than emit ``claude-*`` strings).
+        5. Serialize as TOML via ``_render_codex_agent_toml()``.
+        6. Write to ``.codex/agents/<name>.toml``.
+
+        Files are skipped (not overwritten) when ``force=False`` and the TOML
+        already exists.
+        """
+        from dadaia_workspace.infrastructure.runtime_transforms.codex import (
+            transform_for_codex,
+        )
+        from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import (
+            map_model,
+        )
+
+        agents_src = agentic_dir / "agents"
+        agents_dst = workspace_root / ".codex" / "agents"
+        agents_dst.mkdir(parents=True, exist_ok=True)
+
+        for md_file in sorted(agents_src.glob("*.md")):
+            text = md_file.read_text(encoding="utf-8")
+            fm = _parse_agent_frontmatter(text)
+            if not fm:
+                continue
+            agent_name = str(fm.get("name", ""))
+            if not agent_name:
+                continue
+
+            # Extract body: text after the second '---' fence.
+            if text.startswith("---\n"):
+                end_idx = text.find("\n---\n", 4)
+                body = text[end_idx + 5:] if end_idx != -1 else text
+            else:
+                body = text
+
+            # Transform for Codex runtime.
+            body = transform_for_codex(body, agent_name)
+
+            # Map model — raises ValueError on unknown Claude identifier.
+            claude_model = str(fm.get("model", "claude-sonnet-4-6"))
+            codex_model = map_model(claude_model)
+
+            toml_content = _render_codex_agent_toml(agent_name, codex_model, body)
+
+            dst = agents_dst / f"{agent_name}.toml"
+            if dst.exists() and not force:
+                installed.append(f"[skip] {dst}")
+            else:
+                dst.write_text(toml_content, encoding="utf-8")
+                installed.append(f"[ok]   {dst}")
 
     def _install_opencode(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -847,6 +1006,14 @@ class FileSystemPublicAssetManager:
                 )
 
         for src in self._iter_files(agentic_dir / "rules"):
+            # T-18 / ADR-1/D2: only executable rules (those with YAML frontmatter)
+            # are projected to .codex/rules/. Behavioral prose rules are skipped.
+            try:
+                rule_text = src.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if not rule_text.startswith("---\n"):
+                continue
             rel = src.relative_to(agentic_dir / "rules")
             yield (
                 src,
@@ -1007,8 +1174,9 @@ class FileSystemPublicAssetManager:
         ):
             lines.append(f'  "{cmd}",\n')
         lines.append("]\n")
-        # T-PB-1: emit [agents.<name>] blocks from the agentic agents directory
-        agents_blocks = _render_agents_into_codex_config(agentic_dir / "agents")
+        # FR7: emit [agents.<name>] config_file blocks — one per canonical agent.
+        # Each agent's full definition lives in .codex/agents/<name>.toml.
+        agents_blocks = _render_agents_config_file_blocks(agentic_dir / "agents")
         if agents_blocks:
             lines.append("\n")
             lines.append(agents_blocks)
