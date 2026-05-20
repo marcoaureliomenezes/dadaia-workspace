@@ -6,7 +6,7 @@ description: >
   (QGIS → GDAL → Cesium → UE5). Pesquisa ativamente referências e dados públicos em
   fontes confiáveis. NÃO toca em lógica de jogo, IA de inimigos ou testes.
 tier: 3
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 color: purple
 tools:
   - Read

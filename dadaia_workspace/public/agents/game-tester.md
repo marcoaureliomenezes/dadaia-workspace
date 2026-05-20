@@ -7,7 +7,7 @@ description: >
   Pesquisa ativamente bugs conhecidos e padrões de teste em UE5. NÃO escreve
   código de produção ou assets.
 tier: 3
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 color: yellow
 tools:
   - Read

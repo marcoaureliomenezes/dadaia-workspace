@@ -6,7 +6,7 @@ description: >
   project-manager when a spec is needed. NEVER dispatches other agents; NEVER implements
   code. Do NOT use for bug fixes (use project-manager → software-engineer-python or software-engineer-node).
 tier: 2
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 opencode_model: claude-sonnet-4-6
 tools:
   - Read

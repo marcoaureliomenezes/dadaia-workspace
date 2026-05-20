@@ -10,7 +10,7 @@ description: >
   configs. Bootstrapped in r3 by product-engineer; first real run on its own surface is
   deferred to a follow-up release.
 tier: 3
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 tools:
   - Read
   - Write

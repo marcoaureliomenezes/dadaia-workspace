@@ -6,7 +6,7 @@ description: >
   conflicts. NEVER writes code, specs, memory, tests, or CI. Output only to
   .dadaia/reports/<ctx>/project-manager/*.
 tier: 1
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 tools:
   - Read
   - Glob

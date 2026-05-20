@@ -32,7 +32,7 @@
 
 ## P2-C — Agent rewrites (ai-engineer)
 
-- [-] **T-30** — Model flip: rewrite `model:` frontmatter on 7 agents (`project-manager`, `project-auditor`, `product-engineer`, `software-architect`, `ai-engineer`, `game-designer`, `game-tester`) → `claude-sonnet-4-6`. Confirm `researcher` = `claude-haiku-4-5`.
+- [x] **T-30** — Model flip: rewrite `model:` frontmatter on 7 agents (`project-manager`, `project-auditor`, `product-engineer`, `software-architect`, `ai-engineer`, `game-designer`, `game-tester`) → `claude-sonnet-4-6`. Confirm `researcher` = `claude-haiku-4-5`.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/agents/`
   - **Done criterion:** `grep -l 'model: claude-opus' dadaia_workspace/public/agents/` returns empty for the 7 flipped agents; `researcher.md` confirmed `model: claude-haiku-4-5`.

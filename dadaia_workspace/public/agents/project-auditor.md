@@ -6,7 +6,7 @@ description: >
   evidence. Emits compliance scorecard (1-10, 6 dimensions). NEVER fixes drift or mutates
   specs.
 tier: 1
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 tools:
   - Read
   - Bash
