@@ -48,9 +48,9 @@
 
 ## P5 — Init resolver fix
 
-- [-] T-20 `[software-engineer-python]` Ler `workspace_resolver.py` — entender `resolve_workspace_root` e `_SENTINEL`
-- [ ] T-21 `[software-engineer-python]` Adicionar `resolve_workspace_root_for_init(cwd)` em `workspace_resolver.py` (sentinel walk + fallback para cwd)
-- [ ] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
+- [x] T-20 `[software-engineer-python]` Ler `workspace_resolver.py` — entender `resolve_workspace_root` e `_SENTINEL`
+- [x] T-21 `[software-engineer-python]` Adicionar `resolve_workspace_root_for_init(cwd)` em `workspace_resolver.py` (sentinel walk + fallback para cwd)
+- [-] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
 - [ ] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
 - [ ] T-24 `[software-engineer-python]` Adicionar import de `resolve_workspace_root_for_init` em `init.py`
 - [ ] T-25 `[software-engineer-python]` Escrever 2 unit tests em `test_workspace_resolver.py` (com sentinel; sem sentinel → retorna cwd)
@@ -62,8 +62,8 @@
 
 - [x] T-27 `[software-engineer-python]` Ler `public_assets.py` — localizar `install()`, `_install_workspace_guardrail_pair`, loop de repos
 - [x] T-28 `[software-engineer-python]` Adicionar `scope: Literal["all","repos-only","workspace-only"] = "all"` a `FileSystemPublicAssetManager.install()`
-- [-] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
-- [ ] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
+- [x] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
+- [-] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
 - [ ] T-31 `[software-engineer-python]` Derivar e passar `scope` para `manager.install()`
 - [ ] T-32 `[software-engineer-python]` Adicionar testes para cada scope (all, repos-only, workspace-only, exclusividade)
 - [ ] T-33 `[software-engineer-python]` Rodar `pytest tests/integration/` relacionados a `dadaia public install`
