@@ -472,6 +472,92 @@ def _install_workspace_guardrail_pair(
         _write_pair(consumer)
 
 
+def _install_workspace_root_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str] | None = None,
+) -> None:
+    """Write the guardrail pair to *workspace_root* only (no consumer repos).
+
+    Variant of ``_install_workspace_guardrail_pair`` that skips the consumer-repo
+    enumeration.  Used when ``scope="workspace-only"`` is passed to
+    ``FileSystemPublicAssetManager.install()``.
+
+    Args:
+        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
+        workspace_root: Workspace root directory.
+        force: When True, overwrite existing files; when False, skip if present.
+        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+    """
+    if installed is None:
+        installed = []
+
+    agents_dst = workspace_root / "AGENTS.md"
+    agents_dst.parent.mkdir(parents=True, exist_ok=True)
+    if agents_dst.exists() and not force:
+        installed.append(f"[skip] {agents_dst}")
+    else:
+        shutil.copy2(source, agents_dst)
+        installed.append(f"[ok]   {agents_dst}")
+
+    claude_dst = workspace_root / "CLAUDE.md"
+    claude_dst.parent.mkdir(parents=True, exist_ok=True)
+    if claude_dst.exists() and not force:
+        installed.append(f"[skip] {claude_dst}")
+    else:
+        _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+        installed.append(f"[ok]   {claude_dst}")
+
+
+def _install_consumer_repos_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str] | None = None,
+) -> None:
+    """Write the guardrail pair to each marker-bearing consumer repo only.
+
+    Skips the workspace-root write.  Used when ``scope="repos-only"`` is passed
+    to ``FileSystemPublicAssetManager.install()``.
+
+    Self-skip (R14): if a consumer's manifest ``package_version`` matches our
+    own, that consumer is the dadaia-workspace source repo — skip it.
+
+    Args:
+        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
+        workspace_root: Workspace root directory.
+        force: When True, overwrite existing files; when False, skip if present.
+        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+    """
+    if installed is None:
+        installed = []
+
+    for consumer in _consumer_repos_for_root(workspace_root):
+        if _is_self_repo(consumer):
+            v = _package_version()
+            sys.stderr.write(
+                f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
+            )
+            continue
+
+        agents_dst = consumer / "AGENTS.md"
+        agents_dst.parent.mkdir(parents=True, exist_ok=True)
+        if agents_dst.exists() and not force:
+            installed.append(f"[skip] {agents_dst}")
+        else:
+            shutil.copy2(source, agents_dst)
+            installed.append(f"[ok]   {agents_dst}")
+
+        claude_dst = consumer / "CLAUDE.md"
+        claude_dst.parent.mkdir(parents=True, exist_ok=True)
+        if claude_dst.exists() and not force:
+            installed.append(f"[skip] {claude_dst}")
+        else:
+            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+            installed.append(f"[ok]   {claude_dst}")
+
+
 def _doctor_guardrail_pair(
     source: Path,
     workspace_root: Path,
@@ -595,13 +681,25 @@ class FileSystemPublicAssetManager:
         targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
         data_agents_md = agentic_dir / "data" / "AGENTS.md"
         if data_agents_md.exists():
-            # Option C (ADR): single source fans out to workspace-root pair +
-            # one pair per marker-bearing consumer repo.  Replaces the legacy
-            # _install_agents_md path for data/AGENTS.md.
-            _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
+            # Option C (ADR): scope-aware fan-out to workspace-root pair and/or
+            # marker-bearing consumer repos.
+            if scope == "all":
+                # Full fan-out: workspace-root pair + all consumer repos.
+                _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
+            elif scope == "workspace-only":
+                # Workspace-root guardrail pair only — skip consumer repos.
+                _install_workspace_root_guardrail_pair(
+                    data_agents_md, workspace_root, force, installed
+                )
+            elif scope == "repos-only":
+                # Consumer repos only — skip workspace-root pair.
+                _install_consumer_repos_guardrail_pair(
+                    data_agents_md, workspace_root, force, installed
+                )
         else:
             # Legacy / scaffold path: templates/AGENTS.md → workspace-root only.
-            self._install_agents_md(agentic_dir, workspace_root, force, installed)
+            if scope in ("all", "workspace-only"):
+                self._install_agents_md(agentic_dir, workspace_root, force, installed)
         self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
