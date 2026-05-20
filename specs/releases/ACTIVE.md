@@ -1,5 +1,5 @@
 release: infra-correctness-v1
-phase: SPEC
+phase: TASKS
 
 # History
 # 2026-05-20 — codex-agent-orchestration-parity-v1 CLOSED + ARCHIVED. 34 tasks complete. 20-agent topology fully deployed.
