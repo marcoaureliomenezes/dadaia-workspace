@@ -17,6 +17,10 @@ from typing import Any
 from dadaia_workspace.core.exceptions import PublicAssetError
 
 _SCHEMA_VERSION = "1"
+# T-41: CLAUDE.md is a 1-line stub that delegates to AGENTS.md.
+# Claude Code does not yet support `@AGENTS.md` include syntax natively, so we
+# use a comment-style redirect that is human-readable and forwards readers.
+_CLAUDE_MD_STUB = "# See AGENTS.md for workspace rules and agent personas.\n"
 # OpenCode v1.14+ expects `tools` to be an object or omitted — not an array.
 # Strip it from agent frontmatter when deploying to the opencode projection.
 _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
@@ -24,6 +28,13 @@ _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_RE = re.compile(r"^opencode_model:\s*(.+?)$", re.MULTILINE)
 _FRONTMATTER_MODEL_VALUE_RE = re.compile(r"^(model:\s*)(.+?)$", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_FIELD_RE = re.compile(r"^opencode_model:[^\n]*\n", re.MULTILINE)
+# T-35: forbid the legacy `software-engineer` alias inside public/ (split into
+# `software-engineer-python` and `software-engineer-node`). Matches subagent_type:
+# software-engineer with no trailing -python/-node suffix.
+_LEGACY_SE_ALIAS_RE = re.compile(
+    r"subagent_type\s*[:=]\s*[\"']?software-engineer(?![-_a-z])",
+    re.IGNORECASE,
+)
 _VALID_TARGETS = {"all", "agents", "claude", "codex", "opencode"}
 _COPY_DIRS = (
     "rules",
@@ -367,14 +378,22 @@ def _install_workspace_guardrail_pair(
     _src_sha = hashlib.sha256(source_bytes).hexdigest()  # available for callers
 
     def _write_pair(target_dir: Path) -> None:
-        for filename in ("AGENTS.md", "CLAUDE.md"):
-            dst = target_dir / filename
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            if dst.exists() and not force:
-                installed.append(f"[skip] {dst}")
-                return
-            shutil.copy2(source, dst)
-            installed.append(f"[ok]   {dst}")
+        # AGENTS.md — full canonical content copied from source.
+        agents_dst = target_dir / "AGENTS.md"
+        agents_dst.parent.mkdir(parents=True, exist_ok=True)
+        if agents_dst.exists() and not force:
+            installed.append(f"[skip] {agents_dst}")
+        else:
+            shutil.copy2(source, agents_dst)
+            installed.append(f"[ok]   {agents_dst}")
+        # CLAUDE.md — 1-line stub only (T-41: delegates to AGENTS.md).
+        claude_dst = target_dir / "CLAUDE.md"
+        claude_dst.parent.mkdir(parents=True, exist_ok=True)
+        if claude_dst.exists() and not force:
+            installed.append(f"[skip] {claude_dst}")
+        else:
+            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+            installed.append(f"[ok]   {claude_dst}")
 
     # Workspace-root write set (always).
     _write_pair(workspace_root)
@@ -415,16 +434,27 @@ def _doctor_guardrail_pair(
         sys.stderr.write(line + "\n")
         return line
 
+    def _check_stub(dst: Path, label: str) -> str:
+        """Verify that *dst* contains the expected 1-line CLAUDE.md stub (T-41)."""
+        if not dst.exists():
+            line = f"[missing] {label}"
+        elif dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
+            line = f"[drift] {label}"
+        else:
+            line = f"[ok] {label}"
+        sys.stderr.write(line + "\n")
+        return line
+
     lines: list[str] = []
     lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
-    lines.append(_check(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
+    lines.append(_check_stub(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
 
     for consumer in _consumer_repos_for_root(workspace_root):
         if _is_self_repo(consumer):
             continue
         slug = consumer.name
         lines.append(_check(consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md"))
-        lines.append(_check(consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md"))
+        lines.append(_check_stub(consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md"))
 
     return lines
 
@@ -537,7 +567,10 @@ class FileSystemPublicAssetManager:
         for expected_src, dst, label, transform in self._runtime_expectations(
             agentic_dir, workspace_root
         ):
-            if expected_src is None:
+            if expected_src is None and transform:
+                # T-41: CLAUDE.md is a 1-line stub — verify content matches stub exactly.
+                reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
+            elif expected_src is None:
                 reports.append(f"[unsupported] {label}")
             elif transform:
                 content = _prepare_agent_for_opencode(expected_src.read_text(encoding="utf-8"))
@@ -575,8 +608,34 @@ class FileSystemPublicAssetManager:
         )
 
         reports.extend(self._classify_workflows(agentic_dir))
+        reports.extend(self._lint_legacy_software_engineer())
 
         return reports
+
+    def _lint_legacy_software_engineer(self) -> list[str]:
+        """T-35: reject the legacy `software-engineer` subagent alias in public/.
+
+        The alias was split into `software-engineer-python` and
+        `software-engineer-node`. Any reintroduction is a regression.
+        """
+        out: list[str] = []
+        if not self._public_dir.exists():
+            return out
+        for path in self._iter_files(self._public_dir):
+            # Skip non-textual / binary candidates.
+            if path.suffix not in {".md", ".yaml", ".yml", ".json", ".toml", ".txt"}:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if _LEGACY_SE_ALIAS_RE.search(text):
+                rel = path.relative_to(self._public_dir).as_posix()
+                out.append(
+                    f"[LINT] Legacy alias 'software-engineer' in {rel}. "
+                    "Use 'software-engineer-python' or 'software-engineer-node'."
+                )
+        return out
 
     def _classify_workflows(self, agentic_dir: Path) -> list[str]:
         out: list[str] = []
@@ -737,7 +796,8 @@ class FileSystemPublicAssetManager:
         agents_md = self._agents_md_source(agentic_dir)
         if agents_md is not None:
             yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md", False)
-            yield (agents_md, workspace_root / "CLAUDE.md", "root:CLAUDE.md", False)
+            # T-41: CLAUDE.md is a 1-line stub — use "stub" sentinel to trigger content check.
+            yield (None, workspace_root / "CLAUDE.md", "root:CLAUDE.md", True)
             # Consumer-repo parity (R13 + R14): one pair per marker-bearing repo.
             for consumer in _consumer_repos_for_root(workspace_root):
                 if _is_self_repo(consumer):
@@ -749,11 +809,12 @@ class FileSystemPublicAssetManager:
                     f"repos/{slug}:AGENTS.md",
                     False,
                 )
+                # T-41: CLAUDE.md in consumer repos is also a 1-line stub.
                 yield (
-                    agents_md,
+                    None,
                     consumer / "CLAUDE.md",
                     f"repos/{slug}:CLAUDE.md",
-                    False,
+                    True,
                 )
 
         reports_agents_md = agentic_dir / "data" / "reports-AGENTS.md"
