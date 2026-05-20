@@ -96,7 +96,7 @@
 
 ## P2-D — Workflows + projection (devops-engineer + product-engineer)
 
-- [-] **T-40** — Workflows YAML: update all 7 workflow files. Each stage declares `consumes: [path-to-upstream-sidecar.json]` (not HTML). The 4 read-heavy workflows (`audit-cycle`, `code-review-fan-out`, `cross-cutting-feature`, `spec-refinement`) get dispatch-to-researcher injected.
+- [x] **T-40** — Workflows YAML: update all 7 workflow files. Each stage declares `consumes: [path-to-upstream-sidecar.json]` (not HTML). The 4 read-heavy workflows (`audit-cycle`, `code-review-fan-out`, `cross-cutting-feature`, `spec-refinement`) get dispatch-to-researcher injected.
   - **Owner:** devops-engineer
   - **Write-allowlist:** `dadaia_workspace/public/workflows/`
   - **Done criterion:** All 7 workflows declare `consumes:` with sidecar paths; 4 read-heavy workflows carry dispatch-to-researcher stages.
