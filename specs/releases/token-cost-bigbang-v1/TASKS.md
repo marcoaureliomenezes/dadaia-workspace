@@ -22,7 +22,7 @@
   - **Done criterion:** `dadaia reports validate <v1.0-sidecar>` exits non-zero with clear error message.
   - **Deps:** T-20
 
-- [-] **T-22** — Add `dadaia reports lint <dir>` command: flags orphaned HTML (no sidecar), oversized HTML (> 30 KB), missing schema fields.
+- [x] **T-22** — Add `dadaia reports lint <dir>` command: flags orphaned HTML (no sidecar), oversized HTML (> 30 KB), missing schema fields.
   - **Owner:** devops-engineer
   - **Write-allowlist:** `dadaia_workspace/cli/`, `dadaia_workspace/features/`
   - **Done criterion:** `dadaia reports lint .dadaia/reports/` runs without exception; flags at least one known orphan in the current `.dadaia/reports/` tree.
