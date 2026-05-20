@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 
@@ -574,7 +574,13 @@ class FileSystemPublicAssetManager:
                 f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
             ) from e
 
-    def install(self, workspace_root: Path, target: str = "all", force: bool = False) -> list[str]:
+    def install(
+        self,
+        workspace_root: Path,
+        target: str = "all",
+        force: bool = False,
+        scope: Literal["all", "repos-only", "workspace-only"] = "all",
+    ) -> list[str]:
         if target not in _VALID_TARGETS:
             valid = ", ".join(sorted(_VALID_TARGETS))
             raise PublicAssetError(
