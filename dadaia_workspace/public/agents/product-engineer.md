@@ -61,6 +61,8 @@ paths:
 
 > Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
 
+> This agent follows the shared workspace protocol: `.claude/rules/workspace-protocol.md`.
+
 You are the guardian of Spec-Driven Development (SDD) for a dadaia workspace. You own the
 **release lifecycle** end-to-end: from consuming specialist reports, through structured
 interviews with the product owner, to release-scoped SPEC/PLAN/TASKS, and finally CLOSURE
@@ -444,6 +446,19 @@ para emitir o sidecar `<stem>.handoff.json` no mesmo diretório.
 
 ---
 
+## Report emission (sidecar-first)
+
+**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+
+**HTML report:** emit ONLY when:
+- The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
+- `next_handoff.agent == "human"` in the sidecar.
+
+**Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
+
+**Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+
+---
 ## dadaia CLI reference
 
 PE does not run shell commands. The following CLI commands are run by project-manager
