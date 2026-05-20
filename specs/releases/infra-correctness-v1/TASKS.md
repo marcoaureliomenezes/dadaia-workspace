@@ -79,7 +79,7 @@
 - [x] T-38 `[software-engineer-python]` Escrever testes para `_install_workspace_guardrail_pair` e `_doctor_guardrail_pair`
 - [x] T-39 `[software-engineer-python]` Escrever testes para `_runtime_expectations` (cada runtime)
 - [x] T-40 `[software-engineer-python]` Escrever testes para `_install_codex_agents` e `_install_opencode` (com mock de filesystem)
-- [-] T-41 `[software-engineer-python]` Rodar `pytest --cov` → confirmar ≥ 80%; adicionar testes se abaixo
+- [x] T-41 `[software-engineer-python]` Rodar `pytest --cov` → confirmar ≥ 80%; adicionar testes se abaixo
 
 ---
 
