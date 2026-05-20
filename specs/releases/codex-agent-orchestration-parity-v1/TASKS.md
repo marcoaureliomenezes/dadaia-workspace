@@ -23,7 +23,7 @@
 
 - [x] **T-01** `software-engineer-python` — Deletar os 4 arquivos de `dadaia_workspace/public/commands/`: `dadaia-academy.md`, `dadaia-workspace-doctor.md`, `dadaia-workspace-refine-specs.md`, `spec-context.md` (FR13)
 - [x] **T-02** `software-engineer-python` — Executar `dadaia public install --target claude` e verificar que `.claude/commands/` está vazio; executar `dadaia public install --target opencode` se OpenCode tiver projeção de commands (FR13)
-- [ ] **T-03** `software-engineer-python` — Capturar golden snapshot: `find .claude -type f -print0 | xargs -0 sha256sum | sort > /tmp/pre-codex.txt`; persistir como artefato em `.dadaia/tmp/json/pre-codex-snapshot.txt` (AC1 / ADR-6)
+- [-] **T-03** `software-engineer-python` — Capturar golden snapshot: `find .claude -type f -print0 | xargs -0 sha256sum | sort > /tmp/pre-codex.txt`; persistir como artefato em `.dadaia/tmp/json/pre-codex-snapshot.txt` (AC1 / ADR-6)
 
 ---
 
