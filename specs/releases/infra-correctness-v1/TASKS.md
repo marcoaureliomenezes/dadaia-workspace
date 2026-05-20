@@ -31,7 +31,7 @@
 - [x] T-10 `[software-engineer-python]` Ler `schema.py` — confirmar `SCHEMA_VERSION=5`, `# DEAD:` nas tabelas
 - [x] T-11 `[software-engineer-python]` Incrementar `SCHEMA_VERSION = 6`; adicionar migration 6 (`DROP TABLE IF EXISTS workflow_agents; DROP TABLE IF EXISTS workflows;`)
 - [x] T-12 `[software-engineer-python]` Adicionar teste de migration 6: aplicar sobre banco com migration 5; verificar tabelas ausentes
-- [-] T-13 `[software-engineer-python]` Rodar `pytest` nos testes de telemetry — sem regressão
+- [x] T-13 `[software-engineer-python]` Rodar `pytest` nos testes de telemetry — sem regressão
 
 ---
 
@@ -66,7 +66,7 @@
 - [x] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
 - [x] T-31 `[software-engineer-python]` Derivar e passar `scope` para `manager.install()`
 - [x] T-32 `[software-engineer-python]` Adicionar testes para cada scope (all, repos-only, workspace-only, exclusividade)
-- [-] T-33 `[software-engineer-python]` Rodar `pytest tests/integration/` relacionados a `dadaia public install`
+- [x] T-33 `[software-engineer-python]` Rodar `pytest tests/integration/` relacionados a `dadaia public install`
 
 ---
 
