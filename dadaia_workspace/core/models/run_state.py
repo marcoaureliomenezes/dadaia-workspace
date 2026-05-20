@@ -46,6 +46,7 @@ class DispatcherMode(StrEnum):
     BEST_EFFORT_SEQUENTIAL = "best-effort-sequential"
     UNSUPPORTED = "unsupported"
     CLI_ONLY = "cli-only"
+    CODEX = "codex"
 
 
 @dataclass(frozen=True)
