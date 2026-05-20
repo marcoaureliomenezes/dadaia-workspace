@@ -28,8 +28,8 @@
 
 ## P3 — SQLite workflows drop
 
-- [-] T-10 `[software-engineer-python]` Ler `schema.py` — confirmar `SCHEMA_VERSION=5`, `# DEAD:` nas tabelas
-- [ ] T-11 `[software-engineer-python]` Incrementar `SCHEMA_VERSION = 6`; adicionar migration 6 (`DROP TABLE IF EXISTS workflow_agents; DROP TABLE IF EXISTS workflows;`)
+- [x] T-10 `[software-engineer-python]` Ler `schema.py` — confirmar `SCHEMA_VERSION=5`, `# DEAD:` nas tabelas
+- [-] T-11 `[software-engineer-python]` Incrementar `SCHEMA_VERSION = 6`; adicionar migration 6 (`DROP TABLE IF EXISTS workflow_agents; DROP TABLE IF EXISTS workflows;`)
 - [ ] T-12 `[software-engineer-python]` Adicionar teste de migration 6: aplicar sobre banco com migration 5; verificar tabelas ausentes
 - [ ] T-13 `[software-engineer-python]` Rodar `pytest` nos testes de telemetry — sem regressão
 
@@ -48,7 +48,7 @@
 
 ## P5 — Init resolver fix
 
-- [ ] T-20 `[software-engineer-python]` Ler `workspace_resolver.py` — entender `resolve_workspace_root` e `_SENTINEL`
+- [-] T-20 `[software-engineer-python]` Ler `workspace_resolver.py` — entender `resolve_workspace_root` e `_SENTINEL`
 - [ ] T-21 `[software-engineer-python]` Adicionar `resolve_workspace_root_for_init(cwd)` em `workspace_resolver.py` (sentinel walk + fallback para cwd)
 - [ ] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
 - [ ] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
