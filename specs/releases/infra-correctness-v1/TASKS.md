@@ -11,8 +11,8 @@
 
 - [x] T-01 `[software-engineer-python]` Ler `reports.py:130–160`, confirmar posição da linha 138
 - [x] T-02 `[software-engineer-python]` Mover `workspace_root = resolve_workspace_root()` para dentro do bloco `try` (linha 141)
-- [-] T-03 `[software-engineer-python]` Remover `@pytest.mark.xfail` de `test_10_workspace_not_initialized_exits_3`
-- [ ] T-04 `[software-engineer-python]` Rodar `pytest tests/integration/test_cli_reports.py -v` — todos passam
+- [x] T-03 `[software-engineer-python]` Remover `@pytest.mark.xfail` de `test_10_workspace_not_initialized_exits_3`
+- [-] T-04 `[software-engineer-python]` Rodar `pytest tests/integration/test_cli_reports.py -v` — todos passam
 
 ---
 
