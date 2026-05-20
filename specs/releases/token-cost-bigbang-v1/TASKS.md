@@ -38,7 +38,7 @@
   - **Done criterion:** `grep -l 'model: claude-opus' dadaia_workspace/public/agents/` returns empty for the 7 flipped agents; `researcher.md` confirmed `model: claude-haiku-4-5`.
   - **Deps:** T-12
 
-- [ ] **T-31** — Description trim: rewrite every agent's `description:` frontmatter field to ≤ 200 characters. Move long description content into the agent body if still relevant; delete otherwise.
+- [-] **T-31** — Description trim: rewrite every agent's `description:` frontmatter field to ≤ 200 characters. Move long description content into the agent body if still relevant; delete otherwise.
   - **Owner:** ai-engineer
   - **Write-allowlist:** `dadaia_workspace/public/agents/`
   - **Done criterion:** No agent has `description:` length > 200 chars (verified via script).
