@@ -10,7 +10,7 @@
 
 ## P2-B — Schema + validator (devops-engineer)
 
-- [-] **T-20** — Update `dadaia_workspace/public/schemas/handoff-v1.schema.json` → v1.1. New required fields: `findings[].detail_md`, `findings[].fix_recommendation`, `scope`, `metrics`. Make `artifact.path` optional.
+- [x] **T-20** — Update `dadaia_workspace/public/schemas/handoff-v1.schema.json` → v1.1. New required fields: `findings[].detail_md`, `findings[].fix_recommendation`, `scope`, `metrics`. Make `artifact.path` optional.
   - **Owner:** devops-engineer
   - **Write-allowlist:** `dadaia_workspace/public/schemas/`
   - **Done criterion:** `dadaia reports validate` accepts a v1.1 sidecar; schema file has `"$schema"` bumped to v1.1.
