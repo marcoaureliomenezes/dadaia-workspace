@@ -206,13 +206,13 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-04 done (DI wiring) -->
   <!-- done-when: `GET /api/academy` returns 200 with `[]` when no courses exist; bearer token required -->
 
-- [-] **T-P5-26** — Create `views/academy.py`: HTML scaffold for Academy tab with module list section and content section (hidden by default); follows same static-scaffold pattern as `agents.py` and `sessions.py`
+- [x] **T-P5-26** — Create `views/academy.py`: HTML scaffold for Academy tab with module list section and content section (hidden by default); follows same static-scaffold pattern as `agents.py` and `sessions.py`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/academy.py -->
   <!-- preconditions: T-P5-25 done -->
   <!-- done-when: file exists; HTML scaffold renders empty state when no modules -->
 
-- [ ] **T-P5-27** — Create `academy.js`: fetch `GET /api/academy`; render module cards (type chip, title, 2-line description, "Open →" CTA); handle click → content view with `[← Back to Academy]` breadcrumb; show empty state "No academy modules available" when list is empty; register via `window.Panel.register('academy', ...)`; use `window.escHtml`
+- [-] **T-P5-27** — Create `academy.js`: fetch `GET /api/academy`; render module cards (type chip, title, 2-line description, "Open →" CTA); handle click → content view with `[← Back to Academy]` breadcrumb; show empty state "No academy modules available" when list is empty; register via `window.Panel.register('academy', ...)`; use `window.escHtml`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/js/academy.js -->
   <!-- preconditions: T-P5-26 done, T-P5-07 done (window.Panel registry) -->
