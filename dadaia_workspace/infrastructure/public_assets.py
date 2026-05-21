@@ -795,13 +795,13 @@ class FileSystemPublicAssetManager:
     _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
 
     def _check_codex_drift(self, agentic_dir: Path, workspace_root: Path) -> list[str]:
-        """Run codex-parity drift checks D-CX-1 through D-CX-5.
+        """Run codex-parity drift checks D-CX-1 through D-CX-6.
 
-        Returns a list of ``[missing]``, ``[extra]``, or ``[error]`` report
-        strings.  An empty list means no drift was detected.  The caller
-        extends the main doctor report with these strings so that ``any(r
-        .startswith(("[missing", "[extra", "[error")) for r in reports)``
-        reliably signals a non-zero exit.
+        Returns a list of ``[missing]``, ``[extra]``, ``[error]``, ``[leak]``,
+        or ``[drift]`` report strings.  An empty list means no drift was
+        detected.  The caller extends the main doctor report with these strings
+        so that ``any(r.startswith(("[missing", "[extra", "[error", "[leak",
+        "[drift")) for r in reports)`` reliably signals a non-zero exit.
         """
         codex_dir = workspace_root / ".codex"
         out: list[str] = []
@@ -810,6 +810,7 @@ class FileSystemPublicAssetManager:
         out.extend(self._dcx3_workflow_drift(agentic_dir, codex_dir))
         out.extend(self._dcx4_claude_strings(codex_dir))
         out.extend(self._dcx5_empty_developer_instructions(codex_dir))
+        out.extend(self._dcx6_codex_runtime_adapters(workspace_root))
         return out
 
     def _dcx1_missing_toml(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
@@ -941,6 +942,46 @@ class FileSystemPublicAssetManager:
                 out.append(
                     f"[error] codex:{name}.toml: developer_instructions is empty (D-CX-5)"
                 )
+        return out
+
+    def _dcx6_codex_runtime_adapters(self, workspace_root: Path) -> list[str]:
+        """D-CX-6: public/runtime/codex/ adapters — leak, missing, drift checks.
+
+        For each <slug>/SKILL.md in public/runtime/codex/:
+        - [leak] if the file appears in .claude/skills/<slug>/SKILL.md
+        - [leak] if the file appears in .opencode/skills/<slug>/SKILL.md
+        - [missing] if .codex/skills/<slug>/SKILL.md does not exist
+        - [drift] if .codex/skills/<slug>/SKILL.md content differs from source
+        """
+        src_root = self._public_dir / "runtime" / "codex"
+        out: list[str] = []
+        if not src_root.exists():
+            return out
+        codex_skills = workspace_root / ".codex" / "skills"
+        claude_skills = workspace_root / ".claude" / "skills"
+        opencode_skills = workspace_root / ".opencode" / "skills"
+        for slug_dir in sorted(src_root.iterdir()):
+            if not slug_dir.is_dir():
+                continue
+            skill_src = slug_dir / "SKILL.md"
+            if not skill_src.exists():
+                continue
+            slug = slug_dir.name
+            src_text = skill_src.read_text(encoding="utf-8")
+            # Leak checks
+            for leak_root, label in [(claude_skills, "claude"), (opencode_skills, "opencode")]:
+                leak_path = leak_root / slug / "SKILL.md"
+                if leak_path.exists():
+                    out.append(
+                        f"[leak] {label}:skills/{slug}/SKILL.md"
+                        " — Codex-only adapter must not appear here (D-CX-6)"
+                    )
+            # Missing / drift
+            installed = codex_skills / slug / "SKILL.md"
+            if not installed.exists():
+                out.append(f"[missing] codex:skills/{slug}/SKILL.md (D-CX-6)")
+            elif installed.read_text(encoding="utf-8") != src_text:
+                out.append(f"[drift] codex:skills/{slug}/SKILL.md (D-CX-6)")
         return out
 
     def _lint_legacy_software_engineer(self) -> list[str]:
