@@ -114,19 +114,19 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: Phase A complete -->
   <!-- done-when: API returns `local`/`remote`; existing tests updated; panel displays "local"/"remote" terminology -->
 
-- [-] **T-P5-15** — Update Projects tab section header in `index.py`: change heading from "Memories" to "Projects"; remove "N active contexts — 1 primary" counter; add "N projects" plain count badge; add collapsible description block with expand toggle
+- [x] **T-P5-15** — Update Projects tab section header in `index.py`: change heading from "Memories" to "Projects"; remove "N active contexts — 1 primary" counter; add "N projects" plain count badge; add collapsible description block with expand toggle
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py -->
   <!-- preconditions: Phase B complete -->
   <!-- done-when: heading reads "Projects"; counter is gone; description block present with collapse/expand -->
 
-- [-] **T-P5-16** — Redesign Projects card HTML + CSS (4-zone anatomy): Zone A (name bold); Zone B (repo on own row, branch on own row, monospace, truncated with `text-overflow: ellipsis`); Zone D (three horizontal memory pill chips — Architecture, Tech Stack, Product — with `--color-chip-memory-bg` background, `--color-accent` border, `--radius-pill`); remove PRIMARY badge and primary left-border treatment; set uniform `4px solid var(--color-accent)` left accent on all cards
+- [x] **T-P5-16** — Redesign Projects card HTML + CSS (4-zone anatomy): Zone A (name bold); Zone B (repo on own row, branch on own row, monospace, truncated with `text-overflow: ellipsis`); Zone D (three horizontal memory pill chips — Architecture, Tech Stack, Product — with `--color-chip-memory-bg` background, `--color-accent` border, `--radius-pill`); remove PRIMARY badge and primary left-border treatment; set uniform `4px solid var(--color-accent)` left accent on all cards
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py (card template), dadaia_workspace/features/panel/views/assets/css/ (projects CSS module) -->
   <!-- preconditions: Phase B complete, T-P5-14 done -->
   <!-- done-when: no card shows PRIMARY badge; repo/branch on separate rows with truncation; memory chips are horizontal pills; all cards have mint left accent -->
 
-- [-] **T-P5-17** — Add session binding zone (Zone C) to Projects card: conditional zone shown only when project has >= 1 active session bound; tinted `--color-session-bg`; each session is one row with provider icon + truncated name (max 200px); max 3 rows, "+N more" for overflow
+- [x] **T-P5-17** — Add session binding zone (Zone C) to Projects card: conditional zone shown only when project has >= 1 active session bound; tinted `--color-session-bg`; each session is one row with provider icon + truncated name (max 200px); max 3 rows, "+N more" for overflow
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py, relevant CSS module -->
   <!-- preconditions: T-P5-16 done -->
