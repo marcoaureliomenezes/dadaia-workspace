@@ -9,6 +9,26 @@
 (function () {
   'use strict';
 
+  // ── Panel module registry ─────────────────────────────────────────
+  // Central registry for named panel modules. Each module calls
+  // window.Panel.register(name, mod) after defining itself.
+  // Tab activation calls window.Panel.activate(name, opts) which
+  // delegates to mod.load(opts).
+  (function initPanelRegistry() {
+    var _modules = {};
+    window.Panel = {
+      register: function (name, mod) {
+        _modules[name] = mod;
+      },
+      activate: function (name, opts) {
+        var mod = _modules[name];
+        if (mod && typeof mod.load === 'function') {
+          mod.load(opts);
+        }
+      },
+    };
+  })();
+
   // ── Token bootstrap ───────────────────────────────────────────────
   // On first load the panel URL carries ?token=<value>.
   // Persist it to sessionStorage so auth survives tab navigation,
@@ -122,7 +142,9 @@
     if (statusLabel) { statusLabel.textContent = formatAge(); }
   }
 
-  // ── Server table renderer ──────────────────────────────────────────
+  // ── HTML escape utility ────────────────────────────────────────────
+  // Canonical implementation; promoted to window.escHtml so all modules
+  // can share it without duplicating the function.
   function escHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -130,6 +152,9 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
+  window.escHtml = escHtml;
+
+  // ── Server table renderer ──────────────────────────────────────────
 
   function buildServersHTML(data) {
     var groups = data.groups;
@@ -241,5 +266,15 @@
       }
     }
   })();
+
+  // ── Register modules into window.Panel ───────────────────────────────
+  // Runs after all synchronous <script> tags have executed (DOMContentLoaded
+  // fires after the parser has processed every script in the document head/body).
+  // By this point window.Agents and window.Workflows are already defined by
+  // their respective script tags which are loaded after core.js.
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.Agents) { window.Panel.register('agents', window.Agents); }
+    if (window.Workflows) { window.Panel.register('workflows', window.Workflows); }
+  });
 
 })();
