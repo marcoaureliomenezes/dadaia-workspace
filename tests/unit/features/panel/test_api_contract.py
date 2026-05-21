@@ -210,7 +210,7 @@ def test_api_contexts_shape_contract() -> None:
     assert len(data["contexts"]) >= 1
 
     context = data["contexts"][0]
-    required_keys = {"slug", "name", "repo_path", "branch", "is_primary"}
+    required_keys = {"slug", "name", "repo_path", "branch", "is_primary", "status"}
     missing = required_keys - set(context.keys())
     assert not missing, f"Missing keys in context: {missing}"
 
@@ -221,6 +221,7 @@ def test_api_contexts_shape_contract() -> None:
         "context.branch must be str or null"
     )
     assert isinstance(context["is_primary"], bool), "context.is_primary must be bool"
+    assert context["status"] in ("local", "remote"), "context.status must be 'local' or 'remote'"
 
 
 def test_api_contexts_empty_returns_empty_list() -> None:

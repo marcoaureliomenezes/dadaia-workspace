@@ -108,7 +108,7 @@ complete**. Each group has disjoint write sets.
 <!-- owner: frontend-engineer (CSS/JS/HTML); software-engineer-python (API status rename) -->
 <!-- parallel-safe with: Phase D, Phase E -->
 
-- [-] **T-P5-14** — Update `GET /api/contexts` (or equivalent) API response to rename status labels `active` → `local` and `inactive` → `remote`; update any frontend references to these status strings
+- [x] **T-P5-14** — Update `GET /api/contexts` (or equivalent) API response to rename status labels `active` → `local` and `inactive` → `remote`; update any frontend references to these status strings
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/api.py (contexts endpoint) -->
   <!-- preconditions: Phase A complete -->
