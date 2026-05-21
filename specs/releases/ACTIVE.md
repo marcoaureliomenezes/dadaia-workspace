@@ -1,5 +1,5 @@
-release: none
-phase: none
+release: codex-design-frontend-projection-pilot-v1
+phase: TASKS
 
 # History
 # 2026-05-20 — infra-correctness-v1 CLOSED + ARCHIVED. P1-P7 complete. 48 tasks done. 7 tech-debt items liquidated.

@@ -1,10 +1,10 @@
 # Backlog Draft SPEC — codex-design-frontend-projection-pilot-v1
 
-**Status:** Draft
+**Status:** Aprovado
 **Backlog candidate:** codex-design-frontend-projection-pilot-v1
-**Parent candidate:** codex-agent-orchestration-parity-v1
 **Owner:** product-engineer
 **Created:** 2026-05-19
+**ADRs fechados:** 2026-05-20 (grill-me session)
 
 > This is a backlog discovery draft, not an active release artifact. It does not authorize
 > PLAN.md, TASKS.md, implementation, or production edits. Promotion requires the normal
@@ -20,15 +20,19 @@ ready:
 
 - Shared skills under `dadaia_workspace/public/skills/` are projected to both
   `.claude/skills/` and `.agents/skills/`, so they are not Codex-only.
-- `public/plugins/` is staged and projected to OpenCode, but `_install_codex()` does not
-  install plugins for Codex.
+- `public/plugins/` is staged and projected to OpenCode only; `_install_codex()` does not
+  install plugins for Codex and no `.codex/plugins/` directory exists — Codex-only assets
+  must use a dedicated source path (ADR-CX-001: `public/runtime/codex/`).
 - Codex config currently exposes shared skills through `[skills] paths = [".agents/skills"]`.
-- `design-specialist` already references a missing `frontend-design` skill.
-- `frontend-engineer` declares handoff-schema outputs but does not list
-  `dadaia-handoff-emitter`.
+- `design-specialist` frontmatter lists only `dadaia-handoff-emitter`; skills
+  `frontend-design`, `ux-ui-review`, `design-reference-research`, `design-report-quality-gate`
+  must be created and added (ADR-CX-005).
+- `frontend-engineer` frontmatter is missing `dadaia-handoff-emitter` and
+  `frontend-implementation-quality` (ADR-CX-005).
 
-This pilot is a slice of `codex-agent-orchestration-parity-v1`. It must prove the
-runtime-scoped asset boundary before the wider Codex parity release adopts it.
+This is a standalone release focused on shared skills creation, agent boundary hardening,
+and establishing the Codex-only asset boundary. `codex-agent-orchestration-parity-v1` is
+closed and archived; this release does not depend on it.
 
 ---
 
@@ -118,10 +122,9 @@ The pilot must harden, not weaken, the existing design/frontend split:
 ## 4. Out of Scope
 
 - Codex workflow runtime or dispatcher parity.
-- Native `.codex/agents/*.toml` for all 16 agents, except minimal test fixtures needed for
-  this pilot.
+- Native `.codex/agents/*.toml` for all 20 agents (20 already exist from
+  `codex-agent-orchestration-parity-v1`); this release does not add new agent TOMls.
 - Changing canonical `project-manager` / `project-auditor` Agent-tool wording.
-- Touching active `panel-r4-v1` or draft `panel-r5-v1` scope.
 - Giving `frontend-engineer` design authority.
 - Giving `design-specialist` Playwright, image generation, Bash, Edit, or production-code
   permissions.
@@ -147,8 +150,9 @@ The pilot must harden, not weaken, the existing design/frontend split:
   accidental OpenCode leak.
 - **C9:** any `.codex/config.toml` changes parse with `tomllib` and preserve shared
   `[skills] paths` behavior or document the ADR-approved replacement.
-- **C10:** the pilot SPEC names the exact external Codex plugin/skill bundle choices for
-  `design-specialist` and `frontend-engineer` before implementation.
+- **C10:** the pilot SPEC names the exact Codex-only adapter candidates for
+  `design-specialist` and `frontend-engineer`, sourced from `public/runtime/codex/`
+  (ADR-CX-001), before implementation begins.
 
 ---
 
@@ -156,7 +160,7 @@ The pilot must harden, not weaken, the existing design/frontend split:
 
 ### design-specialist
 
-Recommended shared skills:
+Approved shared skills (ADR-CX-005):
 
 - `frontend-design`
 - `ux-ui-review`
@@ -164,12 +168,10 @@ Recommended shared skills:
 - `design-report-quality-gate`
 - `dadaia-handoff-emitter`
 
-Recommended Codex-only adapter/plugin candidates, pending FR1 ADR:
+Codex-only adapter candidates (source: `public/runtime/codex/` per ADR-CX-001):
 
-- Figma read-only/context adapter for design systems, Code Connect context, and design
-  parity review.
-- Design context injection adapter similar in spirit to `ctx-inject.ts`, but read-only and
-  scoped to latest QA/design reports.
+- Design context injection adapter scoped to latest QA/design reports (read-only).
+- Figma read-only context adapter (deferred to follow-up; not in this pilot's scope).
 
 Rejected for this agent:
 
@@ -179,7 +181,7 @@ Rejected for this agent:
 
 ### frontend-engineer
 
-Recommended shared skills:
+Approved shared skills (ADR-CX-005):
 
 - `dadaia-workspace-spec-navigator`
 - `dadaia-task-manager`
@@ -187,14 +189,11 @@ Recommended shared skills:
 - `frontend-implementation-quality`
 - `dadaia-handoff-emitter`
 
-Recommended Codex-only adapter/plugin candidates, pending FR1 ADR:
+Codex-only adapter candidates (source: `public/runtime/codex/` per ADR-CX-001):
 
-- Build Web Apps / frontend implementation adapter for component implementation and visual
-  QA prompts, limited to objective implementation gates.
-- React best-practices adapter when a repo is React/Next.
-- shadcn adapter only when `components.json` or equivalent project evidence exists.
-- Figma consumer adapter only to read handoff/design-system context, not to decide design.
-- Expo adapter only for React Native/Expo repos.
+- Frontend implementation context adapter for latest design report, active task, and
+  dev-server registry state (read-only context injection).
+- React/shadcn/Expo adapters deferred — conditional on repo evidence; not in this pilot.
 
 Rejected for this agent:
 
@@ -204,24 +203,30 @@ Rejected for this agent:
 
 ---
 
-## 7. Required ADRs Before PLAN
+## 7. ADRs — Fechados em 2026-05-20 (grill-me session)
 
-- **ADR-CX-001:** Runtime-scoped public asset layout (`public/runtime/<runtime>/**` or
-  accepted alternative).
-- **ADR-CX-002:** Codex plugin/skill projection format and runtime-consumption proof.
-- **ADR-CX-003:** Shared skill vs Codex-only adapter classification rules.
-- **ADR-CX-004:** Null-regression methodology for Claude/OpenCode projections.
-- **ADR-CX-005:** UX/frontend role boundary hardening.
+- **ADR-CX-001 ✅:** Codex-only assets vivem em `dadaia_workspace/public/runtime/codex/`.
+  `_install_codex()` lê de lá; shared assets continuam em `public/skills/`.
+- **ADR-CX-002 ✅:** Sem plugins nativos Codex. Codex consome apenas `[skills] paths =
+  [".agents/skills"]`. Projetar `.codex/plugins/` viola NFR4 — não há evidência de consumo
+  pelo runtime. (Respondido via inspeção: nenhum `.codex/plugins/` existe.)
+- **ADR-CX-003 ✅:** Shared em `public/skills/<name>/`; adapter Codex-only separado em
+  `public/runtime/codex/<name>/`. Sem overrides dentro do shared. Doctor verifica que
+  `runtime/codex/` nunca vaza para `.claude/` ou `.opencode/`.
+- **ADR-CX-004 ✅:** Null-regression via SHA snapshot pytest. Fixture calcula hash de
+  `.claude/**` e `.opencode/**` antes e depois de `install --target codex`; diferença = falha.
+- **ADR-CX-005 ✅:** Listas exatas de skills aprovadas (ver §6). Tools não mudam em nenhum
+  dos dois agentes.
 
 ---
 
 ## 8. Discovery Inputs
 
-- Product-engineer consultation: pilot should be a child of
-  `codex-agent-orchestration-parity-v1`, not a competing release.
 - Software-architect consultation: runtime-scoped assets are required; plugin projection must
   not repeat the old `.codex/agents/` problem of projecting files the runtime does not read.
 - Design-specialist consultation: fix `frontend-design`, keep design no-code/no-raster, and
   prefer report/reference skills over browser/image plugins.
 - Frontend-engineer consultation: add handoff emitter, add objective implementation-quality
   skill, keep Playwright/E2E with QA.
+- Grill-me session 2026-05-20: all 5 ADRs closed (see §7). Release is standalone — no
+  parent dependency on `codex-agent-orchestration-parity-v1` (closed and archived).
