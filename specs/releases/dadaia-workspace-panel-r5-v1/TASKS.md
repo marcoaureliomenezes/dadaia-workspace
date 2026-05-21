@@ -200,7 +200,7 @@ complete**. Each group has disjoint write sets.
 
 <!-- owner: software-engineer-python (API/DI) + frontend-engineer (HTML/CSS/JS) -->
 
-- [-] **T-P5-25** — Add `GET /api/academy` route to `handler.py` as bearer-only; add `render_api_academy()` to `api.py` calling `service.academy.list_all()` when `service.academy is not None`, returning JSON list; return empty list with 200 if `service.academy is None`
+- [x] **T-P5-25** — Add `GET /api/academy` route to `handler.py` as bearer-only; add `render_api_academy()` to `api.py` calling `service.academy.list_all()` when `service.academy is not None`, returning JSON list; return empty list with 200 if `service.academy is None`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/handler.py, dadaia_workspace/features/panel/views/api.py -->
   <!-- preconditions: T-P5-04 done (DI wiring) -->

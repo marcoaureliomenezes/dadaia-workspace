@@ -801,6 +801,39 @@ def render_api_session_detail(
     return _view
 
 
+def render_api_academy(
+    service: PanelService,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """Return ``GET /api/academy`` view — list all academy courses.
+
+    Returns 200 with empty list when service.academy is None.
+    Each course: slug, name, module_number, module_name, created_at.
+    course_dir is intentionally omitted (server-side filesystem path).
+    """
+
+    def _view(**_kwargs: object) -> tuple[int, str, bytes]:
+        if service.academy is None:
+            body = json.dumps({"courses": []}).encode("utf-8")
+            return (200, "application/json; charset=utf-8", body)
+        courses = service.academy.list_all()
+        payload = {
+            "courses": [
+                {
+                    "slug": c.slug,
+                    "name": c.name,
+                    "module_number": c.module_number,
+                    "module_name": c.module_name,
+                    "created_at": c.created_at,
+                }
+                for c in courses
+            ]
+        }
+        body = json.dumps(payload).encode("utf-8")
+        return (200, "application/json; charset=utf-8", body)
+
+    return _view
+
+
 def _compute_30d_cost(summary: AgentSummary) -> float | None:
     """Compute total_cost_30d_usd from the summary's recent_sessions.
 

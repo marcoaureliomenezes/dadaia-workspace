@@ -78,6 +78,30 @@ _FORBIDDEN_JSON_KEYS: frozenset[str] = frozenset(
     ["content", "text", "messages", "snapshot", "thinking", "prompt", "response"]
 )
 
+# ---------------------------------------------------------------------------
+# Route categories — declare category before adding a new route.
+#
+# PUBLIC (no auth required):
+#   /                              index (full panel HTML)
+#   /memory/<slug>/<path>          memory atom HTML
+#   /memory-view/<slug>/<path>     memory atom wrapper HTML
+#   /static/<name>                 static assets (CSS, JS, SVG)
+#
+# BEARER-ONLY (Bearer token required; no telemetry dependency; always 200):
+#   /api/academy                   academy course list
+#   /api/agents/<id>/prompt        agent prompt text
+#   /api/workflows                 workflow list
+#   /api/workflows/<name>          workflow detail + DAG SVG
+#
+# BEARER + TELEMETRY (Bearer token required; returns 503 when telemetry is None):
+#   /api/agents                    canonical agent catalog with telemetry overlay
+#   /api/agents/<id>/sessions      per-agent session list
+#   /api/contexts                  active Spec Context Projects
+#   /api/servers                   server registry grouped by context
+#   /api/sessions                  active sessions across all runtimes
+#   /api/sessions/<runtime>/<id>   single session detail
+# ---------------------------------------------------------------------------
+
 # Route patterns: order matters — more-specific patterns first.
 _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/$", "index"),
@@ -91,6 +115,7 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/api/sessions/(?P<runtime>[^/]+)/(?P<session_id>[^/]+)$", "api_session_detail"),
     (r"^/api/sessions$", "api_sessions"),
     (r"^/api/servers$", "api_servers"),
+    (r"^/api/academy$", "api_academy"),
     (r"^/api/contexts$", "api_contexts"),
     (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory"),
     (r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$", "memory_view"),
@@ -104,6 +129,7 @@ _AUTH_REQUIRED_PREFIX = "/api/"
 # These are dispatched after auth check, bypassing the telemetry-not-configured 503.
 _BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
     {
+        "api_academy",
         "api_agent_prompt",
         "api_workflows",
         "api_workflow_detail",
@@ -180,7 +206,7 @@ def make_handler_class(
         ``(status_code, content_type, body_bytes)`` triple.
 
         Required keys: ``"index"``, ``"api_servers"``, ``"api_contexts"``,
-        ``"memory"``, ``"memory_view"``, ``"static"``.
+        ``"api_academy"``, ``"memory"``, ``"memory_view"``, ``"static"``.
 
     token:
         The expected Bearer token.  When provided, all ``/api/*`` routes
@@ -201,6 +227,7 @@ def make_handler_class(
     # in which case it is dispatched from views with active_window_days kwarg.
     # Routes that require Bearer auth: telemetry routes + bearer-only (no telemetry needed).
     _BEARER_AUTH_ROUTE_NAMES = (
+        "api_academy",
         "api_agents",
         "api_agent_prompt",
         "api_agent_sessions",
@@ -299,7 +326,15 @@ def make_handler_class(
         ) -> None:
             """Route to the appropriate telemetry handler method."""
             try:
-                if route_name == "api_agent_prompt":
+                if route_name == "api_academy":
+                    # T-P5-25: academy course list (bearer-only, no telemetry needed).
+                    if "api_academy" in views:
+                        status, content_type, body = views["api_academy"]()
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+                elif route_name == "api_agent_prompt":
                     # PR3-09: path-traversal-guarded prompt endpoint.
                     # The view callable performs all validation; handler just forwards.
                     agent_id = groups.get("agent_id", "")
