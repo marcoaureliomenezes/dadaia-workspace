@@ -31,7 +31,8 @@ JSON shapes (stable contract — if changed, panel.js must be updated in lockste
         "name":          str,
         "repo_path":     str,
         "branch":        str | null,
-        "is_primary":    bool
+        "is_primary":    bool,
+        "status":        "local" | "remote"
       }
     ]
   }
@@ -155,6 +156,7 @@ def render_api_contexts(
                     "repo_path": str(c.repo_path),
                     "branch": c.branch,
                     "is_primary": c.is_primary,
+                    "status": "local" if c.is_primary else "remote",
                 }
                 for c in contexts
             ]
