@@ -288,7 +288,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** May run concurrently with T-12.
 
 ```
-[ ] T-13 — Write SHA null-regression and doctor leak detection tests
+[-] T-13 — Write SHA null-regression and doctor leak detection tests
 ```
 
 ---
