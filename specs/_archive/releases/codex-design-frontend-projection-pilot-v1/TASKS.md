@@ -334,5 +334,5 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Sequential; must be last.
 
 ```
-[ ] T-15 — Write CLOSURE.md and archive release
+[x] T-15 — Write CLOSURE.md and archive release
 ```
