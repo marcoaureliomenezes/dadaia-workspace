@@ -121,7 +121,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Safe to run concurrently with T-01, T-02, T-03, T-04, T-06, T-07.
 
 ```
-[ ] T-05 — Update design-specialist.md frontmatter skills list
+[-] T-05 — Update design-specialist.md frontmatter skills list
 ```
 
 ---
