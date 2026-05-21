@@ -48,7 +48,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Safe to run concurrently with T-01, T-03, T-04, T-05, T-06, T-07.
 
 ```
-[ ] T-02 — Create public/skills/design-reference-research/SKILL.md
+[-] T-02 — Create public/skills/design-reference-research/SKILL.md
 ```
 
 ---
