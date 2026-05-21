@@ -14,6 +14,8 @@ skills:
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
   - dev-server-registry
+  - frontend-implementation-quality
+  - dadaia-handoff-emitter
 maxTurns: 60
 input_contract:
   requires_inputs:
