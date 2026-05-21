@@ -158,7 +158,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Safe to run concurrently with T-01 through T-06.
 
 ```
-[ ] T-07 — Create dadaia_workspace/public/runtime/codex/ with README
+[-] T-07 — Create dadaia_workspace/public/runtime/codex/ with README
 ```
 
 ---
