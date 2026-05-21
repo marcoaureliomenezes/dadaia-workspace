@@ -206,7 +206,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-04 done (DI wiring) -->
   <!-- done-when: `GET /api/academy` returns 200 with `[]` when no courses exist; bearer token required -->
 
-- [ ] **T-P5-26** — Create `views/academy.py`: HTML scaffold for Academy tab with module list section and content section (hidden by default); follows same static-scaffold pattern as `agents.py` and `sessions.py`
+- [-] **T-P5-26** — Create `views/academy.py`: HTML scaffold for Academy tab with module list section and content section (hidden by default); follows same static-scaffold pattern as `agents.py` and `sessions.py`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/academy.py -->
   <!-- preconditions: T-P5-25 done -->
