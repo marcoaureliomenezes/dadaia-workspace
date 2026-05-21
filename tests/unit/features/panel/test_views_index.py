@@ -6,6 +6,9 @@ Covers:
   - Primary context appears first in grid (DOM order)
   - XSS: malicious <script> in project/context fields is html.escape()'d
   - OWASP A03: no raw user-controlled string survives into HTML unescaped
+
+T-P5-01: PANEL_JS and PANEL_CSS removed from _assets.py. Tests that previously
+imported them from _assets now build them inline from individual JS/CSS files.
 """
 
 from pathlib import Path
@@ -14,6 +17,33 @@ from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
+
+# ---------------------------------------------------------------------------
+# JS / CSS assembly helpers (T-P5-01: PANEL_JS and PANEL_CSS moved out of _assets)
+# ---------------------------------------------------------------------------
+_JS_DIR = (
+    Path(__file__).parent.parent.parent.parent.parent
+    / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "js"
+)
+
+
+def _build_panel_js() -> str:
+    return (
+        (_JS_DIR / "core.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
+    )
+
+
+def _build_panel_css() -> str:
+    from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
+    from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
+    from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
+    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+    from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
+    return TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
 
 # ---------------------------------------------------------------------------
 # Fakes (same pattern as test_service.py)
@@ -289,13 +319,12 @@ def test_tabpanel_count_is_three() -> None:
 
 def test_panel_js_contains_keydown_handler() -> None:
     """T-AM-01: PANEL_JS must include keyboard navigation for ArrowRight/ArrowLeft/Home/End."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "ArrowRight" in PANEL_JS
-    assert "ArrowLeft" in PANEL_JS
-    assert "Home" in PANEL_JS
-    assert "End" in PANEL_JS
-    assert "keydown" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "ArrowRight" in panel_js
+    assert "ArrowLeft" in panel_js
+    assert "Home" in panel_js
+    assert "End" in panel_js
+    assert "keydown" in panel_js
 
 
 # ---------------------------------------------------------------------------
@@ -423,29 +452,25 @@ def test_memory_link_hrefs_unchanged() -> None:
 
 def test_panel_js_has_token_bootstrap() -> None:
     """panel-defects Bug 3: PANEL_JS must include token bootstrap from URLSearchParams."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "panel_token" in PANEL_JS
-    assert "sessionStorage" in PANEL_JS
-    assert "URLSearchParams" in PANEL_JS
-    assert "history.replaceState" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "panel_token" in panel_js
+    assert "sessionStorage" in panel_js
+    assert "URLSearchParams" in panel_js
+    assert "history.replaceState" in panel_js
 
 
 def test_panel_js_has_authed_fetch_wrapper() -> None:
     """panel-defects Bug 3: PANEL_JS must define authedFetch with Bearer header."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "authedFetch" in PANEL_JS
-    assert "Authorization" in PANEL_JS
-    assert "Bearer" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch" in panel_js
+    assert "Authorization" in panel_js
+    assert "Bearer" in panel_js
 
 
 def test_panel_js_agents_uses_authed_fetch() -> None:
     """panel-defects Bug 3: Agents.load must use authedFetch, not bare fetch."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    # authedFetch must be called for the agents endpoint
-    assert "authedFetch('/api/agents" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch('/api/agents" in panel_js
 
 
 def test_panel_js_workflows_uses_authed_fetch() -> None:
@@ -454,9 +479,8 @@ def test_panel_js_workflows_uses_authed_fetch() -> None:
     PR5-D6 (runtime retrofit): URL now includes ?runtime= query param so the
     fetch reads authedFetch('/api/workflows?runtime=' + ...).
     """
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "authedFetch('/api/workflows?runtime='" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch('/api/workflows?runtime='" in panel_js
 
 
 def test_panel_js_sessions_uses_authed_fetch() -> None:
@@ -468,10 +492,8 @@ def test_panel_js_sessions_uses_authed_fetch() -> None:
     The assertion checks the URL prefix which is stable regardless of the query
     string appended dynamically at runtime.
     """
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    # agents.js (in PANEL_JS) calls authedFetch with /api/agents base URL (PR5-D5 appends ?runtime=)
-    assert "authedFetch('/api/agents?runtime='" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch('/api/agents?runtime='" in panel_js
 
 
 # ---------------------------------------------------------------------------
@@ -586,29 +608,24 @@ def test_panel_js_workflows_has_card_grid() -> None:
 
     The old 2-pane stepper (buildStepperSVG) was replaced by the card-grid
     layout in PR3-16. This test verifies the new card-grid JS is present
-    in workflows.js (included in PANEL_JS).
+    in workflows.js (included in assembled JS).
     """
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    # The card grid renderer must reference the .workflow-card element class
-    assert "workflow-card" in PANEL_JS
-    # The CTA affordance must carry data-workflow-name for PR3-17 to wire
-    assert "data-workflow-name" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "workflow-card" in panel_js
+    assert "data-workflow-name" in panel_js
 
 
 def test_panel_js_workflows_exposes_window_workflows() -> None:
     """PR3-16: PANEL_JS must include window.Workflows from workflows.js."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "window.Workflows" in PANEL_JS
-    assert "/api/workflows" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "window.Workflows" in panel_js
+    assert "/api/workflows" in panel_js
 
 
 def test_panel_css_has_workflows_pane_layout() -> None:
     """panel-defects Bug 4: PANEL_CSS must contain 2-pane grid layout."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_CSS
-
-    assert ".workflows-pane" in PANEL_CSS
-    assert ".workflows-list" in PANEL_CSS
-    assert ".workflows-detail" in PANEL_CSS
-    assert "workflow-list-item" in PANEL_CSS
+    panel_css = _build_panel_css()
+    assert ".workflows-pane" in panel_css
+    assert ".workflows-list" in panel_css
+    assert ".workflows-detail" in panel_css
+    assert "workflow-list-item" in panel_css

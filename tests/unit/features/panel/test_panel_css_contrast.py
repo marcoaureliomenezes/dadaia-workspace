@@ -14,7 +14,22 @@ from __future__ import annotations
 
 import re
 
-from dadaia_workspace.features.panel.views._assets import PALETTE, PANEL_CSS
+from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
+from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
+from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
+
+# T-P5-01: PALETTE and PANEL_CSS removed from _assets.py. Inline them here.
+PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+
+PALETTE: dict[str, str] = {
+    "accent": "#9cddc8",
+    "accent_secondary": "#bfd8ad",
+    "warning_bg": "#ddd9ab",
+    "alert": "#f7af63",
+    "cost": "#633d2e",
+}
 
 # ---------------------------------------------------------------------------
 # WCAG relative-luminance + contrast-ratio helpers (stdlib only)
