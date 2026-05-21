@@ -11,6 +11,10 @@ tools:
   - WebSearch
   - Write
 skills:
+  - frontend-design
+  - ux-ui-review
+  - design-reference-research
+  - design-report-quality-gate
   - dadaia-handoff-emitter
 maxTurns: 40
 applyTo: ".dadaia/reports/**"
