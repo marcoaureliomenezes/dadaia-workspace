@@ -27,7 +27,7 @@ complete**. Each group has disjoint write sets.
 
 <!-- owner: software-engineer-python (A1–A3, A5, A6, A7) + frontend-engineer (A4) -->
 
-- [ ] **T-P5-01** — Remove `PANEL_CSS`, `PANEL_JS`, and `PALETTE` from `_assets.py`; retain only `LOGO_RHINO_24` and `LOGO_RHINO_16` path constants until Phase B logo migration completes
+- [-] **T-P5-01** — Remove `PANEL_CSS`, `PANEL_JS`, and `PALETTE` from `_assets.py`; retain only `LOGO_RHINO_24` and `LOGO_RHINO_16` path constants until Phase B logo migration completes
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/_assets.py -->
   <!-- done-when: `PANEL_CSS`, `PANEL_JS`, `PALETTE` are absent from `_assets.py`; existing tests pass -->
