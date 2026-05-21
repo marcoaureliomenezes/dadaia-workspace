@@ -38,7 +38,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-01 done -->
   <!-- done-when: `index.py` has no import of `_assets.py`; panel starts and logo renders in topbar -->
 
-- [ ] **T-P5-03** — Harden `_try_build_telemetry()` in `panel.py`: replace bare `except Exception` with per-type handlers (`PermissionError`, `OSError`, `sqlite3.OperationalError`, `ImportError`) each emitting a `logging.warning` with the root cause before returning `None`
+- [-] **T-P5-03** — Harden `_try_build_telemetry()` in `panel.py`: replace bare `except Exception` with per-type handlers (`PermissionError`, `OSError`, `sqlite3.OperationalError`, `ImportError`) each emitting a `logging.warning` with the root cause before returning `None`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/panel.py -->
   <!-- done-when: unit test covers each exception type; warning is emitted; `None` is returned safely -->
