@@ -90,6 +90,22 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 
 ---
 
+### T-04b
+
+- **ID:** T-04b
+- **Description:** Create `dadaia_workspace/public/skills/ux-ui-review/SKILL.md`
+- **Owner:** ai-engineer
+- **Target files:** `dadaia_workspace/public/skills/ux-ui-review/SKILL.md`
+- **Preconditions:** SPEC Aprovado (gap fix — omitted from original PLAN; required by T-05 done criterion and AC C1)
+- **Done criterion:** File exists; describes review protocol for screenshots → design-token audit → a11y check → spacing/typography verification. No Bash or Edit in protocol. AC C1 passes for this skill reference.
+- **Parallel note:** Safe to run concurrently with T-01 through T-07.
+
+```
+[ ] T-04b — Create public/skills/ux-ui-review/SKILL.md
+```
+
+---
+
 ## Phase P2 — Agent frontmatter update
 
 ### T-05
