@@ -85,10 +85,10 @@
 
 ## P8 — CLOSURE prep  *(após P7)*
 
-- [ ] T-42 `[product-engineer]` Rodar `pytest` completo — zero falhas, zero xfail ativos desta release
-- [ ] T-43 `[product-engineer]` Rodar `python scripts/check_agent_topology.py` — I1–I6 passam
-- [ ] T-44 `[product-engineer]` Rodar `dadaia public doctor` — sem drift
-- [ ] T-45 `[product-engineer]` Atualizar `ACTIVE.md` phase → `CLOSURE`
-- [ ] T-46 `[product-engineer]` Autor CLOSURE.md com evidências dos 7 critérios de aceite
-- [ ] T-47 `[product-engineer]` Arquivar release: mover para `specs/_archive/releases/infra-correctness-v1/`
-- [ ] T-48 `[product-engineer]` Reset `ACTIVE.md` → `release: none` / `phase: none`
+- [x] T-42 `[product-engineer]` Rodar `pytest` completo — zero falhas, zero xfail ativos desta release
+- [x] T-43 `[product-engineer]` Rodar `python scripts/check_agent_topology.py` — I1–I6 passam
+- [x] T-44 `[product-engineer]` Rodar `dadaia public doctor` — sem drift
+- [x] T-45 `[product-engineer]` Atualizar `ACTIVE.md` phase → `CLOSURE`
+- [x] T-46 `[product-engineer]` Autor CLOSURE.md com evidências dos 7 critérios de aceite
+- [x] T-47 `[product-engineer]` Arquivar release: mover para `specs/_archive/releases/infra-correctness-v1/`
+- [x] T-48 `[product-engineer]` Reset `ACTIVE.md` → `release: none` / `phase: none`
