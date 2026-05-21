@@ -1052,6 +1052,7 @@ class FileSystemPublicAssetManager:
         self._install_codex_workflows(agentic_dir, workspace_root, force, installed)
         self._install_universal_skills(agentic_dir, workspace_root, force, installed)
         self._install_codex_agents(agentic_dir, workspace_root, force, installed)
+        self._install_codex_runtime_adapters(workspace_root, force, installed)
         self._write_generated(
             codex_dir / "hooks.json",
             _json_dump(self._codex_hooks(workspace_root)),
@@ -1168,6 +1169,29 @@ class FileSystemPublicAssetManager:
             else:
                 dst.write_text(toml_content, encoding="utf-8")
                 installed.append(f"[ok]   {dst}")
+
+    def _install_codex_runtime_adapters(
+        self, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Copy Codex-only adapter SKILL.md files from public/runtime/codex/ to .codex/skills/.
+
+        ADR-CX-001: source is public/runtime/codex/<slug>/SKILL.md.
+        ADR-CX-003: these files must NOT appear in .claude/ or .opencode/.
+        """
+        src_root = self._public_dir / "runtime" / "codex"
+        if not src_root.exists():
+            return
+        dst_root = workspace_root / ".codex" / "skills"
+        dst_root.mkdir(parents=True, exist_ok=True)
+        for slug_dir in sorted(src_root.iterdir()):
+            if not slug_dir.is_dir():
+                continue
+            skill_src = slug_dir / "SKILL.md"
+            if not skill_src.exists():
+                continue
+            skill_dst = dst_root / slug_dir.name / "SKILL.md"
+            skill_dst.parent.mkdir(parents=True, exist_ok=True)
+            self._copy_file(skill_src, skill_dst, force, installed)
 
     def _install_opencode(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
