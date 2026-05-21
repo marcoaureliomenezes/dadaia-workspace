@@ -5,6 +5,19 @@ Factory: ``render_index(service) -> Callable[..., tuple[int, str, bytes]]``
 Security (R3-A / OWASP A03): every operator-controlled string inserted into HTML
 is passed through ``html.escape()`` before interpolation. This covers server
 ``project``, ``url``, context ``name``, ``slug``, ``branch``, and ``group_label``.
+
+SSR-vs-client-side policy
+--------------------------
+SSR (data inlined into the initial HTML response, no auth required):
+  - Contexts (active Spec Context Projects) — small payload, public
+  - Servers (server registry grouped by context) — small payload, public
+  - Academy initial scaffold — public empty shell; content fetched client-side
+
+Client-side (fetched via XHR/fetch after Bearer auth):
+  - Agents    — auth-gated; telemetry-enriched; dynamic
+  - Sessions  — auth-gated; large/dynamic; runtime-dependent
+  - Workflows — auth-gated; file-system backed
+  - Reports   — auth-gated; file-system backed; sidecar-indexed
 """
 
 from __future__ import annotations
@@ -13,9 +26,10 @@ import html
 from collections.abc import Callable, Sequence
 
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
-from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24
+from dadaia_workspace.features.panel.views.academy import render_academy_section
 from dadaia_workspace.features.panel.views.agents import render_agents_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
+from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section
 
 
@@ -41,14 +55,8 @@ def render_index(
         sorted_contexts = sorted(contexts, key=lambda c: (not c.is_primary,))
         memories_html = "".join(_render_context_card(c) for c in sorted_contexts)
         context_count = len(contexts)
-        primary_count = sum(1 for c in contexts if c.is_primary)
-        count_label = (
-            f'<p class="context-count">'
-            f"<strong>{context_count}</strong> active contexts"
-            f" &mdash; {primary_count} primary"
-            f"</p>"
-        )
 
+        academy_section = render_academy_section()
         agents_section = render_agents_section()
         workflows_section = render_workflows_section()
         sessions_section = render_sessions_section()
@@ -63,6 +71,7 @@ def render_index(
   <script>(function(){{var r=localStorage.getItem('dadaia-panel-runtime');if(r&&(r==='claude'||r==='codex')){{document.documentElement.dataset.runtime=r;}}}})();</script>
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
+  <link rel="stylesheet" href="/static/projects.css">
   <link rel="stylesheet" href="/static/agents.css">
   <link rel="stylesheet" href="/static/workflows.css">
   <link rel="stylesheet" href="/static/sessions.css">
@@ -135,16 +144,21 @@ def render_index(
 
     <section id="section-memories" class="section active" aria-label="Spec Context Project memories" role="tabpanel" tabindex="0" aria-labelledby="tab-memories">
       <div class="section-header">
-        <h2>Memories</h2>
-        <p>Architecture, tech-stack and product memories for each active Spec Context Project.</p>
+        <h2>Projects</h2>
+        <span class="projects-count-badge">{context_count} projects</span>
       </div>
-      {count_label}
+      <details class="section-desc">
+        <summary>About this section</summary>
+        <p>Active Spec Context Projects — architecture, tech-stack and product memories for each repo.</p>
+      </details>
       <div class="cards-grid" role="list" aria-label="Active Spec Context Projects">
         {memories_html}
       </div>
     </section>
 
     {agents_section}
+
+    {academy_section}
 
     {workflows_section}
 
@@ -209,41 +223,22 @@ def _render_servers(groups: Sequence[ServerGroup]) -> str:
 
 
 def _render_context_card(ctx: PanelContext) -> str:
-    primary_class = " primary" if ctx.is_primary else ""
-    badge = (
-        '<div class="card-primary-badge" aria-label="Primary context">primary</div>'
-        if ctx.is_primary
-        else ""
-    )
     branch = html.escape(ctx.branch or "(unknown)")
     name = html.escape(ctx.name)
     slug = html.escape(ctx.slug)
+    zone_c = f'<div class="card-zone-c" data-slug="{slug}" aria-live="polite"></div>'
     return (
-        f'<article class="context-card{primary_class}" role="listitem">'
-        f'<div class="card-header">'
-        f'<div class="card-name">{name}</div>'
-        f"{badge}"
+        f'<article class="context-card" role="listitem">'
+        f'<div class="card-zone-a"><span class="card-name">{name}</span></div>'
+        f'<div class="card-zone-b">'
+        f'<span class="card-meta-row">repo: <code class="card-mono">{slug}</code></span>'
+        f'<span class="card-meta-row">branch: <code class="card-mono">{branch}</code></span>'
         f"</div>"
-        f'<div class="card-meta">'
-        f"<span>repo: <code>{slug}</code></span>"
-        f"<span>branch: <code>{branch}</code></span>"
-        f"</div>"
-        f'<nav class="card-links">'
-        f'<a class="memory-link" href="/memory-view/{slug}/architecture.html">'
-        f'<span class="memory-link-icon" aria-hidden="true">&#9632;</span>'
-        f'<span class="memory-link-label">Architecture</span>'
-        f'<span class="memory-link-arrow" aria-hidden="true">&#8594;</span>'
-        f"</a>"
-        f'<a class="memory-link" href="/memory-view/{slug}/tech-stack.html">'
-        f'<span class="memory-link-icon" aria-hidden="true">&#9632;</span>'
-        f'<span class="memory-link-label">Tech Stack</span>'
-        f'<span class="memory-link-arrow" aria-hidden="true">&#8594;</span>'
-        f"</a>"
-        f'<a class="memory-link" href="/memory-view/{slug}/product/index.html">'
-        f'<span class="memory-link-icon" aria-hidden="true">&#9632;</span>'
-        f'<span class="memory-link-label">Product</span>'
-        f'<span class="memory-link-arrow" aria-hidden="true">&#8594;</span>'
-        f"</a>"
+        f"{zone_c}"
+        f'<nav class="card-zone-d card-chips" aria-label="Memory links">'
+        f'<a class="memory-chip" href="/memory-view/{slug}/architecture.html">Architecture</a>'
+        f'<a class="memory-chip" href="/memory-view/{slug}/tech-stack.html">Tech Stack</a>'
+        f'<a class="memory-chip" href="/memory-view/{slug}/product/index.html">Product</a>'
         f"</nav>"
         f"</article>"
     )
