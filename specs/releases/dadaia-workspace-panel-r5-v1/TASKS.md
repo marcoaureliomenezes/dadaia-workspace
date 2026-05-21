@@ -114,19 +114,19 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: Phase A complete -->
   <!-- done-when: API returns `local`/`remote`; existing tests updated; panel displays "local"/"remote" terminology -->
 
-- [ ] **T-P5-15** — Update Projects tab section header in `index.py`: change heading from "Memories" to "Projects"; remove "N active contexts — 1 primary" counter; add "N projects" plain count badge; add collapsible description block with expand toggle
+- [-] **T-P5-15** — Update Projects tab section header in `index.py`: change heading from "Memories" to "Projects"; remove "N active contexts — 1 primary" counter; add "N projects" plain count badge; add collapsible description block with expand toggle
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py -->
   <!-- preconditions: Phase B complete -->
   <!-- done-when: heading reads "Projects"; counter is gone; description block present with collapse/expand -->
 
-- [ ] **T-P5-16** — Redesign Projects card HTML + CSS (4-zone anatomy): Zone A (name bold); Zone B (repo on own row, branch on own row, monospace, truncated with `text-overflow: ellipsis`); Zone D (three horizontal memory pill chips — Architecture, Tech Stack, Product — with `--color-chip-memory-bg` background, `--color-accent` border, `--radius-pill`); remove PRIMARY badge and primary left-border treatment; set uniform `4px solid var(--color-accent)` left accent on all cards
+- [-] **T-P5-16** — Redesign Projects card HTML + CSS (4-zone anatomy): Zone A (name bold); Zone B (repo on own row, branch on own row, monospace, truncated with `text-overflow: ellipsis`); Zone D (three horizontal memory pill chips — Architecture, Tech Stack, Product — with `--color-chip-memory-bg` background, `--color-accent` border, `--radius-pill`); remove PRIMARY badge and primary left-border treatment; set uniform `4px solid var(--color-accent)` left accent on all cards
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py (card template), dadaia_workspace/features/panel/views/assets/css/ (projects CSS module) -->
   <!-- preconditions: Phase B complete, T-P5-14 done -->
   <!-- done-when: no card shows PRIMARY badge; repo/branch on separate rows with truncation; memory chips are horizontal pills; all cards have mint left accent -->
 
-- [ ] **T-P5-17** — Add session binding zone (Zone C) to Projects card: conditional zone shown only when project has >= 1 active session bound; tinted `--color-session-bg`; each session is one row with provider icon + truncated name (max 200px); max 3 rows, "+N more" for overflow
+- [-] **T-P5-17** — Add session binding zone (Zone C) to Projects card: conditional zone shown only when project has >= 1 active session bound; tinted `--color-session-bg`; each session is one row with provider icon + truncated name (max 200px); max 3 rows, "+N more" for overflow
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py, relevant CSS module -->
   <!-- preconditions: T-P5-16 done -->
@@ -139,25 +139,25 @@ complete**. Each group has disjoint write sets.
 <!-- owner: frontend-engineer -->
 <!-- parallel-safe with: Phase C, Phase E -->
 
-- [ ] **T-P5-18** — Add `<dialog id="agent-modal">` scaffold to `agents.py` HTML; implement modal open/close in `agents.js` using native `<dialog>.showModal()` / `.close()`; implement focus trap (Tab cycles inside; Escape closes; focus returns to triggering card); add ARIA attributes (`role="dialog"`, `aria-modal="true"`, `aria-labelledby="agent-modal-title"`, close button `aria-label="Close"`)
+- [x] **T-P5-18** — Add `<dialog id="agent-modal">` scaffold to `agents.py` HTML; implement modal open/close in `agents.js` using native `<dialog>.showModal()` / `.close()`; implement focus trap (Tab cycles inside; Escape closes; focus returns to triggering card); add ARIA attributes (`role="dialog"`, `aria-modal="true"`, `aria-labelledby="agent-modal-title"`, close button `aria-label="Close"`)
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/agents.py, dadaia_workspace/features/panel/views/assets/js/agents.js -->
   <!-- preconditions: Phase B complete -->
   <!-- done-when: clicking agent card opens modal; Escape closes; focus trapped inside modal; ARIA attributes correct; screen reader sees dialog role -->
 
-- [ ] **T-P5-19** — Add modal CSS to `agents.py` CSS module: `.agent-modal`, `.agent-modal::backdrop`, overlay animation (opacity 0→1, translateY 12px→0, 250ms, `--easing-decelerate`), `prefers-reduced-motion` no-transform fallback, close button (44×44px, `--radius`, `--color-accent-dark` focus ring)
+- [x] **T-P5-19** — Add modal CSS to `agents.py` CSS module: `.agent-modal`, `.agent-modal::backdrop`, overlay animation (opacity 0→1, translateY 12px→0, 250ms, `--easing-decelerate`), `prefers-reduced-motion` no-transform fallback, close button (44×44px, `--radius`, `--color-accent-dark` focus ring)
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/css/agents.py -->
   <!-- preconditions: T-P5-18 done -->
   <!-- done-when: modal animates open/close; `prefers-reduced-motion` respected; close button meets 44px touch target -->
 
-- [ ] **T-P5-20** — Redesign collapsed agent card anatomy (Zones A–D): Zone A (status badge + agent name + tier label); Zone B (description, 2-line clamp); Zone C (3-column stats row: Sessions, Cost Life, Last Seen); Zone D (skill chips + "+N more"); remove inline expand chevron and `.agent-card__detail` region; make entire card a `<button>` with `aria-haspopup="dialog"` and `aria-label="View details for [name]"`
+- [x] **T-P5-20** — Redesign collapsed agent card anatomy (Zones A–D): Zone A (status badge + agent name + tier label); Zone B (description, 2-line clamp); Zone C (3-column stats row: Sessions, Cost Life, Last Seen); Zone D (skill chips + "+N more"); remove inline expand chevron and `.agent-card__detail` region; make entire card a `<button>` with `aria-haspopup="dialog"` and `aria-label="View details for [name]"`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/agents.py, dadaia_workspace/features/panel/views/assets/css/agents.py, dadaia_workspace/features/panel/views/assets/js/agents.js -->
   <!-- preconditions: T-P5-18, T-P5-19 done -->
   <!-- done-when: no expand chevron; card grid does not reflow when modal opens; card has button semantics -->
 
-- [ ] **T-P5-21** — Add runtime toggle (`.runtime-switcher`) to Agents tab section header: right-aligned via `margin-left: auto` in the `.section-header` flex row; uses existing `.runtime-switcher` + `.runtime-btn` CSS classes
+- [x] **T-P5-21** — Add runtime toggle (`.runtime-switcher`) to Agents tab section header: right-aligned via `margin-left: auto` in the `.section-header` flex row; uses existing `.runtime-switcher` + `.runtime-btn` CSS classes
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/agents.py -->
   <!-- preconditions: T-P5-18 done -->
@@ -170,25 +170,25 @@ complete**. Each group has disjoint write sets.
 <!-- owner: frontend-engineer -->
 <!-- parallel-safe with: Phase C, Phase D -->
 
-- [ ] **T-P5-22** — Add DAG zoom controls to workflow detail view in `workflows.js`: wrap injected SVG in `div.workflow-dag-viewport` (`overflow: hidden`); add toolbar HTML `[−] [zoom%] [+] [Fit]` (right-aligned); implement `applyZoom(level)` function; zoom range 50%–300%, step 25%; keyboard bindings `+` / `−` / `0` when focus is within DAG section; `[Fit]` resets to `scale(1.0)`
+- [x] **T-P5-22** — Add DAG zoom controls to workflow detail view in `workflows.js`: wrap injected SVG in `div.workflow-dag-viewport` (`overflow: hidden`); add toolbar HTML `[−] [zoom%] [+] [Fit]` (right-aligned); implement `applyZoom(level)` function; zoom range 50%–300%, step 25%; keyboard bindings `+` / `−` / `0` when focus is within DAG section; `[Fit]` resets to `scale(1.0)`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/js/workflows.js -->
   <!-- preconditions: Phase B complete -->
   <!-- done-when: workflow detail view shows toolbar; + zooms in; − zooms out; Fit resets; keyboard bindings functional; zoom% display updates -->
 
-- [ ] **T-P5-23** — Add DAG zoom CSS to `workflows.py` CSS module: `.workflow-dag-viewport` (overflow hidden, min-height 280px, cursor grab when zoomed); `.dag-toolbar` (flex, justify-content flex-end, `--color-th-bg` background, padding); zoom buttons (32×32px, `--color-border` border, `--radius`); zoom% display (52px width, monospace, `--color-muted`)
+- [x] **T-P5-23** — Add DAG zoom CSS to `workflows.py` CSS module: `.workflow-dag-viewport` (overflow hidden, min-height 280px, cursor grab when zoomed); `.dag-toolbar` (flex, justify-content flex-end, `--color-th-bg` background, padding); zoom buttons (32×32px, `--color-border` border, `--radius`); zoom% display (52px width, monospace, `--color-muted`)
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/css/workflows.py -->
   <!-- preconditions: T-P5-22 done -->
   <!-- done-when: DAG toolbar renders with correct styling; buttons are 32×32px; zoom display is monospace -->
 
-- [ ] **T-P5-24** — Add runtime toggle to Workflows tab section header (same pattern as T-P5-21 for Agents)
+- [x] **T-P5-24** — Add runtime toggle to Workflows tab section header (same pattern as T-P5-21 for Agents)
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/workflows.py (or index.py workflows section) -->
   <!-- preconditions: Phase B complete -->
   <!-- done-when: runtime toggle appears in Workflows tab section header -->
 
-- [ ] **T-P5-38** — Redesign Sessions tab error state per FR-6 design spec §8.2: replace single-cell error with a full-table-body-span container (`colspan` or block replacement); add `role="alert"` on the error container; add `[Retry]` button (`<button>` with explicit text, re-triggers `GET /api/sessions`); heading uses `var(--color-cost)` (#633d2e); body text uses `var(--color-muted)`; apply `scroll-margin-top: calc(var(--topbar-h) + var(--nav-h) + var(--space-sm))` to Sessions error container and to Projects/Agents card/modal triggers (FR-12)
+- [x] **T-P5-38** — Redesign Sessions tab error state per FR-6 design spec §8.2: replace single-cell error with a full-table-body-span container (`colspan` or block replacement); add `role="alert"` on the error container; add `[Retry]` button (`<button>` with explicit text, re-triggers `GET /api/sessions`); heading uses `var(--color-cost)` (#633d2e); body text uses `var(--color-muted)`; apply `scroll-margin-top: calc(var(--topbar-h) + var(--nav-h) + var(--space-sm))` to Sessions error container and to Projects/Agents card/modal triggers (FR-12)
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/js/sessions.js, dadaia_workspace/features/panel/views/assets/css/sessions.py (or equivalent) -->
   <!-- preconditions: T-P5-03 done (telemetry fix), Phase B complete (tokens) -->
