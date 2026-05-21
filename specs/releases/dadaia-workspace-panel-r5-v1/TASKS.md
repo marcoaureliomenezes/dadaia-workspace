@@ -58,12 +58,12 @@ complete**. Each group has disjoint write sets.
   <!-- files: dadaia_workspace/features/panel/*.py (whichever file contains _resolve_workspace) -->
   <!-- done-when: `dadaia panel` invoked from `repos/dadaia-workspace/` (a subdirectory) resolves workspace root correctly; unit test covers the walk-up logic -->
 
-- [-] **T-P5-07** — Introduce `window.Panel` registry in `core.js`: add `window.Panel = { register(name, mod), activate(name, opts) }` object before tab loading logic; migrate `window.Agents` and `window.Workflows` to also call `window.Panel.register()`; promote `escHtml` to `window.escHtml`
+- [x] **T-P5-07** — Introduce `window.Panel` registry in `core.js`: add `window.Panel = { register(name, mod), activate(name, opts) }` object before tab loading logic; migrate `window.Agents` and `window.Workflows` to also call `window.Panel.register()`; promote `escHtml` to `window.escHtml`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/js/core.js -->
   <!-- done-when: `window.Panel` object exists at runtime; `window.Panel.register('agents', window.Agents)` is called; `window.escHtml` is defined and callable -->
 
-- [-] **T-P5-08** — Add `// TODO: replace with window.escHtml when touching this file` comment to local `escHtml` copies in `agents.js`, `workflows.js`, and `sessions.js`
+- [x] **T-P5-08** — Add `// TODO: replace with window.escHtml when touching this file` comment to local `escHtml` copies in `agents.js`, `workflows.js`, and `sessions.js`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/js/agents.js, workflows.js, sessions.js -->
   <!-- done-when: TODO comment present above each local `escHtml` function -->

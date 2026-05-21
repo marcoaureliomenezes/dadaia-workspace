@@ -34,6 +34,7 @@
 
   // ── Utilities ────────────────────────────────────────────────────────────────
 
+  // TODO: replace with window.escHtml when touching this file
   function escHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
