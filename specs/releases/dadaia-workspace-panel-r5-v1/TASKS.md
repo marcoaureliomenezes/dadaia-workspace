@@ -38,22 +38,22 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-01 done -->
   <!-- done-when: `index.py` has no import of `_assets.py`; panel starts and logo renders in topbar -->
 
-- [-] **T-P5-03** — Harden `_try_build_telemetry()` in `panel.py`: replace bare `except Exception` with per-type handlers (`PermissionError`, `OSError`, `sqlite3.OperationalError`, `ImportError`) each emitting a `logging.warning` with the root cause before returning `None`
+- [x] **T-P5-03** — Harden `_try_build_telemetry()` in `panel.py`: replace bare `except Exception` with per-type handlers (`PermissionError`, `OSError`, `sqlite3.OperationalError`, `ImportError`) each emitting a `logging.warning` with the root cause before returning `None`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/panel.py -->
   <!-- done-when: unit test covers each exception type; warning is emitted; `None` is returned safely -->
 
-- [ ] **T-P5-04** — Wire `AcademyService` into panel DI: add `academy` parameter to `PanelService.__init__()` (optional, default `None`); instantiate `AcademyService` in `panel.py` composition root and pass to `PanelService`
+- [x] **T-P5-04** — Wire `AcademyService` into panel DI: add `academy` parameter to `PanelService.__init__()` (optional, default `None`); instantiate `AcademyService` in `panel.py` composition root and pass to `PanelService`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/panel.py, dadaia_workspace/features/panel/service.py -->
   <!-- done-when: `PanelService` accepts `academy=None`; panel boots without error; existing tests pass -->
 
-- [ ] **T-P5-05** — Add route-category comment block in `handler.py` enumerating public / bearer-only / bearer+telemetry routes with their current members; add note that new routes must declare their category before being added
+- [x] **T-P5-05** — Add route-category comment block in `handler.py` enumerating public / bearer-only / bearer+telemetry routes with their current members; add note that new routes must declare their category before being added
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/handler.py -->
   <!-- done-when: comment block exists above `_RAW_ROUTES` definition; enumerates all three categories -->
 
-- [ ] **T-P5-06** — Fix `_resolve_workspace()` (workspace resolver) to walk up from cwd to find the workspace root (containing `.dadaia/`) rather than assuming cwd is workspace root; ensure `dadaia panel` works from any subdirectory within the workspace
+- [x] **T-P5-06** — Fix `_resolve_workspace()` (workspace resolver) to walk up from cwd to find the workspace root (containing `.dadaia/`) rather than assuming cwd is workspace root; ensure `dadaia panel` works from any subdirectory within the workspace
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/*.py (whichever file contains _resolve_workspace) -->
   <!-- done-when: `dadaia panel` invoked from `repos/dadaia-workspace/` (a subdirectory) resolves workspace root correctly; unit test covers the walk-up logic -->
@@ -68,7 +68,7 @@ complete**. Each group has disjoint write sets.
   <!-- files: dadaia_workspace/features/panel/views/assets/js/agents.js, workflows.js, sessions.js -->
   <!-- done-when: TODO comment present above each local `escHtml` function -->
 
-- [ ] **T-P5-09** — Add SSR-vs-client-side policy docstring to `views/index.py` module: SSR for public small-payload data (contexts, servers, academy); client-side for auth-gated or large/dynamic data (agents, sessions, workflows, reports)
+- [x] **T-P5-09** — Add SSR-vs-client-side policy docstring to `views/index.py` module: SSR for public small-payload data (contexts, servers, academy); client-side for auth-gated or large/dynamic data (agents, sessions, workflows, reports)
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/index.py -->
   <!-- done-when: module docstring or comment block documents the policy -->
@@ -79,24 +79,24 @@ complete**. Each group has disjoint write sets.
 
 <!-- owner: frontend-engineer -->
 
-- [ ] **T-P5-10** — Add all new CSS custom properties to `tokens.py` per design spec §1.2–§1.10: new color tokens, spacing tokens (`--space-2xs`, `--space-3xl`), border-radius tokens (`--radius-modal`, `--radius-pill`), shadow tokens (`--shadow-card`, `--shadow-modal`, `--shadow-none`), z-index tokens (`--z-modal-overlay`, `--z-modal`, `--z-toast`), motion tokens (`--duration-fast`, `--duration-normal`, `--duration-slow`, `--easing-standard`, `--easing-decelerate`, `--easing-accelerate`), dimension tokens (`--modal-max-w`, `--modal-max-h`); update `--nav-h` from `44px` to `48px`
+- [x] **T-P5-10** — Add all new CSS custom properties to `tokens.py` per design spec §1.2–§1.10: new color tokens, spacing tokens (`--space-2xs`, `--space-3xl`), border-radius tokens (`--radius-modal`, `--radius-pill`), shadow tokens (`--shadow-card`, `--shadow-modal`, `--shadow-none`), z-index tokens (`--z-modal-overlay`, `--z-modal`, `--z-toast`), motion tokens (`--duration-fast`, `--duration-normal`, `--duration-slow`, `--easing-standard`, `--easing-decelerate`, `--easing-accelerate`), dimension tokens (`--modal-max-w`, `--modal-max-h`); update `--nav-h` from `44px` to `48px`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/css/tokens.py -->
   <!-- preconditions: T-P5-01 done (no conflict with _assets.py PANEL_CSS) -->
   <!-- done-when: all tokens listed in design spec §1.2–§1.10 as [NEW] are present; no raw hex values in new CSS rules outside tokens.py; panel compiles without error -->
 
-- [ ] **T-P5-11** — Update `structure.py`: change `.nav-tab` padding from `0.65rem 1.1rem` to `0.75rem 1.1rem`; remove `.tab-memories-btn::after` responsive abbreviation rule
+- [x] **T-P5-11** — Update `structure.py`: change `.nav-tab` padding from `0.65rem 1.1rem` to `0.75rem 1.1rem`; remove `.tab-memories-btn::after` responsive abbreviation rule
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/css/structure.py -->
   <!-- preconditions: T-P5-10 done -->
   <!-- done-when: nav tab height is ~48px; no `::after` abbreviation rule exists for memories tab -->
 
-- [ ] **T-P5-12** — Create `logo-rhino-36.svg`: minimalist stroke-based rhino, viewBox `0 0 48 48`, rendered at 36×36px; anatomy includes body, head, horn (filled triangle), ear (small triangle), eye (circle r=1.5), 4 legs, tail (open stroke); all paths use `stroke="currentColor"`, body/head use `fill-opacity="0.12"`, horn/ear use opaque fill; no hardcoded hex
+- [x] **T-P5-12** — Create `logo-rhino-36.svg`: minimalist stroke-based rhino, viewBox `0 0 48 48`, rendered at 36×36px; anatomy includes body, head, horn (filled triangle), ear (small triangle), eye (circle r=1.5), 4 legs, tail (open stroke); all paths use `stroke="currentColor"`, body/head use `fill-opacity="0.12"`, horn/ear use opaque fill; no hardcoded hex
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/logo-rhino-36.svg -->
   <!-- done-when: SVG file exists; passes `xml.etree.ElementTree` parse; no hex colors; visually recognizable as rhino with horn at 36×36px -->
 
-- [ ] **T-P5-13** — Update `logo-rhino-24.svg` to match new stroke-based design (scaled to 24px viewBox); retain `logo-rhino-16.svg` unchanged
+- [x] **T-P5-13** — Update `logo-rhino-24.svg` to match new stroke-based design (scaled to 24px viewBox); retain `logo-rhino-16.svg` unchanged
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/logo-rhino-24.svg -->
   <!-- done-when: logo-rhino-24.svg uses same anatomy as logo-rhino-36.svg; passes SVG parse; no hardcoded hex -->
@@ -108,7 +108,7 @@ complete**. Each group has disjoint write sets.
 <!-- owner: frontend-engineer (CSS/JS/HTML); software-engineer-python (API status rename) -->
 <!-- parallel-safe with: Phase D, Phase E -->
 
-- [ ] **T-P5-14** — Update `GET /api/contexts` (or equivalent) API response to rename status labels `active` → `local` and `inactive` → `remote`; update any frontend references to these status strings
+- [-] **T-P5-14** — Update `GET /api/contexts` (or equivalent) API response to rename status labels `active` → `local` and `inactive` → `remote`; update any frontend references to these status strings
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/api.py (contexts endpoint) -->
   <!-- preconditions: Phase A complete -->
