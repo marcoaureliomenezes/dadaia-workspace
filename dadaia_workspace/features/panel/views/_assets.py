@@ -1,18 +1,15 @@
-"""Static frontend assets for the Dadaia Workspace Panel — logo path constants.
+"""Backward-compatibility shim — do not import from this module in new code.
 
-T-P5-01: PANEL_CSS, PANEL_JS, and PALETTE have been removed from this module.
-CSS slices live in views/assets/css/*.py and are assembled in static.py.
-JS files are served directly from views/assets/js/ via static.py.
+T-P5-01: PANEL_CSS, PANEL_JS, PALETTE removed.
+T-P5-02: LOGO_RHINO_24 and LOGO_RHINO_16 moved to static.py.
 
-LOGO_RHINO_24 / LOGO_RHINO_16 — inline SVG for the rhino logomark, loaded at
-import time from assets/. currentColor only; zero hardcoded hex.
-(spec: dadaia-workspace-brand-identity-v1 T-BR-03/04/05)
+This module is retained only to avoid breaking any external code that still
+imports the logo constants by their old path. It will be deleted once all
+import sites are migrated. Import from static.py instead:
 
-Phase B will migrate these constants into static.py (T-P5-02).
+    from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24
 """
 
-from pathlib import Path
+from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24, LOGO_RHINO_16
 
-_ASSETS_DIR = Path(__file__).parent / "assets"
-LOGO_RHINO_24: str = (_ASSETS_DIR / "logo-rhino-24.svg").read_text(encoding="utf-8")
-LOGO_RHINO_16: str = (_ASSETS_DIR / "logo-rhino-16.svg").read_text(encoding="utf-8")
+__all__ = ["LOGO_RHINO_24", "LOGO_RHINO_16"]
