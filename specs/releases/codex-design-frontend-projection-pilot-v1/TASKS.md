@@ -177,7 +177,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Must follow T-07. May proceed independently of P1/P2/P4.
 
 ```
-[ ] T-08 — Extend _install_codex() with _install_codex_runtime_adapters()
+[-] T-08 — Extend _install_codex() with _install_codex_runtime_adapters()
 ```
 
 ---
