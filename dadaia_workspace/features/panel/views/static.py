@@ -10,6 +10,10 @@ R3 (PR3-02 activation):
   dict lookup, as defence-in-depth per architect review note in SPEC §5.2.
 
   Cache-Control is set in the handler layer (handler.py) for the /static/ prefix.
+
+T-P5-02: LOGO_RHINO_24 and LOGO_RHINO_16 module-level constants added here so
+that index.py can import logo content from this module instead of _assets.py.
+_assets.py will be deleted once all imports are migrated (Phase B).
 """
 
 from __future__ import annotations
@@ -25,6 +29,13 @@ from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS
 
 _ASSETS_DIR = Path(__file__).parent / "assets"
 _JS_DIR = _ASSETS_DIR / "js"
+
+# ---------------------------------------------------------------------------
+# Logo constants — loaded once at import time for inline HTML embedding.
+# T-P5-02: moved from _assets.py to this module. Import from here instead.
+# ---------------------------------------------------------------------------
+LOGO_RHINO_24: str = (_ASSETS_DIR / "logo-rhino-24.svg").read_text(encoding="utf-8")
+LOGO_RHINO_16: str = (_ASSETS_DIR / "logo-rhino-16.svg").read_text(encoding="utf-8")
 
 _MIME_BY_EXT: dict[str, str] = {
     ".css": "text/css; charset=utf-8",

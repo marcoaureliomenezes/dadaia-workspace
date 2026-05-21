@@ -13,7 +13,7 @@ import html
 from collections.abc import Callable, Sequence
 
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
-from dadaia_workspace.features.panel.views._assets import LOGO_RHINO_24
+from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24
 from dadaia_workspace.features.panel.views.agents import render_agents_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section

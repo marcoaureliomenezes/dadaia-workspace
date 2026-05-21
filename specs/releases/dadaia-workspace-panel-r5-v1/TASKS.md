@@ -32,7 +32,7 @@ complete**. Each group has disjoint write sets.
   <!-- files: dadaia_workspace/features/panel/views/_assets.py -->
   <!-- done-when: `PANEL_CSS`, `PANEL_JS`, `PALETTE` are absent from `_assets.py`; existing tests pass -->
 
-- [-] **T-P5-02** — Move SVG reads (`LOGO_RHINO_24`, `LOGO_RHINO_16`) from `_assets.py` to `static.py`; update `index.py` to remove `_assets.py` import and read logo from `static.py`
+- [x] **T-P5-02** — Move SVG reads (`LOGO_RHINO_24`, `LOGO_RHINO_16`) from `_assets.py` to `static.py`; update `index.py` to remove `_assets.py` import and read logo from `static.py`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/static.py, dadaia_workspace/features/panel/views/index.py, dadaia_workspace/features/panel/views/_assets.py -->
   <!-- preconditions: T-P5-01 done -->
