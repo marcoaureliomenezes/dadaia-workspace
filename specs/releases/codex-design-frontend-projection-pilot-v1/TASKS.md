@@ -218,7 +218,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** May run concurrently with T-11 once T-07 is complete.
 
 ```
-[ ] T-10 — Create public/runtime/codex/design-ctx/SKILL.md
+[-] T-10 — Create public/runtime/codex/design-ctx/SKILL.md
 ```
 
 ---
