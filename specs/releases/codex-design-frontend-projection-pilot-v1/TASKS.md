@@ -313,7 +313,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Sequential after P5.
 
 ```
-[ ] T-14 — Validate stage + install + doctor pipeline (AC C6, C9)
+[-] T-14 — Validate stage + install + doctor pipeline (AC C6, C9)
 ```
 
 ---
