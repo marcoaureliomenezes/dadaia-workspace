@@ -101,7 +101,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Safe to run concurrently with T-01 through T-07.
 
 ```
-[-] T-04b — Create public/skills/ux-ui-review/SKILL.md
+[x] T-04b — Create public/skills/ux-ui-review/SKILL.md
 ```
 
 ---
