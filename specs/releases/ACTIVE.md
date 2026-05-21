@@ -1,7 +1,8 @@
-release: codex-design-frontend-projection-pilot-v1
-phase: TASKS
+release: none
+phase: none
 
 # History
+# 2026-05-21 — codex-design-frontend-projection-pilot-v1 CLOSED + ARCHIVED. T-01..T-15 complete. 5 shared skills created, 2 agent frontmatter updated, public/runtime/codex/ boundary established, 11 new tests (AC C1-C10 green).
 # 2026-05-20 — infra-correctness-v1 CLOSED + ARCHIVED. P1-P7 complete. 48 tasks done. 7 tech-debt items liquidated.
 # 2026-05-20 — codex-agent-orchestration-parity-v1 CLOSED + ARCHIVED. 34 tasks complete. 20-agent topology fully deployed.
 # 2026-05-20 — token-cost-bigbang-v1 CLOSED + ARCHIVED. ADRs X1..X7 em constitution. P3 validation (T-50..T-54) em aberto — operador controla.
