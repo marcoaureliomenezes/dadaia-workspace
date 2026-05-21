@@ -230,7 +230,7 @@ complete**. Each group has disjoint write sets.
 
 <!-- owner: software-engineer-python (API) + frontend-engineer (HTML/CSS/JS) -->
 
-- [ ] **T-P5-29** — Add `GET /api/reports` bearer-only route in `handler.py`; add `render_api_reports()` in `api.py`: traverse `.dadaia/reports/` recursively for `.handoff.json` sidecars, parse each, return sorted list by `produced_at` descending; fields: `title` (from `artifact.path` stem), `agent`, `context`, `created_at`, `path`, `findings_summary` (severity counts)
+- [-] **T-P5-29** — Add `GET /api/reports` bearer-only route in `handler.py`; add `render_api_reports()` in `api.py`: traverse `.dadaia/reports/` recursively for `.handoff.json` sidecars, parse each, return sorted list by `produced_at` descending; fields: `title` (from `artifact.path` stem), `agent`, `context`, `created_at`, `path`, `findings_summary` (severity counts)
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/handler.py, dadaia_workspace/features/panel/views/api.py -->
   <!-- preconditions: Phase A complete -->
