@@ -212,7 +212,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-25 done -->
   <!-- done-when: file exists; HTML scaffold renders empty state when no modules -->
 
-- [-] **T-P5-27** — Create `academy.js`: fetch `GET /api/academy`; render module cards (type chip, title, 2-line description, "Open →" CTA); handle click → content view with `[← Back to Academy]` breadcrumb; show empty state "No academy modules available" when list is empty; register via `window.Panel.register('academy', ...)`; use `window.escHtml`
+- [x] **T-P5-27** — Create `academy.js`: fetch `GET /api/academy`; render module cards (type chip, title, 2-line description, "Open →" CTA); handle click → content view with `[← Back to Academy]` breadcrumb; show empty state "No academy modules available" when list is empty; register via `window.Panel.register('academy', ...)`; use `window.escHtml`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/js/academy.js -->
   <!-- preconditions: T-P5-26 done, T-P5-07 done (window.Panel registry) -->
