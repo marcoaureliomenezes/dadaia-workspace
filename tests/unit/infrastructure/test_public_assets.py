@@ -1874,3 +1874,127 @@ class TestInstallCodexRuntimeAdapters:
         assert len(installed) == 3
         for slug in ("adapter-a", "adapter-b", "adapter-c"):
             assert (workspace_root / ".codex" / "skills" / slug / "SKILL.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# D-CX-6: _dcx6_codex_runtime_adapters (T-09)
+# ---------------------------------------------------------------------------
+
+
+class TestDcx6CodexRuntimeAdapters:
+    def _make_manager_with_fake_public(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def _setup_adapter(self, public_dir: Path, slug: str, content: str = "# Adapter\n") -> None:
+        adapter_dir = public_dir / "runtime" / "codex" / slug
+        adapter_dir.mkdir(parents=True, exist_ok=True)
+        (adapter_dir / "SKILL.md").write_text(content, encoding="utf-8")
+
+    def test_missing_when_codex_skill_absent(self, tmp_path: Path) -> None:
+        """[missing] reported when .codex/skills/<slug>/SKILL.md does not exist."""
+        public_dir = tmp_path / "public"
+        self._setup_adapter(public_dir, "my-adapter")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert any("[missing]" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+
+    def test_ok_when_codex_skill_present_and_matches(self, tmp_path: Path) -> None:
+        """No issues when adapter is installed and content matches source."""
+        public_dir = tmp_path / "public"
+        content = "# My Adapter\n"
+        self._setup_adapter(public_dir, "my-adapter", content)
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text(content, encoding="utf-8")
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert out == []
+
+    def test_drift_when_installed_differs_from_source(self, tmp_path: Path) -> None:
+        """[drift] reported when installed content differs from source."""
+        public_dir = tmp_path / "public"
+        self._setup_adapter(public_dir, "my-adapter", "# Source\n")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text("# Modified\n", encoding="utf-8")
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert any("[drift]" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+
+    def test_leak_when_adapter_in_claude_skills(self, tmp_path: Path) -> None:
+        """[leak] reported when adapter appears in .claude/skills/."""
+        public_dir = tmp_path / "public"
+        self._setup_adapter(public_dir, "my-adapter")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        # Place the adapter in .claude/skills/ — simulating a leak
+        leak_path = workspace_root / ".claude" / "skills" / "my-adapter" / "SKILL.md"
+        leak_path.parent.mkdir(parents=True)
+        leak_path.write_text("# Leak\n", encoding="utf-8")
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert any("[leak]" in l and "claude" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+
+    def test_leak_when_adapter_in_opencode_skills(self, tmp_path: Path) -> None:
+        """[leak] reported when adapter appears in .opencode/skills/."""
+        public_dir = tmp_path / "public"
+        self._setup_adapter(public_dir, "my-adapter")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        # Place the adapter in .opencode/skills/ — simulating a leak
+        leak_path = workspace_root / ".opencode" / "skills" / "my-adapter" / "SKILL.md"
+        leak_path.parent.mkdir(parents=True)
+        leak_path.write_text("# Leak\n", encoding="utf-8")
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert any("[leak]" in l and "opencode" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+
+    def test_no_src_root_returns_empty(self, tmp_path: Path) -> None:
+        """Returns empty list when public/runtime/codex/ does not exist."""
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert out == []
+
+    def test_files_in_src_root_not_dirs_are_skipped(self, tmp_path: Path) -> None:
+        """Regular files at runtime/codex/ root level (not dirs) are ignored."""
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex"
+        runtime_codex.mkdir(parents=True)
+        (runtime_codex / "README.md").write_text("# README\n", encoding="utf-8")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert out == []
+
+    def test_subdirs_without_skill_md_are_skipped(self, tmp_path: Path) -> None:
+        """Adapter subdirs without SKILL.md are silently skipped."""
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex" / "empty-adapter"
+        runtime_codex.mkdir(parents=True)
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._dcx6_codex_runtime_adapters(workspace_root)
+        assert out == []
+
+    def test_check_codex_drift_includes_dcx6(self, tmp_path: Path) -> None:
+        """_check_codex_drift() calls _dcx6_codex_runtime_adapters() and includes its output."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        public_dir = tmp_path / "public_dir"
+        self._setup_adapter(public_dir, "missing-adapter")
+        manager = self._make_manager_with_fake_public(public_dir)
+        out = manager._check_codex_drift(agentic_dir, workspace_root)
+        assert any("[missing]" in l and "missing-adapter" in l and "D-CX-6" in l for l in out)

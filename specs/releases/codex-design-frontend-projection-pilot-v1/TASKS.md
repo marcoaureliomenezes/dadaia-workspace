@@ -197,7 +197,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Must follow T-08.
 
 ```
-[-] T-09 — Add doctor leak/missing/drift check for runtime/codex adapters
+[x] T-09 — Add doctor leak/missing/drift check for runtime/codex adapters
 ```
 
 ---
