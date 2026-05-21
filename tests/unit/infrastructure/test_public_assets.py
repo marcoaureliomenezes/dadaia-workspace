@@ -1762,3 +1762,115 @@ class TestInstanceIsSelfRepo:
         (consumer / ".dadaia" / "agentic").mkdir(parents=True)
         manager = FileSystemPublicAssetManager()
         assert manager._is_self_repo(consumer) is False
+
+
+# ---------------------------------------------------------------------------
+# _install_codex_runtime_adapters (T-08)
+# ---------------------------------------------------------------------------
+
+
+class TestInstallCodexRuntimeAdapters:
+    def _make_manager_with_fake_public(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def test_copies_skill_md_to_codex_skills(self, tmp_path: Path) -> None:
+        """An adapter SKILL.md is copied to .codex/skills/<slug>/SKILL.md."""
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex" / "my-adapter"
+        runtime_codex.mkdir(parents=True)
+        (runtime_codex / "SKILL.md").write_text("# My Adapter\n", encoding="utf-8")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        installed: list[str] = []
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=True, installed=installed)
+        dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
+        assert dst.exists()
+        assert dst.read_text(encoding="utf-8") == "# My Adapter\n"
+        assert any("[ok]" in e for e in installed)
+
+    def test_returns_early_when_src_root_missing(self, tmp_path: Path) -> None:
+        """No error and no writes when public/runtime/codex/ does not exist."""
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        installed: list[str] = []
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=True, installed=installed)
+        assert installed == []
+        assert not (workspace_root / ".codex" / "skills").exists()
+
+    def test_skips_subdirs_without_skill_md(self, tmp_path: Path) -> None:
+        """A subdirectory without SKILL.md is silently skipped."""
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex" / "empty-adapter"
+        runtime_codex.mkdir(parents=True)
+        # No SKILL.md inside
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        installed: list[str] = []
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=True, installed=installed)
+        assert installed == []
+
+    def test_skips_files_in_runtime_codex_root(self, tmp_path: Path) -> None:
+        """Regular files at the root of runtime/codex/ (not subdirs) are skipped."""
+        public_dir = tmp_path / "public"
+        runtime_codex_root = public_dir / "runtime" / "codex"
+        runtime_codex_root.mkdir(parents=True)
+        (runtime_codex_root / "README.md").write_text("# README\n", encoding="utf-8")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        installed: list[str] = []
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=True, installed=installed)
+        assert installed == []
+
+    def test_force_false_skips_existing(self, tmp_path: Path) -> None:
+        """force=False: existing destination is not overwritten."""
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex" / "my-adapter"
+        runtime_codex.mkdir(parents=True)
+        (runtime_codex / "SKILL.md").write_text("# NEW\n", encoding="utf-8")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text("# ORIGINAL\n", encoding="utf-8")
+        installed: list[str] = []
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=False, installed=installed)
+        assert dst.read_text(encoding="utf-8") == "# ORIGINAL\n"
+        assert any("[skip]" in e for e in installed)
+
+    def test_does_not_write_to_claude_or_opencode(self, tmp_path: Path) -> None:
+        """Codex-only adapters are never written to .claude/ or .opencode/."""
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex" / "my-adapter"
+        runtime_codex.mkdir(parents=True)
+        (runtime_codex / "SKILL.md").write_text("# My Adapter\n", encoding="utf-8")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=True, installed=[])
+        assert not (workspace_root / ".claude" / "skills" / "my-adapter" / "SKILL.md").exists()
+        assert not (workspace_root / ".opencode" / "skills" / "my-adapter" / "SKILL.md").exists()
+
+    def test_multiple_adapters_all_copied(self, tmp_path: Path) -> None:
+        """Multiple adapter subdirectories are all copied."""
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex"
+        for slug in ("adapter-a", "adapter-b", "adapter-c"):
+            (runtime_codex / slug).mkdir(parents=True)
+            (runtime_codex / slug / "SKILL.md").write_text(f"# {slug}\n", encoding="utf-8")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        installed: list[str] = []
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=True, installed=installed)
+        assert len(installed) == 3
+        for slug in ("adapter-a", "adapter-b", "adapter-c"):
+            assert (workspace_root / ".codex" / "skills" / slug / "SKILL.md").exists()
