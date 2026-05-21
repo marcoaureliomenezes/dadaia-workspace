@@ -263,7 +263,7 @@ T-15 (P7 CLOSURE) begins once T-14 is `[x]`.
 - **Parallel note:** Must follow T-01 through T-06. May run concurrently with T-13.
 
 ```
-[-] T-12 — Write skill-reference integrity and boundary tests
+[x] T-12 — Write skill-reference integrity and boundary tests
 ```
 
 ---
