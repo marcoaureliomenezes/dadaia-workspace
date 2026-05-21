@@ -11,6 +11,7 @@ from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
+    render_api_academy,
     render_api_agent_prompt,
     render_api_agents_canonical,
     render_api_contexts,
@@ -166,12 +167,14 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
+    academy: object | None = None,
 ) -> PanelService:
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
         telemetry=telemetry,
+        academy=academy,
     )
 
 
@@ -212,13 +215,15 @@ def build_panel_views(
         into PanelService so that ``render_api_agents_canonical`` can overlay
         telemetry data on the canonical agent catalog (PR3-08).
     """
-    service = build_panel_service(workspace_root, telemetry=telemetry)
+    academy = build_academy_service(workspace_root)
+    service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
     # WorkflowsService is exposed via PanelService._workflows_service for the
     # detail endpoint (get_detail needs name resolution against the filesystem).
     return {
         "index": render_index(service),
         "api_servers": render_api_servers(service),
         "api_contexts": render_api_contexts(service),
+        "api_academy": render_api_academy(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
