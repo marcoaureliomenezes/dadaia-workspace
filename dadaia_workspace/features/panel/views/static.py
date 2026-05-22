@@ -38,6 +38,7 @@ _JS_DIR = _ASSETS_DIR / "js"
 # T-P5-02: moved from _assets.py to this module. Import from here instead.
 # ---------------------------------------------------------------------------
 LOGO_RHINO_24: str = (_ASSETS_DIR / "logo-rhino-24.svg").read_text(encoding="utf-8")
+LOGO_RHINO_36: str = (_ASSETS_DIR / "logo-rhino-36.svg").read_text(encoding="utf-8")
 LOGO_RHINO_16: str = (_ASSETS_DIR / "logo-rhino-16.svg").read_text(encoding="utf-8")
 
 _MIME_BY_EXT: dict[str, str] = {
@@ -96,6 +97,10 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",
         (_ASSETS_DIR / "logo-rhino-24.svg").read_bytes(),
+    ),
+    "logo-rhino-36.svg": (
+        "image/svg+xml; charset=utf-8",
+        (_ASSETS_DIR / "logo-rhino-36.svg").read_bytes(),
     ),
     "logo-rhino-16.svg": (
         "image/svg+xml; charset=utf-8",

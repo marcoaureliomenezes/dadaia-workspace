@@ -163,14 +163,14 @@ def test_index_agents_section_has_grid() -> None:
 
 
 def test_index_primary_context_badge() -> None:
-    """Primary context topbar badge must still show; card-level badge removed in T-P5-16."""
+    """T-P5-36: topbar badge removed; card-level badge also removed in T-P5-16."""
     ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
     service = _build_service(contexts=[ctx])
     html = _render(service)
     # T-P5-16: card-primary-badge removed — all cards are uniform
     assert "card-primary-badge" not in html
-    # Topbar badge remains for primary context identification
-    assert "topbar-badge" in html
+    # T-P5-36: topbar-badge also removed — runtime switcher moved to per-tab section headers
+    assert "topbar-badge" not in html
 
 
 def test_index_primary_context_first_in_dom() -> None:
