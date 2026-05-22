@@ -41,6 +41,9 @@ TOKENS_CSS: str = """
   --color-chip-memory-bg: #f0fbf7;  /* memory pill chip background — Phase C */
   --color-session-bg:    #f5f5f5;   /* session binding zone background — Phase C */
   --color-academy-chip-bg: #fef9ec; /* academy type chip background — T-P5-28 */
+  --color-report-tag-bg:   #f0f4f7; /* report agent tag chip background — T-P5-34 */
+  --color-delete-icon:     #666666; /* trash button icon color — T-P5-34 */
+  --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
 
   --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono:  ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -106,6 +109,9 @@ html:not([data-theme]) {
   --color-chip-memory-bg:   #f0fbf7; /* memory pill chip background — Phase C */
   --color-session-bg:       #f0fbf7; /* session binding zone — Phase C */
   --color-academy-chip-bg:  #fef9ec; /* academy type chip background — T-P5-28 */
+  --color-report-tag-bg:    #f0f4f7; /* report agent tag chip background — T-P5-34 */
+  --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
+  --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
   /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
   --color-tier-1:           #c0392b; /* T1 orchestrator — red  (5.52:1) */
   --color-tier-2:           #b35800; /* T2 curator — amber (4.87:1) */
@@ -140,6 +146,9 @@ html[data-theme="sage"] {
   --color-chip-memory-bg:   #f5fbf0; /* memory pill chip background — Phase C (sage) */
   --color-session-bg:       #f4faf0; /* session binding zone — Phase C (sage) */
   --color-academy-chip-bg:  #fef9ec; /* academy type chip background — T-P5-28 */
+  --color-report-tag-bg:    #f0f4f7; /* report agent tag chip background — T-P5-34 */
+  --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
+  --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
   /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
   --color-tier-1:           #b83232; /* T1 orchestrator — muted red  (5.08:1) */
   --color-tier-2:           #a05500; /* T2 curator — muted amber (4.68:1) */
@@ -176,6 +185,9 @@ html[data-theme="warm"] {
   --color-chip-memory-bg:   #fffbf4; /* memory pill chip background — Phase C (warm) */
   --color-session-bg:       #fff8ee; /* session binding zone — Phase C (warm) */
   --color-academy-chip-bg:  #fff8e6; /* academy type chip background — T-P5-28 (warmer) */
+  --color-report-tag-bg:    #f7f3ee; /* report agent tag chip background — T-P5-34 (warm cream) */
+  --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
+  --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
   /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
   --color-tier-1:           #c0392b; /* T1 orchestrator — red  (5.52:1) */
   --color-tier-2:           #9a4400; /* T2 curator — deep rust (5.76:1; distinct from amber accent) */
