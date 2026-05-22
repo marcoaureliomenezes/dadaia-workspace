@@ -2,7 +2,7 @@
 
 **Status:** Aprovado
 
-- [ ] T-CX-HOTFIX-01 — Corrigir runtime Codex agents/skills projection.
+- [-] T-CX-HOTFIX-01 — Corrigir runtime Codex agents/skills projection.
   - Write set:
     - `dadaia_workspace/public/skills/*/SKILL.md`
     - `dadaia_workspace/public/runtime/codex/*/SKILL.md`
