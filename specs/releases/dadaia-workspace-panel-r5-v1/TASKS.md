@@ -285,7 +285,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-12 done (new SVG exists), T-P5-35 done -->
   <!-- done-when: no PRIMARY badge in topbar; no runtime switcher in topbar; logo is 36px; Theme dropdown is still present -->
 
-- [-] **T-P5-37** — Add runtime toggle to Sessions tab section header (same pattern as T-P5-21 for Agents); update `core.js` tab activation to use `window.Panel.activate` for all tabs; wire Academy and Reports tab activations
+- [x] **T-P5-37** — Add runtime toggle to Sessions tab section header (same pattern as T-P5-21 for Agents); update `core.js` tab activation to use `window.Panel.activate` for all tabs; wire Academy and Reports tab activations
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/sessions.py (or equivalent), dadaia_workspace/features/panel/views/assets/js/core.js -->
   <!-- preconditions: T-P5-35, T-P5-36 done -->
