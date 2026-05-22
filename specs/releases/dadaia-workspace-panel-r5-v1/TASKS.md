@@ -254,7 +254,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-29 done -->
   <!-- done-when: file exists; scaffold renders -->
 
-- [ ] **T-P5-33** — Create `reports.js`: fetch `GET /api/reports`; render list grouped by context using `<details>/<summary>` per group; each row: agent tag chip, title button, date, trash icon; trash click: show inline "Are you sure? [Delete] [Cancel]"; Delete: call `DELETE /api/reports/<path>`, remove row on success; title click: fetch and render HTML content inline; breadcrumb `[← Back to Reports]`; register via `window.Panel.register('reports', ...)`; use `window.escHtml`
+- [-] **T-P5-33** — Create `reports.js`: fetch `GET /api/reports`; render list grouped by context using `<details>/<summary>` per group; each row: agent tag chip, title button, date, trash icon; trash click: show inline "Are you sure? [Delete] [Cancel]"; Delete: call `DELETE /api/reports/<path>`, remove row on success; title click: fetch and render HTML content inline; breadcrumb `[← Back to Reports]`; register via `window.Panel.register('reports', ...)`; use `window.escHtml`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/js/reports.js -->
   <!-- preconditions: T-P5-32 done, T-P5-07 done (window.Panel registry) -->
