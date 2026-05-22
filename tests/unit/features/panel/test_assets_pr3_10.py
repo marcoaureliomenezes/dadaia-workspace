@@ -88,11 +88,11 @@ def test_agents_js_has_status_badge_rendering() -> None:
     assert "inactive" in agents_text.lower()
 
 
-def test_agents_js_has_aria_expanded() -> None:
-    """agents.js card template must include aria-expanded attribute."""
+def test_agents_js_has_aria_haspopup_dialog() -> None:
+    """agents.js card must use aria-haspopup="dialog" (modal design, Phase D)."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    assert "aria-expanded" in agents_text, (
-        "agents.js card must include aria-expanded attribute for accessibility"
+    assert "aria-haspopup" in agents_text, (
+        "agents.js card must include aria-haspopup attribute (modal design replaced accordion)"
     )
 
 

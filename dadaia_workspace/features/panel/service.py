@@ -98,6 +98,7 @@ class PanelService:
         spec_context: SpecContextService,
         workspace_root: Path,
         telemetry: Any = None,
+        academy: Any = None,
     ) -> None:
         """Initialise PanelService.
 
@@ -116,11 +117,15 @@ class PanelService:
             boot layer (``dadaia_workspace/cli/commands/panel.py``).
             Passing None is safe: telemetry endpoints will return 503
             until a real TelemetryService is injected.
+        academy:
+            Optional AcademyService instance (injected).  When None,
+            the Academy tab returns an empty course list.
         """
         self._registry = registry
         self._spec_context = spec_context
         self._workspace_root = workspace_root
         self.telemetry = telemetry
+        self.academy = academy
         self._workflows_service = WorkflowsService(workspace_root)
 
     # ------------------------------------------------------------------

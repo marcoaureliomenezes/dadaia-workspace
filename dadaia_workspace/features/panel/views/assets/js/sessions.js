@@ -481,15 +481,20 @@
           if (tbody) {
             if (r.status === 401) {
               tbody.innerHTML = '<tr><td colspan="8">'
-                + '<div class="error-state" role="alert">'
-                + '<strong>Authentication required.</strong> '
-                + 'Re-open the panel via <code>dadaia panel start</code>.'
+                + '<div class="sessions-error-container" role="alert">'
+                + '<h4 class="sessions-error-heading">Authentication required</h4>'
+                + '<p class="sessions-error-body">Re-open the panel via <code>dadaia panel start</code>.</p>'
                 + '</div></td></tr>';
             } else {
               tbody.innerHTML = '<tr><td colspan="8">'
-                + '<div class="error-state" role="alert">'
-                + 'Failed to load sessions (HTTP ' + escHtml(String(r.status)) + ').'
+                + '<div class="sessions-error-container" role="alert">'
+                + '<h4 class="sessions-error-heading">Failed to load sessions</h4>'
+                + '<p class="sessions-error-body">HTTP ' + escHtml(String(r.status)) + '.</p>'
+                + '<button type="button" class="sessions-retry-btn" aria-label="Retry loading sessions">Retry</button>'
                 + '</div></td></tr>';
+              if (container) { container.setAttribute('aria-busy', 'false'); }
+              var retryBtnEl = tbody.querySelector('.sessions-retry-btn');
+              if (retryBtnEl) { retryBtnEl.addEventListener('click', function() { fetchSessions(); }); }
             }
             if (container) { container.setAttribute('aria-busy', 'false'); }
           }
@@ -516,10 +521,15 @@
         var tbody = document.getElementById('sessions-tbody');
         if (tbody) {
           tbody.innerHTML = '<tr><td colspan="8">'
-            + '<div class="error-state" role="alert">'
-            + 'Failed to load sessions: '
+            + '<div class="sessions-error-container" role="alert">'
+            + '<h4 class="sessions-error-heading">Failed to load sessions</h4>'
+            + '<p class="sessions-error-body">'
             + escHtml(err && err.message ? err.message : String(err))
+            + '</p>'
+            + '<button type="button" class="sessions-retry-btn" aria-label="Retry loading sessions">Retry</button>'
             + '</div></td></tr>';
+          var retryBtnEl = tbody.querySelector('.sessions-retry-btn');
+          if (retryBtnEl) { retryBtnEl.addEventListener('click', function() { fetchSessions(); }); }
         }
         if (container) { container.setAttribute('aria-busy', 'false'); }
       });
