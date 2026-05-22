@@ -90,6 +90,8 @@ _FORBIDDEN_JSON_KEYS: frozenset[str] = frozenset(
 # BEARER-ONLY (Bearer token required; no telemetry dependency; always 200):
 #   /api/academy                   academy course list
 #   /api/agents/<id>/prompt        agent prompt text
+#   /api/reports                   report sidecar list (sorted by date)
+#   /api/reports/<path>            delete a report file + its sidecar
 #   /api/workflows                 workflow list
 #   /api/workflows/<name>          workflow detail + DAG SVG
 #
@@ -116,9 +118,14 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/api/sessions$", "api_sessions"),
     (r"^/api/servers$", "api_servers"),
     (r"^/api/academy$", "api_academy"),
+    # /api/reports/<path> must come before /api/reports$ (more specific first).
+    (r"^/api/reports/(?P<path>.+)$", "api_report_delete"),
+    (r"^/api/reports$", "api_reports"),
     (r"^/api/contexts$", "api_contexts"),
     (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory"),
     (r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$", "memory_view"),
+    # /reports/<path>: public route — serves HTML report files directly.
+    (r"^/reports/(?P<path>.+)$", "reports_serve"),
     (r"^/static/(?P<name>[^/]+)$", "static"),
 ]
 
@@ -131,6 +138,8 @@ _BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
     {
         "api_academy",
         "api_agent_prompt",
+        "api_report_delete",
+        "api_reports",
         "api_workflows",
         "api_workflow_detail",
     }
@@ -231,6 +240,8 @@ def make_handler_class(
         "api_agents",
         "api_agent_prompt",
         "api_agent_sessions",
+        "api_report_delete",
+        "api_reports",
         "api_workflows",
         "api_workflow_detail",
         "api_sessions",
@@ -318,6 +329,20 @@ def make_handler_class(
             # 404 fall-through (T-2.3)
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
 
+        def do_DELETE(self) -> None:  # noqa: N802
+            parsed = urllib.parse.urlparse(self.path)
+            path = parsed.path
+            for pattern, route_name in self._tel_patterns:
+                m = pattern.match(path)
+                if m is not None:
+                    auth_header = self.headers.get("Authorization")
+                    if _token is None or not _validate_bearer(auth_header, _token):
+                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
+                        return
+                    self._dispatch_telemetry(route_name, m.groupdict(), {})
+                    return
+            self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
         def _dispatch_telemetry(
             self,
             route_name: str,
@@ -330,6 +355,23 @@ def make_handler_class(
                     # T-P5-25: academy course list (bearer-only, no telemetry needed).
                     if "api_academy" in views:
                         status, content_type, body = views["api_academy"]()
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+                elif route_name == "api_reports":
+                    # T-P5-29: report sidecar list (bearer-only, no telemetry needed).
+                    if "api_reports" in views:
+                        status, content_type, body = views["api_reports"]()
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+                elif route_name == "api_report_delete":
+                    # T-P5-31: delete a report file and its sidecar (bearer-only).
+                    path = groups.get("path", "")
+                    if "api_report_delete" in views:
+                        status, content_type, body = views["api_report_delete"](path=path)
                         self._respond(status, content_type, body)
                     else:
                         self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)

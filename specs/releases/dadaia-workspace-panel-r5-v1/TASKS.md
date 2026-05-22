@@ -230,25 +230,25 @@ complete**. Each group has disjoint write sets.
 
 <!-- owner: software-engineer-python (API) + frontend-engineer (HTML/CSS/JS) -->
 
-- [-] **T-P5-29** — Add `GET /api/reports` bearer-only route in `handler.py`; add `render_api_reports()` in `api.py`: traverse `.dadaia/reports/` recursively for `.handoff.json` sidecars, parse each, return sorted list by `produced_at` descending; fields: `title` (from `artifact.path` stem), `agent`, `context`, `created_at`, `path`, `findings_summary` (severity counts)
+- [x] **T-P5-29** — Add `GET /api/reports` bearer-only route in `handler.py`; add `render_api_reports()` in `api.py`: traverse `.dadaia/reports/` recursively for `.handoff.json` sidecars, parse each, return sorted list by `produced_at` descending; fields: `title` (from `artifact.path` stem), `agent`, `context`, `created_at`, `path`, `findings_summary` (severity counts)
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/handler.py, dadaia_workspace/features/panel/views/api.py -->
   <!-- preconditions: Phase A complete -->
   <!-- done-when: `GET /api/reports` returns 200 with list of sidecars; sorted by date descending; malformed sidecars are skipped with a warning log -->
 
-- [ ] **T-P5-30** — Add `GET /reports/<path>` route in `handler.py`: serve HTML report file with path-traversal guard using `os.path.realpath()` to verify path is under `<workspace_root>/.dadaia/reports/`; return 403 if path escapes; set `Content-Type: text/html`
+- [x] **T-P5-30** — Add `GET /reports/<path>` route in `handler.py`: serve HTML report file with path-traversal guard using `os.path.realpath()` to verify path is under `<workspace_root>/.dadaia/reports/`; return 403 if path escapes; set `Content-Type: text/html`
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/handler.py, dadaia_workspace/features/panel/views/api.py -->
   <!-- preconditions: T-P5-29 done -->
   <!-- done-when: valid path serves HTML; path outside boundary returns 403; symlinks are resolved before check -->
 
-- [ ] **T-P5-31** — Add `DELETE /api/reports/<path>` route in `handler.py` with same traversal guard; `delete_report_file()` in `api.py` deletes the `.html` file and its `.handoff.json` sidecar if present; return 404 if file not found; return 403 if path escapes boundary
+- [x] **T-P5-31** — Add `DELETE /api/reports/<path>` route in `handler.py` with same traversal guard; `delete_report_file()` in `api.py` deletes the `.html` file and its `.handoff.json` sidecar if present; return 404 if file not found; return 403 if path escapes boundary
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/handler.py, dadaia_workspace/features/panel/views/api.py -->
   <!-- preconditions: T-P5-30 done -->
   <!-- done-when: DELETE removes both HTML and sidecar; 404 for missing; 403 for boundary escape -->
 
-- [ ] **T-P5-32** — Create `views/reports.py`: HTML scaffold for Reports tab with list section and content section (hidden by default); follows static-scaffold pattern
+- [x] **T-P5-32** — Create `views/reports.py`: HTML scaffold for Reports tab with list section and content section (hidden by default); follows static-scaffold pattern
   <!-- owner: software-engineer-python -->
   <!-- files: dadaia_workspace/features/panel/views/reports.py -->
   <!-- preconditions: T-P5-29 done -->
