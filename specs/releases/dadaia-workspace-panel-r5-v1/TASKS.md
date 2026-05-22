@@ -218,7 +218,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-26 done, T-P5-07 done (window.Panel registry) -->
   <!-- done-when: Academy tab loads list of courses; empty state shows when none; click opens content view; back button returns to list -->
 
-- [-] **T-P5-28** — Create `academy.py` CSS module: module card grid (2-col >= 768px, 1-col below); type chip (`--color-academy-chip-bg`, `--color-cost` text, `--radius-pill`); left accent `4px solid var(--color-warning-bg)`; content frame (border, padding, `--color-surface` background); add `<link>` and `<script>` tags to `index.py` for academy
+- [x] **T-P5-28** — Create `academy.py` CSS module: module card grid (2-col >= 768px, 1-col below); type chip (`--color-academy-chip-bg`, `--color-cost` text, `--radius-pill`); left accent `4px solid var(--color-warning-bg)`; content frame (border, padding, `--color-surface` background); add `<link>` and `<script>` tags to `index.py` for academy
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/css/academy.py, dadaia_workspace/features/panel/views/index.py -->
   <!-- preconditions: T-P5-27 done, Phase B complete -->

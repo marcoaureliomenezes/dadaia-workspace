@@ -75,6 +75,7 @@ def render_index(
   <link rel="stylesheet" href="/static/agents.css">
   <link rel="stylesheet" href="/static/workflows.css">
   <link rel="stylesheet" href="/static/sessions.css">
+  <link rel="stylesheet" href="/static/academy.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -171,6 +172,7 @@ def render_index(
   <script src="/static/agents.js"></script>
   <script src="/static/workflows.js"></script>
   <script src="/static/sessions.js" defer></script>
+  <script src="/static/academy.js"></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
