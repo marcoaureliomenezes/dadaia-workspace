@@ -11,15 +11,18 @@ from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
+    delete_report_file,
     render_api_academy,
     render_api_agent_prompt,
     render_api_agents_canonical,
     render_api_contexts,
+    render_api_reports,
     render_api_servers,
     render_api_session_detail,
     render_api_sessions,
     render_api_workflow_detail,
     render_api_workflows_list,
+    serve_report_file,
 )
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
@@ -224,6 +227,9 @@ def build_panel_views(
         "api_servers": render_api_servers(service),
         "api_contexts": render_api_contexts(service),
         "api_academy": render_api_academy(service),
+        "api_reports": render_api_reports(service),
+        "reports_serve": serve_report_file(service),
+        "api_report_delete": delete_report_file(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
