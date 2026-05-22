@@ -451,4 +451,81 @@ WORKFLOWS_CSS: str = """
   fill: var(--color-cost, #633d2e);
   font-weight: 700;
 }
+
+/* ── DAG viewport + toolbar ──────────────────────────────────────────── */
+.workflow-dag-viewport {
+  overflow: hidden;
+  min-height: 280px;
+  position: relative;
+  border: 1px solid var(--color-border, #d4e6de);
+  border-radius: 0 0 var(--radius-card, 6px) var(--radius-card, 6px);
+  background: var(--color-surface, #ffffff);
+}
+.workflow-dag-viewport.dag-zoomed {
+  cursor: grab;
+}
+.workflow-dag-viewport.dag-zoomed:active {
+  cursor: grabbing;
+}
+.workflow-dag-viewport .workflow-dag {
+  transform-origin: top left;
+  transition: transform var(--duration-fast, 120ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+  padding: var(--space-md, 1rem);
+  overflow: visible;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workflow-dag-viewport .workflow-dag { transition: none; }
+}
+.dag-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--color-th-bg, #eeeeee);
+  border: 1px solid var(--color-border, #d4e6de);
+  border-bottom: none;
+  border-radius: var(--radius-card, 6px) var(--radius-card, 6px) 0 0;
+  padding: 0.35rem 0.75rem;
+}
+.dag-zoom-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border, #d4e6de);
+  border-radius: var(--radius, 4px);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text, #222222);
+  font-size: 1rem;
+  cursor: pointer;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  padding: 0;
+  line-height: 1;
+}
+.dag-zoom-btn:hover {
+  background: var(--color-placeholder-bg, #f7f7f7);
+  border-color: var(--color-accent-dark, #2d7d9a);
+}
+.dag-zoom-btn:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
+.dag-zoom-fit {
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  font-size: 0.78rem;
+  width: auto;
+  padding: 0 0.5rem;
+}
+.dag-zoom-display {
+  width: 52px;
+  text-align: center;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  color: var(--color-muted, #666666);
+  user-select: none;
+}
 """

@@ -1,5 +1,5 @@
-// agents.js — Agents tab UI (collapsed + expanded card grid, skeleton, error/empty states)
-// PR3-10 (collapsed layout) / PR3-11 (expand interaction + lazy prompt fetch)
+// agents.js — Agents tab UI (card grid, modal detail, skeleton, error/empty states)
+// PR3-10 (collapsed layout) / P5-D (modal redesign: T-P5-18 to T-P5-21)
 //
 // Depends on: window.authedFetch() defined in core.js (loaded before this script)
 //
@@ -14,13 +14,12 @@
 // Card lifecycle:
 //   1. Tab activation → Agents.load() called once
 //   2. fetch in-flight → skeleton cards rendered with aria-busy="true"
-//   3. fetch resolves → real cards rendered (collapsed)
-//   4. click (or Enter/Space) → expand: fetch prompt if not cached, render detail
-//   5. click again (or Escape with card focused) → collapse
-//   6. Multi-open accordion: multiple cards may be expanded simultaneously (SPEC §7.4)
+//   3. fetch resolves → real cards rendered (collapsed button with aria-haspopup="dialog")
+//   4. click (or Enter/Space) → openModal(): fetch prompt if not cached, render in dialog
+//   5. Escape or close button → native <dialog>.close(); focus returns to triggering card
 //
 // Prompt cache: per-session in-memory Map keyed by agent_id.
-//   Re-expanding a card within the same session does NOT re-fetch.
+//   Re-opening a card's modal within the same session does NOT re-fetch.
 //
 // Cost format: total_cost_usd from telemetry → "$N.NN" (2 decimal places).
 //   $0.00 if zero; "—" if cost_known is false or field is null.
@@ -111,7 +110,11 @@
   // ── Collapsed card rendering ─────────────────────────────────────────────────
 
   // Render a single collapsed agent card.
-  // Card root is a <button aria-expanded="false"> per SPEC §7.4.
+  // Card root is a <button aria-haspopup="dialog"> — clicking opens the agent modal.
+  // Zone A: status badge + name/tier block
+  // Zone B: description (2-line clamp)
+  // Zone C: stats row (Sessions, Cost Life, Last Seen)
+  // Zone D: skills chips + "+N more"
   function renderCard(agent) {
     var tel = agent.telemetry || {};
     var isActive = agent.status === 'active';
@@ -138,7 +141,6 @@
     }
 
     var description = agent.description || '';
-    var detailId = 'agent-detail-' + escAttr(agent.agent_id);
 
     // data-tier drives the CSS left-accent colour per the tier-aware design spec (PR4-18).
     // Defensive fallback: if agent.tier is absent/null/undefined, default to 3 (T3 Leaf).
@@ -150,9 +152,8 @@
       + ' class="agent-card ' + escAttr(borderClass) + '"'
       + ' data-agent-id="' + escAttr(agent.agent_id) + '"'
       + ' data-tier="' + tierNum + '"'
-      + ' aria-expanded="false"'
-      + ' aria-controls="' + escAttr(detailId) + '"'
-      + ' aria-label="' + escAttr(agent.display_name || agent.agent_id) + ', ' + statusLabel + '"'
+      + ' aria-haspopup="dialog"'
+      + ' aria-label="View details for ' + escAttr(agent.display_name || agent.agent_id) + '"'
       + '>'
       + '<div class="agent-card__header">'
       + '<span class="agent-status-badge ' + escAttr(statusClass) + '">'
@@ -163,7 +164,6 @@
       + '<span class="agent-card__name">' + escHtml(agent.display_name || agent.agent_id) + '</span>'
       + '<span class="agent-card__tier-label">' + escHtml(tierLabel(tierNum)) + '</span>'
       + '</span>'
-      + '<span class="agent-card__chevron" aria-hidden="true">&#9660;</span>'
       + '</div>'
       + '<p class="agent-card__description">' + escHtml(description) + '</p>'
       + '<div class="agent-card__stats">'
@@ -181,14 +181,16 @@
       + '</div>'
       + '</div>'
       + '<div class="agent-card__skills">' + skillsHtml + '</div>'
-      + '<div id="' + escAttr(detailId) + '" class="agent-card__detail" hidden>'
-      + '</div>'
       + '</button>';
   }
 
-  // ── Expanded detail rendering ────────────────────────────────────────────────
+  // ── Modal management (T-P5-18) ──────────────────────────────────────────────
 
-  // Render the full skills list (all skills, not truncated) for the expanded panel.
+  // Module-level reference to the card button that triggered the modal open.
+  // Used to return focus when the modal closes.
+  var _triggerCard = null;
+
+  // Render the full skills list (all skills, not truncated) for the modal.
   function renderExpandedSkills(skills) {
     if (!skills || skills.length === 0) {
       return '<span class="agent-detail__no-skills">No skills declared.</span>';
@@ -198,7 +200,7 @@
     }).join('');
   }
 
-  // Render context breakdown cost bars.
+  // Render context breakdown cost bars for the modal.
   // tel.context_breakdown is an array of { context_name, cost_usd, cost_known }.
   function renderContextBreakdown(tel) {
     var breakdown = tel.context_breakdown || [];
@@ -223,15 +225,47 @@
       + '</div>';
   }
 
-  // Render the expanded detail panel content for an agent.
-  // Called once the prompt has been fetched (or after a cache hit).
+  // Wire clipboard copy for the system prompt in the modal.
+  // Must be called after the modal content is injected into the DOM.
+  function wireCopyButton(agentId, promptText) {
+    var btn = document.getElementById('copy-prompt-' + agentId);
+    if (!btn) { return; }
+    btn.addEventListener('click', function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(promptText || '').then(function () {
+          btn.textContent = 'Copied';
+          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+        }).catch(function () {
+          btn.textContent = 'Failed';
+          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+        });
+      } else {
+        // Fallback: create a transient textarea
+        var ta = document.createElement('textarea');
+        ta.value = promptText || '';
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          btn.textContent = 'Copied';
+        } catch (_) {
+          btn.textContent = 'Failed';
+        }
+        document.body.removeChild(ta);
+        setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+      }
+    });
+  }
+
+  // Render the full detail content for the modal body.
   // agent: the agent data object from /api/agents
   // promptText: the system_prompt string from /api/agents/<id>/prompt
-  function renderDetailContent(agent, promptText) {
+  function renderModalContent(agent, promptText) {
     var tel = agent.telemetry || {};
     var skills = agent.skills || [];
     var totalCostStr = fmtCost(tel.total_cost_usd, tel.cost_known);
-
     var copyBtnId = 'copy-prompt-' + escAttr(agent.agent_id);
 
     return '<div class="agent-detail">'
@@ -268,8 +302,8 @@
       + '</div>';
   }
 
-  // Render an inline loading state for the detail panel (while prompt is fetching).
-  function renderDetailLoading() {
+  // Render loading skeleton for the modal body while prompt is fetching.
+  function renderModalLoading() {
     return '<div class="agent-detail agent-detail--loading" aria-busy="true" aria-label="Loading system prompt">'
       + '<div class="agent-detail__loading-row">'
       + '<span class="skeleton-line skeleton-pulse" style="width:60%"></span>'
@@ -280,8 +314,8 @@
       + '</div>';
   }
 
-  // Render an error state in the detail panel.
-  function renderDetailError(status) {
+  // Render error state in the modal body.
+  function renderModalError(status) {
     if (status === 401) {
       return '<div class="agent-detail agent-detail--error" role="alert">'
         + '<strong>Authentication required.</strong> '
@@ -293,92 +327,39 @@
       + '</div>';
   }
 
-  // ── Expand / collapse interaction ────────────────────────────────────────────
+  // Open the agent modal for a given agent data object.
+  // Shows loading skeleton immediately, then lazy-fetches the system prompt.
+  function openModal(agentData) {
+    var modal = document.getElementById('agent-modal');
+    var titleEl = document.getElementById('agent-modal-title');
+    var bodyEl = document.getElementById('agent-modal-body');
+    if (!modal || !bodyEl) { return; }
 
-  // Wire clipboard copy for a rendered detail panel.
-  // Must be called after the detail HTML is injected into the DOM.
-  function wireCopyButton(agentId, promptText) {
-    var btn = document.getElementById('copy-prompt-' + agentId);
-    if (!btn) { return; }
-    btn.addEventListener('click', function (e) {
-      e.stopPropagation(); // Don't bubble to card button (would toggle expand)
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(promptText || '').then(function () {
-          btn.textContent = 'Copied';
-          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
-        }).catch(function () {
-          btn.textContent = 'Failed';
-          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
-        });
-      } else {
-        // Fallback: create a transient textarea
-        var ta = document.createElement('textarea');
-        ta.value = promptText || '';
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-          document.execCommand('copy');
-          btn.textContent = 'Copied';
-        } catch (_) {
-          btn.textContent = 'Failed';
-        }
-        document.body.removeChild(ta);
-        setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
-      }
-    });
-  }
+    var agentId = agentData.agent_id;
 
-  // Collapse a card: flip aria-expanded, hide detail, reset chevron.
-  function collapseCard(btn) {
-    btn.setAttribute('aria-expanded', 'false');
-    var chevron = btn.querySelector('.agent-card__chevron');
-    if (chevron) { chevron.style.transform = ''; }
-    var detailEl = document.getElementById(btn.getAttribute('aria-controls'));
-    if (detailEl) { detailEl.hidden = true; }
-  }
-
-  // Expand a card: flip aria-expanded, show detail, rotate chevron, fetch prompt.
-  // The function is intentionally multi-open: it never collapses other cards.
-  // (SPEC §7.4: "multi-open accordion — no single-open enforcement")
-  function expandCard(btn, agentsData) {
-    var agentId = btn.dataset.agentId;
-    var detailEl = document.getElementById(btn.getAttribute('aria-controls'));
-    if (!detailEl) { return; }
-
-    btn.setAttribute('aria-expanded', 'true');
-    var chevron = btn.querySelector('.agent-card__chevron');
-    if (chevron) { chevron.style.transform = 'rotate(180deg)'; }
-    detailEl.hidden = false;
-
-    // Find the agent data for this card (to render the detail content)
-    var agentData = null;
-    if (agentsData && agentsData.agents) {
-      for (var i = 0; i < agentsData.agents.length; i++) {
-        if (agentsData.agents[i].agent_id === agentId) {
-          agentData = agentsData.agents[i];
-          break;
-        }
-      }
+    // Update modal title
+    if (titleEl) {
+      titleEl.textContent = agentData.display_name || agentId;
     }
 
-    // Check prompt cache first
+    // Check prompt cache first — render full content immediately if available
     if (promptCache.has(agentId)) {
       var cachedPrompt = promptCache.get(agentId);
-      detailEl.innerHTML = renderDetailContent(agentData || { agent_id: agentId, skills: [], telemetry: {} }, cachedPrompt);
+      bodyEl.innerHTML = renderModalContent(agentData, cachedPrompt);
+      modal.showModal();
       wireCopyButton(agentId, cachedPrompt);
       return;
     }
 
-    // Render loading state while fetching
-    detailEl.innerHTML = renderDetailLoading();
+    // Show loading skeleton, then open modal
+    bodyEl.innerHTML = renderModalLoading();
+    modal.showModal();
 
-    // Fetch system prompt (lazy, on first expand)
+    // Fetch system prompt (lazy, on first open)
     window.authedFetch('/api/agents/' + encodeURIComponent(agentId) + '/prompt')
       .then(function (r) {
         if (!r.ok) {
-          detailEl.innerHTML = renderDetailError(r.status);
+          bodyEl.innerHTML = renderModalError(r.status);
           return null;
         }
         return r.json();
@@ -386,35 +367,48 @@
       .then(function (data) {
         if (!data) { return; }
         var promptText = data.system_prompt || '';
-        // Store in cache for subsequent expands within this session
+        // Cache for subsequent opens within this session
         promptCache.set(agentId, promptText);
-        // Only update the DOM if the card is still expanded
-        if (btn.getAttribute('aria-expanded') === 'true') {
-          detailEl.innerHTML = renderDetailContent(
-            agentData || { agent_id: agentId, skills: [], telemetry: {} },
-            promptText
-          );
+        // Only update DOM if the modal is still open
+        if (modal.open) {
+          bodyEl.innerHTML = renderModalContent(agentData, promptText);
           wireCopyButton(agentId, promptText);
         }
       })
       .catch(function (err) {
-        if (btn.getAttribute('aria-expanded') === 'true') {
-          detailEl.innerHTML = '<div class="agent-detail agent-detail--error" role="alert">'
+        if (modal.open) {
+          bodyEl.innerHTML = '<div class="agent-detail agent-detail--error" role="alert">'
             + 'Failed to load system prompt: ' + escHtml(err && err.message ? err.message : String(err))
             + '</div>';
         }
       });
   }
 
-  // Toggle a card between expanded and collapsed.
-  function toggleCard(btn, agentsData) {
-    var isExpanded = btn.getAttribute('aria-expanded') === 'true';
-    if (isExpanded) {
-      collapseCard(btn);
-    } else {
-      expandCard(btn, agentsData);
-    }
+  // Close the agent modal.
+  function closeModal() {
+    var modal = document.getElementById('agent-modal');
+    if (modal) { modal.close(); }
   }
+
+  // ── Modal wiring (called once at module load) ────────────────────────────────
+
+  (function wireModal() {
+    var modal = document.getElementById('agent-modal');
+    var closeBtn = document.getElementById('agent-modal-close');
+    if (!modal) { return; }
+
+    // Focus returns to the card that opened the modal when it closes (Escape or close btn)
+    modal.addEventListener('close', function () {
+      if (_triggerCard) {
+        _triggerCard.focus();
+        _triggerCard = null;
+      }
+    });
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () { closeModal(); });
+    }
+  }());
 
   // ── Apply hash filter ────────────────────────────────────────────────────────
 
@@ -468,23 +462,23 @@
     grid.innerHTML = agents.map(renderCard).join('');
     grid.setAttribute('aria-busy', 'false');
 
-    // Wire expand/collapse for each card (click + keyboard)
-    // Multi-open accordion: expanding one card does NOT collapse others (SPEC §7.4).
-    grid.querySelectorAll('.agent-card[aria-expanded]').forEach(function (btn) {
+    // Wire each card button to open the agent modal on click.
+    // Escape is handled natively by the <dialog> element.
+    grid.querySelectorAll('.agent-card[aria-haspopup="dialog"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        toggleCard(btn, data);
-      });
-
-      // Escape key while card has focus → collapse that card
-      btn.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-          var isExpanded = btn.getAttribute('aria-expanded') === 'true';
-          if (isExpanded) {
-            collapseCard(btn);
-            btn.focus();
+        var agentId = btn.dataset.agentId;
+        var agentData = null;
+        if (data.agents) {
+          for (var i = 0; i < data.agents.length; i++) {
+            if (data.agents[i].agent_id === agentId) {
+              agentData = data.agents[i];
+              break;
+            }
           }
         }
-        // Enter/Space are already handled natively by the browser for <button>
+        if (!agentData) { return; }
+        _triggerCard = btn;
+        openModal(agentData);
       });
     });
 

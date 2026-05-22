@@ -38,18 +38,19 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 - agent-monitoring-threshold-alerts-v2 — Threshold alerts e cost-per-day notifications. (owner: product-engineer, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
 - agent-monitoring-multi-host-v2 — Agregação cross-host quando workspace rodar em mais de uma máquina. (owner: software-architect, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
 - agent-monitoring-frontmatter-completo-v2 — Ler frontmatter completo de SKILL.md (autores, tags, parâmetros). (owner: software-engineer-python, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
-- panel-workspace-resolver-fix — Disambiguate `_resolve_workspace()` entre workspace root e repo root para `dadaia panel` funcionar de qualquer cwd dentro do workspace. (owner: software-engineer-python, contexto: drift em `_archive/releases/dadaia-workspace-panel-v1/CLOSURE.md § Drifts #2`)
 - panel-workflow-run-dispatcher — "Run this workflow" invocation: integração com Claude Code dispatcher via POST endpoint no painel. (owner: software-engineer-python, contexto: `_archive/releases/dadaia-workspace-panel-r3-v1/SPEC.md §8.2`)
-- panel-dark-mode — Dark mode permutations para as 3 paletas (Mint/Sage/Warm). (owner: frontend-engineer, contexto: `_archive/releases/dadaia-workspace-panel-r3-v1/SPEC.md §8.2`)
-- panel-patch-terminology — Reconciliar uso colloquial de "PATCH" em `dadaia-workspace-panel-v1/PLAN.md` com SemVer PATCH reservado para hotfix. (owner: product-engineer, contexto: SPEC `sdd-hotfix-track-v1` D18)
 - hotfix-release-workflow — Iterações futuras sobre `hotfix-release.workflow.md` (dry-run mode, version bump automático, integração com qa-engineer stub). (owner: product-engineer, contexto: SPEC `sdd-hotfix-track-v1` "Delta de workflow")
 - vintage-bucket-doc — Documentar Vintage bucket em `docs/sdd-migration-playbook.md` com lista das 10 releases pré-SemVer. (owner: software-engineer-python, contexto: SPEC `sdd-hotfix-track-v1` D14)
 - release-pipeline — Pipeline de release semver/build/publicação cross-repo. (owner: devops-engineer, contexto: `_archive/legacy-features/release-pipeline/SPEC.md`)
 - multi-bot-context-isolation — Isolamento de contexto entre bots concorrentes. (owner: software-architect, contexto: `_archive/legacy-features/multi-bot-context-isolation/SPEC.md`)
-- dadaia-academy — Sistema de cursos in-workspace: migrar para HTML (como reports), revisar conteúdo, servir no painel (nova aba "Academy"). Feature parcialmente implementada; HTML + panel tab pendentes. (owner: software-engineer-python, contexto: `_archive/legacy-features/dadaia-academy/SPEC.md`)
 - security — Security spec workspace-level. (owner: software-architect, contexto: `_archive/legacy-features/security/SPEC.md`)
 
 ## Histórico (candidatas promovidas a release ou resolvidas)
+
+- panel-workspace-resolver-fix → **MERGED** em `dadaia-workspace-panel-r5-v1` (2026-05-21): fix de `_resolve_workspace()` incluído em Phase A, task T-P5-06.
+- panel-dark-mode → **MERGED** em `dadaia-workspace-panel-r5-v1` (2026-05-21): token coverage para dark mode das 3 paletas incluída em Phase B (FR-10, task T-P5-10).
+- dadaia-academy → **ABSORBED** como aba "Academy" em `dadaia-workspace-panel-r5-v1` (2026-05-21): standalone candidata obsoleta; Academy tab (infrastructure only, sem content modules) entregue via Phase F, tasks T-P5-25 a T-P5-28. Content modules (knowledge basis 01–06) permanecem pendentes para próxima release.
+- panel-patch-terminology → **RESOLVIDA** por `sdd-hotfix-track-v1` (2026-05-17): terminologia PATCH/SemVer alinhada; não requer release dedicada.
 
 <!-- Hotfixes migrados em 2026-05-20 — monitorados via specs/z_bug_specs.md -->
 <!-- spec-context — sessions share global primary_context.json, no DADAIA_CONTEXT auto-export (2026-05-17T064915Z) -->
