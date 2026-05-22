@@ -1,5 +1,5 @@
-release: none
-phase: none
+release: codex-runtime-agent-hotfix-v1
+phase: IMPLEMENTATION
 
 # History
 # 2026-05-21 — dadaia-workspace-panel-r5-v1 CLOSED + ARCHIVED. All phases A–H complete. 630 tests green.
