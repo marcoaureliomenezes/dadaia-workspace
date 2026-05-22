@@ -1,3 +1,8 @@
+---
+name: design-reference-research
+description: Approved design reference whitelist and citation protocol for design-specialist research across trusted UI, accessibility, and CSS documentation sources.
+---
+
 # Design Reference Research
 
 Centralizes the approved reference whitelist and citation protocol for `design-specialist`.

@@ -49,6 +49,7 @@ _COPY_DIRS = (
     "scaffold",
     "templates",
     "plugins",
+    "runtime",
     "workflows",
 )
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
@@ -142,11 +143,17 @@ def _render_agents_into_codex_config(agents_dir: Path) -> str:
     return "\n".join(blocks) + ("\n" if blocks else "")
 
 
-def _render_codex_agent_toml(name: str, model: str, developer_instructions: str) -> str:
+def _render_codex_agent_toml(
+    name: str,
+    model: str,
+    developer_instructions: str,
+    description: str | None = None,
+) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
 
-    Emits three fields:
+    Emits four fields:
     - ``name`` — basic string
+    - ``description`` — basic string when available
     - ``model`` — basic string
     - ``developer_instructions`` — triple-quoted multiline basic string
 
@@ -164,9 +171,15 @@ def _render_codex_agent_toml(name: str, model: str, developer_instructions: str)
     escaped = escaped.replace('"""', '\\"\\"\\"')
     lines: list[str] = [
         f"name = {_toml_escape(name)}\n",
-        f"model = {_toml_escape(model)}\n",
-        f'developer_instructions = """\n{escaped}\n"""\n',
     ]
+    if description:
+        lines.append(f"description = {_toml_escape(description)}\n")
+    lines.extend(
+        [
+            f"model = {_toml_escape(model)}\n",
+            f'developer_instructions = """\n{escaped}\n"""\n',
+        ]
+    )
     return "".join(lines)
 
 
@@ -1202,7 +1215,13 @@ class FileSystemPublicAssetManager:
             claude_model = str(fm.get("model", "claude-sonnet-4-6"))
             codex_model = map_model(claude_model)
 
-            toml_content = _render_codex_agent_toml(agent_name, codex_model, body)
+            description = fm.get("description")
+            toml_content = _render_codex_agent_toml(
+                agent_name,
+                codex_model,
+                body,
+                description=str(description) if description else None,
+            )
 
             dst = agents_dst / f"{agent_name}.toml"
             if dst.exists() and not force:

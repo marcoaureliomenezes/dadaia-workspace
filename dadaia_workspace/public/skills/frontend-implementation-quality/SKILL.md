@@ -1,3 +1,8 @@
+---
+name: frontend-implementation-quality
+description: Objective implementation gates for frontend-engineer browser work, including TDD, accessibility, responsiveness, design tokens, performance, and verification.
+---
+
 # Frontend Implementation Quality
 
 Objective implementation quality gates for browser-facing code authored by `frontend-engineer`.

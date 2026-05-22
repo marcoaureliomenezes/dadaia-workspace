@@ -1,3 +1,8 @@
+---
+name: frontend-design
+description: Canonical frontend design vocabulary for design-specialist, including workspace surfaces, token naming, typography, spacing, states, and handoff conventions.
+---
+
 # Frontend Design
 
 Defines the workspace UI surfaces, design token naming conventions, typography scale, spacing system, and component handoff conventions for `design-specialist`.

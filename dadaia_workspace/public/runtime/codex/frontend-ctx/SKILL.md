@@ -1,3 +1,8 @@
+---
+name: frontend-ctx
+description: Codex-only context injection adapter for frontend-engineer sessions, resolving active context, design handoff, QA evidence, and active implementation task.
+---
+
 # frontend-ctx — Codex Context Injection Adapter (frontend-engineer)
 
 Inject read-only implementation context at the start of a Codex session for
