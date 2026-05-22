@@ -260,7 +260,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: T-P5-32 done, T-P5-07 done (window.Panel registry) -->
   <!-- done-when: list loads grouped by context; trash shows inline confirm; delete removes row; click renders HTML inline; back returns to list; delete button 44px touch target; aria-labels dynamic -->
 
-- [ ] **T-P5-34** — Create `reports.py` CSS module: list rows (flex, gap, padding); agent tag chip (`--color-report-tag-bg`, `--radius-pill`, 0.72rem); delete icon button (44px touch target, `--color-delete-icon`, hover `--color-delete-icon-hover`); group label (uppercase, `--color-muted`, `.group-label` class); content frame; add `<link>` and `<script>` to `index.py`
+- [-] **T-P5-34** — Create `reports.py` CSS module: list rows (flex, gap, padding); agent tag chip (`--color-report-tag-bg`, `--radius-pill`, 0.72rem); delete icon button (44px touch target, `--color-delete-icon`, hover `--color-delete-icon-hover`); group label (uppercase, `--color-muted`, `.group-label` class); content frame; add `<link>` and `<script>` to `index.py`
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/assets/css/reports.py, dadaia_workspace/features/panel/views/index.py -->
   <!-- preconditions: T-P5-33 done, Phase B complete -->
