@@ -273,7 +273,7 @@ complete**. Each group has disjoint write sets.
 <!-- owner: frontend-engineer -->
 <!-- must be last — no parallelism -->
 
-- [-] **T-P5-35** — Reorder nav tabs in `index.py` to canonical sequence: `Projects | Agents | Workflows | Sessions | Reports | Academy | Servers`; add nav tab buttons for "Reports" and "Academy" (currently missing); move "Servers" tab button to last position
+- [x] **T-P5-35** — Reorder nav tabs in `index.py` to canonical sequence: `Projects | Agents | Workflows | Sessions | Reports | Academy | Servers`; add nav tab buttons for "Reports" and "Academy" (currently missing); move "Servers" tab button to last position
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py -->
   <!-- preconditions: All phases A–G complete -->

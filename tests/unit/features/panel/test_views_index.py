@@ -365,11 +365,11 @@ def test_aria_pairs_workflows() -> None:
 
 
 def test_nav_has_4_tabs() -> None:
-    """T-AM-18/PR5-C4: nav-tabs must contain exactly 5 tab buttons after Sessions tab added."""
+    """T-AM-18/PR5-C4/T-P5-35: nav-tabs must contain exactly 7 tab buttons after Reports and Academy tabs added."""
     service = _build_service()
     html = _render(service)
-    # Count role="tab" occurrences (Memories, Agents, Workflows, Servers, Sessions)
-    assert html.count('role="tab"') == 5
+    # Count role="tab" occurrences (Memories, Agents, Workflows, Sessions, Reports, Academy, Servers)
+    assert html.count('role="tab"') == 7
 
 
 # ---------------------------------------------------------------------------
