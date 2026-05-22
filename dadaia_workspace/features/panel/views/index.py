@@ -129,8 +129,10 @@ def render_index(
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Spec Context Projects">Spec Context Projects</button>
     <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents</button>
     <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows">Workflows</button>
-    <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
     <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
+    <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
+    <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
+    <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
   </nav>
   <main class="main" role="main">
 
