@@ -87,6 +87,10 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
         "application/javascript; charset=utf-8",
         (_JS_DIR / "academy.js").read_bytes(),
     ),
+    "reports.js": (
+        "application/javascript; charset=utf-8",
+        (_JS_DIR / "reports.js").read_bytes(),
+    ),
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",
         (_ASSETS_DIR / "logo-rhino-24.svg").read_bytes(),
