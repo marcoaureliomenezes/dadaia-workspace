@@ -1,3 +1,8 @@
+---
+name: design-ctx
+description: Codex-only context injection adapter for design-specialist sessions, resolving active context, latest design evidence, QA screenshots, and active release.
+---
+
 # design-ctx — Codex Context Injection Adapter (design-specialist)
 
 Inject read-only workspace context at the start of a Codex session for `design-specialist`,

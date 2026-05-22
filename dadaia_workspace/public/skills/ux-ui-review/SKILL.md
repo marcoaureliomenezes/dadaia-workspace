@@ -1,3 +1,8 @@
+---
+name: ux-ui-review
+description: Structured screenshot and UI review protocol for design-specialist, covering tokens, hierarchy, accessibility, states, and implementation handoff findings.
+---
+
 # UX/UI Review
 
 Structured review of screenshots or existing UI against design token spec and UX principles, for `design-specialist`.

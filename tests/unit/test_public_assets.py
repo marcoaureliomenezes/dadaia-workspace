@@ -10,6 +10,7 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     _parse_agent_frontmatter,
     _render_agent_toml_block,
+    _render_codex_agent_toml,
 )
 
 
@@ -24,6 +25,24 @@ def test_stage_creates_agentic_manifest(tmp_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["schema_version"] == "1"
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
+
+
+def test_stage_copies_codex_runtime_adapters(tmp_path: Path) -> None:
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+
+    manager.stage(workspace)
+
+    assert (
+        workspace / ".dadaia" / "agentic" / "runtime" / "codex" / "design-ctx" / "SKILL.md"
+    ).exists()
+    manifest = json.loads(
+        (workspace / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert any(
+        asset["path"] == "runtime/codex/design-ctx/SKILL.md"
+        for asset in manifest["assets"]
+    )
 
 
 def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
@@ -42,10 +61,31 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     # Executable rules with frontmatter ARE projected:
+    assert (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists()
     assert (workspace / ".codex" / "rules" / "plugin-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "workspace-protocol.md").exists()
-    assert not (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists()
     assert (workspace / "opencode.json").exists()
+
+
+def test_problematic_skill_files_have_frontmatter() -> None:
+    public_dir = FileSystemPublicAssetManager()._public_dir  # noqa: SLF001
+    skill_paths = [
+        public_dir / "skills" / "ux-ui-review" / "SKILL.md",
+        public_dir / "skills" / "design-report-quality-gate" / "SKILL.md",
+        public_dir / "skills" / "frontend-implementation-quality" / "SKILL.md",
+        public_dir / "skills" / "frontend-design" / "SKILL.md",
+        public_dir / "skills" / "design-reference-research" / "SKILL.md",
+        public_dir / "runtime" / "codex" / "design-ctx" / "SKILL.md",
+        public_dir / "runtime" / "codex" / "frontend-ctx" / "SKILL.md",
+    ]
+
+    for skill_path in skill_paths:
+        text = skill_path.read_text(encoding="utf-8")
+        assert text.startswith("---\n"), f"{skill_path} must start with YAML frontmatter"
+        assert "\n---\n" in text[4:], f"{skill_path} must close YAML frontmatter"
+        frontmatter = text.split("\n---\n", 1)[0]
+        assert "\nname: " in frontmatter
+        assert "\ndescription: " in frontmatter
 
 
 def test_install_preserves_existing_files_without_force(tmp_path: Path) -> None:
@@ -196,6 +236,21 @@ def test_render_agent_toml_block_emits_tools_array_literal() -> None:
     fm: dict[str, object] = {"name": "dev", "tools": ["Read", "Edit", "Bash"]}
     result = _render_agent_toml_block("dev", fm)
     assert 'tools = ["Read", "Edit", "Bash"]' in result, f"Expected tools array in: {result!r}"
+
+
+def test_render_codex_agent_toml_emits_description() -> None:
+    result = _render_codex_agent_toml(
+        "ai-engineer",
+        "gpt-5.3-codex",
+        "Follow the Codex persona.",
+        description="AI entity authoring agent.",
+    )
+
+    parsed = tomllib.loads(result)
+    assert parsed["name"] == "ai-engineer"
+    assert parsed["description"] == "AI entity authoring agent."
+    assert parsed["model"] == "gpt-5.3-codex"
+    assert parsed["developer_instructions"].strip() == "Follow the Codex persona."
 
 
 # ---------------------------------------------------------------------------

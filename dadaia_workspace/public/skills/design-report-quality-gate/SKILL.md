@@ -1,3 +1,8 @@
+---
+name: design-report-quality-gate
+description: Quality checklist for design-specialist reports before handoff, ensuring required sections, evidence, citations, sketches, and implementation notes are complete.
+---
+
 # Design Report Quality Gate
 
 Validates design report completeness before handoff to `frontend-engineer`.
