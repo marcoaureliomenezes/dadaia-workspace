@@ -279,7 +279,7 @@ complete**. Each group has disjoint write sets.
   <!-- preconditions: All phases A–G complete -->
   <!-- done-when: 7 tab buttons present in correct order; Reports and Academy tabs activate their respective content sections -->
 
-- [-] **T-P5-36** — Remove global runtime switcher (`div.runtime-switcher`) from topbar HTML in `index.py`; update topbar CSS in `structure.py` to remove primary badge area and runtime switcher area; update `.topbar-logo svg` size to 36×36px; wire new logo-rhino-36.svg reference
+- [x] **T-P5-36** — Remove global runtime switcher (`div.runtime-switcher`) from topbar HTML in `index.py`; update topbar CSS in `structure.py` to remove primary badge area and runtime switcher area; update `.topbar-logo svg` size to 36×36px; wire new logo-rhino-36.svg reference
   <!-- owner: frontend-engineer -->
   <!-- files: dadaia_workspace/features/panel/views/index.py, dadaia_workspace/features/panel/views/assets/css/structure.py -->
   <!-- preconditions: T-P5-12 done (new SVG exists), T-P5-35 done -->

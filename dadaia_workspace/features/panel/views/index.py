@@ -30,7 +30,7 @@ from dadaia_workspace.features.panel.views.academy import render_academy_section
 from dadaia_workspace.features.panel.views.agents import render_agents_section
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
-from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24
+from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section
 
 
@@ -42,13 +42,6 @@ def render_index(
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         groups = service.list_servers_grouped()
         contexts = service.list_active_contexts()
-
-        primary = next((c for c in contexts if c.is_primary), None)
-        primary_badge = (
-            f'<div class="topbar-badge">primary: {html.escape(primary.slug)}</div>'
-            if primary
-            else ""
-        )
 
         servers_html = _render_servers(groups) if groups else _empty_state()
 
@@ -82,12 +75,11 @@ def render_index(
 </head>
 <body>
   <header class="topbar" role="banner">
-    <span class="topbar-logo" aria-hidden="true">{LOGO_RHINO_24}</span>
+    <span class="topbar-logo" aria-hidden="true">{LOGO_RHINO_36}</span>
     <div class="topbar-wordmark">dadaia<span>&#183;</span>workspace</div>
     <div class="topbar-divider" aria-hidden="true"></div>
     <div class="topbar-subtitle">panel</div>
     <div class="topbar-right" style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;">
-    {primary_badge}
     <div class="theme-switcher" style="position:relative;">
       <button id="theme-btn" type="button" class="theme-btn"
         aria-haspopup="menu" aria-expanded="false"
@@ -100,28 +92,6 @@ def render_index(
         <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="sage">Sage</li>
         <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="warm">Warm</li>
       </ul>
-    </div>
-    <div class="runtime-switcher" role="radiogroup" aria-label="Active runtime">
-      <button type="button"
-        class="runtime-btn runtime-btn--claude"
-        id="runtime-btn-claude"
-        role="radio"
-        aria-checked="true"
-        data-runtime-value="claude"
-        aria-label="Claude runtime">
-        <span class="runtime-btn-icon" aria-hidden="true">&#9672;</span>
-        <span class="runtime-btn-label">Claude</span>
-      </button>
-      <button type="button"
-        class="runtime-btn runtime-btn--codex"
-        id="runtime-btn-codex"
-        role="radio"
-        aria-checked="false"
-        data-runtime-value="codex"
-        aria-label="Codex runtime">
-        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>
-        <span class="runtime-btn-label">Codex</span>
-      </button>
     </div>
     </div>
   </header>
