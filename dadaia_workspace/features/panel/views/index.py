@@ -28,6 +28,7 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views.academy import render_academy_section
 from dadaia_workspace.features.panel.views.agents import render_agents_section
+from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section
@@ -57,6 +58,7 @@ def render_index(
         context_count = len(contexts)
 
         academy_section = render_academy_section()
+        reports_section = render_reports_section()
         agents_section = render_agents_section()
         workflows_section = render_workflows_section()
         sessions_section = render_sessions_section()
@@ -76,6 +78,7 @@ def render_index(
   <link rel="stylesheet" href="/static/workflows.css">
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
+  <link rel="stylesheet" href="/static/reports.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -165,6 +168,8 @@ def render_index(
 
     {sessions_section}
 
+    {reports_section}
+
   </main>
   <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
@@ -173,6 +178,7 @@ def render_index(
   <script src="/static/workflows.js"></script>
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
+  <script src="/static/reports.js"></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))

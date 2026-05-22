@@ -317,13 +317,14 @@ def test_sections_have_tabindex_zero() -> None:
 
 
 def test_tabpanel_count_is_three() -> None:
-    """T-AM-01/T-AM-18/PR5-C4/T-P5-26: 6 role=tabpanel elements after Academy section added.
+    """T-AM-01/T-AM-18/PR5-C4/T-P5-26/T-P5-34: 7 role=tabpanel elements after Reports section added.
 
-    Count history: 3 → 5 (Sessions added in PR5-C4) → 6 (Academy added in T-P5-26).
+    Count history: 3 → 5 (Sessions added in PR5-C4) → 6 (Academy added in T-P5-26)
+                     → 7 (Reports added in T-P5-34).
     """
     service = _build_service()
     html = _render(service)
-    assert html.count('role="tabpanel"') == 6
+    assert html.count('role="tabpanel"') == 7
 
 
 def test_panel_js_contains_keydown_handler() -> None:
