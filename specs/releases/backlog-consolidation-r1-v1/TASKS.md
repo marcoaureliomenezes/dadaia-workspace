@@ -29,7 +29,7 @@
 
 ## Phase B — context-deactivate fixes
 
-- [-] T-BCR-04 — Corrigir 4 bugs em `dadaia context deactivate`.
+- [x] T-BCR-04 — Corrigir 4 bugs em `dadaia context deactivate`.
   - Owner: `software-engineer-python`
   - Write set:
     - `dadaia_workspace/infrastructure/git_subprocess.py`
