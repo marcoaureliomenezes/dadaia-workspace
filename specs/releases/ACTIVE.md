@@ -1,7 +1,9 @@
-release: codex-runtime-agent-hotfix-v1
-phase: IMPLEMENTATION
+release: none
+phase: none
 
 # History
+# 2026-05-23 — codex-runtime-agent-hotfix-v1 CLOSED + ARCHIVED. T-CX-HOTFIX-01 complete. dadaia public doctor all [ok].
+# 2026-05-23 — codex-agent-orchestration-parity-v1 ghost release archived (had CLOSURE.md but was not in _archive/).
 # 2026-05-21 — dadaia-workspace-panel-r5-v1 CLOSED + ARCHIVED. All phases A–H complete. 630 tests green.
 # 2026-05-21 — dadaia-workspace-panel-r5-v1 advanced to CLOSURE. All tasks [x].
 # 2026-05-21 — PLAN + TASKS Aprovados. Phase advanced to IMPLEMENTATION.
