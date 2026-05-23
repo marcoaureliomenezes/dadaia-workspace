@@ -1,13 +1,16 @@
 """dadaia context CLI — happy path + error paths."""
 
 import json
+import subprocess
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.workspace.service import WorkspaceService
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -138,3 +141,78 @@ def test_context_workspace_not_initialized_exits(tmp_path: Path, monkeypatch) ->
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["context", "list"])
     assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# T-BCR-08 smoke test — deactivate uses git push -u when no upstream tracking
+# ---------------------------------------------------------------------------
+
+
+def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
+    """Smoke test: GitSubprocessClient.push() uses -u on a repo with no upstream.
+
+    This integration smoke test verifies the Bug-4 fix (T-BCR-04) by using a
+    real git local repo + bare remote so the full subprocess path executes.
+    If no upstream tracking branch is configured, push() must issue
+    ``git push -u origin <branch>`` and not plain ``git push``.
+    """
+    # Create a bare remote
+    bare = tmp_path / "bare.git"
+    bare.mkdir()
+    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+
+    # Create a local repo with at least one commit
+    local = tmp_path / "local"
+    local.mkdir()
+    subprocess.run(["git", "init", str(local)], capture_output=True, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+    (local / "README.md").write_text("hello")
+    subprocess.run(["git", "add", "README.md"], cwd=local, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare)],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+
+    # Pre-condition: no upstream tracking branch
+    no_upstream = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "@{u}"],
+        cwd=local,
+        capture_output=True,
+        text=True,
+    )
+    assert no_upstream.returncode != 0, "pre-condition: upstream must NOT be set"
+
+    # Exercise the fix
+    client = GitSubprocessClient()
+    client.push(local)  # must not raise
+
+    # Post-condition: upstream tracking branch is now set
+    has_upstream = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "@{u}"],
+        cwd=local,
+        capture_output=True,
+        text=True,
+    )
+    assert has_upstream.returncode == 0, (
+        "upstream tracking must be set after git push -u; "
+        f"got stderr: {has_upstream.stderr.strip()!r}"
+    )
