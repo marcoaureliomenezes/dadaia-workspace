@@ -84,7 +84,7 @@
 
 ## Phase F — Test suite
 
-- [-] T-BCR-08 — Testes de regressão para todos os FRs.
+- [x] T-BCR-08 — Testes de regressão para todos os FRs.
   - Owner: `software-engineer-python`
   - Write set:
     - `tests/unit/infrastructure/test_git_subprocess.py`
@@ -104,7 +104,7 @@
 
 ## Phase G — Propagação e validação final
 
-- [ ] T-BCR-09 — Propagação completa + validação final.
+- [-] T-BCR-09 — Propagação completa + validação final.
   - Owner: `software-engineer-python`
   - Write set: nenhum arquivo de produção — apenas runtime
   - Comandos:
