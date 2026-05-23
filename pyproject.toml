@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI-native workspace management CLI with Spec Context Projects"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
 
 [tool.poetry.scripts]
-dadaia = "dadaia_workspace.cli.main:app"
+dadaia = "dadaia_workspace.cli.main:_safe_app"
 
 [tool.poetry.dependencies]
 python = "^3.12"

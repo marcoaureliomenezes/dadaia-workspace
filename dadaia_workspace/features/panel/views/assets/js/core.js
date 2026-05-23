@@ -9,6 +9,26 @@
 (function () {
   'use strict';
 
+  // ── Panel module registry ─────────────────────────────────────────
+  // Central registry for named panel modules. Each module calls
+  // window.Panel.register(name, mod) after defining itself.
+  // Tab activation calls window.Panel.activate(name, opts) which
+  // delegates to mod.load(opts).
+  (function initPanelRegistry() {
+    var _modules = {};
+    window.Panel = {
+      register: function (name, mod) {
+        _modules[name] = mod;
+      },
+      activate: function (name, opts) {
+        var mod = _modules[name];
+        if (mod && typeof mod.load === 'function') {
+          mod.load(opts);
+        }
+      },
+    };
+  })();
+
   // ── Token bootstrap ───────────────────────────────────────────────
   // On first load the panel URL carries ?token=<value>.
   // Persist it to sessionStorage so auth survives tab navigation,
@@ -122,7 +142,9 @@
     if (statusLabel) { statusLabel.textContent = formatAge(); }
   }
 
-  // ── Server table renderer ──────────────────────────────────────────
+  // ── HTML escape utility ────────────────────────────────────────────
+  // Canonical implementation; promoted to window.escHtml so all modules
+  // can share it without duplicating the function.
   function escHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -130,6 +152,9 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
+  window.escHtml = escHtml;
+
+  // ── Server table renderer ──────────────────────────────────────────
 
   function buildServersHTML(data) {
     var groups = data.groups;
@@ -192,11 +217,12 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── Tab activation hook — lazy fetch for agents/workflows ─────────────
+  // ── Tab activation hook — lazy fetch for agents/workflows/sessions/academy/reports ───
   // Agents module: window.Agents (agents.js, loaded after this script).
   // Workflows module: window.Workflows (workflows.js, loaded after this script).
-  // Agents module is loaded by agents.js (separate script tag); accessed via
-  // window.Agents. Workflows module remains inline (PR3-16/17 will extract it).
+  // Sessions module: window.Sessions (sessions.js, loaded after this script).
+  // Academy module: window.Academy (academy.js, loaded after this script).
+  // Reports module: window.Reports (reports.js, loaded after this script).
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       var target = tab.getAttribute('data-section');
@@ -213,6 +239,15 @@
             window.Workflows.load();
           }
         }
+      }
+      if (target === 'sessions') {
+        window.Panel.activate('sessions');
+      }
+      if (target === 'academy') {
+        window.Panel.activate('academy');
+      }
+      if (target === 'reports') {
+        window.Panel.activate('reports');
       }
     });
   });
@@ -239,7 +274,26 @@
         // and #workflows?detail=<name> deep links in one code path.
         workflowsTab.click();
       }
+    } else if (hash.startsWith('#reports')) {
+      var reportsTab = document.getElementById('tab-reports');
+      if (reportsTab) { reportsTab.click(); }
+    } else if (hash.startsWith('#academy')) {
+      var academyTab = document.getElementById('tab-academy');
+      if (academyTab) { academyTab.click(); }
     }
   })();
+
+  // ── Register modules into window.Panel ───────────────────────────────
+  // Runs after all synchronous <script> tags have executed (DOMContentLoaded
+  // fires after the parser has processed every script in the document head/body).
+  // By this point window.Agents and window.Workflows are already defined by
+  // their respective script tags which are loaded after core.js.
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.Agents) { window.Panel.register('agents', window.Agents); }
+    if (window.Workflows) { window.Panel.register('workflows', window.Workflows); }
+    if (window.Sessions) { window.Panel.register('sessions', window.Sessions); }
+    if (window.Academy) { window.Panel.register('academy', window.Academy); }
+    if (window.Reports) { window.Panel.register('reports', window.Reports); }
+  });
 
 })();

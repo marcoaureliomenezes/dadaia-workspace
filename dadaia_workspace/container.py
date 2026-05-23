@@ -11,14 +11,18 @@ from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
+    delete_report_file,
+    render_api_academy,
     render_api_agent_prompt,
     render_api_agents_canonical,
     render_api_contexts,
+    render_api_reports,
     render_api_servers,
     render_api_session_detail,
     render_api_sessions,
     render_api_workflow_detail,
     render_api_workflows_list,
+    serve_report_file,
 )
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
@@ -34,9 +38,9 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
 from dadaia_workspace.infrastructure.cli_agent_dispatcher import (
     CliAgentDispatcher,
-    CodexAgentDispatcher,
     OpenCodeAgentDispatcher,
 )
+from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -166,12 +170,14 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
+    academy: object | None = None,
 ) -> PanelService:
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
         telemetry=telemetry,
+        academy=academy,
     )
 
 
@@ -212,13 +218,18 @@ def build_panel_views(
         into PanelService so that ``render_api_agents_canonical`` can overlay
         telemetry data on the canonical agent catalog (PR3-08).
     """
-    service = build_panel_service(workspace_root, telemetry=telemetry)
+    academy = build_academy_service(workspace_root)
+    service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
     # WorkflowsService is exposed via PanelService._workflows_service for the
     # detail endpoint (get_detail needs name resolution against the filesystem).
     return {
         "index": render_index(service),
         "api_servers": render_api_servers(service),
         "api_contexts": render_api_contexts(service),
+        "api_academy": render_api_academy(service),
+        "api_reports": render_api_reports(service),
+        "reports_serve": serve_report_file(service),
+        "api_report_delete": delete_report_file(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),

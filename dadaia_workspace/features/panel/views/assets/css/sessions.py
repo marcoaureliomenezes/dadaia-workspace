@@ -386,4 +386,43 @@ SESSIONS_CSS: str = """
   padding: 0.75rem 1rem;
   font-size: 0.88rem;
 }
+
+/* ── Sessions error state (T-P5-38) ──────────────────────────────── */
+.sessions-error-container {
+  padding: 1rem 1.25rem;
+  scroll-margin-top: calc(var(--topbar-h, 56px) + var(--nav-h, 48px) + var(--space-sm, 0.6rem));
+}
+.sessions-error-heading {
+  color: var(--color-cost, #633d2e);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+}
+.sessions-error-body {
+  color: var(--color-muted, #666666);
+  font-size: 0.88rem;
+  margin: 0 0 0.75rem;
+}
+.sessions-retry-btn {
+  background: none;
+  border: 1px solid var(--color-accent-dark, #2d7d9a);
+  border-radius: var(--radius, 4px);
+  color: var(--color-accent-dark, #2d7d9a);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.3em 0.9em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sessions-retry-btn:hover {
+  background: var(--color-placeholder-bg, #f7f7f7);
+}
+.sessions-retry-btn:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
 """

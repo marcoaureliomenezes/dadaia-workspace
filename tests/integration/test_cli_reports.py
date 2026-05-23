@@ -20,7 +20,6 @@ import hashlib
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
@@ -59,6 +58,9 @@ def _make_valid_handoff(
         "agent": "software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
+        "scope": "dadaia-workspace/test",
+        "metrics": {},
+        "findings": [],
         "artifact": {
             "type": "report",
             "path": f"{stem}.html",
@@ -74,12 +76,19 @@ def _make_valid_handoff(
 
 
 def _make_invalid_handoff(base_dir: Path, stem: str = "bad") -> Path:
-    """Create an invalid handoff that is missing the required 'agent' field."""
+    """Create an invalid handoff that is missing the required 'agent' field.
+
+    All other v1.1 required fields are present so the v1.0 compat check does
+    not fire — only the schema 'agent' violation triggers.
+    """
     doc = {
         "schema_version": "handoff-v1",
         # "agent" intentionally omitted — required field
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
+        "scope": "dadaia-workspace/test",
+        "metrics": {},
+        "findings": [],
         "artifact": {
             "type": "report",
             "path": f"{stem}.html",
@@ -244,15 +253,6 @@ def test_09_schema_not_in_claude_schemas_dir(tmp_path: Path, monkeypatch) -> Non
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "CLI returns exit code 1 (WorkspaceNotInitializedError) instead of 3. "
-        "Pre-existing mismatch tracked in backlog candidate "
-        "`cli-reports-exit-code-alignment-v1` — decide between aligning the CLI "
-        "to emit exit 3 or updating this test to expect the current behavior."
-    ),
-    strict=True,
-)
 def test_10_workspace_not_initialized_exits_3(tmp_path: Path, monkeypatch) -> None:
     """Test 10: running validate in a directory with no .dadaia/agentic/schemas/ → exit 3."""
     # tmp_path has no workspace init — no .dadaia directory at all

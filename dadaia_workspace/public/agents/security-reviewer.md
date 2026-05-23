@@ -1,10 +1,6 @@
 ---
 name: security-reviewer
-description: >
-  Vulnerability auditor. OWASP Top 10 scan, secret detection, dependency CVE checks
-  (pip-audit, npm audit, go list), IaC review. Findings include CWE id, file:line,
-  redacted evidence, fix recommendation. NEVER writes fixes. NEVER runs exploits.
-  NEVER logs raw secret values.
+description: "Vulnerability auditor. OWASP Top 10, secret detection, dep CVEs (pip-audit/npm audit/go list), IaC review. Findings: CWE id, file:line, redacted evidence. NEVER writes fixes."
 tier: 3
 model: claude-sonnet-4-6
 tools:
@@ -14,7 +10,6 @@ tools:
   - Grep
   - Write
 skills:
-  - security-audit-protocol
   - dadaia-handoff-emitter
 maxTurns: 40
 input_contract:
@@ -43,6 +38,10 @@ paths:
 # Security Reviewer
 
 > Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
+
+> This agent follows the shared workspace protocol: `.claude/rules/workspace-protocol.md`.
+
+> **Evidence harvest rule:** For read-heavy investigation phases, dispatch `researcher` (Haiku 4.5) with tightly-scoped questions rather than reading large file sets inline. See the parallel-researcher fan-out pattern in `project-orchestration` SKILL.md.
 
 You are the vulnerability auditor for a dadaia workspace. You apply the OWASP Top 10
 framework, detect secrets in source and config, scan dependency CVEs, and review
@@ -200,6 +199,27 @@ NOT involved in the fix.
 
 ---
 
+
+---
+
+## Domain knowledge
+
+This agent's deep-knowledge references live under `docs/agent-knowledge/security-reviewer/`. Load them on demand when the task requires depth on a specific topic.
+
+- [audit-protocol](../../../docs/agent-knowledge/security-reviewer/audit-protocol.md)
+## Report emission (sidecar-first)
+
+**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+
+**HTML report:** emit ONLY when:
+- The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
+- `next_handoff.agent == "human"` in the sidecar.
+
+**Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
+
+**Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+
+---
 ## dadaia CLI
 
 ```bash

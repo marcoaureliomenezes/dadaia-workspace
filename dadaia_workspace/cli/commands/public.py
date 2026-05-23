@@ -1,6 +1,6 @@
 """dadaia public subcommands."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -36,11 +36,29 @@ def stage() -> None:
 def install(
     target: TargetOption = "all",
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
+    repos_only: bool = typer.Option(
+        False, "--repos-only", help="Install only consumer repo assets."
+    ),
+    workspace_only: bool = typer.Option(
+        False, "--workspace-only", help="Install only workspace-root guardrail pair."
+    ),
 ) -> None:
     """Install staged public assets into runtime projections."""
+    if repos_only and workspace_only:
+        typer.echo("Error: --repos-only and --workspace-only are mutually exclusive.", err=True)
+        raise typer.Exit(1)
+
+    scope: Literal["all", "repos-only", "workspace-only"]
+    if repos_only:
+        scope = "repos-only"
+    elif workspace_only:
+        scope = "workspace-only"
+    else:
+        scope = "all"
+
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()
-    installed = svc.install(workspace_root, target=target, force=force)
+    installed = svc.install(workspace_root, target=target, force=force, scope=scope)
 
     if installed:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) processed:")

@@ -1,16 +1,16 @@
-"""Unit tests for PR3-11: Agent card expand interaction.
+"""Unit tests for PR3-11 / P5-D (T-P5-18 to T-P5-20): Agent card modal interaction.
 
-Covers:
+PR3-11 covered the inline expand/collapse.  P5-D (T-P5-18 to T-P5-20) replaces the
+inline expand with a native <dialog> modal.  Tests updated accordingly:
   - agents.js has prompt fetch call (authedFetch to /api/agents/<id>/prompt)
   - agents.js has per-card prompt cache (Map or similar cache keyed by agent id)
-  - agents.js collapses properly (aria-expanded toggled)
-  - agents.js renders expanded detail: skills, cost, prompt in <pre>
-  - agents.js formats total_cost_micro_usd to USD string
-  - agents.js handles Escape key to collapse
-  - agents.js supports multi-open (no single-open enforcement code)
-  - agents.css defines expanded panel, prompt block, cost label styles
-  - agents.css has max-height + overflow for prompt scrollability
-  - agents.css has transition rules respecting prefers-reduced-motion
+  - agents.js renders modal content: skills, cost, prompt in <pre>
+  - agents.js formats total_cost_usd to USD string
+  - agents.js opens a <dialog> modal on card click (aria-haspopup="dialog")
+  - agents.js handles Escape key (via native dialog; wired event still present)
+  - agents.css defines modal styles (.agent-modal)
+  - agents.css has max-height + overflow for prompt scrollability (in modal body)
+  - agents.css has transition rules respecting prefers-reduced-motion (modal animation)
 """
 
 from __future__ import annotations
@@ -51,21 +51,22 @@ def test_agents_js_has_prompt_cache() -> None:
     )
 
 
-def test_agents_js_sets_aria_expanded_true_on_expand() -> None:
-    """agents.js expand handler must set aria-expanded='true'."""
+def test_agents_js_card_uses_aria_haspopup_dialog() -> None:
+    """agents.js card button must use aria-haspopup='dialog' (modal pattern, P5-D)."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    assert "aria-expanded" in agents_text
-    # Must set to 'true' somewhere (expansion)
-    assert "'true'" in agents_text or '"true"' in agents_text, (
-        "agents.js must set aria-expanded to 'true' when expanding"
+    assert "aria-haspopup" in agents_text, (
+        "agents.js must set aria-haspopup on the card button (modal design)"
+    )
+    assert "dialog" in agents_text, (
+        "agents.js must reference 'dialog' (aria-haspopup='dialog' or modal wiring)"
     )
 
 
-def test_agents_js_sets_aria_expanded_false_on_collapse() -> None:
-    """agents.js collapse handler must set aria-expanded='false'."""
+def test_agents_js_opens_modal_on_card_click() -> None:
+    """agents.js must call showModal() to open the agent detail dialog."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    assert "'false'" in agents_text or '"false"' in agents_text, (
-        "agents.js must set aria-expanded to 'false' when collapsing"
+    assert "showModal" in agents_text, (
+        "agents.js must call showModal() to open the native <dialog> modal"
     )
 
 
@@ -76,15 +77,14 @@ def test_agents_js_renders_system_prompt_in_pre() -> None:
 
 
 def test_agents_js_renders_full_skills_list() -> None:
-    """agents.js expanded panel must render the full skills list (not truncated)."""
+    """agents.js modal content must render the full skills list (not truncated)."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    # The expanded panel renders all skills; look for expanded-specific skills logic
-    # Both the collapsed (slice 0,2) and the expanded (all skills) must coexist
-    assert "skill" in agents_text.lower(), "agents.js must render skills in expanded panel"
-    # Expanded section should render the full array (no truncation to 2)
-    # The code should have a path that renders all skills in the detail section
-    assert "agent-card__detail" in agents_text or "detail" in agents_text.lower(), (
-        "agents.js must render content into the detail region"
+    # The modal renders all skills; look for modal-specific skills logic
+    # Both the collapsed (slice 0,2) and the modal (all skills) must coexist
+    assert "skill" in agents_text.lower(), "agents.js must render skills in modal"
+    # Modal content should render the full array (no truncation to 2)
+    assert "agent-detail" in agents_text.lower() or "modal" in agents_text.lower(), (
+        "agents.js must render content into the modal body"
     )
 
 
@@ -101,36 +101,31 @@ def test_agents_js_renders_cost_in_expanded_panel() -> None:
     )
 
 
-def test_agents_js_handles_escape_key_to_collapse() -> None:
-    """agents.js must handle the Escape key to collapse an expanded card."""
+def test_agents_js_handles_escape_key_to_close() -> None:
+    """agents.js modal must handle Escape to close (native dialog wires it; close handler present)."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    assert "Escape" in agents_text or "keydown" in agents_text, (
-        "agents.js must listen for Escape key to collapse expanded card"
+    # Native <dialog> handles Escape natively; we verify that the 'close' event is wired
+    # for focus return, which is the P5-D contract.
+    assert "close" in agents_text, (
+        "agents.js must wire the 'close' event on the dialog (for focus return on Escape)"
     )
 
 
-def test_agents_js_supports_multi_open() -> None:
-    """agents.js must support multi-open (multiple cards expanded simultaneously).
+def test_agents_js_uses_modal_not_inline_expand() -> None:
+    """agents.js P5-D: card click opens a <dialog> modal, not an inline expand region.
 
-    The SPEC (§7.4) explicitly states multi-open accordion is allowed.
-    Implementation must NOT collapse other cards when a new one opens.
+    The modal pattern replaces the multi-open accordion from PR3-11.
+    Each card click opens a single shared dialog.
     """
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    # Multi-open means no "close all others" logic; verify absence of patterns
-    # that would enforce single-open (like querying all [aria-expanded="true"] and closing them)
-    # We check that the expand handler does NOT close all other expanded cards
-    # This is a structural assertion: look for comments or code that references multi-open
-    # At minimum the file should not have "querySelectorAll('[aria-expanded=\"true\"]')"
-    # being used to close all expanded cards on expand
-    single_open_pattern = "querySelectorAll('[aria-expanded=\"true\"]'"
-    # If this pattern exists, it might be single-open enforcement; allow if used for Escape
-    # The key check: the expand function itself should NOT close others
-    # We trust the implementation is correct; verify via code comment or absence of close-all
-    assert (
-        "multi" in agents_text.lower()
-        or "accordion" in agents_text.lower()
-        or (single_open_pattern not in agents_text)
-    ), "agents.js must support multi-open accordion (no single-open enforcement on expand)"
+    # Must have modal open function
+    assert "openModal" in agents_text or "showModal" in agents_text, (
+        "agents.js must use openModal() / showModal() for card detail (modal design)"
+    )
+    # Must NOT have inline per-card detail DIVs in the card HTML (detail is in dialog now)
+    assert "agent-card__detail" not in agents_text, (
+        "agents.js must NOT render .agent-card__detail inline (detail moved to modal)"
+    )
 
 
 def test_agents_js_has_loading_state_on_prompt_fetch() -> None:
@@ -155,12 +150,12 @@ def test_agents_js_copy_button_present() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_agents_css_defines_expanded_panel_styles() -> None:
-    """agents.css must define styles for the expanded panel region."""
+def test_agents_css_defines_modal_styles() -> None:
+    """agents.css must define styles for the agent modal (P5-D replaces inline panel)."""
     from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
 
-    assert "agent-card__detail" in AGENTS_CSS, (
-        "agents.css must define styles for .agent-card__detail (expanded panel)"
+    assert "agent-modal" in AGENTS_CSS, (
+        "agents.css must define styles for .agent-modal (modal design, P5-D)"
     )
 
 
@@ -215,14 +210,12 @@ def test_agents_css_uses_tokens_in_expanded_panel() -> None:
     )
 
 
-def test_agents_css_expanded_detail_not_display_none_when_shown() -> None:
-    """agents.css detail region must use hidden attribute pattern, not display:none class."""
+def test_agents_css_modal_has_backdrop() -> None:
+    """agents.css must define ::backdrop styles for the modal overlay (P5-D)."""
     from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
 
-    # The detail uses [hidden] attribute to hide/show; verify we handle this correctly
-    # The CSS should have .agent-card__detail[hidden] { display: none; }
-    assert "agent-card__detail[hidden]" in AGENTS_CSS, (
-        "agents.css must include .agent-card__detail[hidden] { display: none; } rule"
+    assert "::backdrop" in AGENTS_CSS, (
+        "agents.css must include .agent-modal::backdrop rule for the overlay"
     )
 
 

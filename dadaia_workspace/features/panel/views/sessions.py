@@ -38,6 +38,18 @@ def render_sessions_section() -> str:
         '  <header class="section-header">\n'
         "    <h2>Sessions</h2>\n"
         '    <p class="section-meta" id="sessions-meta" aria-live="polite"></p>\n'
+        '    <div class="runtime-switcher" role="radiogroup" aria-label="Active runtime" style="margin-left:auto;">\n'
+        '      <button type="button" class="runtime-btn runtime-btn--claude" id="sessions-runtime-btn-claude"\n'
+        '        role="radio" aria-checked="true" data-runtime-value="claude" aria-label="Claude runtime">\n'
+        '        <span class="runtime-btn-icon" aria-hidden="true">&#9672;</span>\n'
+        '        <span class="runtime-btn-label">Claude</span>\n'
+        "      </button>\n"
+        '      <button type="button" class="runtime-btn runtime-btn--codex" id="sessions-runtime-btn-codex"\n'
+        '        role="radio" aria-checked="false" data-runtime-value="codex" aria-label="Codex runtime">\n'
+        '        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>\n'
+        '        <span class="runtime-btn-label">Codex</span>\n'
+        "      </button>\n"
+        "    </div>\n"
         "  </header>\n"
         # Last-updated badge — updated by JS after each auto-refresh tick
         '  <div class="sessions-toolbar">\n'

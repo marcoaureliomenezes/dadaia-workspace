@@ -6,20 +6,10 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root_for_init
 
 console = Console()
 app = typer.Typer()
-
-
-def _resolve_workspace(workspace: Path | None) -> Path:
-    if workspace:
-        return workspace.resolve()
-    # Walk up from CWD looking for .claude/ or .dadaia/
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".claude").exists() or (parent / ".dadaia").exists():
-            return parent
-    return cwd
 
 
 @app.command()
@@ -30,7 +20,7 @@ def init(
     ),
 ) -> None:
     """Bootstrap a dadaia workspace: creates .dadaia/ and installs agent assets into .claude/."""
-    root = _resolve_workspace(workspace)
+    root = resolve_workspace_root_for_init(workspace)
     console.print(f"[bold]Initializing workspace:[/bold] {root}")
 
     svc = container.build_workspace_service(root)

@@ -1,0 +1,94 @@
+# Tasks: Release — infra-correctness-v1
+
+> **Status:** Aprovado
+> **Release ID:** infra-correctness-v1
+> **Owner:** product-engineer
+> **Created:** 2026-05-20
+
+---
+
+## P1 — Exit code fix
+
+- [x] T-01 `[software-engineer-python]` Ler `reports.py:130–160`, confirmar posição da linha 138
+- [x] T-02 `[software-engineer-python]` Mover `workspace_root = resolve_workspace_root()` para dentro do bloco `try` (linha 141)
+- [x] T-03 `[software-engineer-python]` Remover `@pytest.mark.xfail` de `test_10_workspace_not_initialized_exits_3`
+- [x] T-04 `[software-engineer-python]` Rodar `pytest tests/integration/test_cli_reports.py -v` — todos passam
+
+---
+
+## P2 — I6 topology guard
+
+- [x] T-05 `[ai-engineer]` Ler `check_agent_topology.py` — entender `SKILLS_DIR`, `AGENTS_DIR`, padrão `check_i*`
+- [x] T-06 `[ai-engineer]` Implementar `check_i6_skill_links(agents, errors)` — valida que `SKILLS_DIR / skill_name` existe
+- [x] T-07 `[ai-engineer]` Conectar `check_i6_skill_links` em `main()` após I5; adicionar linha de summary
+- [x] T-08 `[ai-engineer]` Rodar `python scripts/check_agent_topology.py` — I6 passa para todos os agentes atuais
+- [x] T-09 `[ai-engineer]` Teste negativo manual: skill ref fictícia → I6 FAIL confirmado
+
+---
+
+## P3 — SQLite workflows drop
+
+- [x] T-10 `[software-engineer-python]` Ler `schema.py` — confirmar `SCHEMA_VERSION=5`, `# DEAD:` nas tabelas
+- [x] T-11 `[software-engineer-python]` Incrementar `SCHEMA_VERSION = 6`; adicionar migration 6 (`DROP TABLE IF EXISTS workflow_agents; DROP TABLE IF EXISTS workflows;`)
+- [x] T-12 `[software-engineer-python]` Adicionar teste de migration 6: aplicar sobre banco com migration 5; verificar tabelas ausentes
+- [x] T-13 `[software-engineer-python]` Rodar `pytest` nos testes de telemetry — sem regressão
+
+---
+
+## P4 — CSP script-src harden
+
+- [x] T-14 `[software-engineer-python]` Extrair texto literal dos scripts inline em `index.py` e `wrapper.py`
+- [x] T-15 `[software-engineer-python]` Computar SHA-256 base64 de cada script distinto
+- [x] T-16 `[software-engineer-python]` Editar `handler.py:392` — substituir `'unsafe-inline'` em `script-src` pelos tokens `'sha256-<hash>'`
+- [x] T-17 `[software-engineer-python]` Adicionar constantes `_CSP_SCRIPT_HASH_*` nomeadas em `handler.py`
+- [x] T-18 `[software-engineer-python]` Adicionar/estender teste unitário: `script-src` sem `unsafe-inline`, com pelo menos um token `sha256-`
+- [x] T-19 `[software-engineer-python]` Rodar `pytest tests/unit/features/panel/ -v`
+
+---
+
+## P5 — Init resolver fix
+
+- [x] T-20 `[software-engineer-python]` Ler `workspace_resolver.py` — entender `resolve_workspace_root` e `_SENTINEL`
+- [x] T-21 `[software-engineer-python]` Adicionar `resolve_workspace_root_for_init(cwd)` em `workspace_resolver.py` (sentinel walk + fallback para cwd)
+- [x] T-22 `[software-engineer-python]` Ler `init.py:1–50` — localizar `_resolve_workspace` e seu caller
+- [x] T-23 `[software-engineer-python]` Substituir `_resolve_workspace(workspace)` por `resolve_workspace_root_for_init(workspace)` em `init.py`; remover `_resolve_workspace`
+- [x] T-24 `[software-engineer-python]` Adicionar import de `resolve_workspace_root_for_init` em `init.py`
+- [x] T-25 `[software-engineer-python]` Escrever 2 unit tests em `test_workspace_resolver.py` (com sentinel; sem sentinel → retorna cwd)
+- [x] T-26 `[software-engineer-python]` Rodar `pytest tests/unit/core/ -v`
+
+---
+
+## P6 — Install scope flags
+
+- [x] T-27 `[software-engineer-python]` Ler `public_assets.py` — localizar `install()`, `_install_workspace_guardrail_pair`, loop de repos
+- [x] T-28 `[software-engineer-python]` Adicionar `scope: Literal["all","repos-only","workspace-only"] = "all"` a `FileSystemPublicAssetManager.install()`
+- [x] T-29 `[software-engineer-python]` Propagar scope: guardrail pair apenas em `"all"` ou `"workspace-only"`; loop de repos apenas em `"all"` ou `"repos-only"`
+- [x] T-30 `[software-engineer-python]` Adicionar `--repos-only` e `--workspace-only` em `public.py`; validar exclusividade mútua
+- [x] T-31 `[software-engineer-python]` Derivar e passar `scope` para `manager.install()`
+- [x] T-32 `[software-engineer-python]` Adicionar testes para cada scope (all, repos-only, workspace-only, exclusividade)
+- [x] T-33 `[software-engineer-python]` Rodar `pytest tests/integration/` relacionados a `dadaia public install`
+
+---
+
+## P7 — Coverage lift  *(após P6)*
+
+- [x] T-34 `[software-engineer-python]` **Passo 0:** Rodar `pytest --cov=dadaia_workspace/infrastructure/public_assets --cov-report=term-missing` — capturar linhas não cobertas
+- [x] T-35 `[software-engineer-python]` Criar `tests/unit/infrastructure/__init__.py` se ausente
+- [x] T-36 `[software-engineer-python]` Criar `tests/unit/infrastructure/test_public_assets.py`
+- [x] T-37 `[software-engineer-python]` Escrever testes para `doctor()` happy path + D-CX-1..5 drift checks
+- [x] T-38 `[software-engineer-python]` Escrever testes para `_install_workspace_guardrail_pair` e `_doctor_guardrail_pair`
+- [x] T-39 `[software-engineer-python]` Escrever testes para `_runtime_expectations` (cada runtime)
+- [x] T-40 `[software-engineer-python]` Escrever testes para `_install_codex_agents` e `_install_opencode` (com mock de filesystem)
+- [x] T-41 `[software-engineer-python]` Rodar `pytest --cov` → confirmar ≥ 80%; adicionar testes se abaixo
+
+---
+
+## P8 — CLOSURE prep  *(após P7)*
+
+- [x] T-42 `[product-engineer]` Rodar `pytest` completo — zero falhas, zero xfail ativos desta release
+- [x] T-43 `[product-engineer]` Rodar `python scripts/check_agent_topology.py` — I1–I6 passam
+- [x] T-44 `[product-engineer]` Rodar `dadaia public doctor` — sem drift
+- [x] T-45 `[product-engineer]` Atualizar `ACTIVE.md` phase → `CLOSURE`
+- [x] T-46 `[product-engineer]` Autor CLOSURE.md com evidências dos 7 critérios de aceite
+- [x] T-47 `[product-engineer]` Arquivar release: mover para `specs/_archive/releases/infra-correctness-v1/`
+- [x] T-48 `[product-engineer]` Reset `ACTIVE.md` → `release: none` / `phase: none`

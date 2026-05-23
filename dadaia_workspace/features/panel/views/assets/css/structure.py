@@ -44,7 +44,7 @@ code {
 }
 
 .topbar-logo { color: var(--color-cost, #633d2e); display: inline-flex; align-items: center; margin-right: 0.5rem; }
-.topbar-logo svg { width: 24px; height: 24px; display: block; }
+.topbar-logo svg { width: 36px; height: 36px; display: block; }
 
 .topbar-wordmark {
   font-size: 1.1rem;
@@ -55,17 +55,6 @@ code {
 .topbar-wordmark span { color: var(--color-accent-dark); }
 .topbar-divider { width: 1px; height: 24px; background: var(--color-border); }
 .topbar-subtitle { color: var(--color-muted); font-size: 0.9rem; }
-.topbar-badge {
-  margin-left: auto;
-  background: var(--color-accent, #9cddc8);
-  color: var(--color-heading);
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.2rem 0.6rem;
-  border-radius: 20px;
-  white-space: nowrap;
-}
-
 /* ── Navigation tabs ─────────────────────────────── */
 .nav-tabs {
   background: var(--color-surface);
@@ -77,7 +66,7 @@ code {
 
 .nav-tab {
   display: inline-block;
-  padding: 0.65rem 1.1rem;
+  padding: 0.75rem 1.1rem;
   font-size: 0.92rem;
   color: var(--color-muted);
   border-bottom: 3px solid transparent;
@@ -282,10 +271,6 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 @media (max-width: 768px) {
   .tab-memories-btn {
     font-size: 0;
-  }
-  .tab-memories-btn::after {
-    content: "Spec Contexts";
-    font-size: 0.92rem;
   }
 }
 

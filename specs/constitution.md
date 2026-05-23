@@ -183,3 +183,129 @@ A flag `is_primary` (`bool`) distingue, dentro de `ativo`, qual contexto é o pr
 
 - O template canônico do workspace runtime é definido em `specs/memory/architecture.md`.
 - O bootstrap deve reconciliar a estrutura mínima do workspace sem destruir conteúdo já existente.
+
+---
+
+## Architectural Decision Records
+
+Registros canônicos de decisões arquiteturais com impacto multi-feature. Cada ADR é
+imutável após adoção: alterações requerem novo ADR que cite e supere o anterior, nunca
+edição in-place. Os ADRs aqui são consequência atômica da release `token-cost-bigbang-v1`
+(closed 2026-05-20). Decisão completa, rastreabilidade ao audit binding e métricas vivem
+em `specs/_archive/releases/token-cost-bigbang-v1/CLOSURE.md`.
+
+### ADR-X1 — Provider-agnostic instruction files
+
+**Decisão:** `AGENTS.md` é o documento canônico de workspace-root instruction. `CLAUDE.md`
+é emitido pelo `dadaia public install` como stub de 1 linha (`# See AGENTS.md for workspace
+rules and agent personas.`). Qualquer runtime que suporte `@`-include pode resolver o stub
+nativamente; runtimes que não suportam lêem o texto do stub manualmente e seguem o
+redirecionamento.
+
+**Justificativa:** evita duplicação byte-identical entre `AGENTS.md` e `CLAUDE.md` (até
+então a fonte única `data/AGENTS.md` era fanned-out via Option C). Reduz a superfície de
+drift entre os dois documentos e desacopla a CLI da identidade de runtime do consumidor.
+
+**Consequências:** `CLAUDE.md` em workspace-root e em consumer-repos passa a ser stub
+mínimo; `dadaia public doctor` verifica byte-identity do stub contra a string canônica;
+runtimes sem `@`-include resolvem manualmente.
+
+### ADR-X2 — Skill scoping policy (Tier-A vs Tier-B)
+
+**Decisão:** 11 skills Tier-A (uso universal entre agentes) permanecem catalogadas em
+`dadaia_workspace/public/skills/` e são projetadas em todos os runtimes suportados. 22
+skills Tier-B (específicas por agente) migram para `docs/agent-knowledge/<agent>/<topic>.md`
+e são carregadas on-demand pelo agente owner via referência inline no body. O catálogo
+público (e os doctors) expõem apenas Tier-A.
+
+**Justificativa:** o catálogo único de 33 skills inflava o system-prompt floor de todos os
+runtimes; mover 22 Tier-B para per-agent on-demand reduz `cache_read / msg` de ~159 K para
+o target ≤ 80 K (audit §8 P-02).
+
+**Consequências:** `dadaia public install` projeta apenas Tier-A; agent bodies carregam
+ponteiros explícitos para `docs/agent-knowledge/<agent>/`; doctor não mais flagga ausência
+de Tier-B nos catálogos runtime.
+
+### ADR-X3 — Agent size budget
+
+**Decisão:** cada agente cumpre dois limites estruturais: `description:` ≤ 200 caracteres;
+body ≤ 350 linhas. Report templates extensos e knowledge surfaces longas são extraídos
+para `docs/agent-knowledge/<agent>/templates/*.md`. O body do agente mantém apenas
+ponteiro de 1 linha referenciando o template extraído.
+
+**Justificativa:** agentes acima desses limites inflavam o input token cost por dispatch
+(`description` lida sempre; body lido em context bootstrap) sem retorno proporcional em
+qualidade de output.
+
+**Consequências:** lint rule em `dadaia public doctor` flagga agente fora do orçamento;
+templates de report viram artefatos versionados em `docs/agent-knowledge/`.
+
+### ADR-X4 — Default model Sonnet 4.6 (com override Opus per-dispatch)
+
+**Decisão:** todos os 20 agentes da topologia usam `claude-sonnet-4-6` como modelo padrão.
+Override `DADAIA_MODEL_OVERRIDE=opus` é o mecanismo de escalação per-dispatch para tarefas
+que exijam Opus (greenfield architecture, multi-spec drift, memory atomicity writes).
+`researcher` usa `claude-haiku-4-5-20251001` (Haiku 4.5). `security-reviewer` opera em
+dois modos: scan-mode = Haiku; triage-mode = Sonnet, declarado pelo dispatcher.
+
+**Justificativa:** os 7 agentes anteriormente Opus (`project-manager`, `project-auditor`,
+`product-engineer`, `software-architect`, `ai-engineer`, `game-designer`, `game-tester`)
+respondiam por ~$700–900/mês adicionais sem qualidade dispatch-by-dispatch superior
+mensurável; D-12 dropou o multi-mode pattern por inviabilidade arquitetural (Claude Code
+fixa `model:` no registration do agente).
+
+**Consequências:** workspace passa de modelo-misto para Sonnet-default; escalação a Opus
+exige variável ambiente explícita por sessão; Haiku 4.5 viabiliza fan-out de `researcher`
+em phases evidence-heavy (ADR-X6).
+
+### ADR-X5 — Schema handoff-v1.1 (sidecar-first emission)
+
+**Decisão:** `handoff-v1.schema.json` avança para versão v1.1. Novos campos obrigatórios:
+`findings[].detail_md`, `findings[].fix_recommendation`, `scope`, `metrics`. Campo
+`artifact.path` (HTML) torna-se opcional. `schema_version` aceita literais
+`"handoff-v1"` e `"handoff-v1.1"`. Migration: big-bang — todos os 20 agentes reescritos
+em lockstep para emitir sidecar v1.1 como default; HTML só é emitido sob `--with-report`
+explícito ou `next_handoff.agent == "human"`.
+
+**Justificativa:** HTML reports não-lidos respondiam por ~78% do output token cost; o
+schema enriquecido em v1.1 permite que dispatchers e auditors consumam findings
+estruturados a partir do sidecar JSON sem renderizar HTML.
+
+**Consequências:** `dadaia reports validate` distingue v1.0 vs v1.1; `dadaia reports lint`
+flagga orphan HTMLs (no sidecar), oversized HTMLs (>30 KB) e missing schema fields; agent
+prompts carregam linguagem sidecar-first.
+
+### ADR-X6 — Dispatch-to-researcher canonical pattern
+
+**Decisão:** para phases evidence-heavy (audit, code-review, security-scan,
+spec-refinement, cross-cutting-feature), o padrão canônico é o orquestrador
+(`project-manager`, `project-auditor`, `software-architect`, `code-reviewer`,
+`security-reviewer`, `devops-engineer`) despachar N agentes `researcher` (Haiku 4.5) em
+paralelo, cada um com pergunta tightly-scoped. O orquestrador sintetiza a partir dos
+sidecars — não faz Read inline de file sets extensos. Playbook documentado em
+`dadaia_workspace/public/skills/project-orchestration/SKILL.md`.
+
+**Justificativa:** Read inline em arquivos grandes pelos modelos Sonnet/Opus quebra o
+target `cache_read / msg ≤ 80 K`; delegando a Haiku via sidecar, o cost token cai em ~70%
+para a mesma cobertura de evidência.
+
+**Consequências:** 4 workflows read-heavy (`audit-cycle`, `code-review-fan-out`,
+`cross-cutting-feature`, `spec-refinement`) ganham stage `researcher` injetada; orquestrador
+consome sidecars não-HTML.
+
+### ADR-X7 — Plugin scope policy (frontend-design)
+
+**Decisão:** o plugin `frontend-design` é restrito aos agentes `frontend-engineer` e
+`design-specialist`. Todos os outros agentes do workspace devem recusar invocações com
+`[PLUGIN SCOPE ERROR]`. Enforcement por (a) rule `dadaia_workspace/public/rules/plugin-scope.md`
+mirroring `game-developer-scope.md`; (b) allow-list line explícita nos bodies de
+`frontend-engineer.md` e `design-specialist.md`; (c) verificação pelo `dadaia public doctor`
+do alinhamento allow-list ↔ rule.
+
+**Justificativa:** o plugin polui o context surface de agentes non-UI e cria risco de
+design-pattern leakage fora da superfície UI/UX. Mirror do pattern já existente para
+`game-developer-scope`.
+
+**Consequências:** plugin permanece instalado mas só dois agentes podem invocá-lo;
+mensagem padronizada `[PLUGIN SCOPE ERROR]` quando dispatcher tentar despachar agente
+não autorizado com skill/tool do plugin.

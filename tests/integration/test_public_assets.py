@@ -9,7 +9,7 @@ _AGENT_A_CONTENT = """\
 ---
 name: agent-a
 description: First fixture agent for integration testing.
-model: claude-sonnet-4-5
+model: claude-sonnet-4-6
 ---
 # Agent A
 
@@ -20,7 +20,7 @@ _AGENT_B_CONTENT = """\
 ---
 name: agent-b
 description: Second fixture agent for integration testing.
-model: claude-haiku-3-5
+model: claude-haiku-4-5-20251001
 tools:
   - Read
   - Edit

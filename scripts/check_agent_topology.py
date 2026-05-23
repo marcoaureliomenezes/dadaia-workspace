@@ -27,6 +27,7 @@ Invariants (per SPEC agents-r3-v1):
 
 ASCII output only — no colors. Stdlib + PyYAML (already a repo dependency).
 """
+
 from __future__ import annotations
 
 import re
@@ -36,8 +37,7 @@ from pathlib import Path
 try:
     import yaml  # type: ignore[import-untyped]
 except ImportError as exc:  # pragma: no cover - env-dependent
-    print(f"FATAL: PyYAML required ({exc}). Install via .dadaia/.venv/bin/pip.",
-          file=sys.stderr)
+    print(f"FATAL: PyYAML required ({exc}). Install via .dadaia/.venv/bin/pip.", file=sys.stderr)
     sys.exit(1)
 
 
@@ -48,7 +48,8 @@ except ImportError as exc:  # pragma: no cover - env-dependent
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = REPO_ROOT / "dadaia_workspace" / "public"
 AGENTS_DIR = PUBLIC / "agents"
-DAM_SKILL = PUBLIC / "skills" / "project-orchestration" / "SKILL.md"
+SKILLS_DIR = PUBLIC / "skills"
+DAM_SKILL = SKILLS_DIR / "project-orchestration" / "SKILL.md"
 
 EXPECTED_AGENT_COUNT = 20
 
@@ -91,6 +92,7 @@ LEGACY_SE_RE = re.compile(r"legacy\s+`?software-engineer`?")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -118,6 +120,7 @@ def _list_agent_files() -> list[Path]:
 # Invariant checks
 # ---------------------------------------------------------------------------
 
+
 def check_i1_agent_count(errors: list[str]) -> list[Path]:
     """I1: Exactly EXPECTED_AGENT_COUNT persona files."""
     files = _list_agent_files()
@@ -144,22 +147,15 @@ def check_i2_frontmatter(files: list[Path], errors: list[str]) -> dict[str, dict
 
         for key in REQUIRED_FRONTMATTER_KEYS:
             if key not in fm or fm[key] in (None, "", []):
-                errors.append(
-                    f"I2 FAIL: {stem}: required frontmatter key {key!r} "
-                    f"missing or empty"
-                )
+                errors.append(f"I2 FAIL: {stem}: required frontmatter key {key!r} missing or empty")
 
         paths_block = fm.get("paths")
         if not isinstance(paths_block, dict):
-            errors.append(
-                f"I2 FAIL: {stem}: 'paths' block missing or not a dict"
-            )
+            errors.append(f"I2 FAIL: {stem}: 'paths' block missing or not a dict")
             continue
         wl = paths_block.get("write_allowlist")
         if not isinstance(wl, list) or not wl:
-            errors.append(
-                f"I2 FAIL: {stem}: 'paths.write_allowlist' missing or empty"
-            )
+            errors.append(f"I2 FAIL: {stem}: 'paths.write_allowlist' missing or empty")
     return by_stem
 
 
@@ -181,10 +177,7 @@ def check_i3_dispatchers_name_leaves(
         body = _read_text(dpath)
         missing = [leaf for leaf in leaves if leaf not in body]
         if missing:
-            errors.append(
-                f"I3 FAIL: {dispatcher}.md does not mention these leaf agents: "
-                f"{missing}"
-            )
+            errors.append(f"I3 FAIL: {dispatcher}.md does not mention these leaf agents: {missing}")
 
 
 def check_i4_dam_rows(errors: list[str]) -> None:
@@ -195,9 +188,7 @@ def check_i4_dam_rows(errors: list[str]) -> None:
     text = _read_text(DAM_SKILL)
     for row_label in REQUIRED_DAM_ROWS:
         if row_label not in text:
-            errors.append(
-                f"I4 FAIL: DAM is missing row labelled {row_label!r}"
-            )
+            errors.append(f"I4 FAIL: DAM is missing row labelled {row_label!r}")
 
 
 def check_i5_no_bare_se(errors: list[str]) -> None:
@@ -217,20 +208,35 @@ def check_i5_no_bare_se(errors: list[str]) -> None:
                 continue
             for line_no, line in enumerate(text.splitlines(), 1):
                 if BARE_SE_RE.search(line) and not LEGACY_SE_RE.search(line):
-                    hits.append(
-                        f"{path.relative_to(REPO_ROOT)}:{line_no}: {line.strip()}"
-                    )
+                    hits.append(f"{path.relative_to(REPO_ROOT)}:{line_no}: {line.strip()}")
     if hits:
         errors.append(
             "I5 FAIL: bare `software-engineer` references found "
-            "(must be -python or -node suffixed):\n  "
-            + "\n  ".join(hits)
+            "(must be -python or -node suffixed):\n  " + "\n  ".join(hits)
         )
+
+
+def check_i6_skill_links(agents: dict[str, dict], errors: list[str]) -> None:
+    """I6: Every skill name in each agent's frontmatter skills: list must
+    resolve to an existing directory under dadaia_workspace/public/skills/.
+    """
+    for stem, fm in agents.items():
+        skills = fm.get("skills", [])
+        if not isinstance(skills, list):
+            errors.append(f"I6 FAIL: {stem}: 'skills' frontmatter is not a list")
+            continue
+        for skill_name in skills:
+            skill_dir = SKILLS_DIR / skill_name
+            if not skill_dir.is_dir():
+                errors.append(
+                    f"I6 FAIL: {stem}: skill ref {skill_name!r} not found (expected {skill_dir})"
+                )
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     errors: list[str] = []
@@ -240,6 +246,7 @@ def main() -> int:
     check_i3_dispatchers_name_leaves(by_stem, errors)
     check_i4_dam_rows(errors)
     check_i5_no_bare_se(errors)
+    check_i6_skill_links(by_stem, errors)
 
     if errors:
         print("AGENT TOPOLOGY DRIFT DETECTED")
@@ -252,10 +259,11 @@ def main() -> int:
 
     print("AGENT TOPOLOGY OK")
     print(f"  I1: {len(files)} persona files (expected {EXPECTED_AGENT_COUNT})")
-    print(f"  I2: all frontmatter blocks valid")
+    print("  I2: all frontmatter blocks valid")
     print(f"  I3: PM + auditor reference {len(by_stem) - len(T1) - len(T2)} T3 leaves")
     print(f"  I4: DAM contains {len(REQUIRED_DAM_ROWS)} required rows")
-    print(f"  I5: no bare software-engineer references")
+    print("  I5: no bare software-engineer references")
+    print(f"  I6: {len(by_stem)} agents x skill refs validated")
     return 0
 
 

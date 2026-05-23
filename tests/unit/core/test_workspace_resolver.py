@@ -1,14 +1,17 @@
-"""Unit tests for dadaia_workspace.core.workspace_resolver.resolve_workspace_root.
+"""Unit tests for dadaia_workspace.core.workspace_resolver.
 
-TDD — these tests are written BEFORE the implementation and must fail first.
+Covers:
+  resolve_workspace_root —
+    1. cwd inside a sub-repo that has .dadaia/ but no states/ → walks past, finds real root
+    2. cwd at workspace root → returns workspace root immediately
+    3. cwd outside any workspace tree → raises WorkspaceNotInitializedError
+    4. cwd in a workspace whose .dadaia/states/ exists but spec_contexts.json is missing → raises
+    5. No cwd arg → uses Path.cwd() default (monkeypatched)
+    6. Returns absolute path (not relative)
 
-Scenarios covered:
-1. cwd inside a sub-repo that has .dadaia/ but no states/ → walks past, finds real root
-2. cwd at workspace root → returns workspace root immediately
-3. cwd outside any workspace tree → raises WorkspaceNotInitializedError
-4. cwd in a workspace whose .dadaia/states/ exists but spec_contexts.json is missing → raises
-5. No cwd arg → uses Path.cwd() default (monkeypatched)
-6. Returns absolute path (not relative)
+  resolve_workspace_root_for_init (T-25) —
+    7. sentinel present → returns sentinel's parent dir
+    8. sentinel absent → returns cwd (no exception raised)
 """
 
 from __future__ import annotations
@@ -18,7 +21,10 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.core.workspace_resolver import (
+    resolve_workspace_root,
+    resolve_workspace_root_for_init,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -186,3 +192,31 @@ def test_error_message_mentions_skipped_candidates(tmp_path: Path) -> None:
     msg = str(exc_info.value)
     # The skipped candidate (sub_repo) should be mentioned
     assert str(sub_repo) in msg
+
+
+# ---------------------------------------------------------------------------
+# Tests for resolve_workspace_root_for_init (T-25)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_workspace_root_for_init_finds_sentinel(tmp_path: Path) -> None:
+    """T-25a: when .dadaia/states/spec_contexts.json is present, return its parent dir."""
+    workspace_root = _make_full_workspace(tmp_path / "workspace")
+    # Start from a nested dir inside the workspace
+    nested = workspace_root / "repos" / "sub"
+    nested.mkdir(parents=True)
+
+    result = resolve_workspace_root_for_init(nested)
+
+    assert result == workspace_root
+
+
+def test_resolve_workspace_root_for_init_fallback_to_cwd(tmp_path: Path) -> None:
+    """T-25b: when no sentinel is found, return the given cwd path without raising."""
+    orphan = tmp_path / "no-workspace" / "somewhere"
+    orphan.mkdir(parents=True)
+
+    # Must NOT raise — safe fallback for first-time init
+    result = resolve_workspace_root_for_init(orphan)
+
+    assert result == orphan

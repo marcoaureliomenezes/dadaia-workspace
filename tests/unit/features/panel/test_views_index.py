@@ -6,6 +6,9 @@ Covers:
   - Primary context appears first in grid (DOM order)
   - XSS: malicious <script> in project/context fields is html.escape()'d
   - OWASP A03: no raw user-controlled string survives into HTML unescaped
+
+T-P5-01: PANEL_JS and PANEL_CSS removed from _assets.py. Tests that previously
+imported them from _assets now build them inline from individual JS/CSS files.
 """
 
 from pathlib import Path
@@ -14,6 +17,40 @@ from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
+
+# ---------------------------------------------------------------------------
+# JS / CSS assembly helpers (T-P5-01: PANEL_JS and PANEL_CSS moved out of _assets)
+# ---------------------------------------------------------------------------
+_JS_DIR = (
+    Path(__file__).parent.parent.parent.parent.parent
+    / "dadaia_workspace"
+    / "features"
+    / "panel"
+    / "views"
+    / "assets"
+    / "js"
+)
+
+
+def _build_panel_js() -> str:
+    return (
+        (_JS_DIR / "core.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
+    )
+
+
+def _build_panel_css() -> str:
+    from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
+    from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
+    from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
+    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+    from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
+
+    return TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+
 
 # ---------------------------------------------------------------------------
 # Fakes (same pattern as test_service.py)
@@ -106,11 +143,15 @@ def test_index_contains_servers_section() -> None:
 
 
 def test_index_contains_memories_section() -> None:
-    """The index HTML must contain the Memories section."""
+    """The index HTML must contain the Projects (section-memories) section.
+
+    T-P5-15: section ID remains 'section-memories' for backward compat;
+    the visible heading changes from 'Memories' to 'Projects'.
+    """
     service = _build_service()
     html = _render(service)
     assert "section-memories" in html
-    assert ">Memories<" in html
+    assert ">Projects<" in html
 
 
 def test_index_contains_agents_section() -> None:
@@ -129,12 +170,14 @@ def test_index_agents_section_has_grid() -> None:
 
 
 def test_index_primary_context_badge() -> None:
-    """Primary context must show the primary badge."""
+    """T-P5-36: topbar badge removed; card-level badge also removed in T-P5-16."""
     ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
     service = _build_service(contexts=[ctx])
     html = _render(service)
-    assert "card-primary-badge" in html
-    assert "topbar-badge" in html
+    # T-P5-16: card-primary-badge removed — all cards are uniform
+    assert "card-primary-badge" not in html
+    # T-P5-36: topbar-badge also removed — runtime switcher moved to per-tab section headers
+    assert "topbar-badge" not in html
 
 
 def test_index_primary_context_first_in_dom() -> None:
@@ -281,21 +324,24 @@ def test_sections_have_tabindex_zero() -> None:
 
 
 def test_tabpanel_count_is_three() -> None:
-    """T-AM-01/T-AM-18/PR5-C4: there must be exactly 5 role=tabpanel elements after Sessions tab added."""
+    """T-AM-01/T-AM-18/PR5-C4/T-P5-26/T-P5-34: 7 role=tabpanel elements after Reports section added.
+
+    Count history: 3 → 5 (Sessions added in PR5-C4) → 6 (Academy added in T-P5-26)
+                     → 7 (Reports added in T-P5-34).
+    """
     service = _build_service()
     html = _render(service)
-    assert html.count('role="tabpanel"') == 5
+    assert html.count('role="tabpanel"') == 7
 
 
 def test_panel_js_contains_keydown_handler() -> None:
     """T-AM-01: PANEL_JS must include keyboard navigation for ArrowRight/ArrowLeft/Home/End."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "ArrowRight" in PANEL_JS
-    assert "ArrowLeft" in PANEL_JS
-    assert "Home" in PANEL_JS
-    assert "End" in PANEL_JS
-    assert "keydown" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "ArrowRight" in panel_js
+    assert "ArrowLeft" in panel_js
+    assert "Home" in panel_js
+    assert "End" in panel_js
+    assert "keydown" in panel_js
 
 
 # ---------------------------------------------------------------------------
@@ -326,11 +372,11 @@ def test_aria_pairs_workflows() -> None:
 
 
 def test_nav_has_4_tabs() -> None:
-    """T-AM-18/PR5-C4: nav-tabs must contain exactly 5 tab buttons after Sessions tab added."""
+    """T-AM-18/PR5-C4/T-P5-35: nav-tabs must contain exactly 7 tab buttons after Reports and Academy tabs added."""
     service = _build_service()
     html = _render(service)
-    # Count role="tab" occurrences (Memories, Agents, Workflows, Servers, Sessions)
-    assert html.count('role="tab"') == 5
+    # Count role="tab" occurrences (Memories, Agents, Workflows, Sessions, Reports, Academy, Servers)
+    assert html.count('role="tab"') == 7
 
 
 # ---------------------------------------------------------------------------
@@ -423,29 +469,25 @@ def test_memory_link_hrefs_unchanged() -> None:
 
 def test_panel_js_has_token_bootstrap() -> None:
     """panel-defects Bug 3: PANEL_JS must include token bootstrap from URLSearchParams."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "panel_token" in PANEL_JS
-    assert "sessionStorage" in PANEL_JS
-    assert "URLSearchParams" in PANEL_JS
-    assert "history.replaceState" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "panel_token" in panel_js
+    assert "sessionStorage" in panel_js
+    assert "URLSearchParams" in panel_js
+    assert "history.replaceState" in panel_js
 
 
 def test_panel_js_has_authed_fetch_wrapper() -> None:
     """panel-defects Bug 3: PANEL_JS must define authedFetch with Bearer header."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "authedFetch" in PANEL_JS
-    assert "Authorization" in PANEL_JS
-    assert "Bearer" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch" in panel_js
+    assert "Authorization" in panel_js
+    assert "Bearer" in panel_js
 
 
 def test_panel_js_agents_uses_authed_fetch() -> None:
     """panel-defects Bug 3: Agents.load must use authedFetch, not bare fetch."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    # authedFetch must be called for the agents endpoint
-    assert "authedFetch('/api/agents" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch('/api/agents" in panel_js
 
 
 def test_panel_js_workflows_uses_authed_fetch() -> None:
@@ -454,9 +496,8 @@ def test_panel_js_workflows_uses_authed_fetch() -> None:
     PR5-D6 (runtime retrofit): URL now includes ?runtime= query param so the
     fetch reads authedFetch('/api/workflows?runtime=' + ...).
     """
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "authedFetch('/api/workflows?runtime='" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch('/api/workflows?runtime='" in panel_js
 
 
 def test_panel_js_sessions_uses_authed_fetch() -> None:
@@ -468,10 +509,8 @@ def test_panel_js_sessions_uses_authed_fetch() -> None:
     The assertion checks the URL prefix which is stable regardless of the query
     string appended dynamically at runtime.
     """
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    # agents.js (in PANEL_JS) calls authedFetch with /api/agents base URL (PR5-D5 appends ?runtime=)
-    assert "authedFetch('/api/agents?runtime='" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "authedFetch('/api/agents?runtime='" in panel_js
 
 
 # ---------------------------------------------------------------------------
@@ -586,29 +625,251 @@ def test_panel_js_workflows_has_card_grid() -> None:
 
     The old 2-pane stepper (buildStepperSVG) was replaced by the card-grid
     layout in PR3-16. This test verifies the new card-grid JS is present
-    in workflows.js (included in PANEL_JS).
+    in workflows.js (included in assembled JS).
     """
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    # The card grid renderer must reference the .workflow-card element class
-    assert "workflow-card" in PANEL_JS
-    # The CTA affordance must carry data-workflow-name for PR3-17 to wire
-    assert "data-workflow-name" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "workflow-card" in panel_js
+    assert "data-workflow-name" in panel_js
 
 
 def test_panel_js_workflows_exposes_window_workflows() -> None:
     """PR3-16: PANEL_JS must include window.Workflows from workflows.js."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "window.Workflows" in PANEL_JS
-    assert "/api/workflows" in PANEL_JS
+    panel_js = _build_panel_js()
+    assert "window.Workflows" in panel_js
+    assert "/api/workflows" in panel_js
 
 
 def test_panel_css_has_workflows_pane_layout() -> None:
     """panel-defects Bug 4: PANEL_CSS must contain 2-pane grid layout."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_CSS
+    panel_css = _build_panel_css()
+    assert ".workflows-pane" in panel_css
+    assert ".workflows-list" in panel_css
+    assert ".workflows-detail" in panel_css
+    assert "workflow-list-item" in panel_css
 
-    assert ".workflows-pane" in PANEL_CSS
-    assert ".workflows-list" in PANEL_CSS
-    assert ".workflows-detail" in PANEL_CSS
-    assert "workflow-list-item" in PANEL_CSS
+
+# ---------------------------------------------------------------------------
+# T-P5-15 — Projects tab section header redesign
+# ---------------------------------------------------------------------------
+
+
+def test_projects_section_heading_is_projects() -> None:
+    """T-P5-15: section-memories <h2> must read 'Projects', not 'Memories'."""
+    service = _build_service()
+    rendered = _render(service)
+    # Find the section-memories block and check h2 inside it
+    idx = rendered.find('id="section-memories"')
+    end = rendered.find("</section>", idx)
+    section_frag = rendered[idx:end]
+    assert "<h2>Projects</h2>" in section_frag, "h2 inside section-memories must read 'Projects'"
+
+
+def test_projects_section_no_old_count_label() -> None:
+    """T-P5-15: 'N active contexts — 1 primary' count label must be removed from section-memories."""
+    ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    # Find only the memories section fragment
+    idx = rendered.find('id="section-memories"')
+    end = rendered.find("</section>", idx)
+    section_frag = rendered[idx:end]
+    assert "context-count" not in section_frag, "Old context-count CSS class must be removed"
+    # The old count label format was "N active contexts — 1 primary" as a <p class="context-count">
+    # After redesign it should be a badge with "N projects" only
+    assert "primary" not in section_frag or "projects-count-badge" in section_frag, (
+        "Old primary count text must be removed from section header"
+    )
+
+
+def test_projects_section_has_count_badge() -> None:
+    """T-P5-15: section-header must contain a projects-count-badge span with N projects text."""
+    ctx1 = _make_context("Workspace 1", "ws-1")
+    ctx2 = _make_context("Workspace 2", "ws-2")
+    service = _build_service(contexts=[ctx1, ctx2])
+    rendered = _render(service)
+    assert 'class="projects-count-badge"' in rendered
+    assert "2 projects" in rendered
+
+
+def test_projects_section_has_collapsible_description() -> None:
+    """T-P5-15: A <details class='section-desc'> block must follow section-header."""
+    service = _build_service()
+    rendered = _render(service)
+    assert 'class="section-desc"' in rendered
+    assert "<summary>About this section</summary>" in rendered
+    assert "Active Spec Context Projects" in rendered
+
+
+# ---------------------------------------------------------------------------
+# T-P5-16 — Projects card redesign
+# ---------------------------------------------------------------------------
+
+
+def test_projects_card_has_zone_a() -> None:
+    """T-P5-16: Card must have card-zone-a with card-name span."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    assert 'class="card-zone-a"' in rendered
+    assert 'class="card-name"' in rendered
+
+
+def test_projects_card_zone_b_has_repo_and_branch_rows() -> None:
+    """T-P5-16: Zone B must have two card-meta-row spans — repo and branch."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    assert 'class="card-zone-b"' in rendered
+    assert "repo:" in rendered
+    assert "branch:" in rendered
+    assert 'class="card-meta-row"' in rendered
+
+
+def test_projects_card_zone_d_has_memory_chips() -> None:
+    """T-P5-16: Zone D must have three memory-chip links — Architecture, Tech Stack, Product."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    assert 'class="card-zone-d card-chips"' in rendered
+    assert 'class="memory-chip"' in rendered
+    # All three chip labels present
+    assert ">Architecture<" in rendered
+    assert ">Tech Stack<" in rendered
+    assert ">Product<" in rendered
+
+
+def test_projects_card_no_primary_badge() -> None:
+    """T-P5-16: PRIMARY badge must be removed — no card-primary-badge class."""
+    ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    assert "card-primary-badge" not in rendered, "PRIMARY badge must be removed in redesign"
+
+
+def test_projects_card_no_primary_class() -> None:
+    """T-P5-16: No 'primary' CSS class on article — uniform card treatment."""
+    ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    # The article should not have class="context-card primary"
+    assert 'class="context-card primary"' not in rendered, (
+        "Primary context must not get special 'primary' CSS class"
+    )
+
+
+def test_projects_card_memory_chip_hrefs() -> None:
+    """T-P5-16: Memory chip hrefs must point to correct memory URLs."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    assert 'href="/memory-view/my-workspace/architecture.html"' in rendered
+    assert 'href="/memory-view/my-workspace/tech-stack.html"' in rendered
+    assert 'href="/memory-view/my-workspace/product/index.html"' in rendered
+
+
+def test_projects_css_link_present() -> None:
+    """T-P5-16: rendered HTML must include projects.css link."""
+    service = _build_service()
+    rendered = _render(service)
+    assert "/static/projects.css" in rendered
+
+
+# ---------------------------------------------------------------------------
+# T-P5-16 — projects.py CSS module (tokens + static serving)
+# ---------------------------------------------------------------------------
+
+
+def test_projects_css_has_color_chip_memory_bg_token() -> None:
+    """T-P5-16: tokens.py must define --color-chip-memory-bg custom property."""
+    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+
+    assert "--color-chip-memory-bg" in TOKENS_CSS
+
+
+def test_projects_css_module_exists_and_nonempty() -> None:
+    """T-P5-16: projects.py CSS module must exist and export non-empty PROJECTS_CSS."""
+    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
+    assert isinstance(PROJECTS_CSS, str)
+    assert len(PROJECTS_CSS) > 0
+
+
+def test_projects_css_registered_in_static() -> None:
+    """T-P5-16: projects.css must be registered and served from /static/."""
+    from dadaia_workspace.features.panel.views.static import render_static
+
+    view = render_static()
+    status, ct, body = view(name="projects.css")
+    assert status == 200
+    assert ct == "text/css; charset=utf-8"
+    assert len(body) > 0
+
+
+def test_projects_css_has_memory_chip_styles() -> None:
+    """T-P5-16: PROJECTS_CSS must contain .memory-chip styles."""
+    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
+    assert ".memory-chip" in PROJECTS_CSS
+    assert "--color-chip-memory-bg" in PROJECTS_CSS
+    assert "--color-accent" in PROJECTS_CSS
+
+
+def test_projects_css_has_card_zones() -> None:
+    """T-P5-16: PROJECTS_CSS must contain card zone styles."""
+    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
+    assert ".card-zone-a" in PROJECTS_CSS
+    assert ".card-zone-b" in PROJECTS_CSS
+    assert ".card-zone-d" in PROJECTS_CSS
+    assert ".card-name" in PROJECTS_CSS
+    assert ".card-meta-row" in PROJECTS_CSS
+
+
+def test_projects_css_has_context_card_accent() -> None:
+    """T-P5-16: .context-card must have 4px solid var(--color-accent) left border."""
+    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
+    assert ".context-card" in PROJECTS_CSS
+    assert "border-left" in PROJECTS_CSS
+
+
+# ---------------------------------------------------------------------------
+# T-P5-17 — Zone C (session binding placeholder)
+# ---------------------------------------------------------------------------
+
+
+def test_projects_card_has_zone_c() -> None:
+    """T-P5-17: Card must have card-zone-c div with data-slug attribute."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    assert 'class="card-zone-c"' in rendered
+    assert 'data-slug="my-workspace"' in rendered
+    assert 'aria-live="polite"' in rendered
+
+
+def test_projects_card_zone_c_between_b_and_d() -> None:
+    """T-P5-17: Zone C must appear between Zone B and Zone D in card HTML."""
+    ctx = _make_context("My Workspace", "my-workspace")
+    service = _build_service(contexts=[ctx])
+    rendered = _render(service)
+    pos_b = rendered.find('class="card-zone-b"')
+    pos_c = rendered.find('class="card-zone-c"')
+    pos_d = rendered.find('class="card-zone-d')
+    assert pos_b < pos_c < pos_d, "Zone C must appear between Zone B and Zone D"
+
+
+def test_projects_css_has_zone_c_styles() -> None:
+    """T-P5-17: PROJECTS_CSS must contain .card-zone-c and .session-row styles."""
+    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
+    assert ".card-zone-c" in PROJECTS_CSS
+    assert ".session-row" in PROJECTS_CSS
+    assert "--color-session-bg" in PROJECTS_CSS
+
+
+def test_tokens_css_has_color_session_bg() -> None:
+    """T-P5-17: tokens.py must define --color-session-bg custom property."""
+    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+
+    assert "--color-session-bg" in TOKENS_CSS

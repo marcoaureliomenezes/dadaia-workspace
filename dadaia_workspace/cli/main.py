@@ -1,5 +1,8 @@
 """dadaia CLI entry point."""
 
+import sys
+from pathlib import Path
+
 import typer
 
 from dadaia_workspace.cli.commands import (
@@ -17,6 +20,7 @@ from dadaia_workspace.cli.commands import (
 )
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
+from dadaia_workspace.infrastructure.bug_reporter import report_exception as _report_exc
 
 app = typer.Typer(
     name="dadaia",
@@ -41,6 +45,22 @@ app.add_typer(specs.app, name="specs")
 app.add_typer(server.app, name="server")
 app.add_typer(panel.app, name="panel")
 
+# Workspace root resolved from the editable install location:
+# cli/main.py → cli/ → dadaia_workspace/ → repos/dadaia-workspace/ → workspace root
+_WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _safe_app() -> None:
+    """Entry point that captures unexpected exceptions and persists them before re-raising."""
+    try:
+        app()
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception as exc:
+        command = " ".join(sys.argv)
+        _report_exc(_WORKSPACE_ROOT, command, exc)
+        raise  # re-raise so Typer still exits with error
+
 
 if __name__ == "__main__":
-    app()
+    _safe_app()

@@ -196,11 +196,7 @@ def main() -> None:
     print("=" * 72)
 
     # Exit non-zero if fewer than 3 distinct subagent_type values found
-    parent_types = {
-        m["subagent_type"]
-        for m in all_matches
-        if m["source"] == "parent-session"
-    }
+    parent_types = {m["subagent_type"] for m in all_matches if m["source"] == "parent-session"}
     if len(parent_types) < 3:
         print(
             f"\n[WARN] Only {len(parent_types)} distinct parent-session subagent_type"

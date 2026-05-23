@@ -1,7 +1,7 @@
 """Storage protocols for public assets and catalog reading."""
 
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 
 class PublicAssetManager(Protocol):
@@ -9,7 +9,13 @@ class PublicAssetManager(Protocol):
         """Stage package public assets into workspace_root/.dadaia/agentic."""
         ...
 
-    def install(self, workspace_root: Path, target: str = "all", force: bool = False) -> list[str]:
+    def install(
+        self,
+        workspace_root: Path,
+        target: str = "all",
+        force: bool = False,
+        scope: Literal["all", "repos-only", "workspace-only"] = "all",
+    ) -> list[str]:
         """Install staged public assets into runtime projections."""
         ...
 

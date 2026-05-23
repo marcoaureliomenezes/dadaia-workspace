@@ -77,7 +77,7 @@ def test_select_dispatcher_returns_opencode(monkeypatch) -> None:
 
 
 def test_select_dispatcher_returns_codex(monkeypatch) -> None:
-    from dadaia_workspace.infrastructure.cli_agent_dispatcher import CodexAgentDispatcher
+    from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 
     monkeypatch.delenv("DADAIA_AGENT_RUNTIME", raising=False)
     dispatcher = container._select_dispatcher("codex")
@@ -93,7 +93,7 @@ def test_select_dispatcher_defaults_to_cli(monkeypatch) -> None:
 
 
 def test_select_dispatcher_reads_env_var(monkeypatch) -> None:
-    from dadaia_workspace.infrastructure.cli_agent_dispatcher import CodexAgentDispatcher
+    from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 
     monkeypatch.setenv("DADAIA_AGENT_RUNTIME", "codex")
     dispatcher = container._select_dispatcher(None)

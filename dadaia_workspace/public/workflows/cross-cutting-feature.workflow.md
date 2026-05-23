@@ -21,21 +21,41 @@ inputs:
     required: true
     description: Approved backend task identifier from TASKS.md.
 stages:
-  - id: discovery
-    agent: project-manager
+  - id: research_evidence
+    name: research-evidence
+    agent: researcher
+    description: "Evidence harvest — dispatch researcher to gather facts before main analysis."
+    consumes: []
     expected_output:
-      path: ".dadaia/reports/{context}/project-manager/{run_ts}-{feature_topic}-cross-discovery.html"
-      must_include: ["API contract", "Frontend impact", "Backend impact"]
+      path: ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
     inputs:
       - kind: workflow_input
         from: "$.inputs.feature_topic"
         as: feature_topic
 
+  - id: discovery
+    agent: project-manager
+    needs: [research_evidence]
+    consumes:
+      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+    expected_output:
+      path: ".dadaia/reports/{context}/project-manager/{run_ts}-{feature_topic}-cross-discovery.handoff.json"
+      must_include: ["API contract", "Frontend impact", "Backend impact"]
+    inputs:
+      - kind: workflow_input
+        from: "$.inputs.feature_topic"
+        as: feature_topic
+      - kind: stage_output
+        from: stages.research_evidence.output
+        as: evidence_report
+
   - id: contract_review
     agent: software-architect
     needs: [discovery]
+    consumes:
+      - ".dadaia/reports/{context}/project-manager/{run_ts}-{feature_topic}-cross-discovery.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/software-architect/{run_ts}-{feature_topic}-contract.html"
+      path: ".dadaia/reports/{context}/software-architect/{run_ts}-{feature_topic}-contract.handoff.json"
       must_include: ["Contract approved"]
     inputs:
       - kind: stage_output
@@ -49,8 +69,10 @@ stages:
     agent: qa-engineer
     needs: [contract_review]
     parallel_group: red_tests
+    consumes:
+      - ".dadaia/reports/{context}/software-architect/{run_ts}-{feature_topic}-contract.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-{task_id_frontend}-red.html"
+      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-{task_id_frontend}-red.handoff.json"
       must_include: ["Failing tests"]
     inputs:
       - kind: workflow_input
@@ -64,8 +86,10 @@ stages:
     agent: qa-engineer
     needs: [contract_review]
     parallel_group: red_tests
+    consumes:
+      - ".dadaia/reports/{context}/software-architect/{run_ts}-{feature_topic}-contract.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-{task_id_backend}-red.html"
+      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-{task_id_backend}-red.handoff.json"
       must_include: ["Failing tests"]
     inputs:
       - kind: workflow_input
@@ -79,8 +103,10 @@ stages:
     agent: frontend-engineer
     needs: [red_test_frontend]
     parallel_group: green_impls
+    consumes:
+      - ".dadaia/reports/{context}/qa-engineer/{run_ts}-{task_id_frontend}-red.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/frontend-engineer/{run_ts}-{task_id_frontend}-green.html"
+      path: ".dadaia/reports/{context}/frontend-engineer/{run_ts}-{task_id_frontend}-green.handoff.json"
       must_include: ["All tests pass"]
     inputs:
       - kind: stage_output
@@ -91,8 +117,10 @@ stages:
     agent: backend-engineer
     needs: [red_test_backend]
     parallel_group: green_impls
+    consumes:
+      - ".dadaia/reports/{context}/qa-engineer/{run_ts}-{task_id_backend}-red.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/backend-engineer/{run_ts}-{task_id_backend}-green.html"
+      path: ".dadaia/reports/{context}/backend-engineer/{run_ts}-{task_id_backend}-green.handoff.json"
       must_include: ["All tests pass"]
     inputs:
       - kind: stage_output
@@ -102,8 +130,11 @@ stages:
   - id: integration_validation
     agent: qa-engineer
     needs: [green_frontend, green_backend]
+    consumes:
+      - ".dadaia/reports/{context}/frontend-engineer/{run_ts}-{task_id_frontend}-green.handoff.json"
+      - ".dadaia/reports/{context}/backend-engineer/{run_ts}-{task_id_backend}-green.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-{feature_topic}-integration.html"
+      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-{feature_topic}-integration.handoff.json"
       must_include: ["Integration validated"]
     inputs:
       - kind: stage_output
