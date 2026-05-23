@@ -45,7 +45,7 @@
 
 ## Phase C — Doctor git-dirty check
 
-- [ ] T-BCR-05 — Adicionar status `[warn] git-dirty: <path>` em `FileSystemPublicAssetManager.doctor()`.
+- [-] T-BCR-05 — Adicionar status `[warn] git-dirty: <path>` em `FileSystemPublicAssetManager.doctor()`.
   - Owner: `software-engineer-python`
   - Write set:
     - `dadaia_workspace/infrastructure/public_assets.py`
