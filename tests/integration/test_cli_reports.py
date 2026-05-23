@@ -59,6 +59,9 @@ def _make_valid_handoff(
         "agent": "software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
+        "scope": "dadaia-workspace/test",
+        "metrics": {},
+        "findings": [],
         "artifact": {
             "type": "report",
             "path": f"{stem}.html",
@@ -74,12 +77,19 @@ def _make_valid_handoff(
 
 
 def _make_invalid_handoff(base_dir: Path, stem: str = "bad") -> Path:
-    """Create an invalid handoff that is missing the required 'agent' field."""
+    """Create an invalid handoff that is missing the required 'agent' field.
+
+    All other v1.1 required fields are present so the v1.0 compat check does
+    not fire — only the schema 'agent' violation triggers.
+    """
     doc = {
         "schema_version": "handoff-v1",
         # "agent" intentionally omitted — required field
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
+        "scope": "dadaia-workspace/test",
+        "metrics": {},
+        "findings": [],
         "artifact": {
             "type": "report",
             "path": f"{stem}.html",

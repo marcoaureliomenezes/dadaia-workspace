@@ -713,7 +713,7 @@ _R3_NEW_AGENTS = {
     "software-engineer-node": "claude-sonnet-4-6",
     "data-engineer": "claude-sonnet-4-6",
     "data-analyst": "claude-sonnet-4-6",
-    "ai-engineer": "claude-opus-4-7",
+    "ai-engineer": "claude-sonnet-4-6",
 }
 
 
