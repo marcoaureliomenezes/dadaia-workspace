@@ -1998,3 +1998,119 @@ class TestDcx6CodexRuntimeAdapters:
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._check_codex_drift(agentic_dir, workspace_root)
         assert any("[missing]" in l and "missing-adapter" in l and "D-CX-6" in l for l in out)
+
+
+# ---------------------------------------------------------------------------
+# T-BCR-05 — git-dirty check in FileSystemPublicAssetManager.doctor()
+# ---------------------------------------------------------------------------
+
+
+class TestDoctorGitDirtyCheck:
+    """Tests for the [warn] git-dirty check in FileSystemPublicAssetManager.doctor().
+
+    All subprocess.run calls are mocked to ensure isolation from the real git
+    state of the working tree.
+    """
+
+    def _make_manager_with_fake_public(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def _make_minimal_workspace(self, tmp_path: Path) -> tuple[Path, Path]:
+        """Create a minimal public_dir + workspace_root suitable for doctor()."""
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        agentic_dir.mkdir(parents=True)
+        manifest = {
+            "schema_version": "1",
+            "package_version": "0",
+            "generated_at": "2026-01-01T00:00:00+00:00",
+            "assets": [],
+        }
+        (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        return public_dir, workspace_root
+
+    def test_dirty_paths_emit_warn_git_dirty_lines(self, tmp_path: Path) -> None:
+        """When subprocess returns dirty paths, doctor emits [warn] git-dirty: <path> for each."""
+        import subprocess
+
+        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
+        manager = self._make_manager_with_fake_public(public_dir)
+
+        mock_result = subprocess.CompletedProcess(
+            args=["git", "diff", "--name-only", "HEAD"],
+            returncode=0,
+            stdout="dadaia_workspace/public/agents/data-analyst.md\ndadaia_workspace/public/rules/some-rule.md\n",
+            stderr="",
+        )
+
+        with patch("subprocess.run", return_value=mock_result):
+            reports = manager.doctor(workspace_root)
+
+        assert "[warn] git-dirty: dadaia_workspace/public/agents/data-analyst.md" in reports
+        assert "[warn] git-dirty: dadaia_workspace/public/rules/some-rule.md" in reports
+
+    def test_no_dirty_paths_emits_no_warn_lines(self, tmp_path: Path) -> None:
+        """When subprocess returns empty stdout with returncode 0, no [warn] git-dirty lines appear."""
+        import subprocess
+
+        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
+        manager = self._make_manager_with_fake_public(public_dir)
+
+        mock_result = subprocess.CompletedProcess(
+            args=["git", "diff", "--name-only", "HEAD"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+        with patch("subprocess.run", return_value=mock_result):
+            reports = manager.doctor(workspace_root)
+
+        warn_git_dirty = [r for r in reports if r.startswith("[warn] git-dirty:")]
+        assert warn_git_dirty == []
+
+    def test_returncode_128_emits_not_applicable(self, tmp_path: Path) -> None:
+        """When git returns returncode 128 (not a git repo), emits [not-applicable] git-dirty check."""
+        import subprocess
+
+        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
+        manager = self._make_manager_with_fake_public(public_dir)
+
+        mock_result = subprocess.CompletedProcess(
+            args=["git", "diff", "--name-only", "HEAD"],
+            returncode=128,
+            stdout="",
+            stderr="fatal: not a git repository",
+        )
+
+        with patch("subprocess.run", return_value=mock_result):
+            reports = manager.doctor(workspace_root)
+
+        assert "[not-applicable] git-dirty check (not a git repo)" in reports
+
+    def test_git_not_found_emits_not_applicable(self, tmp_path: Path) -> None:
+        """When git is not found (FileNotFoundError), emits [not-applicable] git-dirty check (git not found)."""
+        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
+        manager = self._make_manager_with_fake_public(public_dir)
+
+        with patch("subprocess.run", side_effect=FileNotFoundError("git not found")):
+            reports = manager.doctor(workspace_root)
+
+        assert "[not-applicable] git-dirty check (git not found)" in reports
+
+    def test_timeout_emits_warn(self, tmp_path: Path) -> None:
+        """When subprocess.run times out, emits [warn] git-dirty check timed out."""
+        import subprocess
+
+        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
+        manager = self._make_manager_with_fake_public(public_dir)
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="git", timeout=5)):
+            reports = manager.doctor(workspace_root)
+
+        assert "[warn] git-dirty check timed out" in reports

@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tomllib
 from collections.abc import Iterable
@@ -790,6 +791,27 @@ class FileSystemPublicAssetManager:
         reports.extend(self._classify_workflows(agentic_dir))
         reports.extend(self._lint_legacy_software_engineer())
         reports.extend(self._check_codex_drift(agentic_dir, workspace_root))
+
+        # git-dirty check: detect uncommitted changes in public/ (editable install blind spot)
+        try:
+            git_result = subprocess.run(
+                ["git", "diff", "--name-only", "HEAD", "--", str(self._public_dir)],
+                capture_output=True,
+                text=True,
+                cwd=self._public_dir.parent.parent,  # repo root (dadaia_workspace/../..)
+                timeout=5,
+            )
+            if git_result.returncode == 0:
+                for dirty_path in git_result.stdout.splitlines():
+                    if dirty_path.strip():
+                        reports.append(f"[warn] git-dirty: {dirty_path.strip()}")
+            elif git_result.returncode == 128:
+                reports.append("[not-applicable] git-dirty check (not a git repo)")
+            # returncode 1 = diff found but no paths listed — ignore
+        except FileNotFoundError:
+            reports.append("[not-applicable] git-dirty check (git not found)")
+        except subprocess.TimeoutExpired:
+            reports.append("[warn] git-dirty check timed out")
 
         return reports
 
