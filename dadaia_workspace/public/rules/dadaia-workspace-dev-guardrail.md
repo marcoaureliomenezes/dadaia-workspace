@@ -105,3 +105,29 @@ Additionally:
 
 Never shortcut steps 3–5. Skipping propagation leaves projections stale and triggers
 drift on next `doctor` run.
+
+## 6. DEV Workspace Self-Reference
+
+This workspace is a **live instance of the product being developed**. This creates a self-referential loop that every agent must keep in mind.
+
+### The loop
+
+```
+repos/dadaia-workspace/  ← library source (editable install)
+         ↓
+.dadaia/.venv/           ← pip install -e points here
+         ↓
+.dadaia/agentic/         ← dadaia public stage reads from working tree
+         ↓
+.claude/ .codex/ etc.    ← dadaia public install projects to runtimes
+```
+
+### 4 invariants to keep in mind
+
+1. **Self-referential DEV**: You are inside the workspace you are developing. Changes to the library affect the workspace you are working in.
+
+2. **Editable install is working-tree live**: `Path(__file__)` in the installed package resolves to `repos/dadaia-workspace/dadaia_workspace/`. Any edit to Python source or `public/` files takes effect immediately — no reinstall needed. This is both the power and the danger of the DEV workspace.
+
+3. **`dadaia public doctor` is blind to `git_HEAD ↔ working_tree` drift**: The doctor compares `working_tree_source ↔ staging ↔ projection`. It does NOT compare `git HEAD ↔ working_tree`. An uncommitted edit in `public/` will show as `[ok]` in doctor while the workspace silently runs unreviewed code. True drift check: `git diff HEAD -- dadaia_workspace/public/`
+
+4. **Never insert consumer-specific details into `public/` assets**: `public/agents/`, `public/rules/`, `public/skills/` are the canonical source for ALL workspaces that install dadaia-workspace. Writing a project-specific path, name, or description into a canonical asset corrupts every consumer. If a fix "for this project" is needed, it belongs in a consumer-repo overlay — never in `public/`.
