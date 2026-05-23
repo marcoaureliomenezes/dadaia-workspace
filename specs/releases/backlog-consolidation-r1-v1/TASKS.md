@@ -11,7 +11,7 @@
   - Write set: `specs/backlog/candidates.md`
   - Aceite: entrada ausente do arquivo após edição.
 
-- [-] T-BCR-02 — Estender `dadaia_workspace/public/rules/dadaia-workspace-dev-guardrail.md` com seção `## 6. DEV Workspace Self-Reference`.
+- [x] T-BCR-02 — Estender `dadaia_workspace/public/rules/dadaia-workspace-dev-guardrail.md` com seção `## 6. DEV Workspace Self-Reference`.
   - Owner: `ai-engineer`
   - Write set:
     - `dadaia_workspace/public/rules/dadaia-workspace-dev-guardrail.md`
