@@ -113,8 +113,7 @@ _MIGRATION_6 = (
     # Drop the DEAD tables created in migration 5 (replaced by canonical workflow
     # reader in panel-r3). FK child (workflow_agents) must be dropped before parent
     # (workflows) to satisfy referential integrity constraints.
-    "DROP TABLE IF EXISTS workflow_agents;\n"
-    "DROP TABLE IF EXISTS workflows;\n"
+    "DROP TABLE IF EXISTS workflow_agents;\nDROP TABLE IF EXISTS workflows;\n"
 )
 
 _MIGRATIONS: list[str] = [

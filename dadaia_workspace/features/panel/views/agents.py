@@ -56,13 +56,13 @@ def render_agents_section() -> str:
         '        role="radio" aria-checked="true" data-runtime-value="claude" aria-label="Claude runtime">\n'
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9672;</span>\n'
         '        <span class="runtime-btn-label">Claude</span>\n'
-        '      </button>\n'
+        "      </button>\n"
         '      <button type="button" class="runtime-btn runtime-btn--codex" id="agents-runtime-btn-codex"\n'
         '        role="radio" aria-checked="false" data-runtime-value="codex" aria-label="Codex runtime">\n'
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>\n'
         '        <span class="runtime-btn-label">Codex</span>\n'
-        '      </button>\n'
-        '    </div>\n'
+        "      </button>\n"
+        "    </div>\n"
         "  </header>\n"
         '  <div id="agents-staleness-banner" class="warning-banner" hidden role="status"></div>\n'
         '  <div id="agents-grid" class="card-grid agents-grid" aria-busy="false"></div>\n'
@@ -79,11 +79,11 @@ def render_agents_section() -> str:
         '        <h3 class="agent-modal__title" id="agent-modal-title">Agent detail</h3>\n'
         '        <button type="button" class="agent-modal__close" id="agent-modal-close"\n'
         '                aria-label="Close">&#10005;</button>\n'
-        '      </div>\n'
+        "      </div>\n"
         '      <div class="agent-modal__body" id="agent-modal-body">\n'
-        '        <!-- populated by JS before showModal() -->\n'
-        '      </div>\n'
-        '    </div>\n'
-        '  </dialog>\n'
+        "        <!-- populated by JS before showModal() -->\n"
+        "      </div>\n"
+        "    </div>\n"
+        "  </dialog>\n"
         "</section>"
     )

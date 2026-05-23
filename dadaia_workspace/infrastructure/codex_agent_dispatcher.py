@@ -35,12 +35,14 @@ def _render(invocation: StageInvocation) -> str:
     ]
     if invocation.parallel_group:
         parts.append(f"- parallel_group: `{invocation.parallel_group}`")
-        parts.extend([
-            "",
-            "> **Note:** Codex best-effort parallel — subagent tool used instead of native "
-            "parallel dispatch. This stage is part of a parallel_group but will be executed "
-            "sequentially within this runtime.",
-        ])
+        parts.extend(
+            [
+                "",
+                "> **Note:** Codex best-effort parallel — subagent tool used instead of native "
+                "parallel dispatch. This stage is part of a parallel_group but will be executed "
+                "sequentially within this runtime.",
+            ]
+        )
     parts.extend(["", "## Inputs"])
     if invocation.inputs:
         parts.extend(f"- **{k}**: {v}" for k, v in invocation.inputs.items())
@@ -49,14 +51,16 @@ def _render(invocation: StageInvocation) -> str:
     if invocation.must_include:
         parts.extend(["", "## Output must include"])
         parts.extend(f"- `{needle}`" for needle in invocation.must_include)
-    parts.extend([
-        "",
-        "## How to execute",
-        f"Invoke the agent `{invocation.agent}` using the Codex subagent tool. "
-        f"Write the output to `{invocation.expected_output_path}`. "
-        f"After completion, run `dadaia orchestrate resume {invocation.run_id}` "
-        "to advance the run.",
-    ])
+    parts.extend(
+        [
+            "",
+            "## How to execute",
+            f"Invoke the agent `{invocation.agent}` using the Codex subagent tool. "
+            f"Write the output to `{invocation.expected_output_path}`. "
+            f"After completion, run `dadaia orchestrate resume {invocation.run_id}` "
+            "to advance the run.",
+        ]
+    )
     return "\n".join(parts) + "\n"
 
 

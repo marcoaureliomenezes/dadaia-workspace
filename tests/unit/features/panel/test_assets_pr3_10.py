@@ -133,6 +133,7 @@ def test_agents_js_has_relative_timestamp() -> None:
 # by static.py. Assemble PANEL_JS inline for content verification.
 # ---------------------------------------------------------------------------
 
+
 def _build_panel_js() -> str:
     """Assemble PANEL_JS from individual JS files (mirrors static.py behaviour)."""
     return (
@@ -164,7 +165,9 @@ def test_panel_js_still_contains_core_js_content() -> None:
     """Assembled JS must still include core.js content (tab switching, token bootstrap, etc.)."""
     panel_js = _build_panel_js()
     assert "authedFetch" in panel_js, "Assembled JS no longer contains authedFetch from core.js"
-    assert "bootstrapToken" in panel_js, "Assembled JS no longer contains bootstrapToken from core.js"
+    assert "bootstrapToken" in panel_js, (
+        "Assembled JS no longer contains bootstrapToken from core.js"
+    )
 
 
 def test_panel_js_agents_section_not_in_core_js_portion() -> None:

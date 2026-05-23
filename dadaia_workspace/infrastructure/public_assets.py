@@ -831,11 +831,11 @@ class FileSystemPublicAssetManager:
     # preceded by an alphanumeric character, hyphen, or underscore.  This
     # avoids false positives inside words like `config_claude_sonnet` while
     # still catching standalone references such as `claude-sonnet-4-6`.
-    _CODEX_CLAUDE_RE: re.Pattern[str] = re.compile(
-        r"(?:^|[^a-zA-Z0-9_-])claude-", re.MULTILINE
-    )
+    _CODEX_CLAUDE_RE: re.Pattern[str] = re.compile(r"(?:^|[^a-zA-Z0-9_-])claude-", re.MULTILINE)
     # File extensions considered "text" for D-CX-4 scanning.
-    _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
+    _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset(
+        {".toml", ".md", ".json", ".txt", ".yaml", ".yml"}
+    )
 
     def _check_codex_drift(self, agentic_dir: Path, workspace_root: Path) -> list[str]:
         """Run codex-parity drift checks D-CX-1 through D-CX-6.
@@ -982,9 +982,7 @@ class FileSystemPublicAssetManager:
                 continue
             instructions = data.get("developer_instructions", "")
             if not isinstance(instructions, str) or not instructions.strip():
-                out.append(
-                    f"[error] codex:{name}.toml: developer_instructions is empty (D-CX-5)"
-                )
+                out.append(f"[error] codex:{name}.toml: developer_instructions is empty (D-CX-5)")
         return out
 
     def _dcx6_codex_runtime_adapters(self, workspace_root: Path) -> list[str]:
@@ -1234,7 +1232,7 @@ class FileSystemPublicAssetManager:
             # Extract body: text after the second '---' fence.
             if text.startswith("---\n"):
                 end_idx = text.find("\n---\n", 4)
-                body = text[end_idx + 5:] if end_idx != -1 else text
+                body = text[end_idx + 5 :] if end_idx != -1 else text
             else:
                 body = text
 

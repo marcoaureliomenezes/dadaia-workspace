@@ -48,7 +48,7 @@ SHA snapshot).
 | T-14 | Run full stage + install + doctor pipeline validation (AC C6, C9) | software-engineer-python |
 | T-15 | Write CLOSURE.md and archive release | product-engineer |
 
-## Acceptance Criteria Validation
+## Validations
 
 | AC | Description | Status | Evidence |
 |----|-------------|--------|----------|

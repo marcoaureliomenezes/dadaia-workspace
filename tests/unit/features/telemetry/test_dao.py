@@ -291,10 +291,7 @@ class TestMigration6:
         conn.row_factory = sqlite3.Row
         apply_migrations(conn)
         tables = {
-            row["name"]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
+            row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
         assert "workflows" not in tables
         assert "workflow_agents" not in tables

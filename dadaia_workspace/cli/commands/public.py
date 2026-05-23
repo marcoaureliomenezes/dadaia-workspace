@@ -1,6 +1,6 @@
 """dadaia public subcommands."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -48,7 +48,13 @@ def install(
         typer.echo("Error: --repos-only and --workspace-only are mutually exclusive.", err=True)
         raise typer.Exit(1)
 
-    scope = "repos-only" if repos_only else ("workspace-only" if workspace_only else "all")
+    scope: Literal["all", "repos-only", "workspace-only"]
+    if repos_only:
+        scope = "repos-only"
+    elif workspace_only:
+        scope = "workspace-only"
+    else:
+        scope = "all"
 
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()

@@ -20,12 +20,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_f
 # Helpers
 # ---------------------------------------------------------------------------
 
-_AGENTS_DIR = (
-    Path(__file__).parents[4]
-    / "dadaia_workspace"
-    / "public"
-    / "agents"
-)
+_AGENTS_DIR = Path(__file__).parents[4] / "dadaia_workspace" / "public" / "agents"
 
 _FRONTMATTER_DELIM = "---"
 
@@ -122,7 +117,7 @@ def test_generic_agent_preserved_verbatim() -> None:
 
     assert result == body, (
         "Expected software-architect body to be preserved verbatim "
-        f"(no Agent tool patterns present), but got diff"
+        "(no Agent tool patterns present), but got diff"
     )
 
 
@@ -145,6 +140,4 @@ def test_deterministic(agent_id: str) -> None:
     body = _load_body(agent_id)
     first = transform_for_codex(body, agent_id)
     second = transform_for_codex(body, agent_id)
-    assert first == second, (
-        f"transform_for_codex is non-deterministic for agent '{agent_id}'"
-    )
+    assert first == second, f"transform_for_codex is non-deterministic for agent '{agent_id}'"

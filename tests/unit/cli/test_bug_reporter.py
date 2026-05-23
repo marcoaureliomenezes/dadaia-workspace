@@ -7,14 +7,11 @@ import os
 import stat
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.infrastructure.bug_reporter import (
     append_entry,
     report_doctor_finding,
     report_exception,
 )
-
 
 # ---------------------------------------------------------------------------
 # report_exception
@@ -90,9 +87,7 @@ class TestReportException:
 class TestReportDoctorFinding:
     def test_writes_entry_with_message(self, tmp_path: Path) -> None:
         """report_doctor_finding writes entry with the provided finding message."""
-        report_doctor_finding(
-            tmp_path, "doctor-public", "[missing] stage:agents/foo.md"
-        )
+        report_doctor_finding(tmp_path, "doctor-public", "[missing] stage:agents/foo.md")
 
         bugs_path = tmp_path / ".dadaia" / "bugs" / "reported.json"
         assert bugs_path.exists()
@@ -110,7 +105,9 @@ class TestReportDoctorFinding:
     def test_appends_multiple_findings(self, tmp_path: Path) -> None:
         """Multiple doctor findings are appended to the same file."""
         report_doctor_finding(tmp_path, "doctor-public", "[drift] stage:rules/foo.md")
-        report_doctor_finding(tmp_path, "doctor-public", "[warn] git-dirty: dadaia_workspace/public/agents/bar.md")
+        report_doctor_finding(
+            tmp_path, "doctor-public", "[warn] git-dirty: dadaia_workspace/public/agents/bar.md"
+        )
 
         bugs_path = tmp_path / ".dadaia" / "bugs" / "reported.json"
         entries = json.loads(bugs_path.read_text(encoding="utf-8"))

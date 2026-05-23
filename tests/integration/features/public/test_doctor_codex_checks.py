@@ -78,12 +78,13 @@ def test_ac7_missing_workflow_detected(installed_workspace: Path) -> None:
     reports = manager.doctor(workspace_root)
 
     missing_dcx3 = [
-        r for r in reports
+        r
+        for r in reports
         if r.startswith("[missing]") and "D-CX-3" in r and "cross-cutting-feature" in r
     ]
     assert missing_dcx3, (
-        f"Expected at least one '[missing] ... D-CX-3 ... cross-cutting-feature' "
-        f"report but found none.\nAll reports:\n" + "\n".join(reports)
+        "Expected at least one '[missing] ... D-CX-3 ... cross-cutting-feature' "
+        "report but found none.\nAll reports:\n" + "\n".join(reports)
     )
 
 
@@ -107,14 +108,14 @@ def test_ac7_non_zero_exit_code_for_missing_workflow(installed_workspace: Path) 
     non_ok = [r for r in reports if not r.startswith("[ok]") and not r.startswith("[skip]")]
     assert non_ok, (
         "Expected at least one non-ok/non-skip report after deleting a workflow. "
-        f"Reports:\n" + "\n".join(reports)
+        "Reports:\n" + "\n".join(reports)
     )
 
     # Specifically the D-CX-3 check must flag the missing workflow.
     dcx3_missing = any("D-CX-3" in r and "hotfix-release" in r for r in reports)
     assert dcx3_missing, (
         "Expected a D-CX-3 missing report for 'hotfix-release.workflow.md'. "
-        f"Reports:\n" + "\n".join(reports)
+        "Reports:\n" + "\n".join(reports)
     )
 
 
@@ -157,9 +158,7 @@ def test_ac8_corrupted_toml_detected(installed_workspace: Path) -> None:
     manager = FileSystemPublicAssetManager()
     reports = manager.doctor(workspace_root)
 
-    dcx5_researcher = [
-        r for r in reports if "D-CX-5" in r and "researcher" in r
-    ]
+    dcx5_researcher = [r for r in reports if "D-CX-5" in r and "researcher" in r]
     assert dcx5_researcher, (
         "Expected at least one D-CX-5 report naming 'researcher' after emptying "
         "developer_instructions.\nAll reports:\n" + "\n".join(reports)
@@ -192,8 +191,7 @@ def test_ac8_error_report_not_ok_for_corrupted_agent(installed_workspace: Path) 
 
     # The corrupted agent must not appear as [ok] for D-CX-5.
     ok_dcx5_for_agent = [
-        r for r in reports
-        if r.startswith("[ok]") and agent_name in r and "D-CX-5" in r
+        r for r in reports if r.startswith("[ok]") and agent_name in r and "D-CX-5" in r
     ]
     assert not ok_dcx5_for_agent, (
         f"Corrupted {agent_name}.toml must not produce an [ok] D-CX-5 report. "
@@ -222,9 +220,7 @@ def test_ac9_missing_toml_no_ok_reported(installed_workspace: Path) -> None:
     """
     workspace_root = installed_workspace
     toml_path = workspace_root / ".codex" / "agents" / "researcher.toml"
-    assert toml_path.exists(), (
-        "Pre-condition failed: researcher.toml must exist after install."
-    )
+    assert toml_path.exists(), "Pre-condition failed: researcher.toml must exist after install."
 
     toml_path.unlink()
 
@@ -233,8 +229,7 @@ def test_ac9_missing_toml_no_ok_reported(installed_workspace: Path) -> None:
 
     # No [ok] report should reference researcher in the codex agent context.
     ok_for_researcher = [
-        r for r in reports
-        if r.startswith("[ok]") and "researcher" in r and "codex" in r.lower()
+        r for r in reports if r.startswith("[ok]") and "researcher" in r and "codex" in r.lower()
     ]
     assert not ok_for_researcher, (
         "researcher should not appear as [ok] after its TOML was deleted. "
@@ -243,12 +238,11 @@ def test_ac9_missing_toml_no_ok_reported(installed_workspace: Path) -> None:
 
     # D-CX-1 must flag the missing TOML.
     dcx1_missing = [
-        r for r in reports
-        if r.startswith("[missing]") and "D-CX-1" in r and "researcher" in r
+        r for r in reports if r.startswith("[missing]") and "D-CX-1" in r and "researcher" in r
     ]
     assert dcx1_missing, (
         "Expected '[missing] codex:agents/researcher.toml (D-CX-1)' report. "
-        f"All reports:\n" + "\n".join(reports)
+        "All reports:\n" + "\n".join(reports)
     )
 
 
@@ -261,9 +255,7 @@ def test_ac9_missing_toml_for_second_agent(installed_workspace: Path) -> None:
     workspace_root = installed_workspace
     agent_name = "backend-engineer"
     toml_path = workspace_root / ".codex" / "agents" / f"{agent_name}.toml"
-    assert toml_path.exists(), (
-        f"Pre-condition failed: {agent_name}.toml must exist after install."
-    )
+    assert toml_path.exists(), f"Pre-condition failed: {agent_name}.toml must exist after install."
 
     toml_path.unlink()
 
@@ -272,8 +264,7 @@ def test_ac9_missing_toml_for_second_agent(installed_workspace: Path) -> None:
 
     # Must not be [ok].
     ok_for_agent = [
-        r for r in reports
-        if r.startswith("[ok]") and agent_name in r and "codex" in r.lower()
+        r for r in reports if r.startswith("[ok]") and agent_name in r and "codex" in r.lower()
     ]
     assert not ok_for_agent, (
         f"{agent_name} must not appear as [ok] after its TOML was deleted. "
@@ -282,6 +273,5 @@ def test_ac9_missing_toml_for_second_agent(installed_workspace: Path) -> None:
 
     # Must be reported as [missing] with D-CX-1.
     assert any("D-CX-1" in r and agent_name in r for r in reports), (
-        f"Expected D-CX-1 [missing] report for '{agent_name}'. "
-        f"Reports:\n" + "\n".join(reports)
+        f"Expected D-CX-1 [missing] report for '{agent_name}'. Reports:\n" + "\n".join(reports)
     )

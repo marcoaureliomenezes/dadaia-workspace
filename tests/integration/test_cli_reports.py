@@ -20,7 +20,6 @@ import hashlib
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app

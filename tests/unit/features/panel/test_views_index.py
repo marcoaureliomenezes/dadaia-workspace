@@ -23,7 +23,12 @@ from dadaia_workspace.features.panel.views.index import render_index
 # ---------------------------------------------------------------------------
 _JS_DIR = (
     Path(__file__).parent.parent.parent.parent.parent
-    / "dadaia_workspace" / "features" / "panel" / "views" / "assets" / "js"
+    / "dadaia_workspace"
+    / "features"
+    / "panel"
+    / "views"
+    / "assets"
+    / "js"
 )
 
 
@@ -43,7 +48,9 @@ def _build_panel_css() -> str:
     from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
     from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
     from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
+
     return TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+
 
 # ---------------------------------------------------------------------------
 # Fakes (same pattern as test_service.py)
@@ -652,7 +659,7 @@ def test_projects_section_heading_is_projects() -> None:
     rendered = _render(service)
     # Find the section-memories block and check h2 inside it
     idx = rendered.find('id="section-memories"')
-    end = rendered.find('</section>', idx)
+    end = rendered.find("</section>", idx)
     section_frag = rendered[idx:end]
     assert "<h2>Projects</h2>" in section_frag, "h2 inside section-memories must read 'Projects'"
 
@@ -664,7 +671,7 @@ def test_projects_section_no_old_count_label() -> None:
     rendered = _render(service)
     # Find only the memories section fragment
     idx = rendered.find('id="section-memories"')
-    end = rendered.find('</section>', idx)
+    end = rendered.find("</section>", idx)
     section_frag = rendered[idx:end]
     assert "context-count" not in section_frag, "Old context-count CSS class must be removed"
     # The old count label format was "N active contexts — 1 primary" as a <p class="context-count">
@@ -775,12 +782,14 @@ def test_projects_css_link_present() -> None:
 def test_projects_css_has_color_chip_memory_bg_token() -> None:
     """T-P5-16: tokens.py must define --color-chip-memory-bg custom property."""
     from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+
     assert "--color-chip-memory-bg" in TOKENS_CSS
 
 
 def test_projects_css_module_exists_and_nonempty() -> None:
     """T-P5-16: projects.py CSS module must exist and export non-empty PROJECTS_CSS."""
     from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
     assert isinstance(PROJECTS_CSS, str)
     assert len(PROJECTS_CSS) > 0
 
@@ -788,6 +797,7 @@ def test_projects_css_module_exists_and_nonempty() -> None:
 def test_projects_css_registered_in_static() -> None:
     """T-P5-16: projects.css must be registered and served from /static/."""
     from dadaia_workspace.features.panel.views.static import render_static
+
     view = render_static()
     status, ct, body = view(name="projects.css")
     assert status == 200
@@ -798,6 +808,7 @@ def test_projects_css_registered_in_static() -> None:
 def test_projects_css_has_memory_chip_styles() -> None:
     """T-P5-16: PROJECTS_CSS must contain .memory-chip styles."""
     from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
     assert ".memory-chip" in PROJECTS_CSS
     assert "--color-chip-memory-bg" in PROJECTS_CSS
     assert "--color-accent" in PROJECTS_CSS
@@ -806,6 +817,7 @@ def test_projects_css_has_memory_chip_styles() -> None:
 def test_projects_css_has_card_zones() -> None:
     """T-P5-16: PROJECTS_CSS must contain card zone styles."""
     from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
     assert ".card-zone-a" in PROJECTS_CSS
     assert ".card-zone-b" in PROJECTS_CSS
     assert ".card-zone-d" in PROJECTS_CSS
@@ -816,6 +828,7 @@ def test_projects_css_has_card_zones() -> None:
 def test_projects_css_has_context_card_accent() -> None:
     """T-P5-16: .context-card must have 4px solid var(--color-accent) left border."""
     from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
     assert ".context-card" in PROJECTS_CSS
     assert "border-left" in PROJECTS_CSS
 
@@ -849,6 +862,7 @@ def test_projects_card_zone_c_between_b_and_d() -> None:
 def test_projects_css_has_zone_c_styles() -> None:
     """T-P5-17: PROJECTS_CSS must contain .card-zone-c and .session-row styles."""
     from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+
     assert ".card-zone-c" in PROJECTS_CSS
     assert ".session-row" in PROJECTS_CSS
     assert "--color-session-bg" in PROJECTS_CSS
@@ -857,4 +871,5 @@ def test_projects_css_has_zone_c_styles() -> None:
 def test_tokens_css_has_color_session_bg() -> None:
     """T-P5-17: tokens.py must define --color-session-bg custom property."""
     from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+
     assert "--color-session-bg" in TOKENS_CSS

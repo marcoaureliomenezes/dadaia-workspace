@@ -25,8 +25,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (
-    FileSystemPublicAssetManager,
     _CLAUDE_MD_STUB,
+    FileSystemPublicAssetManager,
     _doctor_guardrail_pair,
     _install_workspace_guardrail_pair,
     _package_version,
@@ -82,7 +82,6 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
         return hashlib.sha256(p.read_bytes()).hexdigest()
 
     expected_agents_sha = sha256(source)
-    expected_stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
 
     # AGENTS.md destinations must be byte-identical to source.
     agents_destinations = [

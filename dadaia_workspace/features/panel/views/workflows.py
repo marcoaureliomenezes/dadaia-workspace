@@ -36,14 +36,14 @@ def render_workflows_section() -> str:
         '        data-runtime-value="claude" aria-label="Claude runtime">\n'
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9672;</span>\n'
         '        <span class="runtime-btn-label">Claude</span>\n'
-        '      </button>\n'
+        "      </button>\n"
         '      <button type="button" class="runtime-btn runtime-btn--codex"\n'
         '        id="workflows-runtime-btn-codex" role="radio" aria-checked="false"\n'
         '        data-runtime-value="codex" aria-label="Codex runtime">\n'
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>\n'
         '        <span class="runtime-btn-label">Codex</span>\n'
-        '      </button>\n'
-        '    </div>\n'
+        "      </button>\n"
+        "    </div>\n"
         "  </header>\n"
         '  <p id="workflows-empty" class="empty-state" hidden>' + empty_msg + "</p>\n"
         # Card grid container — workflows.js renders .workflow-card elements inside.

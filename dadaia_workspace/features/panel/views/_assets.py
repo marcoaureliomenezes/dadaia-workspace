@@ -10,6 +10,6 @@ import sites are migrated. Import from static.py instead:
     from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24
 """
 
-from dadaia_workspace.features.panel.views.static import LOGO_RHINO_24, LOGO_RHINO_16
+from dadaia_workspace.features.panel.views.static import LOGO_RHINO_16, LOGO_RHINO_24
 
 __all__ = ["LOGO_RHINO_24", "LOGO_RHINO_16"]

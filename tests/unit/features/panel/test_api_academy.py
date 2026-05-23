@@ -24,9 +24,7 @@ from dadaia_workspace.features.panel.views.api import render_api_academy
 
 
 class _FakeRegistry:
-    def list_entries(
-        self, project: str | None = None, include_stale: bool = True
-    ) -> list[Any]:
+    def list_entries(self, project: str | None = None, include_stale: bool = True) -> list[Any]:
         return []
 
 
