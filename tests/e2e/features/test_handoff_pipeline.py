@@ -80,6 +80,9 @@ def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
         "agent": "software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
+        "scope": "dadaia-workspace/test",
+        "metrics": {},
+        "findings": [],
         "artifact": {
             "type": "report",
             "path": f"{stem}.html",
@@ -98,6 +101,9 @@ def _write_invalid_handoff(base_dir: Path, stem: str = "bad") -> Path:
         "agent": "software-engineer",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
+        "scope": "dadaia-workspace/test",
+        "metrics": {},
+        "findings": [],
         # 'artifact' intentionally omitted — required field
     }
     handoff_path = base_dir / f"{stem}.handoff.json"

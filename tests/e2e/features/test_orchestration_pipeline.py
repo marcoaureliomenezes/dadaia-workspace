@@ -39,13 +39,24 @@ def test_full_pipeline_run_to_completion(tmp_path: Path) -> None:
         inputs={"context": "demo-ctx", "topic": "smoke", "release_id": "smoke-r1"},
     )
     assert len(invocations) == 1
-    assert invocations[0].stage_id == "discovery"
+    # research_evidence is now the first stage (added before discovery in workflow v0.3.0)
+    assert invocations[0].stage_id == "research_evidence"
     assert Path(invocations[0].invocation_path).exists()
     assert (tmp_path / ".dadaia" / "runs" / manifest.run_id / "manifest.json").exists()
     assert (tmp_path / ".dadaia" / "runs" / manifest.run_id / "events.jsonl").exists()
 
+    # Simulate researcher output for research_evidence (no must_include validation)
+    evidence_out = tmp_path / invocations[0].expected_output_path
+    evidence_out.parent.mkdir(parents=True, exist_ok=True)
+    evidence_out.write_text("{}", encoding="utf-8")
+
+    # research_evidence → discovery
+    _, disc_invocations = service.resume_run(manifest.run_id)
+    assert len(disc_invocations) == 1
+    assert disc_invocations[0].stage_id == "discovery"
+
     # Simulate agent output for discovery (has must_include validation)
-    disc_out = tmp_path / invocations[0].expected_output_path
+    disc_out = tmp_path / disc_invocations[0].expected_output_path
     disc_out.parent.mkdir(parents=True, exist_ok=True)
     disc_out.write_text(
         "<!DOCTYPE html><html><body>"
