@@ -1,5 +1,5 @@
 release: backlog-consolidation-r1-v1
-phase: SPEC
+phase: IMPLEMENTATION
 
 # History
 # 2026-05-23 — backlog-consolidation-r1-v1 opened. Tier A: bug-reporting infra (Phase 1+2), doctor git-dirty check, DEV guardrail extension, 4 deactivate bug fixes, data-architect universal agent (21st), backlog staleness cleanup.
