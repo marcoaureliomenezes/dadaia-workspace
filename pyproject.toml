@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI-native workspace management CLI with Spec Context Projects"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
