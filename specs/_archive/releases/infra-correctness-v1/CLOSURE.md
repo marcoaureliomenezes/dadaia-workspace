@@ -78,6 +78,14 @@ das correccoes ja especificadas nos closures e backlogs de releases anteriores.
 
 ## Validations
 
+| Description | Command | Evidence |
+|-------------|---------|----------|
+| pytest green — zero new failures in release scope | `poetry run pytest` | 1878+ passed; pre-existing failures documented in SPEC §4 |
+| I6 topology guard active | `python3 scripts/check_agent_topology.py` | exit 0; I6 check_i6_skill_links wired in main() |
+| SQLite dead tables dropped (migration 6) | `poetry run pytest tests/unit/features/telemetry/test_schema.py` | all green |
+
+### Summary of ACs
+
 Cada validacao abaixo corresponde a um criterio de aceite do SPEC.md §5.
 
 ### AC-1: pytest green (zero novas falhas, zero xfail ativos desta release)

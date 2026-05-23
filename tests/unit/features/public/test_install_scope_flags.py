@@ -181,7 +181,9 @@ def test_scope_repos_only_no_consumers_returns_empty_list(tmp_path: Path) -> Non
 # -----------------------------------------------------------------------
 
 
-def test_cli_install_both_flags_mutually_exclusive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_install_both_flags_mutually_exclusive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Passing both --repos-only and --workspace-only exits with code 1."""
     monkeypatch.chdir(tmp_path)
     # Need a minimal workspace so resolver doesn't fail before we hit the check
@@ -204,7 +206,9 @@ def test_cli_install_both_flags_mutually_exclusive(tmp_path: Path, monkeypatch: 
     )
 
 
-def test_cli_install_repos_only_flag_exits_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_install_repos_only_flag_exits_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """--repos-only flag: command exits with code 0."""
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -218,12 +222,13 @@ def test_cli_install_repos_only_flag_exits_zero(tmp_path: Path, monkeypatch: pyt
     result = _runner.invoke(app, ["public", "install", "--repos-only"])
 
     assert result.exit_code == 0, (
-        f"Expected exit code 0 for --repos-only; got {result.exit_code}.\n"
-        f"Output: {result.output}"
+        f"Expected exit code 0 for --repos-only; got {result.exit_code}.\nOutput: {result.output}"
     )
 
 
-def test_cli_install_workspace_only_flag_exits_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_install_workspace_only_flag_exits_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """--workspace-only flag: command exits with code 0."""
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -242,7 +247,9 @@ def test_cli_install_workspace_only_flag_exits_zero(tmp_path: Path, monkeypatch:
     )
 
 
-def test_cli_install_no_flags_same_as_scope_all(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_install_no_flags_same_as_scope_all(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """No scope flags: install behaves the same as scope='all' (backward compat)."""
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -317,6 +324,4 @@ def test_cli_install_repos_only_writes_consumer_only(
         "workspace-root AGENTS.md must NOT be created with --repos-only"
     )
     # Consumer pair must exist
-    assert (consumer / "AGENTS.md").exists(), (
-        "consumer AGENTS.md must be written with --repos-only"
-    )
+    assert (consumer / "AGENTS.md").exists(), "consumer AGENTS.md must be written with --repos-only"

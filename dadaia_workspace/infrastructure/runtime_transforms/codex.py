@@ -94,9 +94,7 @@ def transform_for_codex(canonical_body: str, agent_id: str) -> str:  # noqa: ARG
     # Remove lines containing Claude-specific hook references.
     if _HOOK_PATTERN.search(result):
         lines = result.splitlines(keepends=True)
-        result = "".join(
-            line for line in lines if not _HOOK_PATTERN.search(line)
-        )
+        result = "".join(line for line in lines if not _HOOK_PATTERN.search(line))
 
     # Replace known Claude model identifiers in body prose (ADR-5 / AC3).
     result = _KNOWN_MODEL_RE.sub(lambda m: MODEL_MAP[m.group(1)], result)

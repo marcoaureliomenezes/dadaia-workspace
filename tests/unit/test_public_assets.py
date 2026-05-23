@@ -39,10 +39,7 @@ def test_stage_copies_codex_runtime_adapters(tmp_path: Path) -> None:
     manifest = json.loads(
         (workspace / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
     )
-    assert any(
-        asset["path"] == "runtime/codex/design-ctx/SKILL.md"
-        for asset in manifest["assets"]
-    )
+    assert any(asset["path"] == "runtime/codex/design-ctx/SKILL.md" for asset in manifest["assets"])
 
 
 def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
@@ -449,7 +446,9 @@ def test_install_codex_overwrites_legacy_workflow_file(tmp_path: Path) -> None:
     manager.install(workspace_root, target="codex", force=True)
 
     # The canonical workflow content was projected (force=True overwrites)
-    assert (workflows_dir / "hotfix-release.workflow.md").read_text(encoding="utf-8") == _MINIMAL_WORKFLOW_HOTFIX
+    assert (workflows_dir / "hotfix-release.workflow.md").read_text(
+        encoding="utf-8"
+    ) == _MINIMAL_WORKFLOW_HOTFIX
 
 
 # ---------------------------------------------------------------------------

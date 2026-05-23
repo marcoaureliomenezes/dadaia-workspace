@@ -134,9 +134,7 @@ class TestMarkBugsInRelease:
         _write_bugs(tmp_path, [{"id": "g1", "status": "open", "message": "x"}])
         mark_bugs_in_release(tmp_path, ["g1"])
 
-        tmp_file = (
-            tmp_path / ".dadaia" / "bugs" / "reported.json"
-        ).with_suffix(".tmp")
+        tmp_file = (tmp_path / ".dadaia" / "bugs" / "reported.json").with_suffix(".tmp")
         assert not tmp_file.exists()
 
 
@@ -179,9 +177,7 @@ class TestPromptOpenBugs:
         mock_echo.assert_not_called()
         mock_confirm.assert_not_called()
 
-    def test_bugs_exist_operator_confirms_marks_in_release(
-        self, tmp_path: Path
-    ) -> None:
+    def test_bugs_exist_operator_confirms_marks_in_release(self, tmp_path: Path) -> None:
         """When bugs exist and operator confirms, all are marked in_release."""
         _write_bugs(
             tmp_path,
@@ -209,9 +205,7 @@ class TestPromptOpenBugs:
         echo_calls = [str(c.args[0]) for c in mock_echo.call_args_list]
         assert any("h1" in c or "2 known bug" in c or "bug(s)" in c for c in echo_calls)
 
-    def test_bugs_exist_operator_declines_entries_unchanged(
-        self, tmp_path: Path
-    ) -> None:
+    def test_bugs_exist_operator_declines_entries_unchanged(self, tmp_path: Path) -> None:
         """When bugs exist and operator declines, entries stay 'open'."""
         _write_bugs(
             tmp_path,

@@ -73,8 +73,7 @@ def test_agent_skill_references_exist() -> None:
             skill_md = _SKILLS_DIR / skill_name / "SKILL.md"
             if not skill_md.exists():
                 broken.append(
-                    f"  agent={agent_path.name!r}  skill={skill_name!r}"
-                    f"  expected={skill_md}"
+                    f"  agent={agent_path.name!r}  skill={skill_name!r}  expected={skill_md}"
                 )
 
     assert not broken, (

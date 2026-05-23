@@ -47,9 +47,7 @@ def _stage_files_safe(path: Path) -> None:
         ["git", "ls-files", "--others", "--exclude-standard"],
         cwd=path,
     )
-    untracked: list[str] = [
-        line.strip() for line in result.stdout.splitlines() if line.strip()
-    ]
+    untracked: list[str] = [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
     safe: list[str] = []
     skipped: list[str] = []

@@ -70,3 +70,30 @@ ADRs em: `specs/releases/codex-agent-orchestration-parity-v1/adrs/`
 - [x] ADR-4 lida: adr-4-workflow-runtime-boundary.md
 - [x] ADR-5 lida: adr-5-model-mapping.md
 - [x] ADR-6 lida: adr-6-null-claude-regression-suite.md
+
+## Summary
+
+Established Codex agent orchestration parity: 20 agent TOMLs projected to `.codex/agents/`,
+model mapping (Claude→Codex identifiers), `CodexAgentDispatcher` with parallel best-effort,
+workflow runtime boundary (render-at-install), doctor checks D-CX-1..5, and null-Claude
+regression suite. All 10 acceptance criteria verified.
+
+## Validations
+
+| Description | Command | Evidence |
+|-------------|---------|----------|
+| 20 TOMLs parseable, no claude-* strings | `python3 -c "import tomllib, glob; [tomllib.loads(open(f,'rb').read()) for f in glob.glob('.codex/agents/*.toml')]"` | 20 TOMLs parsed; `grep -rE 'claude-' .codex/` exits 1 |
+| Null Claude regression (zero .claude changes) | `diff /tmp/pre-codex.txt /tmp/post-codex.txt` | diff empty — 56 files unchanged |
+| Dispatcher tests green | `pytest tests/unit/features/agents/test_codex_dispatcher_*.py` | 22 passed |
+| Doctor checks D-CX-1..5 | `pytest tests/integration/features/public/test_doctor_codex_checks.py` | all green |
+
+## Drifts
+
+No significant drifts — implementation matched PLAN.md. ADR-6 null-regression suite added
+opportunistically to guard `.claude/**` from accidental mutation.
+
+## Memory updates
+
+- `specs/memory/architecture.html` — Codex renderer-split documented; TOML projection layer added.
+- `specs/memory/tech-stack.html` — Codex parity guard entry added.
+- `specs/memory/product/agent-orchestration.html` — ADR-3 capability matrix added.

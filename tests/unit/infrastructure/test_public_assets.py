@@ -20,20 +20,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import sys
 import tomllib
-from io import StringIO
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-import dadaia_workspace.infrastructure.public_assets as pa
 from dadaia_workspace.infrastructure.public_assets import (
-    FileSystemPublicAssetManager,
     _CLAUDE_MD_STUB,
+    FileSystemPublicAssetManager,
     _atomic_write_text,
     _consumer_repos_for_root,
     _doctor_guardrail_pair,
@@ -55,7 +50,6 @@ from dadaia_workspace.infrastructure.public_assets import (
     _toml_escape,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
@@ -64,7 +58,9 @@ _INSTALLED_VERSION = "1.2.3"
 _OTHER_VERSION = "0.0.1"
 
 
-def _make_agent_md(name: str, model: str = "claude-sonnet-4-6", tools: list[str] | None = None) -> str:
+def _make_agent_md(
+    name: str, model: str = "claude-sonnet-4-6", tools: list[str] | None = None
+) -> str:
     """Build a minimal agent .md file with YAML frontmatter."""
     tools_block = ""
     if tools:
@@ -73,7 +69,9 @@ def _make_agent_md(name: str, model: str = "claude-sonnet-4-6", tools: list[str]
     return f"---\nname: {name}\nmodel: {model}\n{tools_block}---\n# Body of {name}\n"
 
 
-def _add_marker_consumer(workspace_root: Path, slug: str, pkg_version: str = _OTHER_VERSION) -> Path:
+def _add_marker_consumer(
+    workspace_root: Path, slug: str, pkg_version: str = _OTHER_VERSION
+) -> Path:
     """Create a marker-bearing consumer repo under workspace_root/repos/."""
     consumer = workspace_root / "repos" / slug
     (consumer / ".dadaia" / "agentic").mkdir(parents=True, exist_ok=True)
@@ -138,7 +136,10 @@ class TestPackageVersion:
     def test_fallback_when_not_installed(self) -> None:
         from importlib.metadata import PackageNotFoundError
 
-        with patch("dadaia_workspace.infrastructure.public_assets.version", side_effect=PackageNotFoundError):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets.version",
+            side_effect=PackageNotFoundError,
+        ):
             assert _package_version() == "editable"
 
 
@@ -287,7 +288,9 @@ class TestRenderCodexAgentToml:
 
     def test_triple_quote_in_instructions_escaped(self) -> None:
         out = _render_codex_agent_toml("a", "m", 'has """here')
-        assert '"""here' not in out.split("developer_instructions", 1)[1].strip().lstrip("= \n\"")[:-3]
+        assert (
+            '"""here' not in out.split("developer_instructions", 1)[1].strip().lstrip('= \n"')[:-3]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -463,7 +466,9 @@ class TestConsumerReposForRoot:
         result = _consumer_repos_for_root(tmp_path)
         assert consumer in result
 
-    def test_non_qualifying_repo_skipped(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_non_qualifying_repo_skipped(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         bad_repo = tmp_path / "repos" / "no-markers"
         bad_repo.mkdir(parents=True)
         result = _consumer_repos_for_root(tmp_path)
@@ -478,7 +483,9 @@ class TestConsumerReposForRoot:
         result = _consumer_repos_for_root(tmp_path)
         assert result == []
 
-    def test_partial_marker_dadaia_only_skipped(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_partial_marker_dadaia_only_skipped(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Repo with .dadaia/ but not .dadaia/agentic/ should not qualify."""
         repo = tmp_path / "repos" / "partial"
         (repo / ".dadaia").mkdir(parents=True)
@@ -493,12 +500,18 @@ class TestConsumerReposForRoot:
 
 class TestIsSelfRepo:
     def test_matching_version_returns_true(self, tmp_path: Path) -> None:
-        with patch("dadaia_workspace.infrastructure.public_assets._package_version", return_value=_INSTALLED_VERSION):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets._package_version",
+            return_value=_INSTALLED_VERSION,
+        ):
             consumer = _add_marker_consumer(tmp_path, "self", pkg_version=_INSTALLED_VERSION)
             assert _is_self_repo(consumer) is True
 
     def test_different_version_returns_false(self, tmp_path: Path) -> None:
-        with patch("dadaia_workspace.infrastructure.public_assets._package_version", return_value=_INSTALLED_VERSION):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets._package_version",
+            return_value=_INSTALLED_VERSION,
+        ):
             consumer = _add_marker_consumer(tmp_path, "other", pkg_version=_OTHER_VERSION)
             assert _is_self_repo(consumer) is False
 
@@ -510,7 +523,9 @@ class TestIsSelfRepo:
     def test_invalid_json_returns_false(self, tmp_path: Path) -> None:
         consumer = tmp_path / "repos" / "bad-json"
         (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-        (consumer / ".dadaia" / "agentic" / "manifest.json").write_text("NOT JSON", encoding="utf-8")
+        (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
+            "NOT JSON", encoding="utf-8"
+        )
         assert _is_self_repo(consumer) is False
 
     def test_empty_package_version_returns_false(self, tmp_path: Path) -> None:
@@ -563,7 +578,10 @@ class TestInstallWorkspaceGuardrailPair:
 
     def test_self_repo_skipped(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         src = _make_source_file(tmp_path, "# AGENTS\n")
-        with patch("dadaia_workspace.infrastructure.public_assets._package_version", return_value=_INSTALLED_VERSION):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets._package_version",
+            return_value=_INSTALLED_VERSION,
+        ):
             _add_marker_consumer(tmp_path, "self-repo", pkg_version=_INSTALLED_VERSION)
             _install_workspace_guardrail_pair(src, tmp_path, force=True)
         # Self-repo should NOT have AGENTS.md written
@@ -648,7 +666,10 @@ class TestInstallConsumerReposGuardrailPair:
 
     def test_self_repo_skipped(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         src = _make_source_file(tmp_path, "# AGENTS\n")
-        with patch("dadaia_workspace.infrastructure.public_assets._package_version", return_value=_INSTALLED_VERSION):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets._package_version",
+            return_value=_INSTALLED_VERSION,
+        ):
             _add_marker_consumer(tmp_path, "self-repo", pkg_version=_INSTALLED_VERSION)
             _install_consumer_repos_guardrail_pair(src, tmp_path, force=True)
         assert not (tmp_path / "repos" / "self-repo" / "AGENTS.md").exists()
@@ -694,28 +715,28 @@ class TestDoctorGuardrailPair:
         (tmp_path / "AGENTS.md").write_text(content, encoding="utf-8")
         (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
         lines = _doctor_guardrail_pair(src, tmp_path)
-        assert any(l.startswith("[ok]") and "AGENTS.md" in l for l in lines)
-        assert any(l.startswith("[ok]") and "CLAUDE.md" in l for l in lines)
+        assert any(line.startswith("[ok]") and "AGENTS.md" in line for line in lines)
+        assert any(line.startswith("[ok]") and "CLAUDE.md" in line for line in lines)
 
     def test_missing_agents_md(self, tmp_path: Path) -> None:
         src = self._write_agents_src(tmp_path)
         (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
         lines = _doctor_guardrail_pair(src, tmp_path)
-        assert any("[missing]" in l and "AGENTS.md" in l for l in lines)
+        assert any("[missing]" in line and "AGENTS.md" in line for line in lines)
 
     def test_drift_agents_md(self, tmp_path: Path) -> None:
         src = self._write_agents_src(tmp_path, "# CANONICAL\n")
         (tmp_path / "AGENTS.md").write_text("# DIFFERENT\n", encoding="utf-8")
         (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
         lines = _doctor_guardrail_pair(src, tmp_path)
-        assert any("[drift]" in l and "AGENTS.md" in l for l in lines)
+        assert any("[drift]" in line and "AGENTS.md" in line for line in lines)
 
     def test_missing_claude_md(self, tmp_path: Path) -> None:
         content = "# AGENTS\n"
         src = self._write_agents_src(tmp_path, content)
         (tmp_path / "AGENTS.md").write_text(content, encoding="utf-8")
         lines = _doctor_guardrail_pair(src, tmp_path)
-        assert any("[missing]" in l and "CLAUDE.md" in l for l in lines)
+        assert any("[missing]" in line and "CLAUDE.md" in line for line in lines)
 
     def test_drift_claude_md_wrong_stub(self, tmp_path: Path) -> None:
         content = "# AGENTS\n"
@@ -723,7 +744,7 @@ class TestDoctorGuardrailPair:
         (tmp_path / "AGENTS.md").write_text(content, encoding="utf-8")
         (tmp_path / "CLAUDE.md").write_text("# WRONG STUB\n", encoding="utf-8")
         lines = _doctor_guardrail_pair(src, tmp_path)
-        assert any("[drift]" in l and "CLAUDE.md" in l for l in lines)
+        assert any("[drift]" in line and "CLAUDE.md" in line for line in lines)
 
     def test_consumer_repo_included(self, tmp_path: Path) -> None:
         content = "# AGENTS\n"
@@ -734,18 +755,21 @@ class TestDoctorGuardrailPair:
         (consumer / "AGENTS.md").write_text(content, encoding="utf-8")
         (consumer / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
         lines = _doctor_guardrail_pair(src, tmp_path)
-        assert any("repos/my-repo" in l for l in lines)
+        assert any("repos/my-repo" in line for line in lines)
 
     def test_self_repo_skipped_from_consumer_lines(self, tmp_path: Path) -> None:
         content = "# AGENTS\n"
         src = self._write_agents_src(tmp_path, content)
         (tmp_path / "AGENTS.md").write_text(content, encoding="utf-8")
         (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
-        with patch("dadaia_workspace.infrastructure.public_assets._package_version", return_value=_INSTALLED_VERSION):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets._package_version",
+            return_value=_INSTALLED_VERSION,
+        ):
             _add_marker_consumer(tmp_path, "self-repo", pkg_version=_INSTALLED_VERSION)
             lines = _doctor_guardrail_pair(src, tmp_path)
         # self-repo lines must NOT appear
-        assert not any("self-repo" in l for l in lines)
+        assert not any("self-repo" in line for line in lines)
 
     def test_writes_to_stderr(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         content = "# AGENTS\n"
@@ -797,7 +821,7 @@ class TestDcx1MissingToml:
         codex_dir.mkdir()
         manager = FileSystemPublicAssetManager()
         out = manager._dcx1_missing_toml(agentic_dir, codex_dir)
-        assert any("my-agent.toml" in l and "[missing]" in l for l in out)
+        assert any("my-agent.toml" in line and "[missing]" in line for line in out)
 
     def test_no_missing_when_toml_present(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -811,7 +835,6 @@ class TestDcx1MissingToml:
             'name = "my-agent"\nmodel = "gpt-4o"\ndeveloper_instructions = """\nbody\n"""\n',
             encoding="utf-8",
         )
-        out = manager._dcx1_missing_toml(agentic_dir, codex_dir) if False else []
         manager2 = FileSystemPublicAssetManager()
         out = manager2._dcx1_missing_toml(agentic_dir, codex_dir)
         assert out == []
@@ -854,7 +877,7 @@ class TestDcx2ConfigTomlEntries:
         (codex_dir / "config.toml").write_text("", encoding="utf-8")
         manager = FileSystemPublicAssetManager()
         out = manager._dcx2_config_toml_entries(agentic_dir, codex_dir)
-        assert any("my-agent" in l and "[missing]" in l for l in out)
+        assert any("my-agent" in line and "[missing]" in line for line in out)
 
     def test_no_report_when_entry_present(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -895,7 +918,7 @@ class TestDcx3WorkflowDrift:
         codex_dir.mkdir()
         manager = FileSystemPublicAssetManager()
         out = manager._dcx3_workflow_drift(agentic_dir, codex_dir)
-        assert any("my-workflow.workflow.md" in l and "[missing]" in l for l in out)
+        assert any("my-workflow.workflow.md" in line and "[missing]" in line for line in out)
 
     def test_reports_extra_workflow(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -907,7 +930,7 @@ class TestDcx3WorkflowDrift:
         (codex_wf / "extra.workflow.md").write_text("# extra\n", encoding="utf-8")
         manager = FileSystemPublicAssetManager()
         out = manager._dcx3_workflow_drift(agentic_dir, codex_dir)
-        assert any("extra.workflow.md" in l and "[extra]" in l for l in out)
+        assert any("extra.workflow.md" in line and "[extra]" in line for line in out)
 
     def test_no_drift_when_in_sync(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -936,7 +959,7 @@ class TestDcx4ClaudeStrings:
         (codex_dir / "test.toml").write_text('model = "claude-sonnet-4-6"\n', encoding="utf-8")
         manager = FileSystemPublicAssetManager()
         out = manager._dcx4_claude_strings(codex_dir)
-        assert any("[error]" in l and "claude-string" in l for l in out)
+        assert any("[error]" in line and "claude-string" in line for line in out)
 
     def test_no_report_when_no_claude_strings(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -977,7 +1000,7 @@ class TestDcx5EmptyDeveloperInstructions:
         )
         manager = FileSystemPublicAssetManager()
         out = manager._dcx5_empty_developer_instructions(codex_dir)
-        assert any("[error]" in l and "developer_instructions is empty" in l for l in out)
+        assert any("[error]" in line and "developer_instructions is empty" in line for line in out)
 
     def test_reports_missing_instructions(self, tmp_path: Path) -> None:
         codex_dir = tmp_path / ".codex"
@@ -989,7 +1012,7 @@ class TestDcx5EmptyDeveloperInstructions:
         )
         manager = FileSystemPublicAssetManager()
         out = manager._dcx5_empty_developer_instructions(codex_dir)
-        assert any("[error]" in l for l in out)
+        assert any("[error]" in line for line in out)
 
     def test_no_report_when_instructions_present(self, tmp_path: Path) -> None:
         codex_dir = tmp_path / ".codex"
@@ -1010,7 +1033,7 @@ class TestDcx5EmptyDeveloperInstructions:
         (codex_agents / "broken.toml").write_text("NOT VALID TOML ][[\n", encoding="utf-8")
         manager = FileSystemPublicAssetManager()
         out = manager._dcx5_empty_developer_instructions(codex_dir)
-        assert any("[error]" in l and "unparseable TOML" in l for l in out)
+        assert any("[error]" in line and "unparseable TOML" in line for line in out)
 
     def test_no_agents_dir_returns_empty(self, tmp_path: Path) -> None:
         codex_dir = tmp_path / ".codex"
@@ -1153,7 +1176,9 @@ class TestInstallCodexAgents:
         (agents_src / "my-agent.md").write_text(_make_agent_md("my-agent"), encoding="utf-8")
         codex_agents = workspace_root / ".codex" / "agents"
         codex_agents.mkdir(parents=True)
-        existing_content = 'name = "my-agent"\nmodel = "gpt-4o"\ndeveloper_instructions = """\noriginal\n"""\n'
+        existing_content = (
+            'name = "my-agent"\nmodel = "gpt-4o"\ndeveloper_instructions = """\noriginal\n"""\n'
+        )
         (codex_agents / "my-agent.toml").write_text(existing_content, encoding="utf-8")
         installed: list[str] = []
         manager = FileSystemPublicAssetManager()
@@ -1214,7 +1239,9 @@ class TestInstallOpencode:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         agents_src = agentic_dir / "agents"
         agents_src.mkdir()
-        (agents_src / "my-agent.md").write_text(_make_agent_md("my-agent", tools=["Read"]), encoding="utf-8")
+        (agents_src / "my-agent.md").write_text(
+            _make_agent_md("my-agent", tools=["Read"]), encoding="utf-8"
+        )
         installed: list[str] = []
         manager = FileSystemPublicAssetManager()
         manager._install_opencode(agentic_dir, workspace_root, force=True, installed=installed)
@@ -1298,7 +1325,9 @@ class TestCompare:
         src = tmp_path / "src.txt"
         src.write_bytes(b"x")
         manager = FileSystemPublicAssetManager()
-        assert manager._compare(src, tmp_path / "absent.txt", "test:label") == "[missing] test:label"
+        assert (
+            manager._compare(src, tmp_path / "absent.txt", "test:label") == "[missing] test:label"
+        )
 
     def test_compare_content_ok(self, tmp_path: Path) -> None:
         dst = tmp_path / "out.txt"
@@ -1333,7 +1362,7 @@ class TestLintLegacySoftwareEngineer:
             "subagent_type: software-engineer\n", encoding="utf-8"
         )
         out = manager._lint_legacy_software_engineer()
-        assert any("[LINT]" in l for l in out)
+        assert any("[LINT]" in line for line in out)
 
     def test_no_report_for_split_alias(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
@@ -1374,12 +1403,14 @@ class TestClassifyWorkflows:
         agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
         wf_dir = agentic_dir / "workflows"
         wf_dir.mkdir()
-        (wf_dir / "simple.workflow.md").write_text("# Simple WF\nNo parallel_group.\n", encoding="utf-8")
+        (wf_dir / "simple.workflow.md").write_text(
+            "# Simple WF\nNo parallel_group.\n", encoding="utf-8"
+        )
         manager = FileSystemPublicAssetManager()
         out = manager._classify_workflows(agentic_dir)
-        assert any("[ok] opencode:workflows/simple.workflow.md" == l for l in out)
-        assert any("[ok] claude:workflows/simple.workflow.md" == l for l in out)
-        assert any("[not-applicable]" in l and "simple.workflow.md" in l for l in out)
+        assert any(line == "[ok] opencode:workflows/simple.workflow.md" for line in out)
+        assert any(line == "[ok] claude:workflows/simple.workflow.md" for line in out)
+        assert any("[not-applicable]" in line and "simple.workflow.md" in line for line in out)
 
     def test_workflow_with_parallel_group_partial(self, tmp_path: Path) -> None:
         agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
@@ -1390,7 +1421,7 @@ class TestClassifyWorkflows:
         )
         manager = FileSystemPublicAssetManager()
         out = manager._classify_workflows(agentic_dir)
-        assert any("[partial]" in l and "parallel.workflow.md" in l for l in out)
+        assert any("[partial]" in line and "parallel.workflow.md" in line for line in out)
 
 
 # ---------------------------------------------------------------------------
@@ -1542,10 +1573,20 @@ class TestDoctorMethod:
         # Mirror the file
         (agentic_dir / "testfile.txt").write_text("content\n", encoding="utf-8")
         # Write manifest
-        (agentic_dir / "manifest.json").write_text(json.dumps({"schema_version": "1", "package_version": "0", "generated_at": "2026-01-01T00:00:00+00:00", "assets": []}), encoding="utf-8")
+        (agentic_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "1",
+                    "package_version": "0",
+                    "generated_at": "2026-01-01T00:00:00+00:00",
+                    "assets": [],
+                }
+            ),
+            encoding="utf-8",
+        )
         manager = self._make_manager_with_fake_public(public_dir)
         reports = manager.doctor(workspace_root)
-        assert any("[ok] stage:testfile.txt" == r for r in reports)
+        assert any(r == "[ok] stage:testfile.txt" for r in reports)
 
     def test_drift_report_for_modified_file(self, tmp_path: Path) -> None:
         """A file in public_dir that differs in agentic_dir gets [drift] report."""
@@ -1557,10 +1598,20 @@ class TestDoctorMethod:
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         agentic_dir.mkdir(parents=True)
         (agentic_dir / "testfile.txt").write_text("modified\n", encoding="utf-8")
-        (agentic_dir / "manifest.json").write_text(json.dumps({"schema_version": "1", "package_version": "0", "generated_at": "2026-01-01T00:00:00+00:00", "assets": []}), encoding="utf-8")
+        (agentic_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "1",
+                    "package_version": "0",
+                    "generated_at": "2026-01-01T00:00:00+00:00",
+                    "assets": [],
+                }
+            ),
+            encoding="utf-8",
+        )
         manager = self._make_manager_with_fake_public(public_dir)
         reports = manager.doctor(workspace_root)
-        assert any("[drift] stage:testfile.txt" == r for r in reports)
+        assert any(r == "[drift] stage:testfile.txt" for r in reports)
 
     def test_reports_unsupported_for_opencode_hooks(self, tmp_path: Path) -> None:
         """opencode:hooks (src=None, transform=False) gets [unsupported] label."""
@@ -1570,10 +1621,20 @@ class TestDoctorMethod:
         workspace_root.mkdir()
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         agentic_dir.mkdir(parents=True)
-        (agentic_dir / "manifest.json").write_text(json.dumps({"schema_version": "1", "package_version": "0", "generated_at": "2026-01-01T00:00:00+00:00", "assets": []}), encoding="utf-8")
+        (agentic_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "1",
+                    "package_version": "0",
+                    "generated_at": "2026-01-01T00:00:00+00:00",
+                    "assets": [],
+                }
+            ),
+            encoding="utf-8",
+        )
         manager = self._make_manager_with_fake_public(public_dir)
         reports = manager.doctor(workspace_root)
-        assert any("[unsupported] opencode:hooks" == r for r in reports)
+        assert any(r == "[unsupported] opencode:hooks" for r in reports)
 
     def test_reports_claude_md_stub_check(self, tmp_path: Path) -> None:
         """When agents_md source exists, CLAUDE.md stub is verified by doctor."""
@@ -1586,7 +1647,17 @@ class TestDoctorMethod:
         data_dir = agentic_dir / "data"
         data_dir.mkdir()
         (data_dir / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
-        (agentic_dir / "manifest.json").write_text(json.dumps({"schema_version": "1", "package_version": "0", "generated_at": "2026-01-01T00:00:00+00:00", "assets": []}), encoding="utf-8")
+        (agentic_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "1",
+                    "package_version": "0",
+                    "generated_at": "2026-01-01T00:00:00+00:00",
+                    "assets": [],
+                }
+            ),
+            encoding="utf-8",
+        )
         # AGENTS.md correct, CLAUDE.md incorrect
         (workspace_root / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
         (workspace_root / "CLAUDE.md").write_text("# WRONG\n", encoding="utf-8")
@@ -1609,7 +1680,6 @@ class TestInstallLegacyPath:
         (templates_dir / "AGENTS.md").write_text("# TEMPLATES AGENTS\n", encoding="utf-8")
         # Ensure no data/AGENTS.md exists
         assert not (agentic_dir / "data" / "AGENTS.md").exists()
-        installed: list[str] = []
         manager = FileSystemPublicAssetManager()
         manager.install(workspace_root, target="claude", force=True)
         # The AGENTS.md at workspace root should now exist (from templates fallback)
@@ -1696,7 +1766,7 @@ class TestDcx1FallbackToStem:
         manager = FileSystemPublicAssetManager()
         out = manager._dcx1_missing_toml(agentic_dir, codex_dir)
         # Should report missing using stem "fallback-agent"
-        assert any("fallback-agent.toml" in l and "[missing]" in l for l in out)
+        assert any("fallback-agent.toml" in line and "[missing]" in line for line in out)
 
 
 # ---------------------------------------------------------------------------
@@ -1734,7 +1804,9 @@ class TestInstanceConsumerRepos:
         manager = FileSystemPublicAssetManager()
         assert manager._consumer_repos(tmp_path) == []
 
-    def test_non_qualifying_repo_skipped(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_non_qualifying_repo_skipped(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         bad_repo = tmp_path / "repos" / "partial"
         bad_repo.mkdir(parents=True)
         manager = FileSystemPublicAssetManager()
@@ -1746,13 +1818,19 @@ class TestInstanceConsumerRepos:
 
 class TestInstanceIsSelfRepo:
     def test_matching_version_returns_true(self, tmp_path: Path) -> None:
-        with patch("dadaia_workspace.infrastructure.public_assets._package_version", return_value=_INSTALLED_VERSION):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets._package_version",
+            return_value=_INSTALLED_VERSION,
+        ):
             consumer = _add_marker_consumer(tmp_path, "self", pkg_version=_INSTALLED_VERSION)
             manager = FileSystemPublicAssetManager()
             assert manager._is_self_repo(consumer) is True
 
     def test_different_version_returns_false(self, tmp_path: Path) -> None:
-        with patch("dadaia_workspace.infrastructure.public_assets._package_version", return_value=_INSTALLED_VERSION):
+        with patch(
+            "dadaia_workspace.infrastructure.public_assets._package_version",
+            return_value=_INSTALLED_VERSION,
+        ):
             consumer = _add_marker_consumer(tmp_path, "other", pkg_version=_OTHER_VERSION)
             manager = FileSystemPublicAssetManager()
             assert manager._is_self_repo(consumer) is False
@@ -1900,7 +1978,7 @@ class TestDcx6CodexRuntimeAdapters:
         workspace_root.mkdir()
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert any("[missing]" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+        assert any("[missing]" in line and "my-adapter" in line and "D-CX-6" in line for line in out)
 
     def test_ok_when_codex_skill_present_and_matches(self, tmp_path: Path) -> None:
         """No issues when adapter is installed and content matches source."""
@@ -1927,7 +2005,7 @@ class TestDcx6CodexRuntimeAdapters:
         dst.write_text("# Modified\n", encoding="utf-8")
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert any("[drift]" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+        assert any("[drift]" in line and "my-adapter" in line and "D-CX-6" in line for line in out)
 
     def test_leak_when_adapter_in_claude_skills(self, tmp_path: Path) -> None:
         """[leak] reported when adapter appears in .claude/skills/."""
@@ -1941,7 +2019,9 @@ class TestDcx6CodexRuntimeAdapters:
         leak_path.write_text("# Leak\n", encoding="utf-8")
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert any("[leak]" in l and "claude" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+        assert any(
+            "[leak]" in line and "claude" in line and "my-adapter" in line and "D-CX-6" in line for line in out
+        )
 
     def test_leak_when_adapter_in_opencode_skills(self, tmp_path: Path) -> None:
         """[leak] reported when adapter appears in .opencode/skills/."""
@@ -1955,7 +2035,9 @@ class TestDcx6CodexRuntimeAdapters:
         leak_path.write_text("# Leak\n", encoding="utf-8")
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert any("[leak]" in l and "opencode" in l and "my-adapter" in l and "D-CX-6" in l for l in out)
+        assert any(
+            "[leak]" in line and "opencode" in line and "my-adapter" in line and "D-CX-6" in line for line in out
+        )
 
     def test_no_src_root_returns_empty(self, tmp_path: Path) -> None:
         """Returns empty list when public/runtime/codex/ does not exist."""
@@ -1997,7 +2079,7 @@ class TestDcx6CodexRuntimeAdapters:
         self._setup_adapter(public_dir, "missing-adapter")
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._check_codex_drift(agentic_dir, workspace_root)
-        assert any("[missing]" in l and "missing-adapter" in l and "D-CX-6" in l for l in out)
+        assert any("[missing]" in line and "missing-adapter" in line and "D-CX-6" in line for line in out)
 
 
 # ---------------------------------------------------------------------------
@@ -2143,9 +2225,7 @@ class TestDoctorFindingPersistence:
             "generated_at": "2026-01-01T00:00:00+00:00",
             "assets": [],
         }
-        (agentic_dir / "manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         return public_dir, workspace_root
 
     def test_missing_finding_calls_report_doctor_finding(self, tmp_path: Path) -> None:

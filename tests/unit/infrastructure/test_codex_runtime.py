@@ -68,9 +68,7 @@ def _make_workspace(tmp_path: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]
     # Pre-existing .claude/skills/existing-skill/SKILL.md
     existing_skill_dir = workspace_root / ".claude" / "skills" / "existing-skill"
     existing_skill_dir.mkdir(parents=True)
-    (existing_skill_dir / "SKILL.md").write_text(
-        _EXISTING_CLAUDE_SKILL_CONTENT, encoding="utf-8"
-    )
+    (existing_skill_dir / "SKILL.md").write_text(_EXISTING_CLAUDE_SKILL_CONTENT, encoding="utf-8")
 
     # Empty .opencode/ dir
     (workspace_root / ".opencode").mkdir(parents=True)
@@ -174,9 +172,7 @@ class TestDcx6DoctorLeakDetection:
         result = manager._dcx6_codex_runtime_adapters(workspace_root)
 
         missing_lines = [r for r in result if "[missing]" in r and "my-adapter" in r]
-        assert missing_lines, (
-            f"Expected a [missing] entry for my-adapter but got: {result!r}"
-        )
+        assert missing_lines, f"Expected a [missing] entry for my-adapter but got: {result!r}"
         assert any("codex:skills/my-adapter/SKILL.md" in line for line in missing_lines), (
             f"[missing] line does not reference 'codex:skills/my-adapter/SKILL.md': {missing_lines!r}"
         )
@@ -197,9 +193,7 @@ class TestDcx6DoctorLeakDetection:
         result = manager._dcx6_codex_runtime_adapters(workspace_root)
 
         drift_lines = [r for r in result if "[drift]" in r and "my-adapter" in r]
-        assert drift_lines, (
-            f"Expected a [drift] entry for my-adapter but got: {result!r}"
-        )
+        assert drift_lines, f"Expected a [drift] entry for my-adapter but got: {result!r}"
         assert any("codex:skills/my-adapter/SKILL.md" in line for line in drift_lines), (
             f"[drift] line does not reference 'codex:skills/my-adapter/SKILL.md': {drift_lines!r}"
         )
@@ -216,9 +210,7 @@ class TestDcx6DoctorLeakDetection:
         result = manager._dcx6_codex_runtime_adapters(workspace_root)
 
         adapter_problems = [
-            r
-            for r in result
-            if ("my-adapter" in r) and ("[missing]" in r or "[drift]" in r)
+            r for r in result if ("my-adapter" in r) and ("[missing]" in r or "[drift]" in r)
         ]
         assert not adapter_problems, (
             f"Expected no [missing]/[drift] for my-adapter but got: {adapter_problems!r}"
@@ -264,9 +256,7 @@ class TestDcx6DoctorLeakDetection:
 
         result = manager._dcx6_codex_runtime_adapters(workspace_root)
 
-        leak_lines = [
-            r for r in result if "[leak]" in r and "opencode" in r and "my-adapter" in r
-        ]
+        leak_lines = [r for r in result if "[leak]" in r and "opencode" in r and "my-adapter" in r]
         assert leak_lines, (
             f"Expected a [leak] entry for opencode:skills/my-adapter but got: {result!r}"
         )

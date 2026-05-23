@@ -187,9 +187,7 @@ class SpecContextService:
             # with no actionable context.  We scan first and raise a descriptive
             # GitSyncError instead.
             non_writable = [
-                str(f)
-                for f in repo_path.rglob("*")
-                if f.is_file() and not os.access(f, os.W_OK)
+                str(f) for f in repo_path.rglob("*") if f.is_file() and not os.access(f, os.W_OK)
             ]
             if non_writable:
                 sample = non_writable[:3]

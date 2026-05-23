@@ -160,7 +160,8 @@ def test_frontend_engineer_boundary() -> None:
     )
     _SPEC_AUTHORSHIP_EXACT = {"specs/", "specs"}
     specs_entries = [
-        entry for entry in write_allowlist
+        entry
+        for entry in write_allowlist
         if (
             entry in _SPEC_AUTHORSHIP_EXACT
             or any(entry.startswith(p) for p in _SPEC_AUTHORSHIP_PREFIXES)

@@ -108,11 +108,7 @@ class TestSecurityHeaders:
         csp = csp_headers[0]
 
         # Isolate script-src directive
-        directives = {
-            d.strip().split(None, 1)[0]: d.strip()
-            for d in csp.split(";")
-            if d.strip()
-        }
+        directives = {d.strip().split(None, 1)[0]: d.strip() for d in csp.split(";") if d.strip()}
         assert "script-src" in directives, "script-src directive must be present in CSP"
         script_src = directives["script-src"]
 
@@ -127,6 +123,7 @@ class TestSecurityHeaders:
             _CSP_SCRIPT_HASH_1,
             _CSP_SCRIPT_HASH_2,
         )
+
         assert _CSP_SCRIPT_HASH_1 in script_src, (
             f"Theme-switcher hash {_CSP_SCRIPT_HASH_1} missing from script-src"
         )

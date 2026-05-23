@@ -71,9 +71,7 @@ def _dispatch_delete(
     Returns ``(status_code, response_body_bytes)``.
     """
     auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = (
-        f"DELETE {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
-    )
+    raw_request = f"DELETE {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
     fake_sock = _FakeSocket(raw_request)
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
 
@@ -148,9 +146,7 @@ def test_delete_report_nested_path_captures_full_path() -> None:
     views = _make_views()
     handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_delete(
-        handler_class, "/api/reports/ctx/agent/file.html", token=_TOKEN
-    )
+    status, _ = _dispatch_delete(handler_class, "/api/reports/ctx/agent/file.html", token=_TOKEN)
 
     assert status == 200
     assert views["api_report_delete"].call_count == 1

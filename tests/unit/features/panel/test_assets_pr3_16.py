@@ -152,6 +152,7 @@ def test_workflows_js_cards_are_keyboard_accessible() -> None:
 # static.py. Assemble PANEL_JS inline here for content verification.
 # ---------------------------------------------------------------------------
 
+
 def _build_panel_js() -> str:
     """Assemble PANEL_JS from individual JS files (mirrors static.py behaviour)."""
     return (

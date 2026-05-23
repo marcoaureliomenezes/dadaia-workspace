@@ -6,7 +6,9 @@ from dadaia_workspace.core.models.run_state import DispatcherMode, StageInvocati
 from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 
 
-def _make_invocation(tmp_path: Path, stage_id: str, *, parallel_group: str | None) -> StageInvocation:
+def _make_invocation(
+    tmp_path: Path, stage_id: str, *, parallel_group: str | None
+) -> StageInvocation:
     return StageInvocation(
         run_id="run-parallel-99",
         stage_id=stage_id,
@@ -41,8 +43,7 @@ def test_capabilities_runtime_name_is_codex() -> None:
 def test_parallel_dispatch_returns_result_for_each_invocation(tmp_path: Path) -> None:
     """dispatch_parallel() must return a tuple with len == len(invocations)."""
     invocations = tuple(
-        _make_invocation(tmp_path, f"stage-{i}", parallel_group="specialists")
-        for i in range(3)
+        _make_invocation(tmp_path, f"stage-{i}", parallel_group="specialists") for i in range(3)
     )
     results = CodexAgentDispatcher().dispatch_parallel(invocations)
     assert len(results) == 3
@@ -51,8 +52,7 @@ def test_parallel_dispatch_returns_result_for_each_invocation(tmp_path: Path) ->
 def test_parallel_dispatch_all_results_awaiting_gate(tmp_path: Path) -> None:
     """Every result from dispatch_parallel() must have status=AWAITING_GATE."""
     invocations = tuple(
-        _make_invocation(tmp_path, f"p-stage-{i}", parallel_group="group-a")
-        for i in range(2)
+        _make_invocation(tmp_path, f"p-stage-{i}", parallel_group="group-a") for i in range(2)
     )
     results = CodexAgentDispatcher().dispatch_parallel(invocations)
     assert all(r.status == StageStatus.AWAITING_GATE for r in results)
@@ -72,8 +72,7 @@ def test_parallel_dispatch_does_not_raise_for_parallel_group(tmp_path: Path) -> 
 def test_parallel_dispatch_writes_all_invocation_files(tmp_path: Path) -> None:
     """dispatch_parallel() must write one file per invocation."""
     invocations = tuple(
-        _make_invocation(tmp_path, f"item-{i}", parallel_group="batch")
-        for i in range(3)
+        _make_invocation(tmp_path, f"item-{i}", parallel_group="batch") for i in range(3)
     )
     CodexAgentDispatcher().dispatch_parallel(invocations)
     for inv in invocations:

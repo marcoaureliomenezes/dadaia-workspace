@@ -7,8 +7,8 @@ import sqlite3
 import pytest
 
 from dadaia_workspace.features.telemetry.store.schema import (
-    SCHEMA_VERSION,
     _MIGRATIONS,
+    SCHEMA_VERSION,
     apply_migrations,
 )
 
@@ -115,9 +115,7 @@ class TestSchemaMigrations:
     def test_migration_6_preserves_core_tables(self, mem_conn: sqlite3.Connection) -> None:
         """Migration 6 must not drop the four core tables."""
         apply_migrations(mem_conn)
-        assert EXPECTED_TABLES.issubset(_tables(mem_conn)), (
-            "Core tables must survive migration 6"
-        )
+        assert EXPECTED_TABLES.issubset(_tables(mem_conn)), "Core tables must survive migration 6"
 
     def test_migration_6_sqlite_master_query(self, mem_conn: sqlite3.Connection) -> None:
         """Verify via sqlite_master that dead tables are absent after full migration."""
@@ -125,6 +123,4 @@ class TestSchemaMigrations:
         rows = mem_conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('workflows', 'workflow_agents')"
         ).fetchall()
-        assert rows == [], (
-            f"sqlite_master still contains dead tables after migration 6: {rows}"
-        )
+        assert rows == [], f"sqlite_master still contains dead tables after migration 6: {rows}"

@@ -27,7 +27,7 @@ _OVERSIZED_THRESHOLD_BYTES = 30 * 1024  # 30 KB
 # ---------------------------------------------------------------------------
 
 
-def _detect_sidecar_version(doc: dict) -> str:
+def _detect_sidecar_version(doc: dict[str, object]) -> str:
     """Return '1.1' if doc declares handoff-v1.1, else '1.0'."""
     schema_version = doc.get("schema_version", "")
     schema_id = doc.get("$id", "")
@@ -36,7 +36,7 @@ def _detect_sidecar_version(doc: dict) -> str:
     return "1.0"
 
 
-def _check_v10_compat(path: Path, doc: dict) -> tuple[bool, list[str]]:
+def _check_v10_compat(path: Path, doc: dict[str, object]) -> tuple[bool, list[str]]:
     """Check a v1.0 sidecar for missing required v1.1 fields.
 
     Returns:
@@ -49,8 +49,8 @@ def _check_v10_compat(path: Path, doc: dict) -> tuple[bool, list[str]]:
     # Missing findings[] entirely → hard error
     if "findings" not in doc:
         messages.append(
-            f"ERROR: Missing required field 'findings[]'. "
-            f"This sidecar appears to be v1.0 and is incompatible with v1.1."
+            "ERROR: Missing required field 'findings[]'. "
+            "This sidecar appears to be v1.0 and is incompatible with v1.1."
         )
         is_error = True
         return is_error, messages
