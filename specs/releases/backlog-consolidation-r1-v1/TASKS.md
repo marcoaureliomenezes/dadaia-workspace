@@ -6,7 +6,7 @@
 
 ## Phase A — Housekeeping + assets canônicos
 
-- [ ] T-BCR-01 — Remover `codex-runtime-stage-gap-v1` de `specs/backlog/candidates.md` (stale — resolvido pelo hotfix 55cfb4f).
+- [x] T-BCR-01 — Remover `codex-runtime-stage-gap-v1` de `specs/backlog/candidates.md` (stale — resolvido pelo hotfix 55cfb4f).
   - Owner: `product-engineer`
   - Write set: `specs/backlog/candidates.md`
   - Aceite: entrada ausente do arquivo após edição.
