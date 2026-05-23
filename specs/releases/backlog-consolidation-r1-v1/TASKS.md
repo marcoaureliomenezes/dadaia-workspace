@@ -18,7 +18,7 @@
   - Pós-edição: `dadaia public stage && dadaia public install --target claude --force`
   - Aceite: seção presente com os 4 pontos (self-referential, editable install, doctor blind spot, never insert consumer specifics). `dadaia public doctor` retorna `[ok]` para a rule.
 
-- [ ] T-BCR-03 — Criar `dadaia_workspace/public/agents/data-architect.md` com description genérica (21º agent universal).
+- [-] T-BCR-03 — Criar `dadaia_workspace/public/agents/data-architect.md` com description genérica (21º agent universal).
   - Owner: `ai-engineer`
   - Write set:
     - `dadaia_workspace/public/agents/data-architect.md`
