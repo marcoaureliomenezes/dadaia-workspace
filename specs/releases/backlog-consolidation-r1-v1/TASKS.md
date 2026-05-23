@@ -104,7 +104,7 @@
 
 ## Phase G — Propagação e validação final
 
-- [-] T-BCR-09 — Propagação completa + validação final.
+- [x] T-BCR-09 — Propagação completa + validação final.
   - Owner: `software-engineer-python`
   - Write set: nenhum arquivo de produção — apenas runtime
   - Comandos:
