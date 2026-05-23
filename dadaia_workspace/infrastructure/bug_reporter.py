@@ -76,6 +76,22 @@ def report_exception(
         append_entry(workspace_root, entry)
 
 
+def load_open_bugs(workspace_root: Path) -> list[dict]:  # type: ignore[type-arg]
+    """Return all entries with status='open'."""
+    path = _bugs_path(workspace_root)
+    return [e for e in _load(path) if e.get("status") == "open"]
+
+
+def mark_bugs_in_release(workspace_root: Path, bug_ids: list[str]) -> None:
+    """Set status='in_release' for the given bug IDs. Atomic."""
+    path = _bugs_path(workspace_root)
+    entries = _load(path)
+    for entry in entries:
+        if entry.get("id") in bug_ids:
+            entry["status"] = "in_release"
+    _save(path, entries)
+
+
 def report_doctor_finding(
     workspace_root: Path,
     source: str,
