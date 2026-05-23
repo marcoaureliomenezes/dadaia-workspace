@@ -58,16 +58,15 @@
 
 ## Operador — confirmação AC12
 
-[ ] Operador leu as 6 ADRs end-to-end e registra OK aqui.
+[x] Operador leu as 6 ADRs end-to-end e registra OK — 2026-05-20.
 
 ## AC12 — ADRs lidas end-to-end
 
-O operador confirmará leitura das 6 ADRs ao revisar este CLOSURE.
 ADRs em: `specs/releases/codex-agent-orchestration-parity-v1/adrs/`
 
-- [ ] ADR-1 lida: adr-1-codex-agent-projection-format.md
-- [ ] ADR-2 lida: adr-2-runtime-specific-prompt-transform.md
-- [ ] ADR-3 lida: adr-3-dispatcher-capability-matrix.md
-- [ ] ADR-4 lida: adr-4-workflow-runtime-boundary.md
-- [ ] ADR-5 lida: adr-5-model-mapping.md
-- [ ] ADR-6 lida: adr-6-null-claude-regression-suite.md
+- [x] ADR-1 lida: adr-1-codex-agent-projection-format.md
+- [x] ADR-2 lida: adr-2-runtime-specific-prompt-transform.md
+- [x] ADR-3 lida: adr-3-dispatcher-capability-matrix.md
+- [x] ADR-4 lida: adr-4-workflow-runtime-boundary.md
+- [x] ADR-5 lida: adr-5-model-mapping.md
+- [x] ADR-6 lida: adr-6-null-claude-regression-suite.md
