@@ -70,7 +70,7 @@
 
 ## Phase E — Bug reporting Phase 2
 
-- [ ] T-BCR-07 — Integrar leitura de `reported.json` em `dadaia specs` ao criar/abrir release.
+- [-] T-BCR-07 — Integrar leitura de `reported.json` em `dadaia specs` ao criar/abrir release.
   - Owner: `software-engineer-python`
   - Write set:
     - `dadaia_workspace/cli/commands/specs.py`
