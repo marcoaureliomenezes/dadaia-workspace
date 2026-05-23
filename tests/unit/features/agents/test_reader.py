@@ -685,22 +685,22 @@ def test_all_public_agents_write_allowlist_entries_are_strings(
 def test_public_agents_count_is_20(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Exactly 20 public agents must be loadable (SPEC agents-r3-v1 §FR2 — 20-agent roster).
+    """Exactly 21 public agents must be loadable (agents-r3-v1 + data-architect addition).
 
     Topology breakdown:
       T1 dispatchers (2): project-manager, project-auditor
       T2 curator     (1): product-engineer
-      T3 leaves     (17): ai-engineer, backend-engineer, code-reviewer,
-                          data-analyst, data-engineer, design-specialist,
-                          devops-engineer, frontend-engineer, game-designer,
-                          game-developer, game-tester, qa-engineer,
+      T3 leaves     (18): ai-engineer, backend-engineer, code-reviewer,
+                          data-analyst, data-architect, data-engineer,
+                          design-specialist, devops-engineer, frontend-engineer,
+                          game-designer, game-developer, game-tester, qa-engineer,
                           researcher, security-reviewer, software-architect,
                           software-engineer-node, software-engineer-python
     """
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
-    assert len(agents) == 20, (
-        f"Expected 20 public agents, got {len(agents)}: {[a.id for a in agents]}"
+    assert len(agents) == 21, (
+        f"Expected 21 public agents, got {len(agents)}: {[a.id for a in agents]}"
     )
 
 
