@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
 
 [tool.poetry.scripts]
-dadaia = "dadaia_workspace.cli.main:app"
+dadaia = "dadaia_workspace.cli.main:_safe_app"
 
 [tool.poetry.dependencies]
 python = "^3.12"

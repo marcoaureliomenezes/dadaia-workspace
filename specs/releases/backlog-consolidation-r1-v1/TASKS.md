@@ -55,7 +55,7 @@
 
 ## Phase D — Bug reporting Phase 1
 
-- [-] T-BCR-06 — Implementar infra de bug reporting: CLI exception handler + doctor persistence.
+- [x] T-BCR-06 — Implementar infra de bug reporting: CLI exception handler + doctor persistence.
   - Owner: `software-engineer-python`
   - Write set:
     - `dadaia_workspace/cli/main.py`

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 
 _SCHEMA_VERSION = "1"
 # T-41: CLAUDE.md is a 1-line stub that delegates to AGENTS.md.
@@ -812,6 +813,13 @@ class FileSystemPublicAssetManager:
             reports.append("[not-applicable] git-dirty check (git not found)")
         except subprocess.TimeoutExpired:
             reports.append("[warn] git-dirty check timed out")
+
+        # Persist actionable findings to .dadaia/bugs/reported.json
+        _PERSIST_PREFIXES = ("[missing]", "[drift]", "[fail]", "[warn]")
+        for line in reports:
+            stripped = line.strip()
+            if any(stripped.startswith(p) for p in _PERSIST_PREFIXES):
+                report_doctor_finding(workspace_root, "doctor-public", stripped)
 
         return reports
 

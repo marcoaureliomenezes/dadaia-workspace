@@ -2114,3 +2114,103 @@ class TestDoctorGitDirtyCheck:
             reports = manager.doctor(workspace_root)
 
         assert "[warn] git-dirty check timed out" in reports
+
+
+# ---------------------------------------------------------------------------
+# T-BCR-06 — doctor() persists [missing]/[drift]/[fail]/[warn] findings
+# ---------------------------------------------------------------------------
+
+
+class TestDoctorFindingPersistence:
+    """Tests that doctor() calls report_doctor_finding for actionable findings."""
+
+    def _make_manager_with_fake_public(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def _make_minimal_workspace(self, tmp_path: Path) -> tuple[Path, Path]:
+        """Create a minimal public_dir + workspace_root suitable for doctor()."""
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        agentic_dir.mkdir(parents=True)
+        manifest = {
+            "schema_version": "1",
+            "package_version": "0.0.0",
+            "generated_at": "2026-01-01T00:00:00+00:00",
+            "assets": [],
+        }
+        (agentic_dir / "manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        return public_dir, workspace_root
+
+    def test_missing_finding_calls_report_doctor_finding(self, tmp_path: Path) -> None:
+        """When doctor() returns a [missing] line, report_doctor_finding is called."""
+        import subprocess
+
+        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
+        manager = self._make_manager_with_fake_public(public_dir)
+
+        mock_result = subprocess.CompletedProcess(
+            args=["git", "diff", "--name-only", "HEAD"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+        with (
+            patch("subprocess.run", return_value=mock_result),
+            patch(
+                "dadaia_workspace.infrastructure.public_assets.report_doctor_finding"
+            ) as mock_report,
+        ):
+            reports = manager.doctor(workspace_root)
+
+        # At least one [missing] line should have been emitted (manifest.json for stage)
+        # and report_doctor_finding should have been called for each actionable finding.
+        actionable = [
+            r.strip()
+            for r in reports
+            if r.strip().startswith(("[missing]", "[drift]", "[fail]", "[warn]"))
+        ]
+        assert len(actionable) > 0, "Expected at least one actionable finding"
+        assert mock_report.call_count == len(actionable), (
+            f"Expected {len(actionable)} calls but got {mock_report.call_count}"
+        )
+        # Verify each call used the correct source tag
+        for call_args in mock_report.call_args_list:
+            assert call_args[0][1] == "doctor-public"
+
+    def test_ok_lines_do_not_trigger_report(self, tmp_path: Path) -> None:
+        """[ok] and [not-applicable] lines must NOT be persisted."""
+        import subprocess
+
+        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
+        manager = self._make_manager_with_fake_public(public_dir)
+
+        mock_result = subprocess.CompletedProcess(
+            args=["git", "diff", "--name-only", "HEAD"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+        with (
+            patch("subprocess.run", return_value=mock_result),
+            patch(
+                "dadaia_workspace.infrastructure.public_assets.report_doctor_finding"
+            ) as mock_report,
+        ):
+            reports = manager.doctor(workspace_root)
+
+        ok_lines = [r for r in reports if r.strip().startswith("[ok]")]
+        assert len(ok_lines) >= 0  # may be zero in minimal workspace
+
+        # Verify no [ok] line triggered a report
+        reported_messages = [call_args[0][2] for call_args in mock_report.call_args_list]
+        for msg in reported_messages:
+            assert not msg.startswith("[ok]"), f"[ok] line should not be reported: {msg}"
