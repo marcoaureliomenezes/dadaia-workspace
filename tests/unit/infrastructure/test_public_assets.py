@@ -1978,7 +1978,9 @@ class TestDcx6CodexRuntimeAdapters:
         workspace_root.mkdir()
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert any("[missing]" in line and "my-adapter" in line and "D-CX-6" in line for line in out)
+        assert any(
+            "[missing]" in line and "my-adapter" in line and "D-CX-6" in line for line in out
+        )
 
     def test_ok_when_codex_skill_present_and_matches(self, tmp_path: Path) -> None:
         """No issues when adapter is installed and content matches source."""
@@ -2020,7 +2022,8 @@ class TestDcx6CodexRuntimeAdapters:
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
         assert any(
-            "[leak]" in line and "claude" in line and "my-adapter" in line and "D-CX-6" in line for line in out
+            "[leak]" in line and "claude" in line and "my-adapter" in line and "D-CX-6" in line
+            for line in out
         )
 
     def test_leak_when_adapter_in_opencode_skills(self, tmp_path: Path) -> None:
@@ -2036,7 +2039,8 @@ class TestDcx6CodexRuntimeAdapters:
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
         assert any(
-            "[leak]" in line and "opencode" in line and "my-adapter" in line and "D-CX-6" in line for line in out
+            "[leak]" in line and "opencode" in line and "my-adapter" in line and "D-CX-6" in line
+            for line in out
         )
 
     def test_no_src_root_returns_empty(self, tmp_path: Path) -> None:
@@ -2079,7 +2083,9 @@ class TestDcx6CodexRuntimeAdapters:
         self._setup_adapter(public_dir, "missing-adapter")
         manager = self._make_manager_with_fake_public(public_dir)
         out = manager._check_codex_drift(agentic_dir, workspace_root)
-        assert any("[missing]" in line and "missing-adapter" in line and "D-CX-6" in line for line in out)
+        assert any(
+            "[missing]" in line and "missing-adapter" in line and "D-CX-6" in line for line in out
+        )
 
 
 # ---------------------------------------------------------------------------
