@@ -1,5 +1,5 @@
-release: backlog-consolidation-r1-v1
-phase: CLOSURE
+release: none
+phase: none
 
 # History
 # 2026-05-23 — backlog-consolidation-r1-v1 advanced to CLOSURE. All T-BCR-01..09 [x]. dadaia public doctor all [ok].
