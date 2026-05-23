@@ -3,7 +3,7 @@
 PR3-10 (FE): Full collapsed card design.
   - 2-column grid at >=1024px, 1-column below
   - Collapsed card: status badge, name, description (2-line clamp), 3-stat row,
-    skills chips (first 2 + "+N more"), expand chevron
+    skills chips (first 2 + "+N more")
   - Status badge variants: active (green dot) / inactive (gray)
   - Active card: 4px left-border accent
   - Loading skeleton with pulse animation (disabled under prefers-reduced-motion)
@@ -11,14 +11,11 @@ PR3-10 (FE): Full collapsed card design.
   - All brand token usages include comma-separated fallbacks (test_brand_tokens_have_fallbacks)
   - Theme-responsive: Mint/Sage/Warm via tokens
 
-PR3-11 (FE): Expanded card panel.
-  - Expanded detail region: full skills, cost-by-context bars, scrollable system prompt
-  - System prompt: <pre><code> block with max-height + overflow-y: auto
-  - Copy-to-clipboard button for system prompt
-  - Total cost label with prominent styling
-  - Detail loading state (skeleton lines while prompt fetches)
-  - Error state for failed prompt fetch
-  - Expand/collapse transition respects prefers-reduced-motion
+P5-D (FE): Modal redesign (T-P5-18 to T-P5-21).
+  - Collapsed card now opens a <dialog> modal (no inline expand/collapse)
+  - Card button uses aria-haspopup="dialog" (no aria-expanded)
+  - Modal CSS: .agent-modal, ::backdrop, open animation, prefers-reduced-motion fallback
+  - Close button: 44×44px touch target, focus ring via --color-accent-dark
 """
 
 AGENTS_CSS: str = """
@@ -123,19 +120,6 @@ AGENTS_CSS: str = """
   text-overflow: ellipsis;
 }
 
-/* ── Expand chevron ──────────────────────────────────────────────── */
-.agent-card__chevron {
-  font-size: 0.85rem;
-  color: var(--color-muted, #666666);
-  flex-shrink: 0;
-  transition: transform 0.2s ease;
-}
-@media (prefers-reduced-motion: reduce) {
-  .agent-card__chevron {
-    transition: none;
-  }
-}
-
 /* ── Status badge ────────────────────────────────────────────────── */
 .agent-status-badge {
   display: inline-flex;
@@ -238,15 +222,90 @@ AGENTS_CSS: str = """
   opacity: 1;
 }
 
-/* ── Expanded detail region ──────────────────────────────────────── */
-.agent-card__detail {
-  margin-top: 0.75rem;
-  border-top: 1px solid var(--color-border, #dddddd);
-  padding-top: 0.75rem;
+/* ── Agent modal ─────────────────────────────────────────────────────────── */
+.agent-modal {
+  max-width: var(--modal-max-w, 720px);
+  max-height: var(--modal-max-h, 80vh);
+  width: 90vw;
+  border: none;
+  border-radius: var(--radius-modal, 0.75rem);
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-modal, 0 8px 32px rgba(0,0,0,.24), 0 2px 8px rgba(0,0,0,.12));
+  animation: modal-in var(--duration-normal, 220ms) var(--easing-decelerate, cubic-bezier(0, 0, 0.2, 1)) both;
 }
-.agent-card__detail[hidden] { display: none; }
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-modal { animation: modal-in-reduced var(--duration-normal, 220ms) both; }
+  @keyframes modal-in-reduced {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
+.agent-modal::backdrop {
+  background: rgba(0,0,0,0.45);
+  animation: backdrop-in var(--duration-normal, 220ms) var(--easing-decelerate, cubic-bezier(0, 0, 0.2, 1)) both;
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.agent-modal__inner {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--modal-max-h, 80vh);
+  overflow: hidden;
+}
+.agent-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border, #dddddd);
+  flex-shrink: 0;
+}
+.agent-modal__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-heading, #111111);
+  margin: 0;
+}
+.agent-modal__close {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius, 4px);
+  background: none;
+  color: var(--color-muted, #666666);
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: inherit;
+}
+.agent-modal__close:hover {
+  background: var(--color-placeholder-bg, #f7f7f7);
+  color: var(--color-text, #222222);
+}
+.agent-modal__close:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
+.agent-modal__body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border, #dddddd) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
 
-/* ── Agent detail inner wrapper ──────────────────────────────────── */
+/* ── Agent detail inner wrapper (modal body) ────────────────────── */
 .agent-detail {
   display: flex;
   flex-direction: column;
@@ -264,7 +323,7 @@ AGENTS_CSS: str = """
   display: block;
 }
 
-/* ── Skills list (expanded — full list, not truncated) ───────────── */
+/* ── Skills list (full list in modal) ───────────────────────────── */
 .agent-detail__section {
   display: flex;
   flex-direction: column;
@@ -342,7 +401,7 @@ AGENTS_CSS: str = """
   color: var(--color-text, #222222);
   white-space: pre-wrap;
   word-break: break-word;
-  /* Bounded height to prevent very long prompts from dominating the page */
+  /* Bounded height to prevent very long prompts from dominating the modal body */
   max-height: 320px;
   overflow-y: auto;
   /* Custom scrollbar (subtle) */
@@ -352,15 +411,6 @@ AGENTS_CSS: str = """
 .agent-prompt code {
   font-family: inherit;
   font-size: inherit;
-}
-
-/* ── Expand transition ───────────────────────────────────────────── */
-/* Chevron rotation is driven by inline style via JS;
-   the CSS transition on .agent-card__chevron handles the animation. */
-@media (prefers-reduced-motion: reduce) {
-  .agent-card__detail {
-    transition: none;
-  }
 }
 
 /* ── Detail loading state ────────────────────────────────────────── */
@@ -379,6 +429,28 @@ AGENTS_CSS: str = """
   border: 1px solid var(--color-alert, #f7af63);
   border-radius: var(--radius-card, 6px);
   padding: 0.6rem 0.75rem;
+}
+
+/* ── Context breakdown bars (modal, P5-D) ────────────────────────── */
+.context-breakdown { margin: 0.5rem 0; }
+.context-breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  margin: 0.25rem 0;
+}
+.context-bar {
+  flex: 1;
+  height: 0.5rem;
+  background: var(--color-placeholder-bg, #f7f7f7);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.context-bar-fill {
+  height: 100%;
+  background: var(--color-accent, #9cddc8);
+  border-radius: 4px;
 }
 
 /* ── Loading skeleton ────────────────────────────────────────────── */
@@ -447,28 +519,6 @@ AGENTS_CSS: str = """
   border-radius: var(--radius-card, 6px);
   margin-bottom: 1rem;
   font-size: 0.88rem;
-}
-
-/* ── Context breakdown bars (expanded, PR3-11) ───────────────────── */
-.context-breakdown { margin: 0.5rem 0; }
-.context-breakdown-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  margin: 0.25rem 0;
-}
-.context-bar {
-  flex: 1;
-  height: 0.5rem;
-  background: var(--color-placeholder-bg, #f7f7f7);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.context-bar-fill {
-  height: 100%;
-  background: var(--color-accent, #9cddc8);
-  border-radius: 4px;
 }
 
 /* ── Placeholder card (legacy — kept for compat until fully removed) */

@@ -22,6 +22,7 @@ EXPECTED_AGENTS = {
     "backend-engineer",
     "code-reviewer",
     "data-analyst",
+    "data-architect",
     "data-engineer",
     "design-specialist",
     "devops-engineer",
@@ -48,9 +49,6 @@ STALE_AGENTS = {
 }
 
 EXPECTED_SKILLS = {
-    "architect-code-audit",
-    "architect-design-patterns",
-    "architecture-code-review",
     "dadaia-grill-me",
     "dadaia-handoff-emitter",
     "dadaia-release-closure",
@@ -59,27 +57,13 @@ EXPECTED_SKILLS = {
     "dadaia-workspace-manager",
     "dadaia-workspace-spec-navigator",
     "dadaia-workspace-spec-reviewer",
+    "design-reference-research",
+    "design-report-quality-gate",
     "dev-server-registry",
-    "devops-deploy-strategies",
-    "devops-gitflow-governance",
     "drift-detection",
-    "game-audio-design",
-    "game-flight-dynamics",
-    "game-geospatial-pipeline",
-    "game-map-architect",
-    "game-packaging-distribution",
-    "game-physics-engine",
-    "game-platform-browser",
-    "game-platform-godot",
-    "game-platform-unity",
-    "game-platform-unreal",
-    "game-testing-ue5",
-    "game-unreal-designer",
-    "game-unreal-developer",
-    "game-visual-design",
-    "github-actions-pipelines",
+    "frontend-design",
+    "frontend-implementation-quality",
     "project-orchestration",
-    "security-audit-protocol",
     "ux-ui-review",
 }
 
@@ -143,7 +127,7 @@ class TestStage:
         _manager().stage(workspace)
 
         agentic = workspace / ".dadaia" / "agentic"
-        for subdir in ("agents", "skills", "rules", "commands", "scripts", "data"):
+        for subdir in ("agents", "skills", "rules", "scripts", "data"):
             assert (agentic / subdir).is_dir(), f".dadaia/agentic/{subdir}/ not created by stage"
 
     def test_stage_manifest_schema_is_valid(self, tmp_path: Path) -> None:
@@ -254,8 +238,10 @@ class TestInstallAll:
 
         assert (workspace / ".codex" / "hooks.json").exists(), ".codex/hooks.json not created"
         assert (workspace / ".codex" / "config.toml").exists(), ".codex/config.toml not created"
-        assert (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists(), (
-            ".codex/rules/game-agents-coordination.md not installed"
+        # Only rules with YAML frontmatter are projected to .codex/rules/ (behavioral
+        # prose rules like game-agents-coordination.md are intentionally skipped — ADR-1/D2).
+        assert (workspace / ".codex" / "rules" / "workspace-protocol.md").exists(), (
+            ".codex/rules/workspace-protocol.md not installed"
         )
 
     def test_install_no_stale_agents_in_claude(self, tmp_path: Path) -> None:

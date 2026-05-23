@@ -25,7 +25,7 @@
 <body>
 
 <h1>Tech Stack Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-16 · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">Última atualização: 2026-05-20 · Closure: codex-agent-orchestration-parity-v1</p>
 
 <section id="languages">
   <h2>Linguagens</h2>
@@ -59,6 +59,69 @@
       <tr><td>git</td><td>2.x</td><td>VCS; <code>git_subprocess.py</code> wrapeia comandos</td></tr>
     </tbody>
   </table>
+</section>
+
+<section id="agent-runtimes">
+  <h2>Agent runtimes</h2>
+  <ul>
+    <li><strong>Claude (Anthropic)</strong>: runtime nativo; agents projetados verbatim para <code>.claude/agents/</code> via <code>dadaia public install --target claude</code>.</li>
+    <li><strong>Codex (OpenAI)</strong>: parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..5. 20 agentes TOML em <code>.codex/agents/</code>. Zero leak <code>claude-*</code>. Workflows em <code>.codex/workflows/</code>.</li>
+    <li><strong>OpenCode</strong>: projeção via strip de frontmatter de tools; workflows e skills projetados em <code>.opencode/</code>.</li>
+    <li><strong>CLI</strong>: agentes invocados via <code>claude --agent &lt;name&gt;</code> ou equivalente; modo manual sem paralelização automática.</li>
+  </ul>
+</section>
+
+<section id="model-assignments">
+  <h2>Model assignments (20 agentes)</h2>
+  <p>Modelo padrão da topologia: <code>claude-sonnet-4-6</code> para todos os 20 agentes. Override
+  per-dispatch via <code>DADAIA_MODEL_OVERRIDE=opus</code> para tarefas que exijam Opus (greenfield
+  architecture, multi-spec drift, memory atomicity writes). Constitucional em ADR-X4.</p>
+  <table>
+    <thead>
+      <tr><th>Agente</th><th>Modelo</th><th>Nota</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>project-manager</td><td><code>claude-sonnet-4-6</code></td><td>Tier 1 orquestrador</td></tr>
+      <tr><td>project-auditor</td><td><code>claude-sonnet-4-6</code></td><td>Tier 1 orquestrador</td></tr>
+      <tr><td>product-engineer</td><td><code>claude-sonnet-4-6</code></td><td>Tier 2 curator</td></tr>
+      <tr><td>software-architect</td><td><code>claude-sonnet-4-6</code></td><td>Tier 3 leaf</td></tr>
+      <tr><td>ai-engineer</td><td><code>claude-sonnet-4-6</code></td><td>Tier 3 leaf</td></tr>
+      <tr><td>game-designer</td><td><code>claude-sonnet-4-6</code></td><td>Tier 3 leaf</td></tr>
+      <tr><td>game-tester</td><td><code>claude-sonnet-4-6</code></td><td>Tier 3 leaf</td></tr>
+      <tr><td>researcher</td><td><code>claude-haiku-4-5-20251001</code></td><td>Haiku 4.5; canônico em fan-out evidence-heavy (ADR-X6)</td></tr>
+      <tr><td>security-reviewer</td><td><code>claude-sonnet-4-6</code> (triage) / <code>claude-haiku-4-5</code> (scan)</td><td>Dispatcher declara o modo explicitamente</td></tr>
+      <tr><td>code-reviewer, software-engineer-python, software-engineer-node, backend-engineer, frontend-engineer, qa-engineer, devops-engineer, design-specialist, data-engineer, data-analyst, game-developer</td><td><code>claude-sonnet-4-6</code></td><td>Tier 3 leaves restantes (11)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="plugin-inventory">
+  <h2>Plugin inventory</h2>
+  <table>
+    <thead>
+      <tr><th>Plugin</th><th>Status</th><th>Escopo</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>playwright</code></td><td>Retido</td><td>Universal — utilizado por <code>qa-engineer</code> (E2E), <code>data-analyst</code> (dashboard evaluation), <code>frontend-engineer</code>.</td></tr>
+      <tr><td><code>frontend-design</code></td><td>Retido, escopo restrito</td><td>Apenas <code>frontend-engineer</code> e <code>design-specialist</code> podem invocar; outros agentes recusam com <code>[PLUGIN SCOPE ERROR]</code> per ADR-X7. Enforcement via <code>dadaia_workspace/public/rules/plugin-scope.md</code>.</td></tr>
+      <tr><td><code>superpowers</code></td><td>Removido</td><td>Uninstalled em P1; substitutos nativos via skills Tier-A.</td></tr>
+      <tr><td><code>skill-creator</code></td><td>Removido</td><td>Uninstalled em P1; autoria de skills é responsabilidade de <code>ai-engineer</code> editando diretamente <code>dadaia_workspace/public/skills/</code>.</td></tr>
+      <tr><td><code>code-simplifier</code></td><td>Removido</td><td>Uninstalled em P1; refactoring fica em <code>software-architect</code> + implementers.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="schema-handoff">
+  <h2>Schema handoff-v1.1</h2>
+  <p>O contrato de sidecar JSON entre agentes é versionado em
+  <code>dadaia_workspace/public/schemas/handoff-v1.schema.json</code>. A versão corrente é
+  <strong>v1.1</strong> (ADR-X5). Campos obrigatórios novos: <code>findings[].detail_md</code>,
+  <code>findings[].fix_recommendation</code>, <code>scope</code>, <code>metrics</code>. Campo
+  <code>artifact.path</code> tornou-se opcional. <code>schema_version</code> aceita
+  <code>"handoff-v1"</code> e <code>"handoff-v1.1"</code>. Validação via <code>dadaia reports
+  validate</code>; lint orphan/oversized/missing-fields via <code>dadaia reports lint &lt;dir&gt;</code>.
+  Default de emissão dos 20 agentes: sidecar-only; HTML apenas sob <code>--with-report</code> ou
+  <code>next_handoff.agent == "human"</code>.</p>
 </section>
 
 <section id="dependencies">

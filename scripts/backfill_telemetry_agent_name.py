@@ -191,9 +191,7 @@ def backfill(
             return 0, 0
 
         # Fetch reader_state paths as hints for file discovery
-        reader_state_rows = conn.execute(
-            "SELECT file_path FROM reader_state"
-        ).fetchall()
+        reader_state_rows = conn.execute("SELECT file_path FROM reader_state").fetchall()
         reader_state_paths = [r["file_path"] for r in reader_state_rows]
 
         updated = 0
@@ -243,8 +241,7 @@ def _parse_args() -> argparse.Namespace:
         dest="projects_dirs",
         default=None,
         help=(
-            "Claude projects directory to scan (may be repeated; "
-            f"default: {DEFAULT_PROJECTS_DIR})"
+            f"Claude projects directory to scan (may be repeated; default: {DEFAULT_PROJECTS_DIR})"
         ),
     )
     parser.add_argument(

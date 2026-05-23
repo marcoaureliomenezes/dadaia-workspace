@@ -28,40 +28,44 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>academy</h1>
-<p class="meta">CLI surface: <code>dadaia academy {modules|list|create|update|delete}</code> · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">CLI surface: <code>dadaia academy {modules|list|create|update|delete}</code> · Panel: <code>Academy</code> tab at <code>http://127.0.0.1:4999/#academy</code> · Closure: dadaia-workspace-panel-r5-v1 · 2026-05-21</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
   <p>Sistema interno de cursos para onboarding e estudo. O operador escolhe um módulo built-in da knowledge basis (ex. <code>01_foundations</code>, <code>02_intermediate</code>) e gera um curso copy-from-template em <code>.dadaia/academy/&lt;slug&gt;/</code>, registrado no índice <code>academy.json</code>.</p>
+  <p>O acesso primário ao Academy é via a <strong>aba Academy do panel</strong> (<code>http://127.0.0.1:4999/#academy</code>): a aba lista todos os cursos criados como cards (type chip + título + description + "Open →" CTA) e renderiza o conteúdo do módulo inline ao clicar. A CLI (<code>dadaia academy</code>) permanece como superfície de gestão (criar, atualizar, deletar cursos) e é pré-condição para que a aba exiba conteúdo.</p>
   <p>Útil para acelerar onboarding de novos contribuidores (humanos) ou produzir material de referência estruturado que agentes podem consultar.</p>
+  <p><strong>Nota:</strong> os módulos da knowledge basis (arquivos 01–06) ainda não foram criados — seu conteúdo é pendente de uma release subsequente. A infraestrutura (API, DI, aba no panel) está pronta; a aba exibe empty state "No academy modules available" até que módulos sejam criados via <code>dadaia academy create</code>.</p>
 </section>
 
 <section id="flow">
   <h2>Fluxo de uso</h2>
   <ol class="flow">
-    <li><code>dadaia academy modules</code> — lista os módulos disponíveis (numerados).</li>
+    <li><code>dadaia academy modules</code> — lista os módulos disponíveis na knowledge basis (numerados).</li>
     <li><code>dadaia academy create "my-course" --module 1</code> — copia o módulo 1 para <code>.dadaia/academy/my-course/</code> e registra em <code>academy.json</code>.</li>
     <li><code>dadaia academy list</code> — mostra os cursos criados com slug, nome, módulo e created_at.</li>
-    <li><code>dadaia academy update my-course --module 2</code> — muda o módulo associado.</li>
+    <li><code>dadaia panel</code> → aba <strong>Academy</strong>: carrega <code>GET /api/academy</code> e renderiza cards. Clicar em um card exibe o HTML do módulo inline com breadcrumb <code>[← Back to Academy]</code>.</li>
+    <li><code>dadaia academy update my-course --module 2</code> — muda o módulo associado (CLI).</li>
     <li><code>dadaia academy delete my-course</code> — remove curso do índice (arquivos do disco podem permanecer).</li>
   </ol>
 </section>
 
 <section id="trigger">
   <h2>Trigger típico</h2>
-  <p>Onboarding de novo contribuidor ou agente; criação de material de referência estruturado.</p>
+  <p>Onboarding de novo contribuidor ou agente; criação de material de referência estruturado. O operador abre o panel e acessa a aba Academy para navegar os módulos disponíveis sem sair da janela.</p>
 </section>
 
 <section id="differential">
   <h2>Diferencial</h2>
-  <p>Templated learning — acelera onboarding oferecendo conhecimento estruturado em vez de documentação dispersa. Cada curso é uma pasta versionável que pode ser editada pelo operador.</p>
+  <p>Templated learning — acelera onboarding oferecendo conhecimento estruturado em vez de documentação dispersa. Cada curso é uma pasta versionável que pode ser editada pelo operador. A integração como aba no panel elimina a necessidade de sair da janela de controle para consultar conteúdo de onboarding.</p>
 </section>
 
 <section id="runtime-state">
   <h2>Estado runtime tocado</h2>
   <ul>
-    <li><code>.dadaia/academy/academy.json</code> — índice de cursos</li>
-    <li><code>.dadaia/academy/&lt;slug&gt;/</code> — diretório do curso (copiado do template)</li>
+    <li><code>.dadaia/academy/academy.json</code> — índice de cursos (lido por <code>AcademyService.list_all()</code>; escrito por CLI <code>dadaia academy create/update/delete</code>).</li>
+    <li><code>.dadaia/academy/&lt;slug&gt;/</code> — diretório do curso (copiado do template pela CLI; lido pelo panel para renderizar conteúdo).</li>
+    <li><code>GET /api/academy</code> — endpoint bearer-only no panel que chama <code>AcademyService.list_all()</code> e serializa a lista; retorna <code>[]</code> com 200 quando <code>service.academy is None</code> (DI not wired) ou quando não existem cursos.</li>
   </ul>
 </section>
 
@@ -69,6 +73,7 @@
   <h2>Dependências</h2>
   <ul>
     <li>Depende de <a href="workspace-init.html">workspace-init</a> (cria <code>academy.json</code> e instala módulos via <code>public-asset-distribution</code>).</li>
+    <li><a href="panel.html">panel</a>: <code>AcademyService</code> é injetado como DI opcional em <code>PanelService(academy=None)</code> no composition root de <code>panel.py</code>. A aba Academy no panel consome <code>GET /api/academy</code> via <code>academy.js</code>, que regista o módulo via <code>window.Panel.register('academy', Academy)</code> e usa <code>window.authedFetch</code> e <code>window.escHtml</code> (globais de <code>core.js</code>).</li>
   </ul>
 </section>
 

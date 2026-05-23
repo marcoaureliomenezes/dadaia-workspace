@@ -1,13 +1,22 @@
 """WCAG contrast ratio tests for the canonical PALETTE.
 
 Spec: dadaia-workspace-brand-identity-v1 SPEC.md §3 acceptance criteria.
+
+T-P5-01: PANEL_CSS is now assembled from CSS slice modules (no longer in
+_assets.py). Import the slices directly.
 """
 
 from __future__ import annotations
 
 import re
 
-from dadaia_workspace.features.panel.views._assets import PANEL_CSS
+from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
+from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
+from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
+
+PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
 
 
 def _luminance(hex_color: str) -> float:

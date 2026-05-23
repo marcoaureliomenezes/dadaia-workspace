@@ -24,7 +24,7 @@ stages:
   - id: acceptance_criteria
     agent: game-tester
     expected_output:
-      path: ".dadaia/reports/{context}/game-tester/{run_ts}-{task_id}-criteria.html"
+      path: ".dadaia/reports/{context}/game-tester/{run_ts}-{task_id}-criteria.handoff.json"
       must_include: ["Test Scenarios", "Expected Behaviors", "Acceptance Criteria"]
     inputs:
       - kind: workflow_input
@@ -37,8 +37,10 @@ stages:
   - id: design_impl
     agent: game-designer
     needs: [acceptance_criteria]
+    consumes:
+      - ".dadaia/reports/{context}/game-tester/{run_ts}-{task_id}-criteria.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/game-designer/{run_ts}-{task_id}-design.html"
+      path: ".dadaia/reports/{context}/game-designer/{run_ts}-{task_id}-design.handoff.json"
       must_include: ["Assets Implemented", "Design Decisions"]
     inputs:
       - kind: stage_output
@@ -54,8 +56,11 @@ stages:
   - id: logic_impl
     agent: game-developer
     needs: [design_impl]
+    consumes:
+      - ".dadaia/reports/{context}/game-designer/{run_ts}-{task_id}-design.handoff.json"
+      - ".dadaia/reports/{context}/game-tester/{run_ts}-{task_id}-criteria.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/game-developer/{run_ts}-{task_id}-impl.html"
+      path: ".dadaia/reports/{context}/game-developer/{run_ts}-{task_id}-impl.handoff.json"
       must_include: ["Implementation Complete", "Tests Pass"]
     inputs:
       - kind: stage_output
@@ -74,8 +79,11 @@ stages:
   - id: validation
     agent: game-tester
     needs: [logic_impl]
+    consumes:
+      - ".dadaia/reports/{context}/game-developer/{run_ts}-{task_id}-impl.handoff.json"
+      - ".dadaia/reports/{context}/game-tester/{run_ts}-{task_id}-criteria.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/game-tester/{run_ts}-{task_id}-quality.html"
+      path: ".dadaia/reports/{context}/game-tester/{run_ts}-{task_id}-quality.handoff.json"
       must_include: ["Quality Report", "Severity", "PIE Screenshots"]
     inputs:
       - kind: stage_output

@@ -22,6 +22,7 @@ import json
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import (
+    _CLAUDE_MD_STUB,
     _install_workspace_guardrail_pair,
 )
 
@@ -106,8 +107,9 @@ def test_nested_services_pair_untouched_after_install(tmp_path: Path) -> None:
         "services/CLAUDE.md was overwritten by install — it must remain untouched (FR10)."
     )
 
-    # --- Assert: workspace-root pair byte-identical to source (single SHA-256) ---
+    # --- Assert: workspace-root AGENTS.md byte-identical to source ---
     source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
+    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
 
     root_agents = workspace_root / "AGENTS.md"
     root_claude = workspace_root / "CLAUDE.md"
@@ -118,13 +120,14 @@ def test_nested_services_pair_untouched_after_install(tmp_path: Path) -> None:
         f"  source sha256: {source_sha}\n"
         f"  dest   sha256: {_sha256(root_agents)}"
     )
-    assert _sha256(root_claude) == source_sha, (
-        f"workspace-root/CLAUDE.md is not byte-identical to source.\n"
-        f"  source sha256: {source_sha}\n"
-        f"  dest   sha256: {_sha256(root_claude)}"
+    # T-41: CLAUDE.md is always the 1-line stub (delegates to AGENTS.md), not a copy of source.
+    assert _sha256(root_claude) == stub_sha, (
+        f"workspace-root/CLAUDE.md must be the T-41 stub, not a source copy.\n"
+        f"  stub sha256: {stub_sha}\n"
+        f"  dest sha256: {_sha256(root_claude)}"
     )
 
-    # --- Assert: consumer pair byte-identical to source (same single SHA-256) ---
+    # --- Assert: consumer AGENTS.md byte-identical to source; CLAUDE.md is stub ---
     consumer_agents = consumer / "AGENTS.md"
     consumer_claude = consumer / "CLAUDE.md"
     assert consumer_agents.exists(), f"repos/{slug}/AGENTS.md must be written by install."
@@ -134,10 +137,10 @@ def test_nested_services_pair_untouched_after_install(tmp_path: Path) -> None:
         f"  source sha256: {source_sha}\n"
         f"  dest   sha256: {_sha256(consumer_agents)}"
     )
-    assert _sha256(consumer_claude) == source_sha, (
-        f"repos/{slug}/CLAUDE.md is not byte-identical to source.\n"
-        f"  source sha256: {source_sha}\n"
-        f"  dest   sha256: {_sha256(consumer_claude)}"
+    assert _sha256(consumer_claude) == stub_sha, (
+        f"repos/{slug}/CLAUDE.md must be the T-41 stub, not a source copy.\n"
+        f"  stub sha256: {stub_sha}\n"
+        f"  dest sha256: {_sha256(consumer_claude)}"
     )
 
 
@@ -175,11 +178,13 @@ def test_nested_services_pair_untouched_no_consumers(tmp_path: Path) -> None:
     )
 
     source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
+    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
     assert _sha256(workspace_root / "AGENTS.md") == source_sha, (
         "workspace-root/AGENTS.md must be byte-identical to source after install."
     )
-    assert _sha256(workspace_root / "CLAUDE.md") == source_sha, (
-        "workspace-root/CLAUDE.md must be byte-identical to source after install."
+    # T-41: CLAUDE.md is always the 1-line stub, not a copy of source.
+    assert _sha256(workspace_root / "CLAUDE.md") == stub_sha, (
+        "workspace-root/CLAUDE.md must be the T-41 stub after install."
     )
 
 
@@ -210,25 +215,36 @@ def test_all_projected_pairs_share_single_sha256(tmp_path: Path) -> None:
     installed: list[str] = []
     _install_workspace_guardrail_pair(source, workspace_root, force=True, installed=installed)
 
-    projected_files = [
+    agents_files = [
         workspace_root / "AGENTS.md",
-        workspace_root / "CLAUDE.md",
         consumer_a / "AGENTS.md",
-        consumer_a / "CLAUDE.md",
         consumer_b / "AGENTS.md",
+    ]
+    claude_files = [
+        workspace_root / "CLAUDE.md",
+        consumer_a / "CLAUDE.md",
         consumer_b / "CLAUDE.md",
     ]
 
-    for path in projected_files:
+    for path in agents_files + claude_files:
         assert path.exists(), f"Expected projected file missing: {path}"
 
-    sha_set = {_sha256(p) for p in projected_files}
+    # AGENTS.md: all copies byte-identical to source (Option C invariant).
     source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
-
-    assert sha_set == {source_sha}, (
-        f"All projected files must share a single SHA-256 (Option C invariant).\n"
+    agents_sha_set = {_sha256(p) for p in agents_files}
+    assert agents_sha_set == {source_sha}, (
+        f"All AGENTS.md projections must share a single SHA-256 (Option C invariant).\n"
         f"  Expected: {{{source_sha!r}}}\n"
-        f"  Got: {sha_set}"
+        f"  Got: {agents_sha_set}"
+    )
+
+    # T-41: CLAUDE.md is always the 1-line stub across all targets.
+    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
+    claude_sha_set = {_sha256(p) for p in claude_files}
+    assert claude_sha_set == {stub_sha}, (
+        f"All CLAUDE.md projections must be the T-41 stub (single SHA-256).\n"
+        f"  Expected: {{{stub_sha!r}}}\n"
+        f"  Got: {claude_sha_set}"
     )
 
     # Also confirm the installed list records all 6 as [ok]

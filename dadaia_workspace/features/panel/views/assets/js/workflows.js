@@ -32,6 +32,7 @@
 
   // ── Utilities ─────────────────────────────────────────────────────────────────
 
+  // TODO: replace with window.escHtml when touching this file
   function escHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
@@ -249,8 +250,16 @@
       + '</div>'
       + '<div class="workflow-dag-section">'
       + '<div class="workflow-dag-label">DAG Diagram</div>'
+      + '<div class="dag-toolbar" id="dag-toolbar">'
+      + '<button type="button" class="dag-zoom-btn" id="dag-zoom-out" aria-label="Zoom out">&#8722;</button>'
+      + '<span class="dag-zoom-display" id="dag-zoom-display" aria-live="polite">100%</span>'
+      + '<button type="button" class="dag-zoom-btn" id="dag-zoom-in" aria-label="Zoom in">&#43;</button>'
+      + '<button type="button" class="dag-zoom-btn dag-zoom-fit" id="dag-zoom-fit" aria-label="Fit to view">Fit</button>'
+      + '</div>'
+      + '<div class="workflow-dag-viewport" id="workflow-dag-viewport">'
       + '<div class="workflow-dag" role="img" aria-label="Workflow DAG for ' + escAttr(name) + '">'
       + dagHtml
+      + '</div>'
       + '</div>'
       + '</div>'
       + '<div class="workflow-stages-section">'
@@ -287,6 +296,24 @@
   var loaded = false;        // card grid has been loaded
   var inDetailView = false;  // currently showing detail view
   var _cachedGrid = '';      // serialized card grid HTML for back navigation
+  var _zoomLevel = 100;      // current zoom percentage (50-300)
+
+  // ── DAG zoom ───────────────────────────────────────────────────────────────────
+
+  function applyZoom(level) {
+    var STEP = 25, MIN = 50, MAX = 300;
+    level = Math.max(MIN, Math.min(MAX, Math.round(level / STEP) * STEP));
+    _zoomLevel = level;
+    var dagEl = document.querySelector('.workflow-dag-viewport .workflow-dag');
+    var display = document.getElementById('dag-zoom-display');
+    var viewport = document.getElementById('workflow-dag-viewport');
+    if (dagEl) { dagEl.style.transform = 'scale(' + (level / 100) + ')'; }
+    if (display) { display.textContent = level + '%'; }
+    if (viewport) {
+      if (level !== 100) { viewport.classList.add('dag-zoomed'); }
+      else { viewport.classList.remove('dag-zoomed'); }
+    }
+  }
 
   // ── Grid container helpers ─────────────────────────────────────────────────────
 
@@ -363,6 +390,25 @@
           : '&#9662; Hide stages table';
       });
     }
+
+    // Zoom controls
+    var zoomIn = container.querySelector('#dag-zoom-in');
+    var zoomOut = container.querySelector('#dag-zoom-out');
+    var zoomFit = container.querySelector('#dag-zoom-fit');
+    if (zoomIn)  { zoomIn.addEventListener('click',  function() { applyZoom(_zoomLevel + 25); }); }
+    if (zoomOut) { zoomOut.addEventListener('click', function() { applyZoom(_zoomLevel - 25); }); }
+    if (zoomFit) { zoomFit.addEventListener('click', function() { applyZoom(100); }); }
+
+    // Keyboard zoom bindings when focus is within the DAG section
+    var dagSection = container.querySelector('.workflow-dag-section');
+    if (dagSection) {
+      dagSection.addEventListener('keydown', function(e) {
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); applyZoom(_zoomLevel + 25); }
+        else if (e.key === '-' || e.key === '_') { e.preventDefault(); applyZoom(_zoomLevel - 25); }
+        else if (e.key === '0') { e.preventDefault(); applyZoom(100); }
+      });
+      dagSection.setAttribute('tabindex', '0');
+    }
   }
 
   // ── CTA button wiring (card grid) ─────────────────────────────────────────────
@@ -385,6 +431,7 @@
     var grid = getGrid();
     if (!grid) { return; }
 
+    _zoomLevel = 100;
     inDetailView = true;
     grid.className = 'workflow-detail-view-container';
 

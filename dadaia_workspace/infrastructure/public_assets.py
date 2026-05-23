@@ -2,21 +2,29 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import re
 import shutil
+import subprocess
 import sys
+import tomllib
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 
 _SCHEMA_VERSION = "1"
+# T-41: CLAUDE.md is a 1-line stub that delegates to AGENTS.md.
+# Claude Code does not yet support `@AGENTS.md` include syntax natively, so we
+# use a comment-style redirect that is human-readable and forwards readers.
+_CLAUDE_MD_STUB = "# See AGENTS.md for workspace rules and agent personas.\n"
 # OpenCode v1.14+ expects `tools` to be an object or omitted — not an array.
 # Strip it from agent frontmatter when deploying to the opencode projection.
 _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
@@ -24,6 +32,13 @@ _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_RE = re.compile(r"^opencode_model:\s*(.+?)$", re.MULTILINE)
 _FRONTMATTER_MODEL_VALUE_RE = re.compile(r"^(model:\s*)(.+?)$", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_FIELD_RE = re.compile(r"^opencode_model:[^\n]*\n", re.MULTILINE)
+# T-35: forbid the legacy `software-engineer` alias inside public/ (split into
+# `software-engineer-python` and `software-engineer-node`). Matches subagent_type:
+# software-engineer with no trailing -python/-node suffix.
+_LEGACY_SE_ALIAS_RE = re.compile(
+    r"subagent_type\s*[:=]\s*[\"']?software-engineer(?![-_a-z])",
+    re.IGNORECASE,
+)
 _VALID_TARGETS = {"all", "agents", "claude", "codex", "opencode"}
 _COPY_DIRS = (
     "rules",
@@ -36,6 +51,7 @@ _COPY_DIRS = (
     "scaffold",
     "templates",
     "plugins",
+    "runtime",
     "workflows",
 )
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
@@ -127,6 +143,79 @@ def _render_agents_into_codex_config(agents_dir: Path) -> str:
         except (OSError, ValueError):
             continue
     return "\n".join(blocks) + ("\n" if blocks else "")
+
+
+def _render_codex_agent_toml(
+    name: str,
+    model: str,
+    developer_instructions: str,
+    description: str | None = None,
+) -> str:
+    """Serialize an agent as a TOML file for the Codex runtime.
+
+    Emits four fields:
+    - ``name`` — basic string
+    - ``description`` — basic string when available
+    - ``model`` — basic string
+    - ``developer_instructions`` — triple-quoted multiline basic string
+
+    The function avoids external TOML serialiser dependencies; it builds the
+    content manually and is safe for all printable Unicode in instructions text.
+
+    In a TOML triple-quoted basic string, backslashes are escape characters.
+    All literal backslashes in the body must be doubled (``\\``), and any
+    embedded triple-double-quote sequences must be escaped character-by-character
+    to prevent premature string termination.
+    """
+    # Step 1: escape backslashes first (must precede triple-quote escaping).
+    escaped = developer_instructions.replace("\\", "\\\\")
+    # Step 2: escape any embedded triple-double-quote sequences.
+    escaped = escaped.replace('"""', '\\"\\"\\"')
+    lines: list[str] = [
+        f"name = {_toml_escape(name)}\n",
+    ]
+    if description:
+        lines.append(f"description = {_toml_escape(description)}\n")
+    lines.extend(
+        [
+            f"model = {_toml_escape(model)}\n",
+            f'developer_instructions = """\n{escaped}\n"""\n',
+        ]
+    )
+    return "".join(lines)
+
+
+def _render_agents_config_file_blocks(agents_dir: Path) -> str:
+    """Generate ``[agents."<name>"] config_file = ...`` TOML blocks.
+
+    Replaces the inline agent block rendering.  For each canonical agent
+    (determined by the ``.md`` file listing) a two-line TOML block is emitted:
+
+    .. code-block:: toml
+
+        [agents."<name>"]
+        config_file = "agents/<name>.toml"
+
+    Agents whose ``.md`` cannot be parsed (missing ``name``) are skipped.
+    """
+    if not agents_dir.exists():
+        return ""
+    blocks: list[str] = []
+    for md_file in sorted(agents_dir.glob("*.md")):
+        try:
+            text = md_file.read_text(encoding="utf-8")
+            fm = _parse_agent_frontmatter(text)
+            if not fm:
+                continue
+            name = str(fm.get("name", ""))
+            if not name:
+                continue
+            key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
+            blocks.append(f'[agents."{key_escaped}"]\n')
+            blocks.append(f'config_file = "agents/{name}.toml"\n')
+        except (OSError, ValueError):
+            continue
+    return "".join(blocks)
 
 
 def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
@@ -367,14 +456,22 @@ def _install_workspace_guardrail_pair(
     _src_sha = hashlib.sha256(source_bytes).hexdigest()  # available for callers
 
     def _write_pair(target_dir: Path) -> None:
-        for filename in ("AGENTS.md", "CLAUDE.md"):
-            dst = target_dir / filename
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            if dst.exists() and not force:
-                installed.append(f"[skip] {dst}")
-                return
-            shutil.copy2(source, dst)
-            installed.append(f"[ok]   {dst}")
+        # AGENTS.md — full canonical content copied from source.
+        agents_dst = target_dir / "AGENTS.md"
+        agents_dst.parent.mkdir(parents=True, exist_ok=True)
+        if agents_dst.exists() and not force:
+            installed.append(f"[skip] {agents_dst}")
+        else:
+            shutil.copy2(source, agents_dst)
+            installed.append(f"[ok]   {agents_dst}")
+        # CLAUDE.md — 1-line stub only (T-41: delegates to AGENTS.md).
+        claude_dst = target_dir / "CLAUDE.md"
+        claude_dst.parent.mkdir(parents=True, exist_ok=True)
+        if claude_dst.exists() and not force:
+            installed.append(f"[skip] {claude_dst}")
+        else:
+            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+            installed.append(f"[ok]   {claude_dst}")
 
     # Workspace-root write set (always).
     _write_pair(workspace_root)
@@ -388,6 +485,92 @@ def _install_workspace_guardrail_pair(
             )
             continue
         _write_pair(consumer)
+
+
+def _install_workspace_root_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str] | None = None,
+) -> None:
+    """Write the guardrail pair to *workspace_root* only (no consumer repos).
+
+    Variant of ``_install_workspace_guardrail_pair`` that skips the consumer-repo
+    enumeration.  Used when ``scope="workspace-only"`` is passed to
+    ``FileSystemPublicAssetManager.install()``.
+
+    Args:
+        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
+        workspace_root: Workspace root directory.
+        force: When True, overwrite existing files; when False, skip if present.
+        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+    """
+    if installed is None:
+        installed = []
+
+    agents_dst = workspace_root / "AGENTS.md"
+    agents_dst.parent.mkdir(parents=True, exist_ok=True)
+    if agents_dst.exists() and not force:
+        installed.append(f"[skip] {agents_dst}")
+    else:
+        shutil.copy2(source, agents_dst)
+        installed.append(f"[ok]   {agents_dst}")
+
+    claude_dst = workspace_root / "CLAUDE.md"
+    claude_dst.parent.mkdir(parents=True, exist_ok=True)
+    if claude_dst.exists() and not force:
+        installed.append(f"[skip] {claude_dst}")
+    else:
+        _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+        installed.append(f"[ok]   {claude_dst}")
+
+
+def _install_consumer_repos_guardrail_pair(
+    source: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str] | None = None,
+) -> None:
+    """Write the guardrail pair to each marker-bearing consumer repo only.
+
+    Skips the workspace-root write.  Used when ``scope="repos-only"`` is passed
+    to ``FileSystemPublicAssetManager.install()``.
+
+    Self-skip (R14): if a consumer's manifest ``package_version`` matches our
+    own, that consumer is the dadaia-workspace source repo — skip it.
+
+    Args:
+        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
+        workspace_root: Workspace root directory.
+        force: When True, overwrite existing files; when False, skip if present.
+        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+    """
+    if installed is None:
+        installed = []
+
+    for consumer in _consumer_repos_for_root(workspace_root):
+        if _is_self_repo(consumer):
+            v = _package_version()
+            sys.stderr.write(
+                f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
+            )
+            continue
+
+        agents_dst = consumer / "AGENTS.md"
+        agents_dst.parent.mkdir(parents=True, exist_ok=True)
+        if agents_dst.exists() and not force:
+            installed.append(f"[skip] {agents_dst}")
+        else:
+            shutil.copy2(source, agents_dst)
+            installed.append(f"[ok]   {agents_dst}")
+
+        claude_dst = consumer / "CLAUDE.md"
+        claude_dst.parent.mkdir(parents=True, exist_ok=True)
+        if claude_dst.exists() and not force:
+            installed.append(f"[skip] {claude_dst}")
+        else:
+            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+            installed.append(f"[ok]   {claude_dst}")
 
 
 def _doctor_guardrail_pair(
@@ -415,16 +598,27 @@ def _doctor_guardrail_pair(
         sys.stderr.write(line + "\n")
         return line
 
+    def _check_stub(dst: Path, label: str) -> str:
+        """Verify that *dst* contains the expected 1-line CLAUDE.md stub (T-41)."""
+        if not dst.exists():
+            line = f"[missing] {label}"
+        elif dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
+            line = f"[drift] {label}"
+        else:
+            line = f"[ok] {label}"
+        sys.stderr.write(line + "\n")
+        return line
+
     lines: list[str] = []
     lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
-    lines.append(_check(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
+    lines.append(_check_stub(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
 
     for consumer in _consumer_repos_for_root(workspace_root):
         if _is_self_repo(consumer):
             continue
         slug = consumer.name
         lines.append(_check(consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md"))
-        lines.append(_check(consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md"))
+        lines.append(_check_stub(consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md"))
 
     return lines
 
@@ -481,7 +675,13 @@ class FileSystemPublicAssetManager:
                 f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
             ) from e
 
-    def install(self, workspace_root: Path, target: str = "all", force: bool = False) -> list[str]:
+    def install(
+        self,
+        workspace_root: Path,
+        target: str = "all",
+        force: bool = False,
+        scope: Literal["all", "repos-only", "workspace-only"] = "all",
+    ) -> list[str]:
         if target not in _VALID_TARGETS:
             valid = ", ".join(sorted(_VALID_TARGETS))
             raise PublicAssetError(
@@ -496,13 +696,25 @@ class FileSystemPublicAssetManager:
         targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
         data_agents_md = agentic_dir / "data" / "AGENTS.md"
         if data_agents_md.exists():
-            # Option C (ADR): single source fans out to workspace-root pair +
-            # one pair per marker-bearing consumer repo.  Replaces the legacy
-            # _install_agents_md path for data/AGENTS.md.
-            _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
+            # Option C (ADR): scope-aware fan-out to workspace-root pair and/or
+            # marker-bearing consumer repos.
+            if scope == "all":
+                # Full fan-out: workspace-root pair + all consumer repos.
+                _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
+            elif scope == "workspace-only":
+                # Workspace-root guardrail pair only — skip consumer repos.
+                _install_workspace_root_guardrail_pair(
+                    data_agents_md, workspace_root, force, installed
+                )
+            elif scope == "repos-only":
+                # Consumer repos only — skip workspace-root pair.
+                _install_consumer_repos_guardrail_pair(
+                    data_agents_md, workspace_root, force, installed
+                )
         else:
             # Legacy / scaffold path: templates/AGENTS.md → workspace-root only.
-            self._install_agents_md(agentic_dir, workspace_root, force, installed)
+            if scope in ("all", "workspace-only"):
+                self._install_agents_md(agentic_dir, workspace_root, force, installed)
         self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
@@ -537,7 +749,10 @@ class FileSystemPublicAssetManager:
         for expected_src, dst, label, transform in self._runtime_expectations(
             agentic_dir, workspace_root
         ):
-            if expected_src is None:
+            if expected_src is None and transform:
+                # T-41: CLAUDE.md is a 1-line stub — verify content matches stub exactly.
+                reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
+            elif expected_src is None:
                 reports.append(f"[unsupported] {label}")
             elif transform:
                 content = _prepare_agent_for_opencode(expected_src.read_text(encoding="utf-8"))
@@ -575,8 +790,265 @@ class FileSystemPublicAssetManager:
         )
 
         reports.extend(self._classify_workflows(agentic_dir))
+        reports.extend(self._lint_legacy_software_engineer())
+        reports.extend(self._check_codex_drift(agentic_dir, workspace_root))
+
+        # git-dirty check: detect uncommitted changes in public/ (editable install blind spot)
+        try:
+            git_result = subprocess.run(
+                ["git", "diff", "--name-only", "HEAD", "--", str(self._public_dir)],
+                capture_output=True,
+                text=True,
+                cwd=self._public_dir.parent.parent,  # repo root (dadaia_workspace/../..)
+                timeout=5,
+            )
+            if git_result.returncode == 0:
+                for dirty_path in git_result.stdout.splitlines():
+                    if dirty_path.strip():
+                        reports.append(f"[warn] git-dirty: {dirty_path.strip()}")
+            elif git_result.returncode == 128:
+                reports.append("[not-applicable] git-dirty check (not a git repo)")
+            # returncode 1 = diff found but no paths listed — ignore
+        except FileNotFoundError:
+            reports.append("[not-applicable] git-dirty check (git not found)")
+        except subprocess.TimeoutExpired:
+            reports.append("[warn] git-dirty check timed out")
+
+        # Persist actionable findings to .dadaia/bugs/reported.json
+        _PERSIST_PREFIXES = ("[missing]", "[drift]", "[fail]", "[warn]")
+        for line in reports:
+            stripped = line.strip()
+            if any(stripped.startswith(p) for p in _PERSIST_PREFIXES):
+                report_doctor_finding(workspace_root, "doctor-public", stripped)
 
         return reports
+
+    # ------------------------------------------------------------------
+    # Codex drift checks (D-CX-1 … D-CX-5)
+    # ------------------------------------------------------------------
+
+    # Matches the bare identifier `claude-` only when it is NOT immediately
+    # preceded by an alphanumeric character, hyphen, or underscore.  This
+    # avoids false positives inside words like `config_claude_sonnet` while
+    # still catching standalone references such as `claude-sonnet-4-6`.
+    _CODEX_CLAUDE_RE: re.Pattern[str] = re.compile(r"(?:^|[^a-zA-Z0-9_-])claude-", re.MULTILINE)
+    # File extensions considered "text" for D-CX-4 scanning.
+    _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset(
+        {".toml", ".md", ".json", ".txt", ".yaml", ".yml"}
+    )
+
+    def _check_codex_drift(self, agentic_dir: Path, workspace_root: Path) -> list[str]:
+        """Run codex-parity drift checks D-CX-1 through D-CX-6.
+
+        Returns a list of ``[missing]``, ``[extra]``, ``[error]``, ``[leak]``,
+        or ``[drift]`` report strings.  An empty list means no drift was
+        detected.  The caller extends the main doctor report with these strings
+        so that ``any(r.startswith(("[missing", "[extra", "[error", "[leak",
+        "[drift")) for r in reports)`` reliably signals a non-zero exit.
+        """
+        codex_dir = workspace_root / ".codex"
+        out: list[str] = []
+        out.extend(self._dcx1_missing_toml(agentic_dir, codex_dir))
+        out.extend(self._dcx2_config_toml_entries(agentic_dir, codex_dir))
+        out.extend(self._dcx3_workflow_drift(agentic_dir, codex_dir))
+        out.extend(self._dcx4_claude_strings(codex_dir))
+        out.extend(self._dcx5_empty_developer_instructions(codex_dir))
+        out.extend(self._dcx6_codex_runtime_adapters(workspace_root))
+        return out
+
+    def _dcx1_missing_toml(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+        """D-CX-1: every canonical agent .md must have a matching TOML in .codex/agents/.
+
+        For each ``<agent-name>.md`` in the agentic agents directory the
+        corresponding ``.codex/agents/<agent-name>.toml`` must exist.  Uses
+        ``_parse_agent_frontmatter()`` to extract the canonical ``name`` field;
+        agents whose frontmatter lacks ``name`` are skipped (defensive — they
+        are already flagged by other checks).
+        """
+        agents_src = agentic_dir / "agents"
+        codex_agents = codex_dir / "agents"
+        out: list[str] = []
+        if not agents_src.exists():
+            return out
+        for md_file in sorted(agents_src.glob("*.md")):
+            try:
+                text = md_file.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            fm = _parse_agent_frontmatter(text)
+            name = str(fm.get("name", "")) if fm else ""
+            if not name:
+                # Use stem as fallback for the report label so the operator
+                # can locate the offending file even without a valid name.
+                name = md_file.stem
+            toml_path = codex_agents / f"{name}.toml"
+            if not toml_path.exists():
+                out.append(f"[missing] codex:agents/{name}.toml (D-CX-1)")
+        return out
+
+    def _dcx2_config_toml_entries(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+        """D-CX-2: every .codex/agents/*.toml must have a config_file entry in config.toml.
+
+        Reads ``.codex/config.toml`` as plain text and checks for the literal
+        string ``config_file = "agents/<name>.toml"`` for each TOML found in
+        ``.codex/agents/``.  Plain-text matching avoids parsing the full TOML
+        table structure (which is complex given quoted-key headers).
+        """
+        codex_agents = codex_dir / "agents"
+        config_toml = codex_dir / "config.toml"
+        out: list[str] = []
+        if not codex_agents.exists():
+            return out
+        config_text = ""
+        if config_toml.exists():
+            with contextlib.suppress(OSError):
+                config_text = config_toml.read_text(encoding="utf-8")
+        for toml_file in sorted(codex_agents.glob("*.toml")):
+            name = toml_file.stem
+            needle = f'config_file = "agents/{name}.toml"'
+            if needle not in config_text:
+                out.append(f"[missing] codex:config.toml entry for {name} (D-CX-2)")
+        return out
+
+    def _dcx3_workflow_drift(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+        """D-CX-3: .codex/workflows/ must mirror the canonical workflow set exactly.
+
+        Compares file names (not content) between the agentic canonical
+        workflows directory and ``.codex/workflows/``.  Both missing files
+        (canonical present, codex absent) and extra files (codex present,
+        canonical absent) are reported as drift.
+        """
+        canonical_dir = agentic_dir / "workflows"
+        codex_wf = codex_dir / "workflows"
+        out: list[str] = []
+
+        canonical_names: set[str] = set()
+        if canonical_dir.exists():
+            canonical_names = {f.name for f in canonical_dir.glob("*.workflow.md")}
+
+        codex_names: set[str] = set()
+        if codex_wf.exists():
+            codex_names = {f.name for f in codex_wf.glob("*.workflow.md")}
+
+        for name in sorted(canonical_names - codex_names):
+            out.append(f"[missing] codex:workflows/{name} (D-CX-3)")
+        for name in sorted(codex_names - canonical_names):
+            out.append(f"[extra] codex:workflows/{name} (D-CX-3)")
+        return out
+
+    def _dcx4_claude_strings(self, codex_dir: Path) -> list[str]:
+        """D-CX-4: no file inside .codex/ may contain the bare string ``claude-``.
+
+        Scans all text files (by extension) under ``.codex/`` recursively.
+        Any match of the pattern ``(?:^|[^a-zA-Z0-9_-])claude-`` is reported.
+        Binary files and non-text extensions are skipped to avoid false
+        positives from compiled artifacts.
+        """
+        out: list[str] = []
+        if not codex_dir.exists():
+            return out
+        for path in sorted(codex_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            if path.suffix not in self._CODEX_TEXT_SUFFIXES:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if self._CODEX_CLAUDE_RE.search(text):
+                rel = path.relative_to(codex_dir).as_posix()
+                out.append(f"[error] codex:claude-string in {rel} (D-CX-4)")
+        return out
+
+    def _dcx5_empty_developer_instructions(self, codex_dir: Path) -> list[str]:
+        """D-CX-5: every .codex/agents/*.toml must have a non-empty developer_instructions.
+
+        Parses each TOML file via ``tomllib.loads()`` (stdlib, Python 3.11+)
+        and checks that ``developer_instructions`` is present and non-empty
+        after stripping leading/trailing whitespace.
+        """
+        codex_agents = codex_dir / "agents"
+        out: list[str] = []
+        if not codex_agents.exists():
+            return out
+        for toml_file in sorted(codex_agents.glob("*.toml")):
+            name = toml_file.stem
+            try:
+                text = toml_file.read_text(encoding="utf-8")
+                data = tomllib.loads(text)
+            except (OSError, tomllib.TOMLDecodeError):
+                out.append(f"[error] codex:{name}.toml: unparseable TOML (D-CX-5)")
+                continue
+            instructions = data.get("developer_instructions", "")
+            if not isinstance(instructions, str) or not instructions.strip():
+                out.append(f"[error] codex:{name}.toml: developer_instructions is empty (D-CX-5)")
+        return out
+
+    def _dcx6_codex_runtime_adapters(self, workspace_root: Path) -> list[str]:
+        """D-CX-6: public/runtime/codex/ adapters — leak, missing, drift checks.
+
+        For each <slug>/SKILL.md in public/runtime/codex/:
+        - [leak] if the file appears in .claude/skills/<slug>/SKILL.md
+        - [leak] if the file appears in .opencode/skills/<slug>/SKILL.md
+        - [missing] if .codex/skills/<slug>/SKILL.md does not exist
+        - [drift] if .codex/skills/<slug>/SKILL.md content differs from source
+        """
+        src_root = self._public_dir / "runtime" / "codex"
+        out: list[str] = []
+        if not src_root.exists():
+            return out
+        codex_skills = workspace_root / ".codex" / "skills"
+        claude_skills = workspace_root / ".claude" / "skills"
+        opencode_skills = workspace_root / ".opencode" / "skills"
+        for slug_dir in sorted(src_root.iterdir()):
+            if not slug_dir.is_dir():
+                continue
+            skill_src = slug_dir / "SKILL.md"
+            if not skill_src.exists():
+                continue
+            slug = slug_dir.name
+            src_text = skill_src.read_text(encoding="utf-8")
+            # Leak checks
+            for leak_root, label in [(claude_skills, "claude"), (opencode_skills, "opencode")]:
+                leak_path = leak_root / slug / "SKILL.md"
+                if leak_path.exists():
+                    out.append(
+                        f"[leak] {label}:skills/{slug}/SKILL.md"
+                        " — Codex-only adapter must not appear here (D-CX-6)"
+                    )
+            # Missing / drift
+            installed = codex_skills / slug / "SKILL.md"
+            if not installed.exists():
+                out.append(f"[missing] codex:skills/{slug}/SKILL.md (D-CX-6)")
+            elif installed.read_text(encoding="utf-8") != src_text:
+                out.append(f"[drift] codex:skills/{slug}/SKILL.md (D-CX-6)")
+        return out
+
+    def _lint_legacy_software_engineer(self) -> list[str]:
+        """T-35: reject the legacy `software-engineer` subagent alias in public/.
+
+        The alias was split into `software-engineer-python` and
+        `software-engineer-node`. Any reintroduction is a regression.
+        """
+        out: list[str] = []
+        if not self._public_dir.exists():
+            return out
+        for path in self._iter_files(self._public_dir):
+            # Skip non-textual / binary candidates.
+            if path.suffix not in {".md", ".yaml", ".yml", ".json", ".toml", ".txt"}:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if _LEGACY_SE_ALIAS_RE.search(text):
+                rel = path.relative_to(self._public_dir).as_posix()
+                out.append(
+                    f"[LINT] Legacy alias 'software-engineer' in {rel}. "
+                    "Use 'software-engineer-python' or 'software-engineer-node'."
+                )
+        return out
 
     def _classify_workflows(self, agentic_dir: Path) -> list[str]:
         out: list[str] = []
@@ -658,16 +1130,11 @@ class FileSystemPublicAssetManager:
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
     ) -> None:
         codex_dir = workspace_root / ".codex"
-        self._copy_tree(agentic_dir / "rules", codex_dir / "rules", force, installed)
-        workflows_dir = codex_dir / "workflows"
-        if workflows_dir.exists():
-            files = sorted(workflows_dir.rglob("*"))
-            sys.stderr.write(
-                f"[removed] {workflows_dir} (not-applicable: codex has no workflow runtime)"
-                f" — {len(files)} entries\n"
-            )
-            shutil.rmtree(workflows_dir, onerror=_log_cleanup_error)
+        self._install_codex_rules(agentic_dir, workspace_root, force, installed)
+        self._install_codex_workflows(agentic_dir, workspace_root, force, installed)
         self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+        self._install_codex_agents(agentic_dir, workspace_root, force, installed)
+        self._install_codex_runtime_adapters(workspace_root, force, installed)
         self._write_generated(
             codex_dir / "hooks.json",
             _json_dump(self._codex_hooks(workspace_root)),
@@ -680,6 +1147,139 @@ class FileSystemPublicAssetManager:
             force,
             installed,
         )
+
+    def _install_codex_rules(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Copy only executable rules (those with YAML frontmatter) to .codex/rules/.
+
+        Behavioral prose rules (ADR-1/D2) — i.e. files without frontmatter — are
+        excluded from the Codex projection.  This prevents rules like
+        ``game-agents-coordination.md`` and ``game-developer-scope.md`` from
+        polluting the Codex rule surface.
+        """
+        src_dir = agentic_dir / "rules"
+        dst_dir = workspace_root / ".codex" / "rules"
+        if not src_dir.exists():
+            return
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for src in sorted(src_dir.glob("*.md")):
+            try:
+                text = src.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            # Only project rules that start with YAML frontmatter (executable rules).
+            if not text.startswith("---\n"):
+                installed.append(f"[skip-behavioral] {src.name}")
+                continue
+            dst = dst_dir / src.name
+            self._copy_file(src, dst, force, installed)
+
+    def _install_codex_workflows(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Project all canonical workflows to .codex/workflows/.
+
+        FR9/ADR-4: the Codex runtime receives the full canonical workflow set so
+        that operators can reference them.  Previously the workflows directory was
+        removed; that behaviour is replaced by this projection.
+        """
+        self._copy_tree(
+            agentic_dir / "workflows",
+            workspace_root / ".codex" / "workflows",
+            force,
+            installed,
+        )
+
+    def _install_codex_agents(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Generate .codex/agents/<agent-id>.toml for each canonical agent.
+
+        For each ``.md`` file in ``agentic_dir/agents/``:
+        1. Parse frontmatter to extract ``name`` and ``model``.
+        2. Extract the body (everything after the second ``---`` fence).
+        3. Pass the body through ``transform_for_codex()`` to replace Claude-
+           specific references.
+        4. Map the model via ``map_model()`` (raises ``ValueError`` on unknown
+           identifier — fail loudly rather than emit ``claude-*`` strings).
+        5. Serialize as TOML via ``_render_codex_agent_toml()``.
+        6. Write to ``.codex/agents/<name>.toml``.
+
+        Files are skipped (not overwritten) when ``force=False`` and the TOML
+        already exists.
+        """
+        from dadaia_workspace.infrastructure.runtime_transforms.codex import (
+            transform_for_codex,
+        )
+        from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import (
+            map_model,
+        )
+
+        agents_src = agentic_dir / "agents"
+        agents_dst = workspace_root / ".codex" / "agents"
+        agents_dst.mkdir(parents=True, exist_ok=True)
+
+        for md_file in sorted(agents_src.glob("*.md")):
+            text = md_file.read_text(encoding="utf-8")
+            fm = _parse_agent_frontmatter(text)
+            if not fm:
+                continue
+            agent_name = str(fm.get("name", ""))
+            if not agent_name:
+                continue
+
+            # Extract body: text after the second '---' fence.
+            if text.startswith("---\n"):
+                end_idx = text.find("\n---\n", 4)
+                body = text[end_idx + 5 :] if end_idx != -1 else text
+            else:
+                body = text
+
+            # Transform for Codex runtime.
+            body = transform_for_codex(body, agent_name)
+
+            # Map model — raises ValueError on unknown Claude identifier.
+            claude_model = str(fm.get("model", "claude-sonnet-4-6"))
+            codex_model = map_model(claude_model)
+
+            description = fm.get("description")
+            toml_content = _render_codex_agent_toml(
+                agent_name,
+                codex_model,
+                body,
+                description=str(description) if description else None,
+            )
+
+            dst = agents_dst / f"{agent_name}.toml"
+            if dst.exists() and not force:
+                installed.append(f"[skip] {dst}")
+            else:
+                dst.write_text(toml_content, encoding="utf-8")
+                installed.append(f"[ok]   {dst}")
+
+    def _install_codex_runtime_adapters(
+        self, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Copy Codex-only adapter SKILL.md files from public/runtime/codex/ to .codex/skills/.
+
+        ADR-CX-001: source is public/runtime/codex/<slug>/SKILL.md.
+        ADR-CX-003: these files must NOT appear in .claude/ or .opencode/.
+        """
+        src_root = self._public_dir / "runtime" / "codex"
+        if not src_root.exists():
+            return
+        dst_root = workspace_root / ".codex" / "skills"
+        dst_root.mkdir(parents=True, exist_ok=True)
+        for slug_dir in sorted(src_root.iterdir()):
+            if not slug_dir.is_dir():
+                continue
+            skill_src = slug_dir / "SKILL.md"
+            if not skill_src.exists():
+                continue
+            skill_dst = dst_root / slug_dir.name / "SKILL.md"
+            skill_dst.parent.mkdir(parents=True, exist_ok=True)
+            self._copy_file(skill_src, skill_dst, force, installed)
 
     def _install_opencode(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -737,7 +1337,8 @@ class FileSystemPublicAssetManager:
         agents_md = self._agents_md_source(agentic_dir)
         if agents_md is not None:
             yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md", False)
-            yield (agents_md, workspace_root / "CLAUDE.md", "root:CLAUDE.md", False)
+            # T-41: CLAUDE.md is a 1-line stub — use "stub" sentinel to trigger content check.
+            yield (None, workspace_root / "CLAUDE.md", "root:CLAUDE.md", True)
             # Consumer-repo parity (R13 + R14): one pair per marker-bearing repo.
             for consumer in _consumer_repos_for_root(workspace_root):
                 if _is_self_repo(consumer):
@@ -749,11 +1350,12 @@ class FileSystemPublicAssetManager:
                     f"repos/{slug}:AGENTS.md",
                     False,
                 )
+                # T-41: CLAUDE.md in consumer repos is also a 1-line stub.
                 yield (
-                    agents_md,
+                    None,
                     consumer / "CLAUDE.md",
                     f"repos/{slug}:CLAUDE.md",
-                    False,
+                    True,
                 )
 
         reports_agents_md = agentic_dir / "data" / "reports-AGENTS.md"
@@ -786,6 +1388,14 @@ class FileSystemPublicAssetManager:
                 )
 
         for src in self._iter_files(agentic_dir / "rules"):
+            # T-18 / ADR-1/D2: only executable rules (those with YAML frontmatter)
+            # are projected to .codex/rules/. Behavioral prose rules are skipped.
+            try:
+                rule_text = src.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if not rule_text.startswith("---\n"):
+                continue
             rel = src.relative_to(agentic_dir / "rules")
             yield (
                 src,
@@ -946,8 +1556,9 @@ class FileSystemPublicAssetManager:
         ):
             lines.append(f'  "{cmd}",\n')
         lines.append("]\n")
-        # T-PB-1: emit [agents.<name>] blocks from the agentic agents directory
-        agents_blocks = _render_agents_into_codex_config(agentic_dir / "agents")
+        # FR7: emit [agents.<name>] config_file blocks — one per canonical agent.
+        # Each agent's full definition lives in .codex/agents/<name>.toml.
+        agents_blocks = _render_agents_config_file_blocks(agentic_dir / "agents")
         if agents_blocks:
             lines.append("\n")
             lines.append(agents_blocks)

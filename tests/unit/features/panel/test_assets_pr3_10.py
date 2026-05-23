@@ -88,11 +88,11 @@ def test_agents_js_has_status_badge_rendering() -> None:
     assert "inactive" in agents_text.lower()
 
 
-def test_agents_js_has_aria_expanded() -> None:
-    """agents.js card template must include aria-expanded attribute."""
+def test_agents_js_has_aria_haspopup_dialog() -> None:
+    """agents.js card must use aria-haspopup="dialog" (modal design, Phase D)."""
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    assert "aria-expanded" in agents_text, (
-        "agents.js card must include aria-expanded attribute for accessibility"
+    assert "aria-haspopup" in agents_text, (
+        "agents.js card must include aria-haspopup attribute (modal design replaced accordion)"
     )
 
 
@@ -128,18 +128,27 @@ def test_agents_js_has_relative_timestamp() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _assets.py — PANEL_JS must include agents.js content
+# JS files — agents.js + core.js content checks
+# T-P5-01: PANEL_JS removed from _assets.py. JS files are now served directly
+# by static.py. Assemble PANEL_JS inline for content verification.
 # ---------------------------------------------------------------------------
 
 
-def test_panel_js_includes_agents_js_content() -> None:
-    """PANEL_JS assembled in _assets.py must include content from agents.js."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+def _build_panel_js() -> str:
+    """Assemble PANEL_JS from individual JS files (mirrors static.py behaviour)."""
+    return (
+        (_JS_DIR / "core.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
+    )
 
+
+def test_panel_js_includes_agents_js_content() -> None:
+    """Assembled JS must include content from agents.js."""
+    panel_js = _build_panel_js()
     agents_text = (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-    # PANEL_JS should be a concatenation that includes agents.js content
-    # We verify by checking that agents.js content (or part of it) appears in PANEL_JS
-    # Use the first substantial line of agents.js as a marker
     lines = [
         ln.strip()
         for ln in agents_text.splitlines()
@@ -147,19 +156,18 @@ def test_panel_js_includes_agents_js_content() -> None:
     ]
     assert len(lines) > 0, "agents.js has no non-comment content"
     first_code_line = lines[0]
-    assert first_code_line in PANEL_JS, (
-        f"PANEL_JS does not contain the first code line of agents.js: {first_code_line!r}. "
-        "Update _assets.py so PANEL_JS reads from agents.js."
+    assert first_code_line in panel_js, (
+        f"Assembled JS does not contain the first code line of agents.js: {first_code_line!r}."
     )
 
 
 def test_panel_js_still_contains_core_js_content() -> None:
-    """PANEL_JS must still include core.js content (tab switching, token bootstrap, etc.)."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    # core.js contains the authedFetch helper — it must still be in PANEL_JS
-    assert "authedFetch" in PANEL_JS, "PANEL_JS no longer contains authedFetch from core.js"
-    assert "bootstrapToken" in PANEL_JS, "PANEL_JS no longer contains bootstrapToken from core.js"
+    """Assembled JS must still include core.js content (tab switching, token bootstrap, etc.)."""
+    panel_js = _build_panel_js()
+    assert "authedFetch" in panel_js, "Assembled JS no longer contains authedFetch from core.js"
+    assert "bootstrapToken" in panel_js, (
+        "Assembled JS no longer contains bootstrapToken from core.js"
+    )
 
 
 def test_panel_js_agents_section_not_in_core_js_portion() -> None:

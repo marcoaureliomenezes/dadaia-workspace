@@ -11,6 +11,10 @@ import typer
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_hotfix_release
+from dadaia_workspace.infrastructure.bug_reporter import (
+    load_open_bugs,
+    mark_bugs_in_release,
+)
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -95,6 +99,36 @@ def doctor(
 # Canonical templates directory — inside the installed package
 _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
 
+# Workspace root — four levels up from this file (cli/commands/specs.py →
+# cli/ → dadaia_workspace/ → repos/dadaia-workspace/ → workspace root)
+_WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _prompt_open_bugs(workspace_root: Path) -> None:
+    """Surface open bugs from .dadaia/bugs/reported.json to the operator.
+
+    If no open bugs exist the function returns silently.  If open bugs are
+    found the operator is asked whether to include all of them in the current
+    release.  Confirmed bugs receive status='in_release'; declined bugs stay
+    'open'.
+    """
+    bugs = load_open_bugs(workspace_root)
+    if not bugs:
+        return
+
+    n = len(bugs)
+    typer.echo(f"\n⚠  {n} known bug(s) in .dadaia/bugs/reported.json:")
+    for i, bug in enumerate(bugs, start=1):
+        source = bug.get("source", "unknown")
+        message = (bug.get("message") or "")[:120]
+        typer.echo(f"  [{i}] [{source}] {message}")
+
+    if typer.confirm("Include all open bugs in this release?", default=False):
+        mark_bugs_in_release(workspace_root, [b["id"] for b in bugs])
+        typer.echo(f"✓ {n} bug(s) marked as in_release.")
+    else:
+        typer.echo("Bugs left as 'open'. You can include them in a future release.")
+
 
 @app.command("init")
 def init(
@@ -177,6 +211,9 @@ def hotfix_open(
     specs/backlog/candidates.md ## Hotfixes pendentes before running this command.
     """
     target = _resolve_specs_dir(specs_dir)
+
+    # Surface open bugs before proceeding (T-BCR-07)
+    _prompt_open_bugs(_WORKSPACE_ROOT)
 
     # Human-audit warning for D4: check if ## Hotfixes pendentes has any bullets
     candidates_path = target / "backlog" / "candidates.md"

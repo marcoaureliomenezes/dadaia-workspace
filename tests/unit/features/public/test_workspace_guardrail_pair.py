@@ -25,6 +25,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (
+    _CLAUDE_MD_STUB,
     FileSystemPublicAssetManager,
     _doctor_guardrail_pair,
     _install_workspace_guardrail_pair,
@@ -57,7 +58,8 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
           * workspace-root / CLAUDE.md
           * workspace-root / repos/<slug> / AGENTS.md
           * workspace-root / repos/<slug> / CLAUDE.md
-      - All 4 files are byte-identical to the source (verified via SHA-256).
+      - AGENTS.md files are byte-identical to the source (full canonical content).
+      - CLAUDE.md files contain the 1-line stub only (T-41: delegates to AGENTS.md).
     """
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
@@ -79,20 +81,32 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
     def sha256(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
 
-    expected = sha256(source)
-    destinations = [
+    expected_agents_sha = sha256(source)
+
+    # AGENTS.md destinations must be byte-identical to source.
+    agents_destinations = [
         workspace_root / "AGENTS.md",
-        workspace_root / "CLAUDE.md",
         consumer / "AGENTS.md",
+    ]
+    for dest in agents_destinations:
+        assert dest.exists(), f"Expected AGENTS.md destination missing: {dest}"
+        assert sha256(dest) == expected_agents_sha, (
+            f"AGENTS.md at {dest} is not byte-identical to source.\n"
+            f"  source sha256: {expected_agents_sha}\n"
+            f"  dest   sha256: {sha256(dest)}"
+        )
+
+    # CLAUDE.md destinations must be the 1-line stub (T-41).
+    claude_destinations = [
+        workspace_root / "CLAUDE.md",
         consumer / "CLAUDE.md",
     ]
-    assert len(destinations) == 4, "Fixture must define exactly 4 destination paths."
-    for dest in destinations:
-        assert dest.exists(), f"Expected destination missing: {dest}"
-        assert sha256(dest) == expected, (
-            f"Destination {dest} is not byte-identical to source.\n"
-            f"  source sha256: {expected}\n"
-            f"  dest   sha256: {sha256(dest)}"
+    for dest in claude_destinations:
+        assert dest.exists(), f"Expected CLAUDE.md destination missing: {dest}"
+        assert dest.read_text(encoding="utf-8") == _CLAUDE_MD_STUB, (
+            f"CLAUDE.md at {dest} must contain only the 1-line stub (T-41).\n"
+            f"  Expected: {_CLAUDE_MD_STUB!r}\n"
+            f"  Got:      {dest.read_text(encoding='utf-8')!r}"
         )
 
     ok_entries = [e for e in installed if e.startswith("[ok]")]
@@ -470,11 +484,22 @@ def test_install_dispatches_to_workspace_guardrail_pair(tmp_path: Path) -> None:
 
     for dest in destinations:
         assert dest.exists(), f"Expected guardrail destination missing: {dest}"
+
+    # AGENTS.md destinations must be byte-identical to source.
+    for dest in [workspace_root / "AGENTS.md", consumer / "AGENTS.md"]:
         actual_sha = hashlib.sha256(dest.read_bytes()).hexdigest()
         assert actual_sha == expected_sha, (
-            f"Destination {dest.name} is not byte-identical to source.\n"
+            f"AGENTS.md at {dest.name} is not byte-identical to source.\n"
             f"  source sha256: {expected_sha}\n"
             f"  dest   sha256: {actual_sha}"
+        )
+
+    # CLAUDE.md destinations must contain the 1-line stub (T-41).
+    for dest in [workspace_root / "CLAUDE.md", consumer / "CLAUDE.md"]:
+        assert dest.read_text(encoding="utf-8") == _CLAUDE_MD_STUB, (
+            f"CLAUDE.md at {dest.name} must contain only the 1-line stub (T-41).\n"
+            f"  Expected: {_CLAUDE_MD_STUB!r}\n"
+            f"  Got:      {dest.read_text(encoding='utf-8')!r}"
         )
 
     ok_guardrail = [e for e in installed if "AGENTS.md" in e or "CLAUDE.md" in e]

@@ -78,3 +78,25 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
         f"{skipped_msg}"
         f" Run 'dadaia init' at your workspace root."
     )
+
+
+def resolve_workspace_root_for_init(cwd: Path | None = None) -> Path:
+    """Walk up from *cwd* to find workspace root via sentinel.
+
+    Falls back to *cwd* when no sentinel is found — safe for first-time init.
+
+    Parameters
+    ----------
+    cwd:
+        Starting directory. Defaults to ``Path.cwd()`` when *None*.
+
+    Returns
+    -------
+    Path
+        Workspace root when the sentinel is found, otherwise *cwd* (or
+        ``Path.cwd()`` when *cwd* is *None*).  Never raises.
+    """
+    try:
+        return resolve_workspace_root(cwd)
+    except WorkspaceNotInitializedError:
+        return cwd or Path.cwd()

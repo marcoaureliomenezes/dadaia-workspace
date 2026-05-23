@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 import sys
 import webbrowser
 from pathlib import Path
@@ -36,7 +37,6 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
     """
     try:
         import pathlib
-        import sqlite3
 
         from dadaia_workspace.features.telemetry import pricing as _pricing
         from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
@@ -77,10 +77,17 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
             state_dir=state_dir,
             spec_context_service=spec_context,
         )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "Telemetry unavailable: %s — /api/agents, /api/workflows will return 503", exc
-        )
+    except ImportError as exc:
+        logger.warning("Telemetry unavailable (missing dependency): %s", exc)
+        return None
+    except PermissionError as exc:
+        logger.warning("Telemetry unavailable (permission denied on telemetry state dir): %s", exc)
+        return None
+    except OSError as exc:
+        logger.warning("Telemetry unavailable (OS error initialising telemetry state): %s", exc)
+        return None
+    except sqlite3.OperationalError as exc:
+        logger.warning("Telemetry unavailable (SQLite database error): %s", exc)
         return None
 
 

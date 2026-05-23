@@ -10,6 +10,10 @@ R3 (PR3-02 activation):
   dict lookup, as defence-in-depth per architect review note in SPEC §5.2.
 
   Cache-Control is set in the handler layer (handler.py) for the /static/ prefix.
+
+T-P5-02: LOGO_RHINO_24 and LOGO_RHINO_16 module-level constants added here so
+that index.py can import logo content from this module instead of _assets.py.
+_assets.py will be deleted once all imports are migrated (Phase B).
 """
 
 from __future__ import annotations
@@ -17,7 +21,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
 from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.reports import REPORTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
@@ -25,6 +32,14 @@ from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS
 
 _ASSETS_DIR = Path(__file__).parent / "assets"
 _JS_DIR = _ASSETS_DIR / "js"
+
+# ---------------------------------------------------------------------------
+# Logo constants — loaded once at import time for inline HTML embedding.
+# T-P5-02: moved from _assets.py to this module. Import from here instead.
+# ---------------------------------------------------------------------------
+LOGO_RHINO_24: str = (_ASSETS_DIR / "logo-rhino-24.svg").read_text(encoding="utf-8")
+LOGO_RHINO_36: str = (_ASSETS_DIR / "logo-rhino-36.svg").read_text(encoding="utf-8")
+LOGO_RHINO_16: str = (_ASSETS_DIR / "logo-rhino-16.svg").read_text(encoding="utf-8")
 
 _MIME_BY_EXT: dict[str, str] = {
     ".css": "text/css; charset=utf-8",
@@ -37,8 +52,11 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "tokens.css": ("text/css; charset=utf-8", TOKENS_CSS.encode("utf-8")),
     "structure.css": ("text/css; charset=utf-8", STRUCTURE_CSS.encode("utf-8")),
     "agents.css": ("text/css; charset=utf-8", AGENTS_CSS.encode("utf-8")),
+    "projects.css": ("text/css; charset=utf-8", PROJECTS_CSS.encode("utf-8")),
     "workflows.css": ("text/css; charset=utf-8", WORKFLOWS_CSS.encode("utf-8")),
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
+    "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
+    "reports.css": ("text/css; charset=utf-8", REPORTS_CSS.encode("utf-8")),
     "core.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "core.js").read_bytes(),
@@ -68,9 +86,21 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
         "application/javascript; charset=utf-8",
         (_JS_DIR / "sessions.js").read_bytes(),
     ),
+    "academy.js": (
+        "application/javascript; charset=utf-8",
+        (_JS_DIR / "academy.js").read_bytes(),
+    ),
+    "reports.js": (
+        "application/javascript; charset=utf-8",
+        (_JS_DIR / "reports.js").read_bytes(),
+    ),
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",
         (_ASSETS_DIR / "logo-rhino-24.svg").read_bytes(),
+    ),
+    "logo-rhino-36.svg": (
+        "image/svg+xml; charset=utf-8",
+        (_ASSETS_DIR / "logo-rhino-36.svg").read_bytes(),
     ),
     "logo-rhino-16.svg": (
         "image/svg+xml; charset=utf-8",

@@ -147,39 +147,48 @@ def test_workflows_js_cards_are_keyboard_accessible() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _assets.py — PANEL_JS must include workflows.js content
+# JS files — workflows.js + core.js + agents.js content checks
+# T-P5-01: PANEL_JS removed from _assets.py. JS files are served directly by
+# static.py. Assemble PANEL_JS inline here for content verification.
 # ---------------------------------------------------------------------------
 
 
-def test_panel_js_includes_workflows_js_content() -> None:
-    """PANEL_JS assembled in _assets.py must include content from workflows.js."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
+def _build_panel_js() -> str:
+    """Assemble PANEL_JS from individual JS files (mirrors static.py behaviour)."""
+    return (
+        (_JS_DIR / "core.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "agents.js").read_text(encoding="utf-8")
+        + "\n"
+        + (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
+    )
 
+
+def test_panel_js_includes_workflows_js_content() -> None:
+    """Assembled JS must include content from workflows.js."""
+    panel_js = _build_panel_js()
     wf_text = (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
     lines = [
         ln.strip() for ln in wf_text.splitlines() if ln.strip() and not ln.strip().startswith("//")
     ]
     assert len(lines) > 0, "workflows.js has no non-comment content"
     first_code_line = lines[0]
-    assert first_code_line in PANEL_JS, (
-        f"PANEL_JS does not contain the first code line of workflows.js: {first_code_line!r}. "
-        "Update _assets.py so PANEL_JS reads from workflows.js."
+    assert first_code_line in panel_js, (
+        f"Assembled JS does not contain the first code line of workflows.js: {first_code_line!r}."
     )
 
 
 def test_panel_js_still_contains_core_js_content() -> None:
-    """PANEL_JS must still include core.js content (tab switching, token bootstrap, etc.)."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "authedFetch" in PANEL_JS
-    assert "bootstrapToken" in PANEL_JS
+    """Assembled JS must still include core.js content (tab switching, token bootstrap, etc.)."""
+    panel_js = _build_panel_js()
+    assert "authedFetch" in panel_js
+    assert "bootstrapToken" in panel_js
 
 
 def test_panel_js_still_contains_agents_js_content() -> None:
-    """PANEL_JS must still include agents.js content."""
-    from dadaia_workspace.features.panel.views._assets import PANEL_JS
-
-    assert "window.Agents" in PANEL_JS
+    """Assembled JS must still include agents.js content."""
+    panel_js = _build_panel_js()
+    assert "window.Agents" in panel_js
 
 
 # ---------------------------------------------------------------------------

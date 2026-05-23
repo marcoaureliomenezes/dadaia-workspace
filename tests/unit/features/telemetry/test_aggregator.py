@@ -115,7 +115,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
     - Agent "software-architect": 1 session in unknown root, is_sidechain=1.
       - session-3: cwd=_UNKNOWN_ROOT, 1 event (cost_micro_usd=NULL)
     - 1 event with suspect=1 (session-1, event-1)
-    - 2 workflows: wf-alpha (linked to claude (main)), wf-beta (linked to software-architect)
     """
     # Agents
     conn.executemany(
@@ -265,38 +264,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
             None,
             0,
         ),
-    )
-    # Workflows
-    conn.executemany(
-        "INSERT OR REPLACE INTO workflows (name, source_path, description, apply_to, discovered_at, last_seen_at)"
-        " VALUES (?,?,?,?,?,?)",
-        [
-            (
-                "wf-alpha",
-                "/some/path/.claude/skills/wf-alpha/SKILL.md",
-                "Alpha workflow",
-                None,
-                _RECENT_ISO,
-                _RECENT_ISO,
-            ),
-            (
-                "wf-beta",
-                "/some/path/.agents/skills/wf-beta/SKILL.md",
-                "Beta workflow",
-                None,
-                _RECENT_ISO,
-                _RECENT_ISO,
-            ),
-        ],
-    )
-    # Workflow agents
-    conn.executemany(
-        "INSERT OR IGNORE INTO workflow_agents (workflow_name, agent_name) VALUES (?,?)",
-        [
-            ("wf-alpha", "claude (main)"),
-            ("wf-beta", "software-architect"),
-            ("wf-beta", "claude (main)"),
-        ],
     )
     conn.commit()
 

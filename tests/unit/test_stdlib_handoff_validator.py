@@ -28,6 +28,8 @@ _MINIMAL_VALID: dict[str, object] = {
     "agent": "software-engineer",
     "context": "dadaia-workspace",
     "produced_at": "2026-05-16T23:29:05Z",
+    "scope": "dadaia-workspace/agent-comms-v1",
+    "metrics": {"files_changed": 3, "tests_added": 10},
     "artifact": {
         "type": "report",
         "path": "reports/se-report.html",
@@ -39,8 +41,18 @@ _FULL_VALID: dict[str, object] = {
     **_MINIMAL_VALID,
     "release_id": "agent-comms-v1",
     "findings": [
-        {"severity": "HIGH", "message": "Critical issue found"},
-        {"severity": "INFO", "message": "All good"},
+        {
+            "severity": "HIGH",
+            "message": "Critical issue found",
+            "detail_md": "Extended detail on the critical issue.",
+            "fix_recommendation": "Fix the critical issue immediately.",
+        },
+        {
+            "severity": "INFO",
+            "message": "All good",
+            "detail_md": "No action needed.",
+            "fix_recommendation": "No action required.",
+        },
     ],
     "decisions_required": ["Decide on schema v2"],
     "next_handoff": {

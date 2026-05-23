@@ -1,6 +1,7 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
 import contextlib
+import os
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -181,6 +182,20 @@ class SpecContextService:
                             f"Git push failed for context '{name}' at '{repo_path}'. "
                             "Resolve the issue and retry deactivate."
                         ) from exc
+            # Bug 3 fix: detect non-writable files before calling rmtree.
+            # If root-owned files are present, rmtree raises PermissionError
+            # with no actionable context.  We scan first and raise a descriptive
+            # GitSyncError instead.
+            non_writable = [
+                str(f) for f in repo_path.rglob("*") if f.is_file() and not os.access(f, os.W_OK)
+            ]
+            if non_writable:
+                sample = non_writable[:3]
+                raise GitSyncError(
+                    f"Cannot remove '{repo_path}': {len(non_writable)} non-writable "
+                    f"file(s) found (e.g. {sample}). "
+                    f"Run: sudo chown -R $USER '{repo_path}'"
+                )
             shutil.rmtree(repo_path)
 
         inactive = SpecContextProject(

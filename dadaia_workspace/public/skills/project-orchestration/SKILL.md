@@ -411,3 +411,16 @@ is a game SPEC under `specs/releases/<id>/` whose deliverables live in
 **Stop conditions:** refinement reveals a missing release entirely → PE files
 a new candidate in `backlog/candidates.md` and surfaces to operator.
 
+---
+
+## Parallel-researcher fan-out pattern
+
+For evidence-heavy phases (audit, code-review, security-scan), dispatch N `researcher` agents in parallel with tightly-scoped questions. Synthesise from sidecars — not from inline large-file reads.
+
+Pattern:
+1. Decompose the investigation into N atomic questions (each scoped to ≤ 5 files or 1 concept).
+2. Dispatch N `researcher` agents in parallel (one question each).
+3. Each researcher returns a sidecar `*.handoff.json` with `findings[].detail_md`.
+4. Synthesising agent reads sidecars only (not HTML) and emits a synthesis sidecar.
+
+Model: `researcher` = Haiku 4.5 (cheap; fast). Escalate to `DADAIA_MODEL_OVERRIDE=sonnet` only if context is too complex for Haiku.

@@ -1,15 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Handoff Document v1",
+  "$id": "handoff-v1.1",
+  "title": "Handoff Document v1.1",
   "description": "Structured sidecar emitted by an agent after producing a report HTML. Validates the handoff contract between pipeline stages.",
   "type": "object",
-  "required": ["schema_version", "agent", "context", "produced_at", "artifact"],
+  "required": ["schema_version", "agent", "context", "produced_at", "artifact", "scope", "metrics"],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
       "type": "string",
-      "enum": ["handoff-v1"],
-      "description": "Schema version identifier. Always 'handoff-v1' for this schema."
+      "enum": ["handoff-v1", "handoff-v1.1"],
+      "description": "Schema version identifier. Use 'handoff-v1.1' for new sidecars."
     },
     "agent": {
       "type": "string",
@@ -25,9 +26,18 @@
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
       "description": "ISO 8601 UTC timestamp when the handoff was produced."
     },
+    "scope": {
+      "type": "string",
+      "description": "Scope descriptor for the handoff (e.g. file path, module, component)."
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Key quantitative metrics for this handoff (e.g. token counts, file counts).",
+      "additionalProperties": true
+    },
     "artifact": {
       "type": "object",
-      "required": ["type", "path", "content_hash"],
+      "required": ["type", "content_hash"],
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -38,7 +48,7 @@
         "path": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9_./{}-]+$",
-          "description": "Relative path from workspace root to the artifact file. Supports {context} and {run_ts} templates."
+          "description": "Relative path from workspace root to the artifact file. Supports {context} and {run_ts} templates. Optional in v1.1 (sidecar-first emission)."
         },
         "content_hash": {
           "type": "string",
@@ -55,7 +65,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["severity", "message"],
+        "required": ["severity", "message", "detail_md", "fix_recommendation"],
         "additionalProperties": false,
         "properties": {
           "severity": {
@@ -66,6 +76,14 @@
           "message": {
             "type": "string",
             "description": "Human-readable description of the finding."
+          },
+          "detail_md": {
+            "type": "string",
+            "description": "Extended markdown detail on the finding."
+          },
+          "fix_recommendation": {
+            "type": "string",
+            "description": "Concrete fix recommendation for this finding."
           }
         }
       },
