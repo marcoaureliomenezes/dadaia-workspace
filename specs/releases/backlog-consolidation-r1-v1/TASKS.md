@@ -84,7 +84,7 @@
 
 ## Phase F — Test suite
 
-- [ ] T-BCR-08 — Testes de regressão para todos os FRs.
+- [-] T-BCR-08 — Testes de regressão para todos os FRs.
   - Owner: `software-engineer-python`
   - Write set:
     - `tests/unit/infrastructure/test_git_subprocess.py`
