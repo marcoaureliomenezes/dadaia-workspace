@@ -22,6 +22,7 @@ EXPECTED_AGENTS = {
     "backend-engineer",
     "code-reviewer",
     "data-analyst",
+    "data-architect",
     "data-engineer",
     "design-specialist",
     "devops-engineer",
