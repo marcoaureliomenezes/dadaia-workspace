@@ -1,7 +1,8 @@
 release: backlog-consolidation-r1-v1
-phase: IMPLEMENTATION
+phase: CLOSURE
 
 # History
+# 2026-05-23 — backlog-consolidation-r1-v1 advanced to CLOSURE. All T-BCR-01..09 [x]. dadaia public doctor all [ok].
 # 2026-05-23 — backlog-consolidation-r1-v1 opened. Tier A: bug-reporting infra (Phase 1+2), doctor git-dirty check, DEV guardrail extension, 4 deactivate bug fixes, data-architect universal agent (21st), backlog staleness cleanup.
 # 2026-05-23 — codex-runtime-agent-hotfix-v1 CLOSED + ARCHIVED. T-CX-HOTFIX-01 complete. dadaia public doctor all [ok].
 # 2026-05-23 — codex-agent-orchestration-parity-v1 ghost release archived (had CLOSURE.md but was not in _archive/).
