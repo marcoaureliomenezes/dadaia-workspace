@@ -22,9 +22,9 @@
 [x] frontend-engineer: update `agents.py` (CSS) to use brand palette, correct font sizes, WCAG AA status badge contrast.
 
 ## T-PUX-05 — QA validation [qa-engineer]
-[ ] Capture Playwright screenshots for all 4 fixes at 1280px + 768px.
-[ ] Verify Sessions table shows all columns readable.
-[ ] Verify toggle works on Sessions tab after loading from Agents tab.
-[ ] Verify memory pages render with panel visual identity.
-[ ] Verify agent cards contrast ratios pass WCAG AA.
-[ ] Screenshots go to `.dadaia/tmp/qa-engineer/panel-ux-fix-v1/`.
+[-] Capture Playwright screenshots for all 4 fixes at 1280px + 768px.
+[-] Verify Sessions table shows all columns readable.
+[-] Verify toggle works on Sessions tab after loading from Agents tab.
+[-] Verify memory pages render with panel visual identity.
+[-] Verify agent cards contrast ratios pass WCAG AA.
+[-] Screenshots go to `.dadaia/tmp/qa-engineer/panel-ux-fix-v1/`.
