@@ -1,4 +1,4 @@
-"""Unit tests for views/wrapper.py — T-3.10.
+"""Unit tests for views/wrapper.py — T-3.10 / T-PUX-03.
 
 Covers:
   - Back-bar "Voltar ao Painel" link present with href "/"
@@ -7,6 +7,7 @@ Covers:
   - Returns (200, "text/html; charset=utf-8", bytes)
   - PR3-05: no hard-coded palette hex literals; var(--color-*) tokens used;
     tokens.css linked; pre-paint theme script present (theme follows active theme)
+  - T-PUX-03: memory.css linked so iframe host page uses panel visual identity
 """
 
 from pathlib import Path
@@ -118,6 +119,12 @@ def test_wrapper_links_tokens_css() -> None:
     """PR3-05: wrapper must link /static/tokens.css so theme palettes are available."""
     rendered = _render("dadaia-workspace", "architecture.html")
     assert "/static/tokens.css" in rendered
+
+
+def test_wrapper_links_memory_css() -> None:
+    """T-PUX-03: wrapper must link /static/memory.css for panel visual identity."""
+    rendered = _render("dadaia-workspace", "architecture.html")
+    assert "/static/memory.css" in rendered
 
 
 def test_wrapper_prepaint_theme_script() -> None:

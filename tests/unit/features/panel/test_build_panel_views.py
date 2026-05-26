@@ -128,9 +128,17 @@ def test_memory_view_wrapper_callable(tmp_path: Path) -> None:
     status, ct, body = views["memory_view"](slug="dadaia-workspace", path="architecture.html")
     assert status == 200
     assert "text/html" in ct
-    html = body.decode("utf-8")
-    assert "iframe" in html
-    assert "/memory/dadaia-workspace/architecture.html" in html
+    page = body.decode("utf-8")
+    assert "iframe" in page
+    assert "/memory/dadaia-workspace/architecture.html" in page
+
+
+def test_memory_view_wrapper_links_memory_css(tmp_path: Path) -> None:
+    """T-PUX-03: memory_view must link /static/memory.css for panel visual identity."""
+    views = _build_views(tmp_path)
+    status, _, body = views["memory_view"](slug="dadaia-workspace", path="architecture.html")
+    assert status == 200
+    assert "/static/memory.css" in body.decode("utf-8")
 
 
 def test_static_css_callable(tmp_path: Path) -> None:

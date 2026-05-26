@@ -15,11 +15,11 @@
 
 ## T-PUX-03 — Memory pages visual identity [design-specialist → frontend-engineer]
 [x] design-specialist: define visual identity spec for memory pages (typography, colors, spacing tokens matching panel brand).
-[ ] frontend-engineer: implement — create `/assets/css/memory.css` served by the panel's static route; inject `<link>` via a new `/memory-view/` wrapper route that wraps raw memory HTML in a styled shell, OR update the panel's Projects tab to serve memory through an iframe with panel CSS injected.
+[x] frontend-engineer: implement — create `/assets/css/memory.css` served by the panel's static route; inject `<link>` via a new `/memory-view/` wrapper route that wraps raw memory HTML in a styled shell, OR update the panel's Projects tab to serve memory through an iframe with panel CSS injected.
 
 ## T-PUX-04 — Agent cards visual identity [design-specialist → frontend-engineer]
 [x] design-specialist: audit agent cards against brand tokens; emit spec.
-[ ] frontend-engineer: update `agents.py` (CSS) to use brand palette, correct font sizes, WCAG AA status badge contrast.
+[x] frontend-engineer: update `agents.py` (CSS) to use brand palette, correct font sizes, WCAG AA status badge contrast.
 
 ## T-PUX-05 — QA validation [qa-engineer]
 [ ] Capture Playwright screenshots for all 4 fixes at 1280px + 768px.

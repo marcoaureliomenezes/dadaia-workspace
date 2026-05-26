@@ -49,7 +49,7 @@ AGENTS_CSS: str = """
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 .agent-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-card);
   border-color: var(--color-accent, #9cddc8);
   border-left-color: var(--color-accent, #9cddc8);
 }
@@ -136,8 +136,8 @@ AGENTS_CSS: str = """
 }
 /* Active: tinted green background, green text */
 .agent-status-badge--active {
-  background: #d4f5e5; /* light tint of active-dot green */
-  color: #1f7a46;      /* darker green — WCAG AA on the tinted bg */
+  background: var(--color-badge-active-bg, #d4f5e5); /* light tint of active-dot green */
+  color: var(--color-badge-active-text, #1f7a46);    /* darker green — WCAG AA on the tinted bg */
 }
 /* Inactive: neutral */
 .agent-status-badge--inactive {
@@ -177,7 +177,7 @@ AGENTS_CSS: str = """
   gap: 0.15rem;
 }
 .agent-stat__label {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   color: var(--color-muted, #666666);
   letter-spacing: 0.03em;
@@ -200,7 +200,7 @@ AGENTS_CSS: str = """
   padding: 0.2em 0.55em;
   border-radius: 3px;
   background: var(--color-accent-secondary, #bfd8ad);
-  color: #525252; /* WCAG AA ≥5.0:1 on all accent-secondary chip backgrounds */
+  color: var(--color-chip-text, #3a3a3a); /* WCAG AA ≥5.0:1 on all accent-secondary chip backgrounds */
   font-size: 0.72rem;
   font-family: var(--font-mono, ui-monospace, monospace);
   white-space: nowrap;
@@ -335,7 +335,7 @@ AGENTS_CSS: str = """
 }
 .skill-chip--expanded {
   background: var(--color-accent-secondary, #bfd8ad);
-  color: #525252; /* WCAG AA ≥5.0:1 on all accent-secondary chip backgrounds */
+  color: var(--color-chip-text, #3a3a3a); /* WCAG AA ≥5.0:1 on all accent-secondary chip backgrounds */
 }
 .agent-detail__no-skills {
   font-size: 0.82rem;
