@@ -182,7 +182,7 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
 
     stub_views = {
         "index": _stub_view,
-        "api_servers": _stub_json,
+        "api_panel_status": _stub_json,
         "api_contexts": _stub_json,
         "api_workflows": _stub_workflows_list,
         "memory": _stub_view,

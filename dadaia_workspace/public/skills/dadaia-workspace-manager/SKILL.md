@@ -101,7 +101,7 @@ scp workspace-<ts>.tar.gz <local-user>@<local-host>:~/
 **On the local machine:**
 ```bash
 # Prerequisites: Python 3.12+, git
-git clone https://github.com/marcoaureliomenezes/dadaia-workspace.git
+git clone <dadaia-workspace-repo-url>
 pip install -e dadaia-workspace/ --break-system-packages
 
 mkdir -p ~/workspace && cd ~/workspace

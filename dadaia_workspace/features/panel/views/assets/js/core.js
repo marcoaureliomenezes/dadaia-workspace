@@ -198,7 +198,7 @@
   // ── Fetch and refresh servers ──────────────────────────────────────
   function fetchServers() {
     if (statusDot) { statusDot.classList.add('updating'); }
-    fetch('/api/servers')
+    fetch('/api/panel-status')
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var container = document.getElementById('servers-content');
@@ -211,6 +211,14 @@
         if (statusDot) { statusDot.classList.remove('updating'); }
         lastUpdated = new Date();
         updateStatusLabel();
+        var container = document.getElementById('servers-content');
+        if (container && !container.dataset.adblockNotice) {
+          container.dataset.adblockNotice = '1';
+          var notice = document.createElement('p');
+          notice.style.cssText = 'padding:0.5rem 1rem;color:var(--color-muted,#888);font-size:0.82rem;';
+          notice.textContent = 'Server list unavailable — if using an ad blocker, allow this page and reload.';
+          container.appendChild(notice);
+        }
       });
   }
 

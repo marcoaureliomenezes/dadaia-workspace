@@ -1,4 +1,4 @@
-"""Contract tests for /api/servers and /api/contexts — T-3.9 / T-3.9-bis.
+"""Contract tests for /api/panel-status and /api/contexts — T-3.9 / T-3.9-bis.
 
 If these tests fail, panel.js must be updated in lockstep because the JS reads
 specific field names directly from the JSON response (data.groups, row.port,
@@ -7,7 +7,7 @@ row.status, etc.). mypy cannot catch JS breakage — this is the guard.
 Contract shape (stable — do not rename fields without updating both this test
 and PANEL_JS in _assets.py):
 
-/api/servers:
+/api/panel-status:
   { "groups": [ { "group_label": str, "context_name": str|null,
                   "rows": [ { "port": int, "project": str, "url": str,
                               "status": str, "pid": int|null,
@@ -104,7 +104,7 @@ def _build_service(
 
 
 # ---------------------------------------------------------------------------
-# /api/servers contract tests
+# /api/panel-status contract tests (render_api_servers function)
 # ---------------------------------------------------------------------------
 
 

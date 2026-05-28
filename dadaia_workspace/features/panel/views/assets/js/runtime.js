@@ -99,54 +99,57 @@
   }
 
   function _wireRuntimeSwitcher() {
-    var switcher = document.querySelector('.runtime-switcher');
-    if (!switcher) { return; }
+    var switchers = document.querySelectorAll('.runtime-switcher');
+    if (!switchers.length) { return; }
 
-    var btns = switcher.querySelectorAll('[data-runtime-value]');
-    if (!btns.length) { return; }
+    switchers.forEach(function (switcher) {
+      var btns = switcher.querySelectorAll('[data-runtime-value]');
+      if (!btns.length) { return; }
 
-    // Set initial state reflecting current runtime
-    _updateButtonStates(get());
+      // Set initial state reflecting current runtime
+      _updateButtonStates(get());
 
-    btns.forEach(function (btn) {
-      // Click handler
-      btn.addEventListener('click', function () {
-        var value = btn.getAttribute('data-runtime-value');
-        if (value) {
-          set(value);
-          _updateButtonStates(value);
-        }
-      });
-
-      // Arrow key navigation within the radiogroup (ARIA radio group pattern)
-      btn.addEventListener('keydown', function (e) {
-        var allBtns = Array.prototype.slice.call(
-          switcher.querySelectorAll('[data-runtime-value]')
-        );
-        var idx = allBtns.indexOf(btn);
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          var next = allBtns[(idx + 1) % allBtns.length];
-          if (next) {
-            var nextValue = next.getAttribute('data-runtime-value');
-            set(nextValue);
-            _updateButtonStates(nextValue);
-            next.focus();
+      btns.forEach(function (btn) {
+        // Click handler
+        btn.addEventListener('click', function () {
+          var value = btn.getAttribute('data-runtime-value');
+          if (value) {
+            set(value);
+            _updateButtonStates(value);
           }
-        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-          e.preventDefault();
-          var prev = allBtns[(idx - 1 + allBtns.length) % allBtns.length];
-          if (prev) {
-            var prevValue = prev.getAttribute('data-runtime-value');
-            set(prevValue);
-            _updateButtonStates(prevValue);
-            prev.focus();
+        });
+
+        // Arrow key navigation within the radiogroup (ARIA radio group pattern)
+        btn.addEventListener('keydown', function (e) {
+          var allBtns = Array.prototype.slice.call(
+            switcher.querySelectorAll('[data-runtime-value]')
+          );
+          var idx = allBtns.indexOf(btn);
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            var next = allBtns[(idx + 1) % allBtns.length];
+            if (next) {
+              var nextValue = next.getAttribute('data-runtime-value');
+              set(nextValue);
+              _updateButtonStates(nextValue);
+              next.focus();
+            }
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            var prev = allBtns[(idx - 1 + allBtns.length) % allBtns.length];
+            if (prev) {
+              var prevValue = prev.getAttribute('data-runtime-value');
+              set(prevValue);
+              _updateButtonStates(prevValue);
+              prev.focus();
+            }
           }
-        }
+        });
       });
     });
 
-    // Keep button states in sync when runtime changes via another mechanism
+    // Keep ALL button states in sync when runtime changes via any mechanism.
+    // Registered once (outside the per-switcher loop) to avoid duplicate listeners.
     document.addEventListener('dadaia:runtime-change', function (e) {
       var runtime = e.detail && e.detail.runtime ? e.detail.runtime : get();
       _updateButtonStates(runtime);

@@ -44,6 +44,9 @@ TOKENS_CSS: str = """
   --color-report-tag-bg:   #f0f4f7; /* report agent tag chip background — T-P5-34 */
   --color-delete-icon:     #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
+  --color-chip-text:       #3a3a3a; /* skill chip text — T-PUX-04 */
+  --color-badge-active-bg: #d4f5e5; /* active status badge background — T-PUX-04 */
+  --color-badge-active-text: #1f7a46; /* active status badge text (WCAG AA on badge-active-bg) — T-PUX-04 */
 
   --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono:  ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -112,6 +115,9 @@ html:not([data-theme]) {
   --color-report-tag-bg:    #f0f4f7; /* report agent tag chip background — T-P5-34 */
   --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
+  --color-chip-text:        #3a3a3a; /* skill chip text — T-PUX-04 */
+  --color-badge-active-bg:  #d4f5e5; /* active status badge background — T-PUX-04 */
+  --color-badge-active-text: #1f7a46; /* active status badge text (WCAG AA on badge-active-bg) — T-PUX-04 */
   /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
   --color-tier-1:           #c0392b; /* T1 orchestrator — red  (5.52:1) */
   --color-tier-2:           #b35800; /* T2 curator — amber (4.87:1) */
@@ -149,6 +155,9 @@ html[data-theme="sage"] {
   --color-report-tag-bg:    #f0f4f7; /* report agent tag chip background — T-P5-34 */
   --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
+  --color-chip-text:        #3a3a3a; /* skill chip text — T-PUX-04 */
+  --color-badge-active-bg:  #d9f0e0; /* active status badge background (sage) — T-PUX-04 */
+  --color-badge-active-text: #285c35; /* active status badge text (sage) — T-PUX-04 */
   /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
   --color-tier-1:           #b83232; /* T1 orchestrator — muted red  (5.08:1) */
   --color-tier-2:           #a05500; /* T2 curator — muted amber (4.68:1) */
@@ -188,6 +197,9 @@ html[data-theme="warm"] {
   --color-report-tag-bg:    #f7f3ee; /* report agent tag chip background — T-P5-34 (warm cream) */
   --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
+  --color-chip-text:        #3a3a3a; /* skill chip text — T-PUX-04 */
+  --color-badge-active-bg:  #fde8d0; /* active status badge background (warm) — T-PUX-04 */
+  --color-badge-active-text: #7a3a00; /* active status badge text (warm) — T-PUX-04 */
   /* PR4-18 — tier accent tokens (WCAG 2.2 AA non-text contrast ≥ 3:1 vs #ffffff) */
   --color-tier-1:           #c0392b; /* T1 orchestrator — red  (5.52:1) */
   --color-tier-2:           #9a4400; /* T2 curator — deep rust (5.76:1; distinct from amber accent) */

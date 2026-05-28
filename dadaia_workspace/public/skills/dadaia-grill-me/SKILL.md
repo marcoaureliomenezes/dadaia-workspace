@@ -231,7 +231,7 @@ Ao iniciar uma sessão sem escopo específico, começar por estes achados já id
 4. **opencode/telegram-bot SEC8** diz "docker.sock montado `:ro`" → a implementação monta `:rw` (necessário para compose write ops); spec contradiz o código deployado
 5. **platform/instance-templates FR2** usa placeholder `{{INSTANCE_NAME}}` → mas FR/NFR diz "via `envsubst` ou `sed`"; `envsubst` usa `${VAR}`, não `{{VAR}}`
 6. **redacted-infra/guardrails vs platform/snapshots** → ambas fazem backups de `redacted-infra.json`; guardrails: a cada 5 min; snapshots: diário incremental; não há coordenação declarada
-7. **redacted-infra/telegram-gateway Open Questions** ainda `[ ]` → "Qual o ID do operador?" já respondível (`redacted-infra.env: REDACTED_CONFIG=TELEGRAM_CHAT_ID_REDACTED`); "supervisor já instalado?" → já implementado (supervisord rodando)
-8. **security/applications** diz fix aplicado com `TELEGRAM_ALLOWED_USERS=TELEGRAM_CHAT_ID_REDACTED` em `<config-path>/.env` → redacted-infra.env tem `REDACTED_CONFIG`; nomes divergem — pode ser variável diferente ou descrição incorreta do fix
+7. **redacted-infra/telegram-gateway Open Questions** ainda `[ ]` → "Qual o ID do operador?" já respondível (`redacted-infra.env: REDACTED_CONFIG=<TELEGRAM_CHAT_ID>`); "supervisor já instalado?" → já implementado (supervisord rodando)
+8. **security/applications** diz fix aplicado com `TELEGRAM_ALLOWED_USERS=<TELEGRAM_CHAT_ID>` em `<config-path>/.env` → redacted-infra.env tem `REDACTED_CONFIG`; nomes divergem — pode ser variável diferente ou descrição incorreta do fix
 9. **redacted-infra/guardrails** está categorizada como "guardrails" mas especifica backups de config; `redacted-infra/guardrails` especifica restrição de escrita via `REDACTED_CONFIG` — categorias com mesmo nome, problemas totalmente diferentes
 10. **redacted-infra/telegram-gateway Open Questions** → trustedProxies IP ainda `[ ]` mas é descobrível: `docker inspect vps-traefik-1 | grep IPAddress`

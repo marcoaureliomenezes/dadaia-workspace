@@ -10,13 +10,13 @@
 
 ## Referencias internas reutilizadas
 
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/docs/sdd_patterns.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/constitution.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/SPEC.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/PLAN.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/TASKS.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/memory/product.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/memory/architecture.md`
+- `<workspace-root>/dadaia-workspace/docs/sdd_patterns.md`
+- `<workspace-root>/dadaia-workspace/specs/constitution.md`
+- `<workspace-root>/dadaia-workspace/specs/SPEC.md`
+- `<workspace-root>/dadaia-workspace/specs/PLAN.md`
+- `<workspace-root>/dadaia-workspace/specs/TASKS.md`
+- `<workspace-root>/dadaia-workspace/specs/memory/product.md`
+- `<workspace-root>/dadaia-workspace/specs/memory/architecture.md`
 
 ## O que estas referencias sustentam
 

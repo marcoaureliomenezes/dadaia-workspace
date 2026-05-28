@@ -96,6 +96,7 @@ SESSIONS_CSS: str = """
 .sessions-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 0.875rem;
   font-family: var(--font-stack, -apple-system, sans-serif);
   background: var(--color-surface, #ffffff);
@@ -149,7 +150,6 @@ SESSIONS_CSS: str = """
   border-bottom: 1px solid var(--color-border, #dddddd);
   color: var(--color-text, #222222);
   vertical-align: middle;
-  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -178,7 +178,6 @@ SESSIONS_CSS: str = """
 .cell-session {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.8rem;
-  max-width: 110px;
 }
 
 /* ── Cost cell ────────────────────────────────────────────────────── */

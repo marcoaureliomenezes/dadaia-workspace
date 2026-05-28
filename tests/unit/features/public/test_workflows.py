@@ -23,6 +23,8 @@ _EXPECTED_SURVIVING_WORKFLOWS: frozenset[str] = frozenset(
         "audit-cycle",
         "code-review-fan-out",
         "cross-cutting-feature",
+        "dashboard-publication",
+        "design-first-implementation",
         "game-dev-cycle",
         "hotfix-release",
         "onboarding-new-repo",
@@ -52,10 +54,10 @@ def _workflow_names() -> frozenset[str]:
     )
 
 
-def test_exactly_7_workflows_survive() -> None:
-    """After AGT-r2-06 trim, exactly 7 workflows must remain in public/workflows/."""
+def test_exactly_9_workflows_survive() -> None:
+    """After AGT-r2-06 trim (7) + dashboard-publication + design-first-implementation (added post-trim), exactly 9 workflows must remain in public/workflows/."""
     names = _workflow_names()
-    assert len(names) == 7, f"Expected 7 workflows, found {len(names)}: {sorted(names)}"
+    assert len(names) == 9, f"Expected 9 workflows, found {len(names)}: {sorted(names)}"
 
 
 def test_surviving_workflow_names_match_expected_set() -> None:

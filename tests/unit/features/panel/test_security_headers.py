@@ -15,7 +15,7 @@ def _make_handler_with_spy():
     # Minimal stub views — only "index" key required for make_handler_class.
     stub_views: dict = {
         "index": lambda **kw: (200, "text/html; charset=utf-8", b"<html></html>"),
-        "api_servers": lambda **kw: (200, "application/json", b"{}"),
+        "api_panel_status": lambda **kw: (200, "application/json", b"{}"),
         "api_contexts": lambda **kw: (200, "application/json", b"{}"),
         "memory": lambda **kw: (200, "text/html; charset=utf-8", b"ok"),
         "memory_view": lambda **kw: (200, "text/html; charset=utf-8", b"ok"),
