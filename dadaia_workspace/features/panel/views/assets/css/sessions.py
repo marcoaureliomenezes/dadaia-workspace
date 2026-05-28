@@ -424,4 +424,56 @@ SESSIONS_CSS: str = """
   outline: 2px solid var(--color-accent-dark, #2d7d9a);
   outline-offset: 2px;
 }
+
+/* ── Sessions dashboard ─────────────────────────────────────────── */
+.sessions-dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+@media (max-width: 640px) {
+  .sessions-dashboard { grid-template-columns: repeat(2, 1fr); }
+}
+.sessions-stat-card {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius-card, 6px);
+  padding: 0.85rem 1rem;
+  overflow: hidden;
+}
+.sessions-stat-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, #666666);
+  margin-bottom: 0.3rem;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+}
+.sessions-stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-heading, #111111);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sessions-stat-value--cost {
+  color: var(--color-cost, #633d2e);
+}
+.sessions-stat-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-muted, #666666);
+  margin-top: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+}
 """

@@ -51,6 +51,7 @@ def render_sessions_section() -> str:
         "      </button>\n"
         "    </div>\n"
         "  </header>\n"
+        '  <div id="sessions-dashboard" class="sessions-dashboard" aria-label="Sessions summary"></div>\n'
         # Last-updated badge — updated by JS after each auto-refresh tick
         '  <div class="sessions-toolbar">\n'
         '    <label for="sessions-filter" class="sr-only">Filter sessions</label>\n'
