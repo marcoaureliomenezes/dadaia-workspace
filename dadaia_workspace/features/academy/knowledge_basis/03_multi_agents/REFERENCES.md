@@ -9,10 +9,10 @@
 
 ## Referencias internas reutilizadas
 
-- `/home/marco/workspace/projects/data_master/.dadaia/academy/harness-engineering/02-agent-foundations.md`
-- `/home/marco/workspace/projects/data_master/.dadaia/academy/harness-engineering/05-orchestration-patterns.md`
-- `/home/marco/workspace/projects/data_master/.dadaia/academy/02_claude_code_quick_start/03_operacao_segura_e_produtiva.md`
-- `/home/marco/workspace/projects/data_master/.dadaia/academy/04_sdd_quick_start/03_sdd_na_pratica_no_dadaia_workspace.md`
+- `<workspace-root>/.dadaia/academy/harness-engineering/02-agent-foundations.md`
+- `<workspace-root>/.dadaia/academy/harness-engineering/05-orchestration-patterns.md`
+- `<workspace-root>/.dadaia/academy/02_claude_code_quick_start/03_operacao_segura_e_produtiva.md`
+- `<workspace-root>/.dadaia/academy/04_sdd_quick_start/03_sdd_na_pratica_no_dadaia_workspace.md`
 
 ## O que estas referencias sustentam
 

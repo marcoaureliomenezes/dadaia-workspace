@@ -10,9 +10,9 @@
 
 ## Referencias internas reutilizadas
 
-- `/home/marco/workspace/projects/data_master/.claude/rules/agent-environment.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/features/agent-rules-skills/SPEC.md`
-- `/home/marco/workspace/projects/data_master/.dadaia/academy/02_claude_code_quick_start/01_modelo_mental_do_claude_code.md`
+- `<workspace-root>/.claude/rules/agent-environment.md`
+- `<workspace-root>/dadaia-workspace/specs/features/agent-rules-skills/SPEC.md`
+- `<workspace-root>/.dadaia/academy/02_claude_code_quick_start/01_modelo_mental_do_claude_code.md`
 
 ## O que estas referencias sustentam
 
