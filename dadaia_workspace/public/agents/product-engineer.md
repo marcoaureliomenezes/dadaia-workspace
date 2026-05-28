@@ -131,10 +131,11 @@ A file is approved **only** when its header contains exactly:
 
 Every workflow step starts from the content of `specs/releases/ACTIVE.md`.
 
-> **Delegation:** PE does not run shell commands. The project-manager reads
-> `specs/releases/ACTIVE.md` and passes its content in the dispatch briefing.
-> If the briefing is missing this, ask PM to re-run `cat specs/releases/ACTIVE.md`
-> and surface the result before proceeding.
+> **Note:** PE reads `specs/releases/ACTIVE.md` directly via the `Read` tool — no shell
+> required. When `release_id` is omitted from the dispatch briefing, PE reads the file
+> itself. PE does not run CLI commands (no `Bash` tool); for commands like
+> `dadaia public stage`, surface them to the operator or request PM to dispatch
+> `devops-engineer`.
 
 Expected format (two lines):
 ```

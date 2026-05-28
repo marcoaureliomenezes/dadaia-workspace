@@ -316,6 +316,36 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     return result
 
 
+def _parse_skills_from_frontmatter(text: str) -> list[str]:
+    """Extract the ``skills:`` list from agent YAML frontmatter.
+
+    Locates the ``skills:`` key inside the opening ``---`` block and collects
+    indented ``  - <name>`` list items, stopping at the next top-level key or
+    end of the frontmatter block.  Returns an empty list when frontmatter is
+    absent or contains no ``skills:`` key.
+    """
+    if not text.startswith("---\n"):
+        return []
+    end_idx = text.find("\n---\n", 4)
+    if end_idx == -1:
+        return []
+    frontmatter = text[4 : end_idx + 1]
+
+    skills: list[str] = []
+    in_skills = False
+    for line in frontmatter.splitlines():
+        if line.rstrip() == "skills:":
+            in_skills = True
+            continue
+        if in_skills:
+            stripped = line.strip()
+            if stripped.startswith("- "):
+                skills.append(stripped[2:].strip())
+            elif line and not line.startswith(" ") and not line.startswith("\t"):
+                in_skills = False  # next top-level key — skills block ended
+    return skills
+
+
 def _atomic_write_text(dst: Path, content: str) -> None:
     """Write *content* to *dst* atomically via a sibling .tmp file + os.replace().
 
@@ -675,12 +705,30 @@ class FileSystemPublicAssetManager:
                 f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
             ) from e
 
+    def list_all(self) -> dict[str, list[str]]:
+        """Return all public asset names grouped by category directory."""
+        result: dict[str, list[str]] = {}
+        if not self._public_dir.exists():
+            return result
+        for category_dir in sorted(self._public_dir.iterdir()):
+            if not category_dir.is_dir():
+                continue
+            names: list[str] = []
+            for entry in sorted(category_dir.iterdir()):
+                if entry.is_dir():
+                    names.append(entry.name)
+                elif entry.is_file():
+                    names.append(entry.name)
+            result[category_dir.name] = names
+        return result
+
     def install(
         self,
         workspace_root: Path,
         target: str = "all",
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
+        only: str | None = None,
     ) -> list[str]:
         if target not in _VALID_TARGETS:
             valid = ", ".join(sorted(_VALID_TARGETS))
@@ -719,13 +767,14 @@ class FileSystemPublicAssetManager:
 
         for item in targets:
             if item == "agents":
-                self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+                if only is None or only == "skills":
+                    self._install_universal_skills(agentic_dir, workspace_root, force, installed)
             elif item == "claude":
-                self._install_claude(agentic_dir, workspace_root, force, installed)
+                self._install_claude(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "codex":
-                self._install_codex(agentic_dir, workspace_root, force, installed)
+                self._install_codex(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "opencode":
-                self._install_opencode(agentic_dir, workspace_root, force, installed)
+                self._install_opencode(agentic_dir, workspace_root, force, installed, only=only)
 
         if target in {"all", "claude", "codex"}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
@@ -792,6 +841,7 @@ class FileSystemPublicAssetManager:
         reports.extend(self._classify_workflows(agentic_dir))
         reports.extend(self._lint_legacy_software_engineer())
         reports.extend(self._check_codex_drift(agentic_dir, workspace_root))
+        reports.extend(self._check_agent_skill_refs())
 
         # git-dirty check: detect uncommitted changes in public/ (editable install blind spot)
         try:
@@ -1025,6 +1075,70 @@ class FileSystemPublicAssetManager:
                 out.append(f"[drift] codex:skills/{slug}/SKILL.md (D-CX-6)")
         return out
 
+    def _check_agent_skill_refs(self) -> list[str]:
+        """D-CX-SKILLS: every ``skills:`` name in agent frontmatter must exist in ``public/skills/``.
+
+        For each ``public/agents/*.md``, parses the YAML ``skills:`` list and
+        verifies that ``public/skills/<name>/`` is a directory.  A missing
+        directory is ``[drift]`` (hard failure) — the agent promises a
+        capability it cannot actually invoke.
+
+        Also scans the ``## Skills consumed`` section in the body for
+        backtick-quoted names that look like skill identifiers but are absent
+        from ``public/skills/``.  These produce ``[warn]`` (soft) — they may
+        document legacy knowledge intentionally moved to ``docs/agent-knowledge/``
+        rather than a misconfiguration.
+        """
+        agents_dir = self._public_dir / "agents"
+        skills_dir = self._public_dir / "skills"
+        out: list[str] = []
+        if not agents_dir.exists():
+            return out
+
+        for md_file in sorted(agents_dir.glob("*.md")):
+            try:
+                text = md_file.read_text(encoding="utf-8")
+            except OSError:
+                continue
+
+            fm = _parse_agent_frontmatter(text)
+            agent_name = str(fm.get("name", md_file.stem)) if fm else md_file.stem
+
+            # Frontmatter skills — hard failure on missing skill directory
+            skills_in_fm = _parse_skills_from_frontmatter(text)
+            confirmed: set[str] = set()
+            for skill in skills_in_fm:
+                if (skills_dir / skill).is_dir():
+                    confirmed.add(skill)
+                else:
+                    out.append(
+                        f"[drift] agent:{agent_name}: frontmatter references "
+                        f"non-existent skill '{skill}' (D-CX-SKILLS)"
+                    )
+
+            # Body scan — only inside "## Skills consumed" section (soft warning)
+            body_start = text.find("\n---\n", 4)
+            if body_start == -1:
+                continue
+            body = text[body_start + 5:]
+            sc_start = body.find("## Skills consumed")
+            if sc_start == -1:
+                continue
+            sc_end = body.find("\n## ", sc_start + 1)
+            section = body[sc_start:sc_end] if sc_end != -1 else body[sc_start:]
+            already_flagged: set[str] = set(skills_in_fm)
+            for m in re.finditer(r"`([a-z][a-z0-9\-]+)`", section):
+                candidate = m.group(1)
+                if candidate in already_flagged or candidate in confirmed:
+                    continue
+                if not (skills_dir / candidate).is_dir():
+                    out.append(
+                        f"[warn] agent:{agent_name}: 'Skills consumed' body section "
+                        f"mentions '{candidate}' absent from public/skills/ (D-CX-SKILLS)"
+                    )
+                    already_flagged.add(candidate)
+        return out
+
     def _lint_legacy_software_engineer(self) -> list[str]:
         """T-35: reject the legacy `software-engineer` subagent alias in public/.
 
@@ -1112,41 +1226,58 @@ class FileSystemPublicAssetManager:
         )
 
     def _install_claude(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
     ) -> None:
         claude_dir = workspace_root / ".claude"
-        for name in _CLAUDE_DIRS:
+        dirs = _CLAUDE_DIRS if only is None else tuple(d for d in _CLAUDE_DIRS if d == only)
+        for name in dirs:
             self._copy_tree(agentic_dir / name, claude_dir / name, force, installed)
 
-        settings_path = claude_dir / "settings.json"
-        if settings_path.exists() and not force:
-            installed.append(f"[skip] {settings_path}")
-        else:
-            self._write_generated(
-                settings_path, _json_dump(self._claude_settings(workspace_root)), True, installed
-            )
+        if only is None:
+            settings_path = claude_dir / "settings.json"
+            if settings_path.exists() and not force:
+                installed.append(f"[skip] {settings_path}")
+            else:
+                self._write_generated(
+                    settings_path, _json_dump(self._claude_settings(workspace_root)), True, installed
+                )
 
     def _install_codex(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
     ) -> None:
         codex_dir = workspace_root / ".codex"
-        self._install_codex_rules(agentic_dir, workspace_root, force, installed)
-        self._install_codex_workflows(agentic_dir, workspace_root, force, installed)
-        self._install_universal_skills(agentic_dir, workspace_root, force, installed)
-        self._install_codex_agents(agentic_dir, workspace_root, force, installed)
-        self._install_codex_runtime_adapters(workspace_root, force, installed)
-        self._write_generated(
-            codex_dir / "hooks.json",
-            _json_dump(self._codex_hooks(workspace_root)),
-            force,
-            installed,
-        )
-        self._write_generated(
-            codex_dir / "config.toml",
-            self._codex_config(agentic_dir),
-            force,
-            installed,
-        )
+        if only is None or only == "rules":
+            self._install_codex_rules(agentic_dir, workspace_root, force, installed)
+        if only is None or only == "workflows":
+            self._install_codex_workflows(agentic_dir, workspace_root, force, installed)
+        if only is None or only == "skills":
+            self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+        if only is None or only == "agents":
+            self._install_codex_agents(agentic_dir, workspace_root, force, installed)
+            self._install_codex_runtime_adapters(workspace_root, force, installed)
+        if only is None:
+            self._write_generated(
+                codex_dir / "hooks.json",
+                _json_dump(self._codex_hooks(workspace_root)),
+                force,
+                installed,
+            )
+            self._write_generated(
+                codex_dir / "config.toml",
+                self._codex_config(agentic_dir),
+                force,
+                installed,
+            )
 
     def _install_codex_rules(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -1282,22 +1413,29 @@ class FileSystemPublicAssetManager:
             self._copy_file(skill_src, skill_dst, force, installed)
 
     def _install_opencode(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
     ) -> None:
         opencode_dir = workspace_root / ".opencode"
-        for name in _OPENCODE_DIRS:
+        dirs = _OPENCODE_DIRS if only is None else tuple(d for d in _OPENCODE_DIRS if d == only)
+        for name in dirs:
             if name == "agents":
                 self._copy_agents_for_opencode(
                     agentic_dir / name, opencode_dir / name, force, installed
                 )
             else:
                 self._copy_tree(agentic_dir / name, opencode_dir / name, force, installed)
-        self._write_generated(
-            workspace_root / "opencode.json",
-            _json_dump(self._opencode_config(workspace_root)),
-            force,
-            installed,
-        )
+        if only is None:
+            self._write_generated(
+                workspace_root / "opencode.json",
+                _json_dump(self._opencode_config(workspace_root)),
+                force,
+                installed,
+            )
 
     def _copy_agents_for_opencode(
         self, src_dir: Path, dst_dir: Path, force: bool, installed: list[str]

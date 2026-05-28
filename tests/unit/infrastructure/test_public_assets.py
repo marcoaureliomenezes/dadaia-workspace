@@ -2300,3 +2300,96 @@ class TestDoctorFindingPersistence:
         reported_messages = [call_args[0][2] for call_args in mock_report.call_args_list]
         for msg in reported_messages:
             assert not msg.startswith("[ok]"), f"[ok] line should not be reported: {msg}"
+
+
+# ---------------------------------------------------------------------------
+# T-WH-13 — list_all() and install(only=...) unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestListAll:
+    def _make_manager(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def test_list_all_returns_all_categories(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        (public_dir / "agents").mkdir(parents=True)
+        (public_dir / "skills").mkdir(parents=True)
+        (public_dir / "rules").mkdir(parents=True)
+        (public_dir / "agents" / "my-agent.md").write_text("# agent", encoding="utf-8")
+        (public_dir / "skills" / "my-skill").mkdir()
+        (public_dir / "rules" / "my-rule.md").write_text("# rule", encoding="utf-8")
+
+        result = self._make_manager(public_dir).list_all()
+
+        assert set(result.keys()) == {"agents", "skills", "rules"}
+        assert "my-agent.md" in result["agents"]
+        assert "my-skill" in result["skills"]
+        assert "my-rule.md" in result["rules"]
+
+    def test_list_all_returns_empty_dict_when_public_missing(self, tmp_path: Path) -> None:
+        result = self._make_manager(tmp_path / "nonexistent").list_all()
+        assert result == {}
+
+    def test_list_all_skips_non_directories_at_root(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        (public_dir / "agents").mkdir()
+        (public_dir / "README.md").write_text("# readme", encoding="utf-8")
+
+        result = self._make_manager(public_dir).list_all()
+        assert "README.md" not in result
+        assert "agents" in result
+
+
+class TestInstallOnly:
+    def _make_manager(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def _make_minimal_agentic(self, workspace_root: Path) -> Path:
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        (agentic_dir / "rules").mkdir(parents=True)
+        (agentic_dir / "agents").mkdir(parents=True)
+        (agentic_dir / "skills").mkdir(parents=True)
+        (agentic_dir / "workflows").mkdir(parents=True)
+        (agentic_dir / "commands").mkdir(parents=True)
+        (agentic_dir / "rules" / "my-rule.md").write_text("# rule", encoding="utf-8")
+        (agentic_dir / "agents" / "my-agent.md").write_text(
+            "---\nname: my-agent\nmodel: claude-sonnet-4-6\n---\n# body\n", encoding="utf-8"
+        )
+        manifest = {"schema_version": "1", "package_version": "0.0.1"}
+        import json
+        (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        return agentic_dir
+
+    def test_install_only_rules_skips_agents(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        self._make_minimal_agentic(workspace_root)
+        manager = self._make_manager(public_dir)
+
+        installed = manager.install(workspace_root, target="claude", force=True, only="rules")
+
+        installed_paths = " ".join(installed)
+        assert "rules" in installed_paths or len(installed) == 0
+        agents_dir = workspace_root / ".claude" / "agents"
+        assert not agents_dir.exists() or list(agents_dir.iterdir()) == []
+
+    def test_install_only_agents_skips_rules(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        self._make_minimal_agentic(workspace_root)
+        manager = self._make_manager(public_dir)
+
+        installed = manager.install(workspace_root, target="claude", force=True, only="agents")
+
+        rules_dir = workspace_root / ".claude" / "rules"
+        assert not rules_dir.exists() or list(rules_dir.iterdir()) == []

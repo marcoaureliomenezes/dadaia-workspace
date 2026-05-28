@@ -233,18 +233,20 @@ Both reports must have `<stem>.handoff.json` sidecars.
 `researcher`, `security-reviewer`, `design-specialist`, `game-developer`,
 `game-designer`, `game-tester`, `project-auditor`.
 
-Routing notes for the split implementer specialists:
+Routing table for the split implementer specialists:
 
-- When the task is a Python implementation (CLI surface, lib code under
-  `dadaia_workspace/`, tooling scripts), dispatch to `software-engineer-python`.
-- When the task is server-side Node tooling (e.g. opencode harness scripts,
-  Node CLIs outside the browser boundary), dispatch to `software-engineer-node`.
-- Browser-bound HTML/CSS/TS/React stays with `frontend-engineer`.
-- Data pipelines / Spark / Delta / Airflow / Kafka land with `data-engineer`.
-- BI dashboards / data viz land with `data-analyst` (paired with
-  `design-specialist` for visual review).
-- AI entities (skills, rules, workflows, commands, agents, hooks) land with
-  `ai-engineer`; persona-scope conflicts route to `product-engineer`.
+| File / scope pattern | Agent |
+|---|---|
+| `dadaia_workspace/**/*.py`, CLI commands, lib code, tooling scripts | `software-engineer-python` |
+| `src/**/*.tsx`, `*.jsx`, browser bundle entry points | `frontend-engineer` |
+| `cli/`, `scripts/`, `bin/`, `server/**`, non-browser Node tooling | `software-engineer-node` |
+| Spans both browser and server Node | Split dispatch: `frontend-engineer` for UI surface; `software-engineer-node` for server portion |
+| Data pipelines, Spark, Delta, Airflow, Kafka | `data-engineer` |
+| BI dashboards, data viz | `data-analyst` (paired with `design-specialist` for visual review) |
+| AI entities (skills, rules, workflows, commands, agents, hooks) | `ai-engineer`; persona-scope conflicts → `product-engineer` |
+| Go services, gRPC, Postgres/Dynamo/Mongo | `backend-engineer` |
+| `repos/tauan-games/**` | `game-developer` / `game-designer` / `game-tester` only |
+| CI/CD pipelines (`*.github/workflows/**`) | `devops-engineer` only |
 
 **Outputs flow to:** operator (final summary) + any agent that needs the dispatch report
 as an upstream input.

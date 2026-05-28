@@ -76,11 +76,20 @@ You do NOT:
 
 ---
 
+## Built-in methodology
+
+The 6-axis review methodology (architecture conformance, design patterns, test coverage,
+security smells, performance smells, dead code) is embedded in this agent's training — no
+external skill file is required. Deep-knowledge references (layering rules, pattern catalogue,
+OOP/SOLID heuristics, complexity rubric) live under `docs/agent-knowledge/code-reviewer/`
+and are loaded on demand.
+
+**Dispatch condition:** Invoked by `project-manager` after a PR opens (as part of
+`code-review-fan-out` workflow), or by `project-auditor` when code-level evidence is
+required in an `audit-cycle`. NOT for SPEC/PLAN review — that is `product-engineer`.
+
 ## Skills consumed
 
-- `architect-code-audit` — code structure inspection heuristics and layering rules
-- `architect-design-patterns` — design-pattern catalogue; misuse detection
-- `architecture-code-review` — 6-axis checklist, OOP/SOLID heuristics, complexity rubric, output template
 - `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after the review report
 
 ---

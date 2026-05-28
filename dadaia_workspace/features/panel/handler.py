@@ -64,11 +64,13 @@ _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/panel-status /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
-    b"/api/workflows /api/workflows/<name> "
+    b"/api/workflows /api/workflows/<name> /api/workflows/<name>/run "
     b"/api/sessions /api/sessions/<runtime>/<session_id> "
     b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
+
+_WORKFLOW_NAME_RE = re.compile(r"^[a-zA-Z0-9\-]+$")
 
 # ---------------------------------------------------------------------------
 # Forbidden field names for T1 privacy check (belt-and-suspenders; the reader
@@ -111,7 +113,8 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt"),
     (r"^/api/agents/(?P<agent_id>[^/]+)/sessions$", "api_agent_sessions"),
     (r"^/api/agents$", "api_agents"),
-    # /api/workflows/<name> must come before /api/workflows (more specific first).
+    # /api/workflows/<name>/run and /api/workflows/<name> before /api/workflows (more specific first).
+    (r"^/api/workflows/(?P<workflow_name>[^/]+)/run$", "api_workflow_run"),
     (r"^/api/workflows/(?P<workflow_name>[^/]+)$", "api_workflow_detail"),
     (r"^/api/workflows$", "api_workflows"),
     # /api/sessions/<runtime>/<session_id> must come before /api/sessions (more specific first).
@@ -144,8 +147,11 @@ _BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
         "api_reports",
         "api_workflows",
         "api_workflow_detail",
+        "api_workflow_run",
     }
 )
+
+_POST_WORKFLOW_RUN_RE = re.compile(r"^/api/workflows/(?P<workflow_name>[^/]+)/run$")
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +349,47 @@ def make_handler_class(
                         return
                     self._dispatch_telemetry(route_name, m.groupdict(), {})
                     return
+            self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+        def do_POST(self) -> None:  # noqa: N802
+            parsed = urllib.parse.urlparse(self.path)
+            path = parsed.path
+
+            m = _POST_WORKFLOW_RUN_RE.match(path)
+            if m is not None:
+                auth_header = self.headers.get("Authorization")
+                if _token is None or not _validate_bearer(auth_header, _token):
+                    self._respond(401, "application/json", _UNAUTHORIZED_BODY)
+                    return
+                workflow_name = m.group("workflow_name")
+                if not _WORKFLOW_NAME_RE.match(workflow_name):
+                    self._respond(
+                        400,
+                        "application/json",
+                        b'{"error": "invalid workflow name"}',
+                    )
+                    return
+                if "api_workflow_run" in views:
+                    try:
+                        status, content_type, body = views["api_workflow_run"](
+                            workflow_name=workflow_name,
+                        )
+                        self._respond(status, content_type, body)
+                    except Exception as exc:  # noqa: BLE001
+                        import logging
+
+                        logging.getLogger(__name__).warning(
+                            "PanelHandler: api_workflow_run error: %s", exc
+                        )
+                        self._respond(
+                            500,
+                            "application/json",
+                            b'{"error": "internal server error"}',
+                        )
+                else:
+                    self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+                return
+
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
 
         def _dispatch_telemetry(

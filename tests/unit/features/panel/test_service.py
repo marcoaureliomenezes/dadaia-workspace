@@ -192,3 +192,81 @@ def test_no_active_context_returns_empty_contexts() -> None:
     result = service.list_active_contexts()
 
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# T-WH-18 — run_workflow() tests
+# ---------------------------------------------------------------------------
+
+
+class _FakeWorkflowSummary:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _FakeWorkflowsService:
+    def __init__(self, names: list[str]) -> None:
+        self._names = names
+
+    def list_summaries(self) -> list[_FakeWorkflowSummary]:
+        return [_FakeWorkflowSummary(n) for n in self._names]
+
+
+def _build_service_with_workflows(
+    workflow_names: list[str],
+    workspace_root: Path = Path("/workspace"),
+) -> PanelService:
+    service = PanelService(
+        registry=FakeServerRegistryService([]),  # type: ignore[arg-type]
+        spec_context=FakeSpecContextService([]),  # type: ignore[arg-type]
+        workspace_root=workspace_root,
+    )
+    service._workflows_service_override = _FakeWorkflowsService(workflow_names)  # type: ignore[attr-defined]
+    return service
+
+
+def test_run_workflow_starts_subprocess(tmp_path: Path) -> None:
+    """run_workflow returns a dict with pid and workflow name."""
+    import subprocess
+    from unittest.mock import MagicMock, patch
+
+    mock_proc = MagicMock()
+    mock_proc.pid = 99999
+
+    service = _build_service_with_workflows(["my-workflow"])
+
+    with patch("dadaia_workspace.features.panel.service.subprocess.Popen", return_value=mock_proc):
+        result = service.run_workflow("my-workflow")
+
+    assert result["workflow"] == "my-workflow"
+    assert result["pid"] == 99999
+
+
+def test_run_workflow_unknown_returns_error(tmp_path: Path) -> None:
+    """run_workflow raises RuntimeError with 'not found' for unknown workflows."""
+    import pytest
+
+    service = _build_service_with_workflows(["existing-workflow"])
+
+    with pytest.raises(RuntimeError, match="not found"):
+        service.run_workflow("nonexistent-workflow")
+
+
+def test_run_workflow_already_running_409(tmp_path: Path) -> None:
+    """run_workflow raises RuntimeError with 'already running' when PID is alive."""
+    import subprocess
+    from unittest.mock import MagicMock, patch
+
+    mock_proc = MagicMock()
+    mock_proc.pid = 12345
+
+    service = _build_service_with_workflows(["my-workflow"])
+
+    with patch("dadaia_workspace.features.panel.service.subprocess.Popen", return_value=mock_proc):
+        service.run_workflow("my-workflow")
+
+    import pytest
+
+    with patch("dadaia_workspace.features.panel.service.os.kill", return_value=None):
+        with pytest.raises(RuntimeError, match="already running"):
+            service.run_workflow("my-workflow")

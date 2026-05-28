@@ -471,7 +471,8 @@ def test_panel_js_has_token_bootstrap() -> None:
     """panel-defects Bug 3: PANEL_JS must include token bootstrap from URLSearchParams."""
     panel_js = _build_panel_js()
     assert "panel_token" in panel_js
-    assert "sessionStorage" in panel_js
+    # T-WH-01: localStorage persists across tab close; sessionStorage was cleared on tab close
+    assert "localStorage" in panel_js
     assert "URLSearchParams" in panel_js
     assert "history.replaceState" in panel_js
 

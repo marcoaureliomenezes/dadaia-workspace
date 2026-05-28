@@ -92,11 +92,13 @@ Scope defaults to all three unless `audit_scope` input restricts it.
 
 ## Skills consumed
 
-- `architect-code-audit` — code structure inspection heuristics
 - `dadaia-workspace-spec-reviewer` — memory vs implementation diff protocol
 - `drift-detection` — memory-to-code diff algorithm; dead-code detection; 1–10 scoring rubric; dadaia CLI commands
 - `project-orchestration` — agent inventory; dispatch protocol; escalation ladder
 - `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after audit report
+
+Code structure inspection heuristics (layering rules, module boundary analysis) are embedded
+in this agent's training — no external skill file is required.
 
 ---
 

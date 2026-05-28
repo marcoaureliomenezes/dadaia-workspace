@@ -1,5 +1,5 @@
-release: none
-phase: none
+release: workspace-hardening-v1
+phase: IMPLEMENTATION
 
 # History
 # 2026-05-23 — backlog-consolidation-r1-v1 advanced to CLOSURE. All T-BCR-01..09 [x]. dadaia public doctor all [ok].
