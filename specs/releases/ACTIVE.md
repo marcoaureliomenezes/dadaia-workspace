@@ -1,7 +1,8 @@
-release: workspace-hardening-v1
-phase: IMPLEMENTATION
+release: none
+phase: none
 
 # History
+# 2026-05-28 — workspace-hardening-v1 CLOSED + ARCHIVED. All T-WH-01..19 [x]. 1711 tests green, 86.07% coverage. dadaia public doctor all [ok].
 # 2026-05-23 — backlog-consolidation-r1-v1 advanced to CLOSURE. All T-BCR-01..09 [x]. dadaia public doctor all [ok].
 # 2026-05-23 — backlog-consolidation-r1-v1 opened. Tier A: bug-reporting infra (Phase 1+2), doctor git-dirty check, DEV guardrail extension, 4 deactivate bug fixes, data-architect universal agent (21st), backlog staleness cleanup.
 # 2026-05-23 — codex-runtime-agent-hotfix-v1 CLOSED + ARCHIVED. T-CX-HOTFIX-01 complete. dadaia public doctor all [ok].
