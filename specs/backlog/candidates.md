@@ -24,7 +24,6 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 - dashboard-publication-workflow-v1 — Novo workflow para fluxo data-analyst: build dashboard (data-analyst) → visual review (design-specialist) → publish via DABs (data-analyst). Diferido por operator decision Q3 em `agents-r3-v1`. (owner: product-engineer, contexto: `_archive/releases/agents-r3-v1/CLOSURE.md § Backlog returns`)
 - ai-entity-refinement-workflow-v1 — Novo workflow para fluxo ai-engineer: audit (ai-engineer) → refine personas/skills/rules (ai-engineer) → validate (ai-engineer + product-engineer) → install (devops-engineer). Diferido por operator decision Q3 em `agents-r3-v1`. (owner: product-engineer, contexto: `_archive/releases/agents-r3-v1/CLOSURE.md § Backlog returns`)
 - ai-engineer-recursive-bootstrap-v1 — Primeira dispatch real de `ai-engineer` (Sonnet 4.6 — ADR-X4 moveu de Opus 4.7) na sua própria superfície (audit + autoria/refinamento de skills, rules, workflows, commands, agents, hooks). Diferido por operator decision Q4 em `agents-r3-v1`. Requisito antes de promover: pelo menos uma dispatch real bem-sucedida em escopo restrito. (owner: ai-engineer, contexto: `_archive/releases/agents-r3-v1/CLOSURE.md § Backlog returns`)
-- cli-asset-granular — Adicionar operações granulares de assets à CLI: `dadaia public list`, `dadaia public install --only rules`, etc.; baixa prioridade. (owner: software-engineer-python, contexto: `z_bug_specs.md` G3 — discovery source `agent-comms-v1`)
 - reports-next-cli — `dadaia reports next` (v2): descobre o próximo handoff esperado dado o estado atual do workspace. (owner: software-engineer-python, contexto: SPEC `agent-comms-v1` § Out-of-scope)
 - reports-mcp-server — MCP integration (v3): emissão programática de handoff via servidor MCP em vez de skill markdown. (owner: software-architect, contexto: SPEC `agent-comms-v1` § Out-of-scope)
 - reports-evaluator — Evaluator semântico (v4): valida qualidade dos findings, não apenas estrutura JSON. (owner: qa-engineer, contexto: SPEC `agent-comms-v1` § Out-of-scope)
@@ -39,7 +38,6 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 - agent-monitoring-threshold-alerts-v2 — Threshold alerts e cost-per-day notifications. (owner: product-engineer, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
 - agent-monitoring-multi-host-v2 — Agregação cross-host quando workspace rodar em mais de uma máquina. (owner: software-architect, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
 - agent-monitoring-frontmatter-completo-v2 — Ler frontmatter completo de SKILL.md (autores, tags, parâmetros). (owner: software-engineer-python, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
-- panel-workflow-run-dispatcher — "Run this workflow" invocation: integração com Claude Code dispatcher via POST endpoint no painel. (owner: software-engineer-python, contexto: `_archive/releases/dadaia-workspace-panel-r3-v1/SPEC.md §8.2`)
 - hotfix-release-workflow — Iterações futuras sobre `hotfix-release.workflow.md` (dry-run mode, version bump automático, integração com qa-engineer stub). (owner: product-engineer, contexto: SPEC `sdd-hotfix-track-v1` "Delta de workflow")
 - vintage-bucket-doc — Documentar Vintage bucket em `docs/sdd-migration-playbook.md` com lista das 10 releases pré-SemVer. (owner: software-engineer-python, contexto: SPEC `sdd-hotfix-track-v1` D14)
 - release-pipeline — Pipeline de release semver/build/publicação cross-repo. (owner: devops-engineer, contexto: `_archive/legacy-features/release-pipeline/SPEC.md`)
@@ -47,6 +45,9 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 - security — Security spec workspace-level. (owner: software-architect, contexto: `_archive/legacy-features/security/SPEC.md`)
 
 ## Histórico (candidatas promovidas a release ou resolvidas)
+
+- cli-asset-granular → **RESOLVIDA** em `workspace-hardening-v1` (2026-05-28): `dadaia public list` + `dadaia public install --only <type>` entregues em T-WH-11+12.
+- panel-workflow-run-dispatcher → **RESOLVIDA** em `workspace-hardening-v1` (2026-05-28): POST `/api/workflows/<name>/run` + Run button no card grid entregues em T-WH-14..17.
 
 - context-deactivate-hardening-v1 → **RESOLVIDA** em `backlog-consolidation-r1-v1` (2026-05-23): 4 bugs de `dadaia context deactivate` corrigidos em T-BCR-04 (`git_subprocess.py`, `service.py`).
 - panel-workspace-resolver-fix → **MERGED** em `dadaia-workspace-panel-r5-v1` (2026-05-21): fix de `_resolve_workspace()` incluído em Phase A, task T-P5-06.
