@@ -52,7 +52,15 @@ class _StubView:
 
 def _make_stubs() -> dict[str, _StubView]:
     """Return a dict of stub views keyed by route name."""
-    names = ["index", "api_panel_status", "health", "api_contexts", "memory", "memory_view", "static"]
+    names = [
+        "index",
+        "api_panel_status",
+        "health",
+        "api_contexts",
+        "memory",
+        "memory_view",
+        "static",
+    ]
     return {n: _StubView(name=n) for n in names}
 
 
