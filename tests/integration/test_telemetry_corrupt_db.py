@@ -116,7 +116,7 @@ def _build_panel_server(token: str, svc: TelemetryService) -> ThreadingHTTPServe
 
     stub_views = {
         "index": _stub_view,
-        "api_servers": _stub_json,
+        "api_panel_status": _stub_json,
         "api_contexts": _stub_json,
         "api_workflows": _stub_json,
         "memory": _stub_view,

@@ -54,7 +54,7 @@ def _build_views(tmp_path: Path) -> dict:  # type: ignore[type-arg]
     )
     return {
         "index": render_index(service),
-        "api_servers": render_api_servers(service),
+        "api_panel_status": render_api_servers(service),
         "api_contexts": render_api_contexts(service),
         "memory": render_memory(tmp_path),
         "memory_view": render_memory_wrapper(tmp_path),
@@ -70,7 +70,7 @@ def _build_views(tmp_path: Path) -> dict:  # type: ignore[type-arg]
 def test_all_view_keys_present(tmp_path: Path) -> None:
     """All 6 required view keys must be present."""
     views = _build_views(tmp_path)
-    expected_keys = {"index", "api_servers", "api_contexts", "memory", "memory_view", "static"}
+    expected_keys = {"index", "api_panel_status", "api_contexts", "memory", "memory_view", "static"}
     assert set(views.keys()) == expected_keys
 
 
@@ -84,10 +84,10 @@ def test_index_view_callable(tmp_path: Path) -> None:
     assert len(body) > 0
 
 
-def test_api_servers_view_callable(tmp_path: Path) -> None:
-    """api_servers view must return (200, 'application/json; charset=utf-8', bytes)."""
+def test_api_panel_status_view_callable(tmp_path: Path) -> None:
+    """api_panel_status view must return (200, 'application/json; charset=utf-8', bytes)."""
     views = _build_views(tmp_path)
-    status, ct, body = views["api_servers"]()
+    status, ct, body = views["api_panel_status"]()
     assert status == 200
     assert "application/json" in ct
     assert isinstance(body, bytes)
@@ -128,9 +128,17 @@ def test_memory_view_wrapper_callable(tmp_path: Path) -> None:
     status, ct, body = views["memory_view"](slug="dadaia-workspace", path="architecture.html")
     assert status == 200
     assert "text/html" in ct
-    html = body.decode("utf-8")
-    assert "iframe" in html
-    assert "/memory/dadaia-workspace/architecture.html" in html
+    page = body.decode("utf-8")
+    assert "iframe" in page
+    assert "/memory/dadaia-workspace/architecture.html" in page
+
+
+def test_memory_view_wrapper_links_memory_css(tmp_path: Path) -> None:
+    """T-PUX-03: memory_view must link /static/memory.css for panel visual identity."""
+    views = _build_views(tmp_path)
+    status, _, body = views["memory_view"](slug="dadaia-workspace", path="architecture.html")
+    assert status == 200
+    assert "/static/memory.css" in body.decode("utf-8")
 
 
 def test_static_css_callable(tmp_path: Path) -> None:

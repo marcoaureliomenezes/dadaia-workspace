@@ -1,10 +1,27 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.1.1"
-description = "AI-native workspace management CLI with Spec Context Projects"
+version = "0.1.2"
+description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and OpenCode"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
+keywords = [
+    "ai-agents", "claude-code", "codex", "opencode",
+    "workspace", "multi-agent", "sdd", "spec-driven-development",
+    "developer-tools", "cli", "agentic"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Systems Administration",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 
 [tool.poetry.scripts]
 dadaia = "dadaia_workspace.cli.main:_safe_app"
@@ -51,6 +68,7 @@ addopts = "--cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
 source = ["dadaia_workspace"]
+parallel = false
 
 [tool.coverage.report]
 exclude_lines = [

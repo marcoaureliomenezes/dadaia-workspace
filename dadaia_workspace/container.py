@@ -22,6 +22,7 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_sessions,
     render_api_workflow_detail,
     render_api_workflows_list,
+    render_health,
     serve_report_file,
 )
 from dadaia_workspace.features.panel.views.index import render_index
@@ -224,7 +225,8 @@ def build_panel_views(
     # detail endpoint (get_detail needs name resolution against the filesystem).
     return {
         "index": render_index(service),
-        "api_servers": render_api_servers(service),
+        "api_panel_status": render_api_servers(service),
+        "health": render_health(),
         "api_contexts": render_api_contexts(service),
         "api_academy": render_api_academy(service),
         "api_reports": render_api_reports(service),

@@ -147,7 +147,7 @@ def _build_server(token: str, telemetry: _FixtureTelemetry):
 
     stub_views: dict[str, Any] = {
         "index": lambda **kw: (200, "text/html; charset=utf-8", b"<html>ok</html>"),
-        "api_servers": lambda **kw: (200, "application/json", b"{}"),
+        "api_panel_status": lambda **kw: (200, "application/json", b"{}"),
         "api_contexts": lambda **kw: (200, "application/json", b"{}"),
         "api_workflows": lambda **kw: (
             200,

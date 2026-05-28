@@ -2,14 +2,14 @@
 
 ## Arquivos internos do workspace usados como base
 
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/constitution.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/SPEC.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/memory/product.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/memory/architecture.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/memory/tech-stack.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/foundation/SPEC.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/features/spec-context-project/SPEC.md`
-- `/home/marco/workspace/projects/data_master/dadaia-workspace/specs/features/agent-rules-skills/SPEC.md`
+- `<workspace-root>/dadaia-workspace/specs/constitution.md`
+- `<workspace-root>/dadaia-workspace/specs/SPEC.md`
+- `<workspace-root>/dadaia-workspace/specs/memory/product.md`
+- `<workspace-root>/dadaia-workspace/specs/memory/architecture.md`
+- `<workspace-root>/dadaia-workspace/specs/memory/tech-stack.md`
+- `<workspace-root>/dadaia-workspace/specs/foundation/SPEC.md`
+- `<workspace-root>/dadaia-workspace/specs/features/spec-context-project/SPEC.md`
+- `<workspace-root>/dadaia-workspace/specs/features/agent-rules-skills/SPEC.md`
 
 ## Objetivo dessas referencias
 

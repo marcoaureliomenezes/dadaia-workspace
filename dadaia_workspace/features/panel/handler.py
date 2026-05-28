@@ -23,10 +23,10 @@ Security headers (T-AM-14, T8):
   _security_headers(content_type) — CSP for HTML, nosniff for JSON.
 
 404 body (T-2.3, constitution error contract — updated for T-AM-15):
-  "Route not found. The panel exposes / /api/servers /api/contexts
+  "Route not found. The panel exposes / /api/panel-status /api/contexts
    /api/agents /api/agents/<id>/sessions /api/workflows
    /api/sessions /api/sessions/<runtime>/<session_id>
-   /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>.
+   /health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>.
    Open / for the index."
 """
 
@@ -62,11 +62,11 @@ _CSP_SCRIPT_HASH_2 = "'sha256-u9QKVWf5nJ6CpgKA7eHqzt+KvUm6M4dcZhYWRxJuAbA='"
 
 _NOT_FOUND_BODY = (
     b"Route not found. "
-    b"The panel exposes / /api/servers /api/contexts "
+    b"The panel exposes / /api/panel-status /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
     b"/api/workflows /api/workflows/<name> "
     b"/api/sessions /api/sessions/<runtime>/<session_id> "
-    b"/memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
+    b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
 
@@ -99,9 +99,10 @@ _FORBIDDEN_JSON_KEYS: frozenset[str] = frozenset(
 #   /api/agents                    canonical agent catalog with telemetry overlay
 #   /api/agents/<id>/sessions      per-agent session list
 #   /api/contexts                  active Spec Context Projects
-#   /api/servers                   server registry grouped by context
+#   /api/panel-status              server registry grouped by context
 #   /api/sessions                  active sessions across all runtimes
 #   /api/sessions/<runtime>/<id>   single session detail
+#   /health                        health probe (no auth, agent-friendly)
 # ---------------------------------------------------------------------------
 
 # Route patterns: order matters — more-specific patterns first.
@@ -116,7 +117,8 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     # /api/sessions/<runtime>/<session_id> must come before /api/sessions (more specific first).
     (r"^/api/sessions/(?P<runtime>[^/]+)/(?P<session_id>[^/]+)$", "api_session_detail"),
     (r"^/api/sessions$", "api_sessions"),
-    (r"^/api/servers$", "api_servers"),
+    (r"^/api/panel-status$", "api_panel_status"),
+    (r"^/health$", "health"),
     (r"^/api/academy$", "api_academy"),
     # /api/reports/<path> must come before /api/reports$ (more specific first).
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete"),
@@ -214,7 +216,7 @@ def make_handler_class(
         capture groups from the regex as keyword arguments and returns a
         ``(status_code, content_type, body_bytes)`` triple.
 
-        Required keys: ``"index"``, ``"api_servers"``, ``"api_contexts"``,
+        Required keys: ``"index"``, ``"api_panel_status"``, ``"api_contexts"``,
         ``"api_academy"``, ``"memory"``, ``"memory_view"``, ``"static"``.
 
     token:
@@ -313,7 +315,7 @@ def make_handler_class(
 
             # ------------------------------------------------------------------
             # Existing routes (no auth required in v1 for non-/api/* paths).
-            # /api/servers and /api/contexts are in views dict — they do NOT
+            # /api/panel-status and /api/contexts are in views dict — they do NOT
             # require Bearer in v1 to preserve backward compatibility.
             # ------------------------------------------------------------------
             for pattern, view in self._routes:
