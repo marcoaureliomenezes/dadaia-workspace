@@ -1,8 +1,8 @@
-"""Panel API views — JSON endpoints for /api/servers, /api/contexts, /api/agents, /api/agents/<id>/prompt, /api/workflows, /api/workflows/<name>, /api/sessions, /api/sessions/<runtime>/<session_id>.
+"""Panel API views — JSON endpoints for /api/panel-status, /api/contexts, /api/agents, /api/agents/<id>/prompt, /api/workflows, /api/workflows/<name>, /api/sessions, /api/sessions/<runtime>/<session_id>.
 
 JSON shapes (stable contract — if changed, panel.js must be updated in lockstep):
 
-/api/servers response:
+/api/panel-status response:
   {
     "groups": [
       {
@@ -941,6 +941,23 @@ def delete_report_file(
         if sidecar.exists():
             sidecar.unlink()
         return (200, "application/json; charset=utf-8", b'{"deleted": true}')
+
+    return _view
+
+
+def render_health() -> Callable[..., tuple[int, str, bytes]]:
+    """Return a view callable for GET /health — public, no auth, agent-friendly."""
+    import importlib.metadata
+
+    try:
+        version = importlib.metadata.version("dadaia-workspace")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+
+    body = json.dumps({"status": "ok", "version": version}).encode()
+
+    def _view(**_kwargs: object) -> tuple[int, str, bytes]:
+        return (200, "application/json", body)
 
     return _view
 

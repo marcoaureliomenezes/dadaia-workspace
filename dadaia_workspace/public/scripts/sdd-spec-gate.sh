@@ -96,10 +96,15 @@ fi
 # legacy), plus the product/ subfolder (catalog with index + per-feature HTMLs),
 # unless ACTIVE.md phase == CLOSURE. Evaluated BEFORE the meta-edit allow-list
 # so it cannot be bypassed by naming the file *.md or by nesting in product/.
+# v3.2: derive specs_dir from FPATH, not primary_context — fixes cross-repo
+# false-positives when primary context is a different repo in a non-CLOSURE phase.
 case "$FPATH" in
     */specs/memory/*.html|*/specs/memory/*.md|*/specs/memory/product/*.html|*/specs/memory/product/*.md)
-        if [ "$ACTIVE_PHASE" != "CLOSURE" ]; then
-            _block "[SDD GATE] memory/ é atômico. Apenas product-engineer em fase CLOSURE pode editar (release ativa: ${ACTIVE_RELEASE:-none}, phase: ${ACTIVE_PHASE:-none}). Para atualizar memory: terminar implementação, marcar todas as tasks [x], setar phase=CLOSURE em releases/ACTIVE.md, e usar a skill dadaia-release-closure."
+        FILE_SPECS_DIR="$(echo "$FPATH" | sed -E 's|/specs/.*||')/specs"
+        FILE_ACTIVE_RELEASE=$(grep -E '^release:' "$FILE_SPECS_DIR/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')
+        FILE_ACTIVE_PHASE=$(grep -E '^phase:' "$FILE_SPECS_DIR/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//')
+        if [ "$FILE_ACTIVE_PHASE" != "CLOSURE" ]; then
+            _block "[SDD GATE] memory/ é atômico. Apenas product-engineer em fase CLOSURE pode editar (release ativa: ${FILE_ACTIVE_RELEASE:-none}, phase: ${FILE_ACTIVE_PHASE:-none}). Para atualizar memory: terminar implementação, marcar todas as tasks [x], setar phase=CLOSURE em releases/ACTIVE.md, e usar a skill dadaia-release-closure."
         fi
         _log "allowed — memory edit in CLOSURE phase: $FPATH"
         exit 0

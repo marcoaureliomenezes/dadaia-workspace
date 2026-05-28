@@ -45,3 +45,6 @@ Thumbs.db
 node_modules/
 playwright-report/
 test-results/
+
+# dadaia agent reports (absolute paths, not for version control)
+.dadaia/reports/

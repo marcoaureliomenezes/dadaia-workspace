@@ -148,15 +148,15 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             "Index page missing Agents/Workflows section marker"
         )
 
-        # --- /api/servers ---
+        # --- /api/panel-status ---
         # Response shape: {"groups": [...]}  (see views/api.py contract docstring)
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/servers", timeout=5) as resp:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/panel-status", timeout=5) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
-            assert "application/json" in ct, f"Unexpected content-type for /api/servers: {ct}"
+            assert "application/json" in ct, f"Unexpected content-type for /api/panel-status: {ct}"
             servers_data = json.loads(resp.read())
-            assert isinstance(servers_data, dict), "/api/servers must return a JSON object"
-            assert "groups" in servers_data, "/api/servers response missing 'groups' key"
+            assert isinstance(servers_data, dict), "/api/panel-status must return a JSON object"
+            assert "groups" in servers_data, "/api/panel-status response missing 'groups' key"
             assert isinstance(servers_data["groups"], list), "'groups' must be a list"
 
         # --- /api/contexts ---

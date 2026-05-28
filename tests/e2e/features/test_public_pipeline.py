@@ -394,6 +394,8 @@ EXPECTED_WORKFLOWS = {
     "audit-cycle",
     "code-review-fan-out",
     "cross-cutting-feature",
+    "dashboard-publication",
+    "design-first-implementation",
     "game-dev-cycle",
     "hotfix-release",
     "onboarding-new-repo",

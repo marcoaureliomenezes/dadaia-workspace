@@ -9,7 +9,7 @@ they return a minimal ``(status, content_type, body)`` triple.
 
 Assertions:
   (a) ``/`` invokes the index view with no captured groups.
-  (b) ``/api/servers`` invokes the api_servers view with no captured groups.
+  (b) ``/api/panel-status`` invokes the api_panel_status view with no captured groups.
   (c) ``/memory/foo/bar.html`` invokes the memory view with
       ``slug="foo"``, ``path="bar.html"``.
   (d) ``/memory-view/foo/bar.html`` invokes the memory_view view with
@@ -17,6 +17,7 @@ Assertions:
   (e) ``/static/panel.css`` invokes the static view with
       ``name="panel.css"``.
   (f) ``/unknown`` returns HTTP 404 with the error-contract body.
+  (g) ``/health`` returns HTTP 200 with JSON body (public, no auth).
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ class _StubView:
 
 def _make_stubs() -> dict[str, _StubView]:
     """Return a dict of stub views keyed by route name."""
-    names = ["index", "api_servers", "api_contexts", "memory", "memory_view", "static"]
+    names = ["index", "api_panel_status", "health", "api_contexts", "memory", "memory_view", "static"]
     return {n: _StubView(name=n) for n in names}
 
 
@@ -132,15 +133,15 @@ def test_dispatch_index() -> None:
             assert stub.call_count == 0, f"Unexpected call to stub '{name}'"
 
 
-def test_dispatch_api_servers() -> None:
-    """(b) GET /api/servers invokes the api_servers stub with no captured groups."""
+def test_dispatch_api_panel_status() -> None:
+    """(b) GET /api/panel-status invokes the api_panel_status stub with no captured groups."""
     stubs = _make_stubs()
     handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
-    _dispatch(handler_class, "/api/servers")
+    _dispatch(handler_class, "/api/panel-status")
 
-    assert stubs["api_servers"].call_count == 1
-    assert stubs["api_servers"].last_kwargs == {}
+    assert stubs["api_panel_status"].call_count == 1
+    assert stubs["api_panel_status"].last_kwargs == {}
 
 
 def test_dispatch_api_contexts() -> None:
@@ -203,13 +204,32 @@ def test_dispatch_unknown_returns_404_with_error_contract_body() -> None:
 
 
 def test_dispatch_strips_query_string_before_matching() -> None:
-    """Route matching strips query string so /api/servers?x=1 still dispatches."""
+    """Route matching strips query string so /api/panel-status?x=1 still dispatches."""
     stubs = _make_stubs()
     handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
-    _dispatch(handler_class, "/api/servers?refresh=1")
+    _dispatch(handler_class, "/api/panel-status?refresh=1")
 
-    assert stubs["api_servers"].call_count == 1
+    assert stubs["api_panel_status"].call_count == 1
+
+
+def test_dispatch_health_returns_200() -> None:
+    """(g) GET /health returns HTTP 200 with JSON body containing status=ok (public, no auth)."""
+    import json
+
+    stubs = _make_stubs()
+    # Override health stub to return a realistic JSON body.
+    stubs["health"].content_type = "application/json"
+    stubs["health"].body = json.dumps({"status": "ok", "version": "0.1.2"}).encode()
+    stubs["health"].status = 200
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+
+    status, body = _dispatch(handler_class, "/health")
+
+    assert status == 200
+    assert stubs["health"].call_count == 1
+    data = json.loads(body)
+    assert data["status"] == "ok"
 
 
 def test_dispatch_memory_nested_path() -> None:
