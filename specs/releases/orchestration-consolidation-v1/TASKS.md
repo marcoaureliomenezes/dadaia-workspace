@@ -53,7 +53,7 @@
 
 ### Phase 4 — Fix Workflow Contradiction
 
-- [-] **T-OCV-04** | owner: ai-engineer | phase: 4 | AC: AC-OC-07
+- [x] **T-OCV-04** | owner: ai-engineer | phase: 4 | AC: AC-OC-07
   - **Description:** Fix `cross-cutting-feature.workflow.md` self-contradiction. In the YAML front-matter, change `discovery.agent: project-manager` → `agent: product-engineer`. Verify the prose `## Stages` step-1 already names `product-engineer`; if not, update to match. Both must agree.
   - **Target:** `dadaia_workspace/public/workflows/cross-cutting-feature.workflow.md`
   - **Preconditions:** TASKS.md marker flipped to `[-]`. No dependency on T-OCV-01..03 (disjoint file); however ai-engineer must complete any in-progress task before starting this one (one `[-]` per owner at a time).
@@ -130,7 +130,7 @@
 | T-OCV-01 | 1 — PM halt bug fix | ai-engineer | AC-OC-01, AC-OC-02 | `[x]` |
 | T-OCV-02 | 2 — Inventory reconcile | ai-engineer | AC-OC-03, AC-OC-04 | `[x]` |
 | T-OCV-03 | 3 — Add playbooks (schema) | ai-engineer | AC-OC-05, AC-OC-06, AC-OC-14, AC-OC-15 | `[x]` |
-| T-OCV-04 | 4 — Cross-cutting fix | ai-engineer | AC-OC-07 | `[ ]` |
+| T-OCV-04 | 4 — Cross-cutting fix | ai-engineer | AC-OC-07 | `[x]` |
 | T-OCV-05a | 5a — D-OC-1 design note | ai-engineer | (precondition for AC-OC-09) | `[ ]` |
 | T-OCV-05b | 5b — Backlog cleanup | product-engineer | AC-OC-08 | `[ ]` |
 | T-OCV-06b | 5c — D-OC-1 implementation | software-engineer-python | AC-OC-09 | `[ ]` |
