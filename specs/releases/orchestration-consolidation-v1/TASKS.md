@@ -35,7 +35,7 @@
 
 ### Phase 2 — Reconcile SKILL.md Inventory
 
-- [ ] **T-OCV-02** | owner: ai-engineer | phase: 2 | AC: AC-OC-03, AC-OC-04
+- [-] **T-OCV-02** | owner: ai-engineer | phase: 2 | AC: AC-OC-03, AC-OC-04
   - **Description:** Reconcile `project-orchestration/SKILL.md` Workflow Inventory: update count to 7; remove `dashboard-publication` and `design-first-implementation` rows; add cross-reference note to each row pointing to its `*.workflow.md` file. Remove duplicate `spec-refinement` playbook entry — the `scope=game` sub-section in the removed duplicate MUST be preserved (retained in the surviving entry or cross-referenced into `spec-refinement.workflow.md`; content loss is a failure). Add cross-reference to workflow file in surviving spec-refinement playbook entry.
   - **Target:** `dadaia_workspace/public/skills/project-orchestration/SKILL.md`
   - **Preconditions:** T-OCV-01 done (confirms Tier-1 set).
