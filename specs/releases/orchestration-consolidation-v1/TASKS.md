@@ -44,7 +44,7 @@
 
 ### Phase 3 — Add PM Playbooks (mandatory schema)
 
-- [ ] **T-OCV-03** | owner: ai-engineer | phase: 3 | AC: AC-OC-05, AC-OC-06, AC-OC-14, AC-OC-15
+- [-] **T-OCV-03** | owner: ai-engineer | phase: 3 | AC: AC-OC-05, AC-OC-06, AC-OC-14, AC-OC-15
   - **Description:** Add 5 PM Playbook sections to `project-orchestration/SKILL.md`: `data-pipeline-cycle`, `ai-entity-refinement`, `ai-engineer-recursive-bootstrap`, `dashboard-publication` (folded), `design-first-implementation` (folded). Each section MUST follow the mandatory 7-field schema: `**Trigger:**`, `**Entry:**`, `**Input contract:**`, `**Steps:**`, `**Gate:**` (conditional), `**Stop conditions:**`, `**Done when:**`. Where cheap, retrofit existing playbooks with the same schema. The `ai-engineer-recursive-bootstrap` playbook's `**Gate:**` must require the recognition token `APPROVED: ai-engineer-recursive-bootstrap scope=[<explicit named-file list>]`. `**Stop conditions:**` must include: "any edit outside the approved file list → pause immediately, list the edit, escalate to operator."
   - **Target:** `dadaia_workspace/public/skills/project-orchestration/SKILL.md`
   - **Preconditions:** T-OCV-02 done.
