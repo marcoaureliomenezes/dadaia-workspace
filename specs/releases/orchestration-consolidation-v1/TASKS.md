@@ -62,7 +62,7 @@
 
 ### Phase 5a — D-OC-1 Design Note
 
-- [ ] **T-OCV-05a** | owner: ai-engineer | phase: 5a | AC: (precondition for AC-OC-09)
+- [-] **T-OCV-05a** | owner: ai-engineer | phase: 5a | AC: (precondition for AC-OC-09)
   - **Description:** Write the D-OC-1 design note as a comment or addendum visible to software-engineer-python. Specify: (1) parsing logic for extracting Tier-1/Tier-2 names from `project-manager.md` Step-3; (2) parsing logic for extracting `### Playbook — <name>` headings from SKILL.md; (3) the precise D-OC-1 rule statement covering both directions (forward: router→artifact; reverse: artifact→router with `[deprecated]` escape); (4) the expected error message format. Deliver the design note in a comment block within T-OCV-06b's description update in this TASKS.md, or as an inline note in PLAN.md Phase 5a section.
   - **Target:** This TASKS.md (inline design note) or PLAN.md Phase 5a section.
   - **Preconditions:** T-OCV-03 done (playbook schema is final before parsing spec is written).
