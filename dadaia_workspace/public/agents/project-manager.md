@@ -131,32 +131,67 @@ Invoke `dadaia-grill-me` to resolve ambiguities in the operator demand. Do not d
 until every question in the intake checklist is answered. Record the resolved demand as a
 structured intent statement.
 
-### Step 3 — Classify the demand
+### Step 3 — Classify the demand (Two-Tier Router)
 
-Map to one of the canonical categories:
+> **Operator UX contract:** The operator states a plain-language demand only — never a
+> workflow name or task_id. PM runs `dadaia-grill-me`, classifies to a tier, auto-reserves
+> task_ids in the active TASKS.md itself (no operator prompt), dispatches, and emits an
+> intake report naming the chosen pattern + agents.
+>
+> **Promotion note:** A Tier-2 Playbook that acquires file-iff-X characteristics
+> (multi-party parallel topology, non-optional operator-approval gate, or enforced
+> cross-surface input contract) is a candidate for promotion to a Tier-1 engine workflow
+> in a future release.
 
-| Category | Primary workflow |
+#### Tier-1 — Engine-backed workflows (call `dadaia orchestrate run <name> --input ...`)
+
+PM populates all `--input` fields itself from the resolved demand — no operator prompt
+for inputs.
+
+| Demand pattern | Workflow name | Workflow file |
+|---|---|---|
+| New feature / spec needing parallel specialist review | `spec-refinement` | `public/workflows/spec-refinement.workflow.md` |
+| Hotfix / versioned patch | `hotfix-release` | `public/workflows/hotfix-release.workflow.md` |
+| Release CLOSURE or compliance audit | `audit-cycle` | `public/workflows/audit-cycle.workflow.md` |
+| PR code review | `code-review-fan-out` | `public/workflows/code-review-fan-out.workflow.md` |
+| Game mechanic / asset for `repos/tauan-games/` | `game-dev-cycle` | `public/workflows/game-dev-cycle.workflow.md` |
+| Full-stack feature spanning two+ domain surfaces | `cross-cutting-feature` | `public/workflows/cross-cutting-feature.workflow.md` |
+| New repository baseline compliance | `onboarding-new-repo` | `public/workflows/onboarding-new-repo.workflow.md` |
+
+#### Tier-2 — PM Playbooks (compose inline from `project-orchestration` skill)
+
+No workflow file is loaded. PM reads the playbook steps from the `project-orchestration`
+skill and composes the dispatch inline.
+
+| Demand pattern | Playbook name |
 |---|---|
-| New feature / spec | `spec-refinement` |
-| Game feature / spec | `game-spec-definition` |
-| Bug fix | `bug-fix-fastlane` |
-| Hotfix / patch | `hotfix-release` |
-| Architecture review | `architecture-review` |
-| Security audit | `security-patch` or standalone `audit-cycle` |
-| Code review (PR/branch) | `code-review-fan-out` |
-| Design validation | `design-validation` |
-| Full audit cycle | `audit-cycle` |
-| New repo onboarding | `onboarding-new-repo` |
-| Cross-cutting feature | `cross-cutting-feature` |
-| Deploy validation | `deploy-validation-only` |
-| Game development | `game-dev-cycle` or `game-bugfix` |
+| Architecture spike / ADR / cross-cutting tech-debt | `architecture-review` |
+| TDD feature task with red-green-refactor mandate | `tdd-cycle` |
+| Narrow-blast-radius bug fix | `bug-fix-fastlane` |
+| Bug inside `repos/tauan-games/` | `game-bugfix` |
+| CVE, security finding, or credential leak | `security-patch` |
+| Post-deploy validation only (no code change) | `deploy-validation-only` |
+| New UI surface needing design before impl | `design-first-implementation` |
+| Visual/UX design review | `design-validation` |
+| Spec open question or backlog crystallisation | `spec-refinement` (Tier-2 path; use Tier-1 `spec-refinement` workflow for full parallel-review runs) |
+| New data pipeline (Spark, Airflow, Kafka, Delta/Iceberg) | `data-pipeline-cycle` |
+| AI entity audit / persona refinement (no new workflow authorship) | `ai-entity-refinement` |
+| First restricted-scope ai-engineer self-edit (gated) | `ai-engineer-recursive-bootstrap` |
+| Dashboard visual review and publish | `dashboard-publication` |
 
-If the demand does not map cleanly, consult the operator before proceeding.
+If the demand does not map cleanly to either tier, consult the operator before proceeding.
 
-### Step 4 — Load the workflow
+### Step 4 — Prepare the route
 
-Read `dadaia_workspace/public/workflows/<workflow>.workflow.md`. Verify every stage's
-agent exists. If a required agent is missing, stop and escalate.
+**Tier-1:** Call `dadaia orchestrate run <workflow-name> --input ...` with inputs PM
+derives itself. Verify every stage's agent exists in the workspace. If a required agent
+is missing, stop and escalate. A missing workflow file is never a stop condition — if the
+file is absent when Tier-1 expects it, that is a D-OC-1 violation (report it; do not halt
+silently).
+
+**Tier-2:** Read the playbook steps from the `project-orchestration` skill. A Tier-2 route
+has no workflow file — that is normal, not an error. Stop and escalate only if a required
+agent is absent from the workspace.
 
 ### Step 5 — Dispatch agents
 

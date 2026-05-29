@@ -26,7 +26,7 @@
 
 ### Phase 1 — Fix PM Halt Bug
 
-- [-] **T-OCV-01** | owner: ai-engineer | phase: 1 | AC: AC-OC-01, AC-OC-02
+- [x] **T-OCV-01** | owner: ai-engineer | phase: 1 | AC: AC-OC-01, AC-OC-02
   - **Description:** Rewrite `project-manager.md` Step-3 and Step-4 — replace flat routing table with two-tier router (Tier-1: 7 engine-backed workflow names; Tier-2: PM Playbook pattern names). Replace Step-4 stop-and-escalate condition to trigger on missing agent only (not missing file). Add operator UX contract note (plain-language demand; PM auto-reserves task_ids; PM emits intake report naming pattern + agents). Add one-liner note that a PM Playbook acquiring file-iff-X characteristics is a candidate for Tier-1 promotion in a future release.
   - **Target:** `dadaia_workspace/public/agents/project-manager.md`
   - **Preconditions:** SPEC + PLAN approved. TASKS.md marked `[-]` for this task before edit.
@@ -127,7 +127,7 @@
 
 | Task ID | Phase | Owner | AC(s) | Status |
 |---|---|---|---|---|
-| T-OCV-01 | 1 — PM halt bug fix | ai-engineer | AC-OC-01, AC-OC-02 | `[ ]` |
+| T-OCV-01 | 1 — PM halt bug fix | ai-engineer | AC-OC-01, AC-OC-02 | `[x]` |
 | T-OCV-02 | 2 — Inventory reconcile | ai-engineer | AC-OC-03, AC-OC-04 | `[ ]` |
 | T-OCV-03 | 3 — Add playbooks (schema) | ai-engineer | AC-OC-05, AC-OC-06, AC-OC-14, AC-OC-15 | `[ ]` |
 | T-OCV-04 | 4 — Cross-cutting fix | ai-engineer | AC-OC-07 | `[ ]` |
