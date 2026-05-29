@@ -43,19 +43,21 @@ that make the agent unsuitable.
 
 ## Workflow Inventory
 
-7 canonical workflows (post-`agents-r2-v1` trim; 8 deprecated workflows moved to
-`specs/_archive/legacy-workflows/` and replaced by PM Playbooks below). Each row
-names the trigger event, the entry agent, and key intermediate stages.
+7 canonical Tier-1 engine-backed workflows (post-`agents-r2-v1` trim; 8 deprecated
+workflows moved to `specs/_archive/legacy-workflows/` and replaced by PM Playbooks
+below; `dashboard-publication` and `design-first-implementation` folded to PM Playbooks
+in `orchestration-consolidation-v1`). Each row names the trigger event, the entry agent,
+key intermediate stages, and the workflow file path for cross-reference.
 
-| # | Workflow file | Trigger | Entry Agent | Key Stages |
-|---|---|---|---|---|
-| W-01 | `spec-refinement` | New feature scope or spec ambiguity | project-manager | discovery → 5-way parallel specialist review → synthesis → product-engineer SPEC write |
-| W-02 | `hotfix-release` | Production defect requiring a versioned patch | project-manager | triage → implement → qa-engineer smoke → CLOSURE |
-| W-03 | `code-review-fan-out` | PR opened on monitored repo | code-reviewer | diff fetch → 6-axis review → report → approve/request-changes |
-| W-04 | `audit-cycle` | Release CLOSURE phase or scheduled compliance audit | project-auditor | memory inventory → diff walk → scoring → report → project-manager |
-| W-05 | `game-dev-cycle` | New game mechanic or asset for `repos/tauan-games/` | game-developer / game-designer | spec → impl → game-tester report |
-| W-06 | `cross-cutting-feature` | Full-stack feature requiring frontend + backend shipped together | software-architect (contract) | contract review → parallel FE + BE impl → integration validation |
-| W-07 | `onboarding-new-repo` | New repository requires baseline compliance assessment | project-manager | 3-way specialist audit → gap report → SPEC → remediation |
+| # | Workflow name | File | Trigger | Entry Agent | Key Stages |
+|---|---|---|---|---|---|
+| W-01 | `spec-refinement` | `public/workflows/spec-refinement.workflow.md` | New feature scope or spec ambiguity requiring parallel specialist review | project-manager | discovery → 5-way parallel specialist review → synthesis → product-engineer SPEC write |
+| W-02 | `hotfix-release` | `public/workflows/hotfix-release.workflow.md` | Production defect requiring a versioned patch | project-manager | triage → implement → qa-engineer smoke → CLOSURE |
+| W-03 | `code-review-fan-out` | `public/workflows/code-review-fan-out.workflow.md` | PR opened on monitored repo | code-reviewer | diff fetch → 6-axis review → report → approve/request-changes |
+| W-04 | `audit-cycle` | `public/workflows/audit-cycle.workflow.md` | Release CLOSURE phase or scheduled compliance audit | project-auditor | memory inventory → diff walk → scoring → report → project-manager |
+| W-05 | `game-dev-cycle` | `public/workflows/game-dev-cycle.workflow.md` | New game mechanic or asset for `repos/tauan-games/` | game-developer / game-designer | spec → impl → game-tester report |
+| W-06 | `cross-cutting-feature` | `public/workflows/cross-cutting-feature.workflow.md` | Full-stack feature requiring two+ domain surfaces shipped together | software-architect (contract) | contract review → parallel FE + BE impl → integration validation |
+| W-07 | `onboarding-new-repo` | `public/workflows/onboarding-new-repo.workflow.md` | New repository requires baseline compliance assessment | project-manager | 3-way specialist audit → gap report → SPEC → remediation |
 
 ---
 
@@ -379,37 +381,31 @@ before implementation.
 **Stop conditions:** design conflict with `memory/product/*.html` semantics →
 route to `product-engineer` for spec arbitration.
 
-### Playbook — spec-refinement
+### spec-refinement — Tier-1 engine-backed workflow
 
-**Trigger:** open question on an existing SPEC, ambiguity discovered mid-impl,
-or operator request to crystalise a backlog item.
+`spec-refinement` is a **Tier-1** workflow (file: `public/workflows/spec-refinement.workflow.md`).
+Use `dadaia orchestrate run spec-refinement --input ...` for full parallel-review runs.
 
-**Entry:** `product-engineer`.
+For lightweight spec questions (open question on an existing SPEC, ambiguity mid-impl,
+backlog crystallisation), PM may use the `spec-refinement` Tier-2 path: dispatch
+`product-engineer` directly without the engine — see the Tier-2 router table in
+`project-manager.md` Step-3.
 
-**Steps:**
-1. PM dispatches `product-engineer` with the SPEC path (or backlog item) and
-   the open question.
-2. PE runs `dadaia-grill-me` (skill) on the operator for the irresolvable
-   slice; resolves the answerable slice by code inspection.
-3. PE emits refine-specs report at
-   `.dadaia/reports/<context>/product-engineer/<UTC>-refine-specs.html` and
-   updates the SPEC/PLAN/TASKS as required (gate-permitted writes only).
-4. PM routes the refined SPEC back to the original workflow (impl, deploy, etc.).
+#### scope=game — preserved note
 
-#### scope=game
+`spec-refinement` replaces the pre-r2 `game-spec-definition` workflow. When the
+refinement scope is a game SPEC under `specs/releases/<id>/` whose deliverables live in
+`repos/tauan-games/`, the protocol adds two steps regardless of whether Tier-1 or Tier-2
+path is used:
 
-Replaces the pre-r2 `game-spec-definition` workflow. When the refinement scope
-is a game SPEC under `specs/releases/<id>/` whose deliverables live in
-`repos/tauan-games/`, the protocol adds two steps:
-
-- PE consults `game-developer` and/or `game-designer` (read-only via report
-  reference) for engine-specific constraints before drafting FRs.
+- `product-engineer` consults `game-developer` and/or `game-designer` (read-only via
+  report reference) for engine-specific constraints before drafting FRs.
 - The CLOSURE phase routes memory updates through
   `memory/product/<game-feature-slug>.html` and the relevant
   `memory/architecture.html` UE5/Phaser/Three.js section, not generic memory.
 
-**Stop conditions:** refinement reveals a missing release entirely → PE files
-a new candidate in `backlog/candidates.md` and surfaces to operator.
+**Stop conditions:** refinement reveals a missing release entirely → PE files a new
+candidate in `backlog/candidates.md` and surfaces to operator.
 
 ---
 
