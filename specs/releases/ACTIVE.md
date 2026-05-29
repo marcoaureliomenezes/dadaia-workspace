@@ -2,6 +2,11 @@ release: none
 phase: none
 
 # History
+# 2026-05-29 — opencode-runtime-parity-hardening-v1 CLOSED + ARCHIVED. All 18 tasks [x]. Suite green (1959 passed, 0 failed, 89.57% cov). public doctor 0 drift/missing, 21 agents [ok]. CLOSURE.md + memory updated; moved to _archive/releases/. (Git commit/push pending operator authorization.)
+# 2026-05-29 — All 18 tasks [x]. Suite green (1959 passed, 0 failed, 89.57% cov). public doctor 0 drift/missing, 21 agents [ok]. Phase advanced to CLOSURE.
+# 2026-05-29 — TASKS Aprovado (operador). 18 tasks (T-OC-01..06, T-RN-01..03, T-AC-01..08, T-INT-01). Phase advanced to IMPLEMENTATION. Implementers may reserve [-] markers.
+# 2026-05-29 — PLAN Aprovado (operador). F1 owner-conflict resolvido: Track C reatribuído de product-engineer → ai-engineer (public/agents/** é write-surface exclusiva ai-engineer; PE bloqueado pelo path-scope gate). Phase advanced to TASKS.
+# 2026-05-28 — opencode-runtime-parity-hardening-v1 opened. 3 tracks: OpenCode runtime parity (T-OC-*), dadaia reports next CLI (T-RN-*), agent-comms waves 2-7 (T-AC-*). context-gate-cross-repo-fix-v1 resolved by v3.2 gate (not a release deliverable).
 # 2026-05-28 — workspace-hardening-v1 CLOSED + ARCHIVED. All T-WH-01..19 [x]. 1711 tests green, 86.07% coverage. dadaia public doctor all [ok].
 # 2026-05-23 — backlog-consolidation-r1-v1 advanced to CLOSURE. All T-BCR-01..09 [x]. dadaia public doctor all [ok].
 # 2026-05-23 — backlog-consolidation-r1-v1 opened. Tier A: bug-reporting infra (Phase 1+2), doctor git-dirty check, DEV guardrail extension, 4 deactivate bug fixes, data-architect universal agent (21st), backlog staleness cleanup.

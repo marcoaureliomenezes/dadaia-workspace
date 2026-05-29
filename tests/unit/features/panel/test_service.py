@@ -227,7 +227,6 @@ def _build_service_with_workflows(
 
 def test_run_workflow_starts_subprocess(tmp_path: Path) -> None:
     """run_workflow returns a dict with pid and workflow name."""
-    import subprocess
     from unittest.mock import MagicMock, patch
 
     mock_proc = MagicMock()
@@ -254,7 +253,6 @@ def test_run_workflow_unknown_returns_error(tmp_path: Path) -> None:
 
 def test_run_workflow_already_running_409(tmp_path: Path) -> None:
     """run_workflow raises RuntimeError with 'already running' when PID is alive."""
-    import subprocess
     from unittest.mock import MagicMock, patch
 
     mock_proc = MagicMock()
@@ -267,6 +265,8 @@ def test_run_workflow_already_running_409(tmp_path: Path) -> None:
 
     import pytest
 
-    with patch("dadaia_workspace.features.panel.service.os.kill", return_value=None):
-        with pytest.raises(RuntimeError, match="already running"):
-            service.run_workflow("my-workflow")
+    with (
+        patch("dadaia_workspace.features.panel.service.os.kill", return_value=None),
+        pytest.raises(RuntimeError, match="already running"),
+    ):
+        service.run_workflow("my-workflow")

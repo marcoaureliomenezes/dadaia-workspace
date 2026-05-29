@@ -451,6 +451,73 @@ class TestPrepareAgentForOpencode:
         content = "just body\n"
         assert _prepare_agent_for_opencode(content) == content
 
+    def test_strips_color_field(self) -> None:
+        # FR-OC-1: color: is Claude-specific and breaks OpenCode 1.14.x parse.
+        content = "---\nname: a\ncolor: yellow\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "color:" not in result
+        assert "yellow" not in result
+
+    def test_color_strip_preserves_other_fields(self) -> None:
+        content = "---\nname: a\ncolor: orange\nmodel: claude-sonnet-4-6\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "name: a" in result
+        assert "model: claude-sonnet-4-6" in result
+        assert "body" in result
+
+    def test_no_color_field_unchanged(self) -> None:
+        content = "---\nname: a\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert result == content
+
+    # --- T-OC-03 (FR-OC-2): permission: per-agent projection ---
+
+    def test_permission_allow_for_granted_tools(self) -> None:
+        content = (
+            "---\nname: be\ntools:\n  - Read\n  - Write\n  - Edit\n  - Bash\n"
+            "  - Glob\n  - Grep\nmodel: m\n---\nbody\n"
+        )
+        result = _prepare_agent_for_opencode(content)
+        assert "permission:" in result
+        assert "  edit: allow" in result
+        assert "  bash: allow" in result
+        # No WebFetch / Agent declared → deny.
+        assert "  webfetch: deny" in result
+        assert "  task: deny" in result
+
+    def test_permission_deny_for_readonly_agent(self) -> None:
+        content = (
+            "---\nname: ro\ntools:\n  - Read\n  - Glob\n  - Grep\n  - WebFetch\n"
+            "  - WebSearch\n  - Write\nmodel: m\n---\nbody\n"
+        )
+        result = _prepare_agent_for_opencode(content)
+        assert "  edit: allow" in result  # Write maps to edit
+        assert "  bash: deny" in result
+        assert "  webfetch: allow" in result
+        assert "  task: deny" in result
+
+    def test_websearch_emits_unsupported_comment(self) -> None:
+        content = "---\nname: r\ntools:\n  - Read\n  - WebSearch\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "# [opencode-unsupported]: WebSearch" in result
+
+    def test_agent_tool_maps_to_task_allow(self) -> None:
+        content = "---\nname: pm\ntools:\n  - Read\n  - Agent\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "  task: allow" in result
+
+    def test_no_tools_block_no_permission(self) -> None:
+        content = "---\nname: a\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "permission:" not in result
+
+    def test_permission_block_after_tools_stripped(self) -> None:
+        # tools: list form must be gone; permission: object form must be present.
+        content = "---\nname: a\ntools:\n  - Bash\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "tools:\n  - Bash" not in result
+        assert "  bash: allow" in result
+
 
 # ---------------------------------------------------------------------------
 # _consumer_repos_for_root
@@ -2363,6 +2430,7 @@ class TestInstallOnly:
         )
         manifest = {"schema_version": "1", "package_version": "0.0.1"}
         import json
+
         (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         return agentic_dir
 
@@ -2389,7 +2457,7 @@ class TestInstallOnly:
         self._make_minimal_agentic(workspace_root)
         manager = self._make_manager(public_dir)
 
-        installed = manager.install(workspace_root, target="claude", force=True, only="agents")
+        manager.install(workspace_root, target="claude", force=True, only="agents")
 
         rules_dir = workspace_root / ".claude" / "rules"
         assert not rules_dir.exists() or list(rules_dir.iterdir()) == []

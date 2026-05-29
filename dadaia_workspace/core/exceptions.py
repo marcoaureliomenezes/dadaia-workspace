@@ -86,3 +86,19 @@ class HandoffValidationError(DadaiaError):
         self.field_path = field_path
         self.message = message
         super().__init__(f"{field_path}: {message}")
+
+
+class NoActiveReleaseError(DadaiaError):
+    """Raised when ``reports next`` cannot resolve an active release.
+
+    Covers a missing/``none`` ``releases/ACTIVE.md`` in the active context's specs dir.
+    The CLI maps this to exit code 3 with an orienting message.
+    """
+
+
+class NoAgentSequenceError(DadaiaError):
+    """Raised when the active release's PLAN.md declares no identifiable agent owners.
+
+    The CLI maps this to exit code 3, instructing the operator to declare owners via
+    the ``(owner: <agent>)`` / ``**Owner:** <agent>`` / ``owner: <agent>`` patterns.
+    """

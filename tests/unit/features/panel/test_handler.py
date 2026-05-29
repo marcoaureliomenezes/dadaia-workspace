@@ -311,9 +311,7 @@ def test_post_workflow_run_rejects_invalid_name() -> None:
     handler_class = make_handler_class(stubs, token=_POST_TOKEN)  # type: ignore[arg-type]
 
     # Shell-unsafe: contains semicolon
-    status, body = _dispatch_post(
-        handler_class, "/api/workflows/bad;name/run", token=_POST_TOKEN
-    )
+    status, body = _dispatch_post(handler_class, "/api/workflows/bad;name/run", token=_POST_TOKEN)
 
     assert status == 400
     assert run_view.call_count == 0
@@ -326,9 +324,7 @@ def test_post_workflow_run_dispatches_view_with_valid_token() -> None:
     stubs["api_workflow_run"] = run_view  # type: ignore[assignment]
     handler_class = make_handler_class(stubs, token=_POST_TOKEN)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_post(
-        handler_class, "/api/workflows/my-workflow/run", token=_POST_TOKEN
-    )
+    status, _ = _dispatch_post(handler_class, "/api/workflows/my-workflow/run", token=_POST_TOKEN)
 
     assert status == 202
     assert run_view.call_count == 1

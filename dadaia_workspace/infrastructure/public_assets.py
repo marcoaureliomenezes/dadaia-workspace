@@ -32,6 +32,57 @@ _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_RE = re.compile(r"^opencode_model:\s*(.+?)$", re.MULTILINE)
 _FRONTMATTER_MODEL_VALUE_RE = re.compile(r"^(model:\s*)(.+?)$", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_FIELD_RE = re.compile(r"^opencode_model:[^\n]*\n", re.MULTILINE)
+# `color:` is Claude Code-specific (panel tier accent) and causes a frontmatter parse
+# failure in OpenCode 1.14.x. Strip it from the OpenCode projection only (FR-OC-1).
+# It stays intact in the source agents and in the Claude Code / Codex projections.
+_FRONTMATTER_COLOR_RE = re.compile(r"^color:[^\n]*\n", re.MULTILINE)
+
+# T-OC-03 (FR-OC-2): project the agent's Claude `tools:` grants into an OpenCode per-agent
+# `permission:` block. OpenCode permission categories take allow/deny/ask and merge OVER the
+# global opencode.json default ("allow"), with the agent rule winning. We emit `allow` for a
+# mapped category the agent declares and `deny` for the security-sensitive categories it omits,
+# preserving each agent's capability boundary (Pilar 3 — projection honesty). Read-only
+# categories (read/glob/grep/list) keep the OpenCode default and are not emitted.
+_CLAUDE_TOOL_TO_OPENCODE_PERMISSION = {
+    "Edit": "edit",
+    "Write": "edit",
+    "Bash": "bash",
+    "WebFetch": "webfetch",
+    "Agent": "task",
+}
+# Categories always emitted (allow if granted, deny otherwise) — the meaningful boundary set.
+_OPENCODE_PERMISSION_CATEGORIES = ("edit", "bash", "webfetch", "task")
+# Claude tools with no OpenCode permission equivalent → projection-honesty comment.
+_OPENCODE_UNSUPPORTED_TOOLS = ("WebSearch",)
+# Single `  - <Tool>` list item inside a `tools:` YAML block.
+_FRONTMATTER_TOOLS_LIST_ITEM_RE = re.compile(r"^  - ([^\n]+)$", re.MULTILINE)
+
+
+def _opencode_permission_block(frontmatter: str) -> str:
+    """Build an OpenCode ``permission:`` frontmatter block from a Claude ``tools:`` list.
+
+    Returns ``""`` when the agent declares no ``tools:`` block (nothing to map).
+    """
+    m = _FRONTMATTER_TOOLS_RE.search(frontmatter)
+    if not m:
+        return ""
+    tools = {t.strip() for t in _FRONTMATTER_TOOLS_LIST_ITEM_RE.findall(m.group(0))}
+    if not tools:
+        return ""
+    granted = {
+        _CLAUDE_TOOL_TO_OPENCODE_PERMISSION[t]
+        for t in tools
+        if t in _CLAUDE_TOOL_TO_OPENCODE_PERMISSION
+    }
+    lines = ["permission:"]
+    lines += [
+        f"  {cat}: {'allow' if cat in granted else 'deny'}"
+        for cat in _OPENCODE_PERMISSION_CATEGORIES
+    ]
+    lines += [f"# [opencode-unsupported]: {t}" for t in _OPENCODE_UNSUPPORTED_TOOLS if t in tools]
+    return "\n".join(lines) + "\n"
+
+
 # T-35: forbid the legacy `software-engineer` alias inside public/ (split into
 # `software-engineer-python` and `software-engineer-node`). Matches subagent_type:
 # software-engineer with no trailing -python/-node suffix.
@@ -399,6 +450,9 @@ def _prepare_agent_for_opencode(content: str) -> str:
     frontmatter = content[4 : end_idx + 1]
     body = content[end_idx + 5 :]
 
+    # Derive the permission block from the ORIGINAL frontmatter (before tools is stripped).
+    permission_block = _opencode_permission_block(frontmatter)
+
     m = _FRONTMATTER_OPENCODE_MODEL_RE.search(frontmatter)
     if m:
         opencode_model = m.group(1).strip()
@@ -407,6 +461,9 @@ def _prepare_agent_for_opencode(content: str) -> str:
         )
     frontmatter = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
     frontmatter = _FRONTMATTER_OPENCODE_MODEL_FIELD_RE.sub("", frontmatter)
+    frontmatter = _FRONTMATTER_COLOR_RE.sub("", frontmatter)
+    if permission_block:
+        frontmatter = frontmatter + permission_block
     return f"---\n{frontmatter}---\n{body}"
 
 
@@ -715,9 +772,7 @@ class FileSystemPublicAssetManager:
                 continue
             names: list[str] = []
             for entry in sorted(category_dir.iterdir()):
-                if entry.is_dir():
-                    names.append(entry.name)
-                elif entry.is_file():
+                if entry.is_dir() or entry.is_file():
                     names.append(entry.name)
             result[category_dir.name] = names
         return result
@@ -1120,7 +1175,7 @@ class FileSystemPublicAssetManager:
             body_start = text.find("\n---\n", 4)
             if body_start == -1:
                 continue
-            body = text[body_start + 5:]
+            body = text[body_start + 5 :]
             sc_start = body.find("## Skills consumed")
             if sc_start == -1:
                 continue
@@ -1244,7 +1299,10 @@ class FileSystemPublicAssetManager:
                 installed.append(f"[skip] {settings_path}")
             else:
                 self._write_generated(
-                    settings_path, _json_dump(self._claude_settings(workspace_root)), True, installed
+                    settings_path,
+                    _json_dump(self._claude_settings(workspace_root)),
+                    True,
+                    installed,
                 )
 
     def _install_codex(

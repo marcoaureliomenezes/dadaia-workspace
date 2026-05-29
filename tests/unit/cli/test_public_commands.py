@@ -30,7 +30,9 @@ def mock_svc() -> MagicMock:
 
 
 def _patch_svc(svc: MagicMock):
-    return patch("dadaia_workspace.cli.commands.public.container.build_public_service", return_value=svc)
+    return patch(
+        "dadaia_workspace.cli.commands.public.container.build_public_service", return_value=svc
+    )
 
 
 def _patch_workspace(tmp_path: Path):
@@ -40,7 +42,9 @@ def _patch_workspace(tmp_path: Path):
 
 
 class TestListCommand:
-    def test_list_table_output(self, runner: CliRunner, mock_svc: MagicMock, tmp_path: Path) -> None:
+    def test_list_table_output(
+        self, runner: CliRunner, mock_svc: MagicMock, tmp_path: Path
+    ) -> None:
         with _patch_svc(mock_svc), _patch_workspace(tmp_path):
             result = runner.invoke(app, ["list"])
         assert result.exit_code == 0
