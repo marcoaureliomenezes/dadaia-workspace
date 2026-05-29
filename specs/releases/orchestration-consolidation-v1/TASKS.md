@@ -53,7 +53,7 @@
 
 ### Phase 4 — Fix Workflow Contradiction
 
-- [ ] **T-OCV-04** | owner: ai-engineer | phase: 4 | AC: AC-OC-07
+- [-] **T-OCV-04** | owner: ai-engineer | phase: 4 | AC: AC-OC-07
   - **Description:** Fix `cross-cutting-feature.workflow.md` self-contradiction. In the YAML front-matter, change `discovery.agent: project-manager` → `agent: product-engineer`. Verify the prose `## Stages` step-1 already names `product-engineer`; if not, update to match. Both must agree.
   - **Target:** `dadaia_workspace/public/workflows/cross-cutting-feature.workflow.md`
   - **Preconditions:** TASKS.md marker flipped to `[-]`. No dependency on T-OCV-01..03 (disjoint file); however ai-engineer must complete any in-progress task before starting this one (one `[-]` per owner at a time).
