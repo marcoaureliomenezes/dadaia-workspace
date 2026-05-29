@@ -80,7 +80,7 @@
 
 ### Phase 5c — D-OC-1 Invariant Implementation
 
-- [-] **T-OCV-06b** | owner: software-engineer-python | phase: 5c | AC: AC-OC-09
+- [x] **T-OCV-06b** | owner: software-engineer-python | phase: 5c | AC: AC-OC-09
   - **Description:** Implement bidirectional invariant `D-OC-1` in the dadaia specs doctor (locate extension point in `dadaia_workspace/features/doctor/` or `dadaia_workspace/cli/commands/doctor.py`). Implement per the design note from T-OCV-05a. Forward check: for each Tier-1 name in PM router, assert `public/workflows/<name>.workflow.md` exists; for each Tier-2 name, assert `### Playbook — <name>` heading exists in SKILL.md. Reverse check: for each `### Playbook — <name>` heading in SKILL.md, assert it appears as a Tier-2 row in the PM router OR carries `[deprecated]` annotation. Dangling reference in either direction = hard error.
   - **Target:** `dadaia_workspace/features/doctor/` (or equivalent)
   - **Preconditions:** T-OCV-05a done (design note present). T-OCV-01 and T-OCV-02 done (doctor checks final state of those files).
@@ -89,7 +89,7 @@
 
 ### Phase 5d — Unit Test
 
-- [ ] **T-OCV-07** | owner: software-engineer-python | phase: 5d | AC: AC-OC-10
+- [x] **T-OCV-07** | owner: software-engineer-python | phase: 5d | AC: AC-OC-10
   - **Description:** Write unit test `tests/test_orchestration_registry.py`. Four test cases: (1) all correct → D-OC-1 passes; (2) remove a Tier-1 file entry → forward error; (3) remove a playbook heading → forward error; (4) add an orphan `### Playbook —` heading not in Tier-2 router → reverse error. Use stdlib `re` + `pathlib`; no new dependencies.
   - **Target:** `tests/test_orchestration_registry.py` (new file or existing orchestration tests)
   - **Preconditions:** T-OCV-06b done (D-OC-1 invariant must exist to test it).
@@ -98,7 +98,7 @@
 
 ### Phase 6 — Propagation
 
-- [ ] **T-OCV-08** | owner: devops-engineer | phase: 6 | AC: AC-OC-11, AC-OC-12, AC-OC-13
+- [-] **T-OCV-08** | owner: devops-engineer | phase: 6 | AC: AC-OC-11, AC-OC-12, AC-OC-13
   - **Description:** Run full propagation sequence: `cd repos/dadaia-workspace && poetry run pytest` (must exit 0); `dadaia public stage`; `dadaia public install --target all`; `dadaia public doctor` (must show 0 drift / 0 missing); `git diff HEAD -- dadaia_workspace/public/` (must show only the 3 intended file changes: `agents/project-manager.md`, `skills/project-orchestration/SKILL.md`, `workflows/cross-cutting-feature.workflow.md`).
   - **Target:** Propagation pipeline + workspace projections
   - **Preconditions:** T-OCV-01..T-OCV-07 all `[x]` DONE.
@@ -133,9 +133,9 @@
 | T-OCV-04 | 4 — Cross-cutting fix | ai-engineer | AC-OC-07 | `[x]` |
 | T-OCV-05a | 5a — D-OC-1 design note | ai-engineer | (precondition for AC-OC-09) | `[x]` |
 | T-OCV-05b | 5b — Backlog cleanup | product-engineer | AC-OC-08 | `[x]` |
-| T-OCV-06b | 5c — D-OC-1 implementation | software-engineer-python | AC-OC-09 | `[-]` |
-| T-OCV-07 | 5d — Unit test | software-engineer-python | AC-OC-10 | `[ ]` |
-| T-OCV-08 | 6 — Propagation | devops-engineer | AC-OC-11, AC-OC-12, AC-OC-13 | `[ ]` |
+| T-OCV-06b | 5c — D-OC-1 implementation | software-engineer-python | AC-OC-09 | `[x]` |
+| T-OCV-07 | 5d — Unit test | software-engineer-python | AC-OC-10 | `[x]` |
+| T-OCV-08 | 6 — Propagation | devops-engineer | AC-OC-11, AC-OC-12, AC-OC-13 | `[-]` |
 | T-OCV-09 | 7 — Playbook round-trip | qa-engineer + project-manager | AC-OC-16 | `[ ]` |
 | T-OCV-10 | 7 — Engine round-trip | qa-engineer + project-manager | AC-OC-17 | `[ ]` |
 

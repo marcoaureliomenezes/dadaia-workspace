@@ -51,6 +51,21 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     )
 
 
+def _resolve_public_dir(specs_dir: Path) -> Path | None:
+    """Try to locate ``dadaia_workspace/public/`` relative to the specs directory.
+
+    The conventional layout is:
+    ``<repo-root>/specs/`` alongside ``<repo-root>/dadaia_workspace/public/``.
+
+    Walk up from ``specs_dir`` until we find a sibling ``dadaia_workspace/public/``
+    directory.  Returns ``None`` when not found (D-OC-1 check will be skipped).
+    """
+    candidate = specs_dir.parent / "dadaia_workspace" / "public"
+    if candidate.is_dir():
+        return candidate
+    return None
+
+
 @app.command("doctor")
 def doctor(
     specs_dir: str | None = typer.Option(
@@ -61,10 +76,23 @@ def doctor(
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON instead of human output."
     ),
+    public_dir: str | None = typer.Option(
+        None,
+        "--public-dir",
+        help=(
+            "Path to dadaia_workspace/public/. "
+            "Enables D-OC-1 orchestration-registry check. "
+            "Default: auto-detected from specs_dir/../dadaia_workspace/public/."
+        ),
+    ),
 ) -> None:
     """Run structural checks on the SDD specs tree."""
     target = _resolve_specs_dir(specs_dir)
-    doctor_svc = SpecsDoctor(target)
+    if public_dir is not None:
+        resolved_public: Path | None = Path(public_dir).resolve()
+    else:
+        resolved_public = _resolve_public_dir(target)
+    doctor_svc = SpecsDoctor(target, public_dir=resolved_public)
     issues = doctor_svc.check()
 
     if json_output:
