@@ -71,7 +71,7 @@
 
 ### Phase 5b — Backlog Cleanup
 
-- [ ] **T-OCV-05b** | owner: product-engineer | phase: 5b | AC: AC-OC-08
+- [x] **T-OCV-05b** | owner: product-engineer | phase: 5b | AC: AC-OC-08
   - **Description:** Update `specs/backlog/candidates.md`: delete the `dashboard-publication-workflow-v1` bullet from `## Candidatas ativas`. Move `data-pipeline-cycle-workflow-v1`, `ai-entity-refinement-workflow-v1`, `ai-engineer-recursive-bootstrap-v1` from `## Candidatas ativas` to `## Histórico` with annotation: "resolved to PM Playbook in `orchestration-consolidation-v1` (2026-05-29)".
   - **Target:** `specs/backlog/candidates.md`
   - **Preconditions:** T-OCV-03 done (confirms playbook headings exist before backlog annotates them as resolved).
@@ -80,7 +80,7 @@
 
 ### Phase 5c — D-OC-1 Invariant Implementation
 
-- [ ] **T-OCV-06b** | owner: software-engineer-python | phase: 5c | AC: AC-OC-09
+- [-] **T-OCV-06b** | owner: software-engineer-python | phase: 5c | AC: AC-OC-09
   - **Description:** Implement bidirectional invariant `D-OC-1` in the dadaia specs doctor (locate extension point in `dadaia_workspace/features/doctor/` or `dadaia_workspace/cli/commands/doctor.py`). Implement per the design note from T-OCV-05a. Forward check: for each Tier-1 name in PM router, assert `public/workflows/<name>.workflow.md` exists; for each Tier-2 name, assert `### Playbook — <name>` heading exists in SKILL.md. Reverse check: for each `### Playbook — <name>` heading in SKILL.md, assert it appears as a Tier-2 row in the PM router OR carries `[deprecated]` annotation. Dangling reference in either direction = hard error.
   - **Target:** `dadaia_workspace/features/doctor/` (or equivalent)
   - **Preconditions:** T-OCV-05a done (design note present). T-OCV-01 and T-OCV-02 done (doctor checks final state of those files).
@@ -132,8 +132,8 @@
 | T-OCV-03 | 3 — Add playbooks (schema) | ai-engineer | AC-OC-05, AC-OC-06, AC-OC-14, AC-OC-15 | `[x]` |
 | T-OCV-04 | 4 — Cross-cutting fix | ai-engineer | AC-OC-07 | `[x]` |
 | T-OCV-05a | 5a — D-OC-1 design note | ai-engineer | (precondition for AC-OC-09) | `[x]` |
-| T-OCV-05b | 5b — Backlog cleanup | product-engineer | AC-OC-08 | `[ ]` |
-| T-OCV-06b | 5c — D-OC-1 implementation | software-engineer-python | AC-OC-09 | `[ ]` |
+| T-OCV-05b | 5b — Backlog cleanup | product-engineer | AC-OC-08 | `[x]` |
+| T-OCV-06b | 5c — D-OC-1 implementation | software-engineer-python | AC-OC-09 | `[-]` |
 | T-OCV-07 | 5d — Unit test | software-engineer-python | AC-OC-10 | `[ ]` |
 | T-OCV-08 | 6 — Propagation | devops-engineer | AC-OC-11, AC-OC-12, AC-OC-13 | `[ ]` |
 | T-OCV-09 | 7 — Playbook round-trip | qa-engineer + project-manager | AC-OC-16 | `[ ]` |
