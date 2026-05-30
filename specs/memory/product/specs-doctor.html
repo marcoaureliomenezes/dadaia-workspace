@@ -32,22 +32,22 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>specs-doctor</h1>
-<p class="meta">CLI surface: <code>dadaia specs doctor [--specs-dir PATH] [--json]</code> · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">CLI surface: <code>dadaia specs doctor [--specs-dir PATH] [--json]</code> · Closure: orchestration-consolidation-v1</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
-  <p>Valida 11 invariantes estruturais do diretório <code>specs/</code> sob o modelo SDD release-lifecycle: presença de <code>constitution.md</code>, memory HTML (com folder catalog em <code>product/</code>), <code>ACTIVE.md</code> bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory (sem changelog), links de imagem resolvendo, presença do script Mermaid quando há diagramas, e link integrity do <code>product/index.html</code> para suas feature HTMLs.</p>
+  <p>Valida 12 invariantes estruturais do diretório <code>specs/</code> sob o modelo SDD release-lifecycle: presença de <code>constitution.md</code>, memory HTML (com folder catalog em <code>product/</code>), <code>ACTIVE.md</code> bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory (sem changelog), links de imagem resolvendo, presença do script Mermaid quando há diagramas, link integrity do <code>product/index.html</code> para suas feature HTMLs, e o invariante <strong>D-OC-1</strong> (bidirectional orchestration registry consistency): forward — cada nome Tier-1 do router PM mapeia para <code>public/workflows/&lt;name&gt;.workflow.md</code> existente e cada nome Tier-2 mapeia para heading <code>### Playbook — &lt;name&gt;</code> em SKILL.md; reverse — cada heading <code>### Playbook — &lt;name&gt;</code> em SKILL.md aparece como Tier-2 no router PM ou carrega anotação <code>[deprecated]</code>. Referência dangling em qualquer direção é hard error.</p>
   <p>Exit code 1 se houver errors; 0 se só warnings ou tudo verde. Suporta <code>--json</code> para integração com CI/automação.</p>
 </section>
 
 <section id="flow">
   <h2>Fluxo de uso</h2>
   <ol class="flow">
-    <li><code>dadaia specs doctor</code> — resolve <code>specs_dir</code> via <code>primary_context.json</code> ou <code>--specs-dir</code>, roda os 11 checks em ordem, exibe issues formatados com código + severity + path.</li>
+    <li><code>dadaia specs doctor</code> — resolve <code>specs_dir</code> via <code>primary_context.json</code> ou <code>--specs-dir</code>, roda os 12 checks em ordem (incluindo D-OC-1), exibe issues formatados com código + severity + path.</li>
     <li>Para automação: <code>dadaia specs doctor --json</code> emite payload <code>{specs_dir, issues[], summary{errors, warnings}}</code>.</li>
     <li>Em CI: usado como gate de PR para bloquear merge se houver erros estruturais nos specs.</li>
   </ol>
-  <p>Códigos de erro: <code>SPEC-DOC-001</code> a <code>SPEC-DOC-011</code> + sufixo <code>L</code> para legacy (markdown em memory, <code>product.html</code> top-level pre-folder-catalog).</p>
+  <p>Códigos de erro: <code>SPEC-DOC-001</code> a <code>SPEC-DOC-011</code> + <code>D-OC-1</code> (bidirectional orchestration registry consistency) + sufixo <code>L</code> para legacy (markdown em memory, <code>product.html</code> top-level pre-folder-catalog).</p>
 </section>
 
 <section id="trigger">
