@@ -174,6 +174,32 @@ SESSIONS_CSS: str = """
   .sessions-table tbody tr.session-row { transition: none; }
 }
 
+/* ── Per-cell min-width (applied to both <th> and <td>) ───────────────
+   Under table-layout:fixed, min-width on <col> elements is ignored by
+   the layout algorithm (MDN). The only reliable approach is to set
+   min-width directly on each <th>/<td> pair via class selectors.
+   Total floor: 120+96+160+72+80+72+112+80 = 792px.
+   The container has overflow-x:auto so the table scrolls horizontally
+   below this threshold rather than collapsing. ──────────────────────── */
+.cell-session    { min-width: 120px; }
+.cell-project    { min-width:  96px; }
+.cell-model      { min-width: 160px; }
+.cell-turns      { min-width:  72px; }
+.cell-context    { min-width:  80px; }
+.cell-cost       { min-width:  72px; }
+.cell-last-activity { min-width: 112px; }
+.cell-status     { min-width:  80px; }
+
+/* ── Codex PROJECT placeholder ─────────────────────────────────────── */
+/* Rendered by JS in buildRowHtml() when runtime === 'codex' and
+   session.project is absent. The span provides a muted italic em-dash
+   instead of a blank cell so the column reads as intentionally empty.
+   Contrast: #666666 on #ffffff = 5.52:1 (WCAG 2.1 AA ≥ 4.5:1 pass). */
+.cell-placeholder {
+  color: var(--color-muted, #666666);
+  font-style: italic;
+}
+
 /* ── Session cell (truncated session_id + tooltip) ────────────────── */
 .cell-session {
   font-family: var(--font-mono, ui-monospace, monospace);

@@ -71,26 +71,26 @@ def render_sessions_section() -> str:
         '       aria-busy="true">\n'
         '    <table class="sessions-table" aria-label="Sessions">\n'
         "      <colgroup>\n"
-        '        <col style="width:12%">\n'
         '        <col style="width:14%">\n'
-        '        <col style="width:22%">\n'
-        '        <col style="width:7%">\n'
+        '        <col style="width:14%">\n'
+        '        <col style="width:20%">\n'
         '        <col style="width:8%">\n'
         '        <col style="width:8%">\n'
+        '        <col style="width:8%">\n'
         '        <col style="width:14%">\n'
-        '        <col style="width:9%">\n'
+        '        <col style="width:10%">\n'
         "      </colgroup>\n"
         "      <thead>\n"
         "        <tr>\n"
-        '          <th scope="col" data-sort-key="session_id">Session</th>\n'
-        '          <th scope="col" data-sort-key="project">Project</th>\n'
-        '          <th scope="col" data-sort-key="model">Model</th>\n'
-        '          <th scope="col" data-sort-key="message_count">AI Turns</th>\n'
-        '          <th scope="col" data-sort-key="context_size_tokens">Context</th>\n'
-        '          <th scope="col" data-sort-key="cumulative_cost_usd"\n'
+        '          <th scope="col" class="cell-session" data-sort-key="session_id">Session</th>\n'
+        '          <th scope="col" class="cell-project" data-sort-key="project">Project</th>\n'
+        '          <th scope="col" class="cell-model" data-sort-key="model">Model</th>\n'
+        '          <th scope="col" class="cell-turns" data-sort-key="message_count">AI Turns</th>\n'
+        '          <th scope="col" class="cell-context" data-sort-key="context_size_tokens">Context</th>\n'
+        '          <th scope="col" class="cell-cost" data-sort-key="cumulative_cost_usd"\n'
         '              data-sort="cost" data-sort-dir="none">Cost</th>\n'
-        '          <th scope="col" data-sort-key="last_activity_at">Last activity</th>\n'
-        '          <th scope="col" data-sort-key="status">Status</th>\n'
+        '          <th scope="col" class="cell-last-activity" data-sort-key="last_activity_at">Last activity</th>\n'
+        '          <th scope="col" class="cell-status" data-sort-key="status">Status</th>\n'
         "        </tr>\n"
         "      </thead>\n"
         '      <tbody id="sessions-tbody">\n'

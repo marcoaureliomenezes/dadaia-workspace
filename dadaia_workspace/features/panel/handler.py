@@ -212,6 +212,7 @@ def make_handler_class(
     *,
     token: str | None = None,
     telemetry: Any = None,
+    loopback_bypass: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a PanelHandler subclass with *views* and auth/telemetry injected.
 
@@ -233,6 +234,17 @@ def make_handler_class(
     telemetry:
         A TelemetryService (or compatible stub) instance.  When None,
         telemetry routes return 503 Service Unavailable.
+
+    loopback_bypass:
+        When True (set by panel.py when ``bind == "127.0.0.1"``), the Bearer
+        token requirement on ``/api/*`` routes is waived.  This allows local
+        human and AI-agent clients to call the panel API without supplying an
+        Authorization header.  Detection is at the server bind level — NOT
+        derived from the client TCP peer address.
+
+        Security note: any local process can read panel data without a token
+        when this flag is active — a deliberate dev-local trade-off for a
+        read-only GET surface.
     """
     compiled: list[tuple[re.Pattern[str], Callable[..., tuple[int, str, bytes]]]] = [
         (re.compile(pat), views[name]) for pat, name in _RAW_ROUTES if name in views
@@ -261,6 +273,14 @@ def make_handler_class(
 
     _token = token
     _telemetry = telemetry
+    _loopback_bypass = loopback_bypass
+
+    if _loopback_bypass:
+        import logging as _logging
+
+        _logging.getLogger(__name__).warning(
+            "[PANEL] Auth disabled for loopback (127.0.0.1) connections."
+        )
 
     _UNAUTHORIZED_BODY = b'{"error": "unauthorized"}'
 
@@ -279,9 +299,12 @@ def make_handler_class(
             for pattern, route_name in self._tel_patterns:
                 m = pattern.match(path)
                 if m is not None:
-                    # Enforce Bearer auth on all /api/* routes.
+                    # Enforce Bearer auth on all /api/* routes unless the server
+                    # is bound to loopback (127.0.0.1) with bypass active.
                     auth_header = self.headers.get("Authorization")
-                    if _token is None or not _validate_bearer(auth_header, _token):
+                    if not _loopback_bypass and (
+                        _token is None or not _validate_bearer(auth_header, _token)
+                    ):
                         self._respond(
                             401,
                             "application/json",

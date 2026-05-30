@@ -226,7 +226,13 @@
     var titleAttr = session.ai_title
       ? ' title="' + escHtml(session.ai_title) + '"'
       : '';
-    var project = session.project ? escHtml(session.project) : '—';
+    // For Codex sessions project is always absent/em-dash; render a muted
+    // placeholder span so the PROJECT column shows '—' with .cell-placeholder
+    // styling rather than a blank cell (SPEC F2 AC, T-PUX-01).
+    var projectRaw = session.project;
+    var project = (projectRaw && projectRaw !== '—')
+      ? escHtml(projectRaw)
+      : '<span class="cell-placeholder" title="Project context not applicable for Codex sessions">&mdash;</span>';
     var model = session.model ? escHtml(session.model) : '—';
     var turns = session.message_count != null ? escHtml(String(session.message_count)) : '—';
     var ctx = fmtTokens(session.context_size_tokens);
