@@ -1,6 +1,7 @@
 """dadaia context subcommands."""
 
 import json
+import sys
 
 import typer
 from rich.console import Console
@@ -12,6 +13,7 @@ from dadaia_workspace.core.exceptions import (
     ContextNotFoundError,
     ContextStateError,
     RepoCatalogError,
+    SchemaVersionError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
@@ -31,6 +33,10 @@ def _ctx_service() -> SpecContextService:
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
         )
         raise typer.Exit(1) from None
+    except SchemaVersionError as exc:
+        # Use plain stderr so CliRunner captures it in result.output (mix_stderr=True default)
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from None
 
 
 def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
@@ -39,9 +45,9 @@ def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "state": ctx.state.value,
         "repo_slug": ctx.repo_slug,
         "repo_url": ctx.repo_url,
-        "is_primary": ctx.is_primary,
         "created_at": ctx.created_at,
-        "activated_at": ctx.activated_at,
+        "alive_since": ctx.alive_since,
+        "dead_since": ctx.dead_since,
         "current_branch": ctx.current_branch,
     }
 
@@ -51,7 +57,7 @@ def create(
     name: str = typer.Argument(..., help="Context name"),
     repo: str = typer.Option(..., "--repo", help="Repo slug (directory name under repos/)"),
 ) -> None:
-    """Create a new Spec Context Project in state 'inativo'."""
+    """Create a new Spec Context Project in state 'dead'."""
     workspace_root = resolve_workspace_root()
     # Look up repo_url from whitelist; fall back gracefully if catalog unavailable
     repo_url = ""
@@ -79,7 +85,11 @@ def create(
 @app.command(name="list")
 def list_all() -> None:
     """List all Spec Context Projects."""
-    contexts = _ctx_service().list_all()
+    try:
+        contexts = _ctx_service().list_all()
+    except SchemaVersionError as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from None
     if not contexts:
         console.print("[dim]No contexts found. Use 'dadaia context create' to create one.[/dim]")
         return
@@ -87,19 +97,17 @@ def list_all() -> None:
     table = Table(title="Spec Context Projects")
     table.add_column("Name", style="bold")
     table.add_column("State")
-    table.add_column("Primary")
     table.add_column("Repo")
 
     state_style = {
-        ContextState.ATIVO: "[green]ativo[/green]",
-        ContextState.INATIVO: "[dim]inativo[/dim]",
+        ContextState.ALIVE: "[green]alive[/green]",
+        ContextState.DEAD: "[dim]dead[/dim]",
     }
 
     for ctx in contexts:
         table.add_row(
             ctx.name,
             state_style.get(ctx.state, ctx.state.value),
-            "[bold yellow]✓[/bold yellow]" if ctx.is_primary else "",
             ctx.repo_slug,
         )
     console.print(table)
@@ -113,9 +121,9 @@ def show(
     """Show details of a context."""
     svc = _ctx_service()
     if name is None:
-        # Show primary context
+        # Show first ALIVE context when no name given (v2: no global primary)
         all_ctxs = svc.list_all()
-        ctx = next((c for c in all_ctxs if c.is_primary), None)
+        ctx = next((c for c in all_ctxs if c.state == ContextState.ALIVE), None)
     else:
         try:
             ctx = svc.show(name)
@@ -131,17 +139,17 @@ def show(
         return
 
     if ctx is None:
-        msg = f"Context '{name}' not found." if name else "No primary context."
+        msg = f"Context '{name}' not found." if name else "No active context."
         console.print(f"[dim]{msg}[/dim]")
         return
 
     console.print(f"[bold]Name:[/bold]       {ctx.name}")
     console.print(f"[bold]State:[/bold]      {ctx.state.value}")
-    console.print(f"[bold]Primary:[/bold]    {ctx.is_primary}")
     console.print(f"[bold]Repo:[/bold]       {ctx.repo_slug}")
     console.print(f"[bold]Repo URL:[/bold]   {ctx.repo_url or '—'}")
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
-    console.print(f"[bold]Activated:[/bold]  {ctx.activated_at or '—'}")
+    console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
+    console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
 
 
 @app.command()
@@ -150,12 +158,13 @@ def activate(name: str = typer.Argument(..., help="Context name to activate")) -
     try:
         ws = resolve_workspace_root()
         ctx = container.build_spec_context_service(ws).activate(name)
-        primary_note = " [bold yellow](primary)[/bold yellow]" if ctx.is_primary else ""
         console.print(
-            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now active{primary_note}"
+            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now active"
         )
-        if ctx.is_primary:
-            container.build_public_service().install(ws, target="opencode", force=True)
+        container.build_public_service().install(ws, target="opencode", force=True)
+    except SchemaVersionError as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
@@ -180,6 +189,9 @@ def promote(name: str = typer.Argument(..., help="Context name to promote as pri
         ctx = container.build_spec_context_service(ws).promote(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now primary")
         container.build_public_service().install(ws, target="opencode", force=True)
+    except SchemaVersionError as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
@@ -187,7 +199,7 @@ def promote(name: str = typer.Argument(..., help="Context name to promote as pri
 
 @app.command()
 def delete(name: str = typer.Argument(..., help="Context name to delete")) -> None:
-    """Delete a context. Context must be inactive."""
+    """Delete a context. Context must be dead."""
     try:
         _ctx_service().delete(name)
         console.print(f"[green]✓[/green] Context '[bold]{name}[/bold]' deleted")
@@ -202,8 +214,7 @@ def use(name: str = typer.Argument(..., help="Context name to isolate this sessi
 
     Run: eval $(dadaia context use <name>)
 
-    Sets DADAIA_CONTEXT for the current shell only. Does NOT modify spec_contexts.json
-    or primary_context.json.
+    Sets DADAIA_CONTEXT for the current shell only. Does NOT modify spec_contexts.json.
     """
     all_ctxs = _ctx_service().list_all()
     ctx = next((c for c in all_ctxs if c.name == name), None)

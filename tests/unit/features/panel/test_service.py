@@ -66,8 +66,7 @@ def _make_entry(
 def _make_context(
     name: str,
     repo_slug: str,
-    state: ContextState = ContextState.ATIVO,
-    is_primary: bool = False,
+    state: ContextState = ContextState.ALIVE,
     current_branch: str | None = "main",
 ) -> SpecContextProject:
     return SpecContextProject(
@@ -75,9 +74,9 @@ def _make_context(
         state=state,
         repo_slug=repo_slug,
         repo_url=f"https://github.com/org/{repo_slug}",
-        is_primary=is_primary,
         created_at="2026-01-01T00:00:00+00:00",
-        activated_at="2026-01-01T00:00:00+00:00",
+        alive_since="2026-01-01T00:00:00+00:00" if state == ContextState.ALIVE else None,
+        dead_since=None if state == ContextState.ALIVE else "2026-01-01T00:00:00+00:00",
         current_branch=current_branch,
     )
 
@@ -147,7 +146,7 @@ def test_inativo_context_filtered_out() -> None:
     inactive_ctx = _make_context(
         name="Inactive Project",
         repo_slug="inactive-project",
-        state=ContextState.INATIVO,
+        state=ContextState.DEAD,
     )
     entry = _make_entry(port=5000, project="inactive-project")
 
@@ -186,7 +185,7 @@ def test_empty_registry_returns_no_groups() -> None:
 
 def test_no_active_context_returns_empty_contexts() -> None:
     """(e) When all contexts are inativo, list_active_contexts() returns []."""
-    inactive = _make_context(name="Inactive", repo_slug="inactive", state=ContextState.INATIVO)
+    inactive = _make_context(name="Inactive", repo_slug="inactive", state=ContextState.DEAD)
 
     service = _build_service([], [inactive])
     result = service.list_active_contexts()

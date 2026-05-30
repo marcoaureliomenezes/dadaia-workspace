@@ -33,7 +33,7 @@ Add the raw-store-access invariant comment. Remove doctor INV-1, INV-2, INV-3, I
 **Done criterion:** AC-T10a-1..7 all pass. All code references to ATIVO/INATIVO/
 is_primary/activated_at removed. `JsonContextStore._VERSION == "2"`.
 
-[ ] T-10a
+[x] T-10a
 
 ---
 
@@ -77,7 +77,7 @@ context` command on a v1 workspace and prints the migration prompt (non-zero exi
 Migration idempotent on v2 (no-op). All 12 directories/files created by migration exist
 post-run.
 
-[ ] T-10c
+[x] T-10c
 
 ---
 

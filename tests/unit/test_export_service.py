@@ -9,16 +9,16 @@ from tests.fakes import FakeContextStore, FakeGitClient
 
 
 def _ctx(
-    name: str = "demo", *, primary: bool = True, branch: str | None = None
+    name: str = "demo", *, branch: str | None = None
 ) -> SpecContextProject:
     return SpecContextProject(
         name=name,
-        state=ContextState.ATIVO,
+        state=ContextState.ALIVE,
         repo_slug=name,
         repo_url=f"https://example.com/{name}.git",
-        is_primary=primary,
         created_at="2026-01-01T00:00:00Z",
-        activated_at="2026-01-02T00:00:00Z",
+        alive_since="2026-01-02T00:00:00Z",
+        dead_since=None,
         current_branch=branch,
     )
 
@@ -48,16 +48,15 @@ def test_resolve_includes_drops_dotenv_files(tmp_path: Path) -> None:
     assert all(not arc.endswith(".env") for arc in arcs)
 
 
-def test_build_manifest_records_primary_and_branch(tmp_path: Path) -> None:
+def test_build_manifest_records_branch(tmp_path: Path) -> None:
     svc, store, _ = _service(tmp_path)
-    store.save(_ctx("alpha", primary=True, branch="main"))
-    store.save(_ctx("beta", primary=False, branch="dev"))
+    store.save(_ctx("alpha", branch="main"))
+    store.save(_ctx("beta", branch="dev"))
 
     manifest = svc.build_manifest([], ExportOptions(exclude_mnt=True))
     names = {c["name"] for c in manifest.contexts}
     assert {"alpha", "beta"}.issubset(names)
     alpha = next(c for c in manifest.contexts if c["name"] == "alpha")
-    assert alpha["is_primary"] is True
     assert alpha["current_branch"] == "main"
 
 

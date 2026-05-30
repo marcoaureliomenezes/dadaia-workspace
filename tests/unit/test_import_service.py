@@ -93,9 +93,11 @@ def test_patch_state_rewrites_specs_dir(tmp_path: Path) -> None:
     data = json.loads((states / "spec_contexts.json").read_text())
     ctx = data["contexts"][0]
     assert ctx["specs_dir"] == str(tmp_path / "repos" / "alpha" / "specs")
-    assert ctx["state"] == "inativo"
-    assert ctx["is_primary"] is False
-    assert ctx["activated_at"] is None
+    assert ctx["state"] == "dead"
+    assert "is_primary" not in ctx
+    assert "activated_at" not in ctx
+    assert ctx.get("dead_since") is None
+    assert ctx.get("alive_since") is None
 
 
 def test_patch_state_clears_primary_marker(tmp_path: Path) -> None:
@@ -375,38 +377,10 @@ def test_restore_contexts_activate_fails(tmp_path: Path) -> None:
     assert "ctx1" in errors[0]
 
 
-def test_restore_contexts_with_primary_promote_fails(tmp_path: Path) -> None:
-    from unittest.mock import MagicMock, patch
-
-    from dadaia_workspace.core.models.import_ import ImportManifest
-
-    svc = ImportService(workspace_root=tmp_path)
-    manifest = ImportManifest(
-        version="1",
-        exported_at="2026-01-01T00:00:00Z",
-        workspace_root="/old/ws",
-        dadaia_version="0.1.0",
-        contexts=({"name": "ctx1", "state": "ativo", "is_primary": True},),
-        includes=(),
-        mnt_included=False,
-        reports_included=False,
-    )
-    # activate succeeds, promote fails
-    activate_result = MagicMock()
-    activate_result.returncode = 0
-    promote_result = MagicMock()
-    promote_result.returncode = 1
-    promote_result.stderr = "promote failed"
-    call_count = 0
-
-    def side_effect(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        return activate_result if call_count == 1 else promote_result
-
-    with patch("dadaia_workspace.features.import_.service.subprocess.run", side_effect=side_effect):
-        errors = svc.restore_contexts(manifest, tmp_path, skip=False)
-    assert any("promote" in e for e in errors)
+# test_restore_contexts_with_primary_promote_fails was removed in v2:
+# The v1 "promote" step (called after activate for is_primary=True contexts) no longer
+# exists in v2 restore_contexts. v2 only activates; there is no primary/promote concept.
+# The activate-fails path is already covered by test_restore_contexts_activate_fails.
 
 
 def test_run_dry_run_prints_and_returns(tmp_path: Path) -> None:

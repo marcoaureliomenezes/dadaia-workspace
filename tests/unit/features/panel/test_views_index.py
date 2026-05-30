@@ -80,17 +80,16 @@ class FakeSpecContextService:
 def _make_context(
     name: str,
     repo_slug: str,
-    is_primary: bool = False,
-    state: ContextState = ContextState.ATIVO,
+    state: ContextState = ContextState.ALIVE,
 ) -> SpecContextProject:
     return SpecContextProject(
         name=name,
         state=state,
         repo_slug=repo_slug,
         repo_url="https://github.com/org/repo",
-        is_primary=is_primary,
         created_at="2026-01-01T00:00:00+00:00",
-        activated_at="2026-01-01T00:00:00+00:00",
+        alive_since="2026-01-01T00:00:00+00:00" if state == ContextState.ALIVE else None,
+        dead_since=None if state == ContextState.ALIVE else "2026-01-01T00:00:00+00:00",
         current_branch="main",
     )
 
@@ -171,7 +170,7 @@ def test_index_agents_section_has_grid() -> None:
 
 def test_index_primary_context_badge() -> None:
     """T-P5-36: topbar badge removed; card-level badge also removed in T-P5-16."""
-    ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
+    ctx = _make_context("My Workspace", "my-workspace")
     service = _build_service(contexts=[ctx])
     html = _render(service)
     # T-P5-16: card-primary-badge removed — all cards are uniform
@@ -180,17 +179,16 @@ def test_index_primary_context_badge() -> None:
     assert "topbar-badge" not in html
 
 
-def test_index_primary_context_first_in_dom() -> None:
-    """Primary context card must appear before non-primary cards in DOM order."""
-    primary = _make_context("Primary", "primary-slug", is_primary=True)
-    other = _make_context("Other", "other-slug", is_primary=False)
-    service = _build_service(contexts=[other, primary])  # other listed first
+def test_index_context_order_preserved() -> None:
+    """v2: contexts render in the order returned by list_active_contexts (no primary re-sorting)."""
+    first = _make_context("First", "first-slug")
+    second = _make_context("Second", "second-slug")
+    service = _build_service(contexts=[first, second])
     html = _render(service)
 
-    # Primary's slug should appear before other's slug in the HTML
-    pos_primary = html.find("primary-slug")
-    pos_other = html.find("other-slug")
-    assert pos_primary < pos_other, "Primary context card must come first in DOM"
+    pos_first = html.find("first-slug")
+    pos_second = html.find("second-slug")
+    assert pos_first < pos_second, "Contexts must render in the order provided"
 
 
 def test_index_xss_project_name_escaped() -> None:
@@ -219,12 +217,12 @@ def test_index_xss_branch_escaped() -> None:
     """R3-A: <script> in branch name must be HTML-escaped."""
     ctx = SpecContextProject(
         name="safe-name",
-        state=ContextState.ATIVO,
+        state=ContextState.ALIVE,
         repo_slug="safe-slug",
         repo_url="https://github.com/org/repo",
-        is_primary=False,
         created_at="2026-01-01T00:00:00+00:00",
-        activated_at="2026-01-01T00:00:00+00:00",
+        alive_since="2026-01-01T00:00:00+00:00",
+        dead_since=None,
         current_branch="<script>alert(1)</script>",
     )
     service = _build_service(contexts=[ctx])
@@ -667,7 +665,7 @@ def test_projects_section_heading_is_projects() -> None:
 
 def test_projects_section_no_old_count_label() -> None:
     """T-P5-15: 'N active contexts — 1 primary' count label must be removed from section-memories."""
-    ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
+    ctx = _make_context("My Workspace", "my-workspace")
     service = _build_service(contexts=[ctx])
     rendered = _render(service)
     # Find only the memories section fragment
@@ -741,7 +739,7 @@ def test_projects_card_zone_d_has_memory_chips() -> None:
 
 def test_projects_card_no_primary_badge() -> None:
     """T-P5-16: PRIMARY badge must be removed — no card-primary-badge class."""
-    ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
+    ctx = _make_context("My Workspace", "my-workspace")
     service = _build_service(contexts=[ctx])
     rendered = _render(service)
     assert "card-primary-badge" not in rendered, "PRIMARY badge must be removed in redesign"
@@ -749,7 +747,7 @@ def test_projects_card_no_primary_badge() -> None:
 
 def test_projects_card_no_primary_class() -> None:
     """T-P5-16: No 'primary' CSS class on article — uniform card treatment."""
-    ctx = _make_context("My Workspace", "my-workspace", is_primary=True)
+    ctx = _make_context("My Workspace", "my-workspace")
     service = _build_service(contexts=[ctx])
     rendered = _render(service)
     # The article should not have class="context-card primary"

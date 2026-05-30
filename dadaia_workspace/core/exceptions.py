@@ -102,3 +102,11 @@ class NoAgentSequenceError(DadaiaError):
     The CLI maps this to exit code 3, instructing the operator to declare owners via
     the ``(owner: <agent>)`` / ``**Owner:** <agent>`` / ``owner: <agent>`` patterns.
     """
+
+
+class SchemaVersionError(DadaiaError):
+    """Raised when spec_contexts.json uses an incompatible schema version (v1 or legacy values).
+
+    The message always contains "dadaia migrate" so the user knows what to run.
+    Callers must never silently correct v1 data — raise this instead.
+    """

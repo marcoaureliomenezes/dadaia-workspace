@@ -28,7 +28,7 @@ _DADAIA_DIRS = _DADAIA_DURABLE_DIRS + _DADAIA_EPHEMERAL_DIRS
 
 _HOOK_KEY = "UserPromptSubmit"
 
-_EMPTY_CONTEXTS = {"version": "1", "contexts": []}
+_EMPTY_CONTEXTS = {"schema_version": "2", "contexts": []}
 _EMPTY_ACADEMY = {"version": "1", "courses": []}
 _EMPTY_SERVER_REGISTRY = {
     "version": "1",

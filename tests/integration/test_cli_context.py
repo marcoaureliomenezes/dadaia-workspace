@@ -1,4 +1,4 @@
-"""dadaia context CLI — happy path + error paths."""
+"""dadaia context CLI — happy path + error paths (v2 model: ALIVE/DEAD)."""
 
 import json
 import subprocess
@@ -26,12 +26,12 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
-def test_context_create_lists_state_inativo(workspace: Path) -> None:
+def test_context_create_lists_state_dead(workspace: Path) -> None:
     result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
     assert result.exit_code == 0, result.output
     list_out = _runner.invoke(app, ["context", "list"])
     assert "alpha" in list_out.output
-    assert "inativo" in list_out.output
+    assert "dead" in list_out.output
 
 
 def test_context_show_json_returns_structured(workspace: Path) -> None:
@@ -40,8 +40,11 @@ def test_context_show_json_returns_structured(workspace: Path) -> None:
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert data["name"] == "alpha"
-    assert data["state"] == "inativo"
-    assert data["is_primary"] is False
+    assert data["state"] == "dead"
+    # v2: no is_primary field
+    assert "is_primary" not in data
+    assert "alive_since" in data
+    assert "dead_since" in data
 
 
 def test_context_create_rejects_duplicate(workspace: Path) -> None:
@@ -72,7 +75,7 @@ def test_context_show_table_output(workspace: Path) -> None:
     assert "beta" in result.output
 
 
-def test_context_show_no_primary_json(workspace: Path) -> None:
+def test_context_show_no_active_context_json(workspace: Path) -> None:
     result = _runner.invoke(app, ["context", "show", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
@@ -85,7 +88,7 @@ def test_context_list_empty_workspace(workspace: Path) -> None:
     assert "No contexts" in result.output
 
 
-def test_context_delete_inativo_context(workspace: Path) -> None:
+def test_context_delete_dead_context(workspace: Path) -> None:
     _runner.invoke(app, ["context", "create", "to-del", "--repo", "to-del"])
     result = _runner.invoke(app, ["context", "delete", "to-del"])
     assert result.exit_code == 0, result.output
@@ -109,21 +112,21 @@ def test_context_use_nonexistent_errors(workspace: Path) -> None:
     assert result.exit_code != 0
 
 
-def test_context_list_shows_primary_marker(workspace: Path) -> None:
-    # Write a context directly as is_primary=True to cover the primary marker branch
+def test_context_list_shows_alive_context(workspace: Path) -> None:
+    """Write a v2 alive context directly to verify list shows it correctly."""
     states = workspace / ".dadaia" / "states"
     ctx_data = {
-        "version": "1",
+        "schema_version": "2",
         "contexts": [
             {
-                "name": "primary-ctx",
-                "state": "ativo",
-                "repo_slug": "primary-ctx",
+                "name": "alive-ctx",
+                "state": "alive",
+                "repo_slug": "alive-ctx",
                 "repo_url": "",
-                "is_primary": True,
-                "specs_dir": str(workspace / "repos" / "primary-ctx" / "specs"),
                 "created_at": "2026-01-01T00:00:00Z",
-                "activated_at": "2026-01-01T00:00:00Z",
+                "alive_since": "2026-01-01T00:00:00Z",
+                "dead_since": None,
+                "current_branch": "main",
             }
         ],
     }
@@ -132,7 +135,7 @@ def test_context_list_shows_primary_marker(workspace: Path) -> None:
     (states / "spec_contexts.json").write_text(_json.dumps(ctx_data))
     result = _runner.invoke(app, ["context", "list"])
     assert result.exit_code == 0, result.output
-    assert "primary-ctx" in result.output
+    assert "alive-ctx" in result.output
 
 
 def test_context_workspace_not_initialized_exits(tmp_path: Path, monkeypatch) -> None:
@@ -142,19 +145,40 @@ def test_context_workspace_not_initialized_exits(tmp_path: Path, monkeypatch) ->
     assert result.exit_code != 0
 
 
+def test_context_command_on_v1_workspace_exits_nonzero(workspace: Path) -> None:
+    """AC-T10c-4: any dadaia context command on v1 workspace must exit non-zero
+    with the migration prompt."""
+    states = workspace / ".dadaia" / "states"
+    v1_data = {
+        "schema_version": "1",
+        "contexts": [
+            {
+                "name": "old-ctx",
+                "state": "ativo",
+                "repo_slug": "old-ctx",
+                "repo_url": "",
+                "is_primary": False,
+                "created_at": "2026-01-01T00:00:00Z",
+                "activated_at": None,
+            }
+        ],
+    }
+    import json as _json
+
+    (states / "spec_contexts.json").write_text(_json.dumps(v1_data))
+    result = _runner.invoke(app, ["context", "list"])
+    assert result.exit_code != 0
+    combined = result.output + (result.stderr or "")
+    assert "MIGRATION REQUIRED" in combined or "dadaia migrate" in combined
+
+
 # ---------------------------------------------------------------------------
 # T-BCR-08 smoke test — deactivate uses git push -u when no upstream tracking
 # ---------------------------------------------------------------------------
 
 
 def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
-    """Smoke test: GitSubprocessClient.push() uses -u on a repo with no upstream.
-
-    This integration smoke test verifies the Bug-4 fix (T-BCR-04) by using a
-    real git local repo + bare remote so the full subprocess path executes.
-    If no upstream tracking branch is configured, push() must issue
-    ``git push -u origin <branch>`` and not plain ``git push``.
-    """
+    """Smoke test: GitSubprocessClient.push() uses -u on a repo with no upstream."""
     # Create a bare remote
     bare = tmp_path / "bare.git"
     bare.mkdir()

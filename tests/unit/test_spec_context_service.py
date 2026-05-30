@@ -1,4 +1,4 @@
-"""Unit tests for SpecContextService."""
+"""Unit tests for SpecContextService (v2 model: ALIVE/DEAD)."""
 
 from pathlib import Path
 
@@ -58,8 +58,7 @@ def service(
 def test_create_stores_context(service: SpecContextService, store: FakeContextStore) -> None:
     ctx = service.create("proj", "my-repo", "https://github.com/org/my-repo")
     assert store.get("proj") is not None
-    assert ctx.state == ContextState.INATIVO
-    assert ctx.is_primary is False
+    assert ctx.state == ContextState.DEAD
     assert ctx.repo_slug == "my-repo"
 
 
@@ -95,9 +94,10 @@ def test_activate_auto_promotes_first(
 ) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     ctx = service.activate("proj")
-    assert ctx.is_primary is True
+    # Auto-promote writes primary_context.json
     assert primary.read() is not None
     assert primary.read()["name"] == "proj"  # type: ignore[index]
+    assert ctx.state == ContextState.ALIVE
 
 
 def test_activate_no_auto_promote_if_primary_exists(
@@ -109,8 +109,9 @@ def test_activate_no_auto_promote_if_primary_exists(
     service.create("p2", "r2", "https://github.com/org/r2")
     service.activate("p1")
     service.activate("p2")
-    assert service.show("p1").is_primary is True
-    assert service.show("p2").is_primary is False
+    # Only p1 auto-promoted (it was first with no primary)
+    assert primary.read()["name"] == "p1"  # type: ignore[index]
+    assert service.show("p2").state == ContextState.ALIVE
 
 
 def test_activate_not_found_raises(service: SpecContextService) -> None:
@@ -121,33 +122,31 @@ def test_activate_not_found_raises(service: SpecContextService) -> None:
 # ------------------------------------------------------------------ deactivate
 
 
-def test_deactivate_removes_repo_and_marks_inativo(
+def test_deactivate_removes_repo_and_marks_dead(
     service: SpecContextService, workspace_root: Path, git: FakeGitClient
 ) -> None:
     # Create a second ctx to be primary so we can deactivate the first
     (workspace_root / "repos" / "r2").mkdir(parents=True)
     service.create("other", "r2", "https://github.com/org/r2")
     service.activate("other")  # auto-promote
-    # Now promote other so we can deactivate proj
+    # Now create and activate proj — it is NOT primary (other already was primary)
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    ctx = service.activate("proj")
-    # proj is NOT primary (other already was primary); safe to deactivate
-    assert ctx.is_primary is False
+    service.activate("proj")
     repo = workspace_root / "repos" / "my-repo"
     assert repo.exists()
     service.deactivate("proj")
     assert not repo.exists()
-    assert service.show("proj").state == ContextState.INATIVO
+    assert service.show("proj").state == ContextState.DEAD
 
 
 def test_deactivate_primary_raises(service: SpecContextService, workspace_root: Path) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
+    service.activate("proj")  # auto-promotes to primary
     with pytest.raises(ContextStateError, match="primary"):
         service.deactivate("proj")
 
 
-def test_deactivate_inativo_raises(service: SpecContextService) -> None:
+def test_deactivate_dead_raises(service: SpecContextService) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     with pytest.raises(ContextStateError):
         service.deactivate("proj")
@@ -156,7 +155,7 @@ def test_deactivate_inativo_raises(service: SpecContextService) -> None:
 # ------------------------------------------------------------------ promote
 
 
-def test_promote_sets_is_primary(
+def test_promote_writes_primary_json(
     service: SpecContextService, primary: FakePrimaryContextStore, workspace_root: Path
 ) -> None:
     (workspace_root / "repos" / "r1").mkdir(parents=True)
@@ -166,12 +165,10 @@ def test_promote_sets_is_primary(
     service.activate("p1")  # p1 auto-promoted
     service.activate("p2")  # p2 not promoted
     service.promote("p2")
-    assert service.show("p1").is_primary is False
-    assert service.show("p2").is_primary is True
     assert primary.read()["name"] == "p2"  # type: ignore[index]
 
 
-def test_promote_inativo_raises(service: SpecContextService) -> None:
+def test_promote_dead_raises(service: SpecContextService) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     with pytest.raises(ContextStateError):
         service.promote("proj")
@@ -188,13 +185,13 @@ def test_promote_already_primary_is_idempotent(
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.activate("proj")  # auto-promotes
     ctx = service.promote("proj")  # already primary — should return same ctx
-    assert ctx.is_primary is True
+    assert ctx.state == ContextState.ALIVE
 
 
 # ------------------------------------------------------------------ delete
 
 
-def test_delete_removes_inativo_context(
+def test_delete_removes_dead_context(
     service: SpecContextService, store: FakeContextStore
 ) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
@@ -207,7 +204,7 @@ def test_delete_not_found_raises(service: SpecContextService) -> None:
         service.delete("ghost")
 
 
-def test_delete_ativo_context_raises(service: SpecContextService, workspace_root: Path) -> None:
+def test_delete_alive_context_raises(service: SpecContextService, workspace_root: Path) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.activate("proj")
     with pytest.raises(ContextStateError):
@@ -225,7 +222,6 @@ def test_deactivate_syncs_dirty_repo(
     service.activate("other")
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.activate("proj")
-    assert service.show("proj").is_primary is False
     repo = workspace_root / "repos" / "my-repo"
     git._dirty.add(repo)
     service.deactivate("proj")
@@ -240,7 +236,6 @@ def test_deactivate_pushes_when_remote_present(
     service.activate("other")
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.activate("proj")
-    assert service.show("proj").is_primary is False
     repo = workspace_root / "repos" / "my-repo"
     git._has_remote.add(repo)
     service.deactivate("proj")

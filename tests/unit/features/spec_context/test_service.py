@@ -79,7 +79,6 @@ def test_deactivate_raises_gitsyncerror_on_non_writable_files(
 
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.activate("proj")
-    assert not service.show("proj").is_primary
 
     repo = workspace_root / "repos" / "my-repo"
     assert repo.exists()
@@ -117,7 +116,6 @@ def test_deactivate_succeeds_when_all_files_are_writable(
 
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.activate("proj")
-    assert not service.show("proj").is_primary
 
     repo = workspace_root / "repos" / "my-repo"
     # Place a writable file — must not impede rmtree

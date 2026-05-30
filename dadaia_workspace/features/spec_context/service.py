@@ -50,7 +50,11 @@ class SpecContextService:
         return self._repo_path(repo_slug) / "specs"
 
     def _has_primary(self) -> bool:
-        return any(c.is_primary for c in self._store.list_all())
+        # In v2 there is no is_primary; a context is "primary-like" if it is ALIVE.
+        # This method is retained for backward compat with activate() auto-promote logic.
+        # T-10b will remove this entirely.
+        primary_data = self._primary.read()
+        return primary_data is not None
 
     # ------------------------------------------------------------------ create
 
@@ -61,12 +65,12 @@ class SpecContextService:
             )
         ctx = SpecContextProject(
             name=name,
-            state=ContextState.INATIVO,
+            state=ContextState.DEAD,
             repo_slug=repo_slug,
             repo_url=repo_url,
-            is_primary=False,
             created_at=_now(),
-            activated_at=None,
+            alive_since=None,
+            dead_since=None,
         )
         self._store.save(ctx)
         return ctx
@@ -82,9 +86,14 @@ class SpecContextService:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         return ctx
 
-    # ------------------------------------------------------------------ activate
+    # ------------------------------------------------------------------ activate (T-10b compat: keep working)
 
     def activate(self, name: str) -> SpecContextProject:
+        """Transition a context to ALIVE; clone repo if absent; auto-promote if no primary.
+
+        This method is kept for backward compatibility until T-10b removes it.
+        It maps to the ALIVE state in the v2 model.
+        """
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
@@ -127,12 +136,12 @@ class SpecContextService:
 
         activated = SpecContextProject(
             name=ctx.name,
-            state=ContextState.ATIVO,
+            state=ContextState.ALIVE,
             repo_slug=ctx.repo_slug,
             repo_url=ctx.repo_url,
-            is_primary=ctx.is_primary,
             created_at=ctx.created_at,
-            activated_at=_now(),
+            alive_since=_now(),
+            dead_since=None,
             current_branch=actual_branch,
         )
         self._store.update(activated)
@@ -146,15 +155,23 @@ class SpecContextService:
 
         return activated
 
-    # ------------------------------------------------------------------ deactivate
+    # ------------------------------------------------------------------ deactivate (T-10b compat: keep working)
 
     def deactivate(self, name: str) -> SpecContextProject:
+        """Transition a context to DEAD; git sync + remove repo.
+
+        This method is kept for backward compatibility until T-10b removes it.
+        It maps to the DEAD state in the v2 model.
+        """
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
-        if ctx.state != ContextState.ATIVO:
+        if ctx.state != ContextState.ALIVE:
             raise ContextStateError(f"Context '{name}' is not active. It cannot be deactivated.")
-        if ctx.is_primary:
+
+        # Check if this context is the primary — guard against deactivating primary
+        primary_data = self._primary.read()
+        if primary_data is not None and primary_data.get("name") == name:
             raise ContextStateError(
                 f"Context '{name}' is the primary context and cannot be deactivated. "
                 "Promote another context first with 'dadaia context promote <name>'."
@@ -183,9 +200,6 @@ class SpecContextService:
                             "Resolve the issue and retry deactivate."
                         ) from exc
             # Bug 3 fix: detect non-writable files before calling rmtree.
-            # If root-owned files are present, rmtree raises PermissionError
-            # with no actionable context.  We scan first and raise a descriptive
-            # GitSyncError instead.
             non_writable = [
                 str(f) for f in repo_path.rglob("*") if f.is_file() and not os.access(f, os.W_OK)
             ]
@@ -200,66 +214,48 @@ class SpecContextService:
 
         inactive = SpecContextProject(
             name=ctx.name,
-            state=ContextState.INATIVO,
+            state=ContextState.DEAD,
             repo_slug=ctx.repo_slug,
             repo_url=ctx.repo_url,
-            is_primary=False,
             created_at=ctx.created_at,
-            activated_at=None,
+            alive_since=None,
+            dead_since=_now(),
             current_branch=branch_before_sync,
         )
         self._store.update(inactive)
         return inactive
 
-    # ------------------------------------------------------------------ promote
+    # ------------------------------------------------------------------ promote (T-10b compat: keep working)
 
     def promote(self, name: str) -> SpecContextProject:
+        """Promote a context as the workspace primary.
+
+        This method is kept for backward compatibility until T-10b removes it.
+        In v2, there is no global primary; this only updates primary_context.json.
+        """
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
-        if ctx.state != ContextState.ATIVO:
+        if ctx.state != ContextState.ALIVE:
             raise ContextStateError(
                 f"Context '{name}' must be active before it can be promoted. "
                 "Run 'dadaia context activate {name}' first."
             )
-        if ctx.is_primary:
-            return ctx  # already primary — idempotent
 
-        # Demote current primary (if any)
-        for existing in self._store.list_all():
-            if existing.is_primary:
-                demoted = SpecContextProject(
-                    name=existing.name,
-                    state=existing.state,
-                    repo_slug=existing.repo_slug,
-                    repo_url=existing.repo_url,
-                    is_primary=False,
-                    created_at=existing.created_at,
-                    activated_at=existing.activated_at,
-                    current_branch=existing.current_branch,
-                )
-                self._store.update(demoted)
+        # Check if already primary
+        primary_data = self._primary.read()
+        if primary_data is not None and primary_data.get("name") == name:
+            return ctx  # already primary — idempotent
 
         return self._promote_to_primary(ctx)
 
     def _promote_to_primary(self, ctx: SpecContextProject) -> SpecContextProject:
-        promoted = SpecContextProject(
-            name=ctx.name,
-            state=ctx.state,
-            repo_slug=ctx.repo_slug,
-            repo_url=ctx.repo_url,
-            is_primary=True,
-            created_at=ctx.created_at,
-            activated_at=ctx.activated_at,
-            current_branch=ctx.current_branch,
-        )
-        self._store.update(promoted)
         self._primary.write(
-            name=promoted.name,
-            repo_slug=promoted.repo_slug,
-            specs_dir=self._specs_dir(promoted.repo_slug),
+            name=ctx.name,
+            repo_slug=ctx.repo_slug,
+            specs_dir=self._specs_dir(ctx.repo_slug),
         )
-        return promoted
+        return ctx
 
     # ------------------------------------------------------------------ delete
 
@@ -267,7 +263,7 @@ class SpecContextService:
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
-        if ctx.state == ContextState.ATIVO:
+        if ctx.state == ContextState.ALIVE:
             raise ContextStateError(
                 f"Context '{name}' is active. Run 'dadaia context deactivate {name}' before deleting."
             )

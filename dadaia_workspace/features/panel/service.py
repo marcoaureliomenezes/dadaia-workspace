@@ -195,7 +195,7 @@ class PanelService:
     def list_active_contexts(self) -> list[PanelContext]:
         """Return all active Spec Context Projects as PanelContext dataclasses.
 
-        Filters to state == ativo only.  branch is taken from the cached
+        Filters to state == alive only.  branch is taken from the cached
         current_branch field of SpecContextProject (no git subprocess — R4).
         """
         return [
@@ -204,7 +204,7 @@ class PanelService:
                 name=ctx.name,
                 repo_path=self._workspace_root / "repos" / ctx.repo_slug,
                 branch=ctx.current_branch,
-                is_primary=ctx.is_primary,
+                is_primary=False,
             )
             for ctx in self._active_contexts()
         ]
@@ -273,5 +273,5 @@ class PanelService:
     # ------------------------------------------------------------------
 
     def _active_contexts(self) -> list[SpecContextProject]:
-        """Return contexts with state == ativo."""
-        return [ctx for ctx in self._spec_context.list_all() if ctx.state == ContextState.ATIVO]
+        """Return contexts with state == alive."""
+        return [ctx for ctx in self._spec_context.list_all() if ctx.state == ContextState.ALIVE]
