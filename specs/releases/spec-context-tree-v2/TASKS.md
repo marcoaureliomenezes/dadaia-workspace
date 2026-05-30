@@ -201,7 +201,7 @@ flag). All fix policies must match the table in SPEC §3 T-9.
 confirms AC-D-15 (`dadaia doctor` exits 0 on fresh scaffold) and AC-D-16 (exits 0 on
 dadaia-workspace repo itself).
 
-[ ] T-9
+[x] T-9
 
 ---
 

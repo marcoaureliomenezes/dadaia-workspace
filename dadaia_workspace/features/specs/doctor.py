@@ -2,7 +2,8 @@
 
 Runs the 11 structural checks defined in release `sdd-release-lifecycle-v1`,
 extended for the product memory folder catalog (release `Product Memory Feature
-Catalog v1`) and the D-OC-1 orchestration registry coherence invariant:
+Catalog v1`) and the D-OC-1 orchestration registry coherence invariant, plus
+the 7 TREE invariants from release `spec-context-tree-v2`:
 
   1. specs/constitution.md exists
   2. specs/memory/architecture.html and tech-stack.html exist, parseable, with non-empty
@@ -23,17 +24,29 @@ Catalog v1`) and the D-OC-1 orchestration registry coherence invariant:
        heading exists in SKILL.md.
      - Reverse: every non-deprecated playbook heading → appears as Tier-2 row in PM router.
 
+TREE invariants (spec-context-tree-v2):
+  TREE-1. specs/foundation/ exists → WARN-ONLY (migration: dadaia migrate tree-v2)
+  TREE-2. specs/SPEC.md at tree root → WARN-ONLY (migration: dadaia migrate tree-v2)
+  TREE-3. memory/architecture.html | tech-stack.html | product/index.html absent → AUTO-FIX
+  TREE-4. backlog/ | bugs/ | releases/ absent → AUTO-FIX (create dir + README.md + .gitkeep)
+  TREE-5. specs/AGENTS.md absent or hash differs from canonical template → WARN-ONLY (drift)
+  TREE-6. releases/<id>/ missing mandatory SDD artifact for its phase → NO AUTO-FIX
+  TREE-7. bugs/<slug>.md missing session_id frontmatter field → NO AUTO-FIX
+
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from html.parser import HTMLParser
 from pathlib import Path
+
+import jinja2
 
 CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
 CANONICAL_PHASES = {
@@ -96,6 +109,32 @@ RELEASE_VINTAGE_CUTOFF = date(2026, 5, 17)  # releases on/before this are exclud
 # SPEC-DOC-023: hotfix bullets older than 72 hours in ## Hotfixes pendentes get WARNING
 _HOTFIX_STALE_HOURS = 72
 
+# ──────────────────────────────────────────────────────────────────────────────
+# TREE invariant constants (spec-context-tree-v2)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# TREE-3: memory files that must exist; each maps to its Jinja template name.
+_TREE3_MEMORY_TEMPLATES: tuple[tuple[str, str], ...] = (
+    ("architecture.html", "memory-architecture.html.j2"),
+    ("tech-stack.html", "memory-tech-stack.html.j2"),
+    ("product/index.html", "memory-product-index.html.j2"),
+)
+
+# TREE-4: directories that must exist.  Value = README.md content source file (relative
+# to the scaffold source dir embedded in the package).
+_TREE4_REQUIRED_DIRS = ("backlog", "bugs", "releases")
+
+# TREE-6: mandatory artifacts per phase bucket.
+# For the ACTIVE release, if phase is IMPLEMENTATION or CLOSURE, all three must exist.
+_TREE6_IMPL_ARTIFACTS = ("SPEC.md", "PLAN.md", "TASKS.md")
+
+# Migration hint printed loudly for TREE-1 and TREE-2 (regardless of --fix).
+_TREE_MIGRATION_HINT = (
+    "[TREE MIGRATION REQUIRED] Run: dadaia migrate tree-v2\n"
+    "  This command moves deprecated content to releases/legacy/ "
+    "without destroying SDD-approved artifacts."
+)
+
 
 class Severity(StrEnum):
     ERROR = "error"
@@ -108,6 +147,7 @@ class SpecsDoctorIssue:
     severity: Severity
     description: str
     path: str | None = None
+    fixable: bool = False
 
     def to_dict(self) -> dict[str, str | None]:
         return {
@@ -314,12 +354,36 @@ class SpecsDoctor:
     Args:
         specs_dir: Path to the ``specs/`` directory.
         public_dir: Optional path to ``dadaia_workspace/public/``. When provided,
-            the D-OC-1 orchestration-registry coherence check is enabled.
+            the D-OC-1 orchestration-registry coherence check is enabled, and
+            the TREE-3/TREE-4/TREE-5 auto-fix + drift-detect features are available
+            (templates loaded from ``public_dir/templates/``).
+            When *not* provided the TREE checks still run but TREE-3 fix and TREE-5
+            hash comparison are skipped (issue is still emitted, fix is no-op).
     """
 
-    def __init__(self, specs_dir: Path, public_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        specs_dir: Path,
+        public_dir: Path | None = None,
+        templates_dir: Path | None = None,
+    ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
+        # templates_dir is resolved from public_dir if not explicitly supplied.
+        if templates_dir is not None:
+            self._templates_dir: Path | None = Path(templates_dir)
+        elif self.public_dir is not None:
+            candidate = self.public_dir / "templates"
+            self._templates_dir = candidate if candidate.is_dir() else None
+        else:
+            self._templates_dir = None
+
+        # Scaffold source dir (for TREE-4 README content).
+        if self.public_dir is not None:
+            scaffold_candidate = self.public_dir / "scaffold"
+            self._scaffold_dir: Path | None = scaffold_candidate if scaffold_candidate.is_dir() else None
+        else:
+            self._scaffold_dir = None
 
     def check(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
@@ -337,7 +401,50 @@ class SpecsDoctor:
         issues.extend(self._check_backlog_schema())
         issues.extend(self._check_release_semver_naming())
         issues.extend(self._check_orchestration_registry())
+        # TREE invariants (spec-context-tree-v2)
+        issues.extend(self._check_tree1_foundation())
+        issues.extend(self._check_tree2_root_spec_md())
+        issues.extend(self._check_tree3_memory_html())
+        issues.extend(self._check_tree4_required_dirs())
+        issues.extend(self._check_tree5_agents_md())
+        issues.extend(self._check_tree6_release_artifacts())
+        issues.extend(self._check_tree7_bug_session_id())
         return issues
+
+    def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
+        """Apply auto-fixes for all fixable issues.
+
+        Resolves TREE-3 (render missing memory HTML from Jinja templates) and
+        TREE-4 (create missing dirs with README.md + .gitkeep).  Warn-only and
+        no-fix invariants are never touched.
+
+        Args:
+            issues: Pre-computed issue list (avoids a second ``check()`` call).
+                    If None, ``check()`` is called internally.
+
+        Returns:
+            List of issues that were fixed (i.e. ``fixable=True`` issues that
+            were acted upon).  Issues that could not be fixed due to missing
+            templates are omitted and left as residual issues on the next
+            ``check()`` call.
+        """
+        if issues is None:
+            issues = self.check()
+        fixed: list[SpecsDoctorIssue] = []
+        for issue in issues:
+            if not issue.fixable:
+                continue
+            try:
+                if issue.code == "TREE-3":
+                    self._fix_tree3(issue)
+                    fixed.append(issue)
+                elif issue.code == "TREE-4":
+                    self._fix_tree4(issue)
+                    fixed.append(issue)
+            except Exception:
+                # Leave as residual — will re-appear on next check()
+                pass
+        return fixed
 
     # 1
     def _check_constitution(self) -> list[SpecsDoctorIssue]:
@@ -1015,6 +1122,313 @@ class SpecsDoctor:
                             path=str(entry),
                         )
                     )
+        return issues
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # TREE invariants
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _check_tree1_foundation(self) -> list[SpecsDoctorIssue]:
+        """TREE-1: specs/foundation/ must NOT exist (deprecated layout).
+
+        Warn-only (fixable=False).  A loud migration hint pointing to
+        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
+        Auto-moving is intentionally blocked: foundation/ may hold SDD-approved
+        content and reclassification requires operator consent.
+        """
+        foundation = self.specs_dir / "foundation"
+        if not foundation.exists():
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="TREE-1",
+                severity=Severity.WARNING,
+                description=(
+                    "specs/foundation/ exists — this is the deprecated layout. "
+                    f"{_TREE_MIGRATION_HINT}"
+                ),
+                path=str(foundation),
+                fixable=False,
+            )
+        ]
+
+    def _check_tree2_root_spec_md(self) -> list[SpecsDoctorIssue]:
+        """TREE-2: specs/SPEC.md at the tree root must NOT exist (deprecated).
+
+        Warn-only (fixable=False).  A loud migration hint pointing to
+        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
+        Auto-moving is intentionally blocked: root SPEC.md may hold
+        SDD-approved content that requires operator consent to reclassify.
+        """
+        root_spec = self.specs_dir / "SPEC.md"
+        if not root_spec.exists():
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="TREE-2",
+                severity=Severity.WARNING,
+                description=(
+                    "specs/SPEC.md exists at the tree root — this is the deprecated layout. "
+                    f"{_TREE_MIGRATION_HINT}"
+                ),
+                path=str(root_spec),
+                fixable=False,
+            )
+        ]
+
+    def _check_tree3_memory_html(self) -> list[SpecsDoctorIssue]:
+        """TREE-3: required memory HTML files must exist.
+
+        Checks: memory/architecture.html, memory/tech-stack.html,
+        memory/product/index.html.
+
+        When ``fixable=True`` the fix path renders the file from its canonical
+        Jinja template (same mechanism as ``scaffold()``).  If no templates_dir
+        is available, the issue is still emitted as a WARNING but fixable=False
+        (fix path would have nothing to render from).
+        """
+        issues: list[SpecsDoctorIssue] = []
+        mem_dir = self.specs_dir / "memory"
+        for rel_path, template_name in _TREE3_MEMORY_TEMPLATES:
+            target = mem_dir / rel_path
+            if target.exists():
+                continue
+            fixable = self._templates_dir is not None and (
+                self._templates_dir / template_name
+            ).exists()
+            issues.append(
+                SpecsDoctorIssue(
+                    code="TREE-3",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"memory/{rel_path} is missing — required memory HTML. "
+                        + ("Auto-fix available (run doctor --fix)." if fixable else
+                           "No templates_dir available — create manually.")
+                    ),
+                    path=str(target),
+                    fixable=fixable,
+                )
+            )
+        return issues
+
+    def _fix_tree3(self, issue: SpecsDoctorIssue) -> None:
+        """Render the missing memory HTML from its canonical Jinja template."""
+        assert issue.code == "TREE-3"
+        assert self._templates_dir is not None
+        target = Path(issue.path)  # type: ignore[arg-type]
+        rel = target.relative_to(self.specs_dir / "memory").as_posix()
+        # Find the matching template.
+        template_name: str | None = None
+        for rel_path, tpl in _TREE3_MEMORY_TEMPLATES:
+            if rel_path == rel:
+                template_name = tpl
+                break
+        if template_name is None:
+            return
+        today = datetime.now(tz=UTC).date().isoformat()
+        context: dict[str, str] = {
+            "project_name": self.specs_dir.parent.name,
+            "today": today,
+            "last_release_id": "none",
+        }
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(str(self._templates_dir)),
+            undefined=jinja2.Undefined,
+            autoescape=False,
+        )
+        template = env.get_template(template_name)
+        rendered: str = template.render(context)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(rendered, encoding="utf-8")
+
+    def _check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
+        """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
+
+        When a directory is absent the issue is emitted as fixable=True.
+        The fix creates the dir, writes README.md (content copied from the
+        canonical scaffold source), and touches .gitkeep — matching the exact
+        output of ``scaffold()``.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        for dirname in _TREE4_REQUIRED_DIRS:
+            target = self.specs_dir / dirname
+            if target.exists():
+                continue
+            fixable = self._scaffold_dir is not None and (
+                self._scaffold_dir / dirname / "README.md"
+            ).exists()
+            issues.append(
+                SpecsDoctorIssue(
+                    code="TREE-4",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"specs/{dirname}/ is missing — required spec tree directory. "
+                        + ("Auto-fix available (run doctor --fix)." if fixable else
+                           "No scaffold source available — create manually.")
+                    ),
+                    path=str(target),
+                    fixable=fixable,
+                )
+            )
+        return issues
+
+    def _fix_tree4(self, issue: SpecsDoctorIssue) -> None:
+        """Create the missing directory with README.md and .gitkeep."""
+        assert issue.code == "TREE-4"
+        target = Path(issue.path)  # type: ignore[arg-type]
+        dirname = target.name
+        target.mkdir(parents=True, exist_ok=True)
+        # README.md — copy from scaffold source
+        readme_content = ""
+        if self._scaffold_dir is not None:
+            src_readme = self._scaffold_dir / dirname / "README.md"
+            if src_readme.exists():
+                readme_content = src_readme.read_text(encoding="utf-8")
+        readme = target / "README.md"
+        if not readme.exists():
+            readme.write_text(readme_content, encoding="utf-8")
+        # .gitkeep
+        gitkeep = target / ".gitkeep"
+        if not gitkeep.exists():
+            gitkeep.write_text("", encoding="utf-8")
+
+    def _check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
+        """TREE-5: specs/AGENTS.md must exist and its content must match the canonical template.
+
+        Absent file → WARNING (fixable=False; cannot auto-create because the file
+        is intended for operator customisation).
+        Hash drift → WARNING (fixable=False; silent overwrite would destroy
+        operator customisation — user must merge manually).
+
+        When no templates_dir is available, hash comparison is skipped and
+        only presence is checked.
+        """
+        agents_md = self.specs_dir / "AGENTS.md"
+        if not agents_md.exists():
+            return [
+                SpecsDoctorIssue(
+                    code="TREE-5",
+                    severity=Severity.WARNING,
+                    description=(
+                        "specs/AGENTS.md is missing — expected SDD workflow contract. "
+                        "Create it from the canonical template "
+                        "(dadaia_workspace/public/templates/specs-AGENTS.md) "
+                        "or run `dadaia specs init` to scaffold it."
+                    ),
+                    path=str(agents_md),
+                    fixable=False,
+                )
+            ]
+
+        # Hash comparison against canonical template
+        if self._templates_dir is None:
+            return []
+        canonical_path = self._templates_dir / "specs-AGENTS.md"
+        if not canonical_path.exists():
+            return []
+        canonical_text = canonical_path.read_text(encoding="utf-8")
+        current_text = agents_md.read_text(encoding="utf-8")
+        canonical_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
+        current_hash = hashlib.sha256(current_text.encode("utf-8")).hexdigest()
+        if canonical_hash == current_hash:
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="TREE-5",
+                severity=Severity.WARNING,
+                description=(
+                    f"specs/AGENTS.md has drifted from canonical template "
+                    f"(current sha256:{current_hash[:12]}… vs "
+                    f"canonical sha256:{canonical_hash[:12]}…). "
+                    "Review the diff and merge any upstream changes manually — "
+                    "auto-overwrite is disabled to protect operator customisations. "
+                    "Canonical template: dadaia_workspace/public/templates/specs-AGENTS.md"
+                ),
+                path=str(agents_md),
+                fixable=False,
+            )
+        ]
+
+    def _check_tree6_release_artifacts(self) -> list[SpecsDoctorIssue]:
+        """TREE-6: for the ACTIVE release, mandatory SDD artifacts must exist for its phase.
+
+        Rule: if the active release exists and its phase is IMPLEMENTATION or CLOSURE,
+        then SPEC.md, PLAN.md, and TASKS.md must all be present in the release directory.
+        Any missing file is an ERROR (no auto-fix — creating an empty PLAN.md would
+        constitute an unapproved artifact; human review is required).
+
+        Inactive / non-active releases are not checked here (SPEC-DOC-004 already
+        checks the active release's artifact statuses; we only add the TREE-6
+        structural check for the IMPLEMENTATION/CLOSURE gates).
+
+        Note: this invariant applies to the ACTIVE release only.  The broader
+        per-release artifact check (SPEC-DOC-004) covers Status: field validation.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        active_path = self.specs_dir / "releases" / "ACTIVE.md"
+        release, phase, err = _read_active_md(active_path)
+        if err or not release or release == "none":
+            return issues
+        if phase not in ("IMPLEMENTATION", "CLOSURE"):
+            return issues
+        rdir = self.specs_dir / "releases" / release
+        if not rdir.exists():
+            return issues  # already reported by SPEC-DOC-009
+        for fname in _TREE6_IMPL_ARTIFACTS:
+            fpath = rdir / fname
+            if not fpath.exists():
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="TREE-6",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"Active release '{release}' (phase={phase}) is missing "
+                            f"mandatory SDD artifact: {fname}. "
+                            "Create the artifact via the SDD lifecycle (product-engineer) — "
+                            "do NOT create an empty placeholder."
+                        ),
+                        path=str(fpath),
+                        fixable=False,
+                    )
+                )
+        return issues
+
+    def _check_tree7_bug_session_id(self) -> list[SpecsDoctorIssue]:
+        """TREE-7: every bugs/<slug>.md must have a session_id frontmatter field.
+
+        Expected frontmatter format (YAML-like leading lines):
+            session_id: <value>   OR   session_id: null
+
+        Missing field → ERROR (no auto-fix — injecting a session_id would
+        falsify authorship; human review is required).
+
+        If bugs/ does not exist, this check is a no-op.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        bugs_dir = self.specs_dir / "bugs"
+        if not bugs_dir.exists():
+            return issues
+        for bug_file in sorted(bugs_dir.glob("*.md")):
+            # Skip README.md and other non-bug files
+            if bug_file.name in ("README.md",):
+                continue
+            text = bug_file.read_text(encoding="utf-8")
+            has_session_id = bool(re.search(r"^session_id\s*:", text, re.MULTILINE))
+            if not has_session_id:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="TREE-7",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"bugs/{bug_file.name} is missing the required 'session_id:' "
+                            "frontmatter field. "
+                            "Add 'session_id: null' if the session is unknown. "
+                            "Do NOT inject a fabricated session ID."
+                        ),
+                        path=str(bug_file),
+                        fixable=False,
+                    )
+                )
         return issues
 
     # 11

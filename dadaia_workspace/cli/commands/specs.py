@@ -85,6 +85,16 @@ def doctor(
             "Default: auto-detected from specs_dir/../dadaia_workspace/public/."
         ),
     ),
+    fix: bool = typer.Option(
+        False,
+        "--fix",
+        help=(
+            "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
+            "TREE-4: create missing dirs with README + .gitkeep). "
+            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never auto-fixed. "
+            "After fixing, re-checks and reports residual issues."
+        ),
+    ),
 ) -> None:
     """Run structural checks on the SDD specs tree."""
     target = _resolve_specs_dir(specs_dir)
@@ -92,8 +102,25 @@ def doctor(
         resolved_public: Path | None = Path(public_dir).resolve()
     else:
         resolved_public = _resolve_public_dir(target)
-    doctor_svc = SpecsDoctor(target, public_dir=resolved_public)
+    doctor_svc = SpecsDoctor(target, public_dir=resolved_public, templates_dir=_TEMPLATES_DIR)
     issues = doctor_svc.check()
+
+    # Always surface TREE-1/TREE-2 migration hints (even under --fix).
+    migration_issues = [
+        i for i in issues if i.code in ("TREE-1", "TREE-2")
+    ]
+    if migration_issues:
+        for mi in migration_issues:
+            typer.echo(f"[MIGRATION] {mi.description}", err=True)
+
+    if fix:
+        fixed = doctor_svc.fix(issues)
+        if fixed:
+            typer.echo(f"[fix] Applied {len(fixed)} auto-fix(es):")
+            for f_issue in fixed:
+                typer.echo(f"  [fixed] {f_issue.code}: {f_issue.path}")
+        # Re-check after fixes to get residual state.
+        issues = doctor_svc.check()
 
     if json_output:
         payload = {
