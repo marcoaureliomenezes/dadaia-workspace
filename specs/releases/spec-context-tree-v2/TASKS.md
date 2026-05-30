@@ -239,7 +239,7 @@ projections (`.claude/`, `.codex/`, `.opencode/`).
 
 **Done criterion:** `dadaia public doctor` exits 0. No `[drift]` or `[missing]` entries.
 
-[ ] T-DEVOPS
+[x] T-DEVOPS
 
 ---
 
