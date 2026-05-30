@@ -1,7 +1,8 @@
-release: none
-phase: none
+release: spec-context-tree-v2
+phase: IMPLEMENTATION
 
 # History
+# 2026-05-30 — spec-context-tree-v2 (R1) ACTIVATED (operator). SPEC+PLAN+TASKS Aprovado. Phase IMPLEMENTATION; implementers may reserve [-]. NOTE: R1 SPEC §10.1 said "wait for go-open-source CLOSE" — SUPERSEDED by operator re-sequencing (go-open-source parked as capstone). Wave 1 (software-engineer-python, parallel/disjoint): T-1, T-2, T-4, T-5, T-6, T-8a → T-3,T-7 (after T-4) → T-9 → T-QA → T-DEVOPS. Targets the consumer scaffold (public/scaffold/), not this repo. OQ-4 resolved=static pre-rendered HTML (context create = pure copy).
 # 2026-05-30 — panel-ux-fix-v1 CLOSED + ARCHIVED. All 6 tasks [x]. QA APPROVED (2 non-blocking residuals: 600px scroll not screenshotted, Codex fixture not seeded). CLOSURE.md + 3 memory atoms (panel/architecture/index) updated. Moved to _archive/releases/. specs doctor 0/0. ACTIVE.md freed → next: activate spec-context-tree-v2 (R1). go-open-source remains PARKED (capstone). T-PUX-06 unblocked panel-kanban-v1 (R3).
 # 2026-05-30 — panel-ux-fix-v1 all 6 tasks [x] (T-PUX-01..06). T-PUX-05 QA gate APPROVED (Playwright DOM: 8 cols + Codex placeholder; HTTP: loopback GET=200/POST=401; 19 handler + 112 session tests). Phase advanced to CLOSURE. QA report: .dadaia/reports/dadaia-workspace/qa-engineer/2026-05-30T144557Z-panel-ux-fix-v1-qa.html
 # 2026-05-30 — panel-ux-fix-v1 ACTIVATED (operator). SPEC+PLAN+TASKS Aprovado. Phase IMPLEMENTATION. Implementers may reserve [-]. Already partially done: T-PUX-02/03/04 [x]; remaining T-PUX-01 (sessions table), T-PUX-06 (loopback auth), T-PUX-05 (QA gate). T-PUX-06 unblocks panel-kanban-v1 (R3). NOTE: T-PUX-05 has a multi-[-] marker violation to clean up.
