@@ -47,12 +47,12 @@
     Reference: QA auth test catalogue in `.dadaia/reports/dadaia-workspace/qa-engineer/2026-05-30T143000Z-test-strategy-panel-hardening-kanban.html` §1.1.
 
 ## T-PUX-05 — QA validation [qa-engineer]
-[ ] Capture Playwright screenshots for all 4 fixes at 1280px + 768px.
-[ ] Verify Sessions table shows all columns readable.
-[ ] Verify toggle works on Sessions tab after loading from Agents tab.
-[ ] Verify memory pages render with panel visual identity.
-[ ] Verify agent cards contrast ratios pass WCAG AA.
-[ ] Re-verify T-PUX-03 and T-PUX-04 are still passing (check not regressed by column-width rework).
+[x] Capture Playwright screenshots for all 4 fixes at 1280px + 768px.
+[x] Verify Sessions table shows all columns readable.
+[x] Verify toggle works on Sessions tab after loading from Agents tab.
+[x] Verify memory pages render with panel visual identity.
+[x] Verify agent cards contrast ratios pass WCAG AA.
+[x] Re-verify T-PUX-03 and T-PUX-04 are still passing (check not regressed by column-width rework).
     Mandatory Playwright Codex gate (added 2026-05-30):
     Launch panel with a Codex SQLite fixture (see fixture helper `tests/fixtures/telemetry/seed_codex_fixture.py`),
     select Codex runtime, then assert ALL of the following using deterministic `waitForSelector` — NO `time.sleep`:

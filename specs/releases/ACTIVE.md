@@ -1,7 +1,9 @@
-release: panel-ux-fix-v1
-phase: IMPLEMENTATION
+release: none
+phase: none
 
 # History
+# 2026-05-30 — panel-ux-fix-v1 CLOSED + ARCHIVED. All 6 tasks [x]. QA APPROVED (2 non-blocking residuals: 600px scroll not screenshotted, Codex fixture not seeded). CLOSURE.md + 3 memory atoms (panel/architecture/index) updated. Moved to _archive/releases/. specs doctor 0/0. ACTIVE.md freed → next: activate spec-context-tree-v2 (R1). go-open-source remains PARKED (capstone). T-PUX-06 unblocked panel-kanban-v1 (R3).
+# 2026-05-30 — panel-ux-fix-v1 all 6 tasks [x] (T-PUX-01..06). T-PUX-05 QA gate APPROVED (Playwright DOM: 8 cols + Codex placeholder; HTTP: loopback GET=200/POST=401; 19 handler + 112 session tests). Phase advanced to CLOSURE. QA report: .dadaia/reports/dadaia-workspace/qa-engineer/2026-05-30T144557Z-panel-ux-fix-v1-qa.html
 # 2026-05-30 — panel-ux-fix-v1 ACTIVATED (operator). SPEC+PLAN+TASKS Aprovado. Phase IMPLEMENTATION. Implementers may reserve [-]. Already partially done: T-PUX-02/03/04 [x]; remaining T-PUX-01 (sessions table), T-PUX-06 (loopback auth), T-PUX-05 (QA gate). T-PUX-06 unblocks panel-kanban-v1 (R3). NOTE: T-PUX-05 has a multi-[-] marker violation to clean up.
 # 2026-05-30 — go-open-source PAUSED (operator decision: go public LAST, only after bugs + spec-context chain + panel are solved). Implementation 100% COMPLETE and COMMITTED (791170f on branch release/go-open-source); only T-GOS-OPS1 (the irreversible public visibility flip + governance) deferred to the very end. NOT pushed. Resume = run T-GOS-OPS1 after the other releases close. Re-sequenced: go-open-source is now the capstone, not the gate.
 # 2026-05-29 — go-open-source SPEC + PLAN + TASKS Aprovados (operador). Phase advanced to IMPLEMENTATION. Implementers may reserve [-] markers. Goal: take dadaia-workspace lib public safely (private→public; PyPI 1000+ downloads). 18 tasks, 5 owners + operator. Execution waves: [A1,A2 (se-python) ‖ B1,B2,B4 (ai-engineer) ‖ C1-C4 (devops) ‖ D2 (security) ‖ E1,E2 (product-eng)] → [A3,A4 (se-python) ‖ B3 propagation (ai-engineer) ‖ D1 gitleaks full-history (security) ‖ E3 (product-eng)] → T-GOS-OPS1 (operator+devops: visibility flip, branch protection enforce_admins=true, secret scanning). Blockers: no LICENSE, 364 tracked junk files, consumer-corrupting paths in public/, unpinned release.yml.

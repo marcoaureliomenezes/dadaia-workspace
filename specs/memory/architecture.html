@@ -27,7 +27,7 @@
 <body>
 
 <h1>Architecture Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-29 · Closure: orchestration-consolidation-v1</p>
+<p class="meta">Última atualização: 2026-05-30 · Closure: panel-ux-fix-v1</p>
 
 <section id="overview">
   <h2>Visão geral</h2>
@@ -45,7 +45,7 @@
     <li><strong>Route categories (3 tipos declarados em <code>handler.py</code>)</strong>:
       <ul>
         <li><em>Public</em>: rotas em <code>_COMPILED_ROUTES</code>, sem autenticação — <code>GET /</code>, <code>GET /static/&lt;name&gt;</code>, <code>GET /memory/&lt;slug&gt;/&lt;path&gt;</code>, <code>GET /memory-view/&lt;slug&gt;/&lt;file&gt;</code>, <code>GET /reports/&lt;path&gt;</code> (path-traversal guard via <code>Path.resolve()</code> + <code>relative_to(workspace_root/.dadaia/reports/)</code>; 403 se fora do boundary).</li>
-        <li><em>Bearer-only</em>: <code>_BEARER_ONLY_ROUTES</code> — exigem header <code>Authorization: Bearer &lt;token&gt;</code>; incluem todos os <code>/api/*</code> endpoints: <code>/api/servers</code>, <code>/api/contexts</code>, <code>/api/agents</code>, <code>/api/agents/&lt;id&gt;/prompt</code>, <code>/api/workflows</code>, <code>/api/workflows/&lt;name&gt;</code>, <code>/api/sessions</code>, <code>/api/sessions/&lt;runtime&gt;/&lt;id&gt;</code>, <code>/api/academy</code>, <code>/api/reports</code>, <code>DELETE /api/reports/&lt;path&gt;</code>.</li>
+        <li><em>Bearer-only</em>: <code>_BEARER_ONLY_ROUTES</code> — normalmente exigem header <code>Authorization: Bearer &lt;token&gt;</code>; incluem todos os <code>/api/*</code> endpoints: <code>/api/servers</code>, <code>/api/contexts</code>, <code>/api/agents</code>, <code>/api/agents/&lt;id&gt;/prompt</code>, <code>/api/workflows</code>, <code>/api/workflows/&lt;name&gt;</code>, <code>/api/sessions</code>, <code>/api/sessions/&lt;runtime&gt;/&lt;id&gt;</code>, <code>/api/academy</code>, <code>/api/reports</code>, <code>DELETE /api/reports/&lt;path&gt;</code>. <strong>Loopback bypass (panel-ux-fix-v1):</strong> quando o panel inicia com <code>bind == "127.0.0.1"</code>, <code>loopback_bypass=True</code> é passado para <code>make_handler_class()</code>; o branch 401 em <code>handler.py</code> é guardado por <code>if not _loopback_bypass and (…)</code> — <code>GET /api/*</code> retorna 200 sem token em bind loopback. Detecção é no boot address (avaliado uma vez), não no peer TCP address de cada request. Mutações (<code>POST</code>, <code>DELETE</code>) não são afetadas — padrão de autenticação permanece inalterado para elas.</li>
         <li><em>Telemetry</em>: <code>_tel_patterns</code> + telemetry required — subconjunto das bearer-only rotas de sessions que delegam para <code>TelemetryAggregator</code>.</li>
       </ul>
     </li>
