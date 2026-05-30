@@ -1,11 +1,16 @@
-"""Unit tests for SpecContextService (v2 model: ALIVE/DEAD)."""
+"""Unit tests for SpecContextService (v2 model: ALIVE/DEAD).
 
+T-10b: activate(), deactivate(), promote() removed; alive(), dead() added.
+"""
+
+import json
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
+    ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
 )
@@ -68,124 +73,139 @@ def test_create_duplicate_raises(service: SpecContextService) -> None:
         service.create("proj", "other", "https://github.com/org/other")
 
 
-# ------------------------------------------------------------------ activate
+# ------------------------------------------------------------------ alive (T-10b)
 
 
-def test_activate_clones_if_absent(
+def test_alive_clones_if_absent(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
+    service.alive("proj")
     assert len(git.cloned) == 1
     assert git.cloned[0][0] == "https://github.com/org/my-repo"
 
 
-def test_activate_no_clone_if_repo_present(
+def test_alive_no_clone_if_repo_present(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:
     (workspace_root / "repos" / "my-repo").mkdir(parents=True)
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
+    service.alive("proj")
     assert len(git.cloned) == 0
 
 
-def test_activate_auto_promotes_first(
-    service: SpecContextService, primary: FakePrimaryContextStore
-) -> None:
+def test_alive_sets_alive_state(service: SpecContextService) -> None:
+    """AC-T10b-1: alive() sets state=ALIVE, alive_since=<now>, dead_since=null."""
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    ctx = service.activate("proj")
-    # Auto-promote writes primary_context.json
-    assert primary.read() is not None
-    assert primary.read()["name"] == "proj"  # type: ignore[index]
+    ctx = service.alive("proj")
+    assert ctx.state == ContextState.ALIVE
+    assert ctx.alive_since is not None
+    assert ctx.dead_since is None
+
+
+def test_alive_idempotent_on_already_alive(service: SpecContextService, workspace_root: Path) -> None:
+    """AC-T10b-3: alive() on an already-ALIVE context is idempotent (no error)."""
+    (workspace_root / "repos" / "my-repo").mkdir(parents=True)
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    # second call must not raise
+    ctx = service.alive("proj")
     assert ctx.state == ContextState.ALIVE
 
 
-def test_activate_no_auto_promote_if_primary_exists(
-    service: SpecContextService, primary: FakePrimaryContextStore, workspace_root: Path
-) -> None:
-    (workspace_root / "repos" / "r1").mkdir(parents=True)
-    (workspace_root / "repos" / "r2").mkdir(parents=True)
-    service.create("p1", "r1", "https://github.com/org/r1")
-    service.create("p2", "r2", "https://github.com/org/r2")
-    service.activate("p1")
-    service.activate("p2")
-    # Only p1 auto-promoted (it was first with no primary)
-    assert primary.read()["name"] == "p1"  # type: ignore[index]
-    assert service.show("p2").state == ContextState.ALIVE
-
-
-def test_activate_not_found_raises(service: SpecContextService) -> None:
+def test_alive_not_found_raises(service: SpecContextService) -> None:
     with pytest.raises(ContextNotFoundError):
-        service.activate("ghost")
+        service.alive("ghost")
 
 
-# ------------------------------------------------------------------ deactivate
+# ------------------------------------------------------------------ dead (T-10b)
 
 
-def test_deactivate_removes_repo_and_marks_dead(
+def test_dead_removes_repo_and_marks_dead(
     service: SpecContextService, workspace_root: Path, git: FakeGitClient
 ) -> None:
-    # Create a second ctx to be primary so we can deactivate the first
-    (workspace_root / "repos" / "r2").mkdir(parents=True)
-    service.create("other", "r2", "https://github.com/org/r2")
-    service.activate("other")  # auto-promote
-    # Now create and activate proj — it is NOT primary (other already was primary)
+    """AC-T10b-2: dead() sets state=DEAD, dead_since=<now>."""
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
+    service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     assert repo.exists()
-    service.deactivate("proj")
+    ctx = service.dead("proj")
     assert not repo.exists()
-    assert service.show("proj").state == ContextState.DEAD
+    assert ctx.state == ContextState.DEAD
+    assert ctx.dead_since is not None
 
 
-def test_deactivate_primary_raises(service: SpecContextService, workspace_root: Path) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")  # auto-promotes to primary
-    with pytest.raises(ContextStateError, match="primary"):
-        service.deactivate("proj")
-
-
-def test_deactivate_dead_raises(service: SpecContextService) -> None:
+def test_dead_state_error_when_not_alive(service: SpecContextService) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     with pytest.raises(ContextStateError):
-        service.deactivate("proj")
+        service.dead("proj")
 
 
-# ------------------------------------------------------------------ promote
-
-
-def test_promote_writes_primary_json(
-    service: SpecContextService, primary: FakePrimaryContextStore, workspace_root: Path
-) -> None:
-    (workspace_root / "repos" / "r1").mkdir(parents=True)
-    (workspace_root / "repos" / "r2").mkdir(parents=True)
-    service.create("p1", "r1", "https://github.com/org/r1")
-    service.create("p2", "r2", "https://github.com/org/r2")
-    service.activate("p1")  # p1 auto-promoted
-    service.activate("p2")  # p2 not promoted
-    service.promote("p2")
-    assert primary.read()["name"] == "p2"  # type: ignore[index]
-
-
-def test_promote_dead_raises(service: SpecContextService) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    with pytest.raises(ContextStateError):
-        service.promote("proj")
-
-
-def test_promote_not_found_raises(service: SpecContextService) -> None:
+def test_dead_not_found_raises(service: SpecContextService) -> None:
     with pytest.raises(ContextNotFoundError):
-        service.promote("ghost")
+        service.dead("ghost")
 
 
-def test_promote_already_primary_is_idempotent(
+def test_dead_raises_context_locked_when_impl_lock_held(
     service: SpecContextService, workspace_root: Path
 ) -> None:
+    """AC-T10b-4: dead() when a HELD implementation lock exists raises ContextLockedError."""
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")  # auto-promotes
-    ctx = service.promote("proj")  # already primary — should return same ctx
-    assert ctx.state == ContextState.ALIVE
+    service.alive("proj")
+
+    # Create an implementation lock file
+    locks_dir = workspace_root / ".dadaia" / "locks" / "implementation"
+    locks_dir.mkdir(parents=True, exist_ok=True)
+    lock_file = locks_dir / "proj__v1.json"
+    lock_file.write_text(json.dumps({"session_id": "sess_abc123", "last_seen_at": "2026-05-30T00:00:00Z"}))
+
+    with pytest.raises(ContextLockedError):
+        service.dead("proj")
+
+
+def test_dead_syncs_dirty_repo(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._dirty.add(repo)
+    service.dead("proj")
+    assert repo in git.committed
+
+
+def test_dead_pushes_when_remote_present(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    service.dead("proj")
+    assert repo in git.pushed
+
+
+# ------------------------------------------------------------------ T-10b-5: removed methods
+
+def test_activate_method_does_not_exist(service: SpecContextService) -> None:
+    """AC-T10b-5: activate() is removed from SpecContextService."""
+    assert not hasattr(service, "activate"), (
+        "activate() must be removed from SpecContextService in T-10b"
+    )
+
+
+def test_deactivate_method_does_not_exist(service: SpecContextService) -> None:
+    """AC-T10b-5: deactivate() is removed from SpecContextService."""
+    assert not hasattr(service, "deactivate"), (
+        "deactivate() must be removed from SpecContextService in T-10b"
+    )
+
+
+def test_promote_method_does_not_exist(service: SpecContextService) -> None:
+    """AC-T10b-5: promote() is removed from SpecContextService."""
+    assert not hasattr(service, "promote"), (
+        "promote() must be removed from SpecContextService in T-10b"
+    )
 
 
 # ------------------------------------------------------------------ delete
@@ -206,37 +226,6 @@ def test_delete_not_found_raises(service: SpecContextService) -> None:
 
 def test_delete_alive_context_raises(service: SpecContextService, workspace_root: Path) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
+    service.alive("proj")
     with pytest.raises(ContextStateError):
         service.delete("proj")
-
-
-# ------------------------------------------------------------------ deactivate edge cases
-
-
-def test_deactivate_syncs_dirty_repo(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    (workspace_root / "repos" / "r2").mkdir(parents=True)
-    service.create("other", "r2", "https://github.com/org/r2")
-    service.activate("other")
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    git._dirty.add(repo)
-    service.deactivate("proj")
-    assert repo in git.committed
-
-
-def test_deactivate_pushes_when_remote_present(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    (workspace_root / "repos" / "r2").mkdir(parents=True)
-    service.create("other", "r2", "https://github.com/org/r2")
-    service.activate("other")
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    git._has_remote.add(repo)
-    service.deactivate("proj")
-    assert repo in git.pushed

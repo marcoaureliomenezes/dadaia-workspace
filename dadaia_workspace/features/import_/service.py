@@ -194,7 +194,7 @@ class ImportService:
         dadaia_bin = str(Path(sys.executable).parent / "dadaia")
         for ctx in alive:
             result = subprocess.run(
-                [dadaia_bin, "context", "activate", str(ctx["name"])],
+                [dadaia_bin, "context", "alive", str(ctx["name"])],
                 cwd=workspace_root,
                 capture_output=True,
                 text=True,

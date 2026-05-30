@@ -1,7 +1,12 @@
 """dadaia context subcommands."""
 
+import contextlib
 import json
+import os
 import sys
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -10,9 +15,13 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
+    ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
+    ImplementationBlockedByReviewError,
+    LockHeldError,
     RepoCatalogError,
+    ReviewBlockedByImplementationError,
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
@@ -50,6 +59,83 @@ def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "dead_since": ctx.dead_since,
         "current_branch": ctx.current_branch,
     }
+
+
+def _now_iso() -> str:
+    return datetime.now(tz=UTC).isoformat()
+
+
+def _sessions_dir(workspace_root: Path) -> Path:
+    return workspace_root / ".dadaia" / "sessions"
+
+
+def _locks_dir(workspace_root: Path) -> Path:
+    return workspace_root / ".dadaia" / "locks" / "implementation"
+
+
+def _load_session(sessions_dir: Path, session_id: str) -> dict | None:  # type: ignore[type-arg]
+    """Load a session file, return None if not found."""
+    session_file = sessions_dir / f"{session_id}.json"
+    if not session_file.exists():
+        return None
+    try:
+        return json.loads(session_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _session_is_stale(session_data: dict) -> bool:  # type: ignore[type-arg]
+    """Check if a session is stale based on TTL.
+
+    T-12 will implement full staleness logic. For now: file existence = non-stale,
+    with a basic TTL check if last_seen_at + ttl_seconds < now.
+    """
+    try:
+        last_seen = session_data.get("last_seen_at", "")
+        ttl = int(session_data.get("ttl_seconds", 300))
+        if not last_seen:
+            return False  # cannot determine; assume non-stale (fail-open)
+        last_seen_dt = datetime.fromisoformat(last_seen.replace("Z", "+00:00"))
+        now = datetime.now(tz=UTC)
+        elapsed = (now - last_seen_dt).total_seconds()
+        return elapsed > ttl
+    except Exception:
+        return False  # fail-open: treat as non-stale if we can't parse
+
+
+def _find_review_sessions(
+    sessions_dir: Path, context_name: str, release: str
+) -> list[str]:
+    """Return session IDs of non-stale BOUND_REVIEW sessions for this context/release."""
+    if not sessions_dir.exists():
+        return []
+    review_session_ids: list[str] = []
+    for f in sessions_dir.glob("*.json"):
+        try:
+            data = json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if (
+            data.get("mode") == "BOUND_REVIEW"
+            and data.get("context") == context_name
+            and data.get("release") == release
+            and not _session_is_stale(data)
+        ):
+            review_session_ids.append(data["session_id"])
+    return review_session_ids
+
+
+def _load_impl_lock(
+    locks_dir: Path, context_name: str, release: str
+) -> dict | None:  # type: ignore[type-arg]
+    """Load the implementation lock file for this context/release, return None if FREE."""
+    lock_file = locks_dir / f"{context_name}__{release}.json"
+    if not lock_file.exists():
+        return None
+    try:
+        return json.loads(lock_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 @app.command()
@@ -135,7 +221,18 @@ def show(
         if ctx is None:
             print(json.dumps({"context": None}, indent=2))
         else:
-            print(json.dumps(_ctx_to_dict(ctx), indent=2))
+            data = _ctx_to_dict(ctx)
+            # Add session sub-object (AC-T10d-6)
+            session_id = os.environ.get("DADAIA_SESSION_ID")
+            session_obj = None
+            if session_id:
+                workspace_root = resolve_workspace_root()
+                sessions_dir = _sessions_dir(workspace_root)
+                session_data = _load_session(sessions_dir, session_id)
+                if session_data and not _session_is_stale(session_data):
+                    session_obj = session_data
+            data["session"] = session_obj
+            print(json.dumps(data, indent=2))
         return
 
     if ctx is None:
@@ -153,15 +250,16 @@ def show(
 
 
 @app.command()
-def activate(name: str = typer.Argument(..., help="Context name to activate")) -> None:
-    """Activate a context (clone repo if absent; auto-promote if no primary)."""
+def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) -> None:
+    """Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE."""
     try:
         ws = resolve_workspace_root()
-        ctx = container.build_spec_context_service(ws).activate(name)
+        ctx = container.build_spec_context_service(ws).alive(name)
         console.print(
-            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now active"
+            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE"
         )
-        container.build_public_service().install(ws, target="opencode", force=True)
+        with contextlib.suppress(Exception):
+            container.build_public_service().install(ws, target="opencode", force=True)
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
@@ -171,30 +269,196 @@ def activate(name: str = typer.Argument(..., help="Context name to activate")) -
 
 
 @app.command()
-def deactivate(name: str = typer.Argument(..., help="Context name to deactivate")) -> None:
-    """Deactivate a context (git sync + remove repo from disk)."""
+def dead(name: str = typer.Argument(..., help="Context name to make DEAD")) -> None:
+    """Transition a context to DEAD; git sync + remove repo from disk."""
     try:
-        ctx = _ctx_service().deactivate(name)
-        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' deactivated")
+        ctx = _ctx_service().dead(name)
+        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
+    except ContextLockedError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
 
 @app.command()
-def promote(name: str = typer.Argument(..., help="Context name to promote as primary")) -> None:
-    """Promote an active context as the workspace primary."""
-    try:
-        ws = resolve_workspace_root()
-        ctx = container.build_spec_context_service(ws).promote(name)
-        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now primary")
-        container.build_public_service().install(ws, target="opencode", force=True)
-    except SchemaVersionError as exc:
-        print(str(exc), file=sys.stderr)
+def bind(
+    name: str = typer.Argument(..., help="Context name to bind to"),
+    mode: str = typer.Option(..., "--mode", help="Binding mode: read|spec|implementation|review"),
+    release: str | None = typer.Option(None, "--release", help="Release ID (required for implementation and review modes)"),
+) -> None:
+    """Bind this shell session to a context.
+
+    Run: eval $(dadaia context bind <name> --mode <mode> [--release <id>])
+
+    Outputs eval-compatible export lines to set DADAIA_CONTEXT, DADAIA_SESSION_ID,
+    and DADAIA_MODE in the current shell.
+    """
+    mode_upper = mode.upper()
+    if mode_upper not in ("READ", "SPEC", "IMPLEMENTATION", "REVIEW"):
+        err_console.print(
+            f"[red]Error:[/red] Invalid mode '{mode}'. Must be one of: read, spec, implementation, review"
+        )
         raise typer.Exit(1) from None
-    except (ContextNotFoundError, ContextStateError) as e:
+
+    # --release is required for implementation and review
+    if mode_upper in ("IMPLEMENTATION", "REVIEW") and not release:
+        err_console.print(
+            f"[red]Error:[/red] --release <id> is required for --mode {mode_upper.lower()}"
+        )
+        raise typer.Exit(1) from None
+
+    workspace_root = resolve_workspace_root()
+    sessions_dir = _sessions_dir(workspace_root)
+    locks_dir = _locks_dir(workspace_root)
+
+    # Ensure directories exist
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+
+    # Verify context exists
+    svc = _ctx_service()
+    try:
+        svc.show(name)
+    except ContextNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+
+    session_id = f"sess_{uuid.uuid4().hex[:8]}"
+    now = _now_iso()
+    runtime = os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
+    pid = os.getpid()
+
+    session_data: dict = {  # type: ignore[type-arg]
+        "session_id": session_id,
+        "context": name,
+        "mode": f"BOUND_{mode_upper}" if mode_upper in ("IMPLEMENTATION", "REVIEW") else mode_upper,
+        "release": release,
+        "runtime": runtime,
+        "pid": pid,
+        "bound_at": now,
+        "last_seen_at": now,
+        "ttl_seconds": 300,
+        "is_stale": False,
+    }
+
+    try:
+        if mode_upper == "IMPLEMENTATION":
+            assert release is not None  # guaranteed above
+            locks_dir.mkdir(parents=True, exist_ok=True)
+
+            # Check for blocking BOUND_REVIEW sessions first (AC-T10d-10)
+            blocking_reviews = _find_review_sessions(sessions_dir, name, release)
+            if blocking_reviews:
+                raise ImplementationBlockedByReviewError(
+                    f"Context '{name}' release '{release}' is blocked by active BOUND_REVIEW "
+                    f"session(s): {', '.join(blocking_reviews)}. "
+                    "Wait for the review to complete before starting implementation."
+                )
+
+            # Check if implementation lock is already HELD (AC-T10d-4)
+            existing_lock = _load_impl_lock(locks_dir, name, release)
+            if existing_lock is not None:
+                owner_id = existing_lock.get("session_id", "unknown")
+                owner_last_seen = existing_lock.get("last_seen_at", "unknown")
+                raise LockHeldError(
+                    f"Implementation lock for '{name}/{release}' is already HELD by "
+                    f"session '{owner_id}' (last_seen_at: {owner_last_seen}). "
+                    "Run 'dadaia context release' in the owning session or wait for it to expire."
+                )
+
+            # Create implementation lock file (D-4 shape, forward-compatible with T-11)
+            lock_data: dict = {  # type: ignore[type-arg]
+                "session_id": session_id,
+                "context": name,
+                "release": release,
+                "pid": pid,
+                "runtime": runtime,
+                "bound_at": now,
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+            lock_file = locks_dir / f"{name}__{release}.json"
+            lock_file.write_text(json.dumps(lock_data, indent=2))
+
+        elif mode_upper == "REVIEW":
+            assert release is not None  # guaranteed above
+            locks_dir.mkdir(parents=True, exist_ok=True)
+
+            # Check if implementation lock is HELD (AC-T10d-9)
+            existing_lock = _load_impl_lock(locks_dir, name, release)
+            if existing_lock is not None:
+                owner_id = existing_lock.get("session_id", "unknown")
+                raise ReviewBlockedByImplementationError(
+                    f"Context '{name}' release '{release}' has an active implementation lock "
+                    f"held by session '{owner_id}'. "
+                    "Review cannot proceed while implementation is in progress."
+                )
+
+    except LockHeldError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except ReviewBlockedByImplementationError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except ImplementationBlockedByReviewError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    # Write session file
+    session_file = sessions_dir / f"{session_id}.json"
+    session_file.write_text(json.dumps(session_data, indent=2))
+
+    # Output eval-compatible export lines
+    dadaia_mode = mode_upper
+    print(f"export DADAIA_CONTEXT={name}")
+    print(f"export DADAIA_SESSION_ID={session_id}")
+    print(f"export DADAIA_MODE={dadaia_mode}")
+
+
+@app.command(name="release")
+def release_cmd() -> None:
+    """Release the current session's binding and its implementation lock (if owned).
+
+    Run: dadaia context release
+    """
+    session_id = os.environ.get("DADAIA_SESSION_ID")
+    if not session_id:
+        err_console.print(
+            "[red]Error:[/red] No active session. Set DADAIA_SESSION_ID first "
+            "(e.g. eval $(dadaia context bind ...))."
+        )
+        raise typer.Exit(1) from None
+
+    workspace_root = resolve_workspace_root()
+    sessions_dir = _sessions_dir(workspace_root)
+    locks_dir = _locks_dir(workspace_root)
+
+    session_file = sessions_dir / f"{session_id}.json"
+    session_data = None
+    if session_file.exists():
+        try:
+            session_data = json.loads(session_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            session_data = None
+        session_file.unlink(missing_ok=True)
+
+    # If this session owned an implementation lock, remove it
+    if session_data and session_data.get("mode") == "BOUND_IMPLEMENTATION":
+        ctx_name = session_data.get("context", "")
+        rel = session_data.get("release", "")
+        if ctx_name and rel:
+            lock_file = locks_dir / f"{ctx_name}__{rel}.json"
+            if lock_file.exists():
+                # Only remove if this session owns the lock
+                try:
+                    lock_data = json.loads(lock_file.read_text())
+                    if lock_data.get("session_id") == session_id:
+                        lock_file.unlink(missing_ok=True)
+                except (json.JSONDecodeError, OSError):
+                    lock_file.unlink(missing_ok=True)
+
+    console.print(f"[green]✓[/green] Session '[bold]{session_id}[/bold]' released")
 
 
 @app.command()
@@ -208,18 +472,46 @@ def delete(name: str = typer.Argument(..., help="Context name to delete")) -> No
         raise typer.Exit(1) from None
 
 
-@app.command()
-def use(name: str = typer.Argument(..., help="Context name to isolate this session to")) -> None:
-    """Isolate this shell session to a specific context without changing global state.
+# ---------------------------------------------------------------------------
+# Deprecated verbs — exit non-zero with pointer to new verbs (AC-T10d-7)
+# ---------------------------------------------------------------------------
 
-    Run: eval $(dadaia context use <name>)
 
-    Sets DADAIA_CONTEXT for the current shell only. Does NOT modify spec_contexts.json.
-    """
-    all_ctxs = _ctx_service().list_all()
-    ctx = next((c for c in all_ctxs if c.name == name), None)
-    if ctx is None:
-        available = ", ".join(c.name for c in all_ctxs) or "none"
-        err_console.print(f"[red]Error:[/red] Context '{name}' not found. Available: {available}")
-        raise typer.Exit(1) from None
-    print(f"export DADAIA_CONTEXT={name}")
+@app.command(hidden=True)
+def activate(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
+    """[REMOVED] 'activate' was removed in v2."""
+    print(
+        "Error: 'activate' was removed in v2. Use: dadaia context alive <name>",
+        file=sys.stderr,
+    )
+    raise typer.Exit(1)
+
+
+@app.command(hidden=True)
+def deactivate(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
+    """[REMOVED] 'deactivate' was removed in v2."""
+    print(
+        "Error: 'deactivate' was removed in v2. Use: dadaia context dead <name>",
+        file=sys.stderr,
+    )
+    raise typer.Exit(1)
+
+
+@app.command(hidden=True)
+def promote(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
+    """[REMOVED] 'promote' was removed in v2."""
+    print(
+        "Error: 'promote' was removed in v2. Use: dadaia context bind <name> --mode spec",
+        file=sys.stderr,
+    )
+    raise typer.Exit(1)
+
+
+@app.command(hidden=True)
+def use(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
+    """[REMOVED] 'use' was removed in v2."""
+    print(
+        "Error: 'use' was removed in v2. Use: dadaia context bind <name> --mode read",
+        file=sys.stderr,
+    )
+    raise typer.Exit(1)

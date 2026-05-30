@@ -110,3 +110,39 @@ class SchemaVersionError(DadaiaError):
     The message always contains "dadaia migrate" so the user knows what to run.
     Callers must never silently correct v1 data — raise this instead.
     """
+
+
+class ContextLockedError(DadaiaError):
+    """Raised when an operation on a context is blocked because a lock is held.
+
+    E.g. calling dead() on a context that has an active implementation lock.
+    """
+
+
+class LockConflictError(DadaiaError):
+    """Base class for all lock-conflict errors.
+
+    Raised when two sessions attempt mutually-exclusive operations on the same
+    context/release pair.
+    """
+
+
+class LockHeldError(LockConflictError):
+    """Raised when a second bind --mode implementation is attempted while a lock is already HELD.
+
+    The message includes the owner session_id and last_seen_at.
+    """
+
+
+class ReviewBlockedByImplementationError(LockConflictError):
+    """Raised when bind --mode review is attempted while an implementation lock is HELD.
+
+    The message includes the owner session_id.
+    """
+
+
+class ImplementationBlockedByReviewError(LockConflictError):
+    """Raised when bind --mode implementation is attempted while a non-stale BOUND_REVIEW session exists.
+
+    The message lists the blocking review session IDs.
+    """

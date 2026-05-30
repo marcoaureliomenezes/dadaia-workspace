@@ -1,7 +1,5 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
-import contextlib
-import os
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -9,6 +7,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
+    ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
     GitSyncError,
@@ -49,12 +48,20 @@ class SpecContextService:
     def _specs_dir(self, repo_slug: str) -> Path:
         return self._repo_path(repo_slug) / "specs"
 
-    def _has_primary(self) -> bool:
-        # In v2 there is no is_primary; a context is "primary-like" if it is ALIVE.
-        # This method is retained for backward compat with activate() auto-promote logic.
-        # T-10b will remove this entirely.
-        primary_data = self._primary.read()
-        return primary_data is not None
+    def _locks_dir(self) -> Path:
+        return self._workspace_root / ".dadaia" / "locks" / "implementation"
+
+    def _has_implementation_lock(self, name: str) -> bool:
+        """Return True if any implementation lock file exists for the named context.
+
+        T-12 will add staleness checks. For now, file existence = HELD.
+        """
+        locks_dir = self._locks_dir()
+        if not locks_dir.exists():
+            return False
+        # Lock files are named <ctx>__<release>.json
+        prefix = f"{name}__"
+        return any(f.name.startswith(prefix) for f in locks_dir.iterdir() if f.is_file())
 
     # ------------------------------------------------------------------ create
 
@@ -86,17 +93,24 @@ class SpecContextService:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         return ctx
 
-    # ------------------------------------------------------------------ activate (T-10b compat: keep working)
+    # ------------------------------------------------------------------ alive (T-10b)
 
-    def activate(self, name: str) -> SpecContextProject:
-        """Transition a context to ALIVE; clone repo if absent; auto-promote if no primary.
+    def alive(self, name: str) -> SpecContextProject:
+        """Transition a context from DEAD to ALIVE; clone repo if absent.
 
-        This method is kept for backward compatibility until T-10b removes it.
-        It maps to the ALIVE state in the v2 model.
+        Idempotent: calling alive() on an already-ALIVE context is a no-op (no error).
+        Sets alive_since=now, clears dead_since=None.
+
+        Note: fcntl Lock 1 / Lock 2 wrapping comes in T-11. This task implements the
+        service logic only.
         """
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
+
+        # Idempotent: already ALIVE — no-op
+        if ctx.state == ContextState.ALIVE:
+            return ctx
 
         # Clone if repo not on disk
         repo_path = self._repo_path(ctx.repo_slug)
@@ -134,7 +148,7 @@ class SpecContextService:
         if not repo_agents_dst.exists() and repo_agents_src.exists():
             shutil.copy2(repo_agents_src, repo_agents_dst)
 
-        activated = SpecContextProject(
+        alive_ctx = SpecContextProject(
             name=ctx.name,
             state=ContextState.ALIVE,
             repo_slug=ctx.repo_slug,
@@ -144,52 +158,50 @@ class SpecContextService:
             dead_since=None,
             current_branch=actual_branch,
         )
-        self._store.update(activated)
+        self._store.update(alive_ctx)
+        return alive_ctx
 
-        # Auto-promote if no primary exists yet
-        if not self._has_primary():
-            self._promote_to_primary(activated)
-            ctx_after = self._store.get(name)
-            if ctx_after is not None:
-                return ctx_after
+    # ------------------------------------------------------------------ dead (T-10b)
 
-        return activated
+    def dead(self, name: str) -> SpecContextProject:
+        """Transition a context from ALIVE to DEAD; sets dead_since, removes repo.
 
-    # ------------------------------------------------------------------ deactivate (T-10b compat: keep working)
+        Raises ContextLockedError if an implementation lock exists for this context.
+        shutil.rmtree is called OUTSIDE the workspace lock but INSIDE the per-context
+        file lock (T-11). For now (pre-T-11), the lock-file existence check is the only
+        guard.
 
-    def deactivate(self, name: str) -> SpecContextProject:
-        """Transition a context to DEAD; git sync + remove repo.
-
-        This method is kept for backward compatibility until T-10b removes it.
-        It maps to the DEAD state in the v2 model.
+        Note: fcntl Lock 1 / Lock 2 wrapping comes in T-11.
         """
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         if ctx.state != ContextState.ALIVE:
-            raise ContextStateError(f"Context '{name}' is not active. It cannot be deactivated.")
+            raise ContextStateError(f"Context '{name}' is not ALIVE. It cannot be made DEAD.")
 
-        # Check if this context is the primary — guard against deactivating primary
-        primary_data = self._primary.read()
-        if primary_data is not None and primary_data.get("name") == name:
-            raise ContextStateError(
-                f"Context '{name}' is the primary context and cannot be deactivated. "
-                "Promote another context first with 'dadaia context promote <name>'."
+        # Block if an implementation lock is held for this context (T-10b AC-T10b-4)
+        if self._has_implementation_lock(name):
+            raise ContextLockedError(
+                f"Context '{name}' has an active implementation lock. "
+                "Release the implementation session before calling dead()."
             )
 
         repo_path = self._repo_path(ctx.repo_slug)
         branch_before_sync: str | None = None
         if repo_path.exists():
+            import contextlib
+            import os
+
             with contextlib.suppress(Exception):
                 branch_before_sync = self._git.current_branch(repo_path)
             if self._git.is_git_root(repo_path):
                 if self._git.is_dirty(repo_path):
                     try:
-                        self._git.commit_all(repo_path, "chore: auto-sync before deactivate")
+                        self._git.commit_all(repo_path, "chore: auto-sync before dead")
                     except GitSyncError as exc:
                         raise GitSyncError(
                             f"Git sync failed for context '{name}' at '{repo_path}'. "
-                            "Resolve the issue and retry deactivate."
+                            "Resolve the issue and retry dead()."
                         ) from exc
                 if self._git.has_remote(repo_path):
                     try:
@@ -197,9 +209,9 @@ class SpecContextService:
                     except GitSyncError as exc:
                         raise GitSyncError(
                             f"Git push failed for context '{name}' at '{repo_path}'. "
-                            "Resolve the issue and retry deactivate."
+                            "Resolve the issue and retry dead()."
                         ) from exc
-            # Bug 3 fix: detect non-writable files before calling rmtree.
+            # Detect non-writable files before calling rmtree
             non_writable = [
                 str(f) for f in repo_path.rglob("*") if f.is_file() and not os.access(f, os.W_OK)
             ]
@@ -212,7 +224,7 @@ class SpecContextService:
                 )
             shutil.rmtree(repo_path)
 
-        inactive = SpecContextProject(
+        dead_ctx = SpecContextProject(
             name=ctx.name,
             state=ContextState.DEAD,
             repo_slug=ctx.repo_slug,
@@ -222,40 +234,8 @@ class SpecContextService:
             dead_since=_now(),
             current_branch=branch_before_sync,
         )
-        self._store.update(inactive)
-        return inactive
-
-    # ------------------------------------------------------------------ promote (T-10b compat: keep working)
-
-    def promote(self, name: str) -> SpecContextProject:
-        """Promote a context as the workspace primary.
-
-        This method is kept for backward compatibility until T-10b removes it.
-        In v2, there is no global primary; this only updates primary_context.json.
-        """
-        ctx = self._store.get(name)
-        if ctx is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-        if ctx.state != ContextState.ALIVE:
-            raise ContextStateError(
-                f"Context '{name}' must be active before it can be promoted. "
-                "Run 'dadaia context activate {name}' first."
-            )
-
-        # Check if already primary
-        primary_data = self._primary.read()
-        if primary_data is not None and primary_data.get("name") == name:
-            return ctx  # already primary — idempotent
-
-        return self._promote_to_primary(ctx)
-
-    def _promote_to_primary(self, ctx: SpecContextProject) -> SpecContextProject:
-        self._primary.write(
-            name=ctx.name,
-            repo_slug=ctx.repo_slug,
-            specs_dir=self._specs_dir(ctx.repo_slug),
-        )
-        return ctx
+        self._store.update(dead_ctx)
+        return dead_ctx
 
     # ------------------------------------------------------------------ delete
 
@@ -265,6 +245,6 @@ class SpecContextService:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         if ctx.state == ContextState.ALIVE:
             raise ContextStateError(
-                f"Context '{name}' is active. Run 'dadaia context deactivate {name}' before deleting."
+                f"Context '{name}' is active. Run 'dadaia context dead {name}' before deleting."
             )
         self._store.delete(name)

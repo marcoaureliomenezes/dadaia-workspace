@@ -54,7 +54,7 @@ logic; locking is wired in T-11.
 **Done criterion:** AC-T10b-1..5 all pass. No `activate`, `deactivate`, `promote`
 imports or dead code anywhere.
 
-[ ] T-10b
+[x] T-10b
 
 ---
 
@@ -105,7 +105,7 @@ T-11; this task implements the CLI surface and session-file creation logic.
 `eval $(dadaia context bind ...)` exports `DADAIA_CONTEXT`, `DADAIA_SESSION_ID`,
 `DADAIA_MODE` correctly.
 
-[ ] T-10d
+[x] T-10d
 
 ---
 
