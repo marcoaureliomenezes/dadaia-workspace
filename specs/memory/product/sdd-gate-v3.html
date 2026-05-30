@@ -29,11 +29,12 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>sdd-gate-v3</h1>
-<p class="meta">Asset: <code>.dadaia/scripts/sdd-spec-gate.sh</code> · Hook tipo: <code>PreToolUse</code> · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">Asset: <code>.dadaia/scripts/sdd-spec-gate.sh</code> · Hook tipo: <code>PreToolUse</code> · Closure: spec-context-tree-v2</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
-  <p>PreToolUse hook bash que intercepta toda invocação de <code>Write</code>/<code>Edit</code>/<code>MultiEdit</code> (Claude Code, Codex e equivalentes) e decide <strong>allow</strong> ou <strong>block</strong> com base em três regras em camadas: (A) atomicidade do memory — bloqueia edits em <code>memory/*.html</code> e <code>memory/product/**/*.html</code> a menos que <code>releases/ACTIVE.md</code> tenha <code>phase: CLOSURE</code>; (B) archive read-only — bloqueia qualquer write em <code>specs/_archive/**</code>; (C) production paths — exige que exista pelo menos uma task <code>[-]</code> em <code>specs/releases/&lt;active-release&gt;/TASKS.md</code> (ou em legacy <code>features/*/TASKS.md</code> quando <code>SDD_LEGACY_FEATURES=1</code>).</p>
+  <p>PreToolUse hook bash que intercepta toda invocação de <code>Write</code>/<code>Edit</code>/<code>MultiEdit</code> (Claude Code, Codex e equivalentes) e decide <strong>allow</strong> ou <strong>block</strong> com base em três regras em camadas: (A) atomicidade do memory — bloqueia edits em <code>memory/*.html</code> e <code>memory/product/**/*.html</code> a menos que <code>releases/ACTIVE.md</code> tenha <code>phase: CLOSURE</code>; (B) archive read-only — bloqueia qualquer write em <code>specs/_archive/**</code>; (C) production paths — exige que exista pelo menos uma task <code>[-]</code> em <code>specs/releases/&lt;active-release-id&gt;/TASKS.md</code> (ou em legacy <code>features/*/TASKS.md</code> quando <code>SDD_LEGACY_FEATURES=1</code>).</p>
+  <p><strong>T-8a (spec-context-tree-v2):</strong> o fallback de root-<code>TASKS.md</code> foi removido. O gate não busca mais <code>$PRIMARY_SPECS/TASKS.md</code> — tasks só são reconhecidas em <code>$PRIMARY_SPECS/releases/&lt;active-release-id&gt;/TASKS.md</code>. A segunda metade da migração (T-13, per-release context resolution) pertence a <code>spec-context-session-locks-v1</code> (R2).</p>
   <p>Fail-open: qualquer erro interno → allow (nunca bloqueia trabalho legítimo por crash).</p>
 </section>
 
@@ -53,7 +54,7 @@ sequenceDiagram
     participant H as Hook runtime
     participant G as sdd-spec-gate.sh v3
     participant A as releases/ACTIVE.md
-    participant K as releases/&lt;id&gt;/TASKS.md
+    participant K as releases/&lt;active-id&gt;/TASKS.md
     T->>H: file_path = /path/to/file
     H->>G: stdin JSON
     G->>G: resolve PRIMARY_SPECS, ACTIVE_RELEASE, ACTIVE_PHASE
@@ -92,7 +93,7 @@ sequenceDiagram
 <section id="runtime-state">
   <h2>Estado runtime tocado</h2>
   <ul>
-    <li>Read-only: <code>primary_context.json</code>, <code>releases/ACTIVE.md</code>, todos os <code>TASKS.md</code> sob <code>specs/</code>.</li>
+    <li>Read-only: <code>primary_context.json</code>, <code>releases/ACTIVE.md</code>, <code>releases/&lt;active-id&gt;/TASKS.md</code> (único caminho; fallback root-TASKS.md removido em T-8a). Em modo legado (<code>SDD_LEGACY_FEATURES=1</code>): também <code>features/*/TASKS.md</code>.</li>
     <li>Write: <code>/tmp/sdd-gate.log</code> (append-only audit log).</li>
     <li>Saída: STDOUT JSON quando bloqueia; exit 0 (silencioso) quando permite.</li>
   </ul>

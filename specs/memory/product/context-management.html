@@ -29,12 +29,32 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>context-management</h1>
-<p class="meta">CLI surface: <code>dadaia context {create|list|show|activate|deactivate|promote|delete|use}</code> · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">CLI surface: <code>dadaia context {create|list|show|activate|deactivate|promote|delete|use}</code> · <code>dadaia {release|backlog|bug} new</code> · <code>dadaia memory product add</code> · <code>dadaia migrate tree-v2</code> · Closure: spec-context-tree-v2</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
   <p>Gerencia múltiplos <strong>Spec Context Projects</strong> — cada um mapeia <code>nome → repo_slug → repo_url</code> e tem state machine (inativo ↔ ativo). Um context ativo é clonado em <code>repos/&lt;repo_slug&gt;/</code> e suporta promoção a <strong>primary</strong> (o context default usado por agentes e gates).</p>
   <p>Permite ao operador trocar entre projetos/branches em paralelo sem criar múltiplos workspaces, e mantém um único primary explícito em <code>.dadaia/states/primary_context.json</code> que outras features (gate, orchestration, public install) leem para resolver caminhos.</p>
+
+  <h3>Canonical specs/ tree v2 (scaffold baseline pós spec-context-tree-v2)</h3>
+  <p>O scaffold de novo consumer repo (<code>dadaia init</code> + <code>dadaia context create</code>) entrega a árvore v2:</p>
+  <ul>
+    <li><code>specs/constitution.md</code> — leis absolutas do produto.</li>
+    <li><code>specs/memory/architecture.html</code> e <code>specs/memory/tech-stack.html</code> — memory HTML atômica (Markdown depreciado).</li>
+    <li><code>specs/memory/product/index.html</code> — entry point do catalog; <code>dadaia memory product add &lt;slug&gt;</code> cria feature HTML e regenera o index.</li>
+    <li><code>specs/backlog/</code>, <code>specs/bugs/</code>, <code>specs/releases/</code> — diretórios de lifecycle com <code>README.md</code> e <code>.gitkeep</code>.</li>
+    <li><code>specs/AGENTS.md</code> — contrato SDD do spec tree para o operador do consumer repo.</li>
+    <li><strong>Removidos do scaffold:</strong> <code>specs/foundation/</code> (depreciado) e <code>specs/SPEC.md</code> na raiz (pre-release-model).</li>
+  </ul>
+  <p>Doctor TREE-1..7 enforça e repara esta árvore: <code>dadaia specs doctor</code> em workspace recém-scaffoldado deve sair com 0 violations.</p>
+  <p><strong>CLIs de criação de artefatos SDD</strong> (evitam frontmatter manual):</p>
+  <ul>
+    <li><code>dadaia release new &lt;id&gt;</code> — cria <code>specs/releases/&lt;id&gt;/SPEC.md</code> stub com frontmatter canônico (slug validado; não-destrutivo se já existe).</li>
+    <li><code>dadaia backlog new &lt;slug&gt;</code> — cria <code>specs/backlog/&lt;slug&gt;.md</code> stub.</li>
+    <li><code>dadaia bug new &lt;slug&gt;</code> — cria <code>specs/bugs/&lt;slug&gt;.md</code> com <code>session_id: null</code>.</li>
+    <li><code>dadaia memory product add &lt;slug&gt;</code> — cria feature HTML em <code>specs/memory/product/&lt;slug&gt;.html</code> e regenera <code>index.html</code> de forma idempotente.</li>
+  </ul>
+  <p><strong>Migration path para consumer repos existentes:</strong> <code>dadaia migrate tree-v2</code> move <code>specs/foundation/</code> → <code>specs/releases/legacy/foundation/</code> e <code>specs/SPEC.md</code> → <code>specs/releases/legacy/SPEC.md</code> de forma atômica e idempotente.</p>
 </section>
 
 <section id="flow">

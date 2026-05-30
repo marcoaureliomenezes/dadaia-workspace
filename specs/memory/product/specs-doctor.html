@@ -32,22 +32,40 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>specs-doctor</h1>
-<p class="meta">CLI surface: <code>dadaia specs doctor [--specs-dir PATH] [--json]</code> · Closure: orchestration-consolidation-v1</p>
+<p class="meta">CLI surface: <code>dadaia specs doctor [--specs-dir PATH] [--json] [--fix]</code> · Closure: spec-context-tree-v2</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
-  <p>Valida 12 invariantes estruturais do diretório <code>specs/</code> sob o modelo SDD release-lifecycle: presença de <code>constitution.md</code>, memory HTML (com folder catalog em <code>product/</code>), <code>ACTIVE.md</code> bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory (sem changelog), links de imagem resolvendo, presença do script Mermaid quando há diagramas, link integrity do <code>product/index.html</code> para suas feature HTMLs, e o invariante <strong>D-OC-1</strong> (bidirectional orchestration registry consistency): forward — cada nome Tier-1 do router PM mapeia para <code>public/workflows/&lt;name&gt;.workflow.md</code> existente e cada nome Tier-2 mapeia para heading <code>### Playbook — &lt;name&gt;</code> em SKILL.md; reverse — cada heading <code>### Playbook — &lt;name&gt;</code> em SKILL.md aparece como Tier-2 no router PM ou carrega anotação <code>[deprecated]</code>. Referência dangling em qualquer direção é hard error.</p>
-  <p>Exit code 1 se houver errors; 0 se só warnings ou tudo verde. Suporta <code>--json</code> para integração com CI/automação.</p>
+  <p>Valida 19 invariantes estruturais do diretório <code>specs/</code> sob o modelo SDD release-lifecycle: 12 invariantes <strong>SPEC-DOC-001..012</strong> (presença de <code>constitution.md</code>, memory HTML com folder catalog em <code>product/</code>, <code>ACTIVE.md</code> bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory sem changelog, links de imagem resolvendo, presença do script Mermaid quando há diagramas, link integrity do <code>product/index.html</code> para suas feature HTMLs, e o invariante <strong>D-OC-1</strong> bidirectional orchestration registry consistency) + 7 invariantes <strong>TREE-1..7</strong> (canonical specs/ tree v2 shape).</p>
+  <p>Exit code 1 se houver errors; 0 se só warnings ou tudo verde. Suporta <code>--json</code> para integração com CI/automação e <code>--fix</code> para auto-repair dos invariantes tratáveis.</p>
+
+  <h3>Invariantes TREE-1..7 (canonical tree v2)</h3>
+  <table>
+    <thead>
+      <tr><th>Código</th><th>O que detecta</th><th>Severity</th><th><code>--fix</code> policy</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>TREE-1</td><td>Diretório <code>specs/foundation/</code> presente (depreciado)</td><td>WARN</td><td>warn-only; <strong>migration guard</strong> impresso independente de <code>--fix</code> — instrução: <code>dadaia migrate tree-v2</code></td></tr>
+      <tr><td>TREE-2</td><td>Arquivo <code>specs/SPEC.md</code> na raiz (pre-release-model)</td><td>WARN</td><td>warn-only; <strong>migration guard</strong> impresso — instrução: <code>dadaia migrate tree-v2</code></td></tr>
+      <tr><td>TREE-3</td><td><code>specs/memory/product/index.html</code> ausente</td><td>ERROR</td><td><strong>auto-fix</strong>: regenera <code>index.html</code> vazio do template canônico</td></tr>
+      <tr><td>TREE-4</td><td>Um ou mais de <code>specs/backlog/</code>, <code>specs/bugs/</code>, <code>specs/releases/</code> ausentes</td><td>ERROR</td><td><strong>auto-fix</strong>: recria diretório(s) ausente(s) com <code>.gitkeep</code></td></tr>
+      <tr><td>TREE-5</td><td><code>specs/AGENTS.md</code> ausente (drift em relação ao template canônico)</td><td>WARN</td><td>warn-only (sem auto-overwrite — arquivo pode ter customizações do consumer)</td></tr>
+      <tr><td>TREE-6</td><td>Diretório de release em <code>specs/releases/</code> sem pelo menos um artefato SDD obrigatório (<code>SPEC.md</code>)</td><td>ERROR</td><td>no-fix (decisão humana)</td></tr>
+      <tr><td>TREE-7</td><td>Arquivo de bug em <code>specs/bugs/</code> sem campo <code>session_id</code> no frontmatter</td><td>ERROR</td><td>no-fix (campo requer valor real)</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Migration guard (TREE-1/2):</strong> quando detectados, o doctor imprime a mensagem de migration guard independentemente do flag <code>--fix</code> — o auto-move de <code>foundation/</code> e root <code>SPEC.md</code> para <code>releases/legacy/</code> é feito exclusivamente por <code>dadaia migrate tree-v2</code>.</p>
 </section>
 
 <section id="flow">
   <h2>Fluxo de uso</h2>
   <ol class="flow">
-    <li><code>dadaia specs doctor</code> — resolve <code>specs_dir</code> via <code>primary_context.json</code> ou <code>--specs-dir</code>, roda os 12 checks em ordem (incluindo D-OC-1), exibe issues formatados com código + severity + path.</li>
+    <li><code>dadaia specs doctor</code> — resolve <code>specs_dir</code> via <code>primary_context.json</code> ou <code>--specs-dir</code>, roda os 19 checks em ordem (12 SPEC-DOC + 7 TREE), exibe issues formatados com código + severity + path.</li>
+    <li><code>dadaia specs doctor --fix</code> — executa os checks e auto-repara os invariantes com policy <code>auto-fix</code> (TREE-3, TREE-4); emite migration guard para TREE-1/2; deixa TREE-5..7 como warnings/errors sem alterar arquivos.</li>
     <li>Para automação: <code>dadaia specs doctor --json</code> emite payload <code>{specs_dir, issues[], summary{errors, warnings}}</code>.</li>
     <li>Em CI: usado como gate de PR para bloquear merge se houver erros estruturais nos specs.</li>
   </ol>
-  <p>Códigos de erro: <code>SPEC-DOC-001</code> a <code>SPEC-DOC-011</code> + <code>D-OC-1</code> (bidirectional orchestration registry consistency) + sufixo <code>L</code> para legacy (markdown em memory, <code>product.html</code> top-level pre-folder-catalog).</p>
+  <p>Códigos de erro: <code>SPEC-DOC-001</code> a <code>SPEC-DOC-012</code> + <code>D-OC-1</code> (bidirectional orchestration registry consistency) + <code>TREE-1</code> a <code>TREE-7</code> (canonical tree v2 shape) + sufixo <code>L</code> para legacy (markdown em memory, <code>product.html</code> top-level pre-folder-catalog).</p>
 </section>
 
 <section id="trigger">
@@ -63,8 +81,8 @@
 <section id="runtime-state">
   <h2>Estado runtime tocado</h2>
   <ul>
-    <li>Read-only sobre todo <code>specs_dir</code>.</li>
-    <li>Sem efeitos colaterais — pure validation tool.</li>
+    <li>Read-only sobre todo <code>specs_dir</code> (modo padrão).</li>
+    <li><strong>Com <code>--fix</code>:</strong> escreve em <code>specs_dir</code> apenas para os invariantes com policy <code>auto-fix</code>: regenera <code>specs/memory/product/index.html</code> (TREE-3) e recria diretórios ausentes com <code>.gitkeep</code> (TREE-4). Todos os outros invariantes permanecem read-only mesmo com <code>--fix</code>.</li>
   </ul>
 </section>
 
