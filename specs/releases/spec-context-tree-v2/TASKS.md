@@ -135,7 +135,7 @@ deterministically (lexicographic order; idempotent). Doctor TREE-3 auto-fix for
 (`dadaia memory product add payments` creates feature HTML and updates index), AC-T3-3
 (idempotent index regeneration). AC-T3-4 (doctor TREE-3 auto-fix) is verified in T-9.
 
-[ ] T-3
+[x] T-3
 
 ---
 
@@ -178,7 +178,7 @@ it was not already delivered in T-3.
 **Done criterion:** AC-T7-1..AC-T7-5 (all CLI acceptance criteria from SPEC §3 T-7).
 AC-C-1..AC-C-7 from SPEC §7.3.
 
-[ ] T-7
+[x] T-7
 
 ---
 
