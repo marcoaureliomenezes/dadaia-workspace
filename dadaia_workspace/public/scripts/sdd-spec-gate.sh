@@ -344,8 +344,9 @@ fi
 # v3 RULE C — Find [-] task. Priority order:
 #   1. PRIMARY_SPECS/releases/<active-release>/TASKS.md
 #   2. Any PRIMARY_SPECS/releases/*/TASKS.md
-#   3. (legacy compat) PRIMARY_SPECS/features/*/TASKS.md or root TASKS.md
+#   3. (legacy compat) PRIMARY_SPECS/features/*/TASKS.md only
 #      only when SDD_LEGACY_FEATURES=1 (default during migration window)
+#      Note: root-level PRIMARY_SPECS/TASKS.md is no longer searched (removed T-8a)
 ACTIVE=""
 GREP_PAT='^[[:space:]]*-[[:space:]]*\[-\][[:space:]]+'
 
@@ -360,10 +361,12 @@ if [ -z "$ACTIVE" ] && [ -d "$PRIMARY_SPECS/releases" ]; then
 fi
 
 if [ -z "$ACTIVE" ] && [ "${SDD_LEGACY_FEATURES:-1}" = "1" ]; then
-    # Search outside releases/ for legacy compat: features/*/TASKS.md and root TASKS.md
+    # Search outside releases/ for legacy compat: features/*/TASKS.md only.
+    # Root-level $PRIMARY_SPECS/TASKS.md is no longer supported (removed per T-8a).
     ACTIVE=$(grep -rlE "$GREP_PAT" "$PRIMARY_SPECS" --include="TASKS.md" 2>/dev/null \
         | grep -v "/_archive/" \
         | grep -v "/releases/" \
+        | grep -v "^$PRIMARY_SPECS/TASKS\.md$" \
         | head -1)
 fi
 

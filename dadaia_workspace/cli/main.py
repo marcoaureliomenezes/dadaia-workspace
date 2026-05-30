@@ -10,6 +10,7 @@ from dadaia_workspace.cli.commands import (
     context,
     doctor,
     init,
+    migrate,
     orchestrate,
     panel,
     public,
@@ -43,6 +44,7 @@ app.add_typer(orchestrate.app, name="orchestrate")
 app.add_typer(reports.app, name="reports")
 app.add_typer(specs.app, name="specs")
 app.add_typer(server.app, name="server")
+app.add_typer(migrate.app, name="migrate")
 app.add_typer(panel.app, name="panel")
 
 # Workspace root resolved from the editable install location:

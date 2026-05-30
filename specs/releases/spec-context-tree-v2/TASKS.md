@@ -27,7 +27,7 @@ tree-v2` command — see SPEC §4 for the full migrate spec.
 `"foundation"` in fallback list), AC-T1-4 (`dadaia migrate tree-v2` idempotently moves
 `foundation/` content). AC-T1-3 (doctor TREE-1) is verified in T-9.
 
-[ ] T-1
+[x] T-1
 
 ---
 
@@ -48,7 +48,7 @@ these new stubs cleanly (OQ-4 resolution).
 after scaffold), AC-T2-2 (no `*.md` under `specs/memory/` after scaffold). AC-T2-3
 (doctor TREE-3 auto-fix) is verified in T-9.
 
-[ ] T-2
+[x] T-2
 
 ---
 
@@ -67,7 +67,7 @@ backlog entries), `backlog/.gitkeep`, `bugs/README.md` (authoring rules for bug 
 after scaffold), AC-T4-3 (command does not recreate directories that already exist).
 AC-T4-2 (doctor TREE-4) is verified in T-9.
 
-[ ] T-4
+[x] T-4
 
 ---
 
@@ -87,7 +87,7 @@ warn-only; `doctor --fix` does NOT move the file), AC-T6-4 (`dadaia migrate tree
 moves root SPEC.md to `releases/legacy/` atomically). AC-T6-2 (doctor TREE-2) is
 verified in T-9.
 
-[ ] T-6
+[x] T-6
 
 ---
 
@@ -112,7 +112,7 @@ AC-T8a-2 (existing gate integration tests pass), AC-T8a-3 (new test
 `test_gate_resolves_active_release_tasks` passes), AC-T8a-4 (new test
 `test_gate_blocks_when_active_release_has_no_task` passes).
 
-[ ] T-8a
+[x] T-8a
 
 ---
 
@@ -156,7 +156,7 @@ is wired in T-9.
 canonical template), AC-T5-5 (distinct from repo-root AGENTS.md). TREE-5 tests
 (AC-T5-2..T5-4) are verified in T-9.
 
-[ ] T-5
+[x] T-5
 
 ---
 

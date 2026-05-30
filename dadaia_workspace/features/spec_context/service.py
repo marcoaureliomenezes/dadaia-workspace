@@ -116,7 +116,7 @@ class SpecContextService:
             if _SCAFFOLD_SRC.exists():
                 shutil.copytree(_SCAFFOLD_SRC, specs_dir)
             else:
-                for subdir in ("", "memory", "features", "foundation"):
+                for subdir in ("", "memory", "features"):
                     (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
 
         # Copy repo-AGENTS.md template if not already present
