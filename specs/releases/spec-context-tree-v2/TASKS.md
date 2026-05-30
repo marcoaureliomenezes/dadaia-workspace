@@ -222,7 +222,7 @@ evidence.
 **Done criterion:** `poetry run pytest` green, all AC-D-1..D-16, AC-G-1..G-8, AC-O-1
 pass. Coverage unchanged or improved.
 
-[ ] T-QA
+[x] T-QA
 
 ---
 
