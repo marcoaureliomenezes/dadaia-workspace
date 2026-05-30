@@ -2,17 +2,19 @@
 # Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Fallback owner — every PR requires their review by default.
-*                       @marcoaureliomenezes
+*                              @marcoaureliomenezes
 
-# Pipelines & repo governance
-/.github/               @marcoaureliomenezes
-/CODEOWNERS             @marcoaureliomenezes
+# Pipelines and repo governance
+/.github/                      @marcoaureliomenezes
 
-# Build / release tooling
-/pyproject.toml         @marcoaureliomenezes
-/poetry.lock            @marcoaureliomenezes
-/Makefile               @marcoaureliomenezes
-/scripts/               @marcoaureliomenezes
+# Build and release tooling
+/pyproject.toml                @marcoaureliomenezes
+/poetry.lock                   @marcoaureliomenezes
+/Makefile                      @marcoaureliomenezes
+/scripts/                      @marcoaureliomenezes
 
-# Specs are guarded by the operator + product-engineer agent
-/specs/                 @marcoaureliomenezes
+# Agent asset source of truth (public/ affects ALL downstream workspaces)
+/dadaia_workspace/public/      @marcoaureliomenezes
+
+# Specs governed by owner and product-engineer agent
+/specs/                        @marcoaureliomenezes

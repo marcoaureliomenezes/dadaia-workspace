@@ -48,3 +48,15 @@ test-results/
 
 # dadaia agent reports (absolute paths, not for version control)
 .dadaia/reports/
+
+# dadaia runtime projections and generated directories (never commit)
+.claude/
+.agents/
+.codex/
+.opencode/
+.dadaia/agentic/
+.dadaia/scripts/
+.dadaia/states/
+.dadaia/tmp/
+tests/e2e/panel/screenshots/
+img/

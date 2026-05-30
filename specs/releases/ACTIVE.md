@@ -1,7 +1,8 @@
-release: none
-phase: none
+release: go-open-source
+phase: IMPLEMENTATION
 
 # History
+# 2026-05-29 — go-open-source SPEC + PLAN + TASKS Aprovados (operador). Phase advanced to IMPLEMENTATION. Implementers may reserve [-] markers. Goal: take dadaia-workspace lib public safely (private→public; PyPI 1000+ downloads). 18 tasks, 5 owners + operator. Execution waves: [A1,A2 (se-python) ‖ B1,B2,B4 (ai-engineer) ‖ C1-C4 (devops) ‖ D2 (security) ‖ E1,E2 (product-eng)] → [A3,A4 (se-python) ‖ B3 propagation (ai-engineer) ‖ D1 gitleaks full-history (security) ‖ E3 (product-eng)] → T-GOS-OPS1 (operator+devops: visibility flip, branch protection enforce_admins=true, secret scanning). Blockers: no LICENSE, 364 tracked junk files, consumer-corrupting paths in public/, unpinned release.yml.
 # 2026-05-29 — orchestration-consolidation-v1 CLOSED + ARCHIVED. All 11 tasks [x]. Suite green (1963 passed, 0 failed, 89.47% cov). specs doctor 0/0 (incl. bidirectional D-OC-1). public doctor exit 0. CLOSURE.md + 4 memory atoms updated (architecture, agent-orchestration, specs-doctor, index). Moved to _archive/releases/. (Git commit local; push pending operator.)
 # 2026-05-29 — All 11 tasks [x]. Full suite green (1963 passed, 0 failed, 1 skipped, 1 xpassed, 89.47% cov). specs doctor 0/0 (incl. new bidirectional D-OC-1). public doctor exit 0. Acceptance round-trips PASS (operator supplied no workflow name / no task_id, qa-validated). Phase advanced to CLOSURE.
 # 2026-05-29 — SPEC + PLAN + TASKS Aprovados (operador). Phase advanced to IMPLEMENTATION. Implementers may reserve [-] markers. Execution waves: ai-engineer (T-OCV-01..05a) → [product-engineer T-OCV-05b ‖ software-engineer-python T-OCV-06b,07] → devops-engineer T-OCV-08 → [qa-engineer + project-manager T-OCV-09,10].

@@ -603,6 +603,73 @@ class TestIsSelfRepo:
         )
         assert _is_self_repo(consumer) is False
 
+    # --- T-GOS-A3: pyproject-based self-detection (manifest-absent) ---
+
+    def test_pyproject_name_dadaia_workspace_no_manifest_returns_true(
+        self, tmp_path: Path
+    ) -> None:
+        """Secondary guard: pyproject.toml with [tool.poetry] name = 'dadaia-workspace'
+        must return True even when no .dadaia/agentic/manifest.json exists (AC-GOS-10a)."""
+        consumer = tmp_path / "repos" / "lib-clone"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        # Deliberately NO manifest — that is the gap this guard closes.
+        assert _is_self_repo(consumer) is True
+
+    def test_pyproject_project_name_dadaia_workspace_no_manifest_returns_true(
+        self, tmp_path: Path
+    ) -> None:
+        """Secondary guard: [project] name = 'dadaia-workspace' (PEP 621) also detected."""
+        consumer = tmp_path / "repos" / "lib-clone-pep621"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[project]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        assert _is_self_repo(consumer) is True
+
+    def test_pyproject_different_name_no_manifest_returns_false(
+        self, tmp_path: Path
+    ) -> None:
+        """A pyproject.toml whose name is NOT dadaia-workspace must not trigger self-skip."""
+        consumer = tmp_path / "repos" / "other-lib"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[tool.poetry]\nname = "some-other-lib"\nversion = "1.0.0"\n',
+            encoding="utf-8",
+        )
+        assert _is_self_repo(consumer) is False
+
+    def test_pyproject_malformed_toml_falls_through_to_manifest_check(
+        self, tmp_path: Path
+    ) -> None:
+        """Malformed pyproject.toml must not raise; falls through to manifest check."""
+        consumer = tmp_path / "repos" / "broken-pyproject"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text("NOT VALID TOML ][[\n", encoding="utf-8")
+        # No manifest either -> False
+        assert _is_self_repo(consumer) is False
+
+    def test_pyproject_name_dadaia_workspace_with_manifest_returns_true(
+        self, tmp_path: Path
+    ) -> None:
+        """pyproject guard fires before manifest check; result is still True."""
+        consumer = tmp_path / "repos" / "lib-with-manifest"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        # Add a manifest with a non-matching version; pyproject check fires first.
+        (consumer / ".dadaia" / "agentic").mkdir(parents=True)
+        (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
+            json.dumps({"package_version": "999.0.0"}), encoding="utf-8"
+        )
+        assert _is_self_repo(consumer) is True
+
 
 # ---------------------------------------------------------------------------
 # _install_workspace_guardrail_pair

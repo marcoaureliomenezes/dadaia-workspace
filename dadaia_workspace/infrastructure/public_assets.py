@@ -493,10 +493,32 @@ def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
 def _is_self_repo(consumer: Path) -> bool:
     """Return True when *consumer* is the dadaia-workspace repo itself (R14).
 
-    Compares ``package_version`` in the consumer's manifest against the
-    currently installed package version.  A match means the consumer IS the
-    dadaia-workspace source tree — we must never overwrite its source files.
+    Two independent checks, either of which is sufficient.
+
+    Primary (manifest-based): compares ``package_version`` in the consumer's
+    manifest against the currently installed package version.  A match means
+    the consumer IS the dadaia-workspace source tree.
+
+    Secondary (pyproject-based): if the consumer directory contains a
+    ``pyproject.toml`` whose ``[tool.poetry] name`` or ``[project] name``
+    equals ``"dadaia-workspace"``, treat it as self regardless of whether a
+    manifest exists.  This closes the gap where a fresh clone (no
+    ``.dadaia/agentic/manifest.json`` yet) could be mistakenly scaffolded into
+    the library source tree.
     """
+    # Secondary check: pyproject.toml name detection (manifest-independent)
+    pyproject_path = consumer / "pyproject.toml"
+    if pyproject_path.exists():
+        try:
+            data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+            poetry_name = data.get("tool", {}).get("poetry", {}).get("name", "")
+            project_name = data.get("project", {}).get("name", "")
+            if poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace":
+                return True
+        except (tomllib.TOMLDecodeError, OSError):
+            pass
+
+    # Primary check: manifest version match
     manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
     if not manifest_path.exists():
         return False
@@ -1646,11 +1668,32 @@ class FileSystemPublicAssetManager:
     def _is_self_repo(self, consumer: Path) -> bool:
         """Return True when *consumer* is the dadaia-workspace repo itself.
 
-        R14 self-skip: compare ``package_version`` in the consumer's own
-        manifest against the currently installed package version.  A match
-        means the consumer IS the dadaia-workspace source tree — we must
-        never overwrite ``data/AGENTS.md`` by projecting back onto ourselves.
+        R14 self-skip: two independent checks, either of which is sufficient.
+
+        Primary (manifest-based): compare ``package_version`` in the consumer's
+        own manifest against the currently installed package version.  A match
+        means the consumer IS the dadaia-workspace source tree.
+
+        Secondary (pyproject-based): if the consumer directory contains a
+        ``pyproject.toml`` whose ``[tool.poetry] name`` or ``[project] name``
+        equals ``"dadaia-workspace"``, treat it as self regardless of whether
+        a manifest exists.  This closes the gap where a fresh clone (no
+        ``.dadaia/agentic/manifest.json`` yet) could be mistakenly scaffolded
+        into the library source tree.
         """
+        # Secondary check: pyproject.toml name detection (manifest-independent)
+        pyproject_path = consumer / "pyproject.toml"
+        if pyproject_path.exists():
+            try:
+                data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+                poetry_name = data.get("tool", {}).get("poetry", {}).get("name", "")
+                project_name = data.get("project", {}).get("name", "")
+                if poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace":
+                    return True
+            except (tomllib.TOMLDecodeError, OSError):
+                pass
+
+        # Primary check: manifest version match
         manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
         if not manifest_path.exists():
             return False

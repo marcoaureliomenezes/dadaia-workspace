@@ -214,7 +214,7 @@ You receive a task description from the implementer. Your job is to define E2E a
 - **backend-engineer pair**: focus on API contracts, idempotency, error envelopes, latency
   budgets vs the declared SLOs, DB state after each operation.
 - **software-engineer-python / software-engineer-node pair**: focus on CLI ergonomics, exit codes, log shape, and the
-  observable behavior of scripts/agents (e.g., openclaw, workflow-tools).
+  observable behavior of scripts/agents (exit codes, log shape, CLI ergonomics).
 - **game-developer pair**: focus on game-mechanic acceptance (score, win/lose, state
   transitions) and frame stability when feasible. You do NOT touch `repos/tauan-games/`
   source — read-only.

@@ -315,14 +315,13 @@ PYEOF
 _path_scope_check
 
 # Determine if this is a production path
+# Consumer production paths (e.g. /docker/<service>/data/) should be derived from
+# workspace config, not hardcoded here. Add them via workspace-local gate overrides.
 IS_PROD=0
 case "$FPATH" in
     "$WS/services/"*|\
-    "$WS/docker/hermes/"*|\
-    "$WS/docker/openclaw/"*|\
-    "$WS/scripts/"*|\
-    "/docker/hermes-agent-wqps/data/"*|\
-    "/docker/openclaw-x44i/data/"*)
+    "$WS/docker/"*|\
+    "$WS/scripts/"*)
         IS_PROD=1
         ;;
 esac
