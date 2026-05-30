@@ -12,10 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from dadaia_workspace.features.migrate.tree_v2 import MigrateResult, migrate_tree_v2
-
+from dadaia_workspace.features.migrate.tree_v2 import migrate_tree_v2
 
 # ---------------------------------------------------------------------------
 # helpers
