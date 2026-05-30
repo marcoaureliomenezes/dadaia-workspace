@@ -31,12 +31,15 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_workflow_detail,
     render_api_workflows_list,
 )
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 # ---------------------------------------------------------------------------
-# Workspace root
+# Hermetic workspace_root
+#
+# These tests must NOT depend on a pre-existing on-disk .dadaia/agentic/workflows/
+# staging dir (gitignored — absent on a clean checkout / CI). The `staged_root`
+# fixture stages the canonical, tracked public/ assets into a tmp workspace_root.
 # ---------------------------------------------------------------------------
-
-_WORKSPACE_ROOT = Path(__file__).parent.parent.parent.parent
 
 
 # ---------------------------------------------------------------------------
@@ -113,9 +116,22 @@ _TOKEN = "workflows-integ-token-pr3-20"
 
 
 @pytest.fixture(scope="module")
-def workflows_server():
+def staged_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Stage canonical (tracked) public/ assets into a hermetic tmp workspace_root.
+
+    Independent of any pre-existing on-disk .dadaia/agentic/ staging (gitignored,
+    absent on a clean checkout). The stager materialises workflows/ from the
+    package's own public/ dir.
+    """
+    root = tmp_path_factory.mktemp("panel-workflows-ws")
+    FileSystemPublicAssetManager().stage(root)
+    return root
+
+
+@pytest.fixture(scope="module")
+def workflows_server(staged_root: Path):
     """Server backed by real workflow files; yields (base_url, token)."""
-    server = _build_server(_TOKEN, _WORKSPACE_ROOT)
+    server = _build_server(_TOKEN, staged_root)
     port = server.server_address[1]
     base_url = f"http://127.0.0.1:{port}"
     thread = threading.Thread(target=server.serve_forever, daemon=True)
