@@ -60,3 +60,11 @@ test-results/
 .dadaia/tmp/
 tests/e2e/panel/screenshots/
 img/
+
+# dadaia fcntl lock files (never commit — runtime only)
+.dadaia/states/.ws_lock
+.dadaia/states/ctx_locks/*.lock
+
+# dadaia implementation locks and audit log (runtime artefacts)
+.dadaia/locks/
+.dadaia/logs/

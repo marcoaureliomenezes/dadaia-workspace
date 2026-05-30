@@ -8,6 +8,7 @@ from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
 from dadaia_workspace.core.protocols.primary_context_store import PrimaryContextStore
+from dadaia_workspace.features.spec_context.locking import workspace_lock
 
 # Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2 — they guarded
 # is_primary logic that no longer exists.  INV-4 and INV-5 are renamed for
@@ -70,16 +71,26 @@ class DoctorService:
         return issues
 
     def fix(self) -> list[str]:
+        """Fix detected issues.
+
+        INV-5: remove stale repos for DEAD contexts.
+
+        Lock 1 wraps the spec_contexts.json load (to confirm state) and the
+        rmtree + update sequence so concurrent alive() calls cannot race with fix().
+        Per SPEC T-11: the JSON write is inside Lock 1; rmtree is also inside Lock 1
+        for the doctor fix path (doctor fixes are infrequent; we accept the slightly
+        wider lock window for correctness).
+        """
         actions: list[str] = []
 
-        # Fix INV-5: remove stale repos for DEAD contexts
-        for ctx in self._store.list_all():
-            if ctx.state == ContextState.DEAD:
-                repo_path = self._repos_dir() / ctx.repo_slug
-                if repo_path.exists():
-                    shutil.rmtree(repo_path)
-                    actions.append(
-                        f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'"
-                    )
+        with workspace_lock(self._workspace_root):
+            for ctx in self._store.list_all():
+                if ctx.state == ContextState.DEAD:
+                    repo_path = self._repos_dir() / ctx.repo_slug
+                    if repo_path.exists():
+                        shutil.rmtree(repo_path)
+                        actions.append(
+                            f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'"
+                        )
 
         return actions

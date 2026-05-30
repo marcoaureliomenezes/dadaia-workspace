@@ -132,7 +132,7 @@ RECLAIMED/HEARTBEAT/BLOCKED_ATTEMPT). Add `.dadaia/states/.ws_lock` and
 BOUND_REVIEW mutual exclusion). R-1, R-3, R-4, R-5, R-8 closed (concurrency tests
 demonstrate). AC-AUDIT-1 (audit log schema) passes.
 
-[ ] T-11
+[x] T-11
 
 ---
 

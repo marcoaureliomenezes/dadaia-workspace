@@ -19,14 +19,26 @@ from dadaia_workspace.core.exceptions import (
     ContextNotFoundError,
     ContextStateError,
     ImplementationBlockedByReviewError,
+    LockActiveError,
     LockHeldError,
     RepoCatalogError,
     ReviewBlockedByImplementationError,
     SchemaVersionError,
+    WorkspaceLockTimeoutError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.spec_context.locking import (
+    audit_acquired,
+    audit_blocked,
+    audit_released,
+    check_impl_xor_review,
+    create_impl_lock,
+    reclaim_impl_lock,
+    release_impl_lock,
+    workspace_lock,
+)
 from dadaia_workspace.features.spec_context.service import SpecContextService
 
 app = typer.Typer(help="Manage Spec Context Projects.")
@@ -85,57 +97,18 @@ def _load_session(sessions_dir: Path, session_id: str) -> dict | None:  # type: 
 
 
 def _session_is_stale(session_data: dict) -> bool:  # type: ignore[type-arg]
-    """Check if a session is stale based on TTL.
-
-    T-12 will implement full staleness logic. For now: file existence = non-stale,
-    with a basic TTL check if last_seen_at + ttl_seconds < now.
-    """
+    """Check if a session is stale based on TTL."""
     try:
         last_seen = session_data.get("last_seen_at", "")
         ttl = int(session_data.get("ttl_seconds", 300))
         if not last_seen:
-            return False  # cannot determine; assume non-stale (fail-open)
+            return False
         last_seen_dt = datetime.fromisoformat(last_seen.replace("Z", "+00:00"))
         now = datetime.now(tz=UTC)
         elapsed = (now - last_seen_dt).total_seconds()
         return elapsed > ttl
     except Exception:
-        return False  # fail-open: treat as non-stale if we can't parse
-
-
-def _find_review_sessions(
-    sessions_dir: Path, context_name: str, release: str
-) -> list[str]:
-    """Return session IDs of non-stale BOUND_REVIEW sessions for this context/release."""
-    if not sessions_dir.exists():
-        return []
-    review_session_ids: list[str] = []
-    for f in sessions_dir.glob("*.json"):
-        try:
-            data = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        if (
-            data.get("mode") == "BOUND_REVIEW"
-            and data.get("context") == context_name
-            and data.get("release") == release
-            and not _session_is_stale(data)
-        ):
-            review_session_ids.append(data["session_id"])
-    return review_session_ids
-
-
-def _load_impl_lock(
-    locks_dir: Path, context_name: str, release: str
-) -> dict | None:  # type: ignore[type-arg]
-    """Load the implementation lock file for this context/release, return None if FREE."""
-    lock_file = locks_dir / f"{context_name}__{release}.json"
-    if not lock_file.exists():
-        return None
-    try:
-        return json.loads(lock_file.read_text())
-    except (json.JSONDecodeError, OSError):
-        return None
+        return False
 
 
 @app.command()
@@ -287,6 +260,8 @@ def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
     mode: str = typer.Option(..., "--mode", help="Binding mode: read|spec|implementation|review"),
     release: str | None = typer.Option(None, "--release", help="Release ID (required for implementation and review modes)"),
+    force: bool = typer.Option(False, "--force", help="Force-reclaim a STALE implementation lock"),
+    reason: str = typer.Option("", "--reason", help="Reason for forced reclaim (required with --force)"),
 ) -> None:
     """Bind this shell session to a context.
 
@@ -309,19 +284,31 @@ def bind(
         )
         raise typer.Exit(1) from None
 
+    # --force requires --reason
+    if force and not reason:
+        err_console.print("[red]Error:[/red] --reason is required when using --force")
+        raise typer.Exit(1) from None
+
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
-    locks_dir = _locks_dir(workspace_root)
 
     # Ensure directories exist
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
-    # Verify context exists
+    # Verify context exists and is ALIVE (AC-T11-5)
     svc = _ctx_service()
     try:
-        svc.show(name)
+        ctx = svc.show(name)
     except ContextNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    # ALIVE guard: IMPLEMENTATION and REVIEW modes require an ALIVE context (AC-T11-5)
+    if mode_upper in ("IMPLEMENTATION", "REVIEW") and ctx.state != ContextState.ALIVE:
+        err_console.print(
+            f"[red]Error:[/red] Context '{name}' is not ALIVE (state={ctx.state.value}). "
+            "Run 'dadaia context alive <name>' first."
+        )
         raise typer.Exit(1) from None
 
     session_id = f"sess_{uuid.uuid4().hex[:8]}"
@@ -345,69 +332,99 @@ def bind(
     try:
         if mode_upper == "IMPLEMENTATION":
             assert release is not None  # guaranteed above
-            locks_dir.mkdir(parents=True, exist_ok=True)
 
-            # Check for blocking BOUND_REVIEW sessions first (AC-T10d-10)
-            blocking_reviews = _find_review_sessions(sessions_dir, name, release)
-            if blocking_reviews:
-                raise ImplementationBlockedByReviewError(
-                    f"Context '{name}' release '{release}' is blocked by active BOUND_REVIEW "
-                    f"session(s): {', '.join(blocking_reviews)}. "
-                    "Wait for the review to complete before starting implementation."
+            # Impl-XOR-Review: check blocking BOUND_REVIEW sessions first
+            check_impl_xor_review(workspace_root, name, release, "IMPLEMENTATION", session_id)
+
+            if force:
+                # Force-reclaim path
+                try:
+                    reclaim_impl_lock(
+                        workspace_root,
+                        context=name,
+                        release=release,
+                        new_session_id=session_id,
+                        runtime=runtime,
+                        pid=pid,
+                        reason=reason,
+                    )
+                except LockActiveError as e:
+                    err_console.print(f"[red]Error:[/red] {e}")
+                    raise typer.Exit(1) from None
+            else:
+                # Normal path: create_impl_lock checks HELD and raises LockHeldError
+                with workspace_lock(workspace_root):
+                    create_impl_lock(
+                        workspace_root,
+                        context=name,
+                        release=release,
+                        session_id=session_id,
+                        runtime=runtime,
+                        pid=pid,
+                    )
+                # Emit ACQUIRED audit event (outside lock — non-critical)
+                audit_acquired(
+                    workspace_root,
+                    context=name,
+                    release=release,
+                    session_id=session_id,
+                    runtime=runtime,
+                    pid=pid,
                 )
-
-            # Check if implementation lock is already HELD (AC-T10d-4)
-            existing_lock = _load_impl_lock(locks_dir, name, release)
-            if existing_lock is not None:
-                owner_id = existing_lock.get("session_id", "unknown")
-                owner_last_seen = existing_lock.get("last_seen_at", "unknown")
-                raise LockHeldError(
-                    f"Implementation lock for '{name}/{release}' is already HELD by "
-                    f"session '{owner_id}' (last_seen_at: {owner_last_seen}). "
-                    "Run 'dadaia context release' in the owning session or wait for it to expire."
-                )
-
-            # Create implementation lock file (D-4 shape, forward-compatible with T-11)
-            lock_data: dict = {  # type: ignore[type-arg]
-                "session_id": session_id,
-                "context": name,
-                "release": release,
-                "pid": pid,
-                "runtime": runtime,
-                "bound_at": now,
-                "last_seen_at": now,
-                "ttl_seconds": 300,
-            }
-            lock_file = locks_dir / f"{name}__{release}.json"
-            lock_file.write_text(json.dumps(lock_data, indent=2))
 
         elif mode_upper == "REVIEW":
             assert release is not None  # guaranteed above
-            locks_dir.mkdir(parents=True, exist_ok=True)
 
-            # Check if implementation lock is HELD (AC-T10d-9)
-            existing_lock = _load_impl_lock(locks_dir, name, release)
-            if existing_lock is not None:
-                owner_id = existing_lock.get("session_id", "unknown")
-                raise ReviewBlockedByImplementationError(
-                    f"Context '{name}' release '{release}' has an active implementation lock "
-                    f"held by session '{owner_id}'. "
-                    "Review cannot proceed while implementation is in progress."
+            # Impl-XOR-Review: check if implementation lock is HELD
+            try:
+                check_impl_xor_review(workspace_root, name, release, "REVIEW", session_id)
+            except ReviewBlockedByImplementationError:
+                audit_blocked(
+                    workspace_root,
+                    context=name,
+                    release=release,
+                    session_id=session_id,
+                    runtime=runtime,
+                    pid=pid,
+                    reason="review blocked by held implementation lock",
                 )
+                raise
 
     except LockHeldError as e:
+        audit_blocked(
+            workspace_root,
+            context=name,
+            release=release or "",
+            session_id=session_id,
+            runtime=runtime,
+            pid=pid,
+            reason=str(e),
+        )
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except ReviewBlockedByImplementationError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except ImplementationBlockedByReviewError as e:
+        audit_blocked(
+            workspace_root,
+            context=name,
+            release=release or "",
+            session_id=session_id,
+            runtime=runtime,
+            pid=pid,
+            reason=str(e),
+        )
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # Write session file
-    session_file = sessions_dir / f"{session_id}.json"
-    session_file.write_text(json.dumps(session_data, indent=2))
+    # Write session file inside workspace lock
+    with workspace_lock(workspace_root):
+        session_file = sessions_dir / f"{session_id}.json"
+        session_file.write_text(json.dumps(session_data, indent=2))
 
     # Output eval-compatible export lines
     dadaia_mode = mode_upper
@@ -432,31 +449,41 @@ def release_cmd() -> None:
 
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
-    locks_dir = _locks_dir(workspace_root)
 
-    session_file = sessions_dir / f"{session_id}.json"
     session_data = None
-    if session_file.exists():
-        try:
-            session_data = json.loads(session_file.read_text())
-        except (json.JSONDecodeError, OSError):
-            session_data = None
-        session_file.unlink(missing_ok=True)
+    session_file = sessions_dir / f"{session_id}.json"
 
-    # If this session owned an implementation lock, remove it
+    # Load session under workspace lock, then remove session file + lock file atomically
+    with workspace_lock(workspace_root):
+        if session_file.exists():
+            try:
+                session_data = json.loads(session_file.read_text())
+            except (json.JSONDecodeError, OSError):
+                session_data = None
+            session_file.unlink(missing_ok=True)
+
+        # If this session owned an implementation lock, remove it
+        if session_data and session_data.get("mode") == "BOUND_IMPLEMENTATION":
+            ctx_name = session_data.get("context", "")
+            rel = session_data.get("release", "")
+            if ctx_name and rel:
+                release_impl_lock(workspace_root, ctx_name, rel, session_id)
+
+    # Emit RELEASED audit event (outside lock)
     if session_data and session_data.get("mode") == "BOUND_IMPLEMENTATION":
         ctx_name = session_data.get("context", "")
         rel = session_data.get("release", "")
+        runtime = session_data.get("runtime", "unknown")
+        pid = session_data.get("pid", os.getpid())
         if ctx_name and rel:
-            lock_file = locks_dir / f"{ctx_name}__{rel}.json"
-            if lock_file.exists():
-                # Only remove if this session owns the lock
-                try:
-                    lock_data = json.loads(lock_file.read_text())
-                    if lock_data.get("session_id") == session_id:
-                        lock_file.unlink(missing_ok=True)
-                except (json.JSONDecodeError, OSError):
-                    lock_file.unlink(missing_ok=True)
+            audit_released(
+                workspace_root,
+                context=ctx_name,
+                release=rel,
+                session_id=session_id,
+                runtime=runtime,
+                pid=pid,
+            )
 
     console.print(f"[green]✓[/green] Session '[bold]{session_id}[/bold]' released")
 

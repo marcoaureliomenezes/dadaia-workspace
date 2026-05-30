@@ -30,6 +30,36 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
+def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
+    """Register an ALIVE v2 context directly in spec_contexts.json.
+
+    `context bind --mode implementation|review` requires the context to be ALIVE
+    (T-11 AC-T11-5). Writing the state file directly avoids a real `context alive`
+    git clone in these CLI integration tests.
+    """
+    states = workspace / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "spec_contexts.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    {
+                        "name": name,
+                        "state": "alive",
+                        "repo_slug": name,
+                        "repo_url": f"https://example.com/{name}.git",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "alive_since": "2026-01-01T00:00:00Z",
+                        "dead_since": None,
+                        "current_branch": "main",
+                    }
+                ],
+            }
+        )
+    )
+
+
 def test_context_create_lists_state_dead(workspace: Path) -> None:
     result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
     assert result.exit_code == 0, result.output
@@ -228,7 +258,7 @@ def test_context_dead_requires_existing_context(workspace: Path) -> None:
 
 def test_context_bind_read_outputs_eval_lines(workspace: Path) -> None:
     """AC-T10d-3: bind --mode read prints eval-compatible export lines."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
     assert result.exit_code == 0, result.output
     assert "export DADAIA_CONTEXT=myctx" in result.output
@@ -238,7 +268,7 @@ def test_context_bind_read_outputs_eval_lines(workspace: Path) -> None:
 
 def test_context_bind_spec_outputs_eval_lines(workspace: Path) -> None:
     """bind --mode spec prints eval-compatible export lines."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "spec"])
     assert result.exit_code == 0, result.output
     assert "export DADAIA_CONTEXT=myctx" in result.output
@@ -248,7 +278,7 @@ def test_context_bind_spec_outputs_eval_lines(workspace: Path) -> None:
 
 def test_context_bind_implementation_creates_lock_file(workspace: Path) -> None:
     """AC-T10d-3: bind --mode implementation creates session + lock files."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     result = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
     )
@@ -271,14 +301,14 @@ def test_context_bind_implementation_creates_lock_file(workspace: Path) -> None:
 
 def test_context_bind_implementation_requires_release(workspace: Path) -> None:
     """--mode implementation without --release must error."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "implementation"])
     assert result.exit_code != 0
 
 
 def test_context_bind_implementation_lock_held_raises(workspace: Path) -> None:
     """AC-T10d-4: second bind --mode implementation with same context/release raises LockHeldError."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     # First bind
     result1 = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
@@ -296,7 +326,7 @@ def test_context_bind_implementation_lock_held_raises(workspace: Path) -> None:
 
 def test_context_bind_review_no_lock_file_created(workspace: Path) -> None:
     """AC-T10d-8: bind --mode review creates session file but NO implementation lock."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     result = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "review", "--release", "v1"]
     )
@@ -312,14 +342,27 @@ def test_context_bind_review_no_lock_file_created(workspace: Path) -> None:
 
 def test_context_bind_review_blocks_when_impl_lock_held(workspace: Path) -> None:
     """AC-T10d-9: bind --mode review when impl lock HELD raises ReviewBlockedByImplementationError."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    import os
+    from datetime import UTC
+    from datetime import datetime as _dt
 
-    # Create an impl lock directly
+    _register_alive_ctx(workspace)
+
+    # Create a HELD impl lock (fresh timestamp + live PID so T-11 state machine = HELD)
     locks_dir = workspace / ".dadaia" / "locks" / "implementation"
     locks_dir.mkdir(parents=True, exist_ok=True)
     lock_file = locks_dir / "myctx__v1.json"
+    now = _dt.now(tz=UTC).isoformat()
     lock_file.write_text(
-        json.dumps({"session_id": "sess_owner123", "last_seen_at": "2026-05-30T00:00:00Z"})
+        json.dumps({
+            "lock_type": "implementation",
+            "session_id": "sess_owner123",
+            "context": "myctx",
+            "release": "v1",
+            "pid": os.getpid(),
+            "last_seen_at": now,
+            "ttl_seconds": 300,
+        })
     )
 
     result = _runner.invoke(
@@ -332,7 +375,7 @@ def test_context_bind_review_blocks_when_impl_lock_held(workspace: Path) -> None
 
 def test_context_bind_implementation_blocks_when_review_session_exists(workspace: Path) -> None:
     """AC-T10d-10: bind --mode implementation raises ImplementationBlockedByReviewError when BOUND_REVIEW exists."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
 
     # Create a review session directly
     from datetime import UTC, datetime
@@ -367,7 +410,7 @@ def test_context_bind_implementation_blocks_when_review_session_exists(workspace
 
 def test_context_bind_invalid_mode(workspace: Path) -> None:
     """Unsupported mode exits non-zero."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "turbo"])
     assert result.exit_code != 0
 
@@ -379,7 +422,7 @@ def test_context_bind_invalid_mode(workspace: Path) -> None:
 
 def test_context_release_deletes_session_and_lock(workspace: Path) -> None:
     """AC-T10d-5: release deletes session file and implementation lock."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     bind_result = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
     )
@@ -425,7 +468,7 @@ def test_context_release_without_session_exits_nonzero(workspace: Path) -> None:
 
 def test_context_show_json_session_null_when_no_binding(workspace: Path) -> None:
     """AC-T10d-6: show --json has session=null when no session binding."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     import os
 
     env = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
@@ -438,7 +481,7 @@ def test_context_show_json_session_null_when_no_binding(workspace: Path) -> None
 
 def test_context_show_json_session_populated_when_bound(workspace: Path) -> None:
     """AC-T10d-6: show --json has session sub-object when DADAIA_SESSION_ID is set and session file is fresh."""
-    _runner.invoke(app, ["context", "create", "myctx", "--repo", "myctx"])
+    _register_alive_ctx(workspace)
     bind_result = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "spec"]
     )

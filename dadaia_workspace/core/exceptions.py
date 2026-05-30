@@ -146,3 +146,25 @@ class ImplementationBlockedByReviewError(LockConflictError):
 
     The message lists the blocking review session IDs.
     """
+
+
+class WorkspaceLockTimeoutError(DadaiaError):
+    """Raised when the workspace-wide fcntl lock cannot be acquired within the timeout.
+
+    Includes the holder PID if discoverable from the lock file content.
+    """
+
+
+class ContextNotAliveError(DadaiaError):
+    """Raised when bind is attempted on a context whose state is DEAD.
+
+    AC-T11-5: bind on a DEAD context must raise this instead of proceeding.
+    """
+
+
+class LockActiveError(DadaiaError):
+    """Raised when a forced reclaim is attempted on a HELD (non-stale) lock.
+
+    AC-T12-3 (T-12): reclaim() on a fresh HELD lock raises this.
+    Also used in T-11 reclaim path.
+    """
