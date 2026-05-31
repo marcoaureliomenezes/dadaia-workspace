@@ -64,7 +64,7 @@ Deliver the foundation that makes **"agents never work blind"** real and univers
 all three runtimes (Claude Code, OpenCode, Codex) by:
 
 1. Payloading the already-firing `ctx-inject.sh` hook so every Claude Code and OpenCode
-   session receives architecture + tech-stack + catalog at work-start (~7.3K tokens, once).
+   session receives tech-stack + catalog at work-start (~5K tokens, once); architecture is self-pull (D-5).
 2. Generating a machine-readable `catalog.json` as the feature navigation index, with a
    `specs doctor` sync check keeping it consistent with feature HTML files.
 3. Adding a mandatory "Step 0 — Memory bootstrap" block to all 21 agent personas, making
@@ -89,6 +89,7 @@ on any other in-flight release.
 | D-2 | **North star = "agents never work blind."** Format and tokens are enablers in service of correctness; they are not the primary goal. | If we changed format but left consumption un-commanded, agents would still work blind. Fix the requirement first; format is the mechanism that makes it lean. |
 | D-3 | **Decoupled.** This release has no dependency on `spec-context-session-locks-v1`, `spec-context-tree-v2`, `panel-kanban-v1`, or `go-open-source`. It rides the existing always-on `ctx-inject.sh` hook. A later release upgrades injection to per-session bind when `spec-context-session-locks-v1` lands. | Session locks are not yet in production; waiting for them would delay the blindness fix by at least one release cycle. Decoupling is the correct dependency posture. |
 | D-4 | **Catalog format = JSON (machine index).** Content stays HTML in this release (stripped of boilerplate at injection time). The YAML source-of-truth migration is the separate Phase-2 candidate `memory-structured-source-v1` — explicitly out of scope here. | JSON is directly addressable by agents without HTML parsing. At ~540 tokens for 18 features it is the cheapest useful index. Converting 23 HTML atoms to YAML is a larger, higher-risk change; sequencing it after the blindness fix avoids blocking correctness behind migration. |
+| D-5 (amendment 2026-05-31) | **Lean injection payload = tech-stack + catalog ONLY (~5K tokens); `architecture.html` is self-pull, NOT injected.** The measured full payload (arch+tech+catalog) was ~11.4–13K tokens — ~60% over the 6,500–8,500 target — because `architecture.html` is ~27K chars of prose/diagrams (strips only ~5%) and grew with the R2 lock model. | Keeps the two cheapest, highest-navigation-value layers at work-start; treats the large architecture atom like feature atoms (pulled on catalog-signalled relevance). Restores the per-session cost bar. The canonical Step-0 block, the Codex `memory-ctx` adapter, and the `specs/memory/AGENTS.md` read-contract are all updated so `architecture.html` is an **always-pull-before-architectural-work self-pull** rather than an injected layer. |
 
 ---
 
@@ -108,10 +109,15 @@ bootstrap at session start.
 
 | Layer | What is injected | Tokens (est) |
 |-------|-----------------|--------------|
-| Catalog index | `specs/memory/product/catalog.json` — all features with slug, title, summary, path, tags, rank | ~540 |
-| Architecture | `memory/architecture.html` stripped of `<head>`, `<style>`, Mermaid `<script>` | ~3,410 |
-| Tech stack | `memory/tech-stack.html` stripped (same) | ~1,103 |
-| **Total injected** | — | **~7,256 (~7.3K)** |
+| Catalog index | `specs/memory/product/catalog.json` — all features with slug, title, summary, path, tags, rank | ~2,300 |
+| Tech stack | `memory/tech-stack.html` stripped of `<head>`, `<style>`, Mermaid `<script>` | ~2,500 |
+| **Total injected** | — | **~4,800 (~5K)** |
+
+**Architecture is NOT injected (D-5 amendment).** `architecture.html` (~7,500 tokens) is the
+single largest atom and strips almost nothing (it is prose + Mermaid, not boilerplate).
+Injecting it pushed the measured payload to ~11.4–13K tokens. Per operator decision D-5 it is
+moved to the self-pull tier: agents pull `architecture.html` via the catalog before any
+architectural / cross-layer work, exactly as they self-pull feature atoms.
 
 Feature detail files (~32K total for all 18) are **not injected** — the agent self-pulls
 only the 1-3 features relevant to its task using the catalog slug → path mapping.
@@ -122,7 +128,7 @@ Lives in `dadaia_workspace/public/scripts/` so it is lib-originated and propagat
 consumer workspaces. Invoked by `ctx-inject.sh` inline.
 
 **First-message-only guard (OpenCode):** The `ctx-inject.ts` OpenCode plugin fires on
-every user message (`chat.message`). Without a guard, the 7.3K payload would be paid on
+every user message (`chat.message`). Without a guard, the ~5K payload would be paid on
 every turn of a multi-turn session (10 turns = 72.5K tokens, ~$0.22 at Sonnet). The
 plugin must include a session-scoped guard (via `input.messageID` ordering or an
 equivalent mechanism determined by devops-engineer at implementation time) so the payload
@@ -146,19 +152,19 @@ dadaia public doctor   # must exit 0
 
 | File | Change |
 |------|--------|
-| `dadaia_workspace/public/scripts/ctx-inject.sh` | Extend to emit stripped arch + tech-stack + catalog.json; add first-message guard logic |
+| `dadaia_workspace/public/scripts/ctx-inject.sh` | Extend to emit stripped tech-stack + catalog.json (architecture self-pull, D-5); add first-message guard logic |
 | `dadaia_workspace/public/plugins/ctx-inject.ts` | Add first-message-only guard for OpenCode multi-turn |
 | `dadaia_workspace/public/scripts/strip-memory-html.py` | **NEW** — 20-30 line helper; strips head/style/script boilerplate; invoked by ctx-inject.sh |
 
 **Acceptance criteria:**
 
-- AC-C1-1: `ctx-inject.sh` executed with a valid `DADAIA_CONTEXT` pointing to a context with `specs/memory/` emits a block containing stripped `architecture.html` content, stripped `tech-stack.html` content, and `catalog.json` content (or stripped `product/index.html` if catalog absent).
-- AC-C1-2: The injected block is bounded by `=== workspace memory (arch + tech + catalog) ===` … `=== end memory bootstrap ===` markers so agents can locate it deterministically.
+- AC-C1-1: `ctx-inject.sh` executed with a valid `DADAIA_CONTEXT` pointing to a context with `specs/memory/` emits a block containing stripped `tech-stack.html` content and `catalog.json` content (or stripped `product/index.html` if catalog absent). Architecture is NOT emitted (D-5 — self-pull).
+- AC-C1-2: The injected block is bounded by `=== workspace memory (tech + catalog) ===` … `=== end memory bootstrap ===` markers so agents can locate it deterministically.
 - AC-C1-3: `strip-memory-html.py` called on `architecture.html` returns content with `<head>`, `<style>`, and Mermaid `<script>` blocks removed, and all prose/diagram content preserved.
 - AC-C1-4: When `catalog.json` is absent, injection silently falls back to injecting stripped `product/index.html` (no error, no empty block).
 - AC-C1-5: The OpenCode `ctx-inject.ts` plugin injects the memory payload only on the first message of a session, not on subsequent messages of the same session.
 - AC-C1-6: `dadaia public doctor` exits 0 after propagation (no drift, no missing).
-- AC-C1-7: Token count of the injected payload with a representative workspace (18 features, `catalog.json` present) is in the range 6,500-8,500 tokens (validates Option C cost).
+- AC-C1-7: Token count of the injected payload (tech-stack + catalog; architecture NOT injected per D-5) with a representative workspace (18 features, `catalog.json` present) is in the range 3,500-6,000 tokens.
 
 ---
 
@@ -268,15 +274,17 @@ from optional to commanded and covers runtimes/sessions where the hook does not 
 ```markdown
 ## Step 0 — Memory bootstrap (mandatory, before any implementation)
 
-If the memory bootstrap was injected at session start via ctx-inject.sh, it is already in
-your context. If not (Codex or standalone invocation), execute the dadaia-workspace-spec-navigator
-skill now:
+A lean memory bootstrap (tech-stack + feature catalog) is injected at session start via
+ctx-inject.sh — if present, it is already in your context. If not (Codex or standalone
+invocation), read specs/memory/tech-stack.html and specs/memory/product/catalog.json yourself
+(via the dadaia-workspace-spec-navigator skill). Then, in ALL cases, before starting work:
 
-  1. Read specs/memory/architecture.html — layer rules, dependency contracts, agent topology.
-  2. Read specs/memory/tech-stack.html — approved languages, runtimes, constraints.
-  3. Read specs/memory/product/catalog.json (or index.html if catalog.json absent) — feature
-     catalog. Identify the 1-3 features most relevant to your task.
-  4. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+  1. Read the feature catalog (specs/memory/product/catalog.json, or index.html if absent) and
+     identify the 1-3 features most relevant to your task.
+  2. Self-pull specs/memory/architecture.html — layer rules, dependency contracts, agent
+     topology. Architecture is NOT injected (it is large); ALWAYS pull it before any
+     architectural, cross-layer, or design decision.
+  3. Self-pull specs/memory/product/<slug>.html for each relevant feature.
 
 Do NOT begin any implementation, review, or report until Step 0 is complete.
 This ensures you are working from the current product state, not from stale context.
@@ -320,7 +328,7 @@ TREE-5 deliverable). These are different files at different paths serving differ
 
 **Content contract:**
 
-1. **Read contract (all agents):** canonical read order: `architecture.html` → `tech-stack.html` → `product/catalog.json` (or `product/index.html` if catalog absent) → self-pull relevant feature HTMLs. Mirrors spec-navigator but is local to the directory.
+1. **Read contract (all agents):** lean bootstrap `tech-stack.html` + `product/catalog.json` (or `product/index.html` if catalog absent) is injected at work-start; then self-pull `architecture.html` before any architectural/cross-layer work, and self-pull the relevant feature HTMLs named by the catalog (D-5). Mirrors spec-navigator but is local to the directory.
 2. **Write contract (product-engineer only, CLOSURE phase):** states that all `*.html` and `product/*.html` files are write-locked. Cites gate enforcement: RULE A in `sdd-spec-gate.sh`.
 3. **Atomicity contract:** memory describes the product as it is now. No Changelog. No History. The delta lives in git.
 4. **File manifest:** table mapping each file to its role and the type of content it holds, so agents can confirm whether `catalog.json` exists before choosing fallback behaviour.
@@ -359,12 +367,12 @@ the same memory bootstrap that Claude Code and OpenCode receive via `ctx-inject.
 
 **Design (per ai-engineer report §2.3):**
 
-The adapter protocol:
+The adapter protocol (parity with `ctx-inject.sh` per D-5 — tech-stack + catalog only):
 1. Resolve `specs_dir` (from `DADAIA_CONTEXT` env var or `.dadaia/states/primary_context.json`).
-2. Read `specs/memory/architecture.html` — strip boilerplate inline (Bash heredoc or Python one-liner).
-3. Read `specs/memory/tech-stack.html` — same strip.
-4. Read `specs/memory/product/catalog.json` (or `product/index.html` if catalog absent).
-5. Emit the context block into the agent's working context.
+2. Read `specs/memory/tech-stack.html` — strip boilerplate inline (Bash heredoc or Python one-liner).
+3. Read `specs/memory/product/catalog.json` (or `product/index.html` if catalog absent).
+4. Emit the context block (tech-stack + catalog) into the agent's working context.
+5. Instruct the agent to self-pull `specs/memory/architecture.html` (NOT emitted — it is large) before any architectural / cross-layer work, and to self-pull the 1-3 relevant feature atoms named by the catalog.
 
 **Integration with existing adapters:** The existing `design-ctx` and `frontend-ctx`
 adapters continue to exist as role supplements (they add release/task/report context).
@@ -398,7 +406,7 @@ adapters (leak/missing/drift), including `memory-ctx`.
 **Acceptance criteria:**
 
 - AC-C5-1: `dadaia_workspace/public/runtime/codex/memory-ctx/SKILL.md` exists.
-- AC-C5-2: The skill file contains a 5-step protocol covering: specs_dir resolution, architecture.html read (with strip instruction), tech-stack.html read (with strip instruction), catalog.json read (with index.html fallback), and context block emission.
+- AC-C5-2: The skill file contains the protocol covering: specs_dir resolution, tech-stack.html read (with strip instruction), catalog.json read (with index.html fallback), context block emission, and a self-pull instruction for architecture.html + relevant feature atoms (architecture NOT emitted, per D-5).
 - AC-C5-3: After `dadaia public install --target all`, `memory-ctx/SKILL.md` is projected to `.codex/skills/memory-ctx/SKILL.md` (auto-discovered by `_install_codex_runtime_adapters`, ADR-CX-001); `dadaia public doctor` D-CX-6 reports no drift/missing for it.
 - AC-C5-4: `dadaia public doctor` exits 0 after propagation.
 - AC-C5-5: The skill explicitly states it fires before role-specific adapters (`design-ctx`, `frontend-ctx`).
@@ -447,7 +455,7 @@ All changes are additive. No existing public assets are removed.
 
 | Asset type | Path | Change |
 |-----------|------|--------|
-| Shell script (lib-originated) | `dadaia_workspace/public/scripts/ctx-inject.sh` | Extend payload: stripped arch + tech-stack + catalog |
+| Shell script (lib-originated) | `dadaia_workspace/public/scripts/ctx-inject.sh` | Extend payload: stripped tech-stack + catalog (architecture self-pull, D-5) |
 | TypeScript plugin (lib-originated) | `dadaia_workspace/public/plugins/ctx-inject.ts` | Add first-message-only guard for OpenCode |
 | Python helper (lib-originated) | `dadaia_workspace/public/scripts/strip-memory-html.py` | **NEW** — HTML boilerplate stripper; invoked by ctx-inject.sh |
 | Agent personas (lib-originated) | `dadaia_workspace/public/agents/*.md` (21 files) | Add Step 0 block; P0 also get spec-navigator in skills |
@@ -501,7 +509,8 @@ At CLOSURE of this release, the following memory atoms must be updated:
 
 - `specs/memory/architecture.html` — add description of the memory injection subsystem
   (ctx-inject.sh payload, strip-memory-html.py, first-message guard) and the catalog
-  generation pipeline.
+  generation pipeline. Note the D-5 lean payload (tech-stack + catalog injected; architecture
+  self-pull).
 - `specs/memory/product/index.html` — add `memory-context-enforcement` to the feature
   catalog if a new feature entry for the injection subsystem is warranted; reorder if
   catalog relevance changed.
@@ -509,8 +518,14 @@ At CLOSURE of this release, the following memory atoms must be updated:
   feature list changes introduced at CLOSURE.
 - `specs/memory/tech-stack.html` — note: Python `html.parser` (stdlib) now used for
   memory HTML stripping; no new PyPI dependency (update if different from current state).
-- `specs/memory/AGENTS.md` — created as part of C-4 (not updated at CLOSURE; it is the
-  deliverable itself).
+- `specs/memory/AGENTS.md` — created as part of C-4. Its **read-contract section is finalized
+  at CLOSURE by product-engineer** to reflect the D-5 lean injection (tech-stack + catalog
+  injected; architecture self-pull). It cannot be edited during IMPLEMENTATION because the
+  SDD gate RULE A write-locks `specs/memory/*.md` to product-engineer-in-CLOSURE — by design:
+  `AGENTS.md` is governed memory-directory content. (The doctor SPEC-DOC-002L correctly exempts
+  it from the HTML-only atom rule; these two treatments are consistent, not contradictory.)
+  The as-shipped C-4 draft lists the full canonical read order, which remains valid — CLOSURE
+  only adds the lean-injection mechanism detail.
 
 Files that need no CLOSURE update (unchanged by this release):
 - All `specs/memory/product/<feature>.html` atoms (feature descriptions are not changed).
@@ -597,7 +612,7 @@ mirrored in `ctx-inject.sh` for Claude Code. devops-engineer must confirm at imp
 time. If `UserPromptSubmit` fires only once per session (session-start behaviour), no guard
 is needed for Claude Code.
 
-**Impact if wrong:** Without a guard, the 7.3K payload is paid on every message in a
+**Impact if wrong:** Without a guard, the ~5K payload is paid on every message in a
 multi-turn Claude Code session, increasing token cost by ~10x for long sessions. Acceptable
 as a Phase-1 interim; the guard should be added if Claude Code behaviour is confirmed
 multi-turn.
@@ -653,7 +668,7 @@ any active implementer sessions to re-start their session to pick up the fresh i
 
 - AC-COVER-1: All 21 agent persona files contain a Step 0 memory bootstrap block. `grep -l "Step 0" dadaia_workspace/public/agents/*.md | wc -l` = `21`.
 - AC-COVER-2: All 5 P0 agents have `dadaia-workspace-spec-navigator` in frontmatter `skills:`. Zero fully-blind agents remain.
-- AC-COVER-3: `ctx-inject.sh` emits the memory payload (arch + tech-stack + catalog) when `DADAIA_CONTEXT` is set and `specs/memory/` exists.
+- AC-COVER-3: `ctx-inject.sh` emits the memory payload (tech-stack + catalog; architecture self-pull per D-5) when `DADAIA_CONTEXT` is set and `specs/memory/` exists.
 - AC-COVER-4: `catalog.json` exists, is valid JSON, and all slugs map to existing feature HTML files.
 - AC-COVER-5: `dadaia specs doctor` CAT-1 check passes (catalog slugs ↔ feature files in sync) for this repo.
 - AC-COVER-6: `specs/memory/AGENTS.md` exists (closes TREE-5 `specs doctor` warning).
@@ -663,13 +678,13 @@ any active implementer sessions to re-start their session to pick up the fresh i
 ### 13.2 Runtime parity (all three runtimes covered)
 
 - AC-RT-1: Claude Code — injection fires on session start; memory payload present in agent context.
-- AC-RT-2: OpenCode — injection fires on first message only; subsequent messages do not re-pay the 7.3K cost.
+- AC-RT-2: OpenCode — injection fires on first message only; subsequent messages do not re-pay the ~5K cost.
 - AC-RT-3: Codex — `memory-ctx` adapter executes on session start per Step 0 instruction.
 
 ### 13.3 Token cost validation
 
-- AC-TOK-1: Injected payload size (catalog.json present, 18 features) measured between 6,500 and 8,500 tokens.
-- AC-TOK-2: Cost at Sonnet pricing ($3/MTok): ≤ $0.026 per session-start invocation.
+- AC-TOK-1: Injected payload size (tech-stack + catalog; architecture NOT injected per D-5; catalog.json present, 18 features) measured between 3,500 and 6,000 tokens.
+- AC-TOK-2: Cost at Sonnet pricing ($3/MTok): ≤ $0.018 per session-start invocation.
 
 ### 13.4 `specs doctor` health
 

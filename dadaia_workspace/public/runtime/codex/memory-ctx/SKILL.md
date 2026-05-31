@@ -1,13 +1,13 @@
 ---
 name: memory-ctx
-description: Universal Codex memory bootstrap adapter. Fires before all role-specific adapters (design-ctx, frontend-ctx). Injects architecture, tech-stack, and feature catalog into every Codex session.
+description: Universal Codex memory bootstrap adapter. Fires before all role-specific adapters (design-ctx, frontend-ctx). Injects tech-stack and feature catalog into every Codex session.
 ---
 
 # memory-ctx — Universal Memory Bootstrap Adapter (Codex)
 
 Inject the workspace memory context at the start of every Codex session — regardless of
-the active agent role — providing architecture rules, tech-stack constraints, and the
-feature catalog before any work begins.
+the active agent role — providing tech-stack constraints and the feature catalog before
+any work begins.
 
 This adapter fires **before** role-specific adapters (`design-ctx`, `frontend-ctx`).
 Those adapters add role-specific context (release, task, reports). This adapter provides
@@ -21,9 +21,11 @@ The equivalent of `ctx-inject.sh`'s memory bootstrap payload for Claude Code and
 OpenCode sessions — delivered here for Codex sessions where the hook does not fire.
 Every Codex session receives:
 
-1. Architecture rules and agent topology (`architecture.html`)
-2. Approved toolchain and constraints (`tech-stack.html`)
-3. Feature catalog for task-scoped self-pull (`catalog.json` or `product/index.html`)
+1. Approved toolchain and constraints (`tech-stack.html`)
+2. Feature catalog for task-scoped self-pull (`catalog.json` or `product/index.html`)
+
+Architecture (`architecture.html`) is **not** injected here — it is large (~7.5K tokens)
+and agents self-pull it before any architectural, cross-layer, or design decision.
 
 It supplements the canonical agent persona — it does NOT duplicate it.
 
@@ -49,22 +51,11 @@ OR
 Read: .dadaia/states/primary_context.json → extract: specs_dir
 ```
 
-### Step 2 — Read and strip `architecture.html`
+### Step 2 — Read and strip `tech-stack.html`
 
-Read `<specs_dir>/memory/architecture.html`. Strip boilerplate before use:
+Read `<specs_dir>/memory/tech-stack.html`. Strip boilerplate before use:
 remove `<head>`, `<style>`, and Mermaid `<script>` blocks. Preserve all prose,
-heading, ADR, and diagram content.
-
-```
-Read: <specs_dir>/memory/architecture.html
-Strip: <head>, <style>, <script> (Mermaid) blocks
-```
-
-If the file is absent, record `[architecture.html not found]` and continue.
-
-### Step 3 — Read and strip `tech-stack.html`
-
-Read `<specs_dir>/memory/tech-stack.html`. Apply the same strip as Step 2.
+heading, and constraint content.
 
 ```
 Read: <specs_dir>/memory/tech-stack.html
@@ -73,7 +64,7 @@ Strip: <head>, <style>, <script> (Mermaid) blocks
 
 If the file is absent, record `[tech-stack.html not found]` and continue.
 
-### Step 4 — Read feature catalog
+### Step 3 — Read feature catalog
 
 Check whether `<specs_dir>/memory/product/catalog.json` exists.
 
@@ -90,14 +81,12 @@ OR fallback:
 Read: <specs_dir>/memory/product/index.html     (stripped, if catalog.json absent)
 ```
 
-### Step 5 — Emit memory context block
+### Step 4 — Emit memory context block
 
 Emit the following context block before any role-specific adapter runs or any work begins:
 
 ```
-=== workspace memory (arch + tech + catalog) ===
-[stripped architecture.html content]
-
+=== workspace memory (tech + catalog) ===
 [stripped tech-stack.html content]
 
 [catalog.json content OR stripped product/index.html content]
@@ -107,6 +96,18 @@ Emit the following context block before any role-specific adapter runs or any wo
 After emitting this block, proceed to any role-specific adapter (`design-ctx`,
 `frontend-ctx`, etc.) and then to the active task.
 
+### Step 5 — Self-pull architecture before architectural work
+
+Before any architectural, cross-layer, or design decision, self-pull:
+
+```
+Read: <specs_dir>/memory/architecture.html
+Strip: <head>, <style>, <script> (Mermaid) blocks
+```
+
+Architecture is NOT part of the bootstrap payload (it is large). Pull it on demand,
+not at session start.
+
 ---
 
 ## Guardrails
@@ -115,9 +116,10 @@ After emitting this block, proceed to any role-specific adapter (`design-ctx`,
 |------|--------|
 | Universal execution | This adapter runs for every Codex session, every agent role, without exception. |
 | Fires first | Execute this adapter before `design-ctx`, `frontend-ctx`, or any other role adapter. |
-| Read-only | No Write, Edit, or Bash calls beyond the four read operations above during context gathering. |
+| Read-only | No Write, Edit, or Bash calls beyond the read operations above during context gathering. |
 | No persona duplication | This adapter supplements the canonical agent persona — it does not replace or restate it. |
 | Graceful degradation | If a memory file is missing, record the absence and continue — do not block the session. |
+| Architecture is self-pull | Never inject architecture.html as part of bootstrap. Self-pull it only when making architectural or cross-layer decisions. |
 | Self-pull responsibility | Use the catalog to identify relevant features; self-pull only 1-3 `product/<slug>.html` files for your specific task to avoid context overload. |
 
 ---

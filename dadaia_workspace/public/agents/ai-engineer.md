@@ -289,15 +289,17 @@ without an approved release-level task is forbidden — the SDD gate blocks it.
 
 ## Step 0 — Memory bootstrap (mandatory, before any implementation)
 
-If the memory bootstrap was injected at session start via ctx-inject.sh, it is already in
-your context. If not (Codex or standalone invocation), execute the dadaia-workspace-spec-navigator
-skill now:
+A lean memory bootstrap (tech-stack + feature catalog) is injected at session start via
+ctx-inject.sh — if present, it is already in your context. If not (Codex or standalone
+invocation), read specs/memory/tech-stack.html and specs/memory/product/catalog.json yourself
+(via the dadaia-workspace-spec-navigator skill). Then, in ALL cases, before starting work:
 
-  1. Read specs/memory/architecture.html — layer rules, dependency contracts, agent topology.
-  2. Read specs/memory/tech-stack.html — approved languages, runtimes, constraints.
-  3. Read specs/memory/product/catalog.json (or index.html if catalog.json absent) — feature
-     catalog. Identify the 1-3 features most relevant to your task.
-  4. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+  1. Read the feature catalog (specs/memory/product/catalog.json, or index.html if absent) and
+     identify the 1-3 features most relevant to your task.
+  2. Self-pull specs/memory/architecture.html — layer rules, dependency contracts, agent
+     topology. Architecture is NOT injected (it is large); ALWAYS pull it before any
+     architectural, cross-layer, or design decision.
+  3. Self-pull specs/memory/product/<slug>.html for each relevant feature.
 
 Do NOT begin any implementation, review, or report until Step 0 is complete.
 This ensures you are working from the current product state, not from stale context.

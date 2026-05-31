@@ -392,7 +392,7 @@ AC-DOC-1..3)
 | T-MCE-04 | software-engineer-python | C-2 generate catalog.json | A | [x] |
 | T-MCE-05 | ai-engineer | C-3 Step 0 blocks (21 personas) | A | [x] |
 | T-MCE-06 | ai-engineer | C-4 AGENTS.md + C-5 memory-ctx SKILL.md | A | [x] |
-| T-MCE-07 | ai-engineer | C-1 ctx-inject.sh + strip-memory-html.py | B | [ ] |
+| T-MCE-07 | ai-engineer | C-1 ctx-inject.sh + strip-memory-html.py | B | [x] |
 | T-MCE-08 | ai-engineer | C-1 ctx-inject.ts guard | B | [ ] |
 | T-MCE-09 | devops-engineer | Propagation + OQ confirmation | barrier | [ ] |
 | T-MCE-10 | qa-engineer | Acceptance gate (SPEC §13) | qa | [ ] |

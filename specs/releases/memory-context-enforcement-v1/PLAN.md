@@ -52,13 +52,15 @@ at the end of Wave B.
 
 `ctx-inject.sh` currently resolves context name (~5 tokens) and exits. The extension
 adds a second phase: after printing the context name, the script reads
-`$SPECS_DIR/memory/architecture.html`, `$SPECS_DIR/memory/tech-stack.html`, and
-`$SPECS_DIR/memory/product/catalog.json` (falling back to
-`$SPECS_DIR/memory/product/index.html` when catalog is absent), strips each HTML file
-via `strip-memory-html.py`, and emits the results inside bounded markers:
+`$SPECS_DIR/memory/tech-stack.html` and `$SPECS_DIR/memory/product/catalog.json`
+(falling back to `$SPECS_DIR/memory/product/index.html` when catalog is absent), strips
+the HTML via `strip-memory-html.py`, and emits the results inside bounded markers. Per
+operator decision **D-5**, `architecture.html` is NOT injected (it is ~7.5K tokens of
+prose/diagrams that barely strips); it is self-pulled by the agent before architectural
+work, exactly like feature atoms. Lean payload ≈ 5K tokens.
 
 ```
-=== workspace memory (arch + tech + catalog) ===
+=== workspace memory (tech + catalog) ===
 ...
 === end memory bootstrap ===
 ```
@@ -236,7 +238,7 @@ Wave B makes the dependency explicit and avoids partial integration tests.
 |------|-----------|--------|-----------|
 | `doctor.py` shared surface (CAT-1 vs LOCK-1..6 vs TREE-1..7) | Low | Medium — merge conflict if another release touches the same method | CAT-1 uses a unique check ID with no overlap. software-engineer-python must confirm no in-flight branch modifies `doctor.py` before committing; additive check at the end of the function |
 | OpenCode first-message guard token-blowup (OQ-1/OQ-2) | Medium | High — 10x token cost on long sessions if guard fails | Sentinel-file approach is simple and reliable; devops-engineer verifies in acceptance |
-| Claude Code `UserPromptSubmit` per-message (OQ-1) | Medium | Medium — 7.3K overhead per turn in long sessions | Guard implemented in `ctx-inject.sh` as working assumption; accepted Phase-1 cost if single-fire confirmed |
+| Claude Code `UserPromptSubmit` per-message (OQ-1) | Medium | Medium — ~5K overhead per turn in long sessions | Guard implemented in `ctx-inject.sh` as working assumption; accepted Phase-1 cost if single-fire confirmed |
 | `catalog.json` absent on consumer repos (fallback) | High (expected for Phase 1 consumers) | Low — graceful fallback to `product/index.html` already specified in C-1 | Fallback is a first-class requirement (AC-C1-4); consumers are unblocked |
 | 21-file persona edit produces 1 missed file | Medium | Medium — AC-C3-5 (`grep wc -l = 21`) would fail | Acceptance check is machine-verifiable; qa-engineer catches any miss before QA gate passes |
 
