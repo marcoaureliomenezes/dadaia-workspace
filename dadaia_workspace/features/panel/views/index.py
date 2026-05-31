@@ -72,6 +72,7 @@ def render_index(
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
   <link rel="stylesheet" href="/static/reports.css">
+  <link rel="stylesheet" href="/static/kanban.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -102,6 +103,7 @@ def render_index(
     <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
+    <button class="nav-tab" data-section="kanban" aria-selected="false" role="tab" id="tab-kanban">Kanban</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
   </nav>
   <main class="main" role="main">
@@ -140,6 +142,16 @@ def render_index(
 
     {sessions_section}
 
+    <section id="section-kanban" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-kanban">
+      <header class="section-header">
+        <h2>Kanban</h2>
+        <p class="section-meta">Multi-agent workflow state — one swimlane per Spec Context Project.</p>
+        <span id="kanban-last-updated" class="kanban-last-updated" aria-live="polite" data-testid="kanban-last-updated"></span>
+      </header>
+      <div id="kanban-board" class="kanban-board" aria-label="Kanban board" aria-live="polite">
+      </div>
+    </section>
+
     {reports_section}
 
   </main>
@@ -151,6 +163,7 @@ def render_index(
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>
+  <script src="/static/kanban.js"></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))

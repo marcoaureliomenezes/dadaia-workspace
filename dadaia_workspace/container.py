@@ -30,6 +30,7 @@ from dadaia_workspace.features.panel.views.api import (
     serve_report_file,
 )
 from dadaia_workspace.features.panel.views.index import render_index
+from dadaia_workspace.features.panel.views.kanban import render_api_kanban
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
@@ -270,6 +271,7 @@ def build_panel_views(
         "api_panel_status": render_api_servers(service),
         "health": render_health(),
         "api_contexts": render_api_contexts(service),
+        "api_kanban": render_api_kanban(workspace_root),
         "api_academy": render_api_academy(service),
         "api_reports": render_api_reports(service),
         "reports_serve": serve_report_file(service),

@@ -66,6 +66,7 @@ _NOT_FOUND_BODY = (
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
     b"/api/workflows /api/workflows/<name> /api/workflows/<name>/run "
     b"/api/sessions /api/sessions/<runtime>/<session_id> "
+    b"/api/kanban "
     b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
@@ -127,6 +128,7 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete"),
     (r"^/api/reports$", "api_reports"),
     (r"^/api/contexts$", "api_contexts"),
+    (r"^/api/kanban$", "api_kanban"),
     (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory"),
     (r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$", "memory_view"),
     # /reports/<path>: public route — serves HTML report files directly.
@@ -143,6 +145,7 @@ _BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
     {
         "api_academy",
         "api_agent_prompt",
+        "api_kanban",
         "api_report_delete",
         "api_reports",
         "api_workflows",
@@ -152,6 +155,9 @@ _BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
 )
 
 _POST_WORKFLOW_RUN_RE = re.compile(r"^/api/workflows/(?P<workflow_name>[^/]+)/run$")
+
+# Routes that are GET-only and must return 405 Method Not Allowed on POST.
+_GET_ONLY_API_ROUTES_RE = re.compile(r"^/api/kanban$")
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +266,7 @@ def make_handler_class(
         "api_agents",
         "api_agent_prompt",
         "api_agent_sessions",
+        "api_kanban",
         "api_report_delete",
         "api_reports",
         "api_workflows",
@@ -378,6 +385,15 @@ def make_handler_class(
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
 
+            # Return 405 for GET-only API routes.
+            if _GET_ONLY_API_ROUTES_RE.match(path):
+                self._respond(
+                    405,
+                    "application/json",
+                    b'{"error": "method not allowed"}',
+                )
+                return
+
             m = _POST_WORKFLOW_RUN_RE.match(path)
             if m is not None:
                 auth_header = self.headers.get("Authorization")
@@ -427,6 +443,14 @@ def make_handler_class(
                     # T-P5-25: academy course list (bearer-only, no telemetry needed).
                     if "api_academy" in views:
                         status, content_type, body = views["api_academy"]()
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+                elif route_name == "api_kanban":
+                    # K-1: Kanban board (bearer-only, no telemetry needed).
+                    if "api_kanban" in views:
+                        status, content_type, body = views["api_kanban"]()
                         self._respond(status, content_type, body)
                     else:
                         self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
