@@ -65,7 +65,7 @@
   CDN script tag; double-render produces byte-identical output; `dadaia memory render
   <path.yaml>` exits 0 and writes adjacent `.html`; use `yaml.safe_load` throughout.
 - **Parallelism:** disjoint from T-MSS-04, T-MSS-05, T-MSS-06, T-MSS-07.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ### T-MSS-04a — Doctor STRUCT-1..STRUCT-4 checks (schema validation of YAML atoms)
 - **Owner:** software-engineer-python
@@ -97,7 +97,7 @@
   confirmed no collision with R2 session-locks RULE E (already shipped); `dadaia public
   stage && dadaia public install --target all` run; `dadaia public doctor` exits 0.
 - **Parallelism:** disjoint from T-MSS-03, T-MSS-04a, T-MSS-06, T-MSS-07.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ### T-MSS-06 — Scaffold flip HTML→YAML stubs (C-5)
 - **Owner:** ai-engineer (scaffold authoring) + software-architect (YAML stub validation)
@@ -230,10 +230,10 @@
 |---------|-------|---------|------|--------|
 | T-MSS-01 | se-python | dep | W1 | `[x]` |
 | T-MSS-02 | sw-arch + se-python | C-1 | W1 | `[x]` |
-| T-MSS-03 | se-python | C-2 | W2 | `[ ]` |
+| T-MSS-03 | se-python | C-2 | W2 | `[x]` |
 | T-MSS-04a | se-python | C-3 STRUCT | W2 | `[ ]` |
 | T-MSS-04b | se-python | C-3 SYNC-1 | W2 cont | `[ ]` |
-| T-MSS-05 | ai-engineer | C-4 | W2 | `[ ]` |
+| T-MSS-05 | ai-engineer | C-4 | W2 | `[x]` |
 | T-MSS-06 | ai-engineer + sw-arch | C-5 | W2 | `[ ]` |
 | T-MSS-07 | se-python | C-7 | W2 | `[ ]` |
 | T-MSS-08 | devops-engineer | propagation | W3 | `[ ]` |

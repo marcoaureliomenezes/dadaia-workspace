@@ -99,7 +99,8 @@ fi
 # v3.2: derive specs_dir from FPATH, not primary_context — fixes cross-repo
 # false-positives when primary context is a different repo in a non-CLOSURE phase.
 case "$FPATH" in
-    */specs/memory/*.html|*/specs/memory/*.md|*/specs/memory/product/*.html|*/specs/memory/product/*.md)
+    */specs/memory/*.html|*/specs/memory/*.md|*/specs/memory/*.yaml|*/specs/memory/*.yml|\
+    */specs/memory/product/*.html|*/specs/memory/product/*.md|*/specs/memory/product/*.yaml|*/specs/memory/product/*.yml)
         FILE_SPECS_DIR="$(echo "$FPATH" | sed -E 's|/specs/.*||')/specs"
         FILE_ACTIVE_RELEASE=$(grep -E '^release:' "$FILE_SPECS_DIR/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')
         FILE_ACTIVE_PHASE=$(grep -E '^phase:' "$FILE_SPECS_DIR/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//')
