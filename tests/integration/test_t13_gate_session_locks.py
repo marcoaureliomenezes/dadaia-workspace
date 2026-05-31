@@ -53,9 +53,7 @@ def _make_active_release(specs_dir: Path, release_id: str, tasks_marker: str = "
     (specs_dir / "releases" / "ACTIVE.md").write_text(
         f"release: {release_id}\nphase: IMPLEMENTATION\n"
     )
-    (rel_dir / "TASKS.md").write_text(
-        f"# Tasks\n\n- {tasks_marker} T-001 — work in progress\n"
-    )
+    (rel_dir / "TASKS.md").write_text(f"# Tasks\n\n- {tasks_marker} T-001 — work in progress\n")
     return rel_dir
 
 
@@ -135,9 +133,7 @@ def _run_gate(
     extra_env: dict | None = None,
 ) -> subprocess.CompletedProcess:  # type: ignore[type-arg]
     """Run sdd-spec-gate.sh with the given target file write payload."""
-    payload = json.dumps(
-        {"tool_name": "Write", "tool_input": {"file_path": str(target_file)}}
-    )
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
     env = {**os.environ, "WORKSPACE_ROOT": str(workspace)}
     if session_id is not None:
         env["DADAIA_SESSION_ID"] = session_id
@@ -233,9 +229,7 @@ def test_ac_t13_1_fail_open_no_session_id_explicit(workspace: Path) -> None:
 
     # Non-production path → gate exits 0 regardless
     target_file = workspace / "repos" / slug / "src" / "app.py"
-    payload = json.dumps(
-        {"tool_name": "Write", "tool_input": {"file_path": str(target_file)}}
-    )
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
     log_file = workspace / ".dadaia" / "sdd-gate-test.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
     env = {
@@ -387,9 +381,7 @@ def test_ac_t13_5_spec_mode_blocks_spec_md_when_impl_lock_held(workspace: Path) 
     result = _run_gate(scripts, workspace, target_file, session_id=spec_sess_id)
     assert result.returncode == 0
     data = json.loads(result.stdout)
-    assert data["decision"] == "block", (
-        f"Expected BLOCK (R-9) but got: {result.stdout!r}"
-    )
+    assert data["decision"] == "block", f"Expected BLOCK (R-9) but got: {result.stdout!r}"
     assert "RULE E" in data["reason"]
     assert "R-9" in data["reason"] or "implementation lock" in data["reason"].lower()
 
@@ -414,9 +406,7 @@ def test_ac_t13_5_spec_mode_blocks_plan_md_when_impl_lock_held(workspace: Path) 
     result = _run_gate(scripts, workspace, target_file, session_id=spec_sess_id)
     assert result.returncode == 0
     data = json.loads(result.stdout)
-    assert data["decision"] == "block", (
-        f"Expected BLOCK (R-9 PLAN.md) but got: {result.stdout!r}"
-    )
+    assert data["decision"] == "block", f"Expected BLOCK (R-9 PLAN.md) but got: {result.stdout!r}"
     assert "RULE E" in data["reason"]
 
 
@@ -530,7 +520,9 @@ def test_ac_t13_5_no_session_spec_md_allowed(workspace: Path) -> None:
     )
 
 
-def test_ac_t13_5_spec_mode_blocks_spec_in_production_path_when_impl_lock_held(workspace: Path) -> None:
+def test_ac_t13_5_spec_mode_blocks_spec_in_production_path_when_impl_lock_held(
+    workspace: Path,
+) -> None:
     """AC-T13-5 (production variant): SPEC-mode cannot write a production file when impl lock HELD."""
     scripts = _install_scripts(workspace)
     slug = "my-proj"
@@ -598,9 +590,7 @@ def test_ac_t13_6_read_mode_blocks_memory_write(workspace: Path) -> None:
 
     # specs/memory/ path — READ mode should be blocked by RULE E step 4b
     target_file = workspace / "repos" / slug / "specs" / "memory" / "architecture.html"
-    payload = json.dumps(
-        {"tool_name": "Write", "tool_input": {"file_path": str(target_file)}}
-    )
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
     log_file = workspace / ".dadaia" / "sdd-gate-test.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
     env = {
@@ -622,7 +612,9 @@ def test_ac_t13_6_read_mode_blocks_memory_write(workspace: Path) -> None:
     # (it uses the file's own ACTIVE.md phase, not the session mode).
     # If RULE A blocks (phase != CLOSURE), we get an SDD GATE block — that's acceptable.
     # If RULE E would fire, it also blocks. Either block is correct behavior for READ mode.
-    assert result.stdout != "" or "block" in result.stdout  # any block OR silent (non-production path)
+    assert (
+        result.stdout != "" or "block" in result.stdout
+    )  # any block OR silent (non-production path)
 
 
 def test_ac_t13_6_read_mode_allows_reports_write(workspace: Path) -> None:
@@ -637,10 +629,10 @@ def test_ac_t13_6_read_mode_allows_reports_write(workspace: Path) -> None:
     _make_session_file(workspace, read_sess_id, mode="READ", context=slug, release="my-release-v1")
 
     # .dadaia/reports/ is always allowed (step 4a)
-    target_file = workspace / ".dadaia" / "reports" / "dadaia-workspace" / "qa-engineer" / "report.html"
-    payload = json.dumps(
-        {"tool_name": "Write", "tool_input": {"file_path": str(target_file)}}
+    target_file = (
+        workspace / ".dadaia" / "reports" / "dadaia-workspace" / "qa-engineer" / "report.html"
     )
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
     log_file = workspace / ".dadaia" / "sdd-gate-test.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
     env = {
@@ -683,17 +675,13 @@ def test_ac_t13_7_impl_mode_resolves_release_from_lock_not_active_md(workspace: 
     (specs / "releases" / "ACTIVE.md").write_text(
         "release: stale-release-v1\nphase: IMPLEMENTATION\n"
     )
-    (stale_rel_dir / "TASKS.md").write_text(
-        "# Tasks\n\n- [ ] T-001 — not started\n"
-    )
+    (stale_rel_dir / "TASKS.md").write_text("# Tasks\n\n- [ ] T-001 — not started\n")
 
     # Lock release has a [-] task
     lock_release_id = "lock-release-v1"
     lock_rel_dir = specs / "releases" / lock_release_id
     lock_rel_dir.mkdir(parents=True, exist_ok=True)
-    (lock_rel_dir / "TASKS.md").write_text(
-        "# Tasks\n\n- [-] T-002 — in progress\n"
-    )
+    (lock_rel_dir / "TASKS.md").write_text("# Tasks\n\n- [-] T-002 — in progress\n")
 
     _make_primary_context(workspace, slug, specs)
 

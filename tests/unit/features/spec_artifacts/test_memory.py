@@ -24,17 +24,11 @@ from dadaia_workspace.features.specs.renderer import validate_atom
 
 # ── templates directory for rendering ─────────────────────────────────────────
 _TEMPLATES_DIR = (
-    Path(__file__).parent.parent.parent.parent.parent
-    / "dadaia_workspace"
-    / "public"
-    / "templates"
+    Path(__file__).parent.parent.parent.parent.parent / "dadaia_workspace" / "public" / "templates"
 )
 
 _SCAFFOLD_DIR = (
-    Path(__file__).parent.parent.parent.parent.parent
-    / "dadaia_workspace"
-    / "public"
-    / "scaffold"
+    Path(__file__).parent.parent.parent.parent.parent / "dadaia_workspace" / "public" / "scaffold"
 )
 
 
@@ -51,9 +45,7 @@ class TestScaffoldIndexHtml:
     def test_scaffold_product_index_yaml_exists(self) -> None:
         """AC-C5-3 / T-MSS-06: index.yaml must exist in the scaffold (replaces index.html)."""
         index = _SCAFFOLD_DIR / "memory" / "product" / "index.yaml"
-        assert index.is_file(), (
-            "scaffold/memory/product/index.yaml must exist (AC-C5-3 / T-MSS-06)"
-        )
+        assert index.is_file(), "scaffold/memory/product/index.yaml must exist (AC-C5-3 / T-MSS-06)"
 
     def test_scaffold_product_index_html_removed(self) -> None:
         """AC-C5-4 / T-MSS-06: old index.html scaffold file must be removed (REPLACE is complete)."""
@@ -88,9 +80,7 @@ class TestScaffoldIndexHtml:
         content = index.read_text(encoding="utf-8")
         assert "<!DOCTYPE html>" in content or "<!doctype html>" in content.lower()
         assert "<html" in content
-        assert 'id="catalog"' in content, (
-            "index.html must contain <section id='catalog'> (AC-T3-1)"
-        )
+        assert 'id="catalog"' in content, "index.html must contain <section id='catalog'> (AC-T3-1)"
 
     def test_scaffold_index_rendered_html_has_placeholder_entry(self, tmp_path: Path) -> None:
         """T-MSS-06: scaffolded index.html has the placeholder catalog entry from the YAML stub.
@@ -193,10 +183,12 @@ class TestMemoryProductAdd:
         assert "payments.html" in index_content_2
         # The catalog section content must be identical
         import re
+
         def extract_catalog(html: str) -> str:
             m = re.search(r'<section id="catalog">(.*?)</section>', html, re.DOTALL)
             assert m, "catalog section not found"
             return m.group(1).strip()
+
         assert extract_catalog(index_content_1) == extract_catalog(index_content_2), (
             "Catalog section must be identical after idempotent re-run (AC-T3-3)"
         )
@@ -216,9 +208,7 @@ class TestMemoryProductAdd:
         pos_alpha = content.index("alpha.html")
         pos_middle = content.index("middle.html")
         pos_zebra = content.index("zebra.html")
-        assert pos_alpha < pos_middle < pos_zebra, (
-            "Catalog entries must be in lexicographic order"
-        )
+        assert pos_alpha < pos_middle < pos_zebra, "Catalog entries must be in lexicographic order"
 
     def test_invalid_slug_raises_value_error(self, tmp_path: Path) -> None:
         """Invalid slug must raise ValueError."""

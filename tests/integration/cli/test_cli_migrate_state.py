@@ -118,7 +118,11 @@ def test_migrate_on_v2_workspace_is_noop(workspace: Path) -> None:
     """Migrating a v2 workspace must report nothing to do and exit 0."""
     result = _runner.invoke(app, ["migrate", "--yes"])
     assert result.exit_code == 0, result.output
-    assert "schema_version 2" in result.output or "nothing to do" in result.output.lower() or "already" in result.output.lower()
+    assert (
+        "schema_version 2" in result.output
+        or "nothing to do" in result.output.lower()
+        or "already" in result.output.lower()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -134,9 +138,7 @@ def test_tree_v2_subcommand_still_works(tmp_path: Path) -> None:
     foundation.mkdir()
     (foundation / "SPEC.md").write_text("# Foundation\n")
 
-    result = _runner.invoke(
-        app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--dry-run"]
-    )
+    result = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--dry-run"])
     assert result.exit_code == 0, result.output
     assert "MOVE" in result.output
     # Filesystem unchanged

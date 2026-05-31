@@ -235,8 +235,7 @@ def tree_v2(
         typer.echo(f"[skip]   {msg}")
 
     typer.echo(
-        f"[ok] Migration complete. "
-        f"{len(result.moved)} move(s), {len(result.skipped)} skip(s)."
+        f"[ok] Migration complete. {len(result.moved)} move(s), {len(result.skipped)} skip(s)."
     )
 
 

@@ -56,7 +56,9 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 
 @product_app.command("add")
 def product_add(
-    slug: str = typer.Argument(..., help="Feature slug (e.g. payments). Must match ^[a-z][a-z0-9-]+$."),
+    slug: str = typer.Argument(
+        ..., help="Feature slug (e.g. payments). Must match ^[a-z][a-z0-9-]+$."
+    ),
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
@@ -95,7 +97,9 @@ def product_add(
     action = "created" if result.created_feature else "already exists"
     typer.echo(f"[ok] feature HTML ({action}): {result.feature_html}")
     typer.echo(f"[ok] index regenerated: {result.index_html}")
-    typer.echo(f"     catalog entries ({len(result.slug_entries)}): {', '.join(result.slug_entries)}")
+    typer.echo(
+        f"     catalog entries ({len(result.slug_entries)}): {', '.join(result.slug_entries)}"
+    )
 
 
 @app.command("render")

@@ -391,16 +391,14 @@ def has_implementation_lock(workspace_root: Path, context_name: str) -> bool:
         if f.is_file() and f.name.startswith(prefix):
             # Extract release from filename: <context>__<release>.json
             stem = f.stem  # e.g. "proj__v1"
-            release = stem[len(prefix):]
+            release = stem[len(prefix) :]
             state = check_lock_state(workspace_root, context_name, release)
             if state == LockState.HELD:
                 return True
     return False
 
 
-def find_review_sessions(
-    workspace_root: Path, context_name: str, release: str
-) -> list[str]:
+def find_review_sessions(workspace_root: Path, context_name: str, release: str) -> list[str]:
     """Return session IDs of non-stale BOUND_REVIEW sessions for context/release."""
     sessions_dir = workspace_root / ".dadaia" / "sessions"
     if not sessions_dir.exists():

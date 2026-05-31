@@ -60,9 +60,7 @@ def _build_catalog_items(feature_slugs: list[str]) -> str:
     """Return the HTML ``<ol class='catalog'>`` inner items for the given slugs."""
     lines: list[str] = []
     for slug in sorted(feature_slugs):
-        lines.append(
-            f'    <li><a href="{slug}.html">{slug}</a></li>'
-        )
+        lines.append(f'    <li><a href="{slug}.html">{slug}</a></li>')
     return "\n".join(lines)
 
 
@@ -160,11 +158,7 @@ def memory_product_add(
         created_feature = True
 
     # Collect all feature slugs (any *.html except index.html)
-    feature_slugs = sorted(
-        p.stem
-        for p in product_dir.glob("*.html")
-        if p.name != "index.html"
-    )
+    feature_slugs = sorted(p.stem for p in product_dir.glob("*.html") if p.name != "index.html")
 
     index_path = _regenerate_index(product_dir, feature_slugs, tdl, project_name)
 

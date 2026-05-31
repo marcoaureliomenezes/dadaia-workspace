@@ -215,9 +215,7 @@ class TestBugNew:
 
         bug_new(specs, "login-crash")
         content = (specs / "bugs" / "login-crash.md").read_text(encoding="utf-8")
-        assert "session_id: null" in content, (
-            "Bug file must contain session_id: null (AC-T7-4)"
-        )
+        assert "session_id: null" in content, "Bug file must contain session_id: null (AC-T7-4)"
 
     def test_bug_md_contains_frontmatter(self, tmp_path: Path) -> None:
         """Bug report must contain required frontmatter fields."""
@@ -257,7 +255,9 @@ class TestBugNew:
         with pytest.raises(ValueError, match=r"Invalid slug"):
             bug_new(specs, "UPPERCASE")
 
-    def test_no_session_id_env_var_does_not_block(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_session_id_env_var_does_not_block(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """AC-T7-4: R1 spec — bug_new does NOT block when DADAIA_SESSION_ID is absent."""
         monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
         specs = tmp_path / "specs"

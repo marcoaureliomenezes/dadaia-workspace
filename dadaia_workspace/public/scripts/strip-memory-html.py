@@ -5,12 +5,28 @@ Usage: python3 strip-memory-html.py <file.html>
 Output: stripped HTML on stdout (prose, headings, tables, mermaid blocks preserved).
 Exit 1 silently if file is missing or unreadable.
 """
+
 import sys
 from html.parser import HTMLParser
 
 # HTML void elements (no closing tag) — do not track depth for these.
 _VOID = frozenset(
-    ["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]
+    [
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    ]
 )
 # Block-level containers to skip entirely (tag + all descendants).
 _SKIP_CONTAINERS = frozenset(["head", "style"])
@@ -55,7 +71,7 @@ class MemoryHtmlStripper(HTMLParser):
             parts = []
             for name, val in attrs:
                 parts.append(name if val is None else f'{name}="{val}"')
-            self.output.append(f'<{tag} {" ".join(parts)}>')
+            self.output.append(f"<{tag} {' '.join(parts)}>")
         else:
             self.output.append(f"<{tag}>")
 

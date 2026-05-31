@@ -106,9 +106,7 @@ def doctor(
     issues = doctor_svc.check()
 
     # Always surface TREE-1/TREE-2 migration hints (even under --fix).
-    migration_issues = [
-        i for i in issues if i.code in ("TREE-1", "TREE-2")
-    ]
+    migration_issues = [i for i in issues if i.code in ("TREE-1", "TREE-2")]
     if migration_issues:
         for mi in migration_issues:
             typer.echo(f"[MIGRATION] {mi.description}", err=True)

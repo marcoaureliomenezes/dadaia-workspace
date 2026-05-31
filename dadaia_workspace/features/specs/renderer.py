@@ -73,6 +73,7 @@ def _derive_project_name(yaml_path: Path) -> str | None:
             return parent.parent.name
     return None
 
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -143,9 +144,7 @@ def _infer_atom_type(yaml_path: Path) -> str:
 
     raise ValueError(
         f"Cannot infer atom type from path: {yaml_path}. "
-        "Pass atom_type explicitly (one of: "
-        + ", ".join(_SCHEMA_FILENAMES.keys())
-        + ")."
+        "Pass atom_type explicitly (one of: " + ", ".join(_SCHEMA_FILENAMES.keys()) + ")."
     )
 
 
@@ -162,8 +161,7 @@ def _load_schema(atom_type: str) -> dict[str, Any]:
         filename = _SCHEMA_FILENAMES.get(atom_type)
         if filename is None:
             raise ValueError(
-                f"Unknown atom_type: {atom_type!r}. "
-                f"Valid types: {list(_SCHEMA_FILENAMES.keys())}"
+                f"Unknown atom_type: {atom_type!r}. Valid types: {list(_SCHEMA_FILENAMES.keys())}"
             )
         schema_path = _SCHEMAS_DIR / filename
         try:
@@ -206,9 +204,7 @@ def _build_layers_html(layers: list[dict[str, str]]) -> str:
     for layer in layers:
         name = layer.get("name", "")
         desc = layer.get("description", "")
-        parts.append(
-            f'<div class="layer"><strong>{name}</strong> — {desc}</div>'
-        )
+        parts.append(f'<div class="layer"><strong>{name}</strong> — {desc}</div>')
     return "\n".join(parts)
 
 
@@ -280,10 +276,7 @@ def _build_dependencies_rows(dependencies: list[dict[str, str]]) -> str:
 
 def _build_users_bullets(users: list[dict[str, str]]) -> str:
     """product-index: users → users_bullets (<li> with bold name)."""
-    return "\n".join(
-        f"<li><strong>{u['name']}</strong> — {u['description']}</li>"
-        for u in users
-    )
+    return "\n".join(f"<li><strong>{u['name']}</strong> — {u['description']}</li>" for u in users)
 
 
 def _build_catalog_items(catalog: list[dict[str, Any]]) -> str:
@@ -302,8 +295,7 @@ def _build_catalog_items(catalog: list[dict[str, Any]]) -> str:
         title = entry.get("title", slug)
         summary = entry.get("summary", "")
         parts.append(
-            f'<li><a href="{slug}.html">{title}</a>'
-            f'<span class="desc">— {summary}</span></li>'
+            f'<li><a href="{slug}.html">{title}</a><span class="desc">— {summary}</span></li>'
         )
     return "\n".join(parts)
 
@@ -363,9 +355,7 @@ def _build_product_index_context(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_product_feature_context(
-    data: dict[str, Any], yaml_path: Path
-) -> dict[str, Any]:
+def _build_product_feature_context(data: dict[str, Any], yaml_path: Path) -> dict[str, Any]:
     feature_name = data.get("feature_name") or yaml_path.stem
     feature_subtitle = data.get("feature_subtitle") or feature_name
     return {

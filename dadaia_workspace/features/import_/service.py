@@ -229,9 +229,7 @@ class ImportService:
             restored: tuple[str, ...] = ()
         else:
             restored = tuple(
-                str(c["name"])
-                for c in manifest.contexts
-                if c.get("state") in ("alive", "ativo")
+                str(c["name"]) for c in manifest.contexts if c.get("state") in ("alive", "ativo")
             )
         return ImportResult(
             workspace_root=options.workspace,

@@ -605,9 +605,7 @@ class TestIsSelfRepo:
 
     # --- T-GOS-A3: pyproject-based self-detection (manifest-absent) ---
 
-    def test_pyproject_name_dadaia_workspace_no_manifest_returns_true(
-        self, tmp_path: Path
-    ) -> None:
+    def test_pyproject_name_dadaia_workspace_no_manifest_returns_true(self, tmp_path: Path) -> None:
         """Secondary guard: pyproject.toml with [tool.poetry] name = 'dadaia-workspace'
         must return True even when no .dadaia/agentic/manifest.json exists (AC-GOS-10a)."""
         consumer = tmp_path / "repos" / "lib-clone"
@@ -631,9 +629,7 @@ class TestIsSelfRepo:
         )
         assert _is_self_repo(consumer) is True
 
-    def test_pyproject_different_name_no_manifest_returns_false(
-        self, tmp_path: Path
-    ) -> None:
+    def test_pyproject_different_name_no_manifest_returns_false(self, tmp_path: Path) -> None:
         """A pyproject.toml whose name is NOT dadaia-workspace must not trigger self-skip."""
         consumer = tmp_path / "repos" / "other-lib"
         consumer.mkdir(parents=True)
@@ -643,9 +639,7 @@ class TestIsSelfRepo:
         )
         assert _is_self_repo(consumer) is False
 
-    def test_pyproject_malformed_toml_falls_through_to_manifest_check(
-        self, tmp_path: Path
-    ) -> None:
+    def test_pyproject_malformed_toml_falls_through_to_manifest_check(self, tmp_path: Path) -> None:
         """Malformed pyproject.toml must not raise; falls through to manifest check."""
         consumer = tmp_path / "repos" / "broken-pyproject"
         consumer.mkdir(parents=True)

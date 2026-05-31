@@ -43,9 +43,7 @@ class TestDryRun:
         _make_foundation(specs)
         _make_root_spec(specs)
 
-        result = _runner.invoke(
-            app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--dry-run"]
-        )
+        result = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--dry-run"])
 
         assert result.exit_code == 0, result.output
         assert "MOVE" in result.output
@@ -54,9 +52,7 @@ class TestDryRun:
         assert (specs / "SPEC.md").is_file()
 
     def test_dry_run_nothing_to_migrate(self, specs: Path) -> None:
-        result = _runner.invoke(
-            app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--dry-run"]
-        )
+        result = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--dry-run"])
 
         assert result.exit_code == 0, result.output
         assert "nothing" in result.output.lower() or "SKIP" in result.output
@@ -71,9 +67,7 @@ class TestYesFlag:
     def test_moves_foundation_with_yes(self, specs: Path) -> None:
         _make_foundation(specs)
 
-        result = _runner.invoke(
-            app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"]
-        )
+        result = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"])
 
         assert result.exit_code == 0, result.output
         assert not (specs / "foundation").exists()
@@ -82,9 +76,7 @@ class TestYesFlag:
     def test_moves_root_spec_with_yes(self, specs: Path) -> None:
         _make_root_spec(specs)
 
-        result = _runner.invoke(
-            app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"]
-        )
+        result = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"])
 
         assert result.exit_code == 0, result.output
         assert not (specs / "SPEC.md").exists()
@@ -94,9 +86,7 @@ class TestYesFlag:
         _make_foundation(specs)
         _make_root_spec(specs)
 
-        result = _runner.invoke(
-            app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"]
-        )
+        result = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"])
 
         assert result.exit_code == 0, result.output
         assert not (specs / "foundation").exists()
@@ -117,14 +107,10 @@ class TestIdempotency:
         _make_foundation(specs)
         _make_root_spec(specs)
 
-        first = _runner.invoke(
-            app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"]
-        )
+        first = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"])
         assert first.exit_code == 0, first.output
 
-        second = _runner.invoke(
-            app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"]
-        )
+        second = _runner.invoke(app, ["migrate", "tree-v2", "--specs-dir", str(specs), "--yes"])
         assert second.exit_code == 0, second.output
         # Second run should say "nothing to migrate"
         assert "nothing" in second.output.lower()

@@ -103,7 +103,9 @@ def test_alive_sets_alive_state(service: SpecContextService) -> None:
     assert ctx.dead_since is None
 
 
-def test_alive_idempotent_on_already_alive(service: SpecContextService, workspace_root: Path) -> None:
+def test_alive_idempotent_on_already_alive(
+    service: SpecContextService, workspace_root: Path
+) -> None:
     """AC-T10b-3: alive() on an already-ALIVE context is idempotent (no error)."""
     (workspace_root / "repos" / "my-repo").mkdir(parents=True)
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
@@ -167,15 +169,19 @@ def test_dead_raises_context_locked_when_impl_lock_held(
     locks_dir.mkdir(parents=True, exist_ok=True)
     lock_file = locks_dir / "proj__v1.json"
     now = _datetime.now(tz=UTC).isoformat()
-    lock_file.write_text(json.dumps({
-        "lock_type": "implementation",
-        "session_id": "sess_abc123",
-        "context": "proj",
-        "release": "v1",
-        "pid": os.getpid(),  # live PID so state = HELD
-        "last_seen_at": now,
-        "ttl_seconds": 300,
-    }))
+    lock_file.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "session_id": "sess_abc123",
+                "context": "proj",
+                "release": "v1",
+                "pid": os.getpid(),  # live PID so state = HELD
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     with pytest.raises(ContextLockedError):
         service.dead("proj")
@@ -205,6 +211,7 @@ def test_dead_pushes_when_remote_present(
 
 # ------------------------------------------------------------------ T-10b-5: removed methods
 
+
 def test_activate_method_does_not_exist(service: SpecContextService) -> None:
     """AC-T10b-5: activate() is removed from SpecContextService."""
     assert not hasattr(service, "activate"), (
@@ -229,9 +236,7 @@ def test_promote_method_does_not_exist(service: SpecContextService) -> None:
 # ------------------------------------------------------------------ delete
 
 
-def test_delete_removes_dead_context(
-    service: SpecContextService, store: FakeContextStore
-) -> None:
+def test_delete_removes_dead_context(service: SpecContextService, store: FakeContextStore) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.delete("proj")
     assert store.get("proj") is None

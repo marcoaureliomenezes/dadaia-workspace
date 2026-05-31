@@ -426,16 +426,24 @@ def test_ac_race_6_r8_impl_lock_prevents_concurrent_task_md_writes(tmp_path: Pat
 
     # Session 1 acquires the implementation lock
     create_impl_lock(
-        ws, context="proj", release="v1",
-        session_id="sess_1", runtime="test", pid=os.getpid(),
+        ws,
+        context="proj",
+        release="v1",
+        session_id="sess_1",
+        runtime="test",
+        pid=os.getpid(),
     )
     assert check_lock_state(ws, "proj", "v1") == LockState.HELD
 
     # Session 2 tries to acquire — must be blocked
     with pytest.raises(LockHeldError) as exc_info:
         create_impl_lock(
-            ws, context="proj", release="v1",
-            session_id="sess_2", runtime="test", pid=os.getpid(),
+            ws,
+            context="proj",
+            release="v1",
+            session_id="sess_2",
+            runtime="test",
+            pid=os.getpid(),
         )
 
     assert "sess_1" in str(exc_info.value)
@@ -469,8 +477,12 @@ def test_ac_lock_1_free_state_no_lock_file(tmp_path: Path) -> None:
 def test_ac_lock_2_held_fresh_lock(tmp_path: Path) -> None:
     """AC-LOCK-2: HELD state returned for fresh lock with live PID."""
     create_impl_lock(
-        tmp_path, context="proj", release="v1",
-        session_id="sess_1", runtime="test", pid=os.getpid(),
+        tmp_path,
+        context="proj",
+        release="v1",
+        session_id="sess_1",
+        runtime="test",
+        pid=os.getpid(),
     )
     assert check_lock_state(tmp_path, "proj", "v1") == LockState.HELD
 
@@ -480,14 +492,21 @@ def test_ac_lock_3_stale_expired_ttl(tmp_path: Path) -> None:
     lock_path = _impl_lock_path(tmp_path, "proj", "v1")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     old_ts = _stale_ts(20)
-    lock_path.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "proj", "release": "v1",
-        "session_id": "sess_old", "runtime": "test",
-        "pid": os.getpid(),
-        "started_at": old_ts, "last_seen_at": old_ts,
-        "ttl_seconds": 60,  # 60s TTL, 20 min elapsed = STALE
-    }))
+    lock_path.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "proj",
+                "release": "v1",
+                "session_id": "sess_old",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "started_at": old_ts,
+                "last_seen_at": old_ts,
+                "ttl_seconds": 60,  # 60s TTL, 20 min elapsed = STALE
+            }
+        )
+    )
     assert check_lock_state(tmp_path, "proj", "v1") == LockState.STALE
 
 
@@ -496,22 +515,33 @@ def test_ac_lock_4_stale_dead_pid(tmp_path: Path) -> None:
     lock_path = _impl_lock_path(tmp_path, "proj", "v1")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(tz=UTC).isoformat()
-    lock_path.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "proj", "release": "v1",
-        "session_id": "sess_dead", "runtime": "test",
-        "pid": 999999,  # non-existent PID
-        "started_at": now, "last_seen_at": now,
-        "ttl_seconds": 300,
-    }))
+    lock_path.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "proj",
+                "release": "v1",
+                "session_id": "sess_dead",
+                "runtime": "test",
+                "pid": 999999,  # non-existent PID
+                "started_at": now,
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
     assert check_lock_state(tmp_path, "proj", "v1") == LockState.STALE
 
 
 def test_ac_lock_5_held_to_free_via_release(tmp_path: Path) -> None:
     """AC-LOCK-5: HELD → FREE transition via release_impl_lock."""
     create_impl_lock(
-        tmp_path, context="proj", release="v1",
-        session_id="sess_1", runtime="test", pid=os.getpid(),
+        tmp_path,
+        context="proj",
+        release="v1",
+        session_id="sess_1",
+        runtime="test",
+        pid=os.getpid(),
     )
     assert check_lock_state(tmp_path, "proj", "v1") == LockState.HELD
     result = release_impl_lock(tmp_path, "proj", "v1", "sess_1")
@@ -524,19 +554,30 @@ def test_ac_lock_6_stale_to_held_via_reclaim(tmp_path: Path) -> None:
     lock_path = _impl_lock_path(tmp_path, "proj", "v1")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     old_ts = _stale_ts(15)
-    lock_path.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "proj", "release": "v1",
-        "session_id": "sess_stale", "runtime": "test",
-        "pid": os.getpid(),
-        "started_at": old_ts, "last_seen_at": old_ts,
-        "ttl_seconds": 60,
-    }))
+    lock_path.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "proj",
+                "release": "v1",
+                "session_id": "sess_stale",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "started_at": old_ts,
+                "last_seen_at": old_ts,
+                "ttl_seconds": 60,
+            }
+        )
+    )
     assert check_lock_state(tmp_path, "proj", "v1") == LockState.STALE
 
     reclaim_impl_lock(
-        tmp_path, context="proj", release="v1",
-        new_session_id="sess_new", runtime="test", pid=os.getpid(),
+        tmp_path,
+        context="proj",
+        release="v1",
+        new_session_id="sess_new",
+        runtime="test",
+        pid=os.getpid(),
         reason="reclaim after crash",
     )
     assert check_lock_state(tmp_path, "proj", "v1") == LockState.HELD
@@ -547,13 +588,21 @@ def test_ac_lock_6_stale_to_held_via_reclaim(tmp_path: Path) -> None:
 def test_ac_lock_7_reclaim_held_raises_lock_active_error(tmp_path: Path) -> None:
     """AC-LOCK-7: reclaim on HELD (fresh) lock raises LockActiveError."""
     create_impl_lock(
-        tmp_path, context="proj", release="v1",
-        session_id="sess_owner", runtime="test", pid=os.getpid(),
+        tmp_path,
+        context="proj",
+        release="v1",
+        session_id="sess_owner",
+        runtime="test",
+        pid=os.getpid(),
     )
     with pytest.raises(LockActiveError):
         reclaim_impl_lock(
-            tmp_path, context="proj", release="v1",
-            new_session_id="sess_attacker", runtime="test", pid=os.getpid(),
+            tmp_path,
+            context="proj",
+            release="v1",
+            new_session_id="sess_attacker",
+            runtime="test",
+            pid=os.getpid(),
             reason="unauthorized reclaim",
         )
 
@@ -561,8 +610,12 @@ def test_ac_lock_7_reclaim_held_raises_lock_active_error(tmp_path: Path) -> None
 def test_ac_lock_8_release_wrong_session_returns_false(tmp_path: Path) -> None:
     """AC-LOCK-8: release by wrong session_id returns False; lock unchanged."""
     create_impl_lock(
-        tmp_path, context="proj", release="v1",
-        session_id="sess_owner", runtime="test", pid=os.getpid(),
+        tmp_path,
+        context="proj",
+        release="v1",
+        session_id="sess_owner",
+        runtime="test",
+        pid=os.getpid(),
     )
     result = release_impl_lock(tmp_path, "proj", "v1", "sess_other")
     assert result is False
@@ -585,14 +638,21 @@ def test_ac_lock_9_unreadable_lock_file_treated_as_stale(tmp_path: Path) -> None
 def test_ac_rev_1_review_blocked_when_impl_lock_held(tmp_path: Path) -> None:
     """AC-REV-1: REVIEW bind is blocked when an implementation lock is HELD."""
     create_impl_lock(
-        tmp_path, context="proj", release="v1",
-        session_id="sess_impl", runtime="test", pid=os.getpid(),
+        tmp_path,
+        context="proj",
+        release="v1",
+        session_id="sess_impl",
+        runtime="test",
+        pid=os.getpid(),
     )
 
     with pytest.raises(ReviewBlockedByImplementationError) as exc_info:
         check_impl_xor_review(
-            tmp_path, context="proj", release="v1",
-            mode="REVIEW", session_id="sess_review",
+            tmp_path,
+            context="proj",
+            release="v1",
+            mode="REVIEW",
+            session_id="sess_review",
         )
 
     assert "sess_impl" in str(exc_info.value)
@@ -616,8 +676,11 @@ def test_ac_rev_2_impl_blocked_when_review_session_exists(tmp_path: Path) -> Non
 
     with pytest.raises(ImplementationBlockedByReviewError) as exc_info:
         check_impl_xor_review(
-            tmp_path, context="proj", release="v1",
-            mode="IMPLEMENTATION", session_id="sess_impl",
+            tmp_path,
+            context="proj",
+            release="v1",
+            mode="IMPLEMENTATION",
+            session_id="sess_impl",
         )
 
     assert "sess_review_1" in str(exc_info.value)
@@ -630,19 +693,26 @@ def test_ac_rev_3_two_review_sessions_coexist(tmp_path: Path) -> None:
 
     now = datetime.now(tz=UTC).isoformat()
     for i in (1, 2):
-        (sessions_dir / f"sess_r{i}.json").write_text(json.dumps({
-            "session_id": f"sess_r{i}",
-            "context": "proj",
-            "release": "v1",
-            "mode": "BOUND_REVIEW",
-            "last_seen_at": now,
-            "ttl_seconds": 300,
-        }))
+        (sessions_dir / f"sess_r{i}.json").write_text(
+            json.dumps(
+                {
+                    "session_id": f"sess_r{i}",
+                    "context": "proj",
+                    "release": "v1",
+                    "mode": "BOUND_REVIEW",
+                    "last_seen_at": now,
+                    "ttl_seconds": 300,
+                }
+            )
+        )
 
     # REVIEW XOR check must not raise (no impl lock)
     check_impl_xor_review(
-        tmp_path, context="proj", release="v1",
-        mode="REVIEW", session_id="sess_r3",
+        tmp_path,
+        context="proj",
+        release="v1",
+        mode="REVIEW",
+        session_id="sess_r3",
     )
 
     reviews = find_review_sessions(tmp_path, "proj", "v1")
@@ -657,19 +727,26 @@ def test_ac_rev_4_stale_review_session_does_not_block_impl(tmp_path: Path) -> No
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
     old_ts = _stale_ts(20)
-    (sessions_dir / "sess_stale_review.json").write_text(json.dumps({
-        "session_id": "sess_stale_review",
-        "context": "proj",
-        "release": "v1",
-        "mode": "BOUND_REVIEW",
-        "last_seen_at": old_ts,
-        "ttl_seconds": 60,  # 60s TTL, 20 min elapsed → stale
-    }))
+    (sessions_dir / "sess_stale_review.json").write_text(
+        json.dumps(
+            {
+                "session_id": "sess_stale_review",
+                "context": "proj",
+                "release": "v1",
+                "mode": "BOUND_REVIEW",
+                "last_seen_at": old_ts,
+                "ttl_seconds": 60,  # 60s TTL, 20 min elapsed → stale
+            }
+        )
+    )
 
     # Must NOT raise — stale reviews are ignored
     check_impl_xor_review(
-        tmp_path, context="proj", release="v1",
-        mode="IMPLEMENTATION", session_id="sess_impl",
+        tmp_path,
+        context="proj",
+        release="v1",
+        mode="IMPLEMENTATION",
+        session_id="sess_impl",
     )
 
     reviews = find_review_sessions(tmp_path, "proj", "v1")
@@ -687,14 +764,18 @@ def test_ac_rev_5_review_session_does_not_create_impl_lock(tmp_path: Path) -> No
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(tz=UTC).isoformat()
-    (sessions_dir / "sess_review.json").write_text(json.dumps({
-        "session_id": "sess_review",
-        "context": "proj",
-        "release": "v1",
-        "mode": "BOUND_REVIEW",
-        "last_seen_at": now,
-        "ttl_seconds": 300,
-    }))
+    (sessions_dir / "sess_review.json").write_text(
+        json.dumps(
+            {
+                "session_id": "sess_review",
+                "context": "proj",
+                "release": "v1",
+                "mode": "BOUND_REVIEW",
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     lock_path = _impl_lock_path(tmp_path, "proj", "v1")
     assert not lock_path.exists(), (
@@ -708,6 +789,7 @@ def test_ac_rev_5_review_session_does_not_create_impl_lock(tmp_path: Path) -> No
 
 
 # --- LOCK-1: duplicate lock files ---
+
 
 def test_ac_doc_l1_violating_no_duplicates_possible_on_fs(tmp_path: Path) -> None:
     """AC-DOC-L1a: normal case — no duplicate lock files → no LOCK-1 issues."""
@@ -728,6 +810,7 @@ def test_ac_doc_l1_fix_runs_without_error_when_no_duplicates(tmp_path: Path) -> 
 
 
 # --- LOCK-2: impl lock for DEAD context ---
+
 
 def test_ac_doc_l2_violating_lock_for_dead_ctx_detected(tmp_path: Path) -> None:
     """AC-DOC-L2a: LOCK-2 reported when an impl lock exists for a DEAD context."""
@@ -767,12 +850,12 @@ def test_ac_doc_l2_fix_deletes_lock_and_audits(tmp_path: Path) -> None:
 
 # --- LOCK-3: expired HELD lock ---
 
+
 def test_ac_doc_l3_violating_expired_held_lock_reported(tmp_path: Path) -> None:
     """AC-DOC-L3a: LOCK-3 reported for HELD lock with last_seen_at older than ttl."""
     ws = tmp_path
     old_ts = _stale_ts(20)
-    _write_lock_file(ws, "proj", "v1", session_id="sess_x",
-                                 last_seen_at=old_ts, ttl_seconds=60)
+    _write_lock_file(ws, "proj", "v1", session_id="sess_x", last_seen_at=old_ts, ttl_seconds=60)
 
     store = FakeContextStore()
     store.save(_make_ctx("proj", ContextState.ALIVE))
@@ -788,8 +871,9 @@ def test_ac_doc_l3_fix_marks_stale_no_delete(tmp_path: Path) -> None:
     """AC-DOC-L3b: fix() marks STALE, does NOT delete the lock file."""
     ws = tmp_path
     old_ts = _stale_ts(20)
-    lock_path = _write_lock_file(ws, "proj", "v1", session_id="sess_x",
-                                 last_seen_at=old_ts, ttl_seconds=60)
+    lock_path = _write_lock_file(
+        ws, "proj", "v1", session_id="sess_x", last_seen_at=old_ts, ttl_seconds=60
+    )
 
     store = FakeContextStore()
     store.save(_make_ctx("proj", ContextState.ALIVE))
@@ -803,20 +887,25 @@ def test_ac_doc_l3_fix_marks_stale_no_delete(tmp_path: Path) -> None:
 
 # --- LOCK-4: production-write event missing task_id ---
 
+
 def test_ac_doc_l4_violating_production_write_no_task_id(tmp_path: Path) -> None:
     """AC-DOC-L4a: LOCK-4 reported for PRODUCTION_WRITE event without task_id."""
     ws = tmp_path
     audit_path = _audit_log_path(ws)
     audit_path.parent.mkdir(parents=True, exist_ok=True)
 
-    record_bad = json.dumps({
-        "ts": datetime.now(tz=UTC).isoformat(),
-        "event": "PRODUCTION_WRITE",
-        "context": "proj", "release": "v1",
-        "session_id": "sess_bad", "runtime": "test",
-        "pid": os.getpid(),
-        # task_id intentionally absent
-    })
+    record_bad = json.dumps(
+        {
+            "ts": datetime.now(tz=UTC).isoformat(),
+            "event": "PRODUCTION_WRITE",
+            "context": "proj",
+            "release": "v1",
+            "session_id": "sess_bad",
+            "runtime": "test",
+            "pid": os.getpid(),
+            # task_id intentionally absent
+        }
+    )
     audit_path.write_text(record_bad + "\n")
 
     doctor = _make_doctor(ws)
@@ -833,13 +922,17 @@ def test_ac_doc_l4_fix_does_not_modify_audit_log(tmp_path: Path) -> None:
     audit_path = _audit_log_path(ws)
     audit_path.parent.mkdir(parents=True, exist_ok=True)
 
-    record = json.dumps({
-        "ts": datetime.now(tz=UTC).isoformat(),
-        "event": "PRODUCTION_WRITE",
-        "context": "proj", "release": "v1",
-        "session_id": "sess_bad", "runtime": "test",
-        "pid": os.getpid(),
-    })
+    record = json.dumps(
+        {
+            "ts": datetime.now(tz=UTC).isoformat(),
+            "event": "PRODUCTION_WRITE",
+            "context": "proj",
+            "release": "v1",
+            "session_id": "sess_bad",
+            "runtime": "test",
+            "pid": os.getpid(),
+        }
+    )
     audit_path.write_text(record + "\n")
 
     doctor = _make_doctor(ws)
@@ -851,13 +944,18 @@ def test_ac_doc_l4_fix_does_not_modify_audit_log(tmp_path: Path) -> None:
 
 # --- LOCK-5: BLOCKED_ATTEMPT event ---
 
+
 def test_ac_doc_l5_violating_blocked_attempt_surfaces(tmp_path: Path) -> None:
     """AC-DOC-L5a: LOCK-5 reported when BLOCKED_ATTEMPT exists in audit log."""
     ws = tmp_path
     audit_blocked(
-        ws, context="proj", release="v1",
-        session_id="sess_blocked", runtime="test",
-        pid=os.getpid(), reason="lock already held",
+        ws,
+        context="proj",
+        release="v1",
+        session_id="sess_blocked",
+        runtime="test",
+        pid=os.getpid(),
+        reason="lock already held",
     )
 
     doctor = _make_doctor(ws)
@@ -872,9 +970,13 @@ def test_ac_doc_l5_fix_does_not_delete_blocked_attempt(tmp_path: Path) -> None:
     """AC-DOC-L5b: fix() must NOT delete BLOCKED_ATTEMPT audit entries."""
     ws = tmp_path
     audit_blocked(
-        ws, context="proj", release="v1",
-        session_id="sess_blocked", runtime="test",
-        pid=os.getpid(), reason="lock held",
+        ws,
+        context="proj",
+        release="v1",
+        session_id="sess_blocked",
+        runtime="test",
+        pid=os.getpid(),
+        reason="lock held",
     )
 
     doctor = _make_doctor(ws)
@@ -887,6 +989,7 @@ def test_ac_doc_l5_fix_does_not_delete_blocked_attempt(tmp_path: Path) -> None:
 
 # --- LOCK-6: BOUND_REVIEW session for DEAD context ---
 
+
 def test_ac_doc_l6_violating_review_session_dead_ctx_reported(tmp_path: Path) -> None:
     """AC-DOC-L6a: LOCK-6 reported when a BOUND_REVIEW session belongs to a DEAD ctx."""
     ws = tmp_path
@@ -895,16 +998,20 @@ def test_ac_doc_l6_violating_review_session_dead_ctx_reported(tmp_path: Path) ->
 
     now = datetime.now(tz=UTC).isoformat()
     session_file = sessions_dir / "sess_dead_review.json"
-    session_file.write_text(json.dumps({
-        "session_id": "sess_dead_review",
-        "context": "dead-proj",
-        "release": "v1",
-        "mode": "BOUND_REVIEW",
-        "runtime": "test",
-        "pid": os.getpid(),
-        "last_seen_at": now,
-        "ttl_seconds": 300,
-    }))
+    session_file.write_text(
+        json.dumps(
+            {
+                "session_id": "sess_dead_review",
+                "context": "dead-proj",
+                "release": "v1",
+                "mode": "BOUND_REVIEW",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     store = FakeContextStore()
     store.save(_make_ctx("dead-proj", ContextState.DEAD))
@@ -924,16 +1031,20 @@ def test_ac_doc_l6_fix_deletes_session_and_audits(tmp_path: Path) -> None:
 
     now = datetime.now(tz=UTC).isoformat()
     session_file = sessions_dir / "sess_dead_review2.json"
-    session_file.write_text(json.dumps({
-        "session_id": "sess_dead_review2",
-        "context": "dead-proj",
-        "release": "v1",
-        "mode": "BOUND_REVIEW",
-        "runtime": "test",
-        "pid": os.getpid(),
-        "last_seen_at": now,
-        "ttl_seconds": 300,
-    }))
+    session_file.write_text(
+        json.dumps(
+            {
+                "session_id": "sess_dead_review2",
+                "context": "dead-proj",
+                "release": "v1",
+                "mode": "BOUND_REVIEW",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     store = FakeContextStore()
     store.save(_make_ctx("dead-proj", ContextState.DEAD))
@@ -1064,6 +1175,7 @@ def test_ac_cov_service_dead_no_repo_on_disk(tmp_path: Path) -> None:
     repo = ws / "repos" / "repo"
     if repo.exists():
         import shutil
+
         shutil.rmtree(repo)
     # dead() should still succeed
     ctx = svc.dead("proj")
@@ -1093,10 +1205,14 @@ def test_ac_cov_json_store_unknown_schema_version(tmp_path: Path) -> None:
     from dadaia_workspace.core.exceptions import SchemaVersionError
 
     ctx_file = tmp_path / "spec_contexts.json"
-    ctx_file.write_text(json.dumps({
-        "schema_version": "99",
-        "contexts": [],
-    }))
+    ctx_file.write_text(
+        json.dumps(
+            {
+                "schema_version": "99",
+                "contexts": [],
+            }
+        )
+    )
     store = JsonContextStore(tmp_path)
     with pytest.raises(SchemaVersionError) as exc_info:
         store.list_all()
@@ -1163,6 +1279,7 @@ def test_ac_cov_doctor_fix_inv5_removes_stale_repo(tmp_path: Path) -> None:
 
 # --- _grouped_lock_files: non-.json file in locks_dir (line 82) ---
 
+
 def test_ac_cov_doctor_grouped_lock_files_skips_non_json(tmp_path: Path) -> None:
     """_grouped_lock_files skips non-.json files in the locks dir (line 82)."""
     ws = tmp_path
@@ -1180,6 +1297,7 @@ def test_ac_cov_doctor_grouped_lock_files_skips_non_json(tmp_path: Path) -> None
 
 
 # --- _last_seen_epoch: missing field returns 0.0 (lines 93-97) ---
+
 
 def test_ac_cov_doctor_last_seen_epoch_missing_field(tmp_path: Path) -> None:
     """_last_seen_epoch returns 0.0 when last_seen_at is absent (lines 93-97)."""
@@ -1208,6 +1326,7 @@ def test_ac_cov_doctor_last_seen_epoch_bad_json_returns_0(tmp_path: Path) -> Non
 
 # --- _read_lock: exception branch (lines 112-113) ---
 
+
 def test_ac_cov_doctor_read_lock_bad_json_returns_none(tmp_path: Path) -> None:
     """_read_lock returns None when the file contains invalid JSON (lines 112-113)."""
     p = tmp_path / "bad.json"
@@ -1225,6 +1344,7 @@ def test_ac_cov_doctor_read_lock_valid_json(tmp_path: Path) -> None:
 
 
 # --- _int: non-int convertible path and ValueError (lines 124-127) ---
+
 
 def test_ac_cov_doctor_int_non_int_string_convertible(tmp_path: Path) -> None:
     """_int converts a string representation of an int (lines 124-125)."""
@@ -1246,6 +1366,7 @@ def test_ac_cov_doctor_int_int_value_direct(tmp_path: Path) -> None:
 
 # --- _parse_key: single-segment (no '__') returns (key, '') — line 139 ---
 
+
 def test_ac_cov_doctor_parse_key_single_segment(tmp_path: Path) -> None:
     """_parse_key returns (key, '') when there is no '__' separator (line 139)."""
     ctx, release = DoctorService._parse_key("nodoublescore")
@@ -1261,6 +1382,7 @@ def test_ac_cov_doctor_parse_key_two_segments(tmp_path: Path) -> None:
 
 
 # --- LOCK-1 check() detection (line 176) ---
+
 
 def test_ac_cov_doctor_lock1_check_detects_duplicate_lock_files(tmp_path: Path) -> None:
     """LOCK-1 check() fires when two .json files exist for the same key (line 176)."""
@@ -1325,22 +1447,34 @@ def test_ac_cov_doctor_lock1_check_detects_duplicate_lock_files(tmp_path: Path) 
             # Simulate two .json files for the same key
             p1 = locks_dir / "ctx__v1.json"
             p2 = locks_dir / "ctx__v1_copy.json"
-            p1.write_text(json.dumps({
-                "lock_type": "implementation",
-                "context": "ctx", "release": "v1",
-                "session_id": "sess_a", "runtime": "test",
-                "pid": os.getpid(),
-                "last_seen_at": old_ts,
-                "ttl_seconds": 300,
-            }))
-            p2.write_text(json.dumps({
-                "lock_type": "implementation",
-                "context": "ctx", "release": "v1",
-                "session_id": "sess_b", "runtime": "test",
-                "pid": os.getpid(),
-                "last_seen_at": now_ts,
-                "ttl_seconds": 300,
-            }))
+            p1.write_text(
+                json.dumps(
+                    {
+                        "lock_type": "implementation",
+                        "context": "ctx",
+                        "release": "v1",
+                        "session_id": "sess_a",
+                        "runtime": "test",
+                        "pid": os.getpid(),
+                        "last_seen_at": old_ts,
+                        "ttl_seconds": 300,
+                    }
+                )
+            )
+            p2.write_text(
+                json.dumps(
+                    {
+                        "lock_type": "implementation",
+                        "context": "ctx",
+                        "release": "v1",
+                        "session_id": "sess_b",
+                        "runtime": "test",
+                        "pid": os.getpid(),
+                        "last_seen_at": now_ts,
+                        "ttl_seconds": 300,
+                    }
+                )
+            )
             return {"ctx__v1": [p1, p2]}
 
     doctor = _DoctorWithDuplicates(
@@ -1358,6 +1492,7 @@ def test_ac_cov_doctor_lock1_check_detects_duplicate_lock_files(tmp_path: Path) 
 
 # --- LOCK-1 fix() rename path (lines 373-390, 400) ---
 
+
 def test_ac_cov_doctor_lock1_fix_renames_stale_to_conflicted(tmp_path: Path) -> None:
     """LOCK-1 fix(): stale duplicate renamed to .conflicted, freshest kept, audit appended."""
     ws = tmp_path
@@ -1369,22 +1504,34 @@ def test_ac_cov_doctor_lock1_fix_renames_stale_to_conflicted(tmp_path: Path) -> 
 
     p_stale = locks_dir / "ctx__v1_stale.json"
     p_fresh = locks_dir / "ctx__v1_fresh.json"
-    p_stale.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "ctx", "release": "v1",
-        "session_id": "sess_stale", "runtime": "test",
-        "pid": os.getpid(),
-        "last_seen_at": old_ts,
-        "ttl_seconds": 300,
-    }))
-    p_fresh.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "ctx", "release": "v1",
-        "session_id": "sess_fresh", "runtime": "test",
-        "pid": os.getpid(),
-        "last_seen_at": now_ts,
-        "ttl_seconds": 300,
-    }))
+    p_stale.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "ctx",
+                "release": "v1",
+                "session_id": "sess_stale",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "last_seen_at": old_ts,
+                "ttl_seconds": 300,
+            }
+        )
+    )
+    p_fresh.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "ctx",
+                "release": "v1",
+                "session_id": "sess_fresh",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "last_seen_at": now_ts,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     class _DoctorWithDuplicates(DoctorService):
         def _grouped_lock_files(self) -> dict[str, list[Path]]:
@@ -1428,16 +1575,32 @@ def test_ac_cov_doctor_lock1_fix_freshest_kept_by_last_seen(tmp_path: Path) -> N
 
     p_a = locks_dir / "proj__rel1_a.json"
     p_b = locks_dir / "proj__rel1_b.json"
-    p_a.write_text(json.dumps({
-        "context": "proj", "release": "rel1",
-        "session_id": "sess_a", "runtime": "test",
-        "pid": os.getpid(), "last_seen_at": ts_a, "ttl_seconds": 300,
-    }))
-    p_b.write_text(json.dumps({
-        "context": "proj", "release": "rel1",
-        "session_id": "sess_b", "runtime": "test",
-        "pid": os.getpid(), "last_seen_at": ts_b, "ttl_seconds": 300,
-    }))
+    p_a.write_text(
+        json.dumps(
+            {
+                "context": "proj",
+                "release": "rel1",
+                "session_id": "sess_a",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "last_seen_at": ts_a,
+                "ttl_seconds": 300,
+            }
+        )
+    )
+    p_b.write_text(
+        json.dumps(
+            {
+                "context": "proj",
+                "release": "rel1",
+                "session_id": "sess_b",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "last_seen_at": ts_b,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     class _DoctorWith2(DoctorService):
         def _grouped_lock_files(self) -> dict[str, list[Path]]:
@@ -1459,13 +1622,15 @@ def test_ac_cov_doctor_lock1_fix_freshest_kept_by_last_seen(tmp_path: Path) -> N
 
 # --- LOCK-3 check() detection branches (lines 211, 214, 216) ---
 
+
 def test_ac_cov_doctor_lock3_check_skips_already_stale_marked(tmp_path: Path) -> None:
     """LOCK-3 check(): lock already marked state=STALE is skipped (line 214-216)."""
     ws = tmp_path
     old_ts = _stale_ts(20)
     # Write a lock that is already marked STALE in JSON
-    _write_lock_file(ws, "proj", "v1", session_id="sess_x",
-                     last_seen_at=old_ts, ttl_seconds=60, state="STALE")
+    _write_lock_file(
+        ws, "proj", "v1", session_id="sess_x", last_seen_at=old_ts, ttl_seconds=60, state="STALE"
+    )
 
     doctor = _make_doctor(ws)
     issues = doctor.check()
@@ -1491,16 +1656,22 @@ def test_ac_cov_doctor_lock3_check_none_data_skipped(tmp_path: Path) -> None:
 
 # --- LOCK-4/5 JSONDecodeError and OSError branches (245-246, 259-260, 271-272, 285-286) ---
 
+
 def test_ac_cov_doctor_lock4_skips_invalid_json_line(tmp_path: Path) -> None:
     """LOCK-4 check(): malformed JSON lines in audit log are skipped (lines 245-246)."""
     ws = tmp_path
     audit_path = _audit_log_path(ws)
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     # Write one bad JSON line and one good PRODUCTION_WRITE with task_id (no issue)
-    good = json.dumps({
-        "event": "PRODUCTION_WRITE", "session_id": "s1",
-        "context": "p", "release": "v1", "task_id": "T-1",
-    })
+    good = json.dumps(
+        {
+            "event": "PRODUCTION_WRITE",
+            "session_id": "s1",
+            "context": "p",
+            "release": "v1",
+            "task_id": "T-1",
+        }
+    )
     audit_path.write_text("NOT JSON\n" + good + "\n")
 
     doctor = _make_doctor(ws)
@@ -1525,6 +1696,7 @@ def test_ac_cov_doctor_lock5_skips_invalid_json_line(tmp_path: Path) -> None:
 
 
 # --- LOCK-6 check(): non-.json files and non-BOUND_REVIEW sessions skipped (293, 296-297, 299) ---
+
 
 def test_ac_cov_doctor_lock6_check_skips_non_json_session_files(tmp_path: Path) -> None:
     """LOCK-6 check(): non-.json files in sessions_dir are skipped (line 293)."""
@@ -1564,14 +1736,18 @@ def test_ac_cov_doctor_lock6_check_skips_non_bound_review_mode(tmp_path: Path) -
     sessions_dir = ws / ".dadaia" / "sessions"
     sessions_dir.mkdir(parents=True)
     now = datetime.now(tz=UTC).isoformat()
-    (sessions_dir / "impl_session.json").write_text(json.dumps({
-        "session_id": "sess_impl",
-        "context": "dead-ctx",
-        "release": "v1",
-        "mode": "BOUND_IMPLEMENTATION",  # not BOUND_REVIEW
-        "last_seen_at": now,
-        "ttl_seconds": 300,
-    }))
+    (sessions_dir / "impl_session.json").write_text(
+        json.dumps(
+            {
+                "session_id": "sess_impl",
+                "context": "dead-ctx",
+                "release": "v1",
+                "mode": "BOUND_IMPLEMENTATION",  # not BOUND_REVIEW
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     store = FakeContextStore()
     store.save(_make_ctx("dead-ctx", ContextState.DEAD))
@@ -1582,6 +1758,7 @@ def test_ac_cov_doctor_lock6_check_skips_non_bound_review_mode(tmp_path: Path) -
 
 
 # --- INV-5 fix() recheck continue path (line 362) ---
+
 
 def test_ac_cov_doctor_fix_inv5_skips_if_context_transitions_to_alive(tmp_path: Path) -> None:
     """fix() INV-5: skips rmtree if store re-read shows context is no longer DEAD (line 362).
@@ -1603,6 +1780,7 @@ def test_ac_cov_doctor_fix_inv5_skips_if_context_transitions_to_alive(tmp_path: 
 
     class _TransitionStore(FakeContextStore):
         """list_all() returns DEAD; get() returns ALIVE (recheck path)."""
+
         def list_all(self) -> list:
             return [dead_ctx]
 
@@ -1626,6 +1804,7 @@ def test_ac_cov_doctor_fix_inv5_skips_if_context_transitions_to_alive(tmp_path: 
 
 # --- LOCK-3 fix() branches: None read_lock, already STALE, and non-json skip (423, 426, 428) ---
 
+
 def test_ac_cov_doctor_lock3_fix_skips_bad_json_lock(tmp_path: Path) -> None:
     """LOCK-3 fix(): corrupted lock file (read_lock→None) is skipped (line 425-426)."""
     ws = tmp_path
@@ -1644,8 +1823,9 @@ def test_ac_cov_doctor_lock3_fix_skips_already_stale_lock(tmp_path: Path) -> Non
     """LOCK-3 fix(): lock already state=STALE is skipped (line 427-428)."""
     ws = tmp_path
     old_ts = _stale_ts(20)
-    _write_lock_file(ws, "proj", "v1", session_id="sess_x",
-                     last_seen_at=old_ts, ttl_seconds=60, state="STALE")
+    _write_lock_file(
+        ws, "proj", "v1", session_id="sess_x", last_seen_at=old_ts, ttl_seconds=60, state="STALE"
+    )
 
     doctor = _make_doctor(ws)
     actions = doctor.fix()
@@ -1667,6 +1847,7 @@ def test_ac_cov_doctor_lock3_fix_skips_non_json_in_locks_dir(tmp_path: Path) -> 
 
 
 # --- LOCK-6 fix(): non-.json, None read_lock, non-BOUND_REVIEW skips (446, 449, 451) ---
+
 
 def test_ac_cov_doctor_lock6_fix_skips_non_json_session(tmp_path: Path) -> None:
     """LOCK-6 fix(): non-.json session files are skipped (line 446)."""
@@ -1704,14 +1885,18 @@ def test_ac_cov_doctor_lock6_fix_skips_non_bound_review_session(tmp_path: Path) 
     sessions_dir = ws / ".dadaia" / "sessions"
     sessions_dir.mkdir(parents=True)
     now = datetime.now(tz=UTC).isoformat()
-    (sessions_dir / "impl.json").write_text(json.dumps({
-        "session_id": "sess_impl",
-        "context": "dead-ctx",
-        "release": "v1",
-        "mode": "BOUND_IMPLEMENTATION",
-        "last_seen_at": now,
-        "ttl_seconds": 300,
-    }))
+    (sessions_dir / "impl.json").write_text(
+        json.dumps(
+            {
+                "session_id": "sess_impl",
+                "context": "dead-ctx",
+                "release": "v1",
+                "mode": "BOUND_IMPLEMENTATION",
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     store = FakeContextStore()
     store.save(_make_ctx("dead-ctx", ContextState.DEAD))
@@ -1722,6 +1907,7 @@ def test_ac_cov_doctor_lock6_fix_skips_non_bound_review_session(tmp_path: Path) 
 
 
 # --- LOCK-2 fix() audit path: _parse_key in LOCK-2 loop (line 194 / 400) ---
+
 
 def test_ac_cov_doctor_lock4_oserror_on_audit_read(tmp_path: Path) -> None:
     """LOCK-4 check(): OSError reading audit log is swallowed silently (lines 259-260)."""
@@ -1763,14 +1949,20 @@ def test_ac_cov_doctor_lock2_check_uses_parse_key_in_loop(tmp_path: Path) -> Non
     # Write a lock for a context with a single-segment name (no '__' — unusual but valid)
     locks_dir = ws / ".dadaia" / "locks" / "implementation"
     locks_dir.mkdir(parents=True)
-    (locks_dir / "norelease.json").write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "norelease", "release": "",
-        "session_id": "sess_x", "runtime": "test",
-        "pid": os.getpid(),
-        "last_seen_at": datetime.now(tz=UTC).isoformat(),
-        "ttl_seconds": 300,
-    }))
+    (locks_dir / "norelease.json").write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "norelease",
+                "release": "",
+                "session_id": "sess_x",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "last_seen_at": datetime.now(tz=UTC).isoformat(),
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     store = FakeContextStore()
     store.save(_make_ctx("norelease", ContextState.DEAD))

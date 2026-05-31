@@ -100,7 +100,14 @@ def test_feature_atom_migration_validates(tmp_path: Path, runner: CliRunner) -> 
     validate_atom(data, "memory-product-feature-v1")
 
     # Required fields must be present
-    for field in ("purpose", "flow_steps", "typical_trigger", "differential", "runtime_state", "dependencies"):
+    for field in (
+        "purpose",
+        "flow_steps",
+        "typical_trigger",
+        "differential",
+        "runtime_state",
+        "dependencies",
+    ):
         assert field in data, f"Required field '{field}' missing from extracted YAML"
 
     # flow_steps must be a list with at least one item
@@ -173,7 +180,13 @@ def test_architecture_atom_migration_validates(tmp_path: Path, runner: CliRunner
     # Must not raise
     validate_atom(data, "memory-architecture-v1")
 
-    for field in ("overview", "layers", "dependency_rules_diagram", "data_flow_diagram", "runtime_state"):
+    for field in (
+        "overview",
+        "layers",
+        "dependency_rules_diagram",
+        "data_flow_diagram",
+        "runtime_state",
+    ):
         assert field in data, f"Required field '{field}' missing"
 
     assert isinstance(data["layers"], list) and len(data["layers"]) >= 1
@@ -233,7 +246,14 @@ def test_product_index_atom_migration_validates(tmp_path: Path, runner: CliRunne
     assert isinstance(data, dict)
     validate_atom(data, "memory-product-index-v1")
 
-    for field in ("vision_oneliner", "vision_paragraph", "users", "catalog", "capability_map_diagram", "non_goals"):
+    for field in (
+        "vision_oneliner",
+        "vision_paragraph",
+        "users",
+        "catalog",
+        "capability_map_diagram",
+        "non_goals",
+    ):
         assert field in data, f"Required field '{field}' missing"
 
     assert isinstance(data["catalog"], list) and len(data["catalog"]) >= 1

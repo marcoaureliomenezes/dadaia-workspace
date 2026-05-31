@@ -231,9 +231,7 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
     try:
         ws = resolve_workspace_root()
         ctx = container.build_spec_context_service(ws).alive(name)
-        console.print(
-            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE"
-        )
+        console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
         with contextlib.suppress(Exception):
             container.build_public_service().install(ws, target="opencode", force=True)
     except SchemaVersionError as exc:
@@ -262,9 +260,13 @@ def dead(name: str = typer.Argument(..., help="Context name to make DEAD")) -> N
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
     mode: str = typer.Option(..., "--mode", help="Binding mode: read|spec|implementation|review"),
-    release: str | None = typer.Option(None, "--release", help="Release ID (required for implementation and review modes)"),
+    release: str | None = typer.Option(
+        None, "--release", help="Release ID (required for implementation and review modes)"
+    ),
     force: bool = typer.Option(False, "--force", help="Force-reclaim a STALE implementation lock"),
-    reason: str = typer.Option("", "--reason", help="Reason for forced reclaim (required with --force)"),
+    reason: str = typer.Option(
+        "", "--reason", help="Reason for forced reclaim (required with --force)"
+    ),
 ) -> None:
     """Bind this shell session to a context.
 

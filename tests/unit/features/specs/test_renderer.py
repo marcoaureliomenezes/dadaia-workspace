@@ -148,7 +148,7 @@ class TestMermaidDiagram:
         )
         html = render_atom(dest, "memory-product-feature-v1")
         assert '<pre class="mermaid">' in html, (
-            "Rendered HTML must contain <pre class=\"mermaid\"> when diagram field is present (AC-C2-3)."
+            'Rendered HTML must contain <pre class="mermaid"> when diagram field is present (AC-C2-3).'
         )
 
     def test_product_feature_with_diagram_has_cdn_script(self, tmp_path: Path) -> None:
@@ -391,7 +391,7 @@ class TestRenderedContent:
         ranks = sorted(positions.keys())
         for i in range(len(ranks) - 1):
             assert positions[ranks[i]] < positions[ranks[i + 1]], (
-                f"Catalog rank {ranks[i]} appears after rank {ranks[i+1]} — "
+                f"Catalog rank {ranks[i]} appears after rank {ranks[i + 1]} — "
                 "must be sorted ascending for determinism."
             )
 
@@ -463,8 +463,16 @@ class TestCLIRender:
         canonical = dest.parent / "architecture.yaml"
         dest.rename(canonical)
         result = subprocess.run(
-            [sys.executable, "-m", "dadaia_workspace.cli.main", "memory", "render",
-             str(canonical), "--atom-type", "memory-architecture-v1"],
+            [
+                sys.executable,
+                "-m",
+                "dadaia_workspace.cli.main",
+                "memory",
+                "render",
+                str(canonical),
+                "--atom-type",
+                "memory-architecture-v1",
+            ],
             capture_output=True,
             text=True,
             cwd=str(_REPO_ROOT),
@@ -478,8 +486,16 @@ class TestCLIRender:
         """CLI must exit non-zero when the atom fails schema validation."""
         dest = _copy_feature_fixture(_FEAT_INVALID_CHANGELOG, tmp_path)
         result = subprocess.run(
-            [sys.executable, "-m", "dadaia_workspace.cli.main", "memory", "render", str(dest),
-             "--atom-type", "memory-product-feature-v1"],
+            [
+                sys.executable,
+                "-m",
+                "dadaia_workspace.cli.main",
+                "memory",
+                "render",
+                str(dest),
+                "--atom-type",
+                "memory-product-feature-v1",
+            ],
             capture_output=True,
             text=True,
             cwd=str(_REPO_ROOT),
@@ -531,9 +547,7 @@ class TestDeriveProjectName:
         if not yaml_path.exists():
             return  # skip if atoms haven't been migrated yet
         result = _derive_project_name(yaml_path)
-        assert result == "dadaia-workspace", (
-            f"Expected 'dadaia-workspace', got: {result!r}"
-        )
+        assert result == "dadaia-workspace", f"Expected 'dadaia-workspace', got: {result!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -544,9 +558,7 @@ class TestDeriveProjectName:
 class TestDefaultProjectNameDerivation:
     """render_atom injects project_name from path when not in extra_context."""
 
-    def test_render_inside_specs_tree_shows_project_name_in_title(
-        self, tmp_path: Path
-    ) -> None:
+    def test_render_inside_specs_tree_shows_project_name_in_title(self, tmp_path: Path) -> None:
         """Atom inside <project>/specs/memory/ renders with project name in title/H1."""
         project_dir = tmp_path / "my-cool-project"
         mem_dir = project_dir / "specs" / "memory"
@@ -558,12 +570,10 @@ class TestDefaultProjectNameDerivation:
         assert "my-cool-project" in html, (
             "Expected derived project name 'my-cool-project' in rendered HTML "
             f"when atom lives under specs/. Got title/H1 excerpt: "
-            f"{html[html.find('<title>'):html.find('</title>')+8]!r}"
+            f"{html[html.find('<title>') : html.find('</title>') + 8]!r}"
         )
 
-    def test_render_outside_specs_tree_falls_back_to_projeto(
-        self, tmp_path: Path
-    ) -> None:
+    def test_render_outside_specs_tree_falls_back_to_projeto(self, tmp_path: Path) -> None:
         """Atom outside any specs/ tree renders with template default 'Projeto' in title/H1."""
         dest = tmp_path / "architecture.yaml"
         shutil.copy2(_ARCH_VALID, dest)
@@ -573,9 +583,7 @@ class TestDefaultProjectNameDerivation:
             "Expected template default 'Projeto' in rendered HTML when no specs/ ancestor."
         )
 
-    def test_extra_context_project_name_overrides_derived(
-        self, tmp_path: Path
-    ) -> None:
+    def test_extra_context_project_name_overrides_derived(self, tmp_path: Path) -> None:
         """Explicit extra_context project_name wins over path-derived default."""
         project_dir = tmp_path / "my-cool-project"
         mem_dir = project_dir / "specs" / "memory"

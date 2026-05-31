@@ -123,8 +123,20 @@ class _Node:
 # Self-closing / void elements in HTML5 that should never be pushed as parents.
 _VOID_ELEMENTS = frozenset(
     {
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr",
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
     }
 )
 
@@ -151,7 +163,7 @@ class _TreeParser(HTMLParser):
         # Pop until we find the matching open tag (handles unclosed tags gracefully).
         for i in range(len(self._stack) - 1, 0, -1):
             if self._stack[i].tag == tag:
-                self._stack = self._stack[: i]
+                self._stack = self._stack[:i]
                 break
 
     def handle_data(self, data: str) -> None:
@@ -596,7 +608,9 @@ def _extract_product_index(root: _Node, _html_path: Path) -> tuple[dict[str, Any
                 vision_paras.append(text)
     if vision_paras:
         data["vision_oneliner"] = vision_paras[0]
-        data["vision_paragraph"] = " ".join(vision_paras[1:]) if len(vision_paras) > 1 else vision_paras[0]
+        data["vision_paragraph"] = (
+            " ".join(vision_paras[1:]) if len(vision_paras) > 1 else vision_paras[0]
+        )
     else:
         data["vision_oneliner"] = _TODO
         data["vision_paragraph"] = _TODO

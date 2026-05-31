@@ -29,6 +29,7 @@ Fixtures (tests/fixtures/memory/):
   product-feature.invalid-changelog.yaml         (extra field: changelog)
   product-feature.invalid-missing-required.yaml  (missing: purpose)
 """
+
 from __future__ import annotations
 
 import json
@@ -43,7 +44,9 @@ from jsonschema import Draft7Validator, ValidationError, validate
 # Path constants
 # ---------------------------------------------------------------------------
 
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent  # specs/features/unit/tests -> repo root
+_REPO_ROOT = Path(
+    __file__
+).parent.parent.parent.parent.parent  # specs/features/unit/tests -> repo root
 _SCHEMAS_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "memory"
 _FIXTURES_DIR = _REPO_ROOT / "tests" / "fixtures" / "memory"
 
@@ -58,6 +61,7 @@ _SCHEMA_FILES = {
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -78,6 +82,7 @@ def _is_valid(schema: dict[str, Any], instance: Any) -> bool:
 # ---------------------------------------------------------------------------
 # AC-C1-1: Schema files exist
 # ---------------------------------------------------------------------------
+
 
 class TestSchemaFilesExist:
     """AC-C1-1: All 4 schema files must exist under dadaia_workspace/public/schemas/memory/."""
@@ -101,6 +106,7 @@ class TestSchemaFilesExist:
 # AC-C1-2: additionalProperties: false at top-level
 # ---------------------------------------------------------------------------
 
+
 class TestAdditionalPropertiesFalse:
     """AC-C1-2: Each schema must have additionalProperties:false at the top-level object (D-5)."""
 
@@ -118,10 +124,18 @@ class TestAdditionalPropertiesFalse:
 # AC-C1-3: memory-product-feature-v1 has all 6 required fields
 # ---------------------------------------------------------------------------
 
+
 class TestFeatureSchemaRequiredFields:
     """AC-C1-3: memory-product-feature-v1 must have all 6 content fields as required."""
 
-    _REQUIRED_6 = {"purpose", "flow_steps", "typical_trigger", "differential", "runtime_state", "dependencies"}
+    _REQUIRED_6 = {
+        "purpose",
+        "flow_steps",
+        "typical_trigger",
+        "differential",
+        "runtime_state",
+        "dependencies",
+    }
 
     def test_all_six_required_fields_present(self) -> None:
         schema = _load_json(_SCHEMA_FILES["product-feature"])
@@ -155,12 +169,15 @@ class TestFeatureSchemaRequiredFields:
 # AC-C1-4: memory-product-index-v1 catalog entries require rank + keywords
 # ---------------------------------------------------------------------------
 
+
 class TestProductIndexCatalogEntryFields:
     """AC-C1-4: catalog entries must require rank (integer) and keywords (array of strings)."""
 
     def test_catalog_property_exists_and_is_array(self) -> None:
         schema = _load_json(_SCHEMA_FILES["product-index"])
-        assert "catalog" in schema["properties"], "catalog property missing from product-index schema"
+        assert "catalog" in schema["properties"], (
+            "catalog property missing from product-index schema"
+        )
         assert schema["properties"]["catalog"]["type"] == "array"
 
     def test_catalog_entry_requires_rank(self) -> None:
@@ -202,6 +219,7 @@ class TestProductIndexCatalogEntryFields:
 # ---------------------------------------------------------------------------
 # AC-C1-5: changelog/history/versions key fails schema validation
 # ---------------------------------------------------------------------------
+
 
 class TestChangelogKeyFails:
     """AC-C1-5: A YAML atom with changelog/history/versions key must fail schema validation."""
@@ -255,6 +273,7 @@ class TestChangelogKeyFails:
 # AC-C1-5 (continued): missing required field also fails
 # ---------------------------------------------------------------------------
 
+
 class TestMissingRequiredFieldFails:
     """Missing required field in product-feature must fail schema validation."""
 
@@ -280,6 +299,7 @@ class TestMissingRequiredFieldFails:
 # ---------------------------------------------------------------------------
 # AC-C1-6: Valid fixtures pass schema validation
 # ---------------------------------------------------------------------------
+
 
 class TestValidFixturesPass:
     """AC-C1-6: Valid sample atoms for each of the 4 types must pass schema validation."""
@@ -319,7 +339,14 @@ class TestValidFixturesPass:
     def test_product_feature_valid_has_all_six_required_fields(self) -> None:
         """Sanity check: valid fixture must actually contain all 6 required fields."""
         instance = _load_yaml(_FIXTURES_DIR / "product-feature.valid.yaml")
-        required_6 = {"purpose", "flow_steps", "typical_trigger", "differential", "runtime_state", "dependencies"}
+        required_6 = {
+            "purpose",
+            "flow_steps",
+            "typical_trigger",
+            "differential",
+            "runtime_state",
+            "dependencies",
+        }
         present = set(instance.keys())
         missing = required_6 - present
         assert not missing, f"Valid product-feature fixture is missing fields: {sorted(missing)}"
@@ -331,12 +358,15 @@ class TestValidFixturesPass:
             assert "rank" in entry, f"Catalog entry missing 'rank': {entry}"
             assert "keywords" in entry, f"Catalog entry missing 'keywords': {entry}"
             assert isinstance(entry["rank"], int), f"rank must be int, got {type(entry['rank'])}"
-            assert isinstance(entry["keywords"], list), f"keywords must be list, got {type(entry['keywords'])}"
+            assert isinstance(entry["keywords"], list), (
+                f"keywords must be list, got {type(entry['keywords'])}"
+            )
 
 
 # ---------------------------------------------------------------------------
 # Additional structural invariant tests
 # ---------------------------------------------------------------------------
+
 
 class TestSchemaStructuralInvariants:
     """Additional invariants derived from SPEC §C-1 and OWASP-safe design."""

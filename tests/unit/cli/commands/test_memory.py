@@ -85,9 +85,7 @@ class TestCatalogGenerateSuccess:
     def test_output_mentions_feature_count(self, runner: CliRunner, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
         result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert "3" in result.output, (
-            f"Expected feature count '3' in output; got:\n{result.output}"
-        )
+        assert "3" in result.output, f"Expected feature count '3' in output; got:\n{result.output}"
 
     def test_each_entry_has_required_fields(self, runner: CliRunner, tmp_path: Path) -> None:
         required = {"rank", "slug", "title", "summary", "path", "tags", "depends_on"}
@@ -106,42 +104,29 @@ class TestCatalogGenerateSuccess:
 
 
 class TestCatalogGenerateMissingSpecsDir:
-    def test_exits_nonzero_for_nonexistent_path(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_exits_nonzero_for_nonexistent_path(self, runner: CliRunner, tmp_path: Path) -> None:
         nonexistent = tmp_path / "does" / "not" / "exist"
-        result = runner.invoke(
-            app, ["catalog", "generate", "--specs-dir", str(nonexistent)]
-        )
+        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(nonexistent)])
         assert result.exit_code != 0, (
             f"Expected non-zero exit for missing specs_dir; got 0. Output:\n{result.output}"
         )
 
-    def test_error_output_for_nonexistent_path(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_error_output_for_nonexistent_path(self, runner: CliRunner, tmp_path: Path) -> None:
         nonexistent = tmp_path / "does" / "not" / "exist"
-        result = runner.invoke(
-            app, ["catalog", "generate", "--specs-dir", str(nonexistent)]
-        )
+        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(nonexistent)])
         # Either exit_code != 0 or error in output
         assert result.exit_code != 0 or "error" in result.output.lower()
 
-    def test_exits_nonzero_when_index_html_absent(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_exits_nonzero_when_index_html_absent(self, runner: CliRunner, tmp_path: Path) -> None:
         specs = tmp_path / "specs"
         specs.mkdir()
         # Directory exists but no index.html inside memory/product/
         result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
         assert result.exit_code != 0, (
-            f"Expected non-zero exit when index.html is missing; "
-            f"got 0. Output:\n{result.output}"
+            f"Expected non-zero exit when index.html is missing; got 0. Output:\n{result.output}"
         )
 
-    def test_error_message_includes_index_html(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_error_message_includes_index_html(self, runner: CliRunner, tmp_path: Path) -> None:
         specs = tmp_path / "specs"
         specs.mkdir()
         result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
@@ -156,9 +141,7 @@ class TestCatalogGenerateMissingSpecsDir:
 
 
 class TestCatalogGenerateIdempotent:
-    def test_second_call_overwrites_cleanly(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_second_call_overwrites_cleanly(self, runner: CliRunner, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
         # First call
         r1 = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
@@ -184,9 +167,7 @@ class TestCatalogGenerateIdempotent:
         r2 = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
         assert r2.exit_code == 0
 
-    def test_output_json_is_valid_after_overwrite(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_output_json_is_valid_after_overwrite(self, runner: CliRunner, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
         runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
         runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])

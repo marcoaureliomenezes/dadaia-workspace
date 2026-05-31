@@ -99,7 +99,9 @@ def _make_minimal_specs(root: Path, release_id: str = "r1") -> Path:
     (specs / "backlog").mkdir(parents=True)
 
     (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
-    (specs / "memory" / "architecture.html").write_text(MINIMAL_MEMORY_ARCHITECTURE, encoding="utf-8")
+    (specs / "memory" / "architecture.html").write_text(
+        MINIMAL_MEMORY_ARCHITECTURE, encoding="utf-8"
+    )
     (specs / "memory" / "tech-stack.html").write_text(MINIMAL_MEMORY_TECH_STACK, encoding="utf-8")
     (specs / "memory" / "product" / "index.html").write_text(
         MINIMAL_MEMORY_PRODUCT_INDEX, encoding="utf-8"
@@ -149,10 +151,7 @@ def test_struct_error_extra_changelog_field_feature(tmp_path: Path) -> None:
 
     issues = SpecsDoctor(specs).check()
     # Filter to STRUCT-4 errors specifically (not YAML-absent WARNings)
-    struct4_errors = [
-        i for i in issues
-        if i.code == "STRUCT-4" and i.severity == Severity.ERROR
-    ]
+    struct4_errors = [i for i in issues if i.code == "STRUCT-4" and i.severity == Severity.ERROR]
     assert struct4_errors, (
         "Expected STRUCT-4 ERROR for feature atom with changelog field; "
         f"all STRUCT-4: {[i.to_dict() for i in issues if i.code == 'STRUCT-4']}"
@@ -190,10 +189,7 @@ def test_struct_error_missing_required_field_feature(tmp_path: Path) -> None:
     shutil.copy2(_FEAT_INVALID_MISSING, slug_yaml)
 
     issues = SpecsDoctor(specs).check()
-    struct4_errors = [
-        i for i in issues
-        if i.code == "STRUCT-4" and i.severity == Severity.ERROR
-    ]
+    struct4_errors = [i for i in issues if i.code == "STRUCT-4" and i.severity == Severity.ERROR]
     assert struct4_errors, (
         "Expected STRUCT-4 ERROR for feature atom missing 'purpose'; "
         f"all STRUCT-4: {[i.to_dict() for i in issues if i.code == 'STRUCT-4']}"
@@ -218,17 +214,13 @@ def test_yaml_absent_guard_emits_warn_not_error(tmp_path: Path) -> None:
 
     # Must have STRUCT WARNings for the HTML-only atoms.
     struct_warns = [
-        i for i in issues
-        if i.code.startswith("STRUCT-") and i.severity == Severity.WARNING
+        i for i in issues if i.code.startswith("STRUCT-") and i.severity == Severity.WARNING
     ]
-    assert struct_warns, (
-        "Expected STRUCT WARN(s) for HTML-only atoms (YAML-absent guard)"
-    )
+    assert struct_warns, "Expected STRUCT WARN(s) for HTML-only atoms (YAML-absent guard)"
 
     # No STRUCT ERRORs allowed — all atoms are HTML-only.
     struct_errors = [
-        i for i in issues
-        if i.code.startswith("STRUCT-") and i.severity == Severity.ERROR
+        i for i in issues if i.code.startswith("STRUCT-") and i.severity == Severity.ERROR
     ]
     assert struct_errors == [], (
         f"Expected no STRUCT ERRORs for HTML-only repo; got: {[i.description for i in struct_errors]}"
@@ -236,9 +228,7 @@ def test_yaml_absent_guard_emits_warn_not_error(tmp_path: Path) -> None:
 
     # Doctor must exit 0 (no errors at all).
     errors = _errors(issues)
-    assert errors == [], (
-        f"HTML-only repo must have no ERRORs; got: {[i.to_dict() for i in errors]}"
-    )
+    assert errors == [], f"HTML-only repo must have no ERRORs; got: {[i.to_dict() for i in errors]}"
 
 
 def test_yaml_absent_guard_warn_mentions_migrate_command(tmp_path: Path) -> None:
@@ -247,8 +237,7 @@ def test_yaml_absent_guard_warn_mentions_migrate_command(tmp_path: Path) -> None
 
     issues = SpecsDoctor(specs).check()
     struct_warns = [
-        i for i in issues
-        if i.code.startswith("STRUCT-") and i.severity == Severity.WARNING
+        i for i in issues if i.code.startswith("STRUCT-") and i.severity == Severity.WARNING
     ]
     assert struct_warns, "Pre-condition: expected STRUCT WARN(s)"
 
@@ -352,8 +341,9 @@ def test_sync1_not_emitted_when_html_matches_renderer(tmp_path: Path) -> None:
     shutil.copy2(_FEAT_VALID, slug_yaml)
 
     # Render the YAML to produce the expected HTML.
-    rendered = render_atom(slug_yaml, atom_type="memory-product-feature-v1",
-                           templates_dir=_TEMPLATES_DIR)
+    rendered = render_atom(
+        slug_yaml, atom_type="memory-product-feature-v1", templates_dir=_TEMPLATES_DIR
+    )
     slug_html = specs / "memory" / "product" / f"{slug}.html"
     slug_html.write_text(rendered, encoding="utf-8")
 
@@ -397,8 +387,7 @@ def test_doctor_exits_0_all_yaml_valid_html_in_sync(tmp_path: Path) -> None:
     # No errors and no SYNC-1 warnings.
     errors = _errors(issues)
     assert errors == [], (
-        f"Expected 0 errors with valid YAML + synced HTML; got: "
-        f"{[i.to_dict() for i in errors]}"
+        f"Expected 0 errors with valid YAML + synced HTML; got: {[i.to_dict() for i in errors]}"
     )
     sync1 = [i for i in issues if i.code == "SYNC-1"]
     assert sync1 == [], (
@@ -459,13 +448,13 @@ def test_sync1_clean_when_html_rendered_flagless_same_specs_tree(tmp_path: Path)
     (specs / "_archive" / "releases").mkdir(parents=True)
     (specs / "backlog").mkdir(parents=True)
     (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
-    (specs / "memory" / "tech-stack.html").write_text(
-        MINIMAL_MEMORY_TECH_STACK, encoding="utf-8"
-    )
+    (specs / "memory" / "tech-stack.html").write_text(MINIMAL_MEMORY_TECH_STACK, encoding="utf-8")
     (specs / "memory" / "product" / "index.html").write_text(
         MINIMAL_MEMORY_PRODUCT_INDEX, encoding="utf-8"
     )
-    (specs / "releases" / "ACTIVE.md").write_text("release: r1\nphase: IMPLEMENTATION\n", encoding="utf-8")
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release: r1\nphase: IMPLEMENTATION\n", encoding="utf-8"
+    )
     spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-04-01\n\nContent.\n"
     plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
     tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n"
@@ -491,9 +480,7 @@ def test_sync1_clean_when_html_rendered_flagless_same_specs_tree(tmp_path: Path)
     )
 
     # Write the rendered HTML as the committed artifact.
-    (specs / "memory" / "architecture.html").write_text(
-        html_from_flagless_render, encoding="utf-8"
-    )
+    (specs / "memory" / "architecture.html").write_text(html_from_flagless_render, encoding="utf-8")
 
     # Doctor SYNC-1 must report no SYNC-1 warnings (it also uses flagless render_atom).
     issues = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR).check()
@@ -523,9 +510,7 @@ def test_struct1_architecture_invalid_raises_struct1_not_struct4(tmp_path: Path)
     )
     # No STRUCT-4 ERROR should fire (STRUCT-4 is for feature atoms).
     # Only STRUCT-4 WARNings may appear (for HTML-only feature-a).
-    struct4_errors = [
-        i for i in issues if i.code == "STRUCT-4" and i.severity == Severity.ERROR
-    ]
+    struct4_errors = [i for i in issues if i.code == "STRUCT-4" and i.severity == Severity.ERROR]
     assert struct4_errors == [], (
         f"STRUCT-4 ERROR must not fire when architecture.yaml is invalid; got: "
         f"{[i.to_dict() for i in struct4_errors]}"

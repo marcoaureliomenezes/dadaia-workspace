@@ -105,8 +105,8 @@ def test_install_overwrites_existing_files_with_force(tmp_path: Path) -> None:
     FileSystemPublicAssetManager().install(workspace, target="all", force=True)
 
     content = agents_md.read_text(encoding="utf-8")
-    assert content != "custom\n"                  # force overwrote the placeholder
-    assert "# dadaia-workspace" in content        # canonical content is present
+    assert content != "custom\n"  # force overwrote the placeholder
+    assert "# dadaia-workspace" in content  # canonical content is present
 
 
 _CLASSIFY_WORKFLOWS_CASES = [

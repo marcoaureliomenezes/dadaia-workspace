@@ -354,15 +354,17 @@ def test_context_bind_review_blocks_when_impl_lock_held(workspace: Path) -> None
     lock_file = locks_dir / "myctx__v1.json"
     now = _dt.now(tz=UTC).isoformat()
     lock_file.write_text(
-        json.dumps({
-            "lock_type": "implementation",
-            "session_id": "sess_owner123",
-            "context": "myctx",
-            "release": "v1",
-            "pid": os.getpid(),
-            "last_seen_at": now,
-            "ttl_seconds": 300,
-        })
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "session_id": "sess_owner123",
+                "context": "myctx",
+                "release": "v1",
+                "pid": os.getpid(),
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
     )
 
     result = _runner.invoke(
@@ -482,9 +484,7 @@ def test_context_show_json_session_null_when_no_binding(workspace: Path) -> None
 def test_context_show_json_session_populated_when_bound(workspace: Path) -> None:
     """AC-T10d-6: show --json has session sub-object when DADAIA_SESSION_ID is set and session file is fresh."""
     _register_alive_ctx(workspace)
-    bind_result = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "spec"]
-    )
+    bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "spec"])
     assert bind_result.exit_code == 0, bind_result.output
 
     lines = bind_result.output.strip().split("\n")

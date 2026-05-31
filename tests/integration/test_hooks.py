@@ -145,9 +145,7 @@ def test_sdd_gate_v2_passes_primary_slug_path_with_active_task(workspace: Path) 
     # Create release-directory structure (root TASKS.md is no longer supported per T-8a)
     rel_dir = specs / "releases" / "my-release-v1"
     rel_dir.mkdir(parents=True)
-    (specs / "releases" / "ACTIVE.md").write_text(
-        "release: my-release-v1\nphase: IMPLEMENTATION\n"
-    )
+    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
     (rel_dir / "TASKS.md").write_text("- [-] T-001 — doing this now\n")
     _make_primary_context(workspace, "my-proj", specs)
 

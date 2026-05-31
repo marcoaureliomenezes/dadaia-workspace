@@ -236,35 +236,33 @@ class DoctorService:
         audit_path = _audit_log_path(self._workspace_root)
         if audit_path.exists():
             try:
-                lines = [
-                    ln for ln in audit_path.read_text().splitlines() if ln.strip()
-                ]
+                lines = [ln for ln in audit_path.read_text().splitlines() if ln.strip()]
                 for i, line in enumerate(lines, start=1):
                     try:
                         record = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-                    if record.get("event") in _PRODUCTION_WRITE_EVENTS and not record.get("task_id"):
-                            issues.append(
-                                DoctorIssue(
-                                    code="LOCK-4",
-                                    description=(
-                                        f"Production-write event on line {i} of lock-events.jsonl "
-                                        f"is missing 'task_id' field (event={record.get('event')}, "
-                                        f"session_id={record.get('session_id', 'unknown')})"
-                                    ),
-                                    fixable=False,
-                                )
+                    if record.get("event") in _PRODUCTION_WRITE_EVENTS and not record.get(
+                        "task_id"
+                    ):
+                        issues.append(
+                            DoctorIssue(
+                                code="LOCK-4",
+                                description=(
+                                    f"Production-write event on line {i} of lock-events.jsonl "
+                                    f"is missing 'task_id' field (event={record.get('event')}, "
+                                    f"session_id={record.get('session_id', 'unknown')})"
+                                ),
+                                fixable=False,
                             )
+                        )
             except OSError:
                 pass
 
         # LOCK-5: BLOCKED_ATTEMPT event in audit log — surface as signal (NO AUTO-FIX)
         if audit_path.exists():
             try:
-                lines = [
-                    ln for ln in audit_path.read_text().splitlines() if ln.strip()
-                ]
+                lines = [ln for ln in audit_path.read_text().splitlines() if ln.strip()]
                 for i, line in enumerate(lines, start=1):
                     try:
                         record = json.loads(line)

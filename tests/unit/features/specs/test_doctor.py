@@ -625,6 +625,7 @@ def _make_full_tree(root: Path) -> Path:
 
 # ---- TREE-1: foundation/ must not exist
 
+
 def test_tree1_foundation_dir_triggers_warning(tmp_path: Path) -> None:
     """TREE-1: specs/foundation/ present emits a TREE-1 WARNING."""
     specs = _make_clean_specs_tree(tmp_path)
@@ -659,6 +660,7 @@ def test_tree1_fix_does_not_delete_foundation(tmp_path: Path) -> None:
 
 # ---- TREE-2: root SPEC.md must not exist
 
+
 def test_tree2_root_spec_md_triggers_warning(tmp_path: Path) -> None:
     """TREE-2: specs/SPEC.md at tree root emits a TREE-2 WARNING."""
     specs = _make_clean_specs_tree(tmp_path)
@@ -688,6 +690,7 @@ def test_tree2_fix_does_not_move_root_spec_md(tmp_path: Path) -> None:
 
 
 # ---- TREE-3: required memory HTML files must exist
+
 
 def test_tree3_missing_architecture_html_triggers_warning(tmp_path: Path) -> None:
     """TREE-3: memory/architecture.html absent emits a TREE-3 WARNING."""
@@ -726,11 +729,13 @@ def test_tree3_fix_renders_missing_memory_html(tmp_path: Path) -> None:
 
 # ---- TREE-4: backlog/, bugs/, releases/ must exist
 
+
 def test_tree4_missing_backlog_triggers_warning(tmp_path: Path) -> None:
     """TREE-4: specs/backlog/ absent emits a TREE-4 WARNING."""
     specs = _make_clean_specs_tree(tmp_path)
     # Remove backlog dir if present (clean tree doesn't have it)
     import shutil
+
     backlog = specs / "backlog"
     if backlog.exists():
         shutil.rmtree(backlog)
@@ -747,6 +752,7 @@ def test_tree4_fix_creates_missing_dirs(tmp_path: Path) -> None:
     """TREE-4 auto-fix: calling fix() creates the missing directory with README.md + .gitkeep."""
     specs = _make_clean_specs_tree(tmp_path)
     import shutil
+
     for dirname in ("backlog", "bugs"):
         d = specs / dirname
         if d.exists():
@@ -769,6 +775,7 @@ def test_tree4_fix_creates_missing_dirs(tmp_path: Path) -> None:
 
 
 # ---- TREE-5: specs/AGENTS.md must exist and match canonical template
+
 
 def test_tree5_missing_agents_md_triggers_warning(tmp_path: Path) -> None:
     """TREE-5: specs/AGENTS.md absent emits a TREE-5 WARNING."""
@@ -813,6 +820,7 @@ def test_tree5_canonical_agents_md_passes(tmp_path: Path) -> None:
 
 # ---- TREE-6: active release must have mandatory artifacts for its phase
 
+
 def test_tree6_missing_plan_in_impl_phase_triggers_error(tmp_path: Path) -> None:
     """TREE-6: active release in IMPLEMENTATION phase missing PLAN.md emits TREE-6 ERROR."""
     specs = _make_clean_specs_tree(tmp_path)
@@ -842,6 +850,7 @@ def test_tree6_no_autofix_leaves_file_absent(tmp_path: Path) -> None:
 
 
 # ---- TREE-7: bugs/<slug>.md must have session_id frontmatter field
+
 
 def test_tree7_bug_missing_session_id_triggers_error(tmp_path: Path) -> None:
     """TREE-7: a bugs/<slug>.md without session_id: frontmatter emits TREE-7 ERROR."""
@@ -897,6 +906,7 @@ def test_tree7_no_autofix_leaves_bug_unchanged(tmp_path: Path) -> None:
 
 # ---- AC-T9-15: fresh scaffold passes all TREE invariants
 
+
 def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     """AC-T9-15: a freshly scaffolded workspace produces 0 TREE errors and 0 TREE-* issues
     that would break a gate (TREE-1/2/3/4/5 are warnings; 6/7 require violating content).
@@ -917,7 +927,9 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     bugs_dir.mkdir(exist_ok=True)
     src_readme = _SCAFFOLD_DIR / "bugs" / "README.md"
     if src_readme.exists():
-        (bugs_dir / "README.md").write_text(src_readme.read_text(encoding="utf-8"), encoding="utf-8")
+        (bugs_dir / "README.md").write_text(
+            src_readme.read_text(encoding="utf-8"), encoding="utf-8"
+        )
     (bugs_dir / ".gitkeep").write_text("", encoding="utf-8")
 
     # Add AGENTS.md from canonical template
@@ -932,7 +944,9 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
 
     # No TREE-* errors (TREE-6 and TREE-7 would be errors)
     tree_errors = [i for i in issues if i.code.startswith("TREE-") and i.severity == Severity.ERROR]
-    assert tree_errors == [], f"Unexpected TREE errors on fresh scaffold: {[i.to_dict() for i in tree_errors]}"
+    assert tree_errors == [], (
+        f"Unexpected TREE errors on fresh scaffold: {[i.to_dict() for i in tree_errors]}"
+    )
 
 
 # ---- CAT-1: catalog.json ↔ feature HTML sync check (memory-context-enforcement-v1)
@@ -970,12 +984,8 @@ def test_cat1_absent_catalog_with_feature_htmls_triggers_warning(tmp_path: Path)
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
     # Add two more feature HTMLs (feature-a is already in the clean tree)
-    (product_dir / "feature-b.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
-    )
-    (product_dir / "feature-c.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
-    )
+    (product_dir / "feature-b.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
+    (product_dir / "feature-c.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
     # No catalog.json
     assert not (product_dir / "catalog.json").exists()
 
@@ -999,7 +1009,9 @@ def test_cat1_absent_catalog_no_feature_htmls_no_warning(tmp_path: Path) -> None
 
     issues = SpecsDoctor(specs).check()
     cat1 = [i for i in issues if i.code == "CAT-1"]
-    assert cat1 == [], f"Unexpected CAT-1 when no feature HTMLs present: {[i.description for i in cat1]}"
+    assert cat1 == [], (
+        f"Unexpected CAT-1 when no feature HTMLs present: {[i.description for i in cat1]}"
+    )
 
 
 def test_cat1_in_sync_catalog_no_warning(tmp_path: Path) -> None:
@@ -1037,9 +1049,7 @@ def test_cat1_extra_html_warns_with_file_name(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
     # Add an extra HTML file that is NOT in the catalog
-    (product_dir / "new-feature.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
-    )
+    (product_dir / "new-feature.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
     # Catalog lists only feature-a (not new-feature)
     _make_catalog_json(product_dir, ["feature-a"])
 
@@ -1057,9 +1067,7 @@ def test_cat1_both_stale_and_extra_emit_separate_warnings(tmp_path: Path) -> Non
     """CAT-1: one stale slug + one extra HTML → two separate CAT-1 WARNINGs."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    (product_dir / "new-feature.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
-    )
+    (product_dir / "new-feature.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
     # Catalog has stale-slug (no file) but not new-feature or feature-a (extra files)
     _make_catalog_json(product_dir, ["stale-slug"])
 
@@ -1067,8 +1075,7 @@ def test_cat1_both_stale_and_extra_emit_separate_warnings(tmp_path: Path) -> Non
     cat1 = [i for i in issues if i.code == "CAT-1"]
     # At minimum: one for stale-slug, one for feature-a, one for new-feature
     assert len(cat1) >= 2, (
-        f"Expected at least 2 CAT-1 WARNINGs; got {len(cat1)}: "
-        f"{[i.description for i in cat1]}"
+        f"Expected at least 2 CAT-1 WARNINGs; got {len(cat1)}: {[i.description for i in cat1]}"
     )
 
 
@@ -1092,12 +1099,8 @@ def test_cat1_absent_catalog_warning_mentions_count(tmp_path: Path) -> None:
     """CAT-1: the absent-catalog WARNING message includes the HTML file count."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    (product_dir / "feature-b.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
-    )
-    (product_dir / "feature-c.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
-    )
+    (product_dir / "feature-b.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
+    (product_dir / "feature-c.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
     # 3 feature HTMLs: feature-a, feature-b, feature-c
 
     issues = SpecsDoctor(specs).check()
@@ -1110,6 +1113,7 @@ def test_cat1_absent_catalog_warning_mentions_count(tmp_path: Path) -> None:
 
 # ---- AC-T9-16: dadaia-workspace repo itself passes (regression guard)
 
+
 def test_dadaia_workspace_repo_passes_tree_invariants() -> None:
     """AC-T9-16: the dadaia-workspace repo's own specs/ must produce 0 TREE-* errors.
 
@@ -1119,6 +1123,7 @@ def test_dadaia_workspace_repo_passes_tree_invariants() -> None:
     repo_specs = _REPO_ROOT / "specs"
     if not repo_specs.exists():
         import pytest
+
         pytest.skip("specs/ not found — not running in dadaia-workspace repo context")
 
     doctor = SpecsDoctor(repo_specs, public_dir=_PUBLIC_DIR)

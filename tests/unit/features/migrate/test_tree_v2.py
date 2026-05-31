@@ -50,7 +50,9 @@ class TestMigrateFoundation:
 
         legacy_foundation = specs / "releases" / "legacy" / "foundation"
         assert legacy_foundation.is_dir(), "legacy/foundation/ must exist after migration"
-        assert (legacy_foundation / "SPEC.md").is_file(), "SPEC.md must be inside legacy/foundation/"
+        assert (legacy_foundation / "SPEC.md").is_file(), (
+            "SPEC.md must be inside legacy/foundation/"
+        )
         assert not (specs / "foundation").exists(), "original foundation/ must be removed"
         assert len(result.moved) == 1
         src, dst = result.moved[0]
@@ -168,7 +170,9 @@ class TestMigrateRootSpec:
         result = migrate_tree_v2(specs)
 
         assert len(result.moved) == 0
-        assert any("SPEC.md not found" in msg or "nothing to migrate" in msg for msg in result.skipped)
+        assert any(
+            "SPEC.md not found" in msg or "nothing to migrate" in msg for msg in result.skipped
+        )
 
     def test_dry_run_does_not_move_root_spec(self, tmp_path: Path) -> None:
         """dry_run=True reports the planned move without writing anything."""
@@ -249,9 +253,7 @@ class TestScaffoldIntegrity:
             / "public"
             / "scaffold"
         )
-        assert not (scaffold_dir / "SPEC.md").exists(), (
-            "scaffold/SPEC.md must be deleted (AC-T6-1)"
-        )
+        assert not (scaffold_dir / "SPEC.md").exists(), "scaffold/SPEC.md must be deleted (AC-T6-1)"
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +282,7 @@ class TestServiceFallback:
 
         # Find the loop that iterates over the fallback subdirectories
         match = re.search(
-            r'for subdir in \(([^)]+)\)',
+            r"for subdir in \(([^)]+)\)",
             source,
         )
         assert match is not None, "Could not find fallback subdir tuple in service.py"

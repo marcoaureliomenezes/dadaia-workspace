@@ -290,12 +290,18 @@ def test_ac_t11_6_concurrent_alive_no_lost_update(tmp_path: Path) -> None:
     (tmp_path / "repos").mkdir()
 
     ctx_a = SpecContextProject(
-        name="ctx-a", state=ContextState.DEAD, repo_slug="repo-a",
-        repo_url="https://example.com/a", created_at="2026-01-01T00:00:00Z",
+        name="ctx-a",
+        state=ContextState.DEAD,
+        repo_slug="repo-a",
+        repo_url="https://example.com/a",
+        created_at="2026-01-01T00:00:00Z",
     )
     ctx_b = SpecContextProject(
-        name="ctx-b", state=ContextState.DEAD, repo_slug="repo-b",
-        repo_url="https://example.com/b", created_at="2026-01-01T00:00:00Z",
+        name="ctx-b",
+        state=ContextState.DEAD,
+        repo_slug="repo-b",
+        repo_url="https://example.com/b",
+        created_at="2026-01-01T00:00:00Z",
     )
 
     seed_store = JsonContextStore(states_dir)
@@ -357,8 +363,11 @@ def test_ac_t11_7_alive_and_doctor_fix_deterministic(tmp_path: Path) -> None:
     (tmp_path / "repos").mkdir()
 
     ctx = SpecContextProject(
-        name="ctx-c", state=ContextState.DEAD, repo_slug="repo-c",
-        repo_url="https://example.com/c", created_at="2026-01-01T00:00:00Z",
+        name="ctx-c",
+        state=ContextState.DEAD,
+        repo_slug="repo-c",
+        repo_url="https://example.com/c",
+        created_at="2026-01-01T00:00:00Z",
     )
     seed_store = JsonContextStore(states_dir)
     seed_store.save(ctx)
@@ -433,7 +442,9 @@ def test_ac_t11_8_per_context_lock_prevents_concurrent_clone_rmtree(tmp_path: Pa
             barrier.wait(timeout=5)
             with context_lock(ws, "my-repo"):
                 order.append("A-enter")
-                _time.sleep(0.01)  # allowed-sleep: widen critical section to expose a broken lock; serialization is asserted via lock, not timing
+                _time.sleep(
+                    0.01
+                )  # allowed-sleep: widen critical section to expose a broken lock; serialization is asserted via lock, not timing
                 order.append("A-exit")
         except Exception as exc:
             errors.append(exc)
@@ -443,7 +454,9 @@ def test_ac_t11_8_per_context_lock_prevents_concurrent_clone_rmtree(tmp_path: Pa
             barrier.wait(timeout=5)
             with context_lock(ws, "my-repo"):
                 order.append("B-enter")
-                _time.sleep(0.01)  # allowed-sleep: widen critical section to expose a broken lock; serialization is asserted via lock, not timing
+                _time.sleep(
+                    0.01
+                )  # allowed-sleep: widen critical section to expose a broken lock; serialization is asserted via lock, not timing
                 order.append("B-exit")
         except Exception as exc:
             errors.append(exc)
@@ -489,9 +502,7 @@ def test_ac_t11_9_dead_raises_context_locked_when_impl_held(
         svc.dead("proj")
 
 
-def test_ac_t11_9_dead_succeeds_when_no_lock(
-    svc: SpecContextService, ws: Path
-) -> None:
+def test_ac_t11_9_dead_succeeds_when_no_lock(svc: SpecContextService, ws: Path) -> None:
     """dead() succeeds when no implementation lock exists."""
     svc.create("proj", "my-repo", "https://example.com/my-repo")
     svc.alive("proj")
@@ -681,20 +692,24 @@ def test_stale_detected_when_ttl_exceeded(ws: Path) -> None:
     old_time = "2020-01-01T00:00:00Z"  # far in the past
     lock_path = _impl_lock_path(ws, "proj", "v1")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "proj",
-        "release": "v1",
-        "session_id": "sess_old",
-        "runtime": "test",
-        "pid": os.getpid(),
-        "mode": "BOUND_IMPLEMENTATION",
-        "started_at": old_time,
-        "last_seen_at": old_time,
-        "ttl_seconds": 300,
-        "task_path": "",
-        "owner_note": "",
-    }))
+    lock_path.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "proj",
+                "release": "v1",
+                "session_id": "sess_old",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "mode": "BOUND_IMPLEMENTATION",
+                "started_at": old_time,
+                "last_seen_at": old_time,
+                "ttl_seconds": 300,
+                "task_path": "",
+                "owner_note": "",
+            }
+        )
+    )
 
     state = check_lock_state(ws, "proj", "v1")
     assert state == LockState.STALE
@@ -706,20 +721,24 @@ def test_stale_detected_when_pid_dead(ws: Path) -> None:
     # PID 999999999 is virtually guaranteed to not exist
     lock_path = _impl_lock_path(ws, "proj", "v1")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "proj",
-        "release": "v1",
-        "session_id": "sess_dead",
-        "runtime": "test",
-        "pid": 999999999,
-        "mode": "BOUND_IMPLEMENTATION",
-        "started_at": now,
-        "last_seen_at": now,
-        "ttl_seconds": 300,
-        "task_path": "",
-        "owner_note": "",
-    }))
+    lock_path.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "proj",
+                "release": "v1",
+                "session_id": "sess_dead",
+                "runtime": "test",
+                "pid": 999999999,
+                "mode": "BOUND_IMPLEMENTATION",
+                "started_at": now,
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+                "task_path": "",
+                "owner_note": "",
+            }
+        )
+    )
 
     state = check_lock_state(ws, "proj", "v1")
     assert state == LockState.STALE
@@ -730,20 +749,24 @@ def test_reclaim_stale_lock(ws: Path) -> None:
     old_time = "2020-01-01T00:00:00Z"
     lock_path = _impl_lock_path(ws, "proj", "v1")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path.write_text(json.dumps({
-        "lock_type": "implementation",
-        "context": "proj",
-        "release": "v1",
-        "session_id": "sess_stale",
-        "runtime": "test",
-        "pid": os.getpid(),
-        "mode": "BOUND_IMPLEMENTATION",
-        "started_at": old_time,
-        "last_seen_at": old_time,
-        "ttl_seconds": 300,
-        "task_path": "",
-        "owner_note": "",
-    }))
+    lock_path.write_text(
+        json.dumps(
+            {
+                "lock_type": "implementation",
+                "context": "proj",
+                "release": "v1",
+                "session_id": "sess_stale",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "mode": "BOUND_IMPLEMENTATION",
+                "started_at": old_time,
+                "last_seen_at": old_time,
+                "ttl_seconds": 300,
+                "task_path": "",
+                "owner_note": "",
+            }
+        )
+    )
 
     assert check_lock_state(ws, "proj", "v1") == LockState.STALE
 

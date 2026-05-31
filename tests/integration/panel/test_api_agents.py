@@ -305,9 +305,7 @@ class TestTelemetryOverlayMerge:
         assert "telemetry" in se
         assert se["telemetry"]["session_count"] == 5
 
-    def test_telemetry_only_agents_excluded(
-        self, agents_server: Any, staged_root: Path
-    ) -> None:
+    def test_telemetry_only_agents_excluded(self, agents_server: Any, staged_root: Path) -> None:
         """Agents in telemetry but not in canonical catalog are excluded from response."""
         base, token, _ = agents_server
         _, _, body = _get(f"{base}/api/agents", token=token)
@@ -425,9 +423,7 @@ class TestAgentPromptTraversalDefence:
     def test_prompt_valid_known_agent_200(self, agents_server: Any) -> None:
         """GET /api/agents/software-engineer-python/prompt → 200 with system_prompt key."""
         base, token, _ = agents_server
-        status, _, body = _get(
-            f"{base}/api/agents/software-engineer-python/prompt", token=token
-        )
+        status, _, body = _get(f"{base}/api/agents/software-engineer-python/prompt", token=token)
         assert status == 200
         data = json.loads(body)
         assert "system_prompt" in data

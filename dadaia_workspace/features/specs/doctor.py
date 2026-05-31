@@ -512,7 +512,9 @@ class SpecsDoctor:
         # Scaffold source dir (for TREE-4 README content).
         if self.public_dir is not None:
             scaffold_candidate = self.public_dir / "scaffold"
-            self._scaffold_dir: Path | None = scaffold_candidate if scaffold_candidate.is_dir() else None
+            self._scaffold_dir: Path | None = (
+                scaffold_candidate if scaffold_candidate.is_dir() else None
+            )
         else:
             self._scaffold_dir = None
 
@@ -1352,17 +1354,20 @@ class SpecsDoctor:
             target = mem_dir / rel_path
             if target.exists():
                 continue
-            fixable = self._templates_dir is not None and (
-                self._templates_dir / template_name
-            ).exists()
+            fixable = (
+                self._templates_dir is not None and (self._templates_dir / template_name).exists()
+            )
             issues.append(
                 SpecsDoctorIssue(
                     code="TREE-3",
                     severity=Severity.WARNING,
                     description=(
                         f"memory/{rel_path} is missing — required memory HTML. "
-                        + ("Auto-fix available (run doctor --fix)." if fixable else
-                           "No templates_dir available — create manually.")
+                        + (
+                            "Auto-fix available (run doctor --fix)."
+                            if fixable
+                            else "No templates_dir available — create manually."
+                        )
                     ),
                     path=str(target),
                     fixable=fixable,
@@ -1413,17 +1418,21 @@ class SpecsDoctor:
             target = self.specs_dir / dirname
             if target.exists():
                 continue
-            fixable = self._scaffold_dir is not None and (
-                self._scaffold_dir / dirname / "README.md"
-            ).exists()
+            fixable = (
+                self._scaffold_dir is not None
+                and (self._scaffold_dir / dirname / "README.md").exists()
+            )
             issues.append(
                 SpecsDoctorIssue(
                     code="TREE-4",
                     severity=Severity.WARNING,
                     description=(
                         f"specs/{dirname}/ is missing — required spec tree directory. "
-                        + ("Auto-fix available (run doctor --fix)." if fixable else
-                           "No scaffold source available — create manually.")
+                        + (
+                            "Auto-fix available (run doctor --fix)."
+                            if fixable
+                            else "No scaffold source available — create manually."
+                        )
                     ),
                     path=str(target),
                     fixable=fixable,
@@ -1693,9 +1702,7 @@ class SpecsDoctor:
                     SpecsDoctorIssue(
                         code=struct_code,
                         severity=Severity.WARNING,
-                        description=_YAML_ABSENT_WARN_TEMPLATE.format(
-                            atom_rel=f"memory/{rel_key}"
-                        ),
+                        description=_YAML_ABSENT_WARN_TEMPLATE.format(atom_rel=f"memory/{rel_key}"),
                         path=str(html_path),
                     )
                 )
@@ -1790,9 +1797,7 @@ class SpecsDoctor:
 
         # Collect slugs from HTML files (excluding index.html)
         html_slugs: set[str] = {
-            p.stem
-            for p in product_dir.glob("*.html")
-            if p.name != "index.html"
+            p.stem for p in product_dir.glob("*.html") if p.name != "index.html"
         }
 
         if not catalog_path.exists():

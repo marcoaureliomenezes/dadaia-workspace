@@ -202,7 +202,11 @@ def test_ac_t12_3_reclaim_held_raises_lock_active_error(tmp_path: Path) -> None:
             reason="should not work",
         )
 
-    assert "HELD" in str(exc_info.value) or "sess_held" in str(exc_info.value) or "reclaim" in str(exc_info.value).lower()
+    assert (
+        "HELD" in str(exc_info.value)
+        or "sess_held" in str(exc_info.value)
+        or "reclaim" in str(exc_info.value).lower()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -401,9 +405,7 @@ def test_ac_t12_7_audit_event_schema_fields(tmp_path: Path) -> None:
     for line in lines:
         record = json.loads(line)
         missing = required_fields - set(record.keys())
-        assert not missing, (
-            f"Audit record missing fields {missing}: {record}"
-        )
+        assert not missing, f"Audit record missing fields {missing}: {record}"
         # ts must be a valid ISO 8601 timestamp
         assert record["ts"], f"ts field is empty: {record}"
         datetime.fromisoformat(record["ts"].replace("Z", "+00:00"))
@@ -424,26 +426,34 @@ def test_lock1_duplicate_files_detected(tmp_path: Path) -> None:
     old_ts = _stale_iso(20)
 
     lock_fresh = locks_dir / "proj__v1.json"
-    lock_fresh.write_text(json.dumps({
-        "session_id": "sess_fresh",
-        "runtime": "test",
-        "pid": os.getpid(),
-        "context": "proj",
-        "release": "v1",
-        "last_seen_at": now_ts,
-        "ttl_seconds": 300,
-    }))
+    lock_fresh.write_text(
+        json.dumps(
+            {
+                "session_id": "sess_fresh",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "context": "proj",
+                "release": "v1",
+                "last_seen_at": now_ts,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     lock_stale = locks_dir / "proj__v1-dup.json"
-    lock_stale.write_text(json.dumps({
-        "session_id": "sess_stale",
-        "runtime": "test",
-        "pid": os.getpid(),
-        "context": "proj",
-        "release": "v1-dup",
-        "last_seen_at": old_ts,
-        "ttl_seconds": 300,
-    }))
+    lock_stale.write_text(
+        json.dumps(
+            {
+                "session_id": "sess_stale",
+                "runtime": "test",
+                "pid": os.getpid(),
+                "context": "proj",
+                "release": "v1-dup",
+                "last_seen_at": old_ts,
+                "ttl_seconds": 300,
+            }
+        )
+    )
 
     # Both have same stem prefix but different filenames — they're different keys.
     # To test LOCK-1 properly, we create two files with the same stem pattern
@@ -517,26 +527,30 @@ def test_lock4_production_write_missing_task_id_reported(tmp_path: Path) -> None
     audit_path = _audit_log_path(ws)
     audit_path.parent.mkdir(parents=True, exist_ok=True)
 
-    record_with_task = json.dumps({
-        "ts": datetime.now(tz=UTC).isoformat(),
-        "event": "PRODUCTION_WRITE",
-        "context": "proj",
-        "release": "v1",
-        "session_id": "sess_ok",
-        "runtime": "test",
-        "pid": os.getpid(),
-        "task_id": "T-12",
-    })
-    record_missing_task = json.dumps({
-        "ts": datetime.now(tz=UTC).isoformat(),
-        "event": "PRODUCTION_WRITE",
-        "context": "proj",
-        "release": "v1",
-        "session_id": "sess_bad",
-        "runtime": "test",
-        "pid": os.getpid(),
-        # task_id deliberately absent
-    })
+    record_with_task = json.dumps(
+        {
+            "ts": datetime.now(tz=UTC).isoformat(),
+            "event": "PRODUCTION_WRITE",
+            "context": "proj",
+            "release": "v1",
+            "session_id": "sess_ok",
+            "runtime": "test",
+            "pid": os.getpid(),
+            "task_id": "T-12",
+        }
+    )
+    record_missing_task = json.dumps(
+        {
+            "ts": datetime.now(tz=UTC).isoformat(),
+            "event": "PRODUCTION_WRITE",
+            "context": "proj",
+            "release": "v1",
+            "session_id": "sess_bad",
+            "runtime": "test",
+            "pid": os.getpid(),
+            # task_id deliberately absent
+        }
+    )
 
     audit_path.write_text(record_with_task + "\n" + record_missing_task + "\n")
 

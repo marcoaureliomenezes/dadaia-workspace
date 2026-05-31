@@ -97,6 +97,5 @@ def _repo_root_write_guard() -> object:
         formatted = "\n  ".join(sorted(new_files))
         pytest.fail(
             f"Test wrote unexpected files into protected lib-repo paths:\n  {formatted}\n"
-            "These directories must not be modified by tests: "
-            + ", ".join(_GUARDED_DIRS)
+            "These directories must not be modified by tests: " + ", ".join(_GUARDED_DIRS)
         )

@@ -77,6 +77,7 @@ class TestMemoryProductAdd:
         )
         # Catalog section must be identical
         import re
+
         def catalog(html: str) -> str:
             m = re.search(r'<section id="catalog">(.*?)</section>', html, re.DOTALL)
             assert m

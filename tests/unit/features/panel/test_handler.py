@@ -416,9 +416,7 @@ def test_no_bypass_rejects_invalid_token_for_api_get() -> None:
         stubs, token=_BYPASS_TOKEN, loopback_bypass=False
     )
 
-    status, body = _dispatch_get_with_auth(
-        handler_class, "/api/reports", token="wrong-token"
-    )
+    status, body = _dispatch_get_with_auth(handler_class, "/api/reports", token="wrong-token")
 
     assert status == 401
     assert b"unauthorized" in body
@@ -432,9 +430,7 @@ def test_valid_token_works_with_loopback_bypass_enabled() -> None:
         stubs, token=_BYPASS_TOKEN, loopback_bypass=True
     )
 
-    status, _ = _dispatch_get_with_auth(
-        handler_class, "/api/reports", token=_BYPASS_TOKEN
-    )
+    status, _ = _dispatch_get_with_auth(handler_class, "/api/reports", token=_BYPASS_TOKEN)
 
     assert status == 200
     assert stubs["api_reports"].call_count == 1
@@ -447,9 +443,7 @@ def test_valid_token_works_with_loopback_bypass_disabled() -> None:
         stubs, token=_BYPASS_TOKEN, loopback_bypass=False
     )
 
-    status, _ = _dispatch_get_with_auth(
-        handler_class, "/api/reports", token=_BYPASS_TOKEN
-    )
+    status, _ = _dispatch_get_with_auth(handler_class, "/api/reports", token=_BYPASS_TOKEN)
 
     assert status == 200
     assert stubs["api_reports"].call_count == 1

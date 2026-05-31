@@ -161,12 +161,12 @@ def _extract_summary(li_text: str, anchor_text: str) -> str:
     text = li_text.strip()
     # Remove the anchor text from the beginning (if present)
     if anchor_text and text.startswith(anchor_text):
-        text = text[len(anchor_text):]
+        text = text[len(anchor_text) :]
     # Strip leading em-dash variants (— EM DASH, – EN DASH, - HYPHEN-MINUS) and whitespace
     text = text.lstrip()
     for dash in ("—", "–", "-"):
         if text.startswith(dash):
-            text = text[len(dash):].strip()
+            text = text[len(dash) :].strip()
             break
     return text.strip()
 
@@ -194,9 +194,7 @@ def generate_catalog(specs_dir: Path) -> dict:  # type: ignore[type-arg]
     """
     index_path = Path(specs_dir) / "memory" / "product" / "index.html"
     if not index_path.exists():
-        raise FileNotFoundError(
-            f"index.html not found at expected path: {index_path}"
-        )
+        raise FileNotFoundError(f"index.html not found at expected path: {index_path}")
 
     html_text = index_path.read_text(encoding="utf-8")
     parser = _CatalogParser()

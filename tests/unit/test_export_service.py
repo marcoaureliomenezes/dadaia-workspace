@@ -8,9 +8,7 @@ from dadaia_workspace.features.export.service import ExportService
 from tests.fakes import FakeContextStore, FakeGitClient
 
 
-def _ctx(
-    name: str = "demo", *, branch: str | None = None
-) -> SpecContextProject:
+def _ctx(name: str = "demo", *, branch: str | None = None) -> SpecContextProject:
     return SpecContextProject(
         name=name,
         state=ContextState.ALIVE,

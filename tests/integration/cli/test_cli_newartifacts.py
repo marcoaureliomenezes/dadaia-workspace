@@ -78,7 +78,9 @@ class TestReleaseNew:
 
         assert result.exit_code != 0
         # Error message must be informative
-        assert "already exists" in result.output.lower() or "already exists" in (result.stderr or "")
+        assert "already exists" in result.output.lower() or "already exists" in (
+            result.stderr or ""
+        )
 
     def test_invalid_slug_exits_nonzero(self, specs: Path) -> None:
         """AC-T7-5 / AC-C-5: invalid slug exits non-zero."""
