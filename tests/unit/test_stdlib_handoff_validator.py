@@ -199,3 +199,82 @@ def test_error_message_includes_field_path():
             break
     else:
         pytest.fail("No error about 'agent' field_path found")
+
+
+# ---------------------------------------------------------------------------
+# K-3 / AC-4 — handoff-v1.1 verdict field (panel-kanban-v1)
+# ---------------------------------------------------------------------------
+
+
+# AC-4.1: schema accepts verdict: "APPROVED"
+def test_verdict_approved_is_accepted() -> None:
+    """AC-4.1 — verdict: 'APPROVED' validates without errors."""
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    doc = {**_MINIMAL_VALID, "verdict": "APPROVED"}
+    errors = list(validator.validate(doc))
+    assert errors == [], f"Expected no errors but got: {errors}"
+
+
+# AC-4.1: schema accepts verdict: "REJECTED"
+def test_verdict_rejected_is_accepted() -> None:
+    """AC-4.1 — verdict: 'REJECTED' validates without errors."""
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    doc = {**_MINIMAL_VALID, "verdict": "REJECTED"}
+    errors = list(validator.validate(doc))
+    assert errors == [], f"Expected no errors but got: {errors}"
+
+
+# AC-4.1: schema rejects verdict: "MAYBE" (enum enforced)
+def test_verdict_invalid_value_rejected() -> None:
+    """AC-4.1 — verdict: 'MAYBE' must be rejected (enum constraint)."""
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    doc = {**_MINIMAL_VALID, "verdict": "MAYBE"}
+    errors = list(validator.validate(doc))
+    assert len(errors) >= 1, "Expected at least one error for verdict='MAYBE'"
+    assert any("verdict" in e.field_path for e in errors), (
+        f"Expected error on 'verdict' field_path; got: {[e.field_path for e in errors]}"
+    )
+
+
+# AC-4.2: existing sidecar without verdict still validates (backward compat)
+def test_verdict_absent_still_validates() -> None:
+    """AC-4.2 — sidecar without 'verdict' field validates (field is optional)."""
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    # _MINIMAL_VALID has no 'verdict' key — this is the backward-compat case
+    assert "verdict" not in _MINIMAL_VALID
+    errors = list(validator.validate(_MINIMAL_VALID))
+    assert errors == [], f"Expected no errors for sidecar without verdict; got: {errors}"
+
+
+# AC-4.3: verdict_reason string is accepted alongside verdict
+def test_verdict_reason_string_accepted() -> None:
+    """AC-4.3 adjacent — verdict_reason is optional string, validated when present."""
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    doc = {**_MINIMAL_VALID, "verdict": "APPROVED", "verdict_reason": "All acceptance criteria met."}
+    errors = list(validator.validate(doc))
+    assert errors == [], f"Expected no errors but got: {errors}"
+
+
+# AC-4.3: StdlibHandoffValidator with real schema accepts v1.1 sidecar with verdict APPROVED
+def test_stdlib_validator_accepts_v1_1_sidecar_with_verdict() -> None:
+    """AC-4.3 — StdlibHandoffValidator exits cleanly (no errors) on a v1.1 sidecar
+    containing verdict: 'APPROVED', mirroring what dadaia reports validate does."""
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    sidecar: dict[str, object] = {
+        "schema_version": "handoff-v1.1",
+        "agent": "qa-engineer",
+        "context": "dadaia-workspace",
+        "produced_at": "2026-05-31T10:00:00Z",
+        "scope": "dadaia-workspace/panel-kanban-v1",
+        "metrics": {"tests_run": 5, "tests_passed": 5},
+        "artifact": {
+            "type": "report",
+            "content_hash": "a" * 64,
+        },
+        "verdict": "APPROVED",
+        "verdict_reason": "All Playwright board scenarios passed.",
+    }
+    errors = list(validator.validate(sidecar))
+    assert errors == [], (
+        f"Expected no validation errors on v1.1 sidecar with verdict=APPROVED; got: {errors}"
+    )

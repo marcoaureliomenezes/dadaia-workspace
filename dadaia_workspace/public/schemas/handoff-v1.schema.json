@@ -116,6 +116,15 @@
         }
       },
       "description": "Optional pointer to the expected next handoff in the pipeline."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["APPROVED", "REJECTED"],
+      "description": "Optional approval verdict emitted by qa-engineer or security-reviewer. When present, must be APPROVED or REJECTED. Enables machine-checkable dual-approval gate at release CLOSURE."
+    },
+    "verdict_reason": {
+      "type": "string",
+      "description": "Optional human-readable summary explaining the verdict."
     }
   }
 }

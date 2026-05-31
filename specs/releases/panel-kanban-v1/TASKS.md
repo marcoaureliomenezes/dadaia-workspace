@@ -66,7 +66,7 @@ All of the following AC-IDs pass in `poetry run pytest`:
 - AC-1.13 `loopback_bypass=False`, no token → 401.
 - AC-1.14 `loopback_bypass=True` → 200 without Authorization header.
 
-[ ] K-1
+[x] K-1
 
 ---
 
@@ -174,7 +174,7 @@ Tokens added to `tokens.py`; WCAG AA ratios match SPEC §3 K-2 audit table.
   `verdict: "APPROVED"`.
 - `dadaia public doctor` exits 0 after propagation (devops-engineer confirms).
 
-[ ] K-3
+[x] K-3
 
 ---
 
