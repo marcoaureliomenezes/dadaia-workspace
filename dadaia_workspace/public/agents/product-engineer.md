@@ -238,6 +238,23 @@ The panel UI labels the catalog of installed spec contexts as "Spec Context Proj
 `specs/memory/*.html` for *atomic product memory* is unchanged. Don't confuse the
 panel-tab terminology with the memory atom paths I write to during CLOSURE.
 
+## Step 0 — Memory bootstrap (mandatory, before any implementation)
+
+If the memory bootstrap was injected at session start via ctx-inject.sh, it is already in
+your context. If not (Codex or standalone invocation), execute the dadaia-workspace-spec-navigator
+skill now:
+
+  1. Read specs/memory/architecture.html — layer rules, dependency contracts, agent topology.
+  2. Read specs/memory/tech-stack.html — approved languages, runtimes, constraints.
+  3. Read specs/memory/product/catalog.json (or index.html if catalog.json absent) — feature
+     catalog. Identify the 1-3 features most relevant to your task.
+  4. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+
+Do NOT begin any implementation, review, or report until Step 0 is complete.
+This ensures you are working from the current product state, not from stale context.
+
+---
+
 ## Mandatory workflow — release lifecycle (5 phases I own)
 
 This is the ordered sequence under the new topology. Phases 1-3 (intake/dispatch/

@@ -15,6 +15,7 @@ skills:
   - drift-detection
   - project-orchestration
   - dadaia-handoff-emitter
+  - dadaia-workspace-spec-navigator
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -99,6 +100,23 @@ Scope defaults to all three unless `audit_scope` input restricts it.
 
 Code structure inspection heuristics (layering rules, module boundary analysis) are embedded
 in this agent's training — no external skill file is required.
+
+---
+
+## Step 0 — Memory bootstrap (mandatory, before any implementation)
+
+If the memory bootstrap was injected at session start via ctx-inject.sh, it is already in
+your context. If not (Codex or standalone invocation), execute the dadaia-workspace-spec-navigator
+skill now:
+
+  1. Read specs/memory/architecture.html — layer rules, dependency contracts, agent topology.
+  2. Read specs/memory/tech-stack.html — approved languages, runtimes, constraints.
+  3. Read specs/memory/product/catalog.json (or index.html if catalog.json absent) — feature
+     catalog. Identify the 1-3 features most relevant to your task.
+  4. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+
+Do NOT begin any implementation, review, or report until Step 0 is complete.
+This ensures you are working from the current product state, not from stale context.
 
 ---
 
