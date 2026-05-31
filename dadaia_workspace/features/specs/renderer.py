@@ -42,6 +42,37 @@ from jsonschema import Draft7Validator, validate
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Project-name derivation (deterministic default, no system time / env reads)
+# ---------------------------------------------------------------------------
+
+
+def _derive_project_name(yaml_path: Path) -> str | None:
+    """Derive a project/context name deterministically from the YAML atom's path.
+
+    Walk up the directory tree from *yaml_path* looking for a directory named
+    ``specs``.  When found, return the name of **its parent** directory — that
+    is the repository / context root name (e.g. ``dadaia-workspace``).
+
+    Returns ``None`` when no ``specs`` ancestor is found (e.g. a tmp fixture
+    outside any specs tree), so that callers can fall back to the template's
+    own ``| default('Projeto')`` without crashing.
+
+    Examples:
+        ``/home/user/repos/dadaia-workspace/specs/memory/architecture.yaml``
+        → ``dadaia-workspace``
+
+        ``/tmp/pytest-42/architecture.yaml``  (no specs/ ancestor)
+        → ``None``
+    """
+    resolved = yaml_path.resolve()
+    for parent in resolved.parents:
+        if parent.name == "specs":
+            # parent.parent is the repo/context root
+            return parent.parent.name
+    return None
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -437,6 +468,19 @@ def render_atom(
     if builder is None:
         raise ValueError(f"No context builder registered for atom_type {resolved_type!r}")
     context: dict[str, Any] = builder(data, yaml_path)
+
+    # 4b. Inject default project_name derived deterministically from the atom's
+    #     path (walk up to the specs/ ancestor, use its parent directory name).
+    #     This default fires ONLY when neither extra_context nor the builder has
+    #     set project_name, ensuring:
+    #       - flagless CLI  → same result as doctor SYNC-1 (both rely on this default)
+    #       - --project-name flag overrides via extra_context below
+    #       - tmp fixtures outside a specs tree get None → template default ('Projeto')
+    if "project_name" not in context:
+        derived = _derive_project_name(yaml_path)
+        if derived is not None:
+            context["project_name"] = derived
+            context.setdefault("context_name", derived)
 
     # 5. Merge optional extra context (caller-supplied render-time variables).
     # Extra context values win over built context for the same key.

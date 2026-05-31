@@ -31,7 +31,11 @@ import pytest
 import yaml
 from jsonschema import ValidationError
 
-from dadaia_workspace.features.specs.renderer import render_atom, validate_atom
+from dadaia_workspace.features.specs.renderer import (
+    _derive_project_name,
+    render_atom,
+    validate_atom,
+)
 
 # ---------------------------------------------------------------------------
 # Path constants (resolved from repo root via this file's location)
@@ -482,4 +486,125 @@ class TestCLIRender:
         )
         assert result.returncode != 0, (
             "CLI must exit non-zero when the atom fails schema validation."
+        )
+
+
+# ---------------------------------------------------------------------------
+# _derive_project_name helper unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestDeriveProjectName:
+    """_derive_project_name(yaml_path) derives name from specs/ ancestor."""
+
+    def test_specs_in_path_returns_parent_name(self, tmp_path: Path) -> None:
+        """When yaml_path is under .../my-project/specs/memory/..., return 'my-project'."""
+        project_dir = tmp_path / "my-project"
+        specs_dir = project_dir / "specs" / "memory"
+        specs_dir.mkdir(parents=True)
+        yaml_path = specs_dir / "architecture.yaml"
+        yaml_path.write_text("", encoding="utf-8")
+        result = _derive_project_name(yaml_path)
+        assert result == "my-project"
+
+    def test_product_subdir_in_specs(self, tmp_path: Path) -> None:
+        """Path under specs/memory/product/ also yields the project name."""
+        project_dir = tmp_path / "dadaia-workspace"
+        specs_dir = project_dir / "specs" / "memory" / "product"
+        specs_dir.mkdir(parents=True)
+        yaml_path = specs_dir / "some-feature.yaml"
+        yaml_path.write_text("", encoding="utf-8")
+        result = _derive_project_name(yaml_path)
+        assert result == "dadaia-workspace"
+
+    def test_no_specs_ancestor_returns_none(self, tmp_path: Path) -> None:
+        """When there is no specs/ ancestor, return None (fallback to template default)."""
+        # tmp_path has no 'specs' directory in its ancestry.
+        yaml_path = tmp_path / "architecture.yaml"
+        yaml_path.write_text("", encoding="utf-8")
+        result = _derive_project_name(yaml_path)
+        assert result is None
+
+    def test_dadaia_workspace_repo_path(self) -> None:
+        """_REPO_ROOT/specs/memory/architecture.yaml should yield 'dadaia-workspace'."""
+        yaml_path = _REPO_ROOT / "specs" / "memory" / "architecture.yaml"
+        if not yaml_path.exists():
+            return  # skip if atoms haven't been migrated yet
+        result = _derive_project_name(yaml_path)
+        assert result == "dadaia-workspace", (
+            f"Expected 'dadaia-workspace', got: {result!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Default project_name derivation in render_atom (no extra_context)
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultProjectNameDerivation:
+    """render_atom injects project_name from path when not in extra_context."""
+
+    def test_render_inside_specs_tree_shows_project_name_in_title(
+        self, tmp_path: Path
+    ) -> None:
+        """Atom inside <project>/specs/memory/ renders with project name in title/H1."""
+        project_dir = tmp_path / "my-cool-project"
+        mem_dir = project_dir / "specs" / "memory"
+        mem_dir.mkdir(parents=True)
+        dest = mem_dir / "architecture.yaml"
+        shutil.copy2(_ARCH_VALID, dest)
+
+        html = render_atom(dest, "memory-architecture-v1")
+        assert "my-cool-project" in html, (
+            "Expected derived project name 'my-cool-project' in rendered HTML "
+            f"when atom lives under specs/. Got title/H1 excerpt: "
+            f"{html[html.find('<title>'):html.find('</title>')+8]!r}"
+        )
+
+    def test_render_outside_specs_tree_falls_back_to_projeto(
+        self, tmp_path: Path
+    ) -> None:
+        """Atom outside any specs/ tree renders with template default 'Projeto' in title/H1."""
+        dest = tmp_path / "architecture.yaml"
+        shutil.copy2(_ARCH_VALID, dest)
+
+        html = render_atom(dest, "memory-architecture-v1")
+        assert "Projeto" in html, (
+            "Expected template default 'Projeto' in rendered HTML when no specs/ ancestor."
+        )
+
+    def test_extra_context_project_name_overrides_derived(
+        self, tmp_path: Path
+    ) -> None:
+        """Explicit extra_context project_name wins over path-derived default."""
+        project_dir = tmp_path / "my-cool-project"
+        mem_dir = project_dir / "specs" / "memory"
+        mem_dir.mkdir(parents=True)
+        dest = mem_dir / "architecture.yaml"
+        shutil.copy2(_ARCH_VALID, dest)
+
+        html = render_atom(
+            dest,
+            "memory-architecture-v1",
+            extra_context={"project_name": "explicit-override"},
+        )
+        assert "explicit-override" in html, (
+            "extra_context project_name should override the path-derived default."
+        )
+        assert "my-cool-project" not in html, (
+            "Derived project name must NOT appear when extra_context overrides it."
+        )
+
+    def test_determinism_with_derived_project_name(self, tmp_path: Path) -> None:
+        """Double-render in same specs/ tree is byte-identical (AC-REND-1 still holds)."""
+        project_dir = tmp_path / "my-cool-project"
+        mem_dir = project_dir / "specs" / "memory"
+        mem_dir.mkdir(parents=True)
+        dest = mem_dir / "architecture.yaml"
+        shutil.copy2(_ARCH_VALID, dest)
+
+        html1 = render_atom(dest, "memory-architecture-v1")
+        html2 = render_atom(dest, "memory-architecture-v1")
+        assert html1 == html2, (
+            "Double-render with derived project name must be byte-identical (AC-REND-1)."
         )

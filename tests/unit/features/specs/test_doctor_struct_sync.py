@@ -433,6 +433,78 @@ def test_dadaia_workspace_repo_still_exits_0_with_new_checks() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SYNC-1 determinism: doctor and flagless render_atom agree on project_name
+# ---------------------------------------------------------------------------
+
+
+def test_sync1_clean_when_html_rendered_flagless_same_specs_tree(tmp_path: Path) -> None:
+    """SYNC-1 fix verification: doctor and flagless render_atom derive the same
+    project_name from the specs_dir path → SYNC-1 stays clean.
+
+    Before the fix, render_atom used project_name='Projeto' by default while
+    doctor's SYNC-1 also called render_atom without extra_context, so both
+    agreed on 'Projeto' — BUT the committed HTML (rendered with --project-name
+    dadaia-workspace) said 'dadaia-workspace', causing a false SYNC-1 warn.
+
+    After the fix, ALL callers (flagless CLI, doctor SYNC-1) derive from the
+    specs/ ancestor name.  This test verifies that an HTML rendered by
+    render_atom (no extra_context) from within a named specs tree is considered
+    in-sync by doctor.
+    """
+    # Create a project tree with a named root.
+    project_dir = tmp_path / "my-project"
+    specs = project_dir / "specs"
+    (specs / "memory" / "product").mkdir(parents=True)
+    (specs / "releases" / "r1").mkdir(parents=True)
+    (specs / "_archive" / "releases").mkdir(parents=True)
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
+    (specs / "memory" / "tech-stack.html").write_text(
+        MINIMAL_MEMORY_TECH_STACK, encoding="utf-8"
+    )
+    (specs / "memory" / "product" / "index.html").write_text(
+        MINIMAL_MEMORY_PRODUCT_INDEX, encoding="utf-8"
+    )
+    (specs / "releases" / "ACTIVE.md").write_text("release: r1\nphase: IMPLEMENTATION\n", encoding="utf-8")
+    spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-04-01\n\nContent.\n"
+    plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
+    tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n"
+    (specs / "releases" / "r1" / "SPEC.md").write_text(spec_md, encoding="utf-8")
+    (specs / "releases" / "r1" / "PLAN.md").write_text(plan_md, encoding="utf-8")
+    (specs / "releases" / "r1" / "TASKS.md").write_text(tasks_md, encoding="utf-8")
+
+    # Place a valid architecture YAML and render its HTML with NO extra_context.
+    arch_yaml = specs / "memory" / "architecture.yaml"
+    shutil.copy2(_ARCH_VALID, arch_yaml)
+    # flagless render — uses _derive_project_name → "my-project"
+    html_from_flagless_render = render_atom(
+        arch_yaml,
+        atom_type="memory-architecture-v1",
+        templates_dir=_TEMPLATES_DIR,
+    )
+    # Verify the rendered HTML actually uses the derived name (not 'Projeto').
+    assert "my-project" in html_from_flagless_render, (
+        "Flagless render_atom should derive 'my-project' from specs/ ancestor."
+    )
+    assert "Projeto" not in html_from_flagless_render, (
+        "Flagless render_atom must NOT use the 'Projeto' fallback when in a specs tree."
+    )
+
+    # Write the rendered HTML as the committed artifact.
+    (specs / "memory" / "architecture.html").write_text(
+        html_from_flagless_render, encoding="utf-8"
+    )
+
+    # Doctor SYNC-1 must report no SYNC-1 warnings (it also uses flagless render_atom).
+    issues = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR).check()
+    sync1 = [i for i in issues if i.code == "SYNC-1"]
+    assert sync1 == [], (
+        f"Expected SYNC-1 CLEAN after fix (doctor and flagless CLI use same default); "
+        f"got: {[i.description for i in sync1]}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # STRUCT-1 / STRUCT-2 / STRUCT-3 slot codes
 # ---------------------------------------------------------------------------
 

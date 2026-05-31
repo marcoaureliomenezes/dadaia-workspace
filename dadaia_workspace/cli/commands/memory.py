@@ -113,10 +113,14 @@ def memory_render(
             "If omitted, the type is inferred from the file path."
         ),
     ),
-    project_name: str = typer.Option(
-        "Projeto",
+    project_name: str | None = typer.Option(
+        None,
         "--project-name",
-        help="Project name injected as context_name / project_name template variable.",
+        help=(
+            "Project name injected as context_name / project_name template variable. "
+            "When omitted, the name is derived from the specs/ ancestor directory "
+            "(e.g. 'dadaia-workspace'). Explicitly passing this flag overrides the default."
+        ),
     ),
 ) -> None:
     """Validate and render a YAML memory atom to adjacent HTML.
@@ -137,10 +141,15 @@ def memory_render(
         typer.echo(f"[error] Expected a .yaml or .yml file, got: {src.suffix}", err=True)
         sys.exit(1)
 
-    extra_context: dict[str, str] = {
-        "project_name": project_name,
-        "context_name": project_name,
-    }
+    # Explicit --project-name flag → always inject as extra_context so it wins.
+    # No flag → rely on render_atom's built-in _derive_project_name default (same
+    # path that doctor SYNC-1 takes), keeping CLI and doctor in sync.
+    extra_context: dict[str, str] | None = None
+    if project_name is not None:
+        extra_context = {
+            "project_name": project_name,
+            "context_name": project_name,
+        }
 
     try:
         html = render_atom(
