@@ -29,9 +29,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { BASE_URL, PANEL_TOKEN } from './helpers';
 
+// Workspace-root .dadaia/tmp (mandated landing zone): five levels up from
+// tests/e2e/panel/ → repos/dadaia-workspace → repos → <workspace-root>.
 const SCREENSHOTS_DIR = path.join(
   __dirname,
-  '../../../../',
+  '../../../../../',
   '.dadaia/tmp/qa-engineer/panel-kanban-v1'
 );
 

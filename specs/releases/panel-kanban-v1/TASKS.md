@@ -250,7 +250,7 @@ exists); activation gate satisfied
 - Screenshots present in `.dadaia/tmp/qa-engineer/panel-kanban-v1/`.
 - QA handoff sidecar emitted with `verdict: "APPROVED"`.
 
-[ ] K-QA-PW
+[x] K-QA-PW
 
 ---
 
@@ -282,7 +282,7 @@ exists); activation gate satisfied
 - CI run green with a `verdict: "APPROVED"` sidecar present (evidence: CI run URL or
   stdout snippet).
 
-[ ] K-CI
+[x] K-CI
 
 ---
 
