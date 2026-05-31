@@ -322,14 +322,14 @@ def test_sections_have_tabindex_zero() -> None:
 
 
 def test_tabpanel_count_is_three() -> None:
-    """T-AM-01/T-AM-18/PR5-C4/T-P5-26/T-P5-34: 7 role=tabpanel elements after Reports section added.
+    """T-AM-01/T-AM-18/PR5-C4/T-P5-26/T-P5-34/K-2: 8 role=tabpanel elements after Kanban tab added.
 
     Count history: 3 → 5 (Sessions added in PR5-C4) → 6 (Academy added in T-P5-26)
-                     → 7 (Reports added in T-P5-34).
+                     → 7 (Reports added in T-P5-34) → 8 (Kanban added in panel-kanban-v1 K-2).
     """
     service = _build_service()
     html = _render(service)
-    assert html.count('role="tabpanel"') == 7
+    assert html.count('role="tabpanel"') == 8
 
 
 def test_panel_js_contains_keydown_handler() -> None:
@@ -370,11 +370,11 @@ def test_aria_pairs_workflows() -> None:
 
 
 def test_nav_has_4_tabs() -> None:
-    """T-AM-18/PR5-C4/T-P5-35: nav-tabs must contain exactly 7 tab buttons after Reports and Academy tabs added."""
+    """T-AM-18/PR5-C4/T-P5-35/K-2: nav-tabs must contain exactly 8 tab buttons after Kanban tab added."""
     service = _build_service()
     html = _render(service)
-    # Count role="tab" occurrences (Memories, Agents, Workflows, Sessions, Reports, Academy, Servers)
-    assert html.count('role="tab"') == 7
+    # Count role="tab" occurrences (Memories, Agents, Workflows, Sessions, Reports, Academy, Kanban, Servers)
+    assert html.count('role="tab"') == 8
 
 
 # ---------------------------------------------------------------------------

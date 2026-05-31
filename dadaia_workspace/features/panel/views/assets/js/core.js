@@ -257,6 +257,9 @@
       if (target === 'reports') {
         window.Panel.activate('reports');
       }
+      if (target === 'kanban') {
+        window.Panel.activate('kanban');
+      }
     });
   });
 
@@ -288,6 +291,9 @@
     } else if (hash.startsWith('#academy')) {
       var academyTab = document.getElementById('tab-academy');
       if (academyTab) { academyTab.click(); }
+    } else if (hash.startsWith('#kanban')) {
+      var kanbanTab = document.getElementById('tab-kanban');
+      if (kanbanTab) { kanbanTab.click(); }
     }
   })();
 
@@ -302,6 +308,7 @@
     if (window.Sessions) { window.Panel.register('sessions', window.Sessions); }
     if (window.Academy) { window.Panel.register('academy', window.Academy); }
     if (window.Reports) { window.Panel.register('reports', window.Reports); }
+    if (window.Kanban) { window.Panel.register('kanban', window.Kanban); }
   });
 
 })();
