@@ -223,7 +223,7 @@ without `# allowed-sleep` comment (AC-RACE-2). All tests pass with
 **Done criterion:** `poetry run pytest` green; all ACs in §11 pass; coverage thresholds
 met; `--randomly-seed=last` green.
 
-[ ] T-QA
+[x] T-QA
 
 ---
 
