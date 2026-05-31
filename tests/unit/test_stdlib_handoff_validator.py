@@ -250,7 +250,11 @@ def test_verdict_absent_still_validates() -> None:
 def test_verdict_reason_string_accepted() -> None:
     """AC-4.3 adjacent — verdict_reason is optional string, validated when present."""
     validator = StdlibHandoffValidator(_SCHEMA_PATH)
-    doc = {**_MINIMAL_VALID, "verdict": "APPROVED", "verdict_reason": "All acceptance criteria met."}
+    doc = {
+        **_MINIMAL_VALID,
+        "verdict": "APPROVED",
+        "verdict_reason": "All acceptance criteria met.",
+    }
     errors = list(validator.validate(doc))
     assert errors == [], f"Expected no errors but got: {errors}"
 

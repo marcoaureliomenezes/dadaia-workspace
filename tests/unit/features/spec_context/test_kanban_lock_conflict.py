@@ -534,9 +534,7 @@ def test_r_two_impl_sessions_race(ws: Path) -> None:
     assert not t2.is_alive(), "Thread 2 did not complete within 5 s"
 
     total = len(successes) + len(errors)
-    assert total == 2, (
-        f"Expected 2 outcomes, got {total}: successes={successes}, errors={errors}"
-    )
+    assert total == 2, f"Expected 2 outcomes, got {total}: successes={successes}, errors={errors}"
 
     # The lock file must exist with exactly one owner
     lock_path = _impl_lock_path(ws, context, release)
@@ -544,17 +542,11 @@ def test_r_two_impl_sessions_race(ws: Path) -> None:
 
     lock_data = json.loads(lock_path.read_text())
     owner = lock_data.get("session_id")
-    assert owner in ("sess_impl_08a", "sess_impl_08b"), (
-        f"Unexpected lock owner: {owner}"
-    )
+    assert owner in ("sess_impl_08a", "sess_impl_08b"), f"Unexpected lock owner: {owner}"
 
     # Verify state is HELD (file is valid, pid alive, TTL not exceeded)
     state = check_lock_state(ws, context, release)
-    assert state == LockState.HELD, (
-        f"Expected HELD state after race, got {state}"
-    )
+    assert state == LockState.HELD, f"Expected HELD state after race, got {state}"
 
     # At least one thread must have succeeded
-    assert len(successes) >= 1, (
-        f"Both threads failed unexpectedly: errors={errors}"
-    )
+    assert len(successes) >= 1, f"Both threads failed unexpectedly: errors={errors}"

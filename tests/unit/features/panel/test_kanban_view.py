@@ -329,8 +329,10 @@ def test_kanban_stale_session_flagged_is_stale_true(tmp_path: Path) -> None:
     """AC-1.8: last_seen_at 10 minutes ago, ttl_seconds=180 → is_stale=True."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     ten_min_ago = (
-        datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(minutes=10)
-    ).isoformat().replace("+00:00", "Z")
+        (datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(minutes=10))
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     _write_session(
         sessions_dir,
         session_id="sess_stale",
@@ -357,8 +359,10 @@ def test_kanban_fresh_session_flagged_is_stale_false(tmp_path: Path) -> None:
     """AC-1.9: last_seen_at 30 s ago, ttl_seconds=300 → is_stale=False."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     thirty_sec_ago = (
-        datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(seconds=30)
-    ).isoformat().replace("+00:00", "Z")
+        (datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(seconds=30))
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     _write_session(
         sessions_dir,
         session_id="sess_fresh",
@@ -578,12 +582,7 @@ def test_kanban_session_missing_required_field_skipped(tmp_path: Path) -> None:
     assert status == 200
     data = json.loads(body)
     # Only the valid session is in the output.
-    all_cards = [
-        c
-        for lane in data["swimlanes"]
-        for col in lane["columns"].values()
-        for c in col
-    ]
+    all_cards = [c for lane in data["swimlanes"] for col in lane["columns"].values() for c in col]
     ids = [c["session_id"] for c in all_cards]
     assert "sess_good" in ids
     assert "sess_bad" not in ids
