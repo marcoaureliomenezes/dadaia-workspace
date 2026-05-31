@@ -27,7 +27,7 @@
 <body>
 
 <h1>Architecture Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-30 · Closure: panel-ux-fix-v1</p>
+<p class="meta">Última atualização: 2026-05-31 · Closure: spec-context-session-locks-v1</p>
 
 <section id="overview">
   <h2>Visão geral</h2>
@@ -104,26 +104,42 @@ flowchart LR
 </section>
 
 <section id="data-flow-gate">
-  <h2>Fluxo de dados — gate v3 SDD</h2>
+  <h2>Fluxo de dados — gate v3 SDD (com RULE E e PostToolUse)</h2>
   <pre class="mermaid">
 sequenceDiagram
     participant Tool as Agent Tool
-    participant Hook as PreToolUse Hook
-    participant Gate as sdd-spec-gate.sh v3
+    participant PreHook as PreToolUse Hook
+    participant Gate as sdd-spec-gate.sh
     participant Active as releases/ACTIVE.md
+    participant Session as .dadaia/sessions/sess_*.json
+    participant Lock as .dadaia/locks/implementation/
     participant TASKS as releases/&lt;id&gt;/TASKS.md
-    Tool->>Hook: Write/Edit (file_path)
-    Hook->>Gate: stdin JSON
-    Gate->>Active: read release + phase
-    Gate->>Gate: rule A: memory/* + phase≠CLOSURE → block
-    Gate->>Gate: rule B: _archive/* → block
-    Gate->>Gate: rule meta-edit: TASKS/PLAN/SPEC/CLOSURE/ACTIVE → allow
-    Gate->>TASKS: grep [-] marker
-    alt task [-] found
-        Gate-->>Hook: exit 0 (allow)
-    else no [-]
-        Gate-->>Hook: {"decision":"block",...}
+    participant PostHook as PostToolUse Hook
+    participant PostGate as sdd-post-gate.sh
+    Tool->>PreHook: Write/Edit (file_path)
+    PreHook->>Gate: stdin JSON
+    Gate->>Active: read phase
+    Gate->>Gate: RULE A: memory/* + phase≠CLOSURE → block
+    Gate->>Gate: RULE B: _archive/* → block
+    Gate->>Gate: RULE D: path-scope allowlist check
+    Gate->>Session: read DADAIA_SESSION_ID session file
+    alt DADAIA_SESSION_ID absent
+        Gate-->>PreHook: exit 0 (fail-open)
+    else session present
+        Gate->>Lock: read impl lock (IMPLEMENTATION mode)
+        Gate->>Gate: RULE E: path-policy matrix (mode + staleness + ownership)
+        Gate->>TASKS: grep [-] marker (RULE C; release from lock file if IMPL mode)
+        alt allowed + task [-]
+            Gate-->>PreHook: exit 0 (allow)
+        else
+            Gate-->>PreHook: {"decision":"block", owner session_id}
+        end
     end
+    PreHook-->>Tool: allow/block
+    Tool->>PostHook: tool completed
+    PostHook->>PostGate: DADAIA_SESSION_ID
+    PostGate->>Session: renew last_seen_at (atomic)
+    PostGate->>Lock: append HEARTBEAT to lock-events.jsonl
   </pre>
 </section>
 
@@ -149,12 +165,17 @@ sequenceDiagram
   <h2>Estado runtime</h2>
   <p>Locais canônicos de estado em disco e seu propósito:</p>
   <ul>
-    <li><code>.dadaia/states/primary_context.json</code> — contexto primário ativo (<code>repo_slug</code>, <code>specs_dir</code>).</li>
-    <li><code>.dadaia/states/&lt;context&gt;.json</code> — estado por Spec Context Project (lifecycle, ativo/standby).</li>
+    <li><code>.dadaia/states/spec_contexts.json</code> — todos os Spec Context Projects (<code>schema_version: "2"</code>; state ALIVE/DEAD; sem <code>is_primary</code>; campos <code>alive_since</code> e <code>dead_since</code>).</li>
+    <li><code>.dadaia/states/.ws_lock</code> — fcntl workspace-wide lock (gitignored; criado em runtime; Lock 1).</li>
+    <li><code>.dadaia/states/ctx_locks/&lt;slug&gt;.lock</code> — fcntl per-context lock (gitignored; Lock 2).</li>
+    <li><code>.dadaia/sessions/&lt;sess_*&gt;.json</code> — session files criados por <code>context bind</code>; registram mode, release, runtime, pid, last_seen_at, ttl_seconds.</li>
+    <li><code>.dadaia/locks/implementation/&lt;ctx&gt;__&lt;release&gt;.json</code> — Lock 3 per-release implementation lock (state: FREE/HELD/STALE/RECLAIMED).</li>
+    <li><code>.dadaia/logs/lock-events.jsonl</code> — audit log append-only (O_APPEND; registros &lt;1 KB; eventos: ACQUIRED, RELEASED, STALE_DETECTED, RECLAIMED, HEARTBEAT, BLOCKED_ATTEMPT).</li>
     <li><code>.dadaia/agentic/&lt;type&gt;/</code> — staging de assets (snapshot imutável).</li>
     <li><code>.dadaia/agentic/manifest.json</code> — registro do que foi propagado para cada tool.</li>
-    <li><code>.dadaia/scripts/sdd-spec-gate.sh</code> — projeção do gate (instalada por <code>dadaia public install</code>).</li>
-    <li><code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/*.html</code> — reports HTML produzidos por especialistas (20 diretórios possíveis correspondentes aos 20 agentes: 2 Tier 1 orquestradores + product-engineer + 17 Tier 3 leaves incluindo os 5 introduzidos em r3 — <code>software-engineer-python</code>, <code>software-engineer-node</code>, <code>data-engineer</code>, <code>data-analyst</code>, <code>ai-engineer</code>), consumidos por <code>project-manager</code> no Discovery e por <code>project-auditor</code> nas auditorias.</li>
+    <li><code>.dadaia/scripts/sdd-spec-gate.sh</code> — projeção do gate PreToolUse (instalada por <code>dadaia public install</code>).</li>
+    <li><code>.dadaia/scripts/sdd-post-gate.sh</code> — projeção do gate PostToolUse / heartbeat renewal (instalada por <code>dadaia public install</code>).</li>
+    <li><code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/*.html</code> — reports HTML produzidos por especialistas (20 diretórios possíveis correspondentes aos 20 agentes), consumidos por <code>project-manager</code> no Discovery e por <code>project-auditor</code> nas auditorias.</li>
     <li><code>specs/releases/ACTIVE.md</code> — release ativa + phase.</li>
     <li><code>specs/memory/*.html</code> — memory atômica (HTML + Mermaid + assets).</li>
     <li><code>specs/_archive/releases/&lt;id&gt;/</code> — releases concluídas com CLOSURE.</li>
@@ -162,6 +183,7 @@ sequenceDiagram
     <li><code>specs/_archive/legacy-memory/&lt;ts&gt;/</code> — memory markdown migrado para HTML.</li>
     <li><code>specs/_archive/legacy-root/</code> — SPEC/PLAN/TASKS top-level pre-release-lifecycle.</li>
   </ul>
+  <p><strong>Removido em v2:</strong> <code>.dadaia/states/primary_context.json</code> (deletado por <code>dadaia migrate</code>; não recriado em nenhum code path v2). O conceito de "global primary" foi substituído por session binding via <code>eval $(dadaia context bind ...)</code>.</p>
 </section>
 
 <section id="evidence">
