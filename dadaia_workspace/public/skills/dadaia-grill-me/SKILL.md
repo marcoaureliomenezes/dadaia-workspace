@@ -217,3 +217,19 @@ Lista consolidada de todas as mudanças a fazer:
 - **Registrar "respondida via inspeção"** — quando resolver algo sem perguntar, documentar no report
 - **Não aceitar "depende"** — se o operador diz isso, explore a árvore de decisão até ter uma resposta acionável
 
+---
+
+## Problemas Conhecidos no Backlog Atual (pré-carregados)
+
+Ao iniciar uma sessão sem escopo específico, começar por estes achados já identificados:
+
+1. **constitution.md diz "Provider primário: NVIDIA NIM"** → routing-v2 implementado inverteu a ordem (OpenRouter é primário hoje)
+2. **platform/snapshots FR1/FR2** referencia `/home/workspace/mnt/hermes-1/data/` → esses paths só existem após `platform/volume-migration`, que não está declarada como dependência
+3. **openclaw/guardrails verificação** usa path `/docker/openclaw-x44i/data/.backups/` → path antigo; se volume-migration for implementada primeiro, esse comando quebra
+4. **opencode/telegram-bot SEC8** diz "docker.sock montado `:ro`" → a implementação monta `:rw` (necessário para compose write ops); spec contradiz o código deployado
+5. **platform/instance-templates FR2** usa placeholder `{{INSTANCE_NAME}}` → mas FR/NFR diz "via `envsubst` ou `sed`"; `envsubst` usa `${VAR}`, não `{{VAR}}`
+6. **openclaw/guardrails vs platform/snapshots** → ambas fazem backups de `openclaw.json`; guardrails: a cada 5 min; snapshots: diário incremental; não há coordenação declarada
+7. **hermes/telegram-gateway Open Questions** ainda `[ ]` → "Qual o ID do operador?" já respondível (`hermes.env: TELEGRAM_OPERATOR_CHAT_ID=<TELEGRAM_CHAT_ID>`); "supervisor já instalado?" → já implementado (supervisord rodando)
+8. **security/applications** diz fix aplicado com `TELEGRAM_ALLOWED_USERS=<TELEGRAM_CHAT_ID>` em `<config-path>/.env` → hermes.env tem `TELEGRAM_OPERATOR_CHAT_ID`; nomes divergem — pode ser variável diferente ou descrição incorreta do fix
+9. **openclaw/guardrails** está categorizada como "guardrails" mas especifica backups de config; `hermes/guardrails` especifica restrição de escrita via `HERMES_WRITE_SAFE_ROOT` — categorias com mesmo nome, problemas totalmente diferentes
+10. **openclaw/telegram-gateway Open Questions** → trustedProxies IP ainda `[ ]` mas é descobrível: `docker inspect vps-traefik-1 | grep IPAddress`
