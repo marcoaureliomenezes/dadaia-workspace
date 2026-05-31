@@ -1761,6 +1761,19 @@ class FileSystemPublicAssetManager:
                         "matcher": "",
                     }
                 ],
+                "PostToolUse": [
+                    {
+                        "hooks": [
+                            {
+                                "command": str(
+                                    workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"
+                                ),
+                                "type": "command",
+                            }
+                        ],
+                        "matcher": "",
+                    }
+                ],
                 "UserPromptSubmit": [
                     {
                         "hooks": [
@@ -1823,7 +1836,22 @@ class FileSystemPublicAssetManager:
                     },
                     "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"),
                 }
-            ]
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": {
+                        "tool": [
+                            "write_file",
+                            "edit_file",
+                            "apply_patch",
+                            "Write",
+                            "Edit",
+                            "MultiEdit",
+                        ]
+                    },
+                    "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"),
+                }
+            ],
         }
 
     def _opencode_config(self, workspace_root: Path) -> dict[str, object]:

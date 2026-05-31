@@ -933,3 +933,96 @@ def test_bound_review_mode_blocks_production_write(workspace: Path) -> None:
     data = json.loads(result.stdout)
     assert data["decision"] == "block"
     assert "RULE E" in data["reason"]
+
+
+# ---------------------------------------------------------------------------
+# AC-T13-10: Inline heartbeat fallback (OpenCode OQ-3) in sdd-spec-gate.sh
+# ---------------------------------------------------------------------------
+
+
+def test_ac_t13_10_inline_heartbeat_on_allow_path(workspace: Path) -> None:
+    """AC-T13-10a: Bound IMPLEMENTATION session + allowed path → gate exits 0,
+    session last_seen_at renewed, HEARTBEAT appended to lock-events.jsonl.
+
+    This exercises the OpenCode inline-heartbeat fallback (OQ-3): on Claude/Codex
+    the post-gate also fires (idempotent double-renew is harmless); on OpenCode the
+    gate's inline renewal is the only heartbeat mechanism.
+    """
+    scripts = _install_scripts(workspace)
+    slug = "my-proj"
+    release_id = "my-release-v1"
+    specs = workspace / "repos" / slug / "specs"
+    _make_active_release(specs, release_id)
+    _make_primary_context(workspace, slug, specs)
+
+    sess_id = "sess_inline_hb"
+    old_ts = (datetime.now(tz=UTC) - timedelta(seconds=60)).isoformat()
+    sess_file = _make_session_file(
+        workspace,
+        sess_id,
+        mode="BOUND_IMPLEMENTATION",
+        context=slug,
+        release=release_id,
+        last_seen_at=old_ts,
+        runtime="opencode",
+    )
+    _make_impl_lock(workspace, slug, release_id, sess_id)
+
+    target_file = workspace / "repos" / slug / "src" / "main.py"
+    before_run = datetime.now(tz=UTC)
+    result = _run_gate(scripts, workspace, target_file, session_id=sess_id)
+    after_run = datetime.now(tz=UTC)
+
+    assert result.returncode == 0
+    # Gate should allow (not block)
+    assert result.stdout == "" or json.loads(result.stdout).get("decision") != "block", (
+        f"Expected ALLOW but got: {result.stdout!r}"
+    )
+
+    # Verify last_seen_at was renewed (inline heartbeat fired)
+    updated = json.loads(sess_file.read_text())
+    new_last_seen = datetime.fromisoformat(updated["last_seen_at"].replace("Z", "+00:00"))
+    assert new_last_seen >= before_run, (
+        f"last_seen_at ({new_last_seen}) should be >= before_run ({before_run})"
+    )
+    assert new_last_seen <= after_run + timedelta(seconds=2), (
+        f"last_seen_at ({new_last_seen}) should be close to after_run ({after_run})"
+    )
+    assert updated["last_seen_at"] != old_ts, "last_seen_at should have been updated"
+
+    # Verify HEARTBEAT event was appended to lock-events.jsonl
+    audit_path = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
+    assert audit_path.exists(), "lock-events.jsonl should be created by inline heartbeat"
+    lines = [ln for ln in audit_path.read_text().splitlines() if ln.strip()]
+    events = [json.loads(ln) for ln in lines]
+    heartbeats = [e for e in events if e.get("event") == "HEARTBEAT"]
+    assert len(heartbeats) >= 1, "At least one HEARTBEAT event expected"
+    last_hb = heartbeats[-1]
+    assert last_hb["session_id"] == sess_id
+    assert last_hb["context"] == slug
+    assert last_hb["release"] == release_id
+
+
+def test_ac_t13_10_no_heartbeat_when_no_session(workspace: Path) -> None:
+    """AC-T13-10b: Fail-open (no DADAIA_SESSION_ID) → NO inline heartbeat side-effect.
+
+    When the gate fails open (no session), the inline heartbeat block must NOT fire.
+    """
+    scripts = _install_scripts(workspace)
+    slug = "my-proj"
+    specs = workspace / "repos" / slug / "specs"
+    _make_active_release(specs, "my-release-v1")
+    _make_primary_context(workspace, slug, specs)
+
+    target_file = workspace / "repos" / slug / "src" / "main.py"
+    # No session ID
+    result = _run_gate(scripts, workspace, target_file, session_id=None)
+
+    assert result.returncode == 0
+
+    # lock-events.jsonl must NOT be created (or if it exists, no HEARTBEAT lines)
+    audit_path = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
+    if audit_path.exists():
+        lines = [ln for ln in audit_path.read_text().splitlines() if ln.strip()]
+        heartbeats = [json.loads(ln) for ln in lines if json.loads(ln).get("event") == "HEARTBEAT"]
+        assert len(heartbeats) == 0, "No HEARTBEAT expected when no session ID"

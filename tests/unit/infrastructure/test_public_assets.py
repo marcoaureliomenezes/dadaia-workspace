@@ -1572,6 +1572,13 @@ class TestConfigGenerators:
         assert isinstance(matchers, list)
         assert len(matchers) > 0
         assert "command" in matchers[0]
+        # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
+        assert "PostToolUse" in hooks
+        post_matchers = hooks["PostToolUse"]
+        assert isinstance(post_matchers, list)
+        assert len(post_matchers) > 0
+        assert "command" in post_matchers[0]
+        assert str(post_matchers[0]["command"]).endswith("sdd-post-gate.sh")
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
@@ -1579,6 +1586,13 @@ class TestConfigGenerators:
         assert "hooks" in settings
         assert "PreToolUse" in settings["hooks"]
         assert "UserPromptSubmit" in settings["hooks"]
+        # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
+        assert "PostToolUse" in settings["hooks"]
+        post_hooks = settings["hooks"]["PostToolUse"]
+        assert isinstance(post_hooks, list)
+        assert len(post_hooks) > 0
+        commands = [h["command"] for h in post_hooks[0]["hooks"]]
+        assert any(str(c).endswith("sdd-post-gate.sh") for c in commands)
 
     def test_opencode_config_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()

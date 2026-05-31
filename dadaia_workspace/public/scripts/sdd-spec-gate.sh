@@ -689,6 +689,47 @@ fi
 
 if [ -n "$ACTIVE" ]; then
     _log "allowed — active task in: $ACTIVE (release=${ACTIVE_RELEASE:-none})"
+    # OpenCode post-hook fallback (OQ-3): inline heartbeat — OpenCode hooks are
+    # plugin-based, JSON post-hook unsupported. Claude Code and Codex also run
+    # this path; the double-renew (pre + post hook) is idempotent and harmless.
+    # Guard: only when DADAIA_SESSION_ID is set + session file exists; never on
+    # fail-open. Best-effort: failures are silently ignored, gate never blocks.
+    if [ -n "${DADAIA_SESSION_ID:-}" ]; then
+        _INLINE_SESS_FILE="$WS/.dadaia/sessions/${DADAIA_SESSION_ID}.json"
+        if [ -f "$_INLINE_SESS_FILE" ]; then
+            python3 - "$_INLINE_SESS_FILE" "$WS" "$DADAIA_SESSION_ID" 2>/dev/null <<'PYEOF' || true
+import json, os, sys
+from datetime import UTC, datetime
+from pathlib import Path
+sess_file = Path(sys.argv[1])
+ws = Path(sys.argv[2])
+sess_id = sys.argv[3]
+try:
+    data = json.loads(sess_file.read_text())
+except (json.JSONDecodeError, OSError):
+    sys.exit(0)
+now = datetime.now(tz=UTC).isoformat()
+data["last_seen_at"] = now
+tmp = sess_file.with_suffix(".tmp")
+tmp.write_text(json.dumps(data, indent=2))
+os.replace(tmp, sess_file)
+context = data.get("context", "")
+release = data.get("release", "") or ""
+runtime = data.get("runtime", "unknown")
+pid = data.get("pid", 0)
+record = {"ts": now, "event": "HEARTBEAT", "context": context, "release": release,
+          "session_id": sess_id, "runtime": runtime, "pid": pid}
+line = (json.dumps(record) + "\n").encode("utf-8")
+audit_path = ws / ".dadaia" / "logs" / "lock-events.jsonl"
+audit_path.parent.mkdir(parents=True, exist_ok=True)
+fd = os.open(str(audit_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+try:
+    os.write(fd, line)
+finally:
+    os.close(fd)
+PYEOF
+        fi
+    fi
     exit 0
 fi
 
