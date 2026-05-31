@@ -338,11 +338,12 @@ def bind(
         if mode_upper == "IMPLEMENTATION":
             assert release is not None  # guaranteed above
 
-            # Impl-XOR-Review: check blocking BOUND_REVIEW sessions first
-            check_impl_xor_review(workspace_root, name, release, "IMPLEMENTATION", session_id)
-
             if force:
-                # Force-reclaim path
+                # Force-reclaim path: XOR check + reclaim are not wrapped in
+                # workspace_lock because reclaim is a force-overwrite by definition
+                # (it always succeeds regardless of the current lock holder).
+                # workspace_lock is not needed for atomicity here.
+                check_impl_xor_review(workspace_root, name, release, "IMPLEMENTATION", session_id)
                 try:
                     reclaim_impl_lock(
                         workspace_root,
@@ -357,8 +358,21 @@ def bind(
                     err_console.print(f"[red]Error:[/red] {e}")
                     raise typer.Exit(1) from None
             else:
-                # Normal path: create_impl_lock checks HELD and raises LockHeldError
+                # Normal path: check_impl_xor_review + create_impl_lock are both
+                # inside a single workspace_lock critical section (Defect 2 fix).
+                # This eliminates the TOCTOU window between the XOR check and the
+                # lock creation: no other process can interleave after the check
+                # passes and before create_impl_lock writes the lock file.
+                #
+                # Deadlock audit (AC-REG-4): workspace_lock uses fcntl.flock with a
+                # fresh fd each call. create_impl_lock does NOT call workspace_lock
+                # internally (verified by code audit of locking.py). There is
+                # therefore no nested workspace_lock acquisition on any path through
+                # this critical section — no deadlock is possible.
                 with workspace_lock(workspace_root):
+                    check_impl_xor_review(
+                        workspace_root, name, release, "IMPLEMENTATION", session_id
+                    )
                     create_impl_lock(
                         workspace_root,
                         context=name,
@@ -380,9 +394,20 @@ def bind(
         elif mode_upper == "REVIEW":
             assert release is not None  # guaranteed above
 
-            # Impl-XOR-Review: check if implementation lock is HELD
+            # check_impl_xor_review + session-file write are both inside a single
+            # workspace_lock critical section (Defect 2 fix).
+            # The former separate workspace_lock block around session_file.write_text
+            # (below) is merged here so that no other process can interleave between
+            # the XOR check and the session file being written.
+            #
+            # Deadlock audit (AC-REG-4): _write_review_session (called below) and
+            # check_impl_xor_review do NOT call workspace_lock internally (verified by
+            # code audit). No nested acquisition — no deadlock possible.
             try:
-                check_impl_xor_review(workspace_root, name, release, "REVIEW", session_id)
+                with workspace_lock(workspace_root):
+                    check_impl_xor_review(workspace_root, name, release, "REVIEW", session_id)
+                    session_file = sessions_dir / f"{session_id}.json"
+                    session_file.write_text(json.dumps(session_data, indent=2))
             except ReviewBlockedByImplementationError:
                 audit_blocked(
                     workspace_root,
@@ -426,10 +451,13 @@ def bind(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # Write session file inside workspace lock
-    with workspace_lock(workspace_root):
-        session_file = sessions_dir / f"{session_id}.json"
-        session_file.write_text(json.dumps(session_data, indent=2))
+    # Write session file inside workspace lock for all modes EXCEPT REVIEW
+    # (REVIEW mode already wrote the session file atomically inside its own
+    # workspace_lock critical section above, together with the XOR check).
+    if mode_upper != "REVIEW":
+        with workspace_lock(workspace_root):
+            session_file = sessions_dir / f"{session_id}.json"
+            session_file.write_text(json.dumps(session_data, indent=2))
 
     # Output eval-compatible export lines
     dadaia_mode = mode_upper

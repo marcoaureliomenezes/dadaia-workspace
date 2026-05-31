@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import time
+import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -267,10 +268,17 @@ def create_impl_lock(
     lock_path = _impl_lock_path(workspace_root, context, release)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Atomic write via tmp → os.replace
-    tmp = lock_path.with_suffix(".tmp")
+    # Atomic write via per-call unique tmp → os.replace.
+    # Using a UUID-based tmp name (not the shared .tmp suffix) eliminates the
+    # FileNotFoundError that arises when two threads race on the same release and
+    # the loser finds the shared .tmp already consumed by the winner's os.replace.
+    tmp = lock_path.parent / f"{lock_path.name}.{uuid.uuid4().hex}.tmp"
     tmp.write_text(json.dumps(lock_data, indent=2))
-    os.replace(tmp, lock_path)
+    try:
+        os.replace(tmp, lock_path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
     return lock_data
 
@@ -358,9 +366,14 @@ def reclaim_impl_lock(
     }
 
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = lock_path.with_suffix(".tmp")
+    # Per-call unique tmp name — see create_impl_lock for rationale.
+    tmp = lock_path.parent / f"{lock_path.name}.{uuid.uuid4().hex}.tmp"
     tmp.write_text(json.dumps(new_lock_data, indent=2))
-    os.replace(tmp, lock_path)
+    try:
+        os.replace(tmp, lock_path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
     _append_audit_event(
         workspace_root,
@@ -460,7 +473,13 @@ def check_impl_xor_review(
     """
     if mode == "REVIEW":
         state = check_lock_state(workspace_root, context, release)
-        if state == LockState.HELD:
+        # OQ-1 resolved as Option A: STALE blocks review until explicit reclaim.
+        # A STALE lock means the implementation session died mid-work; allowing
+        # review to proceed over a half-done implementation violates Impl-XOR-Review.
+        # The operator must run 'dadaia context bind --mode implementation --force
+        # --reason "..."' to reclaim, or have the owning session run
+        # 'dadaia context release'.
+        if state in (LockState.HELD, LockState.STALE):
             lock_path = _impl_lock_path(workspace_root, context, release)
             owner_id = "unknown"
             with contextlib.suppress(Exception):
@@ -468,8 +487,10 @@ def check_impl_xor_review(
                 owner_id = data.get("session_id", "unknown")
             raise ReviewBlockedByImplementationError(
                 f"Context '{context}' release '{release}' has an active implementation lock "
-                f"held by session '{owner_id}'. "
-                "Review cannot proceed while implementation is in progress."
+                f"(state={state}) held by session '{owner_id}'. "
+                "Review cannot proceed. Reclaim or release the implementation lock first "
+                "('dadaia context bind --mode implementation --force --reason ...' or "
+                "'dadaia context release' in the owning session)."
             )
 
     elif mode == "IMPLEMENTATION":
@@ -627,7 +648,12 @@ def renew_heartbeat(
 
     data["last_seen_at"] = _now_iso()
 
-    tmp = lock_path.with_suffix(".tmp")
+    # Per-call unique tmp name — see create_impl_lock for rationale.
+    tmp = lock_path.parent / f"{lock_path.name}.{uuid.uuid4().hex}.tmp"
     tmp.write_text(json.dumps(data, indent=2))
-    os.replace(tmp, lock_path)
+    try:
+        os.replace(tmp, lock_path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
     return True
