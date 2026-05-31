@@ -2,7 +2,10 @@
 
 Runs the 11 structural checks defined in release `sdd-release-lifecycle-v1`,
 extended for the product memory folder catalog (release `Product Memory Feature
-Catalog v1`):
+Catalog v1`) and the D-OC-1 orchestration registry coherence invariant, plus
+the 7 TREE invariants from release `spec-context-tree-v2`, plus the CAT-1
+catalog sync check from release `memory-context-enforcement-v1`, plus the
+STRUCT-1..STRUCT-4 and SYNC-1 checks from release `memory-structured-source-v1`:
 
   1. specs/constitution.md exists
   2. specs/memory/architecture.html and tech-stack.html exist, parseable, with non-empty
@@ -15,21 +18,55 @@ Catalog v1`):
   6. each _archive/releases/<id>/ has CLOSURE.md with 4 mandatory sections + >=1 evidence triple
   7. no SPEC/PLAN/TASKS outside releases/*/ or _archive/releases/*/ (warn during legacy window)
   8. no <section class="changelog"> or <h2> matching Changelog|History|Histórico|Versions? in any memory HTML
+     (skipped for atoms that have a valid YAML source — schema enforces it structurally, D-5)
   9. release id in ACTIVE.md corresponds to a real directory
  10. every <img src> in any memory HTML resolves to a real file
  11. memory HTML containing <pre class="mermaid"> has the Mermaid CDN <script>
+ D-OC-1. bidirectional orchestration registry coherence (requires public_dir):
+     - Forward: every Tier-1 name → workflow file exists; every Tier-2 name → playbook
+       heading exists in SKILL.md.
+     - Reverse: every non-deprecated playbook heading → appears as Tier-2 row in PM router.
 
-Pure module — no I/O outside the supplied specs_dir. No external dependencies.
+TREE invariants (spec-context-tree-v2):
+  TREE-1. specs/foundation/ exists → WARN-ONLY (migration: dadaia migrate tree-v2)
+  TREE-2. specs/SPEC.md at tree root → WARN-ONLY (migration: dadaia migrate tree-v2)
+  TREE-3. memory/architecture.html | tech-stack.html | product/index.html absent → AUTO-FIX
+  TREE-4. backlog/ | bugs/ | releases/ absent → AUTO-FIX (create dir + README.md + .gitkeep)
+  TREE-5. specs/AGENTS.md absent or hash differs from canonical template → WARN-ONLY (drift)
+  TREE-6. releases/<id>/ missing mandatory SDD artifact for its phase → NO AUTO-FIX
+  TREE-7. bugs/<slug>.md missing session_id frontmatter field → NO AUTO-FIX
+
+CAT-1 (memory-context-enforcement-v1):
+  CAT-1. catalog.json absent when feature HTMLs exist → WARNING
+         catalog.json present but slugs ↔ HTML files out of sync → WARNING (per slug/file)
+
+STRUCT checks (memory-structured-source-v1 / C-3):
+  STRUCT-1. specs/memory/architecture.yaml is invalid against memory-architecture-v1 schema → ERROR
+  STRUCT-2. specs/memory/tech-stack.yaml is invalid against memory-tech-stack-v1 schema → ERROR
+  STRUCT-3. specs/memory/product/index.yaml is invalid against memory-product-index-v1 schema → ERROR
+  STRUCT-4. any specs/memory/product/<slug>.yaml is invalid against memory-product-feature-v1 → ERROR
+  YAML-absent guard: atom HTML present but no YAML source → WARN (not error); migration hint included.
+  Retire #8: when atom has a valid YAML source, skip check #8 (schema structurally guarantees atomicity).
+
+SYNC-1 (memory-structured-source-v1 / C-3):
+  SYNC-1. committed HTML diverges from renderer output for a YAML-source atom → WARN (not error)
+          (PE may be mid-edit; WARN allows working states; exact atom(s) named in message).
+
+Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from html.parser import HTMLParser
 from pathlib import Path
+
+import jinja2
+import yaml
 
 CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
 CANONICAL_PHASES = {
@@ -56,6 +93,32 @@ PRODUCT_INDEX_REL = "product/index.html"
 HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
 
+# D-OC-1: orchestration registry coherence (orchestration-consolidation-v1).
+#
+# The PM Step-3 tables have the format:
+#   Tier-1: | Demand pattern | `<name>` | `public/workflows/<name>.workflow.md` |
+#   Tier-2: | Demand pattern | `<name>` |  (or  | `<name>` (annotation) | ...)
+#
+# Both tables have the canonical name in the SECOND column (the first column
+# contains the free-text demand pattern).  To match either, we look for a row
+# where the second pipe-delimited cell starts with a backtick-quoted name.
+#
+# Tier-1: the workflow-file cell (`public/workflows/…`) is the distinguishing marker.
+_TIER1_ROW_RE = re.compile(
+    r"^\|[^|]+\|\s+`([a-z][a-z0-9-]+)`\s+\|\s+`public/workflows/",
+    re.MULTILINE,
+)
+# Tier-2: second column starts with a backtick-quoted name.
+_TIER2_ROW_RE = re.compile(
+    r"^\|[^|]+\|\s+`([a-z][a-z0-9-]+)`",
+    re.MULTILINE,
+)
+# Playbook headings in SKILL.md: `### Playbook — <name>` optionally followed by `[deprecated]`.
+_PLAYBOOK_HEADING_RE = re.compile(
+    r"^###\s+Playbook\s+—\s+([a-z][a-z0-9-]+)(\s+\[deprecated\])?",
+    re.MULTILINE | re.IGNORECASE,
+)
+
 # SPEC-DOC-016: SemVer folder naming for releases created on/after this date (D3).
 # Vintage releases (Created: <= 2026-05-17) are excluded.
 RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
@@ -65,6 +128,60 @@ RELEASE_VINTAGE_CUTOFF = date(2026, 5, 17)  # releases on/before this are exclud
 
 # SPEC-DOC-023: hotfix bullets older than 72 hours in ## Hotfixes pendentes get WARNING
 _HOTFIX_STALE_HOURS = 72
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TREE invariant constants (spec-context-tree-v2)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# TREE-3: memory files that must exist; each maps to its Jinja template name.
+_TREE3_MEMORY_TEMPLATES: tuple[tuple[str, str], ...] = (
+    ("architecture.html", "memory-architecture.html.j2"),
+    ("tech-stack.html", "memory-tech-stack.html.j2"),
+    ("product/index.html", "memory-product-index.html.j2"),
+)
+
+# TREE-4: directories that must exist.  Value = README.md content source file (relative
+# to the scaffold source dir embedded in the package).
+_TREE4_REQUIRED_DIRS = ("backlog", "bugs", "releases")
+
+# TREE-6: mandatory artifacts per phase bucket.
+# For the ACTIVE release, if phase is IMPLEMENTATION or CLOSURE, all three must exist.
+_TREE6_IMPL_ARTIFACTS = ("SPEC.md", "PLAN.md", "TASKS.md")
+
+# Migration hint printed loudly for TREE-1 and TREE-2 (regardless of --fix).
+_TREE_MIGRATION_HINT = (
+    "[TREE MIGRATION REQUIRED] Run: dadaia migrate tree-v2\n"
+    "  This command moves deprecated content to releases/legacy/ "
+    "without destroying SDD-approved artifacts."
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# STRUCT / SYNC constants (memory-structured-source-v1)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Map relative atom path (within specs/memory/) → atom type identifier.
+# Order matters for STRUCT code assignment: architecture→STRUCT-1, tech-stack→STRUCT-2,
+# product/index→STRUCT-3, product/<slug>→STRUCT-4.
+_STRUCT_TOP_LEVEL_ATOMS: tuple[tuple[str, str, str], ...] = (
+    # (relative_path, yaml_stem, atom_type)
+    ("architecture", "architecture.yaml", "memory-architecture-v1"),
+    ("tech-stack", "tech-stack.yaml", "memory-tech-stack-v1"),
+)
+_STRUCT_INDEX_ATOM = ("product/index", "product/index.yaml", "memory-product-index-v1")
+
+# STRUCT-1..4 codes per slot type.
+_STRUCT_CODE_MAP = {
+    "memory-architecture-v1": "STRUCT-1",
+    "memory-tech-stack-v1": "STRUCT-2",
+    "memory-product-index-v1": "STRUCT-3",
+    "memory-product-feature-v1": "STRUCT-4",
+}
+
+# WARN text required by AC-C3-4 and AC-C7-3 — must include `dadaia migrate memory-yaml`.
+_YAML_ABSENT_WARN_TEMPLATE = (
+    "YAML source absent for {atom_rel}; schema validation skipped. "
+    "Migrate with: dadaia migrate memory-yaml"
+)
 
 
 class Severity(StrEnum):
@@ -78,6 +195,7 @@ class SpecsDoctorIssue:
     severity: Severity
     description: str
     path: str | None = None
+    fixable: bool = False
 
     def to_dict(self) -> dict[str, str | None]:
         return {
@@ -197,6 +315,89 @@ def _iter_memory_html_files(mem_dir: Path) -> list[Path]:
     return out
 
 
+def _enumerate_memory_yaml_slots(
+    mem_dir: Path,
+) -> list[tuple[str, Path, Path, str]]:
+    """Enumerate all memory atom slots (YAML + HTML) under *mem_dir*.
+
+    Returns a list of tuples:
+        (rel_key, yaml_path, html_path, atom_type)
+
+    where:
+        rel_key   — human-readable relative identifier (e.g. "architecture",
+                    "product/index", "product/my-feature")
+        yaml_path — expected YAML source path (may not exist)
+        html_path — expected HTML artifact path (may not exist)
+        atom_type — schema type identifier string
+
+    Includes: architecture, tech-stack, product/index, product/<slug> (all
+    non-index YAML files under product/).
+    """
+    slots: list[tuple[str, Path, Path, str]] = []
+
+    # Top-level atoms: architecture, tech-stack
+    for rel_key, yaml_name, atom_type in _STRUCT_TOP_LEVEL_ATOMS:
+        yaml_path = mem_dir / yaml_name
+        html_path = mem_dir / (rel_key + ".html")
+        slots.append((rel_key, yaml_path, html_path, atom_type))
+
+    # product/index
+    rel_key, yaml_name, atom_type = _STRUCT_INDEX_ATOM
+    slots.append(
+        (
+            "product/index",
+            mem_dir / "product" / "index.yaml",
+            mem_dir / "product" / "index.html",
+            "memory-product-index-v1",
+        )
+    )
+
+    # product/<slug> — discover from existing YAML *or* HTML files.
+    product_dir = mem_dir / "product"
+    if product_dir.is_dir():
+        # Collect slugs from both YAML and HTML so we report YAML-absent on HTML-only atoms.
+        yaml_slugs = {p.stem for p in product_dir.glob("*.yaml") if p.stem != "index"}
+        html_slugs = {p.stem for p in product_dir.glob("*.html") if p.stem != "index"}
+        all_slugs = yaml_slugs | html_slugs
+        for slug in sorted(all_slugs):
+            slots.append(
+                (
+                    f"product/{slug}",
+                    product_dir / f"{slug}.yaml",
+                    product_dir / f"{slug}.html",
+                    "memory-product-feature-v1",
+                )
+            )
+
+    return slots
+
+
+def _collect_yaml_valid_atom_rels(mem_dir: Path) -> set[str]:
+    """Return the rel_keys of atoms that have a YAML source AND pass STRUCT validation.
+
+    Used by check #8 to skip the changelog-grep for schema-validated atoms (D-5),
+    and by SYNC-1 as the input set.
+
+    Does NOT emit issues — callers that need issues use _check_memory_struct() directly.
+    Any ValidationError is silently treated as "not valid" so that #8 still fires.
+    """
+    from dadaia_workspace.features.specs.renderer import validate_atom
+
+    valid_rels: set[str] = set()
+    for rel_key, yaml_path, _html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
+        if not yaml_path.exists():
+            continue
+        try:
+            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                continue
+            validate_atom(data, atom_type)
+            valid_rels.add(rel_key)
+        except Exception:
+            pass
+    return valid_rels
+
+
 def _read_active_md(path: Path) -> tuple[str | None, str | None, str | None]:
     """Returns (release_id, phase, error_message_or_none)."""
     if not path.exists():
@@ -227,6 +428,43 @@ def _extract_status(md_path: Path) -> str | None:
     return None
 
 
+def _split_tier_blocks(text: str) -> tuple[str, str]:
+    """Split project-manager.md into its Tier-1 and Tier-2 table sections.
+
+    Returns (tier1_block, tier2_block) as plain strings. Either may be empty
+    if the respective heading is absent.
+    """
+    tier1_match = re.search(r"#### Tier-1[^\n]*\n", text)
+    tier2_match = re.search(r"#### Tier-2[^\n]*\n", text)
+    if not tier1_match or not tier2_match:
+        return "", ""
+    tier1_block = text[tier1_match.end() : tier2_match.start()]
+    tier2_end = re.search(r"^###", text[tier2_match.end() :], re.MULTILINE)
+    if tier2_end:
+        tier2_block = text[tier2_match.end() : tier2_match.end() + tier2_end.start()]
+    else:
+        tier2_block = text[tier2_match.end() :]
+    return tier1_block, tier2_block
+
+
+def _extract_tier1_names(pm_text: str) -> list[str]:
+    """Return canonical Tier-1 workflow names from the PM Step-3 Tier-1 table."""
+    tier1_block, _ = _split_tier_blocks(pm_text)
+    return re.findall(_TIER1_ROW_RE, tier1_block)
+
+
+def _extract_tier2_names(pm_text: str) -> list[str]:
+    """Return canonical Tier-2 playbook names from the PM Step-3 Tier-2 table."""
+    _, tier2_block = _split_tier_blocks(pm_text)
+    return re.findall(_TIER2_ROW_RE, tier2_block)
+
+
+def _extract_playbook_headings(skill_text: str) -> dict[str, bool]:
+    """Return {playbook_name: is_deprecated} from SKILL.md ``### Playbook — <name>`` headings."""
+    matches = re.findall(_PLAYBOOK_HEADING_RE, skill_text)
+    return {name: bool(dep.strip()) for name, dep in matches}
+
+
 def _extract_created_date(md_path: Path) -> date | None:
     if not md_path.exists():
         return None
@@ -242,10 +480,43 @@ def _extract_created_date(md_path: Path) -> date | None:
 
 
 class SpecsDoctor:
-    """Diagnose specs/ structure under SDD release-lifecycle."""
+    """Diagnose specs/ structure under SDD release-lifecycle.
 
-    def __init__(self, specs_dir: Path) -> None:
+    Args:
+        specs_dir: Path to the ``specs/`` directory.
+        public_dir: Optional path to ``dadaia_workspace/public/``. When provided,
+            the D-OC-1 orchestration-registry coherence check is enabled, and
+            the TREE-3/TREE-4/TREE-5 auto-fix + drift-detect features are available
+            (templates loaded from ``public_dir/templates/``).
+            When *not* provided the TREE checks still run but TREE-3 fix and TREE-5
+            hash comparison are skipped (issue is still emitted, fix is no-op).
+    """
+
+    def __init__(
+        self,
+        specs_dir: Path,
+        public_dir: Path | None = None,
+        templates_dir: Path | None = None,
+    ) -> None:
         self.specs_dir = Path(specs_dir)
+        self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
+        # templates_dir is resolved from public_dir if not explicitly supplied.
+        if templates_dir is not None:
+            self._templates_dir: Path | None = Path(templates_dir)
+        elif self.public_dir is not None:
+            candidate = self.public_dir / "templates"
+            self._templates_dir = candidate if candidate.is_dir() else None
+        else:
+            self._templates_dir = None
+
+        # Scaffold source dir (for TREE-4 README content).
+        if self.public_dir is not None:
+            scaffold_candidate = self.public_dir / "scaffold"
+            self._scaffold_dir: Path | None = (
+                scaffold_candidate if scaffold_candidate.is_dir() else None
+            )
+        else:
+            self._scaffold_dir = None
 
     def check(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
@@ -262,7 +533,57 @@ class SpecsDoctor:
         issues.extend(self._check_memory_mermaid_script())
         issues.extend(self._check_backlog_schema())
         issues.extend(self._check_release_semver_naming())
+        issues.extend(self._check_orchestration_registry())
+        # TREE invariants (spec-context-tree-v2)
+        issues.extend(self._check_tree1_foundation())
+        issues.extend(self._check_tree2_root_spec_md())
+        issues.extend(self._check_tree3_memory_html())
+        issues.extend(self._check_tree4_required_dirs())
+        issues.extend(self._check_tree5_agents_md())
+        issues.extend(self._check_tree6_release_artifacts())
+        issues.extend(self._check_tree7_bug_session_id())
+        # CAT-1 (memory-context-enforcement-v1)
+        issues.extend(self._check_cat1_catalog_sync())
+        # STRUCT-1..4 + YAML-absent guard (memory-structured-source-v1 / C-3)
+        issues.extend(self._check_memory_struct())
+        # SYNC-1 (memory-structured-source-v1 / C-3) — runs after STRUCT
+        issues.extend(self._check_memory_sync())
         return issues
+
+    def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
+        """Apply auto-fixes for all fixable issues.
+
+        Resolves TREE-3 (render missing memory HTML from Jinja templates) and
+        TREE-4 (create missing dirs with README.md + .gitkeep).  Warn-only and
+        no-fix invariants are never touched.
+
+        Args:
+            issues: Pre-computed issue list (avoids a second ``check()`` call).
+                    If None, ``check()`` is called internally.
+
+        Returns:
+            List of issues that were fixed (i.e. ``fixable=True`` issues that
+            were acted upon).  Issues that could not be fixed due to missing
+            templates are omitted and left as residual issues on the next
+            ``check()`` call.
+        """
+        if issues is None:
+            issues = self.check()
+        fixed: list[SpecsDoctorIssue] = []
+        for issue in issues:
+            if not issue.fixable:
+                continue
+            try:
+                if issue.code == "TREE-3":
+                    self._fix_tree3(issue)
+                    fixed.append(issue)
+                elif issue.code == "TREE-4":
+                    self._fix_tree4(issue)
+                    fixed.append(issue)
+            except Exception:
+                # Leave as residual — will re-appear on next check()
+                pass
+        return fixed
 
     # 1
     def _check_constitution(self) -> list[SpecsDoctorIssue]:
@@ -350,8 +671,11 @@ class SpecsDoctor:
             )
 
         # Flag any legacy markdown memory files (root or product/)
+        # AGENTS.md is a directory contract, not a memory atom — exempt it.
         if mem_dir.exists():
             for legacy in mem_dir.glob("*.md"):
+                if legacy.name == "AGENTS.md":
+                    continue
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002L",
@@ -613,14 +937,33 @@ class SpecsDoctor:
 
     # 8
     def _check_memory_atomicity(self) -> list[SpecsDoctorIssue]:
+        """Check #8: no forbidden changelog/history sections in memory HTML.
+
+        D-5 (memory-structured-source-v1): when an atom has a valid YAML source,
+        check #8 is skipped for that atom — the schema enforces atomicity
+        structurally via `additionalProperties: false`, making the heuristic
+        grep redundant.  Check #8 still fires for HTML-only (YAML-absent) atoms.
+        """
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
+
+        # Collect rel_keys of atoms that have a valid YAML source so we can skip
+        # check #8 for them (D-5).  The set is empty when mem_dir doesn't exist.
+        yaml_valid_rels: set[str] = set()
+        if mem_dir.is_dir():
+            yaml_valid_rels = _collect_yaml_valid_atom_rels(mem_dir)
+
         for p in _iter_memory_html_files(mem_dir):
             try:
                 summary = _parse_memory_html(p)
             except Exception:
                 continue
             rel = p.relative_to(mem_dir).as_posix()
+            # Derive rel_key from the HTML path (strip .html extension).
+            rel_key = rel[: -len(".html")] if rel.endswith(".html") else rel
+            # Skip check #8 when a valid YAML source exists for this atom (D-5).
+            if rel_key in yaml_valid_rels:
+                continue
             for label in summary.forbidden_h2:
                 issues.append(
                     SpecsDoctorIssue(
@@ -763,6 +1106,124 @@ class SpecsDoctor:
 
         return issues
 
+    # D-OC-1
+    def _check_orchestration_registry(self) -> list[SpecsDoctorIssue]:
+        """D-OC-1: bidirectional orchestration-registry coherence.
+
+        Requires ``self.public_dir`` to be set. If not set, the check is skipped
+        (noop) and an [ok] pseudo-result is NOT emitted — the check simply does
+        not run.
+
+        Forward check:
+        - Every Tier-1 name in PM Step-3 router → ``public/workflows/<name>.workflow.md``
+          must exist under ``self.public_dir``.
+        - Every Tier-2 name in PM Step-3 router → ``### Playbook — <name>`` heading
+          must exist in SKILL.md.
+
+        Reverse check:
+        - Every non-deprecated ``### Playbook — <name>`` heading in SKILL.md →
+          must appear as a Tier-2 row in the PM router table.
+        """
+        if self.public_dir is None:
+            return []
+
+        issues: list[SpecsDoctorIssue] = []
+        pm_path = self.public_dir / "agents" / "project-manager.md"
+        skill_path = self.public_dir / "skills" / "project-orchestration" / "SKILL.md"
+
+        if not pm_path.exists():
+            issues.append(
+                SpecsDoctorIssue(
+                    code="D-OC-1",
+                    severity=Severity.ERROR,
+                    description=(
+                        "D-OC-1: project-manager.md not found at "
+                        "public/agents/project-manager.md — cannot run D-OC-1 check"
+                    ),
+                    path=str(pm_path),
+                )
+            )
+            return issues
+
+        if not skill_path.exists():
+            issues.append(
+                SpecsDoctorIssue(
+                    code="D-OC-1",
+                    severity=Severity.ERROR,
+                    description=(
+                        "D-OC-1: SKILL.md not found at "
+                        "public/skills/project-orchestration/SKILL.md — cannot run D-OC-1 check"
+                    ),
+                    path=str(skill_path),
+                )
+            )
+            return issues
+
+        pm_text = pm_path.read_text(encoding="utf-8")
+        skill_text = skill_path.read_text(encoding="utf-8")
+
+        tier1_names = _extract_tier1_names(pm_text)
+        tier2_names = _extract_tier2_names(pm_text)
+        playbooks = _extract_playbook_headings(skill_text)
+
+        # --- Forward checks ---
+        for name in tier1_names:
+            wf_path = self.public_dir / "workflows" / f"{name}.workflow.md"
+            if not wf_path.exists():
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="D-OC-1",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"D-OC-1: Tier-1 name '{name}' has no workflow file at "
+                            f"public/workflows/{name}.workflow.md"
+                        ),
+                        path=str(wf_path),
+                    )
+                )
+
+        tier1_set = set(tier1_names)
+        for name in tier2_names:
+            # A Tier-2 name that also appears in Tier-1 is a cross-reference row
+            # (e.g. `spec-refinement` in Tier-2 defers to the Tier-1 workflow file).
+            # Its artifact is the workflow file — already checked above — so no
+            # separate playbook-heading check is needed.
+            if name in tier1_set:
+                continue
+            if name not in playbooks:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="D-OC-1",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"D-OC-1: Tier-2 name '{name}' has no playbook heading "
+                            f"'### Playbook — {name}' in SKILL.md"
+                        ),
+                        path=str(skill_path),
+                    )
+                )
+
+        # --- Reverse check ---
+        tier2_set = set(tier2_names)
+        for name, is_deprecated in playbooks.items():
+            if is_deprecated:
+                continue  # deprecated playbooks are exempt from the reverse check
+            if name not in tier2_set:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="D-OC-1",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"D-OC-1: Playbook heading '### Playbook — {name}' in SKILL.md "
+                            "has no Tier-2 router row in project-manager.md "
+                            "(add it or annotate [deprecated])"
+                        ),
+                        path=str(skill_path),
+                    )
+                )
+
+        return issues
+
     # 13
     def _check_release_semver_naming(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-016: release folder names must follow SemVer (v<M>.<m>.<p>) for releases
@@ -824,6 +1285,320 @@ class SpecsDoctor:
                     )
         return issues
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # TREE invariants
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _check_tree1_foundation(self) -> list[SpecsDoctorIssue]:
+        """TREE-1: specs/foundation/ must NOT exist (deprecated layout).
+
+        Warn-only (fixable=False).  A loud migration hint pointing to
+        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
+        Auto-moving is intentionally blocked: foundation/ may hold SDD-approved
+        content and reclassification requires operator consent.
+        """
+        foundation = self.specs_dir / "foundation"
+        if not foundation.exists():
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="TREE-1",
+                severity=Severity.WARNING,
+                description=(
+                    "specs/foundation/ exists — this is the deprecated layout. "
+                    f"{_TREE_MIGRATION_HINT}"
+                ),
+                path=str(foundation),
+                fixable=False,
+            )
+        ]
+
+    def _check_tree2_root_spec_md(self) -> list[SpecsDoctorIssue]:
+        """TREE-2: specs/SPEC.md at the tree root must NOT exist (deprecated).
+
+        Warn-only (fixable=False).  A loud migration hint pointing to
+        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
+        Auto-moving is intentionally blocked: root SPEC.md may hold
+        SDD-approved content that requires operator consent to reclassify.
+        """
+        root_spec = self.specs_dir / "SPEC.md"
+        if not root_spec.exists():
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="TREE-2",
+                severity=Severity.WARNING,
+                description=(
+                    "specs/SPEC.md exists at the tree root — this is the deprecated layout. "
+                    f"{_TREE_MIGRATION_HINT}"
+                ),
+                path=str(root_spec),
+                fixable=False,
+            )
+        ]
+
+    def _check_tree3_memory_html(self) -> list[SpecsDoctorIssue]:
+        """TREE-3: required memory HTML files must exist.
+
+        Checks: memory/architecture.html, memory/tech-stack.html,
+        memory/product/index.html.
+
+        When ``fixable=True`` the fix path renders the file from its canonical
+        Jinja template (same mechanism as ``scaffold()``).  If no templates_dir
+        is available, the issue is still emitted as a WARNING but fixable=False
+        (fix path would have nothing to render from).
+        """
+        issues: list[SpecsDoctorIssue] = []
+        mem_dir = self.specs_dir / "memory"
+        for rel_path, template_name in _TREE3_MEMORY_TEMPLATES:
+            target = mem_dir / rel_path
+            if target.exists():
+                continue
+            fixable = (
+                self._templates_dir is not None and (self._templates_dir / template_name).exists()
+            )
+            issues.append(
+                SpecsDoctorIssue(
+                    code="TREE-3",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"memory/{rel_path} is missing — required memory HTML. "
+                        + (
+                            "Auto-fix available (run doctor --fix)."
+                            if fixable
+                            else "No templates_dir available — create manually."
+                        )
+                    ),
+                    path=str(target),
+                    fixable=fixable,
+                )
+            )
+        return issues
+
+    def _fix_tree3(self, issue: SpecsDoctorIssue) -> None:
+        """Render the missing memory HTML from its canonical Jinja template."""
+        assert issue.code == "TREE-3"
+        assert self._templates_dir is not None
+        target = Path(issue.path)  # type: ignore[arg-type]
+        rel = target.relative_to(self.specs_dir / "memory").as_posix()
+        # Find the matching template.
+        template_name: str | None = None
+        for rel_path, tpl in _TREE3_MEMORY_TEMPLATES:
+            if rel_path == rel:
+                template_name = tpl
+                break
+        if template_name is None:
+            return
+        today = datetime.now(tz=UTC).date().isoformat()
+        context: dict[str, str] = {
+            "project_name": self.specs_dir.parent.name,
+            "today": today,
+            "last_release_id": "none",
+        }
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(str(self._templates_dir)),
+            undefined=jinja2.Undefined,
+            autoescape=False,
+        )
+        template = env.get_template(template_name)
+        rendered: str = template.render(context)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(rendered, encoding="utf-8")
+
+    def _check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
+        """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
+
+        When a directory is absent the issue is emitted as fixable=True.
+        The fix creates the dir, writes README.md (content copied from the
+        canonical scaffold source), and touches .gitkeep — matching the exact
+        output of ``scaffold()``.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        for dirname in _TREE4_REQUIRED_DIRS:
+            target = self.specs_dir / dirname
+            if target.exists():
+                continue
+            fixable = (
+                self._scaffold_dir is not None
+                and (self._scaffold_dir / dirname / "README.md").exists()
+            )
+            issues.append(
+                SpecsDoctorIssue(
+                    code="TREE-4",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"specs/{dirname}/ is missing — required spec tree directory. "
+                        + (
+                            "Auto-fix available (run doctor --fix)."
+                            if fixable
+                            else "No scaffold source available — create manually."
+                        )
+                    ),
+                    path=str(target),
+                    fixable=fixable,
+                )
+            )
+        return issues
+
+    def _fix_tree4(self, issue: SpecsDoctorIssue) -> None:
+        """Create the missing directory with README.md and .gitkeep."""
+        assert issue.code == "TREE-4"
+        target = Path(issue.path)  # type: ignore[arg-type]
+        dirname = target.name
+        target.mkdir(parents=True, exist_ok=True)
+        # README.md — copy from scaffold source
+        readme_content = ""
+        if self._scaffold_dir is not None:
+            src_readme = self._scaffold_dir / dirname / "README.md"
+            if src_readme.exists():
+                readme_content = src_readme.read_text(encoding="utf-8")
+        readme = target / "README.md"
+        if not readme.exists():
+            readme.write_text(readme_content, encoding="utf-8")
+        # .gitkeep
+        gitkeep = target / ".gitkeep"
+        if not gitkeep.exists():
+            gitkeep.write_text("", encoding="utf-8")
+
+    def _check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
+        """TREE-5: specs/AGENTS.md must exist and its content must match the canonical template.
+
+        Absent file → WARNING (fixable=False; cannot auto-create because the file
+        is intended for operator customisation).
+        Hash drift → WARNING (fixable=False; silent overwrite would destroy
+        operator customisation — user must merge manually).
+
+        When no templates_dir is available, hash comparison is skipped and
+        only presence is checked.
+        """
+        agents_md = self.specs_dir / "AGENTS.md"
+        if not agents_md.exists():
+            return [
+                SpecsDoctorIssue(
+                    code="TREE-5",
+                    severity=Severity.WARNING,
+                    description=(
+                        "specs/AGENTS.md is missing — expected SDD workflow contract. "
+                        "Create it from the canonical template "
+                        "(dadaia_workspace/public/templates/specs-AGENTS.md) "
+                        "or run `dadaia specs init` to scaffold it."
+                    ),
+                    path=str(agents_md),
+                    fixable=False,
+                )
+            ]
+
+        # Hash comparison against canonical template
+        if self._templates_dir is None:
+            return []
+        canonical_path = self._templates_dir / "specs-AGENTS.md"
+        if not canonical_path.exists():
+            return []
+        canonical_text = canonical_path.read_text(encoding="utf-8")
+        current_text = agents_md.read_text(encoding="utf-8")
+        canonical_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
+        current_hash = hashlib.sha256(current_text.encode("utf-8")).hexdigest()
+        if canonical_hash == current_hash:
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="TREE-5",
+                severity=Severity.WARNING,
+                description=(
+                    f"specs/AGENTS.md has drifted from canonical template "
+                    f"(current sha256:{current_hash[:12]}… vs "
+                    f"canonical sha256:{canonical_hash[:12]}…). "
+                    "Review the diff and merge any upstream changes manually — "
+                    "auto-overwrite is disabled to protect operator customisations. "
+                    "Canonical template: dadaia_workspace/public/templates/specs-AGENTS.md"
+                ),
+                path=str(agents_md),
+                fixable=False,
+            )
+        ]
+
+    def _check_tree6_release_artifacts(self) -> list[SpecsDoctorIssue]:
+        """TREE-6: for the ACTIVE release, mandatory SDD artifacts must exist for its phase.
+
+        Rule: if the active release exists and its phase is IMPLEMENTATION or CLOSURE,
+        then SPEC.md, PLAN.md, and TASKS.md must all be present in the release directory.
+        Any missing file is an ERROR (no auto-fix — creating an empty PLAN.md would
+        constitute an unapproved artifact; human review is required).
+
+        Inactive / non-active releases are not checked here (SPEC-DOC-004 already
+        checks the active release's artifact statuses; we only add the TREE-6
+        structural check for the IMPLEMENTATION/CLOSURE gates).
+
+        Note: this invariant applies to the ACTIVE release only.  The broader
+        per-release artifact check (SPEC-DOC-004) covers Status: field validation.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        active_path = self.specs_dir / "releases" / "ACTIVE.md"
+        release, phase, err = _read_active_md(active_path)
+        if err or not release or release == "none":
+            return issues
+        if phase not in ("IMPLEMENTATION", "CLOSURE"):
+            return issues
+        rdir = self.specs_dir / "releases" / release
+        if not rdir.exists():
+            return issues  # already reported by SPEC-DOC-009
+        for fname in _TREE6_IMPL_ARTIFACTS:
+            fpath = rdir / fname
+            if not fpath.exists():
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="TREE-6",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"Active release '{release}' (phase={phase}) is missing "
+                            f"mandatory SDD artifact: {fname}. "
+                            "Create the artifact via the SDD lifecycle (product-engineer) — "
+                            "do NOT create an empty placeholder."
+                        ),
+                        path=str(fpath),
+                        fixable=False,
+                    )
+                )
+        return issues
+
+    def _check_tree7_bug_session_id(self) -> list[SpecsDoctorIssue]:
+        """TREE-7: every bugs/<slug>.md must have a session_id frontmatter field.
+
+        Expected frontmatter format (YAML-like leading lines):
+            session_id: <value>   OR   session_id: null
+
+        Missing field → ERROR (no auto-fix — injecting a session_id would
+        falsify authorship; human review is required).
+
+        If bugs/ does not exist, this check is a no-op.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        bugs_dir = self.specs_dir / "bugs"
+        if not bugs_dir.exists():
+            return issues
+        for bug_file in sorted(bugs_dir.glob("*.md")):
+            # Skip README.md and other non-bug files
+            if bug_file.name in ("README.md",):
+                continue
+            text = bug_file.read_text(encoding="utf-8")
+            has_session_id = bool(re.search(r"^session_id\s*:", text, re.MULTILINE))
+            if not has_session_id:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="TREE-7",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"bugs/{bug_file.name} is missing the required 'session_id:' "
+                            "frontmatter field. "
+                            "Add 'session_id: null' if the session is unknown. "
+                            "Do NOT inject a fabricated session ID."
+                        ),
+                        path=str(bug_file),
+                        fixable=False,
+                    )
+                )
+        return issues
+
     # 11
     def _check_memory_mermaid_script(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
@@ -846,4 +1621,248 @@ class SpecsDoctor:
                         path=str(p),
                     )
                 )
+        return issues
+
+    # STRUCT-1..4 + YAML-absent guard (memory-structured-source-v1 / C-3a + C-3c)
+    def _check_memory_struct(self) -> list[SpecsDoctorIssue]:
+        """Validate YAML memory atom sources against their JSON Schemas.
+
+        For each known atom slot:
+        - If a YAML source exists → validate against the corresponding schema.
+          Validation failure (missing required field OR extra field via
+          ``additionalProperties:false``) → **ERROR** (STRUCT-1..STRUCT-4).
+        - If NO YAML source exists but an HTML file does → **WARN** with the
+          standard migration hint (YAML-absent guard, C-3c).  Doctor still exits 0
+          when all atoms are HTML-only (pre-migration state).
+        - If neither YAML nor HTML exists → no issue emitted (slot is inactive).
+
+        Check #8 retire (D-5 / C-3d): handled in ``_check_memory_atomicity``
+        which calls ``_collect_yaml_valid_atom_rels`` to skip the changelog-grep
+        for atoms that have a valid YAML source.
+        """
+        import jsonschema as _jsonschema
+
+        from dadaia_workspace.features.specs.renderer import validate_atom as _validate_atom
+
+        issues: list[SpecsDoctorIssue] = []
+        mem_dir = self.specs_dir / "memory"
+        if not mem_dir.is_dir():
+            return issues
+
+        for rel_key, yaml_path, html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
+            struct_code = _STRUCT_CODE_MAP.get(atom_type, "STRUCT-4")
+
+            if yaml_path.exists():
+                # YAML present → validate against schema
+                try:
+                    raw = yaml_path.read_text(encoding="utf-8")
+                    data = yaml.safe_load(raw)
+                    if not isinstance(data, dict):
+                        issues.append(
+                            SpecsDoctorIssue(
+                                code=struct_code,
+                                severity=Severity.ERROR,
+                                description=(
+                                    f"{struct_code}: memory/{rel_key}.yaml did not parse to a "
+                                    f"mapping (got {type(data).__name__}). YAML atom must be a "
+                                    "YAML mapping."
+                                ),
+                                path=str(yaml_path),
+                            )
+                        )
+                        continue
+                    _validate_atom(data, atom_type)
+                except _jsonschema.ValidationError as exc:
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code=struct_code,
+                            severity=Severity.ERROR,
+                            description=(
+                                f"{struct_code}: memory/{rel_key}.yaml fails schema validation "
+                                f"({atom_type}): {exc.message}"
+                            ),
+                            path=str(yaml_path),
+                        )
+                    )
+                except Exception as exc:
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code=struct_code,
+                            severity=Severity.ERROR,
+                            description=(
+                                f"{struct_code}: memory/{rel_key}.yaml could not be validated: "
+                                f"{exc}"
+                            ),
+                            path=str(yaml_path),
+                        )
+                    )
+            elif html_path.exists():
+                # YAML absent but HTML present → migration guard WARN (C-3c)
+                issues.append(
+                    SpecsDoctorIssue(
+                        code=struct_code,
+                        severity=Severity.WARNING,
+                        description=_YAML_ABSENT_WARN_TEMPLATE.format(atom_rel=f"memory/{rel_key}"),
+                        path=str(html_path),
+                    )
+                )
+            # else: neither YAML nor HTML — slot is inactive, no issue
+
+        return issues
+
+    # SYNC-1 (memory-structured-source-v1 / C-3b)
+    def _check_memory_sync(self) -> list[SpecsDoctorIssue]:
+        """SYNC-1: warn when committed HTML diverges from renderer output for a YAML atom.
+
+        Runs only for atoms that have a YAML source AND pass STRUCT validation (i.e.
+        appear in ``_collect_yaml_valid_atom_rels``).  When YAML is absent or STRUCT
+        fails, SYNC-1 is skipped for that atom (STRUCT error takes precedence).
+
+        Severity is always WARN (not error) — the product-engineer may be mid-edit
+        between rendering and committing.  The message names the specific atom(s).
+        """
+        from dadaia_workspace.features.specs.renderer import render_atom as _render_atom
+
+        issues: list[SpecsDoctorIssue] = []
+        mem_dir = self.specs_dir / "memory"
+        if not mem_dir.is_dir():
+            return issues
+
+        # Get the set of atoms that have a valid YAML source.
+        valid_rels = _collect_yaml_valid_atom_rels(mem_dir)
+        if not valid_rels:
+            return issues
+
+        # For each valid slot, render from YAML and compare to committed HTML.
+        for rel_key, yaml_path, html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
+            if rel_key not in valid_rels:
+                continue
+            if not html_path.exists():
+                # No committed HTML yet → the HTML needs to be generated first,
+                # but this is a different concern (TREE-3 / scaffolding).  Skip SYNC-1.
+                continue
+            try:
+                rendered = _render_atom(yaml_path, atom_type=atom_type)
+            except Exception as exc:
+                # Renderer failure is unexpected here (STRUCT already passed).
+                # Emit as a WARN to avoid blocking doctor exit 0.
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SYNC-1",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"SYNC-1: memory/{rel_key} — renderer raised an unexpected "
+                            f"error during SYNC-1 check: {exc}"
+                        ),
+                        path=str(yaml_path),
+                    )
+                )
+                continue
+            committed = html_path.read_text(encoding="utf-8")
+            if rendered != committed:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SYNC-1",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"SYNC-1: memory/{rel_key}.html is out of sync with its YAML "
+                            "source. Run `dadaia memory render` to regenerate."
+                        ),
+                        path=str(html_path),
+                    )
+                )
+
+        return issues
+
+    # CAT-1 (memory-context-enforcement-v1)
+    def _check_cat1_catalog_sync(self) -> list[SpecsDoctorIssue]:
+        """CAT-1: catalog.json must stay in sync with *.html feature files.
+
+        Logic:
+        1. Enumerate ``memory/product/*.html`` excluding ``index.html`` → ``html_slugs``.
+        2. If ``catalog.json`` is absent and html_slugs is non-empty → one WARNING.
+        3. If ``catalog.json`` is present → parse ``features[].slug``:
+           - One WARNING per slug in catalog that has no corresponding HTML on disk.
+           - One WARNING per HTML on disk whose slug is not in the catalog.
+        4. Severity is always WARNING (never ERROR) — catalog may simply need regeneration.
+        """
+        import json as _json
+
+        issues: list[SpecsDoctorIssue] = []
+        product_dir = self.specs_dir / "memory" / "product"
+        catalog_path = product_dir / "catalog.json"
+
+        if not product_dir.is_dir():
+            return issues
+
+        # Collect slugs from HTML files (excluding index.html)
+        html_slugs: set[str] = {
+            p.stem for p in product_dir.glob("*.html") if p.name != "index.html"
+        }
+
+        if not catalog_path.exists():
+            if html_slugs:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="CAT-1",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"catalog.json absent; {len(html_slugs)} feature HTML"
+                            f"{'s' if len(html_slugs) != 1 else ''} present; "
+                            "run `dadaia memory catalog generate` to create it."
+                        ),
+                        path=str(catalog_path),
+                    )
+                )
+            return issues
+
+        # catalog.json exists — compare slug sets
+        try:
+            data = _json.loads(catalog_path.read_text(encoding="utf-8"))
+            catalog_slugs: set[str] = {
+                str(entry.get("slug", ""))
+                for entry in data.get("features", [])
+                if entry.get("slug")
+            }
+        except Exception as exc:
+            issues.append(
+                SpecsDoctorIssue(
+                    code="CAT-1",
+                    severity=Severity.WARNING,
+                    description=f"catalog.json is not valid JSON: {exc}",
+                    path=str(catalog_path),
+                )
+            )
+            return issues
+
+        # Slugs in catalog but no HTML on disk
+        for slug in sorted(catalog_slugs - html_slugs):
+            issues.append(
+                SpecsDoctorIssue(
+                    code="CAT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"catalog.json lists slug '{slug}' but no corresponding "
+                        f"'{slug}.html' exists in memory/product/. "
+                        "Run `dadaia memory catalog generate` to resync."
+                    ),
+                    path=str(product_dir / f"{slug}.html"),
+                )
+            )
+
+        # HTML files on disk but not in catalog
+        for slug in sorted(html_slugs - catalog_slugs):
+            issues.append(
+                SpecsDoctorIssue(
+                    code="CAT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"'{slug}.html' exists in memory/product/ but is not listed in "
+                        "catalog.json. "
+                        "Run `dadaia memory catalog generate` to resync."
+                    ),
+                    path=str(product_dir / f"{slug}.html"),
+                )
+            )
+
         return issues

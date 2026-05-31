@@ -96,10 +96,17 @@ class ImportService:
             specs_dir = ctx.get("specs_dir")
             if isinstance(specs_dir, str) and specs_dir.startswith(old_prefix):
                 ctx["specs_dir"] = specs_dir.replace(old_prefix, new_prefix, 1)
-            ctx["state"] = "inativo"
-            ctx["is_primary"] = False
-            ctx["activated_at"] = None
+            ctx["state"] = "dead"
+            ctx.pop("is_primary", None)
+            ctx.pop("activated_at", None)
+            if "alive_since" not in ctx:
+                ctx["alive_since"] = None
+            if "dead_since" not in ctx:
+                ctx["dead_since"] = None
         data["contexts"] = raw_contexts
+        # Ensure v2 schema_version is written (may be patching a v2 file)
+        data["schema_version"] = "2"
+        data.pop("version", None)
 
         tmp = contexts_file.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2))
@@ -181,29 +188,19 @@ class ImportService:
             return ()
 
         errors: list[str] = []
-        ativo = [c for c in manifest.contexts if c.get("state") == "ativo"]
-        primary_name = next((str(c["name"]) for c in ativo if c.get("is_primary")), None)
+        # In v2, "alive" replaces "ativo"
+        alive = [c for c in manifest.contexts if c.get("state") in ("alive", "ativo")]
 
         dadaia_bin = str(Path(sys.executable).parent / "dadaia")
-        for ctx in ativo:
+        for ctx in alive:
             result = subprocess.run(
-                [dadaia_bin, "context", "activate", str(ctx["name"])],
+                [dadaia_bin, "context", "alive", str(ctx["name"])],
                 cwd=workspace_root,
                 capture_output=True,
                 text=True,
             )
             if result.returncode != 0:
                 errors.append(f"{ctx['name']}: {result.stderr.strip()}")
-
-        if primary_name:
-            result = subprocess.run(
-                [dadaia_bin, "context", "promote", primary_name],
-                cwd=workspace_root,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                errors.append(f"promote {primary_name}: {result.stderr.strip()}")
 
         return tuple(errors)
 
@@ -231,7 +228,9 @@ class ImportService:
         if options.skip_activate:
             restored: tuple[str, ...] = ()
         else:
-            restored = tuple(str(c["name"]) for c in manifest.contexts if c.get("state") == "ativo")
+            restored = tuple(
+                str(c["name"]) for c in manifest.contexts if c.get("state") in ("alive", "ativo")
+            )
         return ImportResult(
             workspace_root=options.workspace,
             contexts_restored=restored,
@@ -247,11 +246,10 @@ class ImportService:
         print(f"Source root:    {manifest.workspace_root}")
         print(f"Destination:    {options.workspace}")
         print(f"dadaia version: {manifest.dadaia_version}")
-        ativo = [c for c in manifest.contexts if c.get("state") == "ativo"]
-        print(f"\nContexts to activate ({len(ativo)}):")
-        for ctx in ativo:
-            primary = " [primary]" if ctx.get("is_primary") else ""
-            print(f"  - {ctx['name']}{primary}  ({ctx.get('repo_url', '')})")
+        alive = [c for c in manifest.contexts if c.get("state") in ("alive", "ativo")]
+        print(f"\nContexts to activate ({len(alive)}):")
+        for ctx in alive:
+            print(f"  - {ctx['name']}  ({ctx.get('repo_url', '')})")
         if options.skip_mnt:
             print("\nmnt/ will be skipped (--skip-mnt)")
         if options.skip_activate:

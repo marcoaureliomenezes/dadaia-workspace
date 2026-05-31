@@ -22,6 +22,9 @@ Dataclasses
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -127,6 +130,7 @@ class PanelService:
         self.telemetry = telemetry
         self.academy = academy
         self._workflows_service = WorkflowsService(workspace_root)
+        self._running_workflows: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -191,7 +195,7 @@ class PanelService:
     def list_active_contexts(self) -> list[PanelContext]:
         """Return all active Spec Context Projects as PanelContext dataclasses.
 
-        Filters to state == ativo only.  branch is taken from the cached
+        Filters to state == alive only.  branch is taken from the cached
         current_branch field of SpecContextProject (no git subprocess — R4).
         """
         return [
@@ -200,7 +204,7 @@ class PanelService:
                 name=ctx.name,
                 repo_path=self._workspace_root / "repos" / ctx.repo_slug,
                 branch=ctx.current_branch,
-                is_primary=ctx.is_primary,
+                is_primary=False,
             )
             for ctx in self._active_contexts()
         ]
@@ -234,10 +238,40 @@ class PanelService:
             return list(override)
         return read_canonical_agents(self._workspace_root)
 
+    def run_workflow(self, workflow_name: str) -> dict[str, object]:
+        """Spawn `dadaia orchestrate <workflow_name>` in the background.
+
+        Raises RuntimeError with "not found" if the workflow doesn't exist,
+        or "already running" if a tracked PID is still alive.
+        Returns {"pid": int, "workflow": str} on success.
+        """
+        override = getattr(self, "_workflows_service_override", None)
+        svc = override if override is not None else self._workflows_service
+        known = {s.name for s in svc.list_summaries()}
+        if workflow_name not in known:
+            raise RuntimeError(f"workflow not found: {workflow_name!r}")
+
+        existing_pid = self._running_workflows.get(workflow_name)
+        if existing_pid is not None:
+            try:
+                os.kill(existing_pid, 0)
+                raise RuntimeError(f"already running: {workflow_name!r} (PID {existing_pid})")
+            except ProcessLookupError:
+                del self._running_workflows[workflow_name]
+
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "dadaia_workspace", "orchestrate", workflow_name],
+            cwd=str(self._workspace_root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        self._running_workflows[workflow_name] = proc.pid
+        return {"pid": proc.pid, "workflow": workflow_name}
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
     def _active_contexts(self) -> list[SpecContextProject]:
-        """Return contexts with state == ativo."""
-        return [ctx for ctx in self._spec_context.list_all() if ctx.state == ContextState.ATIVO]
+        """Return contexts with state == alive."""
+        return [ctx for ctx in self._spec_context.list_all() if ctx.state == ContextState.ALIVE]

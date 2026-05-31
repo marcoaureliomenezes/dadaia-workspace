@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "memory-product-feature-v1",
+  "title": "Memory Atom — Product Feature (v1)",
+  "description": "Schema for specs/memory/product/<slug>.yaml (all 18 feature atoms). All 6 content fields are required per SPEC §C-1 (AC-C1-3). additionalProperties:false enforces D-5 atomicity — changelog/history/versions are structurally impossible.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "purpose",
+    "flow_steps",
+    "typical_trigger",
+    "differential",
+    "runtime_state",
+    "dependencies"
+  ],
+  "properties": {
+    "feature_name": {
+      "type": "string",
+      "description": "Display name for the feature (shown in <h1>). Optional: if absent the renderer uses the YAML filename slug. Template variable: feature_name."
+    },
+    "feature_subtitle": {
+      "type": "string",
+      "description": "Subtitle shown in the <p class=meta> line (e.g. CLI surface string). Optional: renderer supplies a default from slug if absent. Template variable: feature_subtitle."
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Purpose prose (one or more paragraphs). Maps to <section id='purpose'> / <h2>Propósito</h2>. Template variable: purpose_paragraphs (renderer wraps each newline-separated paragraph in <p> tags)."
+    },
+    "flow_steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered list of usage flow steps. Each string maps to one <li> in the <ol class='flow'>. Template variable: flow_steps.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "diagram": {
+      "type": "string",
+      "description": "Optional Mermaid diagram source for the flow section. Renderer wraps in <pre class='mermaid'>. Template variable: flow_mermaid_optional."
+    },
+    "typical_trigger": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Single-paragraph description of the typical trigger for using this feature. Maps to <section id='trigger'>. Template variable: typical_trigger."
+    },
+    "differential": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Single-paragraph description of what differentiates this feature (why it exists). Maps to <section id='differential'>. Template variable: differential."
+    },
+    "runtime_state": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of canonical runtime state locations touched by this feature. Each string maps to one <li> bullet. Maps to <section id='runtime-state'>. Template variable: runtime_state_bullets.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of dependencies (features, external tools, constraints). Each string maps to one <li> bullet. Maps to <section id='dependencies'>. Template variable: dependencies_bullets.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

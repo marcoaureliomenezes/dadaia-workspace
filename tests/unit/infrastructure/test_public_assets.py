@@ -451,6 +451,73 @@ class TestPrepareAgentForOpencode:
         content = "just body\n"
         assert _prepare_agent_for_opencode(content) == content
 
+    def test_strips_color_field(self) -> None:
+        # FR-OC-1: color: is Claude-specific and breaks OpenCode 1.14.x parse.
+        content = "---\nname: a\ncolor: yellow\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "color:" not in result
+        assert "yellow" not in result
+
+    def test_color_strip_preserves_other_fields(self) -> None:
+        content = "---\nname: a\ncolor: orange\nmodel: claude-sonnet-4-6\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "name: a" in result
+        assert "model: claude-sonnet-4-6" in result
+        assert "body" in result
+
+    def test_no_color_field_unchanged(self) -> None:
+        content = "---\nname: a\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert result == content
+
+    # --- T-OC-03 (FR-OC-2): permission: per-agent projection ---
+
+    def test_permission_allow_for_granted_tools(self) -> None:
+        content = (
+            "---\nname: be\ntools:\n  - Read\n  - Write\n  - Edit\n  - Bash\n"
+            "  - Glob\n  - Grep\nmodel: m\n---\nbody\n"
+        )
+        result = _prepare_agent_for_opencode(content)
+        assert "permission:" in result
+        assert "  edit: allow" in result
+        assert "  bash: allow" in result
+        # No WebFetch / Agent declared → deny.
+        assert "  webfetch: deny" in result
+        assert "  task: deny" in result
+
+    def test_permission_deny_for_readonly_agent(self) -> None:
+        content = (
+            "---\nname: ro\ntools:\n  - Read\n  - Glob\n  - Grep\n  - WebFetch\n"
+            "  - WebSearch\n  - Write\nmodel: m\n---\nbody\n"
+        )
+        result = _prepare_agent_for_opencode(content)
+        assert "  edit: allow" in result  # Write maps to edit
+        assert "  bash: deny" in result
+        assert "  webfetch: allow" in result
+        assert "  task: deny" in result
+
+    def test_websearch_emits_unsupported_comment(self) -> None:
+        content = "---\nname: r\ntools:\n  - Read\n  - WebSearch\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "# [opencode-unsupported]: WebSearch" in result
+
+    def test_agent_tool_maps_to_task_allow(self) -> None:
+        content = "---\nname: pm\ntools:\n  - Read\n  - Agent\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "  task: allow" in result
+
+    def test_no_tools_block_no_permission(self) -> None:
+        content = "---\nname: a\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "permission:" not in result
+
+    def test_permission_block_after_tools_stripped(self) -> None:
+        # tools: list form must be gone; permission: object form must be present.
+        content = "---\nname: a\ntools:\n  - Bash\nmodel: m\n---\nbody\n"
+        result = _prepare_agent_for_opencode(content)
+        assert "tools:\n  - Bash" not in result
+        assert "  bash: allow" in result
+
 
 # ---------------------------------------------------------------------------
 # _consumer_repos_for_root
@@ -535,6 +602,67 @@ class TestIsSelfRepo:
             json.dumps({"package_version": ""}), encoding="utf-8"
         )
         assert _is_self_repo(consumer) is False
+
+    # --- T-GOS-A3: pyproject-based self-detection (manifest-absent) ---
+
+    def test_pyproject_name_dadaia_workspace_no_manifest_returns_true(self, tmp_path: Path) -> None:
+        """Secondary guard: pyproject.toml with [tool.poetry] name = 'dadaia-workspace'
+        must return True even when no .dadaia/agentic/manifest.json exists (AC-GOS-10a)."""
+        consumer = tmp_path / "repos" / "lib-clone"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        # Deliberately NO manifest — that is the gap this guard closes.
+        assert _is_self_repo(consumer) is True
+
+    def test_pyproject_project_name_dadaia_workspace_no_manifest_returns_true(
+        self, tmp_path: Path
+    ) -> None:
+        """Secondary guard: [project] name = 'dadaia-workspace' (PEP 621) also detected."""
+        consumer = tmp_path / "repos" / "lib-clone-pep621"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[project]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        assert _is_self_repo(consumer) is True
+
+    def test_pyproject_different_name_no_manifest_returns_false(self, tmp_path: Path) -> None:
+        """A pyproject.toml whose name is NOT dadaia-workspace must not trigger self-skip."""
+        consumer = tmp_path / "repos" / "other-lib"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[tool.poetry]\nname = "some-other-lib"\nversion = "1.0.0"\n',
+            encoding="utf-8",
+        )
+        assert _is_self_repo(consumer) is False
+
+    def test_pyproject_malformed_toml_falls_through_to_manifest_check(self, tmp_path: Path) -> None:
+        """Malformed pyproject.toml must not raise; falls through to manifest check."""
+        consumer = tmp_path / "repos" / "broken-pyproject"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text("NOT VALID TOML ][[\n", encoding="utf-8")
+        # No manifest either -> False
+        assert _is_self_repo(consumer) is False
+
+    def test_pyproject_name_dadaia_workspace_with_manifest_returns_true(
+        self, tmp_path: Path
+    ) -> None:
+        """pyproject guard fires before manifest check; result is still True."""
+        consumer = tmp_path / "repos" / "lib-with-manifest"
+        consumer.mkdir(parents=True)
+        (consumer / "pyproject.toml").write_text(
+            '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        # Add a manifest with a non-matching version; pyproject check fires first.
+        (consumer / ".dadaia" / "agentic").mkdir(parents=True)
+        (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
+            json.dumps({"package_version": "999.0.0"}), encoding="utf-8"
+        )
+        assert _is_self_repo(consumer) is True
 
 
 # ---------------------------------------------------------------------------
@@ -1438,6 +1566,13 @@ class TestConfigGenerators:
         assert isinstance(matchers, list)
         assert len(matchers) > 0
         assert "command" in matchers[0]
+        # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
+        assert "PostToolUse" in hooks
+        post_matchers = hooks["PostToolUse"]
+        assert isinstance(post_matchers, list)
+        assert len(post_matchers) > 0
+        assert "command" in post_matchers[0]
+        assert str(post_matchers[0]["command"]).endswith("sdd-post-gate.sh")
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
@@ -1445,6 +1580,13 @@ class TestConfigGenerators:
         assert "hooks" in settings
         assert "PreToolUse" in settings["hooks"]
         assert "UserPromptSubmit" in settings["hooks"]
+        # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
+        assert "PostToolUse" in settings["hooks"]
+        post_hooks = settings["hooks"]["PostToolUse"]
+        assert isinstance(post_hooks, list)
+        assert len(post_hooks) > 0
+        commands = [h["command"] for h in post_hooks[0]["hooks"]]
+        assert any(str(c).endswith("sdd-post-gate.sh") for c in commands)
 
     def test_opencode_config_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
@@ -2300,3 +2442,97 @@ class TestDoctorFindingPersistence:
         reported_messages = [call_args[0][2] for call_args in mock_report.call_args_list]
         for msg in reported_messages:
             assert not msg.startswith("[ok]"), f"[ok] line should not be reported: {msg}"
+
+
+# ---------------------------------------------------------------------------
+# T-WH-13 — list_all() and install(only=...) unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestListAll:
+    def _make_manager(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def test_list_all_returns_all_categories(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        (public_dir / "agents").mkdir(parents=True)
+        (public_dir / "skills").mkdir(parents=True)
+        (public_dir / "rules").mkdir(parents=True)
+        (public_dir / "agents" / "my-agent.md").write_text("# agent", encoding="utf-8")
+        (public_dir / "skills" / "my-skill").mkdir()
+        (public_dir / "rules" / "my-rule.md").write_text("# rule", encoding="utf-8")
+
+        result = self._make_manager(public_dir).list_all()
+
+        assert set(result.keys()) == {"agents", "skills", "rules"}
+        assert "my-agent.md" in result["agents"]
+        assert "my-skill" in result["skills"]
+        assert "my-rule.md" in result["rules"]
+
+    def test_list_all_returns_empty_dict_when_public_missing(self, tmp_path: Path) -> None:
+        result = self._make_manager(tmp_path / "nonexistent").list_all()
+        assert result == {}
+
+    def test_list_all_skips_non_directories_at_root(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        (public_dir / "agents").mkdir()
+        (public_dir / "README.md").write_text("# readme", encoding="utf-8")
+
+        result = self._make_manager(public_dir).list_all()
+        assert "README.md" not in result
+        assert "agents" in result
+
+
+class TestInstallOnly:
+    def _make_manager(self, public_dir: Path) -> FileSystemPublicAssetManager:
+        manager = FileSystemPublicAssetManager()
+        manager._public_dir = public_dir
+        return manager
+
+    def _make_minimal_agentic(self, workspace_root: Path) -> Path:
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        (agentic_dir / "rules").mkdir(parents=True)
+        (agentic_dir / "agents").mkdir(parents=True)
+        (agentic_dir / "skills").mkdir(parents=True)
+        (agentic_dir / "workflows").mkdir(parents=True)
+        (agentic_dir / "commands").mkdir(parents=True)
+        (agentic_dir / "rules" / "my-rule.md").write_text("# rule", encoding="utf-8")
+        (agentic_dir / "agents" / "my-agent.md").write_text(
+            "---\nname: my-agent\nmodel: claude-sonnet-4-6\n---\n# body\n", encoding="utf-8"
+        )
+        manifest = {"schema_version": "1", "package_version": "0.0.1"}
+        import json
+
+        (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        return agentic_dir
+
+    def test_install_only_rules_skips_agents(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        self._make_minimal_agentic(workspace_root)
+        manager = self._make_manager(public_dir)
+
+        installed = manager.install(workspace_root, target="claude", force=True, only="rules")
+
+        installed_paths = " ".join(installed)
+        assert "rules" in installed_paths or len(installed) == 0
+        agents_dir = workspace_root / ".claude" / "agents"
+        assert not agents_dir.exists() or list(agents_dir.iterdir()) == []
+
+    def test_install_only_agents_skips_rules(self, tmp_path: Path) -> None:
+        public_dir = tmp_path / "public"
+        public_dir.mkdir()
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        self._make_minimal_agentic(workspace_root)
+        manager = self._make_manager(public_dir)
+
+        manager.install(workspace_root, target="claude", force=True, only="agents")
+
+        rules_dir = workspace_root / ".claude" / "rules"
+        assert not rules_dir.exists() or list(rules_dir.iterdir()) == []

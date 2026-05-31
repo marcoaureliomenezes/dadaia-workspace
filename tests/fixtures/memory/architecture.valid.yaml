@@ -1,0 +1,56 @@
+# Valid memory-architecture-v1 fixture
+# All required fields present; no changelog/history/versions.
+overview: |
+  Three-ring architecture: (1) CLI thin layer in dadaia_workspace/cli/;
+  (2) isolated features in dadaia_workspace/features/<name>/; (3) infrastructure
+  in dadaia_workspace/infrastructure/ (Git, JSON stores, public asset projection).
+  Core in dadaia_workspace/core/ holds models, protocols and exceptions — no I/O.
+  Dependency injection via dadaia_workspace/container.py.
+
+layers:
+  - name: "cli/"
+    description: "Typer app + commands. Thin wrapper over features; no business logic."
+  - name: "features/"
+    description: "Each feature is a folder with service.py + optional doctor.py, resolver.py, runner.py."
+  - name: "core/"
+    description: "models/ (pure dataclasses), protocols/ (ABCs / Protocols for DI), exceptions.py. Zero I/O."
+  - name: "infrastructure/"
+    description: "Concrete implementations of protocols: git_subprocess, json_*_store, public_assets, etc. All I/O lives here."
+  - name: "container.py"
+    description: "Wires features <-> infrastructure via build_*_service(workspace_root) factories."
+  - name: "public/"
+    description: "Canonical versioned assets: agents/, skills/, rules/, commands/, scripts/, templates/, workflows/."
+
+dependency_rules_diagram: |
+  flowchart TB
+    cli --> features
+    cli --> container
+    features --> core
+    features --> infrastructure
+    infrastructure --> core
+    container --> features
+    container --> infrastructure
+    container --> core
+
+data_flow_diagram: |
+  flowchart LR
+    A[public/<type>/<file>] --> B[dadaia public stage]
+    B --> C[.dadaia/agentic/<type>/<file>]
+    C --> D[dadaia public install --target all]
+    D --> E[.claude/<type>/<file>]
+    D --> F[.codex/<type>/<file>]
+
+contracts:
+  - from: "cli/"
+    to: "features/"
+    contract_type: "Service factory call"
+    notes: "CLI commands call container.build_*_service() to obtain service instances."
+  - from: "features/"
+    to: "infrastructure/"
+    contract_type: "Protocol"
+    notes: "Features declare Protocol interfaces; infrastructure provides concrete implementations."
+
+runtime_state:
+  - ".dadaia/states/spec_contexts.json — context store (JSON)"
+  - ".dadaia/agentic/manifest.json — staged asset manifest with SHA256 hashes"
+  - ".dadaia/sessions/sess_*.json — per-session lock files"

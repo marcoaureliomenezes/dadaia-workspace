@@ -1,22 +1,67 @@
-"""JsonContextStore — atomic CRUD over spec_contexts.json."""
+"""JsonContextStore — atomic CRUD over spec_contexts.json (schema v2).
+
+NOTE: _load and _dump must NOT be called outside SpecContextService methods.
+Calling them directly bypasses the fcntl lock (introduced in T-11) and re-opens
+the concurrent-write race R-1.
+"""
 
 import json
 import os
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 
-_VERSION = "1"
+_VERSION = "2"
+
+# Legacy state values that indicate a v1 file (used only by the migration path — T-10c)
+_LEGACY_STATES: frozenset[str] = frozenset({"ativo", "inativo"})
 
 
 def _load(path: Path) -> dict:  # type: ignore[type-arg]
+    """Load spec_contexts.json.  Raises SchemaVersionError on v1 files.
+
+    Must NOT be called outside SpecContextService methods — see module docstring.
+    """
     if not path.exists():
-        return {"version": _VERSION, "contexts": []}
+        return {"schema_version": _VERSION, "contexts": []}
     with path.open() as f:
-        return json.load(f)  # type: ignore[no-any-return]
+        data = json.load(f)
+
+    # Detect v1 by explicit schema_version field
+    schema_ver = data.get("schema_version") or data.get("version")
+    if schema_ver == "1":
+        raise SchemaVersionError(
+            "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
+            "Run: dadaia migrate\n"
+            "After migration, all v2 commands will work normally."
+        )
+
+    # Detect v1 by legacy state values in context rows
+    for ctx in data.get("contexts", []):
+        if ctx.get("state") in _LEGACY_STATES:
+            raise SchemaVersionError(
+                "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
+                "Run: dadaia migrate\n"
+                "After migration, all v2 commands will work normally."
+            )
+
+    # Unknown schema version — fail loudly
+    if schema_ver not in (None, _VERSION):
+        raise SchemaVersionError(
+            f"[MIGRATION REQUIRED] Unknown schema_version '{schema_ver}' in spec_contexts.json.\n"
+            "Run: dadaia migrate\n"
+            "After migration, all v2 commands will work normally."
+        )
+
+    return data  # type: ignore[no-any-return]
 
 
 def _dump(path: Path, data: dict) -> None:  # type: ignore[type-arg]
+    """Write spec_contexts.json atomically (tmp → os.replace()).
+
+    Must NOT be called outside SpecContextService methods — see module docstring.
+    """
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=2))
     os.replace(tmp, path)
@@ -28,9 +73,9 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "state": ctx.state.value,
         "repo_slug": ctx.repo_slug,
         "repo_url": ctx.repo_url,
-        "is_primary": ctx.is_primary,
         "created_at": ctx.created_at,
-        "activated_at": ctx.activated_at,
+        "alive_since": ctx.alive_since,
+        "dead_since": ctx.dead_since,
         "current_branch": ctx.current_branch,
     }
 
@@ -41,9 +86,9 @@ def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
         state=ContextState(d["state"]),
         repo_slug=d["repo_slug"],
         repo_url=d["repo_url"],
-        is_primary=d["is_primary"],
         created_at=d["created_at"],
-        activated_at=d.get("activated_at"),
+        alive_since=d.get("alive_since"),
+        dead_since=d.get("dead_since"),
         current_branch=d.get("current_branch"),
     )
 

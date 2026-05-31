@@ -13,6 +13,8 @@ from pathlib import Path
 
 import jinja2
 
+from dadaia_workspace.features.specs.renderer import render_atom
+
 # SemVer pattern for hotfix release version IDs (v<M>.<m>.<p>).
 _RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 
@@ -105,11 +107,6 @@ def scaffold(
     """
     result = ScaffoldResult()
     today = datetime.date.today().isoformat()
-    template_context: dict[str, str] = {
-        "project_name": project_name,
-        "today": today,
-        "last_release_id": "none",
-    }
 
     def _write(path: Path, content: str) -> None:
         """Write content to path; respect force flag."""
@@ -148,28 +145,60 @@ def scaffold(
         except OSError as exc:
             result.errors.append(f"Failed to write {constitution_path}: {exc}")
 
-    # 2 — memory/architecture.html
+    # Locate canonical YAML stubs (public/scaffold/memory/ adjacent to templates_dir).
+    _scaffold_memory_dir = templates_dir.parent / "scaffold" / "memory"
+
+    # 2 — memory/architecture.yaml + memory/architecture.html
     try:
-        arch_html = _render_template(templates_dir, "memory-architecture.html.j2", template_context)
+        yaml_stub_src = _scaffold_memory_dir / "architecture.yaml"
+        yaml_content = yaml_stub_src.read_text(encoding="utf-8")
+        _write(specs_dir / "memory" / "architecture.yaml", yaml_content)
+        arch_html = render_atom(
+            yaml_stub_src,
+            atom_type="memory-architecture-v1",
+            templates_dir=templates_dir,
+        )
         _write(specs_dir / "memory" / "architecture.html", arch_html)
     except Exception as exc:
-        result.errors.append(f"Template render error (architecture): {exc}")
+        result.errors.append(f"Scaffold error (architecture): {exc}")
 
-    # 3 — memory/tech-stack.html
+    # 3 — memory/tech-stack.yaml + memory/tech-stack.html
     try:
-        tech_html = _render_template(templates_dir, "memory-tech-stack.html.j2", template_context)
+        yaml_stub_src = _scaffold_memory_dir / "tech-stack.yaml"
+        yaml_content = yaml_stub_src.read_text(encoding="utf-8")
+        _write(specs_dir / "memory" / "tech-stack.yaml", yaml_content)
+        tech_html = render_atom(
+            yaml_stub_src,
+            atom_type="memory-tech-stack-v1",
+            templates_dir=templates_dir,
+        )
         _write(specs_dir / "memory" / "tech-stack.html", tech_html)
     except Exception as exc:
-        result.errors.append(f"Template render error (tech-stack): {exc}")
+        result.errors.append(f"Scaffold error (tech-stack): {exc}")
 
-    # 4 — memory/product/index.html (empty catalog)
+    # 4 — memory/product/index.yaml + memory/product/index.html
     try:
-        product_html = _render_template(
-            templates_dir, "memory-product-index.html.j2", template_context
+        yaml_stub_src = _scaffold_memory_dir / "product" / "index.yaml"
+        yaml_content = yaml_stub_src.read_text(encoding="utf-8")
+        _write(specs_dir / "memory" / "product" / "index.yaml", yaml_content)
+        product_html = render_atom(
+            yaml_stub_src,
+            atom_type="memory-product-index-v1",
+            templates_dir=templates_dir,
         )
         _write(specs_dir / "memory" / "product" / "index.html", product_html)
     except Exception as exc:
-        result.errors.append(f"Template render error (product-index): {exc}")
+        result.errors.append(f"Scaffold error (product-index): {exc}")
+
+    # 4a — memory/product/placeholder.html (satisfies the index.yaml catalog stub link)
+    try:
+        placeholder_src = _scaffold_memory_dir / "product" / "placeholder.html"
+        _write(
+            specs_dir / "memory" / "product" / "placeholder.html",
+            placeholder_src.read_text(encoding="utf-8"),
+        )
+    except Exception as exc:
+        result.errors.append(f"Scaffold error (placeholder): {exc}")
 
     # 5 — releases/ACTIVE.md
     _write(

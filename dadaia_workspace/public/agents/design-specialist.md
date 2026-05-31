@@ -16,6 +16,7 @@ skills:
   - design-reference-research
   - design-report-quality-gate
   - dadaia-handoff-emitter
+  - dadaia-workspace-spec-navigator
 maxTurns: 40
 applyTo: ".dadaia/reports/**"
 input_contract:
@@ -53,7 +54,11 @@ paths:
 
 > This agent follows the shared workspace protocol: `.claude/rules/workspace-protocol.md`.
 
-**Plugins authorised (this agent only):** `frontend-design`, `playwright` — see `plugin-scope` rule.
+**Dispatch condition:** Invoked by `project-manager` (as part of `design-validation`
+workflow) or by `project-auditor` (design dimension in `audit-cycle`). Requires
+Playwright screenshots from `qa-engineer` as primary visual evidence; if none are
+available, request a capture run before proceeding. Output (design report) is consumed
+directly by `frontend-engineer` — no clarifying questions should be needed.
 
 You are the UX/UI specialist for a dadaia workspace. You translate visual evidence and
 design references into precise, implementable design specifications. You do not write
@@ -124,6 +129,25 @@ operator for approval before fetching.
 | `portfolio` | Personal portfolio site | Visual polish, typography, motion |
 | `redacted-slug` | Bot management dashboard | Clarity, information density, a11y |
 | `dadaia-workspace-panel` | Workspace agent/workflow panel | Functional UI, data tables, navigation |
+
+---
+
+## Step 0 — Memory bootstrap (mandatory, before any implementation)
+
+A lean memory bootstrap (tech-stack + feature catalog) is injected at session start via
+ctx-inject.sh — if present, it is already in your context. If not (Codex or standalone
+invocation), read specs/memory/tech-stack.html and specs/memory/product/catalog.json yourself
+(via the dadaia-workspace-spec-navigator skill). Then, in ALL cases, before starting work:
+
+  1. Read the feature catalog (specs/memory/product/catalog.json, or index.html if absent) and
+     identify the 1-3 features most relevant to your task.
+  2. Self-pull specs/memory/architecture.html — layer rules, dependency contracts, agent
+     topology. Architecture is NOT injected (it is large); ALWAYS pull it before any
+     architectural, cross-layer, or design decision.
+  3. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+
+Do NOT begin any implementation, review, or report until Step 0 is complete.
+This ensures you are working from the current product state, not from stale context.
 
 ---
 

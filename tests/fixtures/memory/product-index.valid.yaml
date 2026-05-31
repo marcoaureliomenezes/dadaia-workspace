@@ -1,0 +1,51 @@
+# Valid memory-product-index-v1 fixture
+# All required fields present including rank + keywords on each catalog entry (AC-C1-4).
+# No changelog/history/versions.
+vision_oneliner: >-
+  dadaia-workspace is the CLI and library that manages the operator's multi-repo workspace
+  as an agentic-native Spec Context Project.
+
+vision_paragraph: >-
+  The product solves two problems: (a) fragmentation between agentic tools — each with its
+  own format for agents, skills, hooks — and (b) absence of an observable SDD pipeline
+  from specification to implementation, with a gate hook that prevents editing production
+  without an approved release and an active [-] task.
+
+users:
+  - name: "Operador (único humano)"
+    description: "Orchestrates work across 20 agents in a 3-tier topology. Activates contexts, approves specs, decides trade-offs."
+  - name: "Tier 1 — orchestrators (com tool Agent)"
+    description: "project-manager (intake + workflow dispatch), project-auditor (drift detection)."
+  - name: "Tier 2 — curator (sem tool Agent)"
+    description: "product-engineer: author of SPEC/PLAN/TASKS/CLOSURE and exclusive guardian of specs/memory/*.html in CLOSURE phase."
+  - name: "Tier 3 — leaf specialists (17, sem tool Agent)"
+    description: "ai-engineer, backend-engineer, code-reviewer, data-analyst, data-engineer, design-specialist, devops-engineer, frontend-engineer, game-designer, game-developer, game-tester, qa-engineer, researcher, security-reviewer, software-architect, software-engineer-node, software-engineer-python."
+
+catalog:
+  - slug: "workspace-init"
+    title: "workspace-init"
+    summary: "Entry point; creates .dadaia/, .venv, hooks and idempotent structure."
+    rank: 1
+    keywords: ["init", "bootstrap", "workspace", "venv", "hooks"]
+  - slug: "context-management"
+    title: "context-management"
+    summary: "Multi-context lifecycle ALIVE/DEAD; session binding; three-layer locking; scaffold canonical tree v2."
+    rank: 2
+    keywords: ["context", "lifecycle", "locking", "session", "bind", "ALIVE", "DEAD"]
+  - slug: "agent-orchestration"
+    title: "agent-orchestration"
+    summary: "DAG runner dispatching specialist agents with parallel_groups + gates. Two-tier PM router."
+    rank: 3
+    keywords: ["orchestration", "dag", "dispatch", "workflow", "pm", "playbook"]
+
+capability_map_diagram: |
+  flowchart TB
+    CLI[dadaia CLI]
+    CLI --> CTX[context-management]
+    CLI --> INIT[workspace-init]
+    CLI --> ORCH[agent-orchestration]
+    CLI --> PUB[public-asset-distribution]
+
+non_goals:
+  - "dadaia-workspace does not provide a graphical UI beyond the local panel."
+  - "dadaia-workspace does not manage cloud infrastructure — only local workspace state."

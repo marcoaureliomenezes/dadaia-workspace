@@ -40,7 +40,6 @@ def workspace_with_active_repo(tmp_path: Path) -> tuple[Path, Path, JsonContextS
     workspace = tmp_path / "ws"
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(json.dumps({"version": "1", "contexts": []}))
 
     repo_path = workspace / "repos" / "alpha"
     _init_repo(repo_path)
@@ -50,12 +49,12 @@ def workspace_with_active_repo(tmp_path: Path) -> tuple[Path, Path, JsonContextS
     store.save(
         SpecContextProject(
             name="alpha",
-            state=ContextState.ATIVO,
+            state=ContextState.ALIVE,
             repo_slug="alpha",
             repo_url="https://example.com/alpha.git",
-            is_primary=True,
             created_at="2026-01-01T00:00:00Z",
-            activated_at="2026-01-02T00:00:00Z",
+            alive_since="2026-01-02T00:00:00Z",
+            dead_since=None,
             current_branch=None,
         )
     )

@@ -48,7 +48,7 @@ def test_init_creates_spec_contexts_json(service: WorkspaceService, workspace_ro
     path = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
     assert path.exists()
     data = json.loads(path.read_text())
-    assert data == {"version": "1", "contexts": []}
+    assert data == {"schema_version": "2", "contexts": []}
 
 
 def test_init_creates_academy_json(service: WorkspaceService, workspace_root: Path) -> None:

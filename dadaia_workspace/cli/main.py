@@ -10,6 +10,7 @@ from dadaia_workspace.cli.commands import (
     context,
     doctor,
     init,
+    migrate,
     orchestrate,
     panel,
     public,
@@ -20,6 +21,12 @@ from dadaia_workspace.cli.commands import (
 )
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
+from dadaia_workspace.cli.commands.memory import app as memory_app
+from dadaia_workspace.cli.commands.newartifacts import (
+    backlog_app,
+    bug_app,
+    release_app,
+)
 from dadaia_workspace.infrastructure.bug_reporter import report_exception as _report_exc
 
 app = typer.Typer(
@@ -43,7 +50,12 @@ app.add_typer(orchestrate.app, name="orchestrate")
 app.add_typer(reports.app, name="reports")
 app.add_typer(specs.app, name="specs")
 app.add_typer(server.app, name="server")
+app.add_typer(migrate.app, name="migrate")
 app.add_typer(panel.app, name="panel")
+app.add_typer(memory_app, name="memory")
+app.add_typer(release_app, name="release")
+app.add_typer(backlog_app, name="backlog")
+app.add_typer(bug_app, name="bug")
 
 # Workspace root resolved from the editable install location:
 # cli/main.py → cli/ → dadaia_workspace/ → repos/dadaia-workspace/ → workspace root

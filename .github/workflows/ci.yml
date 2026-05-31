@@ -131,6 +131,22 @@ jobs:
             exit 1
           fi
 
+  repo-hygiene:
+    name: Repo hygiene (no tracked projection files)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - name: Fail if projection or runtime files are git-tracked
+        run: |
+          FOUND=$(git ls-files | grep -E '^\.(claude|agents|codex|opencode)/|^\.dadaia/(agentic|scripts|states|reports)/' || true)
+          if [ -n "$FOUND" ]; then
+            echo "::error::Tracked projection/runtime files detected. Remove them from the git index:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "No tracked projection files found."
+
   hotfix-branch-name:
     name: Hotfix branch SemVer (PATCH>=1)
     runs-on: ubuntu-latest

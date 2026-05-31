@@ -32,6 +32,57 @@ _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_RE = re.compile(r"^opencode_model:\s*(.+?)$", re.MULTILINE)
 _FRONTMATTER_MODEL_VALUE_RE = re.compile(r"^(model:\s*)(.+?)$", re.MULTILINE)
 _FRONTMATTER_OPENCODE_MODEL_FIELD_RE = re.compile(r"^opencode_model:[^\n]*\n", re.MULTILINE)
+# `color:` is Claude Code-specific (panel tier accent) and causes a frontmatter parse
+# failure in OpenCode 1.14.x. Strip it from the OpenCode projection only (FR-OC-1).
+# It stays intact in the source agents and in the Claude Code / Codex projections.
+_FRONTMATTER_COLOR_RE = re.compile(r"^color:[^\n]*\n", re.MULTILINE)
+
+# T-OC-03 (FR-OC-2): project the agent's Claude `tools:` grants into an OpenCode per-agent
+# `permission:` block. OpenCode permission categories take allow/deny/ask and merge OVER the
+# global opencode.json default ("allow"), with the agent rule winning. We emit `allow` for a
+# mapped category the agent declares and `deny` for the security-sensitive categories it omits,
+# preserving each agent's capability boundary (Pilar 3 — projection honesty). Read-only
+# categories (read/glob/grep/list) keep the OpenCode default and are not emitted.
+_CLAUDE_TOOL_TO_OPENCODE_PERMISSION = {
+    "Edit": "edit",
+    "Write": "edit",
+    "Bash": "bash",
+    "WebFetch": "webfetch",
+    "Agent": "task",
+}
+# Categories always emitted (allow if granted, deny otherwise) — the meaningful boundary set.
+_OPENCODE_PERMISSION_CATEGORIES = ("edit", "bash", "webfetch", "task")
+# Claude tools with no OpenCode permission equivalent → projection-honesty comment.
+_OPENCODE_UNSUPPORTED_TOOLS = ("WebSearch",)
+# Single `  - <Tool>` list item inside a `tools:` YAML block.
+_FRONTMATTER_TOOLS_LIST_ITEM_RE = re.compile(r"^  - ([^\n]+)$", re.MULTILINE)
+
+
+def _opencode_permission_block(frontmatter: str) -> str:
+    """Build an OpenCode ``permission:`` frontmatter block from a Claude ``tools:`` list.
+
+    Returns ``""`` when the agent declares no ``tools:`` block (nothing to map).
+    """
+    m = _FRONTMATTER_TOOLS_RE.search(frontmatter)
+    if not m:
+        return ""
+    tools = {t.strip() for t in _FRONTMATTER_TOOLS_LIST_ITEM_RE.findall(m.group(0))}
+    if not tools:
+        return ""
+    granted = {
+        _CLAUDE_TOOL_TO_OPENCODE_PERMISSION[t]
+        for t in tools
+        if t in _CLAUDE_TOOL_TO_OPENCODE_PERMISSION
+    }
+    lines = ["permission:"]
+    lines += [
+        f"  {cat}: {'allow' if cat in granted else 'deny'}"
+        for cat in _OPENCODE_PERMISSION_CATEGORIES
+    ]
+    lines += [f"# [opencode-unsupported]: {t}" for t in _OPENCODE_UNSUPPORTED_TOOLS if t in tools]
+    return "\n".join(lines) + "\n"
+
+
 # T-35: forbid the legacy `software-engineer` alias inside public/ (split into
 # `software-engineer-python` and `software-engineer-node`). Matches subagent_type:
 # software-engineer with no trailing -python/-node suffix.
@@ -316,6 +367,36 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     return result
 
 
+def _parse_skills_from_frontmatter(text: str) -> list[str]:
+    """Extract the ``skills:`` list from agent YAML frontmatter.
+
+    Locates the ``skills:`` key inside the opening ``---`` block and collects
+    indented ``  - <name>`` list items, stopping at the next top-level key or
+    end of the frontmatter block.  Returns an empty list when frontmatter is
+    absent or contains no ``skills:`` key.
+    """
+    if not text.startswith("---\n"):
+        return []
+    end_idx = text.find("\n---\n", 4)
+    if end_idx == -1:
+        return []
+    frontmatter = text[4 : end_idx + 1]
+
+    skills: list[str] = []
+    in_skills = False
+    for line in frontmatter.splitlines():
+        if line.rstrip() == "skills:":
+            in_skills = True
+            continue
+        if in_skills:
+            stripped = line.strip()
+            if stripped.startswith("- "):
+                skills.append(stripped[2:].strip())
+            elif line and not line.startswith(" ") and not line.startswith("\t"):
+                in_skills = False  # next top-level key — skills block ended
+    return skills
+
+
 def _atomic_write_text(dst: Path, content: str) -> None:
     """Write *content* to *dst* atomically via a sibling .tmp file + os.replace().
 
@@ -369,6 +450,9 @@ def _prepare_agent_for_opencode(content: str) -> str:
     frontmatter = content[4 : end_idx + 1]
     body = content[end_idx + 5 :]
 
+    # Derive the permission block from the ORIGINAL frontmatter (before tools is stripped).
+    permission_block = _opencode_permission_block(frontmatter)
+
     m = _FRONTMATTER_OPENCODE_MODEL_RE.search(frontmatter)
     if m:
         opencode_model = m.group(1).strip()
@@ -377,6 +461,9 @@ def _prepare_agent_for_opencode(content: str) -> str:
         )
     frontmatter = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
     frontmatter = _FRONTMATTER_OPENCODE_MODEL_FIELD_RE.sub("", frontmatter)
+    frontmatter = _FRONTMATTER_COLOR_RE.sub("", frontmatter)
+    if permission_block:
+        frontmatter = frontmatter + permission_block
     return f"---\n{frontmatter}---\n{body}"
 
 
@@ -406,10 +493,32 @@ def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
 def _is_self_repo(consumer: Path) -> bool:
     """Return True when *consumer* is the dadaia-workspace repo itself (R14).
 
-    Compares ``package_version`` in the consumer's manifest against the
-    currently installed package version.  A match means the consumer IS the
-    dadaia-workspace source tree — we must never overwrite its source files.
+    Two independent checks, either of which is sufficient.
+
+    Primary (manifest-based): compares ``package_version`` in the consumer's
+    manifest against the currently installed package version.  A match means
+    the consumer IS the dadaia-workspace source tree.
+
+    Secondary (pyproject-based): if the consumer directory contains a
+    ``pyproject.toml`` whose ``[tool.poetry] name`` or ``[project] name``
+    equals ``"dadaia-workspace"``, treat it as self regardless of whether a
+    manifest exists.  This closes the gap where a fresh clone (no
+    ``.dadaia/agentic/manifest.json`` yet) could be mistakenly scaffolded into
+    the library source tree.
     """
+    # Secondary check: pyproject.toml name detection (manifest-independent)
+    pyproject_path = consumer / "pyproject.toml"
+    if pyproject_path.exists():
+        try:
+            data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+            poetry_name = data.get("tool", {}).get("poetry", {}).get("name", "")
+            project_name = data.get("project", {}).get("name", "")
+            if poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace":
+                return True
+        except (tomllib.TOMLDecodeError, OSError):
+            pass
+
+    # Primary check: manifest version match
     manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
     if not manifest_path.exists():
         return False
@@ -675,12 +784,28 @@ class FileSystemPublicAssetManager:
                 f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
             ) from e
 
+    def list_all(self) -> dict[str, list[str]]:
+        """Return all public asset names grouped by category directory."""
+        result: dict[str, list[str]] = {}
+        if not self._public_dir.exists():
+            return result
+        for category_dir in sorted(self._public_dir.iterdir()):
+            if not category_dir.is_dir():
+                continue
+            names: list[str] = []
+            for entry in sorted(category_dir.iterdir()):
+                if entry.is_dir() or entry.is_file():
+                    names.append(entry.name)
+            result[category_dir.name] = names
+        return result
+
     def install(
         self,
         workspace_root: Path,
         target: str = "all",
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
+        only: str | None = None,
     ) -> list[str]:
         if target not in _VALID_TARGETS:
             valid = ", ".join(sorted(_VALID_TARGETS))
@@ -719,13 +844,14 @@ class FileSystemPublicAssetManager:
 
         for item in targets:
             if item == "agents":
-                self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+                if only is None or only == "skills":
+                    self._install_universal_skills(agentic_dir, workspace_root, force, installed)
             elif item == "claude":
-                self._install_claude(agentic_dir, workspace_root, force, installed)
+                self._install_claude(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "codex":
-                self._install_codex(agentic_dir, workspace_root, force, installed)
+                self._install_codex(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "opencode":
-                self._install_opencode(agentic_dir, workspace_root, force, installed)
+                self._install_opencode(agentic_dir, workspace_root, force, installed, only=only)
 
         if target in {"all", "claude", "codex"}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
@@ -792,6 +918,7 @@ class FileSystemPublicAssetManager:
         reports.extend(self._classify_workflows(agentic_dir))
         reports.extend(self._lint_legacy_software_engineer())
         reports.extend(self._check_codex_drift(agentic_dir, workspace_root))
+        reports.extend(self._check_agent_skill_refs())
 
         # git-dirty check: detect uncommitted changes in public/ (editable install blind spot)
         try:
@@ -1025,6 +1152,70 @@ class FileSystemPublicAssetManager:
                 out.append(f"[drift] codex:skills/{slug}/SKILL.md (D-CX-6)")
         return out
 
+    def _check_agent_skill_refs(self) -> list[str]:
+        """D-CX-SKILLS: every ``skills:`` name in agent frontmatter must exist in ``public/skills/``.
+
+        For each ``public/agents/*.md``, parses the YAML ``skills:`` list and
+        verifies that ``public/skills/<name>/`` is a directory.  A missing
+        directory is ``[drift]`` (hard failure) — the agent promises a
+        capability it cannot actually invoke.
+
+        Also scans the ``## Skills consumed`` section in the body for
+        backtick-quoted names that look like skill identifiers but are absent
+        from ``public/skills/``.  These produce ``[warn]`` (soft) — they may
+        document legacy knowledge intentionally moved to ``docs/agent-knowledge/``
+        rather than a misconfiguration.
+        """
+        agents_dir = self._public_dir / "agents"
+        skills_dir = self._public_dir / "skills"
+        out: list[str] = []
+        if not agents_dir.exists():
+            return out
+
+        for md_file in sorted(agents_dir.glob("*.md")):
+            try:
+                text = md_file.read_text(encoding="utf-8")
+            except OSError:
+                continue
+
+            fm = _parse_agent_frontmatter(text)
+            agent_name = str(fm.get("name", md_file.stem)) if fm else md_file.stem
+
+            # Frontmatter skills — hard failure on missing skill directory
+            skills_in_fm = _parse_skills_from_frontmatter(text)
+            confirmed: set[str] = set()
+            for skill in skills_in_fm:
+                if (skills_dir / skill).is_dir():
+                    confirmed.add(skill)
+                else:
+                    out.append(
+                        f"[drift] agent:{agent_name}: frontmatter references "
+                        f"non-existent skill '{skill}' (D-CX-SKILLS)"
+                    )
+
+            # Body scan — only inside "## Skills consumed" section (soft warning)
+            body_start = text.find("\n---\n", 4)
+            if body_start == -1:
+                continue
+            body = text[body_start + 5 :]
+            sc_start = body.find("## Skills consumed")
+            if sc_start == -1:
+                continue
+            sc_end = body.find("\n## ", sc_start + 1)
+            section = body[sc_start:sc_end] if sc_end != -1 else body[sc_start:]
+            already_flagged: set[str] = set(skills_in_fm)
+            for m in re.finditer(r"`([a-z][a-z0-9\-]+)`", section):
+                candidate = m.group(1)
+                if candidate in already_flagged or candidate in confirmed:
+                    continue
+                if not (skills_dir / candidate).is_dir():
+                    out.append(
+                        f"[warn] agent:{agent_name}: 'Skills consumed' body section "
+                        f"mentions '{candidate}' absent from public/skills/ (D-CX-SKILLS)"
+                    )
+                    already_flagged.add(candidate)
+        return out
+
     def _lint_legacy_software_engineer(self) -> list[str]:
         """T-35: reject the legacy `software-engineer` subagent alias in public/.
 
@@ -1112,41 +1303,61 @@ class FileSystemPublicAssetManager:
         )
 
     def _install_claude(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
     ) -> None:
         claude_dir = workspace_root / ".claude"
-        for name in _CLAUDE_DIRS:
+        dirs = _CLAUDE_DIRS if only is None else tuple(d for d in _CLAUDE_DIRS if d == only)
+        for name in dirs:
             self._copy_tree(agentic_dir / name, claude_dir / name, force, installed)
 
-        settings_path = claude_dir / "settings.json"
-        if settings_path.exists() and not force:
-            installed.append(f"[skip] {settings_path}")
-        else:
-            self._write_generated(
-                settings_path, _json_dump(self._claude_settings(workspace_root)), True, installed
-            )
+        if only is None:
+            settings_path = claude_dir / "settings.json"
+            if settings_path.exists() and not force:
+                installed.append(f"[skip] {settings_path}")
+            else:
+                self._write_generated(
+                    settings_path,
+                    _json_dump(self._claude_settings(workspace_root)),
+                    True,
+                    installed,
+                )
 
     def _install_codex(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
     ) -> None:
         codex_dir = workspace_root / ".codex"
-        self._install_codex_rules(agentic_dir, workspace_root, force, installed)
-        self._install_codex_workflows(agentic_dir, workspace_root, force, installed)
-        self._install_universal_skills(agentic_dir, workspace_root, force, installed)
-        self._install_codex_agents(agentic_dir, workspace_root, force, installed)
-        self._install_codex_runtime_adapters(workspace_root, force, installed)
-        self._write_generated(
-            codex_dir / "hooks.json",
-            _json_dump(self._codex_hooks(workspace_root)),
-            force,
-            installed,
-        )
-        self._write_generated(
-            codex_dir / "config.toml",
-            self._codex_config(agentic_dir),
-            force,
-            installed,
-        )
+        if only is None or only == "rules":
+            self._install_codex_rules(agentic_dir, workspace_root, force, installed)
+        if only is None or only == "workflows":
+            self._install_codex_workflows(agentic_dir, workspace_root, force, installed)
+        if only is None or only == "skills":
+            self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+        if only is None or only == "agents":
+            self._install_codex_agents(agentic_dir, workspace_root, force, installed)
+            self._install_codex_runtime_adapters(workspace_root, force, installed)
+        if only is None:
+            self._write_generated(
+                codex_dir / "hooks.json",
+                _json_dump(self._codex_hooks(workspace_root)),
+                force,
+                installed,
+            )
+            self._write_generated(
+                codex_dir / "config.toml",
+                self._codex_config(agentic_dir),
+                force,
+                installed,
+            )
 
     def _install_codex_rules(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -1282,22 +1493,29 @@ class FileSystemPublicAssetManager:
             self._copy_file(skill_src, skill_dst, force, installed)
 
     def _install_opencode(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
     ) -> None:
         opencode_dir = workspace_root / ".opencode"
-        for name in _OPENCODE_DIRS:
+        dirs = _OPENCODE_DIRS if only is None else tuple(d for d in _OPENCODE_DIRS if d == only)
+        for name in dirs:
             if name == "agents":
                 self._copy_agents_for_opencode(
                     agentic_dir / name, opencode_dir / name, force, installed
                 )
             else:
                 self._copy_tree(agentic_dir / name, opencode_dir / name, force, installed)
-        self._write_generated(
-            workspace_root / "opencode.json",
-            _json_dump(self._opencode_config(workspace_root)),
-            force,
-            installed,
-        )
+        if only is None:
+            self._write_generated(
+                workspace_root / "opencode.json",
+                _json_dump(self._opencode_config(workspace_root)),
+                force,
+                installed,
+            )
 
     def _copy_agents_for_opencode(
         self, src_dir: Path, dst_dir: Path, force: bool, installed: list[str]
@@ -1450,11 +1668,32 @@ class FileSystemPublicAssetManager:
     def _is_self_repo(self, consumer: Path) -> bool:
         """Return True when *consumer* is the dadaia-workspace repo itself.
 
-        R14 self-skip: compare ``package_version`` in the consumer's own
-        manifest against the currently installed package version.  A match
-        means the consumer IS the dadaia-workspace source tree — we must
-        never overwrite ``data/AGENTS.md`` by projecting back onto ourselves.
+        R14 self-skip: two independent checks, either of which is sufficient.
+
+        Primary (manifest-based): compare ``package_version`` in the consumer's
+        own manifest against the currently installed package version.  A match
+        means the consumer IS the dadaia-workspace source tree.
+
+        Secondary (pyproject-based): if the consumer directory contains a
+        ``pyproject.toml`` whose ``[tool.poetry] name`` or ``[project] name``
+        equals ``"dadaia-workspace"``, treat it as self regardless of whether
+        a manifest exists.  This closes the gap where a fresh clone (no
+        ``.dadaia/agentic/manifest.json`` yet) could be mistakenly scaffolded
+        into the library source tree.
         """
+        # Secondary check: pyproject.toml name detection (manifest-independent)
+        pyproject_path = consumer / "pyproject.toml"
+        if pyproject_path.exists():
+            try:
+                data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+                poetry_name = data.get("tool", {}).get("poetry", {}).get("name", "")
+                project_name = data.get("project", {}).get("name", "")
+                if poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace":
+                    return True
+            except (tomllib.TOMLDecodeError, OSError):
+                pass
+
+        # Primary check: manifest version match
         manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
         if not manifest_path.exists():
             return False
@@ -1515,6 +1754,19 @@ class FileSystemPublicAssetManager:
                             {
                                 "command": str(
                                     workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"
+                                ),
+                                "type": "command",
+                            }
+                        ],
+                        "matcher": "",
+                    }
+                ],
+                "PostToolUse": [
+                    {
+                        "hooks": [
+                            {
+                                "command": str(
+                                    workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"
                                 ),
                                 "type": "command",
                             }
@@ -1584,7 +1836,22 @@ class FileSystemPublicAssetManager:
                     },
                     "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"),
                 }
-            ]
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": {
+                        "tool": [
+                            "write_file",
+                            "edit_file",
+                            "apply_patch",
+                            "Write",
+                            "Edit",
+                            "MultiEdit",
+                        ]
+                    },
+                    "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"),
+                }
+            ],
         }
 
     def _opencode_config(self, workspace_root: Path) -> dict[str, object]:

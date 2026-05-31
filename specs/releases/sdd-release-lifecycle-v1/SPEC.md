@@ -165,6 +165,6 @@ Markdown legado (`specs/memory/*.md`), se existir, é movido para
 - Source SPEC: `specs/features/sdd-release-lifecycle/SPEC.md`
 - Constitution: `specs/constitution.md`
 - Memory atual: `specs/memory/{product,architecture,tech-stack}.md` (será arquivado)
-- Plan dogfood completo: `/home/marco/.claude/plans/devemos-melhorar-o-streamed-snail.md`
+- Plan dogfood completo: (local plan file — not tracked in this repo)
 - Gate atual: `.dadaia/scripts/sdd-spec-gate.sh` (v2)
 - Agente atual: `dadaia_workspace/public/agents/product-engineer.md`

@@ -86,6 +86,82 @@
     }
   }
 
+  // ── Dashboard ─────────────────────────────────────────────────────────────────
+  function computeStats(rows, runtime) {
+    var totalSessions = rows.length;
+    var activeSessions = 0;
+    var totalCostUsd = 0;
+    var anyCostKnown = false;
+    var totalTurns = 0;
+    var agentCounts = {};
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.status === 'active') { activeSessions++; }
+      if (r.cost_known && r.cumulative_cost_usd != null) {
+        totalCostUsd += r.cumulative_cost_usd;
+        anyCostKnown = true;
+      }
+      if (r.message_count) { totalTurns += r.message_count; }
+      var ag = r.agent_name || 'operator';
+      agentCounts[ag] = (agentCounts[ag] || 0) + 1;
+    }
+    var topAgent = null;
+    var topCount = 0;
+    Object.keys(agentCounts).forEach(function (k) {
+      if (agentCounts[k] > topCount) { topAgent = k; topCount = agentCounts[k]; }
+    });
+    return {
+      totalSessions: totalSessions,
+      activeSessions: activeSessions,
+      totalCostUsd: anyCostKnown ? totalCostUsd : null,
+      totalTurns: totalTurns,
+      topAgent: topAgent,
+      topAgentCount: topCount,
+      runtime: runtime,
+    };
+  }
+
+  function renderDashboard(stats) {
+    var dash = document.getElementById('sessions-dashboard');
+    if (!dash) { return; }
+    var isCodex = stats.runtime === 'codex';
+    var costVal = isCodex ? 'N/A'
+      : (stats.totalCostUsd == null ? '—' : '$' + stats.totalCostUsd.toFixed(2));
+    var costClass = (!isCodex && stats.totalCostUsd != null)
+      ? 'sessions-stat-value sessions-stat-value--cost'
+      : 'sessions-stat-value';
+    var turnsStr = stats.totalTurns >= 1000000
+      ? (stats.totalTurns / 1000000).toFixed(1) + 'M'
+      : stats.totalTurns >= 1000
+      ? (stats.totalTurns / 1000).toFixed(1) + 'k'
+      : String(stats.totalTurns);
+    var agentLabel = stats.topAgent ? escHtml(stats.topAgent) : '—';
+    var agentSub = (stats.topAgent && stats.topAgentCount > 0)
+      ? escHtml(String(stats.topAgentCount)) + ' session' + (stats.topAgentCount !== 1 ? 's' : '')
+      : '&nbsp;';
+    dash.innerHTML =
+      '<div class="sessions-stat-card">'
+        + '<span class="sessions-stat-label">Total Sessions</span>'
+        + '<span class="sessions-stat-value">' + escHtml(String(stats.totalSessions)) + '</span>'
+        + '<span class="sessions-stat-sub">' + escHtml(stats.activeSessions > 0 ? String(stats.activeSessions) + ' active' : 'none active') + '</span>'
+      + '</div>'
+      + '<div class="sessions-stat-card">'
+        + '<span class="sessions-stat-label">Total Cost</span>'
+        + '<span class="' + costClass + '">' + escHtml(costVal) + '</span>'
+        + '<span class="sessions-stat-sub">' + (isCodex ? 'not tracked for Codex' : '&nbsp;') + '</span>'
+      + '</div>'
+      + '<div class="sessions-stat-card">'
+        + '<span class="sessions-stat-label">AI Turns</span>'
+        + '<span class="sessions-stat-value">' + escHtml(turnsStr) + '</span>'
+        + '<span class="sessions-stat-sub">&nbsp;</span>'
+      + '</div>'
+      + '<div class="sessions-stat-card">'
+        + '<span class="sessions-stat-label">Top Agent</span>'
+        + '<span class="sessions-stat-value" style="font-size:1.05rem;line-height:1.3;">' + agentLabel + '</span>'
+        + '<span class="sessions-stat-sub">' + agentSub + '</span>'
+      + '</div>';
+  }
+
   // ── Relative date formatter ────────────────────────────────────────────────────
   function fmtRelativeDate(iso) {
     if (!iso) { return '—'; }
@@ -150,7 +226,13 @@
     var titleAttr = session.ai_title
       ? ' title="' + escHtml(session.ai_title) + '"'
       : '';
-    var project = session.project ? escHtml(session.project) : '—';
+    // For Codex sessions project is always absent/em-dash; render a muted
+    // placeholder span so the PROJECT column shows '—' with .cell-placeholder
+    // styling rather than a blank cell (SPEC F2 AC, T-PUX-01).
+    var projectRaw = session.project;
+    var project = (projectRaw && projectRaw !== '—')
+      ? escHtml(projectRaw)
+      : '<span class="cell-placeholder" title="Project context not applicable for Codex sessions">&mdash;</span>';
     var model = session.model ? escHtml(session.model) : '—';
     var turns = session.message_count != null ? escHtml(String(session.message_count)) : '—';
     var ctx = fmtTokens(session.context_size_tokens);
@@ -510,6 +592,7 @@
 
         updateBanner();
         renderTable(_allRows);
+        renderDashboard(computeStats(_allRows, runtime));
 
         var filtered = applyFilter(_allRows);
         updateMeta(_allRows.length, filtered.length);
@@ -608,8 +691,12 @@
       _allRows = [];
       _sortKey = null;
       _sortDir = 'none';
+      renderDashboard(computeStats([], getRuntime()));
       fetchSessions();
     });
+
+    // Render cleared dashboard immediately on init (data loads asynchronously)
+    renderDashboard(computeStats([], getRuntime()));
 
     // Initial fetch
     fetchSessions();

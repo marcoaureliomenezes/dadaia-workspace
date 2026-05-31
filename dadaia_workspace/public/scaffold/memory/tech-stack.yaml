@@ -1,0 +1,20 @@
+# Memory Atom — Tech Stack
+# Schema: memory-tech-stack-v1
+# Edit this file, then run: dadaia memory render specs/memory/tech-stack.yaml
+languages:
+  - language: "Linguagem"
+    version: "0.0"
+    usage: "Descrever uso aqui."
+
+runtimes:
+  - tool: "Ferramenta"
+    version: "0.0"
+    role: "Descrever função aqui."
+
+dependencies: []
+
+constraints:
+  - "Sem restrições registradas."
+
+canonical_commands: |
+  # Sem comandos canônicos registrados

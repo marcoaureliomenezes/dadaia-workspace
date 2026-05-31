@@ -8,25 +8,89 @@ DEFAULT_WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$DEFAULT_WORKSPACE_ROOT}"
 STATE_FILE="$WORKSPACE_ROOT/.dadaia/states/primary_context.json"
 
+# ---------------------------------------------------------------------------
+# Resolve context name and SPECS_DIR (preserve existing logic).
+# ---------------------------------------------------------------------------
 if [ -n "$DADAIA_CONTEXT" ]; then
+    CONTEXT_NAME="$DADAIA_CONTEXT"
     SPECS_DIR="$WORKSPACE_ROOT/repos/$DADAIA_CONTEXT/specs"
     if [ -d "$SPECS_DIR" ]; then
         echo "[$DADAIA_CONTEXT]"
     else
         echo "[$DADAIA_CONTEXT] WARNING: specs not found"
+        exit 0
     fi
-    exit 0
-fi
-
-if [ ! -f "$STATE_FILE" ]; then
-    echo "[context: none] — run: eval \$(dadaia context use <name>)"
-    exit 0
-fi
-
-NAME=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('name',''))" 2>/dev/null)
-
-if [ -z "$NAME" ]; then
-    echo "[context: none] — run: eval \$(dadaia context use <name>)"
+elif [ -f "$STATE_FILE" ]; then
+    CONTEXT_NAME=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('name',''))" 2>/dev/null)
+    if [ -z "$CONTEXT_NAME" ]; then
+        echo "[context: none] — run: eval \$(dadaia context use <name>)"
+        exit 0
+    fi
+    SPECS_DIR="$WORKSPACE_ROOT/repos/$CONTEXT_NAME/specs"
+    echo "[$CONTEXT_NAME]"
 else
-    echo "[$NAME]"
+    echo "[context: none] — run: eval \$(dadaia context use <name>)"
+    exit 0
 fi
+
+# ---------------------------------------------------------------------------
+# Graceful skip: if specs/memory/ does not exist, emit nothing further.
+# ---------------------------------------------------------------------------
+MEMORY_DIR="$SPECS_DIR/memory"
+if [ ! -d "$MEMORY_DIR" ]; then
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# First-message sentinel guard (OQ-1/OQ-2 working assumption).
+# Probe session env vars in preference order; fall back to shell PID.
+# NOTE for devops-engineer (T-MCE-09 / OQ-1 / OQ-2): confirm the real session
+# env var available in Claude Code and OpenCode and replace the probe below with
+# the confirmed var. If CLAUDE_CODE_SESSION_ID is reliable for Claude Code, it
+# is the preferred source. The PID fallback is safe but causes re-injection on
+# every new shell invocation of the script in the same logical session.
+# ---------------------------------------------------------------------------
+if [ -n "$CLAUDE_CODE_SESSION_ID" ]; then
+    SESSION_ID="$CLAUDE_CODE_SESSION_ID"
+elif [ -n "$OPENCODE_SESSION_ID" ]; then
+    SESSION_ID="$OPENCODE_SESSION_ID"
+else
+    SESSION_ID="$$"
+fi
+
+mkdir -p "$WORKSPACE_ROOT/.dadaia/tmp"
+SENTINEL="$WORKSPACE_ROOT/.dadaia/tmp/ctx-inject-fired-${SESSION_ID}"
+
+if [ -f "$SENTINEL" ]; then
+    # Memory block already injected this session — emit only the context name (already done above).
+    exit 0
+fi
+
+# Create sentinel before emitting to avoid double-injection on concurrent calls.
+touch "$SENTINEL"
+
+# ---------------------------------------------------------------------------
+# Emit bounded memory bootstrap block.
+# ---------------------------------------------------------------------------
+STRIP="$SCRIPT_DIR/strip-memory-html.py"
+
+echo ""
+echo "=== workspace memory (tech + catalog) ==="
+
+# Tech stack
+TECH_FILE="$MEMORY_DIR/tech-stack.html"
+if [ -f "$TECH_FILE" ]; then
+    python3 "$STRIP" "$TECH_FILE"
+fi
+
+# Catalog: prefer catalog.json (machine-readable, no stripping needed);
+# fall back to stripped product/index.html if catalog.json absent (AC-C1-4).
+CATALOG_JSON="$MEMORY_DIR/product/catalog.json"
+PRODUCT_INDEX="$MEMORY_DIR/product/index.html"
+if [ -f "$CATALOG_JSON" ]; then
+    cat "$CATALOG_JSON"
+elif [ -f "$PRODUCT_INDEX" ]; then
+    python3 "$STRIP" "$PRODUCT_INDEX"
+fi
+
+echo "=== end memory bootstrap ==="

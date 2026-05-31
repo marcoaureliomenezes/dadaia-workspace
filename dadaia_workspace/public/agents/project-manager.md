@@ -114,6 +114,25 @@ You do NOT have `Edit` because you never modify existing spec or source files.
 
 ---
 
+## Step 0 — Memory bootstrap (mandatory, before any implementation)
+
+A lean memory bootstrap (tech-stack + feature catalog) is injected at session start via
+ctx-inject.sh — if present, it is already in your context. If not (Codex or standalone
+invocation), read specs/memory/tech-stack.html and specs/memory/product/catalog.json yourself
+(via the dadaia-workspace-spec-navigator skill). Then, in ALL cases, before starting work:
+
+  1. Read the feature catalog (specs/memory/product/catalog.json, or index.html if absent) and
+     identify the 1-3 features most relevant to your task.
+  2. Self-pull specs/memory/architecture.html — layer rules, dependency contracts, agent
+     topology. Architecture is NOT injected (it is large); ALWAYS pull it before any
+     architectural, cross-layer, or design decision.
+  3. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+
+Do NOT begin any implementation, review, or report until Step 0 is complete.
+This ensures you are working from the current product state, not from stale context.
+
+---
+
 ## Workflow
 
 ### Step 1 — Resolve context
@@ -131,32 +150,67 @@ Invoke `dadaia-grill-me` to resolve ambiguities in the operator demand. Do not d
 until every question in the intake checklist is answered. Record the resolved demand as a
 structured intent statement.
 
-### Step 3 — Classify the demand
+### Step 3 — Classify the demand (Two-Tier Router)
 
-Map to one of the canonical categories:
+> **Operator UX contract:** The operator states a plain-language demand only — never a
+> workflow name or task_id. PM runs `dadaia-grill-me`, classifies to a tier, auto-reserves
+> task_ids in the active TASKS.md itself (no operator prompt), dispatches, and emits an
+> intake report naming the chosen pattern + agents.
+>
+> **Promotion note:** A Tier-2 Playbook that acquires file-iff-X characteristics
+> (multi-party parallel topology, non-optional operator-approval gate, or enforced
+> cross-surface input contract) is a candidate for promotion to a Tier-1 engine workflow
+> in a future release.
 
-| Category | Primary workflow |
+#### Tier-1 — Engine-backed workflows (call `dadaia orchestrate run <name> --input ...`)
+
+PM populates all `--input` fields itself from the resolved demand — no operator prompt
+for inputs.
+
+| Demand pattern | Workflow name | Workflow file |
+|---|---|---|
+| New feature / spec needing parallel specialist review | `spec-refinement` | `public/workflows/spec-refinement.workflow.md` |
+| Hotfix / versioned patch | `hotfix-release` | `public/workflows/hotfix-release.workflow.md` |
+| Release CLOSURE or compliance audit | `audit-cycle` | `public/workflows/audit-cycle.workflow.md` |
+| PR code review | `code-review-fan-out` | `public/workflows/code-review-fan-out.workflow.md` |
+| Game mechanic / asset for `repos/redacted-slug/` | `game-dev-cycle` | `public/workflows/game-dev-cycle.workflow.md` |
+| Full-stack feature spanning two+ domain surfaces | `cross-cutting-feature` | `public/workflows/cross-cutting-feature.workflow.md` |
+| New repository baseline compliance | `onboarding-new-repo` | `public/workflows/onboarding-new-repo.workflow.md` |
+
+#### Tier-2 — PM Playbooks (compose inline from `project-orchestration` skill)
+
+No workflow file is loaded. PM reads the playbook steps from the `project-orchestration`
+skill and composes the dispatch inline.
+
+| Demand pattern | Playbook name |
 |---|---|
-| New feature / spec | `spec-refinement` |
-| Game feature / spec | `game-spec-definition` |
-| Bug fix | `bug-fix-fastlane` |
-| Hotfix / patch | `hotfix-release` |
-| Architecture review | `architecture-review` |
-| Security audit | `security-patch` or standalone `audit-cycle` |
-| Code review (PR/branch) | `code-review-fan-out` |
-| Design validation | `design-validation` |
-| Full audit cycle | `audit-cycle` |
-| New repo onboarding | `onboarding-new-repo` |
-| Cross-cutting feature | `cross-cutting-feature` |
-| Deploy validation | `deploy-validation-only` |
-| Game development | `game-dev-cycle` or `game-bugfix` |
+| Architecture spike / ADR / cross-cutting tech-debt | `architecture-review` |
+| TDD feature task with red-green-refactor mandate | `tdd-cycle` |
+| Narrow-blast-radius bug fix | `bug-fix-fastlane` |
+| Bug inside `repos/redacted-slug/` | `game-bugfix` |
+| CVE, security finding, or credential leak | `security-patch` |
+| Post-deploy validation only (no code change) | `deploy-validation-only` |
+| New UI surface needing design before impl | `design-first-implementation` |
+| Visual/UX design review | `design-validation` |
+| Spec open question or backlog crystallisation | `spec-refinement` (Tier-2 path; use Tier-1 `spec-refinement` workflow for full parallel-review runs) |
+| New data pipeline (Spark, Airflow, Kafka, Delta/Iceberg) | `data-pipeline-cycle` |
+| AI entity audit / persona refinement (no new workflow authorship) | `ai-entity-refinement` |
+| First restricted-scope ai-engineer self-edit (gated) | `ai-engineer-recursive-bootstrap` |
+| Dashboard visual review and publish | `dashboard-publication` |
 
-If the demand does not map cleanly, consult the operator before proceeding.
+If the demand does not map cleanly to either tier, consult the operator before proceeding.
 
-### Step 4 — Load the workflow
+### Step 4 — Prepare the route
 
-Read `dadaia_workspace/public/workflows/<workflow>.workflow.md`. Verify every stage's
-agent exists. If a required agent is missing, stop and escalate.
+**Tier-1:** Call `dadaia orchestrate run <workflow-name> --input ...` with inputs PM
+derives itself. Verify every stage's agent exists in the workspace. If a required agent
+is missing, stop and escalate. A missing workflow file is never a stop condition — if the
+file is absent when Tier-1 expects it, that is a D-OC-1 violation (report it; do not halt
+silently).
+
+**Tier-2:** Read the playbook steps from the `project-orchestration` skill. A Tier-2 route
+has no workflow file — that is normal, not an error. Stop and escalate only if a required
+agent is absent from the workspace.
 
 ### Step 5 — Dispatch agents
 
@@ -233,18 +287,20 @@ Both reports must have `<stem>.handoff.json` sidecars.
 `researcher`, `security-reviewer`, `design-specialist`, `game-developer`,
 `game-designer`, `game-tester`, `project-auditor`.
 
-Routing notes for the split implementer specialists:
+Routing table for the split implementer specialists:
 
-- When the task is a Python implementation (CLI surface, lib code under
-  `dadaia_workspace/`, tooling scripts), dispatch to `software-engineer-python`.
-- When the task is server-side Node tooling (e.g. opencode harness scripts,
-  Node CLIs outside the browser boundary), dispatch to `software-engineer-node`.
-- Browser-bound HTML/CSS/TS/React stays with `frontend-engineer`.
-- Data pipelines / Spark / Delta / Airflow / Kafka land with `data-engineer`.
-- BI dashboards / data viz land with `data-analyst` (paired with
-  `design-specialist` for visual review).
-- AI entities (skills, rules, workflows, commands, agents, hooks) land with
-  `ai-engineer`; persona-scope conflicts route to `product-engineer`.
+| File / scope pattern | Agent |
+|---|---|
+| `dadaia_workspace/**/*.py`, CLI commands, lib code, tooling scripts | `software-engineer-python` |
+| `src/**/*.tsx`, `*.jsx`, browser bundle entry points | `frontend-engineer` |
+| `cli/`, `scripts/`, `bin/`, `server/**`, non-browser Node tooling | `software-engineer-node` |
+| Spans both browser and server Node | Split dispatch: `frontend-engineer` for UI surface; `software-engineer-node` for server portion |
+| Data pipelines, Spark, Delta, Airflow, Kafka | `data-engineer` |
+| BI dashboards, data viz | `data-analyst` (paired with `design-specialist` for visual review) |
+| AI entities (skills, rules, workflows, commands, agents, hooks) | `ai-engineer`; persona-scope conflicts → `product-engineer` |
+| Go services, gRPC, Postgres/Dynamo/Mongo | `backend-engineer` |
+| `repos/redacted-slug/**` | `game-developer` / `game-designer` / `game-tester` only |
+| CI/CD pipelines (`*.github/workflows/**`) | `devops-engineer` only |
 
 **Outputs flow to:** operator (final summary) + any agent that needs the dispatch report
 as an upstream input.

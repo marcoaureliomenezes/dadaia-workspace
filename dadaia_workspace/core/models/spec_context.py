@@ -5,8 +5,8 @@ from enum import StrEnum
 
 
 class ContextState(StrEnum):
-    INATIVO = "inativo"
-    ATIVO = "ativo"
+    ALIVE = "alive"
+    DEAD = "dead"
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,7 @@ class SpecContextProject:
     state: ContextState
     repo_slug: str
     repo_url: str
-    is_primary: bool
     created_at: str
-    activated_at: str | None = None
+    alive_since: str | None = None
+    dead_since: str | None = None
     current_branch: str | None = None

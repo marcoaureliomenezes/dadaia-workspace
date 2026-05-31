@@ -17,18 +17,10 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 
 ## Candidatas ativas
 
-- context-gate-cross-repo-fix-v1 — SDD spec-gate (`sdd-spec-gate.sh`) lê `primary_context.json` do contexto PRIMÁRIO para determinar a fase ativa, não o contexto do arquivo que está sendo escrito. Quando o primary context é outro repo (ex: `redacted-slug-explorer`, fase=TASKS), writes em `specs/memory/*.html` do dadaia-workspace (fase=CLOSURE) são bloqueados incorretamente. Fix: gate deve ler o contexto cujas specs pertencem ao arquivo sendo escrito, não o primary context. (owner: software-engineer-python, contexto: `_archive/releases/backlog-consolidation-r1-v1/CLOSURE.md § context-gate-cross-repo-fix drift`)
+- memory-structured-source-migration-v2 — enriquece os schemas v1 para representação lossless dos atoms ricos (diagram arrays, extensible sections, raw-HTML escape hatch), upgrade do renderer/extractor e gate de fidelidade FIDELITY-1 (owner: software-engineer-python, contexto: specs/_archive/releases/memory-structured-source-v1/CLOSURE.md)
 - agents-md-hierarchical-v1 — ⚠️ **Revisão necessária antes de promover:** Codex hierarchical AGENTS.md rendering (múltiplos `AGENTS.md` em sub-dirs com herança), G4 deferido de `multi-platform-parity-v1` (ADR-MP-4 + ADR-ARCH-4). `codex-agent-orchestration-parity-v1` estabeleceu abordagem TOML (`.codex/agents/*.toml`) para personas Codex — avaliar se hierarchical AGENTS.md ainda faz sentido ou é obsoleto dado o TOML approach. (owner: product-engineer, contexto: `_archive/releases/multi-platform-parity-v1/CLOSURE.md § Backlog returns`)
-- data-pipeline-cycle-workflow-v1 — Novo workflow para fluxo data-engineer: discovery (data-engineer) → review (software-architect + qa-engineer) → implementation (data-engineer) → validation (qa-engineer). Diferido por operator decision Q3 em `agents-r3-v1`. Promover quando primeira demanda de pipeline precisar do framework. (owner: product-engineer, contexto: `_archive/releases/agents-r3-v1/CLOSURE.md § Backlog returns`)
-- dashboard-publication-workflow-v1 — Novo workflow para fluxo data-analyst: build dashboard (data-analyst) → visual review (design-specialist) → publish via DABs (data-analyst). Diferido por operator decision Q3 em `agents-r3-v1`. (owner: product-engineer, contexto: `_archive/releases/agents-r3-v1/CLOSURE.md § Backlog returns`)
-- ai-entity-refinement-workflow-v1 — Novo workflow para fluxo ai-engineer: audit (ai-engineer) → refine personas/skills/rules (ai-engineer) → validate (ai-engineer + product-engineer) → install (devops-engineer). Diferido por operator decision Q3 em `agents-r3-v1`. (owner: product-engineer, contexto: `_archive/releases/agents-r3-v1/CLOSURE.md § Backlog returns`)
-- ai-engineer-recursive-bootstrap-v1 — Primeira dispatch real de `ai-engineer` (Sonnet 4.6 — ADR-X4 moveu de Opus 4.7) na sua própria superfície (audit + autoria/refinamento de skills, rules, workflows, commands, agents, hooks). Diferido por operator decision Q4 em `agents-r3-v1`. Requisito antes de promover: pelo menos uma dispatch real bem-sucedida em escopo restrito. (owner: ai-engineer, contexto: `_archive/releases/agents-r3-v1/CLOSURE.md § Backlog returns`)
-- cli-asset-granular — Adicionar operações granulares de assets à CLI: `dadaia public list`, `dadaia public install --only rules`, etc.; baixa prioridade. (owner: software-engineer-python, contexto: `z_bug_specs.md` G3 — discovery source `agent-comms-v1`)
-- reports-next-cli — `dadaia reports next` (v2): descobre o próximo handoff esperado dado o estado atual do workspace. (owner: software-engineer-python, contexto: SPEC `agent-comms-v1` § Out-of-scope)
 - reports-mcp-server — MCP integration (v3): emissão programática de handoff via servidor MCP em vez de skill markdown. (owner: software-architect, contexto: SPEC `agent-comms-v1` § Out-of-scope)
 - reports-evaluator — Evaluator semântico (v4): valida qualidade dos findings, não apenas estrutura JSON. (owner: qa-engineer, contexto: SPEC `agent-comms-v1` § Out-of-scope)
-- agent-comms-wave-2 — Migrar `qa-engineer` para piloto do handoff-emitter (próxima onda). (owner: product-engineer, contexto: SPEC `agent-comms-v1` § Out-of-scope)
-- agent-comms-wave-3-7 — Migrar `devops-engineer`, `backend-engineer`, `frontend-engineer` e os 3 `game-*` agents em waves separadas. (owner: product-engineer, contexto: SPEC `agent-comms-v1` § Out-of-scope)
 - reports-ci-gate — Adicionar job em `.github/workflows/ci.yml` rodando `dadaia reports validate --all --strict` após 100% adoção dos 10 agentes. (owner: devops-engineer, contexto: SPEC `agent-comms-v1` NFR4)
 - reports-hash-mismatch-enforcement — Promover hash-mismatch de warning para erro em strict mode (v2). (owner: software-engineer-python, contexto: SPEC `agent-comms-v1` § Out-of-scope)
 - spec-discovery-chain-workflow — Workflow seed para o padrão D4 (PE→architect→SE→PE→SE), se virar recorrente. (owner: product-engineer, contexto: SPEC `agent-comms-v1` Q6)
@@ -38,7 +30,6 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 - agent-monitoring-threshold-alerts-v2 — Threshold alerts e cost-per-day notifications. (owner: product-engineer, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
 - agent-monitoring-multi-host-v2 — Agregação cross-host quando workspace rodar em mais de uma máquina. (owner: software-architect, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
 - agent-monitoring-frontmatter-completo-v2 — Ler frontmatter completo de SKILL.md (autores, tags, parâmetros). (owner: software-engineer-python, contexto: `_archive/releases/agent-monitoring-v1/SPEC.md § Out of scope`)
-- panel-workflow-run-dispatcher — "Run this workflow" invocation: integração com Claude Code dispatcher via POST endpoint no painel. (owner: software-engineer-python, contexto: `_archive/releases/dadaia-workspace-panel-r3-v1/SPEC.md §8.2`)
 - hotfix-release-workflow — Iterações futuras sobre `hotfix-release.workflow.md` (dry-run mode, version bump automático, integração com qa-engineer stub). (owner: product-engineer, contexto: SPEC `sdd-hotfix-track-v1` "Delta de workflow")
 - vintage-bucket-doc — Documentar Vintage bucket em `docs/sdd-migration-playbook.md` com lista das 10 releases pré-SemVer. (owner: software-engineer-python, contexto: SPEC `sdd-hotfix-track-v1` D14)
 - release-pipeline — Pipeline de release semver/build/publicação cross-repo. (owner: devops-engineer, contexto: `_archive/legacy-features/release-pipeline/SPEC.md`)
@@ -46,6 +37,19 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 - security — Security spec workspace-level. (owner: software-architect, contexto: `_archive/legacy-features/security/SPEC.md`)
 
 ## Histórico (candidatas promovidas a release ou resolvidas)
+
+- memory-context-enforcement-v1 → release `memory-context-enforcement-v1` (promovido 2026-05-30; Phase 1 da initiative de memória; CLOSED 2026-05-31; lean 5K-token injection + catalog.json + Step-0 em 21 personas)
+- memory-structured-source-v1 → release `memory-structured-source-v1` (promovido 2026-05-30; Phase 2 da initiative de memória; CLOSED 2026-05-31; 4 schemas + renderer + doctor STRUCT/SYNC + gate RULE A + scaffold YAML; C-6 deferred → memory-structured-source-migration-v2)
+- data-pipeline-cycle-workflow-v1 → **RESOLVIDA** como PM Playbook em orchestration-consolidation-v1 (2026-05-29)
+- ai-entity-refinement-workflow-v1 → **RESOLVIDA** como PM Playbook em orchestration-consolidation-v1 (2026-05-29)
+- ai-engineer-recursive-bootstrap-v1 → **RESOLVIDA** como PM Playbook em orchestration-consolidation-v1 (2026-05-29)
+- opencode-runtime-parity-hardening-v1 → release `opencode-runtime-parity-hardening-v1` (promovido 2026-05-28; 3 tracks: T-OC-* OpenCode hardening, T-RN-* reports-next CLI, T-AC-* agent-comms waves 2-7; SPEC em `specs/releases/opencode-runtime-parity-hardening-v1/SPEC.md`)
+- context-gate-cross-repo-fix-v1 → **RESOLVIDA** pela v3.2 do `sdd-spec-gate.sh` (2026-05-28): linha 99 já deriva `FILE_SPECS_DIR` do FPATH em vez do primary_context para Rule A (memory atomicity). Confirmado via inspeção; não requer release dedicada.
+- reports-next-cli → **ABSORVIDO** em `opencode-runtime-parity-hardening-v1` como Track B (T-RN-*): `dadaia reports next` workflow-aware.
+- agent-comms-wave-2 → **ABSORVIDO** em `opencode-runtime-parity-hardening-v1` como Track C (T-AC-*): waves 2-7 unificadas.
+- agent-comms-wave-3-7 → **ABSORVIDO** em `opencode-runtime-parity-hardening-v1` como Track C (T-AC-*): waves 2-7 unificadas.
+- cli-asset-granular → **RESOLVIDA** em `workspace-hardening-v1` (2026-05-28): `dadaia public list` + `dadaia public install --only <type>` entregues em T-WH-11+12.
+- panel-workflow-run-dispatcher → **RESOLVIDA** em `workspace-hardening-v1` (2026-05-28): POST `/api/workflows/<name>/run` + Run button no card grid entregues em T-WH-14..17.
 
 - context-deactivate-hardening-v1 → **RESOLVIDA** em `backlog-consolidation-r1-v1` (2026-05-23): 4 bugs de `dadaia context deactivate` corrigidos em T-BCR-04 (`git_subprocess.py`, `service.py`).
 - panel-workspace-resolver-fix → **MERGED** em `dadaia-workspace-panel-r5-v1` (2026-05-21): fix de `_resolve_workspace()` incluído em Phase A, task T-P5-06.

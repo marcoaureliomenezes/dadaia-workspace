@@ -10,7 +10,12 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import (
+    HandoffSchemaError,
+    NoActiveReleaseError,
+    NoAgentSequenceError,
+    WorkspaceNotInitializedError,
+)
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.reports_validation.service import ValidationResult
 
@@ -341,4 +346,69 @@ def lint(
     else:
         console.print("OK: No issues found.")
 
+    raise typer.Exit(0)
+
+
+# ---------------------------------------------------------------------------
+# next subcommand (T-RN-02 / FR-RN-1)
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="next")
+def next_(
+    context: str | None = typer.Option(
+        None, "--context", help="Context name to resolve (defaults to the primary context)."
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON instead of human-readable text."
+    ),
+) -> None:
+    """Discover the next expected agent given the current reports state.
+
+    Reads the active release's PLAN.md owner sequence and checks which agents have
+    already emitted a ``.handoff.json`` for that release.
+
+    \b
+    Exit codes:
+      0  Resolved (an agent is pending, or all agents have emitted handoffs)
+      3  No active release / no agent sequence in PLAN.md / workspace not initialized
+    """
+    ctx = context or os.environ.get("DADAIA_CONTEXT")
+    try:
+        workspace_root = resolve_workspace_root()
+        service = container.build_reports_next_service(workspace_root, context=ctx)
+        result = service.resolve_next()
+    except WorkspaceNotInitializedError:
+        err_console.print(
+            "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
+        )
+        raise typer.Exit(3) from None
+    except (NoActiveReleaseError, NoAgentSequenceError) as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(3) from None
+
+    if json_output:
+        console.print(
+            _json.dumps(
+                {
+                    "next_agent": result.next_agent,
+                    "release_id": result.release_id,
+                    "completed_agents": result.completed_agents,
+                    "pending_agents": result.pending_agents,
+                }
+            )
+        )
+        raise typer.Exit(0)
+
+    completed = ", ".join(result.completed_agents) if result.completed_agents else "(none)"
+    if result.next_agent is None:
+        console.print("All agents have emitted handoffs for this release.")
+        console.print(f"  Release: {result.release_id}")
+        console.print(f"  Completed: {completed}")
+    else:
+        pending = ", ".join(result.pending_agents)
+        console.print(f"Next expected agent: {result.next_agent}")
+        console.print(f"  Release: {result.release_id}")
+        console.print(f"  Already completed: {completed}")
+        console.print(f"  Pending: {pending}")
     raise typer.Exit(0)

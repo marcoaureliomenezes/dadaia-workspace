@@ -962,6 +962,54 @@ def render_health() -> Callable[..., tuple[int, str, bytes]]:
     return _view
 
 
+def render_api_workflow_run(
+    panel_service: object,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """Return a closure that handles POST /api/workflows/<name>/run.
+
+    Status codes:
+        202  — workflow started; body: {"status": "started", "workflow": str, "pid": int}
+        404  — workflow name not found in registry
+        409  — workflow already running
+    """
+
+    def _view(workflow_name: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
+        if not workflow_name or not _WORKFLOW_NAME_RE.match(workflow_name):
+            return (
+                400,
+                "application/json; charset=utf-8",
+                json.dumps({"error": "invalid_workflow_name"}).encode("utf-8"),
+            )
+        try:
+            result = panel_service.run_workflow(workflow_name)  # type: ignore[attr-defined]
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc).lower()
+            if "not found" in msg:
+                return (
+                    404,
+                    "application/json; charset=utf-8",
+                    json.dumps({"error": "workflow not found"}).encode("utf-8"),
+                )
+            if "already running" in msg:
+                return (
+                    409,
+                    "application/json; charset=utf-8",
+                    json.dumps({"error": "already running"}).encode("utf-8"),
+                )
+            logger.warning("render_api_workflow_run: unexpected error: %s", exc)
+            return (
+                500,
+                "application/json; charset=utf-8",
+                json.dumps({"error": "internal server error"}).encode("utf-8"),
+            )
+        body = json.dumps(
+            {"status": "started", "workflow": result["workflow"], "pid": result["pid"]}
+        ).encode("utf-8")
+        return (202, "application/json; charset=utf-8", body)
+
+    return _view
+
+
 def _compute_30d_cost(summary: AgentSummary) -> float | None:
     """Compute total_cost_30d_usd from the summary's recent_sessions.
 

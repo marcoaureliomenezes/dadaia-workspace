@@ -139,11 +139,14 @@ def test_sdd_gate_v2_blocks_primary_slug_path_when_no_active_task(workspace: Pat
 
 
 def test_sdd_gate_v2_passes_primary_slug_path_with_active_task(workspace: Path) -> None:
-    """Gate allows writes inside repos/<primary_slug>/ when a [-] task is marked."""
+    """Gate allows writes inside repos/<primary_slug>/ when a [-] task is in active release."""
     scripts = _install_scripts(workspace)
     specs = workspace / "repos" / "my-proj" / "specs"
-    specs.mkdir(parents=True)
-    (specs / "TASKS.md").write_text("- [-] T-001 — doing this now\n")
+    # Create release-directory structure (root TASKS.md is no longer supported per T-8a)
+    rel_dir = specs / "releases" / "my-release-v1"
+    rel_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
+    (rel_dir / "TASKS.md").write_text("- [-] T-001 — doing this now\n")
     _make_primary_context(workspace, "my-proj", specs)
 
     target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
@@ -192,3 +195,77 @@ def test_sdd_gate_v2_allows_meta_edit_on_tasks_md(workspace: Path) -> None:
     )
     assert result.returncode == 0
     assert result.stdout == ""  # not blocked
+
+
+# --- T-8a: per-release gate tests (AC-T8a-3 and AC-T8a-4) ---
+
+
+def test_gate_resolves_active_release_tasks(workspace: Path) -> None:
+    """AC-T8a-3: Gate reads releases/ACTIVE.md -> releases/<id>/TASKS.md and allows
+    when a [-] marker is present in the active release's TASKS.md.
+
+    This test verifies the gate works correctly with the canonical release-directory
+    structure (no root-level TASKS.md required).
+    """
+    scripts = _install_scripts(workspace)
+    specs = workspace / "repos" / "my-proj" / "specs"
+    rel_dir = specs / "releases" / "active-release-v1"
+    rel_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release: active-release-v1\nphase: IMPLEMENTATION\n"
+    )
+    (rel_dir / "TASKS.md").write_text(
+        "# Tasks\n\n- [-] T-001 — work in progress\n- [ ] T-002 — pending\n"
+    )
+    _make_primary_context(workspace, "my-proj", specs)
+
+    target_file = workspace / "repos" / "my-proj" / "src" / "service.py"
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace)},
+        timeout=5,
+    )
+    assert result.returncode == 0
+    assert result.stdout == ""  # not blocked: active release TASKS.md has [-] marker
+
+
+def test_gate_blocks_when_active_release_has_no_task(workspace: Path) -> None:
+    """AC-T8a-4: Gate blocks when ACTIVE.md points to a release whose TASKS.md
+    has no [-] (IN PROGRESS) marker, and no other releases have one either.
+
+    Confirms the root-level TASKS.md fallback is gone: a root TASKS.md with [-]
+    does NOT satisfy the gate.
+    """
+    scripts = _install_scripts(workspace)
+    specs = workspace / "repos" / "my-proj" / "specs"
+    rel_dir = specs / "releases" / "active-release-v1"
+    rel_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release: active-release-v1\nphase: IMPLEMENTATION\n"
+    )
+    # All tasks open — no [-] marker
+    (rel_dir / "TASKS.md").write_text(
+        "# Tasks\n\n- [ ] T-001 — not started\n- [ ] T-002 — not started\n"
+    )
+    # Root-level TASKS.md with [-] marker must be ignored (T-8a removes this fallback)
+    (specs / "TASKS.md").write_text("- [-] T-ROOT — this should be ignored\n")
+    _make_primary_context(workspace, "my-proj", specs)
+
+    target_file = workspace / "repos" / "my-proj" / "src" / "service.py"
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace)},
+        timeout=5,
+    )
+    assert result.returncode == 0
+    data = json.loads(result.stdout)
+    assert data["decision"] == "block"
+    assert "SDD GATE" in data["reason"]
