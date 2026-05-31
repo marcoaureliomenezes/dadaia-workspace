@@ -9,10 +9,14 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.features.spec_artifacts.memory import memory_product_add
+from dadaia_workspace.features.specs.catalog import generate_catalog, write_catalog
 
 app = typer.Typer(help="Memory catalog management commands.")
 product_app = typer.Typer(help="Product memory catalog commands.")
 app.add_typer(product_app, name="product")
+
+catalog_app = typer.Typer(help="Catalog JSON generation commands.")
+app.add_typer(catalog_app, name="catalog")
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
@@ -90,3 +94,38 @@ def product_add(
     typer.echo(f"[ok] feature HTML ({action}): {result.feature_html}")
     typer.echo(f"[ok] index regenerated: {result.index_html}")
     typer.echo(f"     catalog entries ({len(result.slug_entries)}): {', '.join(result.slug_entries)}")
+
+
+@catalog_app.command("generate")
+def catalog_generate(
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+    ),
+) -> None:
+    """Generate (or regenerate) specs/memory/product/catalog.json from index.html.
+
+    Reads the ``<ol class="catalog">`` entries in ``index.html`` and writes
+    a machine-readable ``catalog.json`` to the same directory.  Running the
+    command a second time is idempotent — it overwrites the previous file.
+    """
+    try:
+        target = _resolve_specs_dir(specs_dir)
+    except typer.BadParameter as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+
+    try:
+        catalog = generate_catalog(target)
+    except FileNotFoundError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+
+    out_path = write_catalog(target, catalog)
+    n = len(catalog.get("features", []))
+    typer.echo(f"[ok] catalog.json written ({n} feature{'s' if n != 1 else ''}): {out_path}")

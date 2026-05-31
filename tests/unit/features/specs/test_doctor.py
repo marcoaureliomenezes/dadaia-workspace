@@ -147,6 +147,27 @@ def test_legacy_product_html_at_root_reports_doc_002L(tmp_path: Path) -> None:
     assert matching, [i.to_dict() for i in issues]
 
 
+def test_memory_agents_md_is_exempt_from_doc_002L(tmp_path: Path) -> None:
+    """AGENTS.md in memory/ is a directory contract, NOT a legacy atom — must be exempt."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "memory" / "AGENTS.md").write_text("# Memory contract\n", encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    doc_002l = [i for i in issues if i.code == "SPEC-DOC-002L" and "AGENTS.md" in i.path]
+    assert doc_002l == [], doc_002l
+
+
+def test_genuine_legacy_markdown_still_reports_doc_002L_when_agents_md_present(
+    tmp_path: Path,
+) -> None:
+    """Presence of AGENTS.md must not suppress errors for other .md files in memory/."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "memory" / "AGENTS.md").write_text("# Memory contract\n", encoding="utf-8")
+    (specs / "memory" / "old-note.md").write_text("# legacy note\n", encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    doc_002l = [i for i in issues if i.code == "SPEC-DOC-002L" and "old-note.md" in i.path]
+    assert doc_002l, "Expected SPEC-DOC-002L for old-note.md but got none"
+
+
 def test_broken_anchor_in_product_index_reports_doc_002(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
     bad_index = """<!DOCTYPE html><html><head>
@@ -912,6 +933,179 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     # No TREE-* errors (TREE-6 and TREE-7 would be errors)
     tree_errors = [i for i in issues if i.code.startswith("TREE-") and i.severity == Severity.ERROR]
     assert tree_errors == [], f"Unexpected TREE errors on fresh scaffold: {[i.to_dict() for i in tree_errors]}"
+
+
+# ---- CAT-1: catalog.json ↔ feature HTML sync check (memory-context-enforcement-v1)
+
+
+def _make_catalog_json(product_dir: Path, slugs: list[str]) -> None:
+    """Write a minimal but valid catalog.json with the given slugs."""
+    import json as _json
+    from datetime import UTC, datetime
+
+    features = [
+        {
+            "rank": i + 1,
+            "slug": slug,
+            "title": slug,
+            "summary": "",
+            "path": f"specs/memory/product/{slug}.html",
+            "tags": [],
+            "depends_on": [],
+        }
+        for i, slug in enumerate(slugs)
+    ]
+    catalog = {
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "context": "test",
+        "features": features,
+    }
+    (product_dir / "catalog.json").write_text(
+        _json.dumps(catalog, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def test_cat1_absent_catalog_with_feature_htmls_triggers_warning(tmp_path: Path) -> None:
+    """CAT-1: catalog.json absent + 3 feature HTMLs → one CAT-1 WARNING."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    # Add two more feature HTMLs (feature-a is already in the clean tree)
+    (product_dir / "feature-b.html").write_text(
+        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
+    )
+    (product_dir / "feature-c.html").write_text(
+        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
+    )
+    # No catalog.json
+    assert not (product_dir / "catalog.json").exists()
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1, "Expected CAT-1 WARNING when catalog.json is absent and HTMLs exist"
+    assert cat1[0].severity == Severity.WARNING
+    # Single warning (not one per file)
+    assert len(cat1) == 1
+
+
+def test_cat1_absent_catalog_no_feature_htmls_no_warning(tmp_path: Path) -> None:
+    """CAT-1: catalog.json absent but no feature HTMLs (only index.html) → no CAT-1."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    # Remove the feature-a.html so no feature HTMLs remain
+    (product_dir / "feature-a.html").unlink()
+    # Also remove the broken anchor from index.html to avoid SPEC-DOC-002 cascade
+    # We only need to verify no CAT-1 fires
+    assert not (product_dir / "catalog.json").exists()
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1 == [], f"Unexpected CAT-1 when no feature HTMLs present: {[i.description for i in cat1]}"
+
+
+def test_cat1_in_sync_catalog_no_warning(tmp_path: Path) -> None:
+    """CAT-1: catalog.json present and in sync with HTML files → no CAT-1."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    # feature-a.html already exists in clean tree; create matching catalog
+    _make_catalog_json(product_dir, ["feature-a"])
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1 == [], f"Unexpected CAT-1 when catalog is in sync: {[i.description for i in cat1]}"
+
+
+def test_cat1_stale_slug_warns_with_slug_name(tmp_path: Path) -> None:
+    """CAT-1: catalog.json has slug 'stale-feature' but no stale-feature.html → WARNING names slug."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    # catalog lists feature-a (which exists) and stale-feature (which does not)
+    _make_catalog_json(product_dir, ["feature-a", "stale-feature"])
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1, "Expected CAT-1 WARNING for stale slug 'stale-feature'"
+    # The warning must name the missing slug
+    descriptions = " ".join(i.description for i in cat1)
+    assert "stale-feature" in descriptions, (
+        f"Expected 'stale-feature' to be named in CAT-1 description; got: {descriptions}"
+    )
+    assert all(i.severity == Severity.WARNING for i in cat1)
+
+
+def test_cat1_extra_html_warns_with_file_name(tmp_path: Path) -> None:
+    """CAT-1: extra HTML file on disk not in catalog → WARNING names the file."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    # Add an extra HTML file that is NOT in the catalog
+    (product_dir / "new-feature.html").write_text(
+        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
+    )
+    # Catalog lists only feature-a (not new-feature)
+    _make_catalog_json(product_dir, ["feature-a"])
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1, "Expected CAT-1 WARNING for extra HTML file 'new-feature.html'"
+    descriptions = " ".join(i.description for i in cat1)
+    assert "new-feature" in descriptions, (
+        f"Expected 'new-feature' to be named in CAT-1 description; got: {descriptions}"
+    )
+    assert all(i.severity == Severity.WARNING for i in cat1)
+
+
+def test_cat1_both_stale_and_extra_emit_separate_warnings(tmp_path: Path) -> None:
+    """CAT-1: one stale slug + one extra HTML → two separate CAT-1 WARNINGs."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    (product_dir / "new-feature.html").write_text(
+        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
+    )
+    # Catalog has stale-slug (no file) but not new-feature or feature-a (extra files)
+    _make_catalog_json(product_dir, ["stale-slug"])
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    # At minimum: one for stale-slug, one for feature-a, one for new-feature
+    assert len(cat1) >= 2, (
+        f"Expected at least 2 CAT-1 WARNINGs; got {len(cat1)}: "
+        f"{[i.description for i in cat1]}"
+    )
+
+
+def test_cat1_is_always_warning_never_error(tmp_path: Path) -> None:
+    """CAT-1 must never be ERROR severity."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    # Maximally broken: catalog with wrong slug and extra file
+    _make_catalog_json(product_dir, ["wrong-slug"])
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1, "Pre-condition: CAT-1 issues must be present"
+    for issue in cat1:
+        assert issue.severity == Severity.WARNING, (
+            f"CAT-1 must be WARNING, got ERROR: {issue.description}"
+        )
+
+
+def test_cat1_absent_catalog_warning_mentions_count(tmp_path: Path) -> None:
+    """CAT-1: the absent-catalog WARNING message includes the HTML file count."""
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    (product_dir / "feature-b.html").write_text(
+        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
+    )
+    (product_dir / "feature-c.html").write_text(
+        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
+    )
+    # 3 feature HTMLs: feature-a, feature-b, feature-c
+
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1
+    assert "3" in cat1[0].description, (
+        f"Expected '3' in absent-catalog CAT-1 description; got: {cat1[0].description}"
+    )
 
 
 # ---- AC-T9-16: dadaia-workspace repo itself passes (regression guard)

@@ -3,7 +3,8 @@
 Runs the 11 structural checks defined in release `sdd-release-lifecycle-v1`,
 extended for the product memory folder catalog (release `Product Memory Feature
 Catalog v1`) and the D-OC-1 orchestration registry coherence invariant, plus
-the 7 TREE invariants from release `spec-context-tree-v2`:
+the 7 TREE invariants from release `spec-context-tree-v2`, plus the CAT-1
+catalog sync check from release `memory-context-enforcement-v1`:
 
   1. specs/constitution.md exists
   2. specs/memory/architecture.html and tech-stack.html exist, parseable, with non-empty
@@ -32,6 +33,10 @@ TREE invariants (spec-context-tree-v2):
   TREE-5. specs/AGENTS.md absent or hash differs from canonical template → WARN-ONLY (drift)
   TREE-6. releases/<id>/ missing mandatory SDD artifact for its phase → NO AUTO-FIX
   TREE-7. bugs/<slug>.md missing session_id frontmatter field → NO AUTO-FIX
+
+CAT-1 (memory-context-enforcement-v1):
+  CAT-1. catalog.json absent when feature HTMLs exist → WARNING
+         catalog.json present but slugs ↔ HTML files out of sync → WARNING (per slug/file)
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
@@ -409,6 +414,8 @@ class SpecsDoctor:
         issues.extend(self._check_tree5_agents_md())
         issues.extend(self._check_tree6_release_artifacts())
         issues.extend(self._check_tree7_bug_session_id())
+        # CAT-1 (memory-context-enforcement-v1)
+        issues.extend(self._check_cat1_catalog_sync())
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
@@ -532,8 +539,11 @@ class SpecsDoctor:
             )
 
         # Flag any legacy markdown memory files (root or product/)
+        # AGENTS.md is a directory contract, not a memory atom — exempt it.
         if mem_dir.exists():
             for legacy in mem_dir.glob("*.md"):
+                if legacy.name == "AGENTS.md":
+                    continue
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002L",
@@ -1453,4 +1463,99 @@ class SpecsDoctor:
                         path=str(p),
                     )
                 )
+        return issues
+
+    # CAT-1 (memory-context-enforcement-v1)
+    def _check_cat1_catalog_sync(self) -> list[SpecsDoctorIssue]:
+        """CAT-1: catalog.json must stay in sync with *.html feature files.
+
+        Logic:
+        1. Enumerate ``memory/product/*.html`` excluding ``index.html`` → ``html_slugs``.
+        2. If ``catalog.json`` is absent and html_slugs is non-empty → one WARNING.
+        3. If ``catalog.json`` is present → parse ``features[].slug``:
+           - One WARNING per slug in catalog that has no corresponding HTML on disk.
+           - One WARNING per HTML on disk whose slug is not in the catalog.
+        4. Severity is always WARNING (never ERROR) — catalog may simply need regeneration.
+        """
+        import json as _json
+
+        issues: list[SpecsDoctorIssue] = []
+        product_dir = self.specs_dir / "memory" / "product"
+        catalog_path = product_dir / "catalog.json"
+
+        if not product_dir.is_dir():
+            return issues
+
+        # Collect slugs from HTML files (excluding index.html)
+        html_slugs: set[str] = {
+            p.stem
+            for p in product_dir.glob("*.html")
+            if p.name != "index.html"
+        }
+
+        if not catalog_path.exists():
+            if html_slugs:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="CAT-1",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"catalog.json absent; {len(html_slugs)} feature HTML"
+                            f"{'s' if len(html_slugs) != 1 else ''} present; "
+                            "run `dadaia memory catalog generate` to create it."
+                        ),
+                        path=str(catalog_path),
+                    )
+                )
+            return issues
+
+        # catalog.json exists — compare slug sets
+        try:
+            data = _json.loads(catalog_path.read_text(encoding="utf-8"))
+            catalog_slugs: set[str] = {
+                str(entry.get("slug", ""))
+                for entry in data.get("features", [])
+                if entry.get("slug")
+            }
+        except Exception as exc:
+            issues.append(
+                SpecsDoctorIssue(
+                    code="CAT-1",
+                    severity=Severity.WARNING,
+                    description=f"catalog.json is not valid JSON: {exc}",
+                    path=str(catalog_path),
+                )
+            )
+            return issues
+
+        # Slugs in catalog but no HTML on disk
+        for slug in sorted(catalog_slugs - html_slugs):
+            issues.append(
+                SpecsDoctorIssue(
+                    code="CAT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"catalog.json lists slug '{slug}' but no corresponding "
+                        f"'{slug}.html' exists in memory/product/. "
+                        "Run `dadaia memory catalog generate` to resync."
+                    ),
+                    path=str(product_dir / f"{slug}.html"),
+                )
+            )
+
+        # HTML files on disk but not in catalog
+        for slug in sorted(html_slugs - catalog_slugs):
+            issues.append(
+                SpecsDoctorIssue(
+                    code="CAT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"'{slug}.html' exists in memory/product/ but is not listed in "
+                        "catalog.json. "
+                        "Run `dadaia memory catalog generate` to resync."
+                    ),
+                    path=str(product_dir / f"{slug}.html"),
+                )
+            )
+
         return issues
