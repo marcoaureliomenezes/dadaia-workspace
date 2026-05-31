@@ -25,7 +25,7 @@
 <body>
 
 <h1>Tech Stack Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-31 · Closure: memory-context-enforcement-v1</p>
+<p class="meta">Última atualização: 2026-05-31 · Closure: memory-structured-source-v1</p>
 
 <section id="languages">
   <h2>Linguagens</h2>
@@ -134,11 +134,12 @@
       <tr><td>typer</td><td>&gt;=0.25 (extras=[all])</td><td>cli/</td><td>CLI framework com auto-completion e rich formatting</td></tr>
       <tr><td>rich</td><td>^13</td><td>cli/</td><td>Pretty terminal output</td></tr>
       <tr><td>openpyxl</td><td>^3.1</td><td>infrastructure/</td><td>Leitura de planilhas Excel (academy)</td></tr>
-      <tr><td>pyyaml</td><td>^6.0</td><td>infrastructure/ + features/</td><td>YAML frontmatter parsing</td></tr>
+      <tr><td>pyyaml</td><td>^6.0</td><td>infrastructure/ + features/</td><td>YAML frontmatter parsing; also used by <code>renderer.py</code> and doctor STRUCT checks via <code>yaml.safe_load</code></td></tr>
+      <tr><td>jsonschema</td><td>^4</td><td>features/specs/</td><td>JSON Schema validation of YAML memory atoms in <code>renderer.py</code> and <code>doctor.py</code> STRUCT-1..4 checks (memory-structured-source-v1)</td></tr>
       <tr><td>types-PyYAML</td><td>&gt;=6</td><td>dev</td><td>Type stubs para mypy</td></tr>
     </tbody>
   </table>
-  <p>Sem dependência de jinja2: templates HTML usam placeholders <code>{{ name }}</code> documentais que o agente product-engineer preenche por substituição manual em fase CLOSURE.</p>
+  <p><strong>Jinja2</strong> (already a transitive dependency) is now the canonical consumer of <code>dadaia_workspace/public/templates/memory-*.html.j2</code> via <code>features/specs/renderer.py</code> (memory-structured-source-v1). Product-engineer no longer fills templates manually; <code>dadaia memory render &lt;atom.yaml&gt;</code> renders them deterministically.</p>
 </section>
 
 <section id="constraints">

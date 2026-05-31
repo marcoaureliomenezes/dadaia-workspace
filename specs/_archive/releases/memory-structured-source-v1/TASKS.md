@@ -194,7 +194,14 @@
 
 ## CLOSURE — Product-engineer only
 
-### T-MSS-10 — Migrate 21 atoms from HTML to YAML (C-6) — CLOSURE-ONLY
+### T-MSS-10 — Migrate 21 atoms from HTML to YAML (C-6) — **DEFERRED** (operator 2026-05-31)
+
+> **DEFERRED to a follow-up release.** The C-6 dogfood revealed the v1 schemas cannot losslessly
+> represent this repo's richest atoms (architecture −25%, tech-stack −46% body-text loss; multiple
+> diagrams / rich tables / non-standard sections exceed single-value fields). Migrating would corrupt
+> memory. Follow-up: enrich schemas → re-extract → migrate. See `specs/backlog/`. Original task spec below.
+
+### T-MSS-10 (original spec) — Migrate 21 atoms from HTML to YAML (C-6) — CLOSURE-ONLY
 - **Owner:** product-engineer
 - **Cluster:** C-6
 - **Preconditions:** T-MSS-09 `[x]` AND `dadaia specs doctor` exits 0 AND ACTIVE.md phase = CLOSURE.
@@ -238,7 +245,7 @@
 | T-MSS-07 | se-python | C-7 | W2 | `[x]` |
 | T-MSS-08 | devops-engineer | propagation | W3 | `[x]` |
 | T-MSS-09 | qa-engineer | acceptance | W3 | `[x]` |
-| T-MSS-10 | product-engineer | C-6 | CLOSURE | `[ ]` |
+| T-MSS-10 | product-engineer | C-6 | CLOSURE | DEFERRED |
 
 **Total: 11 tasks** — 7 se-python, 2 ai-engineer, 1 devops-engineer, 1 qa-engineer,
 1 product-engineer (CLOSURE). (T-MSS-02 is shared sw-arch + se-python.)

@@ -27,7 +27,7 @@
 <body>
 
 <h1>Architecture Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-31 · Closure: memory-context-enforcement-v1</p>
+<p class="meta">Última atualização: 2026-05-31 · Closure: memory-structured-source-v1</p>
 
 <section id="overview">
   <h2>Visão geral</h2>
@@ -256,6 +256,77 @@ flowchart LR
     end
     F --> H
     G --> H
+  </pre>
+</section>
+
+<section id="structured-memory-source">
+  <h2>Structured-memory-source subsystem</h2>
+  <p>Implemented in release <code>memory-structured-source-v1</code>. Inverts the data/presentation boundary for memory atoms: a schema-validated YAML file is the sole editable source; a deterministic renderer converts YAML → committed HTML; the panel serves the committed HTML unchanged.</p>
+
+  <h3>Schemas (atomicity-as-schema)</h3>
+  <p>Four JSON Schema files live in <code>dadaia_workspace/public/schemas/memory/</code>:</p>
+  <table>
+    <thead>
+      <tr><th>Schema ID</th><th>File</th><th>Governs</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>memory-architecture-v1</code></td><td><code>memory-architecture-v1.schema.json</code></td><td><code>specs/memory/architecture.yaml</code></td></tr>
+      <tr><td><code>memory-tech-stack-v1</code></td><td><code>memory-tech-stack-v1.schema.json</code></td><td><code>specs/memory/tech-stack.yaml</code></td></tr>
+      <tr><td><code>memory-product-index-v1</code></td><td><code>memory-product-index-v1.schema.json</code></td><td><code>specs/memory/product/index.yaml</code></td></tr>
+      <tr><td><code>memory-product-feature-v1</code></td><td><code>memory-product-feature-v1.schema.json</code></td><td><code>specs/memory/product/&lt;slug&gt;.yaml</code></td></tr>
+    </tbody>
+  </table>
+  <p>All four schemas use <code>"additionalProperties": false</code>. This makes a <code>changelog</code>, <code>history</code>, or <code>versions</code> field structurally impossible to author — atomicity is enforced at schema-validation time, not by a heuristic regex at doctor runtime (D-5 structural guarantee).</p>
+
+  <h3>Renderer (<code>features/specs/renderer.py</code>)</h3>
+  <p><code>dadaia_workspace/dadaia_workspace/features/specs/renderer.py</code> converts a YAML atom (validated against its schema) into the committed HTML file served by the panel. The renderer is deterministic: the same YAML input always produces byte-identical HTML output. Mermaid diagram fields are wrapped in <code>&lt;pre class="mermaid"&gt;…&lt;/pre&gt;</code> with the CDN script tag included. CLI entry: <code>dadaia memory render &lt;path.yaml&gt;</code> writes/updates the adjacent <code>.html</code> file.</p>
+
+  <h3>Doctor checks (STRUCT-1..4, SYNC-1, YAML-absent guard)</h3>
+  <ul>
+    <li><strong>STRUCT-1..4</strong>: When a YAML atom is present, doctor validates it against its schema. A schema violation (missing required field, extra field) is an error that blocks <code>dadaia specs doctor</code> exit 0.</li>
+    <li><strong>SYNC-1</strong>: When a YAML source exists and passes STRUCT validation, doctor runs the renderer and compares output to the committed HTML. A divergence is a WARN (not error) — naming the specific out-of-sync atom. Catches stale committed HTML when <code>dadaia memory render</code> was not run after editing YAML.</li>
+    <li><strong>YAML-absent guard</strong>: When no YAML source exists for an atom (the atom is still HTML-source), STRUCT and SYNC checks are skipped with a WARN: <code>[WARN] YAML source absent for &lt;atom-path&gt;; schema validation skipped. Migrate with: dadaia migrate memory-yaml</code>. HTML-source consumer repos continue operating with their existing doctor checks. <code>dadaia specs doctor</code> exits 0 with WARN-only. Check #8 (changelog-grep heuristic) is skipped for atoms that have a valid YAML source — schema enforcement supersedes the heuristic.</li>
+  </ul>
+
+  <h3>Gate RULE A extension</h3>
+  <p>RULE A in <code>dadaia_workspace/public/scripts/sdd-spec-gate.sh</code> was extended to lock <code>specs/memory/**/*.yaml</code> and <code>specs/memory/**/*.yml</code> files with the same CLOSURE-only enforcement as HTML atoms. A Write attempt on a YAML memory source outside the CLOSURE phase is blocked with the standard memory-atomicity gate message.</p>
+
+  <h3>Scaffold (born-structured)</h3>
+  <p>New consumer repos initialized via <code>dadaia init</code> or <code>dadaia context create</code> receive YAML stubs in <code>specs/memory/</code> (not HTML scaffold files). The old <code>architecture.html</code>, <code>tech-stack.html</code>, and <code>product/index.html</code> scaffold files were replaced by <code>architecture.yaml</code>, <code>tech-stack.yaml</code>, and <code>product/index.yaml</code> stubs that validate against their respective schemas. Stubs use <code>dadaia memory render</code> to generate their first committed HTML.</p>
+
+  <h3>Migration command</h3>
+  <p><code>dadaia migrate memory-yaml</code> guides existing HTML-source consumers through per-atom migration. Running it on an HTML atom produces a valid YAML file in the same directory; a second run on the same atom is a no-op with a warning (idempotent guard).</p>
+
+  <h3>Current state of this repo's atoms</h3>
+  <p>This repo's 21 memory atoms remain HTML-source. The dogfood migration (C-6) was deferred because the v1 schemas cannot losslessly represent the richest atoms: <code>tech-stack</code> and <code>architecture</code> have rich tables and multiple diagram fields that exceed the single-value schema fields; <code>agent-comms</code> and <code>brand-identity</code> have non-standard sections with no mapping to the <code>memory-product-feature-v1</code> required-field contract. A follow-up release (<code>memory-structured-source-migration-v2</code>) will enrich the schemas and re-run the migration with a content-fidelity gate. Until then, <code>dadaia specs doctor</code> exits 0 with 21 YAML-absent WARNs (benign, expected).</p>
+
+  <pre class="mermaid">
+flowchart LR
+    subgraph Source
+      A[specs/memory/&lt;atom&gt;.yaml]
+    end
+    subgraph Validation
+      B[schema validation\nSTRUCT-1..4]
+      A --> B
+    end
+    subgraph Render
+      C[renderer.py\ndadaia memory render]
+      B -- valid --> C
+    end
+    subgraph Committed
+      D[specs/memory/&lt;atom&gt;.html]
+      C --> D
+    end
+    subgraph Doctor
+      E[SYNC-1 check]
+      D --> E
+      A --> E
+    end
+    subgraph Gate
+      F[RULE A\nCLOSURE-only write lock]
+      A -.guarded by.-> F
+      D -.guarded by.-> F
+    end
   </pre>
 </section>
 
