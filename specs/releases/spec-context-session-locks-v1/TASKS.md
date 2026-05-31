@@ -195,7 +195,7 @@ to product-engineer.
 heartbeat). AC-REV-1..5 (BOUND_REVIEW gate behaviour) pass. Both hooks installed in all
 three runtimes (`dadaia public doctor` exit 0 after install).
 
-[ ] T-13 [software-engineer-python]
+[x] T-13 [software-engineer-python]
 [ ] T-13-hooks [devops-engineer]
 
 ---
