@@ -25,7 +25,7 @@
 <body>
 
 <h1>Tech Stack Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-20 · Closure: codex-agent-orchestration-parity-v1</p>
+<p class="meta">Última atualização: 2026-05-31 · Closure: memory-context-enforcement-v1</p>
 
 <section id="languages">
   <h2>Linguagens</h2>
@@ -34,12 +34,12 @@
       <tr><th>Linguagem</th><th>Versão</th><th>Uso</th></tr>
     </thead>
     <tbody>
-      <tr><td>Python</td><td>^3.12</td><td>CLI inteira, features, infrastructure, container, testes pytest</td></tr>
-      <tr><td>Bash</td><td>4+ POSIX-compatível</td><td>Hooks (sdd-spec-gate.sh, ctx-inject.sh), entry scripts</td></tr>
+      <tr><td>Python</td><td>^3.12</td><td>CLI inteira, features, infrastructure, container, testes pytest. <code>html.parser</code> (stdlib) usado por <code>strip-memory-html.py</code> para stripping de boilerplate HTML na injeção de memória — sem dependência PyPI adicional.</td></tr>
+      <tr><td>Bash</td><td>4+ POSIX-compatível</td><td>Hooks (<code>sdd-spec-gate.sh</code>, <code>ctx-inject.sh</code>), entry scripts. <code>ctx-inject.sh</code> injeta lean payload (tech-stack + catalog, ~4.6K tokens) em sessões Claude Code e OpenCode via first-message sentinel guard.</td></tr>
       <tr><td>HTML5 + Mermaid</td><td>Mermaid via CDN</td><td>Memory files atômicos em <code>specs/memory/*.html</code> e reports em <code>.dadaia/reports/&lt;ctx&gt;/&lt;agent&gt;/*.html</code></td></tr>
       <tr><td>Markdown</td><td>CommonMark</td><td>SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions</td></tr>
       <tr><td>YAML frontmatter</td><td>YAML 1.2</td><td>Frontmatter de agents/skills/workflows</td></tr>
-      <tr><td>JSON</td><td>stdlib</td><td>Estado runtime em <code>.dadaia/states/</code>, manifest.json</td></tr>
+      <tr><td>JSON</td><td>stdlib</td><td>Estado runtime em <code>.dadaia/states/</code>, <code>manifest.json</code>; <code>specs/memory/product/catalog.json</code> (gerado por <code>dadaia memory catalog generate</code>, committed, índice machine-readable de features)</td></tr>
     </tbody>
   </table>
 </section>

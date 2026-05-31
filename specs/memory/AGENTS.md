@@ -7,18 +7,21 @@
 
 ## 1. Read contract (all agents)
 
-Read memory atoms in this canonical order before beginning any implementation, review,
-or analysis task:
+A lean memory bootstrap (tech-stack + feature catalog) is **injected at session start**
+via `ctx-inject.sh` (Claude Code / OpenCode) or the `memory-ctx` Codex adapter — if
+present, it is already in your context. If not (standalone session), read them yourself.
 
-1. `architecture.html` — layer rules, dependency contracts, agent topology.
-2. `tech-stack.html` — approved languages, runtimes, and constraints.
-3. `product/catalog.json` — machine-readable feature index (slug, title, summary, path,
-   tags). If `catalog.json` is absent, fall back to `product/index.html`.
-4. Self-pull `product/<slug>.html` for each feature relevant to your task (1-3 files).
+In ALL cases, before starting work:
+
+1. Read `product/catalog.json` (or `product/index.html` if catalog absent) and identify
+   the 1-3 features most relevant to your task.
+2. Self-pull `architecture.html` — layer rules, dependency contracts, agent topology.
+   Architecture is **NOT injected** (it is large); ALWAYS pull it before any architectural,
+   cross-layer, or design decision.
+3. Self-pull `product/<slug>.html` for each relevant feature (1-3 files).
 
 This mirrors the `dadaia-workspace-spec-navigator` skill and the Step 0 block in every
-agent persona. Do NOT skip step 1 or 2 — architecture and tech-stack constraints apply
-to every task regardless of domain.
+agent persona. Do NOT skip steps 1-3 before implementation, review, or analysis.
 
 ---
 
@@ -48,13 +51,13 @@ atoms are always a point-in-time snapshot — they must be read as truth, not as
 | File | Role | Content type |
 |------|------|--------------|
 | `architecture.html` | Layer rules, ADRs, agent topology | HTML (write-locked) |
-| `tech-stack.html` | Approved toolchain and constraints | HTML (write-locked) |
+| `tech-stack.html` | Approved toolchain and constraints | HTML (write-locked; **injected** at session start) |
 | `product/index.html` | Human-browsable feature catalog | HTML (write-locked) |
-| `product/catalog.json` | Machine-readable feature index | JSON (generated) |
-| `product/<feature>.html` | Per-feature detail atom | HTML (write-locked) |
+| `product/catalog.json` | Machine-readable feature index | JSON (generated; **injected** at session start) |
+| `product/<feature>.html` | Per-feature detail atom | HTML (write-locked; self-pull on demand) |
 
-Check whether `product/catalog.json` exists before reading: if present, prefer it over
-`product/index.html` for feature navigation (direct JSON access, no HTML parsing needed).
+`architecture.html` is self-pull only (not injected). Check whether `product/catalog.json`
+exists before reading: if present, prefer it over `product/index.html` for feature navigation.
 
 ---
 

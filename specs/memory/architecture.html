@@ -27,7 +27,7 @@
 <body>
 
 <h1>Architecture Memory — dadaia-workspace</h1>
-<p class="meta">Última atualização: 2026-05-31 · Closure: spec-context-session-locks-v1</p>
+<p class="meta">Última atualização: 2026-05-31 · Closure: memory-context-enforcement-v1</p>
 
 <section id="overview">
   <h2>Visão geral</h2>
@@ -184,6 +184,79 @@ sequenceDiagram
     <li><code>specs/_archive/legacy-root/</code> — SPEC/PLAN/TASKS top-level pre-release-lifecycle.</li>
   </ul>
   <p><strong>Removido em v2:</strong> <code>.dadaia/states/primary_context.json</code> (deletado por <code>dadaia migrate</code>; não recriado em nenhum code path v2). O conceito de "global primary" foi substituído por session binding via <code>eval $(dadaia context bind ...)</code>.</p>
+</section>
+
+<section id="memory-injection">
+  <h2>Memory injection subsystem</h2>
+  <p>Implemented in release <code>memory-context-enforcement-v1</code>. Ensures agents never start work without product context ("agents never work blind"). The subsystem operates across three runtimes (Claude Code, OpenCode, Codex).</p>
+
+  <h3>Lean payload (operator decision D-5)</h3>
+  <p>The injected bootstrap is <strong>tech-stack + catalog only</strong> (~4,584 tokens / $0.0138 at Sonnet pricing). <code>architecture.html</code> is intentionally <em>not</em> injected — it is large (~7.5K tokens, prose + Mermaid diagrams that barely strip) and is self-pulled by agents before any architectural or cross-layer work, exactly as feature atoms are self-pulled on-demand.</p>
+
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>What is injected</th><th>Tokens (est)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Catalog index</td><td><code>specs/memory/product/catalog.json</code> — all features with slug, title, summary, path, tags, rank</td><td>~2,300</td></tr>
+      <tr><td>Tech stack</td><td><code>memory/tech-stack.html</code> stripped of <code>&lt;head&gt;</code>, <code>&lt;style&gt;</code>, Mermaid <code>&lt;script&gt;</code></td><td>~2,300</td></tr>
+      <tr><td><strong>Total injected</strong></td><td>—</td><td><strong>~4,584 (~5K)</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>ctx-inject.sh (Claude Code + OpenCode)</h3>
+  <p><code>dadaia_workspace/public/scripts/ctx-inject.sh</code> — lib-originated, projected to <code>.dadaia/scripts/ctx-inject.sh</code> by <code>dadaia public install</code>. Fires on every <code>UserPromptSubmit</code> event in Claude Code and on every <code>chat.message</code> in OpenCode. The script:</p>
+  <ol>
+    <li>Resolves <code>$SPECS_DIR</code> from <code>$DADAIA_CONTEXT</code> or <code>primary_context.json</code>.</li>
+    <li>Checks a <strong>first-message sentinel</strong> at <code>.dadaia/tmp/ctx-inject-fired-&lt;SESSION_ID&gt;</code>. If the sentinel exists, emits only the context-name line and exits — no re-injection on subsequent turns of the same session.</li>
+    <li>Creates the sentinel and emits the full payload inside bounded markers:</li>
+  </ol>
+  <pre><code>=== workspace memory (tech + catalog) ===
+...stripped tech-stack.html content...
+...catalog.json content...
+=== end memory bootstrap ===</code></pre>
+  <p>Fallback: when <code>catalog.json</code> is absent (consumer repos not yet generated), injects stripped <code>product/index.html</code> instead of the catalog block (no error, no empty block).</p>
+
+  <h3>strip-memory-html.py</h3>
+  <p><code>dadaia_workspace/public/scripts/strip-memory-html.py</code> — NEW in this release. ~25 lines, Python stdlib only (<code>html.parser</code>). Accepts a file path as <code>argv[1]</code>, removes <code>&lt;head&gt;</code>, <code>&lt;style&gt;</code>, and Mermaid <code>&lt;script&gt;</code> blocks, writes stripped content to stdout. Invoked inline by <code>ctx-inject.sh</code>. Preserves all prose, heading, and diagram content.</p>
+
+  <h3>ctx-inject.ts (OpenCode first-message guard)</h3>
+  <p><code>dadaia_workspace/public/plugins/ctx-inject.ts</code> — extended with a first-message-only guard. The OpenCode <code>chat.message</code> hook fires on every user message; without the guard, the ~5K payload would be paid on every turn. The guard uses the same session sentinel pattern as <code>ctx-inject.sh</code>. If no session env var is available, falls back to a PID-based sentinel. Any error skips injection and never breaks the chat (fail-open).</p>
+
+  <h3>catalog.json generation pipeline</h3>
+  <p><code>dadaia_workspace/features/specs/catalog.py</code> — NEW in this release. Public function <code>generate_catalog(specs_dir: Path) -&gt; dict</code> reads <code>specs_dir/memory/product/index.html</code>, parses the <code>&lt;ol class="catalog"&gt;</code> entries, and returns a dict matching the catalog JSON schema. CLI entry: <code>dadaia memory catalog generate [--specs-dir PATH]</code>. The generated file is committed as <code>specs/memory/product/catalog.json</code> (18 entries for this repo).</p>
+
+  <h3>CAT-1 doctor check</h3>
+  <p>Added to <code>dadaia_workspace/features/specs/doctor.py</code>. Verifies that the set of slugs in <code>catalog.json</code> matches the set of <code>*.html</code> files (excluding <code>index.html</code>) in <code>specs/memory/product/</code>. Severity: WARNING (not ERROR — catalog may simply be stale). The check message names the specific out-of-sync slugs/files.</p>
+
+  <h3>Codex memory-ctx adapter (ADR-CX-001)</h3>
+  <p><code>dadaia_workspace/public/runtime/codex/memory-ctx/SKILL.md</code> — NEW universal Codex bootstrap adapter. Auto-discovered and installed to <code>.codex/skills/memory-ctx/SKILL.md</code> by <code>_install_codex_runtime_adapters</code> in <code>infrastructure/public_assets.py</code> via directory iteration (<code>sorted(src_root.iterdir())</code>). No <code>config.toml</code> entry is created or needed — registration is purely by directory presence (ADR-CX-001). Covered by <code>dadaia public doctor</code> check D-CX-6 (leak/missing/drift). The adapter fires before role-specific adapters (<code>design-ctx</code>, <code>frontend-ctx</code>).</p>
+
+  <h3>Step 0 block in all 21 agent personas</h3>
+  <p>A mandatory "Step 0 — Memory bootstrap (mandatory, before any implementation)" block was inserted into all 21 agent persona files in <code>dadaia_workspace/public/agents/</code>. The block instructs agents to: (1) read the catalog, (2) self-pull <code>architecture.html</code> before architectural/cross-layer work, (3) self-pull the 1-3 relevant feature atoms. 5 previously fully-blind P0 agents (code-reviewer, design-specialist, project-auditor, researcher, security-reviewer) also gained <code>dadaia-workspace-spec-navigator</code> in their frontmatter <code>skills:</code> list.</p>
+
+  <pre class="mermaid">
+flowchart LR
+    subgraph Session start
+      A[UserPromptSubmit / chat.message]
+      B{Sentinel exists?}
+      A --> B
+      B -- No --> C[strip tech-stack.html]
+      C --> D[read catalog.json]
+      D --> E[emit bounded block]
+      E --> F[create sentinel]
+      B -- Yes --> G[emit context-name only]
+    end
+    subgraph Agent self-pull
+      H[catalog.json]
+      I[identify relevant features]
+      H --> I
+      I --> J[self-pull feature slugs.html]
+      I --> K[self-pull architecture.html\nbefore arch work]
+    end
+    F --> H
+    G --> H
+  </pre>
 </section>
 
 <section id="evidence">
