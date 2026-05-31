@@ -90,7 +90,7 @@
   - All five unchanged tests (AC-3.1, AC-3.2, AC-3.3, AC-3.4, AC-3.6) pass.
   - QA handoff verdict: `APPROVED` in the emitted `.handoff.json` sidecar.
 - **Parallelism:** none; sequential final task before CLOSURE.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ---
 
@@ -100,7 +100,7 @@
 |---------|-------|------|---------------|--------|
 | T-1 | software-engineer-python | Fix locking.py + context.py bind() | SPEC+PLAN Aprovado | `[x]` |
 | T-2 | software-engineer-python | Rewrite AC-3.5/3.7/3.8 tests | T-1 `[x]` | `[x]` |
-| T-3 | qa-engineer | Full-suite + gates validation | T-2 `[x]` | `[ ]` |
+| T-3 | qa-engineer | Full-suite + gates validation | T-2 `[x]` | `[x]` |
 
 **Total: 3 tasks** — 2 software-engineer-python, 1 qa-engineer.
 
