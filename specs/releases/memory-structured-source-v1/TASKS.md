@@ -82,7 +82,7 @@
   shipped); uses `yaml.safe_load`; WARN message text includes `dadaia migrate memory-yaml`.
 - **Parallelism:** disjoint from T-MSS-03, T-MSS-05, T-MSS-06, T-MSS-07.
 - **Note:** T-MSS-04b (SYNC-1) is a separate task that depends on T-MSS-03.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ### T-MSS-05 — Gate RULE A extension for `.yaml`/`.yml` (C-4)
 - **Owner:** ai-engineer
@@ -147,7 +147,7 @@
   output for a YAML atom that passes STRUCT validation; SYNC-1 names the specific atom(s)
   out of sync; doctor exits 0 when all YAML atoms pass STRUCT + SYNC (no out-of-sync atoms).
 - **Parallelism:** single task; sequential after T-MSS-03 + T-MSS-04a.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ---
 
@@ -231,8 +231,8 @@
 | T-MSS-01 | se-python | dep | W1 | `[x]` |
 | T-MSS-02 | sw-arch + se-python | C-1 | W1 | `[x]` |
 | T-MSS-03 | se-python | C-2 | W2 | `[x]` |
-| T-MSS-04a | se-python | C-3 STRUCT | W2 | `[ ]` |
-| T-MSS-04b | se-python | C-3 SYNC-1 | W2 cont | `[ ]` |
+| T-MSS-04a | se-python | C-3 STRUCT | W2 | `[x]` |
+| T-MSS-04b | se-python | C-3 SYNC-1 | W2 cont | `[x]` |
 | T-MSS-05 | ai-engineer | C-4 | W2 | `[x]` |
 | T-MSS-06 | ai-engineer + sw-arch | C-5 | W2 | `[ ]` |
 | T-MSS-07 | se-python | C-7 | W2 | `[ ]` |

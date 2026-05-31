@@ -4,7 +4,8 @@ Runs the 11 structural checks defined in release `sdd-release-lifecycle-v1`,
 extended for the product memory folder catalog (release `Product Memory Feature
 Catalog v1`) and the D-OC-1 orchestration registry coherence invariant, plus
 the 7 TREE invariants from release `spec-context-tree-v2`, plus the CAT-1
-catalog sync check from release `memory-context-enforcement-v1`:
+catalog sync check from release `memory-context-enforcement-v1`, plus the
+STRUCT-1..STRUCT-4 and SYNC-1 checks from release `memory-structured-source-v1`:
 
   1. specs/constitution.md exists
   2. specs/memory/architecture.html and tech-stack.html exist, parseable, with non-empty
@@ -17,6 +18,7 @@ catalog sync check from release `memory-context-enforcement-v1`:
   6. each _archive/releases/<id>/ has CLOSURE.md with 4 mandatory sections + >=1 evidence triple
   7. no SPEC/PLAN/TASKS outside releases/*/ or _archive/releases/*/ (warn during legacy window)
   8. no <section class="changelog"> or <h2> matching Changelog|History|Histórico|Versions? in any memory HTML
+     (skipped for atoms that have a valid YAML source — schema enforces it structurally, D-5)
   9. release id in ACTIVE.md corresponds to a real directory
  10. every <img src> in any memory HTML resolves to a real file
  11. memory HTML containing <pre class="mermaid"> has the Mermaid CDN <script>
@@ -38,6 +40,18 @@ CAT-1 (memory-context-enforcement-v1):
   CAT-1. catalog.json absent when feature HTMLs exist → WARNING
          catalog.json present but slugs ↔ HTML files out of sync → WARNING (per slug/file)
 
+STRUCT checks (memory-structured-source-v1 / C-3):
+  STRUCT-1. specs/memory/architecture.yaml is invalid against memory-architecture-v1 schema → ERROR
+  STRUCT-2. specs/memory/tech-stack.yaml is invalid against memory-tech-stack-v1 schema → ERROR
+  STRUCT-3. specs/memory/product/index.yaml is invalid against memory-product-index-v1 schema → ERROR
+  STRUCT-4. any specs/memory/product/<slug>.yaml is invalid against memory-product-feature-v1 → ERROR
+  YAML-absent guard: atom HTML present but no YAML source → WARN (not error); migration hint included.
+  Retire #8: when atom has a valid YAML source, skip check #8 (schema structurally guarantees atomicity).
+
+SYNC-1 (memory-structured-source-v1 / C-3):
+  SYNC-1. committed HTML diverges from renderer output for a YAML-source atom → WARN (not error)
+          (PE may be mid-edit; WARN allows working states; exact atom(s) named in message).
+
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
 
@@ -52,6 +66,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 import jinja2
+import yaml
 
 CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
 CANONICAL_PHASES = {
@@ -138,6 +153,34 @@ _TREE_MIGRATION_HINT = (
     "[TREE MIGRATION REQUIRED] Run: dadaia migrate tree-v2\n"
     "  This command moves deprecated content to releases/legacy/ "
     "without destroying SDD-approved artifacts."
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# STRUCT / SYNC constants (memory-structured-source-v1)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Map relative atom path (within specs/memory/) → atom type identifier.
+# Order matters for STRUCT code assignment: architecture→STRUCT-1, tech-stack→STRUCT-2,
+# product/index→STRUCT-3, product/<slug>→STRUCT-4.
+_STRUCT_TOP_LEVEL_ATOMS: tuple[tuple[str, str, str], ...] = (
+    # (relative_path, yaml_stem, atom_type)
+    ("architecture", "architecture.yaml", "memory-architecture-v1"),
+    ("tech-stack", "tech-stack.yaml", "memory-tech-stack-v1"),
+)
+_STRUCT_INDEX_ATOM = ("product/index", "product/index.yaml", "memory-product-index-v1")
+
+# STRUCT-1..4 codes per slot type.
+_STRUCT_CODE_MAP = {
+    "memory-architecture-v1": "STRUCT-1",
+    "memory-tech-stack-v1": "STRUCT-2",
+    "memory-product-index-v1": "STRUCT-3",
+    "memory-product-feature-v1": "STRUCT-4",
+}
+
+# WARN text required by AC-C3-4 and AC-C7-3 — must include `dadaia migrate memory-yaml`.
+_YAML_ABSENT_WARN_TEMPLATE = (
+    "YAML source absent for {atom_rel}; schema validation skipped. "
+    "Migrate with: dadaia migrate memory-yaml"
 )
 
 
@@ -270,6 +313,89 @@ def _iter_memory_html_files(mem_dir: Path) -> list[Path]:
     if product_dir.is_dir():
         out.extend(sorted(product_dir.glob("*.html")))
     return out
+
+
+def _enumerate_memory_yaml_slots(
+    mem_dir: Path,
+) -> list[tuple[str, Path, Path, str]]:
+    """Enumerate all memory atom slots (YAML + HTML) under *mem_dir*.
+
+    Returns a list of tuples:
+        (rel_key, yaml_path, html_path, atom_type)
+
+    where:
+        rel_key   — human-readable relative identifier (e.g. "architecture",
+                    "product/index", "product/my-feature")
+        yaml_path — expected YAML source path (may not exist)
+        html_path — expected HTML artifact path (may not exist)
+        atom_type — schema type identifier string
+
+    Includes: architecture, tech-stack, product/index, product/<slug> (all
+    non-index YAML files under product/).
+    """
+    slots: list[tuple[str, Path, Path, str]] = []
+
+    # Top-level atoms: architecture, tech-stack
+    for rel_key, yaml_name, atom_type in _STRUCT_TOP_LEVEL_ATOMS:
+        yaml_path = mem_dir / yaml_name
+        html_path = mem_dir / (rel_key + ".html")
+        slots.append((rel_key, yaml_path, html_path, atom_type))
+
+    # product/index
+    rel_key, yaml_name, atom_type = _STRUCT_INDEX_ATOM
+    slots.append(
+        (
+            "product/index",
+            mem_dir / "product" / "index.yaml",
+            mem_dir / "product" / "index.html",
+            "memory-product-index-v1",
+        )
+    )
+
+    # product/<slug> — discover from existing YAML *or* HTML files.
+    product_dir = mem_dir / "product"
+    if product_dir.is_dir():
+        # Collect slugs from both YAML and HTML so we report YAML-absent on HTML-only atoms.
+        yaml_slugs = {p.stem for p in product_dir.glob("*.yaml") if p.stem != "index"}
+        html_slugs = {p.stem for p in product_dir.glob("*.html") if p.stem != "index"}
+        all_slugs = yaml_slugs | html_slugs
+        for slug in sorted(all_slugs):
+            slots.append(
+                (
+                    f"product/{slug}",
+                    product_dir / f"{slug}.yaml",
+                    product_dir / f"{slug}.html",
+                    "memory-product-feature-v1",
+                )
+            )
+
+    return slots
+
+
+def _collect_yaml_valid_atom_rels(mem_dir: Path) -> set[str]:
+    """Return the rel_keys of atoms that have a YAML source AND pass STRUCT validation.
+
+    Used by check #8 to skip the changelog-grep for schema-validated atoms (D-5),
+    and by SYNC-1 as the input set.
+
+    Does NOT emit issues — callers that need issues use _check_memory_struct() directly.
+    Any ValidationError is silently treated as "not valid" so that #8 still fires.
+    """
+    from dadaia_workspace.features.specs.renderer import validate_atom
+
+    valid_rels: set[str] = set()
+    for rel_key, yaml_path, _html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
+        if not yaml_path.exists():
+            continue
+        try:
+            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                continue
+            validate_atom(data, atom_type)
+            valid_rels.add(rel_key)
+        except Exception:
+            pass
+    return valid_rels
 
 
 def _read_active_md(path: Path) -> tuple[str | None, str | None, str | None]:
@@ -416,6 +542,10 @@ class SpecsDoctor:
         issues.extend(self._check_tree7_bug_session_id())
         # CAT-1 (memory-context-enforcement-v1)
         issues.extend(self._check_cat1_catalog_sync())
+        # STRUCT-1..4 + YAML-absent guard (memory-structured-source-v1 / C-3)
+        issues.extend(self._check_memory_struct())
+        # SYNC-1 (memory-structured-source-v1 / C-3) — runs after STRUCT
+        issues.extend(self._check_memory_sync())
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
@@ -805,14 +935,33 @@ class SpecsDoctor:
 
     # 8
     def _check_memory_atomicity(self) -> list[SpecsDoctorIssue]:
+        """Check #8: no forbidden changelog/history sections in memory HTML.
+
+        D-5 (memory-structured-source-v1): when an atom has a valid YAML source,
+        check #8 is skipped for that atom — the schema enforces atomicity
+        structurally via `additionalProperties: false`, making the heuristic
+        grep redundant.  Check #8 still fires for HTML-only (YAML-absent) atoms.
+        """
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
+
+        # Collect rel_keys of atoms that have a valid YAML source so we can skip
+        # check #8 for them (D-5).  The set is empty when mem_dir doesn't exist.
+        yaml_valid_rels: set[str] = set()
+        if mem_dir.is_dir():
+            yaml_valid_rels = _collect_yaml_valid_atom_rels(mem_dir)
+
         for p in _iter_memory_html_files(mem_dir):
             try:
                 summary = _parse_memory_html(p)
             except Exception:
                 continue
             rel = p.relative_to(mem_dir).as_posix()
+            # Derive rel_key from the HTML path (strip .html extension).
+            rel_key = rel[: -len(".html")] if rel.endswith(".html") else rel
+            # Skip check #8 when a valid YAML source exists for this atom (D-5).
+            if rel_key in yaml_valid_rels:
+                continue
             for label in summary.forbidden_h2:
                 issues.append(
                     SpecsDoctorIssue(
@@ -1463,6 +1612,159 @@ class SpecsDoctor:
                         path=str(p),
                     )
                 )
+        return issues
+
+    # STRUCT-1..4 + YAML-absent guard (memory-structured-source-v1 / C-3a + C-3c)
+    def _check_memory_struct(self) -> list[SpecsDoctorIssue]:
+        """Validate YAML memory atom sources against their JSON Schemas.
+
+        For each known atom slot:
+        - If a YAML source exists → validate against the corresponding schema.
+          Validation failure (missing required field OR extra field via
+          ``additionalProperties:false``) → **ERROR** (STRUCT-1..STRUCT-4).
+        - If NO YAML source exists but an HTML file does → **WARN** with the
+          standard migration hint (YAML-absent guard, C-3c).  Doctor still exits 0
+          when all atoms are HTML-only (pre-migration state).
+        - If neither YAML nor HTML exists → no issue emitted (slot is inactive).
+
+        Check #8 retire (D-5 / C-3d): handled in ``_check_memory_atomicity``
+        which calls ``_collect_yaml_valid_atom_rels`` to skip the changelog-grep
+        for atoms that have a valid YAML source.
+        """
+        import jsonschema as _jsonschema
+
+        from dadaia_workspace.features.specs.renderer import validate_atom as _validate_atom
+
+        issues: list[SpecsDoctorIssue] = []
+        mem_dir = self.specs_dir / "memory"
+        if not mem_dir.is_dir():
+            return issues
+
+        for rel_key, yaml_path, html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
+            struct_code = _STRUCT_CODE_MAP.get(atom_type, "STRUCT-4")
+
+            if yaml_path.exists():
+                # YAML present → validate against schema
+                try:
+                    raw = yaml_path.read_text(encoding="utf-8")
+                    data = yaml.safe_load(raw)
+                    if not isinstance(data, dict):
+                        issues.append(
+                            SpecsDoctorIssue(
+                                code=struct_code,
+                                severity=Severity.ERROR,
+                                description=(
+                                    f"{struct_code}: memory/{rel_key}.yaml did not parse to a "
+                                    f"mapping (got {type(data).__name__}). YAML atom must be a "
+                                    "YAML mapping."
+                                ),
+                                path=str(yaml_path),
+                            )
+                        )
+                        continue
+                    _validate_atom(data, atom_type)
+                except _jsonschema.ValidationError as exc:
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code=struct_code,
+                            severity=Severity.ERROR,
+                            description=(
+                                f"{struct_code}: memory/{rel_key}.yaml fails schema validation "
+                                f"({atom_type}): {exc.message}"
+                            ),
+                            path=str(yaml_path),
+                        )
+                    )
+                except Exception as exc:
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code=struct_code,
+                            severity=Severity.ERROR,
+                            description=(
+                                f"{struct_code}: memory/{rel_key}.yaml could not be validated: "
+                                f"{exc}"
+                            ),
+                            path=str(yaml_path),
+                        )
+                    )
+            elif html_path.exists():
+                # YAML absent but HTML present → migration guard WARN (C-3c)
+                issues.append(
+                    SpecsDoctorIssue(
+                        code=struct_code,
+                        severity=Severity.WARNING,
+                        description=_YAML_ABSENT_WARN_TEMPLATE.format(
+                            atom_rel=f"memory/{rel_key}"
+                        ),
+                        path=str(html_path),
+                    )
+                )
+            # else: neither YAML nor HTML — slot is inactive, no issue
+
+        return issues
+
+    # SYNC-1 (memory-structured-source-v1 / C-3b)
+    def _check_memory_sync(self) -> list[SpecsDoctorIssue]:
+        """SYNC-1: warn when committed HTML diverges from renderer output for a YAML atom.
+
+        Runs only for atoms that have a YAML source AND pass STRUCT validation (i.e.
+        appear in ``_collect_yaml_valid_atom_rels``).  When YAML is absent or STRUCT
+        fails, SYNC-1 is skipped for that atom (STRUCT error takes precedence).
+
+        Severity is always WARN (not error) — the product-engineer may be mid-edit
+        between rendering and committing.  The message names the specific atom(s).
+        """
+        from dadaia_workspace.features.specs.renderer import render_atom as _render_atom
+
+        issues: list[SpecsDoctorIssue] = []
+        mem_dir = self.specs_dir / "memory"
+        if not mem_dir.is_dir():
+            return issues
+
+        # Get the set of atoms that have a valid YAML source.
+        valid_rels = _collect_yaml_valid_atom_rels(mem_dir)
+        if not valid_rels:
+            return issues
+
+        # For each valid slot, render from YAML and compare to committed HTML.
+        for rel_key, yaml_path, html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
+            if rel_key not in valid_rels:
+                continue
+            if not html_path.exists():
+                # No committed HTML yet → the HTML needs to be generated first,
+                # but this is a different concern (TREE-3 / scaffolding).  Skip SYNC-1.
+                continue
+            try:
+                rendered = _render_atom(yaml_path, atom_type=atom_type)
+            except Exception as exc:
+                # Renderer failure is unexpected here (STRUCT already passed).
+                # Emit as a WARN to avoid blocking doctor exit 0.
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SYNC-1",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"SYNC-1: memory/{rel_key} — renderer raised an unexpected "
+                            f"error during SYNC-1 check: {exc}"
+                        ),
+                        path=str(yaml_path),
+                    )
+                )
+                continue
+            committed = html_path.read_text(encoding="utf-8")
+            if rendered != committed:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SYNC-1",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"SYNC-1: memory/{rel_key}.html is out of sync with its YAML "
+                            "source. Run `dadaia memory render` to regenerate."
+                        ),
+                        path=str(html_path),
+                    )
+                )
+
         return issues
 
     # CAT-1 (memory-context-enforcement-v1)
