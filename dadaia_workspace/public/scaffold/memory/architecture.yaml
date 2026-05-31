@@ -1,0 +1,22 @@
+# Memory Atom — Architecture
+# Schema: memory-architecture-v1
+# Edit this file, then run: dadaia memory render specs/memory/architecture.yaml
+overview: >-
+  Visão geral ainda não documentada.
+
+layers:
+  - name: "camada-1"
+    description: "Descrever responsabilidades desta camada aqui."
+
+dependency_rules_diagram: |
+  graph TD
+    A[Sem dados]
+
+data_flow_diagram: |
+  graph TD
+    A[Sem dados]
+
+contracts: []
+
+runtime_state:
+  - "Sem estado runtime registrado."

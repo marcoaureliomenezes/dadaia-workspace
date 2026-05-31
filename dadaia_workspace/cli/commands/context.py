@@ -7,6 +7,7 @@ import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -86,13 +87,14 @@ def _locks_dir(workspace_root: Path) -> Path:
     return workspace_root / ".dadaia" / "locks" / "implementation"
 
 
-def _load_session(sessions_dir: Path, session_id: str) -> dict | None:  # type: ignore[type-arg]
+def _load_session(sessions_dir: Path, session_id: str) -> dict[str, Any] | None:
     """Load a session file, return None if not found."""
     session_file = sessions_dir / f"{session_id}.json"
     if not session_file.exists():
         return None
     try:
-        return json.loads(session_file.read_text())
+        data: dict[str, Any] = json.loads(session_file.read_text())
+        return data
     except (json.JSONDecodeError, OSError):
         return None
 

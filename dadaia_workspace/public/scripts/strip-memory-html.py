@@ -10,7 +10,7 @@ from html.parser import HTMLParser
 
 # HTML void elements (no closing tag) — do not track depth for these.
 _VOID = frozenset(
-    "area base br col embed hr img input link meta param source track wbr".split()
+    ["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]
 )
 # Block-level containers to skip entirely (tag + all descendants).
 _SKIP_CONTAINERS = frozenset(["head", "style"])
@@ -23,14 +23,14 @@ class MemoryHtmlStripper(HTMLParser):
     (<pre class="mermaid"> / <div class="mermaid">).
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
         # Stack of skip-container tag names currently open.
-        self._skip_stack = []
+        self._skip_stack: list[str] = []
         self._mermaid_script = False  # inside a mermaid CDN / init <script>
-        self.output = []
+        self.output: list[str] = []
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         # Inside a skipped container: track nesting but emit nothing.
         if self._skip_stack:
             if tag not in _VOID:
@@ -46,7 +46,7 @@ class MemoryHtmlStripper(HTMLParser):
         if tag == "script":
             attr_dict = dict(attrs)
             src = attr_dict.get("src", "")
-            if "mermaid" in src or not src:
+            if "mermaid" in (src or "") or not src:
                 self._mermaid_script = True
                 return
 
@@ -59,7 +59,7 @@ class MemoryHtmlStripper(HTMLParser):
         else:
             self.output.append(f"<{tag}>")
 
-    def handle_endtag(self, tag):
+    def handle_endtag(self, tag: str) -> None:
         if self._skip_stack:
             # Pop when we close the innermost skip container.
             if self._skip_stack and self._skip_stack[-1] == tag:
@@ -70,26 +70,26 @@ class MemoryHtmlStripper(HTMLParser):
             return
         self.output.append(f"</{tag}>")
 
-    def handle_data(self, data):
+    def handle_data(self, data: str) -> None:
         if self._skip_stack or self._mermaid_script:
             return
         self.output.append(data)
 
-    def handle_entityref(self, name):
+    def handle_entityref(self, name: str) -> None:
         if self._skip_stack or self._mermaid_script:
             return
         self.output.append(f"&{name};")
 
-    def handle_charref(self, name):
+    def handle_charref(self, name: str) -> None:
         if self._skip_stack or self._mermaid_script:
             return
         self.output.append(f"&#{name};")
 
-    def get_output(self):
+    def get_output(self) -> str:
         return "".join(self.output)
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         sys.exit(1)
     path = sys.argv[1]

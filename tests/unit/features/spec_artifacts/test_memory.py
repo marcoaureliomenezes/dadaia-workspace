@@ -1,7 +1,7 @@
 """Unit tests for dadaia_workspace.features.spec_artifacts.memory.
 
 Covers:
-- AC-T3-1: scaffold has index.html with empty catalog
+- AC-T3-1: scaffold has index.yaml (T-MSS-06) with minimal catalog
 - AC-T3-2: memory_product_add creates feature HTML + updates index
 - AC-T3-3: idempotent index regeneration
 - AC-C-6: dadaia memory product add <slug> creates feature HTML + regenerates index
@@ -10,14 +10,17 @@ Covers:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from dadaia_workspace.features.spec_artifacts.memory import (
     MemoryProductAddResult,
     memory_product_add,
 )
+from dadaia_workspace.features.specs.renderer import validate_atom
 
 # ── templates directory for rendering ─────────────────────────────────────────
 _TEMPLATES_DIR = (
@@ -27,66 +30,87 @@ _TEMPLATES_DIR = (
     / "templates"
 )
 
+_SCAFFOLD_DIR = (
+    Path(__file__).parent.parent.parent.parent.parent
+    / "dadaia_workspace"
+    / "public"
+    / "scaffold"
+)
 
-# ── scaffold static index.html (AC-T3-1) ─────────────────────────────────────
+
+# ── scaffold YAML stub (AC-T3-1 updated for T-MSS-06) ────────────────────────
 
 
 class TestScaffoldIndexHtml:
-    """AC-T3-1: scaffold/memory/product/index.html exists with empty catalog."""
+    """AC-T3-1 (updated T-MSS-06): scaffold/memory/product/ now ships index.yaml (not index.html).
 
-    def test_scaffold_product_index_exists(self) -> None:
-        """AC-T3-1: index.html must exist in the scaffold."""
-        scaffold_dir = (
-            Path(__file__).parent.parent.parent.parent.parent
-            / "dadaia_workspace"
-            / "public"
-            / "scaffold"
-        )
-        index = scaffold_dir / "memory" / "product" / "index.html"
+    The scaffold function renders YAML→HTML during scaffolding. Tests updated to
+    reflect the YAML-source reality while verifying AC-C5-1..6 compliance.
+    """
+
+    def test_scaffold_product_index_yaml_exists(self) -> None:
+        """AC-C5-3 / T-MSS-06: index.yaml must exist in the scaffold (replaces index.html)."""
+        index = _SCAFFOLD_DIR / "memory" / "product" / "index.yaml"
         assert index.is_file(), (
-            "scaffold/memory/product/index.html must exist (AC-T3-1)"
+            "scaffold/memory/product/index.yaml must exist (AC-C5-3 / T-MSS-06)"
         )
 
-    def test_scaffold_index_is_valid_html(self) -> None:
-        """AC-T3-1: index.html is valid HTML with <!DOCTYPE html>."""
-        scaffold_dir = (
-            Path(__file__).parent.parent.parent.parent.parent
-            / "dadaia_workspace"
-            / "public"
-            / "scaffold"
+    def test_scaffold_product_index_html_removed(self) -> None:
+        """AC-C5-4 / T-MSS-06: old index.html scaffold file must be removed (REPLACE is complete)."""
+        old_html = _SCAFFOLD_DIR / "memory" / "product" / "index.html"
+        assert not old_html.exists(), (
+            "scaffold/memory/product/index.html must be removed (AC-C5-4 / T-MSS-06); "
+            "the scaffold now ships index.yaml"
         )
-        index = scaffold_dir / "memory" / "product" / "index.html"
+
+    def test_scaffold_index_yaml_is_valid_against_schema(self) -> None:
+        """AC-C5-3: index.yaml must be valid against memory-product-index-v1 schema."""
+        index = _SCAFFOLD_DIR / "memory" / "product" / "index.yaml"
+        data = yaml.safe_load(index.read_text(encoding="utf-8"))
+        # Should not raise; raises jsonschema.ValidationError on failure.
+        validate_atom(data, "memory-product-index-v1")
+
+    def test_scaffold_index_rendered_html_has_catalog_section(self, tmp_path: Path) -> None:
+        """AC-T3-1 / T-MSS-06: scaffolded specs/memory/product/index.html contains <section id='catalog'>."""
+        from dadaia_workspace.features.specs.scaffolder import scaffold
+
+        specs_dir = tmp_path / "specs"
+        result = scaffold(
+            specs_dir=specs_dir,
+            project_name="test-project",
+            force=False,
+            templates_dir=_TEMPLATES_DIR,
+        )
+        assert result.errors == [], f"Scaffold errors: {result.errors}"
+
+        index = specs_dir / "memory" / "product" / "index.html"
+        assert index.is_file(), "specs/memory/product/index.html must exist after scaffold"
         content = index.read_text(encoding="utf-8")
         assert "<!DOCTYPE html>" in content or "<!doctype html>" in content.lower()
         assert "<html" in content
-
-    def test_scaffold_index_has_catalog_section(self) -> None:
-        """AC-T3-1: index.html must contain <section id='catalog'>."""
-        scaffold_dir = (
-            Path(__file__).parent.parent.parent.parent.parent
-            / "dadaia_workspace"
-            / "public"
-            / "scaffold"
-        )
-        index = scaffold_dir / "memory" / "product" / "index.html"
-        content = index.read_text(encoding="utf-8")
         assert 'id="catalog"' in content, (
             "index.html must contain <section id='catalog'> (AC-T3-1)"
         )
 
-    def test_scaffold_index_has_zero_feature_entries(self) -> None:
-        """AC-T3-1: empty catalog — no <li> items inside the catalog <ol>."""
-        scaffold_dir = (
-            Path(__file__).parent.parent.parent.parent.parent
-            / "dadaia_workspace"
-            / "public"
-            / "scaffold"
+    def test_scaffold_index_rendered_html_has_placeholder_entry(self, tmp_path: Path) -> None:
+        """T-MSS-06: scaffolded index.html has the placeholder catalog entry from the YAML stub.
+
+        The minimal-valid product-index stub requires at least 1 catalog entry (schema minItems:1).
+        The rendered HTML therefore contains a link to placeholder.html, which also ships in scaffold.
+        """
+        from dadaia_workspace.features.specs.scaffolder import scaffold
+
+        specs_dir = tmp_path / "specs"
+        result = scaffold(
+            specs_dir=specs_dir,
+            project_name="test-project",
+            force=False,
+            templates_dir=_TEMPLATES_DIR,
         )
-        index = scaffold_dir / "memory" / "product" / "index.html"
+        assert result.errors == [], f"Scaffold errors: {result.errors}"
+
+        index = specs_dir / "memory" / "product" / "index.html"
         content = index.read_text(encoding="utf-8")
-        # Find the catalog section; it should have an empty <ol>
-        # We do a simple check: no .html link inside the catalog section
-        import re
         catalog_match = re.search(
             r'<section id="catalog">(.*?)</section>',
             content,
@@ -94,11 +118,12 @@ class TestScaffoldIndexHtml:
         )
         assert catalog_match is not None, "catalog section not found"
         catalog_html = catalog_match.group(1)
-        # No <a href="*.html"> means no entries
+        # The placeholder entry generates exactly 1 link
         links = re.findall(r'<a\s+href="[^"]+\.html"', catalog_html)
-        assert len(links) == 0, (
-            f"Expected 0 feature links in catalog, found {len(links)} (AC-T3-1)"
+        assert len(links) == 1, (
+            f"Expected 1 placeholder entry in catalog, found {len(links)} (T-MSS-06)"
         )
+        assert "placeholder.html" in catalog_html
 
 
 # ── memory_product_add unit tests (AC-T3-2, AC-T3-3) ──────────────────────────

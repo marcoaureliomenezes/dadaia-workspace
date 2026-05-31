@@ -113,7 +113,7 @@
   schemas (sw-arch sign-off); old HTML scaffold files are removed; `dadaia public stage &&
   dadaia public install --target all` run; `dadaia public doctor` exits 0.
 - **Parallelism:** disjoint from T-MSS-03, T-MSS-04a, T-MSS-05, T-MSS-07.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ### T-MSS-07 — `dadaia migrate memory-yaml` guard (C-7)
 - **Owner:** software-engineer-python
@@ -234,7 +234,7 @@
 | T-MSS-04a | se-python | C-3 STRUCT | W2 | `[x]` |
 | T-MSS-04b | se-python | C-3 SYNC-1 | W2 cont | `[x]` |
 | T-MSS-05 | ai-engineer | C-4 | W2 | `[x]` |
-| T-MSS-06 | ai-engineer + sw-arch | C-5 | W2 | `[ ]` |
+| T-MSS-06 | ai-engineer + sw-arch | C-5 | W2 | `[x]` |
 | T-MSS-07 | se-python | C-7 | W2 | `[x]` |
 | T-MSS-08 | devops-engineer | propagation | W3 | `[ ]` |
 | T-MSS-09 | qa-engineer | acceptance | W3 | `[ ]` |

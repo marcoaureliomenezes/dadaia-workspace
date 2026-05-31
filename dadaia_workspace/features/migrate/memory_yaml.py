@@ -53,7 +53,7 @@ class _Node:
 
     __slots__ = ("tag", "attrs", "text_parts", "children", "parent")
 
-    def __init__(self, tag: str, attrs: dict[str, str], parent: "_Node | None" = None) -> None:
+    def __init__(self, tag: str, attrs: dict[str, str], parent: _Node | None = None) -> None:
         self.tag = tag
         self.attrs = attrs
         self.text_parts: list[str] = []
@@ -80,7 +80,7 @@ class _Node:
     # Query helpers
     # ------------------------------------------------------------------
 
-    def find_all(self, tag: str) -> list["_Node"]:
+    def find_all(self, tag: str) -> list[_Node]:
         """Return all descendant nodes with the given tag (BFS)."""
         results: list[_Node] = []
         stack = list(self.children)
@@ -91,12 +91,12 @@ class _Node:
             stack = list(node.children) + stack
         return results
 
-    def find(self, tag: str) -> "_Node | None":
+    def find(self, tag: str) -> _Node | None:
         """Return the first descendant node with the given tag."""
         results = self.find_all(tag)
         return results[0] if results else None
 
-    def find_by_id(self, section_id: str) -> "_Node | None":
+    def find_by_id(self, section_id: str) -> _Node | None:
         """Return the first section/div with id == section_id."""
         stack = list(self.children)
         while stack:
@@ -106,7 +106,7 @@ class _Node:
             stack = list(node.children) + stack
         return None
 
-    def find_all_by_class(self, tag: str, css_class: str) -> list["_Node"]:
+    def find_all_by_class(self, tag: str, css_class: str) -> list[_Node]:
         """Return all nodes with the given tag and a class containing css_class."""
         results: list[_Node] = []
         stack = list(self.children)
