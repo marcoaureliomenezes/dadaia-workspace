@@ -592,3 +592,44 @@ def audit_blocked(
         pid=pid,
         reason=reason,
     )
+
+
+# ---------------------------------------------------------------------------
+# T-12 — Heartbeat renewal
+# ---------------------------------------------------------------------------
+
+
+def renew_heartbeat(
+    workspace_root: Path,
+    context: str,
+    release: str,
+    session_id: str,
+) -> bool:
+    """Atomically update the impl lock's last_seen_at to now.
+
+    Heartbeat renewal does NOT acquire Lock 1 — it is idempotent and the
+    stale window is acceptable vs. lock contention (SPEC T-12 §495-496).
+
+    Returns True if the lock file was found and updated, False if not found.
+    The lock's state stays HELD; ownership is not changed.  If the file
+    belongs to a different session_id we skip the update (return False) to
+    avoid inadvertently renewing a lock we do not own.
+    """
+    lock_path = _impl_lock_path(workspace_root, context, release)
+    if not lock_path.exists():
+        return False
+
+    try:
+        data = json.loads(lock_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return False
+
+    if data.get("session_id") != session_id:
+        return False
+
+    data["last_seen_at"] = _now_iso()
+
+    tmp = lock_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    os.replace(tmp, lock_path)
+    return True

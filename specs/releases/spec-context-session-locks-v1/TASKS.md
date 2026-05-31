@@ -160,7 +160,7 @@ delete). Error messages for STALE/blocked must include owner runtime, session ID
 **Done criterion:** AC-T12-1..7 all pass. Doctor LOCK-1..6 tests pass (AC-DOC-L1..12).
 R-10 closed (stale lock test demonstrates heartbeat expiry → STALE → reclaim cycle).
 
-[ ] T-12
+[x] T-12
 
 ---
 

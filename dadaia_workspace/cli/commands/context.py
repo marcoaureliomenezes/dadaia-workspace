@@ -37,6 +37,7 @@ from dadaia_workspace.features.spec_context.locking import (
     create_impl_lock,
     reclaim_impl_lock,
     release_impl_lock,
+    renew_heartbeat,
     workspace_lock,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService
@@ -486,6 +487,67 @@ def release_cmd() -> None:
             )
 
     console.print(f"[green]✓[/green] Session '[bold]{session_id}[/bold]' released")
+
+
+@app.command()
+def heartbeat() -> None:
+    """Renew the heartbeat for the current session's implementation lock.
+
+    Reads DADAIA_SESSION_ID from the environment. Intended as a fallback
+    for long-running read-only sessions where the post-tool hook (T-13) is
+    not firing (e.g. no write operations in progress).
+
+    Run: dadaia context heartbeat
+    """
+    session_id = os.environ.get("DADAIA_SESSION_ID")
+    if not session_id:
+        err_console.print(
+            "[red]Error:[/red] No active session. Set DADAIA_SESSION_ID first "
+            "(e.g. eval $(dadaia context bind ...))."
+        )
+        raise typer.Exit(1) from None
+
+    workspace_root = resolve_workspace_root()
+    sessions_dir = _sessions_dir(workspace_root)
+
+    # Load the session file to discover which context/release this session owns
+    session_data = _load_session(sessions_dir, session_id)
+    if session_data is None:
+        err_console.print(
+            f"[red]Error:[/red] Session '{session_id}' not found. "
+            "It may have already been released."
+        )
+        raise typer.Exit(1) from None
+
+    mode = session_data.get("mode", "")
+    if mode != "BOUND_IMPLEMENTATION":
+        err_console.print(
+            f"[yellow]Warning:[/yellow] Session '{session_id}' is not an IMPLEMENTATION session "
+            f"(mode={mode}). Heartbeat only applies to implementation locks."
+        )
+        raise typer.Exit(0) from None
+
+    ctx_name = session_data.get("context", "")
+    release = session_data.get("release", "")
+    if not ctx_name or not release:
+        err_console.print(
+            f"[red]Error:[/red] Session '{session_id}' is missing context or release fields."
+        )
+        raise typer.Exit(1) from None
+
+    renewed = renew_heartbeat(workspace_root, ctx_name, release, session_id)
+    if renewed:
+        now = _now_iso()
+        console.print(
+            f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
+            f"(context={ctx_name}, release={release}, last_seen_at={now})"
+        )
+    else:
+        err_console.print(
+            f"[red]Error:[/red] Could not renew heartbeat for session '{session_id}'. "
+            "The lock may not exist or belongs to a different session."
+        )
+        raise typer.Exit(1) from None
 
 
 @app.command()

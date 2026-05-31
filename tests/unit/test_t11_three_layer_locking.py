@@ -433,7 +433,7 @@ def test_ac_t11_8_per_context_lock_prevents_concurrent_clone_rmtree(tmp_path: Pa
             barrier.wait(timeout=5)
             with context_lock(ws, "my-repo"):
                 order.append("A-enter")
-                _time.sleep(0.01)
+                _time.sleep(0.01)  # allowed-sleep: widen critical section to expose a broken lock; serialization is asserted via lock, not timing
                 order.append("A-exit")
         except Exception as exc:
             errors.append(exc)
@@ -443,7 +443,7 @@ def test_ac_t11_8_per_context_lock_prevents_concurrent_clone_rmtree(tmp_path: Pa
             barrier.wait(timeout=5)
             with context_lock(ws, "my-repo"):
                 order.append("B-enter")
-                _time.sleep(0.01)
+                _time.sleep(0.01)  # allowed-sleep: widen critical section to expose a broken lock; serialization is asserted via lock, not timing
                 order.append("B-exit")
         except Exception as exc:
             errors.append(exc)
