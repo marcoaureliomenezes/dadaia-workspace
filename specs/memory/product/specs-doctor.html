@@ -32,22 +32,61 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>specs-doctor</h1>
-<p class="meta">CLI surface: <code>dadaia specs doctor [--specs-dir PATH] [--json]</code> · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">CLI surface: <code>dadaia specs doctor [--specs-dir PATH] [--json] [--fix]</code> · Closure: memory-structured-source-v1</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
-  <p>Valida 11 invariantes estruturais do diretório <code>specs/</code> sob o modelo SDD release-lifecycle: presença de <code>constitution.md</code>, memory HTML (com folder catalog em <code>product/</code>), <code>ACTIVE.md</code> bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory (sem changelog), links de imagem resolvendo, presença do script Mermaid quando há diagramas, e link integrity do <code>product/index.html</code> para suas feature HTMLs.</p>
-  <p>Exit code 1 se houver errors; 0 se só warnings ou tudo verde. Suporta <code>--json</code> para integração com CI/automação.</p>
+  <p>Valida invariantes estruturais do diretório <code>specs/</code> sob o modelo SDD release-lifecycle. Três grupos de checks:</p>
+  <ul>
+    <li><strong>SPEC-DOC-001..012</strong> (12 checks): presença de <code>constitution.md</code>, memory HTML com folder catalog em <code>product/</code>, <code>ACTIVE.md</code> bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory sem changelog, links de imagem resolvendo, presença do script Mermaid quando há diagramas, link integrity do <code>product/index.html</code> para suas feature HTMLs, e o invariante <strong>D-OC-1</strong> bidirectional orchestration registry consistency.</li>
+    <li><strong>TREE-1..7</strong> (7 checks): canonical <code>specs/</code> tree v2 shape.</li>
+    <li><strong>STRUCT-1..4, SYNC-1, YAML-absent guard</strong> (6 checks, added in memory-structured-source-v1): schema-based validation of YAML memory atoms and committed-HTML sync — see below.</li>
+  </ul>
+  <p>Exit code 1 se houver errors; 0 se só warnings ou tudo verde. Suporta <code>--json</code> para integração com CI/automação e <code>--fix</code> para auto-repair dos invariantes tratáveis.</p>
+
+  <h3>Invariantes STRUCT-1..4 + SYNC-1 + YAML-absent guard (memory-structured-source-v1)</h3>
+  <table>
+    <thead>
+      <tr><th>Código</th><th>O que detecta</th><th>Severity</th><th>Notas</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>STRUCT-1</td><td>YAML atom <code>specs/memory/architecture.yaml</code> falha schema validation</td><td>ERROR</td><td>Extra field (incl. <code>changelog</code>) ou campo obrigatório ausente</td></tr>
+      <tr><td>STRUCT-2</td><td>YAML atom <code>specs/memory/tech-stack.yaml</code> falha schema validation</td><td>ERROR</td><td>Idem</td></tr>
+      <tr><td>STRUCT-3</td><td>YAML atom <code>specs/memory/product/index.yaml</code> falha schema validation</td><td>ERROR</td><td>Idem; inclui <code>rank</code> e <code>keywords</code> como campos required por entry</td></tr>
+      <tr><td>STRUCT-4</td><td>Qualquer YAML atom em <code>specs/memory/product/&lt;slug&gt;.yaml</code> falha schema validation</td><td>ERROR</td><td>Os 6 campos required: <code>purpose</code>, <code>flow_steps</code>, <code>typical_trigger</code>, <code>differential</code>, <code>runtime_state</code>, <code>dependencies</code></td></tr>
+      <tr><td>SYNC-1</td><td>Committed HTML diverge do renderer output para um YAML atom válido</td><td>WARN</td><td>Indica que <code>dadaia memory render</code> não foi rodado após edição do YAML; nomeia o(s) atom(s) específico(s)</td></tr>
+      <tr><td>YAML-absent</td><td>Nenhum YAML source presente para um atom (atom ainda em HTML-source)</td><td>WARN</td><td>Mensagem inclui <code>dadaia migrate memory-yaml</code>; STRUCT e SYNC pulados; check #8 (changelog grep) continua ativo para esses atoms; <code>dadaia specs doctor</code> exits 0</td></tr>
+    </tbody>
+  </table>
+  <p>Quando YAML source existe e passa STRUCT validation, o check #8 (heurística grep-for-"Changelog" no HTML) é suprimido — o schema enforça atomicidade estruturalmente.</p>
+
+  <h3>Invariantes TREE-1..7 (canonical tree v2)</h3>
+  <table>
+    <thead>
+      <tr><th>Código</th><th>O que detecta</th><th>Severity</th><th><code>--fix</code> policy</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>TREE-1</td><td>Diretório <code>specs/foundation/</code> presente (depreciado)</td><td>WARN</td><td>warn-only; <strong>migration guard</strong> impresso independente de <code>--fix</code> — instrução: <code>dadaia migrate tree-v2</code></td></tr>
+      <tr><td>TREE-2</td><td>Arquivo <code>specs/SPEC.md</code> na raiz (pre-release-model)</td><td>WARN</td><td>warn-only; <strong>migration guard</strong> impresso — instrução: <code>dadaia migrate tree-v2</code></td></tr>
+      <tr><td>TREE-3</td><td><code>specs/memory/product/index.html</code> ausente</td><td>ERROR</td><td><strong>auto-fix</strong>: regenera <code>index.html</code> vazio do template canônico</td></tr>
+      <tr><td>TREE-4</td><td>Um ou mais de <code>specs/backlog/</code>, <code>specs/bugs/</code>, <code>specs/releases/</code> ausentes</td><td>ERROR</td><td><strong>auto-fix</strong>: recria diretório(s) ausente(s) com <code>.gitkeep</code></td></tr>
+      <tr><td>TREE-5</td><td><code>specs/AGENTS.md</code> ausente (drift em relação ao template canônico)</td><td>WARN</td><td>warn-only (sem auto-overwrite — arquivo pode ter customizações do consumer)</td></tr>
+      <tr><td>TREE-6</td><td>Diretório de release em <code>specs/releases/</code> sem pelo menos um artefato SDD obrigatório (<code>SPEC.md</code>)</td><td>ERROR</td><td>no-fix (decisão humana)</td></tr>
+      <tr><td>TREE-7</td><td>Arquivo de bug em <code>specs/bugs/</code> sem campo <code>session_id</code> no frontmatter</td><td>ERROR</td><td>no-fix (campo requer valor real)</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Migration guard (TREE-1/2):</strong> quando detectados, o doctor imprime a mensagem de migration guard independentemente do flag <code>--fix</code> — o auto-move de <code>foundation/</code> e root <code>SPEC.md</code> para <code>releases/legacy/</code> é feito exclusivamente por <code>dadaia migrate tree-v2</code>.</p>
 </section>
 
 <section id="flow">
   <h2>Fluxo de uso</h2>
   <ol class="flow">
-    <li><code>dadaia specs doctor</code> — resolve <code>specs_dir</code> via <code>primary_context.json</code> ou <code>--specs-dir</code>, roda os 11 checks em ordem, exibe issues formatados com código + severity + path.</li>
+    <li><code>dadaia specs doctor</code> — resolve <code>specs_dir</code> via <code>primary_context.json</code> ou <code>--specs-dir</code>, roda todos os checks em ordem (12 SPEC-DOC + 7 TREE + STRUCT/SYNC/YAML-absent para atoms com YAML source), exibe issues formatados com código + severity + path. Para atoms sem YAML source: emite YAML-absent WARN e continua — <code>dadaia specs doctor</code> exits 0.</li>
+    <li><code>dadaia specs doctor --fix</code> — executa os checks e auto-repara os invariantes com policy <code>auto-fix</code> (TREE-3, TREE-4); emite migration guard para TREE-1/2; deixa TREE-5..7 como warnings/errors sem alterar arquivos.</li>
     <li>Para automação: <code>dadaia specs doctor --json</code> emite payload <code>{specs_dir, issues[], summary{errors, warnings}}</code>.</li>
     <li>Em CI: usado como gate de PR para bloquear merge se houver erros estruturais nos specs.</li>
   </ol>
-  <p>Códigos de erro: <code>SPEC-DOC-001</code> a <code>SPEC-DOC-011</code> + sufixo <code>L</code> para legacy (markdown em memory, <code>product.html</code> top-level pre-folder-catalog).</p>
+  <p>Códigos de erro: <code>SPEC-DOC-001</code> a <code>SPEC-DOC-012</code> + <code>D-OC-1</code> (bidirectional orchestration registry consistency) + <code>TREE-1</code> a <code>TREE-7</code> (canonical tree v2 shape) + <code>STRUCT-1..4</code> / <code>SYNC-1</code> / <code>YAML-absent</code> (memory-structured-source-v1) + sufixo <code>L</code> para legacy (markdown em memory, <code>product.html</code> top-level pre-folder-catalog).</p>
 </section>
 
 <section id="trigger">
@@ -63,8 +102,8 @@
 <section id="runtime-state">
   <h2>Estado runtime tocado</h2>
   <ul>
-    <li>Read-only sobre todo <code>specs_dir</code>.</li>
-    <li>Sem efeitos colaterais — pure validation tool.</li>
+    <li>Read-only sobre todo <code>specs_dir</code> (modo padrão).</li>
+    <li><strong>Com <code>--fix</code>:</strong> escreve em <code>specs_dir</code> apenas para os invariantes com policy <code>auto-fix</code>: regenera <code>specs/memory/product/index.html</code> (TREE-3) e recria diretórios ausentes com <code>.gitkeep</code> (TREE-4). Todos os outros invariantes permanecem read-only mesmo com <code>--fix</code>.</li>
   </ul>
 </section>
 

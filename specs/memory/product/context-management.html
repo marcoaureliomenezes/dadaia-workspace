@@ -15,6 +15,9 @@
     section { margin-bottom: 2rem; }
     code, pre { background: #f0f0f0; padding: .1rem .3rem; border-radius: 3px; font-size: .9em; }
     pre { padding: .8rem 1rem; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { padding: .5rem .7rem; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #eee; }
     .mermaid { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
     .meta { color: #666; font-size: .9em; }
     nav.crumbs { font-size: .85em; color: #666; margin-bottom: .5rem; }
@@ -29,54 +32,122 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>context-management</h1>
-<p class="meta">CLI surface: <code>dadaia context {create|list|show|activate|deactivate|promote|delete|use}</code> · Closure: sdd-release-lifecycle-v1</p>
+<p class="meta">CLI surface: <code>dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}</code> · <code>dadaia migrate [--dry-run] [--yes]</code> · <code>dadaia {release|backlog|bug} new</code> · <code>dadaia memory product add</code> · <code>dadaia migrate tree-v2</code> · Closure: spec-context-session-locks-v1</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
-  <p>Gerencia múltiplos <strong>Spec Context Projects</strong> — cada um mapeia <code>nome → repo_slug → repo_url</code> e tem state machine (inativo ↔ ativo). Um context ativo é clonado em <code>repos/&lt;repo_slug&gt;/</code> e suporta promoção a <strong>primary</strong> (o context default usado por agentes e gates).</p>
-  <p>Permite ao operador trocar entre projetos/branches em paralelo sem criar múltiplos workspaces, e mantém um único primary explícito em <code>.dadaia/states/primary_context.json</code> que outras features (gate, orchestration, public install) leem para resolver caminhos.</p>
+  <p>Gerencia múltiplos <strong>Spec Context Projects</strong> — cada um mapeia <code>nome → repo_slug → repo_url</code> e tem state machine binária: <strong>ALIVE</strong> (repo clonado em <code>repos/&lt;repo_slug&gt;/</code>, disponível para implementação) ou <strong>DEAD</strong> (repo removido do disco, fora de uso). Não existe "global primary": o context ativo por sessão é estabelecido via <em>session binding</em> (<code>eval $(dadaia context bind ...)</code>), exportando <code>DADAIA_CONTEXT</code>, <code>DADAIA_SESSION_ID</code> e <code>DADAIA_MODE</code> no shell da sessão.</p>
+  <p>O modelo v2 (semver 2.0.0) elimina o conceito de <code>is_primary</code> e o arquivo <code>.dadaia/states/primary_context.json</code>. Cada sessão de agente declara seu contexto explicitamente. O gate <code>sdd-spec-gate.sh</code> valida a identidade da sessão e o ownership do implementation lock antes de permitir qualquer write em produção.</p>
+
+  <h3>State machine ALIVE/DEAD</h3>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> DEAD : context create
+    DEAD --> ALIVE : dadaia context alive (clona repo)
+    ALIVE --> DEAD : dadaia context dead (rmtree, se sem impl lock)
+    DEAD --> [*] : context delete
+  </pre>
+
+  <h3>Session binding e três camadas de locking</h3>
+  <p>Uma sessão de agente obtém identidade via:</p>
+  <pre><code>eval $(dadaia context bind &lt;name&gt; --mode implementation --release &lt;id&gt;)
+# → exporta DADAIA_CONTEXT, DADAIA_SESSION_ID (sess_&lt;uuid4&gt;), DADAIA_MODE=IMPLEMENTATION</code></pre>
+  <p>Três camadas de lock garantem operações concorrentes seguras:</p>
+  <table>
+    <thead><tr><th>Lock</th><th>Caminho</th><th>Impl</th><th>Escopo</th></tr></thead>
+    <tbody>
+      <tr><td>Lock 1 (workspace)</td><td><code>.dadaia/states/.ws_lock</code></td><td>fcntl LOCK_EX, 5 s timeout</td><td>Toda mutação em <code>spec_contexts.json</code> (<code>alive()</code>, <code>dead()</code>, <code>create()</code>, <code>delete()</code>, <code>DoctorService.fix()</code>, <code>context bind</code>, <code>context release</code>)</td></tr>
+      <tr><td>Lock 2 (per-context)</td><td><code>.dadaia/states/ctx_locks/&lt;slug&gt;.lock</code></td><td>fcntl LOCK_EX, 5 s timeout</td><td><code>git clone</code> e <code>shutil.rmtree</code> por context (fora do Lock 1; L1&gt;L2 é a única direção safe)</td></tr>
+      <tr><td>Lock 3 (per-release)</td><td><code>.dadaia/locks/implementation/&lt;ctx&gt;__&lt;release&gt;.json</code></td><td>JSON state machine (FREE → HELD → STALE → RECLAIMED)</td><td>Direito de BOUND_IMPLEMENTATION para um par context/release; heartbeat TTL 300 s; PID liveness fast-path</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Modos de sessão (--mode)</h3>
+  <table>
+    <thead><tr><th>Mode</th><th>Cria Lock 3?</th><th>Semântica</th></tr></thead>
+    <tbody>
+      <tr><td><code>read</code></td><td>Não</td><td>Sessão read-only; gate bloqueia todos os writes de produção, memory e releases.</td></tr>
+      <tr><td><code>spec</code></td><td>Não</td><td>Permite escrever em <code>specs/memory/**</code>; bloqueia produção e releases com impl lock ativo (R-9).</td></tr>
+      <tr><td><code>implementation</code></td><td>Sim (BOUND_IMPLEMENTATION)</td><td>Requer <code>--release &lt;id&gt;</code>; permite escrever em produção quando lock é próprio; resolve release ativa do lock file, não do ACTIVE.md.</td></tr>
+      <tr><td><code>review</code></td><td>Não (BOUND_REVIEW session file)</td><td>Sessão de revisão; pode escrever em <code>.dadaia/reports/**</code>; não pode escrever produção. Impl-XOR-Review: exclui-se mutuamente com BOUND_IMPLEMENTATION para o mesmo context/release.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Heartbeat e reclaim</h3>
+  <p>O hook PostToolUse <code>sdd-post-gate.sh</code> renova <code>last_seen_at</code> atomicamente a cada tool call da sessão. TTL default: 300 s. Lock com <code>last_seen_at</code> mais antigo que TTL → estado STALE. PID inativo → STALE imediato. Reclaim: <code>dadaia context bind --force --reason &lt;texto&gt;</code> (reason obrigatório; evento RECLAIMED gravado em <code>lock-events.jsonl</code>). <code>dadaia context heartbeat</code> renova manualmente para sessões read-only longas.</p>
+
+  <h3>Migração v1→v2 (<code>dadaia migrate</code>)</h3>
+  <p>Qualquer workspace v1 (<code>schema_version: "1"</code> ou <code>state: "ativo"</code>) é bloqueado com loud guard ao rodar qualquer comando <code>dadaia context</code>. Migração:</p>
+  <pre><code>dadaia migrate [--dry-run] [--yes]</code></pre>
+  <p>Ações: mapeamento de estados (<code>"ativo"</code>→<code>"alive"</code>, <code>"inativo"</code>→<code>"dead"</code>), renomeação de campos (<code>activated_at</code>→<code>alive_since</code>), remoção de <code>is_primary</code>, adição de <code>dead_since: null</code>, atualização de <code>schema_version</code> para <code>"2"</code>, deleção de <code>primary_context.json</code>, criação de <code>.dadaia/sessions/</code>, <code>.dadaia/locks/implementation/</code>, <code>.dadaia/states/ctx_locks/</code>. Idempotente em workspace v2.</p>
+
+  <h3>Canonical specs/ tree v2 (scaffold baseline pós spec-context-tree-v2)</h3>
+  <p>O scaffold de novo consumer repo (<code>dadaia init</code> + <code>dadaia context create</code>) entrega a árvore v2:</p>
+  <ul>
+    <li><code>specs/constitution.md</code> — leis absolutas do produto.</li>
+    <li><code>specs/memory/architecture.html</code> e <code>specs/memory/tech-stack.html</code> — memory HTML atômica (Markdown depreciado).</li>
+    <li><code>specs/memory/product/index.html</code> — entry point do catalog; <code>dadaia memory product add &lt;slug&gt;</code> cria feature HTML e regenera o index.</li>
+    <li><code>specs/backlog/</code>, <code>specs/bugs/</code>, <code>specs/releases/</code> — diretórios de lifecycle com <code>README.md</code> e <code>.gitkeep</code>.</li>
+    <li><code>specs/AGENTS.md</code> — contrato SDD do spec tree para o operador do consumer repo.</li>
+    <li><strong>Removidos do scaffold:</strong> <code>specs/foundation/</code> (depreciado) e <code>specs/SPEC.md</code> na raiz (pre-release-model).</li>
+  </ul>
+  <p>Doctor TREE-1..7 enforça e repara esta árvore: <code>dadaia specs doctor</code> em workspace recém-scaffoldado deve sair com 0 violations.</p>
+  <p><strong>CLIs de criação de artefatos SDD</strong> (evitam frontmatter manual):</p>
+  <ul>
+    <li><code>dadaia release new &lt;id&gt;</code> — cria <code>specs/releases/&lt;id&gt;/SPEC.md</code> stub com frontmatter canônico.</li>
+    <li><code>dadaia backlog new &lt;slug&gt;</code> — cria <code>specs/backlog/&lt;slug&gt;.md</code> stub.</li>
+    <li><code>dadaia bug new &lt;slug&gt;</code> — cria <code>specs/bugs/&lt;slug&gt;.md</code> com <code>session_id: null</code>.</li>
+    <li><code>dadaia memory product add &lt;slug&gt;</code> — cria feature HTML em <code>specs/memory/product/&lt;slug&gt;.html</code> e regenera <code>index.html</code> de forma idempotente.</li>
+  </ul>
+  <p><strong>Migration path para consumer repos existentes (tree layout):</strong> <code>dadaia migrate tree-v2</code> move <code>specs/foundation/</code> → <code>specs/releases/legacy/foundation/</code> e <code>specs/SPEC.md</code> → <code>specs/releases/legacy/SPEC.md</code> de forma atômica e idempotente.</p>
 </section>
 
 <section id="flow">
   <h2>Fluxo de uso</h2>
   <ol class="flow">
-    <li><code>dadaia context create my-feature --repo dadaia-workspace</code> — registra o context (inativo, sem clone).</li>
-    <li><code>dadaia context activate my-feature</code> — clona o repo em <code>repos/dadaia-workspace/</code>, faz checkout da branch, marca ativo e promove a primary se for o único ativo.</li>
-    <li><code>dadaia context list</code> — mostra todos com state, primary marker, repo slug.</li>
-    <li><code>dadaia context promote other-ctx</code> — move o primary status; dispara reinstall de public assets para alinhar projeções com o novo primary.</li>
-    <li><code>dadaia context deactivate</code> — git sync, remove o repo do disco, volta a inativo.</li>
-    <li><code>eval "$(dadaia context use my-feature)"</code> — seta apenas <code>DADAIA_CONTEXT</code> na shell corrente, sem mutar o estado global. Útil para sessões one-off.</li>
+    <li><code>dadaia context create my-project --repo dadaia-workspace</code> — registra o context (DEAD, sem clone).</li>
+    <li><code>dadaia context alive my-project</code> — clona o repo em <code>repos/dadaia-workspace/</code>, faz checkout da branch, marca ALIVE.</li>
+    <li><code>dadaia context list</code> — mostra todos com state (ALIVE/DEAD), repo slug, datas.</li>
+    <li><code>eval $(dadaia context bind my-project --mode implementation --release my-release-v1)</code> — cria sessão BOUND_IMPLEMENTATION; exporta <code>DADAIA_CONTEXT</code>, <code>DADAIA_SESSION_ID</code>, <code>DADAIA_MODE</code>; cria Lock 3 em <code>.dadaia/locks/implementation/</code>.</li>
+    <li><code>dadaia context release</code> — deleta o session file e o Lock 3; libera o pair context/release para outro agente.</li>
+    <li><code>dadaia context dead my-project</code> — remove o repo do disco (rmtree), marca DEAD. Bloqueado se Lock 3 HELD para o context.</li>
   </ol>
-  <p>O hook <code>.dadaia/scripts/ctx-inject.sh</code> (instalado por <code>workspace-init</code>) executa em cada UserPromptSubmit e injeta <code>DADAIA_CONTEXT</code> a partir de <code>primary_context.json</code> — assim agentes auto-descobrem o context sem flags explícitas.</p>
+  <p>O hook <code>.dadaia/scripts/ctx-inject.sh</code> (instalado por <code>workspace-init</code>) executa em cada UserPromptSubmit e injeta <code>DADAIA_CONTEXT</code> a partir do contexto ativo — em v2, a partir do binding de sessão exportado via <code>eval</code>, ou do último context ALIVE como fallback informativo.</p>
 </section>
 
 <section id="trigger">
   <h2>Trigger típico</h2>
-  <p>Quando o operador vai começar a trabalhar em um repositório novo, ou alternar entre projetos paralelos sem fechar o workspace.</p>
+  <p>Quando o operador vai começar a trabalhar em um repositório novo, ou quando um agente precisa adquirir o direito exclusivo de implementação em um release específico de um context ALIVE.</p>
 </section>
 
 <section id="differential">
   <h2>Diferencial</h2>
-  <p>Sem context management, agentes precisariam de paths absolutos hardcoded ou flags em cada comando. A state machine inativo/ativo + primary garante que o gate, orchestration e public install sempre conhecem inequivocamente onde está o "projeto atual". Promote dispara reinstall de assets, garantindo que <code>.claude/</code> reflete o context certo.</p>
+  <p>Sem context management v2, múltiplos agentes em paralelo podem editar a mesma release simultaneamente (R-8), um agente pode remover o repo enquanto outro tem fds abertos (R-4), ou duas sessões podem corromper <code>spec_contexts.json</code> por update perdido (R-1). O modelo ALIVE/DEAD + session binding + três camadas de locking fecha esse surface completamente sem depender de serialização de processo externo. A exclusão mútua Impl-XOR-Review habilita o fluxo de Review/Quality do Kanban com garantia de que um revisor nunca sobrescreve o que um implementador está produzindo.</p>
 </section>
 
 <section id="runtime-state">
   <h2>Estado runtime tocado</h2>
   <ul>
-    <li><code>.dadaia/states/spec_contexts.json</code> — registro de todos os contexts (state, primary flag, repo metadata)</li>
-    <li><code>.dadaia/states/primary_context.json</code> — qual é o primary corrente (<code>repo_slug</code> + <code>specs_dir</code>)</li>
-    <li><code>repos/&lt;repo_slug&gt;/</code> — repo clonado durante activate, removido em deactivate</li>
-    <li><code>.claude/</code> e outras projeções — reinstaladas em promote</li>
-    <li><code>DADAIA_CONTEXT</code> env var — exportada por <code>use</code> ou pelo hook</li>
+    <li><code>.dadaia/states/spec_contexts.json</code> — registro de todos os contexts (<code>schema_version: "2"</code>; state ALIVE/DEAD; <code>alive_since</code>; <code>dead_since</code>; sem <code>is_primary</code>)</li>
+    <li><code>.dadaia/states/.ws_lock</code> — fcntl workspace lock (gitignored; criado em runtime)</li>
+    <li><code>.dadaia/states/ctx_locks/&lt;slug&gt;.lock</code> — fcntl per-context lock (gitignored)</li>
+    <li><code>.dadaia/sessions/&lt;sess_*&gt;.json</code> — session files (criados por <code>context bind</code>; deletados por <code>context release</code>)</li>
+    <li><code>.dadaia/locks/implementation/&lt;ctx&gt;__&lt;release&gt;.json</code> — Lock 3 implementation lock (criado por bind IMPLEMENTATION; deletado por release)</li>
+    <li><code>.dadaia/logs/lock-events.jsonl</code> — audit log append-only (eventos: ACQUIRED, RELEASED, STALE_DETECTED, RECLAIMED, HEARTBEAT, BLOCKED_ATTEMPT)</li>
+    <li><code>repos/&lt;repo_slug&gt;/</code> — repo clonado durante <code>alive</code>, removido em <code>dead</code></li>
+    <li><code>DADAIA_CONTEXT</code>, <code>DADAIA_SESSION_ID</code>, <code>DADAIA_MODE</code> — env vars exportadas por <code>eval $(dadaia context bind ...)</code></li>
   </ul>
+  <p><strong>Removido em v2:</strong> <code>.dadaia/states/primary_context.json</code> (deletado por <code>dadaia migrate</code>; não recriado em nenhum code path v2).</p>
 </section>
 
 <section id="dependencies">
   <h2>Dependências</h2>
   <ul>
-    <li>Depende de <a href="workspace-init.html">workspace-init</a> (cria <code>spec_contexts.json</code> e o hook ctx-inject).</li>
-    <li>Activate/promote dispara <a href="public-asset-distribution.html">public-asset-distribution</a> internamente.</li>
-    <li><a href="agent-orchestration.html">agent-orchestration</a> e <a href="sdd-gate-v3.html">sdd-gate-v3</a> consomem o primary context para resolver paths.</li>
+    <li>Depende de <a href="workspace-init.html">workspace-init</a> (cria <code>spec_contexts.json</code> e o hook ctx-inject; garante que <code>.dadaia/sessions/</code>, <code>.dadaia/locks/</code>, <code>.dadaia/states/ctx_locks/</code> existam após <code>dadaia migrate</code>).</li>
+    <li><code>alive()</code> indiretamente usa git clone (infra); <code>dead()</code> usa rmtree.</li>
+    <li><a href="sdd-gate-v3.html">sdd-gate-v3</a> lê os session files e o Lock 3 para validar identidade + ownership por sessão.</li>
+    <li><a href="workspace-doctor.html">workspace-doctor</a> valida invariantes LOCK-1..6 sobre os lock files e session files.</li>
+    <li><a href="agent-orchestration.html">agent-orchestration</a> consome <code>DADAIA_CONTEXT</code> exportado por bind para resolver paths de specs.</li>
   </ul>
 </section>
 

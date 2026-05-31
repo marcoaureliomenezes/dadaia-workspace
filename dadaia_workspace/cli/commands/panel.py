@@ -120,7 +120,12 @@ def panel(
         typer.echo(f"Failed to initialise panel: {exc}", err=True)
         raise typer.Exit(1) from None
 
-    handler_cls = make_handler_class(views, token=token, telemetry=telemetry)
+    handler_cls = make_handler_class(
+        views,
+        token=token,
+        telemetry=telemetry,
+        loopback_bypass=(bind in _LOOPBACK_ONLY),
+    )
 
     try:
         server = build_panel_http_server(host=bind, port=port, handler_factory=handler_cls)

@@ -87,7 +87,7 @@ class ExportService:
 
     def _refresh_branches(self) -> None:
         for ctx in self._store.list_all():
-            if ctx.state != ContextState.ATIVO:
+            if ctx.state != ContextState.ALIVE:
                 continue
             repo_path = self._workspace_root / "repos" / ctx.repo_slug
             if not repo_path.exists():
@@ -99,9 +99,9 @@ class ExportService:
                     state=ctx.state,
                     repo_slug=ctx.repo_slug,
                     repo_url=ctx.repo_url,
-                    is_primary=ctx.is_primary,
                     created_at=ctx.created_at,
-                    activated_at=ctx.activated_at,
+                    alive_since=ctx.alive_since,
+                    dead_since=ctx.dead_since,
                     current_branch=branch,
                 )
                 self._store.update(updated)
@@ -116,7 +116,6 @@ class ExportService:
                 {
                     "name": ctx.name,
                     "repo_url": ctx.repo_url,
-                    "is_primary": ctx.is_primary,
                     "state": ctx.state,
                     "current_branch": ctx.current_branch,
                 }

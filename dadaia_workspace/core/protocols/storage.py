@@ -15,8 +15,13 @@ class PublicAssetManager(Protocol):
         target: str = "all",
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
+        only: str | None = None,
     ) -> list[str]:
         """Install staged public assets into runtime projections."""
+        ...
+
+    def list_all(self) -> dict[str, list[str]]:
+        """Return all public asset names grouped by category directory."""
         ...
 
     def doctor(self, workspace_root: Path) -> list[str]:

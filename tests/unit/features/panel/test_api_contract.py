@@ -78,16 +78,15 @@ def _make_context(
     slug: str = "my-project",
     name: str = "My Project",
     branch: str | None = "main",
-    is_primary: bool = False,
 ) -> SpecContextProject:
     return SpecContextProject(
         name=name,
-        state=ContextState.ATIVO,
+        state=ContextState.ALIVE,
         repo_slug=slug,
         repo_url="https://github.com/org/repo",
-        is_primary=is_primary,
         created_at="2026-01-01T00:00:00+00:00",
-        activated_at="2026-01-01T00:00:00+00:00",
+        alive_since="2026-01-01T00:00:00+00:00",
+        dead_since=None,
         current_branch=branch,
     )
 
@@ -193,7 +192,7 @@ def test_api_contexts_shape_contract() -> None:
 
     Asserts every required key exists with the correct type in the JSON response.
     """
-    ctx = _make_context(slug="dadaia-workspace", name="dadaia-workspace", is_primary=True)
+    ctx = _make_context(slug="dadaia-workspace", name="dadaia-workspace")
     service = _build_service(contexts=[ctx])
 
     view = render_api_contexts(service)
@@ -241,14 +240,14 @@ def test_api_contexts_content_type() -> None:
     assert content_type == "application/json; charset=utf-8"
 
 
-def test_api_contexts_is_primary_true() -> None:
-    """is_primary must be Python bool true for the primary context."""
-    ctx = _make_context(is_primary=True)
+def test_api_contexts_is_primary_false() -> None:
+    """is_primary is always False in v2 — PanelContext hardcodes False until R3 rework."""
+    ctx = _make_context()
     service = _build_service(contexts=[ctx])
     view = render_api_contexts(service)
     _, _, body = view()
     data = json.loads(body)
-    assert data["contexts"][0]["is_primary"] is True
+    assert data["contexts"][0]["is_primary"] is False
 
 
 def test_api_contexts_branch_none_serialised_as_null() -> None:

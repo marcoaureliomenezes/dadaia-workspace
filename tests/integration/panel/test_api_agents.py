@@ -35,12 +35,16 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     RecentSession,
     TokenTotals,
 )
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 # ---------------------------------------------------------------------------
-# Workspace root — the dadaia-workspace repo itself
+# Hermetic workspace_root
+#
+# These tests must NOT depend on a pre-existing on-disk .dadaia/agentic/ staging
+# dir (gitignored — absent on a clean checkout / CI). The `staged_root` fixture
+# stages the canonical, tracked public/ assets into a tmp workspace_root, so the
+# panel server reads a freshly-materialised agent + workflow catalog.
 # ---------------------------------------------------------------------------
-
-_WORKSPACE_ROOT = Path(__file__).parent.parent.parent.parent  # .../dadaia-workspace/
 
 
 # ---------------------------------------------------------------------------
@@ -93,9 +97,9 @@ def _make_agent_summary(
 class StubTelemetryService:
     """Returns a controlled AgentListResult with one active and one inactive agent.
 
-    The two summaries target the real agent IDs found in .dadaia/agentic/agents/:
-      - "software-engineer"  → recent activity (active)
-      - "qa-engineer"        → activity 400 days ago (inactive with default window)
+    The two summaries target real agent IDs present in the staged catalog:
+      - "software-engineer-python"  → recent activity (active)
+      - "qa-engineer"               → activity 400 days ago (inactive with default window)
     """
 
     def list_agents(
@@ -115,7 +119,7 @@ class StubTelemetryService:
             pricing_age_days=30,
             pricing_model_date="2026-04-01",
             agents=[
-                _make_agent_summary("software-engineer", active_ts),
+                _make_agent_summary("software-engineer-python", active_ts),
                 _make_agent_summary("qa-engineer", inactive_ts),
             ],
         )
@@ -147,7 +151,7 @@ class _StubSpecContextService:
 def _build_agents_server(
     token: str,
     stub_telemetry: StubTelemetryService,
-    workspace_root: Path = _WORKSPACE_ROOT,
+    workspace_root: Path,
 ) -> ThreadingHTTPServer:
     """Build a server wired with real PanelService pointing at real agent files."""
     panel_service = PanelService(
@@ -208,10 +212,23 @@ _TEST_TOKEN = "integration-test-token-pr3-20"
 
 
 @pytest.fixture(scope="module")
-def agents_server():
+def staged_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Stage canonical (tracked) public/ assets into a hermetic tmp workspace_root.
+
+    Independent of any pre-existing on-disk .dadaia/agentic/ staging (gitignored,
+    absent on a clean checkout). The stager materialises agents/ + workflows/ from
+    the package's own public/ dir.
+    """
+    root = tmp_path_factory.mktemp("panel-agents-ws")
+    FileSystemPublicAssetManager().stage(root)
+    return root
+
+
+@pytest.fixture(scope="module")
+def agents_server(staged_root: Path):
     """Real-file-backed panel server; yields (base_url, token, stub_telemetry)."""
     stub_tel = StubTelemetryService()
-    server = _build_agents_server(_TEST_TOKEN, stub_tel)
+    server = _build_agents_server(_TEST_TOKEN, stub_tel, staged_root)
     port = server.server_address[1]
     base_url = f"http://127.0.0.1:{port}"
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -253,8 +270,8 @@ class TestBearerEnforcement:
 class TestTelemetryOverlayMerge:
     """Telemetry data must be merged over canonical agents.
 
-    The stub returns data for "software-engineer" and "qa-engineer" which are
-    real agents in .dadaia/agentic/agents/. The overlay must inject their
+    The stub returns data for "software-engineer-python" and "qa-engineer" which
+    are real agents in the staged catalog. The overlay must inject their
     telemetry sub-objects.
     """
 
@@ -273,8 +290,8 @@ class TestTelemetryOverlayMerge:
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
         agent_ids = {a["agent_id"] for a in data["agents"]}
-        # The real workspace has software-engineer and qa-engineer
-        assert "software-engineer" in agent_ids
+        # The staged catalog has software-engineer-python and qa-engineer
+        assert "software-engineer-python" in agent_ids
         assert "qa-engineer" in agent_ids
 
     def test_telemetry_overlay_injected(self, agents_server: Any) -> None:
@@ -283,21 +300,21 @@ class TestTelemetryOverlayMerge:
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
         by_id = {a["agent_id"]: a for a in data["agents"]}
-        se = by_id.get("software-engineer")
+        se = by_id.get("software-engineer-python")
         assert se is not None
         assert "telemetry" in se
         assert se["telemetry"]["session_count"] == 5
 
-    def test_telemetry_only_agents_excluded(self, agents_server: Any) -> None:
+    def test_telemetry_only_agents_excluded(self, agents_server: Any, staged_root: Path) -> None:
         """Agents in telemetry but not in canonical catalog are excluded from response."""
         base, token, _ = agents_server
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
-        # The stub injects data for "software-engineer" and "qa-engineer" — only those
-        # present in the canonical files should appear. Agents only in telemetry are excluded.
+        # The stub injects data for "software-engineer-python" and "qa-engineer" — only
+        # those present in the canonical files should appear. Telemetry-only agents excluded.
         canonical_ids = {a["agent_id"] for a in data["agents"]}
-        # All returned agents must have a real on-disk file
-        agents_dir = _WORKSPACE_ROOT / ".dadaia" / "agentic" / "agents"
+        # All returned agents must have a real on-disk file in the staged catalog
+        agents_dir = staged_root / ".dadaia" / "agentic" / "agents"
         disk_ids = {p.stem for p in agents_dir.glob("*.md")}
         assert canonical_ids.issubset(disk_ids), (
             f"Response contains agents not on disk: {canonical_ids - disk_ids}"
@@ -309,7 +326,7 @@ class TestTelemetryOverlayMerge:
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
         by_id = {a["agent_id"]: a for a in data["agents"]}
-        se = by_id.get("software-engineer")
+        se = by_id.get("software-engineer-python")
         assert se is not None
         assert se["status"] == "active"
 
@@ -404,13 +421,13 @@ class TestAgentPromptTraversalDefence:
         assert data.get("error") == "invalid_agent_id"
 
     def test_prompt_valid_known_agent_200(self, agents_server: Any) -> None:
-        """GET /api/agents/software-engineer/prompt → 200 with system_prompt key."""
+        """GET /api/agents/software-engineer-python/prompt → 200 with system_prompt key."""
         base, token, _ = agents_server
-        status, _, body = _get(f"{base}/api/agents/software-engineer/prompt", token=token)
+        status, _, body = _get(f"{base}/api/agents/software-engineer-python/prompt", token=token)
         assert status == 200
         data = json.loads(body)
         assert "system_prompt" in data
-        assert data["agent_id"] == "software-engineer"
+        assert data["agent_id"] == "software-engineer-python"
 
     def test_prompt_unknown_agent_404(self, agents_server: Any) -> None:
         """GET /api/agents/does-not-exist/prompt → 404."""
@@ -419,7 +436,7 @@ class TestAgentPromptTraversalDefence:
         assert status == 404
 
     def test_prompt_401_without_token(self, agents_server: Any) -> None:
-        """GET /api/agents/software-engineer/prompt without token → 401."""
+        """GET /api/agents/software-engineer-python/prompt without token → 401."""
         base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents/software-engineer/prompt")
+        status, _, _ = _get(f"{base}/api/agents/software-engineer-python/prompt")
         assert status == 401

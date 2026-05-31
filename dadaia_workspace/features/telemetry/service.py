@@ -64,7 +64,7 @@ class TelemetryService:
     reader_factory:
         Callable returning a 2-tuple (claude_reader_module, codex_reader_module).
         Each module must expose its read function
-        (read_session_file, read_sessions respectively).
+        (read_session_file, read_codex_db respectively).
         Workflow ingestion is no longer performed here — workflows are read
         directly from the canonical store (PR3-18 cleanup).
     pricing_module:
@@ -285,7 +285,7 @@ class TelemetryService:
         codex_path_env = os.environ.get("DADAIA_CODEX_DB_PATH")
         codex_path = pathlib.Path(codex_path_env) if codex_path_env else _DEFAULT_CODEX_PATH
         try:
-            codex_reader.read_sessions(codex_path, dao, now_iso)
+            codex_reader.read_codex_db(codex_path, dao, now_iso)
         except Exception as exc:  # noqa: BLE001
             logger.warning("TelemetryService: codex reader error: %s", exc)
 

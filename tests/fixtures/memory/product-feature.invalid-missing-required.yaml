@@ -1,0 +1,18 @@
+# INVALID memory-product-feature-v1 fixture — missing required field 'purpose'
+# Schema validation MUST fail because 'purpose' is required (AC-C1-3).
+# This fixture tests the completeness enforcement path: missing section = schema error.
+flow_steps:
+  - "Operator runs dadaia init."
+  - "CLI creates .dadaia/ tree."
+
+typical_trigger: "First run on a new workspace."
+
+differential: "Makes the workspace reproducible from the first command."
+
+runtime_state:
+  - ".dadaia/states/spec_contexts.json"
+
+dependencies:
+  - "No feature precedes init."
+
+# NOTE: 'purpose' field is intentionally absent — validation must fail.

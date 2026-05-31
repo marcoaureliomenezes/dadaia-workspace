@@ -131,10 +131,11 @@ A file is approved **only** when its header contains exactly:
 
 Every workflow step starts from the content of `specs/releases/ACTIVE.md`.
 
-> **Delegation:** PE does not run shell commands. The project-manager reads
-> `specs/releases/ACTIVE.md` and passes its content in the dispatch briefing.
-> If the briefing is missing this, ask PM to re-run `cat specs/releases/ACTIVE.md`
-> and surface the result before proceeding.
+> **Note:** PE reads `specs/releases/ACTIVE.md` directly via the `Read` tool — no shell
+> required. When `release_id` is omitted from the dispatch briefing, PE reads the file
+> itself. PE does not run CLI commands (no `Bash` tool); for commands like
+> `dadaia public stage`, surface them to the operator or request PM to dispatch
+> `devops-engineer`.
 
 Expected format (two lines):
 ```
@@ -236,6 +237,25 @@ The panel UI labels the catalog of installed spec contexts as "Spec Context Proj
 (panel-r3-v1 rename). This is a UI label only. The canonical filesystem path
 `specs/memory/*.html` for *atomic product memory* is unchanged. Don't confuse the
 panel-tab terminology with the memory atom paths I write to during CLOSURE.
+
+## Step 0 — Memory bootstrap (mandatory, before any implementation)
+
+A lean memory bootstrap (tech-stack + feature catalog) is injected at session start via
+ctx-inject.sh — if present, it is already in your context. If not (Codex or standalone
+invocation), read specs/memory/tech-stack.html and specs/memory/product/catalog.json yourself
+(via the dadaia-workspace-spec-navigator skill). Then, in ALL cases, before starting work:
+
+  1. Read the feature catalog (specs/memory/product/catalog.json, or index.html if absent) and
+     identify the 1-3 features most relevant to your task.
+  2. Self-pull specs/memory/architecture.html — layer rules, dependency contracts, agent
+     topology. Architecture is NOT injected (it is large); ALWAYS pull it before any
+     architectural, cross-layer, or design decision.
+  3. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+
+Do NOT begin any implementation, review, or report until Step 0 is complete.
+This ensures you are working from the current product state, not from stale context.
+
+---
 
 ## Mandatory workflow — release lifecycle (5 phases I own)
 

@@ -1,8 +1,10 @@
-"""Unit tests for SpecContextService — Bug 3 (T-BCR-04).
+"""Unit tests for SpecContextService — Bug 3 (T-BCR-04), updated for T-10b.
 
 Bug 3: shutil.rmtree fails with PermissionError on root-owned files.
 Fix: detect non-writable files before rmtree and raise GitSyncError with
      a descriptive message suggesting 'sudo chown'.
+
+T-10b: activate()/deactivate() removed; alive()/dead() replace them.
 """
 
 import stat
@@ -62,24 +64,20 @@ def service(
 # ---------------------------------------------------------------------------
 
 
-def test_deactivate_raises_gitsyncerror_on_non_writable_files(
+def test_dead_raises_gitsyncerror_on_non_writable_files(
     service: SpecContextService,
     store: FakeContextStore,
     git: FakeGitClient,
     workspace_root: Path,
 ) -> None:
-    """When the repo directory contains non-writable files, deactivate must raise
+    """When the repo directory contains non-writable files, dead() must raise
     GitSyncError with an actionable message instead of allowing PermissionError
     to propagate unhandled.
-    """
-    # Bootstrap: create a second context so proj is not primary
-    (workspace_root / "repos" / "r2").mkdir(parents=True)
-    service.create("other", "r2", "https://github.com/org/r2")
-    service.activate("other")
 
+    Updated for T-10b: deactivate() → dead().
+    """
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
-    assert not service.show("proj").is_primary
+    service.alive("proj")
 
     repo = workspace_root / "repos" / "my-repo"
     assert repo.exists()
@@ -91,7 +89,7 @@ def test_deactivate_raises_gitsyncerror_on_non_writable_files(
 
     try:
         with pytest.raises(GitSyncError) as exc_info:
-            service.deactivate("proj")
+            service.dead("proj")
 
         msg = str(exc_info.value)
         assert "non-writable" in msg.lower() or "chown" in msg.lower(), (
@@ -103,25 +101,22 @@ def test_deactivate_raises_gitsyncerror_on_non_writable_files(
         locked_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
 
 
-def test_deactivate_succeeds_when_all_files_are_writable(
+def test_dead_succeeds_when_all_files_are_writable(
     service: SpecContextService,
     workspace_root: Path,
     git: FakeGitClient,
 ) -> None:
-    """Baseline: deactivate must still succeed (remove repo dir) when all files
+    """Baseline: dead() must still succeed (remove repo dir) when all files
     are writable — the permission check must not block normal operation.
-    """
-    (workspace_root / "repos" / "r2").mkdir(parents=True)
-    service.create("other", "r2", "https://github.com/org/r2")
-    service.activate("other")
 
+    Updated for T-10b: deactivate() → dead().
+    """
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.activate("proj")
-    assert not service.show("proj").is_primary
+    service.alive("proj")
 
     repo = workspace_root / "repos" / "my-repo"
     # Place a writable file — must not impede rmtree
     (repo / "writable.txt").write_text("data")
 
-    service.deactivate("proj")
+    service.dead("proj")
     assert not repo.exists()

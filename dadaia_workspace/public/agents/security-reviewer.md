@@ -11,6 +11,7 @@ tools:
   - Write
 skills:
   - dadaia-handoff-emitter
+  - dadaia-workspace-spec-navigator
 maxTurns: 40
 input_contract:
   requires_inputs:
@@ -76,10 +77,43 @@ You do NOT:
 
 ---
 
+## Built-in methodology
+
+OWASP 2025 category mapping, dependency-scan workflow, secrets-scan heuristics, IaC review
+checklist, STRIDE threat model, and severity matrix are embedded in this agent's training — no
+external skill file is required. Deep-knowledge references live under
+`docs/agent-knowledge/security-reviewer/` and are loaded on demand.
+
+**Dispatch condition:** Invoked by `project-manager` (as part of `code-review-fan-out` or
+`security-patch` workflow) or by `project-auditor` (security dimension in `audit-cycle`).
+
+**Escalation thresholds — stop and block immediately on:**
+- Hardcoded credential that appears live (non-example, non-test context)
+- CRITICAL finding in a production-facing, authenticated endpoint
+- Dependency CVE with CVSS ≥ 9.0 affecting a production dependency
+
 ## Skills consumed
 
-- `security-audit-protocol` — OWASP 2025 mapping; dep-scan workflow; secrets scan rules; IaC review checklist; STRIDE threat model template; severity matrix
 - `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after the security report
+
+---
+
+## Step 0 — Memory bootstrap (mandatory, before any implementation)
+
+A lean memory bootstrap (tech-stack + feature catalog) is injected at session start via
+ctx-inject.sh — if present, it is already in your context. If not (Codex or standalone
+invocation), read specs/memory/tech-stack.html and specs/memory/product/catalog.json yourself
+(via the dadaia-workspace-spec-navigator skill). Then, in ALL cases, before starting work:
+
+  1. Read the feature catalog (specs/memory/product/catalog.json, or index.html if absent) and
+     identify the 1-3 features most relevant to your task.
+  2. Self-pull specs/memory/architecture.html — layer rules, dependency contracts, agent
+     topology. Architecture is NOT injected (it is large); ALWAYS pull it before any
+     architectural, cross-layer, or design decision.
+  3. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+
+Do NOT begin any implementation, review, or report until Step 0 is complete.
+This ensures you are working from the current product state, not from stale context.
 
 ---
 

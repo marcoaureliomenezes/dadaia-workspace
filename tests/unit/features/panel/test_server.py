@@ -98,7 +98,7 @@ def test_server_shuts_down_within_2s_from_external_thread() -> None:
     serve_thread.start()
 
     # Give the server a moment to enter the serving loop.
-    time.sleep(0.05)
+    time.sleep(0.05)  # allowed-sleep: server-startup wait, not race synchronization
 
     # Simulate what serve_blocking's signal handler does: call shutdown()
     # from a daemon thread.
@@ -120,7 +120,7 @@ def test_server_port_is_free_after_shutdown() -> None:
 
     serve_thread = threading.Thread(target=server.serve_forever, daemon=True)
     serve_thread.start()
-    time.sleep(0.05)
+    time.sleep(0.05)  # allowed-sleep: server-startup wait, not race synchronization
 
     server.shutdown()
     serve_thread.join(timeout=2.0)

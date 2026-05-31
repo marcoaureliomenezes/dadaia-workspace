@@ -1,0 +1,22 @@
+# INVALID memory-product-feature-v1 fixture
+# Contains a 'changelog' key — structurally forbidden by additionalProperties:false (D-5).
+# Schema validation MUST fail on this fixture.
+purpose: "Entry point of the product."
+
+flow_steps:
+  - "Operator runs dadaia init."
+  - "CLI creates .dadaia/ tree."
+
+typical_trigger: "First run on a new workspace."
+
+differential: "Makes the workspace reproducible from the first command."
+
+runtime_state:
+  - ".dadaia/states/spec_contexts.json"
+
+dependencies:
+  - "No feature precedes init."
+
+# THIS FIELD IS FORBIDDEN — triggers additionalProperties:false rejection
+changelog:
+  - "2026-05-31: initial atom"

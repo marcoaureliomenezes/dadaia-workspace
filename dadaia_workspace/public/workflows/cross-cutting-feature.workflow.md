@@ -34,7 +34,7 @@ stages:
         as: feature_topic
 
   - id: discovery
-    agent: project-manager
+    agent: product-engineer
     needs: [research_evidence]
     consumes:
       - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"

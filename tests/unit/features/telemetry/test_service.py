@@ -61,7 +61,7 @@ class _FakeCodexReader:
     def __init__(self) -> None:
         self.call_count = 0
 
-    def read_sessions(self, path: Any, dao: Any, now_iso: str) -> None:
+    def read_codex_db(self, path: Any, dao: Any, now_iso: str) -> None:
         self.call_count += 1
 
 

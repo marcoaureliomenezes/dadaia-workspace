@@ -20,12 +20,19 @@ from dadaia_workspace.features.specs.scaffolder import (
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
-# Expected canonical outputs (relative to specs_dir)
+# Expected canonical outputs (relative to specs_dir).
+# Since T-MSS-06 (memory-structured-source-v1 C-5), scaffold emits YAML + HTML for each
+# structural atom instead of HTML-only.  placeholder.html is included so that the
+# index.yaml catalog entry does not produce a broken-link doctor error on fresh repos.
 _EXPECTED_FILES = [
     "constitution.md",
+    "memory/architecture.yaml",
     "memory/architecture.html",
+    "memory/tech-stack.yaml",
     "memory/tech-stack.html",
+    "memory/product/index.yaml",
     "memory/product/index.html",
+    "memory/product/placeholder.html",
     "releases/ACTIVE.md",
     "backlog/candidates.md",
     "backlog/ideas.md",
@@ -75,15 +82,28 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     assert "release: none" in active_content
     assert "phase: none" in active_content
 
-    # Verify project_name appears in rendered HTMLs
+    # Verify YAML stubs exist and contain YAML content (T-MSS-06: scaffold now emits YAML + HTML).
+    arch_yaml = (specs_dir / "memory" / "architecture.yaml").read_text(encoding="utf-8")
+    assert "overview:" in arch_yaml, "architecture.yaml must contain YAML 'overview' key"
+
+    tech_yaml = (specs_dir / "memory" / "tech-stack.yaml").read_text(encoding="utf-8")
+    assert "languages:" in tech_yaml, "tech-stack.yaml must contain YAML 'languages' key"
+
+    product_yaml = (specs_dir / "memory" / "product" / "index.yaml").read_text(encoding="utf-8")
+    assert "catalog:" in product_yaml, "product/index.yaml must contain YAML 'catalog' key"
+
+    # Verify rendered HTMLs contain expected section IDs (rendered from YAML via renderer).
     arch_html = (specs_dir / "memory" / "architecture.html").read_text(encoding="utf-8")
-    assert "my-project" in arch_html
+    assert '<section id="overview">' in arch_html
+    assert "<html" in arch_html
 
     tech_html = (specs_dir / "memory" / "tech-stack.html").read_text(encoding="utf-8")
-    assert "my-project" in tech_html
+    assert '<section id="languages">' in tech_html
+    assert "<html" in tech_html
 
     product_html = (specs_dir / "memory" / "product" / "index.html").read_text(encoding="utf-8")
-    assert "my-project" in product_html
+    assert '<section id="catalog">' in product_html
+    assert "<html" in product_html
 
 
 # ---- test 2: idempotency — second run produces all skipped
@@ -146,10 +166,12 @@ def test_scaffold_force_overwrites_files(tmp_path: Path) -> None:
     assert second.skipped == [], f"Force run should not skip: {second.skipped}"
     assert len(second.created) == len(_EXPECTED_FILES)
 
-    # Verify the mutated file was overwritten
+    # Verify the mutated file was overwritten with the canonical scaffold content.
+    # T-MSS-06: rendered HTML comes from YAML stub (no project_name injection);
+    # the canonical section IDs must be present and MUTATED content must be gone.
     new_content = arch_path.read_text(encoding="utf-8")
     assert "MUTATED" not in new_content
-    assert "new-name" in new_content
+    assert '<section id="overview">' in new_content
 
 
 # ---- test 4: scaffolded specs passes doctor with 0 errors

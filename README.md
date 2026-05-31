@@ -1,5 +1,8 @@
 # dadaia-workspace
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/dadaia-workspace)](https://pypi.org/project/dadaia-workspace/)
+
 **AI-native workspace management for multi-agent development.**
 
 `dadaia-workspace` gives AI agents (Claude Code, Codex, OpenCode) a structured shared workspace with managed contexts, agentic asset projection, a real-time monitoring panel, and Spec-Driven Development enforcement.

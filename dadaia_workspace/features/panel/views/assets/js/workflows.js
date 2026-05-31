@@ -152,6 +152,13 @@
       + ' aria-label="View DAG for ' + escAttr(displayName) + '">'
       + 'View DAG &#8594;'
       + '</button>'
+      + '<button type="button"'
+      + ' class="workflow-run-btn"'
+      + ' data-workflow-name="' + escAttr(name) + '"'
+      + ' aria-label="Run workflow ' + escAttr(displayName) + '">'
+      + '&#9654; Run'
+      + '</button>'
+      + '<span class="workflow-run-badge" id="run-badge-' + escAttr(name) + '" hidden></span>'
       + '</div>'
       + '</article>';
   }
@@ -411,6 +418,44 @@
     }
   }
 
+  // ── Run workflow ───────────────────────────────────────────────────────────────
+
+  function runWorkflow(workflowName, btn, badge) {
+    btn.disabled = true;
+    badge.hidden = false;
+    badge.className = 'workflow-run-badge';
+    badge.textContent = '…';
+
+    window.authedFetch('/api/workflows/' + encodeURIComponent(workflowName) + '/run', {
+      method: 'POST',
+    })
+      .then(function (r) {
+        if (r.status === 202) {
+          return r.json().then(function (data) {
+            badge.className = 'workflow-run-badge workflow-run-badge--started';
+            badge.textContent = 'Started (PID: ' + (data.pid || '?') + ')';
+            btn.disabled = false;
+          });
+        }
+        if (r.status === 409) {
+          badge.className = 'workflow-run-badge workflow-run-badge--running';
+          badge.textContent = 'Already running';
+          btn.disabled = false;
+          return null;
+        }
+        badge.className = 'workflow-run-badge workflow-run-badge--error';
+        badge.textContent = 'Failed (HTTP ' + r.status + ')';
+        btn.disabled = false;
+        return null;
+      })
+      .catch(function (err) {
+        badge.className = 'workflow-run-badge workflow-run-badge--error';
+        badge.textContent = 'Failed';
+        btn.disabled = false;
+        void err;
+      });
+  }
+
   // ── CTA button wiring (card grid) ─────────────────────────────────────────────
 
   function wireCTAButtons(grid) {
@@ -421,6 +466,17 @@
         if (!name) { return; }
         history.pushState(null, '', location.pathname + location.search + buildDetailHash(name));
         loadDetail(name);
+      });
+    });
+
+    grid.querySelectorAll('.workflow-run-btn[data-workflow-name]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var name = btn.getAttribute('data-workflow-name');
+        if (!name) { return; }
+        var badge = document.getElementById('run-badge-' + name);
+        if (!badge) { return; }
+        runWorkflow(name, btn, badge);
       });
     });
   }

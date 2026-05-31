@@ -3,7 +3,10 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import (
+    NoActiveReleaseError,
+    WorkspaceNotInitializedError,
+)
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
 from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
 from dadaia_workspace.features.academy.service import AcademyService
@@ -21,6 +24,7 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_session_detail,
     render_api_sessions,
     render_api_workflow_detail,
+    render_api_workflow_run,
     render_api_workflows_list,
     render_health,
     serve_report_file,
@@ -30,6 +34,7 @@ from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
+from dadaia_workspace.features.reports_next.service import ReportsNextService
 from dadaia_workspace.features.reports_validation.service import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
@@ -201,6 +206,43 @@ def build_reports_validation_service(workspace_root: Path) -> ReportsValidationS
     return ReportsValidationService(validator=validator, reports_root=reports_root)
 
 
+def build_reports_next_service(
+    workspace_root: Path, context: str | None = None
+) -> ReportsNextService:
+    """Compose ``ReportsNextService`` for the active (or explicitly named) context.
+
+    Context resolution (FR-RN-1): when *context* is given, specs live at
+    ``repos/<context>/specs``; otherwise the primary context's ``specs_dir`` and
+    ``repo_slug`` from ``primary_context.json`` are used. The reports tree is keyed by
+    the context's repo slug under ``<workspace>/.dadaia/reports``.
+
+    Args:
+        workspace_root: Root directory of the initialized dadaia workspace.
+        context: Optional explicit context name (overrides primary-context resolution).
+
+    Raises:
+        NoActiveReleaseError: No explicit context and no primary context is set.
+    """
+    _guard_initialized(workspace_root)
+    states = _states_dir(workspace_root)
+    reports_root = workspace_root / ".dadaia" / "reports"
+    if context:
+        specs_dir = workspace_root / "repos" / context / "specs"
+        context_name = context
+    else:
+        primary = JsonPrimaryContextStore(states).read()
+        if not primary:
+            raise NoActiveReleaseError(
+                "No primary context set. Run `dadaia context activate <name>` or pass "
+                "--context <name>."
+            )
+        context_name = primary["repo_slug"]
+        specs_dir = Path(primary["specs_dir"])
+    return ReportsNextService(
+        specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
+    )
+
+
 def build_panel_views(
     workspace_root: Path,
     telemetry: object | None = None,
@@ -236,6 +278,7 @@ def build_panel_views(
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
         "api_workflow_detail": render_api_workflow_detail(service._workflows_service),
+        "api_workflow_run": render_api_workflow_run(service),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),

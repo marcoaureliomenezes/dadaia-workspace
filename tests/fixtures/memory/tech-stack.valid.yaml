@@ -1,0 +1,65 @@
+# Valid memory-tech-stack-v1 fixture
+# All required fields present; no changelog/history/versions.
+languages:
+  - language: "Python"
+    version: "^3.12"
+    usage: "CLI, features, infrastructure, container, pytest tests."
+  - language: "Bash"
+    version: "4+ POSIX-compatible"
+    usage: "Hooks (sdd-spec-gate.sh, ctx-inject.sh), entry scripts."
+  - language: "Markdown"
+    version: "CommonMark"
+    usage: "SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions."
+
+runtimes:
+  - tool: "Poetry"
+    version: "core (build-backend)"
+    role: "Build, lock, virtualenv via .venv or poetry-managed env."
+  - tool: "pytest"
+    version: "^8"
+    role: "Test runner (unit/integration/e2e). Coverage gate 80%."
+  - tool: "ruff"
+    version: ">=0.15"
+    role: "Linter + formatter (line-length 100, target py312)."
+  - tool: "mypy"
+    version: "^1.10"
+    role: "Type checker (strict mode)."
+
+dependencies:
+  - dependency: "typer"
+    version: ">=0.25"
+    layer: "cli"
+    justification: "CLI framework with rich help, autocomplete, type inference."
+  - dependency: "pyyaml"
+    version: "^6.0"
+    layer: "features"
+    justification: "YAML parsing for memory atoms, agent frontmatter. yaml.safe_load enforced."
+  - dependency: "jinja2"
+    version: "^3.1"
+    layer: "features"
+    justification: "Template rendering for memory HTML atoms and scaffold files."
+  - dependency: "jsonschema"
+    version: "^4"
+    layer: "features"
+    justification: "JSON Schema (draft-07) validation of YAML memory atoms against memory-*-v1 schemas."
+
+constraints:
+  - "Never use yaml.load() — always yaml.safe_load() to prevent arbitrary object deserialisation."
+  - "No new PyPI dependencies without product-engineer approval. jsonschema is the only new dep in memory-structured-source-v1."
+  - "core/ must import stdlib only — no PyPI deps in that layer."
+
+canonical_commands: |
+  # Run tests
+  poetry run pytest -q
+
+  # Lint + format check
+  poetry run ruff check .
+
+  # Type check
+  poetry run mypy dadaia_workspace/
+
+  # Install deps after pyproject.toml change
+  poetry install
+
+  # CLI smoke test
+  poetry run dadaia --help

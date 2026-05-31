@@ -528,4 +528,54 @@ WORKFLOWS_CSS: str = """
   color: var(--color-muted, #666666);
   user-select: none;
 }
+
+/* ── Workflow Run button + status badges (T-WH-17) ─────────────────────── */
+.workflow-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--color-accent-dark, #2d7d9a);
+  border-radius: var(--radius, 4px);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-accent-dark, #2d7d9a);
+  font-size: 0.82rem;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.workflow-run-btn:hover {
+  background: var(--color-accent-dark, #2d7d9a);
+  color: #ffffff;
+}
+.workflow-run-btn:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
+.workflow-run-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.workflow-run-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius, 4px);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.workflow-run-badge--started {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.workflow-run-badge--running {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+}
+.workflow-run-badge--error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
 """

@@ -174,6 +174,32 @@ SESSIONS_CSS: str = """
   .sessions-table tbody tr.session-row { transition: none; }
 }
 
+/* ── Per-cell min-width (applied to both <th> and <td>) ───────────────
+   Under table-layout:fixed, min-width on <col> elements is ignored by
+   the layout algorithm (MDN). The only reliable approach is to set
+   min-width directly on each <th>/<td> pair via class selectors.
+   Total floor: 120+96+160+72+80+72+112+80 = 792px.
+   The container has overflow-x:auto so the table scrolls horizontally
+   below this threshold rather than collapsing. ──────────────────────── */
+.cell-session    { min-width: 120px; }
+.cell-project    { min-width:  96px; }
+.cell-model      { min-width: 160px; }
+.cell-turns      { min-width:  72px; }
+.cell-context    { min-width:  80px; }
+.cell-cost       { min-width:  72px; }
+.cell-last-activity { min-width: 112px; }
+.cell-status     { min-width:  80px; }
+
+/* ── Codex PROJECT placeholder ─────────────────────────────────────── */
+/* Rendered by JS in buildRowHtml() when runtime === 'codex' and
+   session.project is absent. The span provides a muted italic em-dash
+   instead of a blank cell so the column reads as intentionally empty.
+   Contrast: #666666 on #ffffff = 5.52:1 (WCAG 2.1 AA ≥ 4.5:1 pass). */
+.cell-placeholder {
+  color: var(--color-muted, #666666);
+  font-style: italic;
+}
+
 /* ── Session cell (truncated session_id + tooltip) ────────────────── */
 .cell-session {
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -423,5 +449,57 @@ SESSIONS_CSS: str = """
 .sessions-retry-btn:focus-visible {
   outline: 2px solid var(--color-accent-dark, #2d7d9a);
   outline-offset: 2px;
+}
+
+/* ── Sessions dashboard ─────────────────────────────────────────── */
+.sessions-dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+@media (max-width: 640px) {
+  .sessions-dashboard { grid-template-columns: repeat(2, 1fr); }
+}
+.sessions-stat-card {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius-card, 6px);
+  padding: 0.85rem 1rem;
+  overflow: hidden;
+}
+.sessions-stat-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, #666666);
+  margin-bottom: 0.3rem;
+  font-family: var(--font-stack, -apple-system, sans-serif);
+}
+.sessions-stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-heading, #111111);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sessions-stat-value--cost {
+  color: var(--color-cost, #633d2e);
+}
+.sessions-stat-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-muted, #666666);
+  margin-top: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-stack, -apple-system, sans-serif);
 }
 """

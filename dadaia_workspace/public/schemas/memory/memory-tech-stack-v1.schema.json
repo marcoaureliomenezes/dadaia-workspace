@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "memory-tech-stack-v1",
+  "title": "Memory Atom — Tech Stack (v1)",
+  "description": "Schema for specs/memory/tech-stack.yaml. Governs the tech-stack memory atom. additionalProperties:false enforces D-5 atomicity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "languages",
+    "runtimes",
+    "dependencies",
+    "constraints",
+    "canonical_commands"
+  ],
+  "properties": {
+    "languages": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Programming languages used. Each entry maps to one table row (3 cols). Template variable: languages_rows.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["language", "version", "usage"],
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "Language name (e.g. 'Python', 'Bash', 'TypeScript')."
+          },
+          "version": {
+            "type": "string",
+            "description": "Version constraint or value (e.g. '^3.12', '4+ POSIX-compatível')."
+          },
+          "usage": {
+            "type": "string",
+            "description": "Description of how and where this language is used."
+          }
+        }
+      }
+    },
+    "runtimes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Runtimes and tools. Each entry maps to one table row (3 cols). Template variable: runtimes_rows.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool", "version", "role"],
+        "properties": {
+          "tool": {
+            "type": "string",
+            "description": "Tool name (e.g. 'Poetry', 'pytest', 'ruff')."
+          },
+          "version": {
+            "type": "string",
+            "description": "Version constraint (e.g. '^8', '>=0.15')."
+          },
+          "role": {
+            "type": "string",
+            "description": "Role/function of this tool in the stack."
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Approved PyPI/external dependencies. Each entry maps to one table row (4 cols). Template variable: dependencies_rows.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["dependency", "version", "layer", "justification"],
+        "properties": {
+          "dependency": {
+            "type": "string",
+            "description": "Package or dependency name."
+          },
+          "version": {
+            "type": "string",
+            "description": "Version constraint."
+          },
+          "layer": {
+            "type": "string",
+            "description": "Architectural layer this dependency belongs to (e.g. 'features', 'infrastructure', 'dev')."
+          },
+          "justification": {
+            "type": "string",
+            "description": "Why this dependency is approved and what it does."
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Technology restrictions and prohibitions. Each entry maps to one <li> bullet. Template variable: constraints_bullets.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "canonical_commands": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical commands for running, testing, linting and packaging. Rendered as a <pre><code> block. Template variable: canonical_commands."
+    }
+  }
+}

@@ -31,13 +31,13 @@
 
   // ── Token bootstrap ───────────────────────────────────────────────
   // On first load the panel URL carries ?token=<value>.
-  // Persist it to sessionStorage so auth survives tab navigation,
+  // Persist it to localStorage so auth survives tab close/reopen,
   // then strip from the URL bar so it is not accidentally shared.
   (function bootstrapToken() {
     var params = new URLSearchParams(location.search);
     var urlToken = params.get('token');
     if (urlToken) {
-      sessionStorage.setItem('panel_token', urlToken);
+      localStorage.setItem('panel_token', urlToken);
       params.delete('token');
       var newSearch = params.toString();
       var newUrl = location.pathname + (newSearch ? '?' + newSearch : '') + location.hash;
@@ -50,7 +50,7 @@
   // If the token is absent the call is still made so callers see the 401.
   function authedFetch(url, opts) {
     opts = opts || {};
-    var token = sessionStorage.getItem('panel_token') || '';
+    var token = localStorage.getItem('panel_token') || '';
     var headers = opts.headers ? Object.assign({}, opts.headers) : {};
     if (token) {
       headers['Authorization'] = 'Bearer ' + token;

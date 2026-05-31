@@ -130,9 +130,13 @@ class FakePublicAssetManager:
         target: str = "all",
         force: bool = False,
         scope: str = "all",
+        only: str | None = None,
     ) -> list[str]:
         self.installed.append((workspace_root, target, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
+
+    def list_all(self) -> dict[str, list[str]]:
+        return {"agents": ["fake-agent"], "skills": ["fake-skill"]}
 
     def doctor(self, workspace_root: Path) -> list[str]:
         self.doctored.append(workspace_root)

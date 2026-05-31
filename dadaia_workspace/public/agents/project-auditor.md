@@ -15,6 +15,7 @@ skills:
   - drift-detection
   - project-orchestration
   - dadaia-handoff-emitter
+  - dadaia-workspace-spec-navigator
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -92,11 +93,32 @@ Scope defaults to all three unless `audit_scope` input restricts it.
 
 ## Skills consumed
 
-- `architect-code-audit` — code structure inspection heuristics
 - `dadaia-workspace-spec-reviewer` — memory vs implementation diff protocol
 - `drift-detection` — memory-to-code diff algorithm; dead-code detection; 1–10 scoring rubric; dadaia CLI commands
 - `project-orchestration` — agent inventory; dispatch protocol; escalation ladder
 - `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after audit report
+
+Code structure inspection heuristics (layering rules, module boundary analysis) are embedded
+in this agent's training — no external skill file is required.
+
+---
+
+## Step 0 — Memory bootstrap (mandatory, before any implementation)
+
+A lean memory bootstrap (tech-stack + feature catalog) is injected at session start via
+ctx-inject.sh — if present, it is already in your context. If not (Codex or standalone
+invocation), read specs/memory/tech-stack.html and specs/memory/product/catalog.json yourself
+(via the dadaia-workspace-spec-navigator skill). Then, in ALL cases, before starting work:
+
+  1. Read the feature catalog (specs/memory/product/catalog.json, or index.html if absent) and
+     identify the 1-3 features most relevant to your task.
+  2. Self-pull specs/memory/architecture.html — layer rules, dependency contracts, agent
+     topology. Architecture is NOT injected (it is large); ALWAYS pull it before any
+     architectural, cross-layer, or design decision.
+  3. Self-pull specs/memory/product/<slug>.html for each relevant feature.
+
+Do NOT begin any implementation, review, or report until Step 0 is complete.
+This ensures you are working from the current product state, not from stale context.
 
 ---
 

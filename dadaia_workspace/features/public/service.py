@@ -19,8 +19,14 @@ class PublicAssetService:
         target: str = "all",
         force: bool = False,
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
+        only: str | None = None,
     ) -> list[str]:
-        return self._public_assets.install(workspace_root, target=target, force=force, scope=scope)
+        return self._public_assets.install(
+            workspace_root, target=target, force=force, scope=scope, only=only
+        )
+
+    def list_all(self) -> dict[str, list[str]]:
+        return self._public_assets.list_all()
 
     def doctor(self, workspace_root: Path) -> list[str]:
         return self._public_assets.doctor(workspace_root)

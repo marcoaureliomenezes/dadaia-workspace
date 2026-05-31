@@ -51,6 +51,21 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     )
 
 
+def _resolve_public_dir(specs_dir: Path) -> Path | None:
+    """Try to locate ``dadaia_workspace/public/`` relative to the specs directory.
+
+    The conventional layout is:
+    ``<repo-root>/specs/`` alongside ``<repo-root>/dadaia_workspace/public/``.
+
+    Walk up from ``specs_dir`` until we find a sibling ``dadaia_workspace/public/``
+    directory.  Returns ``None`` when not found (D-OC-1 check will be skipped).
+    """
+    candidate = specs_dir.parent / "dadaia_workspace" / "public"
+    if candidate.is_dir():
+        return candidate
+    return None
+
+
 @app.command("doctor")
 def doctor(
     specs_dir: str | None = typer.Option(
@@ -61,11 +76,49 @@ def doctor(
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON instead of human output."
     ),
+    public_dir: str | None = typer.Option(
+        None,
+        "--public-dir",
+        help=(
+            "Path to dadaia_workspace/public/. "
+            "Enables D-OC-1 orchestration-registry check. "
+            "Default: auto-detected from specs_dir/../dadaia_workspace/public/."
+        ),
+    ),
+    fix: bool = typer.Option(
+        False,
+        "--fix",
+        help=(
+            "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
+            "TREE-4: create missing dirs with README + .gitkeep). "
+            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never auto-fixed. "
+            "After fixing, re-checks and reports residual issues."
+        ),
+    ),
 ) -> None:
     """Run structural checks on the SDD specs tree."""
     target = _resolve_specs_dir(specs_dir)
-    doctor_svc = SpecsDoctor(target)
+    if public_dir is not None:
+        resolved_public: Path | None = Path(public_dir).resolve()
+    else:
+        resolved_public = _resolve_public_dir(target)
+    doctor_svc = SpecsDoctor(target, public_dir=resolved_public, templates_dir=_TEMPLATES_DIR)
     issues = doctor_svc.check()
+
+    # Always surface TREE-1/TREE-2 migration hints (even under --fix).
+    migration_issues = [i for i in issues if i.code in ("TREE-1", "TREE-2")]
+    if migration_issues:
+        for mi in migration_issues:
+            typer.echo(f"[MIGRATION] {mi.description}", err=True)
+
+    if fix:
+        fixed = doctor_svc.fix(issues)
+        if fixed:
+            typer.echo(f"[fix] Applied {len(fixed)} auto-fix(es):")
+            for f_issue in fixed:
+                typer.echo(f"  [fixed] {f_issue.code}: {f_issue.path}")
+        # Re-check after fixes to get residual state.
+        issues = doctor_svc.check()
 
     if json_output:
         payload = {

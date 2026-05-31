@@ -32,11 +32,11 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>agent-comms — Handoff Contract v1</h1>
-<p class="meta">CLI surface: <code>dadaia reports validate [PATHS...] [--all] [--release &lt;id&gt;] [--strict|--no-strict] [--json]</code> · Closure: agent-comms-v1 · 2026-05-17</p>
+<p class="meta">CLI surface: <code>dadaia reports validate [PATHS...] [--all] [--release &lt;id&gt;] [--strict|--no-strict] [--json]</code> · <code>dadaia reports lint [DIR]</code> · <code>dadaia reports next [--context &lt;ctx&gt;] [--json]</code></p>
 
 <section id="purpose">
   <h2>O que é</h2>
-  <p>O <strong>handoff-v1</strong> é o contrato JSON estruturado que cada agente especialista emite junto aos seus reports HTML em <code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/</code>: um sidecar <code>&lt;stem&gt;.handoff.json</code> com schema fixo (agent, context, schema_version, produced_at, artifact{type,path,content_hash}) + campos opcionais (release_id, findings, decisions_required, next_handoff). Materializa o referente simbólico <code>schema_ref: handoff-schema-v1</code> que 10 agentes declaravam (82 ocorrências canônicas + projetadas) mas que nunca existia em disco antes desta release.</p>
+  <p>O <strong>handoff-v1</strong> é o contrato JSON estruturado que cada agente especialista emite junto aos seus reports HTML em <code>.dadaia/reports/&lt;context&gt;/&lt;agent&gt;/</code>: um sidecar <code>&lt;stem&gt;.handoff.json</code> com schema fixo (agent, context, schema_version, produced_at, artifact{type,path,content_hash}) + campos opcionais (release_id, findings, decisions_required, next_handoff). Materializa o referente simbólico <code>schema_ref: handoff-schema-v1</code> declarado pelos 21 agentes da topologia; o schema vive em disco (<code>public/schemas/</code> → staging) e é consumido por CLI + skill.</p>
   <p>Resolve o pattern "build-on-stale-layer" identificado na auditoria de orquestração: <code>input_contract</code> era declarado como verificável, mas o referente apontava para vácuo. Após esta release, qualquer report HTML pode ser auditado mecanicamente via <code>dadaia reports validate &lt;path&gt;</code> — sem dependências externas além da stdlib.</p>
   <p>O contrato é <strong>aditivo</strong>: HTML reports existentes em <code>.dadaia/reports/</code> permanecem válidos; <code>OrchestrationService</code> continua passando <code>output_path</code> entre stages como string. A introdução do sidecar é puramente opt-in via skill <code>dadaia-handoff-emitter</code>.</p>
 </section>
@@ -58,7 +58,7 @@
   <ul>
     <li><strong>Validator stdlib-only</strong> (~85 LoC em <code>infrastructure/stdlib_handoff_validator.py</code>): <code>json</code>, <code>re</code>, <code>datetime.fromisoformat</code>. Whitelist explícita de keywords (<code>type</code>, <code>required</code>, <code>enum</code>, <code>pattern</code>, <code>properties</code>, <code>items</code>, <code>additionalProperties</code>, <code>format</code>, <code>minimum</code>, <code>minItems</code>). Schema com keyword fora do whitelist (<code>oneOf</code>, <code>allOf</code>, <code>$ref</code>) levanta <code>HandoffSchemaError</code> no init.</li>
     <li><strong>Exit codes:</strong> <code>0</code> = todos válidos (ou violations em non-strict); <code>1</code> = violation em strict; <code>2</code> = file not found; <code>3</code> = bad invocation (sem PATHS nem <code>--all</code>, ou workspace não inicializado).</li>
-    <li><strong>Default <code>--strict=false</code></strong> (NFR2): reports sem sidecar emitem warning, não erro. Em v2 o default vira <code>true</code> e CI bloqueia (deferido até 100% adoption dos 10 agentes — backlog <code>reports-ci-gate</code>).</li>
+    <li><strong>Default <code>--strict=false</code></strong> (NFR2): reports sem sidecar emitem warning, não erro. Em v2 o default vira <code>true</code> e CI bloqueia; com adoção completa (21 agentes) o pré-requisito da candidata <code>reports-ci-gate</code> está satisfeito.</li>
     <li><strong>Composição (constitution L67-compliant):</strong> <code>cli/commands/reports.py</code> resolve <code>ReportsValidationService</code> via <code>container.build_reports_validation_service(workspace_root)</code>; <code>service.py</code> não importa <code>StdlibHandoffValidator</code> direto — recebe via <code>ValidatorPort</code> Protocol em <code>core/protocols/handoff_validator.py</code>.</li>
     <li><strong>Coverage:</strong> 98% scoped em <code>features/reports_validation</code> (NFR8 ≥ 80% honrado com folga).</li>
   </ul>
@@ -76,14 +76,8 @@
 </section>
 
 <section id="pilots">
-  <h2>Agentes piloto (3 de 10)</h2>
-  <p>Três agentes recebem handoff-emitter em v1 — dual ownership conforme ADR-006 (SE owns YAML frontmatter <code>skills:</code> list, PE owns markdown body com instrução de invocação):</p>
-  <ul>
-    <li><code>dadaia_workspace/public/agents/product-engineer.md</code></li>
-    <li><code>dadaia_workspace/public/agents/software-architect.md</code></li>
-    <li><code>dadaia_workspace/public/agents/software-engineer.md</code></li>
-  </ul>
-  <p>Os outros 7 agentes (<code>qa-engineer</code>, <code>devops-engineer</code>, <code>backend-engineer</code>, <code>frontend-engineer</code>, <code>game-developer</code>, <code>game-designer</code>, <code>game-tester</code>) migram em waves 2–7 separadas — tracked como candidatas <code>agent-comms-wave-2</code> e <code>agent-comms-wave-3-7</code> no backlog. NFR2 (<code>--strict=false</code> default) + NFR4 (sem CI gate em v1) garantem que a janela de transição não bloqueia agentes não-piloto.</p>
+  <h2>Adoção (21 de 21 agentes)</h2>
+  <p>Todos os 21 agentes da topologia declaram <code>dadaia-handoff-emitter</code> na lista <code>skills:</code> do frontmatter e a invocam no corpo (seção "Report emission (sidecar-first)") — dual ownership conforme ADR-006 (frontmatter <code>skills:</code> + body com instrução de invocação). A adoção é total: a migração por waves foi encerrada com os 6 últimos agentes (<code>qa-engineer</code>, <code>devops-engineer</code>, <code>backend-engineer</code>, <code>game-designer</code>, <code>game-developer</code>, <code>game-tester</code>).</p>
   <pre class="mermaid">
 flowchart LR
     AG[Agente piloto] -->|gera| HTML[report HTML]

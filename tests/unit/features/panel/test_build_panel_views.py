@@ -34,12 +34,12 @@ class FakeSpecContextService:
         return [
             SpecContextProject(
                 name="dadaia-workspace",
-                state=ContextState.ATIVO,
+                state=ContextState.ALIVE,
                 repo_slug="dadaia-workspace",
                 repo_url="https://github.com/org/dadaia-workspace",
-                is_primary=True,
                 created_at="2026-01-01T00:00:00+00:00",
-                activated_at="2026-01-01T00:00:00+00:00",
+                alive_since="2026-01-01T00:00:00+00:00",
+                dead_since=None,
                 current_branch="main",
             )
         ]
