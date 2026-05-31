@@ -8,6 +8,17 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    # Optional: supply sidecar paths when invoking from a CLOSURE workflow.
+    # Leave blank on regular manual runs — the gate auto-discovers or no-ops.
+    inputs:
+      qa_sidecar:
+        description: "Path to qa-engineer handoff sidecar (*.handoff.json). Optional."
+        required: false
+        default: ""
+      security_sidecar:
+        description: "Path to security-reviewer handoff sidecar (*.handoff.json). Optional."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -165,3 +176,27 @@ jobs:
             echo "::error::Examples rejected: hotfix/v1.0 (no patch), hotfix/v1.0.0 (patch=0 reserved for feature releases), hotfix/v1.0.0-beta (pre-release tag)"
             exit 1
           fi
+
+  # ---------------------------------------------------------------------------
+  # Dual-approval verdict gate (panel-kanban-v1 §3 K-3 / §9)
+  # ---------------------------------------------------------------------------
+  # Behaviour:
+  #   - Normal CI runs (push / PR): .dadaia/reports/ is gitignored, no sidecars
+  #     are present in the checkout → check-verdict.sh exits 0 (no-op).
+  #   - Release CLOSURE: operator triggers `workflow_dispatch` supplying
+  #     qa_sidecar and security_sidecar inputs, OR places handoff sidecar files
+  #     inside the checkout (e.g. via upload-artifact / download-artifact in a
+  #     wrapping workflow). The script then asserts both verdicts == "APPROVED".
+  #   - ubuntu-latest ships with jq preinstalled; no extra setup needed.
+  verdict-gate:
+    name: Dual-approval verdict gate (qa + security)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - name: Check qa-engineer + security-reviewer verdicts
+        env:
+          # Passed via workflow_dispatch inputs; empty on push/PR runs.
+          QA_SIDECAR: ${{ github.event.inputs.qa_sidecar || '' }}
+          SECURITY_SIDECAR: ${{ github.event.inputs.security_sidecar || '' }}
+        run: bash scripts/check-verdict.sh

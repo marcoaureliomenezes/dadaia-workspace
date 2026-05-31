@@ -23,6 +23,7 @@ from pathlib import Path
 
 from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
 from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.kanban import KANBAN_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory import MEMORY_CSS
 from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.reports import REPORTS_CSS
@@ -59,6 +60,7 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
     "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
     "reports.css": ("text/css; charset=utf-8", REPORTS_CSS.encode("utf-8")),
+    "kanban.css": ("text/css; charset=utf-8", KANBAN_CSS.encode("utf-8")),
     "core.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "core.js").read_bytes(),
@@ -95,6 +97,10 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "reports.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "reports.js").read_bytes(),
+    ),
+    "kanban.js": (
+        "application/javascript; charset=utf-8",
+        (_JS_DIR / "kanban.js").read_bytes(),
     ),
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",

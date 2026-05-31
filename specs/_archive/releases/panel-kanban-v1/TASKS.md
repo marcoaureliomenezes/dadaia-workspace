@@ -66,7 +66,7 @@ All of the following AC-IDs pass in `poetry run pytest`:
 - AC-1.13 `loopback_bypass=False`, no token → 401.
 - AC-1.14 `loopback_bypass=True` → 200 without Authorization header.
 
-[ ] K-1
+[x] K-1
 
 ---
 
@@ -134,7 +134,7 @@ All of the following AC-IDs pass:
 - AC-2.5 (PW-KAN-05) One stale session → card has `data-stale="true"`.
 Tokens added to `tokens.py`; WCAG AA ratios match SPEC §3 K-2 audit table.
 
-[ ] K-2
+[x] K-2
 
 ---
 
@@ -174,7 +174,7 @@ Tokens added to `tokens.py`; WCAG AA ratios match SPEC §3 K-2 audit table.
   `verdict: "APPROVED"`.
 - `dadaia public doctor` exits 0 after propagation (devops-engineer confirms).
 
-[ ] K-3
+[x] K-3
 
 ---
 
@@ -216,7 +216,7 @@ exists); activation gate satisfied
 - No `time.sleep` without `# allowed-sleep` comment.
 - Tests run with `pytest --randomly-seed=last` (order-independent).
 
-[ ] K-QA-RACE
+[x] K-QA-RACE
 
 ---
 
@@ -250,7 +250,7 @@ exists); activation gate satisfied
 - Screenshots present in `.dadaia/tmp/qa-engineer/panel-kanban-v1/`.
 - QA handoff sidecar emitted with `verdict: "APPROVED"`.
 
-[ ] K-QA-PW
+[x] K-QA-PW
 
 ---
 
@@ -282,7 +282,7 @@ exists); activation gate satisfied
 - CI run green with a `verdict: "APPROVED"` sidecar present (evidence: CI run URL or
   stdout snippet).
 
-[ ] K-CI
+[x] K-CI
 
 ---
 
