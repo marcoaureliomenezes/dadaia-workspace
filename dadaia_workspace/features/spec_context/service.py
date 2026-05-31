@@ -99,8 +99,12 @@ class SpecContextService:
         Idempotent: calling alive() on an already-ALIVE context is a no-op (no error).
         Sets alive_since=now, clears dead_since=None.
 
-        Lock 1 wraps the JSON load→mutate→dump.
-        Lock 2 wraps the git clone (outside Lock 1, inside Lock 2).
+        Lock 2 (context_lock) wraps ALL per-repo filesystem operations: git clone,
+        branch checkout, branch read, scaffold copytree/mkdir, and AGENTS.md copy.
+        Lock 2 is released BEFORE Lock 1 is acquired — never held simultaneously
+        (no AB-BA deadlock possible with doctor.fix() which nests L2 inside L1).
+
+        Lock 1 (workspace_lock) wraps only the JSON load→mutate→dump.
         """
         # Pre-flight read (no lock) to get repo_slug for Lock 2 acquisition
         ctx = self._store.get(name)
@@ -112,46 +116,52 @@ class SpecContextService:
             return ctx
 
         repo_slug = ctx.repo_slug
-
-        # Clone (Lock 2) happens OUTSIDE Lock 1 to minimise lock hold time
         repo_path = self._repo_path(repo_slug)
-        if not repo_path.exists():
-            with context_lock(self._workspace_root, repo_slug):
-                # Re-check after acquiring the per-context lock (another thread may
-                # have cloned between our read and lock acquisition).
-                if not repo_path.exists():
-                    self._git.clone(ctx.repo_url, repo_path)
 
-        # Checkout target branch if stored in context
-        if ctx.current_branch:
+        # Lock 2: serialize ALL per-repo filesystem ops for this slug.
+        # Released before Lock 1 is requested — no simultaneous L1+L2 hold here.
+        actual_branch: str | None = None
+        with context_lock(self._workspace_root, repo_slug):
+            # Re-read ctx inside Lock 2 so we use the freshest repo_url / current_branch.
+            ctx_l2 = self._store.get(name)
+            if ctx_l2 is None:
+                raise ContextNotFoundError(f"Context '{name}' not found.")
+
+            # Clone if repo absent
+            if not repo_path.exists():
+                self._git.clone(ctx_l2.repo_url, repo_path)
+
+            # Checkout target branch if stored in context
+            if ctx_l2.current_branch:
+                try:
+                    self._git.checkout(repo_path, ctx_l2.current_branch)
+                except Exception as exc:
+                    print(
+                        f"WARNING: could not checkout branch {ctx_l2.current_branch!r}: {exc}",
+                        file=sys.stderr,
+                    )
+
+            # Read actual branch from disk
             try:
-                self._git.checkout(repo_path, ctx.current_branch)
-            except Exception as exc:
-                print(
-                    f"WARNING: could not checkout branch {ctx.current_branch!r}: {exc}",
-                    file=sys.stderr,
-                )
+                actual_branch = self._git.current_branch(repo_path)
+            except Exception:
+                actual_branch = None
 
-        # Read actual branch from disk
-        try:
-            actual_branch: str | None = self._git.current_branch(repo_path)
-        except Exception:
-            actual_branch = None
+            # Scaffold specs/ if absent
+            specs_dir = self._specs_dir(repo_slug)
+            if not specs_dir.exists():
+                if _SCAFFOLD_SRC.exists():
+                    shutil.copytree(_SCAFFOLD_SRC, specs_dir)
+                else:
+                    for subdir in ("", "memory", "features"):
+                        (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
 
-        # Scaffold specs/ if absent
-        specs_dir = self._specs_dir(repo_slug)
-        if not specs_dir.exists():
-            if _SCAFFOLD_SRC.exists():
-                shutil.copytree(_SCAFFOLD_SRC, specs_dir)
-            else:
-                for subdir in ("", "memory", "features"):
-                    (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
-
-        # Copy repo-AGENTS.md template if not already present
-        repo_agents_dst = repo_path / "AGENTS.md"
-        repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
-        if not repo_agents_dst.exists() and repo_agents_src.exists():
-            shutil.copy2(repo_agents_src, repo_agents_dst)
+            # Copy repo-AGENTS.md template if not already present
+            repo_agents_dst = repo_path / "AGENTS.md"
+            repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
+            if not repo_agents_dst.exists() and repo_agents_src.exists():
+                shutil.copy2(repo_agents_src, repo_agents_dst)
+        # Lock 2 released here — before acquiring Lock 1.
 
         # Lock 1: load → mutate → dump
         with workspace_lock(self._workspace_root):

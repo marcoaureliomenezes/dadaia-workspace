@@ -17,6 +17,7 @@ from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     _append_audit_event,
     _audit_log_path,
     check_lock_state,
+    context_lock,
     workspace_lock,
 )
 
@@ -322,11 +323,17 @@ class DoctorService:
 
         NO-FIX invariants (LOCK-4, LOCK-5) are only reported in check().
 
-        Lock 1 wraps the spec_contexts.json load (to confirm state) and the
-        rmtree + update sequence so concurrent alive() calls cannot race with fix().
-        Per SPEC T-11: the JSON write is inside Lock 1; rmtree is also inside Lock 1
-        for the doctor fix path (doctor fixes are infrequent; we accept the slightly
-        wider lock window for correctness).
+        Lock ordering (ADR D-4 / T-11):
+          Lock 1 (workspace_lock) wraps the spec_contexts.json load and all JSON
+          mutations so concurrent alive()/dead() JSON writes are serialised.
+          Lock 2 (context_lock per slug) is nested INSIDE Lock 1 for the rmtree
+          step.  alive()/dead() always RELEASE Lock 2 before requesting Lock 1,
+          so the only nesting direction that exists is fix()'s L1→L2 — there is
+          no AB-BA cycle and therefore no deadlock.
+          Before calling rmtree, fix() re-confirms the context is still DEAD
+          (alive() could have won the race and transitioned it to ALIVE while
+          fix() was waiting for Lock 1).  If the context is now ALIVE, the
+          rmtree is skipped.
         """
         actions: list[str] = []
 
@@ -334,12 +341,26 @@ class DoctorService:
             all_contexts = self._store.list_all()
             dead_names = {ctx.name for ctx in all_contexts if ctx.state == ContextState.DEAD}
 
-            # INV-5: remove stale repos for DEAD contexts
+            # INV-5: remove stale repos for DEAD contexts.
+            # Acquire Lock 2 per slug so alive()'s filesystem ops (which hold
+            # Lock 2 while they run) cannot race with this rmtree.
             for ctx in all_contexts:
                 if ctx.state == ContextState.DEAD:
                     repo_path = self._repos_dir() / ctx.repo_slug
                     if repo_path.exists():
-                        shutil.rmtree(repo_path)
+                        with context_lock(self._workspace_root, ctx.repo_slug):
+                            # Re-confirm still DEAD after acquiring Lock 2.
+                            # alive() may have completed its FS work and is now
+                            # waiting for Lock 1 (which we hold).  The JSON has
+                            # not been updated yet (alive() updates JSON under
+                            # Lock 1), so we must check via the store — which
+                            # reads from disk and will still show DEAD at this
+                            # point.  Safe to rmtree only if still DEAD.
+                            ctx_recheck = self._store.get(ctx.name)
+                            if ctx_recheck is None or ctx_recheck.state != ContextState.DEAD:
+                                # Context transitioned — skip rmtree.
+                                continue
+                            shutil.rmtree(repo_path)
                         actions.append(
                             f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'"
                         )
