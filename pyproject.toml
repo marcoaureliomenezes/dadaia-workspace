@@ -33,6 +33,7 @@ rich = "^13"
 openpyxl = "^3.1"
 pyyaml = "^6.0"
 jinja2 = "^3.1"
+jsonschema = "^4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8"

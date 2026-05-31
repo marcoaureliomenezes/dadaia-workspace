@@ -1,0 +1,24 @@
+# INVALID memory-architecture-v1 fixture
+# Contains a 'changelog' key — structurally forbidden by additionalProperties:false (D-5).
+# Schema validation MUST fail on this fixture.
+overview: "Three-ring architecture."
+
+layers:
+  - name: "cli/"
+    description: "CLI commands."
+
+dependency_rules_diagram: "flowchart TB\n  cli --> features"
+data_flow_diagram: "flowchart LR\n  A --> B"
+
+contracts:
+  - from: "cli/"
+    to: "features/"
+    contract_type: "Service factory"
+    notes: "Standard DI."
+
+runtime_state:
+  - ".dadaia/states/spec_contexts.json"
+
+# THIS FIELD IS FORBIDDEN — triggers additionalProperties:false rejection
+changelog:
+  - "2026-05-31: initial atom"

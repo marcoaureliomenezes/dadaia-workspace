@@ -1,0 +1,52 @@
+# Valid memory-product-feature-v1 fixture
+# All 6 required fields present (AC-C1-3): purpose, flow_steps, typical_trigger,
+# differential, runtime_state, dependencies. No changelog/history/versions.
+feature_name: "workspace-init"
+feature_subtitle: "CLI surface: dadaia init [--workspace PATH] [--skip-assets]"
+
+purpose: |
+  Entry point of the product. Bootstraps a new workspace by creating the idempotent
+  structure under .dadaia/ (academy, agentic, reports, scripts, states, src), the Python
+  virtualenv (.venv), the runtime directories for four agentic tools (.claude/, .agents/,
+  .codex/, .opencode/), stages + installs canonical public assets, and configures the
+  UserPromptSubmit hook in .claude/settings.json.
+
+  This is the only feature that can run in a zero-state workspace — without it, no other
+  feature has anywhere to write state.
+
+flow_steps:
+  - "Operator runs dadaia init (auto-detects workspace root by walking up from cwd)."
+  - "CLI creates the idempotent tree under .dadaia/ and tools runtime dirs."
+  - "PythonEnvironmentManager provisions the .venv Python environment."
+  - "Runs public stage and public install automatically (unless --skip-assets)."
+  - "Installs repos.xlsx catalog in .dadaia/src/ and the ctx-inject.sh script."
+  - "Registers the hook entry in .claude/settings.json."
+
+diagram: |
+  flowchart LR
+    A[dadaia init] --> B[create .dadaia/ tree]
+    B --> C[provision .venv]
+    C --> D[public stage + install]
+    D --> E[configure hooks]
+
+typical_trigger: >-
+  First run on a new workspace, or after cloning a repository that does not yet have
+  a local .dadaia/ directory.
+
+differential: >-
+  Makes the workspace reproducible from the first command — agents and operator discover
+  and use distributed assets (skills, workflows, agents) without manual configuration on
+  each new machine. Without init, each workspace would start from scratch or require
+  manual copy-paste of configs.
+
+runtime_state:
+  - ".dadaia/states/spec_contexts.json — contexts list (empty until first creation)"
+  - ".dadaia/academy/academy.json — courses list (empty)"
+  - ".dadaia/src/repos.xlsx — static catalog of known repos"
+  - ".dadaia/scripts/ctx-inject.sh — context injection bash hook"
+  - ".venv/ — Python virtualenv"
+  - ".claude/settings.json — UserPromptSubmit hook entry"
+
+dependencies:
+  - "No feature precedes init — it is the first thing that runs in a zero-state workspace."
+  - "Init internally triggers public-asset-distribution (stage + install) to populate tools runtime dirs."

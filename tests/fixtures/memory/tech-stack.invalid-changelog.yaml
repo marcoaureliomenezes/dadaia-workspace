@@ -1,0 +1,27 @@
+# INVALID memory-tech-stack-v1 fixture
+# Contains a 'history' key — structurally forbidden by additionalProperties:false (D-5).
+# Schema validation MUST fail on this fixture.
+languages:
+  - language: "Python"
+    version: "^3.12"
+    usage: "CLI and features."
+
+runtimes:
+  - tool: "Poetry"
+    version: "core"
+    role: "Build and lock."
+
+dependencies:
+  - dependency: "pyyaml"
+    version: "^6.0"
+    layer: "features"
+    justification: "YAML parsing."
+
+constraints:
+  - "Never use yaml.load()."
+
+canonical_commands: "poetry run pytest -q"
+
+# THIS FIELD IS FORBIDDEN — triggers additionalProperties:false rejection
+history:
+  - "2026-05-31: initial"

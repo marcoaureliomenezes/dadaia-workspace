@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "memory-product-index-v1",
+  "title": "Memory Atom — Product Index (v1)",
+  "description": "Schema for specs/memory/product/index.yaml. Governs the product index (feature catalog) memory atom. additionalProperties:false enforces D-5 atomicity. catalog entries carry rank (integer) and keywords (array of strings) per AC-C1-4 — these are what Phase-1 catalog.json consumes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "vision_oneliner",
+    "vision_paragraph",
+    "users",
+    "catalog",
+    "capability_map_diagram",
+    "non_goals"
+  ],
+  "properties": {
+    "vision_oneliner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-liner product vision (bold statement). Template variable: product_vision_oneliner."
+    },
+    "vision_paragraph": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Paragraph-length product vision elaboration. Template variable: product_vision_paragraph."
+    },
+    "users": {
+      "type": "array",
+      "minItems": 1,
+      "description": "User types and personas. Each entry maps to one <li> bullet. Template variable: users_bullets.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "User type or persona name (e.g. 'Operador (humano único)', 'Tier 1 — orquestradores')."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of this user type and their interaction with the product."
+          }
+        }
+      }
+    },
+    "catalog": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Feature catalog entries. Order reflects daily relevance (rank 1 = most used). Each entry maps to one <li> in the ordered catalog list. Template variable: catalog_items. rank and keywords are required per AC-C1-4 for Phase-1 catalog.json consumption.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slug", "title", "summary", "rank", "keywords"],
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Feature slug used as HTML filename (e.g. 'workspace-init'). Links to <slug>.html."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable feature title (may equal slug or be more descriptive)."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Short description of the feature as it appears in the catalog list."
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Daily-relevance rank (1 = most used). Consumed by Phase-1 catalog.json generator."
+          },
+          "keywords": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Machine-readable keywords for search/injection. Consumed by Phase-1 catalog.json generator.",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "capability_map_diagram": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Mermaid diagram source for the capability map. Template variable: capability_map_mermaid."
+    },
+    "non_goals": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Explicit non-goals / known limits of the product. Each entry maps to one <li> bullet. Template variable: explicit_non_goals.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "screenshots": {
+      "type": "array",
+      "description": "Optional visual evidence items. Template variable: screenshots_html.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["src", "alt"],
+        "properties": {
+          "src": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

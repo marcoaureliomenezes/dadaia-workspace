@@ -1,0 +1,25 @@
+# INVALID memory-product-index-v1 fixture
+# Contains a 'versions' key — structurally forbidden by additionalProperties:false (D-5).
+# Schema validation MUST fail on this fixture.
+vision_oneliner: "dadaia-workspace manages the operator's workspace."
+vision_paragraph: "Single paragraph vision."
+
+users:
+  - name: "Operador"
+    description: "Human operator."
+
+catalog:
+  - slug: "workspace-init"
+    title: "workspace-init"
+    summary: "Entry point."
+    rank: 1
+    keywords: ["init"]
+
+capability_map_diagram: "flowchart TB\n  CLI --> CTX"
+
+non_goals:
+  - "No graphical UI."
+
+# THIS FIELD IS FORBIDDEN — triggers additionalProperties:false rejection
+versions:
+  - "v1: initial"
