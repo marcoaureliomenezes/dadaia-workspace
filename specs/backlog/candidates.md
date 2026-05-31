@@ -17,6 +17,7 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 
 ## Candidatas ativas
 
+- r2-lock-toctou-hardening-v1 — três defects pré-existentes na camada de locking de `spec-context-session-locks-v1` (R2) surfaçados por K-QA-RACE: (a) STALE impl lock não bloqueia review bind, (b) `check_impl_xor_review` TOCTOU race window, (c) `create_impl_lock` shared `.tmp` name levanta `FileNotFoundError` em vez de `LockHeldError` em race same-release; proposta: workspace-flock wrapping do XOR check-then-act + per-thread `.tmp` names em `dadaia_workspace/features/spec_context/locking.py`. (owner: software-engineer-python, contexto: `specs/backlog/r2-lock-toctou-hardening-v1.md`)
 - memory-structured-source-migration-v2 — enriquece os schemas v1 para representação lossless dos atoms ricos (diagram arrays, extensible sections, raw-HTML escape hatch), upgrade do renderer/extractor e gate de fidelidade FIDELITY-1 (owner: software-engineer-python, contexto: specs/_archive/releases/memory-structured-source-v1/CLOSURE.md)
 - agents-md-hierarchical-v1 — ⚠️ **Revisão necessária antes de promover:** Codex hierarchical AGENTS.md rendering (múltiplos `AGENTS.md` em sub-dirs com herança), G4 deferido de `multi-platform-parity-v1` (ADR-MP-4 + ADR-ARCH-4). `codex-agent-orchestration-parity-v1` estabeleceu abordagem TOML (`.codex/agents/*.toml`) para personas Codex — avaliar se hierarchical AGENTS.md ainda faz sentido ou é obsoleto dado o TOML approach. (owner: product-engineer, contexto: `_archive/releases/multi-platform-parity-v1/CLOSURE.md § Backlog returns`)
 - reports-mcp-server — MCP integration (v3): emissão programática de handoff via servidor MCP em vez de skill markdown. (owner: software-architect, contexto: SPEC `agent-comms-v1` § Out-of-scope)
@@ -38,6 +39,7 @@ sinaliza que vale a pena considerar para a próxima rodada de planning.
 
 ## Histórico (candidatas promovidas a release ou resolvidas)
 
+- panel-kanban-v1 → release `panel-kanban-v1` (promovido 2026-05-30; Kanban tab read-only sobre session files R2 + handoff-v1.1 verdict field + CI dual-approval gate; CLOSED 2026-05-31)
 - memory-context-enforcement-v1 → release `memory-context-enforcement-v1` (promovido 2026-05-30; Phase 1 da initiative de memória; CLOSED 2026-05-31; lean 5K-token injection + catalog.json + Step-0 em 21 personas)
 - memory-structured-source-v1 → release `memory-structured-source-v1` (promovido 2026-05-30; Phase 2 da initiative de memória; CLOSED 2026-05-31; 4 schemas + renderer + doctor STRUCT/SYNC + gate RULE A + scaffold YAML; C-6 deferred → memory-structured-source-migration-v2)
 - data-pipeline-cycle-workflow-v1 → **RESOLVIDA** como PM Playbook em orchestration-consolidation-v1 (2026-05-29)
