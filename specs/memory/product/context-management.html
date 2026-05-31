@@ -32,7 +32,7 @@
 <nav class="crumbs"><a href="index.html">← Voltar ao catálogo</a></nav>
 
 <h1>context-management</h1>
-<p class="meta">CLI surface: <code>dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}</code> · <code>dadaia migrate [--dry-run] [--yes]</code> · <code>dadaia {release|backlog|bug} new</code> · <code>dadaia memory product add</code> · <code>dadaia migrate tree-v2</code> · Closure: spec-context-session-locks-v1</p>
+<p class="meta">CLI surface: <code>dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}</code> · <code>dadaia migrate [--dry-run] [--yes]</code> · <code>dadaia {release|backlog|bug} new</code> · <code>dadaia memory product add</code> · <code>dadaia migrate tree-v2</code> · Closure: r2-lock-toctou-hardening-v1</p>
 
 <section id="purpose">
   <h2>Propósito</h2>
@@ -69,7 +69,7 @@ stateDiagram-v2
       <tr><td><code>read</code></td><td>Não</td><td>Sessão read-only; gate bloqueia todos os writes de produção, memory e releases.</td></tr>
       <tr><td><code>spec</code></td><td>Não</td><td>Permite escrever em <code>specs/memory/**</code>; bloqueia produção e releases com impl lock ativo (R-9).</td></tr>
       <tr><td><code>implementation</code></td><td>Sim (BOUND_IMPLEMENTATION)</td><td>Requer <code>--release &lt;id&gt;</code>; permite escrever em produção quando lock é próprio; resolve release ativa do lock file, não do ACTIVE.md.</td></tr>
-      <tr><td><code>review</code></td><td>Não (BOUND_REVIEW session file)</td><td>Sessão de revisão; pode escrever em <code>.dadaia/reports/**</code>; não pode escrever produção. Impl-XOR-Review: exclui-se mutuamente com BOUND_IMPLEMENTATION para o mesmo context/release.</td></tr>
+      <tr><td><code>review</code></td><td>Não (BOUND_REVIEW session file)</td><td>Sessão de revisão; pode escrever em <code>.dadaia/reports/**</code>; não pode escrever produção. Impl-XOR-Review: exclui-se mutuamente com BOUND_IMPLEMENTATION para o mesmo context/release. Um impl lock <strong>STALE</strong> (heartbeat expirado ou PID morto) bloqueia o review bind da mesma forma que HELD — o operador deve reclamar ou liberar o lock antes que a revisão prossiga (<code>dadaia context bind --force --reason ...</code> ou <code>dadaia context release</code> na sessão original). O check-then-act em <code>bind()</code> é atômico sob o workspace fcntl lock para ambos os caminhos IMPLEMENTATION (non-force) e REVIEW.</td></tr>
     </tbody>
   </table>
 
