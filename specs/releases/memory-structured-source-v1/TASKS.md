@@ -129,7 +129,7 @@
   message in doctor (T-MSS-04a) includes `dadaia migrate memory-yaml`; second run on same
   atom is a no-op with warning (idempotent guard).
 - **Parallelism:** disjoint from T-MSS-03, T-MSS-04a, T-MSS-05, T-MSS-06.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ---
 
@@ -235,7 +235,7 @@
 | T-MSS-04b | se-python | C-3 SYNC-1 | W2 cont | `[x]` |
 | T-MSS-05 | ai-engineer | C-4 | W2 | `[x]` |
 | T-MSS-06 | ai-engineer + sw-arch | C-5 | W2 | `[ ]` |
-| T-MSS-07 | se-python | C-7 | W2 | `[ ]` |
+| T-MSS-07 | se-python | C-7 | W2 | `[x]` |
 | T-MSS-08 | devops-engineer | propagation | W3 | `[ ]` |
 | T-MSS-09 | qa-engineer | acceptance | W3 | `[ ]` |
 | T-MSS-10 | product-engineer | C-6 | CLOSURE | `[ ]` |
