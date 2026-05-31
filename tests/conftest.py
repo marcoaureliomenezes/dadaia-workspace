@@ -58,6 +58,30 @@ def _collect_entries(root: Path, rel_dirs: tuple[str, ...]) -> frozenset[str]:
 
 
 @pytest.fixture(autouse=True)
+def _no_real_venv_in_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disk guard: never build a real Python venv during the test suite.
+
+    `WorkspaceService.init()` calls `VenvPythonEnvironmentManager.ensure_workspace_venv`,
+    which runs `venv.create(..., with_pip=True)` — a ~30-50 MB venv + ensurepip PER call.
+    ~20 integration/e2e `workspace` fixtures call `.init()`, so each full-suite run built
+    hundreds of venvs into `tmp_path`; with pytest retaining the last runs, this filled the
+    disk (ENOSPC) and made the suite take 15-24 min. No test asserts venv contents or execs
+    the venv python, so we replace the builder with a no-op that just materialises the
+    directory and returns its path (matching FakePythonEnvironmentManager's behaviour).
+    """
+    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+    def _fake_ensure(self: object, workspace_root: str) -> str:  # noqa: ANN001
+        venv_dir = Path(workspace_root) / ".dadaia" / ".venv"
+        venv_dir.mkdir(parents=True, exist_ok=True)
+        return str(venv_dir)
+
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager, "ensure_workspace_venv", _fake_ensure, raising=True
+    )
+
+
+@pytest.fixture(autouse=True)
 def _repo_root_write_guard() -> object:
     """Assert no new files appear in protected lib-repo paths during a test.
 

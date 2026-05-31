@@ -65,6 +65,10 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80"
+# Disk guard: only retain tmp_path trees for FAILED tests (default keeps the last 3
+# full sessions, which — combined with per-test venvs — exhausted the disk). See the
+# _no_real_venv_in_tests backstop in tests/conftest.py.
+tmp_path_retention_policy = "failed"
 
 [tool.coverage.run]
 source = ["dadaia_workspace"]
