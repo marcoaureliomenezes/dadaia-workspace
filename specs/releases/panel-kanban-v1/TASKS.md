@@ -134,7 +134,7 @@ All of the following AC-IDs pass:
 - AC-2.5 (PW-KAN-05) One stale session → card has `data-stale="true"`.
 Tokens added to `tokens.py`; WCAG AA ratios match SPEC §3 K-2 audit table.
 
-[ ] K-2
+[x] K-2
 
 ---
 
@@ -216,7 +216,7 @@ exists); activation gate satisfied
 - No `time.sleep` without `# allowed-sleep` comment.
 - Tests run with `pytest --randomly-seed=last` (order-independent).
 
-[ ] K-QA-RACE
+[x] K-QA-RACE
 
 ---
 
