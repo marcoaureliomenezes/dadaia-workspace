@@ -168,7 +168,7 @@
   - Existing gate HTML behaviour confirmed unchanged (regression check).
   - `git diff HEAD -- dadaia_workspace/public/` shows no uncommitted working-tree drift.
 - **Parallelism:** single barrier task.
-- **Marker:** `[ ]`
+- **Marker:** `[x]`
 
 ### T-MSS-09 — QA acceptance gate
 - **Owner:** qa-engineer
@@ -188,7 +188,7 @@
   - `dadaia specs doctor` exits 0 on a clean repo (AC-DOC-3 / YAML-absent WARN mode).
   - QA report HTML written to `.dadaia/reports/dadaia-workspace/qa-engineer/`.
 - **Parallelism:** single gate task.
-- **Marker:** `[ ]`
+- **Marker:** `[-]`
 
 ---
 
@@ -236,8 +236,8 @@
 | T-MSS-05 | ai-engineer | C-4 | W2 | `[x]` |
 | T-MSS-06 | ai-engineer + sw-arch | C-5 | W2 | `[x]` |
 | T-MSS-07 | se-python | C-7 | W2 | `[x]` |
-| T-MSS-08 | devops-engineer | propagation | W3 | `[ ]` |
-| T-MSS-09 | qa-engineer | acceptance | W3 | `[ ]` |
+| T-MSS-08 | devops-engineer | propagation | W3 | `[x]` |
+| T-MSS-09 | qa-engineer | acceptance | W3 | `[-]` |
 | T-MSS-10 | product-engineer | C-6 | CLOSURE | `[ ]` |
 
 **Total: 11 tasks** — 7 se-python, 2 ai-engineer, 1 devops-engineer, 1 qa-engineer,
