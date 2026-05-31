@@ -6,6 +6,12 @@
 
 ---
 
+## Summary
+
+workspace-hardening-v1 closed four hardening fronts: panel authentication was fixed so tokens survive tab reopen (Phase A); agent boundary definitions and the D-CX-SKILLS validator were hardened to stop orphaned skill references silently corrupting agent dispatch (Phase B); the CLI gained per-category asset granularity via `dadaia public install --only` (Phase C); and the panel gained a Bearer-authed workflow dispatcher endpoint with PID tracking (Phase D). All T-WH-01..T-WH-19 tasks completed; 1711 pytest tests green at 86.07% coverage.
+
+---
+
 ## What shipped
 
 ### Phase A — Panel Auth Fix
@@ -27,10 +33,26 @@
 
 ---
 
-## Validation
+## Validations
 
-- `dadaia public doctor` → exit 0, no `[drift]`, D-CX-SKILLS passes.
-- `pytest` → 1711 passed, coverage 86.07%.
+| Description | Command | Evidence |
+|-------------|---------|----------|
+| public doctor clean, D-CX-SKILLS passes | `dadaia public doctor` | Exit 0; no `[drift]`; D-CX-SKILLS validator green |
+| Full pytest suite green | `pytest` | 1711 passed; 86.07% coverage |
+
+(Evidence reconstructed 2026-05-31 during releases-housekeeping from the original closure notes; this pre-discipline closure recorded results as prose, now normalized to the SPEC-DOC-006 evidence-triple table.)
+
+---
+
+## Drifts
+
+None recorded at closure. (This `## Drifts` section was added 2026-05-31 during releases-housekeeping to satisfy SPEC-DOC-006; the original closure predates that doctor check.)
+
+---
+
+## Memory updates
+
+Captured at original closure; no atoms changed during this retroactive section-normalization.
 
 ---
 
