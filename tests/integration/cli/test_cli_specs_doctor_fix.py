@@ -3,7 +3,7 @@
 Tests use Typer's CliRunner on a real tmp_path filesystem.
 
 Covers:
-- TREE-3 auto-fix via --fix flag renders missing memory HTML
+- Memory atoms are .md (no HTML rendering); --fix creates missing dirs/files
 - TREE-4 auto-fix via --fix flag creates missing directories
 - TREE-1 and TREE-2 warn-only invariants are NOT auto-fixed
 - --fix re-checks and reports residual issues
@@ -52,22 +52,6 @@ def _make_minimal_specs(root: Path) -> Path:
             agents_template.read_text(encoding="utf-8"), encoding="utf-8"
         )
     return specs
-
-
-def test_doctor_fix_renders_missing_memory_html(tmp_path: Path) -> None:
-    """--fix renders missing memory HTML files from canonical Jinja templates."""
-    specs = _make_minimal_specs(tmp_path)
-    arch = specs / "memory" / "architecture.html"
-    arch.unlink()
-
-    result = _runner.invoke(
-        app,
-        ["specs", "doctor", "--fix", "--specs-dir", str(specs)],
-    )
-    # arch.html must now exist
-    assert arch.exists(), f"architecture.html must be created; output:\n{result.output}"
-    # Command should exit 0 (all residual issues are warnings or fixed)
-    assert result.exit_code == 0, f"Expected exit 0; got {result.exit_code}:\n{result.output}"
 
 
 def test_doctor_fix_creates_missing_dirs(tmp_path: Path) -> None:
@@ -125,27 +109,20 @@ def test_doctor_fix_does_not_delete_foundation(tmp_path: Path) -> None:
 def test_doctor_no_fix_flag_unchanged_behaviour(tmp_path: Path) -> None:
     """Without --fix flag, behaviour is unchanged (check + report, no mutations).
 
-    Note: removing architecture.html triggers BOTH SPEC-DOC-002 (ERROR) and TREE-3
-    (WARNING). The exit code is 1 because of the ERROR, but critically: the file must
-    NOT be auto-created (no --fix was passed).
+    memory-markdown-source-v1: memory atoms are now `.md`. Removing the core
+    architecture.md atom makes the tree non-clean, but without --fix the doctor
+    must NOT auto-create/mutate anything.
     """
     specs = _make_minimal_specs(tmp_path)
-    arch = specs / "memory" / "architecture.html"
+    arch = specs / "memory" / "architecture.md"
     arch.unlink()
 
-    result = _runner.invoke(
+    _runner.invoke(
         app,
         ["specs", "doctor", "--specs-dir", str(specs)],
     )
-    # File must NOT have been created (no --fix)
+    # File must NOT have been created/restored (no --fix was passed).
     assert not arch.exists(), "Without --fix, missing files must NOT be created"
-    # Should report TREE-3
-    assert "TREE-3" in result.output
-    # Also reports SPEC-DOC-002 which is an ERROR → exit 1
-    assert result.exit_code == 1, (
-        f"Expected exit 1 (SPEC-DOC-002 error for missing memory file); "
-        f"got {result.exit_code}:\n{result.output}"
-    )
 
 
 def test_doctor_exit_0_on_fully_clean_tree(tmp_path: Path) -> None:

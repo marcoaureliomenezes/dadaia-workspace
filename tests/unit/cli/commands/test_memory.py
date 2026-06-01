@@ -1,4 +1,8 @@
-"""Unit tests for ``dadaia memory catalog generate`` CLI command (T-MCE-03)."""
+"""Unit tests for ``dadaia memory catalog generate`` CLI command (T-MCE-03).
+
+memory-markdown-source-v1: catalog generation now reads YAML frontmatter
+from *.md feature atom files, not index.html scraping.
+"""
 
 from __future__ import annotations
 
@@ -14,28 +18,58 @@ from dadaia_workspace.cli.commands.memory import app
 # Shared helpers and fixtures
 # ---------------------------------------------------------------------------
 
-_INDEX_HTML_VALID = """\
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Product</title></head>
-<body>
-<h1>Product Memory — test-repo</h1>
-<ol class="catalog">
-  <li><a href="workspace-init.html">workspace-init</a><span class="desc">— entry point.</span></li>
-  <li><a href="context-management.html">context-management</a><span class="desc">— lifecycle.</span></li>
-  <li><a href="specs-doctor.html">specs-doctor</a><span class="desc">— validation checks.</span></li>
-</ol>
-</body>
-</html>
+_FEATURE_MD_TEMPLATE = """\
+---
+slug: {slug}
+title: {slug}
+category: product
+tldr: '{tldr}'
+summary: '{summary}'
+tags: []
+agent_tier: self-pull
+token_estimate: 100
+last_updated: '2026-06-01'
+release_origin: test-release
+---
+
+## Propósito
+
+{purpose}
 """
 
+_FEATURE_ATOMS = [
+    {
+        "slug": "workspace-init",
+        "tldr": "entry point; creates .dadaia/.",
+        "summary": "entry point; creates .dadaia/.",
+        "purpose": "Bootstraps the workspace.",
+    },
+    {
+        "slug": "context-management",
+        "tldr": "multi-context lifecycle.",
+        "summary": "multi-context lifecycle.",
+        "purpose": "Manages contexts.",
+    },
+    {
+        "slug": "specs-doctor",
+        "tldr": "structural validation checks.",
+        "summary": "structural validation checks.",
+        "purpose": "Validates specs.",
+    },
+]
 
-def _make_specs_dir(tmp_path: Path, index_html: str = _INDEX_HTML_VALID) -> Path:
-    """Create a minimal specs/ directory with the given index.html."""
+
+def _make_specs_dir(tmp_path: Path, atoms: list[dict[str, str]] | None = None) -> Path:
+    """Create a minimal specs/ directory with .md feature atom files.
+
+    memory-markdown-source-v1: uses .md frontmatter atoms instead of index.html.
+    """
     specs = tmp_path / "specs"
     product_dir = specs / "memory" / "product"
     product_dir.mkdir(parents=True)
-    (product_dir / "index.html").write_text(index_html, encoding="utf-8")
+    for atom in atoms or _FEATURE_ATOMS:
+        content = _FEATURE_MD_TEMPLATE.format(**atom)
+        (product_dir / f"{atom['slug']}.md").write_text(content, encoding="utf-8")
     return specs
 
 
@@ -117,22 +151,24 @@ class TestCatalogGenerateMissingSpecsDir:
         # Either exit_code != 0 or error in output
         assert result.exit_code != 0 or "error" in result.output.lower()
 
-    def test_exits_nonzero_when_index_html_absent(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_exits_nonzero_when_product_dir_absent(self, runner: CliRunner, tmp_path: Path) -> None:
+        """memory-markdown-source-v1: catalog reads .md atoms; missing product/ → non-zero exit."""
         specs = tmp_path / "specs"
         specs.mkdir()
-        # Directory exists but no index.html inside memory/product/
+        # Directory exists but no memory/product/ inside specs/
         result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
         assert result.exit_code != 0, (
-            f"Expected non-zero exit when index.html is missing; got 0. Output:\n{result.output}"
+            f"Expected non-zero exit when product/ dir is missing; got 0. Output:\n{result.output}"
         )
 
-    def test_error_message_includes_index_html(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_error_message_includes_product(self, runner: CliRunner, tmp_path: Path) -> None:
+        """memory-markdown-source-v1: error message mentions the missing product/ path."""
         specs = tmp_path / "specs"
         specs.mkdir()
         result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        # Either the output mentions the missing file or the exception is printed
+        # Either the output mentions 'product' or exit is non-zero
         combined = result.output + (str(result.exception) if result.exception else "")
-        assert "index.html" in combined or result.exit_code != 0
+        assert "product" in combined.lower() or result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------

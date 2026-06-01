@@ -3,14 +3,14 @@
 Tests use Typer's CliRunner on a real tmp_path filesystem.
 
 Covers:
-- AC-T3-2: dadaia memory product add payments creates feature Markdown atom + updates index
-- AC-T3-3: idempotent index regeneration
-- AC-C-6: feature Markdown atom + index regenerated
+- AC-T3-2: dadaia memory product add payments creates feature Markdown atom
+- AC-T3-3: idempotent — repeated call does not re-create the file
+- AC-C-6: feature Markdown atom created
 - AC-C-7: idempotent
 
-T-MMS-04 change: `memory product add <slug>` now creates `<slug>.md` (born-markdown
-scaffold with YAML frontmatter) instead of `<slug>.html`.  The index is still
-regenerated as `index.html` (that stays until W4 / T-MMS-11).
+memory-markdown-source-v1 (T-MMS-10/11): `memory product add <slug>` creates
+`<slug>.md` (born-markdown scaffold with YAML frontmatter). The index.html
+generation path was retired when the Jinja templates were deleted.
 """
 
 from __future__ import annotations
@@ -37,11 +37,11 @@ def specs(tmp_path: Path) -> Path:
 
 
 class TestMemoryProductAdd:
-    def test_creates_feature_md_and_index(self, specs: Path) -> None:
-        """AC-T3-2 / AC-C-6: creates feature Markdown atom and regenerates index.html.
+    def test_creates_feature_md(self, specs: Path) -> None:
+        """AC-T3-2 / AC-C-6: creates feature Markdown atom.
 
-        T-MMS-04: feature file is now <slug>.md (born-markdown), not <slug>.html.
-        index.html is still regenerated (html index stays until W4).
+        T-MMS-10/11: feature file is <slug>.md (born-markdown).
+        index.html is no longer generated.
         """
         result = _runner.invoke(
             app,
@@ -49,12 +49,11 @@ class TestMemoryProductAdd:
         )
 
         assert result.exit_code == 0, result.output
-        # T-MMS-04: feature atom is now .md, not .html
+        # T-MMS-04/T-MMS-10: feature atom is .md
         assert (specs / "memory" / "product" / "payments.md").is_file()
-        assert (specs / "memory" / "product" / "index.html").is_file()
-        # index.html still links to the slug HTML path for backwards-compat
-        assert "payments.html" in (specs / "memory" / "product" / "index.html").read_text(
-            encoding="utf-8"
+        # No index.html — the HTML index pipeline was retired
+        assert not (specs / "memory" / "product" / "index.html").exists(), (
+            "index.html must NOT be generated (T-MMS-10/11 retired the HTML index)"
         )
 
     def test_feature_md_has_valid_frontmatter(self, specs: Path) -> None:
@@ -70,49 +69,34 @@ class TestMemoryProductAdd:
         assert "slug: payments" in content, "Frontmatter must contain 'slug: payments'"
 
     def test_idempotent_on_second_run(self, specs: Path) -> None:
-        """AC-T3-3 / AC-C-7: second call produces identical index.html catalog section."""
-        _runner.invoke(
+        """AC-T3-3 / AC-C-7: second call with same slug does not re-create the file."""
+        result1 = _runner.invoke(
             app,
             ["memory", "product", "add", "payments", "--specs-dir", str(specs)],
         )
-        index_after_first = (specs / "memory" / "product" / "index.html").read_text(
-            encoding="utf-8"
-        )
+        assert result1.exit_code == 0, result1.output
+        assert "created" in result1.output
 
-        result = _runner.invoke(
+        result2 = _runner.invoke(
             app,
             ["memory", "product", "add", "payments", "--specs-dir", str(specs)],
         )
+        assert result2.exit_code == 0, result2.output
+        assert "already exists" in result2.output
 
-        assert result.exit_code == 0, result.output
-        index_after_second = (specs / "memory" / "product" / "index.html").read_text(
-            encoding="utf-8"
-        )
-        # Catalog section must be identical
-        import re
-
-        def catalog(html: str) -> str:
-            m = re.search(r'<section id="catalog">(.*?)</section>', html, re.DOTALL)
-            assert m
-            return m.group(1).strip()
-
-        assert catalog(index_after_first) == catalog(index_after_second), (
-            "Catalog section must be identical after idempotent re-run (AC-T3-3)"
-        )
-
-    def test_multiple_slugs_appear_in_index(self, specs: Path) -> None:
-        """All added slugs appear in index.html in lexicographic order."""
+    def test_multiple_slugs_all_created(self, specs: Path) -> None:
+        """All added slugs produce .md files in product dir."""
         for slug in ("zebra", "alpha", "middle"):
-            _runner.invoke(
+            result = _runner.invoke(
                 app,
                 ["memory", "product", "add", slug, "--specs-dir", str(specs)],
             )
+            assert result.exit_code == 0, result.output
 
-        content = (specs / "memory" / "product" / "index.html").read_text(encoding="utf-8")
-        pos_alpha = content.index("alpha.html")
-        pos_middle = content.index("middle.html")
-        pos_zebra = content.index("zebra.html")
-        assert pos_alpha < pos_middle < pos_zebra
+        for slug in ("zebra", "alpha", "middle"):
+            assert (specs / "memory" / "product" / f"{slug}.md").is_file(), (
+                f"{slug}.md must exist after add"
+            )
 
 
 # ── error paths ───────────────────────────────────────────────────────────────

@@ -305,17 +305,13 @@ def lint_directory(memory_dir: Path, schema: dict[str, Any]) -> list[AtomResult]
     atom_files: list[Path] = []
 
     # Top-level atoms (e.g. architecture.md, tech-stack.md)
-    atom_files.extend(
-        sorted(p for p in memory_dir.glob("*.md") if p.name not in _NON_ATOM_FILES)
-    )
+    atom_files.extend(sorted(p for p in memory_dir.glob("*.md") if p.name not in _NON_ATOM_FILES))
 
     # Product atoms (product/*.md). index.md is a GENERATED TOC (no frontmatter),
     # not a memory atom — exclude it like AGENTS.md.
     product_dir = memory_dir / "product"
     if product_dir.is_dir():
-        atom_files.extend(
-            sorted(p for p in product_dir.glob("*.md") if p.name != "index.md")
-        )
+        atom_files.extend(sorted(p for p in product_dir.glob("*.md") if p.name != "index.md"))
 
     if not atom_files:
         print(f"WARNING: no .md atoms found in {memory_dir}", file=sys.stderr)

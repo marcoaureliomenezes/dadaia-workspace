@@ -13,8 +13,6 @@ from pathlib import Path
 
 import jinja2
 
-from dadaia_workspace.features.specs.renderer import render_atom
-
 # SemVer pattern for hotfix release version IDs (v<M>.<m>.<p>).
 _RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 
@@ -148,81 +146,21 @@ def scaffold(
     # Locate canonical scaffold stubs (public/scaffold/memory/ adjacent to templates_dir).
     _scaffold_memory_dir = templates_dir.parent / "scaffold" / "memory"
 
-    # 2 — memory/architecture.md (born-markdown scaffold; T-MMS-04)
-    #     Additive: also write the legacy .yaml + .html until W4 deletes them (T-MMS-12).
-    try:
-        md_stub_src = _scaffold_memory_dir / "architecture.md"
-        _write(specs_dir / "memory" / "architecture.md", md_stub_src.read_text(encoding="utf-8"))
-    except Exception as exc:
-        result.errors.append(f"Scaffold error (architecture.md): {exc}")
-
-    try:
-        yaml_stub_src = _scaffold_memory_dir / "architecture.yaml"
-        yaml_content = yaml_stub_src.read_text(encoding="utf-8")
-        _write(specs_dir / "memory" / "architecture.yaml", yaml_content)
-        arch_html = render_atom(
-            yaml_stub_src,
-            atom_type="memory-architecture-v1",
-            templates_dir=templates_dir,
-        )
-        _write(specs_dir / "memory" / "architecture.html", arch_html)
-    except Exception as exc:
-        result.errors.append(f"Scaffold error (architecture): {exc}")
-
-    # 3 — memory/tech-stack.md (born-markdown scaffold; T-MMS-04)
-    #     Additive: also write the legacy .yaml + .html until W4 deletes them (T-MMS-12).
-    try:
-        md_stub_src = _scaffold_memory_dir / "tech-stack.md"
-        _write(specs_dir / "memory" / "tech-stack.md", md_stub_src.read_text(encoding="utf-8"))
-    except Exception as exc:
-        result.errors.append(f"Scaffold error (tech-stack.md): {exc}")
-
-    try:
-        yaml_stub_src = _scaffold_memory_dir / "tech-stack.yaml"
-        yaml_content = yaml_stub_src.read_text(encoding="utf-8")
-        _write(specs_dir / "memory" / "tech-stack.yaml", yaml_content)
-        tech_html = render_atom(
-            yaml_stub_src,
-            atom_type="memory-tech-stack-v1",
-            templates_dir=templates_dir,
-        )
-        _write(specs_dir / "memory" / "tech-stack.html", tech_html)
-    except Exception as exc:
-        result.errors.append(f"Scaffold error (tech-stack): {exc}")
-
-    # 4 — memory/product/index.md (born-markdown scaffold; T-MMS-04)
-    #     Additive: also write the legacy .yaml + .html until W4 deletes them (T-MMS-12).
-    try:
-        md_stub_src = _scaffold_memory_dir / "product" / "index.md"
-        _write(
-            specs_dir / "memory" / "product" / "index.md",
-            md_stub_src.read_text(encoding="utf-8"),
-        )
-    except Exception as exc:
-        result.errors.append(f"Scaffold error (product-index.md): {exc}")
-
-    try:
-        yaml_stub_src = _scaffold_memory_dir / "product" / "index.yaml"
-        yaml_content = yaml_stub_src.read_text(encoding="utf-8")
-        _write(specs_dir / "memory" / "product" / "index.yaml", yaml_content)
-        product_html = render_atom(
-            yaml_stub_src,
-            atom_type="memory-product-index-v1",
-            templates_dir=templates_dir,
-        )
-        _write(specs_dir / "memory" / "product" / "index.html", product_html)
-    except Exception as exc:
-        result.errors.append(f"Scaffold error (product-index): {exc}")
-
-    # 4a — memory/product/placeholder.html (satisfies the index.yaml catalog stub link)
-    try:
-        placeholder_src = _scaffold_memory_dir / "product" / "placeholder.html"
-        _write(
-            specs_dir / "memory" / "product" / "placeholder.html",
-            placeholder_src.read_text(encoding="utf-8"),
-        )
-    except Exception as exc:
-        result.errors.append(f"Scaffold error (placeholder): {exc}")
+    # 2-4 — born-markdown memory scaffolds (.md only).
+    # memory-markdown-source-v1: .md is the sole source of truth; the legacy
+    # .yaml/.html scaffolds and the placeholder.html stub were retired (no committed
+    # HTML — the panel renders .md in-memory, D-4).
+    _memory_md_stubs = [
+        ("architecture.md", specs_dir / "memory" / "architecture.md"),
+        ("tech-stack.md", specs_dir / "memory" / "tech-stack.md"),
+        ("product/index.md", specs_dir / "memory" / "product" / "index.md"),
+    ]
+    for rel, dest in _memory_md_stubs:
+        try:
+            src = _scaffold_memory_dir / rel
+            _write(dest, src.read_text(encoding="utf-8"))
+        except Exception as exc:
+            result.errors.append(f"Scaffold error ({rel}): {exc}")
 
     # 5 — releases/ACTIVE.md
     _write(

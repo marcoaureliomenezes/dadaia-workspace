@@ -182,7 +182,9 @@ def _make_full_context(workspace: Path, slug: str) -> tuple[Path, Path, Path]:
     return scripts, specs_dir / "memory", specs_dir
 
 
-def _run_ctx_inject(workspace: Path, scripts: Path, *, fresh: bool = True) -> subprocess.CompletedProcess[str]:
+def _run_ctx_inject(
+    workspace: Path, scripts: Path, *, fresh: bool = True
+) -> subprocess.CompletedProcess[str]:
     """Run ctx-inject.sh from the scripts dir, optionally purging the sentinel first."""
     sentinel_dir = workspace / ".dadaia" / "tmp"
     if fresh:

@@ -137,7 +137,6 @@ def main() -> None:
                 if agent_type:
                     # Record the meta.json source — agentType is the canonical
                     # label for the sidechain session
-                    stem = meta_path.stem.replace(".meta", "")
                     all_matches.append(
                         {
                             "source": "sidechain-meta",
@@ -165,8 +164,7 @@ def main() -> None:
     print()
 
     # Print sample matches (up to MAX_DISPLAY)
-    displayed = 0
-    for m in all_matches:
+    for displayed, m in enumerate(all_matches):
         if displayed >= MAX_DISPLAY:
             remaining = len(all_matches) - displayed
             print(f"  ... and {remaining} more matches (truncated)")
@@ -176,7 +174,6 @@ def main() -> None:
             f"  session={m['session_id'][:8]}..."
             f"  subagent_type={m['subagent_type']!r}"
         )
-        displayed += 1
 
     print()
     print("Distinct subagent_type values (from parent-session jsonls):")
