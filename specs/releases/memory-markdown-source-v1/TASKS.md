@@ -166,7 +166,7 @@
 > These tasks are PE-only and sequential.
 
 ### T-MMS-08
-- **Status:** `[ ]`
+- **Status:** `[-]`
 - **Wave:** W3 / CLOSURE
 - **Owner:** product-engineer
 - **Description:** Implement `migrate-html-to-md.py` (in-session script, not a permanent
