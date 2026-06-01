@@ -1,14 +1,15 @@
-"""Byte-identity canary test for views/memory.py — T-3.5.
+"""Tests for views/memory.py — path guard and non-Markdown asset serving.
 
-SPEC-DOC-008 (memory atomicity invariant): memory HTML files on disk must never
-be mutated by the panel. This test is the unit-level enforcement.
+T-MMS-06 migration note:
+  SPEC-DOC-008 (byte-identity for .html atoms) is RETIRED as of release
+  memory-markdown-source-v1.  The .md source is now canonical; served HTML
+  is rendered in-memory (D-4) and is never byte-identical to any on-disk file.
 
-NFR-2 (byte-identity): the bytes returned by render_memory() MUST be
-byte-for-byte identical to the bytes that Path.read_bytes() returns for the
-same file. Any decoding, template interpolation, or byte manipulation inside
-views/memory.py will cause this test to fail — which is the intended behaviour.
+  The tests that verified byte-identity for .html atoms are replaced by
+  Markdown render tests in test_views_memory.py.
 
-If this test fails: views/memory.py is mutating bytes it must not touch.
+  This file retains the security and routing tests (path traversal, content-type
+  sniffing, non-Markdown asset serving) that remain valid.
 """
 
 from pathlib import Path
@@ -35,10 +36,12 @@ def _build_memory_root(tmp_path: Path, slug: str, filename: str, data: bytes) ->
 # ---------------------------------------------------------------------------
 
 
-def test_serve_memory_byte_identity_html(tmp_path: Path) -> None:
-    """SPEC-DOC-008 / NFR-2 canary.
+def test_serve_memory_html_asset_200(tmp_path: Path) -> None:
+    """Legacy .html asset is served with 200 and correct content-type.
 
-    serve_memory must return bytes byte-identical to Path.read_bytes() of the fixture.
+    Note: SPEC-DOC-008 byte-identity invariant is retired (T-MMS-06).
+    .html files are served verbatim as a non-Markdown asset fallback; the
+    canonical memory source format is now .md (rendered in-memory, D-4).
     """
     data = b"<!DOCTYPE html><html><body>Hello</body></html>"
     workspace_root = _build_memory_root(tmp_path, "my-project", "architecture.html", data)
@@ -48,8 +51,7 @@ def test_serve_memory_byte_identity_html(tmp_path: Path) -> None:
 
     assert status == 200
     assert content_type == "text/html; charset=utf-8"
-    # CANARY: this assertion fails if views/memory.py mutates bytes in any way.
-    assert body == data, "serve_memory must return bytes byte-identical to disk"
+    assert body == data
 
 
 # ---------------------------------------------------------------------------
@@ -57,12 +59,11 @@ def test_serve_memory_byte_identity_html(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_serve_memory_byte_identity_binary(tmp_path: Path) -> None:
+def test_serve_memory_binary_asset_unchanged(tmp_path: Path) -> None:
     """Binary content (bytes 0..255) must survive round-trip unchanged.
 
-    SPEC-DOC-008 / NFR-2: no decoding or encoding step is permitted.
+    Non-Markdown assets are served verbatim (byte-identical).
     """
-    # bytes 0..255 followed by some non-UTF-8 sequences
     data = bytes(range(256)) + b"\xff\xfe\xfd"
     workspace_root = _build_memory_root(tmp_path, "x", "diagram.png", data)
 
@@ -71,7 +72,7 @@ def test_serve_memory_byte_identity_binary(tmp_path: Path) -> None:
 
     assert status == 200
     assert content_type == "image/png"
-    assert body == data, "Binary bytes must be returned unchanged (SPEC-DOC-008 / NFR-2)"
+    assert body == data
 
 
 # ---------------------------------------------------------------------------
@@ -154,15 +155,19 @@ def test_serve_memory_content_type_sniffing(
 # ---------------------------------------------------------------------------
 
 
-def test_serve_memory_byte_identity_fixture_file(tmp_path: Path) -> None:
-    """Use the committed fixture file as additional canary input."""
+def test_serve_memory_html_fixture_file_served(tmp_path: Path) -> None:
+    """Legacy .html fixture file is served with 200 and correct content-type.
+
+    SPEC-DOC-008 byte-identity canary is retired (T-MMS-06).  The .html fixture
+    is now a non-Markdown asset served verbatim; .md is the canonical source.
+    Markdown render tests are in test_views_memory.py.
+    """
     fixture_path = (
         Path(__file__).parent.parent.parent.parent / "fixtures" / "memory" / "architecture.html"
     )
     assert fixture_path.exists(), f"Fixture file missing: {fixture_path}"
     data = fixture_path.read_bytes()
 
-    # Copy fixture into tmp workspace layout
     specs_dir = tmp_path / "repos" / "dadaia-workspace" / "specs" / "memory"
     specs_dir.mkdir(parents=True)
     (specs_dir / "architecture.html").write_bytes(data)
@@ -172,7 +177,6 @@ def test_serve_memory_byte_identity_fixture_file(tmp_path: Path) -> None:
 
     assert status == 200
     assert content_type == "text/html; charset=utf-8"
-    # CANARY — SPEC-DOC-008 + NFR-2
     assert body == data
 
 
