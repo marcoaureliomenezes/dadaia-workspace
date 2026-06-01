@@ -126,7 +126,7 @@
 - **Parallelism note:** Disjoint from T-MMS-06 and T-MMS-07 (different write sets)
 
 ### T-MMS-06 (Track B)
-- **Status:** `[ ]`
+- **Status:** `[-]`
 - **Wave:** W2 / Track B
 - **Owner:** software-engineer-python
 - **Description:** Panel `md → html` inline render in
