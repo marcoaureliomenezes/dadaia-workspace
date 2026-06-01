@@ -71,26 +71,26 @@ touch "$SENTINEL"
 
 # ---------------------------------------------------------------------------
 # Emit bounded memory bootstrap block.
+# tech-stack.md and product/index.md are read verbatim — no strip pass needed.
 # ---------------------------------------------------------------------------
-STRIP="$SCRIPT_DIR/strip-memory-html.py"
 
 echo ""
 echo "=== workspace memory (tech + catalog) ==="
 
-# Tech stack
-TECH_FILE="$MEMORY_DIR/tech-stack.html"
+# Tech stack — read .md verbatim (T-MMS-07: no strip pass needed for markdown)
+TECH_FILE="$MEMORY_DIR/tech-stack.md"
 if [ -f "$TECH_FILE" ]; then
-    python3 "$STRIP" "$TECH_FILE"
+    cat "$TECH_FILE"
 fi
 
-# Catalog: prefer catalog.json (machine-readable, no stripping needed);
-# fall back to stripped product/index.html if catalog.json absent (AC-C1-4).
+# Catalog: prefer catalog.json (machine-readable, generated from frontmatter);
+# fall back to product/index.md verbatim when catalog.json is absent (T-MMS-07).
 CATALOG_JSON="$MEMORY_DIR/product/catalog.json"
-PRODUCT_INDEX="$MEMORY_DIR/product/index.html"
+PRODUCT_INDEX_MD="$MEMORY_DIR/product/index.md"
 if [ -f "$CATALOG_JSON" ]; then
     cat "$CATALOG_JSON"
-elif [ -f "$PRODUCT_INDEX" ]; then
-    python3 "$STRIP" "$PRODUCT_INDEX"
+elif [ -f "$PRODUCT_INDEX_MD" ]; then
+    cat "$PRODUCT_INDEX_MD"
 fi
 
 echo "=== end memory bootstrap ==="

@@ -144,7 +144,7 @@
 - **Parallelism note:** Disjoint from T-MMS-05
 
 ### T-MMS-07 (Track B)
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W2 / Track B
 - **Owner:** software-engineer-python
 - **Description:** Repoint `ctx-inject.sh` from `tech-stack.html` + strip pass to
