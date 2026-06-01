@@ -70,10 +70,10 @@ def product_add(
         help="Project name used in rendered HTML.",
     ),
 ) -> None:
-    """Create a product feature HTML and regenerate the product catalog index.
+    """Create a product feature Markdown atom and regenerate the product catalog index.
 
     \b
-    1. Creates specs/memory/product/<slug>.html from the canonical template
+    1. Creates specs/memory/product/<slug>.md from the born-markdown scaffold template
        (skipped if the file already exists).
     2. Regenerates specs/memory/product/index.html deterministically in
        lexicographic order over all feature slugs (idempotent).
@@ -95,7 +95,7 @@ def product_add(
         sys.exit(1)
 
     action = "created" if result.created_feature else "already exists"
-    typer.echo(f"[ok] feature HTML ({action}): {result.feature_html}")
+    typer.echo(f"[ok] feature atom ({action}): {result.feature_html}")
     typer.echo(f"[ok] index regenerated: {result.index_html}")
     typer.echo(
         f"     catalog entries ({len(result.slug_entries)}): {', '.join(result.slug_entries)}"

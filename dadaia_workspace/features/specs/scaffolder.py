@@ -145,10 +145,17 @@ def scaffold(
         except OSError as exc:
             result.errors.append(f"Failed to write {constitution_path}: {exc}")
 
-    # Locate canonical YAML stubs (public/scaffold/memory/ adjacent to templates_dir).
+    # Locate canonical scaffold stubs (public/scaffold/memory/ adjacent to templates_dir).
     _scaffold_memory_dir = templates_dir.parent / "scaffold" / "memory"
 
-    # 2 — memory/architecture.yaml + memory/architecture.html
+    # 2 — memory/architecture.md (born-markdown scaffold; T-MMS-04)
+    #     Additive: also write the legacy .yaml + .html until W4 deletes them (T-MMS-12).
+    try:
+        md_stub_src = _scaffold_memory_dir / "architecture.md"
+        _write(specs_dir / "memory" / "architecture.md", md_stub_src.read_text(encoding="utf-8"))
+    except Exception as exc:
+        result.errors.append(f"Scaffold error (architecture.md): {exc}")
+
     try:
         yaml_stub_src = _scaffold_memory_dir / "architecture.yaml"
         yaml_content = yaml_stub_src.read_text(encoding="utf-8")
@@ -162,7 +169,14 @@ def scaffold(
     except Exception as exc:
         result.errors.append(f"Scaffold error (architecture): {exc}")
 
-    # 3 — memory/tech-stack.yaml + memory/tech-stack.html
+    # 3 — memory/tech-stack.md (born-markdown scaffold; T-MMS-04)
+    #     Additive: also write the legacy .yaml + .html until W4 deletes them (T-MMS-12).
+    try:
+        md_stub_src = _scaffold_memory_dir / "tech-stack.md"
+        _write(specs_dir / "memory" / "tech-stack.md", md_stub_src.read_text(encoding="utf-8"))
+    except Exception as exc:
+        result.errors.append(f"Scaffold error (tech-stack.md): {exc}")
+
     try:
         yaml_stub_src = _scaffold_memory_dir / "tech-stack.yaml"
         yaml_content = yaml_stub_src.read_text(encoding="utf-8")
@@ -176,7 +190,17 @@ def scaffold(
     except Exception as exc:
         result.errors.append(f"Scaffold error (tech-stack): {exc}")
 
-    # 4 — memory/product/index.yaml + memory/product/index.html
+    # 4 — memory/product/index.md (born-markdown scaffold; T-MMS-04)
+    #     Additive: also write the legacy .yaml + .html until W4 deletes them (T-MMS-12).
+    try:
+        md_stub_src = _scaffold_memory_dir / "product" / "index.md"
+        _write(
+            specs_dir / "memory" / "product" / "index.md",
+            md_stub_src.read_text(encoding="utf-8"),
+        )
+    except Exception as exc:
+        result.errors.append(f"Scaffold error (product-index.md): {exc}")
+
     try:
         yaml_stub_src = _scaffold_memory_dir / "product" / "index.yaml"
         yaml_content = yaml_stub_src.read_text(encoding="utf-8")

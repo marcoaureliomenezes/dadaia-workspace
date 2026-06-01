@@ -89,7 +89,7 @@
   fixture YAML blocks; lint script uses it
 
 ### T-MMS-04
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W1
 - **Owner:** software-engineer-python
 - **Description:** Born-markdown scaffold template: create `.md` atom scaffold files under

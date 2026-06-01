@@ -2,15 +2,18 @@
 
 Covers:
 - AC-T3-1: scaffold has index.yaml (T-MSS-06) with minimal catalog
-- AC-T3-2: memory_product_add creates feature HTML + updates index
+- AC-T3-2 (updated T-MMS-04): memory_product_add creates feature .md + updates index
 - AC-T3-3: idempotent index regeneration
-- AC-C-6: dadaia memory product add <slug> creates feature HTML + regenerates index
+- AC-C-6 (updated T-MMS-04): dadaia memory product add <slug> creates .md + regenerates index
 - AC-C-7: idempotent on index regeneration
+- T-MMS-04: born-markdown scaffold — .md files with valid frontmatter; lint passes
 """
 
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -116,38 +119,106 @@ class TestScaffoldIndexHtml:
         assert "placeholder.html" in catalog_html
 
 
-# ── memory_product_add unit tests (AC-T3-2, AC-T3-3) ──────────────────────────
+# ── memory_product_add unit tests (AC-T3-2, AC-T3-3, T-MMS-04) ───────────────
+
+# Path to lint-memory-atoms.py script (used in T-MMS-04 gate assertions).
+_LINT_SCRIPT = (
+    Path(__file__).parent.parent.parent.parent.parent
+    / "dadaia_workspace"
+    / "public"
+    / "scripts"
+    / "lint-memory-atoms.py"
+)
 
 
 class TestMemoryProductAdd:
-    """Tests for memory_product_add feature function."""
+    """Tests for memory_product_add feature function.
 
-    def test_creates_feature_html(self, tmp_path: Path) -> None:
-        """AC-T3-2 / AC-C-6: creates specs/memory/product/<slug>.html."""
+    Updated in T-MMS-04: the function now writes <slug>.md (born-markdown)
+    instead of <slug>.html.  The index.html regeneration path is unchanged.
+    """
+
+    def test_creates_feature_md(self, tmp_path: Path) -> None:
+        """T-MMS-04 / AC-C-6 (updated): creates specs/memory/product/<slug>.md."""
         specs = tmp_path / "specs"
         specs.mkdir()
 
         result = memory_product_add(specs, "payments", templates_dir=_TEMPLATES_DIR)
 
         assert isinstance(result, MemoryProductAddResult)
-        feature = specs / "memory" / "product" / "payments.html"
-        assert feature.is_file(), "payments.html must be created"
+        feature = specs / "memory" / "product" / "payments.md"
+        assert feature.is_file(), "payments.md must be created (T-MMS-04)"
         assert result.created_feature is True
         assert result.feature_html == feature
 
-    def test_feature_html_is_valid_html(self, tmp_path: Path) -> None:
-        """The created feature HTML contains DOCTYPE and html tags."""
+    def test_feature_md_has_valid_frontmatter(self, tmp_path: Path) -> None:
+        """T-MMS-04: the created .md file has YAML frontmatter with required fields."""
         specs = tmp_path / "specs"
         specs.mkdir()
 
         memory_product_add(specs, "payments", templates_dir=_TEMPLATES_DIR)
 
-        content = (specs / "memory" / "product" / "payments.html").read_text(encoding="utf-8")
-        assert "<!DOCTYPE html>" in content or "<!doctype html>" in content.lower()
-        assert "<html" in content
+        content = (specs / "memory" / "product" / "payments.md").read_text(encoding="utf-8")
+        # Must start with frontmatter delimiter
+        assert content.startswith("---\n"), "Markdown atom must start with --- frontmatter"
+
+        import yaml as _yaml
+
+        fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+        assert fm_match, "No valid YAML frontmatter block found"
+        fm = _yaml.safe_load(fm_match.group(1))
+
+        required = {
+            "slug",
+            "title",
+            "category",
+            "tldr",
+            "summary",
+            "tags",
+            "agent_tier",
+            "token_estimate",
+            "last_updated",
+            "release_origin",
+        }
+        missing = required - set(fm.keys())
+        assert not missing, f"Frontmatter missing required fields: {missing}"
+
+    def test_feature_md_slug_matches_filename(self, tmp_path: Path) -> None:
+        """T-MMS-04: frontmatter slug must equal the file stem (payments)."""
+        import yaml as _yaml
+
+        specs = tmp_path / "specs"
+        specs.mkdir()
+
+        memory_product_add(specs, "payments", templates_dir=_TEMPLATES_DIR)
+
+        content = (specs / "memory" / "product" / "payments.md").read_text(encoding="utf-8")
+        fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+        assert fm_match
+        fm = _yaml.safe_load(fm_match.group(1))
+        assert fm["slug"] == "payments", f"Expected slug='payments', got {fm['slug']!r}"
+
+    def test_feature_md_passes_lint(self, tmp_path: Path) -> None:
+        """T-MMS-04 gate: the scaffolded .md passes lint-memory-atoms.py (exit 0 or 2 warn-only)."""
+        specs = tmp_path / "specs"
+        specs.mkdir()
+
+        memory_product_add(specs, "my-feature", templates_dir=_TEMPLATES_DIR)
+
+        memory_dir = specs / "memory"
+        proc = subprocess.run(
+            [sys.executable, str(_LINT_SCRIPT), "--memory-dir", str(memory_dir)],
+            capture_output=True,
+            text=True,
+        )
+        # Exit 0 = clean, exit 2 = warnings only. Exit 1 = ERROR (must not happen).
+        assert proc.returncode != 1, (
+            f"lint-memory-atoms.py returned ERROR (exit 1) for scaffolded atom.\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
 
     def test_regenerates_index_with_new_entry(self, tmp_path: Path) -> None:
-        """AC-T3-2 / AC-C-6: index.html is updated to include the new slug."""
+        """AC-T3-2 / AC-C-6 (updated): index.html is updated to include the new slug."""
         specs = tmp_path / "specs"
         specs.mkdir()
 
@@ -157,9 +228,7 @@ class TestMemoryProductAdd:
         assert index_path.is_file(), "index.html must be (re)created"
         assert result.index_html == index_path
         content = index_path.read_text(encoding="utf-8")
-        assert "payments.html" in content, (
-            "index.html must contain a link to payments.html (AC-T3-2)"
-        )
+        assert "payments" in content, "index.html must reference payments slug (AC-T3-2)"
         assert "payments" in result.slug_entries
 
     def test_idempotent_index_regeneration(self, tmp_path: Path) -> None:
@@ -176,13 +245,12 @@ class TestMemoryProductAdd:
         index_content_2 = (specs / "memory" / "product" / "index.html").read_text(encoding="utf-8")
 
         assert result2.created_feature is False, (
-            "Second call must not re-create the existing feature HTML"
+            "Second call must not re-create the existing feature Markdown atom"
         )
-        # Both indexes must reference payments.html
-        assert "payments.html" in index_content_1
-        assert "payments.html" in index_content_2
+        # Both indexes must reference payments
+        assert "payments" in index_content_1
+        assert "payments" in index_content_2
         # The catalog section content must be identical
-        import re
 
         def extract_catalog(html: str) -> str:
             m = re.search(r'<section id="catalog">(.*?)</section>', html, re.DOTALL)
@@ -204,10 +272,10 @@ class TestMemoryProductAdd:
 
         content = (specs / "memory" / "product" / "index.html").read_text(encoding="utf-8")
 
-        # Verify links appear in lexicographic order
-        pos_alpha = content.index("alpha.html")
-        pos_middle = content.index("middle.html")
-        pos_zebra = content.index("zebra.html")
+        # Verify slugs appear in lexicographic order (via .html links in index)
+        pos_alpha = content.index("alpha")
+        pos_middle = content.index("middle")
+        pos_zebra = content.index("zebra")
         assert pos_alpha < pos_middle < pos_zebra, "Catalog entries must be in lexicographic order"
 
     def test_invalid_slug_raises_value_error(self, tmp_path: Path) -> None:
@@ -234,3 +302,128 @@ class TestMemoryProductAdd:
         assert not (specs / "memory" / "product").exists()
         memory_product_add(specs, "auth", templates_dir=_TEMPLATES_DIR)
         assert (specs / "memory" / "product").is_dir()
+
+
+# ── T-MMS-04: born-markdown scaffold file assertions ─────────────────────────
+
+
+class TestBornMarkdownScaffolds:
+    """T-MMS-04: verify .md scaffold files exist and pass lint."""
+
+    def test_architecture_md_scaffold_exists(self) -> None:
+        """T-MMS-04: public/scaffold/memory/architecture.md must exist."""
+        path = _SCAFFOLD_DIR / "memory" / "architecture.md"
+        assert path.is_file(), f"architecture.md scaffold missing at {path}"
+
+    def test_tech_stack_md_scaffold_exists(self) -> None:
+        """T-MMS-04: public/scaffold/memory/tech-stack.md must exist."""
+        path = _SCAFFOLD_DIR / "memory" / "tech-stack.md"
+        assert path.is_file(), f"tech-stack.md scaffold missing at {path}"
+
+    def test_product_index_md_scaffold_exists(self) -> None:
+        """T-MMS-04: public/scaffold/memory/product/index.md must exist."""
+        path = _SCAFFOLD_DIR / "memory" / "product" / "index.md"
+        assert path.is_file(), f"product/index.md scaffold missing at {path}"
+
+    def test_feature_md_scaffold_exists(self) -> None:
+        """T-MMS-04: public/scaffold/memory/product/feature.md must exist."""
+        path = _SCAFFOLD_DIR / "memory" / "product" / "feature.md"
+        assert path.is_file(), f"product/feature.md scaffold missing at {path}"
+
+    def test_architecture_md_has_frontmatter(self) -> None:
+        """T-MMS-04: architecture.md scaffold has valid YAML frontmatter."""
+        import yaml as _yaml
+
+        path = _SCAFFOLD_DIR / "memory" / "architecture.md"
+        content = path.read_text(encoding="utf-8")
+        assert content.startswith("---\n")
+        fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+        assert fm_match, "No frontmatter block found in architecture.md scaffold"
+        fm = _yaml.safe_load(fm_match.group(1))
+        assert fm.get("slug") == "architecture"
+        assert fm.get("category") == "core"
+
+    def test_tech_stack_md_has_frontmatter(self) -> None:
+        """T-MMS-04: tech-stack.md scaffold has valid YAML frontmatter."""
+        import yaml as _yaml
+
+        path = _SCAFFOLD_DIR / "memory" / "tech-stack.md"
+        content = path.read_text(encoding="utf-8")
+        assert content.startswith("---\n")
+        fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+        assert fm_match
+        fm = _yaml.safe_load(fm_match.group(1))
+        assert fm.get("slug") == "tech-stack"
+        assert fm.get("category") == "core"
+
+    def test_product_index_md_has_frontmatter(self) -> None:
+        """T-MMS-04: product/index.md scaffold has valid YAML frontmatter."""
+        import yaml as _yaml
+
+        path = _SCAFFOLD_DIR / "memory" / "product" / "index.md"
+        content = path.read_text(encoding="utf-8")
+        assert content.startswith("---\n")
+        fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+        assert fm_match
+        fm = _yaml.safe_load(fm_match.group(1))
+        assert fm.get("slug") == "index"
+        assert fm.get("category") == "product"
+
+    def test_architecture_md_passes_lint(self, tmp_path: Path) -> None:
+        """T-MMS-04 gate: architecture.md scaffold passes lint-memory-atoms.py."""
+        import shutil
+
+        # Copy scaffold to a temp memory dir so the linter can find it.
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        shutil.copy(_SCAFFOLD_DIR / "memory" / "architecture.md", mem_dir / "architecture.md")
+
+        proc = subprocess.run(
+            [sys.executable, str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode != 1, (
+            f"architecture.md scaffold failed lint (exit 1).\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+
+    def test_tech_stack_md_passes_lint(self, tmp_path: Path) -> None:
+        """T-MMS-04 gate: tech-stack.md scaffold passes lint-memory-atoms.py."""
+        import shutil
+
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        shutil.copy(_SCAFFOLD_DIR / "memory" / "tech-stack.md", mem_dir / "tech-stack.md")
+
+        proc = subprocess.run(
+            [sys.executable, str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode != 1, (
+            f"tech-stack.md scaffold failed lint (exit 1).\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+
+    def test_product_index_md_passes_lint(self, tmp_path: Path) -> None:
+        """T-MMS-04 gate: product/index.md scaffold passes lint-memory-atoms.py."""
+        import shutil
+
+        mem_dir = tmp_path / "memory"
+        product_dir = mem_dir / "product"
+        product_dir.mkdir(parents=True)
+        shutil.copy(
+            _SCAFFOLD_DIR / "memory" / "product" / "index.md",
+            product_dir / "index.md",
+        )
+
+        proc = subprocess.run(
+            [sys.executable, str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode != 1, (
+            f"product/index.md scaffold failed lint (exit 1).\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )

@@ -1,12 +1,14 @@
 """Memory product catalog management for dadaia CLI.
 
 Implements:
-- memory_product_add: creates a feature HTML page and regenerates index.html
+- memory_product_add: creates a feature Markdown atom and regenerates index.html
   (lexicographic, idempotent).
 
-Templates used:
-- memory-product-feature.html.j2  → specs/memory/product/<slug>.html
-- memory-product-index.html.j2    → specs/memory/product/index.html (regenerated)
+Scaffold template used:
+- public/scaffold/memory/product/feature.md  → specs/memory/product/<slug>.md
+
+The legacy HTML path (memory-product-feature.html.j2 → <slug>.html) is retained
+for index regeneration until W4 deletes it (T-MMS-12).
 """
 
 from __future__ import annotations
@@ -18,9 +20,10 @@ from pathlib import Path
 
 import jinja2
 
-# ── canonical templates directory ────────────────────────────────────────────
+# ── canonical directories ─────────────────────────────────────────────────────
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
 _TEMPLATES_DIR = _PUBLIC_DIR / "templates"
+_SCAFFOLD_DIR = _PUBLIC_DIR / "scaffold" / "memory" / "product"
 
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 
@@ -45,9 +48,11 @@ class MemoryProductAddResult:
     """Outcome of a memory_product_add call.
 
     Attributes:
-        feature_html: Path to the created (or existing) feature HTML file.
+        feature_html: Path to the created (or existing) feature Markdown file.
+                      Named ``feature_html`` for backwards-compatibility with
+                      callers; the actual file written is now ``<slug>.md``.
         index_html:   Path to the regenerated index.html.
-        created_feature: True when the feature HTML was freshly written.
+        created_feature: True when the feature Markdown file was freshly written.
     """
 
     feature_html: Path
@@ -89,20 +94,48 @@ def _regenerate_index(
     return index_path
 
 
+def _build_feature_md(slug: str, today: str, scaffold_dir: Path | None = None) -> str:
+    """Build the Markdown content for a new product feature atom.
+
+    Reads the ``feature.md`` scaffold template from ``scaffold_dir`` (defaults to
+    ``_SCAFFOLD_DIR``) and substitutes the slug, title, and date placeholders.
+
+    Args:
+        slug:         Feature slug (already validated by the caller).
+        today:        ISO-8601 date string (``YYYY-MM-DD``).
+        scaffold_dir: Directory containing ``feature.md`` scaffold template.
+                      Defaults to the canonical ``public/scaffold/memory/product/``.
+
+    Returns:
+        Rendered Markdown string ready to be written to ``<slug>.md``.
+    """
+    sdir = scaffold_dir or _SCAFFOLD_DIR
+    feature_template = sdir / "feature.md"
+    template_content = feature_template.read_text(encoding="utf-8")
+    # Substitute canonical placeholders in the frontmatter stubs.
+    content = template_content.replace("SLUG_PLACEHOLDER", slug)
+    content = content.replace("TITLE_PLACEHOLDER", slug.replace("-", " ").title())
+    content = content.replace("RELEASE_PLACEHOLDER", "none")
+    content = content.replace('"2026-01-01"', f'"{today}"')
+    return content
+
+
 def memory_product_add(
     specs_dir: Path,
     slug: str,
     *,
     templates_dir: Path | None = None,
+    scaffold_dir: Path | None = None,
     project_name: str = "Projeto",
 ) -> MemoryProductAddResult:
-    """Create a product feature HTML and regenerate index.html.
+    """Create a product feature Markdown atom and regenerate index.html.
 
     1. Validates ``slug`` against ``^[a-z][a-z0-9-]+$``.
-    2. Creates ``specs/memory/product/<slug>.html`` from the canonical template
-       if it does not yet exist.
-    3. Scans ``specs/memory/product/`` for all ``*.html`` files (excluding
-       ``index.html``) and regenerates ``index.html`` deterministically in
+    2. Creates ``specs/memory/product/<slug>.md`` from the born-markdown scaffold
+       template (``public/scaffold/memory/product/feature.md``) if it does not
+       yet exist.
+    3. Scans ``specs/memory/product/`` for all ``*.md`` files (excluding
+       ``index.md``) and regenerates ``index.html`` deterministically in
        lexicographic order.
 
     This operation is idempotent: calling it twice with the same slug produces
@@ -114,7 +147,9 @@ def memory_product_add(
                        ``^[a-z][a-z0-9-]+$``.
         templates_dir: Directory containing Jinja2 ``.j2`` template files.
                        Defaults to the canonical ``public/templates/`` dir.
-        project_name:  Project name used in rendered HTML.  Defaults to
+        scaffold_dir:  Directory containing the ``feature.md`` scaffold template.
+                       Defaults to ``public/scaffold/memory/product/``.
+        project_name:  Project name used in rendered index HTML.  Defaults to
                        ``"Projeto"``.
 
     Returns:
@@ -134,31 +169,17 @@ def memory_product_add(
     product_dir = specs_dir / "memory" / "product"
     product_dir.mkdir(parents=True, exist_ok=True)
 
-    feature_path = product_dir / f"{slug}.html"
+    feature_path = product_dir / f"{slug}.md"
     created_feature = False
 
     if not feature_path.exists():
         today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
-        ctx = {
-            "feature_name": slug,
-            "context_name": project_name,
-            "feature_subtitle": f"{slug} — placeholder",
-            "last_updated_iso": today,
-            "last_release_id": "none",
-            "purpose_paragraphs": "<p>Placeholder — document the feature purpose here.</p>",
-            "flow_steps": "<li>Step 1 — placeholder.</li>",
-            "flow_mermaid_optional": "",
-            "typical_trigger": "Placeholder trigger.",
-            "differential": "Placeholder differential.",
-            "runtime_state_bullets": "<li>State placeholder.</li>",
-            "dependencies_bullets": "<li>None yet.</li>",
-        }
-        html = _render(tdl, "memory-product-feature.html.j2", ctx)
-        feature_path.write_text(html, encoding="utf-8")
+        md_content = _build_feature_md(slug, today, scaffold_dir)
+        feature_path.write_text(md_content, encoding="utf-8")
         created_feature = True
 
-    # Collect all feature slugs (any *.html except index.html)
-    feature_slugs = sorted(p.stem for p in product_dir.glob("*.html") if p.name != "index.html")
+    # Collect all feature slugs from *.md files (excluding index.md).
+    feature_slugs = sorted(p.stem for p in product_dir.glob("*.md") if p.name != "index.md")
 
     index_path = _regenerate_index(product_dir, feature_slugs, tdl, project_name)
 
