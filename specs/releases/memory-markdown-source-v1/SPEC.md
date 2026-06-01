@@ -51,9 +51,22 @@ This release supersedes `memory-structured-source-migration-v2` entirely.
 
 Markdown-with-YAML-frontmatter becomes the **single source of truth** for all memory
 atoms. Agents read `.md` directly (no strip pass needed). HTML becomes ephemeral
-panel-rendered output (gitignored, never committed). The catalog is generated from
-frontmatter (no HTML scraping). Atomicity is enforced by a heading-allowlist lint, not
-a body schema.
+panel-rendered output (rendered in-memory at serve time, never written to disk). The
+catalog is generated from frontmatter (no HTML scraping). Atomicity is enforced by a
+heading-allowlist lint, not a body schema.
+
+---
+
+## 2.1 Locked operator decisions (grill-me 2026-06-01 — do not re-open)
+
+These resolve OQ-1..OQ-4. Locked by the operator via `/dadaia-grill-me`.
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| **D-1** (OQ-1) | Panel renderer = **`mistune~=3.0`** (pure-Python, zero transitive deps). ~100 LOC of custom hooks: mermaid fence → `<pre class="mermaid">`, `[[wikilink]]` → `<a>`, output sanitiser. | Stdlib renderer was ~350-430 LOC of hand-maintained GFM-table parsing; `pyyaml` precedent permits single-purpose deps at this layer. |
+| **D-2** (OQ-2) | Heading allowlist = **curated set**: canonical 6 PT sections (Propósito, Fluxo de uso, Trigger típico, Diferencial, Estado runtime tocado, Dependências) + the 3 documented divergent-atom headings; `agent-orchestration` ADR headings demoted to `###`. Headings outside the set = **WARN**; `Changelog`/`Histórico`/`History`/`Versions` = **hard ERROR**. | Honest shape enforcement: forbids the atomicity-breaking headings hard, warns on drift, without the brittleness of a flat 45-heading union. |
+| **D-3** (OQ-3) | `token_estimate` is **author-maintained**; lint computes `words × 1.35` (stdlib) and **WARNs** (never errors) on >20% drift. No tokeniser dependency. | Good-enough self-pull budgeting signal; avoids a heavy `tiktoken` dep for a warning-only field. |
+| **D-4** (OQ-4) | Panel renders `.md`→HTML **in-memory at serve time** (cached by mtime); **no `.html` written to disk**. The 21 committed `.html` atoms are deleted in W4; **no `.gitignore` rule needed**. | Cleanest expression of "HTML is ephemeral"; eliminates stale-file risk and gitignore maintenance. |
 
 ---
 
@@ -162,8 +175,8 @@ a body schema.
 
 ## 5. Tech-stack deltas
 
-- **Add** (conditional on OQ-1 resolution): if stdlib renderer is insufficient, add
-  `mistune` or equivalent to `pyproject.toml` optional dependencies.
+- **Add** (D-1): `mistune~=3.0` to `pyproject.toml` runtime dependencies (pure-Python,
+  zero transitive deps). Custom hooks (~100 LOC): mermaid fence, `[[wikilink]]`, sanitiser.
 - **Remove** (if renderer.py memory path is eliminated and no other caller uses it):
   `jinja2` and `jsonschema` remain for other uses — only the memory-atom usage is retired;
   the deps themselves stay if used elsewhere.
@@ -178,8 +191,9 @@ a body schema.
   under `<memory_root>`.
 - HTML rendered from Markdown must be sanitised before serving (no raw `<script>` tags
   from atom content); the renderer must strip or escape inline HTML in Markdown.
-- `.html` memory files added to `.gitignore` under `specs/memory/` — no committed render
-  output (prevents stale committed HTML diverging from source).
+- Per **D-4**, the panel renders `.md`→HTML **in-memory at serve time** — no `.html` is
+  written under `specs/memory/`, so no `.gitignore` rule is needed. The 21 pre-existing
+  committed `.html` atoms are deleted in W4; this structurally prevents stale render output.
 
 ---
 
@@ -201,7 +215,7 @@ a body schema.
 | AC-3 | `ctx-inject.sh` injects `tech-stack.md` verbatim + `catalog.json`; total injection token count ≤ 3 K |
 | AC-4 | Panel memory viewer renders all 21 atoms from `.md` source with correct Mermaid blocks visible |
 | AC-5 | `dadaia specs doctor` exits 0 with no STRUCT/SYNC warnings; LINT-1 check passes |
-| AC-6 | No `.yaml` or `.html` memory atom files remain committed under `specs/memory/`; `.gitignore` excludes `*.html` there |
+| AC-6 | No `.yaml` or `.html` memory atom files remain committed under `specs/memory/`; panel renders `.md`→HTML in-memory (D-4), so no `.html` is written to disk and no `.gitignore` rule exists for it |
 | AC-7 | All 21 personas have Step-0 referencing the shared skill, not inline copy |
 | AC-8 | `[[slug]]` wikilinks in atom bodies resolve (lint passes); panel converts them to anchors |
 | AC-9 | `dadaia specs doctor` check #8 (forbidden headings) works on `.md` body; no escape-hatch bypass possible |
@@ -230,21 +244,23 @@ a body schema.
 - No active release blocking (ACTIVE.md = none at time of writing).
 - `go-open-source` remains parked as capstone; this release does not touch it.
 
-### Open questions (resolve before indicated wave)
+### Open questions — ALL RESOLVED (grill-me 2026-06-01)
 
-| ID | Question | Resolve by |
+All four are locked in §2.1. No design decision defers to implementation.
+
+| ID | Question | Resolution |
 |----|----------|-----------|
-| OQ-1 | Panel renderer: stdlib `html.parser`-based Markdown renderer, or add `mistune`? Evaluate coverage against the atom corpus (tables, Mermaid fences, wikilinks). | W1 end |
-| OQ-2 | Heading allowlist exact set: enumerate every `##` heading currently used across 21 atoms (requires scanning the HTML corpus). | W1 start |
-| OQ-3 | `token_estimate` maintenance: computed once at migration time and manually updated, or auto-recomputed by lint script (requires a tokeniser dep)? | W1 end |
-| OQ-4 | Rendered HTML gitignore scope: ignore `specs/memory/**/*.html`, or render fully in-memory (never touch disk)? | W2 start |
+| OQ-1 | Panel renderer: stdlib vs `mistune`? | **D-1: `mistune~=3.0`** + ~100 LOC custom hooks. |
+| OQ-2 | Heading allowlist exact set? | **D-2: curated set** (canonical 6 + 3 one-offs); ADR headings → `###`; changelog/history = hard ERROR. |
+| OQ-3 | `token_estimate` maintenance? | **D-3: author-maintained**; lint WARNs on >20% drift (`words×1.35`, stdlib). |
+| OQ-4 | Rendered HTML gitignore scope? | **D-4: render in-memory**, no `.html` on disk; no gitignore rule. |
 
 ### Risk register
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|-----------|
 | Markdown conversion loses content from raw_html_sections escape hatch | Medium | High | PE reviews each converted atom for fidelity; migration script has dry-run mode |
-| stdlib Markdown renderer has incomplete table support | Medium | Medium | OQ-1 resolution; fallback to `mistune` if needed |
+| Markdown renderer has incomplete table support | Low | Medium | Resolved via D-1: `mistune` ships GFM table support; only custom hooks (mermaid/wikilink) are bespoke |
 | Panel memory render introduces XSS via atom HTML | Low | High | Sanitise rendered HTML; strip/escape inline `<script>` and `<style>` |
 | `token_estimate` stale after atom edits | High | Low | Lint warns (not errors); addressed by OQ-3 resolution |
 | Doctor STRUCT/SYNC removal breaks assumptions in older test fixtures | Low | Medium | Adapt tests in W4; add regression coverage for new LINT-1 check |
