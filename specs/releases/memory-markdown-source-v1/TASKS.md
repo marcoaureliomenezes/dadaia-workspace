@@ -111,7 +111,7 @@
 > Track A (T-MMS-05) and Track B (T-MMS-06, T-MMS-07) are disjoint — may run in parallel.
 
 ### T-MMS-05 (Track A)
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W2 / Track A
 - **Owner:** ai-engineer
 - **Description:** Extract the Step-0 protocol into a single shared skill file at
