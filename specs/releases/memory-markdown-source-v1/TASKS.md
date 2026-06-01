@@ -252,7 +252,7 @@
 - **Parallelism note:** Disjoint from T-MMS-12
 
 ### T-MMS-12
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Wave:** W4
 - **Owner:** devops-engineer
 - **Description:** Delete lib-originated assets no longer needed:
