@@ -11,7 +11,7 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 1034
+token_estimate: 1100
 last_updated: '2026-06-01'
 release_origin: memory-markdown-source-v1
 ---
@@ -20,12 +20,12 @@ release_origin: memory-markdown-source-v1
 
 Linguagem| Versão| Uso  
 ---|---|---  
-Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest. `html.parser` (stdlib) usado por `strip-memory-html.py` para stripping de boilerplate HTML na injeção de memória — sem dependência PyPI adicional.  
-Bash| 4+ POSIX-compatível| Hooks (`sdd-spec-gate.sh`, `ctx-inject.sh`), entry scripts. `ctx-inject.sh` injeta lean payload (tech-stack + catalog, ~4.6K tokens) em sessões Claude Code e OpenCode via first-message sentinel guard.  
-HTML5 + Mermaid| Mermaid via CDN| Memory files atômicos em `specs/memory/*.html` e reports em `.dadaia/reports/<ctx>/<agent>/*.html`  
-Markdown| CommonMark| SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions  
-YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows  
-JSON| stdlib| Estado runtime em `.dadaia/states/`, `manifest.json`; `specs/memory/product/catalog.json` (gerado por `dadaia memory catalog generate`, committed, índice machine-readable de features)  
+Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest.  
+Bash| 4+ POSIX-compatível| Hooks (`sdd-spec-gate.sh`, `ctx-inject.sh`), entry scripts. `ctx-inject.sh` injeta lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) em sessões Claude Code e OpenCode via first-message sentinel guard.  
+HTML5 + Mermaid| Mermaid via CDN| Reports em `.dadaia/reports/<ctx>/<agent>/*.html`; memory atoms são `.md` renderizados in-memory (D-4)  
+Markdown| CommonMark| Memory atoms atômicos em `specs/memory/*.md` (frontmatter `memory-frontmatter-v1` + corpo Markdown); SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions  
+YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows e memory atoms (`memory-frontmatter-v1`: `additionalProperties: false`)  
+JSON| stdlib| Estado runtime em `.dadaia/states/`, `manifest.json`; `specs/memory/product/catalog.json` (gerado a partir de frontmatter `.md`, committed, índice machine-readable de features)  
   
 ## Runtimes e ferramentas
 
@@ -85,11 +85,12 @@ Dependência| Versão| Camada| Justificativa
 typer| >=0.25 (extras=[all])| cli/| CLI framework com auto-completion e rich formatting  
 rich| ^13| cli/| Pretty terminal output  
 openpyxl| ^3.1| infrastructure/| Leitura de planilhas Excel (academy)  
-pyyaml| ^6.0| infrastructure/ + features/| YAML frontmatter parsing; also used by `renderer.py` and doctor STRUCT checks via `yaml.safe_load`  
-jsonschema| ^4| features/specs/| JSON Schema validation of YAML memory atoms in `renderer.py` and `doctor.py` STRUCT-1..4 checks (memory-structured-source-v1)  
+pyyaml| ^6.0| infrastructure/ + features/| YAML frontmatter parsing (memory atoms, agents/skills/workflows); `yaml.safe_load` used by lint and catalog scripts  
+jsonschema| ^4| features/specs/| JSON Schema validation; now used for `memory-frontmatter-v1.schema.json` validation in `lint-memory-atoms.py`. The per-atom YAML schemas (memory-structured-source-v1) were deleted; `jsonschema` remains for frontmatter validation.  
+mistune| ~=3.0| features/panel/views/| Markdown → HTML render in-memory for the memory viewer (D-1, memory-markdown-source-v1). Pure-Python, zero transitive deps. Custom hooks: mermaid fence, `wikilink`, sanitiser.  
 types-PyYAML| >=6| dev| Type stubs para mypy  
-  
-**Jinja2** (already a transitive dependency) is now the canonical consumer of `dadaia_workspace/public/templates/memory-*.html.j2` via `features/specs/renderer.py` (memory-structured-source-v1). Product-engineer no longer fills templates manually; `dadaia memory render <atom.yaml>` renders them deterministically.
+
+**Jinja2** (transitive dependency) is no longer used for memory atom rendering. The `memory-*.html.j2` templates and `dadaia memory render` CLI were deleted in memory-markdown-source-v1. Jinja2 may remain as a transitive dep of other packages.
 
 ## Restrições e proibições
 

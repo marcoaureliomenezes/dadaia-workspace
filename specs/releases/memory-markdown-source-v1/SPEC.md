@@ -212,7 +212,7 @@ These resolve OQ-1..OQ-4. Locked by the operator via `/dadaia-grill-me`.
 | ID | Criterion |
 |----|-----------|
 | AC-1 | `lint-memory-atoms.py` exits 0 on all 21 converted atoms; exits non-zero on any frontmatter violation or forbidden heading |
-| AC-2 | `generate-memory-catalog.py` produces a `catalog.json` with 21 entries matching the `.md` atom slugs |
+| AC-2 | `generate-memory-catalog.py` produces a `catalog.json` with 18 product feature entries matching the `.md` atom slugs (architecture + tech-stack are core/injected; index.md is the generated TOC — all excluded from the catalog features) |
 | AC-3 | `ctx-inject.sh` injects `tech-stack.md` verbatim + `catalog.json`; total injection token count ≤ 3 K |
 | AC-4 | Panel memory viewer renders all 21 atoms from `.md` source with correct Mermaid blocks visible |
 | AC-5 | `dadaia specs doctor` exits 0 with no STRUCT/SYNC warnings; LINT-1 check passes |

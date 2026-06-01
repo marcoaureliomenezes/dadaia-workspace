@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-01T05:27:07.806393+00:00",
+  "generated_at": "2026-06-01T08:03:52.541553+00:00",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -175,7 +175,7 @@
       "title": "panel",
       "category": "product",
       "tldr": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com ...",
-      "summary": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com agent cards brand-identity (mint/sage/warm palette, WCAG AA badges), 12 workflow cards + DAG SVG server-rendered, tabela Sessions 8 colunas com per-cell min-width (CSS class selectors, floor 792px) + overflow-x:auto + Codex placeholder '—' em PROJECT, theme switcher 3 paletas, per-tab runtime toggle Claude/Codex, memory HTML via two-route proxy com memory.css brand-identity, Bearer token + CSP/nosniff; loopback bypass (panel-ux-fix-v1): GET /api/* retorna 200 sem token quando bind=127.0.0.1 (loopback_bypass=True em make_handler_class()).",
+      "summary": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com agent cards brand-identity (mint/sage/warm palette, WCAG AA badges), 12 workflow cards + DAG SVG server-rendered, tabela Sessions 8 colunas com per-cell min-width (CSS class selectors, floor 792px) + overflow-x:auto + Codex placeholder '—' em PROJECT, theme switcher 3 paletas, per-tab runtime toggle Claude/Codex, memory .md renderizado in-memory via mistune (D-4, memory-markdown-source-v1), Bearer token + CSP/nosniff; loopback bypass (panel-ux-fix-v1): GET /api/* retorna 200 sem token quando bind=127.0.0.1 (loopback_bypass=True em make_handler_class()).",
       "tags": [
         "panel",
         "ui",
@@ -308,8 +308,8 @@
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
-      "tldr": "19 checks estruturais SDD: 12 SPEC-DOC (memory HTML atômico, ACTIVE.md, CLOSURE evidence triples, broken images, Mermaid script, D-OC-1 bidirectional) + 7 TR...",
-      "summary": "19 checks estruturais SDD: 12 SPEC-DOC (memory HTML atômico, ACTIVE.md, CLOSURE evidence triples, broken images, Mermaid script, D-OC-1 bidirectional) + 7 TREE-1..7 (canonical tree v2 shape: foundation depreciada, root SPEC.md depreciado, product/index.html, backlog/bugs/releases dirs, AGENTS.md, release artifacts, bug frontmatter). --fix auto-repara TREE-3/4; migration guard para TREE-1/2.",
+      "tldr": "Valida invariantes estruturais SDD de specs/: SPEC-DOC + TREE-1..7 + LINT-1 (atomicidade .md); --fix auto-repara TREE-3/4.",
+      "summary": "14 checks estruturais SDD pós memory-markdown-source-v1: 12 SPEC-DOC (memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional) + 7 TREE-1..7 (canonical tree v2 shape). STRUCT-1..4/SYNC-1/YAML-absent removidos; SPEC-DOC-008 byte-identity retirado; check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
       "tags": [
         "specs",
         "doctor",

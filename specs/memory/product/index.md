@@ -24,7 +24,7 @@
 | `sdd-gate-v3` | sdd-gate-v3 | hook PreToolUse (RULE A/B/D/E/C) + PostToolUse sdd-post-gate.sh (heartbeat); RULE E valida DADAIA_SESSION_ID, mode-based path-policy matrix, ownership do Loc... |
 | `sdd-hotfix-track` | sdd-hotfix-track | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
-| `specs-doctor` | specs-doctor | 19 checks estruturais SDD: 12 SPEC-DOC (memory HTML atômico, ACTIVE.md, CLOSURE evidence triples, broken images, Mermaid script, D-OC-1 bidirectional) + 7 TR... |
+| `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD de specs/: SPEC-DOC + TREE-1..7 + LINT-1 (atomicidade .md); --fix auto-repara TREE-3/4. |
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional. |
 | `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente. |
 | `workspace-portability` | workspace-portability | export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas. |

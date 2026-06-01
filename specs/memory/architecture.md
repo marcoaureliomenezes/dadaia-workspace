@@ -11,9 +11,9 @@ tags:
 - dependency-rules
 - adr
 agent_tier: self-pull
-token_estimate: 4925
-last_updated: '2026-05-31'
-release_origin: panel-kanban-v1
+token_estimate: 4800
+last_updated: '2026-06-01'
+release_origin: memory-markdown-source-v1
 ---
 
 ## Visão geral
@@ -162,7 +162,8 @@ Locais canônicos de estado em disco e seu propósito:
   * `.dadaia/scripts/sdd-post-gate.sh` — projeção do gate PostToolUse / heartbeat renewal (instalada por `dadaia public install`).
   * `.dadaia/reports/<context>/<agent>/*.html` — reports HTML produzidos por especialistas (20 diretórios possíveis correspondentes aos 20 agentes), consumidos por `project-manager` no Discovery e por `project-auditor` nas auditorias.
   * `specs/releases/ACTIVE.md` — release ativa + phase.
-  * `specs/memory/*.html` — memory atômica (HTML + Mermaid + assets).
+  * `specs/memory/*.md` — memory atômica (Markdown + frontmatter YAML; rendered in-memory pelo panel via mistune).
+  * `specs/memory/product/catalog.json` — gerado por `generate-memory-catalog.py` a partir do frontmatter dos `.md`; committed; índice machine-readable.
   * `specs/_archive/releases/<id>/` — releases concluídas com CLOSURE.
   * `specs/_archive/legacy-features/<name>/` — features SDD pre-release-lifecycle não implementadas.
   * `specs/_archive/legacy-memory/<ts>/` — memory markdown migrado para HTML.
@@ -178,13 +179,13 @@ Implemented in release `memory-context-enforcement-v1`. Ensures agents never sta
 
 ### Lean payload (operator decision D-5)
 
-The injected bootstrap is **tech-stack + catalog only** (~4,584 tokens / $0.0138 at Sonnet pricing). `architecture.html` is intentionally _not_ injected — it is large (~7.5K tokens, prose + Mermaid diagrams that barely strip) and is self-pulled by agents before any architectural or cross-layer work, exactly as feature atoms are self-pulled on-demand.
+The injected bootstrap is **tech-stack + catalog only** (~2,400 tokens). `architecture.md` is intentionally _not_ injected — it is large and is self-pulled by agents before any architectural or cross-layer work, exactly as feature atoms are self-pulled on-demand. Since `memory-markdown-source-v1`, tech-stack is injected verbatim as `.md` (no strip pass needed); the former `strip-memory-html.py` helper was deleted.
 
 Layer| What is injected| Tokens (est)  
 ---|---|---  
-Catalog index| `specs/memory/product/catalog.json` — all features with slug, title, summary, path, tags, rank| ~2,300  
-Tech stack| `memory/tech-stack.html` stripped of `<head>`, `<style>`, Mermaid `<script>`| ~2,300  
-**Total injected**|  —| **~4,584 (~5K)**  
+Catalog index| `specs/memory/product/catalog.json` — all features with slug, title, summary, path, tags, rank| ~1,200  
+Tech stack| `memory/tech-stack.md` verbatim (no strip pass)| ~1,200  
+**Total injected**|  —| **~2,400 (~3K target)**  
   
 ### ctx-inject.sh (Claude Code + OpenCode)
 
@@ -198,15 +199,11 @@ Tech stack| `memory/tech-stack.html` stripped of `<head>`, `<style>`, Mermaid `<
     
     
     === workspace memory (tech + catalog) ===
-    ...stripped tech-stack.html content...
+    ...tech-stack.md content verbatim...
     ...catalog.json content...
     === end memory bootstrap ===
 
-Fallback: when `catalog.json` is absent (consumer repos not yet generated), injects stripped `product/index.html` instead of the catalog block (no error, no empty block).
-
-### strip-memory-html.py
-
-`dadaia_workspace/public/scripts/strip-memory-html.py` — NEW in this release. ~25 lines, Python stdlib only (`html.parser`). Accepts a file path as `argv[1]`, removes `<head>`, `<style>`, and Mermaid `<script>` blocks, writes stripped content to stdout. Invoked inline by `ctx-inject.sh`. Preserves all prose, heading, and diagram content.
+Fallback: when `catalog.json` is absent (consumer repos not yet generated), injects `product/index.md` verbatim instead of the catalog block (no error, no empty block). The former `.html` fallback was removed together with `strip-memory-html.py`.
 
 ### ctx-inject.ts (OpenCode first-message guard)
 
@@ -214,11 +211,11 @@ Fallback: when `catalog.json` is absent (consumer repos not yet generated), inje
 
 ### catalog.json generation pipeline
 
-`dadaia_workspace/features/specs/catalog.py` — NEW in this release. Public function `generate_catalog(specs_dir: Path) -> dict` reads `specs_dir/memory/product/index.html`, parses the `<ol class="catalog">` entries, and returns a dict matching the catalog JSON schema. CLI entry: `dadaia memory catalog generate [--specs-dir PATH]`. The generated file is committed as `specs/memory/product/catalog.json` (18 entries for this repo).
+`dadaia_workspace/features/specs/catalog.py` — reads frontmatter YAML blocks from `specs/memory/product/*.md` files (not HTML scraping). Public function `generate_catalog(specs_dir: Path) -> dict` returns a dict matching the catalog JSON schema. CLI entry: `dadaia memory catalog generate [--specs-dir PATH]`. The generated file is committed as `specs/memory/product/catalog.json` (18 product feature entries). The script `dadaia_workspace/public/scripts/generate-memory-catalog.py` is the standalone equivalent for use outside the CLI.
 
 ### CAT-1 doctor check
 
-Added to `dadaia_workspace/features/specs/doctor.py`. Verifies that the set of slugs in `catalog.json` matches the set of `*.html` files (excluding `index.html`) in `specs/memory/product/`. Severity: WARNING (not ERROR — catalog may simply be stale). The check message names the specific out-of-sync slugs/files.
+In `dadaia_workspace/features/specs/doctor.py`. Verifies that the set of slugs in `catalog.json` matches the set of `*.md` files (excluding `index.md`) in `specs/memory/product/`. Severity: WARNING (not ERROR — catalog may simply be stale). The check message names the specific out-of-sync slugs/files.
 
 ### Codex memory-ctx adapter (ADR-CX-001)
 
@@ -226,7 +223,7 @@ Added to `dadaia_workspace/features/specs/doctor.py`. Verifies that the set of s
 
 ### Step 0 block in all 21 agent personas
 
-A mandatory "Step 0 — Memory bootstrap (mandatory, before any implementation)" block was inserted into all 21 agent persona files in `dadaia_workspace/public/agents/`. The block instructs agents to: (1) read the catalog, (2) self-pull `architecture.html` before architectural/cross-layer work, (3) self-pull the 1-3 relevant feature atoms. 5 previously fully-blind P0 agents (code-reviewer, design-specialist, project-auditor, researcher, security-reviewer) also gained `dadaia-workspace-spec-navigator` in their frontmatter `skills:` list.
+A mandatory "Step 0 — Memory bootstrap (mandatory, before any implementation)" block was extracted to a shared skill `dadaia_workspace/public/skills/dadaia-step0-memory-bootstrap.md` (memory-markdown-source-v1). All 21 agent persona files in `dadaia_workspace/public/agents/` reference this skill instead of inlining ~400 tokens. The block instructs agents to: (1) read the catalog, (2) self-pull `architecture.md` before architectural/cross-layer work, (3) self-pull the 1-3 relevant feature atoms. 5 previously fully-blind P0 agents (code-reviewer, design-specialist, project-auditor, researcher, security-reviewer) also gained `dadaia-workspace-spec-navigator` in their frontmatter `skills:` list.
 
 ```mermaid
 flowchart LR
@@ -234,7 +231,7 @@ flowchart LR
       A[UserPromptSubmit / chat.message]
       B{Sentinel exists?}
       A --> B
-      B -- No --> C[strip tech-stack.html]
+      B -- No --> C[read tech-stack.md verbatim]
       C --> D[read catalog.json]
       D --> E[emit bounded block]
       E --> F[create sentinel]
@@ -244,8 +241,8 @@ flowchart LR
       H[catalog.json]
       I[identify relevant features]
       H --> I
-      I --> J[self-pull feature slugs.html]
-      I --> K[self-pull architecture.html\nbefore arch work]
+      I --> J[self-pull feature slugs.md]
+      I --> K[self-pull architecture.md\nbefore arch work]
     end
     F --> H
     G --> H
@@ -253,75 +250,61 @@ flowchart LR
 
 ## Structured-memory-source subsystem
 
-Implemented in release `memory-structured-source-v1`. Inverts the data/presentation boundary for memory atoms: a schema-validated YAML file is the sole editable source; a deterministic renderer converts YAML → committed HTML; the panel serves the committed HTML unchanged.
+Implemented in release `memory-markdown-source-v1`. Memory atoms are `.md` files with YAML frontmatter + Markdown body. This supersedes the YAML/HTML dual-file model from `memory-structured-source-v1`. HTML is ephemeral (rendered in-memory by the panel via `mistune`; never written to disk). This supersedes the YAML/HTML dual-file model shipped by `memory-structured-source-v1`.
 
-### Schemas (atomicity-as-schema)
+### Source format
 
-Four JSON Schema files live in `dadaia_workspace/public/schemas/memory/`:
+Each atom is a `.md` file with a strict YAML frontmatter block (`---` delimiters). Frontmatter schema: `memory-frontmatter-v1` (file: `dadaia_workspace/public/schemas/memory/memory-frontmatter-v1.schema.json`; `additionalProperties: false`). Required fields: `slug`, `title`, `category`, `tldr`, `summary`, `tags`, `agent_tier`, `token_estimate`, `last_updated`, `release_origin`. Body: Markdown validated by a `##` heading allowlist (curated set of canonical PT section names + documented per-atom headings). `## Changelog`, `## Histórico`, `## History`, `## Versions` are hard errors. Cross-atom links use `slug` wikilinks resolved by `lint-memory-atoms.py`.
 
-Schema ID| File| Governs  
----|---|---  
-`memory-architecture-v1`| `memory-architecture-v1.schema.json`| `specs/memory/architecture.yaml`  
-`memory-tech-stack-v1`| `memory-tech-stack-v1.schema.json`| `specs/memory/tech-stack.yaml`  
-`memory-product-index-v1`| `memory-product-index-v1.schema.json`| `specs/memory/product/index.yaml`  
-`memory-product-feature-v1`| `memory-product-feature-v1.schema.json`| `specs/memory/product/<slug>.yaml`  
-  
-All four schemas use `"additionalProperties": false`. This makes a `changelog`, `history`, or `versions` field structurally impossible to author — atomicity is enforced at schema-validation time, not by a heuristic regex at doctor runtime (D-5 structural guarantee).
+### Panel render path (`features/panel/views/_md_render.py`)
 
-### Renderer (`features/specs/renderer.py`)
+The panel reads `.md` source at serve time, converts it to HTML using `mistune~=3.0` with custom hooks (~100 LOC in `features/panel/views/_md_render.py`):
+- Mermaid fenced code block → `<pre class="mermaid">…</pre>`
+- `wikilink` → `<a href="…">` anchor
+- Sanitiser: strips inline `<script>` and `<style>` from rendered output (XSS guard, OWASP A03)
 
-`dadaia_workspace/dadaia_workspace/features/specs/renderer.py` converts a YAML atom (validated against its schema) into the committed HTML file served by the panel. The renderer is deterministic: the same YAML input always produces byte-identical HTML output. Mermaid diagram fields are wrapped in `<pre class="mermaid">…</pre>` with the CDN script tag included. CLI entry: `dadaia memory render <path.yaml>` writes/updates the adjacent `.html` file.
+Output is cached by mtime. No `.html` files are written to disk. Path traversal guard in `views/memory.py` covers `.md` source files. The SPEC-DOC-008 byte-identity invariant was retired — it applied to committed HTML only and is no longer meaningful.
 
-### Doctor checks (STRUCT-1..4, SYNC-1, YAML-absent guard)
+### Lint tooling (`lint-memory-atoms.py`)
 
-  * **STRUCT-1..4** : When a YAML atom is present, doctor validates it against its schema. A schema violation (missing required field, extra field) is an error that blocks `dadaia specs doctor` exit 0.
-  * **SYNC-1** : When a YAML source exists and passes STRUCT validation, doctor runs the renderer and compares output to the committed HTML. A divergence is a WARN (not error) — naming the specific out-of-sync atom. Catches stale committed HTML when `dadaia memory render` was not run after editing YAML.
-  * **YAML-absent guard** : When no YAML source exists for an atom (the atom is still HTML-source), STRUCT and SYNC checks are skipped with a WARN: `[WARN] YAML source absent for <atom-path>; schema validation skipped. Migrate with: dadaia migrate memory-yaml`. HTML-source consumer repos continue operating with their existing doctor checks. `dadaia specs doctor` exits 0 with WARN-only. Check #8 (changelog-grep heuristic) is skipped for atoms that have a valid YAML source — schema enforcement supersedes the heuristic.
+`dadaia_workspace/public/scripts/lint-memory-atoms.py` validates every atom:
+- Frontmatter present, parseable, required fields, no extra fields (`additionalProperties`)
+- `##` headings are a subset of the allowlist; no duplicates
+- `slug` wikilinks resolve to real `.md` files in `specs/memory/`
+- `token_estimate` drift warning (> 20% from `words × 1.35`; WARN only — never ERROR)
+- Forbidden headings (`## Changelog` / `## Histórico` / `## History` / `## Versions`) — hard ERROR
 
+Invoked by doctor check `LINT-1`. Exit 0 = all valid; exit 1 = at least one ERROR; exit 2 = warnings only.
 
+### Doctor LINT-1 check
 
-### Gate RULE A extension
+`LINT-1` in `features/specs/doctor.py` calls `lint-memory-atoms.py` on all `.md` files under `specs/memory/`. ERROR on frontmatter violations or forbidden headings; WARNING on token drift. Replaces the removed STRUCT-1..4 / SYNC-1 / YAML-absent checks. Check #2 (memory files exist) now looks for `.md` files. Check #8 (forbidden heading grep) now operates on `.md` body directly — no escape hatch.
 
-RULE A in `dadaia_workspace/public/scripts/sdd-spec-gate.sh` was extended to lock `specs/memory/**/*.yaml` and `specs/memory/**/*.yml` files with the same CLOSURE-only enforcement as HTML atoms. A Write attempt on a YAML memory source outside the CLOSURE phase is blocked with the standard memory-atomicity gate message.
+### Gate RULE A (`.md` atoms)
 
-### Scaffold (born-structured)
+RULE A in `sdd-spec-gate.sh` locks `specs/memory/**/*.md` with CLOSURE-only enforcement (same as the former `.yaml` and `.html` locks). A Write attempt on a `.md` memory atom outside the CLOSURE phase is blocked.
 
-New consumer repos initialized via `dadaia init` or `dadaia context create` receive YAML stubs in `specs/memory/` (not HTML scaffold files). The old `architecture.html`, `tech-stack.html`, and `product/index.html` scaffold files were replaced by `architecture.yaml`, `tech-stack.yaml`, and `product/index.yaml` stubs that validate against their respective schemas. Stubs use `dadaia memory render` to generate their first committed HTML.
+### Scaffold (born-markdown)
 
-### Migration command
-
-`dadaia migrate memory-yaml` guides existing HTML-source consumers through per-atom migration. Running it on an HTML atom produces a valid YAML file in the same directory; a second run on the same atom is a no-op with a warning (idempotent guard).
-
-### Current state of this repo's atoms
-
-This repo's 21 memory atoms remain HTML-source. The dogfood migration (C-6) was deferred because the v1 schemas cannot losslessly represent the richest atoms: `tech-stack` and `architecture` have rich tables and multiple diagram fields that exceed the single-value schema fields; `agent-comms` and `brand-identity` have non-standard sections with no mapping to the `memory-product-feature-v1` required-field contract. A follow-up release (`memory-structured-source-migration-v2`) will enrich the schemas and re-run the migration with a content-fidelity gate. Until then, `dadaia specs doctor` exits 0 with 21 YAML-absent WARNs (benign, expected).
+New consumer repos initialized via `dadaia init` or `dadaia context create` receive `.md` stubs in `specs/memory/` (frontmatter scaffold + section placeholders). The old `.yaml` scaffold files were deleted. `dadaia memory product add <slug>` generates a `.md` file validated by `lint-memory-atoms.py`.
 
 ```mermaid
 flowchart LR
     subgraph Source
-      A[specs/memory/<atom>.yaml]
+      A[specs/memory/<atom>.md\nfrontmatter + body]
     end
-    subgraph Validation
-      B[schema validation\nSTRUCT-1..4]
+    subgraph Lint
+      B[lint-memory-atoms.py\nLINT-1 doctor check]
       A --> B
     end
-    subgraph Render
-      C[renderer.py\ndadaia memory render]
-      B -- valid --> C
-    end
-    subgraph Committed
-      D[specs/memory/<atom>.html]
-      C --> D
-    end
-    subgraph Doctor
-      E[SYNC-1 check]
-      D --> E
-      A --> E
+    subgraph Panel render
+      C[features/panel/views/_md_render.py\nmistune + custom hooks]
+      A --> C
+      C --> D[HTML in-memory\nnever written to disk]
     end
     subgraph Gate
       F[RULE A\nCLOSURE-only write lock]
       A -.guarded by.-> F
-      D -.guarded by.-> F
     end
 ```
 
