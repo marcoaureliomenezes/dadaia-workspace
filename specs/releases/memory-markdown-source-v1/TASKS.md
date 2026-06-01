@@ -9,7 +9,7 @@
 ## Wave 0 — Decisions
 
 ### T-MMS-W0-01
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Wave:** W0
 - **Owner:** ai-engineer
 - **Description:** Enumerate every `##` heading used across the 21 current HTML memory
@@ -22,7 +22,7 @@
   confirms allowlist is complete (OQ-2 closed).
 
 ### T-MMS-W0-02
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Wave:** W0
 - **Owner:** ai-engineer
 - **Description:** Proof-of-concept stdlib Markdown renderer: render `architecture.html`
@@ -42,7 +42,7 @@
 > W1 tasks are parallel and disjoint within the wave.
 
 ### T-MMS-01
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W1
 - **Owner:** software-engineer-python
 - **Description:** Implement `dadaia_workspace/public/scripts/lint-memory-atoms.py`.
@@ -62,7 +62,7 @@
   field, forbidden heading, bad wikilink, duplicate heading, token drift); `pytest` green
 
 ### T-MMS-02
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W1
 - **Owner:** software-engineer-python
 - **Description:** Implement `dadaia_workspace/public/scripts/generate-memory-catalog.py`.
