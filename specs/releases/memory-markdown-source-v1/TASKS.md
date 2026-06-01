@@ -205,6 +205,23 @@
 - **Done when:** `git status` shows no tracked `.yaml` or `.html` memory files; `.gitignore`
   excludes `*.html` under `specs/memory/`
 
+### T-MMS-W2-FIX
+- **Status:** `[-]`
+- **Wave:** W2 / Post-merge
+- **Owner:** software-engineer-python
+- **Description:** Reconcile 11 failing tests that encode OLD pre-W2 behavior. Update test
+  assertions to match the new behavior introduced by T-MMS-04 (`.md` atoms alongside
+  `.yaml`/`.html`) and T-MMS-05 (`dadaia-step0-memory-bootstrap` skill). Fix doctor
+  `SPEC-DOC-002L` defect that falsely flags the new born-markdown companion `.md` files
+  as legacy errors when a corresponding `.html` already exists.
+- **Write set:** `tests/unit/features/specs/test_scaffolder.py`;
+  `tests/integration/cli/test_cli_memory.py`;
+  `tests/integration/cli/test_cli_specs_doctor_fix.py`;
+  `tests/e2e/features/test_public_pipeline.py`;
+  `dadaia_workspace/features/specs/doctor.py` (minimal SPEC-DOC-002L guard fix)
+- **Preconditions:** T-MMS-04 and T-MMS-05 done
+- **Done when:** All 11 targeted tests pass; full suite green (0 failed); ruff + mypy clean
+
 ---
 
 ## Wave 4 — Delete old subsystem + doctor + propagation + QA gate
