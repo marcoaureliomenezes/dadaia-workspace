@@ -1,6 +1,6 @@
 # PLAN — Release: memory-markdown-source-v1
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** memory-markdown-source-v1
 **Owner:** product-engineer
 

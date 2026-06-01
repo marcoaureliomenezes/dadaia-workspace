@@ -1,6 +1,6 @@
 # TASKS — Release: memory-markdown-source-v1
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** memory-markdown-source-v1
 **Owner:** product-engineer
 
@@ -76,7 +76,7 @@
   green
 
 ### T-MMS-03
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Wave:** W1
 - **Owner:** software-engineer-python
 - **Description:** Write the frontmatter JSON schema (`memory-frontmatter-v1.schema.json`)

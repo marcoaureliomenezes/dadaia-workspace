@@ -1,9 +1,10 @@
 # SPEC — Release: memory-markdown-source-v1
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** memory-markdown-source-v1
 **Owner:** product-engineer
 **Opened:** 2026-06-01
+**Aprovado:** 2026-06-01 (operator; OQ-1..4 locked via grill-me, D-1..D-4)
 
 > **Supersedes and retires:** `memory-structured-source-migration-v2` (candidate in
 > `backlog/candidates.md`). That candidate's uncommitted WIP was snapshotted on branch
