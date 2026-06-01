@@ -193,7 +193,7 @@
   entries with correct slugs, titles, and tldr values
 
 ### T-MMS-10
-- **Status:** `[ ]`
+- **Status:** `[-]`
 - **Wave:** W3 / CLOSURE
 - **Owner:** product-engineer
 - **Description:** Delete committed `.yaml` and `.html` memory atom files. Add
@@ -230,7 +230,7 @@
 > T-MMS-11 and T-MMS-12 may run in parallel (disjoint write sets).
 
 ### T-MMS-11
-- **Status:** `[ ]`
+- **Status:** `[-]`
 - **Wave:** W4
 - **Owner:** software-engineer-python
 - **Description:** Update `dadaia_workspace/features/specs/doctor.py`:
