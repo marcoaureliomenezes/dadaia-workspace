@@ -276,7 +276,7 @@
 - **Parallelism note:** Disjoint from T-MMS-11
 
 ### T-MMS-13
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W4
 - **Owner:** qa-engineer
 - **Description:** Acceptance gate. Verify all 10 AC criteria from SPEC §8.
