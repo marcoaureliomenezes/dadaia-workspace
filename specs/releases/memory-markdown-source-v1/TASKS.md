@@ -166,7 +166,7 @@
 > These tasks are PE-only and sequential.
 
 ### T-MMS-08
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W3 / CLOSURE
 - **Owner:** product-engineer
 - **Description:** Implement `migrate-html-to-md.py` (in-session script, not a permanent
@@ -181,7 +181,7 @@
 - **Done when:** 21 `.md` files exist; each passes `lint-memory-atoms.py` (no errors)
 
 ### T-MMS-09
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Wave:** W3 / CLOSURE
 - **Owner:** product-engineer
 - **Description:** Run `lint-memory-atoms.py` on all 21 atoms; fix any remaining
