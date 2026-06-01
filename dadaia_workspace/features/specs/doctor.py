@@ -670,11 +670,19 @@ class SpecsDoctor:
                 )
             )
 
-        # Flag any legacy markdown memory files (root or product/)
+        # Flag any legacy markdown memory files (root or product/).
         # AGENTS.md is a directory contract, not a memory atom — exempt it.
+        # T-MMS-04 born-markdown companion: a .md file is NOT legacy when a
+        # corresponding .html file exists in the same directory (the .md is the
+        # new editable source; the .html is the rendered counterpart).  Only flag
+        # .md files that have NO .html companion (those are genuinely orphaned).
         if mem_dir.exists():
             for legacy in mem_dir.glob("*.md"):
                 if legacy.name == "AGENTS.md":
+                    continue
+                # Skip born-markdown companions that already have an HTML counterpart.
+                companion_html = legacy.with_suffix(".html")
+                if companion_html.exists():
                     continue
                 issues.append(
                     SpecsDoctorIssue(
@@ -689,6 +697,10 @@ class SpecsDoctor:
                 )
             if product_dir.is_dir():
                 for legacy in product_dir.glob("*.md"):
+                    # Skip born-markdown companions that have an HTML counterpart.
+                    companion_html = legacy.with_suffix(".html")
+                    if companion_html.exists():
+                        continue
                     issues.append(
                         SpecsDoctorIssue(
                             code="SPEC-DOC-002L",

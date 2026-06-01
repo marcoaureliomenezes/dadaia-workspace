@@ -206,7 +206,7 @@
   excludes `*.html` under `specs/memory/`
 
 ### T-MMS-W2-FIX
-- **Status:** `[-]`
+- **Status:** `[x]`
 - **Wave:** W2 / Post-merge
 - **Owner:** software-engineer-python
 - **Description:** Reconcile 11 failing tests that encode OLD pre-W2 behavior. Update test

@@ -3,10 +3,14 @@
 Tests use Typer's CliRunner on a real tmp_path filesystem.
 
 Covers:
-- AC-T3-2: dadaia memory product add payments creates feature HTML + updates index
+- AC-T3-2: dadaia memory product add payments creates feature Markdown atom + updates index
 - AC-T3-3: idempotent index regeneration
-- AC-C-6: feature HTML + index regenerated
+- AC-C-6: feature Markdown atom + index regenerated
 - AC-C-7: idempotent
+
+T-MMS-04 change: `memory product add <slug>` now creates `<slug>.md` (born-markdown
+scaffold with YAML frontmatter) instead of `<slug>.html`.  The index is still
+regenerated as `index.html` (that stays until W4 / T-MMS-11).
 """
 
 from __future__ import annotations
@@ -33,28 +37,37 @@ def specs(tmp_path: Path) -> Path:
 
 
 class TestMemoryProductAdd:
-    def test_creates_feature_html_and_index(self, specs: Path) -> None:
-        """AC-T3-2 / AC-C-6: creates feature HTML and regenerates index."""
+    def test_creates_feature_md_and_index(self, specs: Path) -> None:
+        """AC-T3-2 / AC-C-6: creates feature Markdown atom and regenerates index.html.
+
+        T-MMS-04: feature file is now <slug>.md (born-markdown), not <slug>.html.
+        index.html is still regenerated (html index stays until W4).
+        """
         result = _runner.invoke(
             app,
             ["memory", "product", "add", "payments", "--specs-dir", str(specs)],
         )
 
         assert result.exit_code == 0, result.output
-        assert (specs / "memory" / "product" / "payments.html").is_file()
+        # T-MMS-04: feature atom is now .md, not .html
+        assert (specs / "memory" / "product" / "payments.md").is_file()
         assert (specs / "memory" / "product" / "index.html").is_file()
+        # index.html still links to the slug HTML path for backwards-compat
         assert "payments.html" in (specs / "memory" / "product" / "index.html").read_text(
             encoding="utf-8"
         )
 
-    def test_feature_html_is_valid_html(self, specs: Path) -> None:
-        """Feature HTML contains DOCTYPE."""
+    def test_feature_md_has_valid_frontmatter(self, specs: Path) -> None:
+        """Feature Markdown atom starts with YAML frontmatter (T-MMS-04 born-markdown)."""
         _runner.invoke(
             app,
             ["memory", "product", "add", "payments", "--specs-dir", str(specs)],
         )
-        content = (specs / "memory" / "product" / "payments.html").read_text(encoding="utf-8")
-        assert "<!DOCTYPE html>" in content or "<!doctype html>" in content.lower()
+        content = (specs / "memory" / "product" / "payments.md").read_text(encoding="utf-8")
+        # Must start with frontmatter delimiter
+        assert content.startswith("---"), "Feature .md must start with YAML frontmatter '---'"
+        # Slug must be injected into the frontmatter
+        assert "slug: payments" in content, "Frontmatter must contain 'slug: payments'"
 
     def test_idempotent_on_second_run(self, specs: Path) -> None:
         """AC-T3-3 / AC-C-7: second call produces identical index.html catalog section."""

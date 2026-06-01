@@ -129,8 +129,15 @@ def test_missing_architecture_html_reports_doc_002(tmp_path: Path) -> None:
 
 
 def test_legacy_memory_markdown_reports_doc_002L(tmp_path: Path) -> None:
+    """An orphaned .md file (no .html companion) is flagged as legacy (SPEC-DOC-002L).
+
+    T-MMS-04: a .md file that coexists with a .html companion (born-markdown pattern)
+    is NOT legacy and must NOT be flagged.  Only truly orphaned .md files (no .html
+    companion in the same directory) are flagged.
+    """
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "memory" / "architecture.md").write_text("# legacy", encoding="utf-8")
+    # Write a .md with NO .html companion — this is the legacy/orphan case.
+    (specs / "memory" / "legacy-notes.md").write_text("# legacy", encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-002L" in _codes(issues)
 

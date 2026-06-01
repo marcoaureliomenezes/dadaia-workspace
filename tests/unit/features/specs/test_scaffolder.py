@@ -21,15 +21,21 @@ _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 # Expected canonical outputs (relative to specs_dir).
+# Since T-MMS-04 (memory-markdown-source-v1 W1), scaffold emits .md born-markdown
+# companions ALONGSIDE the .yaml + .html files for each structural atom.
 # Since T-MSS-06 (memory-structured-source-v1 C-5), scaffold emits YAML + HTML for each
 # structural atom instead of HTML-only.  placeholder.html is included so that the
 # index.yaml catalog entry does not produce a broken-link doctor error on fresh repos.
+# The .yaml/.html files stay until W4 deletes them (T-MMS-12).
 _EXPECTED_FILES = [
     "constitution.md",
+    "memory/architecture.md",
     "memory/architecture.yaml",
     "memory/architecture.html",
+    "memory/tech-stack.md",
     "memory/tech-stack.yaml",
     "memory/tech-stack.html",
+    "memory/product/index.md",
     "memory/product/index.yaml",
     "memory/product/index.html",
     "memory/product/placeholder.html",
@@ -81,6 +87,17 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     active_content = (specs_dir / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
     assert "release: none" in active_content
     assert "phase: none" in active_content
+
+    # Verify born-markdown .md stubs exist (T-MMS-04: scaffold now emits .md alongside
+    # .yaml + .html; .yaml/.html stay until W4 deletes them — T-MMS-12).
+    arch_md = (specs_dir / "memory" / "architecture.md").read_text(encoding="utf-8")
+    assert arch_md.startswith("---"), "architecture.md must start with YAML frontmatter"
+
+    tech_md = (specs_dir / "memory" / "tech-stack.md").read_text(encoding="utf-8")
+    assert tech_md.startswith("---"), "tech-stack.md must start with YAML frontmatter"
+
+    product_index_md = (specs_dir / "memory" / "product" / "index.md").read_text(encoding="utf-8")
+    assert product_index_md.startswith("---"), "product/index.md must start with YAML frontmatter"
 
     # Verify YAML stubs exist and contain YAML content (T-MSS-06: scaffold now emits YAML + HTML).
     arch_yaml = (specs_dir / "memory" / "architecture.yaml").read_text(encoding="utf-8")
