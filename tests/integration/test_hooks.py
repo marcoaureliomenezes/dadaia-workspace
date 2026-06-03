@@ -43,16 +43,17 @@ def test_ctx_inject_reports_none_when_no_primary(workspace: Path) -> None:
 
 def test_ctx_inject_reports_active_context(workspace: Path) -> None:
     scripts = _install_scripts(workspace)
-    (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
-    (workspace / ".dadaia" / "states" / "primary_context.json").write_text(
-        json.dumps({"name": "active-ctx", "repo_slug": "active-ctx", "specs_dir": "/x"})
-    )
+    # v2: context is resolved via DADAIA_CONTEXT env var; create minimal specs dir
+    # so the hook emits the context name rather than a "specs not found" warning.
+    (workspace / "repos" / "active-ctx" / "specs").mkdir(parents=True)
+    env = {**os.environ, "DADAIA_CONTEXT": "active-ctx", "WORKSPACE_ROOT": str(workspace)}
     result = subprocess.run(
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
         text=True,
         cwd="/tmp",
         timeout=5,
+        env=env,
     )
     assert result.returncode == 0
     assert "[active-ctx]" in result.stdout
@@ -168,36 +169,45 @@ def test_sdd_gate_v2_passes_primary_slug_path_with_active_task(workspace: Path) 
 
 
 def _make_full_context(workspace: Path, slug: str) -> tuple[Path, Path, Path]:
-    """Set up a minimal workspace with state file and specs/memory/ tree.
+    """Set up a minimal workspace with specs/memory/ tree under repos/<slug>/specs/.
 
-    Returns (scripts_dir, memory_dir, scripts_dir) so callers can add fixtures.
+    The v2 DADAIA_CONTEXT env-var branch resolves:
+        SPECS_DIR = $WORKSPACE_ROOT/repos/$DADAIA_CONTEXT/specs
+
+    so memory fixtures are placed under repos/<slug>/specs/memory/ — exactly
+    where ctx-inject.sh will look when DADAIA_CONTEXT=<slug> is exported.
+
+    Returns (scripts_dir, memory_dir, specs_dir) so callers can add fixtures.
     """
     scripts = _install_scripts(workspace)
-    (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
     specs_dir = workspace / "repos" / slug / "specs"
     (specs_dir / "memory" / "product").mkdir(parents=True)
-    (workspace / ".dadaia" / "states" / "primary_context.json").write_text(
-        json.dumps({"name": slug, "repo_slug": slug, "specs_dir": str(specs_dir)})
-    )
     return scripts, specs_dir / "memory", specs_dir
 
 
 def _run_ctx_inject(
-    workspace: Path, scripts: Path, *, fresh: bool = True
+    workspace: Path, scripts: Path, *, fresh: bool = True, ctx: str = ""
 ) -> subprocess.CompletedProcess[str]:
-    """Run ctx-inject.sh from the scripts dir, optionally purging the sentinel first."""
+    """Run ctx-inject.sh from the scripts dir, optionally purging the sentinel first.
+
+    Pass *ctx* to inject DADAIA_CONTEXT=<ctx> into the subprocess environment so
+    the v2 env-var branch fires (replacing the removed primary_context.json branch).
+    """
     sentinel_dir = workspace / ".dadaia" / "tmp"
     if fresh:
         # Remove any sentinel so injection fires
         for f in sentinel_dir.glob("ctx-inject-fired-*"):
             f.unlink(missing_ok=True)
+    env = {**os.environ, "WORKSPACE_ROOT": str(workspace)}
+    if ctx:
+        env["DADAIA_CONTEXT"] = ctx
     return subprocess.run(
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
         text=True,
         cwd="/tmp",
         timeout=10,
-        env={**os.environ, "WORKSPACE_ROOT": str(workspace)},
+        env=env,
     )
 
 
@@ -207,7 +217,7 @@ def test_ctx_inject_reads_tech_stack_md_verbatim(workspace: Path) -> None:
     tech_md = memory_dir / "tech-stack.md"
     tech_md.write_text("# tech-stack\n\nsome content here\n")
 
-    result = _run_ctx_inject(workspace, scripts)
+    result = _run_ctx_inject(workspace, scripts, ctx="myctx")
 
     assert result.returncode == 0, result.stderr
     assert "some content here" in result.stdout
@@ -241,7 +251,7 @@ def test_ctx_inject_catalog_json_preferred_over_index_md(workspace: Path) -> Non
     # index.md present but must NOT be emitted when catalog.json exists
     (memory_dir / "product" / "index.md").write_text("# index fallback — should NOT appear\n")
 
-    result = _run_ctx_inject(workspace, scripts)
+    result = _run_ctx_inject(workspace, scripts, ctx="myctx")
 
     assert result.returncode == 0, result.stderr
     assert "foo" in result.stdout
@@ -255,7 +265,7 @@ def test_ctx_inject_falls_back_to_index_md_verbatim(workspace: Path) -> None:
     # No catalog.json; only index.md
     (memory_dir / "product" / "index.md").write_text("# Product Index\n\nfeature-alpha listed\n")
 
-    result = _run_ctx_inject(workspace, scripts)
+    result = _run_ctx_inject(workspace, scripts, ctx="myctx")
 
     assert result.returncode == 0, result.stderr
     assert "feature-alpha listed" in result.stdout

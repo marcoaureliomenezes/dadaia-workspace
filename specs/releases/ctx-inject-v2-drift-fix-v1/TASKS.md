@@ -127,7 +127,7 @@ grep "context bind" .dadaia/scripts/ctx-inject.sh   # must return the new guidan
 ### T-CIV-05 — Reconcile 4 stale integration tests broken by T-CIV-01
 
 - **ID:** T-CIV-05
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target file:** `repos/dadaia-workspace/tests/integration/test_hooks.py`
 - **Preconditions:** T-CIV-03 is `[x]`
