@@ -9,6 +9,7 @@ import pytest
 
 from dadaia_workspace.features.specs.scaffolder import (
     ScaffoldResult,
+    _render_template,
     scaffold,
     scaffold_hotfix_release,
 )
@@ -291,3 +292,20 @@ def test_hotfix_scaffold_rejects_invalid_patches_release(tmp_path: Path) -> None
             severity="LOW",
             templates_dir=_TEMPLATES_DIR,
         )
+
+
+def test_render_template_sandbox_blocks_python_internals(tmp_path: Path) -> None:
+    """F-03: the scaffolder uses a SandboxedEnvironment — template access to
+    Python internals (dunder attributes) raises rather than evaluating."""
+    (tmp_path / "evil.md.j2").write_text("{{ ().__class__.__bases__ }}\n", encoding="utf-8")
+
+    with pytest.raises(jinja2.exceptions.SecurityError):
+        _render_template(tmp_path, "evil.md.j2", {})
+
+
+def test_render_template_renders_normal_context(tmp_path: Path) -> None:
+    """Normal rendering still works under the sandbox."""
+    (tmp_path / "ok.md.j2").write_text("# {{ project_name }}\n", encoding="utf-8")
+
+    # Jinja strips the single trailing template newline by default.
+    assert _render_template(tmp_path, "ok.md.j2", {"project_name": "demo"}) == "# demo"

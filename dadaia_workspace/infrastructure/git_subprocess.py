@@ -75,6 +75,12 @@ def _stage_files_safe(path: Path) -> None:
 
 class GitSubprocessClient:
     def clone(self, url: str, dest: Path) -> None:
+        # Block the two transports that turn a URL into code/option execution:
+        # ``ext::`` runs an arbitrary helper (RCE) and a leading "-" can be parsed
+        # by git as an option (argument injection). Legitimate https/ssh/git@ and
+        # local-path / file:// clones are still allowed.
+        if url.startswith("ext::") or url.startswith("-"):
+            raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}")
         result = _run(["git", "clone", url, str(dest)])
         if result.returncode != 0:
             raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}")

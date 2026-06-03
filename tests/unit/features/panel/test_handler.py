@@ -26,6 +26,8 @@ import io
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler
 
+import pytest
+
 from dadaia_workspace.features.panel.handler import _NOT_FOUND_BODY, make_handler_class
 
 # ---------------------------------------------------------------------------
@@ -129,7 +131,7 @@ def _dispatch(
 def test_dispatch_index() -> None:
     """(a) GET / invokes the index stub."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/")
 
@@ -144,7 +146,7 @@ def test_dispatch_index() -> None:
 def test_dispatch_api_panel_status() -> None:
     """(b) GET /api/panel-status invokes the api_panel_status stub with no captured groups."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/api/panel-status")
 
@@ -155,7 +157,7 @@ def test_dispatch_api_panel_status() -> None:
 def test_dispatch_api_contexts() -> None:
     """GET /api/contexts invokes the api_contexts stub."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/api/contexts")
 
@@ -166,7 +168,7 @@ def test_dispatch_api_contexts() -> None:
 def test_dispatch_memory_with_named_groups() -> None:
     """(c) GET /memory/foo/bar.html invokes memory view with slug="foo", path="bar.html"."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/memory/foo/bar.html")
 
@@ -177,7 +179,7 @@ def test_dispatch_memory_with_named_groups() -> None:
 def test_dispatch_memory_view_with_named_groups() -> None:
     """(d) GET /memory-view/foo/bar.html invokes memory_view with slug="foo", path="bar.html"."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/memory-view/foo/bar.html")
 
@@ -188,7 +190,7 @@ def test_dispatch_memory_view_with_named_groups() -> None:
 def test_dispatch_static_with_named_group() -> None:
     """(e) GET /static/panel.css invokes static view with name="panel.css"."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/static/panel.css")
 
@@ -199,7 +201,7 @@ def test_dispatch_static_with_named_group() -> None:
 def test_dispatch_unknown_returns_404_with_error_contract_body() -> None:
     """(f) GET /unknown returns HTTP 404 with the error-contract body (T-2.3)."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     status, body = _dispatch(handler_class, "/unknown")
 
@@ -214,7 +216,7 @@ def test_dispatch_unknown_returns_404_with_error_contract_body() -> None:
 def test_dispatch_strips_query_string_before_matching() -> None:
     """Route matching strips query string so /api/panel-status?x=1 still dispatches."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/api/panel-status?refresh=1")
 
@@ -230,7 +232,7 @@ def test_dispatch_health_returns_200() -> None:
     stubs["health"].content_type = "application/json"
     stubs["health"].body = json.dumps({"status": "ok", "version": "0.1.2"}).encode()
     stubs["health"].status = 200
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     status, body = _dispatch(handler_class, "/health")
 
@@ -243,7 +245,7 @@ def test_dispatch_health_returns_200() -> None:
 def test_dispatch_memory_nested_path() -> None:
     """Memory route captures multi-segment paths: /memory/foo/dir/file.html."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/memory/foo/dir/file.html")
 
@@ -460,3 +462,82 @@ def test_loopback_bypass_default_is_false() -> None:
 
     assert status == 401
     assert stubs["api_reports"].call_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Second-loop auth gate (F-01 / F-02 / F-04)
+#
+# Routes that expose workspace-sensitive data — server registry/ports, repo
+# filesystem paths, and report/memory file contents — are dispatched by the
+# non-telemetry loop. They must require Bearer auth when loopback_bypass is OFF
+# (defense in depth for non-loopback binds) while staying open under loopback.
+# ---------------------------------------------------------------------------
+
+_SENSITIVE_ROUTE_CASES = [
+    ("/api/panel-status", "api_panel_status"),
+    ("/api/contexts", "api_contexts"),
+    ("/reports/sub/report.html", "reports_serve"),
+    ("/memory/foo/bar.html", "memory"),
+    ("/memory-view/foo/bar.html", "memory_view"),
+]
+
+
+def _make_stubs_with_reports_serve() -> dict[str, _StubView]:
+    stubs = _make_stubs()
+    stubs["reports_serve"] = _StubView(name="reports_serve")
+    return stubs
+
+
+@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
+def test_sensitive_route_requires_token_when_not_loopback(path: str, route_name: str) -> None:
+    stubs = _make_stubs_with_reports_serve()
+    handler_class = make_handler_class(  # type: ignore[arg-type]
+        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
+    )
+
+    status, body = _dispatch_get_with_auth(handler_class, path)
+
+    assert status == 401
+    assert b"unauthorized" in body
+    assert stubs[route_name].call_count == 0
+
+
+@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
+def test_sensitive_route_rejects_invalid_token_when_not_loopback(
+    path: str, route_name: str
+) -> None:
+    stubs = _make_stubs_with_reports_serve()
+    handler_class = make_handler_class(  # type: ignore[arg-type]
+        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
+    )
+
+    status, _ = _dispatch_get_with_auth(handler_class, path, token="wrong-token")
+
+    assert status == 401
+    assert stubs[route_name].call_count == 0
+
+
+@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
+def test_sensitive_route_allows_valid_token_when_not_loopback(path: str, route_name: str) -> None:
+    stubs = _make_stubs_with_reports_serve()
+    handler_class = make_handler_class(  # type: ignore[arg-type]
+        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
+    )
+
+    status, _ = _dispatch_get_with_auth(handler_class, path, token=_BYPASS_TOKEN)
+
+    assert status == 200
+    assert stubs[route_name].call_count == 1
+
+
+@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
+def test_sensitive_route_open_under_loopback_bypass(path: str, route_name: str) -> None:
+    stubs = _make_stubs_with_reports_serve()
+    handler_class = make_handler_class(  # type: ignore[arg-type]
+        stubs, token=_BYPASS_TOKEN, loopback_bypass=True
+    )
+
+    status, _ = _dispatch_get_with_auth(handler_class, path)  # no auth header
+
+    assert status == 200
+    assert stubs[route_name].call_count == 1
