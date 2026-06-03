@@ -56,7 +56,7 @@ Maximum one `[-]` at a time.
 ### T-CIV-02 — Fix SKILL.md: replace stale `context use` verb
 
 - **ID:** T-CIV-02
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Target file:** `dadaia_workspace/public/skills/dadaia-workspace-manager/SKILL.md`
 - **Preconditions:** T-CIV-01 is `[x]`
