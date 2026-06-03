@@ -92,6 +92,9 @@ pip-wheel-metadata/
 .ipynb_checkpoints/
 *.ipynb
 
-# Maintainer SDD dev-ledger — this-instance operational state, NOT distributed.
-# Consumers generate their own specs/ via `dadaia init`. Kept locally, never public.
-/specs/
+# Maintainer SDD release ledger remains local, but product law and memory are public.
+# `specs/constitution.md` and `specs/memory/**` are first-class repository truth.
+/specs/*
+!/specs/constitution.md
+!/specs/memory/
+!/specs/memory/**
