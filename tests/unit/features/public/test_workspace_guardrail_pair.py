@@ -452,7 +452,7 @@ def test_install_dispatches_to_workspace_guardrail_pair(tmp_path: Path) -> None:
     (agentic_dir / "manifest.json").write_text(__import__("json").dumps(manifest), encoding="utf-8")
 
     # One marker-bearing consumer with a distinct (non-self) package_version
-    consumer = workspace_root / "repos" / "dadaia-bots"
+    consumer = workspace_root / "repos" / "sample-consumer"
     (consumer / ".dadaia" / "agentic").mkdir(parents=True)
     consumer_manifest = {"schema_version": "1", "package_version": "0.0.0"}
     (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(

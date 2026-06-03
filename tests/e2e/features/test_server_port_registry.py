@@ -37,10 +37,10 @@ def test_us1_agent_registers_port_before_starting_server(tmp_path: Path) -> None
     probe._alive_pids.add(11111)
     svc = _build_svc(ws, probe)
 
-    entry = svc.register(port=3000, project="portifolio", pid=11111, description="Flask")
+    entry = svc.register(port=3000, project="my-frontend", pid=11111, description="Flask")
 
     assert entry.port == 3000
-    assert entry.project == "portifolio"
+    assert entry.project == "my-frontend"
     assert entry.url == "http://localhost:3000"
     assert entry.pid == 11111
 
@@ -59,10 +59,10 @@ def test_us1_conflict_raises_when_port_occupied(tmp_path: Path) -> None:
     probe._alive_pids.update([11111, 22222])
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3000, project="portifolio", pid=11111)
+    svc.register(port=3000, project="my-frontend", pid=11111)
     with pytest.raises(PortConflictError) as exc_info:
-        svc.register(port=3000, project="portifolio-wave6", pid=22222)
-    assert "portifolio" in str(exc_info.value)
+        svc.register(port=3000, project="my-frontend-wave6", pid=22222)
+    assert "my-frontend" in str(exc_info.value)
 
     entries = svc.list_entries()
     assert len(entries) == 1
@@ -73,8 +73,8 @@ def test_us2_next_port_returns_deterministic_base(tmp_path: Path) -> None:
     ws = _init_workspace(tmp_path)
     svc = _build_svc(ws, FakeProcessProbe())
 
-    port, is_base = svc.next_port("dadaia-bots")
-    assert port == 3537
+    port, is_base = svc.next_port("my-service")
+    assert port == 3073
     assert is_base is True
 
 
@@ -84,11 +84,11 @@ def test_us2_next_port_idempotent_when_registered(tmp_path: Path) -> None:
     probe._alive_pids.add(99)
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3537, project="dadaia-bots", pid=99)
+    svc.register(port=3073, project="my-service", pid=99)
 
-    port1, _ = svc.next_port("dadaia-bots")
-    port2, _ = svc.next_port("dadaia-bots")
-    assert port1 == port2 == 3537
+    port1, _ = svc.next_port("my-service")
+    port2, _ = svc.next_port("my-service")
+    assert port1 == port2 == 3073
 
 
 def test_us2_next_port_increments_when_base_occupied(tmp_path: Path) -> None:
@@ -97,9 +97,9 @@ def test_us2_next_port_increments_when_base_occupied(tmp_path: Path) -> None:
     probe._alive_pids.add(88)
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3537, project="other-project", pid=88)
-    port, is_base = svc.next_port("dadaia-bots")
-    assert port != 3537
+    svc.register(port=3073, project="other-project", pid=88)
+    port, is_base = svc.next_port("my-service")
+    assert port != 3073
     assert is_base is False
 
 
@@ -110,14 +110,14 @@ def test_us3_list_all_registered_servers(tmp_path: Path) -> None:
     probe._alive_pids.update([1, 2, 3])
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3000, project="portifolio", pid=1)
-    svc.register(port=3001, project="portifolio", pid=2, description="Vite")
-    svc.register(port=3537, project="dadaia-bots", pid=3)
+    svc.register(port=3000, project="my-frontend", pid=1)
+    svc.register(port=3001, project="my-frontend", pid=2, description="Vite")
+    svc.register(port=3073, project="my-service", pid=3)
 
     entries = svc.list_entries()
     assert len(entries) == 3
     projects = {e.project for e, _ in entries}
-    assert projects == {"portifolio", "dadaia-bots"}
+    assert projects == {"my-frontend", "my-service"}
 
     _, s = entries[0]
     assert s == PortStatus.ACTIVE
@@ -136,8 +136,8 @@ def test_us4_release_port_on_shutdown(tmp_path: Path) -> None:
     probe._alive_pids.update([1, 2])
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3000, project="portifolio", pid=1)
-    svc.register(port=3001, project="portifolio", pid=2)
+    svc.register(port=3000, project="my-frontend", pid=1)
+    svc.register(port=3001, project="my-frontend", pid=2)
 
     svc.release(port=3000)
 
@@ -156,8 +156,8 @@ def test_us5_show_project_url(tmp_path: Path) -> None:
     probe._alive_pids.add(99)
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3003, project="dd-chain-explorer", pid=99)
-    result = svc.show_project("dd-chain-explorer")
+    svc.register(port=3003, project="my-api", pid=99)
+    result = svc.show_project("my-api")
 
     assert len(result) == 1
     entry, status = result[0]
@@ -168,7 +168,7 @@ def test_us5_show_project_url(tmp_path: Path) -> None:
 def test_us5_show_project_empty_returns_empty_list(tmp_path: Path) -> None:
     ws = _init_workspace(tmp_path)
     svc = _build_svc(ws, FakeProcessProbe())
-    assert svc.show_project("dd-chain-explorer") == []
+    assert svc.show_project("my-api") == []
 
 
 def test_us6_clean_removes_stale_entries(tmp_path: Path) -> None:
@@ -177,7 +177,7 @@ def test_us6_clean_removes_stale_entries(tmp_path: Path) -> None:
     probe = FakeProcessProbe()
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3000, project="portifolio", pid=99)
+    svc.register(port=3000, project="my-frontend", pid=99)
     removed = svc.clean()
     assert len(removed) == 1
     assert removed[0].port == 3000
@@ -189,7 +189,7 @@ def test_us6_clean_dry_run_does_not_remove(tmp_path: Path) -> None:
     probe = FakeProcessProbe()
     svc = _build_svc(ws, probe)
 
-    svc.register(port=3000, project="portifolio", pid=99)
+    svc.register(port=3000, project="my-frontend", pid=99)
     removed = svc.clean(dry_run=True)
     assert len(removed) == 1
     assert len(svc.list_entries()) == 1
@@ -216,7 +216,7 @@ def test_registry_persists_across_service_restarts(tmp_path: Path) -> None:
     probe._alive_pids.add(99)
 
     svc_a = _build_svc(ws, probe)
-    svc_a.register(port=3000, project="portifolio", pid=99)
+    svc_a.register(port=3000, project="my-frontend", pid=99)
 
     svc_b = _build_svc(ws, probe)
     entries = svc_b.list_entries()

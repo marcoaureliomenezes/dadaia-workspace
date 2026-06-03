@@ -32,47 +32,47 @@ def test_server_list_empty_registry(workspace: Path) -> None:
 
 def test_server_register_creates_entry(workspace: Path) -> None:
     result = _runner.invoke(
-        app, ["server", "register", "--port", "3000", "--project", "portifolio"]
+        app, ["server", "register", "--port", "3000", "--project", "my-frontend"]
     )
     assert result.exit_code == 0, result.output
     assert "3000" in result.output
-    assert "portifolio" in result.output
+    assert "my-frontend" in result.output
 
 
 def test_server_list_shows_registered_entry(workspace: Path) -> None:
-    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "portifolio"])
+    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "my-frontend"])
     result = _runner.invoke(app, ["server", "list"])
     assert result.exit_code == 0, result.output
-    assert "portifolio" in result.output
+    assert "my-frontend" in result.output
     assert "3000" in result.output
 
 
 def test_server_list_json_returns_valid_array(workspace: Path) -> None:
-    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "portifolio"])
+    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "my-frontend"])
     result = _runner.invoke(app, ["server", "list", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert isinstance(data, list)
     assert len(data) == 1
     assert data[0]["port"] == 3000
-    assert data[0]["project"] == "portifolio"
+    assert data[0]["project"] == "my-frontend"
     assert "status" in data[0]
 
 
 def test_server_register_conflict_exits_nonzero(workspace: Path) -> None:
-    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "portifolio"])
+    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "my-frontend"])
     result = _runner.invoke(
-        app, ["server", "register", "--port", "3000", "--project", "portifolio-wave6"]
+        app, ["server", "register", "--port", "3000", "--project", "my-frontend-wave6"]
     )
     assert result.exit_code != 0
 
 
 def test_server_release_removes_entry(workspace: Path) -> None:
-    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "portifolio"])
+    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "my-frontend"])
     result = _runner.invoke(app, ["server", "release", "--port", "3000"])
     assert result.exit_code == 0, result.output
     list_result = _runner.invoke(app, ["server", "list"])
-    assert "portifolio" not in list_result.output
+    assert "my-frontend" not in list_result.output
 
 
 def test_server_release_nonexistent_exits_nonzero(workspace: Path) -> None:
@@ -81,32 +81,32 @@ def test_server_release_nonexistent_exits_nonzero(workspace: Path) -> None:
 
 
 def test_server_next_returns_json(workspace: Path) -> None:
-    result = _runner.invoke(app, ["server", "next", "--project", "dadaia-bots", "--json"])
+    result = _runner.invoke(app, ["server", "next", "--project", "my-service", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
-    assert data["port"] == 3537
-    assert data["url"] == "http://localhost:3537"
+    assert data["port"] == 3073
+    assert data["url"] == "http://localhost:3073"
     assert data["is_base_port"] is True
 
 
 def test_server_next_idempotent_when_already_registered(workspace: Path) -> None:
-    _runner.invoke(app, ["server", "register", "--port", "3537", "--project", "dadaia-bots"])
-    result = _runner.invoke(app, ["server", "next", "--project", "dadaia-bots", "--json"])
+    _runner.invoke(app, ["server", "register", "--port", "3073", "--project", "my-service"])
+    result = _runner.invoke(app, ["server", "next", "--project", "my-service", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
-    assert data["port"] == 3537
+    assert data["port"] == 3073
 
 
 def test_server_show_no_entry_prints_tip(workspace: Path) -> None:
-    result = _runner.invoke(app, ["server", "show", "--project", "portifolio"])
+    result = _runner.invoke(app, ["server", "show", "--project", "my-frontend"])
     assert result.exit_code == 0, result.output
     assert "No servers registered" in result.output
     assert "dadaia server next" in result.output
 
 
 def test_server_show_json_returns_entries(workspace: Path) -> None:
-    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "portifolio"])
-    result = _runner.invoke(app, ["server", "show", "--project", "portifolio", "--json"])
+    _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "my-frontend"])
+    result = _runner.invoke(app, ["server", "show", "--project", "my-frontend", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert len(data) == 1
@@ -119,7 +119,7 @@ def test_server_clean_dry_run_reports_stale_without_removing(workspace: Path) ->
     data["entries"].append(
         {
             "port": 3000,
-            "project": "portifolio",
+            "project": "my-frontend",
             "url": "http://localhost:3000",
             "status": "active",
             "pid": None,
@@ -142,7 +142,7 @@ def test_server_clean_removes_expired_entries(workspace: Path) -> None:
     data["entries"].append(
         {
             "port": 3000,
-            "project": "portifolio",
+            "project": "my-frontend",
             "url": "http://localhost:3000",
             "status": "active",
             "pid": None,

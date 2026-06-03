@@ -356,17 +356,17 @@ class TestSessionsProjectFilter:
                 f"Wrong project in response: {row['project']}"
             )
 
-    def test_project_filter_tauan_games(self, sessions_server) -> None:
-        """?project=tauan-games returns only sessions for that project."""
+    def test_project_filter_sample_project(self, sessions_server) -> None:
+        """?project=sample-project returns only sessions for that project."""
         base, token, _ = sessions_server
         _, body = _get(
-            f"{base}/api/sessions?runtime=claude&project=tauan-games",
+            f"{base}/api/sessions?runtime=claude&project=sample-project",
             token=token,
         )
         data = json.loads(body)
-        assert data["sessions"], "Expected sessions for tauan-games"
+        assert data["sessions"], "Expected sessions for sample-project"
         for row in data["sessions"]:
-            assert row["project"] == "tauan-games"
+            assert row["project"] == "sample-project"
 
     def test_unknown_project_returns_empty(self, sessions_server) -> None:
         """?project=nonexistent returns empty sessions list (not an error)."""

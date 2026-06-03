@@ -114,7 +114,7 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
 
-    slug = "dadaia-bots"
+    slug = "sample-consumer"
     _add_consumer(workspace_root, slug)
 
     _install_workspace_guardrail_pair(source, workspace_root, force=True)

@@ -44,8 +44,8 @@ def test_export_creates_archive(workspace: Path, tmp_path: Path) -> None:
 
 
 def test_export_exclude_mnt_skips_mnt_dir(workspace: Path, tmp_path: Path) -> None:
-    (workspace / "mnt" / "openclaw").mkdir(parents=True)
-    (workspace / "mnt" / "openclaw" / "marker.txt").write_text("hi")
+    (workspace / "mnt" / "my-tool").mkdir(parents=True)
+    (workspace / "mnt" / "my-tool" / "marker.txt").write_text("hi")
 
     out = tmp_path / "out"
     out.mkdir()
