@@ -157,7 +157,7 @@ code modification.
 ### T-CIV-04 — QA gate: verify AC matrix
 
 - **ID:** T-CIV-04
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** qa-engineer
 - **Target subsystem:** source files + projection + Python pipeline
 - **Preconditions:** T-CIV-05 is `[x]` (re-run after T-CIV-05; previously failed AC-9)
