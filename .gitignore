@@ -68,3 +68,22 @@ img/
 # dadaia implementation locks and audit log (runtime artefacts)
 .dadaia/locks/
 .dadaia/logs/
+
+# Security — never commit credentials or secrets
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+.env.local
+.env.production
+secrets/
+credentials/
+
+# Python packaging / CI cache leftovers
+pip-wheel-metadata/
+*.whl
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb

@@ -1,32 +1,53 @@
-"""Memory view — serves memory HTML and assets verbatim (byte-identical).
+"""Memory view — serves memory atoms rendered from .md source (D-4, T-MMS-06).
 
-SPEC-DOC-008 (memory atomicity) and NFR-2 (byte-identity) compliance:
-  - Files are read with Path.read_bytes() and returned without ANY modification.
-  - No decoding, no template interpolation, no head injection.
-  - The served bytes are ALWAYS byte-identical to the file on disk.
+Design decisions (SPEC memory-markdown-source-v1 §2.1):
+
+D-4 (in-memory render):
+  The view reads the ``.md`` source file, renders it to HTML via mistune (D-1),
+  sanitises the output, and returns the rendered bytes.  No ``.html`` is written
+  to disk.  The 21 committed ``.html`` atoms are retired in W4 (T-MMS-10).
+
+SPEC-DOC-008 byte-identity invariant:
+  This invariant applied to committed ``.html`` files.  It is now **retired** —
+  the ``.md`` source is the canonical artefact, and served HTML is ephemeral
+  (rendered in-memory).  The canary tests for byte-identity are replaced by
+  Markdown render tests in test_views_memory.py.
 
 Path traversal guard (OWASP A03):
-  - After resolving the absolute path with Path.resolve(), we assert that the
-    resolved path is relative to the memory root (repos/<slug>/specs/memory/).
-  - Any path that escapes the root returns 404 (no information disclosure).
-  - The slug parameter is a URL capture group — malicious values containing
-    ".." are rejected by the guard after path resolution.
+  After resolving the absolute path with ``Path.resolve()``, we assert that the
+  resolved path is relative to the memory root (``repos/<slug>/specs/memory/``).
+  Any path that escapes the root returns 404 (no information disclosure).
+  This guard covers both ``.md`` and all other file types.
 
-Architect R3 layer-bypass note:
+Non-Markdown files (assets):
+  For any file that is NOT a ``.md`` file the view falls back to serving bytes
+  verbatim (same behaviour as before for images, CSS, JS assets).  Content-type
+  is sniffed from file extension.
+
+Arch note (architect D4.A):
   This module reads disk files directly (no domain service abstraction) as an
-  intentional HTTP-layer concern. The architect's D4.A design explicitly permits
-  this for the /memory/ route because the operation is read-only and the path
-  guard is the adequate security boundary here.
+  intentional HTTP-layer concern.  The operation is read-only; the path guard
+  is the adequate security boundary.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
+
+from dadaia_workspace.features.panel.views._md_render import (
+    Markdown,
+    build_renderer,
+    render_md_to_html,
+)
+
+_log = logging.getLogger(__name__)
 
 # Content-type map keyed by file suffix (lower-case, dot included).
 _CONTENT_TYPES: dict[str, str] = {
     ".html": "text/html; charset=utf-8",
+    ".md": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".js": "application/javascript; charset=utf-8",
     ".png": "image/png",
@@ -49,7 +70,11 @@ _NOT_FOUND: tuple[int, str, bytes] = (
 def render_memory(
     workspace_root: Path,
 ) -> Callable[..., tuple[int, str, bytes]]:
-    """Return a closure that serves memory files byte-identically.
+    """Return a closure that serves memory atoms.
+
+    For ``.md`` files, the Markdown source is rendered to HTML in-memory
+    (D-4) and returned as ``text/html``.  All other file types are served
+    verbatim (byte-identical) with the appropriate content-type.
 
     Parameters
     ----------
@@ -57,12 +82,19 @@ def render_memory(
         Absolute path to the dadaia workspace root directory.
         Memory files are resolved under ``<workspace_root>/repos/<slug>/specs/memory/``.
     """
+    _renderer: Markdown | None = None
+
+    def _get_renderer() -> Markdown:
+        nonlocal _renderer
+        if _renderer is None:
+            _renderer = build_renderer()
+        return _renderer
 
     def _view(slug: str = "", path: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
-        """Serve memory file byte-identically.
+        """Serve a memory atom.
 
-        SPEC-DOC-008 + NFR-2 canary: this function MUST NOT alter the bytes it reads.
-        test_memory_byte_identity() in test_views_memory.py will fail if it does.
+        ``.md`` files are rendered to HTML in-memory (D-4).
+        All other files are served verbatim (byte-identical).
         """
         memory_root = (workspace_root / "repos" / slug / "specs" / "memory").resolve()
         target = (memory_root / path).resolve()
@@ -74,9 +106,21 @@ def render_memory(
         if not target.exists() or not target.is_file():
             return _NOT_FOUND
 
-        data = target.read_bytes()
         suffix = target.suffix.lower()
         content_type = _CONTENT_TYPES.get(suffix, "application/octet-stream")
+
+        if suffix == ".md":
+            # D-4: render Markdown to HTML in-memory; never write HTML to disk.
+            try:
+                source = target.read_text(encoding="utf-8")
+                html_str = render_md_to_html(source, renderer=_get_renderer())
+                return (200, "text/html; charset=utf-8", html_str.encode("utf-8"))
+            except Exception:
+                _log.exception("Failed to render memory atom: %s", target)
+                return _NOT_FOUND
+
+        # Non-Markdown assets: serve verbatim (images, CSS, JS, legacy .html).
+        data = target.read_bytes()
         return (200, content_type, data)
 
     return _view

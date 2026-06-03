@@ -1,13 +1,15 @@
 """Catalog generator for product memory feature index.
 
-Reads ``specs/memory/product/index.html``, parses the
-``<ol class="catalog">`` entries, and returns a structured dict
-suitable for serialisation as ``catalog.json``.
+Reads frontmatter from ``specs/memory/product/*.md`` atom files and returns
+a structured dict suitable for serialisation as ``catalog.json``.
+
+memory-markdown-source-v1: .md is the canonical source; the old HTML-scraping
+path (``index.html`` / ``<ol class="catalog">``) is retired.
 
 Public API
 ----------
 generate_catalog(specs_dir: Path) -> dict
-    Read ``specs_dir/memory/product/index.html`` and return the catalog dict.
+    Read ``specs_dir/memory/product/*.md`` frontmatter and return the catalog dict.
 
 Schema of the returned dict
 ---------------------------
@@ -19,156 +21,99 @@ Schema of the returned dict
       "rank": 1,
       "slug": "workspace-init",
       "title": "workspace-init",
+      "category": "product",
+      "tldr": "...",
       "summary": "...",
-      "path": "specs/memory/product/workspace-init.html",
+      "path": "specs/memory/product/workspace-init.md",
       "tags": [],
+      "token_estimate": 413,
+      "agent_tier": "self-pull",
       "depends_on": []
     },
     ...
   ]
 }
 
-Pure module — only ``html.parser`` and ``json`` from stdlib.
-No new PyPI dependencies.
+Pure module — only ``re``, ``json``, and ``yaml`` from runtime deps.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
-from html.parser import HTMLParser
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Regexes
+# ---------------------------------------------------------------------------
+
+_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+_WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+
+# Required frontmatter fields for catalog generation.
+_REQUIRED_FIELDS: tuple[str, ...] = (
+    "slug",
+    "title",
+    "category",
+    "tldr",
+    "summary",
+    "tags",
+    "agent_tier",
+    "token_estimate",
+)
+
 
 # ---------------------------------------------------------------------------
-# Internal HTML parser targeting <ol class="catalog"> entries
+# Internal parsers
 # ---------------------------------------------------------------------------
 
 
-class _CatalogParser(HTMLParser):
-    """Extract entries from the ``<ol class="catalog">`` list in ``index.html``.
+def _parse_md_file(
+    md_path: Path,
+) -> tuple[dict[str, Any] | None, str | None, str | None]:
+    """Parse a .md file into (frontmatter_dict, body, error_message).
 
-    Each ``<li>`` directly under the target ``<ol>`` is expected to contain
-    at least one ``<a href="<slug>.html"><title></a>`` element.  Adjacent
-    text (e.g. a ``<span class="desc">`` sibling) is captured as the summary.
-
-    State machine:
-      IDLE  →  in_catalog_ol  →  in_li  →  in_anchor (within li)
-
-    Entry collection is deferred until ``</li>`` so that all sibling text
-    (including ``<span class="desc">`` content) is accumulated before the
-    entry is recorded.
+    Returns (None, None, error_msg) on failure.
     """
+    try:
+        content = md_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return None, None, f"Cannot read '{md_path}': {exc}"
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._depth: int = 0  # nesting depth inside the catalog <ol>
-        self._in_catalog_ol: bool = False
-        self._in_li: bool = False
-        self._in_anchor: bool = False
-        self._current_href: str = ""
-        self._anchor_text: list[str] = []
-        self._li_text: list[str] = []  # all text inside the current <li>
-        # Pending anchor data: captured when </a> fires, committed when </li> fires
-        self._pending_href: str = ""
-        self._pending_anchor: str = ""
+    m = _FRONTMATTER_RE.match(content)
+    if not m:
+        return None, None, f"'{md_path}': no YAML frontmatter found."
 
-        # Results: list of (href, anchor_text, full_li_text)
-        self.entries: list[tuple[str, str, str]] = []
+    raw_yaml = m.group(1)
+    body = content[m.end() :]
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        attr_map: dict[str, str] = {k: (v or "") for k, v in attrs}
+    try:
+        fm: Any = yaml.safe_load(raw_yaml)
+    except yaml.YAMLError as exc:
+        return None, None, f"'{md_path}': YAML parse error: {exc}"
 
-        if tag == "ol":
-            classes = attr_map.get("class", "").split()
-            if "catalog" in classes:
-                self._in_catalog_ol = True
-                self._depth = 1
-                return
-            if self._in_catalog_ol:
-                self._depth += 1
-            return
+    if not isinstance(fm, dict):
+        return None, None, f"'{md_path}': frontmatter is not a YAML mapping."
 
-        if not self._in_catalog_ol:
-            return
-
-        if tag == "li" and self._depth == 1:
-            self._in_li = True
-            self._li_text = []
-            self._pending_href = ""
-            self._pending_anchor = ""
-            return
-
-        if tag == "a" and self._in_li:
-            self._in_anchor = True
-            self._current_href = attr_map.get("href", "")
-            self._anchor_text = []
-            return
-
-    def handle_endtag(self, tag: str) -> None:
-        if not self._in_catalog_ol:
-            return
-
-        if tag == "ol":
-            self._depth -= 1
-            if self._depth <= 0:
-                self._in_catalog_ol = False
-                self._depth = 0
-            return
-
-        if tag == "a" and self._in_anchor:
-            # Close anchor: save href + anchor_text as pending; do NOT emit yet
-            self._in_anchor = False
-            self._pending_href = self._current_href
-            self._pending_anchor = "".join(self._anchor_text).strip()
-            return
-
-        if tag == "li" and self._in_li and self._depth == 1:
-            # Close li: NOW emit the entry with all accumulated li text
-            self._in_li = False
-            href = self._pending_href
-            anchor_text = self._pending_anchor
-            li_text = "".join(self._li_text).strip()
-            if href:
-                self.entries.append((href, anchor_text, li_text))
-            return
-
-    def handle_data(self, data: str) -> None:
-        if self._in_anchor:
-            self._anchor_text.append(data)
-        if self._in_li:
-            self._li_text.append(data)
+    return fm, body, None
 
 
-# ---------------------------------------------------------------------------
-# Helper: extract summary from the full <li> text
-# ---------------------------------------------------------------------------
-
-
-def _extract_summary(li_text: str, anchor_text: str) -> str:
-    """Return the descriptive part of a catalog list item.
-
-    The li_text typically looks like:
-        "workspace-init— porta de entrada; cria .dadaia/, .venv, hooks…"
-    or
-        "workspace-init — porta de entrada; …"
-
-    We strip the anchor_text prefix and the leading em-dash / dash separator.
-    """
-    text = li_text.strip()
-    # Remove the anchor text from the beginning (if present)
-    if anchor_text and text.startswith(anchor_text):
-        text = text[len(anchor_text) :]
-    # Strip leading em-dash variants (— EM DASH, – EN DASH, - HYPHEN-MINUS) and whitespace
-    text = text.lstrip()
-    for dash in ("—", "–", "-"):
-        if text.startswith(dash):
-            text = text[len(dash) :].strip()
-            break
-    return text.strip()
+def _extract_depends_on(body: str) -> list[str]:
+    """Extract unique, ordered [[slug]] wikilinks from the body."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for slug in _WIKILINK_RE.findall(body):
+        if slug not in seen:
+            seen.add(slug)
+            result.append(slug)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -176,8 +121,8 @@ def _extract_summary(li_text: str, anchor_text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def generate_catalog(specs_dir: Path) -> dict:  # type: ignore[type-arg]
-    """Read ``specs_dir/memory/product/index.html`` and return the catalog dict.
+def generate_catalog(specs_dir: Path) -> dict[str, Any]:
+    """Read ``specs_dir/memory/product/*.md`` frontmatter and return the catalog dict.
 
     Args:
         specs_dir: Path to the ``specs/`` directory (e.g.
@@ -188,44 +133,71 @@ def generate_catalog(specs_dir: Path) -> dict:  # type: ignore[type-arg]
         ``{ "generated_at": ..., "context": ..., "features": [...] }``
 
     Raises:
-        FileNotFoundError: if ``specs_dir/memory/product/index.html`` is absent.
-        ValueError: if the catalog ``<ol class="catalog">`` is not found in the
-            index HTML (malformed file).
+        FileNotFoundError: if ``specs_dir/memory/product/`` directory is absent.
+        ValueError: if any required frontmatter field is missing in any atom.
     """
-    index_path = Path(specs_dir) / "memory" / "product" / "index.html"
-    if not index_path.exists():
-        raise FileNotFoundError(f"index.html not found at expected path: {index_path}")
+    product_dir = Path(specs_dir) / "memory" / "product"
+    if not product_dir.is_dir():
+        raise FileNotFoundError(f"product/ directory not found at expected path: {product_dir}")
 
-    html_text = index_path.read_text(encoding="utf-8")
-    parser = _CatalogParser()
-    parser.feed(html_text)
+    # Discover feature atoms: *.md excluding index.md
+    md_files = sorted(p for p in product_dir.glob("*.md") if p.name != "index.md")
 
     # Derive context name from the parent of specs_dir (the repo/project name)
     context_name = Path(specs_dir).parent.name
 
-    features: list[dict] = []  # type: ignore[type-arg]
-    for rank, (href, anchor_text, li_text) in enumerate(parser.entries, start=1):
-        # slug is the stem of the href filename (e.g. "workspace-init.html" → "workspace-init")
-        slug = Path(href).stem
-        title = anchor_text or slug
-        summary = _extract_summary(li_text, anchor_text)
-        path = f"specs/memory/product/{slug}.html"
+    features: list[dict[str, Any]] = []
+    errors: list[str] = []
+
+    for rank, md_path in enumerate(md_files, start=1):
+        fm, body, parse_error = _parse_md_file(md_path)
+        if parse_error:
+            errors.append(parse_error)
+            continue
+
+        assert fm is not None
+        assert body is not None
+
+        # Validate required fields
+        missing = [f for f in _REQUIRED_FIELDS if f not in fm]
+        if missing:
+            errors.append(f"'{md_path}': required frontmatter field(s) missing: {missing}")
+            continue
+
+        slug: str = str(fm.get("slug", md_path.stem))
+        depends_on = _extract_depends_on(body)
+
+        # Compute path relative to repo root (specs/memory/product/<slug>.md)
+        try:
+            rel_path = str(md_path.relative_to(product_dir.parent.parent.parent))
+        except ValueError:
+            rel_path = str(md_path)
 
         features.append(
             {
                 "rank": rank,
                 "slug": slug,
-                "title": title,
-                "summary": summary,
-                "path": path,
-                "tags": [],
-                "depends_on": [],
+                "title": str(fm.get("title", slug)),
+                "category": str(fm.get("category", "product")),
+                "tldr": str(fm.get("tldr", "")),
+                "summary": str(fm.get("summary", "")),
+                "path": rel_path,
+                "tags": list(fm.get("tags") or []),
+                "token_estimate": int(fm.get("token_estimate", 0)),
+                "agent_tier": str(fm.get("agent_tier", "self-pull")),
+                "depends_on": depends_on,
             }
+        )
+
+    if errors:
+        raise ValueError(
+            f"Catalog generation failed with {len(errors)} error(s):\n"
+            + "\n".join(f"  - {e}" for e in errors)
         )
 
     generated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    catalog: dict = {  # type: ignore[type-arg]
+    catalog: dict[str, Any] = {
         "generated_at": generated_at,
         "context": context_name,
         "features": features,
@@ -240,7 +212,7 @@ def generate_catalog(specs_dir: Path) -> dict:  # type: ignore[type-arg]
     return catalog
 
 
-def write_catalog(specs_dir: Path, catalog: dict) -> Path:  # type: ignore[type-arg]
+def write_catalog(specs_dir: Path, catalog: dict[str, Any]) -> Path:
     """Serialise ``catalog`` to ``specs_dir/memory/product/catalog.json``.
 
     Args:

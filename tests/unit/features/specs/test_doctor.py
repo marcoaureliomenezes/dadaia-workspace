@@ -1,4 +1,10 @@
-"""Unit tests for SpecsDoctor — covers each of the 11 structural checks + TREE-1..7."""
+"""Unit tests for SpecsDoctor — covers structural checks + TREE-1..7.
+
+memory-markdown-source-v1: memory atoms are now .md (frontmatter + body).
+Removed checks: SPEC-DOC-010 (image links), SPEC-DOC-011 (mermaid script).
+TREE-3 no longer has auto-fix; checks .md files instead of .html.
+CAT-1 operates on .md feature atoms, not .html files.
+"""
 
 from __future__ import annotations
 
@@ -21,46 +27,90 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _SCAFFOLD_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold"
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 
-MINIMAL_MEMORY_PRODUCT_INDEX = """<!DOCTYPE html><html><head>
-<title>Product</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-</head><body>
-<h1>Product Memory — example</h1>
-<p>Current state.</p>
-<h2>Catálogo</h2>
-<ol><li><a href="feature-a.html">feature-a</a></li></ol>
-</body></html>"""
+# Minimal .md atom content (frontmatter + body) that passes LINT-1 schema checks.
+# These replace the old HTML constants; memory atoms are now .md.
+# Frontmatter must comply with memory-frontmatter-v1.schema.json (all required fields).
+# Headings must be from the HEADING_ALLOWLIST used by lint-memory-atoms.py.
 
-MINIMAL_MEMORY_PRODUCT_FEATURE = """<!DOCTYPE html><html><head>
-<title>Feature A</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-</head><body>
-<h1>Feature — A</h1>
-<h2>Propósito</h2><p>It does A.</p>
-<h2>Fluxo de uso</h2><ol><li>step</li></ol>
-<h2>Trigger típico</h2><p>when needed.</p>
-<h2>Diferencial</h2><p>solves nothing else does.</p>
-</body></html>"""
+MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
+---
+slug: index
+title: Product Index
+category: product
+tldr: 'Product catalog entry point.'
+summary: 'Product catalog entry point.'
+tags: []
+agent_tier: self-pull
+token_estimate: 20
+last_updated: '2026-06-01'
+release_origin: test-release
+---
 
-MINIMAL_MEMORY_ARCHITECTURE = """<!DOCTYPE html><html><head>
-<title>Architecture</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-</head><body>
-<h1>Architecture Memory — example</h1>
-<p>Layers.</p>
-</body></html>"""
+## Catálogo de features
 
-MINIMAL_MEMORY_TECH_STACK = """<!DOCTYPE html><html><head>
-<title>Tech</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-</head><body>
-<h1>Tech Stack Memory — example</h1>
-<table><tr><th>X</th></tr></table>
-</body></html>"""
+Feature atoms.
+"""
+
+MINIMAL_MEMORY_PRODUCT_FEATURE_MD = """\
+---
+slug: feature-a
+title: Feature A
+category: product
+tldr: 'Does A.'
+summary: 'Does A.'
+tags: []
+agent_tier: self-pull
+token_estimate: 20
+last_updated: '2026-06-01'
+release_origin: test-release
+---
+
+## Propósito
+
+It does A.
+"""
+
+MINIMAL_MEMORY_ARCHITECTURE_MD = """\
+---
+slug: architecture
+title: Architecture Memory
+category: core
+tldr: 'System architecture layers.'
+summary: 'System architecture layers and dependency contracts.'
+tags: []
+agent_tier: self-pull
+token_estimate: 20
+last_updated: '2026-06-01'
+release_origin: test-release
+---
+
+## Visão geral
+
+Layers.
+"""
+
+MINIMAL_MEMORY_TECH_STACK_MD = """\
+---
+slug: tech-stack
+title: Tech Stack Memory
+category: core
+tldr: 'Technology stack.'
+summary: 'Technology stack and approved dependencies.'
+tags: []
+agent_tier: self-pull
+token_estimate: 20
+last_updated: '2026-06-01'
+release_origin: test-release
+---
+
+## Linguagens
+
+Python, Go.
+"""
 
 
 def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
-    """Create a minimal but valid specs/ tree."""
+    """Create a minimal but valid specs/ tree using .md memory atoms."""
     specs = root / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     (specs / "releases" / release_id).mkdir(parents=True)
@@ -68,16 +118,16 @@ def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
     (specs / "backlog").mkdir(parents=True)
 
     (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
-    (specs / "memory" / "product" / "index.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_INDEX, encoding="utf-8"
+    (specs / "memory" / "product" / "index.md").write_text(
+        MINIMAL_MEMORY_PRODUCT_INDEX_MD, encoding="utf-8"
     )
-    (specs / "memory" / "product" / "feature-a.html").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8"
+    (specs / "memory" / "product" / "feature-a.md").write_text(
+        MINIMAL_MEMORY_PRODUCT_FEATURE_MD, encoding="utf-8"
     )
-    (specs / "memory" / "architecture.html").write_text(
-        MINIMAL_MEMORY_ARCHITECTURE, encoding="utf-8"
+    (specs / "memory" / "architecture.md").write_text(
+        MINIMAL_MEMORY_ARCHITECTURE_MD, encoding="utf-8"
     )
-    (specs / "memory" / "tech-stack.html").write_text(MINIMAL_MEMORY_TECH_STACK, encoding="utf-8")
+    (specs / "memory" / "tech-stack.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
     (specs / "releases" / "ACTIVE.md").write_text(
         f"release: {release_id}\nphase: IMPLEMENTATION\n", encoding="utf-8"
     )
@@ -116,21 +166,25 @@ def test_missing_constitution_reports_doc_001(tmp_path: Path) -> None:
 
 def test_missing_product_index_reports_doc_002(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "memory" / "product" / "index.html").unlink()
+    (specs / "memory" / "product" / "index.md").unlink()
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-002" in _codes(issues)
 
 
-def test_missing_architecture_html_reports_doc_002(tmp_path: Path) -> None:
+def test_missing_architecture_md_reports_doc_002(tmp_path: Path) -> None:
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "memory" / "architecture.html").unlink()
+    (specs / "memory" / "architecture.md").unlink()
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-002" in _codes(issues)
 
 
 def test_legacy_memory_markdown_reports_doc_002L(tmp_path: Path) -> None:
+    """A non-canonical .md at memory/ root (not architecture.md or tech-stack.md)
+    is flagged as legacy (SPEC-DOC-002L).
+    """
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "memory" / "architecture.md").write_text("# legacy", encoding="utf-8")
+    # Write a non-canonical .md at memory/ root — should be flagged.
+    (specs / "memory" / "legacy-notes.md").write_text("# legacy", encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-002L" in _codes(issues)
 
@@ -168,19 +222,23 @@ def test_genuine_legacy_markdown_still_reports_doc_002L_when_agents_md_present(
     assert doc_002l, "Expected SPEC-DOC-002L for old-note.md but got none"
 
 
-def test_broken_anchor_in_product_index_reports_doc_002(tmp_path: Path) -> None:
+def test_product_feature_md_without_heading_reports_doc_002(tmp_path: Path) -> None:
+    """SPEC-DOC-002: a feature .md atom with no heading (empty body after frontmatter)
+    is flagged — memory atoms must have at least one ATX heading.
+    """
     specs = _make_clean_specs_tree(tmp_path)
-    bad_index = """<!DOCTYPE html><html><head>
-<script src="mermaid.js"></script>
-</head><body>
-<h1>Product</h1>
-<a href="missing-feature.html">x</a>
-</body></html>"""
-    (specs / "memory" / "product" / "index.html").write_text(bad_index, encoding="utf-8")
+    # Overwrite feature-a.md with content that has frontmatter but NO heading in body
+    bad_feature = """\
+---
+slug: feature-a
+title: Feature A
+---
+
+No heading here, only prose.
+"""
+    (specs / "memory" / "product" / "feature-a.md").write_text(bad_feature, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
-    matching = [
-        i for i in issues if i.code == "SPEC-DOC-002" and "missing-feature.html" in i.description
-    ]
+    matching = [i for i in issues if i.code == "SPEC-DOC-002" and "feature-a.md" in (i.path or "")]
     assert matching, [i.to_dict() for i in issues]
 
 
@@ -293,30 +351,46 @@ def test_orphan_legacy_feature_spec_reports_doc_007(tmp_path: Path) -> None:
 # ---- check 8: memory atomicity
 
 
-def test_memory_with_changelog_h2_reports_doc_008(tmp_path: Path) -> None:
+def test_memory_md_with_changelog_h2_reports_doc_008(tmp_path: Path) -> None:
+    """SPEC-DOC-008: a memory .md file with a ## Changelog heading in its body is flagged."""
     specs = _make_clean_specs_tree(tmp_path)
-    bad = """<!DOCTYPE html><html><head>
-<script src="mermaid.js"></script>
-</head><body>
-<h1>Product</h1>
-<h2>Catálogo</h2>
-<ol><li><a href="feature-a.html">feature-a</a></li></ol>
-<h2>Changelog</h2><p>v1 fix.</p>
-</body></html>"""
-    (specs / "memory" / "product" / "index.html").write_text(bad, encoding="utf-8")
+    bad = """\
+---
+slug: feature-a
+title: Feature A
+---
+
+## Propósito
+
+Does A.
+
+## Changelog
+
+v1 fix.
+"""
+    (specs / "memory" / "product" / "feature-a.md").write_text(bad, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-008" in _codes(issues)
 
 
-def test_memory_feature_with_changelog_h2_reports_doc_008(tmp_path: Path) -> None:
+def test_memory_feature_md_with_history_h2_reports_doc_008(tmp_path: Path) -> None:
+    """SPEC-DOC-008: a memory .md file with a ## History heading is flagged."""
     specs = _make_clean_specs_tree(tmp_path)
-    bad = """<!DOCTYPE html><html><head>
-<script src="mermaid.js"></script>
-</head><body>
-<h1>Feature</h1>
-<h2>History</h2><p>once was X.</p>
-</body></html>"""
-    (specs / "memory" / "product" / "feature-a.html").write_text(bad, encoding="utf-8")
+    bad = """\
+---
+slug: feature-a
+title: Feature A
+---
+
+## Propósito
+
+Does A.
+
+## History
+
+Once was X.
+"""
+    (specs / "memory" / "product" / "feature-a.md").write_text(bad, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-008" in _codes(issues)
 
@@ -333,36 +407,9 @@ def test_active_release_id_without_dir_reports_doc_009(tmp_path: Path) -> None:
     assert "SPEC-DOC-009" in _codes(issues)
 
 
-# ---- check 10: broken image links
-
-
-def test_broken_image_link_in_memory_reports_doc_010(tmp_path: Path) -> None:
-    specs = _make_clean_specs_tree(tmp_path)
-    bad = """<!DOCTYPE html><html><head>
-<script src="mermaid.js"></script>
-</head><body>
-<h1>Product</h1>
-<img src="../assets/missing.png">
-</body></html>"""
-    (specs / "memory" / "product" / "index.html").write_text(bad, encoding="utf-8")
-    issues = SpecsDoctor(specs).check()
-    assert "SPEC-DOC-010" in _codes(issues)
-
-
-# ---- check 11: mermaid script presence
-
-
-def test_mermaid_blocks_without_script_reports_doc_011(tmp_path: Path) -> None:
-    specs = _make_clean_specs_tree(tmp_path)
-    bad = """<!DOCTYPE html><html><head><title>x</title></head><body>
-<h1>Product</h1>
-<pre class="mermaid">flowchart LR
-A --> B</pre>
-</body></html>"""
-    (specs / "memory" / "product" / "index.html").write_text(bad, encoding="utf-8")
-    issues = SpecsDoctor(specs).check()
-    doc11 = [i for i in issues if i.code == "SPEC-DOC-011"]
-    assert doc11 and doc11[0].severity == Severity.WARNING
+# checks 10 and 11 were retired with the HTML → Markdown migration (memory-markdown-source-v1).
+# SPEC-DOC-010 (image links in HTML) and SPEC-DOC-011 (mermaid script in HTML) are removed.
+# The corresponding test functions have been deleted.
 
 
 # ---- meta: JSON output / API surface
@@ -692,39 +739,44 @@ def test_tree2_fix_does_not_move_root_spec_md(tmp_path: Path) -> None:
 # ---- TREE-3: required memory HTML files must exist
 
 
-def test_tree3_missing_architecture_html_triggers_warning(tmp_path: Path) -> None:
-    """TREE-3: memory/architecture.html absent emits a TREE-3 WARNING."""
+def test_tree3_missing_architecture_md_triggers_warning(tmp_path: Path) -> None:
+    """TREE-3: memory/architecture.md absent emits a TREE-3 WARNING.
+
+    memory-markdown-source-v1: TREE-3 now checks .md atoms, not .html files.
+    TREE-3 is warn-only and has no auto-fix (operator must author the .md atom).
+    """
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "memory" / "architecture.html").unlink()
+    (specs / "memory" / "architecture.md").unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
     issues = doctor.check()
     tree3 = [i for i in issues if i.code == "TREE-3"]
-    assert tree3, "Expected TREE-3 WARNING for missing architecture.html"
+    assert tree3, "Expected TREE-3 WARNING for missing architecture.md"
     assert tree3[0].severity == Severity.WARNING
+    assert not tree3[0].fixable
 
 
-def test_tree3_fix_renders_missing_memory_html(tmp_path: Path) -> None:
-    """TREE-3 auto-fix: calling fix() renders missing memory files from Jinja templates."""
+def test_tree3_has_no_autofix(tmp_path: Path) -> None:
+    """TREE-3 is fixable=False: calling fix() must NOT create architecture.md.
+
+    memory-markdown-source-v1: .md atoms are operator-authored, not generated
+    from templates. fix() must leave the file absent.
+    """
     specs = _make_clean_specs_tree(tmp_path)
-    arch = specs / "memory" / "architecture.html"
-    tech = specs / "memory" / "tech-stack.html"
-    arch.unlink()
-    tech.unlink()
+    arch_md = specs / "memory" / "architecture.md"
+    arch_md.unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
     issues = doctor.check()
     tree3 = [i for i in issues if i.code == "TREE-3"]
-    assert tree3, "Pre-condition: TREE-3 issues must exist"
+    assert tree3, "Pre-condition: TREE-3 must be found"
     fixed = doctor.fix(issues)
-    # Both files must now exist
-    assert arch.exists(), "architecture.html must be created by fix()"
-    assert tech.exists(), "tech-stack.html must be created by fix()"
-    assert len(fixed) == 2
-    # Rendered HTML must contain an <h1>
-    content = arch.read_text(encoding="utf-8")
-    assert "<h1>" in content, "Rendered architecture.html must contain <h1>"
-    # After fix, TREE-3 should no longer appear
-    residual = [i for i in doctor.check() if i.code == "TREE-3"]
-    assert residual == [], f"Residual TREE-3 after fix: {[i.description for i in residual]}"
+    # No TREE-3 issues should have been fixed
+    tree3_fixed = [i for i in fixed if i.code == "TREE-3"]
+    assert tree3_fixed == [], "fix() must NOT fix TREE-3 (no auto-fix for .md atoms)"
+    # architecture.md must still be absent
+    assert not arch_md.exists(), "fix() must NOT create architecture.md for TREE-3"
+    # TREE-3 still appears after fix
+    residual = doctor.check()
+    assert any(i.code == "TREE-3" for i in residual)
 
 
 # ---- TREE-4: backlog/, bugs/, releases/ must exist
@@ -949,11 +1001,14 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     )
 
 
-# ---- CAT-1: catalog.json ↔ feature HTML sync check (memory-context-enforcement-v1)
+# ---- CAT-1: catalog.json ↔ feature .md atom sync check (memory-context-enforcement-v1)
+#
+# memory-markdown-source-v1: CAT-1 now compares catalog.json slugs against .md feature
+# atoms (not .html files). The doctor enumerates *.md in product/ (excl. index.md).
 
 
 def _make_catalog_json(product_dir: Path, slugs: list[str]) -> None:
-    """Write a minimal but valid catalog.json with the given slugs."""
+    """Write a minimal but valid catalog.json with the given slugs (paths use .md)."""
     import json as _json
     from datetime import UTC, datetime
 
@@ -963,7 +1018,7 @@ def _make_catalog_json(product_dir: Path, slugs: list[str]) -> None:
             "slug": slug,
             "title": slug,
             "summary": "",
-            "path": f"specs/memory/product/{slug}.html",
+            "path": f"specs/memory/product/{slug}.md",
             "tags": [],
             "depends_on": [],
         }
@@ -979,46 +1034,67 @@ def _make_catalog_json(product_dir: Path, slugs: list[str]) -> None:
     )
 
 
-def test_cat1_absent_catalog_with_feature_htmls_triggers_warning(tmp_path: Path) -> None:
-    """CAT-1: catalog.json absent + 3 feature HTMLs → one CAT-1 WARNING."""
+def _write_feature_md(product_dir: Path, slug: str) -> None:
+    """Write a minimal valid feature .md atom for the given slug."""
+    content = f"""\
+---
+slug: {slug}
+title: {slug}
+category: product
+tldr: 'Does {slug}.'
+summary: 'Does {slug}.'
+tags: []
+agent_tier: self-pull
+token_estimate: 100
+last_updated: '2026-06-01'
+release_origin: test-release
+---
+
+## Propósito
+
+{slug} feature.
+"""
+    (product_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+
+
+def test_cat1_absent_catalog_with_feature_mds_triggers_warning(tmp_path: Path) -> None:
+    """CAT-1: catalog.json absent + 3 feature .md atoms → one CAT-1 WARNING."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    # Add two more feature HTMLs (feature-a is already in the clean tree)
-    (product_dir / "feature-b.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
-    (product_dir / "feature-c.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
+    # Add two more feature .md atoms (feature-a.md is already in the clean tree)
+    _write_feature_md(product_dir, "feature-b")
+    _write_feature_md(product_dir, "feature-c")
     # No catalog.json
     assert not (product_dir / "catalog.json").exists()
 
     issues = SpecsDoctor(specs).check()
     cat1 = [i for i in issues if i.code == "CAT-1"]
-    assert cat1, "Expected CAT-1 WARNING when catalog.json is absent and HTMLs exist"
+    assert cat1, "Expected CAT-1 WARNING when catalog.json is absent and .md atoms exist"
     assert cat1[0].severity == Severity.WARNING
     # Single warning (not one per file)
     assert len(cat1) == 1
 
 
-def test_cat1_absent_catalog_no_feature_htmls_no_warning(tmp_path: Path) -> None:
-    """CAT-1: catalog.json absent but no feature HTMLs (only index.html) → no CAT-1."""
+def test_cat1_absent_catalog_no_feature_mds_no_warning(tmp_path: Path) -> None:
+    """CAT-1: catalog.json absent but no feature .md atoms (only index.md) → no CAT-1."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    # Remove the feature-a.html so no feature HTMLs remain
-    (product_dir / "feature-a.html").unlink()
-    # Also remove the broken anchor from index.html to avoid SPEC-DOC-002 cascade
-    # We only need to verify no CAT-1 fires
+    # Remove the feature-a.md so no feature atoms remain
+    (product_dir / "feature-a.md").unlink()
     assert not (product_dir / "catalog.json").exists()
 
     issues = SpecsDoctor(specs).check()
     cat1 = [i for i in issues if i.code == "CAT-1"]
     assert cat1 == [], (
-        f"Unexpected CAT-1 when no feature HTMLs present: {[i.description for i in cat1]}"
+        f"Unexpected CAT-1 when no feature .md atoms present: {[i.description for i in cat1]}"
     )
 
 
 def test_cat1_in_sync_catalog_no_warning(tmp_path: Path) -> None:
-    """CAT-1: catalog.json present and in sync with HTML files → no CAT-1."""
+    """CAT-1: catalog.json present and in sync with .md feature atoms → no CAT-1."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    # feature-a.html already exists in clean tree; create matching catalog
+    # feature-a.md already exists in clean tree; create matching catalog
     _make_catalog_json(product_dir, ["feature-a"])
 
     issues = SpecsDoctor(specs).check()
@@ -1027,7 +1103,7 @@ def test_cat1_in_sync_catalog_no_warning(tmp_path: Path) -> None:
 
 
 def test_cat1_stale_slug_warns_with_slug_name(tmp_path: Path) -> None:
-    """CAT-1: catalog.json has slug 'stale-feature' but no stale-feature.html → WARNING names slug."""
+    """CAT-1: catalog.json lists slug 'stale-feature' but no stale-feature.md → WARNING names slug."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
     # catalog lists feature-a (which exists) and stale-feature (which does not)
@@ -1044,18 +1120,18 @@ def test_cat1_stale_slug_warns_with_slug_name(tmp_path: Path) -> None:
     assert all(i.severity == Severity.WARNING for i in cat1)
 
 
-def test_cat1_extra_html_warns_with_file_name(tmp_path: Path) -> None:
-    """CAT-1: extra HTML file on disk not in catalog → WARNING names the file."""
+def test_cat1_extra_md_warns_with_slug_name(tmp_path: Path) -> None:
+    """CAT-1: extra .md atom on disk not in catalog → WARNING names the slug."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    # Add an extra HTML file that is NOT in the catalog
-    (product_dir / "new-feature.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
+    # Add a new .md atom that is NOT in the catalog
+    _write_feature_md(product_dir, "new-feature")
     # Catalog lists only feature-a (not new-feature)
     _make_catalog_json(product_dir, ["feature-a"])
 
     issues = SpecsDoctor(specs).check()
     cat1 = [i for i in issues if i.code == "CAT-1"]
-    assert cat1, "Expected CAT-1 WARNING for extra HTML file 'new-feature.html'"
+    assert cat1, "Expected CAT-1 WARNING for extra .md atom 'new-feature'"
     descriptions = " ".join(i.description for i in cat1)
     assert "new-feature" in descriptions, (
         f"Expected 'new-feature' to be named in CAT-1 description; got: {descriptions}"
@@ -1064,11 +1140,11 @@ def test_cat1_extra_html_warns_with_file_name(tmp_path: Path) -> None:
 
 
 def test_cat1_both_stale_and_extra_emit_separate_warnings(tmp_path: Path) -> None:
-    """CAT-1: one stale slug + one extra HTML → two separate CAT-1 WARNINGs."""
+    """CAT-1: one stale slug + one extra .md atom → two separate CAT-1 WARNINGs."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    (product_dir / "new-feature.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
-    # Catalog has stale-slug (no file) but not new-feature or feature-a (extra files)
+    _write_feature_md(product_dir, "new-feature")
+    # Catalog has stale-slug (no .md file) but not new-feature or feature-a (extra atoms)
     _make_catalog_json(product_dir, ["stale-slug"])
 
     issues = SpecsDoctor(specs).check()
@@ -1083,7 +1159,7 @@ def test_cat1_is_always_warning_never_error(tmp_path: Path) -> None:
     """CAT-1 must never be ERROR severity."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    # Maximally broken: catalog with wrong slug and extra file
+    # Maximally broken: catalog with wrong slug (feature-a.md is extra)
     _make_catalog_json(product_dir, ["wrong-slug"])
 
     issues = SpecsDoctor(specs).check()
@@ -1096,12 +1172,12 @@ def test_cat1_is_always_warning_never_error(tmp_path: Path) -> None:
 
 
 def test_cat1_absent_catalog_warning_mentions_count(tmp_path: Path) -> None:
-    """CAT-1: the absent-catalog WARNING message includes the HTML file count."""
+    """CAT-1: the absent-catalog WARNING message includes the .md atom count."""
     specs = _make_clean_specs_tree(tmp_path)
     product_dir = specs / "memory" / "product"
-    (product_dir / "feature-b.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
-    (product_dir / "feature-c.html").write_text(MINIMAL_MEMORY_PRODUCT_FEATURE, encoding="utf-8")
-    # 3 feature HTMLs: feature-a, feature-b, feature-c
+    _write_feature_md(product_dir, "feature-b")
+    _write_feature_md(product_dir, "feature-c")
+    # 3 feature .md atoms: feature-a, feature-b, feature-c
 
     issues = SpecsDoctor(specs).check()
     cat1 = [i for i in issues if i.code == "CAT-1"]

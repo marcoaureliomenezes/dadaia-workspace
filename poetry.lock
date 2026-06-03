@@ -457,6 +457,17 @@ files = [
 ]
 
 [[package]]
+name = "mistune"
+version = "3.2.1"
+description = "A sane and fast Markdown parser with useful plugins and renderers"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "mistune-3.2.1-py3-none-any.whl", hash = "sha256:78cdb0ba5e938053ccf63651b352508d2efa9411dc8810bfb05f2dc5140c0048"},
+    {file = "mistune-3.2.1.tar.gz", hash = "sha256:7c8e5501d38bac1582e067e46c8343f17d57ea1aaa735823f3aba1fd59c88a28"},
+]
+
+[[package]]
 name = "mypy"
 version = "1.20.2"
 description = "Optional static typing for Python"
@@ -995,4 +1006,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "57ff4c834ef514a82d2c3d9b3fe6b30b8e2fdbc4d01e150ac80ee7cedebf3cb3"
+content-hash = "72471363b76f8cc7e290c5490dac53bd61f7e4c31176cdbf26265fd18ad58a7d"
