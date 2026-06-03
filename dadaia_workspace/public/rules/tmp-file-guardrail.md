@@ -18,7 +18,7 @@ for agent-generated temp files. Violation is workspace pollution.
 Examples:
 ```
 .dadaia/tmp/qa-engineer/20260523/dashboard-overview.png
-.dadaia/tmp/data-analyst/20260522/query-result-327.arrow
+.dadaia/tmp/domain-specialist/20260522/query-result-327.json
 .dadaia/tmp/design-specialist/20260523/panel-capture-01.png
 .dadaia/tmp/researcher/20260521/export-manifest.json
 ```

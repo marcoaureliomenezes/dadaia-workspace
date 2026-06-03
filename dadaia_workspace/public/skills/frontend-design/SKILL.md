@@ -19,9 +19,9 @@ This skill gives `design-specialist` a stable vocabulary for authoring design sp
 
 | Surface ID | Description | Primary concern |
 |---|---|---|
-| `portfolio` | Personal portfolio site | Visual polish, typography, motion |
-| `dadaia-bots` | Bot management dashboard | Clarity, information density, a11y |
-| `dadaia-workspace-panel` | Workspace agent/workflow panel | Functional UI, data tables, navigation |
+| `marketing-site` | Public site or landing surface | Visual polish, typography, motion |
+| `admin-dashboard` | Operational dashboard | Clarity, information density, a11y |
+| `workspace-panel` | Workspace/status panel | Functional UI, data tables, navigation |
 
 ---
 

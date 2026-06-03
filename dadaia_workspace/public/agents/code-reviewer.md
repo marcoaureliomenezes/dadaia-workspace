@@ -102,7 +102,7 @@ For every PR/branch/SHA, perform the review along these six axes in order:
 
 ### Axis 1 — Architecture conformance
 
-Does the change respect the declared layer boundaries in `specs/memory/architecture.html`?
+Does the change respect the declared layer boundaries in `specs/memory/architecture.md`?
 Look for: cross-layer imports, business logic leaking into infrastructure, presentation
 logic in domain code.
 
@@ -190,7 +190,7 @@ Stop and alert the operator or `project-manager` when:
 1. A CRITICAL security smell is found — it should be routed to `security-reviewer` for a
    full OWASP scan before the PR merges
 2. The target branch or PR does not exist or the diff is empty
-3. The change modifies `specs/memory/*.html` without a CLOSURE phase in `ACTIVE.md`
+3. The change modifies `specs/memory/*.md` without a CLOSURE phase in `ACTIVE.md`
 
 ---
 

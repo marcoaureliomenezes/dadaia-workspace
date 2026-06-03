@@ -125,14 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
       - name: Fail if projection or runtime files are git-tracked
-        run: |
-          FOUND=$(git ls-files | grep -E '^\.(claude|agents|codex|opencode)/|^\.dadaia/(agentic|scripts|states|reports)/' || true)
-          if [ -n "$FOUND" ]; then
-            echo "::error::Tracked projection/runtime files detected. Remove them from the git index:"
-            echo "$FOUND"
-            exit 1
-          fi
-          echo "No tracked projection files found."
+        run: bash scripts/check_no_repo_local_claude.sh
 
   hotfix-branch-name:
     name: Hotfix branch SemVer (PATCH>=1)

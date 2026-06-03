@@ -100,7 +100,7 @@ in parallel and synthesizes a coherent compliance plan.
 ## When to use
 
 - A new repo is added under `repos/`
-- An existing repo migrates into the workspace from elsewhere (e.g. dadaia-bots)
+- An existing repo migrates into the workspace from elsewhere
 - Periodic re-audit of a long-running repo to re-baseline compliance
 
 ## Stages

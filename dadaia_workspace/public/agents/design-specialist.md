@@ -30,7 +30,7 @@ input_contract:
     - name: surface
       kind: string
       source: workflow_input
-      description: "UI surface under review: 'portfolio', 'dadaia-bots', 'dadaia-workspace-panel', or a path"
+      description: "UI surface under review: an app, dashboard, panel, component, flow, or path"
       stop_if_missing: true
     - name: screenshots
       kind: report
@@ -127,9 +127,9 @@ operator for approval before fetching.
 
 | Surface | Description | Primary concern |
 |---|---|---|
-| `portfolio` | Personal portfolio site | Visual polish, typography, motion |
-| `dadaia-bots` | Bot management dashboard | Clarity, information density, a11y |
-| `dadaia-workspace-panel` | Workspace agent/workflow panel | Functional UI, data tables, navigation |
+| `marketing-site` | Public site or landing surface | Visual polish, typography, motion |
+| `admin-dashboard` | Operational dashboard | Clarity, information density, a11y |
+| `workspace-panel` | Workspace/status panel | Functional UI, data tables, navigation |
 
 ---
 

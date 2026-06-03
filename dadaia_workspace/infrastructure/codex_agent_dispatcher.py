@@ -22,8 +22,8 @@ def _render(invocation: StageInvocation) -> str:
     """Render an invocation document for the Codex runtime.
 
     When ``invocation.parallel_group`` is set, a note is appended explaining that
-    Codex dispatches in best-effort mode using subagent tooling rather than native
-    parallel dispatch.
+    Codex dispatches in best-effort mode through deferred multi-agent tooling
+    discovered with ``tool_search`` rather than native parallel dispatch.
     """
     parts = [
         f"# Stage invocation — {invocation.workflow_name} / {invocation.stage_id}",
@@ -38,9 +38,10 @@ def _render(invocation: StageInvocation) -> str:
         parts.extend(
             [
                 "",
-                "> **Note:** Codex best-effort parallel — subagent tool used instead of native "
-                "parallel dispatch. This stage is part of a parallel_group but will be executed "
-                "sequentially within this runtime.",
+                "> **Note:** Codex best-effort parallel — use the deferred multi-agent "
+                "tool discovered with `tool_search` instead of native parallel dispatch. "
+                "This stage is part of a parallel_group but will be executed sequentially "
+                "within this runtime.",
             ]
         )
     parts.extend(["", "## Inputs"])
@@ -55,7 +56,8 @@ def _render(invocation: StageInvocation) -> str:
         [
             "",
             "## How to execute",
-            f"Invoke the agent `{invocation.agent}` using the Codex subagent tool. "
+            f"Invoke the agent `{invocation.agent}` using the Codex multi-agent tool "
+            "discovered with `tool_search`. "
             f"Write the output to `{invocation.expected_output_path}`. "
             f"After completion, run `dadaia orchestrate resume {invocation.run_id}` "
             "to advance the run.",
@@ -72,7 +74,7 @@ class CodexAgentDispatcher:
     invocation sequentially and recording a best-effort note in each invocation file.
 
     Capability matrix (ADR-3):
-      - supports_parallel: True  (best-effort via subagent; not native)
+      - supports_parallel: True  (best-effort via deferred multi-agent tooling; not native)
       - supports_gates_inline: False  (gates require CLI confirmation loop)
       - mode: DispatcherMode.CODEX
     """

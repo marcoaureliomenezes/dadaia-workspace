@@ -1,10 +1,6 @@
-"""Workflow catalog fixture tests — AGT-r2-07.
+"""Workflow catalog fixture tests.
 
-Asserts exactly 7 workflows survive the AGT-r2-06 trim.
-The 8 deprecated files (game-spec-definition, architecture-review, tdd-cycle,
-bug-fix-fastlane, game-bugfix, security-patch, deploy-validation-only,
-design-validation) have been archived to
-specs/_archive/legacy-workflows/<UTC>/.
+Asserts exactly 7 generic workflows ship in the public default surface.
 
 These tests read from the canonical source directory
 dadaia_workspace/public/workflows/ — no mocks, no fakes.
@@ -25,9 +21,7 @@ _EXPECTED_SURVIVING_WORKFLOWS: frozenset[str] = frozenset(
         "audit-cycle",
         "code-review-fan-out",
         "cross-cutting-feature",
-        "dashboard-publication",
         "design-first-implementation",
-        "game-dev-cycle",
         "hotfix-release",
         "onboarding-new-repo",
         "spec-refinement",
@@ -37,11 +31,9 @@ _EXPECTED_SURVIVING_WORKFLOWS: frozenset[str] = frozenset(
 # The 8 deprecated workflows that must NOT exist under public/workflows/.
 _DEPRECATED_WORKFLOWS: frozenset[str] = frozenset(
     [
-        "game-spec-definition",
         "architecture-review",
         "tdd-cycle",
         "bug-fix-fastlane",
-        "game-bugfix",
         "security-patch",
         "deploy-validation-only",
         "design-validation",
@@ -56,10 +48,10 @@ def _workflow_names() -> frozenset[str]:
     )
 
 
-def test_exactly_9_workflows_survive() -> None:
-    """After AGT-r2-06 trim (7) + dashboard-publication + design-first-implementation (added post-trim), exactly 9 workflows must remain in public/workflows/."""
+def test_exactly_7_workflows_survive() -> None:
+    """Exactly 7 generic workflows must remain in public/workflows/."""
     names = _workflow_names()
-    assert len(names) == 9, f"Expected 9 workflows, found {len(names)}: {sorted(names)}"
+    assert len(names) == 7, f"Expected 7 workflows, found {len(names)}: {sorted(names)}"
 
 
 def test_surviving_workflow_names_match_expected_set() -> None:
