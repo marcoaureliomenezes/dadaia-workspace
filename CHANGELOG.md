@@ -6,15 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Removed the last hardcoded private identifiers from shipped source: the public-privacy denylist no longer embeds operator-specific values. Terms are now loaded at runtime from outside the published package (`$DADAIA_PRIVACY_DENYLIST` or `<repo_root>/.dadaia/states/privacy_denylist.json`); the library ships with an empty default (dev-guardrail rule #4).
+- Genericized changelog entries that previously enumerated private project/infrastructure identifiers.
+
 ## [0.1.3] — 2026-06-03
 
 ### Security
-- Removed private academy modules `09_redacted-infra/` and `10_redacted-infra_agent/` (12 files) from the published wheel — they leaked private-infrastructure operational docs.
-- Purged all private project identifiers from library source, tests, and fixtures: private admin IP, private hostname, and slugs `redacted-slug`/`redacted-slug`, `redacted-infra`, `redacted-infra`, `redacted-slug`, `redacted-slug`, `redacted-slug`, `redacted-slug`, `redacted-slug`, `redacted-slug`, `redacted-slug`, `redacted-slug`; replaced with generic placeholders throughout.
+- Removed two private academy modules (12 files) from the published wheel — they contained private-infrastructure operational docs.
+- Purged private project identifiers (admin IP, hostname, and internal project/infrastructure slugs) from library source, tests, and fixtures; replaced with generic placeholders throughout.
 - Removed hardcoded personal absolute paths (`/home/marco/…`) from tests and fixtures.
 - Re-seeded `sessions_seeded.sqlite` telemetry fixture to strip private session data.
 - Genericized a private example in `core/workspace_resolver.py` docstring (shipped source).
-- Neutralized canonical assets for open-source consumers: `public/data/AGENTS.md` language default changed from "Portuguese (BR) by default" to language-neutral; removed leaked operator-infra examples (`OPERATOR_CHAT_ID`, `OpenRouter`, `dadaia Labs` brand) from the `dadaia-grill-me` skill.
+- Neutralized canonical assets for open-source consumers: `public/data/AGENTS.md` language default changed to language-neutral; removed leaked operator-infra examples from the `dadaia-grill-me` skill.
 - Trimmed bloated canonical rules to concise imperative form: `dadaia-workspace-dev-guardrail` 134→63 lines, `tmp-file-guardrail` 79→47 lines, `plugin-scope` 35→17 lines (removed dangling `ADR-X7` reference).
 - Verified: built wheel + sdist contain zero private-identifier leaks; full test suite green (2404 passed, 88.69% coverage).
 
@@ -35,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `release.yml`: corrected malformed `actions/download-artifact` SHA pin that broke the trusted-publishing release job.
 
 ### Removed
-- `09_redacted-infra/` and `10_redacted-infra_agent/` academy modules removed from `dadaia_workspace/` package tree (private infra docs; 12 files).
+- Two private academy modules removed from the `dadaia_workspace/` package tree (private infra docs; 12 files).
 
 ## [0.1.1] — 2026-05-23
 

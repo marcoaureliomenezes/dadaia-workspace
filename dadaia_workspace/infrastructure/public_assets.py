@@ -126,22 +126,46 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
 }
-_PUBLIC_PRIVACY_DENYLIST: tuple[tuple[str, str], ...] = (
-    ("0.0.0.0", "private admin IP"),
-    ("redacted-slug", "private project slug"),
-    ("redacted-slug", "private project slug"),
-    ("redacted-slug", "private project slug"),
-    ("redacted-slug", "private project slug"),
-    ("redacted-slug", "private project slug"),
-    ("redacted-slug", "private project slug"),
-    ("redacted-infra", "private infrastructure name"),
-    ("redacted-infra", "private infrastructure name"),
-    ("redacted-slug", "private project slug"),
-    ("redacted-slug", "private project slug"),
-    ("repos/redacted-slug", "private repo path"),
-    ("redacted-host", "private hostname"),
-    ("redacted-slug", "private project/person identifier"),
-)
+# Operator-private privacy terms are NEVER hardcoded in this published library
+# (dev-guardrail rule #4: no consumer-specific data in shipped source). Each
+# workspace supplies its own terms via a runtime file kept OUT of the package:
+#   1. $DADAIA_PRIVACY_DENYLIST            (path to a JSON file), or
+#   2. <repo_root>/.dadaia/states/privacy_denylist.json
+# Format: [["term", "reason"], ...] or {"term": "reason", ...}. Absent -> no terms.
+_PRIVACY_DENYLIST_ENV = "DADAIA_PRIVACY_DENYLIST"
+_PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
+
+
+def _load_privacy_denylist(repo_root: Path) -> tuple[tuple[str, str], ...]:
+    """Load operator-private privacy terms from outside the published package.
+
+    Resolution order: ``$DADAIA_PRIVACY_DENYLIST`` then
+    ``<repo_root>/.dadaia/states/privacy_denylist.json``. Returns ``()`` when no
+    source exists or the source is unreadable/malformed.
+    """
+    candidates: list[Path] = []
+    env_path = os.environ.get(_PRIVACY_DENYLIST_ENV)
+    if env_path:
+        candidates.append(Path(env_path))
+    candidates.append(repo_root / _PRIVACY_DENYLIST_REL)
+    for source in candidates:
+        try:
+            raw = json.loads(source.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        terms: list[tuple[str, str]] = []
+        if isinstance(raw, dict):
+            terms = [(str(key), str(value)) for key, value in raw.items()]
+        elif isinstance(raw, list):
+            for item in raw:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    terms.append((str(item[0]), str(item[1])))
+                elif isinstance(item, str):
+                    terms.append((item, "private identifier"))
+        if terms:
+            return tuple(terms)
+    return ()
+
 
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
 _TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset({"name", "description", "model", "tools"})
@@ -1869,6 +1893,9 @@ class FileSystemPublicAssetManager:
         """Fail doctor if public distributed assets contain known private identifiers."""
         roots = [self._public_dir]
         repo_root = self._public_dir.parent.parent
+        denylist = _load_privacy_denylist(repo_root)
+        if not denylist:
+            return ["[ok] public-privacy"]
         root_agents = repo_root / "AGENTS.md"
         if root_agents.exists():
             roots.append(root_agents)
@@ -1888,7 +1915,7 @@ class FileSystemPublicAssetManager:
                 except OSError:
                     continue
                 lowered = text.lower()
-                for term, reason in _PUBLIC_PRIVACY_DENYLIST:
+                for term, reason in denylist:
                     if term.lower() in lowered:
                         rel = (
                             path.relative_to(repo_root) if path.is_relative_to(repo_root) else path

@@ -151,18 +151,29 @@ def test_doctor_tracks_dadaia_scoped_agents_files(tmp_path: Path) -> None:
     assert "[drift] dadaia:states/AGENTS.md" in drift_report
 
 
+_PRIVACY_TEST_TERM = "10.99.99.99"
+
+
+def _seed_repo_denylist(repo_root: Path) -> None:
+    """Seed the file-based denylist source the doctor loads at runtime."""
+    import json  # noqa: PLC0415
+
+    states = repo_root / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "privacy_denylist.json").write_text(
+        json.dumps([[_PRIVACY_TEST_TERM, "test private IP"]]), encoding="utf-8"
+    )
+
+
 def test_public_privacy_gate_flags_private_identifiers(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     public_dir = repo_root / "dadaia_workspace" / "public"
     data_dir = public_dir / "data"
     data_dir.mkdir(parents=True)
-    # Use the first denylist term dynamically so the literal never appears in source.
-    from dadaia_workspace.infrastructure.public_assets import (
-        _PUBLIC_PRIVACY_DENYLIST,  # noqa: PLC0415
+    _seed_repo_denylist(repo_root)
+    (data_dir / "AGENTS.md").write_text(
+        f"Private endpoint: {_PRIVACY_TEST_TERM}\n", encoding="utf-8"
     )
-
-    first_term, _ = _PUBLIC_PRIVACY_DENYLIST[0]
-    (data_dir / "AGENTS.md").write_text(f"Private endpoint: {first_term}\n", encoding="utf-8")
 
     manager = FileSystemPublicAssetManager()
     manager._public_dir = public_dir  # noqa: SLF001
@@ -170,7 +181,7 @@ def test_public_privacy_gate_flags_private_identifiers(tmp_path: Path) -> None:
     report = manager._check_public_privacy()  # noqa: SLF001
 
     assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(first_term in line.lower() for line in report)
+    assert any(_PRIVACY_TEST_TERM in line.lower() for line in report)
 
 
 def test_public_privacy_gate_ignores_bytecode_cache(tmp_path: Path) -> None:
@@ -178,12 +189,8 @@ def test_public_privacy_gate_ignores_bytecode_cache(tmp_path: Path) -> None:
     public_dir = repo_root / "dadaia_workspace" / "public"
     cache_dir = public_dir / "skills" / "sample" / "__pycache__"
     cache_dir.mkdir(parents=True)
-    from dadaia_workspace.infrastructure.public_assets import (
-        _PUBLIC_PRIVACY_DENYLIST,  # noqa: PLC0415
-    )
-
-    first_term, _ = _PUBLIC_PRIVACY_DENYLIST[0]
-    (cache_dir / "leak.pyc").write_bytes(first_term.encode())
+    _seed_repo_denylist(repo_root)
+    (cache_dir / "leak.pyc").write_bytes(_PRIVACY_TEST_TERM.encode())
     (public_dir / "data").mkdir()
     (public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
 
