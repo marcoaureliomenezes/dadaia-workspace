@@ -26,7 +26,7 @@ Maximum one `[-]` at a time.
 ### T-CIV-01 — Fix ctx-inject.sh: remove dead branch + rewrite message
 
 - **ID:** T-CIV-01
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target file:** `dadaia_workspace/public/scripts/ctx-inject.sh`
 - **Preconditions:** SPEC.md and PLAN.md have `**Status:** Aprovado`; ACTIVE.md phase = `IMPLEMENTATION`

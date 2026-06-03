@@ -6,7 +6,6 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$DEFAULT_WORKSPACE_ROOT}"
-STATE_FILE="$WORKSPACE_ROOT/.dadaia/states/primary_context.json"
 
 # ---------------------------------------------------------------------------
 # Resolve context name and SPECS_DIR (preserve existing logic).
@@ -20,16 +19,10 @@ if [ -n "$DADAIA_CONTEXT" ]; then
         echo "[$DADAIA_CONTEXT] WARNING: specs not found"
         exit 0
     fi
-elif [ -f "$STATE_FILE" ]; then
-    CONTEXT_NAME=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('name',''))" 2>/dev/null)
-    if [ -z "$CONTEXT_NAME" ]; then
-        echo "[context: none] — run: eval \$(dadaia context use <name>)"
-        exit 0
-    fi
-    SPECS_DIR="$WORKSPACE_ROOT/repos/$CONTEXT_NAME/specs"
-    echo "[$CONTEXT_NAME]"
 else
-    echo "[context: none] — run: eval \$(dadaia context use <name>)"
+    echo "[context: none] — no context bound."
+    echo "  To bind a context: eval \$(.dadaia/.venv/bin/dadaia context bind <name> --mode read)"
+    echo "  Then export DADAIA_CONTEXT in the shell that launches your agent runtime."
     exit 0
 fi
 
