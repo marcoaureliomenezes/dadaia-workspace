@@ -401,8 +401,7 @@ def test_codex_config_emits_skills_table(case: dict) -> None:  # type: ignore[ty
     output = manager._codex_config(case["agentic_dir"])  # noqa: SLF001
     assert "[skills]" in output, f"Expected '[skills]' in output; got:\n{output}"
     assert 'paths = [".agents/skills", ".codex/skills"]' in output, (
-        'Expected shared and Codex-only skill roots in output; got:\n'
-        f"{output}"
+        f"Expected shared and Codex-only skill roots in output; got:\n{output}"
     )
 
 

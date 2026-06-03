@@ -581,8 +581,21 @@ def _is_source_repo_root(path: Path) -> bool:
         data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     except (tomllib.TOMLDecodeError, OSError):
         return False
-    poetry_name = data.get("tool", {}).get("poetry", {}).get("name", "")
-    project_name = data.get("project", {}).get("name", "")
+    tool = data.get("tool")
+    poetry_name = ""
+    if isinstance(tool, dict):
+        poetry = tool.get("poetry")
+        if isinstance(poetry, dict):
+            name = poetry.get("name")
+            if isinstance(name, str):
+                poetry_name = name
+
+    project_name = ""
+    project = data.get("project")
+    if isinstance(project, dict):
+        name = project.get("name")
+        if isinstance(name, str):
+            project_name = name
     return poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace"
 
 
@@ -868,9 +881,10 @@ class FileSystemPublicAssetManager:
             raise PublicAssetError(
                 f"Unsupported public install target '{target}'. Expected one of: {valid}"
             )
-        if _is_source_repo_root(workspace_root) and os.environ.get(
-            "DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL"
-        ) != "1":
+        if (
+            _is_source_repo_root(workspace_root)
+            and os.environ.get("DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL") != "1"
+        ):
             raise PublicAssetError(
                 "Refusing to project public runtime assets into the dadaia-workspace source "
                 "repository root. Use a temporary workspace for install smoke tests, or set "
@@ -1847,9 +1861,8 @@ class FileSystemPublicAssetManager:
         )
 
     def _is_ignored_public_asset(self, path: Path) -> bool:
-        return (
-            path.suffix in _PUBLIC_ASSET_IGNORED_SUFFIXES
-            or bool(_PUBLIC_ASSET_IGNORED_DIRS.intersection(path.parts))
+        return path.suffix in _PUBLIC_ASSET_IGNORED_SUFFIXES or bool(
+            _PUBLIC_ASSET_IGNORED_DIRS.intersection(path.parts)
         )
 
     def _check_public_privacy(self) -> list[str]:
@@ -1878,13 +1891,10 @@ class FileSystemPublicAssetManager:
                 for term, reason in _PUBLIC_PRIVACY_DENYLIST:
                     if term.lower() in lowered:
                         rel = (
-                            path.relative_to(repo_root)
-                            if path.is_relative_to(repo_root)
-                            else path
+                            path.relative_to(repo_root) if path.is_relative_to(repo_root) else path
                         )
                         findings.append(
-                            f"[error] public-privacy:{rel.as_posix()}: "
-                            f"contains '{term}' ({reason})"
+                            f"[error] public-privacy:{rel.as_posix()}: contains '{term}' ({reason})"
                         )
         if not findings:
             findings.append("[ok] public-privacy")

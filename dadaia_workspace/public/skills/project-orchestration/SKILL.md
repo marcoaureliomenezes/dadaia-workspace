@@ -145,7 +145,7 @@ Stop and surface to the operator when:
 
 ## Generic Playbooks
 
-### Architecture Review
+### Playbook — architecture-review
 
 Entry: `software-architect`.
 
@@ -153,7 +153,7 @@ Use for ADRs, dependency boundaries, cross-cutting migrations, or pattern
 selection. Architect reports the recommendation; implementation is dispatched
 only after the relevant SDD gate exists.
 
-### TDD Cycle
+### Playbook — tdd-cycle
 
 Entry: the surface implementer.
 
@@ -161,14 +161,14 @@ Use for non-trivial logic. Engineer writes or updates a failing test, implements
 the smallest passing change, refactors if needed, then requests QA when
 operator-visible behavior changed.
 
-### Bug Fix Fastlane
+### Playbook — bug-fix-fastlane
 
 Entry: the surface implementer.
 
 Use for a reproducible defect with narrow blast radius. Include reproduction
 steps, expected/actual behavior, suspected files, and validation command.
 
-### Security Patch
+### Playbook — security-patch
 
 Entry: `security-reviewer`.
 
@@ -176,7 +176,7 @@ Reviewer triages severity and blast radius. `project-manager` then dispatches
 the appropriate implementer or `devops-engineer`, followed by security
 verification.
 
-### Deploy Validation
+### Playbook — deploy-validation-only
 
 Entry: `qa-engineer`.
 
@@ -184,7 +184,7 @@ Use when deployment already happened and only smoke/evidence is needed. QA
 captures command output, screenshots, logs, or endpoint probes and writes a
 validation report.
 
-### Design First Implementation
+### Playbook — design-validation
 
 Entry: `design-specialist`.
 
@@ -192,10 +192,19 @@ Designer emits a handoff report with states, tokens, accessibility findings,
 and screenshots or sketches. `frontend-engineer` implements from that report,
 then QA validates the UI.
 
-### AI Entity Refinement
+### Playbook — ai-entity-refinement
 
 Entry: `ai-engineer`.
 
 Use for public agents, skills, rules, workflows, commands, hooks, and runtime
 projection behavior. Scope must list exact files or globs. Public asset edits
 must pass `dadaia public doctor` and the public privacy gate.
+
+### Playbook — ai-engineer-recursive-bootstrap
+
+Entry: `ai-engineer`.
+
+Use only for the first restricted-scope self-edit of public AI entities. The
+task must name exact files or globs, keep the edit generic/public-safe, and end
+with `dadaia public doctor`, memory lint when memory is touched, and a privacy
+gate result.
