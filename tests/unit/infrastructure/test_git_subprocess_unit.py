@@ -26,7 +26,7 @@ def test_clone_raises_git_clone_error_with_stderr(monkeypatch: pytest.MonkeyPatc
     )
 
     with pytest.raises(GitCloneError, match="fatal"):
-        GitSubprocessClient().clone("missing", Path("/dest"))
+        GitSubprocessClient().clone("https://github.com/o/missing.git", Path("/dest"))
 
 
 def test_commit_all_treats_nothing_to_commit_as_noop(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -100,3 +100,43 @@ def test_checkout_raises_sync_error_on_git_failure(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(GitSyncError, match="no branch"):
         GitSubprocessClient().checkout(Path("/repo"), "missing")
+
+
+@pytest.mark.parametrize(
+    "bad_url",
+    ["ext::sh -c id", "-oProxyCommand=evil", "--upload-pack=evil"],
+)
+def test_clone_rejects_disallowed_url_scheme(
+    bad_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-05: clone() rejects non-https/ssh transports BEFORE invoking git."""
+    ran = {"called": False}
+
+    def _spy(*_a: object, **_k: object) -> subprocess.CompletedProcess[str]:
+        ran["called"] = True
+        return _result(0)
+
+    monkeypatch.setattr(git_subprocess, "_run", _spy)
+
+    with pytest.raises(GitCloneError):
+        GitSubprocessClient().clone(bad_url, tmp_path / "dest")
+
+    assert ran["called"] is False, "git must not run for a disallowed URL"
+
+
+@pytest.mark.parametrize(
+    "ok_url",
+    [
+        "https://github.com/o/r.git",
+        "ssh://git@github.com/o/r.git",
+        "git@github.com:o/r.git",
+        "/local/path/repo",
+        "file:///srv/repo",
+    ],
+)
+def test_clone_allows_network_url_schemes(
+    ok_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Allowed https/ssh URLs pass validation and reach git."""
+    monkeypatch.setattr(git_subprocess, "_run", lambda *_a, **_k: _result(0))
+    GitSubprocessClient().clone(ok_url, tmp_path / "dest")  # must not raise
