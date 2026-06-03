@@ -203,10 +203,10 @@ where possible.
 Required validation:
 
 ```bash
-/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -m "unit and not slow" tests/unit
-/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -m "contract and not slow" tests/contract
-/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80
-/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -m integration tests/integration --durations=30
-/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -m e2e tests/e2e/features --durations=30
+poetry run python -m pytest -q -m "unit and not slow" tests/unit
+poetry run python -m pytest -q -m "contract and not slow" tests/contract
+poetry run python -m pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80
+poetry run python -m pytest -q -m integration tests/integration --durations=30
+poetry run python -m pytest -q -m e2e tests/e2e/features --durations=30
 npm run test:e2e
 ```

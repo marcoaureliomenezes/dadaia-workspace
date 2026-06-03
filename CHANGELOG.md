@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Removed two private academy modules (12 files) from the published wheel — they contained private-infrastructure operational docs.
 - Purged private project identifiers (admin IP, hostname, and internal project/infrastructure slugs) from library source, tests, and fixtures; replaced with generic placeholders throughout.
-- Removed hardcoded personal absolute paths (`/home/marco/…`) from tests and fixtures.
+- Removed hardcoded personal absolute paths (`/home/<user>/…`) from tests and fixtures.
 - Re-seeded `sessions_seeded.sqlite` telemetry fixture to strip private session data.
 - Genericized a private example in `core/workspace_resolver.py` docstring (shipped source).
 - Neutralized canonical assets for open-source consumers: `public/data/AGENTS.md` language default changed to language-neutral; removed leaked operator-infra examples from the `dadaia-grill-me` skill.
