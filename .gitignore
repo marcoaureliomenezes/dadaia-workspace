@@ -87,3 +87,7 @@ pip-wheel-metadata/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+
+# Maintainer SDD dev-ledger — this-instance operational state, NOT distributed.
+# Consumers generate their own specs/ via `dadaia init`. Kept locally, never public.
+/specs/
