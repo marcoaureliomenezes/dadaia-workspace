@@ -6,9 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-06-03
+
+### Added
+- Executable pytest taxonomy (`unit`/`contract`/`integration`/`e2e`/`slow`/`tmp` markers), a `tests/contract/**` public-contract layer, and a `tests/tmp/**` quarantine excluded from default collection (`test-suite-architecture`).
+
+### Changed
+- Coverage instrumentation removed from default pytest `addopts` (fast local default); coverage now enforced only by an explicit CI job. CI split into per-layer jobs (lint, typecheck, unit-fast, contract-coverage, integration, e2e-python, e2e-panel).
+
 ### Security
 - Removed the last hardcoded private identifiers from shipped source: the public-privacy denylist no longer embeds operator-specific values. Terms are now loaded at runtime from outside the published package (`$DADAIA_PRIVACY_DENYLIST` or `<repo_root>/.dadaia/states/privacy_denylist.json`); the library ships with an empty default (dev-guardrail rule #4).
-- Genericized changelog entries that previously enumerated private project/infrastructure identifiers.
+- Purged residual private identifiers from the full git history and genericized changelog entries that previously enumerated them.
 
 ## [0.1.3] — 2026-06-03
 
