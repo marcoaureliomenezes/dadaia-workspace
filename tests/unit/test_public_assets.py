@@ -155,7 +155,9 @@ def test_public_privacy_gate_flags_private_identifiers(tmp_path: Path) -> None:
     data_dir = public_dir / "data"
     data_dir.mkdir(parents=True)
     # Use the first denylist term dynamically so the literal never appears in source.
-    from dadaia_workspace.infrastructure.public_assets import _PUBLIC_PRIVACY_DENYLIST  # noqa: PLC0415
+    from dadaia_workspace.infrastructure.public_assets import (
+        _PUBLIC_PRIVACY_DENYLIST,  # noqa: PLC0415
+    )
 
     first_term, _ = _PUBLIC_PRIVACY_DENYLIST[0]
     (data_dir / "AGENTS.md").write_text(f"Private endpoint: {first_term}\n", encoding="utf-8")
@@ -174,7 +176,9 @@ def test_public_privacy_gate_ignores_bytecode_cache(tmp_path: Path) -> None:
     public_dir = repo_root / "dadaia_workspace" / "public"
     cache_dir = public_dir / "skills" / "sample" / "__pycache__"
     cache_dir.mkdir(parents=True)
-    from dadaia_workspace.infrastructure.public_assets import _PUBLIC_PRIVACY_DENYLIST  # noqa: PLC0415
+    from dadaia_workspace.infrastructure.public_assets import (
+        _PUBLIC_PRIVACY_DENYLIST,  # noqa: PLC0415
+    )
 
     first_term, _ = _PUBLIC_PRIVACY_DENYLIST[0]
     (cache_dir / "leak.pyc").write_bytes(first_term.encode())
