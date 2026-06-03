@@ -49,7 +49,7 @@ def render_workflows_section() -> str:
         # Card grid container — workflows.js renders .workflow-card elements inside.
         # aria-busy="false" is the default; workflows.js sets it to "true" during fetch.
         '  <div id="workflows-grid" class="workflows-card-grid" '
-        'aria-busy="false" aria-label="Workflow cards"></div>\n'
+        'aria-busy="false"></div>\n'
         # Legacy pane elements retained as hidden stubs so existing tests that check
         # for workflows-list/workflows-detail keep passing; they are visually hidden
         # via CSS (display:none on .workflows-list / .workflows-detail in workflows.css).

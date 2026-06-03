@@ -112,6 +112,7 @@ jobs:
       - name: Bootstrap panel workspace
         run: |
           poetry run python -m dadaia_workspace.cli.main init --workspace "$PWD" --skip-assets
+          poetry run python -m dadaia_workspace.cli.main public stage
           mkdir -p repos
           ln -sfn "$PWD" repos/dadaia-workspace
           cat > .dadaia/states/spec_contexts.json <<JSON
