@@ -10,7 +10,6 @@
 # Build and release tooling
 /pyproject.toml                @marcoaureliomenezes
 /poetry.lock                   @marcoaureliomenezes
-/Makefile                      @marcoaureliomenezes
 /scripts/                      @marcoaureliomenezes
 
 # Agent asset source of truth (public/ affects ALL downstream workspaces)

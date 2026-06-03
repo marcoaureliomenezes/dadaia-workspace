@@ -1,6 +1,6 @@
 ---
 name: dadaia-workspace-spec-navigator
-description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via specs/releases/ACTIVE.md and reads memory HTML + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via primary_context.json or `dadaia context show --json`."
+description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via specs/releases/ACTIVE.md and reads memory Markdown + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via primary_context.json or `dadaia context show --json`."
 ---
 
 # dadaia-workspace-spec-navigator
@@ -23,18 +23,18 @@ canonical order for the current task.
    - If neither resolves: stop and tell the operator to activate a context first
      (`dadaia context activate <name>`).
 
-2. **Read constitution and atomic memory (HTML).**
+2. **Read constitution and atomic memory (Markdown).**
    - `<specs-dir>/constitution.md`
-   - `<specs-dir>/memory/architecture.html`
-   - `<specs-dir>/memory/product/index.html` — entry point for product catalog. Load
-     specific `<specs-dir>/memory/product/<feature-slug>.html` files on demand when the
+   - `<specs-dir>/memory/architecture.md`
+   - `<specs-dir>/memory/product/catalog.json` — preferred machine-readable feature catalog when present.
+   - `<specs-dir>/memory/product/index.md` — entry point for product catalog. Load
+     specific `<specs-dir>/memory/product/<feature-slug>.md` files on demand when the
      task requires functional depth on a particular feature (avoids overloading context
      with all features at once).
-   - `<specs-dir>/memory/tech-stack.html`
+   - `<specs-dir>/memory/tech-stack.md`
 
-   Parse HTML as text and extract content. Sections of interest are typically marked with
-   `class="…"` or `id="…"` attributes (e.g. `<section id="layers">`, `<section id="catalog">`,
-   `<section id="purpose">`).
+   Read Markdown atoms directly. Use `catalog.json` to select the 1-3 feature
+   atoms relevant to the task; do not load every product atom by default.
 
 3. **Resolve the active release.**
    - Read `<specs-dir>/releases/ACTIVE.md`. Expected format:
@@ -73,5 +73,5 @@ canonical order for the current task.
 - Do not treat `Em revisão`, `Draft`, or missing status markers as approval.
 - Never reference `standby`, `context_dir`, `select`, or `is_selected` — these concepts do
   not exist in v3.0.
-- HTML memory files are read-only for every agent except `product-engineer` during the
+- Markdown memory files are read-only for every agent except `product-engineer` during the
   CLOSURE phase. Reading is always allowed.

@@ -21,6 +21,10 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_WS="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WS="${WORKSPACE_ROOT:-$DEFAULT_WS}"
+PYTHON_BIN="${DADAIA_PYTHON:-$WS/.dadaia/.venv/bin/python}"
+if [ ! -x "$PYTHON_BIN" ]; then
+    PYTHON_BIN="${PYTHON:-python3}"
+fi
 
 LOG="${SDD_GATE_LOG:-/tmp/sdd-gate.log}"
 _log() { printf '[%s] sdd-post-gate: %s\n' "$(date -Iseconds)" "$*" >> "$LOG" 2>/dev/null; }
@@ -40,7 +44,7 @@ fi
 
 # Step 3 — Renew last_seen_at atomically (tmp → os.replace())
 # Step 4 — Append HEARTBEAT event to .dadaia/logs/lock-events.jsonl
-python3 - "$SESS_FILE" "$WS" "$SESS_ID" 2>/dev/null <<'PYEOF'
+"$PYTHON_BIN" - "$SESS_FILE" "$WS" "$SESS_ID" 2>/dev/null <<'PYEOF'
 import json
 import os
 import sys

@@ -109,6 +109,40 @@ _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
 _OPENCODE_DIRS = ("commands", "skills", "agents", "plugins", "workflows")
 _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
 
+_PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+_PUBLIC_ASSET_IGNORED_SUFFIXES = {".pyc", ".pyo"}
+_PUBLIC_PRIVACY_TEXT_SUFFIXES = {
+    ".css",
+    ".html",
+    ".j2",
+    ".js",
+    ".json",
+    ".md",
+    ".py",
+    ".sh",
+    ".toml",
+    ".ts",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
+_PUBLIC_PRIVACY_DENYLIST: tuple[tuple[str, str], ...] = (
+    ("0.0.0.0", "private admin IP"),
+    ("redacted-slug", "private project slug"),
+    ("redacted-slug", "private project slug"),
+    ("redacted-slug", "private project slug"),
+    ("redacted-slug", "private project slug"),
+    ("redacted-slug", "private project slug"),
+    ("redacted-slug", "private project slug"),
+    ("redacted-infra", "private infrastructure name"),
+    ("redacted-infra", "private infrastructure name"),
+    ("redacted-slug", "private project slug"),
+    ("redacted-slug", "private project slug"),
+    ("repos/redacted-slug", "private repo path"),
+    ("redacted-host", "private hostname"),
+    ("redacted-slug", "private project/person identifier"),
+)
+
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
 _TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset({"name", "description", "model", "tools"})
 
@@ -530,6 +564,41 @@ def _is_self_repo(consumer: Path) -> bool:
         return False
 
 
+def _is_source_repo_root(path: Path) -> bool:
+    """Return True only for the dadaia-workspace source tree root.
+
+    Unlike ``_is_self_repo()``, this intentionally ignores staged manifest
+    versions. A normal temporary consumer workspace becomes version-matching
+    after ``stage()``, and must still be installable. The source-root guard is
+    only for the library checkout that contains the package source itself.
+    """
+    pyproject_path = path / "pyproject.toml"
+    if not pyproject_path.exists():
+        return False
+    if not (path / "dadaia_workspace" / "public").is_dir():
+        return False
+    try:
+        data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    except (tomllib.TOMLDecodeError, OSError):
+        return False
+    tool = data.get("tool")
+    poetry_name = ""
+    if isinstance(tool, dict):
+        poetry = tool.get("poetry")
+        if isinstance(poetry, dict):
+            name = poetry.get("name")
+            if isinstance(name, str):
+                poetry_name = name
+
+    project_name = ""
+    project = data.get("project")
+    if isinstance(project, dict):
+        name = project.get("name")
+        if isinstance(name, str):
+            project_name = name
+    return poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace"
+
+
 def _install_workspace_guardrail_pair(
     source: Path,
     workspace_root: Path,
@@ -812,6 +881,15 @@ class FileSystemPublicAssetManager:
             raise PublicAssetError(
                 f"Unsupported public install target '{target}'. Expected one of: {valid}"
             )
+        if (
+            _is_source_repo_root(workspace_root)
+            and os.environ.get("DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL") != "1"
+        ):
+            raise PublicAssetError(
+                "Refusing to project public runtime assets into the dadaia-workspace source "
+                "repository root. Use a temporary workspace for install smoke tests, or set "
+                "DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1 for an explicit local-only override."
+            )
 
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         installed: list[str] = []
@@ -840,6 +918,7 @@ class FileSystemPublicAssetManager:
             # Legacy / scaffold path: templates/AGENTS.md → workspace-root only.
             if scope in ("all", "workspace-only"):
                 self._install_agents_md(agentic_dir, workspace_root, force, installed)
+        self._install_dadaia_agents_md(agentic_dir, workspace_root, force, installed)
         self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
@@ -919,6 +998,7 @@ class FileSystemPublicAssetManager:
         reports.extend(self._lint_legacy_software_engineer())
         reports.extend(self._check_codex_drift(agentic_dir, workspace_root))
         reports.extend(self._check_agent_skill_refs())
+        reports.extend(self._check_public_privacy())
 
         # git-dirty check: detect uncommitted changes in public/ (editable install blind spot)
         try:
@@ -1254,7 +1334,7 @@ class FileSystemPublicAssetManager:
                 out.append(f"[partial] opencode:{tag} (parallel_group sequentially)")
             else:
                 out.append(f"[ok] opencode:{tag}")
-            out.append(f"[not-applicable] codex:{tag} (no workflow runtime)")
+            out.append(f"[reference-only] codex:{tag} (installed, no workflow executor)")
             out.append(f"[ok] claude:{tag}")
         return out
 
@@ -1288,6 +1368,20 @@ class FileSystemPublicAssetManager:
             reports_dir = workspace_root / ".dadaia" / "reports"
             reports_dir.mkdir(parents=True, exist_ok=True)
             self._copy_file(src, reports_dir / "AGENTS.md", force, installed)
+
+    def _install_dadaia_agents_md(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        mappings = (
+            ("dadaia-AGENTS.md", workspace_root / ".dadaia" / "AGENTS.md"),
+            ("tmp-AGENTS.md", workspace_root / ".dadaia" / "tmp" / "AGENTS.md"),
+            ("states-AGENTS.md", workspace_root / ".dadaia" / "states" / "AGENTS.md"),
+        )
+        for source_name, dst in mappings:
+            src = agentic_dir / "data" / source_name
+            if src.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                self._copy_file(src, dst, force, installed)
 
     def _install_universal_skills(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -1365,9 +1459,8 @@ class FileSystemPublicAssetManager:
         """Copy only executable rules (those with YAML frontmatter) to .codex/rules/.
 
         Behavioral prose rules (ADR-1/D2) — i.e. files without frontmatter — are
-        excluded from the Codex projection.  This prevents rules like
-        ``game-agents-coordination.md`` and ``game-developer-scope.md`` from
-        polluting the Codex rule surface.
+        excluded from the Codex projection so the runtime receives only executable,
+        structured rules.
         """
         src_dir = agentic_dir / "rules"
         dst_dir = workspace_root / ".codex" / "rules"
@@ -1585,6 +1678,24 @@ class FileSystemPublicAssetManager:
                 False,
             )
 
+        dadaia_agents = (
+            ("dadaia-AGENTS.md", workspace_root / ".dadaia" / "AGENTS.md", "dadaia:AGENTS.md"),
+            (
+                "tmp-AGENTS.md",
+                workspace_root / ".dadaia" / "tmp" / "AGENTS.md",
+                "dadaia:tmp/AGENTS.md",
+            ),
+            (
+                "states-AGENTS.md",
+                workspace_root / ".dadaia" / "states" / "AGENTS.md",
+                "dadaia:states/AGENTS.md",
+            ),
+        )
+        for source_name, dst, label in dadaia_agents:
+            src = agentic_dir / "data" / source_name
+            if src.exists():
+                yield (src, dst, label, False)
+
         for src in self._iter_files(agentic_dir / "skills"):
             rel = src.relative_to(agentic_dir / "skills")
             yield (
@@ -1743,7 +1854,51 @@ class FileSystemPublicAssetManager:
     def _iter_files(self, root: Path) -> Iterable[Path]:
         if not root.exists():
             return ()
-        return (path for path in sorted(root.rglob("*")) if path.is_file())
+        return (
+            path
+            for path in sorted(root.rglob("*"))
+            if path.is_file() and not self._is_ignored_public_asset(path)
+        )
+
+    def _is_ignored_public_asset(self, path: Path) -> bool:
+        return path.suffix in _PUBLIC_ASSET_IGNORED_SUFFIXES or bool(
+            _PUBLIC_ASSET_IGNORED_DIRS.intersection(path.parts)
+        )
+
+    def _check_public_privacy(self) -> list[str]:
+        """Fail doctor if public distributed assets contain known private identifiers."""
+        roots = [self._public_dir]
+        repo_root = self._public_dir.parent.parent
+        root_agents = repo_root / "AGENTS.md"
+        if root_agents.exists():
+            roots.append(root_agents)
+
+        findings: list[str] = []
+        for root in roots:
+            files = [root] if root.is_file() else list(self._iter_files(root))
+            for path in files:
+                if self._is_ignored_public_asset(path):
+                    continue
+                if path.suffix.lower() not in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
+                    continue
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    continue
+                except OSError:
+                    continue
+                lowered = text.lower()
+                for term, reason in _PUBLIC_PRIVACY_DENYLIST:
+                    if term.lower() in lowered:
+                        rel = (
+                            path.relative_to(repo_root) if path.is_relative_to(repo_root) else path
+                        )
+                        findings.append(
+                            f"[error] public-privacy:{rel.as_posix()}: contains '{term}' ({reason})"
+                        )
+        if not findings:
+            findings.append("[ok] public-privacy")
+        return findings
 
     def _claude_settings(self, workspace_root: Path) -> dict[str, object]:
         return {
@@ -1802,7 +1957,6 @@ class FileSystemPublicAssetManager:
             "cat",
             "grep",
             "curl",
-            "python3",
             "systemctl",
             "journalctl",
         ):
@@ -1817,39 +1971,27 @@ class FileSystemPublicAssetManager:
         # T-PB-4: emit [skills] table after all [agents.*] blocks
         lines.append("\n")
         lines.append("[skills]\n")
-        lines.append('paths = [".agents/skills"]\n')
+        lines.append('paths = [".agents/skills", ".codex/skills"]\n')
         return "".join(lines)
 
     def _codex_hooks(self, workspace_root: Path) -> dict[str, object]:
         return {
             "PreToolUse": [
                 {
-                    "matcher": {
-                        "tool": [
-                            "write_file",
-                            "edit_file",
-                            "apply_patch",
-                            "Write",
-                            "Edit",
-                            "MultiEdit",
-                        ]
-                    },
+                    "matcher": {},
                     "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"),
                 }
             ],
             "PostToolUse": [
                 {
-                    "matcher": {
-                        "tool": [
-                            "write_file",
-                            "edit_file",
-                            "apply_patch",
-                            "Write",
-                            "Edit",
-                            "MultiEdit",
-                        ]
-                    },
+                    "matcher": {},
                     "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"),
+                }
+            ],
+            "UserPromptSubmit": [
+                {
+                    "matcher": {},
+                    "command": str(workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"),
                 }
             ],
         }

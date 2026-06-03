@@ -4,7 +4,7 @@
  * Design principles:
  *   - All helpers are pure functions; they take a `page` or `request` and return
  *     a result — they never access global state beyond the fixtures below.
- *   - The panel Bearer token is read once from disk via the playwright.config.ts
+ *   - The panel Bearer token is read once from disk by this helper.
  *     module and re-exported here for convenience.
  *   - Zero mocks; tests exercise the real running panel.
  */

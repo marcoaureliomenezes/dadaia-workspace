@@ -7,6 +7,10 @@
 
 `dadaia-workspace` gives AI agents (Claude Code, Codex, OpenCode) a structured shared workspace with managed contexts, agentic asset projection, a real-time monitoring panel, and Spec-Driven Development enforcement.
 
+`dadaia-workspace` is open source under the MIT license. Source code, issues, and
+contributions live at
+[github.com/marcoaureliomenezes/dadaia-workspace](https://github.com/marcoaureliomenezes/dadaia-workspace).
+
 ---
 
 ## Install

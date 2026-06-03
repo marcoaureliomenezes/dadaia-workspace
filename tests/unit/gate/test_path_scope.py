@@ -580,6 +580,31 @@ def test_t9_memory_atomicity_wins_over_path_scope(tmp_path: Path) -> None:
     assert "[PATH SCOPE ERROR]" not in stdout
 
 
+def test_memory_html_blocked_even_in_closure(tmp_path: Path) -> None:
+    """memory-markdown-source-v1: legacy HTML memory is read-only even in CLOSURE."""
+    ws = _build_workspace(
+        tmp_path,
+        agents={"product-engineer": ["specs/**", ".dadaia/reports/<ctx>/product-engineer/**"]},
+        active_phase="CLOSURE",
+        context_name="dadaia-workspace",
+    )
+    log_path = tmp_path / "gate.log"
+    (ws / "specs" / "memory").mkdir(parents=True, exist_ok=True)
+    target = str(ws / "specs" / "memory" / "architecture.html")
+
+    stdout, rc, _log = _run_gate(
+        ws,
+        tool="Write",
+        file_path=target,
+        env_overrides={"DADAIA_AGENT_PERSONA": "product-engineer"},
+        log_path=log_path,
+    )
+
+    assert rc == 0
+    assert '"decision":"block"' in stdout
+    assert "Markdown como fonte única" in stdout
+
+
 # ---------------------------------------------------------------------------
 # Additional edge cases
 # ---------------------------------------------------------------------------

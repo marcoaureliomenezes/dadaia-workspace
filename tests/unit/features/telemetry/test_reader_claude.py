@@ -1,5 +1,4 @@
-"""Unit tests for features/telemetry/reader/claude.py (T-AM-06) and
-backfill_telemetry_agent_name.py (PR4-08).
+"""Unit tests for features/telemetry/reader/claude.py (T-AM-06 / PR4-08).
 
 Uses in-memory SQLite with full schema applied (via apply_migrations) so
 the DAO behaves exactly as in production without touching the filesystem DB.

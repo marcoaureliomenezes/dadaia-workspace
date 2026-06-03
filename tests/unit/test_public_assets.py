@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     _parse_agent_frontmatter,
@@ -49,6 +50,9 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     manager.install(workspace, target="all")
 
     assert (workspace / "AGENTS.md").exists()
+    assert (workspace / ".dadaia" / "AGENTS.md").exists()
+    assert (workspace / ".dadaia" / "tmp" / "AGENTS.md").exists()
+    assert (workspace / ".dadaia" / "states" / "AGENTS.md").exists()
     assert (workspace / ".agents" / "skills" / "dadaia-grill-me" / "SKILL.md").exists()
     assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
@@ -62,6 +66,24 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert (workspace / ".codex" / "rules" / "plugin-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "workspace-protocol.md").exists()
     assert (workspace / "opencode.json").exists()
+
+
+def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:
+    workspace = tmp_path / "dadaia-workspace"
+    workspace.mkdir()
+    (workspace / "dadaia_workspace" / "public").mkdir(parents=True)
+    (workspace / "pyproject.toml").write_text(
+        '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+        encoding="utf-8",
+    )
+
+    manager = FileSystemPublicAssetManager()
+
+    with pytest.raises(PublicAssetError, match="Refusing to project public runtime assets"):
+        manager.install(workspace, target="all")
+
+    assert not (workspace / ".dadaia").exists()
+    assert not (workspace / "opencode.json").exists()
 
 
 def test_problematic_skill_files_have_frontmatter() -> None:
@@ -109,12 +131,61 @@ def test_install_overwrites_existing_files_with_force(tmp_path: Path) -> None:
     assert "# dadaia-workspace" in content  # canonical content is present
 
 
+def test_doctor_tracks_dadaia_scoped_agents_files(tmp_path: Path) -> None:
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+
+    manager.stage(workspace)
+    manager.install(workspace, target="all", force=True)
+
+    clean_report = manager.doctor(workspace)
+    assert "[ok] dadaia:AGENTS.md" in clean_report
+    assert "[ok] dadaia:tmp/AGENTS.md" in clean_report
+    assert "[ok] dadaia:states/AGENTS.md" in clean_report
+
+    (workspace / ".dadaia" / "states" / "AGENTS.md").write_text("drift\n", encoding="utf-8")
+    drift_report = manager.doctor(workspace)
+
+    assert "[drift] dadaia:states/AGENTS.md" in drift_report
+
+
+def test_public_privacy_gate_flags_private_identifiers(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    public_dir = repo_root / "dadaia_workspace" / "public"
+    data_dir = public_dir / "data"
+    data_dir.mkdir(parents=True)
+    (data_dir / "AGENTS.md").write_text("Private endpoint: redacted-infra\n", encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+
+    report = manager._check_public_privacy()  # noqa: SLF001
+
+    assert any(line.startswith("[error] public-privacy:") for line in report)
+    assert any("redacted-infra" in line.lower() for line in report)
+
+
+def test_public_privacy_gate_ignores_bytecode_cache(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    public_dir = repo_root / "dadaia_workspace" / "public"
+    cache_dir = public_dir / "skills" / "sample" / "__pycache__"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "leak.pyc").write_bytes(b"redacted-infra")
+    (public_dir / "data").mkdir()
+    (public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+
+    assert manager._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
+
+
 _CLASSIFY_WORKFLOWS_CASES = [
     {
         "id": "codex_linear",
         "content": "# linear workflow\nstep: do_something\n",
         "expected_in": [
-            "[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"
+            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)"
         ],
         "expected_not_in": ["[partial] opencode:workflows/sample.workflow.md"],
     },
@@ -122,7 +193,7 @@ _CLASSIFY_WORKFLOWS_CASES = [
         "id": "codex_parallel",
         "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
         "expected_in": [
-            "[not-applicable] codex:workflows/sample.workflow.md (no workflow runtime)"
+            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)"
         ],
         "expected_not_in": ["[ok] opencode:workflows/sample.workflow.md"],
     },
@@ -329,8 +400,8 @@ def test_codex_config_emits_skills_table(case: dict) -> None:  # type: ignore[ty
     manager = FileSystemPublicAssetManager()
     output = manager._codex_config(case["agentic_dir"])  # noqa: SLF001
     assert "[skills]" in output, f"Expected '[skills]' in output; got:\n{output}"
-    assert 'paths = [".agents/skills"]' in output, (
-        f"Expected 'paths = [\".agents/skills\"]' in output; got:\n{output}"
+    assert 'paths = [".agents/skills", ".codex/skills"]' in output, (
+        f"Expected shared and Codex-only skill roots in output; got:\n{output}"
     )
 
 

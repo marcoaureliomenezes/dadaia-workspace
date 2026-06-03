@@ -1,7 +1,7 @@
 ---
 name: drift-detection
 description: >
-  Reference for project-auditor agent. Protocol for comparing specs/memory/*.html
+  Reference for project-auditor agent. Protocol for comparing specs/memory/*.md
   to actual implementation, dead-code detection methodology, 1–10 compliance
   scoring rubric across 6 dimensions, and dadaia CLI integration.
 applyTo: ".dadaia/reports/**"
@@ -16,14 +16,14 @@ Load each atom in order; extract content by parsing HTML as text.
 
 | Atom | Path | What it declares | Sections of interest |
 |---|---|---|---|
-| Architecture | `memory/architecture.html` | Layers, module boundaries, ADRs, data-flow topology | `#layers`, `#adr-log`, `#module-map` |
-| Product catalog | `memory/product/index.html` | Feature catalog (one entry per shipped feature) | `#catalog` |
-| Feature detail | `memory/product/<slug>.html` | Acceptance criteria, behavior spec, edge cases per feature | `#criteria`, `#behavior` |
-| Tech stack | `memory/tech-stack.html` | Languages, frameworks, versions, tooling, rationale | `#stack`, `#tooling` |
+| Architecture | `memory/architecture.md` | Layers, module boundaries, ADRs, data-flow topology | `#layers`, `#adr-log`, `#module-map` |
+| Product catalog | `memory/product/index.md` | Feature catalog (one entry per shipped feature) | `#catalog` |
+| Feature detail | `memory/product/<slug>.md` | Acceptance criteria, behavior spec, edge cases per feature | `#criteria`, `#behavior` |
+| Tech stack | `memory/tech-stack.md` | Languages, frameworks, versions, tooling, rationale | `#stack`, `#tooling` |
 
 Rules for loading:
-- Load `architecture.html` and `tech-stack.html` on every audit.
-- Load `product/index.html` first; then load individual feature files only for features
+- Load `architecture.md` and `tech-stack.md` on every audit.
+- Load `product/index.md` first; then load individual feature files only for features
   that are in-scope for the current audit.
 - Never use `_archive/` atoms as the authoritative source.
 - If an atom is missing, that is itself a drift finding (severity HIGH).
@@ -34,7 +34,7 @@ Rules for loading:
 
 ### Step 1 — Layer Sample Walk
 
-For each architectural layer declared in `architecture.html`:
+For each architectural layer declared in `architecture.md`:
 
 1. List the declared responsibilities and module paths.
 2. `find <repo-root>/<module-path> -type f -name "*.py" -o -name "*.ts" | head -20`
@@ -45,9 +45,9 @@ Record each mismatch as a drift item with evidence on both sides (spec:line + co
 
 ### Step 2 — Feature Cross-Reference
 
-For each feature in `memory/product/index.html`:
+For each feature in `memory/product/index.md`:
 
-1. Extract the acceptance criteria from `memory/product/<slug>.html`.
+1. Extract the acceptance criteria from `memory/product/<slug>.md`.
 2. Locate the corresponding implementation file(s) via:
    ```bash
    grep -rn "<feature-keyword>" <repo-root>/src --include="*.py" -l
@@ -59,7 +59,7 @@ For each feature in `memory/product/index.html`:
 
 ### Step 3 — Tech-Stack Cross-Reference
 
-For each declared dependency in `tech-stack.html`:
+For each declared dependency in `tech-stack.md`:
 
 1. Verify it appears in `pyproject.toml` / `package.json` / `go.mod`.
 2. Verify the pinned version matches the declared version.
@@ -232,7 +232,7 @@ ID: DRIFT-<n>
 Dimension: A (Architecture) | B (Product) | C (Tech-Stack) | D (Security) | E (Tests) | F (Design)
 Severity: CRITICAL | HIGH | MEDIUM | LOW
 Description: <what is drifted and why it matters>
-Spec evidence: <specs-dir>/memory/<atom>.html#<section> — "<quoted text>"
+Spec evidence: <specs-dir>/memory/<atom>.md#<section> — "<quoted text>"
 Code evidence: <repo-root>/<path>:<line> — "<quoted snippet>"
 Recommendation: <specific action to close the drift>
 Proposed owner: <agent responsible for the fix>

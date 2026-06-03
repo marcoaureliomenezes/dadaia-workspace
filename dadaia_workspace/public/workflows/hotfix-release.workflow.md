@@ -1,6 +1,6 @@
 ---
 name: hotfix-release
-description: "Hotfix release lifecycle. qa-engineer or operator files a candidate in specs/backlog/candidates.md `## Hotfixes pendentes`; project-manager promotes it to a PATCH release (v<M>.<m>.<patch+1>) and dispatches product-engineer for SPEC entry; the chosen implementer applies the fix; qa-engineer validates with smoke; product-engineer closes. Implementer slot is selected from {software-engineer-python, software-engineer-node, data-engineer, data-analyst, ai-engineer, frontend-engineer, backend-engineer, devops-engineer, game-developer, game-designer, game-tester} based on the file paths the fix touches. Memory updates are optional — required only if the fix changes operator-visible product behavior."
+description: "Hotfix release lifecycle. qa-engineer or operator files a candidate in specs/backlog/candidates.md `## Hotfixes pendentes`; project-manager promotes it to a PATCH release (v<M>.<m>.<patch+1>) and dispatches product-engineer for SPEC entry; the chosen implementer applies the fix; qa-engineer validates with smoke; product-engineer closes. Implementer slot is selected from {software-engineer-python, software-engineer-node, ai-engineer, frontend-engineer, backend-engineer, devops-engineer} based on the file paths the fix touches. Memory updates are optional — required only if the fix changes operator-visible product behavior."
 version: 0.3.0
 schema_version: "1"
 inputs:
@@ -20,7 +20,7 @@ inputs:
     type: string
     required: false
     default: software-engineer-python
-    description: "Which engineer applies the fix. Selected by project-manager (or operator) from the path → agent triage table in the workflow body. Allowed values: software-engineer-python, software-engineer-node, data-engineer, data-analyst, ai-engineer, frontend-engineer, backend-engineer, devops-engineer, game-developer, game-designer, game-tester."
+    description: "Which engineer applies the fix. Selected by project-manager (or operator) from the path → agent triage table in the workflow body. Allowed values: software-engineer-python, software-engineer-node, ai-engineer, frontend-engineer, backend-engineer, devops-engineer."
 stages:
   - id: file_hotfix_candidate
     agent: qa-engineer
@@ -150,15 +150,11 @@ the dispatch in `apply_fix` is unambiguous.
 |---|---|
 | `*.py`, `pyproject.toml`, `poetry.lock`, Python scripts, `dadaia_workspace/{features,infrastructure,cli,core}/**` | `software-engineer-python` |
 | Node server-side (`package.json` without browser bundler, CLIs, agent runtimes, `*.mjs`, server-side `*.ts`/`*.js`) | `software-engineer-node` |
-| `*.sql`, `**/databricks/**`, `**/dabs/**` excluding `**/dabs/dashboards/**`, `**/notebooks/**`, `**/pipelines/**` | `data-engineer` |
-| `**/dashboards/**`, `**/genie/**`, `**/bi/**`, `**/dabs/dashboards/**` | `data-analyst` |
 | `dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**` (AI-entity surface) | `ai-engineer` |
 | `*.tsx`, `*.jsx`, browser-targeted `*.ts`/`*.js`, `*.css`, `*.html`, `*/frontend/`, `*/client/`, `*/web/`, `*/ui/` | `frontend-engineer` |
 | `*.go`, `go.mod`, `go.sum`, production DB integrations (non data-pipeline) | `backend-engineer` |
 | `.github/workflows/*.yml`, CI/CD config, Docker base-image bumps that change pipeline shape | `devops-engineer` |
-| `repos/redacted-slug/**` — gameplay logic, mechanics, IA, physics | `game-developer` |
-| `repos/redacted-slug/**` — assets, materials, maps, audio | `game-designer` |
-| `repos/redacted-slug/**` — engine test automation + evidence reports | `game-tester` |
+| Optional domain-pack source | installed domain specialist; if absent, stop and ask the operator to install or define the pack |
 
 Triage rules:
 
@@ -168,17 +164,16 @@ Triage rules:
    `cross-cutting-feature` workflow) rather than a hotfix. If the operator confirms
    single-release urgency, project-manager dispatches the implementers sequentially —
    never in parallel inside a hotfix, because the smoke evidence must remain coherent.
-3. **Game subdomain conflicts** — when a hotfix touches `repos/redacted-slug/**` and spans
-   logic + assets, the three game agents triage among themselves per
-   `game-agents-coordination` rule; one of them owns the `apply_fix` stage and the
-   others are consulted via report.
+3. **Optional domain-pack conflicts** — when a hotfix touches source governed by
+   an installed optional pack, follow that pack's local rules. If no pack is
+   installed, stop and ask the operator to define the ownership boundary.
 4. **Default** — if the path family is ambiguous, project-manager defaults to
    `software-engineer-python` (the workflow input default) and documents the choice in
    the promote report. The operator may override before `apply_fix` starts.
 
 ## When to use `bug-fix-fastlane` instead
 
-- Fix does NOT touch `specs/memory/product/*.html`
+- Fix does NOT touch `specs/memory/product/*.md`
 - No release versioning needed (no PATCH bump)
 - Operator decides the fix is too small to warrant a release
 

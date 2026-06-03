@@ -16,13 +16,17 @@ Protected paths (relative to the repo root, checked recursively):
   .agents/
   .codex/
   .opencode/
-  .dadaia/agentic/
-  .dadaia/scripts/
+  .dadaia/
+
+Protected root files:
+  CLAUDE.md
+  opencode.json
+  Makefile
+  playwright.config.ts
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -39,12 +43,20 @@ _GUARDED_DIRS: tuple[str, ...] = (
     ".agents",
     ".codex",
     ".opencode",
-    os.path.join(".dadaia", "agentic"),
-    os.path.join(".dadaia", "scripts"),
+    ".dadaia",
+)
+
+_GUARDED_ROOT_FILES: tuple[str, ...] = (
+    "CLAUDE.md",
+    "opencode.json",
+    "Makefile",
+    "playwright.config.ts",
 )
 
 
-def _collect_entries(root: Path, rel_dirs: tuple[str, ...]) -> frozenset[str]:
+def _collect_entries(
+    root: Path, rel_dirs: tuple[str, ...], rel_files: tuple[str, ...]
+) -> frozenset[str]:
     """Return the set of all file paths (as strings) within the guarded dirs."""
     entries: set[str] = set()
     for rel in rel_dirs:
@@ -54,6 +66,10 @@ def _collect_entries(root: Path, rel_dirs: tuple[str, ...]) -> frozenset[str]:
         for path in guarded.rglob("*"):
             if path.is_file():
                 entries.add(str(path))
+    for rel in rel_files:
+        guarded_file = root / rel
+        if guarded_file.exists() and guarded_file.is_file():
+            entries.add(str(guarded_file))
     return frozenset(entries)
 
 
@@ -89,13 +105,14 @@ def _repo_root_write_guard() -> object:
     before the test against the one taken after.  If new files appear, the
     test fails with a descriptive message listing the offending paths.
     """
-    before = _collect_entries(_REPO_ROOT, _GUARDED_DIRS)
+    before = _collect_entries(_REPO_ROOT, _GUARDED_DIRS, _GUARDED_ROOT_FILES)
     yield
-    after = _collect_entries(_REPO_ROOT, _GUARDED_DIRS)
+    after = _collect_entries(_REPO_ROOT, _GUARDED_DIRS, _GUARDED_ROOT_FILES)
     new_files = after - before
     if new_files:
         formatted = "\n  ".join(sorted(new_files))
         pytest.fail(
             f"Test wrote unexpected files into protected lib-repo paths:\n  {formatted}\n"
-            "These directories must not be modified by tests: " + ", ".join(_GUARDED_DIRS)
+            "These paths must not be modified by tests: "
+            + ", ".join((*_GUARDED_DIRS, *_GUARDED_ROOT_FILES))
         )

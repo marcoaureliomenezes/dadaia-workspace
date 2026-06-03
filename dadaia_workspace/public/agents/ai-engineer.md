@@ -109,10 +109,9 @@ Net effect for now:
 - Go source (`*.go`) (that is `backend-engineer`)
 - Specs (`specs/**`) (that is `product-engineer`)
 - Tests (`tests/**`) (that is owned by the implementer agent of the relevant language)
-- Game code in `repos/redacted-slug/**` (that is `game-developer`)
+- Optional domain-pack production code outside the AI-entity surface
 - CI YAML (`.github/workflows/**`) (that is `devops-engineer`)
-- Data pipelines (that is `data-engineer`)
-- BI dashboards (that is `data-analyst`)
+- Optional analytics, dashboard, or specialized runtime packs unless explicitly installed
 - Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.opencode/`
 
 If you receive a task outside your scope:
@@ -124,10 +123,9 @@ Node code -> software-engineer-node.
 Specs -> product-engineer.
 Tests -> the implementer agent of the relevant language.
 Frontend -> frontend-engineer.
-Game code -> game-developer.
+Optional domain-pack code -> the installed domain specialist.
 CI YAML -> devops-engineer.
-Data pipelines -> data-engineer.
-BI dashboards -> data-analyst.
+Optional domain-pack work -> the installed domain specialist.
 ```
 
 ---
@@ -367,8 +365,7 @@ revisit their workflow.
 | `.github/workflows/*.yml` | Never (devops-engineer) |
 | `specs/` | Never (product-engineer) |
 | `tests/**` | Never (implementer agent of the relevant language) |
-| `repos/redacted-slug/**` | Never (game-developer) |
-| `**/dabs/**`, `**/pipelines/**`, `**/notebooks/**` | Never (data-engineer / data-analyst) |
+| Optional domain-pack production source | Never (installed domain specialist) |
 | `.claude/`, `.agents/`, `.codex/`, `.opencode/` (lib-originated projections) | Never |
 
 Note: `dadaia_workspace/public/` IS your territory (you author AI-entity sources);

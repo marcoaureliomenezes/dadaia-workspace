@@ -1,6 +1,6 @@
 ---
 name: cross-cutting-feature
-description: Feature that spans two or more domain surfaces simultaneously (frontend↔backend, Python↔Node, pipeline↔dashboard, AI-entity↔runtime). project-manager scopes, software-architect approves the contract, qa runs parallel red tests, the chosen implementer pair (or trio) builds in parallel against the contract, qa validates the integration end-to-end. Implementer slot is selected from {frontend-engineer, backend-engineer, software-engineer-python, software-engineer-node, data-engineer, data-analyst, ai-engineer} based on the file paths the release touches.
+description: Feature that spans two or more domain surfaces simultaneously (frontend↔backend, Python↔Node, AI-entity↔runtime). project-manager scopes, software-architect approves the contract, qa runs parallel red tests, the chosen implementer pair (or trio) builds in parallel against the contract, qa validates the integration end-to-end. Implementer slot is selected from {frontend-engineer, backend-engineer, software-engineer-python, software-engineer-node, ai-engineer} based on the file paths the release touches.
 version: 0.3.0
 schema_version: "1"
 inputs:
@@ -168,7 +168,6 @@ Python↔Node, pipeline↔dashboard, AI-entity↔runtime.
   on the contract
 - A schema change that affects the rendered shape and the producing service
 - A Python CLI that shells out to a Node helper (twin specialists, disjoint write sets)
-- A new curated table that hydrates a new BI dashboard (data-engineer ⇄ data-analyst)
 - A new agent persona whose runtime adapter lives in Python (ai-engineer ⇄
   software-engineer-python)
 - Anything where shipping only one side leaves the system in an incoherent state
@@ -190,9 +189,8 @@ retired generic implementer that the legacy lib used to expose.
 | Go services, `*.go`, `go.mod`, `go.sum`, production DB integrations | `backend-engineer` |
 | Python lib + scripts (`*.py`, `pyproject.toml`, `dadaia_workspace/{features,infrastructure,cli,core}/**`, Python-marked `repos/**`) | `software-engineer-python` |
 | Node tooling, server-side (`package.json` projects without browser bundler, CLIs, agent runtimes, npm tooling) | `software-engineer-node` |
-| Data pipelines (`*.sql`, `**/databricks/**`, `**/dabs/**` excluding `dashboards/`, `**/notebooks/**`, `**/pipelines/**`) | `data-engineer` |
-| BI dashboards (`**/dashboards/**`, `**/genie/**`, `**/bi/**`, `**/dabs/dashboards/**`) | `data-analyst` |
 | AI-entity surface (`dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**`) | `ai-engineer` |
+| Optional domain-pack source | installed domain specialist; if absent, stop and ask the operator to install or define the pack |
 
 Dispatch rules:
 
@@ -207,10 +205,8 @@ Dispatch rules:
 4. **Python↔Node twin tasks** — when both lib languages are touched, dispatch both
    `software-engineer-python` and `software-engineer-node` in parallel; each handles its
    own file subset.
-5. **Data pipeline + BI dashboard** — dispatch `data-engineer` to produce the curated
-   table first, then `data-analyst` to consume it. If both ship in the same release, the
-   workflow stages them with `data-engineer` ahead of `data-analyst` (sequential, not
-   parallel — BI needs the table to exist).
+5. **Optional domain-pack source** — follow the installed pack's ownership
+   table. If no pack is installed, stop before dispatching.
 6. **AI-entity + Python runtime** — dispatch `ai-engineer` and `software-engineer-python`
    in parallel; the persona file and the Python adapter ship together.
 

@@ -1538,7 +1538,7 @@ class TestClassifyWorkflows:
         out = manager._classify_workflows(agentic_dir)
         assert any(line == "[ok] opencode:workflows/simple.workflow.md" for line in out)
         assert any(line == "[ok] claude:workflows/simple.workflow.md" for line in out)
-        assert any("[not-applicable]" in line and "simple.workflow.md" in line for line in out)
+        assert any("[reference-only]" in line and "simple.workflow.md" in line for line in out)
 
     def test_workflow_with_parallel_group_partial(self, tmp_path: Path) -> None:
         agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
@@ -1566,13 +1566,20 @@ class TestConfigGenerators:
         assert isinstance(matchers, list)
         assert len(matchers) > 0
         assert "command" in matchers[0]
+        assert matchers[0]["matcher"] == {}
         # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
         assert "PostToolUse" in hooks
         post_matchers = hooks["PostToolUse"]
         assert isinstance(post_matchers, list)
         assert len(post_matchers) > 0
         assert "command" in post_matchers[0]
+        assert post_matchers[0]["matcher"] == {}
         assert str(post_matchers[0]["command"]).endswith("sdd-post-gate.sh")
+        assert "UserPromptSubmit" in hooks
+        prompt_matchers = hooks["UserPromptSubmit"]
+        assert isinstance(prompt_matchers, list)
+        assert prompt_matchers[0]["matcher"] == {}
+        assert str(prompt_matchers[0]["command"]).endswith("ctx-inject.sh")
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
@@ -1623,6 +1630,7 @@ class TestConfigGenerators:
         config_text = manager._codex_config(agentic_dir)
         assert "[skills]" in config_text
         assert ".agents/skills" in config_text
+        assert ".codex/skills" in config_text
 
 
 # ---------------------------------------------------------------------------

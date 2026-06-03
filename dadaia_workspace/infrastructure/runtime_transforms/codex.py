@@ -6,15 +6,16 @@ Codex runtime.
 
 Transformations applied (v1, per ADR-2 §Transformações obrigatórias):
 
-1. Replace references to the Claude Code ``Agent`` tool with Codex subagent
-   equivalents:
-   - `` `Agent` tool `` → `` `subagent` dispatch ``
-   - ``Agent tool``     → ``subagent dispatch``
-   - ``Agent.dispatch`` → ``subagent.dispatch``
-   - `` `Agent` ``      → `` `subagent` ``   (tool-table entries)
+1. Replace references to the Claude Code ``Agent`` tool with Codex-native
+   multi-agent wording:
+   - `` `Agent` tool `` → ``deferred multi-agent tool via tool_search``
+   - ``Agent tool``     → ``deferred multi-agent tool via tool_search``
+   - ``Agent.dispatch`` → ``multi-agent dispatch discovered via tool_search``
+   - `` `Agent` ``      → ``multi-agent tool discovered via tool_search``
 
-2. Remove Claude-specific hook lines (``UserPromptSubmit``, ``PreToolUse hook``,
-   ``PostToolUse hook``) if any appear in the body.
+2. Preserve hook semantics. Claude-authored references to ``PreToolUse``,
+   ``PostToolUse``, and ``UserPromptSubmit`` remain visible because Codex
+   receives equivalent generated hooks where the runtime supports them.
 
 3. Replace Claude model identifiers (``claude-*``) appearing in body text with
    their Codex equivalents from the model mapping table (ADR-5).  This prevents
@@ -37,20 +38,14 @@ from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MOD
 # ---------------------------------------------------------------------------
 
 _REPLACEMENTS: tuple[tuple[str, str], ...] = (
-    # "`Agent` tool" → "`subagent` dispatch"
-    ("`Agent` tool", "`subagent` dispatch"),
-    # "Agent tool" (unquoted) → "subagent dispatch"
-    ("Agent tool", "subagent dispatch"),
-    # "Agent.dispatch" → "subagent.dispatch"
-    ("Agent.dispatch", "subagent.dispatch"),
-    # "`Agent`" alone (e.g. tool-table entries) → "`subagent`"
-    ("`Agent`", "`subagent`"),
-)
-
-# Lines that reference Claude-specific hooks are removed entirely.
-_HOOK_PATTERN: re.Pattern[str] = re.compile(
-    r"UserPromptSubmit\s+hook|PreToolUse\s+hook|PostToolUse\s+hook",
-    re.IGNORECASE,
+    # "`Agent` tool" → Codex deferred tool-discovery wording.
+    ("`Agent` tool", "deferred multi-agent tool via `tool_search`"),
+    # "Agent tool" (unquoted) → Codex deferred tool-discovery wording.
+    ("Agent tool", "deferred multi-agent tool via `tool_search`"),
+    # "Agent.dispatch" → Codex dispatch wording.
+    ("Agent.dispatch", "multi-agent dispatch discovered via `tool_search`"),
+    # "`Agent`" alone (e.g. tool-table entries) → Codex tool-discovery wording.
+    ("`Agent`", "multi-agent tool discovered via `tool_search`"),
 )
 
 # Pattern matching any ``claude-<identifier>`` token in body prose.
@@ -90,11 +85,6 @@ def transform_for_codex(canonical_body: str, agent_id: str) -> str:  # noqa: ARG
     # Apply string replacements in priority order.
     for old, new in _REPLACEMENTS:
         result = result.replace(old, new)
-
-    # Remove lines containing Claude-specific hook references.
-    if _HOOK_PATTERN.search(result):
-        lines = result.splitlines(keepends=True)
-        result = "".join(line for line in lines if not _HOOK_PATTERN.search(line))
 
     # Replace known Claude model identifiers in body prose (ADR-5 / AC3).
     result = _KNOWN_MODEL_RE.sub(lambda m: MODEL_MAP[m.group(1)], result)

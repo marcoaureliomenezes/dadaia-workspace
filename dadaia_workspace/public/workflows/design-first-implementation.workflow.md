@@ -11,7 +11,7 @@ inputs:
   surface:
     type: string
     required: true
-    description: "UI surface under review (e.g. 'portfolio', 'dadaia-workspace-panel', or a path)."
+    description: "UI surface under review (app, dashboard, panel, component, flow, or path)."
   task_id:
     type: string
     required: true

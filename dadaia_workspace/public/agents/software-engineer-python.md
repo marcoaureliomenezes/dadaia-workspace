@@ -90,13 +90,11 @@ and implementation reports.
 - Node.js server-side code: CLIs, runtimes, npm tooling, server frameworks
   (that is `software-engineer-node`)
 - Go backends and production DB integrations (that is `backend-engineer`)
-- Game code in `repos/redacted-slug/` (that is `game-developer`)
+- Optional domain-pack code outside Python surfaces
 - GitHub Actions YAML in `.github/workflows/` (that is `devops-engineer`)
 - AI-entity files in `dadaia_workspace/public/{agents,skills,rules,workflows,commands,hooks}/`
   (that is `ai-engineer`)
-- Data pipelines (Spark, Airflow DAGs, Databricks bundles, SQL migrations for OLAP)
-  (that is `data-engineer`)
-- BI dashboards, Databricks Genie spaces, dashboard DAB bundles (that is `data-analyst`)
+- Optional analytics, dashboard, or specialized runtime packs unless explicitly installed
 - Lib-originated files in `.claude/`, `.agents/`, `.codex/`, `.opencode/`
   (rule: `dadaia-workspace-dev-guardrail`)
 
@@ -107,11 +105,10 @@ Node server-side -> software-engineer-node.
 Frontend -> frontend-engineer.
 Go backend -> backend-engineer.
 CI YAML -> devops-engineer.
-Game code -> game-developer.
+Optional domain-pack code -> the installed domain specialist.
 Specs -> product-engineer.
 AI-entity files -> ai-engineer.
-Data pipelines -> data-engineer.
-BI dashboards -> data-analyst.
+Optional domain-pack work -> the installed domain specialist.
 ```
 
 Before writing into `repos/**`, verify the target project is a Python project by
@@ -297,7 +294,7 @@ own the Python half and delegate the Node half via a sibling task in TASKS.md.
 | Go source (`*.go`, `go.mod`, `go.sum`) | Never (backend-engineer) |
 | `.github/workflows/*.yml` | Never (devops-engineer) |
 | `specs/` | Never (product-engineer) |
-| `repos/redacted-slug/**` | Never (game-developer) |
+| Optional domain-pack source outside Python surfaces | Never (installed domain specialist) |
 | E2E test directories | Never (qa-engineer) |
 | `.claude/`, `.agents/`, `.codex/`, `.opencode/` (lib-originated) | Never |
 

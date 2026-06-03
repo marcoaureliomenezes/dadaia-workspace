@@ -13,13 +13,13 @@ vision_paragraph: >-
 
 users:
   - name: "Operador (único humano)"
-    description: "Orchestrates work across 20 agents in a 3-tier topology. Activates contexts, approves specs, decides trade-offs."
+    description: "Orchestrates work across 15 agents in a 3-tier topology. Activates contexts, approves specs, decides trade-offs."
   - name: "Tier 1 — orchestrators (com tool Agent)"
     description: "project-manager (intake + workflow dispatch), project-auditor (drift detection)."
   - name: "Tier 2 — curator (sem tool Agent)"
     description: "product-engineer: author of SPEC/PLAN/TASKS/CLOSURE and exclusive guardian of specs/memory/*.html in CLOSURE phase."
-  - name: "Tier 3 — leaf specialists (17, sem tool Agent)"
-    description: "ai-engineer, backend-engineer, code-reviewer, data-analyst, data-engineer, design-specialist, devops-engineer, frontend-engineer, game-designer, game-developer, game-tester, qa-engineer, researcher, security-reviewer, software-architect, software-engineer-node, software-engineer-python."
+  - name: "Tier 3 — leaf specialists (12, sem tool Agent)"
+    description: "ai-engineer, backend-engineer, code-reviewer, design-specialist, devops-engineer, frontend-engineer, qa-engineer, researcher, security-reviewer, software-architect, software-engineer-node, software-engineer-python."
 
 catalog:
   - slug: "workspace-init"

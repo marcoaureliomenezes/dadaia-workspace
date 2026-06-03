@@ -273,15 +273,13 @@ class TestNewWorkflowsInList:
     def test_full_7_workflow_topology_count(self) -> None:
         """With the post-AGT-r2-06 7-workflow topology the LIST response returns 7 entries.
 
-        The 8 deprecated workflows (tdd-cycle, game-spec-definition, architecture-review,
-        bug-fix-fastlane, game-bugfix, security-patch, deploy-validation-only,
-        design-validation) have been trimmed. The surviving 7 are listed below.
+        Deprecated specialist workflows have been trimmed. The surviving 7 are listed below.
         """
         all_7 = [
             "audit-cycle",
             "code-review-fan-out",
             "cross-cutting-feature",
-            "game-dev-cycle",
+            "design-first-implementation",
             "hotfix-release",
             "onboarding-new-repo",
             "spec-refinement",

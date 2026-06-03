@@ -46,18 +46,22 @@ node_modules/
 playwright-report/
 test-results/
 
+# Root-level runtime projections / local harness files.
+# dadaia-workspace is the source library, not a generated consumer workspace.
+/CLAUDE.md
+/opencode.json
+/Makefile
+/playwright.config.ts
+
 # dadaia agent reports (absolute paths, not for version control)
 .dadaia/reports/
 
 # dadaia runtime projections and generated directories (never commit)
+.dadaia/
 .claude/
 .agents/
 .codex/
 .opencode/
-.dadaia/agentic/
-.dadaia/scripts/
-.dadaia/states/
-.dadaia/tmp/
 tests/e2e/panel/screenshots/
 img/
 
@@ -88,6 +92,9 @@ pip-wheel-metadata/
 .ipynb_checkpoints/
 *.ipynb
 
-# Maintainer SDD dev-ledger — this-instance operational state, NOT distributed.
-# Consumers generate their own specs/ via `dadaia init`. Kept locally, never public.
-/specs/
+# Maintainer SDD release ledger remains local, but product law and memory are public.
+# `specs/constitution.md` and `specs/memory/**` are first-class repository truth.
+/specs/*
+!/specs/constitution.md
+!/specs/memory/
+!/specs/memory/**

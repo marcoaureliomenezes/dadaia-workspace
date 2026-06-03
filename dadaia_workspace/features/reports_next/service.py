@@ -18,22 +18,16 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
 
-#: Canonical 21-agent topology (data-architect is the 21st). Owner names parsed from
+#: Canonical 15-agent public topology. Owner names parsed from
 #: PLAN.md are filtered to this set so prose like ``owner: TBD`` never enters a sequence.
 CANONICAL_AGENTS: frozenset[str] = frozenset(
     {
         "ai-engineer",
         "backend-engineer",
         "code-reviewer",
-        "data-analyst",
-        "data-architect",
-        "data-engineer",
         "design-specialist",
         "devops-engineer",
         "frontend-engineer",
-        "game-designer",
-        "game-developer",
-        "game-tester",
         "product-engineer",
         "project-auditor",
         "project-manager",

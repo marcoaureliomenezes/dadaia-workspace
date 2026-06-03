@@ -52,7 +52,7 @@ _HEADING_GROUP_B: frozenset[str] = frozenset(
         "Schema location",
         "CLI",
         "Skill: dadaia-handoff-emitter",
-        "Adoção (21 de 21 agentes)",
+        "Adoção (15 de 15 agentes)",
         "Referência",
         "Brand identity",
         "Decision Authority Matrix — domínios novos (r3)",
