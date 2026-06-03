@@ -92,7 +92,7 @@ def test_nested_services_pair_untouched_after_install(tmp_path: Path) -> None:
     services_claude.write_bytes(_OPERATOR_CLAUDE_CONTENT)
 
     # --- Marker-bearing consumer repo ---
-    slug = "dadaia-bots"
+    slug = "sample-consumer"
     consumer = _add_marker_consumer(workspace_root, slug)
 
     # --- Run install ---
@@ -207,7 +207,7 @@ def test_all_projected_pairs_share_single_sha256(tmp_path: Path) -> None:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
 
-    slug_a = "dadaia-bots"
+    slug_a = "sample-consumer"
     slug_b = "workflow-tools"
     consumer_a = _add_marker_consumer(workspace_root, slug_a)
     consumer_b = _add_marker_consumer(workspace_root, slug_b)

@@ -78,10 +78,10 @@ jobs:
       - name: mypy --strict
         run: poetry run mypy --strict dadaia_workspace/
 
-  test:
-    name: Tests (pytest)
+  unit-fast:
+    name: Unit fast (pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
@@ -99,8 +99,144 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest
-        run: poetry run pytest -q
+      - name: pytest unit fast
+        run: poetry run pytest -q -m "unit and not slow" tests/unit
+
+  contract-coverage:
+    name: Contract coverage (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+      - name: Cache poetry deps
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: pytest unit/contract coverage
+        run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
+
+  integration:
+    name: Integration (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+      - name: Cache poetry deps
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: pytest integration
+        run: poetry run pytest -q -m integration tests/integration --durations=30
+
+  e2e-python:
+    name: E2E Python (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+      - name: Cache poetry deps
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: pytest e2e python
+        run: poetry run pytest -q -m e2e tests/e2e/features --durations=30
+
+  e2e-panel:
+    name: E2E panel (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.3
+      - name: Cache poetry deps
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install Python deps
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: Bootstrap panel workspace
+        run: |
+          poetry run python -m dadaia_workspace.cli.main init --workspace "$PWD" --skip-assets
+          poetry run python -m dadaia_workspace.cli.main public stage
+          mkdir -p repos
+          ln -sfn "$PWD" repos/dadaia-workspace
+          cat > .dadaia/states/spec_contexts.json <<JSON
+          {
+            "schema_version": "2",
+            "contexts": [
+              {
+                "name": "dadaia-workspace",
+                "state": "alive",
+                "repo_slug": "dadaia-workspace",
+                "repo_url": "https://github.com/marcoaureliomenezes/dadaia-workspace.git",
+                "created_at": "2026-06-03T00:00:00+00:00",
+                "alive_since": "2026-06-03T00:00:00+00:00",
+                "dead_since": null,
+                "current_branch": "main"
+              }
+            ]
+          }
+          JSON
+          cat > .dadaia/states/primary_context.json <<JSON
+          {
+            "name": "dadaia-workspace",
+            "repo_slug": "dadaia-workspace",
+            "specs_dir": "$PWD/specs"
+          }
+          JSON
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903  # v6.0.0
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install Node deps
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: playwright panel e2e
+        env:
+          PANEL_WEB_SERVER_COMMAND: poetry run python -m dadaia_workspace.cli.main panel --port 4999 --no-open
+        run: npm run test:e2e
 
   pr-title:
     name: PR title (conventional commits)

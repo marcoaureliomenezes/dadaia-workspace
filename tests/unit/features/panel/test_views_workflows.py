@@ -1,4 +1,4 @@
-"""Unit tests for views/workflows.py — T-AM-17.
+"""Unit tests for views/workflows.py.
 
 Covers:
   - render_workflows_section() returns a non-empty string
@@ -6,9 +6,8 @@ Covers:
   - Grid container id="workflows-grid" is present
   - Empty-state id="workflows-empty" element is present
 
-AGT-33 note: render_workflows_section() is a static-HTML skeleton; workflow cards are
-populated client-side via JS fetch.  No hardcoded card count is asserted here.
-The 15-workflow topology (C2) is validated through /api/workflows LIST tests.
+render_workflows_section() is a static HTML skeleton; workflow cards are
+populated client-side via JS fetch. No hardcoded card count is asserted here.
 """
 
 from dadaia_workspace.features.panel.views.workflows import render_workflows_section

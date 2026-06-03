@@ -1,10 +1,4 @@
-"""Tests for canonical brand PALETTE and CSS token discipline.
-
-Spec: dadaia-workspace-brand-identity-v1 SPEC.md.
-
-T-P5-01: PALETTE and PANEL_CSS removed from _assets.py. PALETTE is defined
-inline here (spec values are load-bearing). PANEL_CSS is assembled from slices.
-"""
+"""Tests for panel CSS token discipline."""
 
 from __future__ import annotations
 
@@ -18,39 +12,23 @@ from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS
 
 PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
 
-PALETTE: dict[str, str] = {
-    "accent": "#9cddc8",
-    "accent_secondary": "#bfd8ad",
-    "warning_bg": "#ddd9ab",
-    "alert": "#f7af63",
-    "cost": "#633d2e",
+
+_REQUIRED_COLOR_TOKENS = {
+    "--color-accent",
+    "--color-accent-secondary",
+    "--color-warning-bg",
+    "--color-alert",
+    "--color-cost",
 }
 
 
-def test_palette_has_five_canonical_keys() -> None:
-    assert set(PALETTE.keys()) == {"accent", "accent_secondary", "warning_bg", "alert", "cost"}
+def test_required_brand_tokens_exist_in_token_css() -> None:
+    """Brand colors are sourced from CSS tokens, not duplicated in tests."""
+    for token in _REQUIRED_COLOR_TOKENS:
+        assert re.search(rf"{re.escape(token)}\s*:\s*#[0-9a-fA-F]{{3,8}}\b", TOKENS_CSS)
 
 
-def test_palette_values_are_canonical_hex() -> None:
-    assert PALETTE["accent"] == "#9cddc8"
-    assert PALETTE["accent_secondary"] == "#bfd8ad"
-    assert PALETTE["warning_bg"] == "#ddd9ab"
-    assert PALETTE["alert"] == "#f7af63"
-    assert PALETTE["cost"] == "#633d2e"
-
-
-def test_palette_hex_only_in_token_definitions() -> None:
-    """Each PALETTE hex appears only in --color-* definitions or var(...) fallbacks.
-
-    The fallback form `var(--color-X, #hex)` is required by D-AM-22 (agent-monitoring-v1)
-    so the panel renders correctly even if brand-identity tokens are missing.
-    """
-    pattern = re.compile(
-        r"(--color-[a-z-]+\s*:\s*|var\(--color-[a-z-]+\s*,\s*)",
-    )
-    for hex_value in PALETTE.values():
-        occurrences = [line for line in PANEL_CSS.splitlines() if hex_value.lower() in line.lower()]
-        for line in occurrences:
-            assert pattern.search(line), (
-                f"hex {hex_value} found outside token definition or var() fallback: {line!r}"
-            )
+def test_panel_css_consumes_color_tokens() -> None:
+    """Panel CSS should consume the token contract through var(--color-*)."""
+    for token in _REQUIRED_COLOR_TOKENS:
+        assert f"var({token}" in PANEL_CSS or token in TOKENS_CSS

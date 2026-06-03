@@ -1,220 +1,220 @@
 ---
 name: dadaia-grill-me
 description: >
-  Modo de refinamento de backlog/intake — entrevista o operador sobre uma demanda, SPEC,
-  ou feature até atingir entendimento compartilhado completo. Resolve inconsistências,
-  gaps de escopo e decisões em aberto.
-  PRIMARY CALLER (post-agents-r1-v1): project-manager durante a fase de intake.
-  product-engineer pode invocar quando consultado como leaf specialist para uma dúvida
-  específica de spec. O report final vai para
+  Backlog/intake refinement mode — interviews the operator about a demand, SPEC,
+  or feature until full shared understanding is reached. Resolves inconsistencies,
+  scope gaps, and open decisions.
+  PRIMARY CALLER (post-agents-r1-v1): project-manager during the intake phase.
+  product-engineer may invoke when consulted as a leaf specialist for a specific
+  spec question. The final report goes to
   .dadaia/reports/<context-name>/<caller-agent>/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html.
-  Use quando o operador mencionar "grill", "refine specs", "revisar backlog" ou "/dadaia-grill-me".
+  Use when the operator mentions "grill", "refine specs", "review backlog", or "/dadaia-grill-me".
 applyTo: "specs/**"
 ---
 
-# dadaia-grill-me — Refinamento de Specs SDD
+# dadaia-grill-me — SDD Spec Refinement
 
-## Propósito
+## Purpose
 
-Identificar e resolver — antes da implementação — os problemas que destroem specs:
+Identify and resolve — before implementation — the problems that destroy specs:
 
-| Tipo de problema | Exemplo |
+| Problem type | Example |
 |---|---|
-| **Inconsistência entre specs** | `feature/snapshots` referencia paths de `mnt/` mas `feature/volume-migration` não foi feita ainda |
-| **Spec vs implementação** | `service/bot` SEC8 diz socket `:ro` mas o bot precisa de escrita para compose |
-| **Pergunta aberta que o código já responde** | "Qual o ID do operador?" — está no env file do serviço |
-| **Nomes divergentes para a mesma coisa** | `ALLOWED_USERS` na security spec vs `OPERATOR_CHAT_ID` no env file — mesmo conceito, dois nomes |
-| **Sintaxe ambígua** | `{{VAR}}` na instance-templates mas `envsubst` usa `${VAR}` |
-| **Dependência não declarada** | snapshots depende de volume-migration; volume-migration não declara isso |
-| **Categoria incorreta** | `service/guardrails` chama de "guardrails" mas especifica backups de config |
-| **Constitution desatualizada** | constitution.md diz Provider A é primário; routing-v2 implementou Provider B como primário |
+| **Inconsistency between specs** | `feature/my-feature` references paths from `platform/my-platform` but that feature is not done yet |
+| **Spec vs implementation** | `service/my-service` security section says socket `:ro` but the service needs write access |
+| **Open question already answered by code** | "What is the operator ID?" — it is in the service env file |
+| **Divergent names for the same concept** | `ALLOWED_IDS` in the security spec vs `OWNER_ID` in the env file — same concept, two names |
+| **Ambiguous syntax** | `{{VAR}}` in config templates but `envsubst` uses `${VAR}` |
+| **Undeclared dependency** | `feature/my-feature` depends on `platform/my-platform`; dependency not declared |
+| **Incorrect category** | A feature called "guardrails" actually specifies config backups |
+| **Stale constitution** | `constitution.md` says Provider A is primary; a later release implemented Provider B as primary |
 
-**O operador responde apenas o que o código não pode responder.** O modelo faz a inspeção primeiro.
+**The operator only answers what the code cannot answer.** The model inspects first.
 
 ---
 
-## Como Invocar
+## How to Invoke
 
 ```
-/dadaia-grill-me                       → todo o backlog (14 specs)
-/dadaia-grill-me <feature-id>          → uma spec específica + suas dependências
-/dadaia-grill-me report                → gera report com Q&A acumulado na sessão
+/dadaia-grill-me                       → entire backlog
+/dadaia-grill-me <feature-id>          → one specific spec + its dependencies
+/dadaia-grill-me report                → generate report with Q&A accumulated in the session
 ```
 
 ---
 
-## Protocolo em 3 Fases
+## 3-Phase Protocol
 
 ---
 
-### Fase 0 — Inspeção (antes de qualquer pergunta)
+### Phase 0 — Inspection (before any question)
 
-**Nunca pergunte o que pode ser descoberto. Inspecione primeiro.**
+**Never ask what can be discovered. Inspect first.**
 
 ```bash
-# 1. Listar todas as specs e status
+# 1. List all specs and status
 grep -r "Status:" specs/ --include="SPEC.md" -l | xargs grep "Status:" | sort
 
-# 2. Verificar estado real dos containers vs o que as specs afirmam
+# 2. Check real container state vs what specs claim
 docker compose -f <COMPOSE_FILE> ps
 docker inspect <CONTAINER_NAME> --format '{{range .Mounts}}{{.Source}}→{{.Destination}} {{end}}'
 
-# 3. Verificar env vars reais vs o que as specs dizem
+# 3. Check real env vars vs what specs say
 grep -r "<ENV_VAR_TARGET>" <config-path>/
 
-# 4. Verificar paths que as specs referenciam mas podem não existir
-ls <workspace-data-path>/ 2>/dev/null || echo "path não existe"
+# 4. Check paths specs reference but may not exist
+ls <workspace-data-path>/ 2>/dev/null || echo "path does not exist"
 ```
 
-Após inspeção, montar internamente uma lista de **achados** por tipo antes de começar a entrevistar:
+After inspection, build internally a list of **findings** by type before starting the interview:
 
 ```
-ACHADOS (internos — não mostrar ao operador ainda):
-  [INCONSISTÊNCIA] ...
-  [DRIFT spec↔código] ...
-  [PERGUNTA ABERTA RESPONDÍVEL] → já respondida: <valor>
-  [PERGUNTA ABERTA IRRESPONDÍVEL] → precisa do operador
-  [DEPENDÊNCIA NÃO DECLARADA] ...
-  [NOMENCLATURA DIVERGENTE] ...
-  [CONSTITUTION DESATUALIZADA] ...
+FINDINGS (internal — do not show the operator yet):
+  [INCONSISTENCY] ...
+  [DRIFT spec↔code] ...
+  [OPEN QUESTION ANSWERABLE] → already answered: <value>
+  [OPEN QUESTION UNANSWERABLE] → needs operator
+  [UNDECLARED DEPENDENCY] ...
+  [DIVERGENT NAMING] ...
+  [STALE CONSTITUTION] ...
 ```
 
-Resolver os "RESPONDÍVEIS" internamente. Só levar ao operador os "IRRESPONDÍVEIS".
+Resolve the "ANSWERABLE" ones internally. Only bring "UNANSWERABLE" ones to the operator.
 
 ---
 
-### Fase 1 — Entrevista Focada em Problemas Reais
+### Phase 1 — Focused Interview on Real Problems
 
-**Uma pergunta por vez. Sempre ancorada em specs e arquivos reais.**
+**One question per turn. Always anchored in real specs and files.**
 
-Formato obrigatório de cada turno:
+Required format for each turn:
 
 ```
-**Inconsistência/Gap #N:**
-📄 Spec(s) envolvida(s): `specs/.../SPEC.md` (seção X) e `specs/.../SPEC.md` (seção Y)
-❓ Problema: [descrição precisa do conflito, gap ou ambiguidade]
-💡 Minha recomendação: [solução sugerida com justificativa]
-→ Como quer resolver isso?
+**Inconsistency/Gap #N:**
+Spec(s) involved: `specs/.../SPEC.md` (section X) and `specs/.../SPEC.md` (section Y)
+Problem: [precise description of the conflict, gap, or ambiguity]
+My recommendation: [suggested solution with justification]
+→ How do you want to resolve this?
 ```
 
-**Nunca duas perguntas no mesmo turno.**
+**Never two questions in the same turn.**
 
-**Ordem de prioridade:**
+**Priority order:**
 
-1. **Inconsistências que bloqueiam implementação** — se implementar X com base na spec Y vai gerar retrabalho imediato
-2. **Drift spec↔código** — o que foi implementado diverge do que a spec diz; qual prevalece?
-3. **Dependências de ordem** — qual feature deve vir antes de qual, e isso está declarado?
-4. **Nomenclatura** — o mesmo conceito tem dois nomes; qual padronizar?
-5. **Critérios de aceitação irrespondíveis** — FRs sem "como verificar" definido
-6. **Constitution desatualizada** — o documento de leis está mentindo sobre o estado atual
+1. **Inconsistencies that block implementation** — implementing X based on spec Y will cause immediate rework
+2. **Spec↔code drift** — what was implemented diverges from what the spec says; which prevails?
+3. **Order dependencies** — which feature must come before which, and is that declared?
+4. **Naming** — the same concept has two names; which one to standardize?
+5. **Unanswerable acceptance criteria** — FRs without a defined "how to verify"
+6. **Stale constitution** — the law document is lying about the current state
 
-**Não pergunte sobre:**
-- Preferências estéticas de formatação
-- Escolhas de implementação já feitas e funcionando
-- Detalhes que o operador claramente não se importa (tudo que pode ser "qualquer coisa razoável")
+**Do not ask about:**
+- Aesthetic formatting preferences
+- Implementation choices already made and working
+- Details the operator clearly does not care about (anything that can be "whatever is reasonable")
 
 ---
 
-### Fase 2 — Síntese por Spec (no final de cada spec)
+### Phase 2 — Synthesis per Spec (at the end of each spec)
 
 ```
-## Síntese: <feature-id>
+## Synthesis: <feature-id>
 
-**Problema central resolvido:** [1 frase]
-**Status pós-refinamento:** Pronta para aprovação | Precisa de edição | Bloqueada por <dependência>
+**Core problem resolved:** [1 sentence]
+**Post-refinement status:** Ready for approval | Needs editing | Blocked by <dependency>
 
-**Mudanças necessárias no SPEC.md:**
-  - [ ] [seção] → [o que mudar e por quê]
+**Required changes in SPEC.md:**
+  - [ ] [section] → [what to change and why]
 
-**Dependências declaradas:** [lista ou "nenhuma nova"]
-**ADRs registrados nesta sessão:**
-  - [decisão] — razão: [justificativa curta]
+**Declared dependencies:** [list or "none new"]
+**ADRs recorded in this session:**
+  - [decision] — reason: [short justification]
 ```
 
 ---
 
-### Fase 3 — Gerar Report
+### Phase 3 — Generate Report
 
-Ao terminar (ou em `/dadaia-grill-me report`), escrever `.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html`:
+When done (or at `/dadaia-grill-me report`), write `.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html`:
 
 ---
 
-## Formato do Report (`.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html`)
+## Report Format (`.dadaia/reports/<context-name>/product-engineer/<YYYY-MM-DDTHHMMSSZ>-refine-specs.html`)
 
 ```markdown
-# Refinamento de Specs — dadaia Labs
-> Gerado em: <ISO 8601>
-> Escopo: <todo o backlog | feature-id>
-> Problemas encontrados: <N> | Resolvidos: <M> | Abertos: <P>
+# Spec Refinement Report
+> Generated at: <ISO 8601>
+> Scope: <entire backlog | feature-id>
+> Problems found: <N> | Resolved: <M> | Open: <P>
 
 ---
 
-## Sumário de Problemas
+## Problem Summary
 
-| # | Tipo | Specs envolvidas | Status |
+| # | Type | Specs involved | Status |
 |---|------|-----------------|--------|
-| 1 | Inconsistência | platform/snapshots ↔ platform/volume-migration | ✅ Resolvido |
-| 2 | Drift spec↔código | service/bot SEC8 | ✅ Resolvido |
-| 3 | Constitution desatualizada | constitution.md provider primário | ⚠️ Pendente |
+| 1 | Inconsistency | platform/my-feature ↔ platform/my-platform | Resolved |
+| 2 | Spec↔code drift | service/my-service security section | Resolved |
+| 3 | Stale constitution | constitution.md primary provider | Pending |
 | ... | | | |
 
 ---
 
-## Backlog Priorizado (pós-refinamento)
+## Prioritized Backlog (post-refinement)
 
-Ordem recomendada com justificativa de dependências:
+Recommended order with dependency justification:
 
-| Ordem | Feature | Depende de | Razão |
+| Order | Feature | Depends on | Reason |
 |-------|---------|-----------|-------|
-| 1 | service/guardrails | — | 1 env var, zero risco, desbloqueia segurança |
-| 2 | platform/volume-migration | — | desbloqueia snapshots e instance-templates |
-| 3 | platform/snapshots | volume-migration | paths assumem mnt/ já existente |
+| 1 | service/my-service | — | zero risk, unblocks security |
+| 2 | platform/my-platform | — | unblocks dependent features |
+| 3 | feature/my-feature | my-platform | paths assume my-platform already present |
 | ... | | | |
 
 ---
 
-## Detalhes por Problema
+## Details per Problem
 
-### Problema #N — <título curto>
+### Problem #N — <short title>
 
-**Tipo:** Inconsistência | Drift | Dependência | Nomenclatura | Critério irrespondível | Constitution
-**Specs:** `specs/.../SPEC.md` seção X; `specs/.../SPEC.md` seção Y
-**Descrição:** [o que está errado, com citação literal do texto problemático]
-**Pergunta feita:** [texto da pergunta ao operador]
-**Resposta:** [resposta do operador ou "respondida via inspeção: <valor>"]
-**Resolução:** [como a spec deve ser atualizada]
-**Pendência:** [o que ainda precisa mudar no arquivo — ou "nenhuma"]
+**Type:** Inconsistency | Drift | Dependency | Naming | Unanswerable criterion | Stale constitution
+**Specs:** `specs/.../SPEC.md` section X; `specs/.../SPEC.md` section Y
+**Description:** [what is wrong, with literal citation of the problematic text]
+**Question asked:** [text of the question to the operator]
+**Answer:** [operator's answer or "answered via inspection: <value>"]
+**Resolution:** [how the spec should be updated]
+**Pending:** [what still needs to change in the file — or "none"]
 
 ---
 
-## Edições Pendentes nas Specs
+## Pending Spec Edits
 
-Lista consolidada de todas as mudanças a fazer:
+Consolidated list of all changes to make:
 
-| Arquivo | Seção | O que mudar |
+| File | Section | What to change |
 |---------|-------|-------------|
-| `specs/constitution.md` | Stack | Atualizar provider primário para OpenRouter |
-| `specs/releases/<release-id>/SPEC.md` | FR1/FR2 | Declarar dependência de volume-migration |
+| `specs/constitution.md` | Stack | Update primary provider |
+| `specs/releases/<release-id>/SPEC.md` | FR1/FR2 | Declare dependency on my-platform |
 | ... | | |
 
 ---
 
-## Próximos Passos
+## Next Steps
 
-1. Editar os arquivos listados acima (em ordem de dependência)
-2. Marcar `[x] Approved` nas specs prontas
-3. Criar PLAN.md para specs aprovadas sem PLAN
+1. Edit the files listed above (in dependency order)
+2. Mark `[x] Approved` on ready specs
+3. Create PLAN.md for approved specs without a PLAN
 ```
 
 ---
 
-## Regras Absolutas
+## Absolute Rules
 
-- **Inspecione antes de perguntar** — qualquer dado factual (path, env var, status, ID) deve ser buscado no código ou containers, nunca perguntado ao operador
-- **Cite specs literalmente** — toda pergunta deve incluir a seção exata e o texto problemático
-- **Uma pergunta por turno** — sem exceção
-- **Não sugerir implementação** — output é refinamento de specs, não código
-- **Registrar "respondida via inspeção"** — quando resolver algo sem perguntar, documentar no report
-- **Não aceitar "depende"** — se o operador diz isso, explore a árvore de decisão até ter uma resposta acionável
+- **Inspect before asking** — any factual data (path, env var, status, ID) must be found in code or containers, never asked of the operator
+- **Cite specs literally** — every question must include the exact section and the problematic text
+- **One question per turn** — no exceptions
+- **Do not suggest implementation** — output is spec refinement, not code
+- **Record "answered via inspection"** — when resolving something without asking, document it in the report
+- **Do not accept "it depends"** — if the operator says this, explore the decision tree until you have an actionable answer
 
 ---

@@ -62,7 +62,7 @@ def test_walks_past_partial_dadaia_to_real_workspace(tmp_path: Path) -> None:
     workspace_root = _make_full_workspace(tmp_path / "workspace")
 
     # Sub-repo: has .dadaia/ but no states/
-    sub_repo = _make_partial_dadaia(workspace_root / "repos", "dadaia-bots")
+    sub_repo = _make_partial_dadaia(workspace_root / "repos", "sample-consumer")
     # A file deep inside the sub-repo
     deep = sub_repo / "src" / "module"
     deep.mkdir(parents=True)

@@ -1,4 +1,4 @@
-"""Integration test — PR4-10: end-to-end telemetry aggregation pipeline.
+"""Integration test for the end-to-end telemetry aggregation pipeline.
 
 Seeds synthetic jsonl files with dispatched-subagent events, drives the
 reader + aggregator pipeline, and asserts that list_agents() returns at
@@ -150,7 +150,7 @@ def _make_dao(db_path: pathlib.Path) -> TelemetryDao:
 
 
 class TestEndToEndAggregation:
-    """PR4-10: seed → read → aggregate → assert session_count > 0."""
+    """Seed → read → aggregate → assert session_count > 0."""
 
     def test_single_agent_session_count_nonzero(self, tmp_path: pathlib.Path) -> None:
         """After reading one synthetic jsonl, list_agents returns the seeded

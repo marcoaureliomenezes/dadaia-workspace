@@ -1,6 +1,6 @@
-"""Unit tests for the activated /static/<name> route — PR3-02.
+"""Unit tests for the /static/<name> route.
 
-Covers §6 of SPEC dadaia-workspace-panel-r3-v1:
+Covers static asset serving contracts:
   - .css  → 200, Content-Type: text/css; charset=utf-8
   - .js   → 200, Content-Type: application/javascript; charset=utf-8
   - .svg  → 200, Content-Type: image/svg+xml; charset=utf-8

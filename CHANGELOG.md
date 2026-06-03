@@ -6,6 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-06-03
+
+### Security
+- Removed private academy modules `09_openclaw/` and `10_hermes_agent/` (12 files) from the published wheel — they leaked private-infrastructure operational docs.
+- Purged all private project identifiers from library source, tests, and fixtures: private admin IP, private hostname, and slugs `tauan`/`tauan-games`, `openclaw`, `hermes`, `dd-chain`, `portifolio`, `bothub`, `burrinhos`, `dadaia-bots`, `dadaia-web`, `rand-engine`, `aero-fighters`; replaced with generic placeholders throughout.
+- Removed hardcoded personal absolute paths (`/home/marco/…`) from tests and fixtures.
+- Re-seeded `sessions_seeded.sqlite` telemetry fixture to strip private session data.
+- Genericized a private example in `core/workspace_resolver.py` docstring (shipped source).
+- Neutralized canonical assets for open-source consumers: `public/data/AGENTS.md` language default changed from "Portuguese (BR) by default" to language-neutral; removed leaked operator-infra examples (`OPERATOR_CHAT_ID`, `OpenRouter`, `dadaia Labs` brand) from the `dadaia-grill-me` skill.
+- Trimmed bloated canonical rules to concise imperative form: `dadaia-workspace-dev-guardrail` 134→63 lines, `tmp-file-guardrail` 79→47 lines, `plugin-scope` 35→17 lines (removed dangling `ADR-X7` reference).
+- Verified: built wheel + sdist contain zero private-identifier leaks; full test suite green (2404 passed, 88.69% coverage).
+
+### Added
+- Markdown-memory source (`memory-markdown-source-v1`): product memory is now `.md` atoms with YAML frontmatter; panel renders via `mistune`; deleted renderer/schemas/HTML templates from the old YAML/HTML memory approach.
+- Panel Kanban tab: task-state board (`[ ]`/`[-]`/`[x]`) with `/api/kanban` endpoint; handoff verdict gate enforced at panel level (`panel-kanban-v1`).
+- Spec-context tree-v2: `ALIVE`/`DEAD` context states, new verbs (`bind`/`unbind`), per-release session locks with `acquire`/`release` semantics (`spec-context-tree-v2`).
+- Per-release TOCTOU-hardened session locks: `Impl-XOR-Review` lock enforcement with stale-lock detection and temp-race fixes (`r2-lock-toctou-hardening-v1`).
+- `ctx-inject v2`: `context use` → `bind` rename; `primary_context.json` retired from hook; `ctx-inject.sh` updated to v2 context resolution.
+- `dadaia public stage` sanitization: defaults for new workspaces scrubbed of private agentic config.
+
+### Changed
+- `specs/` carved out of the public repository: marked untracked + added to `.gitignore`; private infra paths and project slugs that had leaked via the specs tree are now excluded from the wheel and sdist.
+- `public/data/AGENTS.md` language default is now language-neutral (was "Portuguese (BR) by default").
+- GitHub Actions SHA pins corrected: malformed `actions/download-artifact` SHA in `release.yml` fixed; all action pins refreshed.
+
+### Fixed
+- `release.yml`: corrected malformed `actions/download-artifact` SHA pin that broke the trusted-publishing release job.
+
+### Removed
+- `09_openclaw/` and `10_hermes_agent/` academy modules removed from `dadaia_workspace/` package tree (private infra docs; 12 files).
+
 ## [0.1.1] — 2026-05-23
 
 ### Added
