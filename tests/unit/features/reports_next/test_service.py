@@ -160,4 +160,4 @@ def test_sequence_order_and_dedup(tmp_path: Path) -> None:
 
 
 def test_canonical_agents_count() -> None:
-    assert len(CANONICAL_AGENTS) == 21
+    assert len(CANONICAL_AGENTS) == 15

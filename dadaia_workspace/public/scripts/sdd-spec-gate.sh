@@ -17,6 +17,10 @@ LOG="${SDD_GATE_LOG:-/tmp/sdd-gate.log}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_WS="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WS="${WORKSPACE_ROOT:-$DEFAULT_WS}"
+PYTHON_BIN="${DADAIA_PYTHON:-$WS/.dadaia/.venv/bin/python}"
+if [ ! -x "$PYTHON_BIN" ]; then
+    PYTHON_BIN="${PYTHON:-python3}"
+fi
 
 _log() { printf '[%s] sdd-gate: %s\n' "$(date -Iseconds)" "$*" >> "$LOG" 2>/dev/null; }
 _block() { _log "BLOCKED: $*"; printf '{"decision":"block","reason":"%s"}' "$1"; exit 0; }
@@ -28,7 +32,7 @@ cat > "$TMP" 2>/dev/null
 [ ! -s "$TMP" ] && exit 0
 
 # Parse tool name
-TOOL=$(python3 - "$TMP" 2>/dev/null <<'EOF'
+TOOL=$("$PYTHON_BIN" - "$TMP" 2>/dev/null <<'EOF'
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
@@ -44,7 +48,7 @@ case "$TOOL" in
 esac
 
 # Parse file path from tool input
-FPATH=$(python3 - "$TMP" 2>/dev/null <<'EOF'
+FPATH=$("$PYTHON_BIN" - "$TMP" 2>/dev/null <<'EOF'
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
@@ -60,7 +64,7 @@ EOF
 _log "tool=$TOOL path=$FPATH"
 
 # Resolve primary slug + specs_dir from primary_context.json (best effort)
-PRIMARY_SLUG=$(python3 - 2>/dev/null <<EOF
+PRIMARY_SLUG=$("$PYTHON_BIN" - 2>/dev/null <<EOF
 import json
 try:
     print(json.load(open("$WS/.dadaia/states/primary_context.json")).get("repo_slug", ""))
@@ -68,7 +72,7 @@ except Exception:
     print("")
 EOF
 )
-PRIMARY_SPECS=$(python3 - 2>/dev/null <<EOF
+PRIMARY_SPECS=$("$PYTHON_BIN" - 2>/dev/null <<EOF
 import json
 try:
     print(json.load(open("$WS/.dadaia/states/primary_context.json")).get("specs_dir", ""))
@@ -92,15 +96,18 @@ if [ -n "$PRIMARY_SPECS" ] && [ -f "$PRIMARY_SPECS/releases/ACTIVE.md" ]; then
 fi
 [ -n "$ACTIVE_RELEASE" ] && _log "active_release=$ACTIVE_RELEASE phase=$ACTIVE_PHASE"
 
-# v3 RULE A — Memory atomicity. Block writes to specs/memory/*.html (and *.md
-# legacy), plus the product/ subfolder (catalog with index + per-feature HTMLs),
-# unless ACTIVE.md phase == CLOSURE. Evaluated BEFORE the meta-edit allow-list
-# so it cannot be bypassed by naming the file *.md or by nesting in product/.
+# v3 RULE A — Memory atomicity. Markdown is the sole editable memory source.
+# Legacy specs/memory/*.html and YAML atoms are always read-only. Markdown atoms
+# are write-locked unless ACTIVE.md phase == CLOSURE. Evaluated BEFORE the
+# meta-edit allow-list so it cannot be bypassed by nesting in product/.
 # v3.2: derive specs_dir from FPATH, not primary_context — fixes cross-repo
 # false-positives when primary context is a different repo in a non-CLOSURE phase.
 case "$FPATH" in
-    */specs/memory/*.html|*/specs/memory/*.md|*/specs/memory/*.yaml|*/specs/memory/*.yml|\
-    */specs/memory/product/*.html|*/specs/memory/product/*.md|*/specs/memory/product/*.yaml|*/specs/memory/product/*.yml)
+    */specs/memory/*.html|*/specs/memory/*.yaml|*/specs/memory/*.yml|\
+    */specs/memory/product/*.html|*/specs/memory/product/*.yaml|*/specs/memory/product/*.yml)
+        _block "[SDD GATE] memory/ usa Markdown como fonte única. Arquivos .html/.yaml/.yml em specs/memory/ são legado read-only; escreva apenas atoms .md durante CLOSURE."
+        ;;
+    */specs/memory/*.md|*/specs/memory/product/*.md)
         FILE_SPECS_DIR="$(echo "$FPATH" | sed -E 's|/specs/.*||')/specs"
         FILE_ACTIVE_RELEASE=$(grep -E '^release:' "$FILE_SPECS_DIR/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')
         FILE_ACTIVE_PHASE=$(grep -E '^phase:' "$FILE_SPECS_DIR/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//')
@@ -201,7 +208,7 @@ _path_scope_check() {
 
     # Priority 3 — JSON payload field tool_input._meta.agent_persona
     if [ -z "$persona" ]; then
-        persona=$(python3 - "$TMP" 2>/dev/null <<'PYEOF'
+        persona=$("$PYTHON_BIN" - "$TMP" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
@@ -241,7 +248,7 @@ PYEOF
     # Parse write_allowlist from frontmatter via Python (one-shot, per-invocation)
     # Returns newline-separated list of glob patterns, or empty on error/missing.
     local raw_allowlist
-    raw_allowlist=$(python3 - "$agent_file" 2>/dev/null <<'PYEOF'
+    raw_allowlist=$("$PYTHON_BIN" - "$agent_file" 2>/dev/null <<'PYEOF'
 import sys
 try:
     text = open(sys.argv[1], encoding="utf-8").read()
@@ -308,7 +315,7 @@ PYEOF
         [ -z "$allowlist_rendered" ] && allowlist_rendered="${glob}"
         # Python fnmatch with ** expansion
         local hit
-        hit=$(python3 - "$rel_fpath" "$glob" 2>/dev/null <<'PYEOF'
+        hit=$("$PYTHON_BIN" - "$rel_fpath" "$glob" 2>/dev/null <<'PYEOF'
 import sys, fnmatch, re
 rel = sys.argv[1]
 pat = sys.argv[2]
@@ -405,7 +412,7 @@ _rule_e() {
 
     # Step 3 — Staleness check: last_seen_at + ttl_seconds < now → BLOCK
     local is_stale
-    is_stale=$(python3 - "$sess_file" 2>/dev/null <<'PYEOF'
+    is_stale=$("$PYTHON_BIN" - "$sess_file" 2>/dev/null <<'PYEOF'
 import json, sys
 from datetime import datetime, timezone
 try:
@@ -430,7 +437,7 @@ PYEOF
 
     # Read session mode, context, release from session file
     local sess_mode sess_context sess_release
-    sess_mode=$(python3 - "$sess_file" 2>/dev/null <<'PYEOF'
+    sess_mode=$("$PYTHON_BIN" - "$sess_file" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
     print(json.load(open(sys.argv[1])).get("mode", ""))
@@ -438,7 +445,7 @@ except Exception:
     print("")
 PYEOF
 )
-    sess_context=$(python3 - "$sess_file" 2>/dev/null <<'PYEOF'
+    sess_context=$("$PYTHON_BIN" - "$sess_file" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
     print(json.load(open(sys.argv[1])).get("context", ""))
@@ -446,7 +453,7 @@ except Exception:
     print("")
 PYEOF
 )
-    sess_release=$(python3 - "$sess_file" 2>/dev/null <<'PYEOF'
+    sess_release=$("$PYTHON_BIN" - "$sess_file" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
     print(json.load(open(sys.argv[1])).get("release", "") or "")
@@ -487,7 +494,7 @@ PYEOF
     #   No lock held:           fall through to step 4c / RULE C
     local rel_id_from_path="" rel_file_type=""
     local _match_result
-    _match_result=$(python3 - "$rel_fpath" 2>/dev/null <<'PYEOF'
+    _match_result=$("$PYTHON_BIN" - "$rel_fpath" 2>/dev/null <<'PYEOF'
 import sys, re
 m = re.match(r'.*specs/releases/([^/]+)/(SPEC|PLAN|TASKS)\.md$', sys.argv[1])
 if m:
@@ -510,7 +517,7 @@ PYEOF
             for lf in "$lock_for_rel"/*__"${rel_id_from_path}".json; do
                 [ -f "$lf" ] || continue
                 local lstate
-                lstate=$(python3 - "$lf" 2>/dev/null <<'PYEOF'
+                lstate=$("$PYTHON_BIN" - "$lf" 2>/dev/null <<'PYEOF'
 import json, sys
 from datetime import datetime, timezone
 try:
@@ -529,7 +536,7 @@ PYEOF
 )
                 if [ "$lstate" = "held" ]; then
                     lock_held="yes"
-                    lock_owner_sess=$(python3 - "$lf" 2>/dev/null <<'PYEOF'
+                    lock_owner_sess=$("$PYTHON_BIN" - "$lf" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
     print(json.load(open(sys.argv[1])).get("session_id", ""))
@@ -571,7 +578,7 @@ PYEOF
                     for lf in "$lock_file/${PRIMARY_SLUG}__"*.json; do
                         [ -f "$lf" ] || continue
                         local owner_sess
-                        owner_sess=$(python3 - "$lf" 2>/dev/null <<'PYEOF'
+                        owner_sess=$("$PYTHON_BIN" - "$lf" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
     print(json.load(open(sys.argv[1])).get("session_id", ""))
@@ -580,7 +587,7 @@ except Exception:
 PYEOF
 )
                         local lstate2
-                        lstate2=$(python3 - "$lf" 2>/dev/null <<'PYEOF'
+                        lstate2=$("$PYTHON_BIN" - "$lf" 2>/dev/null <<'PYEOF'
 import json, sys
 from datetime import datetime, timezone
 try:
@@ -612,7 +619,7 @@ PYEOF
                 # Owns the lock — resolve active release from lock file (T-8 completion / ADR D-9)
                 # For IMPLEMENTATION mode, ACTIVE.md is NOT consulted; release comes from the lock.
                 local lock_release
-                lock_release=$(python3 - "$lock_file" "$PRIMARY_SLUG" "$sess_id" 2>/dev/null <<'PYEOF'
+                lock_release=$("$PYTHON_BIN" - "$lock_file" "$PRIMARY_SLUG" "$sess_id" 2>/dev/null <<'PYEOF'
 import json, sys
 from pathlib import Path
 lock_dir = Path(sys.argv[1])
@@ -698,7 +705,7 @@ if [ -n "$ACTIVE" ]; then
     if [ -n "${DADAIA_SESSION_ID:-}" ]; then
         _INLINE_SESS_FILE="$WS/.dadaia/sessions/${DADAIA_SESSION_ID}.json"
         if [ -f "$_INLINE_SESS_FILE" ]; then
-            python3 - "$_INLINE_SESS_FILE" "$WS" "$DADAIA_SESSION_ID" 2>/dev/null <<'PYEOF' || true
+            "$PYTHON_BIN" - "$_INLINE_SESS_FILE" "$WS" "$DADAIA_SESSION_ID" 2>/dev/null <<'PYEOF' || true
 import json, os, sys
 from datetime import UTC, datetime
 from pathlib import Path

@@ -682,25 +682,24 @@ def test_all_public_agents_write_allowlist_entries_are_strings(
     assert bad == [], f"Non-string or empty entries in write_allowlist: {bad}"
 
 
-def test_public_agents_count_is_20(
+def test_public_agents_count_is_15(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Exactly 21 public agents must be loadable (agents-r3-v1 + data-architect addition).
+    """Exactly 15 public default agents must be loadable.
 
     Topology breakdown:
       T1 dispatchers (2): project-manager, project-auditor
       T2 curator     (1): product-engineer
-      T3 leaves     (18): ai-engineer, backend-engineer, code-reviewer,
-                          data-analyst, data-architect, data-engineer,
+      T3 leaves     (12): ai-engineer, backend-engineer, code-reviewer,
                           design-specialist, devops-engineer, frontend-engineer,
-                          game-designer, game-developer, game-tester, qa-engineer,
+                          qa-engineer,
                           researcher, security-reviewer, software-architect,
                           software-engineer-node, software-engineer-python
     """
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
-    assert len(agents) == 21, (
-        f"Expected 21 public agents, got {len(agents)}: {[a.id for a in agents]}"
+    assert len(agents) == 15, (
+        f"Expected 15 public agents, got {len(agents)}: {[a.id for a in agents]}"
     )
 
 
@@ -708,11 +707,9 @@ def test_public_agents_count_is_20(
 # agents-r3-v1 — 5 new personas (Python/Node split + Data/BI + AI)
 # ---------------------------------------------------------------------------
 
-_R3_NEW_AGENTS = {
+_GENERIC_SPECIALIST_AGENTS = {
     "software-engineer-python": "claude-sonnet-4-6",
     "software-engineer-node": "claude-sonnet-4-6",
-    "data-engineer": "claude-sonnet-4-6",
-    "data-analyst": "claude-sonnet-4-6",
     "ai-engineer": "claude-sonnet-4-6",
 }
 
@@ -720,7 +717,7 @@ _R3_NEW_AGENTS = {
 def test_r3_new_personas_parse_with_tier3(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Each of the 5 new personas (agents-r3-v1 P1) parses from public/agents/.
+    """Each generic specialist persona parses from public/agents/.
 
     Asserts frontmatter loads cleanly, tier == 3 (T3 leaf), and the
     write_allowlist is non-empty per SPEC §5.
@@ -729,7 +726,7 @@ def test_r3_new_personas_parse_with_tier3(
     agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
     by_id = {a.id: a for a in agents}
 
-    for new_id in _R3_NEW_AGENTS:
+    for new_id in _GENERIC_SPECIALIST_AGENTS:
         assert new_id in by_id, f"R3 new persona {new_id!r} missing from public/agents/ roster"
         agent = by_id[new_id]
         assert agent.tier == 3, f"R3 persona {new_id!r} must be tier 3 (T3 leaf), got {agent.tier}"
@@ -741,32 +738,33 @@ def test_r3_new_personas_parse_with_tier3(
 def test_r3_new_personas_have_expected_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ai-engineer rides on claude-opus-4-7; the other 4 new personas on claude-sonnet-4-6."""
+    """Generic specialist personas keep their declared model assignments."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
     by_id = {a.id: a for a in agents}
 
-    for new_id, expected_model in _R3_NEW_AGENTS.items():
+    for new_id, expected_model in _GENERIC_SPECIALIST_AGENTS.items():
         agent = by_id.get(new_id)
-        assert agent is not None, f"R3 persona {new_id!r} missing"
+        assert agent is not None, f"Generic specialist persona {new_id!r} missing"
         assert agent.model == expected_model, (
-            f"R3 persona {new_id!r}: expected model {expected_model!r}, got {agent.model!r}"
+            f"Generic specialist persona {new_id!r}: "
+            f"expected model {expected_model!r}, got {agent.model!r}"
         )
 
 
 def test_r3_new_personas_have_skills(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Each new persona must declare a non-empty skills list (SPEC §5 — workflow protocol)."""
+    """Each generic specialist persona must declare a non-empty skills list."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
     by_id = {a.id: a for a in agents}
 
-    for new_id in _R3_NEW_AGENTS:
+    for new_id in _GENERIC_SPECIALIST_AGENTS:
         agent = by_id.get(new_id)
-        assert agent is not None, f"R3 persona {new_id!r} missing"
+        assert agent is not None, f"Generic specialist persona {new_id!r} missing"
         assert isinstance(agent.skills, list) and len(agent.skills) > 0, (
-            f"R3 persona {new_id!r} must declare a non-empty skills list, got {agent.skills!r}"
+            f"Generic specialist persona {new_id!r} must declare a non-empty skills list, got {agent.skills!r}"
         )
 
 
@@ -789,7 +787,7 @@ def test_legacy_software_engineer_archived(
 # PR4-14 — tier field tests
 # ---------------------------------------------------------------------------
 
-# Canonical tier mapping (per TASKS.md PR4-11; updated for agents-r3-v1 — 20-agent topology)
+# Canonical tier mapping for the 15-agent public topology.
 _TIER1_AGENTS = {"project-manager", "project-auditor"}
 _TIER2_AGENTS = {"product-engineer"}
 # Sample of T3 leaf agents — software-engineer was archived in R3-11 and replaced

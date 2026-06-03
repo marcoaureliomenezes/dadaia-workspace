@@ -35,7 +35,7 @@ If none resolves: stop and ask operator to run `dadaia context activate <name>`.
 - Reports > 30 KB: split into multi-HTML with `index.html` entry point.
 
 ## 5. Memory atomicity
-`specs/memory/*.html` files are write-locked for all agents EXCEPT `product-engineer` during CLOSURE phase. Never edit memory atoms in any earlier phase.
+`specs/memory/**/*.md` files are write-locked for all agents EXCEPT `product-engineer` during CLOSURE phase. Never edit memory atoms in any earlier phase.
 
 ## 6. Write-allowlist enforcement
 Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. The SDD gate enforces this at runtime.

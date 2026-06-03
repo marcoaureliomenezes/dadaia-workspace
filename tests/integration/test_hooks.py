@@ -279,6 +279,15 @@ def test_ctx_inject_no_index_html_fallback(workspace: Path) -> None:
     )
 
 
+def test_sdd_hooks_use_workspace_python() -> None:
+    """SDD hooks must prefer .dadaia/.venv/bin/python over direct python3 calls."""
+    for script in (SDD_GATE, _PKG_SCRIPTS / "sdd-post-gate.sh"):
+        src = script.read_text(encoding="utf-8")
+        assert 'PYTHON_BIN="${DADAIA_PYTHON:-$WS/.dadaia/.venv/bin/python}"' in src
+        assert '"$PYTHON_BIN" -' in src
+        assert "python3 -" not in src
+
+
 def test_sdd_gate_fail_open_on_empty_stdin(workspace: Path) -> None:
     """Gate exits 0 and emits nothing when stdin is empty (fail-open)."""
     scripts = _install_scripts(workspace)

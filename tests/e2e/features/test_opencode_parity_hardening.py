@@ -5,7 +5,7 @@ tmp workspace, so the actual agent transform and plugin projection are covered:
 
   T-OC-06 / FR-OC-6:
     - no `color:` in any .opencode/agents/*.md (all agents)
-    - `color:` present in .claude/agents/*.md for the 3 color agents (parity)
+    - source agents with color metadata keep it only outside OpenCode
     - per-agent `permission:` block in .opencode projections (allow/deny mapping)
     - `.opencode/plugins/sdd-gate.ts` projected
     - `.opencode/plugins/ctx-inject.ts` uses the migrated chat.message signature
@@ -21,16 +21,13 @@ from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
-# The only agents that declare `color:` in source (SPEC: yellow/orange/purple).
-COLOR_AGENTS = {"game-designer", "game-developer", "game-tester"}
+# No default public agents currently declare `color:` metadata.
+COLOR_AGENTS: set[str] = set()
 # Agents migrated to handoff-emitter in Track C.
 MIGRATED_AGENTS = {
     "qa-engineer",
     "devops-engineer",
     "backend-engineer",
-    "game-designer",
-    "game-developer",
-    "game-tester",
 }
 
 

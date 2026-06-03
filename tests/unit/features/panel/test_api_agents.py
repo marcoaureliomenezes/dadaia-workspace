@@ -492,7 +492,7 @@ class TestContentType:
 
 
 # ---------------------------------------------------------------------------
-# AGT-33 — 6 new agents present in /api/agents LIST response
+# Generic dispatcher/reviewer agents present in /api/agents LIST response
 # ---------------------------------------------------------------------------
 
 _NEW_AGENT_IDS = [
@@ -506,7 +506,7 @@ _NEW_AGENT_IDS = [
 
 
 class TestNewAgentsInList:
-    """Assert each of the 6 new agents (AGT-09..AGT-14) appears in the LIST response."""
+    """Assert each generic dispatcher/reviewer agent appears in the LIST response."""
 
     def _build_service_with_agents(self, agent_ids: list[str]) -> PanelService:
         agents = [_make_dto(agent_id=aid) for aid in agent_ids]
@@ -525,22 +525,18 @@ class TestNewAgentsInList:
             assert aid in returned_ids, f"New agent {aid!r} missing from LIST response"
 
     def test_new_agent_count_is_6(self) -> None:
-        """LIST response with exactly the 6 new agents returns 6 entries."""
+        """LIST response with exactly the generic dispatcher/reviewer agents returns 6 entries."""
         svc = self._build_service_with_agents(_NEW_AGENT_IDS)
         view = render_api_agents_canonical(svc)
         _, _, body = view()
         data = json.loads(body)
         assert len(data["agents"]) == 6
 
-    def test_full_20_agent_topology_count(self) -> None:
-        """With 20-agent topology (agents-r3-v1) the LIST response returns 20 entries.
-
-        Replaces the legacy 16-agent assertion. `software-engineer` is archived
-        and replaced by the Python/Node split + Data/BI + AI personas.
-        """
-        all_20 = (
+    def test_full_15_agent_topology_count(self) -> None:
+        """With the public 15-agent topology the LIST response returns 15 entries."""
+        all_15 = (
             [
-                # T3 leaves not in _NEW_AGENT_IDS — 11 of them
+                # T3 leaves not in _NEW_AGENT_IDS
                 "software-architect",
                 "software-engineer-python",
                 "software-engineer-node",
@@ -548,22 +544,17 @@ class TestNewAgentsInList:
                 "frontend-engineer",
                 "qa-engineer",
                 "devops-engineer",
-                "data-engineer",
-                "data-analyst",
                 "ai-engineer",
-                "game-developer",
-                "game-designer",
-                "game-tester",
                 # T2 curator
                 "product-engineer",
             ]
             + _NEW_AGENT_IDS
         )  # 6 entries: PM, PA, code-reviewer, researcher, security-reviewer, design-specialist
-        svc = self._build_service_with_agents(all_20)
+        svc = self._build_service_with_agents(all_15)
         view = render_api_agents_canonical(svc)
         _, _, body = view()
         data = json.loads(body)
-        assert len(data["agents"]) == 20
+        assert len(data["agents"]) == 15
 
     def test_new_agent_card_has_required_keys(self) -> None:
         """Each new-agent card must include all §5.1 required keys."""
@@ -593,7 +584,7 @@ class TestNewAgentsInList:
 # PR4-15 — tier field in /api/agents response (C4)
 # ---------------------------------------------------------------------------
 
-# Full 20-agent topology with canonical tier assignments
+# Full 15-agent topology with canonical tier assignments
 # (agents-r3-v1: T1=2, T2=1, T3=17 — Python/Node split + Data/BI + AI)
 _TIER1_IDS = ["project-manager", "project-auditor"]
 _TIER2_IDS = ["product-engineer"]
@@ -609,12 +600,7 @@ _TIER3_IDS = [
     "security-reviewer",
     "researcher",
     "design-specialist",
-    "data-engineer",
-    "data-analyst",
     "ai-engineer",
-    "game-developer",
-    "game-designer",
-    "game-tester",
 ]
 
 
@@ -623,7 +609,7 @@ def _make_dto_with_tier(agent_id: str, tier: int) -> AgentDTO:
 
 
 def _build_full_topology_service() -> PanelService:
-    """Build a PanelService with 16 agents using canonical tier assignments."""
+    """Build a PanelService with 15 agents using canonical tier assignments."""
     agents = (
         [_make_dto_with_tier(aid, 1) for aid in _TIER1_IDS]
         + [_make_dto_with_tier(aid, 2) for aid in _TIER2_IDS]
@@ -661,7 +647,7 @@ class TestTierFieldInResponse:
             )
 
     def test_tier_count_per_tier(self) -> None:
-        """With the canonical 20-agent topology (agents-r3-v1): T1=2, T2=1, T3=17."""
+        """With the canonical 15-agent topology: T1=2, T2=1, T3=12."""
         svc = _build_full_topology_service()
         view = render_api_agents_canonical(svc)
         _, _, body = view()
@@ -672,7 +658,7 @@ class TestTierFieldInResponse:
         tier_counts = Counter(card["tier"] for card in data["agents"])
         assert tier_counts[1] == 2, f"Expected 2 T1 agents, got {tier_counts[1]}"
         assert tier_counts[2] == 1, f"Expected 1 T2 agent, got {tier_counts[2]}"
-        assert tier_counts[3] == 17, f"Expected 17 T3 agents, got {tier_counts[3]}"
+        assert tier_counts[3] == 12, f"Expected 12 T3 agents, got {tier_counts[3]}"
 
     def test_tier_values_match_canonical_mapping(self) -> None:
         """Specific agents have the correct canonical tier value."""

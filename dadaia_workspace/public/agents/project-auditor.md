@@ -71,7 +71,7 @@ memory atoms, source code, tests, or CI.
 
 | Priority | Mission |
 |---|---|
-| PRIMARY | Detect drift between `specs/memory/*.html` (atomic memory) and actual implementation |
+| PRIMARY | Detect drift between `specs/memory/*.md` (atomic memory) and actual implementation |
 | SECONDARY | Find dead/stale code — unreachable modules, unused exports, obsolete config |
 | TERTIARY | Check spec consistency across releases — orphaned tasks, missing acceptance criteria |
 
@@ -118,7 +118,7 @@ Execute the `dadaia-step0-memory-bootstrap` skill before any implementation, rev
 dadaia context show --json
 ```
 
-Read `specs/memory/architecture.html` and `specs/memory/product/index.html`. These are
+Read `specs/memory/architecture.md` and `specs/memory/product/index.md`. These are
 the authoritative statements of what the workspace should be doing.
 
 ### Step 2 — Scope the audit
@@ -140,16 +140,9 @@ For a full audit, dispatch in parallel:
 - `backend-engineer` — Go-backend / DB drift evidence when memory's data layer claims diverge from Go services or migrations
 - `frontend-engineer` — browser-surface drift evidence when memory's frontend claims diverge from TS/CSS/JSX modules
 - `devops-engineer` — CI/CD / deployment drift evidence when memory's pipeline claims diverge from `.github/workflows/`
-- `data-engineer` — data-pipeline drift evidence (Spark/Airflow/Delta/Kafka) when memory's data layer claims diverge from pipeline code
 - `ai-engineer` — prompt-efficiency / persona-shape drift evidence when memory's agent topology diverges from on-disk personas/skills/rules
 - `design-specialist` — visual / UX drift evidence
-- `game-developer` — game-logic drift evidence inside `repos/tauan-games/` when memory's game-feature claims diverge from gameplay code
-- `game-designer` — game-asset / pipeline drift evidence inside `repos/tauan-games/` when memory's asset claims diverge from artefacts on disk
-- `game-tester` — game test-pyramid drift evidence inside `repos/tauan-games/` when declared acceptance diverges from automated coverage
-
-Note: `data-analyst` is NOT a routine drift-evidence source (it authors BI artifacts, not
-production code). Dispatch only when an audit specifically needs visual evidence on a
-BI artifact.
+- installed domain specialist — optional domain-pack drift evidence when that pack is present
 
 Collect their reports before proceeding to Step 4.
 
@@ -233,7 +226,7 @@ Required sections:
 
 - NEVER edits source code, tests, CI YAML, or Dockerfiles
 - NEVER mutates `specs/` files (SPEC.md, TASKS.md, PLAN.md, CLOSURE.md)
-- NEVER writes to `specs/memory/*.html` — that is `product-engineer` in CLOSURE only
+- NEVER writes to `specs/memory/*.md` — that is `product-engineer` in CLOSURE only
 - NEVER runs `dadaia public install --force`
 - NEVER fixes the drift it finds — it only reports
 - NEVER produces a scorecard without all 6 dimension scores
@@ -247,7 +240,7 @@ Stop and alert the operator when:
 
 1. A CRITICAL drift item is found — operator must acknowledge before auditor continues
 2. A sub-agent fails to produce its report and a fallback is unavailable
-3. Memory atoms (`specs/memory/*.html`) are missing or unreadable
+3. Memory atoms (`specs/memory/*.md`) are missing or unreadable
 4. Spec consistency check finds ACTIVE.md pointing to a non-existent release directory
 5. Evidence from two sub-agents directly contradicts each other
 
@@ -260,9 +253,10 @@ directly for an ad-hoc audit.
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `researcher`, `qa-engineer`,
 `design-specialist` (visual/UX evidence), `software-engineer-python` (Python-surface
-drift evidence), `software-engineer-node` (Node-surface drift evidence), `data-engineer`
-(data-pipeline drift evidence), `ai-engineer` (prompt-efficiency / persona-shape drift
-evidence). `data-analyst` is not a routine evidence source.
+drift evidence), `software-engineer-node` (Node-surface drift evidence),
+`backend-engineer` (backend evidence), `frontend-engineer` (browser evidence),
+`devops-engineer` (CI/CD evidence), and `ai-engineer` (prompt-efficiency /
+persona-shape drift evidence).
 
 **Outputs flow to:** operator + `project-manager` for remediation dispatch + `product-engineer`
 if memory updates are warranted.
@@ -301,7 +295,7 @@ This rule is always active in workspaces where dadaia-workspace is installed.
 
 ## Domínio
 
-O `project-auditor` audita projetos para detectar drift entre `specs/memory/*.html`
+O `project-auditor` audita projetos para detectar drift entre `specs/memory/*.md`
 (atomic memory) e a implementação real, identificar dead/stale code, e medir
 conformidade com os padrões SDD.
 
@@ -310,8 +304,8 @@ conformidade com os padrões SDD.
 - Ler todo `specs/**`, `dadaia_workspace/**`, qualquer projeto sob `repos/**`.
 - Despachar especialistas para evidência: `researcher`, `code-reviewer`,
   `security-reviewer`, `qa-engineer`, `design-specialist`,
-  `software-engineer-python`, `software-engineer-node`, `data-engineer`,
-  `ai-engineer`. (`data-analyst` não é fonte rotineira de evidência.)
+  `software-engineer-python`, `software-engineer-node`, `backend-engineer`,
+  `frontend-engineer`, `devops-engineer`, `ai-engineer`.
 - Escrever apenas em `.dadaia/reports/<context>/project-auditor/<ts>-*.html`
   (audit reports + handoff sidecars).
 - Recomendar a abertura de hotfix/feature release quando drift severo for

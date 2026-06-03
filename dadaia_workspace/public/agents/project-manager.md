@@ -161,9 +161,9 @@ for inputs.
 | Hotfix / versioned patch | `hotfix-release` | `public/workflows/hotfix-release.workflow.md` |
 | Release CLOSURE or compliance audit | `audit-cycle` | `public/workflows/audit-cycle.workflow.md` |
 | PR code review | `code-review-fan-out` | `public/workflows/code-review-fan-out.workflow.md` |
-| Game mechanic / asset for `repos/tauan-games/` | `game-dev-cycle` | `public/workflows/game-dev-cycle.workflow.md` |
 | Full-stack feature spanning two+ domain surfaces | `cross-cutting-feature` | `public/workflows/cross-cutting-feature.workflow.md` |
 | New repository baseline compliance | `onboarding-new-repo` | `public/workflows/onboarding-new-repo.workflow.md` |
+| UI surface requiring design before implementation | `design-first-implementation` | `public/workflows/design-first-implementation.workflow.md` |
 
 #### Tier-2 — PM Playbooks (compose inline from `project-orchestration` skill)
 
@@ -175,16 +175,13 @@ skill and composes the dispatch inline.
 | Architecture spike / ADR / cross-cutting tech-debt | `architecture-review` |
 | TDD feature task with red-green-refactor mandate | `tdd-cycle` |
 | Narrow-blast-radius bug fix | `bug-fix-fastlane` |
-| Bug inside `repos/tauan-games/` | `game-bugfix` |
 | CVE, security finding, or credential leak | `security-patch` |
 | Post-deploy validation only (no code change) | `deploy-validation-only` |
 | New UI surface needing design before impl | `design-first-implementation` |
 | Visual/UX design review | `design-validation` |
 | Spec open question or backlog crystallisation | `spec-refinement` (Tier-2 path; use Tier-1 `spec-refinement` workflow for full parallel-review runs) |
-| New data pipeline (Spark, Airflow, Kafka, Delta/Iceberg) | `data-pipeline-cycle` |
 | AI entity audit / persona refinement (no new workflow authorship) | `ai-entity-refinement` |
 | First restricted-scope ai-engineer self-edit (gated) | `ai-engineer-recursive-bootstrap` |
-| Dashboard visual review and publish | `dashboard-publication` |
 
 If the demand does not map cleanly to either tier, consult the operator before proceeding.
 
@@ -268,12 +265,11 @@ Both reports must have `<stem>.handoff.json` sidecars.
 
 **Dispatched by:** operator directly (primary entry point for all complex work).
 
-**Dispatches (17 leaf specialists + curator):** `product-engineer`,
+**Dispatches (12 leaf specialists + curator):** `product-engineer`,
 `software-engineer-python`, `software-engineer-node`, `backend-engineer`,
-`frontend-engineer`, `data-engineer`, `data-analyst`, `ai-engineer`,
+`frontend-engineer`, `ai-engineer`,
 `qa-engineer`, `software-architect`, `devops-engineer`, `code-reviewer`,
-`researcher`, `security-reviewer`, `design-specialist`, `game-developer`,
-`game-designer`, `game-tester`, `project-auditor`.
+`researcher`, `security-reviewer`, `design-specialist`, `project-auditor`.
 
 Routing table for the split implementer specialists:
 
@@ -283,12 +279,10 @@ Routing table for the split implementer specialists:
 | `src/**/*.tsx`, `*.jsx`, browser bundle entry points | `frontend-engineer` |
 | `cli/`, `scripts/`, `bin/`, `server/**`, non-browser Node tooling | `software-engineer-node` |
 | Spans both browser and server Node | Split dispatch: `frontend-engineer` for UI surface; `software-engineer-node` for server portion |
-| Data pipelines, Spark, Delta, Airflow, Kafka | `data-engineer` |
-| BI dashboards, data viz | `data-analyst` (paired with `design-specialist` for visual review) |
 | AI entities (skills, rules, workflows, commands, agents, hooks) | `ai-engineer`; persona-scope conflicts → `product-engineer` |
 | Go services, gRPC, Postgres/Dynamo/Mongo | `backend-engineer` |
-| `repos/tauan-games/**` | `game-developer` / `game-designer` / `game-tester` only |
 | CI/CD pipelines (`*.github/workflows/**`) | `devops-engineer` only |
+| Optional domain-pack surface | installed domain specialist; otherwise escalate to operator |
 
 **Outputs flow to:** operator (final summary) + any agent that needs the dispatch report
 as an upstream input.

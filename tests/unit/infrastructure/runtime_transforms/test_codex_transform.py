@@ -1,10 +1,10 @@
 """Unit tests for dadaia_workspace.infrastructure.runtime_transforms.codex.
 
 Covers (ADR-2 golden tests):
-- project-manager body: Agent tool references are replaced.
-- project-auditor body: Agent tool references are replaced.
+- project-manager body: Agent tool references are replaced with Codex tool-search wording.
+- project-auditor body: Agent tool references are replaced with Codex tool-search wording.
 - software-architect body (no Agent tool): output is identical to input (verbatim).
-- All 20 canonical agents: output is non-empty after strip().
+- All 15 canonical agents: output is non-empty after strip().
 - Determinism: same input always produces the same output.
 """
 
@@ -49,21 +49,16 @@ def _load_body(agent_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# All 20 canonical agent IDs
+# All 15 canonical agent IDs
 # ---------------------------------------------------------------------------
 
 _CANONICAL_AGENTS: tuple[str, ...] = (
     "ai-engineer",
     "backend-engineer",
     "code-reviewer",
-    "data-analyst",
-    "data-engineer",
     "design-specialist",
     "devops-engineer",
     "frontend-engineer",
-    "game-designer",
-    "game-developer",
-    "game-tester",
     "product-engineer",
     "project-auditor",
     "project-manager",
@@ -95,6 +90,8 @@ def test_project_manager_agent_tool_replaced() -> None:
     assert "`Agent`" not in result, (
         "Expected '`Agent`' tool-table entry to be replaced in project-manager output"
     )
+    assert "subagent dispatch" not in result
+    assert "`tool_search`" in result
 
 
 def test_project_auditor_agent_tool_replaced() -> None:
@@ -108,6 +105,8 @@ def test_project_auditor_agent_tool_replaced() -> None:
     assert "`Agent`" not in result, (
         "Expected '`Agent`' tool-table entry to be replaced in project-auditor output"
     )
+    assert "subagent dispatch" not in result
+    assert "`tool_search`" in result
 
 
 def test_generic_agent_preserved_verbatim() -> None:

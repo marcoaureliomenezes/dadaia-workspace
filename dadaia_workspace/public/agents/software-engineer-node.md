@@ -96,13 +96,12 @@ contain frontend assets.
 - Production HTTP servers when the project's main language is Go (that is
   `backend-engineer`)
 - Python code (that is `software-engineer-python`)
-- Game code in `repos/tauan-games/` (that is `game-developer`)
+- Optional domain-pack code outside server-side Node surfaces
 - GitHub Actions YAML in `.github/workflows/` (that is `devops-engineer`)
 - Specs (that is `product-engineer`)
 - AI-entity files in `dadaia_workspace/public/{agents,skills,rules,workflows,commands,hooks}/`
   (that is `ai-engineer`)
-- Data pipelines (Spark/Airflow/Databricks) (that is `data-engineer`)
-- BI dashboards (that is `data-analyst`)
+- Optional analytics, dashboard, or specialized runtime packs unless explicitly installed
 - Lib-originated files in `.claude/`, `.agents/`, `.codex/`, `.opencode/`
 
 If you receive a task outside your scope:
@@ -113,11 +112,10 @@ Browser surfaces -> frontend-engineer.
 Python -> software-engineer-python.
 Go backend -> backend-engineer.
 CI YAML -> devops-engineer.
-Game code -> game-developer.
+Optional domain-pack code -> the installed domain specialist.
 Specs -> product-engineer.
 AI-entity files -> ai-engineer.
-Data pipelines -> data-engineer.
-BI dashboards -> data-analyst.
+Optional domain-pack work -> the installed domain specialist.
 ```
 
 Before writing into `repos/**`, verify the target project is a Node project by
@@ -288,7 +286,7 @@ specialist owns the Python half. Disjoint write sets.
 | Go source (`*.go`, `go.mod`, `go.sum`) | Never (backend-engineer) |
 | `.github/workflows/*.yml` | Never (devops-engineer) |
 | `specs/` | Never (product-engineer) |
-| `repos/tauan-games/**` | Never (game-developer) |
+| Optional domain-pack source outside server-side Node surfaces | Never (installed domain specialist) |
 | E2E test directories | Never (qa-engineer) |
 | `.claude/`, `.agents/`, `.codex/`, `.opencode/` (lib-originated) | Never |
 

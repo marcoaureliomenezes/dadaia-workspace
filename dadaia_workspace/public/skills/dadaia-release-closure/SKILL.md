@@ -1,6 +1,6 @@
 ---
 name: dadaia-release-closure
-description: "Use when: closing a release that has all TASKS marked [x] DONE. Defines the CLOSURE.md template, the memory HTML update protocol, the evidence-triple validation format, and the move-to-archive command. Only product-engineer in CLOSURE phase invokes this skill — gate enforces that memory writes only happen here."
+description: "Use when: closing a release that has all TASKS marked [x] DONE. Defines the CLOSURE.md template, the memory Markdown update protocol, the evidence-triple validation format, and the move-to-archive command. Only product-engineer in CLOSURE phase invokes this skill — gate enforces that memory writes only happen here."
 applyTo: "specs/releases/*/CLOSURE.md"
 ---
 
@@ -10,7 +10,7 @@ applyTo: "specs/releases/*/CLOSURE.md"
 
 After every task in `specs/releases/<release-id>/TASKS.md` is marked `[x] DONE` and
 implementation is verified. Set `specs/releases/ACTIVE.md` phase to `CLOSURE` **before**
-writing CLOSURE.md or memory HTML — gate v3 only allows memory writes in this phase.
+writing CLOSURE.md or memory Markdown — gate v3 only allows memory writes in this phase.
 
 ## CLOSURE.md template
 
@@ -55,7 +55,7 @@ For every place where reality diverged from PLAN.md during implementation, docum
 
 **Resolution:** How was it resolved? What was the trade-off?
 
-**Memory updates:** Which `specs/memory/*.html` files needed adjustment because of this
+**Memory updates:** Which `specs/memory/*.md` files needed adjustment because of this
 drift?
 
 ### <another-drift>
@@ -65,13 +65,13 @@ drift?
 ## Memory updates
 
 Explicit list of memory files written during this CLOSURE phase. If a memory file was not
-updated, state the reason here (e.g. "memory/tech-stack.html: no change — release did not
+updated, state the reason here (e.g. "memory/tech-stack.md: no change — release did not
 touch dependencies").
 
-- `specs/memory/product/index.html` — <one-liner of what changed in the catalog>
-- `specs/memory/product/<slug>.html` — <one-liner per feature page updated>
-- `specs/memory/architecture.html` — <one-liner>
-- `specs/memory/tech-stack.html` — <one-liner or "no change: reason">
+- `specs/memory/product/index.md` — <one-liner of what changed in the catalog>
+- `specs/memory/product/<slug>.md` — <one-liner per feature page updated>
+- `specs/memory/architecture.md` — <one-liner>
+- `specs/memory/tech-stack.md` — <one-liner or "no change: reason">
 
 ## Backlog returns
 
@@ -91,28 +91,21 @@ candidate for next planning round).
 by the operator. Should be rare.)
 ```
 
-## Memory HTML update protocol
+## Memory Markdown update protocol
 
 1. **Verify gate phase.** Confirm `specs/releases/ACTIVE.md` phase = `CLOSURE`. Otherwise
-   the gate will block writes to `specs/memory/*.html`.
+   the gate will block writes to `specs/memory/*.md`.
 
-2. **Archive legacy memory.** If markdown `specs/memory/*.md` still exists from a previous
-   model, move to `specs/_archive/legacy-memory/<UTC-timestamp>/` (one-time, then never
-   again). Markdown is not accepted in `specs/memory/`.
+2. **Do not author legacy HTML memory.** If legacy HTML memory exists, treat it as
+   read-only migration input. New memory writes are Markdown atoms.
 
-3. **Render from canonical templates.** Source templates live in
-   `dadaia_workspace/public/templates/`:
-   - `memory-product.html.j2`
-   - `memory-architecture.html.j2`
-   - `memory-tech-stack.html.j2`
+3. **Update Markdown atoms.** Apply the release's deltas to the corresponding
+   `specs/memory/*.md` or `specs/memory/product/*.md` files. Memory describes the
+   product **as it is now** — not what changed. The change history lives in this
+   CLOSURE.md and the archived release dir.
 
-   Render each template into the corresponding `specs/memory/<name>.html` with the
-   release's deltas applied. Memory describes the product **as it is now** — not what
-   changed. The change history lives in this CLOSURE.md and the archived release dir.
-
-4. **Diagrams.** Use Mermaid embedded inside the HTML:
-   ```html
-   <pre class="mermaid">
+4. **Diagrams.** Use fenced Mermaid blocks:
+   ```mermaid
    flowchart LR
      A --> B
    </pre>
@@ -120,7 +113,7 @@ by the operator. Should be rare.)
    For screenshots, place PNGs under `specs/assets/<scope>/<id>.png` and reference via
    `<img src="../assets/<scope>/<id>.png" alt="<text>">`.
 
-5. **Forbidden in memory HTML:**
+5. **Forbidden in memory Markdown:**
    - `<h2>Changelog</h2>`, `<h2>History</h2>`, `<h2>Histórico</h2>`, `<h2>Versions</h2>`
    - `<section class="changelog">` and similar
    - Narrative of past versions ("we used to use X, now we use Y")

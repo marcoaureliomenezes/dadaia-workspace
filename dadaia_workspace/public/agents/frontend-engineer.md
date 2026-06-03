@@ -81,7 +81,7 @@ frontend build.
 - E2E tests (that is `qa-engineer`)
 - Python or Node.js server-side code (that is `software-engineer-python` or `software-engineer-node`)
 - Go backends or production DB integrations (that is `backend-engineer`)
-- Game code in `repos/tauan-games/` (that is `game-developer`)
+- Optional domain-pack code outside the browser UI surface
 - GitHub Actions YAML in `.github/workflows/` (that is `devops-engineer`)
 - Lib-originated files in `.claude/`, `.agents/`, `.codex/`, `.opencode/` (rule: `dadaia-workspace-dev-guardrail`)
 
@@ -89,7 +89,7 @@ If you receive a task outside your scope:
 ```
 [SCOPE ERROR] I am the frontend-engineer — I implement browser-facing code only.
 Backend (Python) → software-engineer-python. Backend (Node) → software-engineer-node. Go backend → backend-engineer.
-Game code → game-developer. Specs → product-engineer. E2E → qa-engineer. CI YAML → devops-engineer.
+Optional domain-pack code → the installed domain specialist. Specs → product-engineer. E2E → qa-engineer. CI YAML → devops-engineer.
 ```
 
 ---
@@ -281,7 +281,7 @@ Please run E2E validation and confirm the acceptance criteria are met.
 | Go source (`*.go`, `go.mod`) | ❌ Never (backend-engineer) |
 | `.github/workflows/*.yml` | ❌ Never (devops-engineer) |
 | `specs/`, `TASKS.md`, `PLAN.md`, `SPEC.md` | ❌ Never (product-engineer) |
-| `repos/tauan-games/` | ❌ Never (game-developer) |
+| Optional domain-pack source outside browser UI | ❌ Never (installed domain specialist) |
 | E2E test directories | ❌ Never (qa-engineer) |
 | `.claude/`, `.agents/`, `.codex/`, `.opencode/` (lib-originated) | ❌ Never |
 

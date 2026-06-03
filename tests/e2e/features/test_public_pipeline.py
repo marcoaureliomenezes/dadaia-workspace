@@ -21,15 +21,9 @@ EXPECTED_AGENTS = {
     "ai-engineer",
     "backend-engineer",
     "code-reviewer",
-    "data-analyst",
-    "data-architect",
-    "data-engineer",
     "design-specialist",
     "devops-engineer",
     "frontend-engineer",
-    "game-designer",
-    "game-developer",
-    "game-tester",
     "product-engineer",
     "project-auditor",
     "project-manager",
@@ -240,7 +234,7 @@ class TestInstallAll:
         assert (workspace / ".codex" / "hooks.json").exists(), ".codex/hooks.json not created"
         assert (workspace / ".codex" / "config.toml").exists(), ".codex/config.toml not created"
         # Only rules with YAML frontmatter are projected to .codex/rules/ (behavioral
-        # prose rules like game-agents-coordination.md are intentionally skipped — ADR-1/D2).
+        # prose rules are intentionally skipped — ADR-1/D2).
         assert (workspace / ".codex" / "rules" / "workspace-protocol.md").exists(), (
             ".codex/rules/workspace-protocol.md not installed"
         )
@@ -395,9 +389,7 @@ EXPECTED_WORKFLOWS = {
     "audit-cycle",
     "code-review-fan-out",
     "cross-cutting-feature",
-    "dashboard-publication",
     "design-first-implementation",
-    "game-dev-cycle",
     "hotfix-release",
     "onboarding-new-repo",
     "spec-refinement",
@@ -416,9 +408,8 @@ class TestWorkflows:
     def test_install_all_projects_workflows_to_every_runtime(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
-        # Codex has no workflow runtime (multi-platform-parity-v1): workflows are
-        # projected only to .agents, .claude, and .opencode.
-        for runtime in (".agents", ".claude", ".opencode"):
+        # Codex receives workflows as reference documents; it does not execute them.
+        for runtime in (".agents", ".claude", ".codex", ".opencode"):
             for stem in EXPECTED_WORKFLOWS:
                 projected = workspace / runtime / "workflows" / f"{stem}.workflow.md"
                 assert projected.exists(), f"workflow not projected to {projected}"
@@ -435,21 +426,20 @@ class TestWorkflows:
             "Full report:\n" + "\n".join(report)
         )
 
-    def test_doctor_reports_not_applicable_for_codex_when_parallel_group(
+    def test_doctor_reports_reference_only_for_codex_when_parallel_group(
         self, tmp_path: Path
     ) -> None:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
         report = _manager().doctor(workspace)
-        # multi-platform-parity-v1: codex has no workflow runtime, so doctor
-        # emits [not-applicable] for ALL codex workflows (parallel or serial).
-        not_applicable_lines = [
+        # Codex workflows are installed as reference documents, not executable runtime jobs.
+        reference_lines = [
             line
             for line in report
-            if line.startswith("[not-applicable]") and "codex:workflows/spec-refinement" in line
+            if line.startswith("[reference-only]") and "codex:workflows/spec-refinement" in line
         ]
-        assert not_applicable_lines, (
-            "Doctor did not emit [not-applicable] for codex:spec-refinement.\n"
+        assert reference_lines, (
+            "Doctor did not emit [reference-only] for codex:spec-refinement.\n"
             "Full report:\n" + "\n".join(report)
         )
 
@@ -457,22 +447,22 @@ class TestWorkflows:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
         report = _manager().doctor(workspace)
-        # game-dev-cycle has no parallel_group → opencode and claude should be [ok];
-        # codex emits [not-applicable] (multi-platform-parity-v1: no workflow runtime).
+        # hotfix-release has no parallel_group → opencode and claude should be [ok];
+        # codex emits [reference-only] because workflows are installed reference docs.
         ok_lines = [
             line
             for line in report
-            if line.startswith("[ok]") and "game-dev-cycle" in line and ":workflows/" in line
+            if line.startswith("[ok]") and "hotfix-release" in line and ":workflows/" in line
         ]
         assert any("opencode" in line for line in ok_lines)
         assert any("claude" in line for line in ok_lines)
-        # Codex check moved to a [not-applicable] assertion below.
-        na_lines = [
+        # Codex check moved to a [reference-only] assertion below.
+        ref_lines = [
             line
             for line in report
-            if line.startswith("[not-applicable]") and "codex:workflows/game-dev-cycle" in line
+            if line.startswith("[reference-only]") and "codex:workflows/hotfix-release" in line
         ]
-        assert na_lines, "Doctor did not emit [not-applicable] for codex:tdd-cycle"
+        assert ref_lines, "Doctor did not emit [reference-only] for codex:hotfix-release"
 
     def test_seed_workflows_pass_schema_validation(self, tmp_path: Path) -> None:
         """`dadaia public stage` aborts if any workflow fails schema validation."""
