@@ -83,7 +83,7 @@ eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode read)   # bind contex
 ### T-CIV-03 — Propagate: stage + install + doctor
 
 - **ID:** T-CIV-03
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** devops-engineer
 - **Target subsystem:** asset pipeline (`.dadaia/agentic/`, `.dadaia/scripts/`, `.claude/`, `.codex/`, `.opencode/`)
 - **Preconditions:** T-CIV-01 and T-CIV-02 are both `[x]`
