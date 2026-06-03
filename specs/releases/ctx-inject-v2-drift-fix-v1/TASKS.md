@@ -10,12 +10,19 @@
 ## Execution order
 
 ```
-T-CIV-01 → T-CIV-02 → T-CIV-03 → T-CIV-04
+T-CIV-01 → T-CIV-02 → T-CIV-03 → T-CIV-05 → T-CIV-04
 ```
 
 T-CIV-01 and T-CIV-02 are sequentially ordered but may be combined into a single commit
 by the implementer (disjoint files, same owner). T-CIV-03 must not start until both
-T-CIV-01 and T-CIV-02 are `[x]`. T-CIV-04 must not start until T-CIV-03 is `[x]`.
+T-CIV-01 and T-CIV-02 are `[x]`. T-CIV-05 must not start until T-CIV-03 is `[x]`.
+T-CIV-04 must not start (or re-run) until T-CIV-05 is `[x]`.
+
+**Note (2026-06-02):** T-CIV-05 was added as in-scope remediation after T-CIV-04 failed
+AC-9 (no-regression): removing the `primary_context.json` detection branch in T-CIV-01
+broke 4 integration tests that asserted the now-deleted branch. T-CIV-04 reverts to
+`[ ]` OPEN pending T-CIV-05 completion; QA will re-verify AC-9 and flip T-CIV-04 to
+`[x]` on PASS.
 
 Maximum one `[-]` at a time.
 
@@ -117,13 +124,43 @@ grep "context bind" .dadaia/scripts/ctx-inject.sh   # must return the new guidan
 
 ---
 
+### T-CIV-05 — Reconcile 4 stale integration tests broken by T-CIV-01
+
+- **ID:** T-CIV-05
+- **Status:** [-]
+- **Owner:** ai-engineer
+- **Target file:** `repos/dadaia-workspace/tests/integration/test_hooks.py`
+- **Preconditions:** T-CIV-03 is `[x]`
+
+**Work:**
+Reconcile 4 stale integration tests in `repos/dadaia-workspace/tests/integration/test_hooks.py`
+that asserted the removed `primary_context.json` detection branch:
+- `test_ctx_inject_reports_active_context`
+- `test_ctx_inject_reads_tech_stack_md_verbatim`
+- `test_ctx_inject_catalog_json_preferred_over_index_md`
+- `test_ctx_inject_falls_back_to_index_md_verbatim`
+
+Replace the `primary_context.json` fixture setup in each of these 4 tests with
+`DADAIA_CONTEXT` env-var injection, mirroring the passing test
+`test_ctx_inject_honors_dadaia_context_env`. This is a tests-only change — no application
+code modification.
+
+**Done criterion:**
+- Full `pytest` suite green (0 failed)
+- `ruff check . && ruff format --check . && mypy dadaia_workspace` exits 0
+- No application source files modified (diff scope: `tests/` only)
+
+**Commit message:** `test(ctx-inject): reconcile 4 stale integration tests; replace primary_context.json fixture with DADAIA_CONTEXT env-var (T-CIV-05)`
+
+---
+
 ### T-CIV-04 — QA gate: verify AC matrix
 
 - **ID:** T-CIV-04
 - **Status:** [ ]
 - **Owner:** qa-engineer
 - **Target subsystem:** source files + projection + Python pipeline
-- **Preconditions:** T-CIV-03 is `[x]`
+- **Preconditions:** T-CIV-05 is `[x]` (re-run after T-CIV-05; previously failed AC-9)
 
 **Work:** Verify each acceptance criterion from SPEC.md §7.
 
