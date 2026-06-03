@@ -17,7 +17,7 @@ const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 // ---------------------------------------------------------------------------
 // E2E-TAB-01 — Tab order and labels
 // ---------------------------------------------------------------------------
-test('E2E-TAB-01 — Tab bar contains exactly 4 tabs in correct order', async ({ page }) => {
+test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async ({ page }) => {
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
@@ -25,11 +25,16 @@ test('E2E-TAB-01 — Tab bar contains exactly 4 tabs in correct order', async ({
     els.map((el) => el.textContent?.trim() ?? '')
   );
 
-  expect(tabs).toHaveLength(4);
-  expect(tabs[0]).toBe('Spec Context Projects');
-  expect(tabs[1]).toBe('Agents');
-  expect(tabs[2]).toBe('Workflows');
-  expect(tabs[3]).toBe('Servers');
+  expect(tabs).toEqual([
+    'Spec Context Projects',
+    'Agents',
+    'Workflows',
+    'Sessions',
+    'Reports',
+    'Academy',
+    'Kanban',
+    'Servers',
+  ]);
 
   await page.screenshot({
     path: path.join(SCREENSHOTS_DIR, 'tab-bar-initial.png'),
@@ -73,6 +78,10 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
     { tabId: '#tab-agents', sectionId: 'agents' },
     { tabId: '#tab-workflows', sectionId: 'workflows' },
+    { tabId: '#tab-sessions', sectionId: 'sessions' },
+    { tabId: '#tab-reports', sectionId: 'reports' },
+    { tabId: '#tab-academy', sectionId: 'academy' },
+    { tabId: '#tab-kanban', sectionId: 'kanban' },
     { tabId: '#tab-servers', sectionId: 'servers' },
     { tabId: '#tab-memories', sectionId: 'memories' },
   ];

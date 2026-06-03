@@ -1,18 +1,15 @@
 /**
- * test_panel_sessions_tab.spec.ts — E2E-SES-01 through E2E-SES-05 (PR5-C7)
- *                                    E2E-RT-01 through E2E-RT-04 (PR5-D8)
+ * Browser journeys for the Sessions tab and runtime switcher.
  *
- * Tests: 9 (5 Phase C + 4 Phase D)
  * Surface:
- *   Phase C (E2E-SES-01..05): Sessions tab — table population, drawer detail,
+ *   E2E-SES-01..05: Sessions tab — table population, drawer detail,
  *     sort by Cost, "Last updated" badge ticking, auto-refresh suspension.
- *   Phase D (E2E-RT-01..04): Three-tab × two-runtime matrix — toggling the
+ *   E2E-RT-01..04: Three-tab x two-runtime matrix — toggling the
  *     runtime switcher reloads Agents, Workflows, AND Sessions with ?runtime=codex;
  *     localStorage persistence verified across page.reload().
  *
- * Live FE mode (Phase C, PR5-C7):
- *   The running panel instance may pre-date Phase C (stale process). To decouple
- *   the E2E gate from the live-server restart cycle, each test:
+ * Live FE mode:
+ *   Each test isolates the browser journey from dev-server asset timing:
  *     1. Navigates to the REAL panel origin (http://127.0.0.1:4999) so
  *        page.route() intercepts have a concrete origin for relative URL resolution.
  *     2. Uses page.route() to intercept the panel root ("/") and serve a crafted
@@ -21,7 +18,7 @@
  *        sessions.js via a <script> tag that is intercepted from the filesystem.
  *     3. Mocks /api/sessions* with deterministic fixture payloads.
  *
- *   Phase D multi-tab mode (PR5-D8):
+ *   Multi-tab mode:
  *     Same origin-interception strategy, but the crafted page includes all three
  *     tab sections (Agents, Workflows, Sessions) + the runtime switcher markup,
  *     loads runtime.js + agents.js + workflows.js + sessions.js from the filesystem,
@@ -30,15 +27,8 @@
  *   This drives the REAL views/*.py DOM contracts and REAL assets/js/*.js logic —
  *   the only synthetic element is the surrounding minimal HTML scaffold.
  *
- * Done criteria:
- *   PR5-C7 (a)–(e) — E2E-SES-01..05
- *   PR5-D8 — E2E-RT-01..04: switcher reloads all three tabs; localStorage persists
- *
- * FR coverage: FR3, FR4, NFR4 (Phase C) + NFR3 (localStorage) (Phase D).
- *
- * Priority: P0 (E2E-SES-01, E2E-SES-02, E2E-RT-01, E2E-RT-04) /
- *           P1 (E2E-SES-03, E2E-SES-04, E2E-RT-02, E2E-RT-03) /
- *           P2 (E2E-SES-05)
+ * Coverage: sessions list/detail, runtime filter propagation, refresh timing,
+ * localStorage persistence, and the Codex cost-unknown presentation.
  */
 
 import { test, expect, type Page, type Route } from '@playwright/test';
@@ -57,16 +47,12 @@ const JS_ASSETS_DIR = path.join(
 //
 // This is the canonical DOM contract produced by the real Python view function
 // (dadaia_workspace/features/panel/views/sessions.py). When sessions.py changes,
-// this constant must be regenerated. For Phase C the function is stable.
+// regenerate this fixture so the browser harness stays aligned with the view.
 //
 // To regenerate:
 //   python -c "from dadaia_workspace.features.panel.views.sessions \
 //              import render_sessions_section; print(render_sessions_section())"
 // ---------------------------------------------------------------------------
-// Updated to include #sessions-banner (added by PR5-E3 in sessions.py).
-// To regenerate:
-//   python -c "from dadaia_workspace.features.panel.views.sessions \
-//              import render_sessions_section; print(render_sessions_section())"
 const REAL_SESSIONS_SECTION_HTML = `<section id="section-sessions" class="section panel-section active" role="tabpanel" tabindex="0" aria-labelledby="tab-sessions">
   <header class="section-header">
     <h2>Sessions</h2>
@@ -123,8 +109,8 @@ const REAL_SESSIONS_SECTION_HTML = `<section id="section-sessions" class="sectio
 // and loads the real JS modules (core.js for authedFetch, sessions.js).
 //
 // core.js is served by the live panel at /static/core.js.
-// sessions.js is intercepted from the filesystem (Phase C: not yet served by
-// the stale panel process — intercepted via page.route).
+// sessions.js is intercepted from the filesystem so the test uses the checked
+// out asset even when another panel process is already running.
 //
 // The token bootstrap in core.js reads from sessionStorage ('panel_token');
 // we seed that via page.addInitScript before navigation so authedFetch works.
@@ -259,8 +245,7 @@ const MOCK_SESSION_DETAIL = {
 // Three interception layers are installed before any navigation:
 //   1. Panel root ("/") — serves the crafted page with real sessions HTML.
 //   2. "/static/sessions.js" — serves the real sessions.js from the filesystem
-//      (handles the case where the running panel instance predates Phase C and
-//      does not yet serve this asset).
+//      (handles the case where the running panel instance has older assets).
 //   3. "/api/sessions*" — returns deterministic mock payloads so the test is
 //      hermetic and does not depend on live telemetry data.
 //
@@ -290,7 +275,7 @@ async function installLiveFERoutes(page: Page): Promise<void> {
     }
   );
 
-  // 2. sessions.js — serve from filesystem (covers stale panel instances).
+  // 2. sessions.js — serve from filesystem.
   await page.route('**/static/sessions.js', (route: Route) => {
     route.fulfill({
       status: 200,
@@ -601,7 +586,7 @@ test('E2E-SES-05 — Auto-refresh suspends when document.hidden is true', async 
   const fetchesAfterInit = sessionListFetchCount;
 
   // Simulate tab backgrounding: override document.hidden = true and dispatch
-  // visibilitychange (TASKS.md PR5-C6 done criterion technique).
+  // visibilitychange.
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', {
       value: true,
@@ -643,7 +628,7 @@ test('E2E-SES-05 — Auto-refresh suspends when document.hidden is true', async 
 });
 
 // ============================================================================
-// Phase D — PR5-D8: Three-tab × two-runtime matrix + localStorage persistence
+// Runtime switcher: three-tab x two-runtime matrix + localStorage persistence
 // ============================================================================
 //
 // These tests verify that toggling the runtime switcher causes each of the
@@ -706,7 +691,7 @@ function buildMultiTabPageHtml(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>dadaia panel — Multi-tab runtime e2e scaffold (PR5-D8)</title>
+  <title>dadaia panel — Multi-tab runtime e2e scaffold</title>
   <script>(function(){var r=localStorage.getItem('dadaia-panel-runtime');if(r&&(r==='claude'||r==='codex')){document.documentElement.dataset.runtime=r;}})();</script>
   <style>
     /* Minimal structural styles */
@@ -1051,8 +1036,8 @@ async function loadMultiTabPanel(page: Page): Promise<void> {
 //   Then agents.js refetches /api/agents?runtime=codex and renders the
 //        Codex-scoped agent cards.
 //
-// Verifies: agents.js `dadaia:runtime-change` subscription (PR5-D5) and
-//           the ?runtime= fetch param (PR5-D5 done criterion).
+// Verifies: agents.js `dadaia:runtime-change` subscription and the
+//           ?runtime= fetch param.
 // ---------------------------------------------------------------------------
 test('E2E-RT-01 — Runtime switcher reloads Agents tab with ?runtime=codex', async ({
   page,
@@ -1115,7 +1100,7 @@ test('E2E-RT-01 — Runtime switcher reloads Agents tab with ?runtime=codex', as
 //   Then workflows.js refetches /api/workflows?runtime=codex and renders the
 //        Codex-scoped workflow cards.
 //
-// Verifies: workflows.js `dadaia:runtime-change` subscription (PR5-D6).
+// Verifies: workflows.js `dadaia:runtime-change` subscription.
 // ---------------------------------------------------------------------------
 test('E2E-RT-02 — Runtime switcher reloads Workflows tab with ?runtime=codex', async ({
   page,
@@ -1177,7 +1162,7 @@ test('E2E-RT-02 — Runtime switcher reloads Workflows tab with ?runtime=codex',
 //   Then sessions.js refetches /api/sessions?runtime=codex and renders the
 //        Codex sessions.
 //
-// Verifies: sessions.js `dadaia:runtime-change` subscription (PR5-C3 + PR5-D8).
+// Verifies: sessions.js `dadaia:runtime-change` subscription.
 // ---------------------------------------------------------------------------
 test('E2E-RT-03 — Runtime switcher reloads Sessions tab with ?runtime=codex', async ({
   page,
@@ -1250,7 +1235,7 @@ test('E2E-RT-03 — Runtime switcher reloads Sessions tab with ?runtime=codex', 
 //        AND document.documentElement.dataset.runtime === 'codex'
 //        (the inline <script> in the page <head> restores data-runtime on reload).
 //
-// Verifies: NFR3 localStorage persistence contract (PR5-D2 done criterion).
+// Verifies: runtime localStorage persistence.
 // ---------------------------------------------------------------------------
 test('E2E-RT-04 — localStorage persistence: runtime=codex survives page.reload()', async ({
   page,
@@ -1314,7 +1299,7 @@ test('E2E-RT-04 — localStorage persistence: runtime=codex survives page.reload
 });
 
 // ============================================================================
-// Phase E — PR5-E4: Codex banner + Cost column "—" override
+// Codex banner + Cost column "—" override
 // ============================================================================
 //
 // E2E-COD-01: When the runtime switcher is set to 'codex':
@@ -1328,7 +1313,7 @@ test('E2E-RT-04 — localStorage persistence: runtime=codex survives page.reload
 // so sessions.js receives MOCK_SESSIONS_CODEX on runtime=codex fetches and
 // MOCK_SESSIONS_LIST (Claude) on runtime=claude fetches.
 //
-// Verifies: PR5-E3 (FE) + PR5-E4 (QA) done criteria:
+// Verifies the Codex cost presentation contract:
 //   - Banner element #sessions-banner visible with "Cost not tracked" text.
 //   - Cost column renders "—" for all Codex rows (cumulative_cost_usd=null).
 //   - Banner disappears and Cost cells show "$" when runtime reverts to claude.

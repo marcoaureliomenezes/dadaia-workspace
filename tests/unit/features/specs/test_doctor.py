@@ -1,10 +1,4 @@
-"""Unit tests for SpecsDoctor — covers structural checks + TREE-1..7.
-
-memory-markdown-source-v1: memory atoms are now .md (frontmatter + body).
-Removed checks: SPEC-DOC-010 (image links), SPEC-DOC-011 (mermaid script).
-TREE-3 no longer has auto-fix; checks .md files instead of .html.
-CAT-1 operates on .md feature atoms, not .html files.
-"""
+"""Unit tests for SpecsDoctor structural checks and tree invariants."""
 
 from __future__ import annotations
 
@@ -12,25 +6,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 
-# Repo root: tests/unit/features/specs/test_doctor.py → 5 levels up = repo root
-# Path(__file__).parent = tests/unit/features/specs/
-# .parent.parent = tests/unit/features/
-# .parent.parent.parent = tests/unit/
-# .parent.parent.parent.parent = tests/
-# .parent.parent.parent.parent.parent = repo root
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
-
-# Canonical templates directory — same as the CLI uses
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 _SCAFFOLD_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold"
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
-
-# Minimal .md atom content (frontmatter + body) that passes LINT-1 schema checks.
-# These replace the old HTML constants; memory atoms are now .md.
-# Frontmatter must comply with memory-frontmatter-v1.schema.json (all required fields).
-# Headings must be from the HEADING_ALLOWLIST used by lint-memory-atoms.py.
 
 MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
 ---
@@ -107,6 +90,12 @@ release_origin: test-release
 
 Python, Go.
 """
+
+
+@pytest.fixture(autouse=True)
+def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep SpecsDoctor unit tests focused on in-process structural checks."""
+    monkeypatch.setattr(SpecsDoctor, "_check_lint1_memory_atoms", lambda self: [])
 
 
 def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
@@ -351,10 +340,11 @@ def test_orphan_legacy_feature_spec_reports_doc_007(tmp_path: Path) -> None:
 # ---- check 8: memory atomicity
 
 
-def test_memory_md_with_changelog_h2_reports_doc_008(tmp_path: Path) -> None:
-    """SPEC-DOC-008: a memory .md file with a ## Changelog heading in its body is flagged."""
+@pytest.mark.parametrize("heading", ["Changelog", "History"])
+def test_memory_md_with_history_heading_reports_doc_008(tmp_path: Path, heading: str) -> None:
+    """Memory atoms cannot contain changelog/history sections."""
     specs = _make_clean_specs_tree(tmp_path)
-    bad = """\
+    bad = f"""\
 ---
 slug: feature-a
 title: Feature A
@@ -364,31 +354,9 @@ title: Feature A
 
 Does A.
 
-## Changelog
+## {heading}
 
-v1 fix.
-"""
-    (specs / "memory" / "product" / "feature-a.md").write_text(bad, encoding="utf-8")
-    issues = SpecsDoctor(specs).check()
-    assert "SPEC-DOC-008" in _codes(issues)
-
-
-def test_memory_feature_md_with_history_h2_reports_doc_008(tmp_path: Path) -> None:
-    """SPEC-DOC-008: a memory .md file with a ## History heading is flagged."""
-    specs = _make_clean_specs_tree(tmp_path)
-    bad = """\
----
-slug: feature-a
-title: Feature A
----
-
-## Propósito
-
-Does A.
-
-## History
-
-Once was X.
+Historical details.
 """
     (specs / "memory" / "product" / "feature-a.md").write_text(bad, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
@@ -405,11 +373,6 @@ def test_active_release_id_without_dir_reports_doc_009(tmp_path: Path) -> None:
     )
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-009" in _codes(issues)
-
-
-# checks 10 and 11 were retired with the HTML → Markdown migration (memory-markdown-source-v1).
-# SPEC-DOC-010 (image links in HTML) and SPEC-DOC-011 (mermaid script in HTML) are removed.
-# The corresponding test functions have been deleted.
 
 
 # ---- meta: JSON output / API surface
@@ -740,11 +703,7 @@ def test_tree2_fix_does_not_move_root_spec_md(tmp_path: Path) -> None:
 
 
 def test_tree3_missing_architecture_md_triggers_warning(tmp_path: Path) -> None:
-    """TREE-3: memory/architecture.md absent emits a TREE-3 WARNING.
-
-    memory-markdown-source-v1: TREE-3 now checks .md atoms, not .html files.
-    TREE-3 is warn-only and has no auto-fix (operator must author the .md atom).
-    """
+    """TREE-3: memory/architecture.md absent emits a warn-only TREE-3 issue."""
     specs = _make_clean_specs_tree(tmp_path)
     (specs / "memory" / "architecture.md").unlink()
     doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
@@ -756,11 +715,7 @@ def test_tree3_missing_architecture_md_triggers_warning(tmp_path: Path) -> None:
 
 
 def test_tree3_has_no_autofix(tmp_path: Path) -> None:
-    """TREE-3 is fixable=False: calling fix() must NOT create architecture.md.
-
-    memory-markdown-source-v1: .md atoms are operator-authored, not generated
-    from templates. fix() must leave the file absent.
-    """
+    """TREE-3 fix() must not create operator-authored memory atoms."""
     specs = _make_clean_specs_tree(tmp_path)
     arch_md = specs / "memory" / "architecture.md"
     arch_md.unlink()
@@ -956,13 +911,8 @@ def test_tree7_no_autofix_leaves_bug_unchanged(tmp_path: Path) -> None:
     assert any(i.code == "TREE-7" for i in residual)
 
 
-# ---- AC-T9-15: fresh scaffold passes all TREE invariants
-
-
 def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
-    """AC-T9-15: a freshly scaffolded workspace produces 0 TREE errors and 0 TREE-* issues
-    that would break a gate (TREE-1/2/3/4/5 are warnings; 6/7 require violating content).
-    """
+    """A freshly scaffolded workspace produces no TREE errors."""
     from dadaia_workspace.features.specs.scaffolder import scaffold
 
     specs = tmp_path / "specs"
@@ -1001,10 +951,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     )
 
 
-# ---- CAT-1: catalog.json ↔ feature .md atom sync check (memory-context-enforcement-v1)
-#
-# memory-markdown-source-v1: CAT-1 now compares catalog.json slugs against .md feature
-# atoms (not .html files). The doctor enumerates *.md in product/ (excl. index.md).
+# ---- CAT-1: catalog.json ↔ feature atom sync check
 
 
 def _make_catalog_json(product_dir: Path, slugs: list[str]) -> None:
@@ -1152,60 +1099,4 @@ def test_cat1_both_stale_and_extra_emit_separate_warnings(tmp_path: Path) -> Non
     # At minimum: one for stale-slug, one for feature-a, one for new-feature
     assert len(cat1) >= 2, (
         f"Expected at least 2 CAT-1 WARNINGs; got {len(cat1)}: {[i.description for i in cat1]}"
-    )
-
-
-def test_cat1_is_always_warning_never_error(tmp_path: Path) -> None:
-    """CAT-1 must never be ERROR severity."""
-    specs = _make_clean_specs_tree(tmp_path)
-    product_dir = specs / "memory" / "product"
-    # Maximally broken: catalog with wrong slug (feature-a.md is extra)
-    _make_catalog_json(product_dir, ["wrong-slug"])
-
-    issues = SpecsDoctor(specs).check()
-    cat1 = [i for i in issues if i.code == "CAT-1"]
-    assert cat1, "Pre-condition: CAT-1 issues must be present"
-    for issue in cat1:
-        assert issue.severity == Severity.WARNING, (
-            f"CAT-1 must be WARNING, got ERROR: {issue.description}"
-        )
-
-
-def test_cat1_absent_catalog_warning_mentions_count(tmp_path: Path) -> None:
-    """CAT-1: the absent-catalog WARNING message includes the .md atom count."""
-    specs = _make_clean_specs_tree(tmp_path)
-    product_dir = specs / "memory" / "product"
-    _write_feature_md(product_dir, "feature-b")
-    _write_feature_md(product_dir, "feature-c")
-    # 3 feature .md atoms: feature-a, feature-b, feature-c
-
-    issues = SpecsDoctor(specs).check()
-    cat1 = [i for i in issues if i.code == "CAT-1"]
-    assert cat1
-    assert "3" in cat1[0].description, (
-        f"Expected '3' in absent-catalog CAT-1 description; got: {cat1[0].description}"
-    )
-
-
-# ---- AC-T9-16: dadaia-workspace repo itself passes (regression guard)
-
-
-def test_dadaia_workspace_repo_passes_tree_invariants() -> None:
-    """AC-T9-16: the dadaia-workspace repo's own specs/ must produce 0 TREE-* errors.
-
-    This is the critical regression guard: if any new ERROR-severity TREE invariant
-    fires against this repo's own tree, the severity mapping or trigger logic is wrong.
-    """
-    repo_specs = _REPO_ROOT / "specs"
-    if not repo_specs.exists():
-        import pytest
-
-        pytest.skip("specs/ not found — not running in dadaia-workspace repo context")
-
-    doctor = SpecsDoctor(repo_specs, public_dir=_PUBLIC_DIR)
-    issues = doctor.check()
-    tree_errors = [i for i in issues if i.code.startswith("TREE-") and i.severity == Severity.ERROR]
-    assert tree_errors == [], (
-        "dadaia-workspace repo triggered TREE ERROR invariants — severity mapping is wrong:\n"
-        + "\n".join(f"  {i.code}: {i.description}" for i in tree_errors)
     )

@@ -7,11 +7,20 @@ import os
 import stat
 from pathlib import Path
 
+import pytest
+
+from dadaia_workspace.infrastructure import bug_reporter
 from dadaia_workspace.infrastructure.bug_reporter import (
     append_entry,
     report_doctor_finding,
     report_exception,
 )
+
+
+@pytest.fixture(autouse=True)
+def _skip_git_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(bug_reporter, "_git_context", lambda *_args, **_kwargs: "")
+
 
 # ---------------------------------------------------------------------------
 # report_exception

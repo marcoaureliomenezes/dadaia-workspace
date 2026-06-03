@@ -1,11 +1,11 @@
-"""WCAG contrast ratio tests for brand-identity-v1 tokens in PANEL_CSS (T-AM-19).
+"""WCAG contrast ratio tests for panel CSS tokens.
 
 Reuses the _luminance/_contrast helpers from test_contrast.py (same algorithm,
 inlined here so this module is self-contained and does not create a circular
 import between test modules).
 
 Assertions cover:
-  - Text-on-background pairs required by D-AM-22 / SPEC § Threat matrix T2.
+  - Text-on-background pairs required by the panel visual contract.
   - Structural assertions that palette colors are NOT used as text `color:`
     values where they would fail contrast (accent / alert are decorative only).
 """
@@ -20,7 +20,6 @@ from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
 from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
 
-# T-P5-01: PALETTE and PANEL_CSS removed from _assets.py. Inline them here.
 PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
 
 PALETTE: dict[str, str] = {

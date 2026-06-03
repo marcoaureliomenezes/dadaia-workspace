@@ -53,6 +53,31 @@ _GUARDED_ROOT_FILES: tuple[str, ...] = (
     "playwright.config.ts",
 )
 
+_PATH_MARKERS: tuple[tuple[str, str], ...] = (
+    ("tests/unit/", "unit"),
+    ("tests/contract/", "contract"),
+    ("tests/integration/", "integration"),
+    ("tests/e2e/", "e2e"),
+    ("tests/tmp/", "tmp"),
+)
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Apply layer markers from test directory layout.
+
+    Directory placement is the first enforcement mechanism for the existing
+    suite. Tests may still add explicit markers, but unmarked legacy tests do
+    not fall out of layer-specific commands.
+    """
+    for item in items:
+        rel = Path(str(item.fspath)).resolve().relative_to(_REPO_ROOT).as_posix()
+        for prefix, marker in _PATH_MARKERS:
+            if rel.startswith(prefix):
+                item.add_marker(getattr(pytest.mark, marker))
+                if marker == "e2e":
+                    item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
+                break
+
 
 def _collect_entries(
     root: Path, rel_dirs: tuple[str, ...], rel_files: tuple[str, ...]

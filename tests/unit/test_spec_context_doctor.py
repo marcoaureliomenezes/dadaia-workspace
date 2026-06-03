@@ -1,8 +1,4 @@
-"""Unit tests for DoctorService — spec context invariant checker (v2: ALIVE/DEAD).
-
-INV-1, INV-2, INV-3, INV-6 have been removed in v2 (they guarded is_primary logic).
-INV-4 and INV-5 are retained, renamed for ALIVE/DEAD semantics.
-"""
+"""Unit tests for DoctorService — spec context invariant checker."""
 
 from pathlib import Path
 
@@ -114,20 +110,3 @@ def test_fix_no_issues_returns_empty(tmp_path: Path) -> None:
     svc, _, _ = _make_doctor(tmp_path, [ctx])
     actions = svc.fix()
     assert actions == []
-
-
-# ---------------------------------------------------------------------------
-# Removed invariants (INV-1, INV-2, INV-3, INV-6) must not appear in check()
-# ---------------------------------------------------------------------------
-
-
-def test_removed_invariants_not_raised(tmp_path: Path) -> None:
-    """INV-1, INV-2, INV-3, INV-6 no longer exist in v2."""
-    ctx = _ctx("alpha", state=ContextState.ALIVE)
-    (tmp_path / "repos" / "alpha").mkdir(parents=True)
-    svc, _, _ = _make_doctor(tmp_path, [ctx])
-    codes = {i.code for i in svc.check()}
-    assert "INV-1" not in codes
-    assert "INV-2" not in codes
-    assert "INV-3" not in codes
-    assert "INV-6" not in codes

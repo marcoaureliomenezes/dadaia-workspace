@@ -1,6 +1,6 @@
-"""Unit tests for panel-r5-v1 FR3: /api/sessions and /api/sessions/<runtime>/<session_id>.
+"""Unit tests for /api/sessions and /api/sessions/<runtime>/<session_id>.
 
-Coverage per TASKS.md PR5-B3:
+Coverage:
 - envelope shape on success (list + detail)
 - auth-missing → 401 (via handler dispatch with a fake socket)
 - telemetry-unavailable → 503
@@ -76,7 +76,7 @@ _SESSION_ROW_CLAUDE = SessionRow(
     cost_known=True,
     status="idle",
     agent_name="software-engineer",
-    ai_title="Panel r5 Phase B",
+    ai_title="Panel sessions fixture",
 )
 
 _SESSION_ROW_CODEX = SessionRow(
@@ -110,7 +110,7 @@ _SESSION_DETAIL_CLAUDE = SessionDetail(
     cost_known=True,
     status="idle",
     agent_name="software-engineer",
-    ai_title="Panel r5 Phase B",
+    ai_title="Panel sessions fixture",
     event_timestamps=(
         "2026-05-19T08:01:00Z",
         "2026-05-19T08:15:00Z",

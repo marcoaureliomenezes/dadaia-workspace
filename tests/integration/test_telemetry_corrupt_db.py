@@ -228,7 +228,9 @@ class TestHandlerDegradedResponses:
         port = server.server_address[1]
         base_url = f"http://127.0.0.1:{port}"
 
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread = threading.Thread(
+            target=lambda: server.serve_forever(poll_interval=0.05), daemon=True
+        )
         thread.start()
 
         yield base_url, test_token
@@ -257,7 +259,7 @@ class TestHandlerDegradedResponses:
     def test_api_workflows_with_token_returns_200(self, degraded_panel: Any) -> None:
         """GET /api/workflows with valid Bearer → 200 even when telemetry is degraded.
 
-        api_workflows is a bearer-only route (PR3-14) backed by the canonical
+        api_workflows is a bearer-only route backed by the canonical
         WorkflowsService — it does NOT go through the telemetry service, so
         corrupt-DB degradation does not affect it.
         """

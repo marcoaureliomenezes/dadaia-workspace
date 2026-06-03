@@ -249,7 +249,7 @@ def test_memory_view_iframe_loads() -> None:
     """
     if not _REAL_MEMORY_HTML.exists():
         pytest.skip(
-            f"Memory fixture not found at {_REAL_MEMORY_HTML} — skipping byte-identity canary"
+            f"Memory fixture not found at {_REAL_MEMORY_HTML} — skipping real-content check"
         )
 
     slug = "dadaia-workspace"

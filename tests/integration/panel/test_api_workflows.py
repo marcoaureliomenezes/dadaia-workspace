@@ -1,6 +1,6 @@
 """Integration tests for GET /api/workflows and GET /api/workflows/<name>.
 
-Coverage areas (PR3-20 spec):
+Coverage areas:
   - Bearer token enforcement (auth)
   - Cache invalidation when underlying file mtime changes
   - Response shape against SPEC §5.3 / §5.4
@@ -134,7 +134,7 @@ def workflows_server(staged_root: Path):
     server = _build_server(_TOKEN, staged_root)
     port = server.server_address[1]
     base_url = f"http://127.0.0.1:{port}"
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
     thread.start()
     yield base_url, _TOKEN
     server.shutdown()
@@ -319,7 +319,9 @@ stages:
             server = _build_server("cache-token", tmp)
             port = server.server_address[1]
             base = f"http://127.0.0.1:{port}"
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread = threading.Thread(
+                target=lambda: server.serve_forever(poll_interval=0.05), daemon=True
+            )
             thread.start()
 
             try:

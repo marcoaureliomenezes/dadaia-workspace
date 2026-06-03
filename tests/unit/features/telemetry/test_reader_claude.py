@@ -1,4 +1,4 @@
-"""Unit tests for features/telemetry/reader/claude.py (T-AM-06 / PR4-08).
+"""Unit tests for features/telemetry/reader/claude.py.
 
 Uses in-memory SQLite with full schema applied (via apply_migrations) so
 the DAO behaves exactly as in production without touching the filesystem DB.
@@ -366,10 +366,10 @@ class TestMissingFile:
 
 
 # ---------------------------------------------------------------------------
-# PR4-07 — Dispatched subagent persona extraction tests
+# Dispatched subagent persona extraction tests
 # ---------------------------------------------------------------------------
 
-# Minimal jsonl fixture helpers for PR4-07 (inline synthetic data).
+# Minimal jsonl fixture helpers for inline synthetic dispatch data.
 # No real operator content — all values are fictional.
 
 
@@ -504,7 +504,7 @@ def _make_top_level_jsonl(session_id: str) -> bytes:
 
 
 class TestDispatchedSubagentExtraction:
-    """PR4-07 — Agent name extracted from dispatched subagent persona."""
+    """Agent name is extracted from dispatched subagent persona."""
 
     def test_agent_name_extracted_from_dispatched_subagent(self, tmp_path: pathlib.Path) -> None:
         """Synthetic jsonl with an Agent tool_use carrying subagent_type='software-engineer'
@@ -579,7 +579,8 @@ class TestDispatchedSubagentExtraction:
         The agent-name event carries a project slug (not a persona), and
         agent_name=None is intentional for operator/main-Claude sessions.
 
-        Acceptance criterion: PR4-07 second case.
+        This protects top-level operator sessions from being misclassified as
+        persona-agent sessions.
         """
         dao = _make_dao(tmp_path)
         session_id = "toplevel-session-001"

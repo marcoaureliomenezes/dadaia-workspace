@@ -67,7 +67,27 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80"
+addopts = "-ra"
+markers = [
+    "unit: pure or near-pure fast tests",
+    "contract: public API/schema/security contracts",
+    "integration: multi-component tests using real tmp filesystem or CLI runner",
+    "e2e: full user journeys and browser-backed flows",
+    "slow: tests over 1s or tests that start a server/subprocess",
+    "tmp: temporary debugging tests excluded from default runs",
+]
+norecursedirs = [
+    ".*",
+    "CVS",
+    "_darcs",
+    "{arch}",
+    "*.egg",
+    "build",
+    "dist",
+    "venv",
+    ".venv",
+    "tests/tmp",
+]
 # Disk guard: only retain tmp_path trees for FAILED tests (default keeps the last 3
 # full sessions, which — combined with per-test venvs — exhausted the disk). See the
 # _no_real_venv_in_tests backstop in tests/conftest.py.

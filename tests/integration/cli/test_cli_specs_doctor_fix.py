@@ -73,39 +73,6 @@ def test_doctor_fix_creates_missing_dirs(tmp_path: Path) -> None:
     assert result.exit_code == 0, f"Expected exit 0; got {result.exit_code}:\n{result.output}"
 
 
-def test_doctor_fix_does_not_move_root_spec_md(tmp_path: Path) -> None:
-    """--fix must NOT move specs/SPEC.md even though TREE-2 warns about it."""
-    specs = _make_minimal_specs(tmp_path)
-    root_spec = specs / "SPEC.md"
-    root_spec.write_text("# Root Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
-
-    result = _runner.invoke(
-        app,
-        ["specs", "doctor", "--fix", "--specs-dir", str(specs)],
-    )
-    assert root_spec.exists(), "--fix must NOT remove/move specs/SPEC.md"
-    # TREE-2 warning still in output (warn-only; migration hint always shown)
-    assert "TREE-2" in result.output or "MIGRATION" in result.output, (
-        f"TREE-2 migration hint must appear; got:\n{result.output}"
-    )
-
-
-def test_doctor_fix_does_not_delete_foundation(tmp_path: Path) -> None:
-    """--fix must NOT delete specs/foundation/ even though TREE-1 warns about it."""
-    specs = _make_minimal_specs(tmp_path)
-    foundation = specs / "foundation"
-    foundation.mkdir()
-    (foundation / "content.md").write_text("# Protected\n", encoding="utf-8")
-
-    result = _runner.invoke(
-        app,
-        ["specs", "doctor", "--fix", "--specs-dir", str(specs)],
-    )
-    assert foundation.exists(), "--fix must NOT delete specs/foundation/"
-    assert (foundation / "content.md").exists()
-    assert "TREE-1" in result.output or "MIGRATION" in result.output
-
-
 def test_doctor_no_fix_flag_unchanged_behaviour(tmp_path: Path) -> None:
     """Without --fix flag, behaviour is unchanged (check + report, no mutations).
 

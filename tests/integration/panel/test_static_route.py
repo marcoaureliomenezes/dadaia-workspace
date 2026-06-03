@@ -1,6 +1,6 @@
 """Integration tests for GET /static/<name> — static asset serving.
 
-Coverage areas (PR3-20 spec):
+Coverage areas:
   - Known assets served with correct MIME type
   - Path traversal defence-in-depth (names with / \\ .. rejected with 400)
   - Unknown file names → 404
@@ -65,7 +65,7 @@ def static_server():
     server = _build_static_server()
     port = server.server_address[1]
     base_url = f"http://127.0.0.1:{port}"
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
     thread.start()
     yield base_url
     server.shutdown()

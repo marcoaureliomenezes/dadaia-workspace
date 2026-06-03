@@ -1,12 +1,4 @@
-"""Unit tests for views/static.py — T-3.6 (updated for PR3-02 activation).
-
-Covers:
-  - tokens.css served with correct content-type (replaces panel.css)
-  - core.js served with correct content-type (replaces panel.js)
-  - Returned bytes are non-empty
-  - Unknown name returns 404
-  - Traversal-like names ("../etc/passwd") return 400 (path traversal guard, PR3-02)
-"""
+"""Unit contracts for the panel static asset view."""
 
 from dadaia_workspace.features.panel.views.static import render_static
 
@@ -80,32 +72,24 @@ def test_static_returns_bytes() -> None:
     assert isinstance(body, bytes)
 
 
-# ---------------------------------------------------------------------------
-# PR5-D7 — runtime.js registered in _ASSETS
-# ---------------------------------------------------------------------------
-
-
 def test_static_runtime_js_status_and_content_type() -> None:
-    """PR5-D7: runtime.js must return 200 with application/javascript; charset=utf-8."""
+    """runtime.js must return 200 with application/javascript; charset=utf-8."""
     status, ct, _ = _view("runtime.js")
     assert status == 200
     assert ct == "application/javascript; charset=utf-8"
 
 
 def test_static_runtime_js_body_is_nonempty() -> None:
-    """PR5-D7: runtime.js body must be non-empty bytes."""
+    """runtime.js body must be non-empty bytes."""
     _, _, body = _view("runtime.js")
     assert isinstance(body, bytes)
     assert len(body) > 0
 
 
 def test_static_runtime_js_load_order() -> None:
-    """PR5-D7: load-order invariant — runtime.js must appear in _ASSETS before agents.js.
+    """runtime.js must be registered before modules that depend on window.Runtime.
 
-    The _ASSETS dict insertion order mirrors the intended static-serving
-    registration. runtime.js must be registered before agents.js, workflows.js,
-    and sessions.js because window.Runtime must be defined before those modules
-    subscribe to dadaia:runtime-change or call Runtime.get().
+    The _ASSETS dict insertion order mirrors static-serving registration.
     """
     from dadaia_workspace.features.panel.views.static import _ASSETS
 
