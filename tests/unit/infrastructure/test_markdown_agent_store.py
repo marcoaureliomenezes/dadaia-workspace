@@ -1,6 +1,6 @@
 """Unit tests for dadaia_workspace.infrastructure.markdown_agent_store.
 
-Coverage targets (lines uncovered before PR3-19):
+Coverage targets:
 - line 43: _split_frontmatter missing closing delimiter → returns None
 - lines 56-58: _parse_file OSError on unreadable file → returns None
 - line 90: MarkdownAgentStore._files() when path is not a dir → returns []

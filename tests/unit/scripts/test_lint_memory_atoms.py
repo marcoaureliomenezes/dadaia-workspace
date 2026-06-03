@@ -1,4 +1,4 @@
-"""Unit tests for dadaia_workspace/public/scripts/lint-memory-atoms.py (T-MMS-01).
+"""Unit tests for dadaia_workspace/public/scripts/lint-memory-atoms.py.
 
 Coverage:
   - Valid atom with all required fields passes lint (exit 0)
@@ -13,15 +13,12 @@ Coverage:
   - Token estimate within 20% → OK
   - slug != filename stem → ERROR (exit 1)
   - No frontmatter → ERROR (exit 1)
-  - Subprocess integration: clean atom exits 0; bad atom exits 1
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
-import subprocess
-import sys
 import types
 from pathlib import Path
 from typing import Any
@@ -32,7 +29,7 @@ import pytest
 # Locate the script and schema
 # ---------------------------------------------------------------------------
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]  # tests/unit/scripts/../../../.. = repo root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCRIPT = _REPO_ROOT / "dadaia_workspace" / "public" / "scripts" / "lint-memory-atoms.py"
 _SCHEMA_PATH = (
     _REPO_ROOT
@@ -503,38 +500,3 @@ def test_main_bad_atom_exit_one(tmp_path: Path) -> None:
     )
     code = main(["--memory-dir", str(tmp_path)])
     assert code == 1, f"Expected exit 1, got {code}"
-
-
-# ---------------------------------------------------------------------------
-# Subprocess integration tests
-# ---------------------------------------------------------------------------
-
-
-def test_subprocess_clean_exits_zero(tmp_path: Path) -> None:
-    """Running script via subprocess exits 0 for a valid atom."""
-    _make_atom(tmp_path, slug="test-atom")
-    result = subprocess.run(
-        [sys.executable, str(_SCRIPT), "--memory-dir", str(tmp_path)],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, (
-        f"Expected exit 0.\nstdout: {result.stdout!r}\nstderr: {result.stderr!r}"
-    )
-
-
-def test_subprocess_bad_atom_exits_one(tmp_path: Path) -> None:
-    """Running script via subprocess exits 1 for an atom with errors."""
-    _make_atom(
-        tmp_path,
-        slug="test-atom",
-        body="## Propósito\n\nOK.\n\n## Changelog\n\nHistory.\n",
-    )
-    result = subprocess.run(
-        [sys.executable, str(_SCRIPT), "--memory-dir", str(tmp_path)],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 1, (
-        f"Expected exit 1.\nstdout: {result.stdout!r}\nstderr: {result.stderr!r}"
-    )

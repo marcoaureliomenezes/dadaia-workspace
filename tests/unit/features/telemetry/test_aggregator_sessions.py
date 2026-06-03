@@ -1,7 +1,5 @@
 """Unit tests for TelemetryAggregator.list_sessions and get_session.
 
-Panel-r5-v1 PR5-A4.
-
 All fixtures are built in-memory via sqlite3 INSERT statements — no live
 telemetry.sqlite is read or touched.
 """

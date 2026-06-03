@@ -28,9 +28,9 @@ test('E2E-SCP-01 — Spec Context Projects tab renders context cards with three 
 
   // Each visible card must have the three required memory links
   for (const card of contextCards) {
-    const links = await card.$$('.memory-link');
+    const links = await card.$$('.memory-chip');
     const linkLabels = await Promise.all(
-      links.map((l) => l.$eval('.memory-link-label', (el) => el.textContent?.trim() ?? ''))
+      links.map((l) => l.evaluate((el) => el.textContent?.trim() ?? ''))
     );
     expect(linkLabels).toContain('Architecture');
     expect(linkLabels).toContain('Tech Stack');

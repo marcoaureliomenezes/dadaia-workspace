@@ -1,7 +1,4 @@
-"""Unit tests for features/panel/auth.py — Bearer token auth (T-AM-13).
-
-Per TDD: tests written first. They will fail until auth.py is created.
-"""
+"""Unit tests for features/panel/auth.py bearer token auth."""
 
 from __future__ import annotations
 

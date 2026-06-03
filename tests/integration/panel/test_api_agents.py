@@ -1,6 +1,6 @@
 """Integration tests for GET /api/agents — end-to-end HTTP (no browser).
 
-Coverage areas (PR3-20 spec):
+Coverage areas:
   - Telemetry overlay merge: real PanelService + real canonical agents + stub telemetry
   - ?active_window_days query parameter honoured (200 and 400 boundary)
   - Bearer token enforcement (401 without token, 200 with valid token)
@@ -231,7 +231,7 @@ def agents_server(staged_root: Path):
     server = _build_agents_server(_TEST_TOKEN, stub_tel, staged_root)
     port = server.server_address[1]
     base_url = f"http://127.0.0.1:{port}"
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
     thread.start()
     yield base_url, _TEST_TOKEN, stub_tel
     server.shutdown()

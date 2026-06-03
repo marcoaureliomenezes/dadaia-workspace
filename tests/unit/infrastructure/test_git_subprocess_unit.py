@@ -1,0 +1,102 @@
+"""Pure unit tests for GitSubprocessClient command decisions."""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.infrastructure import git_subprocess
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+
+
+def _result(
+    returncode: int = 0, stdout: str = "", stderr: str = ""
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(
+        args=["git"], returncode=returncode, stdout=stdout, stderr=stderr
+    )
+
+
+def test_clone_raises_git_clone_error_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        git_subprocess, "_run", lambda *_args, **_kwargs: _result(1, stderr="fatal")
+    )
+
+    with pytest.raises(GitCloneError, match="fatal"):
+        GitSubprocessClient().clone("missing", Path("/dest"))
+
+
+def test_commit_all_treats_nothing_to_commit_as_noop(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        if args[:2] == ["git", "commit"]:
+            return _result(1, stdout="nothing to commit, working tree clean")
+        return _result()
+
+    monkeypatch.setattr(git_subprocess, "_run", fake_run)
+
+    GitSubprocessClient().commit_all(Path("/repo"), "message")
+
+    assert ["git", "commit", "-m", "message"] in calls
+
+
+def test_commit_all_raises_with_stdout_and_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+        if args[:2] == ["git", "commit"]:
+            return _result(1, stdout="stdout detail", stderr="stderr detail")
+        return _result()
+
+    monkeypatch.setattr(git_subprocess, "_run", fake_run)
+
+    with pytest.raises(GitSyncError) as exc_info:
+        GitSubprocessClient().commit_all(Path("/repo"), "message")
+
+    assert "stdout detail" in str(exc_info.value)
+    assert "stderr detail" in str(exc_info.value)
+
+
+def test_push_sets_upstream_when_tracking_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        if args == ["git", "rev-parse", "--abbrev-ref", "@{u}"]:
+            return _result(1)
+        if args == ["git", "branch", "--show-current"]:
+            return _result(stdout="main\n")
+        return _result()
+
+    monkeypatch.setattr(git_subprocess, "_run", fake_run)
+
+    GitSubprocessClient().push(Path("/repo"))
+
+    assert ["git", "push", "-u", "origin", "main"] in calls
+
+
+def test_push_uses_plain_push_when_tracking_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return _result(stdout="origin/main\n" if "--abbrev-ref" in args else "")
+
+    monkeypatch.setattr(git_subprocess, "_run", fake_run)
+
+    GitSubprocessClient().push(Path("/repo"))
+
+    assert ["git", "push"] in calls
+    assert not any(call[:3] == ["git", "push", "-u"] for call in calls)
+
+
+def test_checkout_raises_sync_error_on_git_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        git_subprocess, "_run", lambda *_args, **_kwargs: _result(1, stderr="no branch")
+    )
+
+    with pytest.raises(GitSyncError, match="no branch"):
+        GitSubprocessClient().checkout(Path("/repo"), "missing")

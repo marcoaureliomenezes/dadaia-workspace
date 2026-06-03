@@ -4,7 +4,7 @@ Single source of truth for walking up the directory tree to find the
 workspace root. A valid workspace root is a directory that contains
 ``.dadaia/states/spec_contexts.json`` — NOT merely ``.dadaia/``.
 
-Sub-repos (e.g. ``repos/redacted-slug``, ``repos/redacted-slug``) may have
+Sub-repos (e.g. ``repos/my-service``, ``repos/my-app``) may have
 their own ``.dadaia/`` for lib projection purposes, but they do NOT have
 a ``states/`` subdirectory. Those are skipped so that CLI commands run
 from within any sub-repo resolve to the workspace root correctly.

@@ -256,7 +256,7 @@ def test_detail_shape_matches_spec(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert detail.source_path.endswith("simple-wf.workflow.md")
     assert isinstance(detail.inputs, list)
     assert isinstance(detail.stages, list)
-    assert isinstance(detail.diagram_svg, str)  # stub "" until PR3-13
+    assert isinstance(detail.diagram_svg, str)
 
 
 def test_detail_stage_dto_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

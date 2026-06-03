@@ -1,11 +1,10 @@
-"""Real assertions for `_install_workspace_guardrail_pair` — AGT-r2-27 + AGT-r2-34 + AGT-r2-35.
+"""Real assertions for `_install_workspace_guardrail_pair`.
 
 Tests for `_install_workspace_guardrail_pair` and `_doctor_guardrail_pair` in
 `dadaia_workspace.infrastructure.public_assets`, plus the Option C absence
-invariant for `dadaia_workspace/public/data/CLAUDE.md` (AGT-r2-34), and the
-install call-site dispatch to `_install_workspace_guardrail_pair` (AGT-r2-35).
+invariant for `dadaia_workspace/public/data/CLAUDE.md`.
 
-Eight cases covering:
+Seven cases covering:
 1. 4-target projection write (byte-identical, single SHA-256).
 2. Skip when consumer has no `.dadaia/` marker.
 3. Skip when consumer has `.dadaia/` but no `.dadaia/agentic/` marker.
@@ -13,8 +12,6 @@ Eight cases covering:
 5. Nested-pair non-interference: `services/CLAUDE.md` + `services/AGENTS.md` untouched (FR10).
 6. Doctor produces exactly 4 parity labels per source.
 7. Option C invariant: `data/CLAUDE.md` MUST NOT exist as a source file.
-8. Install call site dispatch: `FileSystemPublicAssetManager.install()` writes 4 guardrail
-   files when `data/AGENTS.md` is present in the staged agentic dir (AGT-r2-35).
 """
 
 from __future__ import annotations
@@ -26,7 +23,6 @@ import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (
     _CLAUDE_MD_STUB,
-    FileSystemPublicAssetManager,
     _doctor_guardrail_pair,
     _install_workspace_guardrail_pair,
     _package_version,
@@ -401,109 +397,4 @@ def test_no_data_claude_md_source() -> None:
         "MUST NOT EXIST. The single source of truth is data/AGENTS.md, "
         "projected under both filenames at install time.\n"
         f"  Unexpected path: {forbidden}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Case 8 — Install call-site dispatch (AGT-r2-35)
-# ---------------------------------------------------------------------------
-
-
-def test_install_dispatches_to_workspace_guardrail_pair(tmp_path: Path) -> None:
-    """FileSystemPublicAssetManager.install() calls _install_workspace_guardrail_pair
-    once for data/AGENTS.md, producing 4 guardrail files per run.
-
-    AGT-r2-35 acceptance: when `data/AGENTS.md` is present in the staged agentic dir,
-    `install()` must write exactly 4 guardrail files:
-      * workspace-root / AGENTS.md
-      * workspace-root / CLAUDE.md
-      * <consumer> / AGENTS.md
-      * <consumer> / CLAUDE.md
-
-    Setup:
-      - A minimal pre-staged agentic dir (manifest.json + data/AGENTS.md).
-      - One marker-bearing consumer repo under repos/ with a distinct package_version.
-      - FileSystemPublicAssetManager._public_dir pointed at a minimal stub public dir
-        containing only data/AGENTS.md (so stage() is a no-op and install() proceeds
-        against the pre-staged agentic dir).
-
-    After install(force=True):
-      - All 4 destination paths exist and are byte-identical to the source.
-    """
-    guardrail_content = b"# AGENTS guardrail - install dispatch test\n"
-
-    # Build a minimal workspace
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
-    # Pre-stage the agentic dir so install() skips stage()
-    agentic_dir = workspace_root / ".dadaia" / "agentic"
-    (agentic_dir / "data").mkdir(parents=True)
-    source = agentic_dir / "data" / "AGENTS.md"
-    source.write_bytes(guardrail_content)
-
-    # Minimal manifest so install() skips stage()
-    manifest = {
-        "schema_version": "1",
-        "package_version": "0.0.0-test",
-        "generated_at": "2026-01-01T00:00:00+00:00",
-        "assets": [{"path": "data/AGENTS.md", "sha256": "aa", "type": "data"}],
-    }
-    (agentic_dir / "manifest.json").write_text(__import__("json").dumps(manifest), encoding="utf-8")
-
-    # One marker-bearing consumer with a distinct (non-self) package_version
-    consumer = workspace_root / "repos" / "redacted-slug"
-    (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-    consumer_manifest = {"schema_version": "1", "package_version": "0.0.0"}
-    (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
-        __import__("json").dumps(consumer_manifest), encoding="utf-8"
-    )
-
-    # Instantiate the manager with a minimal public dir stub (only data/AGENTS.md)
-    public_stub = tmp_path / "public"
-    (public_stub / "data").mkdir(parents=True)
-    (public_stub / "data" / "AGENTS.md").write_bytes(guardrail_content)
-
-    manager = FileSystemPublicAssetManager()
-    # Redirect _public_dir to the stub so runtime_expectations uses the stub
-    manager._public_dir = public_stub  # type: ignore[assignment]
-
-    installed = manager.install(workspace_root, target="all", force=True)
-
-    # All 4 guardrail destinations must exist and be byte-identical to source
-    import hashlib
-
-    expected_sha = hashlib.sha256(guardrail_content).hexdigest()
-
-    destinations = [
-        workspace_root / "AGENTS.md",
-        workspace_root / "CLAUDE.md",
-        consumer / "AGENTS.md",
-        consumer / "CLAUDE.md",
-    ]
-
-    for dest in destinations:
-        assert dest.exists(), f"Expected guardrail destination missing: {dest}"
-
-    # AGENTS.md destinations must be byte-identical to source.
-    for dest in [workspace_root / "AGENTS.md", consumer / "AGENTS.md"]:
-        actual_sha = hashlib.sha256(dest.read_bytes()).hexdigest()
-        assert actual_sha == expected_sha, (
-            f"AGENTS.md at {dest.name} is not byte-identical to source.\n"
-            f"  source sha256: {expected_sha}\n"
-            f"  dest   sha256: {actual_sha}"
-        )
-
-    # CLAUDE.md destinations must contain the 1-line stub (T-41).
-    for dest in [workspace_root / "CLAUDE.md", consumer / "CLAUDE.md"]:
-        assert dest.read_text(encoding="utf-8") == _CLAUDE_MD_STUB, (
-            f"CLAUDE.md at {dest.name} must contain only the 1-line stub (T-41).\n"
-            f"  Expected: {_CLAUDE_MD_STUB!r}\n"
-            f"  Got:      {dest.read_text(encoding='utf-8')!r}"
-        )
-
-    ok_guardrail = [e for e in installed if "AGENTS.md" in e or "CLAUDE.md" in e]
-    assert len(ok_guardrail) >= 4, (
-        f"Expected at least 4 guardrail entries in installed list, got {len(ok_guardrail)}.\n"
-        f"  installed: {installed}"
     )

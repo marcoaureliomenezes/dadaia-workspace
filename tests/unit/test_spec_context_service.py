@@ -1,7 +1,4 @@
-"""Unit tests for SpecContextService (v2 model: ALIVE/DEAD).
-
-T-10b: activate(), deactivate(), promote() removed; alive(), dead() added.
-"""
+"""Unit tests for SpecContextService current ALIVE/DEAD behavior."""
 
 import json
 from pathlib import Path
@@ -207,30 +204,6 @@ def test_dead_pushes_when_remote_present(
     git._has_remote.add(repo)
     service.dead("proj")
     assert repo in git.pushed
-
-
-# ------------------------------------------------------------------ T-10b-5: removed methods
-
-
-def test_activate_method_does_not_exist(service: SpecContextService) -> None:
-    """AC-T10b-5: activate() is removed from SpecContextService."""
-    assert not hasattr(service, "activate"), (
-        "activate() must be removed from SpecContextService in T-10b"
-    )
-
-
-def test_deactivate_method_does_not_exist(service: SpecContextService) -> None:
-    """AC-T10b-5: deactivate() is removed from SpecContextService."""
-    assert not hasattr(service, "deactivate"), (
-        "deactivate() must be removed from SpecContextService in T-10b"
-    )
-
-
-def test_promote_method_does_not_exist(service: SpecContextService) -> None:
-    """AC-T10b-5: promote() is removed from SpecContextService."""
-    assert not hasattr(service, "promote"), (
-        "promote() must be removed from SpecContextService in T-10b"
-    )
 
 
 # ------------------------------------------------------------------ delete

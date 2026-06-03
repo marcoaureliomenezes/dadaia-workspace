@@ -1,4 +1,4 @@
-"""Unit tests for StdlibHandoffValidator — 10 tests, TDD first-pass."""
+"""Unit tests for StdlibHandoffValidator."""
 
 from __future__ import annotations
 
