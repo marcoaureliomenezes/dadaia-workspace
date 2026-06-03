@@ -38,7 +38,7 @@ Voce pode autenticar por assinatura (`/login`) ou API key no ambiente.
 Exemplo API key:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY="your-api-key-here"
 pi
 ```
 
