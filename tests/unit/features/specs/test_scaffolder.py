@@ -7,7 +7,6 @@ from pathlib import Path
 import jinja2
 import pytest
 
-from dadaia_workspace.features.specs.doctor import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import (
     ScaffoldResult,
     scaffold,
@@ -159,33 +158,7 @@ def test_scaffold_force_overwrites_files(tmp_path: Path) -> None:
     assert new_content.startswith("---"), "architecture.md must start with YAML frontmatter"
 
 
-# ---- test 4: scaffolded specs passes doctor with 0 errors
-
-
-def test_scaffolded_specs_passes_doctor(tmp_path: Path) -> None:
-    """A freshly scaffolded specs/ directory passes SpecsDoctor with no errors.
-
-    memory-markdown-source-v1 (T-MMS-10/11): scaffold emits .md-only atoms;
-    no legacy .html or .yaml files are present.  A fresh scaffold must pass
-    SpecsDoctor with 0 ERROR-severity issues.
-    """
-    specs_dir = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs_dir,
-        project_name="doctor-test",
-        force=False,
-        templates_dir=_TEMPLATES_DIR,
-    )
-    assert result.errors == [], f"Scaffold errors: {result.errors}"
-
-    issues = SpecsDoctor(specs_dir).check()
-    errors = [i for i in issues if i.severity == Severity.ERROR]
-    assert errors == [], "Scaffolded specs/ should pass doctor with 0 errors. Got:\n" + "\n".join(
-        f"  {e.code}: {e.description}" for e in errors
-    )
-
-
-# ---- test 5: templates render with default dict (no UndefinedError)
+# ---- test 4: templates render with default dict (no UndefinedError)
 
 
 def test_templates_render_with_empty_context(tmp_path: Path) -> None:

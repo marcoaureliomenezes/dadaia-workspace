@@ -1,7 +1,5 @@
 """Unit tests for ClaudeRuntimeAdapter and CodexRuntimeAdapter.
 
-Panel-r5-v1 PR5-A5.
-
 Tests verify:
 - ClaudeRuntimeAdapter.enrich_row: sets cumulative_cost_usd and cost_known=True
   when cost is present; pricing.compute_cost is NOT called (cost is computed by
@@ -10,7 +8,7 @@ Tests verify:
   pricing.compute_cost is NOT called.
 - Both adapters satisfy the RuntimeAdapter protocol.
 - Liveness classification for ClaudeRuntimeAdapter (with filesystem fakes).
-- CodexRuntimeAdapter.liveness always returns "idle" in Phase A.
+- CodexRuntimeAdapter.liveness defaults to "idle" when no stronger signal exists.
 """
 
 from __future__ import annotations
@@ -554,15 +552,12 @@ def test_codex_liveness_unknown_session_returns_idle(tmp_path: pathlib.Path) -> 
 
 
 # ---------------------------------------------------------------------------
-# PR5-E2 — pricing.compute_cost NOT called for Codex enrich_row
+# Codex enrich_row must not call pricing.compute_cost
 # ---------------------------------------------------------------------------
 
 
 def test_codex_enrich_row_compute_cost_not_called_e2() -> None:
-    """PR5-E2: compute_cost must NEVER be called by CodexRuntimeAdapter.enrich_row.
-
-    This is the explicit guard documented in PR5-E2 Done criteria.
-    """
+    """compute_cost must never be called by CodexRuntimeAdapter.enrich_row."""
     adapter = CodexRuntimeAdapter()
     row = _make_row(runtime="codex", cumulative_cost_usd=None, cost_known=False)
 

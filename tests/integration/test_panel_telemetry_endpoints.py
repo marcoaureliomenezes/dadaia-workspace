@@ -166,9 +166,8 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
     def _stub_json(**kw: Any) -> tuple[int, str, bytes]:
         return (200, "application/json", b"{}")
 
-    # PR3-14: /api/workflows is now a bearer-only canonical-source view
-    # (no longer uses telemetry).  The integration test injects a stub that
-    # returns a minimal conforming payload so existing 200+shape assertions pass.
+    # /api/workflows is a bearer-only canonical-source view. The integration
+    # test injects a minimal conforming payload for existing 200+shape assertions.
     def _stub_workflows_list(**kw: Any) -> tuple[int, str, bytes]:
         import datetime as _dt
         import json as _json
@@ -207,7 +206,7 @@ def panel_server():
     port = server.server_address[1]
     base_url = f"http://127.0.0.1:{port}"
 
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
     thread.start()
 
     yield base_url, test_token, stub_tel

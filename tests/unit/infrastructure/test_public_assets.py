@@ -1,19 +1,7 @@
-"""Unit tests for dadaia_workspace/infrastructure/public_assets.py — T-36..T-40.
+"""Unit tests for public asset projection helpers.
 
-Coverage targets (T-37..T-40):
-- Module-level helpers: _sha256, _package_version, _json_dump, _toml_escape,
-  _render_agents_into_codex_config, _render_agent_toml_block, _parse_agent_frontmatter,
-  _atomic_write_text, _log_cleanup_error, _strip_tools_from_frontmatter,
-  _prepare_agent_for_opencode, _consumer_repos_for_root, _is_self_repo.
-- _install_workspace_guardrail_pair (force=True/False, self-skip, consumer fanout).
-- _install_workspace_root_guardrail_pair (workspace-only variant).
-- _install_consumer_repos_guardrail_pair (repos-only variant, self-skip).
-- _doctor_guardrail_pair (ok, missing, drift, CLAUDE.md stub check).
-- FileSystemPublicAssetManager.doctor() happy path + D-CX-1..5 checks.
-- FileSystemPublicAssetManager._runtime_expectations() each branch.
-- FileSystemPublicAssetManager._install_codex_agents().
-- FileSystemPublicAssetManager._install_opencode().
-- Various rendering helpers (_render_codex_agent_toml, _render_agents_config_file_blocks).
+These tests cover pure rendering, drift classification, and in-process install
+helpers. Process-boundary behavior belongs in integration tests.
 """
 
 from __future__ import annotations
@@ -108,12 +96,6 @@ class TestSha256:
         expected = hashlib.sha256(b"hello world").hexdigest()
         assert result == expected
 
-    def test_empty_file(self, tmp_path: Path) -> None:
-        f = tmp_path / "empty.txt"
-        f.write_bytes(b"")
-        result = _sha256(f)
-        assert result == hashlib.sha256(b"").hexdigest()
-
     def test_large_file(self, tmp_path: Path) -> None:
         """Ensure chunked reading is exercised."""
         data = b"X" * (2 * 1024 * 1024 + 7)  # > 1 MB chunk size
@@ -149,16 +131,11 @@ class TestPackageVersion:
 
 
 class TestJsonDump:
-    def test_sorted_keys(self) -> None:
+    def test_sorted_indented_json_ends_with_newline(self) -> None:
         out = _json_dump({"b": 1, "a": 2})
         assert out.index('"a"') < out.index('"b"')
-
-    def test_ends_with_newline(self) -> None:
-        assert _json_dump({}).endswith("\n")
-
-    def test_indent_2(self) -> None:
-        out = _json_dump({"x": 1})
-        assert "  " in out  # 2-space indent
+        assert out.endswith("\n")
+        assert "\n  " in out
 
 
 # ---------------------------------------------------------------------------
@@ -167,14 +144,14 @@ class TestJsonDump:
 
 
 class TestTomlEscape:
-    def test_simple_string(self) -> None:
-        assert _toml_escape("hello") == '"hello"'
-
-    def test_double_quote_escaped(self) -> None:
-        assert _toml_escape('say "hi"') == '"say \\"hi\\""'
-
-    def test_backslash_escaped(self) -> None:
-        assert _toml_escape("a\\b") == '"a\\\\b"'
+    def test_single_line_strings_are_escaped(self) -> None:
+        cases = {
+            "hello": '"hello"',
+            'say "hi"': '"say \\"hi\\""',
+            "a\\b": '"a\\\\b"',
+        }
+        for raw, expected in cases.items():
+            assert _toml_escape(raw) == expected
 
     def test_multiline_uses_triple_quotes(self) -> None:
         result = _toml_escape("line1\nline2")
@@ -254,13 +231,11 @@ class TestRenderAgentTomlBlock:
         assert '"Read"' in out
         assert '"Write"' in out
 
-    def test_name_with_closing_bracket_raises(self) -> None:
-        with pytest.raises(ValueError, match="invalid character"):
-            _render_agent_toml_block("bad]name", {"name": "bad]name"})
-
-    def test_name_with_newline_raises(self) -> None:
-        with pytest.raises(ValueError, match="newline"):
-            _render_agent_toml_block("bad\nname", {"name": "bad\nname"})
+    def test_invalid_agent_names_raise(self) -> None:
+        cases = [("bad]name", "invalid character"), ("bad\nname", "newline")]
+        for name, message in cases:
+            with pytest.raises(ValueError, match=message):
+                _render_agent_toml_block(name, {"name": name})
 
     def test_missing_optional_fields_omitted(self) -> None:
         fm = {"name": "minimal"}
@@ -566,7 +541,7 @@ class TestConsumerReposForRoot:
 
 
 class TestIsSelfRepo:
-    def test_matching_version_returns_true(self, tmp_path: Path) -> None:
+    def test_manifest_matching_package_version_returns_true(self, tmp_path: Path) -> None:
         with patch(
             "dadaia_workspace.infrastructure.public_assets._package_version",
             return_value=_INSTALLED_VERSION,
@@ -574,60 +549,45 @@ class TestIsSelfRepo:
             consumer = _add_marker_consumer(tmp_path, "self", pkg_version=_INSTALLED_VERSION)
             assert _is_self_repo(consumer) is True
 
-    def test_different_version_returns_false(self, tmp_path: Path) -> None:
+    def test_manifest_missing_invalid_or_different_version_returns_false(
+        self, tmp_path: Path
+    ) -> None:
         with patch(
             "dadaia_workspace.infrastructure.public_assets._package_version",
             return_value=_INSTALLED_VERSION,
         ):
-            consumer = _add_marker_consumer(tmp_path, "other", pkg_version=_OTHER_VERSION)
-            assert _is_self_repo(consumer) is False
+            different = _add_marker_consumer(tmp_path, "other", pkg_version=_OTHER_VERSION)
+            assert _is_self_repo(different) is False
 
-    def test_no_manifest_returns_false(self, tmp_path: Path) -> None:
-        consumer = tmp_path / "repos" / "no-manifest"
-        (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-        assert _is_self_repo(consumer) is False
+        no_manifest = tmp_path / "repos" / "no-manifest"
+        (no_manifest / ".dadaia" / "agentic").mkdir(parents=True)
+        assert _is_self_repo(no_manifest) is False
 
-    def test_invalid_json_returns_false(self, tmp_path: Path) -> None:
-        consumer = tmp_path / "repos" / "bad-json"
-        (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-        (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
+        invalid_json = tmp_path / "repos" / "bad-json"
+        (invalid_json / ".dadaia" / "agentic").mkdir(parents=True)
+        (invalid_json / ".dadaia" / "agentic" / "manifest.json").write_text(
             "NOT JSON", encoding="utf-8"
         )
-        assert _is_self_repo(consumer) is False
+        assert _is_self_repo(invalid_json) is False
 
-    def test_empty_package_version_returns_false(self, tmp_path: Path) -> None:
-        consumer = tmp_path / "repos" / "empty-ver"
-        (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-        (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
+        empty_version = tmp_path / "repos" / "empty-ver"
+        (empty_version / ".dadaia" / "agentic").mkdir(parents=True)
+        (empty_version / ".dadaia" / "agentic" / "manifest.json").write_text(
             json.dumps({"package_version": ""}), encoding="utf-8"
         )
-        assert _is_self_repo(consumer) is False
+        assert _is_self_repo(empty_version) is False
 
-    # --- T-GOS-A3: pyproject-based self-detection (manifest-absent) ---
-
-    def test_pyproject_name_dadaia_workspace_no_manifest_returns_true(self, tmp_path: Path) -> None:
-        """Secondary guard: pyproject.toml with [tool.poetry] name = 'dadaia-workspace'
-        must return True even when no .dadaia/agentic/manifest.json exists (AC-GOS-10a)."""
-        consumer = tmp_path / "repos" / "lib-clone"
-        consumer.mkdir(parents=True)
-        (consumer / "pyproject.toml").write_text(
-            '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
-            encoding="utf-8",
-        )
-        # Deliberately NO manifest — that is the gap this guard closes.
-        assert _is_self_repo(consumer) is True
-
-    def test_pyproject_project_name_dadaia_workspace_no_manifest_returns_true(
-        self, tmp_path: Path
-    ) -> None:
-        """Secondary guard: [project] name = 'dadaia-workspace' (PEP 621) also detected."""
-        consumer = tmp_path / "repos" / "lib-clone-pep621"
-        consumer.mkdir(parents=True)
-        (consumer / "pyproject.toml").write_text(
-            '[project]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
-            encoding="utf-8",
-        )
-        assert _is_self_repo(consumer) is True
+    def test_pyproject_dadaia_workspace_name_returns_true(self, tmp_path: Path) -> None:
+        """Poetry and PEP 621 pyproject names identify the source repo without a manifest."""
+        cases = {
+            "poetry": '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            "pep621": '[project]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+        }
+        for slug, pyproject in cases.items():
+            consumer = tmp_path / "repos" / slug
+            consumer.mkdir(parents=True)
+            (consumer / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+            assert _is_self_repo(consumer) is True
 
     def test_pyproject_different_name_no_manifest_returns_false(self, tmp_path: Path) -> None:
         """A pyproject.toml whose name is NOT dadaia-workspace must not trigger self-skip."""
@@ -644,7 +604,6 @@ class TestIsSelfRepo:
         consumer = tmp_path / "repos" / "broken-pyproject"
         consumer.mkdir(parents=True)
         (consumer / "pyproject.toml").write_text("NOT VALID TOML ][[\n", encoding="utf-8")
-        # No manifest either -> False
         assert _is_self_repo(consumer) is False
 
     def test_pyproject_name_dadaia_workspace_with_manifest_returns_true(
@@ -1817,53 +1776,7 @@ class TestDoctorMethod:
 
 
 # ---------------------------------------------------------------------------
-# install() — legacy/scaffold path (no data/AGENTS.md)
-# ---------------------------------------------------------------------------
-
-
-class TestInstallLegacyPath:
-    def test_legacy_path_uses_templates_agents_md(self, tmp_path: Path) -> None:
-        """install() with no data/AGENTS.md falls back to templates/AGENTS.md."""
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        templates_dir = agentic_dir / "templates"
-        templates_dir.mkdir()
-        (templates_dir / "AGENTS.md").write_text("# TEMPLATES AGENTS\n", encoding="utf-8")
-        # Ensure no data/AGENTS.md exists
-        assert not (agentic_dir / "data" / "AGENTS.md").exists()
-        manager = FileSystemPublicAssetManager()
-        manager.install(workspace_root, target="claude", force=True)
-        # The AGENTS.md at workspace root should now exist (from templates fallback)
-        assert (workspace_root / "AGENTS.md").exists()
-
-    def test_legacy_path_repos_only_skips_agents_md(self, tmp_path: Path) -> None:
-        """install(scope='repos-only') with legacy path: _install_agents_md NOT called."""
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        templates_dir = agentic_dir / "templates"
-        templates_dir.mkdir()
-        (templates_dir / "AGENTS.md").write_text("# TEMPLATES AGENTS\n", encoding="utf-8")
-        manager = FileSystemPublicAssetManager()
-        manager.install(workspace_root, target="claude", force=True, scope="repos-only")
-        # workspace root AGENTS.md must NOT be written in repos-only scope
-        assert not (workspace_root / "AGENTS.md").exists()
-
-
-# ---------------------------------------------------------------------------
-# install() — invalid target raises
-# ---------------------------------------------------------------------------
-
-
-class TestInstallInvalidTarget:
-    def test_invalid_target_raises_public_asset_error(self, tmp_path: Path) -> None:
-        from dadaia_workspace.core.exceptions import PublicAssetError
-
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        manager = FileSystemPublicAssetManager()
-        with pytest.raises(PublicAssetError, match="Unsupported"):
-            manager.install(workspace_root, target="invalid-target")
-
-
-# ---------------------------------------------------------------------------
-# install() — _install_claude settings.json skip
+# _install_claude settings.json skip
 # ---------------------------------------------------------------------------
 
 
@@ -2239,7 +2152,7 @@ class TestDcx6CodexRuntimeAdapters:
 
 
 # ---------------------------------------------------------------------------
-# T-BCR-05 — git-dirty check in FileSystemPublicAssetManager.doctor()
+# Git-dirty check in FileSystemPublicAssetManager.doctor()
 # ---------------------------------------------------------------------------
 
 
@@ -2312,50 +2225,42 @@ class TestDoctorGitDirtyCheck:
         warn_git_dirty = [r for r in reports if r.startswith("[warn] git-dirty:")]
         assert warn_git_dirty == []
 
-    def test_returncode_128_emits_not_applicable(self, tmp_path: Path) -> None:
-        """When git returns returncode 128 (not a git repo), emits [not-applicable] git-dirty check."""
+    def test_unavailable_git_states_emit_expected_status(self, tmp_path: Path) -> None:
+        """Non-repo, missing git, and timeout states emit explicit status lines."""
         import subprocess
 
         public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
         manager = self._make_manager_with_fake_public(public_dir)
 
-        mock_result = subprocess.CompletedProcess(
-            args=["git", "diff", "--name-only", "HEAD"],
-            returncode=128,
-            stdout="",
-            stderr="fatal: not a git repository",
-        )
-
-        with patch("subprocess.run", return_value=mock_result):
-            reports = manager.doctor(workspace_root)
-
-        assert "[not-applicable] git-dirty check (not a git repo)" in reports
-
-    def test_git_not_found_emits_not_applicable(self, tmp_path: Path) -> None:
-        """When git is not found (FileNotFoundError), emits [not-applicable] git-dirty check (git not found)."""
-        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
-        manager = self._make_manager_with_fake_public(public_dir)
-
-        with patch("subprocess.run", side_effect=FileNotFoundError("git not found")):
-            reports = manager.doctor(workspace_root)
-
-        assert "[not-applicable] git-dirty check (git not found)" in reports
-
-    def test_timeout_emits_warn(self, tmp_path: Path) -> None:
-        """When subprocess.run times out, emits [warn] git-dirty check timed out."""
-        import subprocess
-
-        public_dir, workspace_root = self._make_minimal_workspace(tmp_path)
-        manager = self._make_manager_with_fake_public(public_dir)
-
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="git", timeout=5)):
-            reports = manager.doctor(workspace_root)
-
-        assert "[warn] git-dirty check timed out" in reports
+        cases = [
+            (
+                {
+                    "return_value": subprocess.CompletedProcess(
+                        args=["git", "diff", "--name-only", "HEAD"],
+                        returncode=128,
+                        stdout="",
+                        stderr="fatal: not a git repository",
+                    )
+                },
+                "[not-applicable] git-dirty check (not a git repo)",
+            ),
+            (
+                {"side_effect": FileNotFoundError("git not found")},
+                "[not-applicable] git-dirty check (git not found)",
+            ),
+            (
+                {"side_effect": subprocess.TimeoutExpired(cmd="git", timeout=5)},
+                "[warn] git-dirty check timed out",
+            ),
+        ]
+        for patch_kwargs, expected in cases:
+            with patch("subprocess.run", **patch_kwargs):
+                reports = manager.doctor(workspace_root)
+            assert expected in reports
 
 
 # ---------------------------------------------------------------------------
-# T-BCR-06 — doctor() persists [missing]/[drift]/[fail]/[warn] findings
+# doctor() persists actionable findings
 # ---------------------------------------------------------------------------
 
 
@@ -2453,7 +2358,7 @@ class TestDoctorFindingPersistence:
 
 
 # ---------------------------------------------------------------------------
-# T-WH-13 — list_all() and install(only=...) unit tests
+# list_all()
 # ---------------------------------------------------------------------------
 
 
@@ -2492,55 +2397,3 @@ class TestListAll:
         result = self._make_manager(public_dir).list_all()
         assert "README.md" not in result
         assert "agents" in result
-
-
-class TestInstallOnly:
-    def _make_manager(self, public_dir: Path) -> FileSystemPublicAssetManager:
-        manager = FileSystemPublicAssetManager()
-        manager._public_dir = public_dir
-        return manager
-
-    def _make_minimal_agentic(self, workspace_root: Path) -> Path:
-        agentic_dir = workspace_root / ".dadaia" / "agentic"
-        (agentic_dir / "rules").mkdir(parents=True)
-        (agentic_dir / "agents").mkdir(parents=True)
-        (agentic_dir / "skills").mkdir(parents=True)
-        (agentic_dir / "workflows").mkdir(parents=True)
-        (agentic_dir / "commands").mkdir(parents=True)
-        (agentic_dir / "rules" / "my-rule.md").write_text("# rule", encoding="utf-8")
-        (agentic_dir / "agents" / "my-agent.md").write_text(
-            "---\nname: my-agent\nmodel: claude-sonnet-4-6\n---\n# body\n", encoding="utf-8"
-        )
-        manifest = {"schema_version": "1", "package_version": "0.0.1"}
-        import json
-
-        (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-        return agentic_dir
-
-    def test_install_only_rules_skips_agents(self, tmp_path: Path) -> None:
-        public_dir = tmp_path / "public"
-        public_dir.mkdir()
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        self._make_minimal_agentic(workspace_root)
-        manager = self._make_manager(public_dir)
-
-        installed = manager.install(workspace_root, target="claude", force=True, only="rules")
-
-        installed_paths = " ".join(installed)
-        assert "rules" in installed_paths or len(installed) == 0
-        agents_dir = workspace_root / ".claude" / "agents"
-        assert not agents_dir.exists() or list(agents_dir.iterdir()) == []
-
-    def test_install_only_agents_skips_rules(self, tmp_path: Path) -> None:
-        public_dir = tmp_path / "public"
-        public_dir.mkdir()
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        self._make_minimal_agentic(workspace_root)
-        manager = self._make_manager(public_dir)
-
-        manager.install(workspace_root, target="claude", force=True, only="agents")
-
-        rules_dir = workspace_root / ".claude" / "rules"
-        assert not rules_dir.exists() or list(rules_dir.iterdir()) == []

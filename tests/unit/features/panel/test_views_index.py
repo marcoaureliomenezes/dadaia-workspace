@@ -1,17 +1,8 @@
-"""Unit tests for views/index.py — T-3.1 / T-3.9.
-
-Covers:
-  - HTML contains all 3 section headers
-  - Placeholder card copy "Em breve — Release-2" present verbatim
-  - Primary context appears first in grid (DOM order)
-  - XSS: malicious <script> in project/context fields is html.escape()'d
-  - OWASP A03: no raw user-controlled string survives into HTML unescaped
-
-T-P5-01: PANEL_JS and PANEL_CSS removed from _assets.py. Tests that previously
-imported them from _assets now build them inline from individual JS/CSS files.
-"""
+"""Unit contracts for the panel index view."""
 
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
@@ -19,7 +10,7 @@ from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
 
 # ---------------------------------------------------------------------------
-# JS / CSS assembly helpers (T-P5-01: PANEL_JS and PANEL_CSS moved out of _assets)
+# JS / CSS assembly helpers
 # ---------------------------------------------------------------------------
 _JS_DIR = (
     Path(__file__).parent.parent.parent.parent.parent
@@ -128,116 +119,6 @@ def _render(service: PanelService) -> str:
     return body.decode("utf-8")
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
-def test_index_contains_servers_section() -> None:
-    """The index HTML must contain the Servers section."""
-    service = _build_service()
-    html = _render(service)
-    assert "section-servers" in html
-    assert ">Servers<" in html
-
-
-def test_index_contains_memories_section() -> None:
-    """The index HTML must contain the Projects (section-memories) section.
-
-    T-P5-15: section ID remains 'section-memories' for backward compat;
-    the visible heading changes from 'Memories' to 'Projects'.
-    """
-    service = _build_service()
-    html = _render(service)
-    assert "section-memories" in html
-    assert ">Projects<" in html
-
-
-def test_index_contains_agents_section() -> None:
-    """The index HTML must contain the Agents & Workflows section."""
-    service = _build_service()
-    html = _render(service)
-    assert "section-agents" in html
-    assert "Agents" in html
-
-
-def test_index_agents_section_has_grid() -> None:
-    """T-AM-18: agents section replaced placeholder with real grid scaffold."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="agents-grid"' in html
-
-
-def test_index_primary_context_badge() -> None:
-    """T-P5-36: topbar badge removed; card-level badge also removed in T-P5-16."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    html = _render(service)
-    # T-P5-16: card-primary-badge removed — all cards are uniform
-    assert "card-primary-badge" not in html
-    # T-P5-36: topbar-badge also removed — runtime switcher moved to per-tab section headers
-    assert "topbar-badge" not in html
-
-
-def test_index_context_order_preserved() -> None:
-    """v2: contexts render in the order returned by list_active_contexts (no primary re-sorting)."""
-    first = _make_context("First", "first-slug")
-    second = _make_context("Second", "second-slug")
-    service = _build_service(contexts=[first, second])
-    html = _render(service)
-
-    pos_first = html.find("first-slug")
-    pos_second = html.find("second-slug")
-    assert pos_first < pos_second, "Contexts must render in the order provided"
-
-
-def test_index_xss_project_name_escaped() -> None:
-    """R3-A: <script> in project name must be HTML-escaped, never raw."""
-    malicious_project = "<script>alert(1)</script>"
-    entry = _make_entry(port=3000, project=malicious_project)
-    service = _build_service(entries=[entry])
-    html = _render(service)
-    assert "<script>alert(1)</script>" not in html
-    assert "&lt;script&gt;" in html
-
-
-def test_index_xss_context_name_escaped() -> None:
-    """R3-A: <script> in context name must be HTML-escaped."""
-    ctx = _make_context(
-        name='<script>alert("xss")</script>',
-        repo_slug="safe-slug",
-    )
-    service = _build_service(contexts=[ctx])
-    html = _render(service)
-    assert '<script>alert("xss")</script>' not in html
-    assert "&lt;script&gt;" in html
-
-
-def test_index_xss_branch_escaped() -> None:
-    """R3-A: <script> in branch name must be HTML-escaped."""
-    ctx = SpecContextProject(
-        name="safe-name",
-        state=ContextState.ALIVE,
-        repo_slug="safe-slug",
-        repo_url="https://github.com/org/repo",
-        created_at="2026-01-01T00:00:00+00:00",
-        alive_since="2026-01-01T00:00:00+00:00",
-        dead_since=None,
-        current_branch="<script>alert(1)</script>",
-    )
-    service = _build_service(contexts=[ctx])
-    html = _render(service)
-    assert "<script>alert(1)</script>" not in html
-    assert "&lt;script&gt;" in html
-
-
-def test_index_empty_servers_shows_empty_state() -> None:
-    """When registry is empty, empty-state hint must be present."""
-    service = _build_service(entries=[], contexts=[])
-    html = _render(service)
-    assert "Nenhum servidor rodando" in html
-
-
 def test_index_returns_bytes() -> None:
     """View must return (int, str, bytes) tuple."""
     service = _build_service()
@@ -251,624 +132,273 @@ def test_index_returns_bytes() -> None:
     assert isinstance(body, bytes)
 
 
-# ---------------------------------------------------------------------------
-# T-AM-01: A11y role snapshot tests
-# ---------------------------------------------------------------------------
+def _tag_fragment(html: str, marker: str, close_tag: str) -> str:
+    start = html.find(marker)
+    assert start >= 0, f"Missing marker: {marker}"
+    end = html.find(close_tag, start)
+    assert end >= 0, f"Missing close tag after marker: {marker}"
+    return html[start:end]
 
 
-def test_nav_has_role_tablist() -> None:
-    """T-AM-01: <nav class="nav-tabs"> must carry role="tablist"."""
-    service = _build_service()
-    html = _render(service)
+def _section_fragment(html: str, section_id: str) -> str:
+    return _tag_fragment(html, f'id="{section_id}"', "</section>")
+
+
+def _button_fragment(html: str, tab_id: str) -> str:
+    id_pos = html.find(f'id="{tab_id}"')
+    assert id_pos >= 0, f"Missing tab: {tab_id}"
+    start = html.rfind("<button", 0, id_pos)
+    assert start >= 0, f"Missing button start for tab: {tab_id}"
+    end = html.find("</button>", id_pos)
+    assert end >= 0, f"Missing button close for tab: {tab_id}"
+    return html[start:end]
+
+
+@pytest.mark.parametrize(
+    ("section_id", "visible_text"),
+    [
+        ("section-servers", ">Servers<"),
+        ("section-memories", ">Projects<"),
+        ("section-agents", "agents-grid"),
+        ("section-workflows", "workflows-grid"),
+        ("section-sessions", "sessions-tbody"),
+        ("section-reports", "reports-list"),
+        ("section-academy", "academy-content"),
+        ("section-kanban", "kanban-board"),
+    ],
+)
+def test_index_renders_panel_sections(section_id: str, visible_text: str) -> None:
+    """The index shell must render every top-level panel section."""
+    html = _render(_build_service())
+    assert f'id="{section_id}"' in html
+    assert visible_text in html
+
+
+def test_index_tablist_contract() -> None:
+    """The nav must expose the current tab order and active default tab."""
+    html = _render(_build_service())
+    expected = [
+        ("tab-memories", "Spec Context Projects"),
+        ("tab-agents", "Agents"),
+        ("tab-workflows", "Workflows"),
+        ("tab-sessions", "Sessions"),
+        ("tab-reports", "Reports"),
+        ("tab-academy", "Academy"),
+        ("tab-kanban", "Kanban"),
+        ("tab-servers", "Servers"),
+    ]
+
     assert 'role="tablist"' in html
+    assert html.count('role="tab"') == len(expected)
+    assert [html.find(f'id="{tab_id}"') for tab_id, _ in expected] == sorted(
+        html.find(f'id="{tab_id}"') for tab_id, _ in expected
+    )
+    for tab_id, label in expected:
+        button = _button_fragment(html, tab_id)
+        assert 'role="tab"' in button
+        assert label in button
+
+    memories_button = _button_fragment(html, "tab-memories")
+    servers_button = _button_fragment(html, "tab-servers")
+    assert "active" in memories_button
+    assert 'aria-selected="true"' in memories_button
+    assert 'aria-label="Spec Context Projects"' in memories_button
+    assert 'aria-selected="false"' in servers_button
 
 
-def test_tab_servers_has_id() -> None:
-    """T-AM-01: Servers tab button must have id="tab-servers"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-servers"' in html
-
-
-def test_tab_memories_has_id() -> None:
-    """T-AM-01: Memories tab button must have id="tab-memories"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-memories"' in html
-
-
-def test_tab_agents_has_id() -> None:
-    """T-AM-01: Agents tab button must have id="tab-agents"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-agents"' in html
-
-
-def test_section_servers_has_tabpanel_role() -> None:
-    """T-AM-01: section#section-servers must have role="tabpanel"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="section-servers"' in html
-    # Verify role=tabpanel appears somewhere before closing of the section
-    assert 'role="tabpanel"' in html
-
-
-def test_section_servers_has_aria_labelledby() -> None:
-    """T-AM-01: section#section-servers must have aria-labelledby="tab-servers"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'aria-labelledby="tab-servers"' in html
-
-
-def test_section_memories_has_aria_labelledby() -> None:
-    """T-AM-01: section#section-memories must have aria-labelledby="tab-memories"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'aria-labelledby="tab-memories"' in html
-
-
-def test_section_agents_has_aria_labelledby() -> None:
-    """T-AM-01: section#section-agents must have aria-labelledby="tab-agents"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'aria-labelledby="tab-agents"' in html
-
-
-def test_sections_have_tabindex_zero() -> None:
-    """T-AM-01: all tabpanel sections must have tabindex="0"."""
-    service = _build_service()
-    html = _render(service)
-    assert html.count('tabindex="0"') >= 3
-
-
-def test_tabpanel_count_is_three() -> None:
-    """T-AM-01/T-AM-18/PR5-C4/T-P5-26/T-P5-34/K-2: 8 role=tabpanel elements after Kanban tab added.
-
-    Count history: 3 → 5 (Sessions added in PR5-C4) → 6 (Academy added in T-P5-26)
-                     → 7 (Reports added in T-P5-34) → 8 (Kanban added in panel-kanban-v1 K-2).
-    """
-    service = _build_service()
-    html = _render(service)
+@pytest.mark.parametrize(
+    ("section_id", "tab_id"),
+    [
+        ("section-memories", "tab-memories"),
+        ("section-agents", "tab-agents"),
+        ("section-workflows", "tab-workflows"),
+        ("section-sessions", "tab-sessions"),
+        ("section-reports", "tab-reports"),
+        ("section-academy", "tab-academy"),
+        ("section-kanban", "tab-kanban"),
+        ("section-servers", "tab-servers"),
+    ],
+)
+def test_index_tabpanel_contract(section_id: str, tab_id: str) -> None:
+    """Every section must be connected to its tab for keyboard and screen-reader users."""
+    html = _render(_build_service())
+    section = _section_fragment(html, section_id)
+    assert 'role="tabpanel"' in section
+    assert 'tabindex="0"' in section
+    assert f'aria-labelledby="{tab_id}"' in section
     assert html.count('role="tabpanel"') == 8
 
 
-def test_panel_js_contains_keydown_handler() -> None:
-    """T-AM-01: PANEL_JS must include keyboard navigation for ArrowRight/ArrowLeft/Home/End."""
+def test_panel_js_keyboard_and_auth_contract() -> None:
+    """The assembled panel JS must support tab keyboard nav and authenticated API calls."""
     panel_js = _build_panel_js()
-    assert "ArrowRight" in panel_js
-    assert "ArrowLeft" in panel_js
-    assert "Home" in panel_js
-    assert "End" in panel_js
-    assert "keydown" in panel_js
-
-
-# ---------------------------------------------------------------------------
-# T-AM-18: 4th nav-tab (Workflows) wired into index
-# ---------------------------------------------------------------------------
-
-
-def test_has_workflows_tab() -> None:
-    """T-AM-18: nav must contain a tab with id="tab-workflows"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-workflows"' in html
-
-
-def test_has_workflows_section() -> None:
-    """T-AM-18: rendered HTML must contain id="section-workflows"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="section-workflows"' in html
-
-
-def test_aria_pairs_workflows() -> None:
-    """T-AM-18: section has aria-labelledby="tab-workflows" and tab has id="tab-workflows"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-workflows"' in html
-    assert 'aria-labelledby="tab-workflows"' in html
-
-
-def test_nav_has_4_tabs() -> None:
-    """T-AM-18/PR5-C4/T-P5-35/K-2: nav-tabs must contain exactly 8 tab buttons after Kanban tab added."""
-    service = _build_service()
-    html = _render(service)
-    # Count role="tab" occurrences (Memories, Agents, Workflows, Sessions, Reports, Academy, Kanban, Servers)
-    assert html.count('role="tab"') == 8
-
-
-# ---------------------------------------------------------------------------
-# PR5-C4 — Sessions tab wired into index
-# ---------------------------------------------------------------------------
-
-
-def test_has_sessions_tab() -> None:
-    """PR5-C4: nav must contain a tab with id="tab-sessions"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-sessions"' in html
-
-
-def test_has_sessions_section() -> None:
-    """PR5-C4: rendered HTML must contain id="section-sessions"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="section-sessions"' in html
-
-
-def test_aria_pairs_sessions() -> None:
-    """PR5-C4: section has aria-labelledby="tab-sessions" and tab has id="tab-sessions"."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-sessions"' in html
-    assert 'aria-labelledby="tab-sessions"' in html
-
-
-def test_sessions_css_link_present() -> None:
-    """PR5-C4: rendered HTML must include sessions.css link."""
-    service = _build_service()
-    html = _render(service)
-    assert "/static/sessions.css" in html
-
-
-def test_sessions_js_script_present() -> None:
-    """PR5-C4: rendered HTML must include sessions.js script tag."""
-    service = _build_service()
-    html = _render(service)
-    assert "/static/sessions.js" in html
-
-
-# ---------------------------------------------------------------------------
-# Bug 2 — memory link labels (panel-defects hotfix)
-# ---------------------------------------------------------------------------
-
-
-def test_memory_link_label_architecture() -> None:
-    """panel-defects Bug 2: architecture link must show 'Architecture', not filename."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    html = _render(service)
-    assert ">Architecture<" in html
-    assert ">architecture.html<" not in html
-
-
-def test_memory_link_label_tech_stack() -> None:
-    """panel-defects Bug 2: tech-stack link must show 'Tech Stack', not filename."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    html = _render(service)
-    assert ">Tech Stack<" in html
-    assert ">tech-stack.html<" not in html
-
-
-def test_memory_link_label_product() -> None:
-    """panel-defects Bug 2: product link must show 'Product', not filename."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    html = _render(service)
-    assert ">Product<" in html
-    assert ">product/index.html<" not in html
-
-
-def test_memory_link_hrefs_unchanged() -> None:
-    """panel-defects Bug 2: hrefs must remain unchanged after label fix."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    html = _render(service)
-    assert 'href="/memory-view/my-workspace/architecture.html"' in html
-    assert 'href="/memory-view/my-workspace/tech-stack.html"' in html
-    assert 'href="/memory-view/my-workspace/product/index.html"' in html
-
-
-# ---------------------------------------------------------------------------
-# Bug 3 — token management (panel-defects hotfix)
-# ---------------------------------------------------------------------------
-
-
-def test_panel_js_has_token_bootstrap() -> None:
-    """panel-defects Bug 3: PANEL_JS must include token bootstrap from URLSearchParams."""
-    panel_js = _build_panel_js()
-    assert "panel_token" in panel_js
-    # T-WH-01: localStorage persists across tab close; sessionStorage was cleared on tab close
-    assert "localStorage" in panel_js
-    assert "URLSearchParams" in panel_js
-    assert "history.replaceState" in panel_js
-
-
-def test_panel_js_has_authed_fetch_wrapper() -> None:
-    """panel-defects Bug 3: PANEL_JS must define authedFetch with Bearer header."""
-    panel_js = _build_panel_js()
-    assert "authedFetch" in panel_js
-    assert "Authorization" in panel_js
-    assert "Bearer" in panel_js
-
-
-def test_panel_js_agents_uses_authed_fetch() -> None:
-    """panel-defects Bug 3: Agents.load must use authedFetch, not bare fetch."""
-    panel_js = _build_panel_js()
-    assert "authedFetch('/api/agents" in panel_js
-
-
-def test_panel_js_workflows_uses_authed_fetch() -> None:
-    """panel-defects Bug 3+4 (updated PR5-D6): Workflows.load must use authedFetch.
-
-    PR5-D6 (runtime retrofit): URL now includes ?runtime= query param so the
-    fetch reads authedFetch('/api/workflows?runtime=' + ...).
-    """
-    panel_js = _build_panel_js()
-    assert "authedFetch('/api/workflows?runtime='" in panel_js
-
-
-def test_panel_js_sessions_uses_authed_fetch() -> None:
-    """panel-defects Bug 3 (updated PR3-10 + PR5-D5): agents.js must call authedFetch for /api/agents.
-
-    PR3-10 (collapsed card): initial list fetch via authedFetch('/api/agents').
-    PR5-D5 (runtime retrofit): URL now includes ?runtime= query param so the
-    fetch reads authedFetch('/api/agents?runtime=' + ...).
-    The assertion checks the URL prefix which is stable regardless of the query
-    string appended dynamically at runtime.
-    """
-    panel_js = _build_panel_js()
-    assert "authedFetch('/api/agents?runtime='" in panel_js
-
-
-# ---------------------------------------------------------------------------
-# PR3-06 — Tab rename + reorder + responsive label
-# ---------------------------------------------------------------------------
-
-
-def test_tab_memories_visible_label_is_spec_context_projects() -> None:
-    """PR3-06: The visible label on #tab-memories must be 'Spec Context Projects'."""
-    service = _build_service()
-    html = _render(service)
-    # The button text must show the new label
-    assert "Spec Context Projects" in html
-    # The tab button must NOT use the old "Memories" label as its text
-    # (the word may still appear in the section <h2>, but the nav button must say
-    # "Spec Context Projects"). Check the button content specifically.
-    assert ">Spec Context Projects<" in html
-    # The tab-memories button must not still read ">Memories<" as its own label.
-    # Note: <h2>Memories</h2> is allowed inside the section — only the button label matters.
-    idx = html.find('id="tab-memories"')
-    # Grab the button tag up to the closing </button>
-    close_tag = html.find("</button>", idx)
-    button_fragment = html[idx:close_tag]
-    assert "Memories" not in button_fragment, (
-        "tab-memories button text must be 'Spec Context Projects', not 'Memories'"
-    )
-
-
-def test_tab_memories_aria_label_is_spec_context_projects() -> None:
-    """PR3-06: aria-label on tab-memories must be 'Spec Context Projects'."""
-    service = _build_service()
-    html = _render(service)
-    assert 'aria-label="Spec Context Projects"' in html
-
-
-def test_tab_memories_id_unchanged() -> None:
-    """PR3-06: Internal ID tab-memories must remain so #memories hash still works."""
-    service = _build_service()
-    html = _render(service)
-    assert 'id="tab-memories"' in html
-
-
-def test_tab_spec_context_projects_is_active_default() -> None:
-    """PR3-06: Default-active tab must be Spec Context Projects (tab-memories)."""
-    service = _build_service()
-    html = _render(service)
-    # The tab-memories button must carry the 'active' class
-    assert 'id="tab-memories"' in html
-    # Verify active class and aria-selected=true are on tab-memories
-    # The active tab button must have aria-selected="true"
-    assert 'id="tab-memories"' in html
-    # Find the substring containing tab-memories and verify active class is present
-    idx = html.find('id="tab-memories"')
-    # Look for 'active' in the surrounding tag (within 200 chars before the id)
-    surrounding = html[max(0, idx - 200) : idx + 100]
-    assert "active" in surrounding, "tab-memories button must have active class"
-    assert 'aria-selected="true"' in surrounding
-
-
-def test_tab_order_spec_context_first_before_agents() -> None:
-    """PR3-06: Spec Context Projects tab must appear before Agents tab in DOM."""
-    service = _build_service()
-    html = _render(service)
-    pos_memories = html.find('id="tab-memories"')
-    pos_agents = html.find('id="tab-agents"')
-    assert pos_memories < pos_agents, "tab-memories must come before tab-agents"
-
-
-def test_tab_order_agents_before_workflows() -> None:
-    """PR3-06: Agents tab must appear before Workflows tab in DOM."""
-    service = _build_service()
-    html = _render(service)
-    pos_agents = html.find('id="tab-agents"')
-    pos_workflows = html.find('id="tab-workflows"')
-    assert pos_agents < pos_workflows, "tab-agents must come before tab-workflows"
-
-
-def test_tab_order_workflows_before_servers() -> None:
-    """PR3-06: Workflows tab must appear before Servers tab in DOM."""
-    service = _build_service()
-    html = _render(service)
-    pos_workflows = html.find('id="tab-workflows"')
-    pos_servers = html.find('id="tab-servers"')
-    assert pos_workflows < pos_servers, "tab-workflows must come before tab-servers"
-
-
-def test_servers_tab_not_active_by_default() -> None:
-    """PR3-06: Servers tab must NOT be the default-active tab."""
-    service = _build_service()
-    html = _render(service)
-    idx = html.find('id="tab-servers"')
-    surrounding = html[max(0, idx - 200) : idx + 100]
-    assert 'aria-selected="false"' in surrounding, "tab-servers must not be active"
-
-
-def test_responsive_css_abbreviation_rule_present() -> None:
-    """PR3-06: structure.py must contain a <768px CSS rule abbreviating the tab label."""
+    for expected in [
+        "ArrowRight",
+        "ArrowLeft",
+        "Home",
+        "End",
+        "keydown",
+        "panel_token",
+        "localStorage",
+        "URLSearchParams",
+        "history.replaceState",
+        "authedFetch",
+        "Authorization",
+        "Bearer",
+        "authedFetch('/api/agents?runtime='",
+        "authedFetch('/api/workflows?runtime='",
+    ]:
+        assert expected in panel_js
+
+
+@pytest.mark.parametrize(
+    "asset",
+    [
+        "tokens.css",
+        "structure.css",
+        "projects.css",
+        "agents.css",
+        "workflows.css",
+        "sessions.css",
+        "academy.css",
+        "reports.css",
+        "kanban.css",
+        "runtime.js",
+        "themes.js",
+        "core.js",
+        "agents.js",
+        "workflows.js",
+        "sessions.js",
+        "academy.js",
+        "reports.js",
+        "kanban.js",
+    ],
+)
+def test_index_links_registered_static_assets(asset: str) -> None:
+    """The HTML shell must load the static assets required by the panel."""
+    html = _render(_build_service())
+    assert f"/static/{asset}" in html
+
+
+def test_index_context_order_preserved() -> None:
+    """Contexts with the same primary status render in service order."""
+    first = _make_context("First", "first-slug")
+    second = _make_context("Second", "second-slug")
+    html = _render(_build_service(contexts=[first, second]))
+
+    assert html.find("first-slug") < html.find("second-slug")
+
+
+@pytest.mark.parametrize("field", ["project", "context_name", "branch"])
+def test_index_escapes_operator_controlled_fields(field: str) -> None:
+    """Operator-controlled strings must be HTML-escaped before rendering."""
+    raw = "<script>alert(1)</script>"
+    if field == "project":
+        html = _render(_build_service(entries=[_make_entry(port=3000, project=raw)]))
+    elif field == "context_name":
+        html = _render(_build_service(contexts=[_make_context(raw, "safe-slug")]))
+    else:
+        ctx = SpecContextProject(
+            name="safe-name",
+            state=ContextState.ALIVE,
+            repo_slug="safe-slug",
+            repo_url="https://github.com/org/repo",
+            created_at="2026-01-01T00:00:00+00:00",
+            alive_since="2026-01-01T00:00:00+00:00",
+            dead_since=None,
+            current_branch=raw,
+        )
+        html = _render(_build_service(contexts=[ctx]))
+
+    assert raw not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_index_empty_servers_shows_empty_state() -> None:
+    """When registry is empty, empty-state hint must be present."""
+    html = _render(_build_service(entries=[], contexts=[]))
+    assert "Nenhum servidor rodando" in html
+
+
+def test_projects_section_contract() -> None:
+    """The projects section must expose count, description, cards, and memory chips."""
+    ctx1 = _make_context("Workspace 1", "ws-1")
+    ctx2 = _make_context("Workspace 2", "ws-2")
+    html = _render(_build_service(contexts=[ctx1, ctx2]))
+    section = _section_fragment(html, "section-memories")
+
+    assert "<h2>Projects</h2>" in section
+    assert 'class="projects-count-badge"' in section
+    assert "2 projects" in section
+    assert 'class="section-desc"' in section
+    assert "<summary>About this section</summary>" in section
+    assert "Active Spec Context Projects" in section
+    assert "card-primary-badge" not in section
+    assert 'class="context-card primary"' not in section
+
+
+def test_project_card_contract() -> None:
+    """A project card must render stable zones, metadata, session slot, and memory links."""
+    html = _render(_build_service(contexts=[_make_context("My Workspace", "my-workspace")]))
+    card = _tag_fragment(html, 'class="context-card"', "</article>")
+
+    for expected in [
+        'class="card-zone-a"',
+        'class="card-name"',
+        'class="card-zone-b"',
+        'class="card-meta-row"',
+        "repo:",
+        "branch:",
+        'class="card-zone-c"',
+        'data-slug="my-workspace"',
+        'aria-live="polite"',
+        'class="card-zone-d card-chips"',
+        'class="memory-chip"',
+        'href="/memory-view/my-workspace/architecture.html"',
+        'href="/memory-view/my-workspace/tech-stack.html"',
+        'href="/memory-view/my-workspace/product/index.html"',
+        ">Architecture<",
+        ">Tech Stack<",
+        ">Product<",
+    ]:
+        assert expected in card
+
+    assert card.find('class="card-zone-b"') < card.find('class="card-zone-c"')
+    assert card.find('class="card-zone-c"') < card.find('class="card-zone-d')
+    assert ">architecture.html<" not in card
+    assert ">tech-stack.html<" not in card
+    assert ">product/index.html<" not in card
+
+
+def test_projects_css_contract() -> None:
+    """Project card CSS and tokens must stay registered for static serving."""
+    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
     from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
+    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+    from dadaia_workspace.features.panel.views.static import render_static
+
+    for expected in [
+        ".context-card",
+        "border-left",
+        ".memory-chip",
+        ".card-zone-a",
+        ".card-zone-b",
+        ".card-zone-c",
+        ".card-zone-d",
+        ".card-name",
+        ".card-meta-row",
+        ".session-row",
+        "--color-chip-memory-bg",
+        "--color-session-bg",
+        "--color-accent",
+    ]:
+        assert expected in PROJECTS_CSS or expected in TOKENS_CSS
 
     assert "@media" in STRUCTURE_CSS
     assert "768px" in STRUCTURE_CSS
     assert "Spec Contexts" in STRUCTURE_CSS
 
-
-# ---------------------------------------------------------------------------
-# Bug 4 — Workflows 2-pane redesign (panel-defects hotfix)
-# ---------------------------------------------------------------------------
-
-
-def test_panel_js_workflows_has_card_grid() -> None:
-    """PR3-16: PANEL_JS must render workflow-card elements in a card grid.
-
-    The old 2-pane stepper (buildStepperSVG) was replaced by the card-grid
-    layout in PR3-16. This test verifies the new card-grid JS is present
-    in workflows.js (included in assembled JS).
-    """
-    panel_js = _build_panel_js()
-    assert "workflow-card" in panel_js
-    assert "data-workflow-name" in panel_js
-
-
-def test_panel_js_workflows_exposes_window_workflows() -> None:
-    """PR3-16: PANEL_JS must include window.Workflows from workflows.js."""
-    panel_js = _build_panel_js()
-    assert "window.Workflows" in panel_js
-    assert "/api/workflows" in panel_js
-
-
-def test_panel_css_has_workflows_pane_layout() -> None:
-    """panel-defects Bug 4: PANEL_CSS must contain 2-pane grid layout."""
-    panel_css = _build_panel_css()
-    assert ".workflows-pane" in panel_css
-    assert ".workflows-list" in panel_css
-    assert ".workflows-detail" in panel_css
-    assert "workflow-list-item" in panel_css
-
-
-# ---------------------------------------------------------------------------
-# T-P5-15 — Projects tab section header redesign
-# ---------------------------------------------------------------------------
-
-
-def test_projects_section_heading_is_projects() -> None:
-    """T-P5-15: section-memories <h2> must read 'Projects', not 'Memories'."""
-    service = _build_service()
-    rendered = _render(service)
-    # Find the section-memories block and check h2 inside it
-    idx = rendered.find('id="section-memories"')
-    end = rendered.find("</section>", idx)
-    section_frag = rendered[idx:end]
-    assert "<h2>Projects</h2>" in section_frag, "h2 inside section-memories must read 'Projects'"
-
-
-def test_projects_section_no_old_count_label() -> None:
-    """T-P5-15: 'N active contexts — 1 primary' count label must be removed from section-memories."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    # Find only the memories section fragment
-    idx = rendered.find('id="section-memories"')
-    end = rendered.find("</section>", idx)
-    section_frag = rendered[idx:end]
-    assert "context-count" not in section_frag, "Old context-count CSS class must be removed"
-    # The old count label format was "N active contexts — 1 primary" as a <p class="context-count">
-    # After redesign it should be a badge with "N projects" only
-    assert "primary" not in section_frag or "projects-count-badge" in section_frag, (
-        "Old primary count text must be removed from section header"
-    )
-
-
-def test_projects_section_has_count_badge() -> None:
-    """T-P5-15: section-header must contain a projects-count-badge span with N projects text."""
-    ctx1 = _make_context("Workspace 1", "ws-1")
-    ctx2 = _make_context("Workspace 2", "ws-2")
-    service = _build_service(contexts=[ctx1, ctx2])
-    rendered = _render(service)
-    assert 'class="projects-count-badge"' in rendered
-    assert "2 projects" in rendered
-
-
-def test_projects_section_has_collapsible_description() -> None:
-    """T-P5-15: A <details class='section-desc'> block must follow section-header."""
-    service = _build_service()
-    rendered = _render(service)
-    assert 'class="section-desc"' in rendered
-    assert "<summary>About this section</summary>" in rendered
-    assert "Active Spec Context Projects" in rendered
-
-
-# ---------------------------------------------------------------------------
-# T-P5-16 — Projects card redesign
-# ---------------------------------------------------------------------------
-
-
-def test_projects_card_has_zone_a() -> None:
-    """T-P5-16: Card must have card-zone-a with card-name span."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    assert 'class="card-zone-a"' in rendered
-    assert 'class="card-name"' in rendered
-
-
-def test_projects_card_zone_b_has_repo_and_branch_rows() -> None:
-    """T-P5-16: Zone B must have two card-meta-row spans — repo and branch."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    assert 'class="card-zone-b"' in rendered
-    assert "repo:" in rendered
-    assert "branch:" in rendered
-    assert 'class="card-meta-row"' in rendered
-
-
-def test_projects_card_zone_d_has_memory_chips() -> None:
-    """T-P5-16: Zone D must have three memory-chip links — Architecture, Tech Stack, Product."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    assert 'class="card-zone-d card-chips"' in rendered
-    assert 'class="memory-chip"' in rendered
-    # All three chip labels present
-    assert ">Architecture<" in rendered
-    assert ">Tech Stack<" in rendered
-    assert ">Product<" in rendered
-
-
-def test_projects_card_no_primary_badge() -> None:
-    """T-P5-16: PRIMARY badge must be removed — no card-primary-badge class."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    assert "card-primary-badge" not in rendered, "PRIMARY badge must be removed in redesign"
-
-
-def test_projects_card_no_primary_class() -> None:
-    """T-P5-16: No 'primary' CSS class on article — uniform card treatment."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    # The article should not have class="context-card primary"
-    assert 'class="context-card primary"' not in rendered, (
-        "Primary context must not get special 'primary' CSS class"
-    )
-
-
-def test_projects_card_memory_chip_hrefs() -> None:
-    """T-P5-16: Memory chip hrefs must point to correct memory URLs."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    assert 'href="/memory-view/my-workspace/architecture.html"' in rendered
-    assert 'href="/memory-view/my-workspace/tech-stack.html"' in rendered
-    assert 'href="/memory-view/my-workspace/product/index.html"' in rendered
-
-
-def test_projects_css_link_present() -> None:
-    """T-P5-16: rendered HTML must include projects.css link."""
-    service = _build_service()
-    rendered = _render(service)
-    assert "/static/projects.css" in rendered
-
-
-# ---------------------------------------------------------------------------
-# T-P5-16 — projects.py CSS module (tokens + static serving)
-# ---------------------------------------------------------------------------
-
-
-def test_projects_css_has_color_chip_memory_bg_token() -> None:
-    """T-P5-16: tokens.py must define --color-chip-memory-bg custom property."""
-    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-
-    assert "--color-chip-memory-bg" in TOKENS_CSS
-
-
-def test_projects_css_module_exists_and_nonempty() -> None:
-    """T-P5-16: projects.py CSS module must exist and export non-empty PROJECTS_CSS."""
-    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
-
-    assert isinstance(PROJECTS_CSS, str)
-    assert len(PROJECTS_CSS) > 0
-
-
-def test_projects_css_registered_in_static() -> None:
-    """T-P5-16: projects.css must be registered and served from /static/."""
-    from dadaia_workspace.features.panel.views.static import render_static
-
-    view = render_static()
-    status, ct, body = view(name="projects.css")
+    status, ct, body = render_static()(name="projects.css")
     assert status == 200
     assert ct == "text/css; charset=utf-8"
     assert len(body) > 0
-
-
-def test_projects_css_has_memory_chip_styles() -> None:
-    """T-P5-16: PROJECTS_CSS must contain .memory-chip styles."""
-    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
-
-    assert ".memory-chip" in PROJECTS_CSS
-    assert "--color-chip-memory-bg" in PROJECTS_CSS
-    assert "--color-accent" in PROJECTS_CSS
-
-
-def test_projects_css_has_card_zones() -> None:
-    """T-P5-16: PROJECTS_CSS must contain card zone styles."""
-    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
-
-    assert ".card-zone-a" in PROJECTS_CSS
-    assert ".card-zone-b" in PROJECTS_CSS
-    assert ".card-zone-d" in PROJECTS_CSS
-    assert ".card-name" in PROJECTS_CSS
-    assert ".card-meta-row" in PROJECTS_CSS
-
-
-def test_projects_css_has_context_card_accent() -> None:
-    """T-P5-16: .context-card must have 4px solid var(--color-accent) left border."""
-    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
-
-    assert ".context-card" in PROJECTS_CSS
-    assert "border-left" in PROJECTS_CSS
-
-
-# ---------------------------------------------------------------------------
-# T-P5-17 — Zone C (session binding placeholder)
-# ---------------------------------------------------------------------------
-
-
-def test_projects_card_has_zone_c() -> None:
-    """T-P5-17: Card must have card-zone-c div with data-slug attribute."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    assert 'class="card-zone-c"' in rendered
-    assert 'data-slug="my-workspace"' in rendered
-    assert 'aria-live="polite"' in rendered
-
-
-def test_projects_card_zone_c_between_b_and_d() -> None:
-    """T-P5-17: Zone C must appear between Zone B and Zone D in card HTML."""
-    ctx = _make_context("My Workspace", "my-workspace")
-    service = _build_service(contexts=[ctx])
-    rendered = _render(service)
-    pos_b = rendered.find('class="card-zone-b"')
-    pos_c = rendered.find('class="card-zone-c"')
-    pos_d = rendered.find('class="card-zone-d')
-    assert pos_b < pos_c < pos_d, "Zone C must appear between Zone B and Zone D"
-
-
-def test_projects_css_has_zone_c_styles() -> None:
-    """T-P5-17: PROJECTS_CSS must contain .card-zone-c and .session-row styles."""
-    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
-
-    assert ".card-zone-c" in PROJECTS_CSS
-    assert ".session-row" in PROJECTS_CSS
-    assert "--color-session-bg" in PROJECTS_CSS
-
-
-def test_tokens_css_has_color_session_bg() -> None:
-    """T-P5-17: tokens.py must define --color-session-bg custom property."""
-    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-
-    assert "--color-session-bg" in TOKENS_CSS

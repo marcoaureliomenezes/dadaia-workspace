@@ -61,6 +61,7 @@ def _wait_for_line(proc: subprocess.Popen[str], prefix: str, timeout: float = 5.
     return False
 
 
+@pytest.mark.slow(reason="spawns the panel CLI subprocess and waits for HTTP readiness")
 def test_panel_starts_serves_shuts_down_clean(workspace: Path) -> None:
     """Panel subprocess boots, serves /, shuts down on SIGINT, frees the port."""
     port = _free_port()
@@ -108,6 +109,7 @@ def test_panel_starts_serves_shuts_down_clean(workspace: Path) -> None:
         s.bind(("127.0.0.1", port))  # should not raise if port is free
 
 
+@pytest.mark.slow(reason="spawns the panel CLI subprocess to validate bind handling")
 def test_panel_bind_validation_rejects_non_loopback(workspace: Path) -> None:
     """--bind 0.0.0.0 exits with code 2 and prints the loopback error message."""
     result = subprocess.run(

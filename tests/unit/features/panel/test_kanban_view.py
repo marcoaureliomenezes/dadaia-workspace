@@ -1,4 +1,4 @@
-"""Unit tests for GET /api/kanban — AC-1.1 through AC-1.14.
+"""Unit tests for GET /api/kanban.
 
 Tests use:
 - ``tmp_path`` (pytest fixture) as the workspace root.
@@ -172,13 +172,8 @@ def _make_handler(
     )
 
 
-# ---------------------------------------------------------------------------
-# AC-1.1 — All four column keys present, each a list
-# ---------------------------------------------------------------------------
-
-
 def test_kanban_schema_all_four_columns_present(tmp_path: Path) -> None:
-    """AC-1.1: Response has research, spec, implementation, review keys; each is a list."""
+    """Response has swimlanes, generated_at, and all four column lists."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_001", mode="READ")
 
@@ -198,77 +193,12 @@ def test_kanban_schema_all_four_columns_present(tmp_path: Path) -> None:
         assert isinstance(columns[key], list), f"Column {key!r} is not a list"
 
 
-# ---------------------------------------------------------------------------
-# AC-1.2 — READ mode → research column
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_read_mode_lands_in_research_column(tmp_path: Path) -> None:
-    """AC-1.2: mode='READ' session appears in the research column."""
+def test_kanban_modes_land_in_expected_columns(tmp_path: Path) -> None:
+    """Supported session modes land in their expected kanban columns."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_read", mode="READ")
-
-    view = render_api_kanban(tmp_path)
-    status, _ct, body = view()
-
-    assert status == 200
-    data = json.loads(body)
-    columns = data["swimlanes"][0]["columns"]
-    assert len(columns["research"]) == 1
-    assert columns["research"][0]["session_id"] == "sess_read"
-    assert columns["research"][0]["mode"] == "READ"
-    for other in ("spec", "implementation", "review"):
-        assert columns[other] == []
-
-
-# ---------------------------------------------------------------------------
-# AC-1.3 — SPEC mode → spec column
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_spec_mode_lands_in_spec_column(tmp_path: Path) -> None:
-    """AC-1.3: mode='SPEC' session appears in the spec column."""
-    sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_spec", mode="SPEC")
-
-    view = render_api_kanban(tmp_path)
-    status, _ct, body = view()
-
-    assert status == 200
-    data = json.loads(body)
-    columns = data["swimlanes"][0]["columns"]
-    assert len(columns["spec"]) == 1
-    assert columns["spec"][0]["session_id"] == "sess_spec"
-
-
-# ---------------------------------------------------------------------------
-# AC-1.4 — BOUND_IMPLEMENTATION → implementation column
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_bound_implementation_lands_in_implementation_column(tmp_path: Path) -> None:
-    """AC-1.4: mode='BOUND_IMPLEMENTATION' session appears in the implementation column."""
-    sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_impl", mode="BOUND_IMPLEMENTATION")
-
-    view = render_api_kanban(tmp_path)
-    status, _ct, body = view()
-
-    assert status == 200
-    data = json.loads(body)
-    columns = data["swimlanes"][0]["columns"]
-    assert len(columns["implementation"]) == 1
-    assert columns["implementation"][0]["session_id"] == "sess_impl"
-
-
-# ---------------------------------------------------------------------------
-# AC-1.5 — BOUND_REVIEW → review column
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_bound_review_lands_in_review_column(tmp_path: Path) -> None:
-    """AC-1.5: mode='BOUND_REVIEW' session appears in the review column."""
-    sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_rev", mode="BOUND_REVIEW")
 
     view = render_api_kanban(tmp_path)
@@ -277,56 +207,32 @@ def test_kanban_bound_review_lands_in_review_column(tmp_path: Path) -> None:
     assert status == 200
     data = json.loads(body)
     columns = data["swimlanes"][0]["columns"]
-    assert len(columns["review"]) == 1
+    assert columns["research"][0]["session_id"] == "sess_read"
+    assert columns["research"][0]["mode"] == "READ"
+    assert columns["spec"][0]["session_id"] == "sess_spec"
+    assert columns["implementation"][0]["session_id"] == "sess_impl"
     assert columns["review"][0]["session_id"] == "sess_rev"
 
 
-# ---------------------------------------------------------------------------
-# AC-1.6 — Missing sessions dir → 200 with empty swimlanes
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_missing_sessions_dir_returns_200_empty(tmp_path: Path) -> None:
-    """AC-1.6: No .dadaia/sessions/ directory → 200, swimlanes is empty list."""
-    # Do NOT create the sessions directory.
-    assert not (tmp_path / ".dadaia" / "sessions").exists()
-
+def test_kanban_empty_or_missing_sessions_dir_returns_empty_swimlanes(tmp_path: Path) -> None:
+    """Missing or empty sessions directories return 200 with empty swimlanes."""
     view = render_api_kanban(tmp_path)
     status, _ct, body = view()
-
     assert status == 200
     data = json.loads(body)
     assert data["swimlanes"] == []
     assert "generated_at" in data
 
-
-# ---------------------------------------------------------------------------
-# AC-1.7 — Empty sessions dir → 200 with empty swimlanes
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_empty_sessions_dir_returns_200_empty(tmp_path: Path) -> None:
-    """AC-1.7: Sessions directory exists but contains no JSON files → 200, empty swimlanes."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     sessions_dir.mkdir(parents=True)
-    # Write a non-JSON file to confirm only *.json are parsed.
     (sessions_dir / "ignore.txt").write_text("not json", encoding="utf-8")
-
-    view = render_api_kanban(tmp_path)
     status, _ct, body = view()
-
     assert status == 200
-    data = json.loads(body)
-    assert data["swimlanes"] == []
+    assert json.loads(body)["swimlanes"] == []
 
 
-# ---------------------------------------------------------------------------
-# AC-1.8 — Stale session flagged is_stale=True
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_stale_session_flagged_is_stale_true(tmp_path: Path) -> None:
-    """AC-1.8: last_seen_at 10 minutes ago, ttl_seconds=180 → is_stale=True."""
+def test_kanban_stale_and_fresh_sessions_are_flagged(tmp_path: Path) -> None:
+    """Cards expose stale state according to last_seen_at and ttl_seconds."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     ten_min_ago = (
         (datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(minutes=10))
@@ -340,24 +246,6 @@ def test_kanban_stale_session_flagged_is_stale_true(tmp_path: Path) -> None:
         last_seen_at=ten_min_ago,
         ttl_seconds=180,
     )
-
-    view = render_api_kanban(tmp_path)
-    status, _ct, body = view()
-
-    assert status == 200
-    data = json.loads(body)
-    card = data["swimlanes"][0]["columns"]["research"][0]
-    assert card["is_stale"] is True
-
-
-# ---------------------------------------------------------------------------
-# AC-1.9 — Fresh session flagged is_stale=False
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_fresh_session_flagged_is_stale_false(tmp_path: Path) -> None:
-    """AC-1.9: last_seen_at 30 s ago, ttl_seconds=300 → is_stale=False."""
-    sessions_dir = tmp_path / ".dadaia" / "sessions"
     thirty_sec_ago = (
         (datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(seconds=30))
         .isoformat()
@@ -376,17 +264,13 @@ def test_kanban_fresh_session_flagged_is_stale_false(tmp_path: Path) -> None:
 
     assert status == 200
     data = json.loads(body)
-    card = data["swimlanes"][0]["columns"]["research"][0]
-    assert card["is_stale"] is False
-
-
-# ---------------------------------------------------------------------------
-# AC-1.10 — Unknown mode → no 500, card in research (fail-safe)
-# ---------------------------------------------------------------------------
+    cards = {c["session_id"]: c for c in data["swimlanes"][0]["columns"]["research"]}
+    assert cards["sess_stale"]["is_stale"] is True
+    assert cards["sess_fresh"]["is_stale"] is False
 
 
 def test_kanban_unknown_mode_excluded_or_surfaced(tmp_path: Path) -> None:
-    """AC-1.10: Unknown mode → graceful (no 500); card placed in research column."""
+    """Unknown mode is handled gracefully and appears in the fail-safe research column."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_unknown", mode="SOMETHING_WEIRD")
 
@@ -403,32 +287,23 @@ def test_kanban_unknown_mode_excluded_or_surfaced(tmp_path: Path) -> None:
     assert columns["research"][0]["mode"] == "SOMETHING_WEIRD"
 
 
-# ---------------------------------------------------------------------------
-# AC-1.11 — POST /api/kanban → 405
-# ---------------------------------------------------------------------------
-
-
 def test_kanban_post_not_allowed(tmp_path: Path) -> None:
-    """AC-1.11: POST /api/kanban → 405 Method Not Allowed."""
+    """POST /api/kanban returns 405 Method Not Allowed."""
     handler_class = _make_handler(tmp_path, loopback_bypass=True)
     status, _body = _dispatch_post(handler_class, "/api/kanban")
     assert status == 405
 
 
-# ---------------------------------------------------------------------------
-# AC-1.12 — Corrupt JSON file skipped, valid session appears
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_malformed_session_file_skipped(tmp_path: Path) -> None:
-    """AC-1.12: Corrupt JSON file is silently skipped; valid session still appears."""
+def test_kanban_invalid_session_files_skipped(tmp_path: Path) -> None:
+    """Corrupt files and files missing required fields are skipped."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write a corrupt JSON file.
     (sessions_dir / "corrupt.json").write_text("{not valid json", encoding="utf-8")
-
-    # Write a valid session file.
+    (sessions_dir / "sess_bad.json").write_text(
+        json.dumps({"session_id": "sess_bad", "mode": "READ"}),
+        encoding="utf-8",
+    )
     _write_session(sessions_dir, session_id="sess_valid", mode="READ")
 
     view = render_api_kanban(tmp_path)
@@ -436,55 +311,29 @@ def test_kanban_malformed_session_file_skipped(tmp_path: Path) -> None:
 
     assert status == 200
     data = json.loads(body)
-    # Valid session appears; corrupt file is skipped.
     assert len(data["swimlanes"]) == 1
     columns = data["swimlanes"][0]["columns"]
     assert len(columns["research"]) == 1
     assert columns["research"][0]["session_id"] == "sess_valid"
 
 
-# ---------------------------------------------------------------------------
-# AC-1.13 — loopback_bypass=False, no token → 401
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_requires_auth_non_loopback(tmp_path: Path) -> None:
-    """AC-1.13: loopback_bypass=False, no Authorization header → 401."""
+def test_kanban_auth_enforced_unless_loopback_bypass(tmp_path: Path) -> None:
+    """Auth is required without loopback bypass and skipped with loopback bypass."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_auth", mode="READ")
 
     handler_class = _make_handler(tmp_path, loopback_bypass=False, token=_TEST_TOKEN)
-
-    # No token supplied.
     status, body = _dispatch_get(handler_class, "/api/kanban")
 
     assert status == 401
     assert b"unauthorized" in body
 
-
-# ---------------------------------------------------------------------------
-# AC-1.14 — loopback_bypass=True → 200 without Authorization header
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_no_auth_required_loopback_bind(tmp_path: Path) -> None:
-    """AC-1.14: loopback_bypass=True → 200 without Authorization header."""
-    sessions_dir = tmp_path / ".dadaia" / "sessions"
-    _write_session(sessions_dir, session_id="sess_loop", mode="READ")
-
     handler_class = _make_handler(tmp_path, loopback_bypass=True, token=_TEST_TOKEN)
-
-    # No token supplied.
     status, body = _dispatch_get(handler_class, "/api/kanban")
 
     assert status == 200
     data = json.loads(body)
     assert "swimlanes" in data
-
-
-# ---------------------------------------------------------------------------
-# Extra: SessionCard shape validation
-# ---------------------------------------------------------------------------
 
 
 def test_kanban_session_card_shape(tmp_path: Path) -> None:
@@ -517,11 +366,6 @@ def test_kanban_session_card_shape(tmp_path: Path) -> None:
     assert isinstance(card["is_stale"], bool)
 
 
-# ---------------------------------------------------------------------------
-# Extra: Multiple contexts → multiple swimlanes sorted by context name
-# ---------------------------------------------------------------------------
-
-
 def test_kanban_multiple_contexts_sorted(tmp_path: Path) -> None:
     """Multiple contexts produce multiple swimlanes sorted alphabetically."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
@@ -539,11 +383,6 @@ def test_kanban_multiple_contexts_sorted(tmp_path: Path) -> None:
     assert contexts[-1] == "z-project"
 
 
-# ---------------------------------------------------------------------------
-# Extra: Cards within a column sorted by session_id
-# ---------------------------------------------------------------------------
-
-
 def test_kanban_cards_sorted_by_session_id(tmp_path: Path) -> None:
     """Cards within a column are sorted by session_id for deterministic output."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
@@ -557,32 +396,3 @@ def test_kanban_cards_sorted_by_session_id(tmp_path: Path) -> None:
     cards = data["swimlanes"][0]["columns"]["research"]
     ids = [c["session_id"] for c in cards]
     assert ids == sorted(ids), "Cards must be sorted by session_id"
-
-
-# ---------------------------------------------------------------------------
-# Extra: Missing required field → session skipped
-# ---------------------------------------------------------------------------
-
-
-def test_kanban_session_missing_required_field_skipped(tmp_path: Path) -> None:
-    """A session file missing a required field (context) is silently skipped."""
-    sessions_dir = tmp_path / ".dadaia" / "sessions"
-    sessions_dir.mkdir(parents=True, exist_ok=True)
-
-    # File missing the 'context' field.
-    bad = {"session_id": "sess_bad", "mode": "READ"}
-    (sessions_dir / "sess_bad.json").write_text(json.dumps(bad), encoding="utf-8")
-
-    # Write a valid session alongside.
-    _write_session(sessions_dir, session_id="sess_good", mode="READ")
-
-    view = render_api_kanban(tmp_path)
-    status, _ct, body = view()
-
-    assert status == 200
-    data = json.loads(body)
-    # Only the valid session is in the output.
-    all_cards = [c for lane in data["swimlanes"] for col in lane["columns"].values() for c in col]
-    ids = [c["session_id"] for c in all_cards]
-    assert "sess_good" in ids
-    assert "sess_bad" not in ids

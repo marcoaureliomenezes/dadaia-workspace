@@ -92,9 +92,26 @@ pip-wheel-metadata/
 .ipynb_checkpoints/
 *.ipynb
 
-# Maintainer SDD release ledger remains local, but product law and memory are public.
-# `specs/constitution.md` and `specs/memory/**` are first-class repository truth.
+# SDD product law and release gates are repository truth.
+# Keep broad specs/ ignore as a privacy backstop, then opt in only canonical
+# lifecycle artifacts that the gate, doctor, and agents must see in review/CI.
 /specs/*
 !/specs/constitution.md
 !/specs/memory/
 !/specs/memory/**
+!/specs/releases/
+!/specs/releases/ACTIVE.md
+!/specs/releases/*/
+/specs/releases/*/*
+!/specs/releases/*/SPEC.md
+!/specs/releases/*/PLAN.md
+!/specs/releases/*/TASKS.md
+!/specs/releases/*/CLOSURE.md
+!/specs/_archive/
+!/specs/_archive/releases/
+!/specs/_archive/releases/*/
+/specs/_archive/releases/*/*
+!/specs/_archive/releases/*/SPEC.md
+!/specs/_archive/releases/*/PLAN.md
+!/specs/_archive/releases/*/TASKS.md
+!/specs/_archive/releases/*/CLOSURE.md

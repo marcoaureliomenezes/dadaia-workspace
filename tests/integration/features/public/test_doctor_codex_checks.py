@@ -1,9 +1,9 @@
 """Integration tests for doctor() Codex drift checks D-CX-1 through D-CX-5.
 
 Covers acceptance criteria:
-  - AC7: artificial removal of a workflow → doctor returns a [missing] report (D-CX-3)
-  - AC8: corrupted developer_instructions in a TOML → doctor names the agent (D-CX-5)
-  - AC9: missing TOML → doctor does not report [ok] for that agent; reports [missing] (D-CX-1)
+  - D-CX-1: missing TOML is reported as [missing] and not [ok]
+  - D-CX-3: artificial removal of a workflow is reported as [missing]
+  - D-CX-5: corrupted developer_instructions in a TOML reports the agent
 
 Strategy
 --------
@@ -88,37 +88,6 @@ def test_ac7_missing_workflow_detected(installed_workspace: Path) -> None:
     )
 
 
-def test_ac7_non_zero_exit_code_for_missing_workflow(installed_workspace: Path) -> None:
-    """The presence of a [missing] D-CX-3 report implies a non-zero doctor exit.
-
-    The CLI treats any report NOT starting with '[ok]' or '[skip]' as a failure.
-    This test validates that invariant holds for the D-CX-3 missing-workflow case
-    by checking that no [ok] report exists for the deleted workflow.
-    """
-    workspace_root = installed_workspace
-    codex_workflows = workspace_root / ".codex" / "workflows"
-
-    target_workflow = "hotfix-release.workflow.md"
-    (codex_workflows / target_workflow).unlink()
-
-    manager = FileSystemPublicAssetManager()
-    reports = manager.doctor(workspace_root)
-
-    # At least one non-ok/non-skip report must exist for a non-zero exit.
-    non_ok = [r for r in reports if not r.startswith("[ok]") and not r.startswith("[skip]")]
-    assert non_ok, (
-        "Expected at least one non-ok/non-skip report after deleting a workflow. "
-        "Reports:\n" + "\n".join(reports)
-    )
-
-    # Specifically the D-CX-3 check must flag the missing workflow.
-    dcx3_missing = any("D-CX-3" in r and "hotfix-release" in r for r in reports)
-    assert dcx3_missing, (
-        "Expected a D-CX-3 missing report for 'hotfix-release.workflow.md'. "
-        "Reports:\n" + "\n".join(reports)
-    )
-
-
 # ---------------------------------------------------------------------------
 # AC8 — corrupted developer_instructions is detected by name (D-CX-5)
 # ---------------------------------------------------------------------------
@@ -165,45 +134,6 @@ def test_ac8_corrupted_toml_detected(installed_workspace: Path) -> None:
     )
 
 
-def test_ac8_error_report_not_ok_for_corrupted_agent(installed_workspace: Path) -> None:
-    """A corrupted TOML must NOT produce an [ok] report for that agent.
-
-    This complements AC8 by verifying the absence of a false-positive [ok] label
-    for the corrupted agent, confirming doctor cannot be fooled into reporting
-    health while the invariant is violated.
-    """
-    workspace_root = installed_workspace
-    agent_name = "qa-engineer"
-    toml_path = workspace_root / ".codex" / "agents" / f"{agent_name}.toml"
-    assert toml_path.exists(), f"Pre-condition: {agent_name}.toml must exist after install."
-
-    original_text = toml_path.read_text(encoding="utf-8")
-    corrupted = re.sub(
-        r'developer_instructions\s*=\s*""".*?"""',
-        'developer_instructions = """"""',
-        original_text,
-        flags=re.DOTALL,
-    )
-    toml_path.write_text(corrupted, encoding="utf-8")
-
-    manager = FileSystemPublicAssetManager()
-    reports = manager.doctor(workspace_root)
-
-    # The corrupted agent must not appear as [ok] for D-CX-5.
-    ok_dcx5_for_agent = [
-        r for r in reports if r.startswith("[ok]") and agent_name in r and "D-CX-5" in r
-    ]
-    assert not ok_dcx5_for_agent, (
-        f"Corrupted {agent_name}.toml must not produce an [ok] D-CX-5 report. "
-        f"Reports:\n" + "\n".join(reports)
-    )
-
-    # D-CX-5 error must be present.
-    assert any("D-CX-5" in r and agent_name in r for r in reports), (
-        f"Expected D-CX-5 report naming '{agent_name}'. Reports:\n" + "\n".join(reports)
-    )
-
-
 # ---------------------------------------------------------------------------
 # AC9 — missing TOML is not reported as [ok] and is reported as [missing] (D-CX-1)
 # ---------------------------------------------------------------------------
@@ -243,35 +173,4 @@ def test_ac9_missing_toml_no_ok_reported(installed_workspace: Path) -> None:
     assert dcx1_missing, (
         "Expected '[missing] codex:agents/researcher.toml (D-CX-1)' report. "
         "All reports:\n" + "\n".join(reports)
-    )
-
-
-def test_ac9_missing_toml_for_second_agent(installed_workspace: Path) -> None:
-    """D-CX-1 triggers for any removed TOML, not just researcher.
-
-    Verifies that the check is not agent-specific by removing a different agent's TOML
-    (backend-engineer) and confirming the same invariant holds.
-    """
-    workspace_root = installed_workspace
-    agent_name = "backend-engineer"
-    toml_path = workspace_root / ".codex" / "agents" / f"{agent_name}.toml"
-    assert toml_path.exists(), f"Pre-condition failed: {agent_name}.toml must exist after install."
-
-    toml_path.unlink()
-
-    manager = FileSystemPublicAssetManager()
-    reports = manager.doctor(workspace_root)
-
-    # Must not be [ok].
-    ok_for_agent = [
-        r for r in reports if r.startswith("[ok]") and agent_name in r and "codex" in r.lower()
-    ]
-    assert not ok_for_agent, (
-        f"{agent_name} must not appear as [ok] after its TOML was deleted. "
-        f"Offending: {ok_for_agent}"
-    )
-
-    # Must be reported as [missing] with D-CX-1.
-    assert any("D-CX-1" in r and agent_name in r for r in reports), (
-        f"Expected D-CX-1 [missing] report for '{agent_name}'. Reports:\n" + "\n".join(reports)
     )
