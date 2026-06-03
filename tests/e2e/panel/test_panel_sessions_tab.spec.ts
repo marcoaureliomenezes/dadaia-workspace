@@ -665,7 +665,7 @@ const REAL_WORKFLOWS_SECTION_HTML = `<section id="section-workflows" class="sect
     <p class="section-meta" id="workflows-meta" aria-live="polite"></p>
   </header>
   <p id="workflows-empty" class="empty-state" hidden>Nenhum workflow descoberto.</p>
-  <div id="workflows-grid" class="workflows-card-grid" aria-busy="false" aria-label="Workflow cards"></div>
+  <div id="workflows-grid" class="workflows-card-grid" aria-busy="false"></div>
   <nav class="workflows-list" aria-label="Workflow list" id="workflows-list" hidden></nav>
   <div class="workflows-detail" id="workflows-detail" role="region" aria-label="Workflow detail" aria-live="polite" hidden></div>
 </section>`;
