@@ -6,7 +6,6 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$DEFAULT_WORKSPACE_ROOT}"
-STATE_FILE="$WORKSPACE_ROOT/.dadaia/states/primary_context.json"
 
 # ---------------------------------------------------------------------------
 # Resolve context name and SPECS_DIR (preserve existing logic).
@@ -20,16 +19,10 @@ if [ -n "$DADAIA_CONTEXT" ]; then
         echo "[$DADAIA_CONTEXT] WARNING: specs not found"
         exit 0
     fi
-elif [ -f "$STATE_FILE" ]; then
-    CONTEXT_NAME=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('name',''))" 2>/dev/null)
-    if [ -z "$CONTEXT_NAME" ]; then
-        echo "[context: none] — run: eval \$(dadaia context use <name>)"
-        exit 0
-    fi
-    SPECS_DIR="$WORKSPACE_ROOT/repos/$CONTEXT_NAME/specs"
-    echo "[$CONTEXT_NAME]"
 else
-    echo "[context: none] — run: eval \$(dadaia context use <name>)"
+    echo "[context: none] — no context bound."
+    echo "  To bind a context: eval \$(.dadaia/.venv/bin/dadaia context bind <name> --mode read)"
+    echo "  Then export DADAIA_CONTEXT in the shell that launches your agent runtime."
     exit 0
 fi
 
@@ -71,26 +64,26 @@ touch "$SENTINEL"
 
 # ---------------------------------------------------------------------------
 # Emit bounded memory bootstrap block.
+# tech-stack.md and product/index.md are read verbatim — no strip pass needed.
 # ---------------------------------------------------------------------------
-STRIP="$SCRIPT_DIR/strip-memory-html.py"
 
 echo ""
 echo "=== workspace memory (tech + catalog) ==="
 
-# Tech stack
-TECH_FILE="$MEMORY_DIR/tech-stack.html"
+# Tech stack — read .md verbatim (T-MMS-07: no strip pass needed for markdown)
+TECH_FILE="$MEMORY_DIR/tech-stack.md"
 if [ -f "$TECH_FILE" ]; then
-    python3 "$STRIP" "$TECH_FILE"
+    cat "$TECH_FILE"
 fi
 
-# Catalog: prefer catalog.json (machine-readable, no stripping needed);
-# fall back to stripped product/index.html if catalog.json absent (AC-C1-4).
+# Catalog: prefer catalog.json (machine-readable, generated from frontmatter);
+# fall back to product/index.md verbatim when catalog.json is absent (T-MMS-07).
 CATALOG_JSON="$MEMORY_DIR/product/catalog.json"
-PRODUCT_INDEX="$MEMORY_DIR/product/index.html"
+PRODUCT_INDEX_MD="$MEMORY_DIR/product/index.md"
 if [ -f "$CATALOG_JSON" ]; then
     cat "$CATALOG_JSON"
-elif [ -f "$PRODUCT_INDEX" ]; then
-    python3 "$STRIP" "$PRODUCT_INDEX"
+elif [ -f "$PRODUCT_INDEX_MD" ]; then
+    cat "$PRODUCT_INDEX_MD"
 fi
 
 echo "=== end memory bootstrap ==="

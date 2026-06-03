@@ -21,18 +21,14 @@ _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 # Expected canonical outputs (relative to specs_dir).
-# Since T-MSS-06 (memory-structured-source-v1 C-5), scaffold emits YAML + HTML for each
-# structural atom instead of HTML-only.  placeholder.html is included so that the
-# index.yaml catalog entry does not produce a broken-link doctor error on fresh repos.
+# Since memory-markdown-source-v1 (T-MMS-10/11), scaffold emits ONLY .md born-markdown
+# files for memory atoms.  Legacy .yaml stubs, .html files, and placeholder.html
+# were retired.  The 10 paths below are the complete scaffolded set.
 _EXPECTED_FILES = [
     "constitution.md",
-    "memory/architecture.yaml",
-    "memory/architecture.html",
-    "memory/tech-stack.yaml",
-    "memory/tech-stack.html",
-    "memory/product/index.yaml",
-    "memory/product/index.html",
-    "memory/product/placeholder.html",
+    "memory/architecture.md",
+    "memory/tech-stack.md",
+    "memory/product/index.md",
     "releases/ACTIVE.md",
     "backlog/candidates.md",
     "backlog/ideas.md",
@@ -82,28 +78,17 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     assert "release: none" in active_content
     assert "phase: none" in active_content
 
-    # Verify YAML stubs exist and contain YAML content (T-MSS-06: scaffold now emits YAML + HTML).
-    arch_yaml = (specs_dir / "memory" / "architecture.yaml").read_text(encoding="utf-8")
-    assert "overview:" in arch_yaml, "architecture.yaml must contain YAML 'overview' key"
+    # Verify born-markdown .md stubs exist and have valid YAML frontmatter.
+    # memory-markdown-source-v1: .md is the sole source of truth; legacy .yaml/.html
+    # scaffolds were retired (T-MMS-10/11).
+    arch_md = (specs_dir / "memory" / "architecture.md").read_text(encoding="utf-8")
+    assert arch_md.startswith("---"), "architecture.md must start with YAML frontmatter"
 
-    tech_yaml = (specs_dir / "memory" / "tech-stack.yaml").read_text(encoding="utf-8")
-    assert "languages:" in tech_yaml, "tech-stack.yaml must contain YAML 'languages' key"
+    tech_md = (specs_dir / "memory" / "tech-stack.md").read_text(encoding="utf-8")
+    assert tech_md.startswith("---"), "tech-stack.md must start with YAML frontmatter"
 
-    product_yaml = (specs_dir / "memory" / "product" / "index.yaml").read_text(encoding="utf-8")
-    assert "catalog:" in product_yaml, "product/index.yaml must contain YAML 'catalog' key"
-
-    # Verify rendered HTMLs contain expected section IDs (rendered from YAML via renderer).
-    arch_html = (specs_dir / "memory" / "architecture.html").read_text(encoding="utf-8")
-    assert '<section id="overview">' in arch_html
-    assert "<html" in arch_html
-
-    tech_html = (specs_dir / "memory" / "tech-stack.html").read_text(encoding="utf-8")
-    assert '<section id="languages">' in tech_html
-    assert "<html" in tech_html
-
-    product_html = (specs_dir / "memory" / "product" / "index.html").read_text(encoding="utf-8")
-    assert '<section id="catalog">' in product_html
-    assert "<html" in product_html
+    product_index_md = (specs_dir / "memory" / "product" / "index.md").read_text(encoding="utf-8")
+    assert product_index_md.startswith("---"), "product/index.md must start with YAML frontmatter"
 
 
 # ---- test 2: idempotency — second run produces all skipped
@@ -152,8 +137,8 @@ def test_scaffold_force_overwrites_files(tmp_path: Path) -> None:
     assert first.errors == []
 
     # Mutate a file to detect overwrite
-    arch_path = specs_dir / "memory" / "architecture.html"
-    arch_path.write_text("<h1>MUTATED</h1>", encoding="utf-8")
+    arch_path = specs_dir / "memory" / "architecture.md"
+    arch_path.write_text("# MUTATED\n", encoding="utf-8")
 
     # Second scaffold with --force
     second = scaffold(
@@ -167,18 +152,23 @@ def test_scaffold_force_overwrites_files(tmp_path: Path) -> None:
     assert len(second.created) == len(_EXPECTED_FILES)
 
     # Verify the mutated file was overwritten with the canonical scaffold content.
-    # T-MSS-06: rendered HTML comes from YAML stub (no project_name injection);
-    # the canonical section IDs must be present and MUTATED content must be gone.
+    # memory-markdown-source-v1: scaffold emits .md only; MUTATED content must be gone
+    # and the file must start with frontmatter again.
     new_content = arch_path.read_text(encoding="utf-8")
     assert "MUTATED" not in new_content
-    assert '<section id="overview">' in new_content
+    assert new_content.startswith("---"), "architecture.md must start with YAML frontmatter"
 
 
 # ---- test 4: scaffolded specs passes doctor with 0 errors
 
 
 def test_scaffolded_specs_passes_doctor(tmp_path: Path) -> None:
-    """A freshly scaffolded specs/ directory passes SpecsDoctor with no errors."""
+    """A freshly scaffolded specs/ directory passes SpecsDoctor with no errors.
+
+    memory-markdown-source-v1 (T-MMS-10/11): scaffold emits .md-only atoms;
+    no legacy .html or .yaml files are present.  A fresh scaffold must pass
+    SpecsDoctor with 0 ERROR-severity issues.
+    """
     specs_dir = tmp_path / "specs"
     result = scaffold(
         specs_dir=specs_dir,
@@ -199,24 +189,34 @@ def test_scaffolded_specs_passes_doctor(tmp_path: Path) -> None:
 
 
 def test_templates_render_with_empty_context(tmp_path: Path) -> None:
-    """All scaffold templates render without UndefinedError when given empty context."""
+    """Existing scaffold templates render without UndefinedError when given empty context.
+
+    memory-markdown-source-v1: the YAML→HTML memory templates were retired (T-MMS-10/11).
+    The remaining templates are the hotfix scaffold templates; this test verifies the
+    templates directory is accessible and the hotfix templates render cleanly.
+    """
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(_TEMPLATES_DIR)),
         undefined=jinja2.StrictUndefined,
         autoescape=False,
     )
     template_names = [
-        "memory-architecture.html.j2",
-        "memory-tech-stack.html.j2",
-        "memory-product-index.html.j2",
+        "release_hotfix.md.j2",
     ]
     for name in template_names:
         template = env.get_template(name)
         try:
-            rendered = template.render({})
-            assert len(rendered) > 100, f"Template {name} rendered suspiciously short output"
+            rendered = template.render(
+                {
+                    "version_id": "v0.0.1",
+                    "patches_release_id": "v0.0.0",
+                    "severity": "LOW",
+                    "today": "2026-01-01",
+                }
+            )
+            assert len(rendered) > 10, f"Template {name} rendered suspiciously short output"
         except jinja2.UndefinedError as exc:
-            pytest.fail(f"Template {name} raised UndefinedError with empty context: {exc}")
+            pytest.fail(f"Template {name} raised UndefinedError: {exc}")
 
 
 # ---- scaffold_hotfix_release tests

@@ -1,4 +1,8 @@
-"""Unit tests for dadaia_workspace.features.specs.catalog (T-MCE-01)."""
+"""Unit tests for dadaia_workspace.features.specs.catalog (T-MCE-01).
+
+Adapted for memory-markdown-source-v1: catalog.py now reads YAML frontmatter
+from *.md feature atom files (not index.html scraping).
+"""
 
 from __future__ import annotations
 
@@ -10,75 +14,74 @@ import pytest
 from dadaia_workspace.features.specs.catalog import generate_catalog, write_catalog
 
 # ---------------------------------------------------------------------------
-# Fixtures: HTML fragments used across tests
+# Helpers — build .md atoms with frontmatter
 # ---------------------------------------------------------------------------
 
-_INDEX_HTML_3_ENTRIES = """\
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Product</title>
-</head>
-<body>
-<h1>Product Memory — test-project</h1>
-<section id="catalog">
-  <h2>Feature catalog</h2>
-  <ol class="catalog">
-    <li><a href="workspace-init.html">workspace-init</a><span class="desc">— entry point; creates .dadaia/.</span></li>
-    <li><a href="context-management.html">context-management</a><span class="desc">— multi-context lifecycle.</span></li>
-    <li><a href="specs-doctor.html">specs-doctor</a><span class="desc">— structural validation checks.</span></li>
-  </ol>
-</section>
-</body>
-</html>
+_FRONTMATTER_TEMPLATE = """\
+---
+slug: {slug}
+title: {title}
+category: product
+tldr: '{tldr}'
+summary: '{summary}'
+tags: {tags}
+agent_tier: self-pull
+token_estimate: 100
+last_updated: '2026-06-01'
+release_origin: test-release
+---
+
+## Propósito
+
+{purpose}
 """
 
-_INDEX_HTML_EMPTY_CATALOG = """\
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Product</title></head>
-<body>
-<h1>Product Memory</h1>
-<ol class="catalog">
-</ol>
-</body>
-</html>
-"""
-
-_INDEX_HTML_NO_CATALOG_OL = """\
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Product</title></head>
-<body>
-<h1>Product Memory</h1>
-<ol>
-  <li><a href="workspace-init.html">workspace-init</a></li>
-</ol>
-</body>
-</html>
-"""
-
-_FEATURE_HTML = """\
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Feature</title></head>
-<body><h1>Feature</h1><p>Content.</p></body>
-</html>
-"""
+_ATOMS_3 = [
+    {
+        "slug": "workspace-init",
+        "title": "workspace-init",
+        "tldr": "entry point; creates .dadaia/.",
+        "summary": "entry point; creates .dadaia/.",
+        "tags": "[]",
+        "purpose": "Bootstraps the workspace.",
+    },
+    {
+        "slug": "context-management",
+        "title": "context-management",
+        "tldr": "multi-context lifecycle.",
+        "summary": "multi-context lifecycle.",
+        "tags": "[]",
+        "purpose": "Manages contexts.",
+    },
+    {
+        "slug": "specs-doctor",
+        "title": "specs-doctor",
+        "tldr": "structural validation checks.",
+        "summary": "structural validation checks.",
+        "tags": "[]",
+        "purpose": "Validates specs.",
+    },
+]
 
 
-def _make_specs_dir(tmp_path: Path, index_html: str = _INDEX_HTML_3_ENTRIES) -> Path:
-    """Create a minimal specs/ directory with the given index.html content."""
+def _write_atom(product_dir: Path, atom: dict[str, str]) -> Path:
+    md_path = product_dir / f"{atom['slug']}.md"
+    md_path.write_text(_FRONTMATTER_TEMPLATE.format(**atom), encoding="utf-8")
+    return md_path
+
+
+def _make_specs_dir(tmp_path: Path, atoms: list[dict[str, str]] | None = None) -> Path:
+    """Create a minimal specs/ directory with .md feature atom files."""
     specs = tmp_path / "specs"
     product_dir = specs / "memory" / "product"
     product_dir.mkdir(parents=True)
-    (product_dir / "index.html").write_text(index_html, encoding="utf-8")
+    for atom in atoms or _ATOMS_3:
+        _write_atom(product_dir, atom)
     return specs
 
 
 # ---------------------------------------------------------------------------
-# T-MCE-01-1: Valid parse produces N entries with all 7 required fields
+# T-MCE-01-1: Valid parse produces N entries with all required fields
 # ---------------------------------------------------------------------------
 
 
@@ -98,19 +101,17 @@ class TestGenerateCatalogValidParse:
         specs = _make_specs_dir(tmp_path)
         catalog = generate_catalog(specs)
         ts = catalog["generated_at"]
-        # Must parse as a valid datetime
         parsed = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
         assert parsed is not None
 
     def test_context_is_parent_directory_name(self, tmp_path: Path) -> None:
-        # Create specs inside a known directory name
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
         specs = project_dir / "specs"
-        (specs / "memory" / "product").mkdir(parents=True)
-        (specs / "memory" / "product" / "index.html").write_text(
-            _INDEX_HTML_3_ENTRIES, encoding="utf-8"
-        )
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+        for atom in _ATOMS_3:
+            _write_atom(product_dir, atom)
         catalog = generate_catalog(specs)
         assert catalog["context"] == "my-project"
 
@@ -119,8 +120,20 @@ class TestGenerateCatalogValidParse:
         catalog = generate_catalog(specs)
         assert len(catalog["features"]) == 3
 
-    def test_each_entry_has_all_seven_fields(self, tmp_path: Path) -> None:
-        required_fields = {"rank", "slug", "title", "summary", "path", "tags", "depends_on"}
+    def test_each_entry_has_all_required_fields(self, tmp_path: Path) -> None:
+        required_fields = {
+            "rank",
+            "slug",
+            "title",
+            "category",
+            "tldr",
+            "summary",
+            "path",
+            "tags",
+            "token_estimate",
+            "agent_tier",
+            "depends_on",
+        }
         specs = _make_specs_dir(tmp_path)
         catalog = generate_catalog(specs)
         for entry in catalog["features"]:
@@ -134,17 +147,16 @@ class TestGenerateCatalogValidParse:
         for i, entry in enumerate(features, start=1):
             assert entry["rank"] == i
 
-    def test_tags_and_depends_on_are_empty_lists(self, tmp_path: Path) -> None:
+    def test_tags_and_depends_on_are_lists(self, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
         features = generate_catalog(specs)["features"]
         for entry in features:
-            assert entry["tags"] == []
-            assert entry["depends_on"] == []
+            assert isinstance(entry["tags"], list)
+            assert isinstance(entry["depends_on"], list)
 
     def test_result_is_json_serialisable(self, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
         catalog = generate_catalog(specs)
-        # Must not raise
         serialised = json.dumps(catalog)
         reparsed = json.loads(serialised)
         assert reparsed["features"][0]["rank"] == 1
@@ -156,19 +168,19 @@ class TestGenerateCatalogValidParse:
 
 
 class TestSlugPathConsistency:
-    def test_slug_matches_href_stem(self, tmp_path: Path) -> None:
+    def test_slug_matches_frontmatter_slug(self, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
         features = generate_catalog(specs)["features"]
-        expected_slugs = ["workspace-init", "context-management", "specs-doctor"]
-        for entry, expected_slug in zip(features, expected_slugs, strict=True):
-            assert entry["slug"] == expected_slug
+        expected_slugs = sorted(a["slug"] for a in _ATOMS_3)
+        actual_slugs = sorted(e["slug"] for e in features)
+        assert actual_slugs == expected_slugs
 
     def test_path_contains_slug(self, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
         features = generate_catalog(specs)["features"]
         for entry in features:
-            assert entry["path"].endswith(f"/{entry['slug']}.html"), (
-                f"path {entry['path']!r} does not end with /{entry['slug']}.html"
+            assert entry["path"].endswith(f"/{entry['slug']}.md"), (
+                f"path {entry['path']!r} does not end with /{entry['slug']}.md"
             )
 
     def test_path_prefix_is_specs_memory_product(self, tmp_path: Path) -> None:
@@ -190,48 +202,49 @@ class TestSlugPathConsistency:
 
 
 # ---------------------------------------------------------------------------
-# T-MCE-01-3: Missing index.html raises a clear error
+# T-MCE-01-3: Missing product directory → clear error
 # ---------------------------------------------------------------------------
 
 
-class TestMissingIndexHtml:
+class TestMissingProductDir:
     def test_raises_file_not_found(self, tmp_path: Path) -> None:
         specs = tmp_path / "specs"
         specs.mkdir()
-        with pytest.raises(FileNotFoundError, match="index.html"):
+        with pytest.raises(FileNotFoundError):
             generate_catalog(specs)
 
-    def test_error_message_includes_path(self, tmp_path: Path) -> None:
+    def test_error_message_includes_product(self, tmp_path: Path) -> None:
         specs = tmp_path / "specs"
         specs.mkdir()
         with pytest.raises(FileNotFoundError) as exc_info:
             generate_catalog(specs)
-        assert "index.html" in str(exc_info.value)
+        assert "product" in str(exc_info.value).lower()
 
 
 # ---------------------------------------------------------------------------
-# T-MCE-01-4: Empty catalog <ol> → empty features list
+# T-MCE-01-4: Empty product/ → empty features list
 # ---------------------------------------------------------------------------
 
 
 class TestEmptyCatalog:
-    def test_empty_ol_produces_empty_features(self, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path, index_html=_INDEX_HTML_EMPTY_CATALOG)
+    def test_empty_product_dir_produces_empty_features(self, tmp_path: Path) -> None:
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+        # Write only index.md (which is excluded from feature discovery)
+        (product_dir / "index.md").write_text(
+            "---\nslug: index\n---\n\n## Index\n", encoding="utf-8"
+        )
         catalog = generate_catalog(specs)
         assert catalog["features"] == []
 
     def test_envelope_fields_still_present_when_empty(self, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path, index_html=_INDEX_HTML_EMPTY_CATALOG)
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
         catalog = generate_catalog(specs)
         assert "generated_at" in catalog
         assert "context" in catalog
-        assert catalog["features"] == []
-
-    def test_ol_without_catalog_class_is_ignored(self, tmp_path: Path) -> None:
-        """An <ol> without class="catalog" must NOT be parsed."""
-        specs = _make_specs_dir(tmp_path, index_html=_INDEX_HTML_NO_CATALOG_OL)
-        catalog = generate_catalog(specs)
-        # The plain <ol> (no catalog class) has one entry but should not be picked up
         assert catalog["features"] == []
 
 
@@ -254,7 +267,8 @@ class TestWriteCatalog:
         catalog = generate_catalog(specs)
         out_path = write_catalog(specs, catalog)
         reparsed = json.loads(out_path.read_text(encoding="utf-8"))
-        assert reparsed["features"][0]["slug"] == "workspace-init"
+        first_slug = reparsed["features"][0]["slug"]
+        assert first_slug in {a["slug"] for a in _ATOMS_3}
 
     def test_output_ends_with_newline(self, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)
@@ -269,18 +283,12 @@ class TestWriteCatalog:
         out1 = write_catalog(specs, catalog)
         out2 = write_catalog(specs, catalog)
         assert out1 == out2
-        # Content should be identical (same catalog)
-        text1 = out1.read_text(encoding="utf-8")
-        # Re-generate to check content stability (generated_at may differ by a second)
-        reparsed = json.loads(text1)
-        assert reparsed["features"][0]["slug"] == "workspace-init"
+        reparsed = json.loads(out1.read_text(encoding="utf-8"))
+        assert len(reparsed["features"]) == 3
 
     def test_no_trailing_commas_in_json(self, tmp_path: Path) -> None:
-        """stdlib json.dumps never produces trailing commas — verify the file
-        round-trips cleanly (no JSON parse errors)."""
         specs = _make_specs_dir(tmp_path)
         catalog = generate_catalog(specs)
         out_path = write_catalog(specs, catalog)
-        # json.loads will raise if there are trailing commas or syntax errors
         parsed = json.loads(out_path.read_text(encoding="utf-8"))
         assert isinstance(parsed, dict)

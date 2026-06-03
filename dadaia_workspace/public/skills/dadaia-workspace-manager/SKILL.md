@@ -71,7 +71,7 @@ dadaia context activate <name>               # clone repo, checkout stored branc
 dadaia context deactivate <name>             # git sync + push + remove repo; stores current_branch
 dadaia context promote <name>                # set is_primary=true, write primary_context.json
 dadaia context delete <name>                 # delete context record (must be inativo first)
-dadaia context use <name>                    # eval $(dadaia context use <name>) — session isolation
+eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode read)   # bind context; exports DADAIA_CONTEXT into launching shell
 ```
 
 ### Supporting commands

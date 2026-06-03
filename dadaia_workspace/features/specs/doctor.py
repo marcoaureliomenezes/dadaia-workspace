@@ -1,27 +1,26 @@
-"""SpecsDoctor — structural validation for SDD release-lifecycle specs (HTML memory).
+"""SpecsDoctor — structural validation for SDD release-lifecycle specs (Markdown memory).
 
-Runs the 11 structural checks defined in release `sdd-release-lifecycle-v1`,
-extended for the product memory folder catalog (release `Product Memory Feature
-Catalog v1`) and the D-OC-1 orchestration registry coherence invariant, plus
-the 7 TREE invariants from release `spec-context-tree-v2`, plus the CAT-1
-catalog sync check from release `memory-context-enforcement-v1`, plus the
-STRUCT-1..STRUCT-4 and SYNC-1 checks from release `memory-structured-source-v1`:
+Runs the structural checks defined in release `sdd-release-lifecycle-v1`,
+extended for the product memory folder catalog and the D-OC-1 orchestration
+registry coherence invariant, plus the 7 TREE invariants from release
+`spec-context-tree-v2`, plus the CAT-1 catalog sync check from release
+`memory-context-enforcement-v1`, plus the LINT-1 check from release
+`memory-markdown-source-v1`:
 
   1. specs/constitution.md exists
-  2. specs/memory/architecture.html and tech-stack.html exist, parseable, with non-empty
-     <h1>; specs/memory/product/index.html exists (folder catalog entry); legacy
-     product.html at memory/ root reported as error; broken <a href> links from
-     product/index.html reported as error
+  2. specs/memory/architecture.md and tech-stack.md exist with non-empty first
+     heading; specs/memory/product/index.md exists (folder catalog entry); legacy
+     product.html at memory/ root reported as error; stray .html atoms flagged as
+     legacy; broken [[slug]] wikilinks from product/*.md reported as warning
   3. specs/releases/ACTIVE.md exists, parseable, phase canonical
   4. active release has SPEC+PLAN+TASKS with Status: Aprovado (warn if Draft + phase != ARCHIVED)
   5. PLAN <= 300 lines (warning <= 2026-05-16; error >= 2026-05-17)
   6. each _archive/releases/<id>/ has CLOSURE.md with 4 mandatory sections + >=1 evidence triple
   7. no SPEC/PLAN/TASKS outside releases/*/ or _archive/releases/*/ (warn during legacy window)
-  8. no <section class="changelog"> or <h2> matching Changelog|History|Histórico|Versions? in any memory HTML
-     (skipped for atoms that have a valid YAML source — schema enforces it structurally, D-5)
+  8. no ## heading matching Changelog|History|Histórico|Versions? in any memory .md body
   9. release id in ACTIVE.md corresponds to a real directory
- 10. every <img src> in any memory HTML resolves to a real file
- 11. memory HTML containing <pre class="mermaid"> has the Mermaid CDN <script>
+ 10. (reserved — HTML image-link check retired with HTML atoms)
+ 11. (reserved — HTML mermaid-script check retired with HTML atoms)
  D-OC-1. bidirectional orchestration registry coherence (requires public_dir):
      - Forward: every Tier-1 name → workflow file exists; every Tier-2 name → playbook
        heading exists in SKILL.md.
@@ -30,27 +29,19 @@ STRUCT-1..STRUCT-4 and SYNC-1 checks from release `memory-structured-source-v1`:
 TREE invariants (spec-context-tree-v2):
   TREE-1. specs/foundation/ exists → WARN-ONLY (migration: dadaia migrate tree-v2)
   TREE-2. specs/SPEC.md at tree root → WARN-ONLY (migration: dadaia migrate tree-v2)
-  TREE-3. memory/architecture.html | tech-stack.html | product/index.html absent → AUTO-FIX
+  TREE-3. memory/architecture.md | tech-stack.md | product/index.md absent → WARNING
   TREE-4. backlog/ | bugs/ | releases/ absent → AUTO-FIX (create dir + README.md + .gitkeep)
   TREE-5. specs/AGENTS.md absent or hash differs from canonical template → WARN-ONLY (drift)
   TREE-6. releases/<id>/ missing mandatory SDD artifact for its phase → NO AUTO-FIX
   TREE-7. bugs/<slug>.md missing session_id frontmatter field → NO AUTO-FIX
 
 CAT-1 (memory-context-enforcement-v1):
-  CAT-1. catalog.json absent when feature HTMLs exist → WARNING
-         catalog.json present but slugs ↔ HTML files out of sync → WARNING (per slug/file)
+  CAT-1. catalog.json absent when feature .md atoms exist → WARNING
+         catalog.json present but slugs ↔ .md files out of sync → WARNING (per slug/file)
 
-STRUCT checks (memory-structured-source-v1 / C-3):
-  STRUCT-1. specs/memory/architecture.yaml is invalid against memory-architecture-v1 schema → ERROR
-  STRUCT-2. specs/memory/tech-stack.yaml is invalid against memory-tech-stack-v1 schema → ERROR
-  STRUCT-3. specs/memory/product/index.yaml is invalid against memory-product-index-v1 schema → ERROR
-  STRUCT-4. any specs/memory/product/<slug>.yaml is invalid against memory-product-feature-v1 → ERROR
-  YAML-absent guard: atom HTML present but no YAML source → WARN (not error); migration hint included.
-  Retire #8: when atom has a valid YAML source, skip check #8 (schema structurally guarantees atomicity).
-
-SYNC-1 (memory-structured-source-v1 / C-3):
-  SYNC-1. committed HTML diverges from renderer output for a YAML-source atom → WARN (not error)
-          (PE may be mid-edit; WARN allows working states; exact atom(s) named in message).
+LINT-1 (memory-markdown-source-v1):
+  LINT-1. frontmatter/schema violations in .md atoms → ERROR
+          token_estimate drift > 20% in .md atoms → WARNING
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
@@ -59,13 +50,14 @@ from __future__ import annotations
 
 import hashlib
 import re
+import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from html.parser import HTMLParser
 from pathlib import Path
 
-import jinja2
 import yaml
 
 CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
@@ -86,10 +78,10 @@ BACKLOG_HOTFIX_RE = re.compile(
     r"^- (\d{4}-\d{2}-\d{2}T\d{6}Z) (LOW|MEDIUM|HIGH|CRITICAL) ([\w\-/]+) — .+ \(post-mortem: .+\)$"
 )
 FORBIDDEN_MEMORY_H2_RE = re.compile(r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE)
-# Top-level memory files (still single HTML).
-TOPLEVEL_MEMORY_FILES = ("architecture.html", "tech-stack.html")
-# Product memory is a folder catalog: index.html is required + 0..N feature HTMLs.
-PRODUCT_INDEX_REL = "product/index.html"
+# Top-level memory files (.md canonical source).
+TOPLEVEL_MEMORY_FILES = ("architecture.md", "tech-stack.md")
+# Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
+PRODUCT_INDEX_REL = "product/index.md"
 HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
 
@@ -133,11 +125,12 @@ _HOTFIX_STALE_HOURS = 72
 # TREE invariant constants (spec-context-tree-v2)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# TREE-3: memory files that must exist; each maps to its Jinja template name.
-_TREE3_MEMORY_TEMPLATES: tuple[tuple[str, str], ...] = (
-    ("architecture.html", "memory-architecture.html.j2"),
-    ("tech-stack.html", "memory-tech-stack.html.j2"),
-    ("product/index.html", "memory-product-index.html.j2"),
+# TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
+# Kept as a tuple of (rel_path,) for structural consistency with the check loop.
+_TREE3_MEMORY_FILES: tuple[str, ...] = (
+    "architecture.md",
+    "tech-stack.md",
+    "product/index.md",
 )
 
 # TREE-4: directories that must exist.  Value = README.md content source file (relative
@@ -155,32 +148,10 @@ _TREE_MIGRATION_HINT = (
     "without destroying SDD-approved artifacts."
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-# STRUCT / SYNC constants (memory-structured-source-v1)
-# ──────────────────────────────────────────────────────────────────────────────
-
-# Map relative atom path (within specs/memory/) → atom type identifier.
-# Order matters for STRUCT code assignment: architecture→STRUCT-1, tech-stack→STRUCT-2,
-# product/index→STRUCT-3, product/<slug>→STRUCT-4.
-_STRUCT_TOP_LEVEL_ATOMS: tuple[tuple[str, str, str], ...] = (
-    # (relative_path, yaml_stem, atom_type)
-    ("architecture", "architecture.yaml", "memory-architecture-v1"),
-    ("tech-stack", "tech-stack.yaml", "memory-tech-stack-v1"),
-)
-_STRUCT_INDEX_ATOM = ("product/index", "product/index.yaml", "memory-product-index-v1")
-
-# STRUCT-1..4 codes per slot type.
-_STRUCT_CODE_MAP = {
-    "memory-architecture-v1": "STRUCT-1",
-    "memory-tech-stack-v1": "STRUCT-2",
-    "memory-product-index-v1": "STRUCT-3",
-    "memory-product-feature-v1": "STRUCT-4",
-}
-
-# WARN text required by AC-C3-4 and AC-C7-3 — must include `dadaia migrate memory-yaml`.
-_YAML_ABSENT_WARN_TEMPLATE = (
-    "YAML source absent for {atom_rel}; schema validation skipped. "
-    "Migrate with: dadaia migrate memory-yaml"
+# LINT-1: path to the lint-memory-atoms.py script, resolved from this file's location.
+# dadaia_workspace/features/specs/doctor.py → dadaia_workspace/public/scripts/
+_LINT_SCRIPT: Path = (
+    Path(__file__).resolve().parent.parent.parent / "public" / "scripts" / "lint-memory-atoms.py"
 )
 
 
@@ -206,6 +177,87 @@ class SpecsDoctorIssue:
         }
 
 
+# ---------------------------------------------------------------------------
+# Markdown memory atom helpers
+# ---------------------------------------------------------------------------
+
+_MD_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+# Any ATX heading (H1-H6): satisfies the "has a heading" requirement.
+_MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
+_MD_H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
+_MD_H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
+_WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+
+
+@dataclass
+class _MemoryMdSummary:
+    has_heading: bool
+    heading_text: str
+    forbidden_h2: list[str]
+    frontmatter: dict | None  # type: ignore[type-arg]
+    body: str
+
+
+def _parse_memory_md(path: Path) -> _MemoryMdSummary:
+    """Extract the facts the doctor needs from a memory .md atom."""
+    content = path.read_text(encoding="utf-8")
+
+    # Extract frontmatter if present
+    fm: dict | None = None  # type: ignore[type-arg]
+    body = content
+    m = _MD_FRONTMATTER_RE.match(content)
+    if m:
+        try:
+            fm = yaml.safe_load(m.group(1))
+        except yaml.YAMLError:
+            fm = None
+        body = content[m.end() :]
+
+    # First H1 heading text (used for heading_text field; may be empty).
+    h1_match = _MD_H1_RE.search(body)
+    heading_text = h1_match.group(1).strip() if h1_match else ""
+    # has_heading is True if the body contains ANY ATX heading (H1–H6), including
+    # atoms that only have ## / ### level headings and no H1.
+    has_heading = bool(_MD_HEADING_RE.search(body))
+
+    # Check ## headings for forbidden patterns
+    forbidden_h2: list[str] = []
+    for h2_match in _MD_H2_RE.finditer(body):
+        text = h2_match.group(1).strip()
+        if text and FORBIDDEN_MEMORY_H2_RE.search(text):
+            forbidden_h2.append(text)
+
+    return _MemoryMdSummary(
+        has_heading=has_heading,
+        heading_text=heading_text,
+        forbidden_h2=forbidden_h2,
+        frontmatter=fm,
+        body=body,
+    )
+
+
+def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
+    """All memory .md atom files that should be checked for atomicity.
+
+    Includes the top-level singles (architecture.md, tech-stack.md) and every
+    *.md under product/ except index.md (the catalog folder).
+    """
+    out: list[Path] = []
+    for name in TOPLEVEL_MEMORY_FILES:
+        p = mem_dir / name
+        if p.exists():
+            out.append(p)
+    product_dir = mem_dir / "product"
+    if product_dir.is_dir():
+        for p in sorted(product_dir.glob("*.md")):
+            if p.name == "index.md":
+                continue
+            out.append(p)
+    return out
+
+
+# _MemoryHtmlSummary and _MemoryParser are retained for any callers that still
+# parse HTML assets (e.g. non-atom HTML files served by the panel).
 @dataclass
 class _MemoryHtmlSummary:
     has_h1: bool
@@ -296,106 +348,6 @@ def _parse_memory_html(path: Path) -> _MemoryHtmlSummary:
         has_mermaid_blocks=parser.has_mermaid_blocks,
         has_mermaid_script=parser.has_mermaid_script,
     )
-
-
-def _iter_memory_html_files(mem_dir: Path) -> list[Path]:
-    """All memory HTML files that should be checked for atomicity/imgs/mermaid.
-
-    Includes the top-level singles (architecture.html, tech-stack.html) and every
-    *.html under product/ (the catalog folder).
-    """
-    out: list[Path] = []
-    for name in TOPLEVEL_MEMORY_FILES:
-        p = mem_dir / name
-        if p.exists():
-            out.append(p)
-    product_dir = mem_dir / "product"
-    if product_dir.is_dir():
-        out.extend(sorted(product_dir.glob("*.html")))
-    return out
-
-
-def _enumerate_memory_yaml_slots(
-    mem_dir: Path,
-) -> list[tuple[str, Path, Path, str]]:
-    """Enumerate all memory atom slots (YAML + HTML) under *mem_dir*.
-
-    Returns a list of tuples:
-        (rel_key, yaml_path, html_path, atom_type)
-
-    where:
-        rel_key   — human-readable relative identifier (e.g. "architecture",
-                    "product/index", "product/my-feature")
-        yaml_path — expected YAML source path (may not exist)
-        html_path — expected HTML artifact path (may not exist)
-        atom_type — schema type identifier string
-
-    Includes: architecture, tech-stack, product/index, product/<slug> (all
-    non-index YAML files under product/).
-    """
-    slots: list[tuple[str, Path, Path, str]] = []
-
-    # Top-level atoms: architecture, tech-stack
-    for rel_key, yaml_name, atom_type in _STRUCT_TOP_LEVEL_ATOMS:
-        yaml_path = mem_dir / yaml_name
-        html_path = mem_dir / (rel_key + ".html")
-        slots.append((rel_key, yaml_path, html_path, atom_type))
-
-    # product/index
-    rel_key, yaml_name, atom_type = _STRUCT_INDEX_ATOM
-    slots.append(
-        (
-            "product/index",
-            mem_dir / "product" / "index.yaml",
-            mem_dir / "product" / "index.html",
-            "memory-product-index-v1",
-        )
-    )
-
-    # product/<slug> — discover from existing YAML *or* HTML files.
-    product_dir = mem_dir / "product"
-    if product_dir.is_dir():
-        # Collect slugs from both YAML and HTML so we report YAML-absent on HTML-only atoms.
-        yaml_slugs = {p.stem for p in product_dir.glob("*.yaml") if p.stem != "index"}
-        html_slugs = {p.stem for p in product_dir.glob("*.html") if p.stem != "index"}
-        all_slugs = yaml_slugs | html_slugs
-        for slug in sorted(all_slugs):
-            slots.append(
-                (
-                    f"product/{slug}",
-                    product_dir / f"{slug}.yaml",
-                    product_dir / f"{slug}.html",
-                    "memory-product-feature-v1",
-                )
-            )
-
-    return slots
-
-
-def _collect_yaml_valid_atom_rels(mem_dir: Path) -> set[str]:
-    """Return the rel_keys of atoms that have a YAML source AND pass STRUCT validation.
-
-    Used by check #8 to skip the changelog-grep for schema-validated atoms (D-5),
-    and by SYNC-1 as the input set.
-
-    Does NOT emit issues — callers that need issues use _check_memory_struct() directly.
-    Any ValidationError is silently treated as "not valid" so that #8 still fires.
-    """
-    from dadaia_workspace.features.specs.renderer import validate_atom
-
-    valid_rels: set[str] = set()
-    for rel_key, yaml_path, _html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
-        if not yaml_path.exists():
-            continue
-        try:
-            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                continue
-            validate_atom(data, atom_type)
-            valid_rels.add(rel_key)
-        except Exception:
-            pass
-    return valid_rels
 
 
 def _read_active_md(path: Path) -> tuple[str | None, str | None, str | None]:
@@ -529,25 +481,22 @@ class SpecsDoctor:
         issues.extend(self._check_no_orphan_specs())
         issues.extend(self._check_memory_atomicity())
         # 9: covered inside _check_active_md (release id ↔ dir)
-        issues.extend(self._check_memory_image_links())
-        issues.extend(self._check_memory_mermaid_script())
+        # checks 10 and 11 (HTML image-links / mermaid-script) retired with HTML atoms
         issues.extend(self._check_backlog_schema())
         issues.extend(self._check_release_semver_naming())
         issues.extend(self._check_orchestration_registry())
         # TREE invariants (spec-context-tree-v2)
         issues.extend(self._check_tree1_foundation())
         issues.extend(self._check_tree2_root_spec_md())
-        issues.extend(self._check_tree3_memory_html())
+        issues.extend(self._check_tree3_memory_md())
         issues.extend(self._check_tree4_required_dirs())
         issues.extend(self._check_tree5_agents_md())
         issues.extend(self._check_tree6_release_artifacts())
         issues.extend(self._check_tree7_bug_session_id())
-        # CAT-1 (memory-context-enforcement-v1)
+        # CAT-1 (memory-context-enforcement-v1) — now based on .md files
         issues.extend(self._check_cat1_catalog_sync())
-        # STRUCT-1..4 + YAML-absent guard (memory-structured-source-v1 / C-3)
-        issues.extend(self._check_memory_struct())
-        # SYNC-1 (memory-structured-source-v1 / C-3) — runs after STRUCT
-        issues.extend(self._check_memory_sync())
+        # LINT-1 (memory-markdown-source-v1) — invoke lint-memory-atoms.py
+        issues.extend(self._check_lint1_memory_atoms())
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
@@ -574,10 +523,7 @@ class SpecsDoctor:
             if not issue.fixable:
                 continue
             try:
-                if issue.code == "TREE-3":
-                    self._fix_tree3(issue)
-                    fixed.append(issue)
-                elif issue.code == "TREE-4":
+                if issue.code == "TREE-4":
                     self._fix_tree4(issue)
                     fixed.append(issue)
             except Exception:
@@ -599,8 +545,14 @@ class SpecsDoctor:
             ]
         return []
 
-    # 2 + helper used by 8, 10, 11
+    # 2 + helper used by 8
     def _check_memory_files(self) -> list[SpecsDoctorIssue]:
+        """Check #2: required memory .md atoms exist with non-empty heading.
+
+        Canonical source format is .md (memory-markdown-source-v1).
+        Stray .html files are flagged as legacy (SPEC-DOC-002L).
+        The product.html-at-root legacy error is retained for historical compat.
+        """
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
 
@@ -611,14 +563,14 @@ class SpecsDoctor:
         # Required folder catalog entry
         required.append((PRODUCT_INDEX_REL, mem_dir / PRODUCT_INDEX_REL))
 
-        # Plus any optional feature HTMLs that DO exist — they must parse too
+        # Plus any optional feature .md atoms that DO exist — they must parse too
         product_dir = mem_dir / "product"
         feature_files: list[tuple[str, Path]] = []
         if product_dir.is_dir():
             feature_files = [
                 (f"product/{p.name}", p)
-                for p in sorted(product_dir.glob("*.html"))
-                if p.name != "index.html"
+                for p in sorted(product_dir.glob("*.md"))
+                if p.name != "index.md"
             ]
 
         for rel, p in required + feature_files:
@@ -627,34 +579,34 @@ class SpecsDoctor:
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002",
                         severity=Severity.ERROR,
-                        description=f"memory/{rel} is missing — memory must be HTML",
+                        description=f"memory/{rel} is missing — memory must be Markdown (.md)",
                         path=str(p),
                     )
                 )
                 continue
             try:
-                summary = _parse_memory_html(p)
+                summary = _parse_memory_md(p)
             except Exception as e:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002",
                         severity=Severity.ERROR,
-                        description=f"memory/{rel} is not parseable HTML: {e}",
+                        description=f"memory/{rel} is not parseable: {e}",
                         path=str(p),
                     )
                 )
                 continue
-            if not summary.has_h1:
+            if not summary.has_heading:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002",
                         severity=Severity.ERROR,
-                        description=f"memory/{rel} has no non-empty <h1>",
+                        description=f"memory/{rel} has no non-empty heading",
                         path=str(p),
                     )
                 )
 
-        # Legacy product.html at memory/ root (pre-folder-catalog) is now an error
+        # Legacy product.html at memory/ root (pre-folder-catalog) is still an error
         legacy_product = mem_dir / "product.html"
         if legacy_product.exists():
             issues.append(
@@ -664,66 +616,65 @@ class SpecsDoctor:
                     description=(
                         "memory/product.html is legacy — product memory is now a folder "
                         "catalog. Move to _archive/legacy-memory/<timestamp>/ and create "
-                        "memory/product/index.html + memory/product/<feature>.html files."
+                        "memory/product/index.md + memory/product/<feature>.md files."
                     ),
                     path=str(legacy_product),
                 )
             )
 
-        # Flag any legacy markdown memory files (root or product/)
+        # Flag any stray .html files in memory/ root or product/ as legacy.
         # AGENTS.md is a directory contract, not a memory atom — exempt it.
+        # .html files are never written at runtime (D-4); any that appear are stale.
         if mem_dir.exists():
+            for stray in mem_dir.glob("*.html"):
+                if stray.name == "product.html":
+                    continue  # already reported above
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-002L",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"memory/{stray.name} is a stray HTML file — "
+                            "memory atoms must be .md (memory-markdown-source-v1, D-4). "
+                            "Remove the .html file; the canonical source is the .md atom."
+                        ),
+                        path=str(stray),
+                    )
+                )
+            if product_dir.is_dir():
+                for stray in product_dir.glob("*.html"):
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-002L",
+                            severity=Severity.ERROR,
+                            description=(
+                                f"memory/product/{stray.name} is a stray HTML file — "
+                                "memory atoms must be .md (D-4). Remove the .html file."
+                            ),
+                            path=str(stray),
+                        )
+                    )
+
+            # Orphaned .md files at root (no known canonical role) — flag as legacy.
+            # AGENTS.md is exempt. TOPLEVEL_MEMORY_FILES (.md) are canonical. index.md in
+            # product/ is the generated TOC.  Everything else is flagged.
+            _canonical_root_md = {Path(f).name for f in TOPLEVEL_MEMORY_FILES}
             for legacy in mem_dir.glob("*.md"):
                 if legacy.name == "AGENTS.md":
+                    continue
+                if legacy.name in _canonical_root_md:
                     continue
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-002L",
                         severity=Severity.ERROR,
                         description=(
-                            f"memory/{legacy.name} is markdown — memory must be HTML. "
-                            "Move legacy markdown to _archive/legacy-memory/<timestamp>/."
+                            f"memory/{legacy.name} is not a canonical memory atom. "
+                            "Move to _archive/legacy-memory/<timestamp>/ if historical."
                         ),
                         path=str(legacy),
                     )
                 )
-            if product_dir.is_dir():
-                for legacy in product_dir.glob("*.md"):
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-002L",
-                            severity=Severity.ERROR,
-                            description=(
-                                f"memory/product/{legacy.name} is markdown — memory must be HTML."
-                            ),
-                            path=str(legacy),
-                        )
-                    )
-
-        # Broken <a href> links from product/index.html
-        index_path = mem_dir / PRODUCT_INDEX_REL
-        if index_path.exists():
-            try:
-                index_summary = _parse_memory_html(index_path)
-            except Exception:
-                index_summary = None
-            if index_summary is not None:
-                for href in index_summary.anchor_hrefs:
-                    if href.startswith(("http://", "https://", "mailto:", "#")):
-                        continue
-                    target = (index_path.parent / href).resolve()
-                    if not target.exists():
-                        issues.append(
-                            SpecsDoctorIssue(
-                                code="SPEC-DOC-002",
-                                severity=Severity.ERROR,
-                                description=(
-                                    f"memory/product/index.html links to missing file: "
-                                    f'<a href="{href}"> (resolves to {target})'
-                                ),
-                                path=str(index_path),
-                            )
-                        )
 
         return issues
 
@@ -937,74 +888,45 @@ class SpecsDoctor:
 
     # 8
     def _check_memory_atomicity(self) -> list[SpecsDoctorIssue]:
-        """Check #8: no forbidden changelog/history sections in memory HTML.
+        """Check #8: no forbidden changelog/history ## headings in memory .md bodies.
 
-        D-5 (memory-structured-source-v1): when an atom has a valid YAML source,
-        check #8 is skipped for that atom — the schema enforces atomicity
-        structurally via `additionalProperties: false`, making the heuristic
-        grep redundant.  Check #8 still fires for HTML-only (YAML-absent) atoms.
+        memory-markdown-source-v1: .md is now the canonical source.  We grep the
+        Markdown body directly — no YAML escape hatch, no STRUCT bypass.
+        Forbidden headings: ## Changelog, ## History, ## Histórico, ## Versions.
         """
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
 
-        # Collect rel_keys of atoms that have a valid YAML source so we can skip
-        # check #8 for them (D-5).  The set is empty when mem_dir doesn't exist.
-        yaml_valid_rels: set[str] = set()
-        if mem_dir.is_dir():
-            yaml_valid_rels = _collect_yaml_valid_atom_rels(mem_dir)
-
-        for p in _iter_memory_html_files(mem_dir):
+        for p in _iter_memory_md_files(mem_dir):
             try:
-                summary = _parse_memory_html(p)
+                summary = _parse_memory_md(p)
             except Exception:
                 continue
             rel = p.relative_to(mem_dir).as_posix()
-            # Derive rel_key from the HTML path (strip .html extension).
-            rel_key = rel[: -len(".html")] if rel.endswith(".html") else rel
-            # Skip check #8 when a valid YAML source exists for this atom (D-5).
-            if rel_key in yaml_valid_rels:
-                continue
             for label in summary.forbidden_h2:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-008",
                         severity=Severity.ERROR,
                         description=(
-                            f"memory/{rel} has forbidden section: {label!r} — "
-                            "memory must be atomic, not a changelog"
+                            f"memory/{rel} has forbidden heading: ## {label!r} — "
+                            "memory atoms must be atomic, not changelogs"
                         ),
                         path=str(p),
                     )
                 )
         return issues
 
-    # 10
+    # 10 — retired (HTML memory atoms deleted in memory-markdown-source-v1)
+    # Image-link checks applied to .html atoms are no longer needed.
+    # This stub keeps the method available if callers enumerate the check list.
     def _check_memory_image_links(self) -> list[SpecsDoctorIssue]:
-        issues: list[SpecsDoctorIssue] = []
-        mem_dir = self.specs_dir / "memory"
-        for p in _iter_memory_html_files(mem_dir):
-            try:
-                summary = _parse_memory_html(p)
-            except Exception:
-                continue
-            rel = p.relative_to(mem_dir).as_posix()
-            for src in summary.img_srcs:
-                if src.startswith(("http://", "https://", "data:")):
-                    continue
-                target = (p.parent / src).resolve()
-                if not target.exists():
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-010",
-                            severity=Severity.ERROR,
-                            description=(
-                                f'memory/{rel} references broken <img src="{src}"> '
-                                f"(resolves to {target})"
-                            ),
-                            path=str(p),
-                        )
-                    )
-        return issues
+        return []
+
+    # 11 — retired (HTML memory atoms deleted in memory-markdown-source-v1)
+    # Mermaid-script checks applied to .html atoms are no longer needed.
+    def _check_memory_mermaid_script(self) -> list[SpecsDoctorIssue]:
+        return []
 
     # 12
     def _check_backlog_schema(self) -> list[SpecsDoctorIssue]:
@@ -1337,73 +1259,34 @@ class SpecsDoctor:
             )
         ]
 
-    def _check_tree3_memory_html(self) -> list[SpecsDoctorIssue]:
-        """TREE-3: required memory HTML files must exist.
+    def _check_tree3_memory_md(self) -> list[SpecsDoctorIssue]:
+        """TREE-3: required memory .md atom files must exist.
 
-        Checks: memory/architecture.html, memory/tech-stack.html,
-        memory/product/index.html.
+        Checks: memory/architecture.md, memory/tech-stack.md,
+        memory/product/index.md.
 
-        When ``fixable=True`` the fix path renders the file from its canonical
-        Jinja template (same mechanism as ``scaffold()``).  If no templates_dir
-        is available, the issue is still emitted as a WARNING but fixable=False
-        (fix path would have nothing to render from).
+        .md is the canonical source (memory-markdown-source-v1 / D-4).
+        No auto-fix: .md atoms are operator-authored, not generated from templates.
         """
         issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
-        for rel_path, template_name in _TREE3_MEMORY_TEMPLATES:
+        for rel_path in _TREE3_MEMORY_FILES:
             target = mem_dir / rel_path
             if target.exists():
                 continue
-            fixable = (
-                self._templates_dir is not None and (self._templates_dir / template_name).exists()
-            )
             issues.append(
                 SpecsDoctorIssue(
                     code="TREE-3",
                     severity=Severity.WARNING,
                     description=(
-                        f"memory/{rel_path} is missing — required memory HTML. "
-                        + (
-                            "Auto-fix available (run doctor --fix)."
-                            if fixable
-                            else "No templates_dir available — create manually."
-                        )
+                        f"memory/{rel_path} is missing — required memory .md atom. "
+                        "Create it using `dadaia memory product add` or the born-markdown scaffold."
                     ),
                     path=str(target),
-                    fixable=fixable,
+                    fixable=False,
                 )
             )
         return issues
-
-    def _fix_tree3(self, issue: SpecsDoctorIssue) -> None:
-        """Render the missing memory HTML from its canonical Jinja template."""
-        assert issue.code == "TREE-3"
-        assert self._templates_dir is not None
-        target = Path(issue.path)  # type: ignore[arg-type]
-        rel = target.relative_to(self.specs_dir / "memory").as_posix()
-        # Find the matching template.
-        template_name: str | None = None
-        for rel_path, tpl in _TREE3_MEMORY_TEMPLATES:
-            if rel_path == rel:
-                template_name = tpl
-                break
-        if template_name is None:
-            return
-        today = datetime.now(tz=UTC).date().isoformat()
-        context: dict[str, str] = {
-            "project_name": self.specs_dir.parent.name,
-            "today": today,
-            "last_release_id": "none",
-        }
-        env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(str(self._templates_dir)),
-            undefined=jinja2.Undefined,
-            autoescape=False,
-        )
-        template = env.get_template(template_name)
-        rendered: str = template.render(context)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(rendered, encoding="utf-8")
 
     def _check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
         """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
@@ -1599,191 +1482,116 @@ class SpecsDoctor:
                 )
         return issues
 
-    # 11
-    def _check_memory_mermaid_script(self) -> list[SpecsDoctorIssue]:
-        issues: list[SpecsDoctorIssue] = []
-        mem_dir = self.specs_dir / "memory"
-        for p in _iter_memory_html_files(mem_dir):
-            try:
-                summary = _parse_memory_html(p)
-            except Exception:
-                continue
-            rel = p.relative_to(mem_dir).as_posix()
-            if summary.has_mermaid_blocks and not summary.has_mermaid_script:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-011",
-                        severity=Severity.WARNING,
-                        description=(
-                            f'memory/{rel} has <pre class="mermaid"> blocks but no '
-                            'Mermaid <script src="...mermaid..."> — diagrams will not render'
-                        ),
-                        path=str(p),
-                    )
-                )
-        return issues
+    # LINT-1 (memory-markdown-source-v1)
+    def _check_lint1_memory_atoms(self) -> list[SpecsDoctorIssue]:
+        """LINT-1: invoke lint-memory-atoms.py over specs/memory/.
 
-    # STRUCT-1..4 + YAML-absent guard (memory-structured-source-v1 / C-3a + C-3c)
-    def _check_memory_struct(self) -> list[SpecsDoctorIssue]:
-        """Validate YAML memory atom sources against their JSON Schemas.
+        ERROR on frontmatter/schema violations + forbidden headings.
+        WARNING on token-estimate drift.
 
-        For each known atom slot:
-        - If a YAML source exists → validate against the corresponding schema.
-          Validation failure (missing required field OR extra field via
-          ``additionalProperties:false``) → **ERROR** (STRUCT-1..STRUCT-4).
-        - If NO YAML source exists but an HTML file does → **WARN** with the
-          standard migration hint (YAML-absent guard, C-3c).  Doctor still exits 0
-          when all atoms are HTML-only (pre-migration state).
-        - If neither YAML nor HTML exists → no issue emitted (slot is inactive).
-
-        Check #8 retire (D-5 / C-3d): handled in ``_check_memory_atomicity``
-        which calls ``_collect_yaml_valid_atom_rels`` to skip the changelog-grep
-        for atoms that have a valid YAML source.
+        The lint script is invoked as a subprocess using the same Python interpreter.
+        If the script is not found, LINT-1 is skipped with a WARNING.
         """
-        import jsonschema as _jsonschema
-
-        from dadaia_workspace.features.specs.renderer import validate_atom as _validate_atom
-
-        issues: list[SpecsDoctorIssue] = []
         mem_dir = self.specs_dir / "memory"
         if not mem_dir.is_dir():
-            return issues
-
-        for rel_key, yaml_path, html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
-            struct_code = _STRUCT_CODE_MAP.get(atom_type, "STRUCT-4")
-
-            if yaml_path.exists():
-                # YAML present → validate against schema
-                try:
-                    raw = yaml_path.read_text(encoding="utf-8")
-                    data = yaml.safe_load(raw)
-                    if not isinstance(data, dict):
-                        issues.append(
-                            SpecsDoctorIssue(
-                                code=struct_code,
-                                severity=Severity.ERROR,
-                                description=(
-                                    f"{struct_code}: memory/{rel_key}.yaml did not parse to a "
-                                    f"mapping (got {type(data).__name__}). YAML atom must be a "
-                                    "YAML mapping."
-                                ),
-                                path=str(yaml_path),
-                            )
-                        )
-                        continue
-                    _validate_atom(data, atom_type)
-                except _jsonschema.ValidationError as exc:
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code=struct_code,
-                            severity=Severity.ERROR,
-                            description=(
-                                f"{struct_code}: memory/{rel_key}.yaml fails schema validation "
-                                f"({atom_type}): {exc.message}"
-                            ),
-                            path=str(yaml_path),
-                        )
-                    )
-                except Exception as exc:
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code=struct_code,
-                            severity=Severity.ERROR,
-                            description=(
-                                f"{struct_code}: memory/{rel_key}.yaml could not be validated: "
-                                f"{exc}"
-                            ),
-                            path=str(yaml_path),
-                        )
-                    )
-            elif html_path.exists():
-                # YAML absent but HTML present → migration guard WARN (C-3c)
-                issues.append(
-                    SpecsDoctorIssue(
-                        code=struct_code,
-                        severity=Severity.WARNING,
-                        description=_YAML_ABSENT_WARN_TEMPLATE.format(atom_rel=f"memory/{rel_key}"),
-                        path=str(html_path),
-                    )
+            return []
+        if not _LINT_SCRIPT.exists():
+            return [
+                SpecsDoctorIssue(
+                    code="LINT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        "LINT-1: lint-memory-atoms.py not found at expected path "
+                        f"({_LINT_SCRIPT}). Install or update dadaia_workspace package."
+                    ),
+                    path=str(_LINT_SCRIPT),
                 )
-            # else: neither YAML nor HTML — slot is inactive, no issue
+            ]
 
-        return issues
+        try:
+            result = subprocess.run(
+                [sys.executable, str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            return [
+                SpecsDoctorIssue(
+                    code="LINT-1",
+                    severity=Severity.WARNING,
+                    description="LINT-1: lint-memory-atoms.py timed out (>30s).",
+                    path=str(mem_dir),
+                )
+            ]
+        except Exception as exc:
+            return [
+                SpecsDoctorIssue(
+                    code="LINT-1",
+                    severity=Severity.WARNING,
+                    description=f"LINT-1: failed to invoke lint-memory-atoms.py: {exc}",
+                    path=str(mem_dir),
+                )
+            ]
 
-    # SYNC-1 (memory-structured-source-v1 / C-3b)
-    def _check_memory_sync(self) -> list[SpecsDoctorIssue]:
-        """SYNC-1: warn when committed HTML diverges from renderer output for a YAML atom.
-
-        Runs only for atoms that have a YAML source AND pass STRUCT validation (i.e.
-        appear in ``_collect_yaml_valid_atom_rels``).  When YAML is absent or STRUCT
-        fails, SYNC-1 is skipped for that atom (STRUCT error takes precedence).
-
-        Severity is always WARN (not error) — the product-engineer may be mid-edit
-        between rendering and committing.  The message names the specific atom(s).
-        """
-        from dadaia_workspace.features.specs.renderer import render_atom as _render_atom
-
+        # Exit codes: 0 = clean, 1 = at least one ERROR, 2 = warnings only
+        output = (result.stdout + result.stderr).strip()
         issues: list[SpecsDoctorIssue] = []
-        mem_dir = self.specs_dir / "memory"
-        if not mem_dir.is_dir():
-            return issues
 
-        # Get the set of atoms that have a valid YAML source.
-        valid_rels = _collect_yaml_valid_atom_rels(mem_dir)
-        if not valid_rels:
-            return issues
-
-        # For each valid slot, render from YAML and compare to committed HTML.
-        for rel_key, yaml_path, html_path, atom_type in _enumerate_memory_yaml_slots(mem_dir):
-            if rel_key not in valid_rels:
-                continue
-            if not html_path.exists():
-                # No committed HTML yet → the HTML needs to be generated first,
-                # but this is a different concern (TREE-3 / scaffolding).  Skip SYNC-1.
-                continue
-            try:
-                rendered = _render_atom(yaml_path, atom_type=atom_type)
-            except Exception as exc:
-                # Renderer failure is unexpected here (STRUCT already passed).
-                # Emit as a WARN to avoid blocking doctor exit 0.
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SYNC-1",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"SYNC-1: memory/{rel_key} — renderer raised an unexpected "
-                            f"error during SYNC-1 check: {exc}"
-                        ),
-                        path=str(yaml_path),
-                    )
+        if result.returncode == 0:
+            return []
+        if result.returncode == 1:
+            # ERRORs present
+            issues.append(
+                SpecsDoctorIssue(
+                    code="LINT-1",
+                    severity=Severity.ERROR,
+                    description=(
+                        "LINT-1: memory atom lint found frontmatter/schema violations "
+                        f"or forbidden headings:\n{output}"
+                    ),
+                    path=str(mem_dir),
                 )
-                continue
-            committed = html_path.read_text(encoding="utf-8")
-            if rendered != committed:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SYNC-1",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"SYNC-1: memory/{rel_key}.html is out of sync with its YAML "
-                            "source. Run `dadaia memory render` to regenerate."
-                        ),
-                        path=str(html_path),
-                    )
+            )
+        elif result.returncode == 2:
+            # Warnings only (e.g. token_estimate drift)
+            issues.append(
+                SpecsDoctorIssue(
+                    code="LINT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"LINT-1: memory atom lint warnings (token_estimate drift etc.):\n{output}"
+                    ),
+                    path=str(mem_dir),
                 )
-
+            )
+        else:
+            # Unexpected exit code
+            issues.append(
+                SpecsDoctorIssue(
+                    code="LINT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"LINT-1: lint-memory-atoms.py exited with unexpected code "
+                        f"{result.returncode}:\n{output}"
+                    ),
+                    path=str(mem_dir),
+                )
+            )
         return issues
 
-    # CAT-1 (memory-context-enforcement-v1)
+    # CAT-1 (memory-context-enforcement-v1 / memory-markdown-source-v1)
     def _check_cat1_catalog_sync(self) -> list[SpecsDoctorIssue]:
-        """CAT-1: catalog.json must stay in sync with *.html feature files.
+        """CAT-1: catalog.json must stay in sync with *.md feature atom files.
+
+        memory-markdown-source-v1: .md is canonical source; .html is retired.
 
         Logic:
-        1. Enumerate ``memory/product/*.html`` excluding ``index.html`` → ``html_slugs``.
-        2. If ``catalog.json`` is absent and html_slugs is non-empty → one WARNING.
+        1. Enumerate ``memory/product/*.md`` excluding ``index.md`` → ``md_slugs``.
+        2. If ``catalog.json`` is absent and md_slugs is non-empty → one WARNING.
         3. If ``catalog.json`` is present → parse ``features[].slug``:
-           - One WARNING per slug in catalog that has no corresponding HTML on disk.
-           - One WARNING per HTML on disk whose slug is not in the catalog.
+           - One WARNING per slug in catalog that has no corresponding .md on disk.
+           - One WARNING per .md on disk whose slug is not in the catalog.
         4. Severity is always WARNING (never ERROR) — catalog may simply need regeneration.
         """
         import json as _json
@@ -1795,20 +1603,18 @@ class SpecsDoctor:
         if not product_dir.is_dir():
             return issues
 
-        # Collect slugs from HTML files (excluding index.html)
-        html_slugs: set[str] = {
-            p.stem for p in product_dir.glob("*.html") if p.name != "index.html"
-        }
+        # Collect slugs from .md feature atoms (excluding index.md)
+        md_slugs: set[str] = {p.stem for p in product_dir.glob("*.md") if p.name != "index.md"}
 
         if not catalog_path.exists():
-            if html_slugs:
+            if md_slugs:
                 issues.append(
                     SpecsDoctorIssue(
                         code="CAT-1",
                         severity=Severity.WARNING,
                         description=(
-                            f"catalog.json absent; {len(html_slugs)} feature HTML"
-                            f"{'s' if len(html_slugs) != 1 else ''} present; "
+                            f"catalog.json absent; {len(md_slugs)} feature .md atom"
+                            f"{'s' if len(md_slugs) != 1 else ''} present; "
                             "run `dadaia memory catalog generate` to create it."
                         ),
                         path=str(catalog_path),
@@ -1835,33 +1641,33 @@ class SpecsDoctor:
             )
             return issues
 
-        # Slugs in catalog but no HTML on disk
-        for slug in sorted(catalog_slugs - html_slugs):
+        # Slugs in catalog but no .md on disk
+        for slug in sorted(catalog_slugs - md_slugs):
             issues.append(
                 SpecsDoctorIssue(
                     code="CAT-1",
                     severity=Severity.WARNING,
                     description=(
                         f"catalog.json lists slug '{slug}' but no corresponding "
-                        f"'{slug}.html' exists in memory/product/. "
+                        f"'{slug}.md' exists in memory/product/. "
                         "Run `dadaia memory catalog generate` to resync."
                     ),
-                    path=str(product_dir / f"{slug}.html"),
+                    path=str(product_dir / f"{slug}.md"),
                 )
             )
 
-        # HTML files on disk but not in catalog
-        for slug in sorted(html_slugs - catalog_slugs):
+        # .md atoms on disk but not in catalog
+        for slug in sorted(md_slugs - catalog_slugs):
             issues.append(
                 SpecsDoctorIssue(
                     code="CAT-1",
                     severity=Severity.WARNING,
                     description=(
-                        f"'{slug}.html' exists in memory/product/ but is not listed in "
+                        f"'{slug}.md' exists in memory/product/ but is not listed in "
                         "catalog.json. "
                         "Run `dadaia memory catalog generate` to resync."
                     ),
-                    path=str(product_dir / f"{slug}.html"),
+                    path=str(product_dir / f"{slug}.md"),
                 )
             )
 
