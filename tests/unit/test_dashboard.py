@@ -21,7 +21,7 @@ def test_render_html_shows_project_name(tmp_path: Path) -> None:
         [
             {
                 "port": 3000,
-                "project": "redacted-slug",
+                "project": "my-project",
                 "url": "http://localhost:3000",
                 "status": "active",
                 "pid": None,
@@ -32,7 +32,7 @@ def test_render_html_shows_project_name(tmp_path: Path) -> None:
         ],
     )
     html = render_html(tmp_path)
-    assert "redacted-slug" in html
+    assert "my-project" in html
 
 
 def test_render_html_shows_clickable_url(tmp_path: Path) -> None:
@@ -41,7 +41,7 @@ def test_render_html_shows_clickable_url(tmp_path: Path) -> None:
         [
             {
                 "port": 3000,
-                "project": "redacted-slug",
+                "project": "my-project",
                 "url": "http://localhost:3000",
                 "status": "active",
                 "pid": None,
@@ -80,7 +80,7 @@ def test_render_html_shows_description_when_present(tmp_path: Path) -> None:
         [
             {
                 "port": 3000,
-                "project": "redacted-slug",
+                "project": "my-project",
                 "url": "http://localhost:3000",
                 "status": "active",
                 "pid": None,

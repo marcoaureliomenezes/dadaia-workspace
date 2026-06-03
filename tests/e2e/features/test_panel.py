@@ -40,7 +40,7 @@ _REPO_ROOT = Path(__file__).parents[3]  # repos/dadaia-workspace/
 # The dadaia workspace root is the parent that contains the real .dadaia/states/ directory.
 # _REPO_ROOT has a .dadaia/ dir too, but only with agentic/reports/scripts — no states/.
 # Walking: repos/dadaia-workspace/ → repos/ → dadaia/  (which has .dadaia/states/)
-_DADAIA_WORKSPACE_ROOT = _REPO_ROOT.parents[1]  # /home/marco/workspace/dadaia/
+_DADAIA_WORKSPACE_ROOT = _REPO_ROOT.parents[1]  # workspace root
 # The real memory file is served from repos/<slug>/specs/memory/ relative to the workspace.
 _REAL_MEMORY_HTML = (
     _DADAIA_WORKSPACE_ROOT / "repos" / "dadaia-workspace" / "specs" / "memory" / "architecture.html"

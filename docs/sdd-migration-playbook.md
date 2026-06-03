@@ -11,7 +11,7 @@
 - `dadaia` CLI installed (`dadaia doctor` → healthy)
 - Target repo has a writable git working tree (clean or stashed)
 - `SDD_LEGACY_FEATURES=1` set for the session (allows gate to pass while specs tree is partial)
-- You know the repo slug (example: `redacted-slug-barbe`, `redacted-slug-explorer`)
+- You know the repo slug (example: `my-service`, `my-api`)
 
 ```bash
 export SDD_LEGACY_FEATURES=1

@@ -3,14 +3,14 @@
 Creates (or re-creates) the fixture SQLite database deterministically.
 Run with the dadaia venv:
 
-    /home/marco/workspace/dadaia/.dadaia/.venv/bin/python \
+    .dadaia/.venv/bin/python \
         tests/fixtures/telemetry/_seed_sessions.py
 
 Schema is applied via the production schema module to keep the fixture
 in sync with any future migrations.
 
 Seed layout (PR5-B4 requirements):
-- >= 3 Claude sessions across two projects (dadaia-workspace, redacted-slug)
+- >= 3 Claude sessions across two projects (dadaia-workspace, sample-project)
 - >= 2 Codex sessions
 - Mix of active / idle / ended statuses controlled by last_activity_at delta
 - events rows with meaningful token counts so context_size_tokens is non-trivial
@@ -68,17 +68,17 @@ _SESSIONS: list[dict] = [
         "last_event_at": "2026-05-19T06:00:00Z",
         "status": "open",  # maps to idle
     },
-    # Claude session 3 — project: redacted-slug — status: ended (closed)
+    # Claude session 3 — project: sample-project — status: ended (closed)
     {
         "session_id": "claude-session-ggg777hhh888iii9",
         "provider": "claude",
-        "agent_name": "game-developer",
+        "agent_name": "backend-engineer",
         "ai_title": None,
         "entrypoint": "cli",
-        "cwd": "/home/user/workspace/dadaia/repos/redacted-slug",
-        "git_branch": "feature/aero-physics",
+        "cwd": "/home/user/workspace/dadaia/repos/sample-project",
+        "git_branch": "feature/api-refactor",
         "is_sidechain": 0,
-        "sub_slug": "redacted-slug",
+        "sub_slug": "sample-project",
         "first_event_at": "2026-05-18T10:00:00Z",
         "last_event_at": "2026-05-18T12:30:00Z",
         "status": "closed",  # maps to ended
@@ -98,17 +98,17 @@ _SESSIONS: list[dict] = [
         "last_event_at": "2026-05-19T04:45:00Z",
         "status": "closed",  # maps to ended
     },
-    # Codex session 2 — project: redacted-slug — status: idle (open)
+    # Codex session 2 — project: sample-project — status: idle (open)
     {
         "session_id": "codex-session-mmm333nnn444ooo5",
         "provider": "codex",
         "agent_name": None,
         "ai_title": None,
         "entrypoint": "cli",
-        "cwd": "/home/user/workspace/dadaia/repos/redacted-slug",
+        "cwd": "/home/user/workspace/dadaia/repos/sample-project",
         "git_branch": "main",
         "is_sidechain": 0,
-        "sub_slug": "redacted-slug",
+        "sub_slug": "sample-project",
         "first_event_at": "2026-05-19T03:00:00Z",
         "last_event_at": "2026-05-19T03:30:00Z",
         "status": "open",  # maps to idle
@@ -132,7 +132,7 @@ _AGENTS: list[dict] = [
         "last_seen_at": "2026-05-19T06:00:00Z",
     },
     {
-        "name": "game-developer",
+        "name": "backend-engineer",
         "provider": "claude",
         "is_subagent": 0,
         "first_seen_at": "2026-05-01T00:00:00Z",
@@ -215,11 +215,11 @@ _EVENTS: list[dict] = [
         "pricing_version": "2026-02-12",
         "suspect": 0,
     },
-    # ---- Claude session 3 (game-developer, ended) ----
+    # ---- Claude session 3 (backend-engineer, ended) ----
     {
         "event_id": "evt-a3-1",
         "session_id": "claude-session-ggg777hhh888iii9",
-        "agent_name": "game-developer",
+        "agent_name": "backend-engineer",
         "model": "claude-sonnet-4-6",
         "occurred_at": "2026-05-18T10:05:00Z",
         "tokens_input": 3000,
@@ -233,7 +233,7 @@ _EVENTS: list[dict] = [
     {
         "event_id": "evt-a3-2",
         "session_id": "claude-session-ggg777hhh888iii9",
-        "agent_name": "game-developer",
+        "agent_name": "backend-engineer",
         "model": "claude-sonnet-4-6",
         "occurred_at": "2026-05-18T12:30:00Z",
         "tokens_input": 6000,

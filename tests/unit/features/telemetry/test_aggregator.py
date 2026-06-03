@@ -23,7 +23,7 @@ from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 # Constants — synthetic fixture paths
 # ---------------------------------------------------------------------------
 
-_KNOWN_ROOT = "/home/marco/workspace/dadaia/repos/dadaia-workspace"
+_KNOWN_ROOT = "/home/user/workspace/dadaia/repos/dadaia-workspace"
 _UNKNOWN_ROOT = "/tmp/unknown-project"
 _CONTEXT_SLUG = "dadaia-workspace"
 

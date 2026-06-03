@@ -6,7 +6,7 @@ from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 
 
-def _entry(port: int = 3000, project: str = "redacted-slug") -> PortEntry:
+def _entry(port: int = 3000, project: str = "my-project") -> PortEntry:
     return PortEntry(
         port=port,
         project=project,
@@ -32,7 +32,7 @@ def test_save_and_get_roundtrip(tmp_path: Path) -> None:
     fetched = store.get(3000)
     assert fetched is not None
     assert fetched.port == 3000
-    assert fetched.project == "redacted-slug"
+    assert fetched.project == "my-project"
 
 
 def test_save_persists_to_disk(tmp_path: Path) -> None:
@@ -74,7 +74,7 @@ def test_optional_fields_preserved(tmp_path: Path) -> None:
     store = JsonServerRegistryStore(tmp_path)
     entry = PortEntry(
         port=3000,
-        project="redacted-slug",
+        project="my-project",
         reserved_at="2026-05-16T10:00:00Z",
         expires_at="2026-05-16T18:00:00Z",
         url="http://0.0.0.0:3000",

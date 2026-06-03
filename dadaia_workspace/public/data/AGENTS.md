@@ -11,7 +11,7 @@ take precedence.
 
 ## Operating Defaults
 
-- Language: Portuguese (BR) by default; English is fine for technical terms.
+- Language: follow the operator's preference; default to English.
 - Tone: direct, concise, operational.
 - Use `.dadaia/.venv/bin/python` and `.dadaia/.venv/bin/pip`; do not use system
   Python tooling for workspace commands.
@@ -51,30 +51,7 @@ instructions.
 
 ## Active Spec Context
 
-Resolve the active Spec Context Project in this order:
-
-1. `DADAIA_CONTEXT=<slug>`
-2. `.dadaia/states/primary_context.json`
-3. `dadaia context show --json`
-
-If no context resolves, ask the operator to run:
-
-```bash
-dadaia context activate <name>
-```
-
-For implementation or review, load:
-
-```bash
-<specs-dir>/constitution.md
-<specs-dir>/memory/architecture.md
-<specs-dir>/memory/tech-stack.md
-<specs-dir>/memory/product/index.md
-<specs-dir>/releases/ACTIVE.md
-<specs-dir>/releases/<release-id>/{SPEC,PLAN,TASKS}.md
-```
-
-Use `_archive/` only when the operator asks for history.
+See `workspace-protocol` rule for the full context-resolution and spec-loading procedure.
 
 ## SDD Gate
 
@@ -82,6 +59,7 @@ Production edits require an active approved release:
 
 - `ACTIVE.md` points at the release.
 - `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
+  (`Aprovado`, `Em revisão`, and `Draft` are the canonical SDD status tokens — do not translate or change them.)
 - The task is reserved in `TASKS.md` with `[-]`.
 - The edit stays inside the task's declared write set.
 
