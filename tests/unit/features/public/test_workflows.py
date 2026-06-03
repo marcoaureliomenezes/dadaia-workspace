@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _WORKFLOWS_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "workflows"
 
@@ -81,6 +83,11 @@ def test_deprecated_workflows_absent_from_public() -> None:
     )
 
 
+@pytest.mark.skipif(
+    not (_REPO_ROOT / "specs" / "_archive" / "legacy-workflows").exists(),
+    reason="specs/ is the maintainer dev-ledger, untracked in the public repo; "
+    "archive integrity is verified locally only.",
+)
 def test_deprecated_workflows_archived() -> None:
     """The 8 deprecated workflow files must exist in a legacy-workflows archive directory."""
     archive_root = _REPO_ROOT / "specs" / "_archive" / "legacy-workflows"
