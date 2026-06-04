@@ -9,8 +9,9 @@
 
 ## Execution order
 
-Maximum one `[-]` at a time unless this file is amended with explicit disjoint
-write sets.
+Maximum one `[-]` at a time unless disjoint write sets are declared.
+
+**Disjoint-parallel authorized:** T-HARD-01 (sdd-spec-gate.sh) ∥ T-HARD-02 (public/ docs) — non-overlapping write sets.
 
 ```
 T-HARD-00 → T-HARD-01 → T-HARD-02 → T-HARD-03 → T-HARD-04
@@ -23,7 +24,7 @@ T-HARD-00 → T-HARD-01 → T-HARD-02 → T-HARD-03 → T-HARD-04
 
 ### T-HARD-00 — Merge hardening/panel-auth-review branch
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** devops-engineer
 - **Target files:** git history (merge commit only)
 - **Preconditions:** none
