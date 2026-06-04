@@ -22,7 +22,7 @@ T-RET-01 -> T-RET-02 -> T-RET-03 -> T-RET-04 -> T-RET-05 -> T-RET-06
 
 ### T-BUG-REPORTS-01 - Fix Reports tab report routing and indexing
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python + frontend-engineer
 - **Reviewers before approval:** qa-engineer, code-reviewer
 - **Target files:** `dadaia_workspace/features/panel/views/api.py`, `dadaia_workspace/features/panel/views/assets/js/reports.js`, focused panel reports tests
