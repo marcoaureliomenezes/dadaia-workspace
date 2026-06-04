@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json as _json
 import os
+import datetime as _dt
 from pathlib import Path
 
 import typer
@@ -25,6 +26,36 @@ err_console = Console(stderr=True)
 
 # Maximum HTML file size (bytes) before flagging as oversized
 _OVERSIZED_THRESHOLD_BYTES = 30 * 1024  # 30 KB
+
+
+def _parse_duration(value: str) -> _dt.timedelta:
+    raw = value.strip().lower()
+    if raw.endswith("h"):
+        return _dt.timedelta(hours=int(raw[:-1]))
+    if raw.endswith("d"):
+        return _dt.timedelta(days=int(raw[:-1]))
+    raise typer.BadParameter("duration must use h or d suffix, for example 48h or 2d")
+
+
+def _retention_service():
+    try:
+        workspace_root = resolve_workspace_root()
+        return container.build_reports_retention_service(workspace_root)
+    except WorkspaceNotInitializedError:
+        err_console.print(
+            "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
+        )
+        raise typer.Exit(3) from None
+
+
+def _candidate_payload(candidate) -> dict[str, object]:
+    return {
+        "artifact_path": candidate.artifact_path,
+        "reason": candidate.reason,
+        "paths": [str(path) for path in candidate.paths],
+        "effective_timestamp": candidate.effective_timestamp.isoformat().replace("+00:00", "Z"),
+        "important": candidate.important,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +121,100 @@ def _check_v10_compat(path: Path, doc: dict[str, object]) -> tuple[bool, list[st
         )
 
     return is_error, messages
+
+
+# ---------------------------------------------------------------------------
+# retention subcommands
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="cleanup")
+def cleanup(
+    older_than: str = typer.Option("48h", "--older-than", help="TTL threshold, e.g. 48h or 2d."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List eligible deletions without deleting."),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON instead of text."
+    ),
+) -> None:
+    """Delete expired non-important report artifacts and related handoffs."""
+    service = _retention_service()
+    ttl = _parse_duration(older_than)
+    result = service.cleanup(older_than=ttl, dry_run=dry_run)
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {
+                    "dry_run": result.dry_run,
+                    "candidate_count": len(result.candidates),
+                    "deleted_count": len(result.deleted_paths),
+                    "candidates": [_candidate_payload(c) for c in result.candidates],
+                    "deleted_paths": [str(path) for path in result.deleted_paths],
+                    "skipped_paths": [str(path) for path in result.skipped_paths],
+                }
+            )
+        )
+        raise typer.Exit(0)
+
+    action = "Would delete" if dry_run else "Deleted"
+    console.print(f"{action} {len(result.deleted_paths) if not dry_run else len(result.candidates)} item(s).")
+    for candidate in result.candidates:
+        console.print(f"- {candidate.artifact_path}: {candidate.reason}")
+        for path in candidate.paths:
+            console.print(f"  {path}")
+    raise typer.Exit(0)
+
+
+@app.command(name="mark-important")
+def mark_important(
+    report_or_handoff_path: str = typer.Argument(..., help="Report or handoff path to protect."),
+    reason: str | None = typer.Option(None, "--reason", help="Optional operator reason."),
+) -> None:
+    """Mark a report or handoff as important so cleanup skips it."""
+    service = _retention_service()
+    try:
+        artifact = service.mark_important(report_or_handoff_path, reason=reason)
+    except ValueError as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(2) from None
+    console.print(f"Marked important: {artifact}")
+    raise typer.Exit(0)
+
+
+@app.command(name="unmark-important")
+def unmark_important(
+    report_or_handoff_path: str = typer.Argument(..., help="Report or handoff path to unprotect."),
+) -> None:
+    """Remove important protection from a report or handoff."""
+    service = _retention_service()
+    try:
+        artifact = service.unmark_important(report_or_handoff_path)
+    except ValueError as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(2) from None
+    console.print(f"Unmarked important: {artifact}")
+    raise typer.Exit(0)
+
+
+@app.command(name="important")
+def important(
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON instead of text."
+    ),
+) -> None:
+    """List reports currently marked important."""
+    service = _retention_service()
+    items = service.important_reports()
+    if json_output:
+        typer.echo(_json.dumps({"important": items}))
+        raise typer.Exit(0)
+    if not items:
+        console.print("No important reports.")
+    else:
+        for path, meta in sorted(items.items()):
+            reason = meta.get("reason", "")
+            suffix = f" — {reason}" if reason else ""
+            console.print(f"{path}{suffix}")
+    raise typer.Exit(0)
 
 
 # ---------------------------------------------------------------------------
