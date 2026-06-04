@@ -96,7 +96,7 @@ non-important reports older than 48 hours.
 
 ### T-RET-05 - Add doctor/status visibility
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python + qa-engineer
 - **Reviewers before approval:** code-reviewer, security-reviewer
 - **Target files:** doctor or reports status surface, tests
