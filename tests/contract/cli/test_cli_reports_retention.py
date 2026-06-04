@@ -94,3 +94,29 @@ def test_reports_mark_important_rejects_parent_traversal(
 
     assert result.exit_code == 2
     assert "parent traversal" in result.output
+
+
+def test_reports_cleanup_rejects_invalid_duration(tmp_path: Path, monkeypatch) -> None:
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = _runner.invoke(app, ["reports", "cleanup", "--older-than", "bad", "--json"])
+
+    assert result.exit_code == 2
+    assert "duration must use h or d suffix" in result.output
+
+
+def test_reports_cleanup_rejects_non_positive_duration(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    zero = _runner.invoke(app, ["reports", "cleanup", "--older-than", "0h"])
+    negative = _runner.invoke(app, ["reports", "cleanup", "--older-than", "-1h"])
+
+    assert zero.exit_code == 2
+    assert "greater than zero" in zero.output
+    assert negative.exit_code == 2
+    assert "greater than zero" in negative.output
