@@ -8,7 +8,6 @@ Implements:
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -19,6 +18,7 @@ from dadaia_workspace.features.spec_artifacts.new_artifacts import (
     bug_new,
     release_new,
 )
+from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 
 # ── shared typer apps ─────────────────────────────────────────────────────────
 
@@ -35,32 +35,10 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 
     Priority:
     1. Explicit ``--specs-dir`` argument.
-    2. ``primary_context.json`` in ``.dadaia/states/``.
+    2. Bound context session (``DADAIA_CONTEXT`` or ``DADAIA_SESSION_ID``).
     3. ``<cwd>/specs`` fallback.
     """
-    if specs_dir:
-        return Path(specs_dir).resolve()
-
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        primary = parent / ".dadaia" / "states" / "primary_context.json"
-        if primary.exists():
-            try:
-                data = json.loads(primary.read_text(encoding="utf-8"))
-                sd = data.get("specs_dir")
-                if sd:
-                    return Path(sd).resolve()
-            except (OSError, ValueError):
-                pass
-
-    candidate = cwd / "specs"
-    if candidate.exists():
-        return candidate.resolve()
-
-    raise typer.BadParameter(
-        "Could not resolve specs_dir. Pass --specs-dir or activate a context "
-        "with `dadaia context activate <name>`."
-    )
+    return _shared_resolve_specs_dir(specs_dir)
 
 
 # ── dadaia release new ────────────────────────────────────────────────────────
@@ -75,7 +53,7 @@ def release_new_cmd(
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
-        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
     """Create specs/releases/<id>/SPEC.md with canonical Draft frontmatter.
@@ -113,7 +91,7 @@ def backlog_new_cmd(
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
-        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
     """Create specs/backlog/<slug>.md with canonical frontmatter stub."""
@@ -147,7 +125,7 @@ def bug_new_cmd(
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
-        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
     """Create specs/bugs/<slug>.md with session_id: null in frontmatter.

@@ -9,7 +9,6 @@ Note: ``dadaia migrate memory-yaml`` was removed in memory-markdown-source-v1.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -21,6 +20,7 @@ from dadaia_workspace.features.migrate.state_v2 import (
     plan_migration,
 )
 from dadaia_workspace.features.migrate.tree_v2 import migrate_tree_v2
+from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 
 app = typer.Typer(
     help="Migration helpers for dadaia workspace and spec trees.",
@@ -42,32 +42,10 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 
     Priority:
     1. Explicit ``--specs-dir`` argument.
-    2. ``primary_context.json`` in ``.dadaia/states/``.
+    2. Bound context session (``DADAIA_CONTEXT`` or ``DADAIA_SESSION_ID``).
     3. ``<cwd>/specs`` fallback.
     """
-    if specs_dir:
-        return Path(specs_dir).resolve()
-
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        primary = parent / ".dadaia" / "states" / "primary_context.json"
-        if primary.exists():
-            try:
-                data = json.loads(primary.read_text(encoding="utf-8"))
-                sd = data.get("specs_dir")
-                if sd:
-                    return Path(sd).resolve()
-            except (OSError, ValueError):
-                pass
-
-    candidate = cwd / "specs"
-    if candidate.exists():
-        return candidate.resolve()
-
-    raise typer.BadParameter(
-        "Could not resolve specs_dir. Pass --specs-dir or activate a context "
-        "with `dadaia context activate <name>`."
-    )
+    return _shared_resolve_specs_dir(specs_dir)
 
 
 def _print_plan(plan: MigrationPlan) -> None:
@@ -164,7 +142,7 @@ def tree_v2(
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
-        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
     dry_run: bool = typer.Option(
         False,

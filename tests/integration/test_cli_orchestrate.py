@@ -22,12 +22,8 @@ def _init_workspace(workspace: Path) -> None:
     FileSystemPublicAssetManager().stage(workspace)
 
 
-def _set_primary(workspace: Path, name: str = "test-ctx") -> None:
-    states = workspace / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    (states / "primary_context.json").write_text(
-        json.dumps({"name": name, "repo_slug": name, "specs_dir": str(workspace / "specs")})
-    )
+def _bind_context(monkeypatch, name: str = "test-ctx") -> None:
+    monkeypatch.setenv("DADAIA_CONTEXT", name)
 
 
 def test_orchestrate_list_returns_seed_workflows(tmp_path: Path, monkeypatch) -> None:
@@ -52,7 +48,7 @@ def test_orchestrate_run_rejects_without_context(tmp_path: Path, monkeypatch) ->
 
 def test_orchestrate_run_happy_path(tmp_path: Path, monkeypatch) -> None:
     _init_workspace(tmp_path)
-    _set_primary(tmp_path)
+    _bind_context(monkeypatch)
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(
         app,
@@ -77,7 +73,7 @@ def test_orchestrate_run_happy_path(tmp_path: Path, monkeypatch) -> None:
 
 def test_orchestrate_dry_run_does_not_create_state(tmp_path: Path, monkeypatch) -> None:
     _init_workspace(tmp_path)
-    _set_primary(tmp_path)
+    _bind_context(monkeypatch)
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(
         app,
@@ -99,7 +95,7 @@ def test_orchestrate_dry_run_does_not_create_state(tmp_path: Path, monkeypatch) 
 
 def test_input_kv_parsing_error(tmp_path: Path, monkeypatch) -> None:
     _init_workspace(tmp_path)
-    _set_primary(tmp_path)
+    _bind_context(monkeypatch)
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(
         app,
@@ -135,7 +131,7 @@ def test_orchestrate_list_on_uninitialized_workspace_errors(tmp_path: Path, monk
 
 def test_orchestrate_status_all_json_output(tmp_path: Path, monkeypatch) -> None:
     _init_workspace(tmp_path)
-    _set_primary(tmp_path)
+    _bind_context(monkeypatch)
     monkeypatch.chdir(tmp_path)
     # Start a run first
     _runner.invoke(

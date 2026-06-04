@@ -2094,14 +2094,15 @@ class FileSystemPublicAssetManager:
 
     def _opencode_config(self, workspace_root: Path) -> dict[str, object]:
         instructions: list[str] = ["AGENTS.md", "CLAUDE.md"]
-        primary_json = workspace_root / ".dadaia" / "states" / "primary_context.json"
-        if primary_json.exists():
+        registry_json = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
+        if registry_json.exists():
             try:
-                ctx = json.loads(primary_json.read_text(encoding="utf-8"))
-                repo_slug = ctx.get("repo_slug", "")
-                if repo_slug and (workspace_root / "repos" / repo_slug / "AGENTS.md").exists():
-                    instructions.append(f"repos/{repo_slug}/AGENTS.md")
-            except (json.JSONDecodeError, KeyError):
+                registry = json.loads(registry_json.read_text(encoding="utf-8"))
+                for ctx in registry.get("contexts", []):
+                    repo_slug = ctx.get("repo_slug", "")
+                    if repo_slug and (workspace_root / "repos" / repo_slug / "AGENTS.md").exists():
+                        instructions.append(f"repos/{repo_slug}/AGENTS.md")
+            except (json.JSONDecodeError, AttributeError, KeyError):
                 pass
         return {
             "$schema": "https://opencode.ai/config.json",

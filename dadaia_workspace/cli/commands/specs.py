@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
@@ -11,6 +10,7 @@ import typer
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_hotfix_release
+from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.infrastructure.bug_reporter import (
     load_open_bugs,
     mark_bugs_in_release,
@@ -24,31 +24,7 @@ app.add_typer(hotfix_app, name="hotfix")
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    if specs_dir:
-        return Path(specs_dir).resolve()
-
-    # Try primary_context.json first
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        primary = parent / ".dadaia" / "states" / "primary_context.json"
-        if primary.exists():
-            try:
-                data = json.loads(primary.read_text(encoding="utf-8"))
-                sd = data.get("specs_dir")
-                if sd:
-                    return Path(sd).resolve()
-            except (OSError, ValueError):
-                pass
-
-    # Fallback: cwd/specs
-    candidate = cwd / "specs"
-    if candidate.exists():
-        return candidate.resolve()
-
-    raise typer.BadParameter(
-        "Could not resolve specs_dir. Pass --specs-dir or activate a context "
-        "with `dadaia context activate <name>`."
-    )
+    return _shared_resolve_specs_dir(specs_dir)
 
 
 def _resolve_public_dir(specs_dir: Path) -> Path | None:
@@ -71,7 +47,7 @@ def doctor(
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
-        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON instead of human output."
@@ -247,7 +223,7 @@ def hotfix_open(
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
-        help="Path to specs/ directory. Default: resolve from primary_context.json.",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
     force: bool = typer.Option(
         False,

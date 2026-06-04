@@ -13,7 +13,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from tests.fakes import FakeContextStore, FakeGitClient, FakePrimaryContextStore
+from tests.fakes import FakeContextStore, FakeGitClient
 
 
 @pytest.fixture()
@@ -30,11 +30,6 @@ def store() -> FakeContextStore:
 
 
 @pytest.fixture()
-def primary() -> FakePrimaryContextStore:
-    return FakePrimaryContextStore()
-
-
-@pytest.fixture()
 def git() -> FakeGitClient:
     return FakeGitClient()
 
@@ -42,13 +37,11 @@ def git() -> FakeGitClient:
 @pytest.fixture()
 def service(
     store: FakeContextStore,
-    primary: FakePrimaryContextStore,
     git: FakeGitClient,
     workspace_root: Path,
 ) -> SpecContextService:
     return SpecContextService(
         context_store=store,
-        primary_store=primary,
         git_client=git,
         workspace_root=workspace_root,
     )

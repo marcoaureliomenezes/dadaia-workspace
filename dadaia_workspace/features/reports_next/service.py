@@ -114,7 +114,7 @@ class ReportsNextService:
         if not active_path.is_file():
             raise NoActiveReleaseError(
                 "No active release: releases/ACTIVE.md not found under the active context. "
-                "Run `dadaia context activate <name>` and open a release."
+                "Run `eval $(dadaia context bind <name> --mode read)` and open a release."
             )
         m = _RELEASE_RE.search(active_path.read_text(encoding="utf-8"))
         release = m.group(1).strip() if m else ""

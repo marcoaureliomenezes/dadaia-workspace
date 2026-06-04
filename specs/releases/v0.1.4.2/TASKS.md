@@ -41,7 +41,7 @@ or explicit legacy migration exception.
 
 ### T-BUG-02 — Remove session-bind primary residue from CLI/source
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Target files:** `dadaia_workspace/cli/**`, `dadaia_workspace/core/**`,
   `dadaia_workspace/features/**`, `dadaia_workspace/infrastructure/**`
@@ -51,6 +51,10 @@ or explicit legacy migration exception.
 
 Fix specs doctor, memory, migrate, newartifacts, orchestrate, gate helpers, and
 any source-level primary-context residue.
+
+Evidence:
+- `rg -n "primary_context|is_primary|context promote|context activate|PRIMARY_|JsonPrimaryContextStore|PrimaryContextStore|primary_store" dadaia_workspace/cli dadaia_workspace/core dadaia_workspace/features dadaia_workspace/infrastructure` reports only explicit migration/import cleanup paths.
+- `python -m pytest -q -p no:cacheprovider tests/contract/test_session_bound_context_residue.py tests/unit/test_spec_context_service.py tests/unit/features/spec_context/test_service.py tests/unit/test_spec_context_doctor.py tests/unit/test_spec_context_locking.py tests/unit/test_spec_context_lock_reclaim.py tests/unit/features/panel/test_api_contract.py tests/contract/cli/test_cli_memory_catalog.py tests/integration/test_cli_orchestrate.py tests/unit/infrastructure/test_public_assets.py` → 287 passed.
 
 ---
 
