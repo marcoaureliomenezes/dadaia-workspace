@@ -30,11 +30,20 @@ _OVERSIZED_THRESHOLD_BYTES = 30 * 1024  # 30 KB
 
 def _parse_duration(value: str) -> _dt.timedelta:
     raw = value.strip().lower()
-    if raw.endswith("h"):
-        return _dt.timedelta(hours=int(raw[:-1]))
-    if raw.endswith("d"):
-        return _dt.timedelta(days=int(raw[:-1]))
-    raise typer.BadParameter("duration must use h or d suffix, for example 48h or 2d")
+    try:
+        if raw.endswith("h"):
+            amount = int(raw[:-1])
+            duration = _dt.timedelta(hours=amount)
+        elif raw.endswith("d"):
+            amount = int(raw[:-1])
+            duration = _dt.timedelta(days=amount)
+        else:
+            raise ValueError
+    except ValueError as exc:
+        raise typer.BadParameter("duration must use h or d suffix, for example 48h or 2d") from exc
+    if duration <= _dt.timedelta(0):
+        raise typer.BadParameter("duration must be greater than zero")
+    return duration
 
 
 def _retention_service():
@@ -138,7 +147,11 @@ def cleanup(
 ) -> None:
     """Delete expired non-important report artifacts and related handoffs."""
     service = _retention_service()
-    ttl = _parse_duration(older_than)
+    try:
+        ttl = _parse_duration(older_than)
+    except typer.BadParameter as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(2) from None
     result = service.cleanup(older_than=ttl, dry_run=dry_run)
     if json_output:
         typer.echo(
