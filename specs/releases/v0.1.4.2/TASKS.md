@@ -186,13 +186,16 @@ Evidence:
 
 ### T-BUG-09 — Add regression tests for workflow gate contract
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** qa-engineer
 - **Target files:** `tests/**`
 - **Preconditions:** T-BUG-07 and T-BUG-08 done
 - **Done criterion:** Tests assert public workflows/skills/personas contain the
   required pre-implementation agreement gate, post-implementation review/QA gate,
   rework loop, approval evidence, and no-push/PR/deploy-before-approval wording.
+
+Evidence:
+- `python -m pytest -q -p no:cacheprovider tests/contract/test_workflow_review_gate_contract.py tests/contract/test_source_repo_hygiene.py tests/contract/test_codex_reference_only_wording.py` → 11 passed.
 
 ---
 
