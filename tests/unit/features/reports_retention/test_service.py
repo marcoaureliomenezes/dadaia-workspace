@@ -151,3 +151,65 @@ def test_malformed_state_is_reported(tmp_path: Path) -> None:
     state.write_text("{not json", encoding="utf-8")
 
     assert _service(tmp_path).status()["malformed_state"] is True
+
+
+def test_state_persists_version_one(tmp_path: Path) -> None:
+    _write_report(tmp_path, "ctx/qa/report.html")
+    service = _service(tmp_path)
+    service.mark_important("ctx/qa/report.html")
+
+    state = json.loads(service.state_path.read_text(encoding="utf-8"))
+    assert state["version"] == 1
+
+
+def test_handoff_without_artifact_path_can_be_marked_important(tmp_path: Path) -> None:
+    handoff = tmp_path / ".dadaia" / "handoff" / "ctx" / "orphan.handoff.json"
+    handoff.parent.mkdir(parents=True)
+    handoff.write_text(json.dumps({"agent": "qa-engineer"}), encoding="utf-8")
+
+    artifact = _service(tmp_path).mark_important(".dadaia/handoff/ctx/orphan.handoff.json")
+
+    assert artifact == ".dadaia/handoff/ctx/orphan.handoff.json"
+
+
+def test_legacy_adjacent_handoff_with_same_stem_is_deleted_with_report(tmp_path: Path) -> None:
+    report = _write_report(tmp_path, "ctx/qa/old.html", mtime=NOW - dt.timedelta(days=3))
+    handoff = report.with_name("old.handoff.json")
+    handoff.write_text(json.dumps({"agent": "qa-engineer"}), encoding="utf-8")
+
+    candidate = _service(tmp_path).cleanup_candidates()[0]
+
+    assert report in candidate.paths
+    assert handoff in candidate.paths
+
+
+def test_legacy_handoff_produced_at_does_not_override_report_filename(tmp_path: Path) -> None:
+    report = _write_report(tmp_path, "ctx/qa/2026-06-04T090000Z-report.html")
+    handoff = report.with_name("2026-06-04T090000Z-report.handoff.json")
+    handoff.write_text(
+        json.dumps(
+            {
+                "produced_at": "2026-06-01T00:00:00Z",
+                "artifact": {"path": ".dadaia/reports/ctx/qa/2026-06-04T090000Z-report.html"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    record = _service(tmp_path).list_reports()[0]
+
+    assert record.effective_timestamp == dt.datetime(2026, 6, 4, 9, 0, tzinfo=dt.UTC)
+
+
+def test_external_report_symlink_is_ignored_without_crashing(tmp_path: Path) -> None:
+    external = tmp_path / "external.html"
+    external.write_text("<html>outside</html>", encoding="utf-8")
+    link = tmp_path / ".dadaia" / "reports" / "ctx" / "qa" / "link.html"
+    link.parent.mkdir(parents=True)
+    os.symlink(external, link)
+
+    service = _service(tmp_path)
+
+    assert service.list_reports() == []
+    assert service.cleanup().deleted_paths == ()
+    assert external.exists()
