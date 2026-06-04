@@ -8,7 +8,8 @@ product source.
 
 ## Subtree Rules
 
-- `.dadaia/reports/AGENTS.md` governs reports and handoff sidecars.
+- `.dadaia/reports/AGENTS.md` governs human-readable reports.
+- `.dadaia/handoff/AGENTS.md` governs machine-readable handoffs.
 - `.dadaia/tmp/AGENTS.md` governs scratch files and evidence captures.
 - `.dadaia/states/AGENTS.md` governs JSON state files.
 - `.dadaia/agentic/manifest.json` identifies lib-originated projections.
@@ -35,6 +36,7 @@ corresponding service code, not ad hoc text edits.
 | Path | Rule |
 |---|---|
 | `.dadaia/reports/` | agent reports; must follow `.dadaia/reports/AGENTS.md` |
+| `.dadaia/handoff/` | agent handoffs; must follow `.dadaia/handoff/AGENTS.md` |
 | `.dadaia/tmp/` | disposable scratch/evidence; must follow `.dadaia/tmp/AGENTS.md` |
 | `.dadaia/states/` | machine state; must follow `.dadaia/states/AGENTS.md` |
 | `.dadaia/scripts/` | generated hook/runtime scripts; edit public source first |

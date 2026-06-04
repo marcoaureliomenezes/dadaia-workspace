@@ -17,7 +17,7 @@ stages:
   - id: audit_intake
     agent: project-auditor
     expected_output:
-      path: ".dadaia/reports/{context}/project-auditor/{run_ts}-intake.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-project-auditor-intake.handoff.json"
       must_include: ["Audit scope", "Known risks"]
     inputs:
       - kind: workflow_input
@@ -37,7 +37,7 @@ stages:
     description: "Evidence harvest — dispatch researcher to gather facts before main analysis."
     consumes: []
     expected_output:
-      path: ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.audit_intake.output
@@ -48,10 +48,10 @@ stages:
     needs: [audit_intake, research_evidence]
     parallel_group: audit
     consumes:
-      - ".dadaia/reports/{context}/project-auditor/{run_ts}-intake.handoff.json"
-      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-project-auditor-intake.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/code-reviewer/{run_ts}-audit.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-code-reviewer-audit.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.audit_intake.output
@@ -65,10 +65,10 @@ stages:
     needs: [audit_intake, research_evidence]
     parallel_group: audit
     consumes:
-      - ".dadaia/reports/{context}/project-auditor/{run_ts}-intake.handoff.json"
-      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-project-auditor-intake.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/security-reviewer/{run_ts}-audit.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-security-reviewer-audit.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.audit_intake.output
@@ -82,10 +82,10 @@ stages:
     needs: [audit_intake, research_evidence]
     parallel_group: audit
     consumes:
-      - ".dadaia/reports/{context}/project-auditor/{run_ts}-intake.handoff.json"
-      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-project-auditor-intake.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/researcher/{run_ts}-audit.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-researcher-audit.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.audit_intake.output
@@ -99,10 +99,10 @@ stages:
     needs: [audit_intake, research_evidence]
     parallel_group: audit
     consumes:
-      - ".dadaia/reports/{context}/project-auditor/{run_ts}-intake.handoff.json"
-      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-project-auditor-intake.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-audit.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-qa-engineer-audit.handoff.json"
     inputs:
       - kind: stage_output
         from: stages.audit_intake.output
@@ -115,12 +115,12 @@ stages:
     agent: project-auditor
     needs: [code_review, security_review, research_review, qa_review]
     consumes:
-      - ".dadaia/reports/{context}/code-reviewer/{run_ts}-audit.handoff.json"
-      - ".dadaia/reports/{context}/security-reviewer/{run_ts}-audit.handoff.json"
-      - ".dadaia/reports/{context}/researcher/{run_ts}-audit.handoff.json"
-      - ".dadaia/reports/{context}/qa-engineer/{run_ts}-audit.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-code-reviewer-audit.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-security-reviewer-audit.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-audit.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-qa-engineer-audit.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/project-auditor/{run_ts}-synthesis.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-project-auditor-synthesis.handoff.json"
       must_include: ["Compliance score", "Drift items", "Recommended actions"]
     inputs:
       - kind: stage_output

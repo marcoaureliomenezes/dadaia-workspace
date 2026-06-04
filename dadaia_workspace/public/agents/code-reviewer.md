@@ -35,6 +35,7 @@ input_contract:
 paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/code-reviewer/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # Code Reviewer
@@ -92,7 +93,7 @@ required in an `audit-cycle`. NOT for SPEC/PLAN review — that is `product-engi
 
 ## Skills consumed
 
-- `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after the review report
+- `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after the review report
 
 ---
 
@@ -149,7 +150,7 @@ Execute the `dadaia-step0-memory-bootstrap` skill before any implementation, rev
 4. Apply the 6-axis checklist
 5. Classify each finding by severity
 6. Write the review report
-7. Emit handoff sidecar
+7. Emit handoff JSON
 
 ---
 
@@ -212,13 +213,13 @@ merge decision.
 This agent's deep-knowledge references live under `docs/agent-knowledge/code-reviewer/`. Load them on demand when the task requires depth on a specific topic.
 
 - [architecture-review](../../../docs/agent-knowledge/code-reviewer/architecture-review.md)
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 

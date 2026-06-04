@@ -23,7 +23,7 @@ stages:
     description: "Produce Figma artifact + design report for the surface. Output must include figma_url and all 8 required sections."
     consumes: []
     expected_output:
-      path: ".dadaia/reports/{context}/design-specialist/{run_ts}-design.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-design-specialist-design.handoff.json"
       must_include: ["figma_url", "Design spec", "ASCII sketches", "Handoff to frontend-engineer"]
     inputs:
       - kind: workflow_input
@@ -42,9 +42,9 @@ stages:
     needs: [design_production]
     description: "Run design-report-quality-gate skill to verify all 8 sections pass, including figma_url. Blocks if any section is FAIL."
     consumes:
-      - ".dadaia/reports/{context}/design-specialist/{run_ts}-design.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-design-specialist-design.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/design-specialist/{run_ts}-quality-gate.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-design-specialist-quality-gate.handoff.json"
       must_include: ["PASS"]
     inputs:
       - kind: stage_output
@@ -57,9 +57,9 @@ stages:
     needs: [design_quality_gate]
     description: "Implement the approved design spec. design_report is a required stage input — gate blocks if missing."
     consumes:
-      - ".dadaia/reports/{context}/design-specialist/{run_ts}-design.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-design-specialist-design.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/frontend-engineer/{run_ts}-{task_id}-green.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-frontend-engineer-{task_id}-green.handoff.json"
       must_include: ["All tests pass"]
     inputs:
       - kind: workflow_input
@@ -78,10 +78,10 @@ stages:
     needs: [implementation]
     description: "Two-pass validation: (1) functional E2E, (2) design compliance — token audit, spacing, contrast, visual regression against design report."
     consumes:
-      - ".dadaia/reports/{context}/frontend-engineer/{run_ts}-{task_id}-green.handoff.json"
-      - ".dadaia/reports/{context}/design-specialist/{run_ts}-design.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-frontend-engineer-{task_id}-green.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-design-specialist-design.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-{task_id}-design-compliance.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-qa-engineer-{task_id}-design-compliance.handoff.json"
       must_include: ["E2E pass", "Design compliance pass"]
     inputs:
       - kind: stage_output

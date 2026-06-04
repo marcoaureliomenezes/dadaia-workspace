@@ -35,6 +35,7 @@ input_contract:
 paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/security-reviewer/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # Security Reviewer
@@ -95,7 +96,7 @@ external skill file is required. Deep-knowledge references live under
 
 ## Skills consumed
 
-- `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after the security report
+- `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after the security report
 
 ---
 
@@ -161,7 +162,7 @@ For Dockerfile, docker-compose, and any cloud IaC (Terraform, Pulumi):
 ### Step 5 — Emit report
 
 Write to `.dadaia/reports/<ctx>/security-reviewer/<ts>-security.html`. Invoke
-`dadaia-handoff-emitter` for the sidecar.
+`dadaia-handoff-emitter` for the handoff JSON.
 
 ---
 
@@ -229,13 +230,13 @@ NOT involved in the fix.
 This agent's deep-knowledge references live under `docs/agent-knowledge/security-reviewer/`. Load them on demand when the task requires depth on a specific topic.
 
 - [audit-protocol](../../../docs/agent-knowledge/security-reviewer/audit-protocol.md)
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 

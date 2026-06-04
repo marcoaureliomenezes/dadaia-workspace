@@ -25,7 +25,7 @@ stages:
   - id: file_hotfix_candidate
     agent: qa-engineer
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-hotfix-candidate.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-qa-engineer-hotfix-candidate.handoff.json"
       must_include: ["Affected release", "Suggested PATCH"]
     inputs:
       - kind: workflow_input
@@ -39,9 +39,9 @@ stages:
     agent: project-manager
     needs: [file_hotfix_candidate]
     consumes:
-      - ".dadaia/reports/{context}/qa-engineer/{run_ts}-hotfix-candidate.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-qa-engineer-hotfix-candidate.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/project-manager/{run_ts}-hotfix-promote.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-project-manager-hotfix-promote.handoff.json"
       must_include: ["PATCH version assigned", "ACTIVE.md updated"]
     inputs:
       - kind: stage_output
@@ -52,7 +52,7 @@ stages:
     agent: product-engineer
     needs: [promote_to_release]
     consumes:
-      - ".dadaia/reports/{context}/project-manager/{run_ts}-hotfix-promote.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-project-manager-hotfix-promote.handoff.json"
     expected_output:
       path: "specs/releases/{run_version_id}/SPEC.md"
       must_include: ["Patches release", "Incident summary"]
@@ -67,7 +67,7 @@ stages:
     consumes:
       - "specs/releases/{run_version_id}/SPEC.md"
     expected_output:
-      path: ".dadaia/reports/{context}/{implementer_agent}/{run_ts}-hotfix-implementation.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-{implementer_agent}-hotfix-implementation.handoff.json"
       must_include: ["Smoke test", "All tests pass"]
     inputs:
       - kind: stage_output
@@ -78,9 +78,9 @@ stages:
     agent: qa-engineer
     needs: [apply_fix]
     consumes:
-      - ".dadaia/reports/{context}/{implementer_agent}/{run_ts}-hotfix-implementation.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-{implementer_agent}-hotfix-implementation.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-hotfix-smoke.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-qa-engineer-hotfix-smoke.handoff.json"
       must_include: ["Validations", "post-deploy smoke"]
     inputs:
       - kind: stage_output
@@ -94,7 +94,7 @@ stages:
     agent: product-engineer
     needs: [close_with_smoke]
     consumes:
-      - ".dadaia/reports/{context}/qa-engineer/{run_ts}-hotfix-smoke.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-qa-engineer-hotfix-smoke.handoff.json"
     expected_output:
       path: "specs/releases/{run_version_id}/CLOSURE.md"
       must_include: ["Validations", "post-deploy smoke"]

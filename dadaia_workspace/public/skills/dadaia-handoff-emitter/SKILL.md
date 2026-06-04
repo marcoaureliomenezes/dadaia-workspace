@@ -1,13 +1,13 @@
 ---
 name: dadaia-handoff-emitter
 description: >
-  Standalone skill that instructs an agent to emit a machine-readable handoff sidecar
-  (<stem>.handoff.json) adjacent to any HTML report it just produced under
-  .dadaia/reports/. The sidecar conforms to the schema at
+  Standalone skill that instructs an agent to emit a machine-readable handoff JSON
+  file under .dadaia/handoff/<context>/ for any HTML report it just produced under
+  .dadaia/reports/. The handoff conforms to the schema at
   .dadaia/agentic/schemas/handoff-v1.schema.json and enables downstream CLI validation
   via `dadaia reports validate`. Invoke this skill once per HTML report, immediately
   after the Write tool call that finalises the report.
-applyTo: ".dadaia/reports/**/*.html"
+applyTo: ".dadaia/handoff/**/*.handoff.json"
 ---
 
 # dadaia-handoff-emitter
@@ -15,11 +15,11 @@ applyTo: ".dadaia/reports/**/*.html"
 ## Purpose
 
 After an agent finalises an HTML report in `.dadaia/reports/`, it must emit a
-structured JSON sidecar so that other agents and the `dadaia reports validate`
+structured JSON handoff under `.dadaia/handoff/<context>/` so that other agents and the `dadaia reports validate`
 CLI can verify the report's origin, content hash, and conformance to the
 handoff contract.
 
-The sidecar schema lives at:
+The handoff schema lives at:
 
 ```
 .dadaia/agentic/schemas/handoff-v1.schema.json
@@ -73,7 +73,7 @@ listed below. All field semantics match the schema at
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `artifact.path` | string | Logical path to the HTML report, relative to workspace root. Optional in v1.1 (sidecar-first emission). |
+| `artifact.path` | string | Logical path to the HTML report, relative to workspace root. Optional in v1.1 handoff-first emission. |
 | `release_id` | string | Active release identifier, e.g. `"agent-comms-v1"`. Include whenever the report relates to a named release. |
 | `findings` | array | Zero or more finding objects. Each item requires: `severity` (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, or `INFO`), `message` (string), `detail_md` (string), `fix_recommendation` (string). |
 | `decisions_required` | array of strings | List of decision items that a downstream agent or operator must resolve. |
@@ -136,28 +136,28 @@ listed below. All field semantics match the schema at
 }
 ```
 
-### Step 3 — Emit the sidecar file using the Write tool
+### Step 3 — Emit the handoff file using the Write tool
 
-The sidecar filename is derived from the HTML report's stem by replacing `.html`
-with `.handoff.json`. It lives in the **same directory** as the HTML report.
+The handoff filename is derived from the HTML report's timestamp, producer, and
+slug. It lives under `.dadaia/handoff/<context>/`, not beside the report.
 
 Rules:
-- Same directory as the HTML report.
-- Same stem as the HTML report.
+- Directory: `.dadaia/handoff/<context>/`.
+- Filename: `<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`.
 - Extension: `.handoff.json`.
 
 Example:
 
 ```
 HTML report:  .dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html
-Sidecar:      .dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.handoff.json
+Handoff:      .dadaia/handoff/dadaia-workspace/2026-05-16T120000Z-software-engineer-python-task-green.handoff.json
 ```
 
 Use the `Write` tool with the assembled JSON as content:
 
 ```
 Write(
-  file_path = "<same-dir-as-html>/<stem>.handoff.json",
+  file_path = ".dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json",
   content   = <JSON string from Step 2>
 )
 ```
@@ -168,21 +168,21 @@ Emit the JSON with 2-space indentation for human readability.
 
 ## Validation
 
-After emitting the sidecar, optionally verify it with:
+After emitting the handoff, verify it with:
 
 ```bash
-dadaia reports validate <path-to-sidecar.handoff.json>
+dadaia reports validate <path-to-handoff.handoff.json>
 ```
 
-Exit 0 confirms the sidecar is valid against the schema. A non-zero exit
-indicates a structural error — fix the sidecar before proceeding.
+Exit 0 confirms the handoff is valid against the schema. A non-zero exit
+indicates a structural error — fix the handoff before proceeding.
 
 ---
 
 ## Guardrails
 
 - Never duplicate the schema content inside the handoff JSON or this skill file.
-- Never emit a sidecar for a report that does not yet exist on disk.
-- The sidecar must be adjacent to the HTML (same directory, same stem) — no exceptions.
+- Never emit a handoff for a report that does not yet exist on disk.
+- Never write handoff JSON under `.dadaia/reports/`.
 - `produced_at` must be a valid ISO 8601 UTC timestamp ending in `Z`.
 - `artifact.content_hash` is a bare 64-character lowercase hex string — no prefix.

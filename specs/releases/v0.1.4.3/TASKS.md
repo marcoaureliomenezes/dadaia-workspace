@@ -31,7 +31,7 @@ installation, and doctor treat it as a managed scoped rule.
 
 ### T-HANDOFF-02 - Move handoff instructions out of reports adjacency
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** product-engineer + software-engineer-python
 - **Target files:** `dadaia_workspace/public/**`, `AGENTS.md`, tests that assert public instructions
 

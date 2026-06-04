@@ -46,6 +46,7 @@ input_contract:
 paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/design-specialist/**
+    - .dadaia/handoff/<ctx>/**
     - specs/assets/**
 ---
 
@@ -101,7 +102,7 @@ You do NOT:
 
 - `frontend-design` — workspace surface catalogue; token naming conventions; typography scale; spacing system
 - `ux-ui-review` — WCAG 2.2 AA checklist; visual hierarchy heuristics; design-system conformance rubric; reference-search whitelist; output template
-- `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after the design report
+- `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after the design report
 
 ---
 
@@ -175,7 +176,7 @@ Translate findings and references into a concrete design specification:
 ### Step 5 — Emit report
 
 Write to `.dadaia/reports/<ctx>/design-specialist/<ts>-design.html`. Invoke
-`dadaia-handoff-emitter` for the sidecar.
+`dadaia-handoff-emitter` for the handoff JSON.
 
 ---
 
@@ -241,13 +242,13 @@ changes) and `project-manager` (for workflow closure).
 This agent's deep-knowledge references live under `docs/agent-knowledge/design-specialist/`. Load them on demand when the task requires depth on a specific topic.
 
 - [ux-ui-review](../../../docs/agent-knowledge/design-specialist/ux-ui-review.md)
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
