@@ -1,4 +1,4 @@
-"""T-11 — CodexAgentDispatcher parallel fan-out (AC5)."""
+"""CodexAgentDispatcher reference-only parallel handoff behavior."""
 
 from pathlib import Path
 
@@ -22,16 +22,16 @@ def _make_invocation(
     )
 
 
-def test_capabilities_supports_parallel_true() -> None:
-    """CodexAgentDispatcher.capabilities() must advertise supports_parallel=True."""
+def test_capabilities_supports_parallel_false() -> None:
+    """CodexAgentDispatcher must not advertise unsupported parallel spawning."""
     cap = CodexAgentDispatcher().capabilities()
-    assert cap.supports_parallel is True
+    assert cap.supports_parallel is False
 
 
-def test_capabilities_mode_is_codex() -> None:
-    """CodexAgentDispatcher.capabilities() must report mode=DispatcherMode.CODEX."""
+def test_capabilities_mode_is_cli_only() -> None:
+    """CodexAgentDispatcher reports CLI_ONLY because it writes manual handoffs."""
     cap = CodexAgentDispatcher().capabilities()
-    assert cap.mode == DispatcherMode.CODEX
+    assert cap.mode == DispatcherMode.CLI_ONLY
 
 
 def test_capabilities_runtime_name_is_codex() -> None:
@@ -59,12 +59,11 @@ def test_parallel_dispatch_all_results_awaiting_gate(tmp_path: Path) -> None:
 
 
 def test_parallel_dispatch_does_not_raise_for_parallel_group(tmp_path: Path) -> None:
-    """dispatch_parallel() with parallel_group must NOT raise OrchestrationUnsupportedError."""
+    """dispatch_parallel() writes reference files but does not claim execution."""
     invocations = (
         _make_invocation(tmp_path, "alpha", parallel_group="group-x"),
         _make_invocation(tmp_path, "beta", parallel_group="group-x"),
     )
-    # Must not raise — best-effort parallel is a supported capability
     results = CodexAgentDispatcher().dispatch_parallel(invocations)
     assert len(results) == 2
 
@@ -79,8 +78,10 @@ def test_parallel_dispatch_writes_all_invocation_files(tmp_path: Path) -> None:
         assert Path(inv.invocation_path).exists(), f"Missing file for {inv.stage_id}"
 
 
-def test_parallel_dispatch_writes_note_for_each_parallel_stage(tmp_path: Path) -> None:
-    """Each file written for a parallel_group invocation must contain the best-effort note."""
+def test_parallel_dispatch_writes_reference_only_note_for_each_parallel_stage(
+    tmp_path: Path,
+) -> None:
+    """Each parallel_group handoff must state that Codex did not spawn agents."""
     invocations = (
         _make_invocation(tmp_path, "node-a", parallel_group="tier-1"),
         _make_invocation(tmp_path, "node-b", parallel_group="tier-1"),
@@ -88,9 +89,8 @@ def test_parallel_dispatch_writes_note_for_each_parallel_stage(tmp_path: Path) -
     CodexAgentDispatcher().dispatch_parallel(invocations)
     for inv in invocations:
         content = Path(inv.invocation_path).read_text()
-        assert "best-effort" in content.lower(), (
-            f"Expected best-effort note in file for {inv.stage_id}"
-        )
+        assert "reference-only" in content.lower()
+        assert "does not spawn agents" in content.lower()
 
 
 def test_parallel_dispatch_empty_tuple_returns_empty_tuple(tmp_path: Path) -> None:

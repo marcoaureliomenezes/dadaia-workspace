@@ -1,4 +1,4 @@
-"""CodexAgentDispatcher — best-effort parallel dispatch for OpenAI Codex runtime."""
+"""CodexAgentDispatcher — reference-only handoffs for OpenAI Codex runtime."""
 
 from pathlib import Path
 
@@ -12,18 +12,18 @@ from dadaia_workspace.core.models.run_state import (
 )
 
 # Features supported by this dispatcher.
-_SUPPORTED_FEATURES: frozenset[str] = frozenset({"parallel", "sequential"})
+_SUPPORTED_FEATURES: frozenset[str] = frozenset({"sequential"})
 
 # Features known but explicitly unsupported.
-_UNSUPPORTED_FEATURES: frozenset[str] = frozenset({"gates_inline"})
+_UNSUPPORTED_FEATURES: frozenset[str] = frozenset({"parallel", "gates_inline"})
 
 
 def _render(invocation: StageInvocation) -> str:
     """Render an invocation document for the Codex runtime.
 
-    When ``invocation.parallel_group`` is set, a note is appended explaining that
-    Codex dispatches in best-effort mode through deferred multi-agent tooling
-    discovered with ``tool_search`` rather than native parallel dispatch.
+    Codex currently has no workflow executor that can spawn project agents.
+    These files are manual/reference handoffs only; the operator must run the
+    named agent work and place the report at the expected output path.
     """
     parts = [
         f"# Stage invocation — {invocation.workflow_name} / {invocation.stage_id}",
@@ -38,10 +38,9 @@ def _render(invocation: StageInvocation) -> str:
         parts.extend(
             [
                 "",
-                "> **Note:** Codex best-effort parallel — use the deferred multi-agent "
-                "tool discovered with `tool_search` instead of native parallel dispatch. "
-                "This stage is part of a parallel_group but will be executed sequentially "
-                "within this runtime.",
+                "> **Note:** Codex reference-only mode does not spawn agents or "
+                "execute parallel groups. This stage is part of a parallel_group, "
+                "but this dispatcher only wrote a manual handoff file.",
             ]
         )
     parts.extend(["", "## Inputs"])
@@ -56,8 +55,8 @@ def _render(invocation: StageInvocation) -> str:
         [
             "",
             "## How to execute",
-            f"Invoke the agent `{invocation.agent}` using the Codex multi-agent tool "
-            "discovered with `tool_search`. "
+            f"Manually run or copy this handoff to the agent `{invocation.agent}`. "
+            "No Codex agent process was spawned by `dadaia orchestrate`. "
             f"Write the output to `{invocation.expected_output_path}`. "
             f"After completion, run `dadaia orchestrate resume {invocation.run_id}` "
             "to advance the run.",
@@ -67,24 +66,25 @@ def _render(invocation: StageInvocation) -> str:
 
 
 class CodexAgentDispatcher:
-    """Dispatcher for OpenAI Codex runtime with best-effort parallel support.
+    """Dispatcher for OpenAI Codex runtime with reference-only handoff support.
 
-    Codex does not provide a native parallel agent dispatch mechanism equivalent to
-    Claude's Agent tool.  This dispatcher emulates parallelism by dispatching each
-    invocation sequentially and recording a best-effort note in each invocation file.
+    Codex does not provide this project with a supported workflow executor that can
+    spawn named project agents. This dispatcher writes invocation files only. The
+    operator must execute the work manually and resume the run after the expected
+    report is present.
 
-    Capability matrix (ADR-3):
-      - supports_parallel: True  (best-effort via deferred multi-agent tooling; not native)
+    Capability matrix:
+      - supports_parallel: False  (manual/reference-only; no spawning)
       - supports_gates_inline: False  (gates require CLI confirmation loop)
-      - mode: DispatcherMode.CODEX
+      - mode: DispatcherMode.CLI_ONLY
     """
 
     def capabilities(self) -> DispatcherCapabilities:
         return DispatcherCapabilities(
             runtime_name="codex",
-            supports_parallel=True,
+            supports_parallel=False,
             supports_gates_inline=False,
-            mode=DispatcherMode.CODEX,
+            mode=DispatcherMode.CLI_ONLY,
         )
 
     def check_capability(self, feature: str) -> None:
@@ -97,6 +97,12 @@ class CodexAgentDispatcher:
         if feature in _SUPPORTED_FEATURES:
             return
         if feature in _UNSUPPORTED_FEATURES:
+            if feature == "parallel":
+                raise OrchestrationUnsupportedError(
+                    "Codex runtime is reference-only for dadaia workflows and does not "
+                    "spawn agents or execute parallel groups. It can write manual handoff "
+                    "files; use --runtime claude for supported parallel delegation."
+                )
             raise OrchestrationUnsupportedError(
                 f"Codex runtime does not support '{feature}'. "
                 "Inline gate confirmation requires a CLI operator loop which is unavailable "
@@ -105,8 +111,8 @@ class CodexAgentDispatcher:
             )
         raise OrchestrationUnsupportedError(
             f"Codex runtime does not recognise feature '{feature}'. "
-            "Known unsupported features: gates_inline. "
-            "Supported features: parallel (best-effort), sequential."
+            "Known unsupported features: parallel, gates_inline. "
+            "Supported features: sequential manual handoff."
         )
 
     def dispatch(self, invocation: StageInvocation) -> StageResult:
@@ -131,12 +137,12 @@ class CodexAgentDispatcher:
     def dispatch_parallel(
         self, invocations: tuple[StageInvocation, ...]
     ) -> tuple[StageResult, ...]:
-        """Dispatch all invocations sequentially (best-effort parallel).
+        """Write reference handoff files for each invocation.
 
-        Codex does not support native parallel agent dispatch.  Each invocation is
-        written to disk individually with a note explaining the best-effort limitation.
-        This satisfies AC5: fan-out is attempted; no ``OrchestrationUnsupportedError``
-        is raised.
+        Codex does not support agent spawning or native parallel agent dispatch in
+        this project. Each invocation is written to disk individually with a note
+        explaining the manual/reference-only limitation. No agent execution is
+        implied by these results.
 
         Args:
             invocations: Tuple of :class:`StageInvocation` objects to dispatch.

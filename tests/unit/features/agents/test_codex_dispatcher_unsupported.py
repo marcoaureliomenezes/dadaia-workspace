@@ -42,11 +42,14 @@ def test_check_capability_error_message_is_human_readable(tmp_path: Path) -> Non
     assert "codex" in message.lower()
 
 
-def test_check_capability_does_not_raise_for_parallel(tmp_path: Path) -> None:
-    """check_capability('parallel') must NOT raise — Codex supports best-effort parallel."""
+def test_check_capability_raises_for_parallel(tmp_path: Path) -> None:
+    """check_capability('parallel') must raise because Codex is reference-only."""
     dispatcher = CodexAgentDispatcher()
-    # Should not raise
-    dispatcher.check_capability("parallel")
+    with pytest.raises(OrchestrationUnsupportedError) as exc_info:
+        dispatcher.check_capability("parallel")
+    message = str(exc_info.value).lower()
+    assert "reference-only" in message
+    assert "parallel" in message
 
 
 def test_check_capability_does_not_raise_for_sequential(tmp_path: Path) -> None:
