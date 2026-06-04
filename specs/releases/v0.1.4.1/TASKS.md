@@ -82,7 +82,7 @@ correct v2 verb. Keep the rest of each file's content intact.
 
 ### T-HARD-03 — Fix dadaia-handoff-emitter skill schema drift
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target files:** `dadaia_workspace/public/skills/dadaia-handoff-emitter.md`
 - **Preconditions:** T-HARD-02 done (sequential ownership; disjoint write set)
@@ -119,7 +119,7 @@ See AC-CONS-1 and PLAN §5 "Language uniformity".
 
 ### T-HARD-05 — Gate RULE F tmp fast-allow and one-[-]-per-owner warn
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Target files:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`
 - **Preconditions:** T-HARD-04 done (different file from T-HARD-04; may overlap

@@ -47,7 +47,7 @@ Capture the hex digest (the first field). This is the value for `artifact.conten
 Example:
 ```bash
 sha256sum .dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html
-# → a3f8c2... .dadaia/reports/.../task-green.html
+# → a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1  .dadaia/reports/.../task-green.html
 ```
 
 ### Step 2 — Assemble the handoff JSON dictionary
@@ -60,35 +60,41 @@ listed below. All field semantics match the schema at
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema_version` | string (literal) | Always `"handoff-v1"` |
+| `schema_version` | string (literal) | Always `"handoff-v1.1"` |
 | `agent` | string | The `name` from your own frontmatter (e.g. `"software-engineer-python"`) |
 | `context` | string | Active Spec Context Project name (e.g. `"dadaia-workspace"`) |
 | `produced_at` | string (ISO 8601) | UTC timestamp when the report was finalised, e.g. `"2026-05-16T12:00:00Z"` |
-| `artifact.type` | string | One of `"report"`, `"spec"`, `"plan"`, `"tasks"`, `"closure"` |
-| `artifact.path` | string | Logical path to the HTML report, relative to workspace root, e.g. `.dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html` |
-| `artifact.content_hash` | string | `sha256:<hex>` — prefix the hex digest from Step 1 with `sha256:` |
+| `scope` | string | Scope descriptor for the handoff (e.g. file path, module, component, or task id) |
+| `metrics` | object | Key quantitative metrics for this handoff (e.g. `{"files_changed": 3, "lines_added": 42}`) |
+| `artifact.type` | string | One of `"report"`, `"spec"`, `"plan"`, `"tasks"`, `"closure"`, `"memory"`, `"other"` |
+| `artifact.content_hash` | string | Bare 64-character lowercase hex digest from Step 1 (no prefix) |
 
 #### Optional fields (include when applicable)
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `artifact.path` | string | Logical path to the HTML report, relative to workspace root. Optional in v1.1 (sidecar-first emission). |
 | `release_id` | string | Active release identifier, e.g. `"agent-comms-v1"`. Include whenever the report relates to a named release. |
-| `findings` | array | Zero or more finding objects, each with `severity` (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, or `INFO`) and `summary` (string). Include when the report surfaces structured findings. |
+| `findings` | array | Zero or more finding objects. Each item requires: `severity` (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, or `INFO`), `message` (string), `detail_md` (string), `fix_recommendation` (string). |
 | `decisions_required` | array of strings | List of decision items that a downstream agent or operator must resolve. |
-| `next_handoff` | object | Expected next handoff: `{ "agent": "<name>", "input": "<description>" }`. Include when the workflow has a clear next recipient. |
+| `next_handoff` | object | Expected next handoff. Required sub-fields: `agent` (string), `context` (string), `expected_artifact_type` (one of `"report"`, `"spec"`, `"plan"`, `"tasks"`, `"closure"`, `"memory"`, `"other"`). |
+| `verdict` | string | Approval verdict: `"APPROVED"` or `"REJECTED"`. Emitted by qa-engineer or security-reviewer. |
+| `verdict_reason` | string | Human-readable explanation of the verdict. |
 
 #### Example minimal handoff
 
 ```json
 {
-  "schema_version": "handoff-v1",
+  "schema_version": "handoff-v1.1",
   "agent": "software-engineer-python",
   "context": "dadaia-workspace",
   "produced_at": "2026-05-16T12:00:00Z",
+  "scope": ".dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html",
+  "metrics": {},
   "artifact": {
     "type": "report",
     "path": ".dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-task-green.html",
-    "content_hash": "sha256:a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
+    "content_hash": "a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
   }
 }
 ```
@@ -97,23 +103,35 @@ listed below. All field semantics match the schema at
 
 ```json
 {
-  "schema_version": "handoff-v1",
+  "schema_version": "handoff-v1.1",
   "agent": "software-engineer-python",
   "context": "dadaia-workspace",
   "produced_at": "2026-05-16T12:00:00Z",
+  "scope": "T-AC-09 implementation — dadaia_workspace/public/scripts/sdd-spec-gate.sh",
+  "metrics": {
+    "files_changed": 1,
+    "lines_added": 42,
+    "lines_removed": 5
+  },
   "release_id": "agent-comms-v1",
   "artifact": {
     "type": "report",
     "path": ".dadaia/reports/dadaia-workspace/software-engineer-python/2026-05-16T120000Z-T-AC-09-green.html",
-    "content_hash": "sha256:a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
+    "content_hash": "a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
   },
   "findings": [
-    { "severity": "INFO", "summary": "All acceptance checks passed." }
+    {
+      "severity": "INFO",
+      "message": "All acceptance checks passed.",
+      "detail_md": "Ran full pytest suite; 0 failures.",
+      "fix_recommendation": "No action required."
+    }
   ],
   "decisions_required": [],
   "next_handoff": {
     "agent": "qa-engineer",
-    "input": "Green implementation report for T-AC-09; please run E2E validation."
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
   }
 }
 ```
@@ -164,7 +182,7 @@ indicates a structural error — fix the sidecar before proceeding.
 ## Guardrails
 
 - Never duplicate the schema content inside the handoff JSON or this skill file.
-- Never omit the `sha256:` prefix from `artifact.content_hash`.
 - Never emit a sidecar for a report that does not yet exist on disk.
 - The sidecar must be adjacent to the HTML (same directory, same stem) — no exceptions.
 - `produced_at` must be a valid ISO 8601 UTC timestamp ending in `Z`.
+- `artifact.content_hash` is a bare 64-character lowercase hex string — no prefix.
