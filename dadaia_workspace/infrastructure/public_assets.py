@@ -956,6 +956,7 @@ class FileSystemPublicAssetManager:
                 self._install_agents_md(agentic_dir, workspace_root, force, installed)
         self._install_dadaia_agents_md(agentic_dir, workspace_root, force, installed)
         self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
+        self._install_handoff_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
             if item == "agents":
@@ -1405,6 +1406,15 @@ class FileSystemPublicAssetManager:
             reports_dir.mkdir(parents=True, exist_ok=True)
             self._copy_file(src, reports_dir / "AGENTS.md", force, installed)
 
+    def _install_handoff_agents_md(
+        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        src = agentic_dir / "data" / "handoff-AGENTS.md"
+        if src.exists():
+            handoff_dir = workspace_root / ".dadaia" / "handoff"
+            handoff_dir.mkdir(parents=True, exist_ok=True)
+            self._copy_file(src, handoff_dir / "AGENTS.md", force, installed)
+
     def _install_dadaia_agents_md(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
     ) -> None:
@@ -1739,6 +1749,15 @@ class FileSystemPublicAssetManager:
                 reports_agents_md,
                 workspace_root / ".dadaia" / "reports" / "AGENTS.md",
                 "reports:AGENTS.md",
+                False,
+            )
+
+        handoff_agents_md = agentic_dir / "data" / "handoff-AGENTS.md"
+        if handoff_agents_md.exists():
+            yield (
+                handoff_agents_md,
+                workspace_root / ".dadaia" / "handoff" / "AGENTS.md",
+                "handoff:AGENTS.md",
                 False,
             )
 
