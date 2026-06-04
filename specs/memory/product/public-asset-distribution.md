@@ -47,7 +47,8 @@ scoped AGENTS files:
 - `.dadaia/AGENTS.md` — runtime control-plane ownership.
 - `.dadaia/tmp/AGENTS.md` — temporary artifact policy.
 - `.dadaia/states/AGENTS.md` — machine-owned state policy.
-- `.dadaia/reports/AGENTS.md` — report and handoff sidecar policy.
+- `.dadaia/reports/AGENTS.md` — human-readable report policy.
+- `.dadaia/handoff/AGENTS.md` — machine-readable handoff policy.
 - `specs/AGENTS.md` and repo-local `AGENTS.md` — SDD and production-source scope.
 
 The installer and doctor manage only lib-originated projections. Operator-owned
