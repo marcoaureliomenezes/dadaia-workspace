@@ -98,7 +98,7 @@ Edit the skill file per PLAN §5 "Handoff skill fix". The schema at
 
 ### T-HARD-04 — Fix broken refs, language uniformity, scope blocks
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target files:**
   - `dadaia_workspace/public/agents/project-auditor.md`
@@ -134,7 +134,7 @@ Implement RULE F and the one-[-]-warn as specified in PLAN §5.
 
 ### T-HARD-06 — De-bloat: write_allowlist tightening and consumer path removal
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target files:**
   - `dadaia_workspace/public/agents/devops-engineer.md`

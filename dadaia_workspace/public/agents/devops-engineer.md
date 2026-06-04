@@ -38,7 +38,7 @@ input_contract:
 paths:
   write_allowlist:
     - .github/**
-    - dadaia_workspace/**
+    - dadaia_workspace/public/**
     - services/**
     - .dadaia/reports/<ctx>/devops-engineer/**
 ---
