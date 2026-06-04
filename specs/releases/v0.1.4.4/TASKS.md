@@ -38,7 +38,7 @@ Markers: `[ ]` open → `[-]` in progress → `[x]` done. Backlog: `specs/backlo
 
 ### T-SANI-05 — `dadaia doctor` ROOT-* invariants (additive)
 - **Owner:** software-engineer-python
-- **Status:** [ ]
+- **Status:** [x]
 - Add `ROOT-1` (only whitelisted root entries + operator-tagged), `ROOT-2` (no forbidden
   caches/outputs at root), `ROOT-3` (configs in canonical homes or exception list), `ROOT-4`
   (`.dadaia/` only canonical top-level subdirs). ADDITIVE — must not collide with v0.1.4.3
