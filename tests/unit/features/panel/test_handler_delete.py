@@ -82,6 +82,22 @@ def _dispatch_delete(
     return status_code, body
 
 
+def _dispatch_post(
+    handler_class: type[BaseHTTPRequestHandler],
+    path: str,
+    token: str | None = None,
+) -> tuple[int, bytes]:
+    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
+    raw_request = f"POST {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
+    fake_sock = _FakeSocket(raw_request)
+    handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
+    response = fake_sock._wfile.getvalue()
+    status_line = response.split(b"\r\n", 1)[0]
+    status_code = int(status_line.split(b" ")[1])
+    body = response.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in response else b""
+    return status_code, body
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -93,6 +109,8 @@ def _make_views() -> dict[str, _StubView]:
     names = ["index", "api_servers", "api_contexts", "memory", "memory_view", "static"]
     views: dict[str, _StubView] = {n: _StubView(name=n) for n in names}
     views["api_report_delete"] = _StubView(name="api_report_delete")
+    views["api_report_mark_important"] = _StubView(name="api_report_mark_important")
+    views["api_report_unmark_important"] = _StubView(name="api_report_unmark_important")
     views["api_reports"] = _StubView(name="api_reports")
     return views  # type: ignore[return-value]
 
@@ -151,3 +169,31 @@ def test_delete_report_nested_path_captures_full_path() -> None:
     assert status == 200
     assert views["api_report_delete"].call_count == 1
     assert views["api_report_delete"].last_kwargs == {"path": "ctx/agent/file.html"}
+
+
+def test_mark_important_post_with_valid_token_dispatches_view() -> None:
+    views = _make_views()
+    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+
+    status, _ = _dispatch_post(
+        handler_class,
+        "/api/reports-important/ctx/agent/file.html",
+        token=_TOKEN,
+    )
+
+    assert status == 200
+    assert views["api_report_mark_important"].call_count == 1
+    assert views["api_report_mark_important"].last_kwargs == {"path": "ctx/agent/file.html"}
+
+
+def test_unmark_important_post_without_token_returns_401() -> None:
+    views = _make_views()
+    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+
+    status, _ = _dispatch_post(
+        handler_class,
+        "/api/reports-unimportant/ctx/agent/file.html",
+    )
+
+    assert status == 401
+    assert views["api_report_unmark_important"].call_count == 0

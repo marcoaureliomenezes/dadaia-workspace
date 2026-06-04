@@ -15,6 +15,7 @@ from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
     delete_report_file,
+    mark_report_important,
     render_api_academy,
     render_api_agent_prompt,
     render_api_agents_canonical,
@@ -28,6 +29,7 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_workflows_list,
     render_health,
     serve_report_file,
+    unmark_report_important,
 )
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.kanban import render_api_kanban
@@ -274,6 +276,8 @@ def build_panel_views(
         "api_reports": render_api_reports(service),
         "reports_serve": serve_report_file(service),
         "api_report_delete": delete_report_file(service),
+        "api_report_mark_important": mark_report_important(service),
+        "api_report_unmark_important": unmark_report_important(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),

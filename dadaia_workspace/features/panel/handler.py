@@ -125,6 +125,8 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/health$", "health"),
     (r"^/api/academy$", "api_academy"),
     # /api/reports/<path> must come before /api/reports$ (more specific first).
+    (r"^/api/reports-important/(?P<path>.+)$", "api_report_mark_important"),
+    (r"^/api/reports-unimportant/(?P<path>.+)$", "api_report_unmark_important"),
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete"),
     (r"^/api/reports$", "api_reports"),
     (r"^/api/contexts$", "api_contexts"),
@@ -147,6 +149,8 @@ _BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
         "api_agent_prompt",
         "api_kanban",
         "api_report_delete",
+        "api_report_mark_important",
+        "api_report_unmark_important",
         "api_reports",
         "api_workflows",
         "api_workflow_detail",
@@ -277,6 +281,8 @@ def make_handler_class(
         "api_agent_sessions",
         "api_kanban",
         "api_report_delete",
+        "api_report_mark_important",
+        "api_report_unmark_important",
         "api_reports",
         "api_workflows",
         "api_workflow_detail",
@@ -413,6 +419,20 @@ def make_handler_class(
                 )
                 return
 
+            for pattern, route_name in self._tel_patterns:
+                m_api = pattern.match(path)
+                if m_api is None or route_name not in {
+                    "api_report_mark_important",
+                    "api_report_unmark_important",
+                }:
+                    continue
+                auth_header = self.headers.get("Authorization")
+                if _token is None or not _validate_bearer(auth_header, _token):
+                    self._respond(401, "application/json", _UNAUTHORIZED_BODY)
+                    return
+                self._dispatch_telemetry(route_name, m_api.groupdict(), {})
+                return
+
             m = _POST_WORKFLOW_RUN_RE.match(path)
             if m is not None:
                 auth_header = self.headers.get("Authorization")
@@ -487,6 +507,14 @@ def make_handler_class(
                     path = groups.get("path", "")
                     if "api_report_delete" in views:
                         status, content_type, body = views["api_report_delete"](path=path)
+                        self._respond(status, content_type, body)
+                    else:
+                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+                elif route_name in {"api_report_mark_important", "api_report_unmark_important"}:
+                    path = groups.get("path", "")
+                    if route_name in views:
+                        status, content_type, body = views[route_name](path=path)
                         self._respond(status, content_type, body)
                     else:
                         self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)

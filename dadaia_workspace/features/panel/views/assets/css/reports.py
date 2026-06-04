@@ -117,6 +117,31 @@ REPORTS_CSS: str = """
   flex-shrink: 0;
 }
 
+.reports-row__retention {
+  font-size: 0.75rem;
+  color: var(--color-muted, #666666);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.reports-row__important {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  background: transparent;
+  border: 1px solid var(--color-border, #dddddd);
+  color: var(--color-text, #222222);
+  border-radius: var(--radius, 4px);
+  font-size: 0.78rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.reports-row__important[aria-pressed="true"] {
+  border-color: var(--color-accent-dark, #2d7d9a);
+  color: var(--color-accent-dark, #2d7d9a);
+  font-weight: 600;
+}
+
 /* ── Trash button (44px touch target) ────────────────────────────── */
 .reports-row__trash {
   display: flex;
