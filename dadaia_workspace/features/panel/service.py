@@ -5,9 +5,9 @@ Responsibilities
 - Fan out to ServerRegistryService and SpecContextService (injected via DI).
 - Group server registry entries by project against active contexts using
   best-effort case-insensitive matching (D1.A from architect report).
-- Expose active Spec Context Projects as PanelContext dataclasses, including
-  the cached current_branch field from SpecContextService (R4: no git subprocess
-  per request — potential staleness is accepted for Release-1; see PLAN risks R4).
+- Expose alive Spec Context Projects as PanelContext dataclasses, including the
+  cached current_branch field from SpecContextService (R4: no git subprocess per
+  request — potential staleness is accepted for Release-1; see PLAN risks R4).
 - Expose the canonical agent catalog via list_canonical_agents() (PR3-08).
 
 Dataclasses
@@ -16,8 +16,8 @@ Dataclasses
                 expires_at, description).
 - ServerGroup — a named group of ServerRows (group_label, context_name | None,
                 rows).
-- PanelContext — one active Spec Context Project (slug, name, repo_path, branch,
-                 is_primary).
+- PanelContext — one alive Spec Context Project (slug, name, repo_path, branch,
+                 status).
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ class PanelContext:
     name: str
     repo_path: Path
     branch: str | None
-    is_primary: bool
+    status: str
 
 
 class PanelService:
@@ -204,7 +204,7 @@ class PanelService:
                 name=ctx.name,
                 repo_path=self._workspace_root / "repos" / ctx.repo_slug,
                 branch=ctx.current_branch,
-                is_primary=False,
+                status="alive",
             )
             for ctx in self._active_contexts()
         ]

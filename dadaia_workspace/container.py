@@ -52,13 +52,13 @@ from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
-from dadaia_workspace.infrastructure.json_primary_context_store import JsonPrimaryContextStore
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
+from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 
 
 def _states_dir(workspace_root: Path) -> Path:
@@ -85,7 +85,6 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     states = _states_dir(workspace_root)
     return SpecContextService(
         context_store=JsonContextStore(states),
-        primary_store=JsonPrimaryContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
@@ -104,7 +103,6 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
     states = _states_dir(workspace_root)
     return DoctorService(
         context_store=JsonContextStore(states),
-        primary_store=JsonPrimaryContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
@@ -213,9 +211,8 @@ def build_reports_next_service(
     """Compose ``ReportsNextService`` for the active (or explicitly named) context.
 
     Context resolution (FR-RN-1): when *context* is given, specs live at
-    ``repos/<context>/specs``; otherwise the primary context's ``specs_dir`` and
-    ``repo_slug`` from ``primary_context.json`` are used. The reports tree is keyed by
-    the context's repo slug under ``<workspace>/.dadaia/reports``.
+    ``repos/<context>/specs``; otherwise the bound context session is used. The
+    reports tree is keyed by the context name under ``<workspace>/.dadaia/reports``.
 
     Args:
         workspace_root: Root directory of the initialized dadaia workspace.
@@ -225,20 +222,14 @@ def build_reports_next_service(
         NoActiveReleaseError: No explicit context and no primary context is set.
     """
     _guard_initialized(workspace_root)
-    states = _states_dir(workspace_root)
     reports_root = workspace_root / ".dadaia" / "reports"
-    if context:
-        specs_dir = workspace_root / "repos" / context / "specs"
-        context_name = context
-    else:
-        primary = JsonPrimaryContextStore(states).read()
-        if not primary:
-            raise NoActiveReleaseError(
-                "No primary context set. Run `dadaia context activate <name>` or pass "
-                "--context <name>."
-            )
-        context_name = primary["repo_slug"]
-        specs_dir = Path(primary["specs_dir"])
+    context_name = resolve_bound_context_name(context)
+    if not context_name:
+        raise NoActiveReleaseError(
+            "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
+            "or pass --context <name>."
+        )
+    specs_dir = workspace_root / "repos" / context_name / "specs"
     return ReportsNextService(
         specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
     )

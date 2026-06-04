@@ -209,7 +209,7 @@ def test_api_contexts_shape_contract() -> None:
     assert len(data["contexts"]) >= 1
 
     context = data["contexts"][0]
-    required_keys = {"slug", "name", "repo_path", "branch", "is_primary", "status"}
+    required_keys = {"slug", "name", "repo_path", "branch", "status"}
     missing = required_keys - set(context.keys())
     assert not missing, f"Missing keys in context: {missing}"
 
@@ -219,8 +219,7 @@ def test_api_contexts_shape_contract() -> None:
     assert context["branch"] is None or isinstance(context["branch"], str), (
         "context.branch must be str or null"
     )
-    assert isinstance(context["is_primary"], bool), "context.is_primary must be bool"
-    assert context["status"] in ("local", "remote"), "context.status must be 'local' or 'remote'"
+    assert context["status"] == "alive", "context.status must be 'alive'"
 
 
 def test_api_contexts_empty_returns_empty_list() -> None:
@@ -240,14 +239,14 @@ def test_api_contexts_content_type() -> None:
     assert content_type == "application/json; charset=utf-8"
 
 
-def test_api_contexts_is_primary_false() -> None:
-    """is_primary is always False in v2 — PanelContext hardcodes False until R3 rework."""
+def test_api_contexts_omits_retired_primary_flag() -> None:
+    """The contexts API must not expose retired primary-context state."""
     ctx = _make_context()
     service = _build_service(contexts=[ctx])
     view = render_api_contexts(service)
     _, _, body = view()
     data = json.loads(body)
-    assert data["contexts"][0]["is_primary"] is False
+    assert "is_primary" not in data["contexts"][0]
 
 
 def test_api_contexts_branch_none_serialised_as_null() -> None:

@@ -51,7 +51,7 @@ from dadaia_workspace.features.spec_context.locking import (
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fakes import FakeContextStore, FakeGitClient, FakePrimaryContextStore
+from tests.fakes import FakeContextStore, FakeGitClient
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -74,11 +74,6 @@ def store() -> FakeContextStore:
 
 
 @pytest.fixture()
-def primary() -> FakePrimaryContextStore:
-    return FakePrimaryContextStore()
-
-
-@pytest.fixture()
 def git() -> FakeGitClient:
     return FakeGitClient()
 
@@ -86,13 +81,11 @@ def git() -> FakeGitClient:
 @pytest.fixture()
 def svc(
     store: FakeContextStore,
-    primary: FakePrimaryContextStore,
     git: FakeGitClient,
     ws: Path,
 ) -> SpecContextService:
     return SpecContextService(
         context_store=store,
-        primary_store=primary,
         git_client=git,
         workspace_root=ws,
     )
@@ -101,13 +94,11 @@ def svc(
 @pytest.fixture()
 def doctor(
     store: FakeContextStore,
-    primary: FakePrimaryContextStore,
     git: FakeGitClient,
     ws: Path,
 ) -> DoctorService:
     return DoctorService(
         context_store=store,
-        primary_store=primary,
         git_client=git,
         workspace_root=ws,
     )
@@ -307,7 +298,6 @@ def test_ac_t11_6_concurrent_alive_no_lost_update(tmp_path: Path) -> None:
     def do_alive(name: str) -> None:
         local_svc = SpecContextService(
             context_store=JsonContextStore(states_dir),
-            primary_store=FakePrimaryContextStore(),
             git_client=FakeGitClient(),
             workspace_root=tmp_path,
         )
@@ -371,7 +361,6 @@ def test_ac_t11_7_alive_and_doctor_fix_deterministic(tmp_path: Path) -> None:
     def do_alive() -> None:
         local_svc = SpecContextService(
             context_store=JsonContextStore(states_dir),
-            primary_store=FakePrimaryContextStore(),
             git_client=FakeGitClient(),
             workspace_root=tmp_path,
         )
@@ -384,7 +373,6 @@ def test_ac_t11_7_alive_and_doctor_fix_deterministic(tmp_path: Path) -> None:
     def do_fix() -> None:
         local_doc = DoctorService(
             context_store=JsonContextStore(states_dir),
-            primary_store=FakePrimaryContextStore(),
             git_client=FakeGitClient(),
             workspace_root=tmp_path,
         )

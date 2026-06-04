@@ -10,7 +10,6 @@ from pathlib import Path
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
-from dadaia_workspace.core.protocols.primary_context_store import PrimaryContextStore
 from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     _LOCK_TTL_DEFAULT,
     LockState,
@@ -21,9 +20,8 @@ from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     workspace_lock,
 )
 
-# Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2 — they guarded
-# is_primary logic that no longer exists.  INV-4 and INV-5 are renamed for
-# the ALIVE/DEAD semantics.
+# Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5
+# are renamed for the ALIVE/DEAD semantics.
 
 # Production-write event types that must carry task_id (LOCK-4).
 # Note: T-13 wires task_id into gate events. Until then the set of
@@ -49,12 +47,10 @@ class DoctorService:
     def __init__(
         self,
         context_store: ContextStore,
-        primary_store: PrimaryContextStore,
         git_client: GitClient,
         workspace_root: Path,
     ) -> None:
         self._store = context_store
-        self._primary = primary_store
         self._git = git_client
         self._workspace_root = workspace_root
 

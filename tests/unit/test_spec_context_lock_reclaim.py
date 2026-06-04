@@ -33,7 +33,7 @@ from dadaia_workspace.features.spec_context.locking import (
     reclaim_impl_lock,
     renew_heartbeat,
 )
-from tests.fakes import FakeContextStore, FakeGitClient, FakePrimaryContextStore
+from tests.fakes import FakeContextStore, FakeGitClient
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -83,7 +83,6 @@ def _make_doctor(
         store = FakeContextStore()
     return DoctorService(
         context_store=store,
-        primary_store=FakePrimaryContextStore(),
         git_client=FakeGitClient(),
         workspace_root=ws,
     )

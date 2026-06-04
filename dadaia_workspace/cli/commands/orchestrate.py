@@ -1,6 +1,5 @@
 """dadaia orchestrate subcommands."""
 
-import json as _json
 import os
 
 import typer
@@ -16,6 +15,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 
 app = typer.Typer(help="Run and manage multi-agent workflows.")
@@ -34,20 +34,7 @@ def _service(runtime: str | None = None) -> OrchestrationService:
 
 
 def _resolve_context(explicit: str | None) -> str:
-    if explicit:
-        return explicit
-    env = os.environ.get("DADAIA_CONTEXT")
-    if env:
-        return env
-    workspace = resolve_workspace_root()
-    primary = workspace / ".dadaia" / "states" / "primary_context.json"
-    if primary.exists():
-        try:
-            data = _json.loads(primary.read_text())
-            return str(data.get("name", ""))
-        except Exception:  # noqa: BLE001
-            return ""
-    return ""
+    return resolve_bound_context_name(explicit) or ""
 
 
 def _parse_inputs(items: list[str]) -> dict[str, str]:
@@ -161,7 +148,7 @@ def run(
     if not ctx:
         err_console.print(
             "[red]Error:[/red] no active context. "
-            "Run [bold]dadaia context activate <name>[/bold] or pass --context."
+            "Run [bold]eval $(dadaia context bind <name> --mode read)[/bold] or pass --context."
         )
         raise typer.Exit(2)
     service = _service(runtime or None)

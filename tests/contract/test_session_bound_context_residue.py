@@ -49,84 +49,17 @@ ALLOWED_LEGACY_RESIDUE: tuple[ResidueClassification, ...] = (
         ),
         disposition="keep as explicit import compatibility cleanup",
     ),
-)
-
-EXPECTED_RESIDUE_TO_REMOVE: tuple[ResidueClassification, ...] = (
-    ResidueClassification(
-        relpath="dadaia_workspace/cli/commands/specs.py",
-        patterns=(
-            ResiduePattern("primary_context", "stale specs_dir fallback/help text"),
-            ResiduePattern("context activate", "removed verb in operator guidance"),
-        ),
-        disposition="remove in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/cli/commands/memory.py",
-        patterns=(
-            ResiduePattern("primary_context", "stale specs_dir fallback/help text"),
-            ResiduePattern("context activate", "removed verb in operator guidance"),
-        ),
-        disposition="remove in T-BUG-02",
-    ),
     ResidueClassification(
         relpath="dadaia_workspace/cli/commands/migrate.py",
         patterns=(
-            ResiduePattern("primary_context", "mixed migration cleanup and stale specs fallback"),
-            ResiduePattern("context activate", "removed verb in operator guidance"),
+            ResiduePattern("primary_context", "delete legacy primary_context.json during v1->v2"),
+            ResiduePattern("is_primary", "report legacy is_primary field removal during v1->v2"),
         ),
-        disposition="split cleanup exception from stale CLI guidance in T-BUG-02",
+        disposition="keep as explicit legacy migration cleanup",
     ),
-    ResidueClassification(
-        relpath="dadaia_workspace/cli/commands/newartifacts.py",
-        patterns=(
-            ResiduePattern("primary_context", "stale specs_dir fallback/help text"),
-            ResiduePattern("context activate", "removed verb in operator guidance"),
-        ),
-        disposition="remove in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/cli/commands/orchestrate.py",
-        patterns=(
-            ResiduePattern("primary_context", "stale context resolver"),
-            ResiduePattern("context activate", "removed verb in operator guidance"),
-        ),
-        disposition="remove in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/features/reports_next/service.py",
-        patterns=(ResiduePattern("context activate", "removed verb in operator guidance"),),
-        disposition="remove in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/core/protocols/primary_context_store.py",
-        patterns=(ResiduePattern("primary_context", "retired primary context protocol"),),
-        disposition="delete or quarantine in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/infrastructure/json_primary_context_store.py",
-        patterns=(ResiduePattern("primary_context", "retired primary context store"),),
-        disposition="delete or quarantine in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/features/spec_context/service.py",
-        patterns=(ResiduePattern("primary_context", "imports retired primary context protocol"),),
-        disposition="remove in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/features/spec_context/doctor.py",
-        patterns=(ResiduePattern("primary_context", "imports retired primary context protocol"),),
-        disposition="remove in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/features/panel",
-        patterns=(ResiduePattern("is_primary", "panel API still exposes primary flag"),),
-        disposition="rename/remove compatibility surface in T-BUG-02",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/infrastructure/public_assets.py",
-        patterns=(ResiduePattern("primary_context", "installer still reads legacy primary file"),),
-        disposition="remove in T-BUG-02 or convert to explicit migration-only cleanup",
-    ),
+)
+
+EXPECTED_RESIDUE_TO_REMOVE: tuple[ResidueClassification, ...] = (
     ResidueClassification(
         relpath="dadaia_workspace/public/scripts/sdd-spec-gate.sh",
         patterns=(
@@ -190,6 +123,7 @@ def test_legacy_primary_context_exceptions_are_migration_or_import_cleanup_only(
     cleanup_paths = {entry.relpath for entry in ALLOWED_LEGACY_RESIDUE}
 
     assert cleanup_paths == {
+        "dadaia_workspace/cli/commands/migrate.py",
         "dadaia_workspace/features/migrate/state_v2.py",
         "dadaia_workspace/features/import_/service.py",
     }
@@ -201,7 +135,6 @@ def test_current_residue_inventory_is_classified() -> None:
     """T-BUG-01 classifies active residue so later tasks can remove it deliberately."""
     relpaths = {entry.relpath for entry in EXPECTED_RESIDUE_TO_REMOVE}
 
-    assert "dadaia_workspace/cli/commands/specs.py" in relpaths
     assert "dadaia_workspace/public/scripts/sdd-spec-gate.sh" in relpaths
     assert "dadaia_workspace/public/skills/dadaia-workspace-manager/SKILL.md" in relpaths
     assert "specs/memory" in relpaths

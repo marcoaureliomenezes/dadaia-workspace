@@ -1588,15 +1588,16 @@ class TestConfigGenerators:
 
     def test_opencode_config_adds_repo_slug_when_context_exists(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
-        # Create primary_context.json pointing to a repo with AGENTS.md
+        # Create spec_contexts.json pointing to a repo with AGENTS.md
         states_dir = tmp_path / ".dadaia" / "states"
         states_dir.mkdir(parents=True)
         repo_slug = "my-project"
         repo_agents = tmp_path / "repos" / repo_slug / "AGENTS.md"
         repo_agents.parent.mkdir(parents=True)
         repo_agents.write_text("# AGENTS\n", encoding="utf-8")
-        (states_dir / "primary_context.json").write_text(
-            json.dumps({"repo_slug": repo_slug}), encoding="utf-8"
+        (states_dir / "spec_contexts.json").write_text(
+            json.dumps({"version": 2, "contexts": [{"name": "My Project", "repo_slug": repo_slug}]}),
+            encoding="utf-8",
         )
         config = manager._opencode_config(tmp_path)
         assert f"repos/{repo_slug}/AGENTS.md" in config["instructions"]
@@ -1826,10 +1827,10 @@ class TestInstallClaudeSettingsSkip:
 
 
 class TestOpencodeConfigJsonError:
-    def test_invalid_json_in_primary_context_ignored(self, tmp_path: Path) -> None:
+    def test_invalid_json_in_context_registry_ignored(self, tmp_path: Path) -> None:
         states_dir = tmp_path / ".dadaia" / "states"
         states_dir.mkdir(parents=True)
-        (states_dir / "primary_context.json").write_text("NOT JSON", encoding="utf-8")
+        (states_dir / "spec_contexts.json").write_text("NOT JSON", encoding="utf-8")
         manager = FileSystemPublicAssetManager()
         # Should not raise; invalid JSON is silently swallowed
         config = manager._opencode_config(tmp_path)

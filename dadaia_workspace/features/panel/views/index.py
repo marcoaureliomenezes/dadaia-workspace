@@ -45,8 +45,7 @@ def render_index(
 
         servers_html = _render_servers(groups) if groups else _empty_state()
 
-        # Primary context first (auto-fill grid respects DOM order)
-        sorted_contexts = sorted(contexts, key=lambda c: (not c.is_primary,))
+        sorted_contexts = sorted(contexts, key=lambda c: c.slug)
         memories_html = "".join(_render_context_card(c) for c in sorted_contexts)
         context_count = len(contexts)
 

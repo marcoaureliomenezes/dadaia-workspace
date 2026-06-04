@@ -15,7 +15,6 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
-from dadaia_workspace.core.protocols.primary_context_store import PrimaryContextStore
 from dadaia_workspace.features.spec_context.locking import (
     context_lock,
     has_implementation_lock,
@@ -35,12 +34,10 @@ class SpecContextService:
     def __init__(
         self,
         context_store: ContextStore,
-        primary_store: PrimaryContextStore,
         git_client: GitClient,
         workspace_root: Path,
     ) -> None:
         self._store = context_store
-        self._primary = primary_store
         self._git = git_client
         self._workspace_root = workspace_root
 
