@@ -107,7 +107,7 @@ delete reports as a surprising side effect.
 
 ### T-RET-06 - Validate, review, and emit implementation handoffs
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** qa-engineer + code-reviewer + security-reviewer
 - **Reviewers before approval:** product-engineer
 - **Target files:** `.dadaia/reports/**`, `.dadaia/handoff/**`
