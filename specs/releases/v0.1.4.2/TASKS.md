@@ -132,7 +132,7 @@ Evidence:
 
 ### T-BUG-07 — Define strict implementation-review QA contract
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** product-engineer
 - **Target files:** `dadaia_workspace/public/skills/project-orchestration/SKILL.md`,
   `dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md`,
@@ -149,6 +149,10 @@ The contract must state that before TASKS approval, the owning implementer(s),
 `qa-engineer`, `code-reviewer`, and `security-reviewer` agree with each task's
 implementation scope, test plan, E2E/validation plan, review criteria, and
 security/privacy checks. UI tasks also require `design-specialist` agreement.
+
+Evidence:
+- `python -m pytest -q -p no:cacheprovider tests/unit/test_workflow_schema.py tests/unit/features/workflows/test_service.py tests/integration/panel/test_api_workflows.py` → 47 passed.
+- Public orchestration docs now define pre-implementation agreement, implementation-complete handoff, review/QA fan-out, rework loop, and done gate before `[x]`, push, PR, merge, deploy, CLOSURE, or memory updates.
 
 ---
 

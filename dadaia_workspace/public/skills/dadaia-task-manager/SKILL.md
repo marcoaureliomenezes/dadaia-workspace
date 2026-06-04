@@ -17,7 +17,7 @@ applyTo: "specs/**/TASKS.md"
 |---|---|---|
 | `[ ]` | OPEN | Task declarada, ninguém trabalhando nela. Default. |
 | `[-]` | IN PROGRESS | Algum agente reservou. Trabalho ativo. |
-| `[x]` | DONE | Implementada, verificada, commitada. |
+| `[x]` | DONE | Implementada, revisada por QA/code/security, aprovada, commitada. |
 
 **Regra invariante:** nunca dois `[-]` simultâneos no mesmo `TASKS.md`. Se você
 encontrar dois `[-]` ao começar uma sessão, **pare** e reporte ao operador.
@@ -63,6 +63,15 @@ trabalho.
 ### Passo 4 — Concluir (`[-]` → `[x]`) e commitar
 
 Quando terminar e os critérios de aceite da task estiverem satisfeitos:
+
+**Implementação completa não é DONE.** Depois que o implementer termina código,
+unit tests e integration tests, a task permanece `[-]` até existir aprovação
+verde de `qa-engineer`, `code-reviewer` e `security-reviewer` para o mesmo
+commit. Tasks de UI também exigem aprovação de `design-specialist`.
+
+Antes dessas aprovações, é proibido marcar `[x]`, abrir PR, pedir merge, fazer
+deploy, fechar release, escrever `CLOSURE.md` ou atualizar memory. Se qualquer
+revisor pedir mudanças, volte ao Passo 3 e mantenha `[-]`.
 
 1. Mude o marker `[-]` → `[x]`.
 2. Faça o **último commit da task** com convencional commits, incluindo no
@@ -134,4 +143,5 @@ do PR — política de cada repo.
 ## Em uma frase
 
 > Antes de tocar qualquer arquivo de produção: declare a task com `[-]` e
-> commit. Antes de encerrar: feche com `[x]` e commit. Sem exceção.
+> commit. Antes de encerrar: só feche com `[x]` depois de QA/code/security
+> aprovarem o handoff de implementação. Sem exceção.

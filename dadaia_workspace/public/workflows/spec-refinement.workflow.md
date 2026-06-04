@@ -194,3 +194,11 @@ than orchestration concerns.
 Operator gates are placed (a) after discovery — to validate that the right problem
 is framed — and (b) after synthesis — to validate the assembled findings before
 PE writes the SPEC.
+
+Pre-implementation agreement gate: before TASKS reaches `Aprovado`, every
+implementation task must be reviewed by the owning implementer(s), `qa-engineer`,
+`code-reviewer`, and `security-reviewer`; UI tasks also require
+`design-specialist`. The task must define implementation scope, write set,
+unit/integration test plan, E2E or validation plan, review criteria, and
+security/privacy checks. If any required agent objects, TASKS stays out of
+approval until the task is revised.

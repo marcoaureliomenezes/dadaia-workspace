@@ -131,6 +131,11 @@ skip reason in the implementation report.
    - *Pass 2 (Design compliance):* token audit, spacing grid check, contrast verification,
      visual regression at 360/768/1280px. Both passes must return PASS.
 
+Done gate: the implementation stage is only an implementation-complete handoff.
+The task remains `[-]` until `qa-engineer`, `code-reviewer`, `security-reviewer`,
+and `design-specialist` approve the same commit. Before that, `[x]`, push, PR,
+merge, deploy, release closure, and memory updates are forbidden.
+
 ## Relationship to tdd-cycle
 
 `design-first-implementation` wraps the green-phase of `tdd-cycle` — the
