@@ -64,10 +64,17 @@ ignore = ["E501", "B008"]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+incremental = false
+# Redirect the mypy cache to /dev/null so no .mypy_cache is ever created in
+# the repo tree.  On Linux/macOS writes to /dev/null are silently discarded.
+# CI runners and Windows users who need caching can override via the
+# MYPY_CACHE_DIR environment variable (mypy reads that variable and it takes
+# precedence over cache_dir in config).
+cache_dir = "/dev/null"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra -p no:cacheprovider"
 markers = [
     "unit: pure or near-pure fast tests",
     "contract: public API/schema/security contracts",

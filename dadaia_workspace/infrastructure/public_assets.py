@@ -17,7 +17,8 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
 
-from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.exceptions import PublicAssetError, WorkspaceNotInitializedError
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 
 _SCHEMA_VERSION = "1"
@@ -130,24 +131,35 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
 # (dev-guardrail rule #4: no consumer-specific data in shipped source). Each
 # workspace supplies its own terms via a runtime file kept OUT of the package:
 #   1. $DADAIA_PRIVACY_DENYLIST            (path to a JSON file), or
-#   2. <repo_root>/.dadaia/states/privacy_denylist.json
+#   2. <workspace_root>/.dadaia/states/privacy_denylist.json
+#      where workspace_root is resolved by walking up from cwd looking for the
+#      .dadaia/states/spec_contexts.json sentinel (via resolve_workspace_root).
 # Format: [["term", "reason"], ...] or {"term": "reason", ...}. Absent -> no terms.
 _PRIVACY_DENYLIST_ENV = "DADAIA_PRIVACY_DENYLIST"
 _PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
 
 
-def _load_privacy_denylist(repo_root: Path) -> tuple[tuple[str, str], ...]:
+def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
     """Load operator-private privacy terms from outside the published package.
 
-    Resolution order: ``$DADAIA_PRIVACY_DENYLIST`` then
-    ``<repo_root>/.dadaia/states/privacy_denylist.json``. Returns ``()`` when no
-    source exists or the source is unreadable/malformed.
+    Resolution order:
+    1. ``$DADAIA_PRIVACY_DENYLIST`` environment variable — path to a JSON file.
+    2. ``<workspace_root>/.dadaia/states/privacy_denylist.json`` where
+       *workspace_root* is resolved by walking up from ``cwd`` looking for the
+       ``.dadaia/states/spec_contexts.json`` sentinel. Returns ``()`` when no
+       workspace root is found (e.g. pip-installed in site-packages without an
+       active workspace) or the file is absent / unreadable / malformed.
     """
     candidates: list[Path] = []
     env_path = os.environ.get(_PRIVACY_DENYLIST_ENV)
     if env_path:
         candidates.append(Path(env_path))
-    candidates.append(repo_root / _PRIVACY_DENYLIST_REL)
+    # Resolve workspace root via cwd-based walk-up; never fall back to the lib repo.
+    try:
+        workspace_root = resolve_workspace_root()
+        candidates.append(workspace_root / _PRIVACY_DENYLIST_REL)
+    except WorkspaceNotInitializedError:
+        pass  # No workspace found — file-based fallback is simply unavailable.
     for source in candidates:
         try:
             raw = json.loads(source.read_text(encoding="utf-8"))
@@ -1892,11 +1904,13 @@ class FileSystemPublicAssetManager:
     def _check_public_privacy(self) -> list[str]:
         """Fail doctor if public distributed assets contain known private identifiers."""
         roots = [self._public_dir]
-        repo_root = self._public_dir.parent.parent
-        denylist = _load_privacy_denylist(repo_root)
+        # lib_root is the library source tree root (parent of dadaia_workspace/public).
+        # Used only for scanning sibling AGENTS.md — NOT for denylist resolution.
+        lib_root = self._public_dir.parent.parent
+        denylist = _load_privacy_denylist()
         if not denylist:
             return ["[ok] public-privacy"]
-        root_agents = repo_root / "AGENTS.md"
+        root_agents = lib_root / "AGENTS.md"
         if root_agents.exists():
             roots.append(root_agents)
 
@@ -1918,7 +1932,7 @@ class FileSystemPublicAssetManager:
                 for term, reason in denylist:
                     if term.lower() in lowered:
                         rel = (
-                            path.relative_to(repo_root) if path.is_relative_to(repo_root) else path
+                            path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
                         )
                         findings.append(
                             f"[error] public-privacy:{rel.as_posix()}: contains '{term}' ({reason})"
