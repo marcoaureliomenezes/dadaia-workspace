@@ -20,7 +20,7 @@ source or an approval artifact.
 
 Files here may be deleted after their evidence is summarized in a report. If a
 temporary artifact is required for traceability, move the evidence reference to
-`.dadaia/reports/<context>/<agent>/` and mention it in the report sidecar.
+`.dadaia/reports/<context>/<agent>/` and mention it in the handoff JSON.
 
 ## Validation
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "handoff-v1.1",
   "title": "Handoff Document v1.1",
-  "description": "Structured sidecar emitted by an agent after producing a report HTML. Validates the handoff contract between pipeline stages.",
+  "description": "Structured handoff emitted by an agent after producing a report HTML or review decision. Validates the handoff contract between pipeline stages.",
   "type": "object",
   "required": ["schema_version", "agent", "context", "produced_at", "artifact", "scope", "metrics"],
   "additionalProperties": false,
@@ -10,7 +10,7 @@
     "schema_version": {
       "type": "string",
       "enum": ["handoff-v1", "handoff-v1.1"],
-      "description": "Schema version identifier. Use 'handoff-v1.1' for new sidecars."
+      "description": "Schema version identifier. Use 'handoff-v1.1' for new handoffs."
     },
     "agent": {
       "type": "string",
@@ -48,7 +48,7 @@
         "path": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9_./{}-]+$",
-          "description": "Relative path from workspace root to the artifact file. Supports {context} and {run_ts} templates. Optional in v1.1 (sidecar-first emission)."
+          "description": "Relative path from workspace root to the artifact file. Supports {context} and {run_ts} templates. Optional in v1.1 handoff-first emission."
         },
         "content_hash": {
           "type": "string",

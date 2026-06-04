@@ -72,7 +72,8 @@ Gitignore entries for these dirs are defence-in-depth only. **Gitignore is not a
 Before editing, check for the nearest scoped rule file:
 
 - `specs/AGENTS.md` governs SDD artifacts, memory, release gates, backlog, bugs.
-- `.dadaia/reports/AGENTS.md` governs report files and handoff sidecars.
+- `.dadaia/reports/AGENTS.md` governs human-readable report files.
+- `.dadaia/handoff/AGENTS.md` governs machine-readable agent handoff files.
 - `repos/<slug>/AGENTS.md` governs production source for that repo.
 - Nested `AGENTS.md` / `CLAUDE.md` files govern their subtree only.
 
@@ -126,14 +127,20 @@ Every agent report goes under:
 .dadaia/reports/<context>/<agent>/<UTC>-<slug>.html
 ```
 
-Every HTML report must have a sibling `<stem>.handoff.json` sidecar. Validate it:
+Every HTML report that feeds another agent must have a handoff JSON file under:
+
+```text
+.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json
+```
+
+Validate it:
 
 ```bash
 dadaia reports validate <path>
 ```
 
-`dadaia panel` reads context state, reports, servers, workflows, and projection
-health. Keep report paths and sidecars machine-readable.
+`dadaia panel` reads context state, reports, handoffs, servers, workflows, and
+projection health. Keep report and handoff paths machine-readable.
 
 ## Lib-Originated Assets
 

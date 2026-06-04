@@ -250,5 +250,5 @@ Proposed owner: <agent responsible for the fix>
 | final_score < 5 | Significant drift — recommend immediate hotfix release; escalate to `product-engineer` |
 | Any dimension score < 3 | Floor breach — mandatory escalation regardless of weighted average |
 
-When recommending a release, emit a `next_handoff` in the `.handoff.json` sidecar
+When recommending a release, emit a `next_handoff` in the `.handoff.json` handoff
 with `agent: "project-manager"` and a summary of the drift areas requiring a release.

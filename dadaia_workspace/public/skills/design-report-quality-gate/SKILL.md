@@ -11,7 +11,7 @@ Validates design report completeness before handoff to `frontend-engineer`.
 
 ## Purpose
 
-Before `design-specialist` emits a design report and its `.handoff.json` sidecar, this skill provides a structured checklist to confirm all required sections exist and are non-empty. An incomplete report blocks `frontend-engineer` from starting implementation. This skill catches missing sections early, in the same session, so that one report covers the full handoff surface.
+Before `design-specialist` emits a design report and its `.dadaia/handoff/<context>/` handoff JSON, this skill provides a structured checklist to confirm all required sections exist and are non-empty. An incomplete report blocks `frontend-engineer` from starting implementation. This skill catches missing sections early, in the same session, so that one report covers the full handoff surface.
 
 ---
 
@@ -52,7 +52,7 @@ After checking all sections:
 - [ ] Section 5 (ASCII sketches): no sketch provided for CardComponent
 ```
 
-Do NOT emit the `.handoff.json` sidecar until all `[FAIL]` items are resolved and the report is updated.
+Do NOT emit the `.handoff.json` handoff until all `[FAIL]` items are resolved and the report is updated.
 
 ---
 
@@ -74,5 +74,5 @@ Beyond section existence, flag these specific conditions as `[FAIL]`:
 
 - This skill does NOT execute Bash, Edit, or Playwright. It reads the report draft and emits a text checklist only.
 - This skill does NOT modify the design report — it only informs `design-specialist` of what to fix.
-- This skill does NOT block reading; it only blocks sidecar emission when sections are incomplete.
+- This skill does NOT block reading; it only blocks handoff emission when sections are incomplete.
 - This skill applies only to design reports in `.dadaia/reports/<ctx>/design-specialist/`. It is not applicable to other report types.

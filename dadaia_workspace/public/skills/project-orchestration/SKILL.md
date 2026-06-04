@@ -4,7 +4,7 @@ description: >
   Generic dispatch reference for project-manager and project-auditor agents.
   Defines the default public agent inventory, workflow inventory, dispatch
   protocol, mediation rules, escalation triggers, and forbidden actions.
-applyTo: ".dadaia/reports/**"
+applyTo: ".dadaia/handoff/**"
 ---
 
 # project-orchestration
@@ -76,6 +76,7 @@ Every dispatch prompt starts with:
 - release_id: <release-id>
 - task_id: <task-id or n/a>
 - report_dir: .dadaia/reports/<context-name>/<agent-name>/
+- handoff_dir: .dadaia/handoff/<context-name>/
 - allowed_write_paths: <explicit paths or reports-only>
 ```
 
@@ -85,7 +86,11 @@ Reports land in:
 .dadaia/reports/<context-name>/<agent-name>/<UTC>-<task-slug>.html
 ```
 
-Every HTML report must have a sibling `<stem>.handoff.json` sidecar.
+Every HTML report that feeds another agent must have a handoff JSON file under:
+
+```text
+.dadaia/handoff/<context-name>/<UTC>-<agent-name>-<task-slug>.handoff.json
+```
 
 ## Strict Implementation-Review-QA Contract
 
@@ -125,7 +130,7 @@ handoff:
 - `security-reviewer` reviews security, privacy, secrets, dependency, and deploy leakage risk
 - `design-specialist` reviews UI/design compliance when applicable
 
-Each validator returns `APPROVE` or `REQUEST_CHANGES` in its handoff sidecar.
+Each validator returns `APPROVE` or `REQUEST_CHANGES` in its handoff JSON.
 Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing
 evidence, or stale report sends the task back to implementation. The rework loop
 continues until every required validator approves the same implementation commit
@@ -163,7 +168,7 @@ as approved work.
 | Orchestration | project-manager | any agent | operator |
 
 Evidence means a file:line citation, spec citation, command output, screenshot,
-or report sidecar field. Objections without evidence do not block progress.
+or handoff JSON field. Objections without evidence do not block progress.
 
 ## Anti-Deadlock
 
@@ -194,7 +199,7 @@ Stop and surface to the operator when:
 
 | Action | Why forbidden |
 |---|---|
-| Dispatchers editing outside `.dadaia/reports/` | They are reports-only roles. |
+| Dispatchers editing outside `.dadaia/reports/` and `.dadaia/handoff/` | They are report/handoff-only roles. |
 | Recursive agent chains without operator approval | Breaks traceability. |
 | Marking tasks DONE without validation evidence | Skips acceptance. |
 | Push, PR, merge, deploy, release closure, or `[x]` before QA/code/security approval | Bypasses the quality gate. |

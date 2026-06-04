@@ -24,7 +24,7 @@ stages:
     description: "Evidence harvest — dispatch researcher to gather facts before main analysis."
     consumes: []
     expected_output:
-      path: ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     inputs:
       - kind: workflow_input
         from: "$.inputs.pr_ref"
@@ -38,9 +38,9 @@ stages:
     needs: [research_evidence]
     parallel_group: review
     consumes:
-      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/code-reviewer/{run_ts}-{pr_ref}-review.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-code-reviewer-{pr_ref}-review.handoff.json"
       must_include: ["Findings", "Verdict"]
     inputs:
       - kind: workflow_input
@@ -58,9 +58,9 @@ stages:
     needs: [research_evidence]
     parallel_group: review
     consumes:
-      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/security-reviewer/{run_ts}-{pr_ref}-review.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-security-reviewer-{pr_ref}-review.handoff.json"
       must_include: ["Security findings", "Verdict"]
     inputs:
       - kind: workflow_input
@@ -78,9 +78,9 @@ stages:
     needs: [research_evidence]
     parallel_group: review
     consumes:
-      - ".dadaia/reports/{context}/researcher/{run_ts}-evidence.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-researcher-evidence.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/design-specialist/{run_ts}-{pr_ref}-review.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-design-specialist-{pr_ref}-review.handoff.json"
       must_include: ["Verdict"]
     inputs:
       - kind: workflow_input
@@ -100,11 +100,11 @@ stages:
     agent: project-manager
     needs: [code_review, security_review, design_review]
     consumes:
-      - ".dadaia/reports/{context}/code-reviewer/{run_ts}-{pr_ref}-review.handoff.json"
-      - ".dadaia/reports/{context}/security-reviewer/{run_ts}-{pr_ref}-review.handoff.json"
-      - ".dadaia/reports/{context}/design-specialist/{run_ts}-{pr_ref}-review.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-code-reviewer-{pr_ref}-review.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-security-reviewer-{pr_ref}-review.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-design-specialist-{pr_ref}-review.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/project-manager/{run_ts}-{pr_ref}-verdict.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-project-manager-{pr_ref}-verdict.handoff.json"
       must_include: ["Consolidated verdict", "Action items"]
     inputs:
       - kind: stage_output

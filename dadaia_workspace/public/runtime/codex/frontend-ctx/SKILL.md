@@ -99,7 +99,7 @@ Dev server state  : <list of name:port entries, or "none registered">
 | No E2E ownership | Playwright and browser evidence are owned by `qa-engineer`, not this adapter. |
 | No design authority | Do not modify tokens, color palettes, spacing scales, or typography without a design report authorizing the change. |
 | No persona duplication | This adapter supplements `frontend-engineer`; it does not replace or restate the canonical persona. |
-| Handoff emitter | After completing implementation, use the `dadaia-handoff-emitter` shared skill to emit the sidecar. |
+| Handoff emitter | After completing implementation, use the `dadaia-handoff-emitter` shared skill to emit handoff JSON under `.dadaia/handoff/<context>/`. |
 
 ---
 

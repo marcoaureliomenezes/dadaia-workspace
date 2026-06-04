@@ -39,6 +39,7 @@ input_contract:
 paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/project-auditor/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # Project Auditor
@@ -97,7 +98,7 @@ Scope defaults to all three unless `audit_scope` input restricts it.
 - `dadaia-workspace-spec-reviewer` — memory vs implementation diff protocol
 - `drift-detection` — memory-to-code diff algorithm; dead-code detection; 1–10 scoring rubric; dadaia CLI commands
 - `project-orchestration` — agent inventory; dispatch protocol; escalation ladder
-- `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after audit report
+- `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after audit report
 
 Code structure inspection heuristics (layering rules, module boundary analysis) are embedded
 in this agent's training — no external skill file is required.
@@ -165,7 +166,7 @@ Compute an overall weighted score. Record the rationale for each score.
 ### Step 6 — Emit audit report
 
 Write to `.dadaia/reports/<ctx>/project-auditor/<ts>-audit.html`. Invoke
-`dadaia-handoff-emitter` for the sidecar.
+`dadaia-handoff-emitter` for the handoff JSON.
 
 ---
 
@@ -267,13 +268,13 @@ if memory updates are warranted.
 
 ---
 
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
@@ -309,7 +310,7 @@ conformance with SDD standards.
   `software-engineer-python`, `software-engineer-node`, `backend-engineer`,
   `frontend-engineer`, `devops-engineer`, `ai-engineer`.
 - Write only to `.dadaia/reports/<context>/project-auditor/<ts>-*.html`
-  (audit reports + handoff sidecars).
+  (audit reports + handoff JSONs).
 - Recommend opening a hotfix/feature release when severe drift is detected — the
   recommendation goes to `project-manager` via report; the auditor NEVER creates releases.
 

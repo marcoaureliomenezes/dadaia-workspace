@@ -41,6 +41,7 @@ input_contract:
 paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/researcher/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # Researcher
@@ -91,7 +92,7 @@ You do NOT:
 
 ## Skills consumed
 
-- `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after the research report
+- `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after the research report
 
 ---
 
@@ -151,7 +152,7 @@ Mark unresolved sub-questions as open ends.
 ### Step 5 — Emit report
 
 Write to `.dadaia/reports/<ctx>/researcher/<ts>-research.html`. Invoke
-`dadaia-handoff-emitter` for the sidecar.
+`dadaia-handoff-emitter` for the handoff JSON.
 
 ---
 
@@ -204,13 +205,13 @@ Stop and alert `project-manager` or the operator when:
 
 ---
 
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 

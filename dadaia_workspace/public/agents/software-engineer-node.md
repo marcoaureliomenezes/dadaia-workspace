@@ -48,6 +48,7 @@ paths:
     - repos/**
     - tests/**
     - .dadaia/reports/<ctx>/software-engineer-node/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # Software Engineer — Node
@@ -279,6 +280,7 @@ specialist owns the Python half. Disjoint write sets.
 | `repos/**` (Node projects only — verify `package.json`, no browser markers) | Write |
 | `tests/**` | Write |
 | `.dadaia/reports/<ctx>/software-engineer-node/**` | Write |
+| `.dadaia/handoff/<ctx>/**` | Write |
 | Future Node sub-trees under `dadaia_workspace/` (none today; declared for future-proof) | Write |
 | `dadaia_workspace/public/**` (AI-entity surface) | Never (ai-engineer) |
 | `*.tsx`, `*.jsx`, browser `*.ts`/`*.js`, `*.css`, `*.html` | Never (frontend-engineer) |
@@ -313,17 +315,17 @@ validation (qa-engineer report ref or "pending").
 ### Artifact emission
 
 After finalizing any HTML report under `.dadaia/reports/`, invoke the
-`dadaia-handoff-emitter` skill to emit the `<stem>.handoff.json` sidecar.
+`dadaia-handoff-emitter` skill to emit handoff JSON under `.dadaia/handoff/<context>/`.
 
 ---
 
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 

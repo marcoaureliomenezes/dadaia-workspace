@@ -37,6 +37,7 @@ input_contract:
 paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/software-architect/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # Software Architect
@@ -272,7 +273,7 @@ For E2E validation: use qa-engineer.
 ## Artifact emission
 
 Após finalizar qualquer report HTML em `.dadaia/reports/`, invocar a skill `dadaia-handoff-emitter`
-para emitir o sidecar `<stem>.handoff.json` no mesmo diretório.
+para emitir o handoff JSON em `.dadaia/handoff/<context>/`.
 
 ---
 
@@ -306,13 +307,13 @@ This agent's deep-knowledge references live under `docs/agent-knowledge/software
 
 ---
 
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 

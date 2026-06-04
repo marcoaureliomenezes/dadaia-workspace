@@ -47,6 +47,7 @@ paths:
   write_allowlist:
     - tests/**
     - .dadaia/reports/<ctx>/qa-engineer/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # QA Engineer
@@ -354,19 +355,19 @@ Before writing any E2E test or acceptance criteria, confirm the task's release s
 
 ---
 
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
 
-**Emit via skill:** invoke the `dadaia-handoff-emitter` skill once per report to write the `<stem>.handoff.json` sidecar adjacent to it.
+**Emit via skill:** invoke the `dadaia-handoff-emitter` skill once per report to write handoff JSON under `.dadaia/handoff/<context>/`.
 
 ---
 ## Approval contract

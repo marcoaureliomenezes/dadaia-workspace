@@ -45,6 +45,7 @@ input_contract:
 paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/project-manager/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # Project Manager
@@ -111,7 +112,7 @@ You do NOT have `Edit` because you never modify existing spec or source files.
 - `dadaia-workspace-spec-navigator` — resolve active release and load SPEC/PLAN/TASKS
 - `dadaia-task-manager` — task state protocol (reserve `[-]` before dispatching; close `[x]` after)
 - `project-orchestration` — agent + workflow inventory matrices; dispatch protocol; mediation rules; escalation ladder; forbidden actions
-- `dadaia-handoff-emitter` — emit `.handoff.json` sidecar after each report
+- `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after each report
 
 ---
 
@@ -273,7 +274,7 @@ Every PM session produces at minimum:
 - `## Deviations` — any stage that was skipped or modified vs the workflow spec
 - `## Overall status` — COMPLETE / PARTIAL / FAILED with explanation
 
-Both reports must have `<stem>.handoff.json` sidecars.
+Both reports must have handoff JSON files under `.dadaia/handoff/<context>/`.
 
 ---
 
@@ -307,13 +308,13 @@ as an upstream input.
 
 ---
 
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
@@ -322,10 +323,10 @@ as an upstream input.
 ## Report emission playbook
 
 When operator requests a report:
-1. Before emitting, ask: "Should this be an HTML report or a JSON sidecar? (Default: sidecar)"
+1. Before emitting, ask: "Should this be an HTML report or a JSON handoff? (Default: handoff)"
 2. If HTML requested AND estimated size > 30 KB: split into multiple HTMLs with `index.html` as entry point.
-3. If sidecar only: emit `<UTC>-<slug>.handoff.json` (handoff-v1.1 schema). No HTML.
-4. Sidecars are the agent-to-agent contract; HTML is for human consumption only.
+3. If handoff only: emit `<UTC>-<slug>.handoff.json` (handoff-v1.1 schema). No HTML.
+4. Handoffs are the agent-to-agent contract; HTML is for human consumption only.
 
 ---
 ## dadaia CLI
@@ -354,7 +355,7 @@ e despacha o agente especialista correto para o sub-domínio.
 - Ler qualquer arquivo do workspace.
 - Despachar outros agentes via Agent tool.
 - Escrever apenas em `.dadaia/reports/<context>/project-manager/<ts>-*.html`
-  (relatórios de orquestração + handoff sidecars adjacentes).
+  (relatórios de orquestração + handoff JSONs em `.dadaia/handoff/<context>/`).
 - Mediar conflitos entre agentes via Decision Authority Matrix.
 - Escalar para o operador quando não houver consenso.
 
@@ -374,8 +375,8 @@ e despacha o agente especialista correto para o sub-domínio.
 
 Toda invocação produz um report HTML em
 `.dadaia/reports/<context>/project-manager/<YYYY-MM-DDTHHMMSSZ>-<type>.html`
-seguindo o template em `.dadaia/reports/AGENTS.md`, com handoff sidecar
-adjacente conforme `handoff-v1` schema. Seções obrigatórias:
+seguindo o template em `.dadaia/reports/AGENTS.md`, com handoff JSON
+em `.dadaia/handoff/<context>/` conforme `handoff-v1` schema. Seções obrigatórias:
 
 - `<h2>Demand</h2>` — texto original da demanda + categorização.
 - `<h2>Workflow chosen</h2>` — workflow despachado (ou ad-hoc).

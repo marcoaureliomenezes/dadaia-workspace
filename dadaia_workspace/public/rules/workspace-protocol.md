@@ -29,9 +29,10 @@ If none resolves: stop and ask operator to run `eval $(dadaia context bind <name
 5. Flip `[-]` → `[x]`. Commit with `conventional-commit(task-id): description`.
 
 ## 4. Report emission
-- Default: emit JSON sidecar (`<UTC>-<slug>.handoff.json`) only.
+- Default: emit JSON handoff (`<UTC>-<agent>-<slug>.handoff.json`) only.
 - HTML report: only when operator explicitly requests it OR `next_handoff.agent == "human"`.
-- Report path: `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html` (HTML) / `.handoff.json` (sidecar, adjacent).
+- Report path: `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html`.
+- Handoff path: `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
 - Reports > 30 KB: split into multi-HTML with `index.html` entry point.
 
 ## 5. Memory atomicity

@@ -56,7 +56,7 @@ _HEADING_GROUP_B: frozenset[str] = frozenset(
         "Referência",
         "Brand identity",
         "Decision Authority Matrix — domínios novos (r3)",
-        "Sidecar-first emission contract (ADR-X5)",
+        "Handoff-first emission contract (ADR-X5)",
         "Dispatch-to-researcher pattern (ADR-X6)",
         "Plugin-scope enforcement (ADR-X7)",
         "Codex Dispatcher Capability Matrix (ADR-3)",

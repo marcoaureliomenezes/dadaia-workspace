@@ -19,7 +19,7 @@ stages:
     parallel_group: assessment
     consumes: []
     expected_output:
-      path: ".dadaia/reports/{context}/software-architect/{run_ts}-onboard.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-software-architect-onboard.handoff.json"
       must_include: ["Architecture maturity", "Gaps"]
     inputs:
       - kind: workflow_input
@@ -31,7 +31,7 @@ stages:
     parallel_group: assessment
     consumes: []
     expected_output:
-      path: ".dadaia/reports/{context}/devops-engineer/{run_ts}-onboard.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-devops-engineer-onboard.handoff.json"
       must_include: ["CI/CD status", "Compliance gaps"]
     inputs:
       - kind: workflow_input
@@ -43,7 +43,7 @@ stages:
     parallel_group: assessment
     consumes: []
     expected_output:
-      path: ".dadaia/reports/{context}/qa-engineer/{run_ts}-onboard.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-qa-engineer-onboard.handoff.json"
       must_include: ["Test pyramid", "Coverage gaps"]
     inputs:
       - kind: workflow_input
@@ -54,11 +54,11 @@ stages:
     agent: project-manager
     needs: [arch_assessment, devops_assessment, qa_assessment]
     consumes:
-      - ".dadaia/reports/{context}/software-architect/{run_ts}-onboard.handoff.json"
-      - ".dadaia/reports/{context}/devops-engineer/{run_ts}-onboard.handoff.json"
-      - ".dadaia/reports/{context}/qa-engineer/{run_ts}-onboard.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-software-architect-onboard.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-devops-engineer-onboard.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-qa-engineer-onboard.handoff.json"
     expected_output:
-      path: ".dadaia/reports/{context}/project-manager/{run_ts}-onboard-synthesis.handoff.json"
+      path: ".dadaia/handoff/{context}/{run_ts}-project-manager-onboard-synthesis.handoff.json"
       must_include: ["Status", "Road to compliance"]
     inputs:
       - kind: stage_output
@@ -78,7 +78,7 @@ stages:
     agent: product-engineer
     needs: [synthesis]
     consumes:
-      - ".dadaia/reports/{context}/project-manager/{run_ts}-onboard-synthesis.handoff.json"
+      - ".dadaia/handoff/{context}/{run_ts}-project-manager-onboard-synthesis.handoff.json"
     expected_output:
       path: "specs/onboarding/SPEC.md"
       must_include: ["Status", "Road to compliance"]

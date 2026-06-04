@@ -3,7 +3,8 @@
 Scope: this file governs only `.dadaia/reports/**`.
 
 Reports are operational evidence for humans and `dadaia panel`. They must be
-small, self-contained, and machine-linkable through a handoff sidecar.
+small, self-contained, and machine-linkable through handoff JSON in
+`.dadaia/handoff/<context>/`.
 
 ## File Contract
 
@@ -11,18 +12,6 @@ Write one HTML report per agent run:
 
 ```text
 .dadaia/reports/<context>/<agent>/<YYYY-MM-DDTHHMMSSZ>-<slug>.html
-```
-
-Immediately write the sidecar next to it:
-
-```text
-.dadaia/reports/<context>/<agent>/<YYYY-MM-DDTHHMMSSZ>-<slug>.handoff.json
-```
-
-Validate the sidecar:
-
-```bash
-dadaia reports validate <path-to-html-or-sidecar>
 ```
 
 Do not write Markdown reports. Do not store temporary logs here; use
@@ -110,10 +99,10 @@ Each finding must include:
 - Impact
 - Recommendation
 
-## Handoff Sidecar
+## Handoff JSON
 
-The sidecar is the machine-readable summary consumed by downstream agents and
-validation tooling. It must identify:
+The machine-readable handoff is written under `.dadaia/handoff/<context>/` and
+is consumed by downstream agents and validation tooling. It must identify:
 
 - producing agent
 - context
@@ -126,6 +115,6 @@ Use the `dadaia-handoff-emitter` skill immediately after writing the HTML.
 
 ## Panel Compatibility
 
-`dadaia panel` expects stable paths, valid HTML, and sidecars. If a report is
-renamed, rename its sidecar with the same stem. Do not move reports between
-agents after creation.
+`dadaia panel` expects stable paths and valid HTML. If a report is renamed,
+update the matching handoff JSON under `.dadaia/handoff/<context>/`. Do not move
+reports between agents after creation.

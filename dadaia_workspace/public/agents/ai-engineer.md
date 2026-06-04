@@ -52,6 +52,7 @@ paths:
     - dadaia_workspace/public/agents/**
     - dadaia_workspace/public/hooks/**
     - .dadaia/reports/<ctx>/ai-engineer/**
+    - .dadaia/handoff/<ctx>/**
 ---
 
 # AI Engineer
@@ -194,7 +195,7 @@ Across all personas, the following invariants MUST hold:
 - Same [SCOPE ERROR] block format (verbatim refusal with explicit redirect to the
   right agent).
 - Same TDD / `dadaia-task-manager` reservation flow for implementer agents.
-- Same handoff sidecar contract (via `dadaia-handoff-emitter`).
+- Same handoff JSON contract (via `dadaia-handoff-emitter`).
 
 Inconsistencies across personas are bugs. File them in a refactor report.
 
@@ -339,6 +340,7 @@ revisit their workflow.
 | `dadaia_workspace/public/agents/**` | Write |
 | `dadaia_workspace/public/hooks/**` | Write |
 | `.dadaia/reports/<ctx>/ai-engineer/**` | Write |
+| `.dadaia/handoff/<ctx>/**` | Write |
 | `dadaia_workspace/` Python source (`*.py`, non-public) | Never (software-engineer-python) |
 | Node source (`*.js`, `*.ts`, `*.mjs`) | Never (software-engineer-node) |
 | `*.tsx`, `*.css`, `*.html` | Never (frontend-engineer) |
@@ -372,17 +374,17 @@ Operator-facing rationale.
 ### Artifact emission
 
 After finalizing any HTML report under `.dadaia/reports/`, invoke the
-`dadaia-handoff-emitter` skill to emit the `<stem>.handoff.json` sidecar.
+`dadaia-handoff-emitter` skill to emit handoff JSON under `.dadaia/handoff/<context>/`.
 
 ---
 
-## Report emission (sidecar-first)
+## Report emission (handoff-first)
 
-**Default:** emit JSON sidecar `<UTC>-<slug>.handoff.json` only. This is the agent-to-agent contract.
+**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
 
 **HTML report:** emit ONLY when:
 - The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the sidecar.
+- `next_handoff.agent == "human"` in the handoff JSON.
 
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
