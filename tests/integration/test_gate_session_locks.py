@@ -37,11 +37,31 @@ def _install_scripts(workspace: Path) -> Path:
 
 
 def _make_primary_context(workspace: Path, slug: str, specs_dir: Path) -> None:
+    """Write spec_contexts.json (v2) with the given slug as the sole ALIVE context.
+
+    The legacy primary_context.json file is no longer read by the gate (T-HARD-01);
+    the v2 resolution chain uses spec_contexts.json as step 2.
+    The specs_dir parameter is retained for signature compatibility but the v2 gate
+    derives specs_dir from repo_slug: $WS/repos/<slug>/specs.
+    """
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
-    (states / "primary_context.json").write_text(
-        json.dumps({"name": slug, "repo_slug": slug, "specs_dir": str(specs_dir)})
-    )
+    ctx_data = {
+        "schema_version": "2",
+        "contexts": [
+            {
+                "name": slug,
+                "state": "alive",
+                "repo_slug": slug,
+                "repo_url": "",
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "alive_since": "2026-01-01T00:00:00+00:00",
+                "dead_since": None,
+                "current_branch": "main",
+            }
+        ],
+    }
+    (states / "spec_contexts.json").write_text(json.dumps(ctx_data, indent=2))
 
 
 def _make_active_release(specs_dir: Path, release_id: str, tasks_marker: str = "[-]") -> Path:

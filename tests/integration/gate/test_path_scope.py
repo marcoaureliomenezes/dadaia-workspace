@@ -96,19 +96,29 @@ def _build_workspace(
     )
     (rel_dir / "TASKS.md").write_text(tasks_content, encoding="utf-8")
 
-    # primary_context.json
+    # spec_contexts.json (v2) — step 2 of the T-HARD-01 resolution chain.
+    # The gate derives specs_dir as $WS/repos/<slug>/specs, so we mirror that
+    # by also creating the release tree under repos/<context_name>/specs when
+    # any test needs IS_PROD path checking.  For path-scope tests the important
+    # part is that PRIMARY_SLUG == context_name so <ctx> substitution works.
     state_dir = tmp_path / ".dadaia" / "states"
     state_dir.mkdir(parents=True)
-    (state_dir / "primary_context.json").write_text(
-        json.dumps(
+    ctx_data = {
+        "schema_version": "2",
+        "contexts": [
             {
                 "name": context_name,
+                "state": "alive",
                 "repo_slug": context_name,
-                "specs_dir": str(tmp_path / "specs"),
+                "repo_url": "",
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "alive_since": "2026-01-01T00:00:00+00:00",
+                "dead_since": None,
+                "current_branch": "main",
             }
-        ),
-        encoding="utf-8",
-    )
+        ],
+    }
+    (state_dir / "spec_contexts.json").write_text(json.dumps(ctx_data, indent=2), encoding="utf-8")
 
     return tmp_path
 

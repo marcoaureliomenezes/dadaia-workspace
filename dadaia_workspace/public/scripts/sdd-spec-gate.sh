@@ -63,28 +63,63 @@ EOF
 [[ "$FPATH" != /* ]] && FPATH="$WS/$FPATH"
 _log "tool=$TOOL path=$FPATH"
 
-# Resolve primary slug + specs_dir from primary_context.json (best effort)
-PRIMARY_SLUG=$("$PYTHON_BIN" - 2>/dev/null <<EOF
-import json
-try:
-    print(json.load(open("$WS/.dadaia/states/primary_context.json")).get("repo_slug", ""))
-except Exception:
-    print("")
-EOF
-)
-PRIMARY_SPECS=$("$PYTHON_BIN" - 2>/dev/null <<EOF
-import json
-try:
-    print(json.load(open("$WS/.dadaia/states/primary_context.json")).get("specs_dir", ""))
-except Exception:
-    print("")
-EOF
-)
+# Resolve primary slug + specs_dir via 4-step chain (T-HARD-01):
+#   Step 1 — DADAIA_CONTEXT env var (highest priority)
+#   Step 2 — spec_contexts.json: first ALIVE entry (v2 schema; no is_primary field)
+#   Step 3 — session file: DADAIA_SESSION_ID.json → context field
+#   Step 4 — fail-open (last resort; logs a meaningful warning)
+PRIMARY_SLUG=""
+PRIMARY_SPECS=""
 
-# Legacy DADAIA_CONTEXT override
+# Step 1 — DADAIA_CONTEXT env var
 if [ -n "${DADAIA_CONTEXT:-}" ]; then
     PRIMARY_SLUG="$DADAIA_CONTEXT"
     PRIMARY_SPECS="$WS/repos/$DADAIA_CONTEXT/specs"
+    _log "context-resolution step1 (DADAIA_CONTEXT): slug=$PRIMARY_SLUG specs=$PRIMARY_SPECS"
+fi
+
+# Step 2 — spec_contexts.json: first ALIVE entry
+if [ -z "$PRIMARY_SLUG" ]; then
+    _CTX_RESULT=$("$PYTHON_BIN" - "$WS/.dadaia/states/spec_contexts.json" 2>/dev/null <<'PYEOF'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    for ctx in data.get("contexts", []):
+        if ctx.get("state", "").lower() == "alive":
+            print(ctx.get("repo_slug", "") + "|" + ctx.get("name", ""))
+            break
+except Exception:
+    pass
+PYEOF
+)
+    if [ -n "$_CTX_RESULT" ]; then
+        PRIMARY_SLUG="${_CTX_RESULT%%|*}"
+        _CTX_NAME="${_CTX_RESULT##*|}"
+        PRIMARY_SPECS="$WS/repos/$PRIMARY_SLUG/specs"
+        _log "context-resolution step2 (spec_contexts.json ALIVE): name=$_CTX_NAME slug=$PRIMARY_SLUG specs=$PRIMARY_SPECS"
+    fi
+fi
+
+# Step 3 — session file: DADAIA_SESSION_ID -> context field
+if [ -z "$PRIMARY_SLUG" ] && [ -n "${DADAIA_SESSION_ID:-}" ]; then
+    _SESS_CTX=$("$PYTHON_BIN" - "$WS/.dadaia/sessions/${DADAIA_SESSION_ID}.json" 2>/dev/null <<'PYEOF'
+import json, sys
+try:
+    print(json.load(open(sys.argv[1])).get("context", ""))
+except Exception:
+    pass
+PYEOF
+)
+    if [ -n "$_SESS_CTX" ]; then
+        PRIMARY_SLUG="$_SESS_CTX"
+        PRIMARY_SPECS="$WS/repos/$_SESS_CTX/specs"
+        _log "context-resolution step3 (session file $DADAIA_SESSION_ID): slug=$PRIMARY_SLUG specs=$PRIMARY_SPECS"
+    fi
+fi
+
+# Step 4 — fail-open: log a meaningful warning but do not block
+if [ -z "$PRIMARY_SLUG" ]; then
+    _log "WARN context-resolution: could not resolve primary context (DADAIA_CONTEXT unset, spec_contexts.json absent/empty, no session); gate will fail-open on IS_PROD check"
 fi
 
 # Resolve active release id and phase from <PRIMARY_SPECS>/releases/ACTIVE.md
@@ -663,7 +698,7 @@ _rule_e
 
 # Production path with no resolvable specs_dir → block with orientation
 if [ -z "$PRIMARY_SPECS" ] || [ ! -d "$PRIMARY_SPECS" ]; then
-    _block "[SDD GATE] Nenhum Spec Context ativo (primary). Execute: dadaia context activate <nome> antes de editar arquivos de producao em $FPATH."
+    _block "[SDD GATE] No active Spec Context resolved. To bind a context run: eval \$(dadaia context bind <name> --mode read). Then retry the edit on $FPATH."
 fi
 
 # v3 RULE C — Find [-] task. Priority order:

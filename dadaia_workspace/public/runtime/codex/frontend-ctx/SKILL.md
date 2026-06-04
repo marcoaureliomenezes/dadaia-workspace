@@ -56,7 +56,7 @@ If no such task exists, record: `[no frontend-engineer task found]`.
 
 ### Step 3 — Find the latest design report
 
-Resolve `slug` from `.dadaia/states/primary_context.json`, then:
+Resolve `slug` from `.dadaia/states/spec_contexts.json` (first ALIVE entry's `repo_slug`), then:
 
 ```
 ls .dadaia/reports/<slug>/design-specialist/ | sort -r | head -1

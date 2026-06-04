@@ -9,8 +9,7 @@ the panel. They are not documentation and not an implementation workspace.
 
 | File | Owner |
 |---|---|
-| `spec_contexts.json` | context lifecycle commands |
-| `primary_context.json` | `dadaia context activate/show` |
+| `spec_contexts.json` | context lifecycle commands (`dadaia context bind/show/list`) |
 | `server_registry.json` | `dadaia server register/list/unregister` |
 | other `*.json` | owning feature/service code |
 
