@@ -201,7 +201,7 @@ Evidence:
 
 ### T-BUG-10 — Propagate assets and verify release
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** devops-engineer
 - **Target files:** `.dadaia/agentic/`, `.claude/`, `.codex/`, `.opencode/`,
   `.agents/` (generated projections)
@@ -209,3 +209,15 @@ Evidence:
 - **Done criterion:** Full validation plan from PLAN §6 exits 0, public doctor
   has no drift, specs doctor has no errors, and no forbidden cache/state dirs
   exist in the repo.
+
+Evidence:
+- `rg -n "primary_context|is_primary|context promote|context activate" dadaia_workspace/public dadaia_workspace/cli dadaia_workspace/core dadaia_workspace/infrastructure specs/memory` reports only explicit migration/import cleanup paths.
+- `rg -n "Agent tool|supports_parallel|CodexAgentDispatcher|manual/reference-only" dadaia_workspace/public dadaia_workspace/infrastructure specs/memory` confirms truthful dispatcher capability and reference-only/manual wording.
+- `rg -n "pre-implementation agreement|implementation-complete|review/QA gate|security-reviewer|code-reviewer|qa-engineer" dadaia_workspace/public/agents dadaia_workspace/public/skills dadaia_workspace/public/workflows specs/memory` confirms the review/QA gate contract surfaces.
+- `.dadaia/.venv/bin/dadaia public stage` staged 12 asset groups.
+- `.dadaia/.venv/bin/dadaia public install --target all --force` processed 176 workspace-root assets.
+- `.dadaia/.venv/bin/dadaia public doctor` exited 0 with `[ok] public-privacy`, expected Codex `[reference-only]` workflow entries, and no drift failures.
+- `.dadaia/.venv/bin/dadaia specs doctor` exited 0 errors with 5 existing warnings.
+- `.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider -m "unit and not slow" tests/unit` → 1543 passed, 1 xpassed.
+- `.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/features/specs/` → 96 passed.
+- Forbidden repo artifact scan for `.dadaia`, `.venv`, pytest/mypy/ruff caches, coverage, Playwright reports, test-results, and `__pycache__` returned no paths after cleanup.
