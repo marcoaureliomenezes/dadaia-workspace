@@ -65,7 +65,7 @@ Deletion must never escape `.dadaia/reports/` or `.dadaia/handoff/`.
 
 ### T-RET-03 - Add reports retention CLI commands
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Reviewers before approval:** qa-engineer, code-reviewer, security-reviewer
 - **Target files:** `dadaia_workspace/cli/commands/reports.py`, CLI tests
