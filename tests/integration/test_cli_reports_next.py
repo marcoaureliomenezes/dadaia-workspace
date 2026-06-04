@@ -41,9 +41,9 @@ def _seed_context(
     (releases / "ACTIVE.md").write_text(active, encoding="utf-8")
     (releases / _RELEASE / "PLAN.md").write_text(plan, encoding="utf-8")
     for agent, rel in (handoffs or {}).items():
-        agent_dir = workspace / ".dadaia" / "reports" / _CTX / agent
-        agent_dir.mkdir(parents=True, exist_ok=True)
-        (agent_dir / "h.handoff.json").write_text(
+        handoff_dir = workspace / ".dadaia" / "handoff" / _CTX
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        (handoff_dir / f"2026-06-04T000000Z-{agent}-h.handoff.json").write_text(
             json.dumps({"release_id": rel, "agent": agent}), encoding="utf-8"
         )
 

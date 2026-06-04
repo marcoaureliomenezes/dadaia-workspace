@@ -864,6 +864,7 @@ def render_api_reports(
                     data = json.loads(handoff.read_text(encoding="utf-8"))
                     artifact = data.get("artifact", {})
                     artifact_path = artifact.get("path", "")
+                    report_path = _report_route_path(str(artifact_path))
                     title = Path(artifact_path).stem if artifact_path else handoff.stem
                     results.append(
                         {
@@ -871,7 +872,7 @@ def render_api_reports(
                             "agent": data.get("agent", ""),
                             "context": data.get("context", ""),
                             "created_at": data.get("produced_at", ""),
-                            "path": artifact_path,
+                            "path": report_path,
                             "findings_summary": _severity_counts(data.get("findings", [])),
                         }
                     )
@@ -882,6 +883,13 @@ def render_api_reports(
         return (200, "application/json; charset=utf-8", body)
 
     return _view
+
+
+def _report_route_path(artifact_path: str) -> str:
+    prefix = ".dadaia/reports/"
+    if artifact_path.startswith(prefix):
+        return artifact_path[len(prefix) :]
+    return artifact_path
 
 
 def serve_report_file(

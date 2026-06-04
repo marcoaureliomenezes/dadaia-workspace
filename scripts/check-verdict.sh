@@ -14,6 +14,8 @@
 #   QA_HANDOFF       absolute or relative path to qa-engineer *.handoff.json
 #   SECURITY_HANDOFF absolute or relative path to security-reviewer *.handoff.json
 #   HANDOFF_DIR      root search directory (default: .dadaia/handoff)
+#   RELEASE_ID       release id that both reviewer handoffs must match
+#   CONTEXT          optional context that both reviewer handoffs must match
 #
 # Usage:
 #   ./scripts/check-verdict.sh
@@ -23,6 +25,8 @@
 set -euo pipefail
 
 HANDOFF_DIR="${HANDOFF_DIR:-${REPORTS_DIR:-.dadaia/handoff}}"
+RELEASE_ID="${RELEASE_ID:-}"
+CONTEXT="${CONTEXT:-${DADAIA_CONTEXT:-}}"
 
 # ---------------------------------------------------------------------------
 # Resolve handoff paths
@@ -54,6 +58,11 @@ if [ -z "$qa_handoff" ] && [ -z "$sec_handoff" ]; then
   exit 0
 fi
 
+if [ -z "$RELEASE_ID" ]; then
+  echo "[verdict-gate] FAIL: RELEASE_ID is required when reviewer handoffs are present."
+  exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # Helper: check one handoff
 # ---------------------------------------------------------------------------
@@ -73,6 +82,18 @@ check_handoff() {
   fi
 
   verdict=$(jq -r '.verdict // empty' "$path" 2>/dev/null || true)
+  release_id=$(jq -r '.release_id // empty' "$path" 2>/dev/null || true)
+  context=$(jq -r '.context // empty' "$path" 2>/dev/null || true)
+
+  if [ "$release_id" != "$RELEASE_ID" ]; then
+    echo "[verdict-gate] FAIL: ${label} handoff release_id '${release_id}' does not match required '${RELEASE_ID}'."
+    failed=1
+  fi
+
+  if [ -n "$CONTEXT" ] && [ "$context" != "$CONTEXT" ]; then
+    echo "[verdict-gate] FAIL: ${label} handoff context '${context}' does not match required '${CONTEXT}'."
+    failed=1
+  fi
 
   if [ -z "$verdict" ]; then
     echo "[verdict-gate] FAIL: ${label} handoff at '$path' has no 'verdict' field."

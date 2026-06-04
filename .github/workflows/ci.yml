@@ -19,6 +19,10 @@ on:
         description: "Path to security-reviewer handoff (*.handoff.json). Optional."
         required: false
         default: ""
+      release_id:
+        description: "Release id expected in qa/security handoffs when supplied."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -304,4 +308,5 @@ jobs:
           # Passed via workflow_dispatch inputs; empty on push/PR runs.
           QA_HANDOFF: ${{ github.event.inputs.qa_sidecar || '' }}
           SECURITY_HANDOFF: ${{ github.event.inputs.security_sidecar || '' }}
+          RELEASE_ID: ${{ github.event.inputs.release_id || '' }}
         run: bash scripts/check-verdict.sh

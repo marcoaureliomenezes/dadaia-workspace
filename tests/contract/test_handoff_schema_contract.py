@@ -61,3 +61,17 @@ def test_handoff_contract_rejects_invalid_verdict() -> None:
 
     assert errors
     assert any("verdict" in error.field_path for error in errors)
+
+
+def test_handoff_contract_rejects_absolute_and_parent_traversal_artifact_paths() -> None:
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+
+    for path in ("/etc/passwd", "../report.html", ".dadaia/reports/../states/private.json"):
+        doc = _valid_handoff()
+        artifact = dict(doc["artifact"])  # type: ignore[arg-type]
+        artifact["path"] = path
+        doc["artifact"] = artifact
+
+        errors = list(validator.validate(doc))
+
+        assert errors, path

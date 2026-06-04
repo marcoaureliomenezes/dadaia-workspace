@@ -72,7 +72,7 @@ class ReportsNextService:
 
     Args:
         specs_dir: Absolute path to the active context's ``specs/`` directory.
-        reports_root: Root of the reports tree (``<workspace>/.dadaia/reports``).
+        reports_root: Root of the handoff tree (``<workspace>/.dadaia/handoff``).
         context_name: Context directory under ``reports_root`` (the repo slug).
     """
 
@@ -141,14 +141,18 @@ class ReportsNextService:
         return sequence
 
     def _has_handoff(self, agent: str, release_id: str) -> bool:
-        agent_dir = self._reports_root / self._context / agent
-        if not agent_dir.is_dir():
+        context_dir = self._reports_root / self._context
+        if not context_dir.is_dir():
             return False
-        for path in sorted(agent_dir.rglob("*.handoff.json")):
+        for path in sorted(context_dir.rglob("*.handoff.json")):
             try:
                 doc = json.loads(path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 continue
-            if isinstance(doc, dict) and doc.get("release_id") == release_id:
+            if (
+                isinstance(doc, dict)
+                and doc.get("release_id") == release_id
+                and doc.get("agent") == agent
+            ):
                 return True
         return False
