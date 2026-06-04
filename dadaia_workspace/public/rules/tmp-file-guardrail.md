@@ -30,17 +30,29 @@ Create with `mkdir -p` if the directory does not exist.
 
 ## Workspace root whitelist
 
-| File | Origin |
-|---|---|
-| `AGENTS.md` | lib-originated |
-| `CLAUDE.md` | operator-authored |
-| `opencode.json` | lib-originated |
-| `.mcp.json` | operator-authored |
-| `.dadaia/` | workspace state directory |
-| `repos/` | spec context project repos |
-| `scripts/` | operator-authored utility scripts |
+The workspace root may contain **only** the following entries:
 
-**Nothing else belongs at root.**
+| Entry | Type | Origin |
+|-------|------|--------|
+| `.agents/` | dir | lib-originated projection |
+| `.claude/` | dir | lib-originated projection |
+| `.codex/` | dir | lib-originated projection |
+| `.dadaia/` | dir | workspace state directory |
+| `.opencode/` | dir | lib-originated projection |
+| `repos/` | dir | spec context project repos |
+| `AGENTS.md` | file | lib-originated (dadaia public install) |
+
+**Nothing else belongs at root.** Files such as `CLAUDE.md`, `opencode.json`,
+`.mcp.json`, and `scripts/` are NOT default-whitelisted. Their placement at root
+is under investigation (T-SANI-02); pending that research, they are not authorized
+root entries. If a specific tool genuinely requires one of these at root, it must
+be added as a documented exception in `.dadaia/states/root_exceptions.txt` (one
+glob per line) after operator approval.
+
+**Operator exception:** any file or directory created by the human operator is always
+allowed and must never be auto-deleted (e.g. `prompt.md`, `sessions-tab-1280.png`).
+
+This whitelist is enforced by the `root-whitelist-gate.sh` PreToolUse hook.
 
 ## No cache/state dirs inside repos
 

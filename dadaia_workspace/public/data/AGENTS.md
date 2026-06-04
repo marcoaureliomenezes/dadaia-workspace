@@ -20,6 +20,29 @@ take precedence.
 - Public defaults must stay generic: no private repo names, hostnames, IPs,
   customer names, operator-local paths, or optional domain-pack assumptions.
 
+## Workspace Root Law
+
+The workspace **root** may contain **only**:
+
+- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.opencode/`, `repos/`
+- File: `AGENTS.md`
+
+**Operator exception:** any file or directory created by the human operator is always
+allowed and MUST never be auto-deleted (e.g. `prompt.md`, screenshots). Operator
+authorship is determined by human judgment — the hook fails open when origin is ambiguous.
+
+Everything else at root is forbidden. If a legitimate process regenerates an artifact,
+it MUST be redirected into a canonical `.dadaia/<subdir>` — never left loose at root.
+Agent-generated temp files go to `.dadaia/tmp/<agent>/<YYYYMMDD>/` (see the
+`tmp-file-guardrail` rule). Tool caches go under `.dadaia/` (ruff `cache-dir`, coverage
+`data_file`, etc.). MCP server working dirs go under `.dadaia/mcps/<server>/`.
+
+This law is enforced deterministically by the `root-whitelist-gate.sh` PreToolUse hook.
+Any write that would create a new top-level root entry not in the whitelist above is
+**blocked**. The hook reads an optional operator exception list from
+`.dadaia/states/root_exceptions.txt` (one glob per line) for documented, deliberate
+exceptions (e.g. tool configs that a specific tool hard-requires at root).
+
 ## Repository Hygiene
 
 This repository is the `dadaia-workspace` source library, not a generated
