@@ -36,6 +36,7 @@ from dadaia_workspace.features.panel.views.static import render_static
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reports_next.service import ReportsNextService
+from dadaia_workspace.features.reports_retention.service import ReportRetentionService
 from dadaia_workspace.features.reports_validation.service import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
@@ -233,6 +234,12 @@ def build_reports_next_service(
     return ReportsNextService(
         specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
     )
+
+
+def build_reports_retention_service(workspace_root: Path) -> ReportRetentionService:
+    """Compose ``ReportRetentionService`` for workspace runtime report state."""
+    _guard_initialized(workspace_root)
+    return ReportRetentionService(workspace_root)
 
 
 def build_panel_views(
