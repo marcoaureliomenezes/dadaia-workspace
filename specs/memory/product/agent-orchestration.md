@@ -3,16 +3,16 @@ slug: agent-orchestration
 title: agent-orchestration
 category: product
 tldr: Generic multi-agent orchestration over public default agents and workflows, with runtime-specific dispatch for Claude Code, Codex, OpenCode, and CLI.
-summary: Defines the public default agent topology, workflow inventory, dispatcher boundaries, path-scope ownership, and report/handoff expectations.
+summary: Defines the public default agent topology, workflow inventory, dispatcher boundaries, review/QA gate, path-scope ownership, and report/handoff expectations.
 tags:
 - orchestration
 - agents
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 370
-last_updated: '2026-06-03'
-release_origin: public-agentic-hygiene-codex-readiness
+token_estimate: 506
+last_updated: '2026-06-04'
+release_origin: v0.1.4.2
 ---
 
 ## Propósito
@@ -61,6 +61,16 @@ groups. OpenCode uses its own agent and plugin projection.
 The dispatcher layer must report unsupported runtime capabilities honestly
 instead of simulating success. In Codex, parallel workflow groups are topology
 metadata and manual handoff files, not a promise of runtime concurrency.
+
+Before TASKS approval, the owning implementer agents, `qa-engineer`,
+`code-reviewer`, and `security-reviewer` must agree that each task is
+implementable, testable, reviewable, and security-checkable. UI-visible tasks
+also require `design-specialist` agreement. After implementation, an
+implementer emits an implementation-complete handoff; the task remains active
+until QA, code review, and security review approve the same commit or artifact.
+Any rejection routes back to the owning implementer for rework and re-review.
+Task `[x]`, push, PR, merge, deploy, release closure, and memory updates are
+blocked until the review/QA gate is green.
 
 ## Estado runtime tocado
 

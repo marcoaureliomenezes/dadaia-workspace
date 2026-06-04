@@ -17,8 +17,8 @@ tags:
 - locking
 agent_tier: self-pull
 token_estimate: 1658
-last_updated: '2026-06-01'
-release_origin: r2-lock-toctou-hardening-v1
+last_updated: '2026-06-04'
+release_origin: v0.1.4.2
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2` · Closure: r2-lock-toctou-hardening-v1
@@ -114,7 +114,7 @@ Doctor TREE-1..7 enforça e repara esta árvore: `dadaia specs doctor` em worksp
 
 
 
-O hook `.dadaia/scripts/ctx-inject.sh` (instalado por `workspace-init`) executa em cada UserPromptSubmit e injeta `DADAIA_CONTEXT` a partir do contexto ativo — em v2, a partir do binding de sessão exportado via `eval`, ou do último context ALIVE como fallback informativo.
+O hook `.dadaia/scripts/ctx-inject.sh` (instalado por `workspace-init`) executa em cada UserPromptSubmit e injeta contexto a partir do binding de sessão exportado via `eval $(dadaia context bind ...)`. Quando não há sessão ligada, o hook pode emitir orientação read-only para descoberta, mas produção, release e memory writes continuam bloqueados até `DADAIA_CONTEXT`, `DADAIA_SESSION_ID` e `DADAIA_MODE` apontarem para uma sessão válida.
 
 ## Trigger típico
 
