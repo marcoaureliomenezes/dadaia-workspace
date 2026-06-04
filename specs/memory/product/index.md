@@ -12,11 +12,15 @@
 
 | `academy` | academy | sistema de cursos copy-from-template para onboarding de contribuidores e agentes. |
 | `agent-comms` | agent-comms — Handoff Contract v1 | contrato handoff-v1.1 que materializa o referente schema_ref: handoff-schema-v1; schema JSON Draft 2020-12 + CLI dadaia reports validate/lint/next stdlib-onl... |
+| `ai-context-engineering` | ai-context-engineering | Deep skill (ai-engineer-only): token economy, instruction hierarchy, persona-consistency invariants, model-tier selection decision table, scope-drift detection. |
+| `ai-harness-claude-code` | ai-harness-claude-code | Deep skill (ai-engineer-only): compiled decision protocols for Claude Code harness — agentic loop, context hierarchy, rules, skills, hooks, subagents, MCP, composition tree. |
+| `ai-harness-codex` | ai-harness-codex | Deep skill (ai-engineer-only): compiled decision protocols for Codex harness — AGENTS.md constitution, naming-collision disambiguation, Starlark rules, config trust model. |
 | `agent-monitoring` | agent-monitoring | telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privac... |
 | `agent-orchestration` | agent-orchestration | DAG runner que dispatcha agentes especialistas (cli/claude/codex/opencode) com parallel_groups + gates. Two-tier PM router: Tier-1 — 7 engine-backed workflow... |
 | `agent-sdd-alignment` | agent-sdd-alignment | agentes, skills, workflows e templates SDD release-aware (specs/releases/<active>/ como primary; features/<feat>/ apenas Legacy compat) + dadaia specs init +... |
 | `brand-identity` | brand-identity | paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1). |
 | `context-management` | context-management | multi-context lifecycle ALIVE/DEAD (sem global primary); session binding via eval $(dadaia context bind --mode) exporta DADAIA_SESSION_ID; três camadas de lo... |
+| `harness-primitives` | harness-primitives | Shared literacy skill (all agents): what each harness primitive is, Claude Code vs Codex deltas, dadaia projection mechanics, when to defer to ai-engineer. |
 | `multi-platform-parity` | multi-platform-parity | Pilar 3 entre Claude Code / Codex / OpenCode: Codex [agents.<name>] blocks + [skills] table em .codex/config.toml; doctor emite [not-applicable] cyan para Co... |
 | `panel` | panel | superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com ... |
 | `public-asset-distribution` | public-asset-distribution | canonical → .dadaia/agentic/ → projeções multi-tool (.claude/, .codex/, .opencode/, .agents/). |

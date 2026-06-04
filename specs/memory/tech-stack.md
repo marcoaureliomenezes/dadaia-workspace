@@ -12,8 +12,8 @@ tags:
 - constraints
 agent_tier: inject
 token_estimate: 1100
-last_updated: '2026-06-01'
-release_origin: memory-markdown-source-v1
+last_updated: '2026-06-04'
+release_origin: v0.1.4.6
 ---
 
 ## Linguagens
@@ -60,7 +60,7 @@ project-manager| `claude-sonnet-4-6`| Tier 1 orquestrador
 project-auditor| `claude-sonnet-4-6`| Tier 1 orquestrador
 product-engineer| `claude-sonnet-4-6`| Tier 2 curator
 software-architect| `claude-sonnet-4-6`| Tier 3 leaf
-ai-engineer| `claude-sonnet-4-6`| Tier 3 leaf
+ai-engineer| `claude-opus-4-8`| Tier 3 leaf (upgraded v0.1.4.6: harness-mastery synthesis workload)
 researcher| `claude-haiku-4-5-20251001`| Haiku 4.5; canônico em fan-out evidence-heavy (ADR-X6)
 security-reviewer| `claude-sonnet-4-6` (triage) / `claude-haiku-4-5` (scan)| Dispatcher declara o modo explicitamente
 code-reviewer, software-engineer-python, software-engineer-node, backend-engineer, frontend-engineer, qa-engineer, devops-engineer, design-specialist| `claude-sonnet-4-6`| Tier 3 leaves restantes (8)
