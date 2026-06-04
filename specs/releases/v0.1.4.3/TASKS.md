@@ -52,7 +52,7 @@ resolve workspace-relative artifact paths correctly for hash checks.
 
 - **Status:** [-]
 - **Owner:** qa-engineer + code-reviewer + security-reviewer
-- **Target files:** `tests/**`, `.github/workflows/ci.yml` if needed
+- **Target files:** `tests/**`, `dadaia_workspace/features/panel/views/api.py`, `.github/workflows/ci.yml` if needed
 
 Add or update focused tests for the new directory contract. Run verification
 for public assets, schema/model validation, CLI validation, and hash validation.
