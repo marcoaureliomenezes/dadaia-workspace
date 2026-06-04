@@ -550,3 +550,158 @@ def test_gate_blocks_when_active_release_has_no_task(workspace: Path) -> None:
     data = json.loads(result.stdout)
     assert data["decision"] == "block"
     assert "SDD GATE" in data["reason"]
+
+
+# ---------------------------------------------------------------------------
+# T-HARD-05: RULE F — .dadaia/tmp/ fast-allow
+# ---------------------------------------------------------------------------
+
+
+def test_sdd_gate_rule_f_tmp_path_exits_0(workspace: Path) -> None:
+    """RULE F: a write whose target path is under .dadaia/tmp/ must exit 0
+    immediately, regardless of any other gate state (no active task, no context).
+
+    This makes the tmp-file-guardrail rule deterministic: even without a [-]
+    task marker or a resolved primary context, tmp writes are never blocked.
+    """
+    scripts = _install_scripts(workspace)
+    # No specs, no context, no tasks — conditions that would normally fail-open.
+    # With RULE F the gate must exit 0 (allow) silently for tmp paths.
+    tmp_target = (
+        workspace / ".dadaia" / "tmp" / "software-engineer-python" / "20260603" / "output.json"
+    )
+    log_file = workspace / ".dadaia" / "sdd-gate.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), "SDD_GATE_LOG": str(log_file)}
+
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(tmp_target)}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0, f"Gate crashed; stderr: {result.stderr!r}"
+    assert result.stdout == "", f"Expected empty stdout (allow) but gate emitted: {result.stdout!r}"
+
+    # Log must contain RULE F fast-allow message
+    log_content = log_file.read_text() if log_file.exists() else ""
+    assert "tmp path fast-allow" in log_content or "RULE F" in log_content, (
+        f"Expected RULE F log message. Log:\n{log_content!r}"
+    )
+
+
+def test_sdd_gate_rule_f_tmp_nested_subdir_exits_0(workspace: Path) -> None:
+    """RULE F: deeply nested paths under .dadaia/tmp/ are also fast-allowed."""
+    scripts = _install_scripts(workspace)
+    tmp_target = (
+        workspace / ".dadaia" / "tmp" / "qa-engineer" / "2026" / "06" / "screenshot.png"
+    )
+    env = {**os.environ, "WORKSPACE_ROOT": str(workspace)}
+
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(tmp_target)}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    assert result.stdout == "", f"Expected allow but got: {result.stdout!r}"
+
+
+# ---------------------------------------------------------------------------
+# T-HARD-05: one-[-]-per-owner WARN
+# ---------------------------------------------------------------------------
+
+
+def test_sdd_gate_one_minus_warn_two_markers_no_parallel_declaration(workspace: Path) -> None:
+    """One-[-]-per-owner: when TASKS.md has 2+ [-] markers and no parallel_tasks:
+    header, the gate must emit a WARN line to the gate log (but NOT block).
+    """
+    scripts = _install_scripts(workspace)
+    specs = workspace / "repos" / "my-proj" / "specs"
+    rel_dir = specs / "releases" / "my-release-v1"
+    rel_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
+    # Two simultaneous [-] markers, no parallel_tasks: declaration
+    (rel_dir / "TASKS.md").write_text(
+        "# Tasks\n\n"
+        "- [-] T-001 — first in-progress task\n"
+        "- [-] T-002 — second in-progress task\n"
+        "- [ ] T-003 — open task\n"
+    )
+    _make_primary_context(workspace, "my-proj", specs)
+
+    log_file = workspace / ".dadaia" / "sdd-gate.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), "SDD_GATE_LOG": str(log_file)}
+
+    # Write to a production path (repos/<slug>/) to reach RULE C
+    target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        env=env,
+    )
+    # Gate must ALLOW (two [-] markers do satisfy RULE C)
+    assert result.returncode == 0, f"Gate crashed; stderr: {result.stderr!r}"
+    assert result.stdout == "", f"Expected allow (warn-only) but got blocked: {result.stdout!r}"
+
+    # WARN must be in the log
+    log_content = log_file.read_text() if log_file.exists() else ""
+    assert "WARN" in log_content and (
+        "one-active-task" in log_content or "multiple [-]" in log_content
+    ), (f"Expected WARN one-active-task in log. Log:\n{log_content!r}")
+    # The count (2) must appear in the log message
+    assert "2" in log_content, f"Expected count '2' in WARN log. Log:\n{log_content!r}"
+
+
+def test_sdd_gate_one_minus_warn_suppressed_with_parallel_declaration(workspace: Path) -> None:
+    """One-[-]-per-owner: when parallel_tasks: header is present, the WARN must
+    be suppressed even if 2+ [-] markers exist.
+    """
+    scripts = _install_scripts(workspace)
+    specs = workspace / "repos" / "my-proj" / "specs"
+    rel_dir = specs / "releases" / "my-release-v1"
+    rel_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
+    # Two simultaneous [-] markers WITH parallel_tasks: declaration
+    (rel_dir / "TASKS.md").write_text(
+        "# Tasks\n\n"
+        "parallel_tasks: T-001 || T-002 (disjoint write sets)\n\n"
+        "- [-] T-001 — first in-progress task\n"
+        "- [-] T-002 — second in-progress task\n"
+    )
+    _make_primary_context(workspace, "my-proj", specs)
+
+    log_file = workspace / ".dadaia" / "sdd-gate.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), "SDD_GATE_LOG": str(log_file)}
+
+    target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    assert result.stdout == "", f"Expected allow but got: {result.stdout!r}"
+
+    log_content = log_file.read_text() if log_file.exists() else ""
+    # WARN must NOT appear when parallel_tasks: is declared
+    assert "WARN one-active-task" not in log_content and "WARN: multiple [-]" not in log_content, (
+        f"WARN should be suppressed with parallel_tasks declaration. Log:\n{log_content!r}"
+    )

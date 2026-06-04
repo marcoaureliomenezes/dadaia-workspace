@@ -394,6 +394,17 @@ PYEOF
 
 _path_scope_check
 
+# RULE F — tmp path fast-allow (T-HARD-05)
+# Writes whose target is under .dadaia/tmp/ are always allowed without further
+# gate checks. This makes the tmp-file-guardrail rule deterministic in addition
+# to its prose form. Placed before IS_PROD so tmp writes are never gated.
+case "$FPATH" in
+    "$WS/.dadaia/tmp/"*)
+        _log "allowed — tmp path fast-allow (RULE F): $FPATH"
+        exit 0
+        ;;
+esac
+
 # Determine if this is a production path
 # Consumer production paths (e.g. /docker/<service>/data/) should be derived from
 # workspace config, not hardcoded here. Add them via workspace-local gate overrides.
@@ -728,6 +739,25 @@ if [ -z "$ACTIVE" ] && [ "${SDD_LEGACY_FEATURES:-1}" = "1" ]; then
         | grep -v "/releases/" \
         | grep -v "^$PRIMARY_SPECS/TASKS\.md$" \
         | head -1)
+fi
+
+# One-[-]-per-owner warn (T-HARD-05).
+# Workspace-protocol says "at most one [-] at a time unless disjoint write sets
+# are declared." When the resolved TASKS.md has 2+ [-] markers without a
+# parallel_tasks: header, emit a WARN to the gate log. Do NOT hard-block — warn
+# only, to avoid breaking declared-disjoint parallel work.
+if [ -n "$ACTIVE" ]; then
+    _COUNT=$(grep -cE "$GREP_PAT" "$ACTIVE" 2>/dev/null || echo 0)
+    if [ "$_COUNT" -gt 1 ]; then
+        # grep -c exits 0 when lines match, 1 when zero lines match; avoid the
+        # `|| echo 0` pattern here — it double-appends when grep itself outputs "0".
+        # Use arithmetic test instead: if grep finds no parallel_tasks: line, count is 0.
+        _HAS_PARALLEL=0
+        grep -qF 'parallel_tasks:' "$ACTIVE" 2>/dev/null && _HAS_PARALLEL=1
+        if [ "$_HAS_PARALLEL" = "0" ]; then
+            _log "WARN one-active-task: $_COUNT simultaneous [-] markers in $ACTIVE without parallel_tasks declaration"
+        fi
+    fi
 fi
 
 if [ -n "$ACTIVE" ]; then
