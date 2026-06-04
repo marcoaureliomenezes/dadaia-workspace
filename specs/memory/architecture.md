@@ -13,7 +13,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 4800
 last_updated: '2026-06-04'
-release_origin: v0.1.4.4
+release_origin: v0.1.4.6
 ---
 
 ## Visão geral
@@ -71,7 +71,7 @@ agent-persona não detectada → fail-open com warning em `/tmp/sdd-gate.log`
 `software-engineer-python`/`-node` são banidos dessa superfície AI-entity (e
 vice-versa: `ai-engineer` não escreve código Python/Node nem specs).
 
-**rules folder** — 4 arquivos canônicos públicos: `workspace-protocol.md` (SDD gate + context discovery + task lifecycle), `tmp-file-guardrail.md` (artefatos temporários e outputs), `plugin-scope.md` (escopo de plugins/skills especializados) e `dadaia-workspace-dev-guardrail.md` (regras de evolução da própria lib). Rules de domínio, jogos, vendors ou projetos privados não pertencem ao default público.
+**rules folder** — 5 arquivos canônicos públicos: `workspace-protocol.md` (SDD gate + context discovery + task lifecycle), `tmp-file-guardrail.md` (artefatos temporários e outputs), `plugin-scope.md` (escopo de plugins/skills especializados), `dadaia-workspace-dev-guardrail.md` (regras de evolução da própria lib) e `harness-skill-scope.md` (always_on; restringe as skills ai-harness-claude-code, ai-harness-codex e ai-context-engineering ao ai-engineer; harness-primitives é explicitamente não-restrita). Rules de domínio, jogos, vendors ou projetos privados não pertencem ao default público.
 
 ## Regras de dependência
 

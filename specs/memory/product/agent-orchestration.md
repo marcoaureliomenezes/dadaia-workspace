@@ -12,7 +12,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 506
 last_updated: '2026-06-04'
-release_origin: v0.1.4.2
+release_origin: v0.1.4.6
 ---
 
 ## Propósito
@@ -82,3 +82,14 @@ agentic assets. `product-engineer` owns specs and memory according to SDD phase.
 The SDD gate validates write allowlists, task ownership, active context, and
 memory phase rules. Reports are emitted under `.dadaia/reports/<context>/<agent>/`
 with machine-readable handoff sidecars where required.
+
+`ai-engineer` model assignment: `claude-opus-4-8` (operator-approved v0.1.4.6 —
+synthesis-heavy harness-mastery workload justifies Opus tier).
+
+`ai-engineer` exclusive skills (restricted by `harness-skill-scope` rule):
+`ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`.
+
+Shared literacy skill (all agents): `harness-primitives`.
+
+Public rules inventory (5): `workspace-protocol`, `tmp-file-guardrail`,
+`plugin-scope`, `dadaia-workspace-dev-guardrail`, `harness-skill-scope`.
