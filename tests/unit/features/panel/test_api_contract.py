@@ -28,9 +28,11 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
     delete_report_file,
+    mark_report_important,
     render_api_contexts,
     render_api_reports,
     render_api_servers,
+    unmark_report_important,
 )
 
 # ---------------------------------------------------------------------------
@@ -248,8 +250,43 @@ def test_api_reports_lists_html_report_without_handoff(tmp_path: Path) -> None:
             "created_at": "2026-06-04T15:32:39Z",
             "path": "ctx/project-auditor/2026-06-04T153239Z-workflow-audit.html",
             "findings_summary": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+            "important": False,
+            "expires_at": "2026-06-06T15:32:39Z",
+            "retention_status": "expires",
         }
     ]
+
+
+def test_api_reports_includes_important_retention_state(tmp_path: Path) -> None:
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>qa</html>", encoding="utf-8")
+    service = _build_service(workspace_root=tmp_path)
+    status, _, _ = mark_report_important(service)(path="ctx/qa-engineer/qa.html")
+    assert status == 200
+
+    _, _, body = render_api_reports(service)()
+
+    row = json.loads(body)["reports"][0]
+    assert row["important"] is True
+    assert row["retention_status"] == "important"
+
+
+def test_mark_and_unmark_report_important_views(tmp_path: Path) -> None:
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>qa</html>", encoding="utf-8")
+    service = _build_service(workspace_root=tmp_path)
+
+    mark_status, _, mark_body = mark_report_important(service)(path="ctx/qa-engineer/qa.html")
+    unmark_status, _, unmark_body = unmark_report_important(service)(
+        path="ctx/qa-engineer/qa.html"
+    )
+
+    assert mark_status == 200
+    assert json.loads(mark_body)["important"] is True
+    assert unmark_status == 200
+    assert json.loads(unmark_body)["important"] is False
 
 
 def test_api_reports_enriches_html_report_from_legacy_adjacent_handoff(

@@ -96,6 +96,7 @@ from dadaia_workspace.features.agents.reader import (
     get_prompt,
 )
 from dadaia_workspace.features.panel.service import PanelService
+from dadaia_workspace.features.reports_retention import ReportRetentionService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 
@@ -896,6 +897,15 @@ def render_api_reports(
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         reports_root = (service._workspace_root / ".dadaia" / "reports").resolve()
+        retention = ReportRetentionService(service._workspace_root)
+        try:
+            retention.cleanup()
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("Report retention cleanup skipped: %s", exc)
+        retention_by_route = {
+            record.artifact_path.removeprefix(".dadaia/reports/"): record
+            for record in retention.list_reports()
+        }
         results_by_path: dict[str, dict[str, object]] = {}
         if reports_root.exists():
             for report in reports_root.rglob("*.html"):
@@ -932,8 +942,61 @@ def render_api_reports(
                     _log.warning("Skipping malformed handoff %s: %s", handoff, exc)
 
         results = list(results_by_path.values())
+        now = datetime.datetime.now(tz=datetime.UTC)
+        for row in results:
+            record = retention_by_route.get(str(row["path"]))
+            if record is None:
+                row["important"] = False
+                row["expires_at"] = ""
+                row["retention_status"] = "unknown"
+                continue
+            expires_at = record.effective_timestamp + datetime.timedelta(hours=48)
+            row["important"] = record.important
+            row["expires_at"] = expires_at.isoformat().replace("+00:00", "Z")
+            if record.important:
+                row["retention_status"] = "important"
+            elif expires_at <= now:
+                row["retention_status"] = "expired"
+            else:
+                row["retention_status"] = "expires"
         results.sort(key=lambda r: str(r["created_at"]), reverse=True)
         body = json.dumps({"reports": results}).encode("utf-8")
+        return (200, "application/json; charset=utf-8", body)
+
+    return _view
+
+
+def mark_report_important(
+    service: PanelService,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """Mark a report important from the Reports panel."""
+
+    def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
+        retention = ReportRetentionService(service._workspace_root)
+        try:
+            artifact = retention.mark_important(path)
+        except ValueError as exc:
+            body = json.dumps({"error": "invalid_path", "message": str(exc)}).encode("utf-8")
+            return (400, "application/json; charset=utf-8", body)
+        body = json.dumps({"important": True, "artifact_path": artifact}).encode("utf-8")
+        return (200, "application/json; charset=utf-8", body)
+
+    return _view
+
+
+def unmark_report_important(
+    service: PanelService,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """Remove important protection from a report from the Reports panel."""
+
+    def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
+        retention = ReportRetentionService(service._workspace_root)
+        try:
+            artifact = retention.unmark_important(path)
+        except ValueError as exc:
+            body = json.dumps({"error": "invalid_path", "message": str(exc)}).encode("utf-8")
+            return (400, "application/json; charset=utf-8", body)
+        body = json.dumps({"important": False, "artifact_path": artifact}).encode("utf-8")
         return (200, "application/json; charset=utf-8", body)
 
     return _view

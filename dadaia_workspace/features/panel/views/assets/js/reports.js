@@ -5,6 +5,8 @@
 // API contracts:
 //   GET  /api/reports        → { reports: [ { title, agent, context, created_at, path, findings_summary } ] }
 //   DELETE /api/reports/<path> → { deleted: true }   (bearer-only)
+//   POST /api/reports-important/<path> → { important: true }
+//   POST /api/reports-unimportant/<path> → { important: false }
 //   GET  /reports/<path>     → HTML report content    (public route)
 //
 // Module lifecycle:
@@ -55,6 +57,12 @@
     var d = new Date(iso);
     if (isNaN(d.getTime())) { return '—'; }
     return d.toLocaleString();
+  }
+
+  function retentionLabel(report) {
+    if (report.important) { return 'Marked important'; }
+    if (!report.expires_at) { return ''; }
+    return 'Expires ' + fmtDate(report.expires_at);
   }
 
   // ── Group reports by context ──────────────────────────────────────────────────
@@ -197,6 +205,31 @@
     });
   }
 
+  function wireImportantBtn(li, report) {
+    var btn = li.querySelector('.reports-row__important');
+    if (!btn) { return; }
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      var route = report.important ? '/api/reports-unimportant/' : '/api/reports-important/';
+      window.authedFetch(route + encodeReportPath(report.path), { method: 'POST' })
+        .then(function (r) {
+          if (!r.ok) { throw new Error('HTTP ' + r.status); }
+          return r.json();
+        })
+        .then(function (data) {
+          report.important = !!data.important;
+          var meta = li.querySelector('.reports-row__retention');
+          if (meta) { meta.textContent = retentionLabel(report); }
+          btn.textContent = report.important ? 'Unmark important' : 'Important';
+          btn.setAttribute('aria-pressed', report.important ? 'true' : 'false');
+          btn.disabled = false;
+        })
+        .catch(function () {
+          btn.disabled = false;
+        });
+    });
+  }
+
   // ── Build a single report row (<li>) ─────────────────────────────────────────
 
   function buildRow(report) {
@@ -216,6 +249,11 @@
       + escHtml(report.title || '(untitled)')
       + '</button>'
       + '<span class="reports-row__date">' + escHtml(dateStr) + '</span>'
+      + '<span class="reports-row__retention">' + escHtml(retentionLabel(report)) + '</span>'
+      + '<button class="reports-row__important" type="button" aria-pressed="'
+      + (report.important ? 'true' : 'false') + '">'
+      + (report.important ? 'Unmark important' : 'Important')
+      + '</button>'
       + '<button class="reports-row__trash" type="button"'
       + ' aria-label="Delete report: ' + escHtml(report.title || '') + '">'
       + '&#128465;'
@@ -229,6 +267,7 @@
 
     wireTrashBtn(li, report);
     wireTitleBtn(li, report);
+    wireImportantBtn(li, report);
 
     return li;
   }
