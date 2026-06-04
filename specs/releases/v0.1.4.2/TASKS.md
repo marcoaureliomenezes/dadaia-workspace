@@ -98,7 +98,7 @@ Evidence:
 
 ### T-BUG-05 — Align Codex-facing orchestration wording
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Target files:** `dadaia_workspace/public/agents/**`,
   `dadaia_workspace/public/workflows/**`, `specs/memory/product/agent-orchestration.md`
