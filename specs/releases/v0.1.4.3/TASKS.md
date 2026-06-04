@@ -41,7 +41,7 @@ manually deletes a report.
 
 ### T-RET-01 - Implement report retention domain service
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Reviewers before approval:** qa-engineer, code-reviewer, security-reviewer
 - **Target files:** `dadaia_workspace/features/reports_retention/**` or nearest existing reports feature, `tests/unit/features/reports_retention/**`
