@@ -8,7 +8,7 @@ Markers: `[ ]` open → `[-]` in progress → `[x]` done. Backlog: `specs/backlo
 
 ### T-SANI-01 — Root law in AGENTS.md + tighten tmp-file-guardrail + deterministic hook
 - **Owner:** ai-engineer
-- **Status:** [-]
+- **Status:** [x]
 - Codify the root whitelist law (6 dirs + `AGENTS.md` + operator exception) in
   `public/data/AGENTS.md`. Tighten `public/rules/tmp-file-guardrail.md` so its root
   whitelist == the law (remove `CLAUDE.md`, `opencode.json`, `.mcp.json`, `scripts/`).
@@ -28,7 +28,7 @@ Markers: `[ ]` open → `[-]` in progress → `[x]` done. Backlog: `specs/backlo
 
 ### T-SANI-02 — Relocate root crap + research tool configs
 - **Owner:** software-engineer-python
-- **Status:** [ ]
+- **Status:** [x]
 - Relocate `scripts/` → `.dadaia/scripts/` (update any references). Redirect Playwright MCP
   output → `.dadaia/mcps/playwright/`; delete stray `.playwright-mcp/`. Delete regenerated
   caches at root. **Research** `.mcp.json` / `opencode.json` / `CLAUDE.md`: verify each tool's
@@ -47,7 +47,7 @@ Markers: `[ ]` open → `[-]` in progress → `[x]` done. Backlog: `specs/backlo
 
 ### T-SANI-06 — QA verification
 - **Owner:** qa-engineer
-- **Status:** [ ]
+- **Status:** [x]
 - Verify all ACs above; full unit+contract run leaves repo root clean; the root-whitelist hook
   blocks a planted non-whitelisted write and allows an operator-tagged file.
 - **AC:** evidence captured; zero root pollution after the run.
