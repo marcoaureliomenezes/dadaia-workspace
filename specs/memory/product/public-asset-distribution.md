@@ -12,8 +12,8 @@ tags:
 - privacy
 agent_tier: self-pull
 token_estimate: 450
-last_updated: '2026-06-03'
-release_origin: public-agentic-hygiene-codex-readiness
+last_updated: '2026-06-04'
+release_origin: v0.1.4.1
 ---
 
 ## Propósito
@@ -76,3 +76,11 @@ Staged temp workspaces remain supported.
 `public doctor` compares canonical source, staging, and projections; filters
 cache files such as `__pycache__/` and `*.pyc`; and reports drift as actionable
 `[missing]`, `[drift]`, `[ok]`, or reference-only runtime status.
+
+Codex hook projection writes the nested Codex hook schema under `.codex/hooks.json`.
+`PreToolUse` and `PostToolUse` match write-like tools (`apply_patch`, `Edit`,
+`Write`), and `UserPromptSubmit` runs `ctx-inject.sh` with
+`DADAIA_HOOK_OUTPUT=codex-json` so the hook returns valid additional-context JSON.
+Forced Codex installs remove stale generated `.codex/agents/*.toml` and
+`.codex/workflows/*.workflow.md` files that no longer exist in canonical public
+assets.

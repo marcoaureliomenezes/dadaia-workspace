@@ -12,8 +12,8 @@ tags:
 - adr
 agent_tier: self-pull
 token_estimate: 4800
-last_updated: '2026-06-01'
-release_origin: memory-markdown-source-v1
+last_updated: '2026-06-04'
+release_origin: v0.1.4.1
 ---
 
 ## Visão geral
@@ -57,7 +57,16 @@ Asset chain canonical → projeções: a fonte de cada agente, skill, rule, comm
 
 **Renderer split e runtime parity** — personas canônicas em `public/agents/` são projetadas para cada runtime via adapters. Claude recebe frontmatter/body no formato Claude Code. Codex recebe blocos nativos em `.codex/config.toml`, `paths = [".agents/skills", ".codex/skills"]`, hooks `PreToolUse`/`PostToolUse`/`UserPromptSubmit`, workflows como reference-only, e linguagem de dispatch baseada em `tool_search`/deferred multi-agent tools quando disponíveis. OpenCode recebe permissões mapeadas para seu runtime e plugins de gate/context. Doctor deve reportar essas diferenças como estado verdadeiro do runtime, não como paridade falsa.
 
-**path-scope enforcement** — O gate PreToolUse `sdd-spec-gate.sh` tem um passo 6 (post-TASKS-marker) que valida o `file_path` de Write/Edit/MultiEdit contra `paths.write_allowlist` do frontmatter do agente ativo. Todos os 20 agentes declaram bloco `paths:`. Mismatch → JSON `{"decision":"block","reason":"[PATH SCOPE ERROR] …"}`; agent-persona não detectada → fail-open com warning em `/tmp/sdd-gate.log` (NFR3). `ai-engineer` tem write authority exclusiva sobre `dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**`; `software-engineer-python`/`-node` são banidos dessa superfície AI-entity (e vice-versa: `ai-engineer` não escreve código Python/Node nem specs).
+**path-scope enforcement** — O gate PreToolUse `sdd-spec-gate.sh` valida o
+`file_path` de Write/Edit/MultiEdit e headers de Codex `apply_patch` contra
+`paths.write_allowlist` do frontmatter do agente ativo. Tools de write sem
+target path parseável falham fechadas. Todos os 20 agentes declaram bloco
+`paths:`. Mismatch → JSON `{"decision":"block","reason":"[PATH SCOPE ERROR] …"}`;
+agent-persona não detectada → fail-open com warning em `/tmp/sdd-gate.log`
+(NFR3). `ai-engineer` tem write authority exclusiva sobre
+`dadaia_workspace/public/{skills,rules,workflows,commands,agents,hooks}/**`;
+`software-engineer-python`/`-node` são banidos dessa superfície AI-entity (e
+vice-versa: `ai-engineer` não escreve código Python/Node nem specs).
 
 **rules folder** — 4 arquivos canônicos públicos: `workspace-protocol.md` (SDD gate + context discovery + task lifecycle), `tmp-file-guardrail.md` (artefatos temporários e outputs), `plugin-scope.md` (escopo de plugins/skills especializados) e `dadaia-workspace-dev-guardrail.md` (regras de evolução da própria lib). Rules de domínio, jogos, vendors ou projetos privados não pertencem ao default público.
 
@@ -118,7 +127,7 @@ sequenceDiagram
     Gate->>Gate: RULE D: path-scope allowlist check
     Gate->>Session: read DADAIA_SESSION_ID session file
     alt DADAIA_SESSION_ID absent
-        Gate-->>PreHook: exit 0 (fail-open)
+        Gate-->>PreHook: block production write; tmp paths already fast-allowed
     else session present
         Gate->>Lock: read impl lock (IMPLEMENTATION mode)
         Gate->>Gate: RULE E: path-policy matrix (mode + staleness + ownership)
