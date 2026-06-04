@@ -838,9 +838,9 @@ def render_api_reports(
 ) -> Callable[..., tuple[int, str, bytes]]:
     """Return ``GET /api/reports`` view — list all report sidecars.
 
-    Traverses ``<workspace_root>/.dadaia/reports/`` for ``*.handoff.json``
+    Traverses ``<workspace_root>/.dadaia/handoff/`` for ``*.handoff.json``
     files, parses each, and returns a JSON list sorted by ``produced_at``
-    descending. Malformed sidecars are skipped with a WARNING log.
+    descending. Malformed handoffs are skipped with a WARNING log.
 
     Response shape: {"reports": [{title, agent, context, created_at, path, findings_summary}]}
     findings_summary: {"CRITICAL": N, "HIGH": N, "MEDIUM": N, "LOW": N}
@@ -856,15 +856,15 @@ def render_api_reports(
         return counts
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
-        reports_root = service._workspace_root / ".dadaia" / "reports"
+        handoff_root = service._workspace_root / ".dadaia" / "handoff"
         results: list[dict] = []  # type: ignore[type-arg]
-        if reports_root.exists():
-            for sidecar in reports_root.rglob("*.handoff.json"):
+        if handoff_root.exists():
+            for handoff in handoff_root.rglob("*.handoff.json"):
                 try:
-                    data = json.loads(sidecar.read_text(encoding="utf-8"))
+                    data = json.loads(handoff.read_text(encoding="utf-8"))
                     artifact = data.get("artifact", {})
                     artifact_path = artifact.get("path", "")
-                    title = Path(artifact_path).stem if artifact_path else sidecar.stem
+                    title = Path(artifact_path).stem if artifact_path else handoff.stem
                     results.append(
                         {
                             "title": title,
@@ -876,7 +876,7 @@ def render_api_reports(
                         }
                     )
                 except Exception as exc:  # noqa: BLE001
-                    _log.warning("Skipping malformed sidecar %s: %s", sidecar, exc)
+                    _log.warning("Skipping malformed handoff %s: %s", handoff, exc)
         results.sort(key=lambda r: r["created_at"], reverse=True)
         body = json.dumps({"reports": results}).encode("utf-8")
         return (200, "application/json; charset=utf-8", body)
@@ -916,13 +916,14 @@ def serve_report_file(
 def delete_report_file(
     service: PanelService,
 ) -> Callable[..., tuple[int, str, bytes]]:
-    """Delete a report HTML file and its .handoff.json sidecar.
+    """Delete a report HTML file and handoffs that reference it.
 
     Path-traversal guard: resolves path under .dadaia/reports/.
     Returns 403 if outside boundary, 404 if not found, 200 on success.
 
     Security (OWASP A01, A03): same boundary check as serve_report_file.
-    Deletes .handoff.json sidecar if it exists alongside the target file.
+    Deletes handoff JSON files under .dadaia/handoff/ whose artifact.path points
+    at the target report.
     """
 
     def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
@@ -935,9 +936,17 @@ def delete_report_file(
         if not target.exists():
             return (404, "application/json; charset=utf-8", b'{"error": "not found"}')
         target.unlink()
-        sidecar = target.with_suffix(".handoff.json")
-        if sidecar.exists():
-            sidecar.unlink()
+        target_ref = target.relative_to(service._workspace_root).as_posix()
+        handoff_root = service._workspace_root / ".dadaia" / "handoff"
+        if handoff_root.exists():
+            for handoff in handoff_root.rglob("*.handoff.json"):
+                try:
+                    data = json.loads(handoff.read_text(encoding="utf-8"))
+                except Exception:  # noqa: BLE001
+                    continue
+                artifact = data.get("artifact", {})
+                if isinstance(artifact, dict) and artifact.get("path") == target_ref:
+                    handoff.unlink()
         return (200, "application/json; charset=utf-8", b'{"deleted": true}')
 
     return _view

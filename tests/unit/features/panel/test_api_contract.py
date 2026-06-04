@@ -26,7 +26,12 @@ from pathlib import Path
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import render_api_contexts, render_api_servers
+from dadaia_workspace.features.panel.views.api import (
+    delete_report_file,
+    render_api_contexts,
+    render_api_reports,
+    render_api_servers,
+)
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -94,11 +99,12 @@ def _make_context(
 def _build_service(
     entries: list[tuple[PortEntry, PortStatus]] | None = None,
     contexts: list[SpecContextProject] | None = None,
+    workspace_root: Path = Path("/workspace"),
 ) -> PanelService:
     return PanelService(
         registry=FakeServerRegistryService(entries or []),  # type: ignore[arg-type]
         spec_context=FakeSpecContextService(contexts or []),  # type: ignore[arg-type]
-        workspace_root=Path("/workspace"),
+        workspace_root=workspace_root,
     )
 
 
@@ -180,6 +186,66 @@ def test_api_servers_stale_status_string() -> None:
     # Find any row
     rows = [r for g in data["groups"] for r in g["rows"]]
     assert any(r["status"] == "stale" for r in rows)
+
+
+def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>qa</html>", encoding="utf-8")
+    handoff_path = tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-04T000000Z-qa-engineer-qa.handoff.json"
+    handoff_path.parent.mkdir(parents=True)
+    handoff_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "handoff-v1.1",
+                "agent": "qa-engineer",
+                "context": "ctx",
+                "produced_at": "2026-06-04T00:00:00Z",
+                "artifact": {
+                    "type": "report",
+                    "path": ".dadaia/reports/ctx/qa-engineer/qa.html",
+                    "content_hash": "a" * 64,
+                },
+                "findings": [{"severity": "HIGH", "message": "issue"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    service = _build_service(workspace_root=tmp_path)
+    status, content_type, body = render_api_reports(service)()
+
+    assert status == 200
+    assert content_type == "application/json; charset=utf-8"
+    data = json.loads(body)
+    assert data["reports"][0]["agent"] == "qa-engineer"
+    assert data["reports"][0]["path"] == ".dadaia/reports/ctx/qa-engineer/qa.html"
+    assert data["reports"][0]["findings_summary"]["HIGH"] == 1
+
+
+def test_delete_report_removes_handoff_from_canonical_root(tmp_path: Path) -> None:
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>qa</html>", encoding="utf-8")
+    handoff_path = tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-04T000000Z-qa-engineer-qa.handoff.json"
+    handoff_path.parent.mkdir(parents=True)
+    handoff_path.write_text(
+        json.dumps(
+            {
+                "artifact": {
+                    "path": ".dadaia/reports/ctx/qa-engineer/qa.html",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    service = _build_service(workspace_root=tmp_path)
+    status, _, _ = delete_report_file(service)(path="ctx/qa-engineer/qa.html")
+
+    assert status == 200
+    assert not report_path.exists()
+    assert not handoff_path.exists()
 
 
 # ---------------------------------------------------------------------------
