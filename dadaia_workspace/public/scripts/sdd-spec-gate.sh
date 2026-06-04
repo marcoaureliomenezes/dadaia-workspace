@@ -78,23 +78,23 @@ fi
 [[ "$FPATH" != /* ]] && FPATH="$WS/$FPATH"
 _log "tool=$TOOL path=$FPATH"
 
-# Resolve primary slug + specs_dir via 4-step chain (T-HARD-01):
+# Resolve context slug + specs_dir via 4-step chain (T-HARD-01):
 #   Step 1 — DADAIA_CONTEXT env var (highest priority)
-#   Step 2 — spec_contexts.json: first ALIVE entry (v2 schema; no is_primary field)
+#   Step 2 — spec_contexts.json: first ALIVE entry (v2 schema; no global context flag)
 #   Step 3 — session file: DADAIA_SESSION_ID.json → context field
 #   Step 4 — fail-open (last resort; logs a meaningful warning)
-PRIMARY_SLUG=""
-PRIMARY_SPECS=""
+CONTEXT_SLUG=""
+CONTEXT_SPECS=""
 
 # Step 1 — DADAIA_CONTEXT env var
 if [ -n "${DADAIA_CONTEXT:-}" ]; then
-    PRIMARY_SLUG="$DADAIA_CONTEXT"
-    PRIMARY_SPECS="$WS/repos/$DADAIA_CONTEXT/specs"
-    _log "context-resolution step1 (DADAIA_CONTEXT): slug=$PRIMARY_SLUG specs=$PRIMARY_SPECS"
+    CONTEXT_SLUG="$DADAIA_CONTEXT"
+    CONTEXT_SPECS="$WS/repos/$DADAIA_CONTEXT/specs"
+    _log "context-resolution step1 (DADAIA_CONTEXT): slug=$CONTEXT_SLUG specs=$CONTEXT_SPECS"
 fi
 
 # Step 2 — spec_contexts.json: first ALIVE entry
-if [ -z "$PRIMARY_SLUG" ]; then
+if [ -z "$CONTEXT_SLUG" ]; then
     _CTX_RESULT=$("$PYTHON_BIN" - "$WS/.dadaia/states/spec_contexts.json" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
@@ -108,15 +108,15 @@ except Exception:
 PYEOF
 )
     if [ -n "$_CTX_RESULT" ]; then
-        PRIMARY_SLUG="${_CTX_RESULT%%|*}"
+        CONTEXT_SLUG="${_CTX_RESULT%%|*}"
         _CTX_NAME="${_CTX_RESULT##*|}"
-        PRIMARY_SPECS="$WS/repos/$PRIMARY_SLUG/specs"
-        _log "context-resolution step2 (spec_contexts.json ALIVE): name=$_CTX_NAME slug=$PRIMARY_SLUG specs=$PRIMARY_SPECS"
+        CONTEXT_SPECS="$WS/repos/$CONTEXT_SLUG/specs"
+        _log "context-resolution step2 (spec_contexts.json ALIVE): name=$_CTX_NAME slug=$CONTEXT_SLUG specs=$CONTEXT_SPECS"
     fi
 fi
 
 # Step 3 — session file: DADAIA_SESSION_ID -> context field
-if [ -z "$PRIMARY_SLUG" ] && [ -n "${DADAIA_SESSION_ID:-}" ]; then
+if [ -z "$CONTEXT_SLUG" ] && [ -n "${DADAIA_SESSION_ID:-}" ]; then
     _SESS_CTX=$("$PYTHON_BIN" - "$WS/.dadaia/sessions/${DADAIA_SESSION_ID}.json" 2>/dev/null <<'PYEOF'
 import json, sys
 try:
@@ -126,23 +126,23 @@ except Exception:
 PYEOF
 )
     if [ -n "$_SESS_CTX" ]; then
-        PRIMARY_SLUG="$_SESS_CTX"
-        PRIMARY_SPECS="$WS/repos/$_SESS_CTX/specs"
-        _log "context-resolution step3 (session file $DADAIA_SESSION_ID): slug=$PRIMARY_SLUG specs=$PRIMARY_SPECS"
+        CONTEXT_SLUG="$_SESS_CTX"
+        CONTEXT_SPECS="$WS/repos/$_SESS_CTX/specs"
+        _log "context-resolution step3 (session file $DADAIA_SESSION_ID): slug=$CONTEXT_SLUG specs=$CONTEXT_SPECS"
     fi
 fi
 
 # Step 4 — fail-open: log a meaningful warning but do not block
-if [ -z "$PRIMARY_SLUG" ]; then
-    _log "WARN context-resolution: could not resolve primary context (DADAIA_CONTEXT unset, spec_contexts.json absent/empty, no session); gate will fail-open on IS_PROD check"
+if [ -z "$CONTEXT_SLUG" ]; then
+    _log "WARN context-resolution: could not resolve bound context (DADAIA_CONTEXT unset, spec_contexts.json absent/empty, no session); gate will fail-open on IS_PROD check"
 fi
 
-# Resolve active release id and phase from <PRIMARY_SPECS>/releases/ACTIVE.md
+# Resolve active release id and phase from <CONTEXT_SPECS>/releases/ACTIVE.md
 ACTIVE_RELEASE=""
 ACTIVE_PHASE=""
-if [ -n "$PRIMARY_SPECS" ] && [ -f "$PRIMARY_SPECS/releases/ACTIVE.md" ]; then
-    ACTIVE_RELEASE=$(grep -E '^release:' "$PRIMARY_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')
-    ACTIVE_PHASE=$(grep -E '^phase:' "$PRIMARY_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//')
+if [ -n "$CONTEXT_SPECS" ] && [ -f "$CONTEXT_SPECS/releases/ACTIVE.md" ]; then
+    ACTIVE_RELEASE=$(grep -E '^release:' "$CONTEXT_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')
+    ACTIVE_PHASE=$(grep -E '^phase:' "$CONTEXT_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//')
 fi
 [ -n "$ACTIVE_RELEASE" ] && _log "active_release=$ACTIVE_RELEASE phase=$ACTIVE_PHASE"
 
@@ -150,8 +150,8 @@ fi
 # Legacy specs/memory/*.html and YAML atoms are always read-only. Markdown atoms
 # are write-locked unless ACTIVE.md phase == CLOSURE. Evaluated BEFORE the
 # meta-edit allow-list so it cannot be bypassed by nesting in product/.
-# v3.2: derive specs_dir from FPATH, not primary_context — fixes cross-repo
-# false-positives when primary context is a different repo in a non-CLOSURE phase.
+# v3.2: derive specs_dir from FPATH to avoid cross-repo false positives when
+# the bound context is a different repo in a non-CLOSURE phase.
 case "$FPATH" in
     */specs/memory/*.html|*/specs/memory/*.yaml|*/specs/memory/*.yml|\
     */specs/memory/product/*.html|*/specs/memory/product/*.yaml|*/specs/memory/product/*.yml)
@@ -349,10 +349,10 @@ PYEOF
     # Relative path from workspace root (for glob matching)
     local rel_fpath="${FPATH#$WS/}"
 
-    # Substitute <ctx> in allowlist globs with PRIMARY_SLUG (context name).
-    # If PRIMARY_SLUG is empty, leave <ctx> as literal (will not match, but
+    # Substitute <ctx> in allowlist globs with CONTEXT_SLUG (context name).
+    # If CONTEXT_SLUG is empty, leave <ctx> as literal (will not match, but
     # fail-open already covers persona-absent case; here persona is known).
-    local ctx_val="${PRIMARY_SLUG:-}"
+    local ctx_val="${CONTEXT_SLUG:-}"
 
     # Match rel_fpath against each glob in write_allowlist.
     # Glob matching: ** matches any number of path segments; * matches one segment.
@@ -433,9 +433,9 @@ case "$FPATH" in
 esac
 
 # v2: also gate repos/<primary_slug>/* when primary is known
-if [ "$IS_PROD" = "0" ] && [ -n "$PRIMARY_SLUG" ]; then
+if [ "$IS_PROD" = "0" ] && [ -n "$CONTEXT_SLUG" ]; then
     case "$FPATH" in
-        "$WS/repos/$PRIMARY_SLUG/"*) IS_PROD=1 ;;
+        "$WS/repos/$CONTEXT_SLUG/"*) IS_PROD=1 ;;
     esac
 fi
 
@@ -460,7 +460,7 @@ _rule_e() {
     # Step 1 — Resolve DADAIA_SESSION_ID
     local sess_id="${DADAIA_SESSION_ID:-}"
     if [ -z "$sess_id" ]; then
-        _block "[RULE E] DADAIA_SESSION_ID is not set. Production writes require a bound implementation session. Run: eval \$(dadaia context bind ${PRIMARY_SLUG:-<ctx>} --mode implementation --release ${ACTIVE_RELEASE:-<release-id>})"
+        _block "[RULE E] DADAIA_SESSION_ID is not set. Production writes require a bound implementation session. Run: eval \$(dadaia context bind ${CONTEXT_SLUG:-<ctx>} --mode implementation --release ${ACTIVE_RELEASE:-<release-id>})"
         return
     fi
 
@@ -632,11 +632,11 @@ PYEOF
     if [ "$IS_PROD" = "1" ]; then
         case "$sess_mode" in
             BOUND_IMPLEMENTATION)
-                # Verify the session owns the impl lock for PRIMARY_SLUG
+                # Verify the session owns the impl lock for CONTEXT_SLUG
                 local lock_file="$WS/.dadaia/locks/implementation"
                 local found_owner=""
-                if [ -d "$lock_file" ] && [ -n "$PRIMARY_SLUG" ]; then
-                    for lf in "$lock_file/${PRIMARY_SLUG}__"*.json; do
+                if [ -d "$lock_file" ] && [ -n "$CONTEXT_SLUG" ]; then
+                    for lf in "$lock_file/${CONTEXT_SLUG}__"*.json; do
                         [ -f "$lf" ] || continue
                         local owner_sess
                         owner_sess=$("$PYTHON_BIN" - "$lf" 2>/dev/null <<'PYEOF'
@@ -672,15 +672,15 @@ PYEOF
                     done
                 fi
                 if [ -z "$found_owner" ]; then
-                    _block "[RULE E] Session '${sess_id}' (mode=BOUND_IMPLEMENTATION) has no HELD implementation lock for context '${PRIMARY_SLUG:-<unknown>}'. Acquire lock via: eval \$(dadaia context bind ${PRIMARY_SLUG:-<ctx>} --mode implementation --release <release-id>)"
+                    _block "[RULE E] Session '${sess_id}' (mode=BOUND_IMPLEMENTATION) has no HELD implementation lock for context '${CONTEXT_SLUG:-<unknown>}'. Acquire lock via: eval \$(dadaia context bind ${CONTEXT_SLUG:-<ctx>} --mode implementation --release <release-id>)"
                 fi
                 if [ "$found_owner" != "$sess_id" ]; then
-                    _block "[RULE E] Session '${sess_id}' does not own the implementation lock for '${PRIMARY_SLUG:-<unknown>}'. Lock is owned by session '${found_owner}'. Cannot write to production paths."
+                    _block "[RULE E] Session '${sess_id}' does not own the implementation lock for '${CONTEXT_SLUG:-<unknown>}'. Lock is owned by session '${found_owner}'. Cannot write to production paths."
                 fi
                 # Owns the lock — resolve active release from lock file (T-8 completion / ADR D-9)
                 # For IMPLEMENTATION mode, ACTIVE.md is NOT consulted; release comes from the lock.
                 local lock_release
-                lock_release=$("$PYTHON_BIN" - "$lock_file" "$PRIMARY_SLUG" "$sess_id" 2>/dev/null <<'PYEOF'
+                lock_release=$("$PYTHON_BIN" - "$lock_file" "$CONTEXT_SLUG" "$sess_id" 2>/dev/null <<'PYEOF'
 import json, sys
 from pathlib import Path
 lock_dir = Path(sys.argv[1])
@@ -723,36 +723,36 @@ PYEOF
 _rule_e
 
 # Production path with no resolvable specs_dir → block with orientation
-if [ -z "$PRIMARY_SPECS" ] || [ ! -d "$PRIMARY_SPECS" ]; then
+if [ -z "$CONTEXT_SPECS" ] || [ ! -d "$CONTEXT_SPECS" ]; then
     _block "[SDD GATE] No active Spec Context resolved. To bind a context run: eval \$(dadaia context bind <name> --mode read). Then retry the edit on $FPATH."
 fi
 
 # v3 RULE C — Find [-] task. Priority order:
-#   1. PRIMARY_SPECS/releases/<active-release>/TASKS.md
-#   2. Any PRIMARY_SPECS/releases/*/TASKS.md
-#   3. (legacy compat) PRIMARY_SPECS/features/*/TASKS.md only
+#   1. CONTEXT_SPECS/releases/<active-release>/TASKS.md
+#   2. Any CONTEXT_SPECS/releases/*/TASKS.md
+#   3. (legacy compat) CONTEXT_SPECS/features/*/TASKS.md only
 #      only when SDD_LEGACY_FEATURES=1 (default during migration window)
-#      Note: root-level PRIMARY_SPECS/TASKS.md is no longer searched (removed T-8a)
+#      Note: root-level CONTEXT_SPECS/TASKS.md is no longer searched (removed T-8a)
 ACTIVE=""
 GREP_PAT='^[[:space:]]*-[[:space:]]*\[-\][[:space:]]+'
 
-if [ -n "$ACTIVE_RELEASE" ] && [ -f "$PRIMARY_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" ]; then
-    if grep -qE "$GREP_PAT" "$PRIMARY_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" 2>/dev/null; then
-        ACTIVE="$PRIMARY_SPECS/releases/$ACTIVE_RELEASE/TASKS.md"
+if [ -n "$ACTIVE_RELEASE" ] && [ -f "$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" ]; then
+    if grep -qE "$GREP_PAT" "$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" 2>/dev/null; then
+        ACTIVE="$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md"
     fi
 fi
 
-if [ -z "$ACTIVE" ] && [ -d "$PRIMARY_SPECS/releases" ]; then
-    ACTIVE=$(grep -rlE "$GREP_PAT" "$PRIMARY_SPECS/releases" --include="TASKS.md" 2>/dev/null | head -1)
+if [ -z "$ACTIVE" ] && [ -d "$CONTEXT_SPECS/releases" ]; then
+    ACTIVE=$(grep -rlE "$GREP_PAT" "$CONTEXT_SPECS/releases" --include="TASKS.md" 2>/dev/null | head -1)
 fi
 
 if [ -z "$ACTIVE" ] && [ "${SDD_LEGACY_FEATURES:-1}" = "1" ]; then
     # Search outside releases/ for legacy compat: features/*/TASKS.md only.
-    # Root-level $PRIMARY_SPECS/TASKS.md is no longer supported (removed per T-8a).
-    ACTIVE=$(grep -rlE "$GREP_PAT" "$PRIMARY_SPECS" --include="TASKS.md" 2>/dev/null \
+    # Root-level $CONTEXT_SPECS/TASKS.md is no longer supported (removed per T-8a).
+    ACTIVE=$(grep -rlE "$GREP_PAT" "$CONTEXT_SPECS" --include="TASKS.md" 2>/dev/null \
         | grep -v "/_archive/" \
         | grep -v "/releases/" \
-        | grep -v "^$PRIMARY_SPECS/TASKS\.md$" \
+        | grep -v "^$CONTEXT_SPECS/TASKS\.md$" \
         | head -1)
 fi
 
@@ -821,4 +821,4 @@ PYEOF
     exit 0
 fi
 
-_block "[SDD GATE] Nenhuma task IN PROGRESS (marker [-]) em $PRIMARY_SPECS/releases/${ACTIVE_RELEASE:-<no-active-release>}/TASKS.md. Antes de editar $FPATH, marque a task alvo de '[ ]' para '[-]' e commit (skill: dadaia-task-manager). Janela de migração: exporte SDD_LEGACY_FEATURES=1 para reaproveitar specs/features/*/TASKS.md."
+_block "[SDD GATE] Nenhuma task IN PROGRESS (marker [-]) em $CONTEXT_SPECS/releases/${ACTIVE_RELEASE:-<no-active-release>}/TASKS.md. Antes de editar $FPATH, marque a task alvo de '[ ]' para '[-]' e commit (skill: dadaia-task-manager). Janela de migração: exporte SDD_LEGACY_FEATURES=1 para reaproveitar specs/features/*/TASKS.md."

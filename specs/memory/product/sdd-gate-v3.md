@@ -139,7 +139,7 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 
 
 
-**Removido em v2:** o gate não lê mais `primary_context.json` (arquivo deletado por `dadaia migrate`). Context resolution usa `DADAIA_CONTEXT` env var ou fallback por workspace scan.
+**Removido em v2:** o gate não lê mais o marcador global de contexto legado. Context resolution usa `DADAIA_CONTEXT`, session file ou fallback por workspace scan.
 
 ## Dependências
 

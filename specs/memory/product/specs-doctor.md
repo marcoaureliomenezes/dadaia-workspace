@@ -57,7 +57,7 @@ TREE-7| Arquivo de bug em `specs/bugs/` sem campo `session_id` no frontmatter| E
 
 ## Fluxo de uso
 
-  1. `dadaia specs doctor` — resolve `specs_dir` via `primary_context.json` ou `--specs-dir`, roda todos os checks em ordem (12 SPEC-DOC + 7 TREE), exibe issues formatados com código + severity + path. LINT-1 invoca `lint-memory-atoms.py` nos átomos `.md`; token drift é WARN; violações de frontmatter ou heading proibido são ERROR.
+  1. `dadaia specs doctor` — resolve `specs_dir` via `--specs-dir` ou contexto de sessão bound, roda todos os checks em ordem (12 SPEC-DOC + 7 TREE), exibe issues formatados com código + severity + path. LINT-1 invoca `lint-memory-atoms.py` nos átomos `.md`; token drift é WARN; violações de frontmatter ou heading proibido são ERROR.
   2. `dadaia specs doctor --fix` — executa os checks e auto-repara os invariantes com policy `auto-fix` (TREE-3, TREE-4); emite migration guard para TREE-1/2; deixa TREE-5..7 como warnings/errors sem alterar arquivos.
   3. Para automação: `dadaia specs doctor --json` emite payload `{specs_dir, issues[], summary{errors, warnings}}`.
   4. Em CI: usado como gate de PR para bloquear merge se houver erros estruturais nos specs.
@@ -83,6 +83,6 @@ Sem este validador, drift entre modelo SDD e a realidade no disco vira bug laten
 
 ## Dependências
 
-  * Resolução de `specs_dir`: [[context-management]] (via `primary_context.json`).
+  * Resolução de `specs_dir`: [[context-management]] (via explicit flag or session-bound context).
   * Complementar a [[sdd-gate-v3]] (gate previne writes inválidos; doctor detecta inconsistências post-hoc).
   * Complementar a [[workspace-doctor]] (workspace state vs specs structure).

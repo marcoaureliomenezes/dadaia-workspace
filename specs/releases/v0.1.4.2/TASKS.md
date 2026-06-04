@@ -60,7 +60,7 @@ Evidence:
 
 ### T-BUG-03 — Remove session-bind primary residue from public assets and memory
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target files:** `dadaia_workspace/public/**`, `specs/memory/**`
 - **Preconditions:** T-BUG-01 done
@@ -69,6 +69,11 @@ Evidence:
   as current behavior.
 
 Update public source only; generated projections are handled in T-BUG-07.
+
+Evidence:
+- `rg -n "primary_context|is_primary|context promote|context activate|PRIMARY_" dadaia_workspace/public specs/memory` returns no hits.
+- `python -m pytest -q -p no:cacheprovider tests/contract/test_session_bound_context_residue.py tests/integration/features/spec_artifacts/test_memory.py tests/unit/infrastructure/test_public_assets.py` → 201 passed.
+- `bash -n dadaia_workspace/public/scripts/sdd-spec-gate.sh` passed.
 
 ---
 

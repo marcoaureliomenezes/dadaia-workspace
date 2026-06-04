@@ -19,7 +19,7 @@ CLI surface: `dadaia doctor [--fix]` · Closure: spec-context-session-locks-v1
 
 ## Propósito
 
-Valida invariantes do estado do workspace — consistência de `spec_contexts.json` (schema v2: ALIVE/DEAD, sem `is_primary`), presença de arquivos esperados em `.dadaia/`, estado das branches dos repos clonados em `repos/`, e saúde dos lock files de implementação. Quando passado `--fix`, aplica reparos automáticos para issues marcados como fixable.
+Valida invariantes do estado do workspace — consistência de `spec_contexts.json` (schema v2: ALIVE/DEAD, sem flag global de contexto), presença de arquivos esperados em `.dadaia/`, estado das branches dos repos clonados em `repos/`, e saúde dos lock files de implementação. Quando passado `--fix`, aplica reparos automáticos para issues marcados como fixable.
 
 ### Invariantes de estado de context (INV-4, INV-5)
 
@@ -30,7 +30,7 @@ Com o modelo v2 (ALIVE/DEAD), dois invariantes cobrem o ciclo de vida do context
 
 
 
-Os antigos INV-1, INV-2, INV-3, INV-6 (guards de `is_primary` e `primary_context.json`) foram removidos em v2. Não existem mais checks de "primary flag duplicado" ou "primary context sem arquivo" — o conceito de primary context global foi eliminado pelo modelo de session binding.
+Os antigos INV-1, INV-2, INV-3, INV-6 (guards do marcador global de contexto legado) foram removidos em v2. Não existem mais checks de flag global duplicada ou contexto global sem arquivo — esse conceito foi eliminado pelo modelo de session binding.
 
 ### Invariantes de lock (LOCK-1..LOCK-6)
 

@@ -47,7 +47,7 @@ Workspace reprodutível em alguns segundos sem rebuild manual — todas as confi
 
   * Export: cria `.dadaia/dist/<archive>.tar.gz`
   * Import: extrai sobre workspace destino, sobrescreve `.dadaia/states/*`, `.dadaia/academy/`, `.claude/rules/`, `.agents/skills/`, `.opencode/`, opencode.json
-  * Repos clonados NÃO viajam — re-clone via `context activate` após import
+  * Repos clonados NÃO viajam — re-clone via `dadaia context alive` após import
 
 
 
