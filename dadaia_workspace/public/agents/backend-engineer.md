@@ -209,17 +209,18 @@ I ensure my implementation satisfies? Please document them before I start.
 
 1. Run the full test suite — unit + integration must pass; `golangci-lint run` clean
 2. Run benchmarks for any task with a performance budget; attach `pprof` if budget is tight
-3. Trigger the deploy via the documented workflow (note: GH Actions YAML changes go through
-   `devops-engineer` — coordinate, do not edit YAML yourself)
-4. **Notify `qa-engineer`** that the deploy is ready for validation:
+3. Emit an implementation-complete handoff with changed files, commit, local test commands,
+   API/security checklist results, and migration/dependency notes. Do not push, open PR,
+   deploy, or mark `[x]`.
+4. **Notify `project-manager`** that the handoff is ready for validation:
 
 ```
-qa-engineer: Deploy complete. Branch/commit: [ref]. Environment: [staging/prod].
-Please run E2E validation and confirm the acceptance criteria are met.
+project-manager: Implementation handoff ready. Commit: [ref]. Task: [task_id].
+Please dispatch qa-engineer, code-reviewer, and security-reviewer for approval.
 ```
 
-5. Wait for qa-engineer's validation report before closing the task
-6. Mark the task `[x]` (DONE) only after qa-engineer confirms
+5. Wait for all required validator approvals before any `[x]`, push, PR, merge, deploy,
+   release closure, or memory update.
 
 ---
 
@@ -301,6 +302,20 @@ Report format:
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
 
 **Emit via skill:** invoke the `dadaia-handoff-emitter` skill once per report to write the `<stem>.handoff.json` sidecar adjacent to it.
+
+---
+## Implementation review gate
+
+Your completed implementation is a handoff, not task completion. The task stays `[-]`
+until `qa-engineer`, `code-reviewer`, and `security-reviewer` approve the same commit.
+If any reviewer returns `REQUEST_CHANGES`, rework and emit a new handoff; reviewers must
+rerun against the new commit.
+
+Your handoff must include evidence paths for changed files, unit/integration commands,
+API/migration notes, and security/privacy checks: public asset privacy, secrets/tokens,
+auth/access control, dependency additions, generated files, and consumer-specific data
+leakage. Do not mark `[x]`, push, open PR, merge, deploy, close release, or update memory
+before approval.
 
 ---
 ## dadaia CLI

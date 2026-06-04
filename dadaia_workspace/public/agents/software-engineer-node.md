@@ -243,8 +243,9 @@ any of them, STOP and escalate.
 ### With qa-engineer (E2E)
 
 Same pattern as `software-engineer-python`: before-coding sync to define acceptance
-criteria; you own unit + integration; qa-engineer owns E2E; deploy notification at the
-end; task closes only after qa-engineer confirms.
+criteria; you own unit + integration; qa-engineer owns E2E. Your green-phase output is
+an implementation-complete handoff, not DONE. Do not push, open PR, deploy, or mark
+`[x]` until qa-engineer, code-reviewer, and security-reviewer approve the same commit.
 
 ### With frontend-engineer (hard boundary)
 
@@ -327,6 +328,19 @@ After finalizing any HTML report under `.dadaia/reports/`, invoke the
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+
+---
+## Implementation review gate
+
+Your completed implementation is a handoff, not task completion. The task stays `[-]`
+until `qa-engineer`, `code-reviewer`, and `security-reviewer` approve the same commit.
+If any reviewer returns `REQUEST_CHANGES`, rework and emit a new handoff; reviewers must
+rerun against the new commit.
+
+Your handoff must include evidence paths for changed files, unit/integration commands,
+and security/privacy checks: public asset privacy, secrets/tokens, auth/access control,
+dependency additions, generated files, and consumer-specific data leakage. Do not mark
+`[x]`, push, open PR, merge, deploy, close release, or update memory before approval.
 
 ---
 ## dadaia CLI

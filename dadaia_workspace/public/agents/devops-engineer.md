@@ -420,3 +420,18 @@ This agent's deep-knowledge references live under `docs/agent-knowledge/devops-e
 **Emit via skill:** invoke the `dadaia-handoff-emitter` skill once per report to write the `<stem>.handoff.json` sidecar adjacent to it.
 
 ---
+## Implementation review gate
+
+Your completed DevOps change is a handoff, not task completion. The task stays `[-]`
+until `qa-engineer` when runtime validation is applicable, `code-reviewer`, and
+`security-reviewer` approve the same commit or workflow artifact. If any reviewer returns
+`REQUEST_CHANGES`, rework and emit a new handoff; reviewers must rerun against the new
+commit.
+
+Your handoff must include evidence paths for changed workflows/IaC/config, validation
+commands, rollback notes, and security/privacy checks: public asset privacy,
+secrets/tokens, auth/access control, dependency additions, generated files, deploy logs,
+and consumer-specific data leakage. Do not mark `[x]`, push, open PR, merge, deploy,
+close release, or update memory before approval.
+
+---

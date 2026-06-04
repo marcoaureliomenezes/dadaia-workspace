@@ -158,7 +158,7 @@ Evidence:
 
 ### T-BUG-08 — Align implementer and reviewer personas with the gate
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target files:** `dadaia_workspace/public/agents/software-engineer-python.md`,
   `dadaia_workspace/public/agents/software-engineer-node.md`,
@@ -177,6 +177,10 @@ Evidence:
 Include explicit security/privacy leakage checks for public assets, secrets,
 auth/access control, dependency additions, generated files, and consumer-specific
 data.
+
+Evidence:
+- `python -m pytest -q -p no:cacheprovider tests/contract/test_source_repo_hygiene.py tests/contract/test_codex_reference_only_wording.py` → 5 passed.
+- Target implementer personas now state implementation-complete handoff, not DONE; reviewer personas define `APPROVE`/`REQUEST_CHANGES`, evidence paths, rerun-after-rework, and security/privacy leakage checks.
 
 ---
 
