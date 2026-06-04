@@ -13,7 +13,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 4800
 last_updated: '2026-06-04'
-release_origin: v0.1.4.1
+release_origin: v0.1.4.2
 ---
 
 ## Visão geral
@@ -56,6 +56,8 @@ Asset chain canonical → projeções: a fonte de cada agente, skill, rule, comm
 **agent topology (public default: 3 tiers, 15 agentes)** — Tier 1 _orchestrators_ (2): `project-manager` (intake + routing) e `project-auditor` (drift/dead-code audit). Tier 2 _curator_ (1): `product-engineer`, autor de SPEC/PLAN/TASKS/CLOSURE e guardião de `specs/memory/**/*.md` apenas em CLOSURE. Tier 3 _leaf specialists_ (12): `ai-engineer`, `backend-engineer`, `code-reviewer`, `design-specialist`, `devops-engineer`, `frontend-engineer`, `qa-engineer`, `researcher`, `security-reviewer`, `software-architect`, `software-engineer-node`, `software-engineer-python`. Agentes de jogo, data/BI vendor-specific e qualquer agente preso a projetos pessoais não fazem parte do default público; pertencem a optional packs ou overlays privados. Workflows públicos default: `spec-refinement`, `cross-cutting-feature`, `onboarding-new-repo`, `hotfix-release`, `audit-cycle`, `code-review-fan-out`, `design-first-implementation`. Rules públicos default: `workspace-protocol`, `tmp-file-guardrail`, `plugin-scope`, `dadaia-workspace-dev-guardrail`.
 
 **Renderer split e runtime parity** — personas canônicas em `public/agents/` são projetadas para cada runtime via adapters. Claude recebe frontmatter/body no formato Claude Code. Codex recebe blocos nativos em `.codex/config.toml`, `paths = [".agents/skills", ".codex/skills"]`, hooks `PreToolUse`/`PostToolUse`/`UserPromptSubmit`, workflows como reference-only, e linguagem de dispatch baseada em `tool_search`/deferred multi-agent tools quando disponíveis. OpenCode recebe permissões mapeadas para seu runtime e plugins de gate/context. Doctor deve reportar essas diferenças como estado verdadeiro do runtime, não como paridade falsa.
+
+**Implementation review/QA gate** — SPEC/PLAN/TASKS approval requires pre-implementation agreement from the owning implementer, `qa-engineer`, `code-reviewer`, and `security-reviewer` (plus `design-specialist` for visible UI). Implementers own code plus unit/integration tests and emit implementation-complete handoffs only. `project-manager` coordinates QA, code review, security review, and rework. Task `[x]`, push, PR, merge, deploy, release closure, and memory updates are blocked until every required reviewer approves the same commit or artifact.
 
 **path-scope enforcement** — O gate PreToolUse `sdd-spec-gate.sh` valida o
 `file_path` de Write/Edit/MultiEdit e headers de Codex `apply_patch` contra

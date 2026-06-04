@@ -15,7 +15,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 1372
 last_updated: '2026-06-04'
-release_origin: v0.1.4.1
+release_origin: v0.1.4.2
 ---
 
 Assets: `.dadaia/scripts/sdd-spec-gate.sh` (PreToolUse) · `.dadaia/scripts/sdd-post-gate.sh` (PostToolUse) · Codex also projects `UserPromptSubmit` where supported · Closure: public-agentic-hygiene-codex-readiness
@@ -139,7 +139,7 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 
 
 
-**Removido em v2:** o gate não lê mais o marcador global de contexto legado. Context resolution usa `DADAIA_CONTEXT`, session file ou fallback por workspace scan.
+**Removido em v2:** o gate não lê mais o marcador global de contexto legado. Production/release writes require `DADAIA_SESSION_ID` and a matching session file; `DADAIA_CONTEXT` is contextual metadata, not an authorization fallback. There is no first-ALIVE or workspace-scan fallback for write authorization.
 
 ## Dependências
 
