@@ -199,10 +199,12 @@ agent is absent from the workspace.
 
 ### Step 5 — Dispatch agents
 
-For each stage in the workflow, invoke the `Agent` tool with the correct agent name, input
-contract fields, and any prior stage outputs needed as inputs. Follow the workflow's
-dependency graph — parallel stages may be dispatched in parallel; sequential stages must
-respect ordering.
+For each stage in the workflow, invoke the correct agent with the required input
+contract fields and any prior stage outputs needed as inputs. Follow the
+workflow's dependency graph. Parallel groups describe topology: use real
+parallel delegation only when the host runtime supports it. In Codex, parallel
+groups are reference-only manual handoffs; do not claim spawned subagents or
+runtime concurrency. Sequential stages must respect ordering.
 
 ### Step 6 — Synthesise
 

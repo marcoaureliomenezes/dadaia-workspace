@@ -1,6 +1,6 @@
 ---
 name: onboarding-new-repo
-description: Onboarding a new repo into the workspace. Parallel assessment by software-architect (ONBOARD), devops-engineer (SCAN), and qa-engineer (pyramid audit), then project-manager synthesizes findings and product-engineer authors the initial SPEC and road-to-compliance TASKS.
+description: Onboarding a new repo into the workspace. Parallel-capable assessment topology by software-architect (ONBOARD), devops-engineer (SCAN), and qa-engineer (pyramid audit), then project-manager synthesizes findings and product-engineer authors the initial SPEC and road-to-compliance TASKS. Codex runtime receives manual/reference handoffs, not spawned subagents.
 version: 0.2.0
 schema_version: "1"
 inputs:
@@ -94,8 +94,12 @@ exit_criteria:
 # onboarding-new-repo
 
 Use this workflow the first time a repo enters the dadaia workspace. The three
-specialist roles each have a dedicated onboarding/audit mode — this workflow runs them
-in parallel and synthesizes a coherent compliance plan.
+specialist roles each have a dedicated onboarding/audit mode — this workflow treats them
+as a parallel-capable topology and synthesizes a coherent compliance plan.
+
+Runtime note: `parallel_group` records workflow topology. Claude may delegate
+parallel-capable stages with native tools. Codex receives manual/reference
+handoff files and does not spawn subagents or execute runtime parallelism.
 
 ## When to use
 
