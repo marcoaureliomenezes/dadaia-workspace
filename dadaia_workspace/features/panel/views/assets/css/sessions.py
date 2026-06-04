@@ -174,21 +174,25 @@ SESSIONS_CSS: str = """
   .sessions-table tbody tr.session-row { transition: none; }
 }
 
-/* ── Per-cell min-width (applied to both <th> and <td>) ───────────────
-   Under table-layout:fixed, min-width on <col> elements is ignored by
-   the layout algorithm (MDN). The only reliable approach is to set
-   min-width directly on each <th>/<td> pair via class selectors.
-   Total floor: 120+96+160+72+80+72+112+80 = 792px.
+/* ── Per-cell width — single source of truth for header AND body ───────
+   Both <th class="cell-*"> and <td class="cell-*"> use these declarations.
+   Under table-layout:fixed, the first row of cells (the <thead> row) sets
+   the column widths. Because header and body cells share the same .cell-*
+   class, both read from the same source — eliminating any <colgroup>/
+   min-width divergence.
+
+   Width values (px) preserve original proportions, summing to 792px:
+     120+96+160+72+80+72+112+80 = 792px total floor.
    The container has overflow-x:auto so the table scrolls horizontally
-   below this threshold rather than collapsing. ──────────────────────── */
-.cell-session    { min-width: 120px; }
-.cell-project    { min-width:  96px; }
-.cell-model      { min-width: 160px; }
-.cell-turns      { min-width:  72px; }
-.cell-context    { min-width:  80px; }
-.cell-cost       { min-width:  72px; }
-.cell-last-activity { min-width: 112px; }
-.cell-status     { min-width:  80px; }
+   below 792px instead of collapsing. ─────────────────────────────────── */
+.cell-session       { width: 120px; min-width: 120px; }
+.cell-project       { width:  96px; min-width:  96px; }
+.cell-model         { width: 160px; min-width: 160px; }
+.cell-turns         { width:  72px; min-width:  72px; }
+.cell-context       { width:  80px; min-width:  80px; }
+.cell-cost          { width:  72px; min-width:  72px; }
+.cell-last-activity { width: 112px; min-width: 112px; }
+.cell-status        { width:  80px; min-width:  80px; }
 
 /* ── Codex PROJECT placeholder ─────────────────────────────────────── */
 /* Rendered by JS in buildRowHtml() when runtime === 'codex' and
