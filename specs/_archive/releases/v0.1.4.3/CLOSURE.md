@@ -31,29 +31,13 @@ release handoffs.
 
 | Description | Command | Evidence |
 |-------------|---------|----------|
-| Handoff model and validation service | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/test_handoff_models.py tests/unit/test_reports_validation_service.py` | ```text
-15 passed in 1.10s
-``` |
-| Handoff schema and CLI validation contracts | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/contract/test_handoff_schema_contract.py tests/contract/cli/test_cli_reports.py` | ```text
-13 passed in 5.06s
-``` |
-| Public asset projection contracts | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/infrastructure/test_public_assets.py` | ```text
-195 passed in 2.78s
-``` |
-| Panel report/handoff linkage | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/features/panel/test_api_contract.py` | ```text
-11 passed in 1.47s
-``` |
-| Expanded regression suite after review fixes | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/test_reports_validation_service.py tests/contract/test_handoff_schema_contract.py tests/contract/cli/test_cli_reports.py tests/unit/features/panel/test_api_contract.py tests/integration/test_cli_reports_next.py` | ```text
-42 passed in 4.57s
-``` |
-| Verdict gate smoke for matching, same-file, wrong-agent, and stale-release handoffs | `HANDOFF_DIR=<tmp> RELEASE_ID=v0.1.4.3 CONTEXT=dadaia-workspace bash scripts/check-verdict.sh` | ```text
-matching handoffs passed; same-file, wrong-agent, and stale-release handoffs rejected
-``` |
-| Required reviewer gate | QA, code-reviewer, and security-reviewer read-only re-reviews against `bbe196c` | ```text
-qa-engineer: APPROVE
-code-reviewer: APPROVE
-security-reviewer: APPROVE
-``` |
+| Handoff model and validation service | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/test_handoff_models.py tests/unit/test_reports_validation_service.py` | stdout: `15 passed in 1.10s` |
+| Handoff schema and CLI validation contracts | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/contract/test_handoff_schema_contract.py tests/contract/cli/test_cli_reports.py` | stdout: `13 passed in 5.06s` |
+| Public asset projection contracts | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/infrastructure/test_public_assets.py` | stdout: `195 passed in 2.78s` |
+| Panel report/handoff linkage | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/features/panel/test_api_contract.py` | stdout: `11 passed in 1.47s` |
+| Expanded regression suite after review fixes | `/home/marco/workspace/dadaia/.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit/test_reports_validation_service.py tests/contract/test_handoff_schema_contract.py tests/contract/cli/test_cli_reports.py tests/unit/features/panel/test_api_contract.py tests/integration/test_cli_reports_next.py` | stdout: `42 passed in 4.57s` |
+| Verdict gate smoke for matching, same-file, wrong-agent, and stale-release handoffs | `HANDOFF_DIR=<tmp> RELEASE_ID=v0.1.4.3 CONTEXT=dadaia-workspace bash scripts/check-verdict.sh` | stdout: `matching passed; stale/same-file/wrong-agent rejected` |
+| Required reviewer gate | QA, code-reviewer, and security-reviewer read-only re-reviews against `bbe196c` | stdout: `qa-engineer APPROVE; code-reviewer APPROVE; security-reviewer APPROVE` |
 
 ## Drifts
 
