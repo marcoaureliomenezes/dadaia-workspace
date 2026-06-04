@@ -41,7 +41,7 @@ or explicit legacy migration exception.
 
 ### T-BUG-02 — Remove session-bind primary residue from CLI/source
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Target files:** `dadaia_workspace/cli/**`, `dadaia_workspace/core/**`,
   `dadaia_workspace/features/**`, `dadaia_workspace/infrastructure/**`
