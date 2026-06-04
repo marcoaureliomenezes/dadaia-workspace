@@ -1519,26 +1519,33 @@ class TestClassifyWorkflows:
 class TestConfigGenerators:
     def test_codex_hooks_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
-        hooks = manager._codex_hooks(tmp_path)
+        config = manager._codex_hooks(tmp_path)
+        assert "hooks" in config
+        hooks = config["hooks"]
+
         assert "PreToolUse" in hooks
         matchers = hooks["PreToolUse"]
         assert isinstance(matchers, list)
         assert len(matchers) > 0
-        assert "command" in matchers[0]
-        assert matchers[0]["matcher"] == {}
+        assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
+        assert matchers[0]["hooks"][0]["type"] == "command"
+        assert str(matchers[0]["hooks"][0]["command"]).endswith("sdd-spec-gate.sh")
         # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
         assert "PostToolUse" in hooks
         post_matchers = hooks["PostToolUse"]
         assert isinstance(post_matchers, list)
         assert len(post_matchers) > 0
-        assert "command" in post_matchers[0]
-        assert post_matchers[0]["matcher"] == {}
-        assert str(post_matchers[0]["command"]).endswith("sdd-post-gate.sh")
+        assert post_matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
+        assert post_matchers[0]["hooks"][0]["type"] == "command"
+        assert str(post_matchers[0]["hooks"][0]["command"]).endswith("sdd-post-gate.sh")
         assert "UserPromptSubmit" in hooks
         prompt_matchers = hooks["UserPromptSubmit"]
         assert isinstance(prompt_matchers, list)
-        assert prompt_matchers[0]["matcher"] == {}
-        assert str(prompt_matchers[0]["command"]).endswith("ctx-inject.sh")
+        assert "matcher" not in prompt_matchers[0]
+        assert prompt_matchers[0]["hooks"][0]["type"] == "command"
+        prompt_command = str(prompt_matchers[0]["hooks"][0]["command"])
+        assert prompt_command.startswith("DADAIA_HOOK_OUTPUT=codex-json ")
+        assert prompt_command.endswith("ctx-inject.sh")
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
@@ -1553,6 +1560,24 @@ class TestConfigGenerators:
         assert len(post_hooks) > 0
         commands = [h["command"] for h in post_hooks[0]["hooks"]]
         assert any(str(c).endswith("sdd-post-gate.sh") for c in commands)
+
+    def test_codex_force_install_removes_stale_agents_and_workflows(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "ws"
+        manager = FileSystemPublicAssetManager()
+        manager.stage(workspace)
+        stale_agent = workspace / ".codex" / "agents" / "stale-agent.toml"
+        stale_agent.parent.mkdir(parents=True, exist_ok=True)
+        stale_agent.write_text('model = "gpt-5.3-codex"\n', encoding="utf-8")
+        stale_workflow = workspace / ".codex" / "workflows" / "stale.workflow.md"
+        stale_workflow.parent.mkdir(parents=True, exist_ok=True)
+        stale_workflow.write_text("# stale\n", encoding="utf-8")
+
+        installed = manager.install(workspace, target="codex", force=True)
+
+        assert not stale_agent.exists()
+        assert not stale_workflow.exists()
+        assert any("[rm]" in item and "stale-agent.toml" in item for item in installed)
+        assert any("[rm]" in item and "stale.workflow.md" in item for item in installed)
 
     def test_opencode_config_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()

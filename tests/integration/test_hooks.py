@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -134,13 +135,51 @@ def _make_primary_context(workspace: Path, slug: str, specs_dir: Path) -> None:
     (states / "spec_contexts.json").write_text(json.dumps(ctx_data, indent=2))
 
 
+def _bind_impl_session(workspace: Path, slug: str, release: str, session_id: str = "sess_impl") -> dict[str, str]:
+    now = datetime.now(tz=UTC).isoformat()
+    sessions = workspace / ".dadaia" / "sessions"
+    sessions.mkdir(parents=True, exist_ok=True)
+    (sessions / f"{session_id}.json").write_text(
+        json.dumps(
+            {
+                "session_id": session_id,
+                "mode": "BOUND_IMPLEMENTATION",
+                "context": slug,
+                "release": release,
+                "runtime": "codex",
+                "pid": 123,
+                "started_at": now,
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
+    locks = workspace / ".dadaia" / "locks" / "implementation"
+    locks.mkdir(parents=True, exist_ok=True)
+    (locks / f"{slug}__{release}.json").write_text(
+        json.dumps(
+            {
+                "context": slug,
+                "release": release,
+                "session_id": session_id,
+                "last_seen_at": now,
+                "ttl_seconds": 300,
+            }
+        )
+    )
+    return {"DADAIA_SESSION_ID": session_id}
+
+
 def test_sdd_gate_v2_blocks_primary_slug_path_when_no_active_task(workspace: Path) -> None:
     """Gate blocks writes inside repos/<primary_slug>/ when no [-] task in specs."""
     scripts = _install_scripts(workspace)
     specs = workspace / "repos" / "my-proj" / "specs"
-    specs.mkdir(parents=True)
-    (specs / "TASKS.md").write_text("- [ ] T-001 — do something\n")
+    rel_dir = specs / "releases" / "my-release-v1"
+    rel_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
+    (rel_dir / "TASKS.md").write_text("- [ ] T-001 — do something\n")
     _make_primary_context(workspace, "my-proj", specs)
+    session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
 
     target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
@@ -149,6 +188,7 @@ def test_sdd_gate_v2_blocks_primary_slug_path_when_no_active_task(workspace: Pat
         input=payload,
         capture_output=True,
         text=True,
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env},
         timeout=5,
     )
     assert result.returncode == 0
@@ -158,7 +198,7 @@ def test_sdd_gate_v2_blocks_primary_slug_path_when_no_active_task(workspace: Pat
 
 
 def test_sdd_gate_v2_passes_primary_slug_path_with_active_task(workspace: Path) -> None:
-    """Gate allows writes inside repos/<primary_slug>/ when a [-] task is in active release."""
+    """Gate allows production writes only with a bound implementation session."""
     scripts = _install_scripts(workspace)
     specs = workspace / "repos" / "my-proj" / "specs"
     # Create release-directory structure (root TASKS.md is no longer supported per T-8a)
@@ -167,6 +207,7 @@ def test_sdd_gate_v2_passes_primary_slug_path_with_active_task(workspace: Path) 
     (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
     (rel_dir / "TASKS.md").write_text("- [-] T-001 — doing this now\n")
     _make_primary_context(workspace, "my-proj", specs)
+    session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
 
     target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
@@ -175,10 +216,64 @@ def test_sdd_gate_v2_passes_primary_slug_path_with_active_task(workspace: Path) 
         input=payload,
         capture_output=True,
         text=True,
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env},
         timeout=5,
     )
     assert result.returncode == 0
     assert result.stdout == ""  # not blocked
+
+
+def test_sdd_gate_parses_codex_apply_patch_command_path(workspace: Path) -> None:
+    """Codex apply_patch provides patch text in tool_input.command; gate must parse it."""
+    scripts = _install_scripts(workspace)
+    specs = workspace / "repos" / "my-proj" / "specs"
+    rel_dir = specs / "releases" / "my-release-v1"
+    rel_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
+    (rel_dir / "TASKS.md").write_text("- [ ] T-001 — not started\n")
+    _make_primary_context(workspace, "my-proj", specs)
+    session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
+
+    target = workspace / "repos" / "my-proj" / "src" / "main.py"
+    command = f"""*** Begin Patch
+*** Update File: {target}
+@@
++x = 1
+*** End Patch
+"""
+    payload = json.dumps({"tool_name": "apply_patch", "tool_input": {"command": command}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env},
+        timeout=5,
+    )
+
+    assert result.returncode == 0
+    data = json.loads(result.stdout)
+    assert data["decision"] == "block"
+    assert "Nenhuma task IN PROGRESS" in data["reason"]
+
+
+def test_sdd_gate_blocks_write_like_tool_without_parseable_path(workspace: Path) -> None:
+    """Write-like hooks without file_path or patch headers must fail closed."""
+    scripts = _install_scripts(workspace)
+    payload = json.dumps({"tool_name": "apply_patch", "tool_input": {"command": "not a patch"}})
+    result = subprocess.run(
+        ["bash", str(scripts / "sdd-spec-gate.sh")],
+        input=payload,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace)},
+        timeout=5,
+    )
+
+    assert result.returncode == 0
+    data = json.loads(result.stdout)
+    assert data["decision"] == "block"
+    assert "parseable target path" in data["reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -229,9 +324,10 @@ def test_sdd_gate_t_hard_01_spec_contexts_fallback_blocks_when_no_active_task(
     }
     (states / "spec_contexts.json").write_text(json.dumps(ctx_data, indent=2))
     assert not (states / "primary_context.json").exists(), "primary_context.json must be absent"
+    session_env = _bind_impl_session(workspace, slug, "v1")
 
     target_file = workspace / "repos" / slug / "src" / "service.py"
-    env = {**os.environ, "WORKSPACE_ROOT": str(workspace)}
+    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env}
     # Explicitly unset DADAIA_CONTEXT to exercise step 2
     env.pop("DADAIA_CONTEXT", None)
     log_file = workspace / ".dadaia" / "sdd-gate.log"
@@ -271,7 +367,7 @@ def test_sdd_gate_t_hard_01_spec_contexts_fallback_allows_when_active_task(
 ) -> None:
     """T-HARD-01 (positive): DADAIA_CONTEXT unset, primary_context.json absent,
     valid spec_contexts.json with ALIVE entry → gate allows write inside repos/<slug>/
-    when a [-] task IS active.
+    when a [-] task IS active and the session owns the implementation lock.
     """
     scripts = _install_scripts(workspace)
     slug = "my-proj"
@@ -301,9 +397,10 @@ def test_sdd_gate_t_hard_01_spec_contexts_fallback_allows_when_active_task(
     }
     (states / "spec_contexts.json").write_text(json.dumps(ctx_data, indent=2))
     assert not (states / "primary_context.json").exists(), "primary_context.json must be absent"
+    session_env = _bind_impl_session(workspace, slug, "v1")
 
     target_file = workspace / "repos" / slug / "src" / "service.py"
-    env = {**os.environ, "WORKSPACE_ROOT": str(workspace)}
+    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env}
     env.pop("DADAIA_CONTEXT", None)
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
     result = subprocess.run(
@@ -341,7 +438,12 @@ def _make_full_context(workspace: Path, slug: str) -> tuple[Path, Path, Path]:
 
 
 def _run_ctx_inject(
-    workspace: Path, scripts: Path, *, fresh: bool = True, ctx: str = ""
+    workspace: Path,
+    scripts: Path,
+    *,
+    fresh: bool = True,
+    ctx: str = "",
+    hook_output: str = "",
 ) -> subprocess.CompletedProcess[str]:
     """Run ctx-inject.sh from the scripts dir, optionally purging the sentinel first.
 
@@ -356,6 +458,8 @@ def _run_ctx_inject(
     env = {**os.environ, "WORKSPACE_ROOT": str(workspace)}
     if ctx:
         env["DADAIA_CONTEXT"] = ctx
+    if hook_output:
+        env["DADAIA_HOOK_OUTPUT"] = hook_output
     return subprocess.run(
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
@@ -376,6 +480,24 @@ def test_ctx_inject_reads_tech_stack_md_verbatim(workspace: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert "some content here" in result.stdout
+
+
+def test_ctx_inject_codex_json_output_is_parseable(workspace: Path) -> None:
+    """Codex UserPromptSubmit output must be valid hook JSON, not JSON-like text."""
+    scripts, memory_dir, _ = _make_full_context(workspace, "myctx")
+    (memory_dir / "tech-stack.md").write_text("# tech-stack\n\njson mode content\n")
+    (memory_dir / "product" / "catalog.json").write_text(
+        json.dumps({"features": [{"slug": "json-mode"}]})
+    )
+
+    result = _run_ctx_inject(workspace, scripts, ctx="myctx", hook_output="codex-json")
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    hook_output = payload["hookSpecificOutput"]
+    assert hook_output["hookEventName"] == "UserPromptSubmit"
+    assert "json mode content" in hook_output["additionalContext"]
+    assert "json-mode" in hook_output["additionalContext"]
 
 
 def test_ctx_inject_does_not_call_strip_script(workspace: Path) -> None:
@@ -483,7 +605,7 @@ def test_sdd_gate_v2_allows_meta_edit_on_tasks_md(workspace: Path) -> None:
 
 def test_gate_resolves_active_release_tasks(workspace: Path) -> None:
     """AC-T8a-3: Gate reads releases/ACTIVE.md -> releases/<id>/TASKS.md and allows
-    when a [-] marker is present in the active release's TASKS.md.
+    when a [-] marker is present and the session owns the implementation lock.
 
     This test verifies the gate works correctly with the canonical release-directory
     structure (no root-level TASKS.md required).
@@ -499,6 +621,7 @@ def test_gate_resolves_active_release_tasks(workspace: Path) -> None:
         "# Tasks\n\n- [-] T-001 — work in progress\n- [ ] T-002 — pending\n"
     )
     _make_primary_context(workspace, "my-proj", specs)
+    session_env = _bind_impl_session(workspace, "my-proj", "active-release-v1")
 
     target_file = workspace / "repos" / "my-proj" / "src" / "service.py"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
@@ -507,7 +630,7 @@ def test_gate_resolves_active_release_tasks(workspace: Path) -> None:
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "WORKSPACE_ROOT": str(workspace)},
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env},
         timeout=5,
     )
     assert result.returncode == 0
@@ -535,6 +658,7 @@ def test_gate_blocks_when_active_release_has_no_task(workspace: Path) -> None:
     # Root-level TASKS.md with [-] marker must be ignored (T-8a removes this fallback)
     (specs / "TASKS.md").write_text("- [-] T-ROOT — this should be ignored\n")
     _make_primary_context(workspace, "my-proj", specs)
+    session_env = _bind_impl_session(workspace, "my-proj", "active-release-v1")
 
     target_file = workspace / "repos" / "my-proj" / "src" / "service.py"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
@@ -543,7 +667,7 @@ def test_gate_blocks_when_active_release_has_no_task(workspace: Path) -> None:
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "WORKSPACE_ROOT": str(workspace)},
+        env={**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env},
         timeout=5,
     )
     assert result.returncode == 0
@@ -636,10 +760,16 @@ def test_sdd_gate_one_minus_warn_two_markers_no_parallel_declaration(workspace: 
         "- [ ] T-003 — open task\n"
     )
     _make_primary_context(workspace, "my-proj", specs)
+    session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
 
     log_file = workspace / ".dadaia" / "sdd-gate.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), "SDD_GATE_LOG": str(log_file)}
+    env = {
+        **os.environ,
+        "WORKSPACE_ROOT": str(workspace),
+        "SDD_GATE_LOG": str(log_file),
+        **session_env,
+    }
 
     # Write to a production path (repos/<slug>/) to reach RULE C
     target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
@@ -682,10 +812,16 @@ def test_sdd_gate_one_minus_warn_suppressed_with_parallel_declaration(workspace:
         "- [-] T-002 — second in-progress task\n"
     )
     _make_primary_context(workspace, "my-proj", specs)
+    session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
 
     log_file = workspace / ".dadaia" / "sdd-gate.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), "SDD_GATE_LOG": str(log_file)}
+    env = {
+        **os.environ,
+        "WORKSPACE_ROOT": str(workspace),
+        "SDD_GATE_LOG": str(log_file),
+        **session_env,
+    }
 
     target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})

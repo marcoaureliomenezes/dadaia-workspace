@@ -205,12 +205,12 @@ def workspace(tmp_path: Path) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# AC-T13-1: DADAIA_SESSION_ID absent → gate exits 0 (fail-open) + warning logged
+# AC-T13-1: DADAIA_SESSION_ID absent → production write blocks
 # ---------------------------------------------------------------------------
 
 
-def test_ac_t13_1_fail_open_no_session_id(workspace: Path) -> None:
-    """AC-T13-1: No DADAIA_SESSION_ID → gate exits 0 (fail-open) with warning in log."""
+def test_ac_t13_1_blocks_production_write_without_session_id(workspace: Path) -> None:
+    """AC-T13-1: production writes require a bound implementation session."""
     scripts = _install_scripts(workspace)
     slug = "my-proj"
     specs = workspace / "repos" / slug / "specs"
@@ -219,20 +219,18 @@ def test_ac_t13_1_fail_open_no_session_id(workspace: Path) -> None:
     _make_primary_context(workspace, slug, specs)
 
     target_file = workspace / "repos" / slug / "src" / "main.py"
-    # No DADAIA_SESSION_ID — should fail-open (allow production write based on task marker)
-    # But the workspace has a [-] task, so it should fully allow.
+    # No DADAIA_SESSION_ID — must fail closed even though TASKS.md has [-].
     result = _run_gate(scripts, workspace, target_file, session_id=None)
 
     assert result.returncode == 0
-    # Should NOT be blocked by RULE E (fail-open), but may be blocked by RULE C (no lock).
-    # Since RULE E fails open, the gate falls through to RULE C.
-    # RULE C finds the [-] task → allow.
-    assert "decision" not in result.stdout or json.loads(result.stdout).get("decision") != "block"
+    data = json.loads(result.stdout)
+    assert data["decision"] == "block"
+    assert "DADAIA_SESSION_ID" in data["reason"]
 
-    # Verify warning was logged
+    # Verify the blocked production path was logged.
     log_file = workspace / ".dadaia" / "sdd-gate-test.log"
     log_content = log_file.read_text() if log_file.exists() else ""
-    assert "FAIL-OPEN" in log_content
+    assert "BLOCKED" in log_content
     assert "DADAIA_SESSION_ID" in log_content
 
 

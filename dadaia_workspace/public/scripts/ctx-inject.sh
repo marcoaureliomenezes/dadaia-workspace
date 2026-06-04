@@ -6,6 +6,35 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$DEFAULT_WORKSPACE_ROOT}"
+PYTHON_BIN="${DADAIA_PYTHON:-$WORKSPACE_ROOT/.dadaia/.venv/bin/python}"
+if [ ! -x "$PYTHON_BIN" ]; then
+    PYTHON_BIN="python3"
+fi
+
+TMP_DIR="$WORKSPACE_ROOT/.dadaia/tmp"
+mkdir -p "$TMP_DIR"
+PAYLOAD_FILE="$(mktemp "$TMP_DIR/ctx-inject-payload.XXXXXX")"
+trap 'rm -f "$PAYLOAD_FILE"' EXIT
+
+emit_payload() {
+    if [ "$DADAIA_HOOK_OUTPUT" = "codex-json" ] || [ "$DADAIA_HOOK_OUTPUT" = "json" ]; then
+        "$PYTHON_BIN" - "$PAYLOAD_FILE" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit",
+        "additionalContext": payload,
+    }
+}))
+PY
+    else
+        cat "$PAYLOAD_FILE"
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Resolve context name and SPECS_DIR (preserve existing logic).
@@ -14,15 +43,19 @@ if [ -n "$DADAIA_CONTEXT" ]; then
     CONTEXT_NAME="$DADAIA_CONTEXT"
     SPECS_DIR="$WORKSPACE_ROOT/repos/$DADAIA_CONTEXT/specs"
     if [ -d "$SPECS_DIR" ]; then
-        echo "[$DADAIA_CONTEXT]"
+        printf '[%s]\n' "$DADAIA_CONTEXT" >> "$PAYLOAD_FILE"
     else
-        echo "[$DADAIA_CONTEXT] WARNING: specs not found"
+        printf '[%s] WARNING: specs not found\n' "$DADAIA_CONTEXT" >> "$PAYLOAD_FILE"
+        emit_payload
         exit 0
     fi
 else
-    echo "[context: none] — no context bound."
-    echo "  To bind a context: eval \$(.dadaia/.venv/bin/dadaia context bind <name> --mode read)"
-    echo "  Then export DADAIA_CONTEXT in the shell that launches your agent runtime."
+    {
+        echo "[context: none] — no context bound."
+        echo "  To bind a context: eval \$(.dadaia/.venv/bin/dadaia context bind <name> --mode read)"
+        echo "  Then export DADAIA_CONTEXT in the shell that launches your agent runtime."
+    } >> "$PAYLOAD_FILE"
+    emit_payload
     exit 0
 fi
 
@@ -31,6 +64,7 @@ fi
 # ---------------------------------------------------------------------------
 MEMORY_DIR="$SPECS_DIR/memory"
 if [ ! -d "$MEMORY_DIR" ]; then
+    emit_payload
     exit 0
 fi
 
@@ -51,11 +85,11 @@ else
     SESSION_ID="$$"
 fi
 
-mkdir -p "$WORKSPACE_ROOT/.dadaia/tmp"
-SENTINEL="$WORKSPACE_ROOT/.dadaia/tmp/ctx-inject-fired-${SESSION_ID}"
+SENTINEL="$TMP_DIR/ctx-inject-fired-${SESSION_ID}"
 
 if [ -f "$SENTINEL" ]; then
     # Memory block already injected this session — emit only the context name (already done above).
+    emit_payload
     exit 0
 fi
 
@@ -67,13 +101,15 @@ touch "$SENTINEL"
 # tech-stack.md and product/index.md are read verbatim — no strip pass needed.
 # ---------------------------------------------------------------------------
 
-echo ""
-echo "=== workspace memory (tech + catalog) ==="
+{
+    echo ""
+    echo "=== workspace memory (tech + catalog) ==="
+} >> "$PAYLOAD_FILE"
 
 # Tech stack — read .md verbatim (T-MMS-07: no strip pass needed for markdown)
 TECH_FILE="$MEMORY_DIR/tech-stack.md"
 if [ -f "$TECH_FILE" ]; then
-    cat "$TECH_FILE"
+    cat "$TECH_FILE" >> "$PAYLOAD_FILE"
 fi
 
 # Catalog: prefer catalog.json (machine-readable, generated from frontmatter);
@@ -81,9 +117,10 @@ fi
 CATALOG_JSON="$MEMORY_DIR/product/catalog.json"
 PRODUCT_INDEX_MD="$MEMORY_DIR/product/index.md"
 if [ -f "$CATALOG_JSON" ]; then
-    cat "$CATALOG_JSON"
+    cat "$CATALOG_JSON" >> "$PAYLOAD_FILE"
 elif [ -f "$PRODUCT_INDEX_MD" ]; then
-    cat "$PRODUCT_INDEX_MD"
+    cat "$PRODUCT_INDEX_MD" >> "$PAYLOAD_FILE"
 fi
 
-echo "=== end memory bootstrap ==="
+echo "=== end memory bootstrap ===" >> "$PAYLOAD_FILE"
+emit_payload

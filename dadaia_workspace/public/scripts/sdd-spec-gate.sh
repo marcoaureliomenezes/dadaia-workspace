@@ -5,10 +5,9 @@
 #          _archive/ read-only, release-id audit log, SDD_LEGACY_FEATURES env.
 # v3.1 adds: path-scope gate (RULE D) — validates write against agent's
 #            write_allowlist from frontmatter (AGT-r2-19).
-# Blocks Write/Edit/MultiEdit on production paths when no IN PROGRESS task
-# exists in a TASKS.md under the active release (primary) or under legacy
-# features/* if SDD_LEGACY_FEATURES=1.
-# FAIL OPEN: any internal error → allow (never block legitimate edits by crashing).
+# Blocks Write/Edit/MultiEdit/apply_patch on production paths unless a bound
+# implementation session owns the active release lock and a TASKS.md marker is
+# IN PROGRESS. Write-like tool calls with unparseable target paths fail closed.
 
 # SDD_GATE_LOG override allows tests to redirect log to a tmp file.
 LOG="${SDD_GATE_LOG:-/tmp/sdd-gate.log}"
@@ -47,19 +46,35 @@ case "$TOOL" in
     *) exit 0 ;;
 esac
 
-# Parse file path from tool input
+# Parse file path from tool input. Codex apply_patch sends the patch as
+# tool_input.command, so extract touched files from patch headers too.
 FPATH=$("$PYTHON_BIN" - "$TMP" 2>/dev/null <<'EOF'
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
     i = d.get("tool_input") or d
-    print(i.get("file_path") or i.get("path") or "")
+    direct = i.get("file_path") or i.get("path") or ""
+    if direct:
+        print(direct)
+        sys.exit(0)
+    command = i.get("command") or ""
+    if not isinstance(command, str):
+        print("")
+        sys.exit(0)
+    for line in command.splitlines():
+        for prefix in ("*** Update File: ", "*** Add File: ", "*** Delete File: "):
+            if line.startswith(prefix):
+                print(line[len(prefix):].strip())
+                sys.exit(0)
+    print("")
 except Exception:
     print("")
 EOF
 )
 
-[ -z "$FPATH" ] && exit 0
+if [ -z "$FPATH" ]; then
+    _block "[SDD GATE] Write-like tool '${TOOL}' did not provide a parseable target path. Blocking to avoid bypassing SDD enforcement."
+fi
 [[ "$FPATH" != /* ]] && FPATH="$WS/$FPATH"
 _log "tool=$TOOL path=$FPATH"
 
@@ -434,8 +449,8 @@ fi
 #   1. DADAIA_SESSION_ID env var — set by eval $(dadaia context bind ...).
 #      This is the primary stable key, portable across Claude Code / Codex /
 #      OpenCode. The hook reads this first.
-#   2. Fail-open — if DADAIA_SESSION_ID is absent, log a warning and exit 0.
-#      Lock enforcement only activates once session identity is established.
+#   2. Fail-closed for production paths — if DADAIA_SESSION_ID is absent,
+#      production writes are blocked. Temporary paths are allowed by RULE F.
 #
 # The native runtime session_id (e.g. from Claude Code's hook stdin payload)
 # is runtime-specific and NOT portable; it is used for correlation logging
@@ -445,8 +460,8 @@ _rule_e() {
     # Step 1 — Resolve DADAIA_SESSION_ID
     local sess_id="${DADAIA_SESSION_ID:-}"
     if [ -z "$sess_id" ]; then
-        _log "RULE-E FAIL-OPEN: DADAIA_SESSION_ID not set; lock enforcement inactive for path=$FPATH"
-        return 0  # fail-open: fall through to RULE C
+        _block "[RULE E] DADAIA_SESSION_ID is not set. Production writes require a bound implementation session. Run: eval \$(dadaia context bind ${PRIMARY_SLUG:-<ctx>} --mode implementation --release ${ACTIVE_RELEASE:-<release-id>})"
+        return
     fi
 
     # Step 2 — Load session file
