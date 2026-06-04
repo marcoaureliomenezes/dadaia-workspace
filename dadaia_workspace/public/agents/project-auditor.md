@@ -126,9 +126,11 @@ the authoritative statements of what the workspace should be doing.
 Determine which dimensions to audit based on `audit_scope` input. Default: all six
 dimensions (architecture, product, tech-stack, security, tests, design).
 
-### Step 3 — Dispatch evidence agents (parallel where safe)
+### Step 3 — Dispatch evidence agents (parallel-capable where safe)
 
-For a full audit, dispatch in parallel:
+For a full audit, use parallel delegation only when the host runtime supports it.
+In Codex, treat this as a set of manual/reference handoffs and do not claim that
+subagents were spawned. Evidence agents:
 
 - `code-reviewer` — architecture conformance, patterns, test coverage gaps, dead code
 - `security-reviewer` — OWASP scan, CVEs, secrets, IaC

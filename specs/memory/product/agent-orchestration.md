@@ -51,13 +51,16 @@ Seven workflows ship by default:
 Domain workflows such as game development, dashboard publication, or
 vendor-specific data pipelines are not part of the default public install.
 
-Claude Code uses Claude-native agent/tool semantics. Codex uses Codex-native
-configuration and tool discovery; Codex personas must reference `tool_search`
-and deferred multi-agent tools when that capability is available, not a fake
-literal `subagent` tool. OpenCode uses its own agent and plugin projection.
+Claude Code uses Claude-native agent/tool semantics. Codex projections are
+reference-only for workflow execution unless the host conversation exposes a
+real subagent/delegation tool. Codex personas may reference `tool_search` only
+to discover available host-conversation tools; they must not claim that
+`dadaia orchestrate --runtime codex` spawned subagents or executed parallel
+groups. OpenCode uses its own agent and plugin projection.
 
-The dispatcher layer is best-effort across runtimes: it must report unsupported
-runtime capabilities honestly instead of simulating success.
+The dispatcher layer must report unsupported runtime capabilities honestly
+instead of simulating success. In Codex, parallel workflow groups are topology
+metadata and manual handoff files, not a promise of runtime concurrency.
 
 ## Estado runtime tocado
 

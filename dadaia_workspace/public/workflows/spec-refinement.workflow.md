@@ -1,6 +1,6 @@
 ---
 name: spec-refinement
-description: Discovery → 5-way parallel specialist analysis (arch + devops + qa + frontend + backend) → synthesis with operator gates.
+description: Discovery -> 5-way parallel-capable specialist analysis topology (arch + devops + qa + frontend + backend) -> synthesis with operator gates. Codex runtime receives manual/reference handoffs, not spawned subagents.
 version: 0.3.0
 schema_version: "1"
 inputs:
@@ -49,7 +49,7 @@ stages:
         as: evidence_report
     gate:
       kind: operator-approval
-      prompt: "Approve discovery report before triggering 3-way parallel analysis?"
+      prompt: "Approve discovery report before triggering parallel-capable specialist analysis?"
 
   - id: arch_review
     agent: software-architect
@@ -168,10 +168,14 @@ exit_criteria:
 # spec-refinement
 
 This workflow runs the canonical SDD spec refinement pipeline for any feature topic:
-discovery by `project-manager`, parallel analysis by five specialists
+discovery by `project-manager`, parallel-capable analysis by five specialists
 (`software-architect`, `devops-engineer`, `qa-engineer`, `frontend-engineer`,
 `backend-engineer`), then synthesis by `project-manager`, and finally SPEC authoring
 by `product-engineer` as a leaf.
+
+Runtime note: `parallel_group` records workflow topology. Claude may delegate
+parallel-capable stages with native tools. Codex receives manual/reference
+handoff files and does not spawn subagents or execute runtime parallelism.
 
 `frontend-engineer` and `backend-engineer` were added in v0.2.0 to capture
 stack-specific concerns at spec time: the frontend agent reviews UX/UI

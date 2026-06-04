@@ -98,7 +98,7 @@ Evidence:
 
 ### T-BUG-05 — Align Codex-facing orchestration wording
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target files:** `dadaia_workspace/public/agents/**`,
   `dadaia_workspace/public/workflows/**`, `specs/memory/product/agent-orchestration.md`
@@ -108,6 +108,10 @@ Evidence:
 
 Use explicit language such as manual handoff, reference-only workflow, or
 host-conversation subagent tool when available.
+
+Evidence:
+- `rg -n "best-effort|deferred multi-agent|fake literal|parallel stages may be dispatched in parallel|run in parallel|runs them in parallel|builds in parallel|work in parallel|race ahead in parallel" dadaia_workspace/public/agents dadaia_workspace/public/workflows specs/memory/product/agent-orchestration.md` has no Codex-facing runtime-concurrency promises.
+- `python -m pytest -q -p no:cacheprovider tests/unit/test_workflow_schema.py tests/unit/features/workflows/test_service.py tests/integration/panel/test_api_workflows.py` → 47 passed.
 
 ---
 

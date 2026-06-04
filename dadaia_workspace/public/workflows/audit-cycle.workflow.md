@@ -1,6 +1,6 @@
 ---
 name: audit-cycle
-description: project-auditor orchestrates a 4-way parallel deep audit (code-reviewer + security-reviewer + researcher + qa-engineer), then synthesizes a compliance score. Triggered manually per project.
+description: project-auditor orchestrates a 4-way parallel-capable audit topology (code-reviewer + security-reviewer + researcher + qa-engineer), then synthesizes a compliance score. Codex runtime receives manual/reference handoffs, not spawned subagents. Triggered manually per project.
 version: 0.1.0
 schema_version: "1"
 inputs:
@@ -143,8 +143,13 @@ exit_criteria:
 # audit-cycle
 
 Comprehensive compliance audit workflow triggered manually per project.
+
+Runtime note: `parallel_group` records workflow topology. Claude may delegate
+parallel-capable stages with native tools. Codex receives manual/reference
+handoff files and does not spawn subagents or execute runtime parallelism.
+
 `project-auditor` owns the full lifecycle: scopes the audit (intake), dispatches
-four specialist reviewers in parallel, and synthesizes a compliance score with
+four specialist reviewers as a parallel-capable review group, and synthesizes a compliance score with
 prioritized action items.
 
 ## When to use
@@ -161,7 +166,7 @@ prioritized action items.
    specialist should focus on. Operator-approval gate ensures scope is agreed
    before specialist work begins.
 
-2. **4-way parallel audit** — all four run concurrently after intake:
+2. **4-way parallel-capable audit** — all four may run concurrently after intake only on runtimes with real delegation:
    - **code_review** — `code-reviewer` applies the `architecture-code-review`
      skill: 6-axis checklist, OOP/SOLID, design-pattern misuse, complexity
      heuristics.

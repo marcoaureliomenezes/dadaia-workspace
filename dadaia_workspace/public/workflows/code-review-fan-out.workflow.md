@@ -1,6 +1,6 @@
 ---
 name: code-review-fan-out
-description: Per-PR parallel review by code-reviewer + security-reviewer + design-specialist → project-manager consolidates verdict. design-specialist decides internally whether to skip if design is not applicable to the PR.
+description: Per-PR parallel-capable review topology by code-reviewer + security-reviewer + design-specialist -> project-manager consolidates verdict. Codex runtime receives manual/reference handoffs, not spawned subagents. design-specialist decides internally whether to skip if design is not applicable to the PR.
 version: 0.1.0
 schema_version: "1"
 inputs:
@@ -123,7 +123,13 @@ exit_criteria:
 
 # code-review-fan-out
 
-Per-PR multi-dimensional code review. Three reviewers run in parallel and
+Per-PR multi-dimensional code review.
+
+Runtime note: `parallel_group` records workflow topology. Claude may delegate
+parallel-capable stages with native tools. Codex receives manual/reference
+handoff files and does not spawn subagents or execute runtime parallelism.
+
+Three reviewers form a parallel-capable group and
 `project-manager` consolidates their findings into a single actionable verdict.
 
 ## When to use
@@ -135,7 +141,7 @@ Per-PR multi-dimensional code review. Three reviewers run in parallel and
 
 ## Stages
 
-1. **3-way parallel review** — all three run concurrently:
+1. **3-way parallel-capable review** — all three may run concurrently only on runtimes with real delegation:
    - **code_review** — `code-reviewer` applies the `architecture-code-review`
      skill: readability, SOLID principles, design-pattern misuse, complexity,
      test coverage adequacy.
