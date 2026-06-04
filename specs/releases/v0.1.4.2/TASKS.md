@@ -158,7 +158,7 @@ Evidence:
 
 ### T-BUG-08 — Align implementer and reviewer personas with the gate
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Target files:** `dadaia_workspace/public/agents/software-engineer-python.md`,
   `dadaia_workspace/public/agents/software-engineer-node.md`,
