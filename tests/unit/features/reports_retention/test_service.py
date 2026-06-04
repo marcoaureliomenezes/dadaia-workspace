@@ -153,6 +153,25 @@ def test_malformed_state_is_reported(tmp_path: Path) -> None:
     assert _service(tmp_path).status()["malformed_state"] is True
 
 
+def test_status_counts_fresh_orphan_handoff_files(tmp_path: Path) -> None:
+    _write_handoff(
+        tmp_path,
+        "ctx/qa/missing.html",
+        produced_at="2026-06-04T11:00:00Z",
+    )
+    _write_handoff(
+        tmp_path,
+        "ctx/qa/other-missing.html",
+        produced_at="2026-06-04T11:00:00Z",
+        canonical=False,
+    )
+
+    status = _service(tmp_path).status()
+
+    assert status["orphan_handoff_count"] == 2
+    assert status["stale_handoff_count"] == 0
+
+
 def test_state_persists_version_one(tmp_path: Path) -> None:
     _write_report(tmp_path, "ctx/qa/report.html")
     service = _service(tmp_path)
