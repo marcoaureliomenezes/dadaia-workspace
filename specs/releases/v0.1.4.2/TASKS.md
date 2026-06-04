@@ -1,7 +1,7 @@
-# TASKS: v0.1.5 — session-bind and codex-orchestration bug fix
+# TASKS: v0.1.4.2 — session-bind, codex-orchestration, and review-gate bug fix
 
 **Status:** Aprovado
-**Release ID:** v0.1.5
+**Release ID:** v0.1.4.2
 **Owner:** product-engineer
 **Created:** 2026-06-04
 
@@ -14,7 +14,9 @@ Maximum one `[-]` at a time unless disjoint write sets are declared.
 ```
 T-BUG-01 → T-BUG-02 → T-BUG-03
                   ↘
-                    T-BUG-04 → T-BUG-05 → T-BUG-06 → T-BUG-07
+                    T-BUG-04 → T-BUG-05
+T-BUG-06 → T-BUG-07 → T-BUG-08
+all implementation tasks → T-BUG-09 → T-BUG-10
 ```
 
 ---
@@ -104,17 +106,75 @@ host-conversation subagent tool when available.
 - **Preconditions:** T-BUG-02 through T-BUG-05 done
 - **Done criterion:** Tests fail on the reported bugs and pass after the fixes:
   no stale primary-context active hits, current context-bind guidance, and
-  truthful Codex dispatcher/manual orchestration output.
+truthful Codex dispatcher/manual orchestration output.
 
 ---
 
-### T-BUG-07 — Propagate assets and verify release
+### T-BUG-07 — Define strict implementation-review QA contract
+
+- **Status:** [ ]
+- **Owner:** product-engineer
+- **Target files:** `dadaia_workspace/public/skills/project-orchestration/SKILL.md`,
+  `dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md`,
+  `dadaia_workspace/public/agents/project-manager.md`,
+  `dadaia_workspace/public/workflows/**`
+- **Preconditions:** none
+- **Done criterion:** Public workflow/playbook docs define the full lifecycle:
+  pre-implementation agreement, implementation-complete handoff, review/QA
+  fan-out, rework loop, and done gate. They explicitly forbid push, PR, merge,
+  deploy, release closure, and `[x]` task closure before green QA/security/code
+  review approval.
+
+The contract must state that before TASKS approval, the owning implementer(s),
+`qa-engineer`, `code-reviewer`, and `security-reviewer` agree with each task's
+implementation scope, test plan, E2E/validation plan, review criteria, and
+security/privacy checks. UI tasks also require `design-specialist` agreement.
+
+---
+
+### T-BUG-08 — Align implementer and reviewer personas with the gate
+
+- **Status:** [ ]
+- **Owner:** ai-engineer
+- **Target files:** `dadaia_workspace/public/agents/software-engineer-python.md`,
+  `dadaia_workspace/public/agents/software-engineer-node.md`,
+  `dadaia_workspace/public/agents/frontend-engineer.md`,
+  `dadaia_workspace/public/agents/backend-engineer.md`,
+  `dadaia_workspace/public/agents/ai-engineer.md`,
+  `dadaia_workspace/public/agents/devops-engineer.md`,
+  `dadaia_workspace/public/agents/qa-engineer.md`,
+  `dadaia_workspace/public/agents/security-reviewer.md`,
+  `dadaia_workspace/public/agents/code-reviewer.md`
+- **Preconditions:** T-BUG-07 done
+- **Done criterion:** Implementer personas say implementation completion is a
+  handoff, not task completion; reviewer personas define approve/reject output
+  contracts; all require evidence paths and rerun after rework.
+
+Include explicit security/privacy leakage checks for public assets, secrets,
+auth/access control, dependency additions, generated files, and consumer-specific
+data.
+
+---
+
+### T-BUG-09 — Add regression tests for workflow gate contract
+
+- **Status:** [ ]
+- **Owner:** qa-engineer
+- **Target files:** `tests/**`
+- **Preconditions:** T-BUG-07 and T-BUG-08 done
+- **Done criterion:** Tests assert public workflows/skills/personas contain the
+  required pre-implementation agreement gate, post-implementation review/QA gate,
+  rework loop, approval evidence, and no-push/PR/deploy-before-approval wording.
+
+---
+
+### T-BUG-10 — Propagate assets and verify release
 
 - **Status:** [ ]
 - **Owner:** devops-engineer
 - **Target files:** `.dadaia/agentic/`, `.claude/`, `.codex/`, `.opencode/`,
   `.agents/` (generated projections)
-- **Preconditions:** T-BUG-01 through T-BUG-06 all `[x]`
+- **Preconditions:** T-BUG-01 through T-BUG-09 all `[x]`
 - **Done criterion:** Full validation plan from PLAN §6 exits 0, public doctor
   has no drift, specs doctor has no errors, and no forbidden cache/state dirs
   exist in the repo.
