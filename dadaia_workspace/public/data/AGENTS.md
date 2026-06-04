@@ -37,6 +37,36 @@ pytest `tmp_path`, never against the repository root. If a validation command
 must run on the root, remove generated projections before finishing and confirm
 `git status --short` contains only intentional source/test changes.
 
+## Repo cleanliness — no temp/cache/state dirs
+
+No repo — neither the `dadaia-workspace` library repo nor any Spec Context Project repo — may contain tool-generated cache, state, or artifact directories. These dirs are unconditionally forbidden inside any repo working tree:
+
+| Forbidden dir | Origin |
+|---|---|
+| `.dadaia/` | workspace-level only — lives at the workspace root, NEVER inside a repo |
+| `.venv/` | virtual-environment bootstrap artefact |
+| `.pytest_cache/` | pytest cache |
+| `.mypy_cache/` | mypy incremental cache |
+| `.hypothesis/` | hypothesis database |
+| `.ruff_cache/` | ruff lint cache |
+| `test-results/` | test runner artefact |
+| `playwright-report/` | Playwright HTML report artefact |
+| `coverage/`, `.coverage` | coverage artefact |
+
+**`.dadaia/` is workspace-level ONLY.** Creating `.dadaia/` inside a repo is a hard violation — it corrupts workspace-vs-repo boundary detection and breaks context resolution for every tool that walks the directory tree.
+
+**Tools must run with caching disabled or redirected outside the repo:**
+
+- pytest: pass `-p no:cacheprovider` (or set `cache_dir` to a path under `.dadaia/tmp/`)
+- mypy: set `incremental = false` in config
+- hypothesis: set `database = None`
+- ruff: pass `--no-cache`
+- Playwright: direct `outputDir` and `reporter` to `.dadaia/tmp/<agent>/<date>/`
+
+Ephemeral agent files go to the workspace `.dadaia/tmp/` landing zone (see `tmp-file-guardrail` rule), not into any repo.
+
+Gitignore entries for these dirs are defence-in-depth only. **Gitignore is not a licence to create them.** They must not appear in the working tree at all. CI repo-hygiene checks enforce this.
+
 ## Scoped Rules
 
 Before editing, check for the nearest scoped rule file:
