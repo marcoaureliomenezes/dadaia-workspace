@@ -41,7 +41,7 @@ instructions, and agent write contracts so handoff JSON is emitted under
 
 ### T-HANDOFF-03 - Update reports validation discovery and hash resolution
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Target files:** `dadaia_workspace/features/reports_validation/**`, `dadaia_workspace/cli/commands/reports.py`, `scripts/check-verdict.sh`, reports validation tests
 

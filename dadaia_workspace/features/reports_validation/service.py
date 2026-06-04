@@ -55,18 +55,20 @@ class ReportsValidationService:
     """Validates agent handoff documents using a pluggable ``ValidatorPort``.
 
     This service discovers, reads, and validates ``.handoff.json`` files under
-    ``reports_root``.  It does **not** couple itself to any concrete validator
+    ``handoff_root``.  It does **not** couple itself to any concrete validator
     implementation — callers inject the adapter via ``validator``.
 
     Args:
         validator: Any object implementing ``ValidatorPort``.
-        reports_root: Root directory where agent report sidecars are stored
-            (typically ``<workspace>/.dadaia/reports``).
+        reports_root: Root directory where agent handoff files are stored
+            (typically ``<workspace>/.dadaia/handoff``). The argument name is
+            kept for API compatibility.
     """
 
     def __init__(self, validator: ValidatorPort, reports_root: Path) -> None:
         self._validator = validator
         self._reports_root = reports_root
+        self._workspace_root = self._infer_workspace_root(reports_root)
 
     # ------------------------------------------------------------------
     # Public API
@@ -100,10 +102,10 @@ class ReportsValidationService:
         )
 
     def validate_all(self, context: str | None = None) -> list[ValidationResult]:
-        """Discover and validate all ``*.handoff.json`` files under ``reports_root``.
+        """Discover and validate all ``*.handoff.json`` files under ``handoff_root``.
 
         Args:
-            context: If provided, only files under ``reports_root/<context>/``
+            context: If provided, only files under ``handoff_root/<context>/``
                 are included.
 
         Returns:
@@ -118,8 +120,9 @@ class ReportsValidationService:
     def check_hash(self, handoff_path: Path) -> str:
         """Compare the artifact's actual sha256 against the handoff's ``content_hash``.
 
-        The artifact file is resolved relative to the directory that contains
-        ``handoff_path``.
+        Workspace-relative artifact paths such as ``.dadaia/reports/...`` are
+        resolved from the workspace root. Other relative paths keep the legacy
+        behavior and resolve from the handoff file directory.
 
         Args:
             handoff_path: Path to the ``.handoff.json`` file.
@@ -137,11 +140,25 @@ class ReportsValidationService:
         artifact_rel = str(artifact_info.get("path", ""))
         expected_hash = str(artifact_info.get("content_hash", ""))
 
-        handoff_dir = handoff_path.parent
-        artifact_path = handoff_dir / artifact_rel
+        artifact_path = self._resolve_artifact_path(handoff_path, artifact_rel)
 
         if not artifact_path.exists():
             return "missing_artifact"
 
         actual_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
         return "match" if actual_hash == expected_hash else "mismatch"
+
+    def _resolve_artifact_path(self, handoff_path: Path, artifact_ref: str) -> Path:
+        artifact_path = Path(artifact_ref)
+        if artifact_path.is_absolute():
+            return artifact_path
+        if artifact_ref.startswith(".dadaia/") and self._workspace_root is not None:
+            return self._workspace_root / artifact_path
+        return handoff_path.parent / artifact_path
+
+    @staticmethod
+    def _infer_workspace_root(handoff_root: Path) -> Path | None:
+        parts = handoff_root.parts
+        if len(parts) >= 2 and parts[-2:] == (".dadaia", "handoff"):
+            return handoff_root.parent.parent
+        return None

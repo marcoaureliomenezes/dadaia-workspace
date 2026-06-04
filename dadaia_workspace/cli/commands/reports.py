@@ -103,7 +103,7 @@ def validate(
         default=None, help="Paths to .handoff.json files to validate."
     ),
     all_: bool = typer.Option(
-        False, "--all", help="Validate all *.handoff.json files under the workspace reports root."
+        False, "--all", help="Validate all *.handoff.json files under the workspace handoff root."
     ),
     release: str | None = typer.Option(
         None,
@@ -159,7 +159,7 @@ def validate(
     # Collect paths to validate
     target_paths: list[Path] = []
     if all_:
-        results_root = workspace_root / ".dadaia" / "reports"
+        results_root = workspace_root / ".dadaia" / "handoff"
         target_paths = sorted(results_root.rglob("*.handoff.json")) if results_root.exists() else []
     elif paths:
         missing = [p for p in paths if not p.exists()]
@@ -268,16 +268,16 @@ def validate(
 def lint(
     directory: Path | None = typer.Argument(
         default=None,
-        help="Directory to lint recursively. Defaults to .dadaia/reports/ in the workspace root.",
+        help="Directory to lint recursively. Defaults to .dadaia/reports/ plus .dadaia/handoff/.",
     ),
 ) -> None:
-    """Lint the reports directory for orphaned HTMLs, oversized files, and missing sidecar fields.
+    """Lint reports and handoffs for missing links, oversized HTMLs, and fields.
 
     \b
     Flags emitted:
-      ORPHAN: <path>              HTML file with no adjacent .handoff.json sidecar
+      ORPHAN: <path>              HTML file with no handoff artifact.path reference
       OVERSIZED: <path> (<size>KB) HTML file larger than 30 KB
-      MISSING_FIELDS: <path>      Sidecar missing findings, scope, or metrics fields
+      MISSING_FIELDS: <path>      Handoff missing findings, scope, or metrics fields
 
     \b
     Exit code is always 0 (lint, not blocker). Summary printed at end.
@@ -286,58 +286,62 @@ def lint(
     Examples:
       dadaia reports lint
       dadaia reports lint .dadaia/reports/
-      dadaia reports lint /path/to/reports/
+      dadaia reports lint .dadaia/handoff/
     """
     workspace_root = resolve_workspace_root()
 
+    reports_root = workspace_root / ".dadaia" / "reports"
+    handoff_root = workspace_root / ".dadaia" / "handoff"
     if directory is None:
-        directory = workspace_root / ".dadaia" / "reports"
+        directories = [reports_root, handoff_root]
+    else:
+        directories = [directory]
 
-    if not directory.exists():
-        err_console.print(f"[yellow]Warning:[/yellow] Directory not found: {directory}")
+    existing_directories = [item for item in directories if item.exists()]
+    if not existing_directories:
+        err_console.print(
+            f"[yellow]Warning:[/yellow] Directory not found: {', '.join(str(d) for d in directories)}"
+        )
         raise typer.Exit(0)
 
     flags: list[str] = []
+    referenced_artifacts = _handoff_artifact_paths(handoff_root, workspace_root)
 
-    for dirpath_str, _dirnames, filenames in os.walk(directory):
-        dirpath = Path(dirpath_str)
-        for filename in filenames:
-            filepath = dirpath / filename
+    for root in existing_directories:
+        for dirpath_str, _dirnames, filenames in os.walk(root):
+            dirpath = Path(dirpath_str)
+            for filename in filenames:
+                filepath = dirpath / filename
 
-            # --- Check HTML files ---
-            if filename.lower().endswith(".html"):
-                # Check for orphaned HTML (no adjacent sidecar)
-                stem = filepath.stem
-                sidecar = dirpath / f"{stem}.handoff.json"
-                if not sidecar.exists():
-                    flags.append(f"ORPHAN: {filepath}")
+                if filename.lower().endswith(".html"):
+                    report_ref = _workspace_relative_ref(filepath, workspace_root)
+                    if report_ref not in referenced_artifacts:
+                        flags.append(f"ORPHAN: {filepath}")
 
-                # Check for oversized HTML
-                size_bytes = filepath.stat().st_size
-                if size_bytes > _OVERSIZED_THRESHOLD_BYTES:
-                    size_kb = size_bytes / 1024
-                    flags.append(f"OVERSIZED: {filepath} ({size_kb:.1f}KB)")
+                    size_bytes = filepath.stat().st_size
+                    if size_bytes > _OVERSIZED_THRESHOLD_BYTES:
+                        size_kb = size_bytes / 1024
+                        flags.append(f"OVERSIZED: {filepath} ({size_kb:.1f}KB)")
 
-            # --- Check sidecar JSON files ---
-            elif filename.lower().endswith(".handoff.json"):
-                try:
-                    raw = filepath.read_text(encoding="utf-8")
-                    doc = _json.loads(raw)
-                except (_json.JSONDecodeError, OSError):
-                    flags.append(f"MISSING_FIELDS: {filepath} (malformed JSON)")
-                    continue
+                elif filename.lower().endswith(".handoff.json"):
+                    try:
+                        raw = filepath.read_text(encoding="utf-8")
+                        doc = _json.loads(raw)
+                    except (_json.JSONDecodeError, OSError):
+                        flags.append(f"MISSING_FIELDS: {filepath} (malformed JSON)")
+                        continue
 
-                missing_fields: list[str] = []
-                if "findings" not in doc:
-                    missing_fields.append("findings")
-                if "scope" not in doc:
-                    missing_fields.append("scope")
-                if "metrics" not in doc:
-                    missing_fields.append("metrics")
+                    missing_fields: list[str] = []
+                    if "findings" not in doc:
+                        missing_fields.append("findings")
+                    if "scope" not in doc:
+                        missing_fields.append("scope")
+                    if "metrics" not in doc:
+                        missing_fields.append("metrics")
 
-                if missing_fields:
-                    fields_str = ", ".join(missing_fields)
-                    flags.append(f"MISSING_FIELDS: {filepath} (missing: {fields_str})")
+                    if missing_fields:
+                        fields_str = ", ".join(missing_fields)
+                        flags.append(f"MISSING_FIELDS: {filepath} (missing: {fields_str})")
 
     if flags:
         for flag in flags:
@@ -347,6 +351,32 @@ def lint(
         console.print("OK: No issues found.")
 
     raise typer.Exit(0)
+
+
+def _handoff_artifact_paths(handoff_root: Path, workspace_root: Path) -> set[str]:
+    refs: set[str] = set()
+    if not handoff_root.exists():
+        return refs
+    for filepath in handoff_root.rglob("*.handoff.json"):
+        try:
+            doc = _json.loads(filepath.read_text(encoding="utf-8"))
+        except (_json.JSONDecodeError, OSError):
+            continue
+        artifact = doc.get("artifact", {})
+        if isinstance(artifact, dict):
+            path = artifact.get("path")
+            if isinstance(path, str) and path:
+                refs.add(path)
+                artifact_path = workspace_root / path if path.startswith(".dadaia/") else filepath.parent / path
+                refs.add(_workspace_relative_ref(artifact_path, workspace_root))
+    return refs
+
+
+def _workspace_relative_ref(path: Path, workspace_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(workspace_root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 # ---------------------------------------------------------------------------

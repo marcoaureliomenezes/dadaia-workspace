@@ -191,7 +191,7 @@ def build_reports_validation_service(workspace_root: Path) -> ReportsValidationS
 
     Schema is read from the staged location:
     ``workspace_root/.dadaia/agentic/schemas/handoff-v1.schema.json``.
-    Reports root is ``workspace_root/.dadaia/reports``.
+    Handoff root is ``workspace_root/.dadaia/handoff``.
 
     Args:
         workspace_root: Root directory of the initialized dadaia workspace.
@@ -200,7 +200,7 @@ def build_reports_validation_service(workspace_root: Path) -> ReportsValidationS
         A fully wired ``ReportsValidationService`` instance.
     """
     schema_path = workspace_root / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
-    reports_root = workspace_root / ".dadaia" / "reports"
+    reports_root = workspace_root / ".dadaia" / "handoff"
     validator = StdlibHandoffValidator(schema_path)
     return ReportsValidationService(validator=validator, reports_root=reports_root)
 

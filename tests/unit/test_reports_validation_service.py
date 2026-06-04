@@ -226,3 +226,32 @@ def test_check_hash_returns_missing_artifact(tmp_path: Path):
 
     status = service.check_hash(handoff_path)
     assert status == "missing_artifact"
+
+
+def test_check_hash_resolves_workspace_relative_report_artifact(tmp_path: Path):
+    fake = FakeHandoffValidator(canned_errors=[])
+    handoff_root = tmp_path / ".dadaia" / "handoff"
+    handoff_root.mkdir(parents=True)
+    service = ReportsValidationService(validator=fake, reports_root=handoff_root)
+
+    artifact = tmp_path / ".dadaia" / "reports" / "dadaia-workspace" / "qa-engineer" / "report.html"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_bytes(b"<html>canonical report</html>")
+    actual_hash = hashlib.sha256(artifact.read_bytes()).hexdigest()
+
+    handoff_path = handoff_root / "dadaia-workspace" / "2026-06-04T000000Z-qa-report.handoff.json"
+    handoff_path.parent.mkdir()
+    doc: dict[str, object] = {
+        "schema_version": "handoff-v1",
+        "agent": "qa-engineer",
+        "context": "dadaia-workspace",
+        "produced_at": "2026-06-04T00:00:00Z",
+        "artifact": {
+            "type": "report",
+            "path": ".dadaia/reports/dadaia-workspace/qa-engineer/report.html",
+            "content_hash": actual_hash,
+        },
+    }
+    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+
+    assert service.check_hash(handoff_path) == "match"
