@@ -54,7 +54,7 @@ state handling.
 
 ### T-RET-02 - Implement safe cleanup execution
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python + security-reviewer
 - **Reviewers before approval:** qa-engineer, code-reviewer, security-reviewer
 - **Target files:** retention service, `tests/unit/features/reports_retention/**`, `tests/contract/**`
