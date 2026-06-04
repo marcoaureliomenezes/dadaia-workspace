@@ -146,19 +146,19 @@ def test_04_file_not_found_exits_2_with_error_message(tmp_path: Path, monkeypatc
     assert "ghost.handoff.json" in result.output or "not found" in result.output.lower()
 
 
-def test_05_all_flag_discovers_handoff_files_under_reports_root(
+def test_05_all_flag_discovers_handoff_files_under_handoff_root(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Test 5: --all discovers all *.handoff.json files under the workspace reports root."""
+    """Test 5: --all discovers all *.handoff.json files under the workspace handoff root."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
 
-    reports_root = tmp_path / ".dadaia" / "reports"
-    reports_root.mkdir(parents=True, exist_ok=True)
+    handoff_root = tmp_path / ".dadaia" / "handoff" / "dadaia-workspace"
+    handoff_root.mkdir(parents=True, exist_ok=True)
 
-    # Place 3 valid handoffs under reports root
+    # Place 3 valid handoffs under handoff root
     for i in range(3):
-        _make_valid_handoff(reports_root, stem=f"report-{i}")
+        _make_valid_handoff(handoff_root, stem=f"report-{i}")
 
     result = _runner.invoke(app, ["reports", "validate", "--all"])
 
@@ -194,13 +194,13 @@ def test_07_release_filter_narrows_discovery(tmp_path: Path, monkeypatch) -> Non
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
 
-    reports_root = tmp_path / ".dadaia" / "reports"
-    reports_root.mkdir(parents=True, exist_ok=True)
+    handoff_root = tmp_path / ".dadaia" / "handoff" / "dadaia-workspace"
+    handoff_root.mkdir(parents=True, exist_ok=True)
 
     # 1 handoff with target release_id, 2 with different release
-    _make_valid_handoff(reports_root, stem="agent-comms-report", release_id="agent-comms-v1")
-    _make_valid_handoff(reports_root, stem="other-report-1", release_id="panel-v1")
-    _make_valid_handoff(reports_root, stem="other-report-2", release_id="panel-v1")
+    _make_valid_handoff(handoff_root, stem="agent-comms-report", release_id="agent-comms-v1")
+    _make_valid_handoff(handoff_root, stem="other-report-1", release_id="panel-v1")
+    _make_valid_handoff(handoff_root, stem="other-report-2", release_id="panel-v1")
 
     result = _runner.invoke(app, ["reports", "validate", "--all", "--release", "agent-comms-v1"])
 
