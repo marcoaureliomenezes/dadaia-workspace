@@ -152,6 +152,8 @@ class ReportRetentionService:
                 )
 
         for handoff in malformed:
+            if handoff in seen_handoffs or self._workspace_ref(handoff) in important:
+                continue
             timestamp = self._timestamp_from_path(handoff)
             if timestamp <= cutoff:
                 candidates.append(
@@ -259,6 +261,9 @@ class ReportRetentionService:
                     doc = json.loads(handoff.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, OSError):
                     malformed.append(handoff)
+                    stem_artifact = self._legacy_same_stem_artifact(handoff)
+                    if stem_artifact is not None:
+                        result.setdefault(stem_artifact, []).append(handoff)
                     continue
                 artifact = doc.get("artifact", {}) if isinstance(doc, dict) else {}
                 path = artifact.get("path") if isinstance(artifact, dict) else None
@@ -332,8 +337,8 @@ class ReportRetentionService:
                 raise ValueError("handoff path must be under .dadaia/handoff or .dadaia/reports")
             try:
                 doc = json.loads(handoff.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError) as exc:
-                raise ValueError("handoff cannot be resolved to a report artifact") from exc
+            except (json.JSONDecodeError, OSError):
+                return self._workspace_ref(handoff)
             artifact = doc.get("artifact", {}) if isinstance(doc, dict) else {}
             artifact_path = artifact.get("path") if isinstance(artifact, dict) else None
             if isinstance(artifact_path, str):
