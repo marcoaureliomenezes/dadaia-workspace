@@ -1225,6 +1225,17 @@ class TestRuntimeExpectations:
         labels = [t[2] for t in items]
         assert "reports:AGENTS.md" in labels
 
+    def test_handoff_agents_md_yielded(self, tmp_path: Path) -> None:
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        data_dir = agentic_dir / "data"
+        data_dir.mkdir()
+        (data_dir / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
+        (data_dir / "handoff-AGENTS.md").write_text("# HANDOFF AGENTS\n", encoding="utf-8")
+        manager = self._make_manager()
+        items = list(manager._runtime_expectations(agentic_dir, workspace_root))
+        labels = [t[2] for t in items]
+        assert "handoff:AGENTS.md" in labels
+
 
 # ---------------------------------------------------------------------------
 # _install_codex_agents
