@@ -79,7 +79,7 @@ Evidence:
 
 ### T-BUG-04 — Make Codex dispatcher capabilities truthful
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Target files:** `dadaia_workspace/infrastructure/codex_agent_dispatcher.py`,
   `dadaia_workspace/features/orchestration/**`, relevant tests
@@ -89,6 +89,10 @@ Evidence:
 
 Prefer manual/reference-only mode. Do not claim parallel execution for a loop
 that writes handoff files sequentially.
+
+Evidence:
+- `rg -n "Codex.*best-effort|best-effort.*Codex|supports_parallel.*True|parallel \\(best-effort\\)|Codex supports best-effort|mode=DispatcherMode.CODEX|DispatcherMode.CODEX, True" dadaia_workspace tests` reports only Claude's native `supports_parallel=True`.
+- `python -m pytest -q -p no:cacheprovider tests/unit/features/agents/test_codex_dispatcher_parallel.py tests/unit/features/agents/test_codex_dispatcher_unsupported.py tests/unit/features/agents/test_codex_dispatcher_sequential.py tests/unit/test_orchestration_runtime.py tests/unit/test_orchestration_runner.py tests/unit/test_orchestration_service.py` → 59 passed.
 
 ---
 

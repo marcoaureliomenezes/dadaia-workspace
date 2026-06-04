@@ -38,7 +38,7 @@ def _make_invocation(tmp_path: Path, *, parallel_group: str | None = None) -> St
         (ClaudeAgentDispatcher, "claude", DispatcherMode.NATIVE, True),
         (CliAgentDispatcher, "cli", DispatcherMode.CLI_ONLY, False),
         (OpenCodeAgentDispatcher, "opencode", DispatcherMode.BEST_EFFORT_SEQUENTIAL, False),
-        (CodexAgentDispatcher, "codex", DispatcherMode.CODEX, True),
+        (CodexAgentDispatcher, "codex", DispatcherMode.CLI_ONLY, False),
     ],
 )
 def test_capabilities_match_runtime(
@@ -74,12 +74,15 @@ def test_opencode_marks_parallel_group_as_best_effort(tmp_path: Path) -> None:
     assert "OpenCode does not support true parallel agent dispatch" in content
 
 
-def test_codex_accepts_parallel_group_dispatch_best_effort(tmp_path: Path) -> None:
-    """New CodexAgentDispatcher supports parallel_group — best-effort, no exception raised."""
+def test_codex_parallel_group_dispatch_writes_reference_handoff(tmp_path: Path) -> None:
+    """Codex writes a manual handoff for parallel_group without claiming execution."""
     inv = _make_invocation(tmp_path, parallel_group="specialists")
     results = CodexAgentDispatcher().dispatch_parallel((inv,))
     assert len(results) == 1
     assert results[0].status == StageStatus.AWAITING_GATE
+    content = Path(inv.invocation_path).read_text()
+    assert "reference-only" in content.lower()
+    assert "no codex agent process was spawned" in content.lower()
 
 
 def test_codex_accepts_sequential_dispatch(tmp_path: Path) -> None:
