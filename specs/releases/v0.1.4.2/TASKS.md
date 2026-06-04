@@ -117,13 +117,16 @@ Evidence:
 
 ### T-BUG-06 — Add regression tests for both bugs
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** qa-engineer
 - **Target files:** `tests/**`
 - **Preconditions:** T-BUG-02 through T-BUG-05 done
 - **Done criterion:** Tests fail on the reported bugs and pass after the fixes:
   no stale primary-context active hits, current context-bind guidance, and
 truthful Codex dispatcher/manual orchestration output.
+
+Evidence:
+- `python -m pytest -q -p no:cacheprovider tests/contract/test_session_bound_context_residue.py tests/contract/test_codex_reference_only_wording.py tests/unit/features/agents/test_codex_dispatcher_parallel.py tests/unit/features/agents/test_codex_dispatcher_unsupported.py tests/unit/features/agents/test_codex_dispatcher_sequential.py tests/unit/test_orchestration_runtime.py tests/unit/test_workflow_schema.py tests/unit/features/workflows/test_service.py` → 71 passed.
 
 ---
 
