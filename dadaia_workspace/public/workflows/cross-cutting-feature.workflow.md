@@ -234,6 +234,13 @@ the same red-test-then-green-impl-then-integration shape.
 5. **integration_validation** — `qa-engineer` runs E2E tests that exercise the full
    contract (frontend calls backend, real network). Operator-approval gate at the end.
 
+Done gate: green implementation reports are implementation-complete handoffs,
+not task completion. `project-manager` must fan out QA, code review, security
+review, and design review when UI is touched. Any rejection returns to the
+owning implementer while the task stays `[-]`. `[x]`, push, PR, merge, deploy,
+release closure, and memory updates are allowed only after every required
+validator approves the same commit.
+
 ## Why not run two `tdd-cycle` workflows at the same time?
 
 You could, but you'd lose:

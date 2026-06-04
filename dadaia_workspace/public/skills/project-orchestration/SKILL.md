@@ -87,6 +87,64 @@ Reports land in:
 
 Every HTML report must have a sibling `<stem>.handoff.json` sidecar.
 
+## Strict Implementation-Review-QA Contract
+
+This contract applies to every implementation task in an approved SDD release.
+`project-manager` owns orchestration discipline; `product-engineer` owns SDD
+artifact approval; implementers and reviewers own their evidence.
+
+### 0. Pre-Implementation Agreement
+
+Before `TASKS.md` is approved, the task definition must be agreed by:
+
+- the owning implementer agent or implementer set
+- `qa-engineer`
+- `code-reviewer`
+- `security-reviewer`
+- `design-specialist` when the task touches browser UI, visual UX, flows, or design tokens
+
+The approved task must state implementation scope, declared write set, unit and
+integration test plan, E2E/validation plan, code-review criteria, security and
+privacy checks, and expected evidence paths. Missing agreement blocks TASKS
+approval; it is not deferred to implementation time.
+
+### 1. Implementation Handoff
+
+When an implementer finishes code and local unit/integration checks, the work is
+only `implementation-complete`. It is not DONE. The implementer emits a handoff
+report with changed files, commits, test commands, known residual risk, and any
+security/privacy-sensitive areas. The task marker stays `[-]`.
+
+### 2. Review/QA Fan-Out
+
+`project-manager` dispatches all required validators after the implementation
+handoff:
+
+- `qa-engineer` validates the E2E/acceptance plan and operator-visible behavior
+- `code-reviewer` reviews architecture, maintainability, tests, and regressions
+- `security-reviewer` reviews security, privacy, secrets, dependency, and deploy leakage risk
+- `design-specialist` reviews UI/design compliance when applicable
+
+Each validator returns `APPROVE` or `REQUEST_CHANGES` in its handoff sidecar.
+Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing
+evidence, or stale report sends the task back to implementation. The rework loop
+continues until every required validator approves the same implementation commit
+or the operator explicitly stops the release.
+
+### 3. Done Gate
+
+Only after all required validators approve may the orchestrator or task owner:
+
+- mark the task `[x]`
+- push implementation commits
+- open or update a PR for merge
+- merge, deploy, or close the release
+- write release `CLOSURE.md` or memory updates
+
+Before this gate, those actions are forbidden. A local commit is acceptable as
+workspace evidence, but it is not release completion and must not be represented
+as approved work.
+
 ## Decision Authority
 
 | Domain | Primary authority | May object with evidence | Tie-breaker |
@@ -139,6 +197,7 @@ Stop and surface to the operator when:
 | Dispatchers editing outside `.dadaia/reports/` | They are reports-only roles. |
 | Recursive agent chains without operator approval | Breaks traceability. |
 | Marking tasks DONE without validation evidence | Skips acceptance. |
+| Push, PR, merge, deploy, release closure, or `[x]` before QA/code/security approval | Bypasses the quality gate. |
 | Editing `specs/` outside product-engineer authority | Breaks SDD ownership. |
 | Editing production files without a `[-]` task reservation | Breaks task locking. |
 | Shipping private/project-specific details in public assets | Security and portability risk. |

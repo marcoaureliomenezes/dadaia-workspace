@@ -133,9 +133,13 @@ The 6 stages map to the SDD hotfix flow (v0.2.0: PM + PE separation):
    new hotfix release using the promote report as input.
 4. **apply_fix** — the chosen implementer reserves a task in
    `specs/releases/<version_id>/TASKS.md` (marker `[-]`), applies the minimum
-   change, runs the local smoke test, commits, marks `[x]`.
-5. **close_with_smoke** — `qa-engineer` validates with a post-deploy smoke
-   evidence-triple (description, command, evidence). Gated by operator-approval.
+   change, runs unit/integration/local smoke checks, commits locally, and emits
+   an implementation-complete handoff. The task remains `[-]`.
+5. **close_with_smoke** — `qa-engineer`, `code-reviewer`, and `security-reviewer`
+   validate the same commit. QA provides the smoke evidence-triple
+   (description, command, evidence). Only after all required reviewers approve
+   may the task be marked `[x]`, pushed, PR'd, merged, deployed, or closed.
+   Gated by operator-approval.
 6. **closure_write** — `product-engineer` writes `CLOSURE.md`. After approval:
    `git mv` to `specs/_archive/releases/` and reset `ACTIVE.md`.
 

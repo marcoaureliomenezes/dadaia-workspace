@@ -197,6 +197,20 @@ silently).
 has no workflow file — that is normal, not an error. Stop and escalate only if a required
 agent is absent from the workspace.
 
+### Step 4.5 — Enforce implementation-review-QA gates
+
+Before TASKS approval, verify each implementation task has documented agreement from the
+owning implementer(s), `qa-engineer`, `code-reviewer`, `security-reviewer`, and
+`design-specialist` for UI work. The task must include implementation scope, write set,
+unit/integration test plan, E2E or validation plan, review criteria, and security/privacy
+checks.
+
+After implementation, treat the implementer output as `implementation-complete` only.
+Dispatch QA, code review, security review, and design review when applicable. Do not let
+any agent mark `[x]`, push, open PR, merge, deploy, close the release, or write CLOSURE
+until every required validator returns `APPROVE` for the same commit. Any
+`REQUEST_CHANGES` routes back to the implementer and keeps the task `[-]`.
+
 ### Step 5 — Dispatch agents
 
 For each stage in the workflow, invoke the correct agent with the required input
