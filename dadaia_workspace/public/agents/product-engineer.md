@@ -469,7 +469,7 @@ PE does not run shell commands. The following CLI commands are run by project-ma
 | Command | Purpose | Who runs it |
 |---------|---------|-------------|
 | `dadaia context show --json` | Active context + specs_dir | PM (includes in briefing) |
-| `dadaia context activate <name>` | Set primary context | PM or operator |
+| `eval $(dadaia context bind <name> --mode read)` | Bind context into shell env | PM or operator |
 | `dadaia doctor` | Workspace health check | PM or operator |
 | `dadaia specs doctor` | SDD-specific health check | PM (surfaces output to PE) |
 | `dadaia public stage` | Stage canonical assets | devops-engineer |

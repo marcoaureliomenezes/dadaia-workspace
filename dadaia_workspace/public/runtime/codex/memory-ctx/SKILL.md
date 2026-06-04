@@ -41,14 +41,15 @@ role-specific adapter and before any implementation work.
 Resolve in priority order:
 
 1. Environment variable `DADAIA_CONTEXT` is set: use `repos/<DADAIA_CONTEXT>/specs/`.
-2. Otherwise: read `.dadaia/states/primary_context.json` and extract `specs_dir`.
+2. Otherwise: read `.dadaia/states/spec_contexts.json`, find the first entry with `state: alive`,
+   and derive `repos/<slug>/specs/`.
 
-If neither resolves, stop and ask the operator to run `dadaia context activate <name>`.
+If neither resolves, stop and ask the operator to run `eval $(dadaia context bind <name> --mode read)`.
 
 ```
 DADAIA_CONTEXT env var → repos/<slug>/specs/
 OR
-Read: .dadaia/states/primary_context.json → extract: specs_dir
+Read: .dadaia/states/spec_contexts.json → find first alive entry → derive: repos/<slug>/specs/
 ```
 
 ### Step 2 — Read `tech-stack.md`

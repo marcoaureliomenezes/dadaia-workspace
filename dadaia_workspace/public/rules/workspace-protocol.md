@@ -17,9 +17,9 @@ Before editing any production file:
 ## 2. Context discovery
 Resolve specs_dir in priority order:
 1. `DADAIA_CONTEXT` env var → `repos/<slug>/specs/`
-2. `.dadaia/states/primary_context.json` field `specs_dir`
+2. `.dadaia/states/spec_contexts.json` — find the first ALIVE entry and derive `repos/<slug>/specs/`
 3. `dadaia context show --json`
-If none resolves: stop and ask operator to run `dadaia context activate <name>`.
+If none resolves: stop and ask operator to run `eval $(dadaia context bind <name> --mode read)`.
 
 ## 3. Task lifecycle
 1. Read ACTIVE.md → confirm release + phase.

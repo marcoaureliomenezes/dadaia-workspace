@@ -32,13 +32,14 @@ beginning any design work.
 
 ### Step 1 — Resolve workspace context
 
-Read `.dadaia/states/primary_context.json` and extract:
-- `slug` — the active context name.
-- `specs_dir` — the path to the specs directory (e.g. `specs/` or `repos/<slug>/specs/`).
+Read `.dadaia/states/spec_contexts.json` and find the first entry with `state: alive`:
+- `slug` — the active context name (`repo_slug` field).
+- `specs_dir` — derived as `repos/<slug>/specs/` from the alive entry.
 
 ```
-Read: .dadaia/states/primary_context.json
-Extract: slug, specs_dir
+Read: .dadaia/states/spec_contexts.json
+Find: first entry where state == "alive"
+Derive: slug = entry.repo_slug, specs_dir = repos/<slug>/specs/
 ```
 
 ### Step 2 — Find the latest design report

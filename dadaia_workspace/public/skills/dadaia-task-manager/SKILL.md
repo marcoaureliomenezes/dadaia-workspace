@@ -100,10 +100,10 @@ depois.
 Significa que:
 - (a) você não tem nenhuma task `[-]` no `TASKS.md` relevante e está
   tentando editar produção, ou
-- (b) a resolução de `primary_context.json` falhou.
+- (b) a resolução do contexto ativo falhou (env var `DADAIA_CONTEXT` ausente e nenhum context `alive` em `spec_contexts.json`).
 
-Em (a): volte ao Passo 1–2. Em (b): rode `dadaia context show` para verificar
-o context primário; se inativo, ative ou peça ao operador.
+Em (a): volte ao Passo 1–2. Em (b): rode `dadaia context show --json` para verificar
+o context ativo; se ausente, execute `eval $(dadaia context bind <name> --mode read)` ou peça ao operador.
 
 ## Onde TASKS.md vive
 

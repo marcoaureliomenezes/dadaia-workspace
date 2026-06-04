@@ -41,7 +41,7 @@ URL guard).
 
 ### T-HARD-01 — Fix sdd-spec-gate.sh context-resolution chain
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Target files:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`
 - **Preconditions:** T-HARD-00 done
@@ -61,7 +61,7 @@ pass after the change.
 
 ### T-HARD-02 — Purge dadaia context activate and primary_context.json refs
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Target files:**
   - `dadaia_workspace/public/skills/dadaia-workspace-spec-navigator.md`

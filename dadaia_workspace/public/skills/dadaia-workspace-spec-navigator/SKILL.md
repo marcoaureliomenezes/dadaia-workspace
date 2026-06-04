@@ -1,6 +1,6 @@
 ---
 name: dadaia-workspace-spec-navigator
-description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via specs/releases/ACTIVE.md and reads memory Markdown + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via primary_context.json or `dadaia context show --json`."
+description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via specs/releases/ACTIVE.md and reads memory Markdown + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via spec_contexts.json (v2 registry) or `dadaia context show --json`."
 ---
 
 # dadaia-workspace-spec-navigator
@@ -18,10 +18,10 @@ canonical order for the current task.
    - Otherwise, resolve in priority order:
      - **a) `DADAIA_CONTEXT` env var** — if set, use
        `<workspace-root>/repos/<DADAIA_CONTEXT>/specs/`.
-     - **b) `primary_context.json`** — read `.dadaia/states/primary_context.json` and
-       parse `specs_dir`. Fallback: `dadaia context show --json`.
-   - If neither resolves: stop and tell the operator to activate a context first
-     (`dadaia context activate <name>`).
+     - **b) `spec_contexts.json`** — read `.dadaia/states/spec_contexts.json`, find the first
+       entry with `state: alive`, and derive `repos/<slug>/specs/`. Fallback: `dadaia context show --json`.
+   - If neither resolves: stop and tell the operator to bind a context first
+     (`eval $(dadaia context bind <name> --mode read)`).
 
 2. **Read constitution and atomic memory (Markdown).**
    - `<specs-dir>/constitution.md`

@@ -17,11 +17,11 @@ NEVER do these things for workspace management — they corrupt state:
 | What you might reach for | Use this instead |
 |---|---|
 | Edit `.dadaia/states/spec_contexts.json` directly | `dadaia context` subcommands |
-| Edit `primary_context.json` directly | `dadaia context promote <name>` |
-| `git clone <url> repos/<slug>/` | `dadaia context activate <name>` |
+| Manually edit `spec_contexts.json` to set a primary | `dadaia context promote <name>` |
+| `git clone <url> repos/<slug>/` | `dadaia context alive <name>` |
 | `tar xzf <archive>` to import a workspace | `dadaia import <archive>` |
-| `rm -rf repos/<slug>/` | `dadaia context deactivate <name>` |
-| `git checkout <branch>` inside `repos/<slug>/` | `dadaia context activate <name>` — it reads `current_branch` and checks out automatically |
+| `rm -rf repos/<slug>/` | `dadaia context dead <name>` |
+| `git checkout <branch>` inside `repos/<slug>/` | `dadaia context alive <name>` — it reads `current_branch` and checks out automatically |
 
 ## Core Concepts
 
@@ -38,7 +38,7 @@ NEVER do these things for workspace management — they corrupt state:
 | `is_primary` | Marks the context whose `specs/` guides AI agents |
 | `current_branch` | Branch stored at deactivate, checked out on next activate |
 
-**primary_context.json** — written by `dadaia context promote`; read by spec-navigator skills to locate the active project's specs.
+**Active context** — the context with `is_primary: true` in `spec_contexts.json`, set by `dadaia context promote`; read by spec-navigator skills to locate the active project's specs.
 
 **Repos on disk** — `repos/<slug>/` exists only when a context is `ativo`. Deactivating git-syncs and removes it. Re-activating clones it back on the correct branch.
 
@@ -67,9 +67,9 @@ dadaia context show                          # show primary context details
 dadaia context show <name>                   # show specific context
 dadaia context show --json                   # JSON (includes current_branch, repo_url)
 dadaia context create <name> --repo <slug>   # register new context (state: inativo)
-dadaia context activate <name>               # clone repo, checkout stored branch, auto-promote if first
-dadaia context deactivate <name>             # git sync + push + remove repo; stores current_branch
-dadaia context promote <name>                # set is_primary=true, write primary_context.json
+dadaia context alive <name>                  # clone repo, checkout stored branch; transition to ALIVE
+dadaia context dead <name>                   # git sync + push + remove repo; transition to DEAD
+dadaia context promote <name>                # set is_primary=true in spec_contexts.json
 dadaia context delete <name>                 # delete context record (must be inativo first)
 eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode read)   # bind context; exports DADAIA_CONTEXT into launching shell
 ```
@@ -115,7 +115,7 @@ dadaia import ~/workspace-<ts>.tar.gz --skip-mnt
 4. Resets all contexts to `inativo` / `is_primary=false` (repos not cloned yet)
 5. Preserves `current_branch` on each context (used in step 6)
 6. Runs `dadaia init` — creates `.venv`, deploys agent assets
-7. For each context that was `ativo` in the manifest: `dadaia context activate <name>` (clones + checks out stored branch)
+7. For each context that was `ativo` in the manifest: `dadaia context alive <name>` (clones + checks out stored branch)
 8. Promotes the primary context: `dadaia context promote <name>`
 9. Reports restored contexts, any errors, and next steps (add secrets, run `dadaia doctor`)
 
@@ -130,17 +130,17 @@ dadaia doctor          # should report "All invariants OK"
 ```
 create (inativo)
   └─ activate → ativo (repo cloned at repos/<slug>/, branch checked out)
-       ├─ promote → is_primary=true (primary_context.json written)
+       ├─ promote → is_primary=true (spec_contexts.json updated)
        └─ deactivate → inativo (git sync + push + rmtree, current_branch stored)
             └─ delete → context record removed
 ```
 
 **Switch primary context** (correct procedure):
 ```bash
-dadaia context activate <other-name>   # clone if needed
-dadaia context promote <other-name>    # writes new primary_context.json
+dadaia context alive <other-name>      # clone if needed
+dadaia context promote <other-name>    # updates is_primary in spec_contexts.json
 ```
-Never run `dadaia context deactivate` during a switch — it removes the repo from disk.
+Never run `dadaia context dead` during a switch — it removes the repo from disk.
 
 ## Doctor Invariants
 
@@ -150,7 +150,7 @@ Never run `dadaia context deactivate` during a switch — it removes the repo fr
 |---|---|---|
 | INV-1 | At most one context has `is_primary=true` | Yes |
 | INV-2 | `is_primary=true` only on `ativo` context | Yes |
-| INV-3 | `primary_context.json` matches the `is_primary` context | Yes |
-| INV-4 | `ativo` context has repo on disk at `repos/<slug>/` | No (run `dadaia context activate`) |
+| INV-3 | `is_primary` entry in `spec_contexts.json` matches the active context | Yes |
+| INV-4 | `ativo` context has repo on disk at `repos/<slug>/` | No (run `dadaia context alive <name>`) |
 | INV-5 | `inativo` context does NOT have repo on disk | Yes |
-| INV-6 | `primary_context.json` present but no `is_primary` context | Yes |
+| INV-6 | `is_primary=true` flag set but context is not `ativo` | Yes |
