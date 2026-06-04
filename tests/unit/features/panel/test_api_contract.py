@@ -223,6 +223,132 @@ def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
     assert data["reports"][0]["findings_summary"]["HIGH"] == 1
 
 
+def test_api_reports_lists_html_report_without_handoff(tmp_path: Path) -> None:
+    report_path = (
+        tmp_path
+        / ".dadaia"
+        / "reports"
+        / "ctx"
+        / "project-auditor"
+        / "2026-06-04T153239Z-workflow-audit.html"
+    )
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>audit</html>", encoding="utf-8")
+
+    service = _build_service(workspace_root=tmp_path)
+    status, _, body = render_api_reports(service)()
+
+    assert status == 200
+    data = json.loads(body)
+    assert data["reports"] == [
+        {
+            "title": "2026-06-04T153239Z-workflow-audit",
+            "agent": "project-auditor",
+            "context": "ctx",
+            "created_at": "2026-06-04T15:32:39Z",
+            "path": "ctx/project-auditor/2026-06-04T153239Z-workflow-audit.html",
+            "findings_summary": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+        }
+    ]
+
+
+def test_api_reports_enriches_html_report_from_legacy_adjacent_handoff(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>qa</html>", encoding="utf-8")
+    handoff_path = report_path.with_suffix(".handoff.json")
+    handoff_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "handoff-v1.1",
+                "agent": "qa-engineer",
+                "context": "ctx",
+                "produced_at": "2026-06-04T02:00:00Z",
+                "artifact": {
+                    "type": "report",
+                    "path": ".dadaia/reports/ctx/qa-engineer/qa.html",
+                },
+                "findings": [
+                    {"severity": "CRITICAL", "message": "critical issue"},
+                    {"severity": "LOW", "message": "minor issue"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    service = _build_service(workspace_root=tmp_path)
+    _, _, body = render_api_reports(service)()
+
+    data = json.loads(body)
+    assert len(data["reports"]) == 1
+    assert data["reports"][0]["path"] == "ctx/qa-engineer/qa.html"
+    assert data["reports"][0]["created_at"] == "2026-06-04T02:00:00Z"
+    assert data["reports"][0]["findings_summary"]["CRITICAL"] == 1
+    assert data["reports"][0]["findings_summary"]["LOW"] == 1
+
+
+def test_api_reports_skips_self_referential_and_source_file_handoffs(
+    tmp_path: Path,
+) -> None:
+    handoff_root = tmp_path / ".dadaia" / "handoff" / "ctx"
+    handoff_root.mkdir(parents=True)
+    (handoff_root / "self.handoff.json").write_text(
+        json.dumps(
+            {
+                "agent": "qa-engineer",
+                "context": "ctx",
+                "artifact": {"path": ".dadaia/reports/ctx/qa-engineer/self.handoff.json"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (handoff_root / "source.handoff.json").write_text(
+        json.dumps(
+            {
+                "agent": "security-reviewer",
+                "context": "ctx",
+                "artifact": {"path": "dadaia_workspace/public/scripts/sdd-spec-gate.sh"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    service = _build_service(workspace_root=tmp_path)
+    _, _, body = render_api_reports(service)()
+
+    assert json.loads(body)["reports"] == []
+
+
+def test_api_reports_deduplicates_canonical_and_legacy_handoffs(tmp_path: Path) -> None:
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>qa</html>", encoding="utf-8")
+    handoff_payload = {
+        "agent": "qa-engineer",
+        "context": "ctx",
+        "produced_at": "2026-06-04T03:00:00Z",
+        "artifact": {"path": ".dadaia/reports/ctx/qa-engineer/qa.html"},
+        "findings": [{"severity": "HIGH", "message": "issue"}],
+    }
+    legacy_handoff = report_path.with_suffix(".handoff.json")
+    legacy_handoff.write_text(json.dumps(handoff_payload), encoding="utf-8")
+    canonical_handoff = tmp_path / ".dadaia" / "handoff" / "ctx" / "qa.handoff.json"
+    canonical_handoff.parent.mkdir(parents=True)
+    canonical_handoff.write_text(json.dumps(handoff_payload), encoding="utf-8")
+
+    service = _build_service(workspace_root=tmp_path)
+    _, _, body = render_api_reports(service)()
+
+    data = json.loads(body)
+    assert len(data["reports"]) == 1
+    assert data["reports"][0]["title"] == "qa"
+    assert data["reports"][0]["path"] == "ctx/qa-engineer/qa.html"
+    assert data["reports"][0]["findings_summary"]["HIGH"] == 1
+
+
 def test_delete_report_removes_handoff_from_canonical_root(tmp_path: Path) -> None:
     report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
     report_path.parent.mkdir(parents=True)
@@ -237,6 +363,24 @@ def test_delete_report_removes_handoff_from_canonical_root(tmp_path: Path) -> No
                 }
             }
         ),
+        encoding="utf-8",
+    )
+
+    service = _build_service(workspace_root=tmp_path)
+    status, _, _ = delete_report_file(service)(path="ctx/qa-engineer/qa.html")
+
+    assert status == 200
+    assert not report_path.exists()
+    assert not handoff_path.exists()
+
+
+def test_delete_report_removes_legacy_adjacent_handoff(tmp_path: Path) -> None:
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text("<html>qa</html>", encoding="utf-8")
+    handoff_path = report_path.with_suffix(".handoff.json")
+    handoff_path.write_text(
+        json.dumps({"artifact": {"path": ".dadaia/reports/ctx/qa-engineer/qa.html"}}),
         encoding="utf-8",
     )
 
