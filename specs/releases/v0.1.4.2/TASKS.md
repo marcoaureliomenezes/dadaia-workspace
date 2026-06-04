@@ -25,7 +25,7 @@ all implementation tasks → T-BUG-09 → T-BUG-10
 
 ### T-BUG-01 — Define allowed legacy primary-context exceptions
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-architect
 - **Target files:** `dadaia_workspace/**`, `tests/**`
 - **Preconditions:** none
