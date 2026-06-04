@@ -836,49 +836,103 @@ def render_api_academy(
 def render_api_reports(
     service: PanelService,
 ) -> Callable[..., tuple[int, str, bytes]]:
-    """Return ``GET /api/reports`` view — list all report sidecars.
+    """Return ``GET /api/reports`` view — list human-readable HTML reports.
 
-    Traverses ``<workspace_root>/.dadaia/handoff/`` for ``*.handoff.json``
-    files, parses each, and returns a JSON list sorted by ``produced_at``
-    descending. Malformed handoffs are skipped with a WARNING log.
+    Reports are discovered from rendered artifacts under
+    ``<workspace_root>/.dadaia/reports/`` and enriched from canonical handoffs in
+    ``.dadaia/handoff/`` plus legacy adjacent handoffs in ``.dadaia/reports/``.
+    Malformed handoffs are skipped with a WARNING log.
 
     Response shape: {"reports": [{title, agent, context, created_at, path, findings_summary}]}
     findings_summary: {"CRITICAL": N, "HIGH": N, "MEDIUM": N, "LOW": N}
     """
     _log = logging.getLogger(__name__)
 
-    def _severity_counts(findings: list[dict]) -> dict[str, int]:  # type: ignore[type-arg]
+    def _severity_counts(findings: object) -> dict[str, int]:
         counts: dict[str, int] = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        if not isinstance(findings, list):
+            return counts
         for f in findings:
+            if not isinstance(f, dict):
+                continue
             sev = f.get("severity", "").upper()
             if sev in counts:
                 counts[sev] += 1
         return counts
 
+    def _created_at_from_file(path: Path) -> str:
+        match = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)", path.name)
+        if match:
+            raw = match.group(1)
+            return f"{raw[:13]}:{raw[13:15]}:{raw[15:]}"
+        return (
+            datetime.datetime.fromtimestamp(path.stat().st_mtime, tz=datetime.UTC)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+
+    def _empty_counts() -> dict[str, int]:
+        return {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+
+    def _row_from_report(report: Path, reports_root: Path) -> dict[str, object]:
+        route_path = report.relative_to(reports_root).as_posix()
+        parts = Path(route_path).parts
+        return {
+            "title": report.stem,
+            "agent": parts[1] if len(parts) > 1 else "",
+            "context": parts[0] if parts else "",
+            "created_at": _created_at_from_file(report),
+            "path": route_path,
+            "findings_summary": _empty_counts(),
+        }
+
+    def _iter_handoffs(reports_root: Path) -> list[Path]:
+        handoffs: list[Path] = []
+        for root in (service._workspace_root / ".dadaia" / "handoff", reports_root):
+            if root.exists():
+                handoffs.extend(root.rglob("*.handoff.json"))
+        return handoffs
+
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
-        handoff_root = service._workspace_root / ".dadaia" / "handoff"
-        results: list[dict] = []  # type: ignore[type-arg]
-        if handoff_root.exists():
-            for handoff in handoff_root.rglob("*.handoff.json"):
+        reports_root = (service._workspace_root / ".dadaia" / "reports").resolve()
+        results_by_path: dict[str, dict[str, object]] = {}
+        if reports_root.exists():
+            for report in reports_root.rglob("*.html"):
+                if report.is_file():
+                    row = _row_from_report(report, reports_root)
+                    results_by_path[str(row["path"])] = row
+
+            for handoff in _iter_handoffs(reports_root):
                 try:
                     data = json.loads(handoff.read_text(encoding="utf-8"))
                     artifact = data.get("artifact", {})
-                    artifact_path = artifact.get("path", "")
-                    report_path = _report_route_path(str(artifact_path))
-                    title = Path(artifact_path).stem if artifact_path else handoff.stem
-                    results.append(
-                        {
-                            "title": title,
-                            "agent": data.get("agent", ""),
-                            "context": data.get("context", ""),
-                            "created_at": data.get("produced_at", ""),
-                            "path": report_path,
-                            "findings_summary": _severity_counts(data.get("findings", [])),
-                        }
+                    if not isinstance(artifact, dict):
+                        continue
+                    artifact_path = str(artifact.get("path", ""))
+                    if not artifact_path.startswith(".dadaia/reports/"):
+                        continue
+                    report_path = _report_route_path(artifact_path)
+                    report_file = (reports_root / report_path).resolve()
+                    try:
+                        report_file.relative_to(reports_root)
+                    except ValueError:
+                        continue
+                    if not report_file.is_file() or report_file.suffix.lower() != ".html":
+                        continue
+                    row = results_by_path.setdefault(
+                        report_path,
+                        _row_from_report(report_file, reports_root),
                     )
+                    row["agent"] = data.get("agent") or row["agent"]
+                    row["context"] = data.get("context") or row["context"]
+                    row["created_at"] = data.get("produced_at") or row["created_at"]
+                    row["findings_summary"] = _severity_counts(data.get("findings", []))
                 except Exception as exc:  # noqa: BLE001
                     _log.warning("Skipping malformed handoff %s: %s", handoff, exc)
-        results.sort(key=lambda r: r["created_at"], reverse=True)
+
+        results = list(results_by_path.values())
+        results.sort(key=lambda r: str(r["created_at"]), reverse=True)
         body = json.dumps({"reports": results}).encode("utf-8")
         return (200, "application/json; charset=utf-8", body)
 
@@ -930,8 +984,9 @@ def delete_report_file(
     Returns 403 if outside boundary, 404 if not found, 200 on success.
 
     Security (OWASP A01, A03): same boundary check as serve_report_file.
-    Deletes handoff JSON files under .dadaia/handoff/ whose artifact.path points
-    at the target report.
+    Deletes handoff JSON files under .dadaia/handoff/ and legacy adjacent
+    handoffs under .dadaia/reports/ whose artifact.path points at the target
+    report.
     """
 
     def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
@@ -945,8 +1000,12 @@ def delete_report_file(
             return (404, "application/json; charset=utf-8", b'{"error": "not found"}')
         target.unlink()
         target_ref = target.relative_to(service._workspace_root).as_posix()
-        handoff_root = service._workspace_root / ".dadaia" / "handoff"
-        if handoff_root.exists():
+        for handoff_root in (
+            service._workspace_root / ".dadaia" / "handoff",
+            service._workspace_root / ".dadaia" / "reports",
+        ):
+            if not handoff_root.exists():
+                continue
             for handoff in handoff_root.rglob("*.handoff.json"):
                 try:
                     data = json.loads(handoff.read_text(encoding="utf-8"))

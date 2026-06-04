@@ -20,17 +20,24 @@ T-RET-01 -> T-RET-02 -> T-RET-03 -> T-RET-04 -> T-RET-05 -> T-RET-06
 
 ## Tasks
 
-### T-BUG-REPORTS-01 - Fix Reports tab report path encoding
+### T-BUG-REPORTS-01 - Fix Reports tab report routing and indexing
 
 - **Status:** [-]
 - **Owner:** software-engineer-python + frontend-engineer
 - **Reviewers before approval:** qa-engineer, code-reviewer
-- **Target files:** `dadaia_workspace/features/panel/views/assets/js/reports.js`, focused panel reports tests
+- **Target files:** `dadaia_workspace/features/panel/views/api.py`, `dadaia_workspace/features/panel/views/assets/js/reports.js`, focused panel reports tests
 
-Fix the Reports tab click/delete URL construction so report paths containing
-slashes are served correctly. The current bug encodes `/` as `%2F`, causing
-`GET /reports/<path>` from the real panel button flow to return HTTP 404 even
-when the direct slash-preserving URL returns HTTP 200.
+Fix the Reports tab click/delete URL construction and report listing contract.
+The current browser bug encodes `/` as `%2F`, causing `GET /reports/<path>` from
+the real panel button flow to return HTTP 404 even when the direct
+slash-preserving URL returns HTTP 200.
+
+Also fold `BUG-PANEL-REPORTS-01` into this release: `/api/reports` must discover
+real HTML reports under `.dadaia/reports/**`, enrich them from canonical
+`.dadaia/handoff/**` and legacy adjacent `.dadaia/reports/**/*.handoff.json`
+sidecars, skip self-referential/source-file handoffs, deduplicate to one row per
+HTML report, and delete matching canonical plus legacy handoffs when the user
+manually deletes a report.
 
 ### T-RET-01 - Implement report retention domain service
 

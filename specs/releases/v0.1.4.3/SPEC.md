@@ -212,9 +212,19 @@ repo working tree.
 
 ## 7. Hotfix Scope
 
-This release also includes an immediate Reports tab bug fix:
+This release also includes immediate Reports tab bug fixes:
 
 - The Reports tab must open report paths containing `/` from `/api/reports`.
 - The browser must not encode path separators into `%2F` for `/reports/<path>`
   or `/api/reports/<path>` routes.
-- The fix is limited to report open/delete URL construction and focused tests.
+- `/api/reports` must list rendered HTML report artifacts from
+  `.dadaia/reports/**` even when a report has no handoff sidecar.
+- `/api/reports` must enrich those report rows from both canonical handoffs in
+  `.dadaia/handoff/**` and legacy adjacent handoffs in `.dadaia/reports/**`.
+- `/api/reports` must never emit a row whose target is a `.handoff.json` file or
+  a source file outside `.dadaia/reports/`.
+- `/api/reports` must deduplicate to one row per human-readable HTML report.
+- Manual delete must remove the HTML report plus matching canonical and legacy
+  handoff sidecars.
+- The fix is limited to Reports tab URL construction, Reports API indexing and
+  deletion behavior, and focused tests.
