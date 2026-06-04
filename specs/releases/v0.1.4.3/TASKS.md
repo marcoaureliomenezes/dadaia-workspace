@@ -50,7 +50,7 @@ resolve workspace-relative artifact paths correctly for hash checks.
 
 ### T-HANDOFF-04 - Verify handoff contract end to end
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** qa-engineer + code-reviewer + security-reviewer
 - **Target files:** `tests/**`, `.github/workflows/ci.yml` if needed
 
