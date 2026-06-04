@@ -125,8 +125,7 @@ _RAW_ROUTES: list[tuple[str, str]] = [
     (r"^/health$", "health"),
     (r"^/api/academy$", "api_academy"),
     # /api/reports/<path> must come before /api/reports$ (more specific first).
-    (r"^/api/reports-important/(?P<path>.+)$", "api_report_mark_important"),
-    (r"^/api/reports-unimportant/(?P<path>.+)$", "api_report_unmark_important"),
+    (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important"),
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete"),
     (r"^/api/reports$", "api_reports"),
     (r"^/api/contexts$", "api_contexts"),
@@ -402,6 +401,15 @@ def make_handler_class(
                     if _token is None or not _validate_bearer(auth_header, _token):
                         self._respond(401, "application/json", _UNAUTHORIZED_BODY)
                         return
+                    if route_name == "api_report_mark_important":
+                        if "api_report_unmark_important" in views:
+                            status, content_type, body = views["api_report_unmark_important"](
+                                path=m.groupdict().get("path", "")
+                            )
+                            self._respond(status, content_type, body)
+                        else:
+                            self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+                        return
                     self._dispatch_telemetry(route_name, m.groupdict(), {})
                     return
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
@@ -423,7 +431,6 @@ def make_handler_class(
                 m_api = pattern.match(path)
                 if m_api is None or route_name not in {
                     "api_report_mark_important",
-                    "api_report_unmark_important",
                 }:
                     continue
                 auth_header = self.headers.get("Authorization")

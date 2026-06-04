@@ -26,5 +26,6 @@ def test_reports_js_preserves_path_separators_when_encoding_report_paths() -> No
     assert ".join('/')" in source
     assert "fetch('/reports/' + encodeReportPath(report.path))" in source
     assert "authedFetch('/api/reports/' + encodeReportPath(report.path)" in source
+    assert "+ '/important'" in source
     assert "fetch('/reports/' + encodeURIComponent(report.path))" not in source
     assert "authedFetch('/api/reports/' + encodeURIComponent(report.path)" not in source

@@ -5,8 +5,8 @@
 // API contracts:
 //   GET  /api/reports        → { reports: [ { title, agent, context, created_at, path, findings_summary } ] }
 //   DELETE /api/reports/<path> → { deleted: true }   (bearer-only)
-//   POST /api/reports-important/<path> → { important: true }
-//   POST /api/reports-unimportant/<path> → { important: false }
+//   POST /api/reports/<path>/important → { important: true }
+//   DELETE /api/reports/<path>/important → { important: false }
 //   GET  /reports/<path>     → HTML report content    (public route)
 //
 // Module lifecycle:
@@ -63,6 +63,11 @@
     if (report.important) { return 'Marked important'; }
     if (!report.expires_at) { return ''; }
     return 'Expires ' + fmtDate(report.expires_at);
+  }
+
+  function importantLabel(report) {
+    var title = report.title || report.path || 'report';
+    return (report.important ? 'Unmark important: ' : 'Mark important: ') + title;
   }
 
   // ── Group reports by context ──────────────────────────────────────────────────
@@ -210,8 +215,8 @@
     if (!btn) { return; }
     btn.addEventListener('click', function () {
       btn.disabled = true;
-      var route = report.important ? '/api/reports-unimportant/' : '/api/reports-important/';
-      window.authedFetch(route + encodeReportPath(report.path), { method: 'POST' })
+      var method = report.important ? 'DELETE' : 'POST';
+      window.authedFetch('/api/reports/' + encodeReportPath(report.path) + '/important', { method: method })
         .then(function (r) {
           if (!r.ok) { throw new Error('HTTP ' + r.status); }
           return r.json();
@@ -222,9 +227,15 @@
           if (meta) { meta.textContent = retentionLabel(report); }
           btn.textContent = report.important ? 'Unmark important' : 'Important';
           btn.setAttribute('aria-pressed', report.important ? 'true' : 'false');
+          btn.setAttribute('aria-label', importantLabel(report));
           btn.disabled = false;
         })
-        .catch(function () {
+        .catch(function (err) {
+          var meta = li.querySelector('.reports-row__retention');
+          if (meta) {
+            meta.textContent = 'Important update failed: '
+              + (err && err.message ? err.message : String(err));
+          }
           btn.disabled = false;
         });
     });
@@ -250,8 +261,8 @@
       + '</button>'
       + '<span class="reports-row__date">' + escHtml(dateStr) + '</span>'
       + '<span class="reports-row__retention">' + escHtml(retentionLabel(report)) + '</span>'
-      + '<button class="reports-row__important" type="button" aria-pressed="'
-      + (report.important ? 'true' : 'false') + '">'
+      + '<button class="reports-row__important" type="button" aria-label="'
+      + escHtml(importantLabel(report)) + '" aria-pressed="' + (report.important ? 'true' : 'false') + '">'
       + (report.important ? 'Unmark important' : 'Important')
       + '</button>'
       + '<button class="reports-row__trash" type="button"'
