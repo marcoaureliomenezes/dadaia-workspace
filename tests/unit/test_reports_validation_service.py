@@ -19,6 +19,10 @@ from tests.fakes import FakeHandoffValidator
 
 def _write_valid_handoff(path: Path, artifact_path_rel: str = "report.html") -> dict[str, object]:
     """Write a syntactically well-formed handoff JSON to ``path``."""
+    artifact_path = path.parent / artifact_path_rel
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_bytes(b"<html>report</html>")
+    content_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
     doc: dict[str, object] = {
         "schema_version": "handoff-v1",
         "agent": "software-engineer",
@@ -27,7 +31,7 @@ def _write_valid_handoff(path: Path, artifact_path_rel: str = "report.html") -> 
         "artifact": {
             "type": "report",
             "path": artifact_path_rel,
-            "content_hash": "a" * 64,
+            "content_hash": content_hash,
         },
     }
     path.write_text(json.dumps(doc), encoding="utf-8")
@@ -49,6 +53,7 @@ def test_validate_file_happy_path(tmp_path: Path):
 
     assert result.valid is True
     assert result.errors == ()
+    assert result.hash_status == "match"
     assert len(fake.calls) == 1
 
 
@@ -255,3 +260,58 @@ def test_check_hash_resolves_workspace_relative_report_artifact(tmp_path: Path):
     handoff_path.write_text(json.dumps(doc), encoding="utf-8")
 
     assert service.check_hash(handoff_path) == "match"
+
+
+def test_check_hash_rejects_artifact_path_outside_workspace(tmp_path: Path):
+    fake = FakeHandoffValidator(canned_errors=[])
+    handoff_root = tmp_path / ".dadaia" / "handoff"
+    handoff_root.mkdir(parents=True)
+    service = ReportsValidationService(validator=fake, reports_root=handoff_root)
+
+    outside = tmp_path.parent / "outside-report.html"
+    outside.write_bytes(b"outside")
+    try:
+        handoff_path = handoff_root / "ctx" / "2026-06-04T000000Z-qa-report.handoff.json"
+        handoff_path.parent.mkdir()
+        doc: dict[str, object] = {
+            "schema_version": "handoff-v1",
+            "agent": "qa-engineer",
+            "context": "ctx",
+            "produced_at": "2026-06-04T00:00:00Z",
+            "artifact": {
+                "type": "report",
+                "path": str(outside),
+                "content_hash": hashlib.sha256(outside.read_bytes()).hexdigest(),
+            },
+        }
+        handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+
+        assert service.check_hash(handoff_path) == "missing_artifact"
+    finally:
+        outside.unlink(missing_ok=True)
+
+
+def test_validate_file_marks_hash_mismatch_invalid(tmp_path: Path):
+    fake = FakeHandoffValidator(canned_errors=[])
+    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
+    artifact = tmp_path / "report.html"
+    artifact.write_bytes(b"<html>changed</html>")
+    handoff_path = tmp_path / "report.handoff.json"
+    doc: dict[str, object] = {
+        "schema_version": "handoff-v1",
+        "agent": "software-engineer",
+        "context": "dadaia-workspace",
+        "produced_at": "2026-05-16T23:29:05Z",
+        "artifact": {
+            "type": "report",
+            "path": "report.html",
+            "content_hash": "b" * 64,
+        },
+    }
+    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+
+    result = service.validate_file(handoff_path)
+
+    assert result.valid is False
+    assert result.hash_status == "mismatch"
+    assert any("artifact hash check failed" in error.message for error in result.errors)

@@ -222,7 +222,7 @@ def build_reports_next_service(
         NoActiveReleaseError: No explicit context and no primary context is set.
     """
     _guard_initialized(workspace_root)
-    reports_root = workspace_root / ".dadaia" / "reports"
+    reports_root = workspace_root / ".dadaia" / "handoff"
     context_name = resolve_bound_context_name(context)
     if not context_name:
         raise NoActiveReleaseError(

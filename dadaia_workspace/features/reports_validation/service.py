@@ -95,10 +95,21 @@ class ReportsValidationService:
             return ValidationResult(path=path, valid=False, errors=(malformed_error,))
 
         errors = list(self._validator.validate(doc))
+        hash_status = None
+        if not errors:
+            hash_status = self.check_hash(path)
+            if hash_status != "match":
+                errors.append(
+                    HandoffValidationError(
+                        "artifact.content_hash",
+                        f"artifact hash check failed: {hash_status}",
+                    )
+                )
         return ValidationResult(
             path=path,
             valid=len(errors) == 0,
             errors=tuple(errors),
+            hash_status=hash_status,
         )
 
     def validate_all(self, context: str | None = None) -> list[ValidationResult]:
@@ -131,7 +142,7 @@ class ReportsValidationService:
             - ``"match"`` — hashes are identical.
             - ``"mismatch"`` — hashes differ.
             - ``"missing_artifact"`` — the artifact file referenced in the handoff
-              does not exist on disk.
+              does not exist on disk or is outside the workspace boundary.
         """
         raw = handoff_path.read_text(encoding="utf-8")
         doc: dict[str, object] = json.loads(raw)
@@ -141,6 +152,8 @@ class ReportsValidationService:
         expected_hash = str(artifact_info.get("content_hash", ""))
 
         artifact_path = self._resolve_artifact_path(handoff_path, artifact_rel)
+        if artifact_path is None:
+            return "missing_artifact"
 
         if not artifact_path.exists():
             return "missing_artifact"
@@ -148,13 +161,24 @@ class ReportsValidationService:
         actual_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
         return "match" if actual_hash == expected_hash else "mismatch"
 
-    def _resolve_artifact_path(self, handoff_path: Path, artifact_ref: str) -> Path:
+    def _resolve_artifact_path(self, handoff_path: Path, artifact_ref: str) -> Path | None:
         artifact_path = Path(artifact_ref)
         if artifact_path.is_absolute():
-            return artifact_path
+            return self._within_workspace(artifact_path)
         if artifact_ref.startswith(".dadaia/") and self._workspace_root is not None:
-            return self._workspace_root / artifact_path
-        return handoff_path.parent / artifact_path
+            return self._within_workspace(self._workspace_root / artifact_path)
+        candidate = handoff_path.parent / artifact_path
+        return self._within_workspace(candidate) if self._workspace_root is not None else candidate
+
+    def _within_workspace(self, path: Path) -> Path | None:
+        if self._workspace_root is None:
+            return path
+        try:
+            resolved = path.resolve()
+            resolved.relative_to(self._workspace_root.resolve())
+        except (OSError, ValueError):
+            return None
+        return resolved
 
     @staticmethod
     def _infer_workspace_root(handoff_root: Path) -> Path | None:

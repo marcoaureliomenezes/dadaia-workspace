@@ -219,7 +219,7 @@ def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
     assert content_type == "application/json; charset=utf-8"
     data = json.loads(body)
     assert data["reports"][0]["agent"] == "qa-engineer"
-    assert data["reports"][0]["path"] == ".dadaia/reports/ctx/qa-engineer/qa.html"
+    assert data["reports"][0]["path"] == "ctx/qa-engineer/qa.html"
     assert data["reports"][0]["findings_summary"]["HIGH"] == 1
 
 
