@@ -252,6 +252,8 @@ def test_api_reports_lists_html_report_without_handoff(tmp_path: Path) -> None:
             "findings_summary": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
             "important": False,
             "expires_at": "2026-06-06T15:32:39Z",
+            "is_expired": False,
+            "retention_reason": "Expires after 48h",
             "retention_status": "expires",
         }
     ]
@@ -269,6 +271,8 @@ def test_api_reports_includes_important_retention_state(tmp_path: Path) -> None:
 
     row = json.loads(body)["reports"][0]
     assert row["important"] is True
+    assert row["is_expired"] is False
+    assert row["retention_reason"] == "Marked important"
     assert row["retention_status"] == "important"
 
 

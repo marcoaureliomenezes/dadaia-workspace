@@ -177,7 +177,7 @@ def test_mark_important_post_with_valid_token_dispatches_view() -> None:
 
     status, _ = _dispatch_post(
         handler_class,
-        "/api/reports-important/ctx/agent/file.html",
+        "/api/reports/ctx/agent/file.html/important",
         token=_TOKEN,
     )
 
@@ -186,14 +186,29 @@ def test_mark_important_post_with_valid_token_dispatches_view() -> None:
     assert views["api_report_mark_important"].last_kwargs == {"path": "ctx/agent/file.html"}
 
 
-def test_unmark_important_post_without_token_returns_401() -> None:
+def test_unmark_important_delete_without_token_returns_401() -> None:
     views = _make_views()
     handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_post(
+    status, _ = _dispatch_delete(
         handler_class,
-        "/api/reports-unimportant/ctx/agent/file.html",
+        "/api/reports/ctx/agent/file.html/important",
     )
 
     assert status == 401
     assert views["api_report_unmark_important"].call_count == 0
+
+
+def test_unmark_important_delete_with_valid_token_dispatches_view() -> None:
+    views = _make_views()
+    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+
+    status, _ = _dispatch_delete(
+        handler_class,
+        "/api/reports/ctx/agent/file.html/important",
+        token=_TOKEN,
+    )
+
+    assert status == 200
+    assert views["api_report_unmark_important"].call_count == 1
+    assert views["api_report_unmark_important"].last_kwargs == {"path": "ctx/agent/file.html"}

@@ -947,18 +947,25 @@ def render_api_reports(
             record = retention_by_route.get(str(row["path"]))
             if record is None:
                 row["important"] = False
-                row["expires_at"] = ""
+                row["expires_at"] = None
+                row["is_expired"] = False
+                row["retention_reason"] = None
                 row["retention_status"] = "unknown"
                 continue
             expires_at = record.effective_timestamp + datetime.timedelta(hours=48)
+            is_expired = expires_at <= now
             row["important"] = record.important
             row["expires_at"] = expires_at.isoformat().replace("+00:00", "Z")
+            row["is_expired"] = is_expired
             if record.important:
                 row["retention_status"] = "important"
-            elif expires_at <= now:
+                row["retention_reason"] = "Marked important"
+            elif is_expired:
                 row["retention_status"] = "expired"
+                row["retention_reason"] = "Expired after 48h"
             else:
                 row["retention_status"] = "expires"
+                row["retention_reason"] = "Expires after 48h"
         results.sort(key=lambda r: str(r["created_at"]), reverse=True)
         body = json.dumps({"reports": results}).encode("utf-8")
         return (200, "application/json; charset=utf-8", body)
