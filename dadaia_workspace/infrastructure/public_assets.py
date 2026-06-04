@@ -1524,6 +1524,13 @@ class FileSystemPublicAssetManager:
         that operators can reference them.  Previously the workflows directory was
         removed; that behaviour is replaced by this projection.
         """
+        if force:
+            self._remove_stale_files(
+                src_dir=agentic_dir / "workflows",
+                dst_dir=workspace_root / ".codex" / "workflows",
+                pattern="*.workflow.md",
+                installed=installed,
+            )
         self._copy_tree(
             agentic_dir / "workflows",
             workspace_root / ".codex" / "workflows",
@@ -1559,6 +1566,12 @@ class FileSystemPublicAssetManager:
         agents_src = agentic_dir / "agents"
         agents_dst = workspace_root / ".codex" / "agents"
         agents_dst.mkdir(parents=True, exist_ok=True)
+        expected_tomls = {md_file.with_suffix(".toml").name for md_file in agents_src.glob("*.md")}
+        if force:
+            for stale in sorted(agents_dst.glob("*.toml")):
+                if stale.name not in expected_tomls:
+                    stale.unlink()
+                    installed.append(f"[rm]   {stale}")
 
         for md_file in sorted(agents_src.glob("*.md")):
             text = md_file.read_text(encoding="utf-8")
@@ -1597,6 +1610,21 @@ class FileSystemPublicAssetManager:
             else:
                 dst.write_text(toml_content, encoding="utf-8")
                 installed.append(f"[ok]   {dst}")
+
+    def _remove_stale_files(
+        self,
+        src_dir: Path,
+        dst_dir: Path,
+        pattern: str,
+        installed: list[str],
+    ) -> None:
+        if not dst_dir.exists():
+            return
+        expected = {src.name for src in src_dir.glob(pattern)} if src_dir.exists() else set()
+        for stale in sorted(dst_dir.glob(pattern)):
+            if stale.name not in expected:
+                stale.unlink()
+                installed.append(f"[rm]   {stale}")
 
     def _install_codex_runtime_adapters(
         self, workspace_root: Path, force: bool, installed: list[str]
@@ -2016,25 +2044,52 @@ class FileSystemPublicAssetManager:
         return "".join(lines)
 
     def _codex_hooks(self, workspace_root: Path) -> dict[str, object]:
+        write_matcher = "^(apply_patch|Edit|Write)$"
         return {
-            "PreToolUse": [
-                {
-                    "matcher": {},
-                    "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"),
-                }
-            ],
-            "PostToolUse": [
-                {
-                    "matcher": {},
-                    "command": str(workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"),
-                }
-            ],
-            "UserPromptSubmit": [
-                {
-                    "matcher": {},
-                    "command": str(workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"),
-                }
-            ],
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": write_matcher,
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": str(
+                                    workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"
+                                ),
+                                "statusMessage": "Checking SDD gate",
+                            }
+                        ],
+                    }
+                ],
+                "PostToolUse": [
+                    {
+                        "matcher": write_matcher,
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": str(
+                                    workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"
+                                ),
+                                "statusMessage": "Refreshing SDD session heartbeat",
+                            }
+                        ],
+                    }
+                ],
+                "UserPromptSubmit": [
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "DADAIA_HOOK_OUTPUT=codex-json "
+                                + str(
+                                    workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"
+                                ),
+                                "statusMessage": "Loading dadaia context",
+                            }
+                        ],
+                    }
+                ],
+            }
         }
 
     def _opencode_config(self, workspace_root: Path) -> dict[str, object]:
