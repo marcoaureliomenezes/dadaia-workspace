@@ -31,6 +31,13 @@
     });
   }
 
+  function encodeReportPath(path) {
+    return String(path == null ? '' : path)
+      .split('/')
+      .map(function (segment) { return encodeURIComponent(segment); })
+      .join('/');
+  }
+
   // ── Container helpers ─────────────────────────────────────────────────────────
 
   function getList() {
@@ -118,7 +125,7 @@
       deleteBtn.disabled = true;
       deleteBtn.textContent = 'Deleting…';
 
-      window.authedFetch('/api/reports/' + encodeURIComponent(report.path), { method: 'DELETE' })
+      window.authedFetch('/api/reports/' + encodeReportPath(report.path), { method: 'DELETE' })
         .then(function (r) {
           if (r.ok) {
             // Remove the <li> from the DOM
@@ -166,7 +173,7 @@
       titleBtn.setAttribute('aria-busy', 'true');
 
       // Public route — use plain fetch, not authedFetch
-      fetch('/reports/' + encodeURIComponent(report.path))
+      fetch('/reports/' + encodeReportPath(report.path))
         .then(function (r) {
           if (!r.ok) {
             throw new Error('HTTP ' + r.status);
