@@ -117,7 +117,7 @@ Evidence:
 
 ### T-BUG-06 — Add regression tests for both bugs
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** qa-engineer
 - **Target files:** `tests/**`
 - **Preconditions:** T-BUG-02 through T-BUG-05 done
