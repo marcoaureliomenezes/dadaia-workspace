@@ -2002,7 +2002,21 @@ class FileSystemPublicAssetManager:
                             }
                         ],
                         "matcher": "",
-                    }
+                    },
+                    {
+                        "hooks": [
+                            {
+                                "command": str(
+                                    workspace_root
+                                    / ".dadaia"
+                                    / "scripts"
+                                    / "root-whitelist-gate.sh"
+                                ),
+                                "type": "command",
+                            }
+                        ],
+                        "matcher": "",
+                    },
                 ],
                 "PostToolUse": [
                     {
@@ -2078,7 +2092,22 @@ class FileSystemPublicAssetManager:
                                 "statusMessage": "Checking SDD gate",
                             }
                         ],
-                    }
+                    },
+                    {
+                        "matcher": write_matcher,
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": str(
+                                    workspace_root
+                                    / ".dadaia"
+                                    / "scripts"
+                                    / "root-whitelist-gate.sh"
+                                ),
+                                "statusMessage": "Checking root whitelist",
+                            }
+                        ],
+                    },
                 ],
                 "PostToolUse": [
                     {

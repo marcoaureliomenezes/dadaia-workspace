@@ -1572,6 +1572,36 @@ class TestConfigGenerators:
         commands = [h["command"] for h in post_hooks[0]["hooks"]]
         assert any(str(c).endswith("sdd-post-gate.sh") for c in commands)
 
+    def test_claude_settings_root_whitelist_gate_present(self, tmp_path: Path) -> None:
+        """T-SANI-01: root-whitelist-gate.sh must be registered as a PreToolUse hook."""
+        manager = FileSystemPublicAssetManager()
+        settings = manager._claude_settings(tmp_path)
+        pre_tool_use = settings["hooks"]["PreToolUse"]
+        # Collect all hook commands across all PreToolUse entries
+        all_commands = [
+            str(hook["command"])
+            for entry in pre_tool_use
+            for hook in entry.get("hooks", [])
+        ]
+        assert any(cmd.endswith("root-whitelist-gate.sh") for cmd in all_commands), (
+            "root-whitelist-gate.sh not found in claude settings PreToolUse hooks"
+        )
+
+    def test_codex_hooks_root_whitelist_gate_present(self, tmp_path: Path) -> None:
+        """T-SANI-01: root-whitelist-gate.sh must be registered as a Codex PreToolUse hook."""
+        manager = FileSystemPublicAssetManager()
+        config = manager._codex_hooks(tmp_path)
+        pre_tool_use = config["hooks"]["PreToolUse"]
+        # Collect all hook commands across all PreToolUse entries
+        all_commands = [
+            str(hook["command"])
+            for entry in pre_tool_use
+            for hook in entry.get("hooks", [])
+        ]
+        assert any(cmd.endswith("root-whitelist-gate.sh") for cmd in all_commands), (
+            "root-whitelist-gate.sh not found in codex hooks PreToolUse hooks"
+        )
+
     def test_codex_force_install_removes_stale_agents_and_workflows(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         manager = FileSystemPublicAssetManager()

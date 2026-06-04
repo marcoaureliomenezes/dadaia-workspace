@@ -1,5 +1,6 @@
 """DoctorService — diagnose and repair workspace state invariants (v2 model: ALIVE/DEAD)."""
 
+import fnmatch
 import json
 import os
 import shutil
@@ -32,6 +33,66 @@ _PRODUCTION_WRITE_EVENTS: frozenset[str] = frozenset(
         "PRODUCTION_WRITE",
         "GATE_WRITE",
         "WRITE",
+    }
+)
+
+# ---------------------------------------------------------------------------
+# ROOT-* invariant constants
+# ---------------------------------------------------------------------------
+
+#: Directories allowed at workspace root (exact names, no wildcards).
+_ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
+    {".agents", ".claude", ".codex", ".dadaia", ".opencode", "repos"}
+)
+
+#: Files allowed at workspace root (exact names, no wildcards).
+_ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md"})
+
+#: Caches and tool outputs that are forbidden at workspace root (ROOT-2).
+#: These are safe to delete — they regenerate.
+_ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
+    {
+        ".ruff_cache",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".hypothesis",
+        ".coverage",
+        ".playwright-mcp",
+        "test-results",
+    }
+)
+
+#: Tool config files that have canonical homes elsewhere but are currently
+#: tolerated at root with a WARN (ROOT-3, lenient).
+_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset(
+    {".mcp.json", "opencode.json", "CLAUDE.md"}
+)
+
+#: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4).
+_DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
+    {
+        "agentic",
+        "mcps",
+        "scripts",
+        "tmp",
+        "reports",
+        "dev-report",
+        "states",
+        "logs",
+        "locks",
+        "sessions",
+        "handoff",
+        ".cache",
+        ".venv",
+        # Additional dirs observed in practice
+        "academy",
+        "bugs",
+        "dist",
+        "figma-bridge",
+        "imgs",
+        "references",
+        "runs",
+        "src",
     }
 )
 
@@ -133,6 +194,144 @@ class DoctorService:
         if len(parts) == 2:
             return parts[0], parts[1]
         return key, ""
+
+    # ------------------------------------------------------------------
+    # Helper: load operator exception allowlist from .dadaia/states/root_exceptions.txt
+    # Returns a list of fnmatch glob patterns (one per non-empty line).
+    # File is optional — returns empty list when absent.
+    # ------------------------------------------------------------------
+
+    def _root_exception_globs(self) -> list[str]:
+        exc_path = self._workspace_root / ".dadaia" / "states" / "root_exceptions.txt"
+        if not exc_path.exists():
+            return []
+        lines = exc_path.read_text(encoding="utf-8").splitlines()
+        return [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+
+    @staticmethod
+    def _matches_any_glob(name: str, globs: list[str]) -> bool:
+        return any(fnmatch.fnmatch(name, g) for g in globs)
+
+    # ------------------------------------------------------------------
+    # ROOT-* check helpers
+    # ------------------------------------------------------------------
+
+    def _check_root_1(self, exc_globs: list[str]) -> list[DoctorIssue]:
+        """ROOT-1 — workspace root contains only whitelisted entries."""
+        issues: list[DoctorIssue] = []
+        offenders: list[str] = []
+        try:
+            entries = list(self._workspace_root.iterdir())
+        except OSError:
+            return issues
+        for entry in sorted(entries):
+            name = entry.name
+            # Skip git internals
+            if name == ".git":
+                continue
+            if entry.is_dir():
+                if name in _ROOT_ALLOWED_DIRS:
+                    continue
+            else:
+                if name in _ROOT_ALLOWED_FILES:
+                    continue
+                # gitignore is operator-owned; always allow it
+                if name == ".gitignore":
+                    continue
+            # Check operator exception allowlist
+            if self._matches_any_glob(name, exc_globs):
+                continue
+            offenders.append(name)
+        if offenders:
+            listed = ", ".join(repr(o) for o in offenders)
+            issues.append(
+                DoctorIssue(
+                    code="ROOT-1",
+                    description=(
+                        f"Workspace root contains non-whitelisted entries: {listed}. "
+                        "Relocate under .dadaia/<subdir> or add to "
+                        ".dadaia/states/root_exceptions.txt"
+                    ),
+                    fixable=False,
+                )
+            )
+        return issues
+
+    def _check_root_2(self) -> list[DoctorIssue]:
+        """ROOT-2 — no forbidden caches/outputs at workspace root."""
+        issues: list[DoctorIssue] = []
+        found: list[str] = []
+        for name in _ROOT_FORBIDDEN_CACHES:
+            if (self._workspace_root / name).exists():
+                found.append(name)
+        if found:
+            listed = ", ".join(repr(n) for n in sorted(found))
+            issues.append(
+                DoctorIssue(
+                    code="ROOT-2",
+                    description=(
+                        f"Forbidden cache/output dirs at workspace root: {listed}. "
+                        "Run 'dadaia doctor --fix' to delete them (they regenerate under .dadaia/)."
+                    ),
+                    fixable=True,
+                )
+            )
+        return issues
+
+    def _check_root_3(self, exc_globs: list[str]) -> list[DoctorIssue]:
+        """ROOT-3 — tool configs in canonical homes or documented exception list (WARN)."""
+        issues: list[DoctorIssue] = []
+        found: list[str] = []
+        for name in _ROOT_TOOL_CONFIGS:
+            entry = self._workspace_root / name
+            if entry.exists() and not self._matches_any_glob(name, exc_globs):
+                found.append(name)
+        if found:
+            listed = ", ".join(repr(n) for n in sorted(found))
+            issues.append(
+                DoctorIssue(
+                    code="ROOT-3",
+                    description=(
+                        f"Tool config file(s) at workspace root not in exception list: {listed}. "
+                        "Add to .dadaia/states/root_exceptions.txt or relocate under .dadaia/. "
+                        "(T-SANI-02 will resolve canonical placement.)"
+                    ),
+                    fixable=False,
+                )
+            )
+        return issues
+
+    def _check_root_4(self) -> list[DoctorIssue]:
+        """ROOT-4 — .dadaia/ contains only canonical top-level subdirs."""
+        issues: list[DoctorIssue] = []
+        dadaia_dir = self._workspace_root / ".dadaia"
+        if not dadaia_dir.exists():
+            return issues
+        unknown: list[str] = []
+        try:
+            entries = list(dadaia_dir.iterdir())
+        except OSError:
+            return issues
+        for entry in sorted(entries):
+            name = entry.name
+            # Allow dotfiles at the .dadaia level (e.g. .gitkeep, .DS_Store)
+            if name.startswith(".") and not entry.is_dir():
+                continue
+            if entry.is_dir() and name not in _DADAIA_ALLOWED_SUBDIRS:
+                unknown.append(name)
+        if unknown:
+            listed = ", ".join(repr(u) for u in sorted(unknown))
+            issues.append(
+                DoctorIssue(
+                    code="ROOT-4",
+                    description=(
+                        f"Unknown top-level subdirectory/ies inside .dadaia/: {listed}. "
+                        "Relocate or register in the canonical .dadaia/ layout."
+                    ),
+                    fixable=False,
+                )
+            )
+        return issues
 
     def check(self) -> list[DoctorIssue]:
         issues: list[DoctorIssue] = []
@@ -304,6 +503,13 @@ class DoctorService:
                         )
                     )
 
+        # ---- ROOT invariants (T-SANI-05) ----
+        exc_globs = self._root_exception_globs()
+        issues.extend(self._check_root_1(exc_globs))
+        issues.extend(self._check_root_2())
+        issues.extend(self._check_root_3(exc_globs))
+        issues.extend(self._check_root_4())
+
         return issues
 
     def fix(self) -> list[str]:
@@ -460,5 +666,22 @@ class DoctorService:
                         actions.append(
                             f"LOCK-6: deleted BOUND_REVIEW session '{f.name}' for DEAD context '{ctx_name}'"
                         )
+
+        # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
+        for cache_name in sorted(_ROOT_FORBIDDEN_CACHES):
+            target = self._workspace_root / cache_name
+            if target.exists():
+                try:
+                    if target.is_dir():
+                        shutil.rmtree(target)
+                    else:
+                        target.unlink()
+                    actions.append(
+                        f"ROOT-2: deleted forbidden cache/output '{cache_name}' from workspace root"
+                    )
+                except OSError as exc:
+                    actions.append(
+                        f"ROOT-2: failed to delete '{cache_name}': {exc}"
+                    )
 
         return actions
