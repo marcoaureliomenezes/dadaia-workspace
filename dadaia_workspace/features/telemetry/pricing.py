@@ -41,6 +41,9 @@ PRICING_TABLE: dict[str, list[ModelPricing]] = {
     "claude-opus-4-7": [
         ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),
     ],
+    "claude-opus-4-8": [
+        ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),
+    ],
     "claude-sonnet-4-6": [
         ModelPricing(3.00, 15.00, 3.75, 0.30, date(2025, 1, 1)),
     ],
