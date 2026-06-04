@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import jinja2
+from jinja2.sandbox import SandboxedEnvironment
 
 # SemVer pattern for hotfix release version IDs (v<M>.<m>.<p>).
 _RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
@@ -76,7 +77,11 @@ def _render_template(
     context: dict[str, str],
 ) -> str:
     """Render a Jinja2 template file with the given context."""
-    env = jinja2.Environment(
+    # SandboxedEnvironment blocks access to Python internals (e.g. dunder
+    # attributes) so a hostile project_name/version cannot reach a sandbox
+    # escape via template syntax. autoescape stays off: templates render
+    # Markdown, not HTML.
+    env = SandboxedEnvironment(
         loader=jinja2.FileSystemLoader(str(templates_dir)),
         undefined=jinja2.Undefined,
         autoescape=False,

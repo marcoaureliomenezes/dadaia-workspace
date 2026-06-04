@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Panel HTTP handler: enforce Bearer auth on workspace-sensitive routes that were previously served by the unauthenticated dispatch loop — `/reports/<path>`, `/api/panel-status`, `/api/contexts`, `/memory/<slug>/<path>`, `/memory-view/<slug>/<path>` — whenever the panel is NOT loopback-bound (defense in depth; loopback keeps the zero-friction local default). (F-01/F-02/F-04)
+- Scaffolder renders templates with a Jinja2 `SandboxedEnvironment`, blocking template access to Python internals. (F-03)
+- `GitSubprocessClient.clone` refuses unsafe URLs (`ext::` transport and option-injection via a leading `-`) before invoking git. (F-05)
+
 ## [0.1.4] — 2026-06-03
 
 ### Added

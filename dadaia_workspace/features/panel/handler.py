@@ -154,6 +154,15 @@ _BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
     }
 )
 
+# Routes served by the non-telemetry dispatch loop that nonetheless expose
+# workspace-sensitive data — server registry/ports (api_panel_status), repo
+# filesystem paths (api_contexts), and report/memory file contents. They require
+# Bearer auth whenever the panel is NOT loopback-bound (defense in depth; under
+# loopback the bypass waives auth for the local dev experience).
+_SECOND_LOOP_AUTH_ROUTES: frozenset[str] = frozenset(
+    {"api_panel_status", "api_contexts", "reports_serve", "memory", "memory_view"}
+)
+
 _POST_WORKFLOW_RUN_RE = re.compile(r"^/api/workflows/(?P<workflow_name>[^/]+)/run$")
 
 # Routes that are GET-only and must return 405 Method Not Allowed on POST.
@@ -252,8 +261,8 @@ def make_handler_class(
         when this flag is active — a deliberate dev-local trade-off for a
         read-only GET surface.
     """
-    compiled: list[tuple[re.Pattern[str], Callable[..., tuple[int, str, bytes]]]] = [
-        (re.compile(pat), views[name]) for pat, name in _RAW_ROUTES if name in views
+    compiled: list[tuple[re.Pattern[str], str, Callable[..., tuple[int, str, bytes]]]] = [
+        (re.compile(pat), name, views[name]) for pat, name in _RAW_ROUTES if name in views
     ]
     # Telemetry routes are handled inline (not via views dict) because they
     # depend on the injected telemetry service and auth token — not a pure
@@ -354,9 +363,19 @@ def make_handler_class(
             # /api/panel-status and /api/contexts are in views dict — they do NOT
             # require Bearer in v1 to preserve backward compatibility.
             # ------------------------------------------------------------------
-            for pattern, view in self._routes:
+            for pattern, route_name, view in self._routes:
                 m = pattern.match(path)
                 if m is not None:
+                    if (
+                        route_name in _SECOND_LOOP_AUTH_ROUTES
+                        and not _loopback_bypass
+                        and (
+                            _token is None
+                            or not _validate_bearer(self.headers.get("Authorization"), _token)
+                        )
+                    ):
+                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
+                        return
                     status, content_type, body = view(**m.groupdict())
                     is_static = path.startswith("/static/")
                     self._respond(
