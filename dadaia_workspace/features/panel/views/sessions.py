@@ -70,16 +70,6 @@ def render_sessions_section() -> str:
         '  <div id="sessions-table-container" class="sessions-table-container"\n'
         '       aria-busy="true">\n'
         '    <table class="sessions-table" aria-label="Sessions">\n'
-        "      <colgroup>\n"
-        '        <col style="width:14%">\n'
-        '        <col style="width:14%">\n'
-        '        <col style="width:20%">\n'
-        '        <col style="width:8%">\n'
-        '        <col style="width:8%">\n'
-        '        <col style="width:8%">\n'
-        '        <col style="width:14%">\n'
-        '        <col style="width:10%">\n'
-        "      </colgroup>\n"
         "      <thead>\n"
         "        <tr>\n"
         '          <th scope="col" class="cell-session" data-sort-key="session_id">Session</th>\n'
