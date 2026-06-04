@@ -186,7 +186,7 @@ Evidence:
 
 ### T-BUG-09 — Add regression tests for workflow gate contract
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** qa-engineer
 - **Target files:** `tests/**`
 - **Preconditions:** T-BUG-07 and T-BUG-08 done
