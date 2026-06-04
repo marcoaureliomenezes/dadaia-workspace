@@ -83,7 +83,7 @@ Return clear operator messages and JSON output suitable for panel reuse.
 
 ### T-RET-04 - Extend Reports panel API and UI
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** frontend-engineer + software-engineer-python
 - **Reviewers before approval:** qa-engineer, code-reviewer, security-reviewer, design-specialist
 - **Target files:** `dadaia_workspace/features/panel/views/api.py`, panel route/container wiring, `dadaia_workspace/features/panel/views/assets/js/reports.js`, focused panel tests
