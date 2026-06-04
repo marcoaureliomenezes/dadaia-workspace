@@ -459,8 +459,60 @@ fi
 _rule_e() {
     # Step 1 — Resolve DADAIA_SESSION_ID
     local sess_id="${DADAIA_SESSION_ID:-}"
+
+    # Step 1b (T-SEMA-01 / FEAT-SESSION-SEMAPHORE-01 root cause #1) —
+    # Env-free session resolution. A running agent runtime cannot inject
+    # DADAIA_SESSION_ID into its own (parent) environment, so requiring it from
+    # env alone fails closed whenever the runtime was not launched with the
+    # export — a stop-the-flow defect with no in-session recovery. Fallback:
+    # when the env var is absent, adopt the session that already owns a
+    # NON-STALE implementation lock for the resolved context. The lock file
+    # records session_id, so `dadaia context bind` from ANY shell (including an
+    # in-session `! dadaia context bind ...`) unblocks writes — no relaunch.
+    # A stale lock is never adopted. When the env var IS set it still wins.
+    if [ -z "$sess_id" ] && [ -n "$CONTEXT_SLUG" ]; then
+        local _semaf_lockdir="$WS/.dadaia/locks/implementation"
+        if [ -d "$_semaf_lockdir" ]; then
+            local _semaf_lf
+            for _semaf_lf in "$_semaf_lockdir/${CONTEXT_SLUG}__"*.json; do
+                [ -f "$_semaf_lf" ] || continue
+                local _semaf_state
+                _semaf_state=$("$PYTHON_BIN" - "$_semaf_lf" 2>/dev/null <<'PYEOF'
+import json, sys
+from datetime import datetime, timezone
+try:
+    d = json.load(open(sys.argv[1]))
+    ttl = int(d.get("ttl_seconds", 300))
+    ls = d.get("last_seen_at", "")
+    if not ls:
+        print("held"); sys.exit(0)
+    elapsed = (datetime.now(tz=timezone.utc) - datetime.fromisoformat(ls.replace("Z", "+00:00"))).total_seconds()
+    print("stale" if elapsed > ttl else "held")
+except Exception:
+    print("held")
+PYEOF
+)
+                if [ "$_semaf_state" = "held" ]; then
+                    sess_id=$("$PYTHON_BIN" - "$_semaf_lf" 2>/dev/null <<'PYEOF'
+import json, sys
+try:
+    print(json.load(open(sys.argv[1])).get("session_id", ""))
+except Exception:
+    print("")
+PYEOF
+)
+                    if [ -n "$sess_id" ]; then
+                        export DADAIA_SESSION_ID="$sess_id"
+                        _log "RULE-E env-free: adopted session '$sess_id' from non-stale lock $_semaf_lf (DADAIA_SESSION_ID was unset)"
+                        break
+                    fi
+                fi
+            done
+        fi
+    fi
+
     if [ -z "$sess_id" ]; then
-        _block "[RULE E] DADAIA_SESSION_ID is not set. Production writes require a bound implementation session. Run: eval \$(dadaia context bind ${CONTEXT_SLUG:-<ctx>} --mode implementation --release ${ACTIVE_RELEASE:-<release-id>})"
+        _block "[RULE E] No active implementation session for context '${CONTEXT_SLUG:-<ctx>}'. Bind it from ANY shell — no relaunch needed: eval \$(dadaia context bind ${CONTEXT_SLUG:-<ctx>} --mode implementation --release ${ACTIVE_RELEASE:-<release-id>}). (DADAIA_SESSION_ID was unset and no non-stale implementation lock was found.)"
         return
     fi
 
@@ -734,7 +786,13 @@ fi
 #      only when SDD_LEGACY_FEATURES=1 (default during migration window)
 #      Note: root-level CONTEXT_SPECS/TASKS.md is no longer searched (removed T-8a)
 ACTIVE=""
-GREP_PAT='^[[:space:]]*-[[:space:]]*\[-\][[:space:]]+'
+# T-SEMA-01 (Bug B): match BOTH canonical TASKS.md marker line forms:
+#   "- [-] T-001 ..."            (gate test / inline list style)
+#   "- **Status:** [-]"          (release TASKS.md style used by every release)
+# The release style places the marker after a "**Status:**" label, and the
+# marker may sit at end-of-line, so no trailing-space is required. Without this,
+# RULE C never matches a real release marker and every production write blocks.
+GREP_PAT='^[[:space:]]*-[[:space:]]*(\*\*Status:\*\*[[:space:]]*)?\[-\]'
 
 if [ -n "$ACTIVE_RELEASE" ] && [ -f "$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" ]; then
     if grep -qE "$GREP_PAT" "$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" 2>/dev/null; then
@@ -803,6 +861,20 @@ tmp.write_text(json.dumps(data, indent=2))
 os.replace(tmp, sess_file)
 context = data.get("context", "")
 release = data.get("release", "") or ""
+# T-SEMA-01 (SCOPE-02): also renew the implementation lock owned by this
+# session so env-free resolution (which only adopts NON-STALE locks) keeps
+# working across a long agent session. Best-effort; never blocks the gate.
+if context and release:
+    lock_path = ws / ".dadaia" / "locks" / "implementation" / f"{context}__{release}.json"
+    try:
+        ldata = json.loads(lock_path.read_text())
+        if ldata.get("session_id") == sess_id:
+            ldata["last_seen_at"] = now
+            ltmp = lock_path.with_suffix(".tmp")
+            ltmp.write_text(json.dumps(ldata, indent=2))
+            os.replace(ltmp, lock_path)
+    except (json.JSONDecodeError, OSError):
+        pass
 runtime = data.get("runtime", "unknown")
 pid = data.get("pid", 0)
 record = {"ts": now, "event": "HEARTBEAT", "context": context, "release": release,

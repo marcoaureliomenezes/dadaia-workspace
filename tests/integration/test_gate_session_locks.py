@@ -210,7 +210,13 @@ def workspace(tmp_path: Path) -> Path:
 
 
 def test_ac_t13_1_blocks_production_write_without_session_id(workspace: Path) -> None:
-    """AC-T13-1: production writes require a bound implementation session."""
+    """AC-T13-1: production writes require a bound implementation session.
+
+    T-SEMA-01: env-free resolution means "no DADAIA_SESSION_ID" alone no longer
+    blocks — the gate blocks only when there is ALSO no non-stale implementation
+    lock to adopt. This test creates no lock, so the gate must still fail closed,
+    now with the no-relaunch message.
+    """
     scripts = _install_scripts(workspace)
     slug = "my-proj"
     specs = workspace / "repos" / slug / "specs"
@@ -219,19 +225,20 @@ def test_ac_t13_1_blocks_production_write_without_session_id(workspace: Path) ->
     _make_primary_context(workspace, slug, specs)
 
     target_file = workspace / "repos" / slug / "src" / "main.py"
-    # No DADAIA_SESSION_ID — must fail closed even though TASKS.md has [-].
+    # No DADAIA_SESSION_ID and no impl lock — must fail closed even though TASKS.md has [-].
     result = _run_gate(scripts, workspace, target_file, session_id=None)
 
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert data["decision"] == "block"
-    assert "DADAIA_SESSION_ID" in data["reason"]
+    assert "No active implementation session" in data["reason"]
+    assert "no relaunch" in data["reason"].lower()
 
     # Verify the blocked production path was logged.
     log_file = workspace / ".dadaia" / "sdd-gate-test.log"
     log_content = log_file.read_text() if log_file.exists() else ""
     assert "BLOCKED" in log_content
-    assert "DADAIA_SESSION_ID" in log_content
+    assert "No active implementation session" in log_content
 
 
 # ---------------------------------------------------------------------------
@@ -936,3 +943,125 @@ def test_ac_t13_10_no_heartbeat_when_no_session(workspace: Path) -> None:
         lines = [ln for ln in audit_path.read_text().splitlines() if ln.strip()]
         heartbeats = [json.loads(ln) for ln in lines if json.loads(ln).get("event") == "HEARTBEAT"]
         assert len(heartbeats) == 0, "No HEARTBEAT expected when no session ID"
+
+
+# ---------------------------------------------------------------------------
+# T-SEMA-01 (FEAT-SESSION-SEMAPHORE-01 R1): env-free session resolution
+# ---------------------------------------------------------------------------
+
+
+def test_sema01_env_absent_nonstale_lock_allows(workspace: Path) -> None:
+    """Bug A fix: DADAIA_SESSION_ID absent but a NON-STALE impl lock exists →
+    the gate adopts the lock's session and ALLOWS the write (env-free; no relaunch).
+
+    This is the core regression guard for the deploy-blocker: a running agent
+    runtime that never had the env exported can still write after a `dadaia
+    context bind` from any shell (which writes the lock the gate reads here).
+    """
+    scripts = _install_scripts(workspace)
+    slug = "my-proj"
+    release_id = "my-release-v1"
+    specs = workspace / "repos" / slug / "specs"
+    _make_active_release(specs, release_id)
+    _make_primary_context(workspace, slug, specs)
+
+    sess_id = "sess_envfree01"
+    _make_session_file(
+        workspace, sess_id, mode="BOUND_IMPLEMENTATION", context=slug, release=release_id
+    )
+    _make_impl_lock(workspace, slug, release_id, sess_id)
+
+    target_file = workspace / "repos" / slug / "src" / "main.py"
+    # session_id=None → DADAIA_SESSION_ID is NOT present in the gate's environment.
+    result = _run_gate(scripts, workspace, target_file, session_id=None)
+
+    assert result.returncode == 0
+    assert result.stdout == "" or "block" not in result.stdout
+
+    # The env-free adoption is logged.
+    log_file = workspace / ".dadaia" / "sdd-gate-test.log"
+    log_content = log_file.read_text() if log_file.exists() else ""
+    assert "env-free" in log_content
+
+
+def test_sema01_env_absent_stale_lock_blocks(workspace: Path) -> None:
+    """Bug A fix: a STALE impl lock is never adopted → env-absent write still blocks
+    (with the no-relaunch message), honoring 'avoid race at any cost'."""
+    scripts = _install_scripts(workspace)
+    slug = "my-proj"
+    release_id = "my-release-v1"
+    specs = workspace / "repos" / slug / "specs"
+    _make_active_release(specs, release_id)
+    _make_primary_context(workspace, slug, specs)
+
+    sess_id = "sess_stalelock01"
+    _make_session_file(
+        workspace, sess_id, mode="BOUND_IMPLEMENTATION", context=slug, release=release_id
+    )
+    _make_impl_lock(workspace, slug, release_id, sess_id, last_seen_at=_stale_ts())
+
+    target_file = workspace / "repos" / slug / "src" / "main.py"
+    result = _run_gate(scripts, workspace, target_file, session_id=None)
+
+    assert result.returncode == 0
+    data = json.loads(result.stdout)
+    assert data["decision"] == "block"
+    assert "No active implementation session" in data["reason"]
+
+
+def test_sema01_env_absent_status_marker_form_allows(workspace: Path) -> None:
+    """Bug B fix: RULE C accepts the real release marker form '- **Status:** [-]'
+    (not only '- [-] T-xxx'). With a valid env-free lock + a Status-form marker,
+    the write is ALLOWED."""
+    scripts = _install_scripts(workspace)
+    slug = "my-proj"
+    release_id = "my-release-v1"
+    specs = workspace / "repos" / slug / "specs"
+    _make_active_release(specs, release_id)
+    _make_primary_context(workspace, slug, specs)
+
+    # Overwrite TASKS.md with the canonical release marker form.
+    tasks = specs / "releases" / release_id / "TASKS.md"
+    tasks.write_text(
+        "# Tasks\n\n### T-001 — work\n- **Owner:** someone\n- **Status:** [-]\n"
+    )
+
+    sess_id = "sess_statusform01"
+    _make_session_file(
+        workspace, sess_id, mode="BOUND_IMPLEMENTATION", context=slug, release=release_id
+    )
+    _make_impl_lock(workspace, slug, release_id, sess_id)
+
+    target_file = workspace / "repos" / slug / "src" / "main.py"
+    result = _run_gate(scripts, workspace, target_file, session_id=None)
+
+    assert result.returncode == 0
+    assert result.stdout == "" or "block" not in result.stdout
+
+
+def test_sema01_inline_heartbeat_renews_lock(workspace: Path) -> None:
+    """SCOPE-02: an allowed write renews the owning lock's last_seen_at (not just
+    the session file), so env-free resolution keeps working across a long session."""
+    scripts = _install_scripts(workspace)
+    slug = "my-proj"
+    release_id = "my-release-v1"
+    specs = workspace / "repos" / slug / "specs"
+    _make_active_release(specs, release_id)
+    _make_primary_context(workspace, slug, specs)
+
+    sess_id = "sess_hb01"
+    _make_session_file(
+        workspace, sess_id, mode="BOUND_IMPLEMENTATION", context=slug, release=release_id
+    )
+    backdated = _stale_ts(120)  # 120s ago: NOT stale (ttl 300) but clearly in the past
+    lock = _make_impl_lock(workspace, slug, release_id, sess_id, last_seen_at=backdated)
+
+    target_file = workspace / "repos" / slug / "src" / "main.py"
+    result = _run_gate(scripts, workspace, target_file, session_id=sess_id)
+
+    assert result.returncode == 0
+    assert result.stdout == "" or "block" not in result.stdout
+
+    ldata = json.loads(lock.read_text())
+    assert ldata["last_seen_at"] != backdated
+    assert datetime.fromisoformat(ldata["last_seen_at"]) > datetime.fromisoformat(backdated)
