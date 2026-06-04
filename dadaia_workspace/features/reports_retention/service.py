@@ -238,7 +238,14 @@ class ReportRetentionService:
         candidates = self.cleanup_candidates(older_than=older_than)
         stale_handoffs = sum(1 for c in candidates for p in c.paths if p.name.endswith(".handoff.json"))
         stale_reports = sum(1 for c in candidates for p in c.paths if p.suffix.lower() == ".html")
-        orphan_handoffs = sum(1 for c in candidates if c.reason.startswith("orphan"))
+        live_handoffs = {handoff for report in reports for handoff in report.handoff_paths}
+        handoffs_by_artifact, _malformed = self._handoffs_by_artifact()
+        orphan_handoffs = sum(
+            1
+            for handoffs in handoffs_by_artifact.values()
+            for handoff in handoffs
+            if handoff not in live_handoffs
+        )
         return {
             "report_count": len(reports),
             "stale_report_count": stale_reports,
