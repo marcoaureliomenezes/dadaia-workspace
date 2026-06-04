@@ -51,9 +51,10 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# Redirect ruff's lint cache so no .ruff_cache/ is ever created at the repo root.
-# The .dadaia/ tree is gitignored / non-polluting.
-cache-dir = ".dadaia/.cache/ruff"
+# Redirect ruff's lint cache to an OS-temp path so no .ruff_cache/ or .dadaia/
+# is ever created inside the repo tree.  .dadaia/ is workspace-level only and
+# must never appear inside a sub-repo (the pytest pollution guard enforces this).
+cache-dir = "/tmp/dadaia-ws-toolcache/ruff"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -106,9 +107,10 @@ tmp_path_retention_policy = "failed"
 [tool.coverage.run]
 source = ["dadaia_workspace"]
 parallel = false
-# Redirect coverage data file so no .coverage is ever created at the repo root.
-# coverage.py creates the parent directory automatically.
-data_file = ".dadaia/.cache/coverage/.coverage"
+# Redirect coverage data file to an OS-temp path so no .coverage or .dadaia/
+# is ever created inside the repo tree.  .dadaia/ is workspace-level only and
+# must never appear inside a sub-repo (the pytest pollution guard enforces this).
+data_file = "/tmp/dadaia-ws-toolcache/coverage/.coverage"
 
 [tool.coverage.report]
 exclude_lines = [
