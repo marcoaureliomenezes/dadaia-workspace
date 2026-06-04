@@ -27,7 +27,7 @@ CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|heartbeat
 
 Gerencia múltiplos **Spec Context Projects** — cada um mapeia `nome → repo_slug → repo_url` e tem state machine binária: **ALIVE** (repo clonado em `repos/<repo_slug>/`, disponível para implementação) ou **DEAD** (repo removido do disco, fora de uso). Não existe "global primary": o context ativo por sessão é estabelecido via _session binding_ (`eval $(dadaia context bind ...)`), exportando `DADAIA_CONTEXT`, `DADAIA_SESSION_ID` e `DADAIA_MODE` no shell da sessão.
 
-O modelo v2 (semver 2.0.0) elimina o conceito de `is_primary` e o arquivo `.dadaia/states/primary_context.json`. Cada sessão de agente declara seu contexto explicitamente. O gate `sdd-spec-gate.sh` valida a identidade da sessão e o ownership do implementation lock antes de permitir qualquer write em produção.
+O modelo v2 (semver 2.0.0) elimina o contexto global implícito. Cada sessão de agente declara seu contexto explicitamente. O gate `sdd-spec-gate.sh` valida a identidade da sessão e o ownership do implementation lock antes de permitir qualquer write em produção.
 
 ### State machine ALIVE/DEAD
 
@@ -75,7 +75,7 @@ Qualquer workspace v1 (`schema_version: "1"` ou `state: "ativo"`) é bloqueado c
 
     dadaia migrate [--dry-run] [--yes]
 
-Ações: mapeamento de estados (`"ativo"`→`"alive"`, `"inativo"`→`"dead"`), renomeação de campos (`activated_at`→`alive_since`), remoção de `is_primary`, adição de `dead_since: null`, atualização de `schema_version` para `"2"`, deleção de `primary_context.json`, criação de `.dadaia/sessions/`, `.dadaia/locks/implementation/`, `.dadaia/states/ctx_locks/`. Idempotente em workspace v2.
+Ações: mapeamento de estados (`"ativo"`→`"alive"`, `"inativo"`→`"dead"`), renomeação de campos (`activated_at`→`alive_since`), remoção do flag global legado, adição de `dead_since: null`, atualização de `schema_version` para `"2"`, deleção do marcador global legado, criação de `.dadaia/sessions/`, `.dadaia/locks/implementation/`, `.dadaia/states/ctx_locks/`. Idempotente em workspace v2.
 
 ### Canonical specs/ tree v2 (scaffold baseline pós spec-context-tree-v2)
 
@@ -126,7 +126,7 @@ Sem context management v2, múltiplos agentes em paralelo podem editar a mesma r
 
 ## Estado runtime tocado
 
-  * `.dadaia/states/spec_contexts.json` — registro de todos os contexts (`schema_version: "2"`; state ALIVE/DEAD; `alive_since`; `dead_since`; sem `is_primary`)
+  * `.dadaia/states/spec_contexts.json` — registro de todos os contexts (`schema_version: "2"`; state ALIVE/DEAD; `alive_since`; `dead_since`; sem flag global)
   * `.dadaia/states/.ws_lock` — fcntl workspace lock (gitignored; criado em runtime)
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored)
   * `.dadaia/sessions/<sess_*>.json` — session files (criados por `context bind`; deletados por `context release`)
@@ -137,7 +137,7 @@ Sem context management v2, múltiplos agentes em paralelo podem editar a mesma r
 
 
 
-**Removido em v2:** `.dadaia/states/primary_context.json` (deletado por `dadaia migrate`; não recriado em nenhum code path v2).
+**Removido em v2:** o antigo marcador global de contexto é deletado por `dadaia migrate` e não é recriado em nenhum code path v2.
 
 ## Dependências
 

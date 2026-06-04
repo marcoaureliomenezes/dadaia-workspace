@@ -61,31 +61,6 @@ ALLOWED_LEGACY_RESIDUE: tuple[ResidueClassification, ...] = (
 
 EXPECTED_RESIDUE_TO_REMOVE: tuple[ResidueClassification, ...] = (
     ResidueClassification(
-        relpath="dadaia_workspace/public/scripts/sdd-spec-gate.sh",
-        patterns=(
-            ResiduePattern("PRIMARY_", "gate variables still named primary"),
-            ResiduePattern("primary_context", "stale comment"),
-        ),
-        disposition="rename to session/context terminology in T-BUG-03",
-    ),
-    ResidueClassification(
-        relpath="dadaia_workspace/public/skills/dadaia-workspace-manager/SKILL.md",
-        patterns=(
-            ResiduePattern("is_primary", "public skill still describes global primary"),
-            ResiduePattern("context promote", "removed verb in public skill"),
-        ),
-        disposition="remove in T-BUG-03",
-    ),
-    ResidueClassification(
-        relpath="specs/memory",
-        patterns=(
-            ResiduePattern("primary_context", "memory atoms still describe removed global primary"),
-            ResiduePattern("is_primary", "memory atoms still describe removed global primary"),
-            ResiduePattern("context activate", "memory atoms mention removed verb"),
-        ),
-        disposition="update during CLOSURE or authorized task scope per T-BUG-03",
-    ),
-    ResidueClassification(
         relpath="tests",
         patterns=(
             ResiduePattern("primary_context", "tests/helpers still use retired terminology"),
@@ -135,9 +110,6 @@ def test_current_residue_inventory_is_classified() -> None:
     """T-BUG-01 classifies active residue so later tasks can remove it deliberately."""
     relpaths = {entry.relpath for entry in EXPECTED_RESIDUE_TO_REMOVE}
 
-    assert "dadaia_workspace/public/scripts/sdd-spec-gate.sh" in relpaths
-    assert "dadaia_workspace/public/skills/dadaia-workspace-manager/SKILL.md" in relpaths
-    assert "specs/memory" in relpaths
     assert "tests" in relpaths
 
 

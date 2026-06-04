@@ -161,7 +161,7 @@ features/telemetry/aggregator/queries.py| features/telemetry/aggregator/runtimes
 
 Locais canônicos de estado em disco e seu propósito:
 
-  * `.dadaia/states/spec_contexts.json` — todos os Spec Context Projects (`schema_version: "2"`; state ALIVE/DEAD; sem `is_primary`; campos `alive_since` e `dead_since`).
+  * `.dadaia/states/spec_contexts.json` — todos os Spec Context Projects (`schema_version: "2"`; state ALIVE/DEAD; sem flag global de contexto; campos `alive_since` e `dead_since`).
   * `.dadaia/states/.ws_lock` — fcntl workspace-wide lock (gitignored; criado em runtime; Lock 1).
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored; Lock 2).
   * `.dadaia/sessions/<sess_*>.json` — session files criados por `context bind`; registram mode, release, runtime, pid, last_seen_at, ttl_seconds.
@@ -182,7 +182,7 @@ Locais canônicos de estado em disco e seu propósito:
 
 
 
-**Removido em v2:** `.dadaia/states/primary_context.json` (deletado por `dadaia migrate`; não recriado em nenhum code path v2). O conceito de "global primary" foi substituído por session binding via `eval $(dadaia context bind ...)`.
+**Removido em v2:** o antigo marcador global de contexto é deletado por `dadaia migrate` e não é recriado em nenhum code path v2. O conceito de "global primary" foi substituído por session binding via `eval $(dadaia context bind ...)`.
 
 ## Memory injection subsystem
 
@@ -202,7 +202,7 @@ Tech stack| `memory/tech-stack.md` verbatim (no strip pass)| ~1,200
 
 `dadaia_workspace/public/scripts/ctx-inject.sh` — lib-originated, projected to `.dadaia/scripts/ctx-inject.sh` by `dadaia public install`. Fires on every `UserPromptSubmit` event in Claude Code and on every `chat.message` in OpenCode. The script:
 
-  1. Resolves `$SPECS_DIR` from `$DADAIA_CONTEXT` or `primary_context.json`.
+  1. Resolves `$SPECS_DIR` from `$DADAIA_CONTEXT`, the bound session file, or explicit command flags.
   2. Checks a **first-message sentinel** at `.dadaia/tmp/ctx-inject-fired-<SESSION_ID>`. If the sentinel exists, emits only the context-name line and exits — no re-injection on subsequent turns of the same session.
   3. Creates the sentinel and emits the full payload inside bounded markers:
 
