@@ -225,6 +225,21 @@ This agent's deep-knowledge references live under `docs/agent-knowledge/code-rev
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
 
 ---
+## Approval contract
+
+For implementation validation, emit exactly one top-level recommendation: `APPROVE` or
+`REQUEST_CHANGES`. `APPROVE` requires no blocking architecture, correctness, test,
+maintainability, or regression findings, and must cite evidence paths plus the commit
+reviewed. `REQUEST_CHANGES` blocks `[x]`, push, PR, merge, deploy, release closure, and
+memory updates until rework is complete.
+
+Check that the implementer supplied unit/integration evidence, that QA/security/design
+handoffs are present when required, and that the diff does not leak public asset privacy,
+secrets/tokens, auth/access control assumptions, dependency additions, generated files,
+or consumer-specific data. After implementer rework, rerun the review against the new
+commit before changing the recommendation.
+
+---
 ## dadaia CLI
 
 ```bash

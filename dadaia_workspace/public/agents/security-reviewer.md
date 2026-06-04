@@ -242,6 +242,19 @@ This agent's deep-knowledge references live under `docs/agent-knowledge/security
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
 
 ---
+## Approval contract
+
+For implementation validation, emit exactly one top-level recommendation: `APPROVE` or
+`REQUEST_CHANGES`. `APPROVE` requires no blocking security/privacy findings and evidence
+paths for the commit reviewed. `REQUEST_CHANGES` is mandatory for public asset privacy
+violations, secrets/tokens, PII leakage, auth/access control gaps, unsafe dependency
+additions, generated-file leakage, deploy leakage, or consumer-specific data exposure.
+
+Always redact raw secret values. Include file:line evidence, command output references,
+and the commit reviewed. After implementer rework, rerun the review against the new commit
+before changing the recommendation.
+
+---
 ## dadaia CLI
 
 ```bash

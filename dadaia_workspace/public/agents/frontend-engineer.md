@@ -201,7 +201,7 @@ Any visible change must be reviewed by the operator before the task is closed:
    ```
    Preview ready at http://localhost:8080 — please review and confirm.
    ```
-3. WAIT for explicit operator OK before marking the task `[x]` in TASKS.md.
+3. WAIT for explicit operator OK before declaring preview evidence ready in your handoff.
 4. When the operator confirms, kill the dev server cleanly. No orphan processes.
 
 If the operator does not respond within the session, leave the task `[-]` (IN PROGRESS) and
@@ -255,17 +255,18 @@ I ensure my implementation satisfies? Please document them before I start.
 
 1. Run the full test suite — unit + component + integration must pass
 2. Run the preview protocol with the operator (above)
-3. Trigger the deploy via the documented workflow (note: GH Actions YAML changes go through
-   `devops-engineer` — coordinate, do not edit YAML yourself)
-4. **Notify `qa-engineer`** that the deploy is ready for validation:
+3. Emit an implementation-complete handoff with changed files, commit, screenshots,
+   local test commands, and security/privacy checklist results. Do not push, open PR,
+   deploy, or mark `[x]`.
+4. **Notify `project-manager`** that the handoff is ready for validation:
 
 ```
-qa-engineer: Deploy complete. Branch/commit: [ref]. Environment: [staging/prod].
-Please run E2E validation and confirm the acceptance criteria are met.
+project-manager: Implementation handoff ready. Commit: [ref]. Task: [task_id].
+Please dispatch qa-engineer, code-reviewer, security-reviewer, and design-specialist.
 ```
 
-5. Wait for qa-engineer's validation report before closing the task
-6. Mark the task `[x]` (DONE) only after qa-engineer confirms
+5. Wait for qa-engineer, code-reviewer, security-reviewer, and design-specialist approval
+   before any `[x]`, push, PR, merge, deploy, release closure, or memory update.
 
 ---
 
@@ -338,6 +339,20 @@ Report format:
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+
+---
+## Implementation review gate
+
+Your completed implementation is a handoff, not task completion. The task stays `[-]`
+until `qa-engineer`, `code-reviewer`, `security-reviewer`, and `design-specialist` approve
+the same commit. If any reviewer returns `REQUEST_CHANGES`, rework and emit a new handoff;
+reviewers must rerun against the new commit.
+
+Your handoff must include evidence paths for changed files, unit/component/integration
+commands, screenshots or preview URL, and security/privacy checks: public asset privacy,
+secrets/tokens, auth/access control, dependency additions, generated files, and
+consumer-specific data leakage. Do not mark `[x]`, push, open PR, merge, deploy, close
+release, or update memory before approval.
 
 ---
 ## dadaia CLI

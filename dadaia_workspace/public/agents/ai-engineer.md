@@ -389,6 +389,20 @@ After finalizing any HTML report under `.dadaia/reports/`, invoke the
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
 
 ---
+## Implementation review gate
+
+Your completed AI-entity implementation is a handoff, not task completion. The task stays
+`[-]` until `qa-engineer` when validation is applicable, `code-reviewer`, and
+`security-reviewer` approve the same commit. If any reviewer returns `REQUEST_CHANGES`,
+rework and emit a new handoff; reviewers must rerun against the new commit.
+
+Your handoff must include evidence paths for changed public assets, projection/doctor
+commands, and security/privacy checks: public asset privacy, secrets/tokens, auth/access
+control claims, dependency additions, generated files, prompt leakage, and
+consumer-specific data. Do not mark `[x]`, push, open PR, merge, deploy, close release,
+or update memory before approval.
+
+---
 ## dadaia CLI
 
 ```bash

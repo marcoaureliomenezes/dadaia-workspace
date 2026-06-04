@@ -248,17 +248,17 @@ During implementation:
 
 After implementation:
 1. Run the full pytest suite — unit + integration must pass.
-2. Trigger the deploy via GitHub Actions (push to the appropriate branch or workflow
-   dispatch). YAML edits go through `devops-engineer`.
-3. Notify `qa-engineer` for validation:
+2. Emit an implementation-complete handoff with commit, changed files, test commands,
+   and security/privacy checklist results. Do not push, open PR, deploy, or mark `[x]`.
+3. Notify `project-manager` to fan out QA, code review, and security review:
 
 ```
-qa-engineer: Deploy complete. Branch/commit: [ref]. Environment: [staging/prod].
-Please run E2E validation and confirm the acceptance criteria are met.
+project-manager: Implementation handoff ready. Commit: [ref]. Task: [task_id].
+Please dispatch qa-engineer, code-reviewer, and security-reviewer for approval.
 ```
 
-4. Wait for qa-engineer's validation report before closing the task.
-5. Mark the task `[x]` (DONE) only after qa-engineer confirms.
+4. Wait for all required validator approvals before any `[x]`, push, PR, merge, deploy,
+   release closure, or memory update.
 
 ### With ai-engineer (boundary)
 
@@ -336,6 +336,19 @@ directory.
 **Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
 
 **Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+
+---
+## Implementation review gate
+
+Your completed implementation is a handoff, not task completion. The task stays `[-]`
+until `qa-engineer`, `code-reviewer`, and `security-reviewer` approve the same commit.
+If any reviewer returns `REQUEST_CHANGES`, rework and emit a new handoff; reviewers must
+rerun against the new commit.
+
+Your handoff must include evidence paths for changed files, unit/integration commands,
+and security/privacy checks: public asset privacy, secrets/tokens, auth/access control,
+dependency additions, generated files, and consumer-specific data leakage. Do not mark
+`[x]`, push, open PR, merge, deploy, close release, or update memory before approval.
 
 ---
 ## dadaia CLI
