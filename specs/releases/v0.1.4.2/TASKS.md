@@ -132,7 +132,7 @@ Evidence:
 
 ### T-BUG-07 — Define strict implementation-review QA contract
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** product-engineer
 - **Target files:** `dadaia_workspace/public/skills/project-orchestration/SKILL.md`,
   `dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md`,
