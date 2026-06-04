@@ -157,7 +157,7 @@ names, hostnames, or private paths from `public/` assets per Constitution §2.
 
 ### T-HARD-11 — Propagate asset chain and verify all ACs
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** devops-engineer
 - **Target files:** `.dadaia/agentic/` (staging), `.claude/`, `.codex/`,
   `.opencode/`, `.agents/` (projections — generated, not committed in lib)
