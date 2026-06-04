@@ -73,17 +73,16 @@ class ReportRetentionService:
 
         if self._reports_root.exists():
             for report in sorted(self._reports_root.rglob("*.html")):
-                if not report.is_file():
+                if not report.is_file() or not self._is_under(report, self._reports_root):
                     continue
                 artifact = self._workspace_ref(report)
+                handoffs = handoffs_by_artifact.get(artifact, [])
                 records[artifact] = ReportRecord(
                     artifact_path=artifact,
                     report_path=report,
-                    handoff_paths=tuple(handoffs_by_artifact.get(artifact, [])),
-                    effective_timestamp=self._effective_timestamp(
-                        report, handoffs_by_artifact.get(artifact, [])
-                    ),
-                    important=artifact in important,
+                    handoff_paths=tuple(handoffs),
+                    effective_timestamp=self._effective_timestamp(report, handoffs),
+                    important=self._node_is_important(artifact, [report, *handoffs], important),
                     malformed_handoffs=tuple(malformed),
                 )
 
@@ -98,7 +97,7 @@ class ReportRetentionService:
                 report_path=report,
                 handoff_paths=tuple(handoffs),
                 effective_timestamp=self._effective_timestamp(report, handoffs),
-                important=artifact in important,
+                important=self._node_is_important(artifact, [report, *handoffs], important),
                 malformed_handoffs=tuple(malformed),
             )
 
@@ -136,7 +135,7 @@ class ReportRetentionService:
 
         handoffs_by_artifact, malformed = self._handoffs_by_artifact()
         for artifact, handoffs in handoffs_by_artifact.items():
-            if artifact in important:
+            if artifact in important or any(self._workspace_ref(p) in important for p in handoffs):
                 continue
             orphan_paths = tuple(p for p in handoffs if p not in seen_handoffs)
             if not orphan_paths:
@@ -254,6 +253,8 @@ class ReportRetentionService:
             if not root.exists():
                 continue
             for handoff in sorted(root.rglob("*.handoff.json")):
+                if not self._is_under(handoff, root):
+                    continue
                 try:
                     doc = json.loads(handoff.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, OSError):
@@ -263,10 +264,19 @@ class ReportRetentionService:
                 path = artifact.get("path") if isinstance(artifact, dict) else None
                 if isinstance(path, str) and path.startswith(".dadaia/reports/"):
                     result.setdefault(path, []).append(handoff)
+                    continue
+                stem_artifact = self._legacy_same_stem_artifact(handoff)
+                if stem_artifact is not None:
+                    result.setdefault(stem_artifact, []).append(handoff)
         return result, malformed
 
     def _effective_timestamp(self, report: Path | None, handoffs: list[Path]) -> dt.datetime:
-        for handoff in sorted(handoffs, key=lambda p: 0 if self._is_under(p, self._handoff_root) else 1):
+        timestamp_handoffs = (
+            [handoff for handoff in handoffs if self._is_under(handoff, self._handoff_root)]
+            if report is not None
+            else handoffs
+        )
+        for handoff in timestamp_handoffs:
             try:
                 doc = json.loads(handoff.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
@@ -326,9 +336,10 @@ class ReportRetentionService:
                 raise ValueError("handoff cannot be resolved to a report artifact") from exc
             artifact = doc.get("artifact", {}) if isinstance(doc, dict) else {}
             artifact_path = artifact.get("path") if isinstance(artifact, dict) else None
-            if not isinstance(artifact_path, str):
-                raise ValueError("handoff artifact.path is missing")
-            ref = artifact_path
+            if isinstance(artifact_path, str):
+                ref = artifact_path
+            else:
+                return self._workspace_ref(handoff)
         elif not ref.startswith(".dadaia/reports/"):
             ref = f".dadaia/reports/{ref}"
         report = self._artifact_to_report_path(ref)
@@ -350,6 +361,21 @@ class ReportRetentionService:
     def _workspace_ref(self, path: Path) -> str:
         return path.resolve().relative_to(self._workspace_root).as_posix()
 
+    def _legacy_same_stem_artifact(self, handoff: Path) -> str | None:
+        if not self._is_under(handoff, self._reports_root) or not handoff.name.endswith(
+            ".handoff.json"
+        ):
+            return None
+        report = handoff.with_name(handoff.name.removesuffix(".handoff.json") + ".html")
+        if report.is_file() and self._is_under(report, self._reports_root):
+            return self._workspace_ref(report)
+        return None
+
+    def _node_is_important(self, artifact: str, paths: list[Path], important: set[str]) -> bool:
+        if artifact in important:
+            return True
+        return any(self._workspace_ref(path) in important for path in paths)
+
     def _is_mutable_runtime_path(self, path: Path) -> bool:
         resolved = path.resolve()
         return self._is_under(resolved, self._reports_root) or self._is_under(
@@ -368,14 +394,21 @@ class ReportRetentionService:
 
     def _load_state(self) -> dict[str, object]:
         if not self._state_path.exists():
-            return {"important": {}}
+            return {"version": 1, "important": {}}
         try:
             data = json.loads(self._state_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
-            return {"important": {}}
-        return data if isinstance(data, dict) else {"important": {}}
+            return {"version": 1, "important": {}}
+        if not isinstance(data, dict):
+            return {"version": 1, "important": {}}
+        data.setdefault("version", 1)
+        data.setdefault("important", {})
+        return data
 
     def _save_state(self, state: dict[str, object]) -> None:
+        state.setdefault("version", 1)
+        if not isinstance(state.get("important"), dict):
+            state["important"] = {}
         self._states_root.mkdir(parents=True, exist_ok=True)
         self._state_path.write_text(
             json.dumps(state, indent=2, sort_keys=True) + "\n",
