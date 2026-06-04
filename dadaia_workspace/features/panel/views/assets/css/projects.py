@@ -105,7 +105,12 @@ PROJECTS_CSS: str = """
   margin-top: var(--space-sm);
 }
 
-.session-row {
+/* Scoped to the project card's zone-C. This selector MUST stay scoped: a bare
+   `.session-row` collides with the Sessions-table rows (<tr class="session-row">
+   in sessions.js) — all panel CSS is bundled into one document, so an unscoped
+   rule here turns every sessions-table body row into a flexbox and breaks the
+   table out of its column grid. Keep it under .card-zone-c. */
+.card-zone-c .session-row {
   display: flex;
   align-items: center;
   gap: 0.4rem;
