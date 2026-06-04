@@ -79,7 +79,7 @@ Evidence:
 
 ### T-BUG-04 — Make Codex dispatcher capabilities truthful
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Target files:** `dadaia_workspace/infrastructure/codex_agent_dispatcher.py`,
   `dadaia_workspace/features/orchestration/**`, relevant tests
