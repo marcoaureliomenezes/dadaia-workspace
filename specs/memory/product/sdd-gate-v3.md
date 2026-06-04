@@ -4,10 +4,9 @@ title: sdd-gate-v3
 category: product
 tldr: hook PreToolUse (RULE A/B/D/E/C) + PostToolUse sdd-post-gate.sh (heartbeat);
   RULE E valida DADAIA_SESSION_ID, mode-based path-policy matrix, ownership do Loc...
-summary: hook PreToolUse (RULE A/B/D/E/C) + PostToolUse sdd-post-gate.sh (heartbeat);
-  RULE E valida DADAIA_SESSION_ID, mode-based path-policy matrix, ownership do Lock
-  3; IMPLEMENTATION resolve release do lock file (não do ACTIVE.md); R-9 bloqueia
-  SPEC writes quando impl lock HELD.
+summary: hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh
+  (heartbeat); RULE E validates DADAIA_SESSION_ID, mode-based path policy, and
+  Lock 3 ownership; production writes without a bound session fail closed.
 tags:
 - sdd
 - gate
@@ -15,8 +14,8 @@ tags:
 - enforcement
 agent_tier: self-pull
 token_estimate: 1372
-last_updated: '2026-06-01'
-release_origin: spec-context-session-locks-v1
+last_updated: '2026-06-04'
+release_origin: v0.1.4.1
 ---
 
 Assets: `.dadaia/scripts/sdd-spec-gate.sh` (PreToolUse) · `.dadaia/scripts/sdd-post-gate.sh` (PostToolUse) · Codex also projects `UserPromptSubmit` where supported · Closure: public-agentic-hygiene-codex-readiness
@@ -34,17 +33,21 @@ scripts decidem se o payload é relevante.
   * **RULE D (path-scope):** valida `file_path` contra `paths.write_allowlist` do frontmatter do agente ativo.
   * **RULE E (session + lock enforcement, T-13/T-8 completion):** valida identidade de sessão e ownership do implementation lock. Ver detalhes abaixo.
   * **RULE C (task marker):** exige que exista pelo menos uma task `[-]` em `specs/releases/<active-release-id>/TASKS.md`. Para sessões IMPLEMENTATION-mode, o release ativo é resolvido do lock file — não do `ACTIVE.md` (T-8 completion, ADR D-9).
+  * **RULE F (temporary paths):** permite imediatamente writes sob `.dadaia/tmp/` antes das checagens de produção.
 
 
 
-Fail-open: qualquer erro interno → allow (nunca bloqueia trabalho legítimo por crash do hook). `DADAIA_SESSION_ID` ausente → fail-open com warning em `/tmp/sdd-gate.log` (compatibilidade retroativa: sessões sem bind continuam funcionando sem proteção de lock).
+Fail-open remains only for internal hook crashes. Write-like tools with no
+parseable target path fail closed, and production writes without
+`DADAIA_SESSION_ID` fail closed with an orientation message to bind an
+implementation session. Temporary paths remain allowed by RULE F.
 
 ### RULE E — Session identity resolution
 
 Ordem de resolução da identidade da sessão (a mesma em todos os runtimes):
 
   1. **`DADAIA_SESSION_ID` env var** — exportado por `eval $(dadaia context bind ...)`. É a chave estável e portável. O gate usa este como primary.
-  2. **Fail-open** — se ausente, gate loga warning e exit 0. Lock enforcement só ativa quando a identidade está estabelecida.
+  2. **Fail-closed for production paths** — se ausente, o gate bloqueia e orienta o operador a rodar `eval $(dadaia context bind <ctx> --mode implementation --release <release-id>)`.
 
 
 
@@ -54,7 +57,7 @@ O `session_id` nativo do stdin payload do Claude Code é usado apenas para corre
 
 Modo de sessão| Código produção (`repos/<slug>/`)| `specs/memory/**`| `releases/<id>/SPEC.md` (impl lock HELD)| `releases/<id>/TASKS.md`| `.dadaia/reports/**`
 ---|---|---|---|---|---
-Sem sessão (fail-open)| Allowed (cai para RULE C)| Allowed| Allowed| Allowed| Allowed
+Sem sessão| BLOCK para código produção; `.dadaia/tmp/**` allowed| BLOCK| BLOCK| BLOCK| Allowed
 READ| BLOCK| BLOCK| BLOCK| BLOCK| Allowed
 SPEC| BLOCK| Allowed| BLOCK (R-9)| BLOCK (R-9)| Allowed
 IMPLEMENTATION (owns lock)| Allowed| Allowed| BLOCK (read-only once impl started)| Allowed| Allowed
@@ -69,7 +72,7 @@ BOUND_REVIEW (mesmo context/release)| BLOCK (read-only)| BLOCK (read-only)| BLOC
 
   1. Agente invoca uma tool de escrita (ex. `Write` em `dadaia_workspace/foo.py`).
   2. Claude Code (ou Codex/OpenCode) executa o hook `sdd-spec-gate.sh` passando JSON em stdin com tool_name + file_path.
-  3. O gate resolve `WORKSPACE_ROOT`, `PRIMARY_SLUG`, `PRIMARY_SPECS`; lê `releases/ACTIVE.md` para phase; lê `DADAIA_SESSION_ID` do env.
+  3. O gate resolve `WORKSPACE_ROOT`, context/specs path, `releases/ACTIVE.md` para phase, e `DADAIA_SESSION_ID` do env. Para Codex `apply_patch`, extrai o target path dos headers `*** Add/Update/Delete File:`.
   4. Aplica regras A, B, D, E, C nessa ordem. A primeira regra que decida block-or-allow encerra o gate.
   5. Allow → exit 0 (silencioso); Block → STDOUT JSON `{"decision":"block","reason":"..."}` com mensagem orientada e owner session_id quando relevante.
   6. Após o allow (PostToolUse), `sdd-post-gate.sh` renova `last_seen_at` do Lock 3 atomicamente (`tmp → os.replace()`) e appenda evento HEARTBEAT em `lock-events.jsonl`.
@@ -96,7 +99,7 @@ sequenceDiagram
     G->>G: RULE D: path-scope allowlist check
     G->>S: read session (DADAIA_SESSION_ID)
     alt DADAIA_SESSION_ID absent
-        G-->>PreH: exit 0 (fail-open)
+        G-->>PreH: block production write; tmp paths were already allowed by RULE F
     else session present
         G->>G: check staleness (last_seen_at + TTL)
         G->>L: read impl lock (if IMPLEMENTATION mode)
@@ -152,5 +155,5 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 Runtime| PreToolUse| PostToolUse| Observação
 ---|---|---|---
 Claude Code| `.claude/settings.json hooks.PreToolUse[*]`| `hooks.PostToolUse[*]`| Shell script direto; ambos instalados via `dadaia public install --target claude`
-Codex| `.codex/hooks.json pre_tool_call`| `post_tool_call`| Shell script direto; instalado via `dadaia public install --target codex`
+Codex| `.codex/hooks.json` `PreToolUse` matcher for `apply_patch`/`Edit`/`Write`| `PostToolUse` same write matcher| Shell script direto; `UserPromptSubmit` injects JSON additional context via `DADAIA_HOOK_OUTPUT=codex-json`; instalado via `dadaia public install --target codex`
 OpenCode| Plugin TS `sdd-gate.ts` (`tool.execute.before`)| Inline no path allow do pre-gate (fallback OQ-3)| OpenCode não suporta shell post-hook separado; heartbeat inlineado no exit path do sdd-spec-gate.sh; doctor reporta `[unsupported]` para PostToolUse target opencode — esperado.
