@@ -315,3 +315,25 @@ def test_validate_file_marks_hash_mismatch_invalid(tmp_path: Path):
     assert result.valid is False
     assert result.hash_status == "mismatch"
     assert any("artifact hash check failed" in error.message for error in result.errors)
+
+
+def test_validate_file_without_artifact_path_does_not_crash(tmp_path: Path):
+    fake = FakeHandoffValidator(canned_errors=[])
+    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
+    handoff_path = tmp_path / "handoff.handoff.json"
+    doc: dict[str, object] = {
+        "schema_version": "handoff-v1",
+        "agent": "software-engineer",
+        "context": "dadaia-workspace",
+        "produced_at": "2026-05-16T23:29:05Z",
+        "artifact": {
+            "type": "report",
+            "content_hash": "b" * 64,
+        },
+    }
+    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+
+    result = service.validate_file(handoff_path)
+
+    assert result.valid is True
+    assert result.hash_status is None
