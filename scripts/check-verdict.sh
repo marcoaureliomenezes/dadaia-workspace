@@ -63,6 +63,11 @@ if [ -z "$RELEASE_ID" ]; then
   exit 1
 fi
 
+if [ "$(realpath -m "$qa_handoff")" = "$(realpath -m "$sec_handoff")" ]; then
+  echo "[verdict-gate] FAIL: qa-engineer and security-reviewer handoffs must be distinct files."
+  exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # Helper: check one handoff
 # ---------------------------------------------------------------------------
@@ -82,8 +87,14 @@ check_handoff() {
   fi
 
   verdict=$(jq -r '.verdict // empty' "$path" 2>/dev/null || true)
+  agent=$(jq -r '.agent // empty' "$path" 2>/dev/null || true)
   release_id=$(jq -r '.release_id // empty' "$path" 2>/dev/null || true)
   context=$(jq -r '.context // empty' "$path" 2>/dev/null || true)
+
+  if [ "$agent" != "$label" ]; then
+    echo "[verdict-gate] FAIL: ${label} handoff agent '${agent}' does not match required '${label}'."
+    failed=1
+  fi
 
   if [ "$release_id" != "$RELEASE_ID" ]; then
     echo "[verdict-gate] FAIL: ${label} handoff release_id '${release_id}' does not match required '${RELEASE_ID}'."

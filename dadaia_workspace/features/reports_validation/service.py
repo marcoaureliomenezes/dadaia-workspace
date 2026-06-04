@@ -96,7 +96,7 @@ class ReportsValidationService:
 
         errors = list(self._validator.validate(doc))
         hash_status = None
-        if not errors:
+        if not errors and self._artifact_path(doc):
             hash_status = self.check_hash(path)
             if hash_status != "match":
                 errors.append(
@@ -149,6 +149,8 @@ class ReportsValidationService:
         artifact_info = doc.get("artifact", {})
         assert isinstance(artifact_info, dict)
         artifact_rel = str(artifact_info.get("path", ""))
+        if not artifact_rel:
+            return "missing_artifact"
         expected_hash = str(artifact_info.get("content_hash", ""))
 
         artifact_path = self._resolve_artifact_path(handoff_path, artifact_rel)
@@ -186,3 +188,11 @@ class ReportsValidationService:
         if len(parts) >= 2 and parts[-2:] == (".dadaia", "handoff"):
             return handoff_root.parent.parent
         return None
+
+    @staticmethod
+    def _artifact_path(doc: dict[str, object]) -> str | None:
+        artifact = doc.get("artifact", {})
+        if not isinstance(artifact, dict):
+            return None
+        path = artifact.get("path")
+        return path if isinstance(path, str) and path else None
