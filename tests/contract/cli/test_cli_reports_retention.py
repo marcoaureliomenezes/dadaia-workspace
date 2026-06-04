@@ -120,3 +120,21 @@ def test_reports_cleanup_rejects_non_positive_duration(
     assert "greater than zero" in zero.output
     assert negative.exit_code == 2
     assert "greater than zero" in negative.output
+
+
+def test_reports_status_json_exposes_retention_counters(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    _old_report(tmp_path)
+
+    result = _runner.invoke(app, ["reports", "status", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["report_count"] == 1
+    assert payload["stale_report_count"] == 1
+    assert payload["important_report_count"] == 0
+    assert payload["malformed_state"] is False

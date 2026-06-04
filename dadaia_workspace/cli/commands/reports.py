@@ -230,6 +230,29 @@ def important(
     raise typer.Exit(0)
 
 
+@app.command(name="status")
+def status(
+    older_than: str = typer.Option("48h", "--older-than", help="TTL threshold, e.g. 48h or 2d."),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON instead of text."
+    ),
+) -> None:
+    """Show report-retention counters without deleting anything."""
+    service = _retention_service()
+    try:
+        ttl = _parse_duration(older_than)
+    except typer.BadParameter as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(2) from None
+    payload = service.status(older_than=ttl)
+    if json_output:
+        typer.echo(_json.dumps(payload))
+        raise typer.Exit(0)
+    for key, value in payload.items():
+        console.print(f"{key}: {value}")
+    raise typer.Exit(0)
+
+
 # ---------------------------------------------------------------------------
 # validate subcommand
 # ---------------------------------------------------------------------------
