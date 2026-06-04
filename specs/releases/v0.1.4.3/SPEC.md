@@ -82,10 +82,10 @@ control-plane scoped AGENTS files.
 The public asset source contains a concise handoff scoped AGENTS file and the
 installer projects it to `.dadaia/handoff/AGENTS.md`.
 
-### AC-2: Report sidecar language removed
+### AC-2: Report-adjacent handoff language removed
 
-Default public instructions no longer require handoff JSON to be adjacent to
-HTML reports in `.dadaia/reports/`.
+Default public instructions require handoff JSON under `.dadaia/handoff/`, not
+beside HTML reports in `.dadaia/reports/`.
 
 ### AC-3: CLI default updated
 
