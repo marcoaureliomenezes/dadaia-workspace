@@ -60,7 +60,7 @@ Evidence:
 
 ### T-BUG-03 — Remove session-bind primary residue from public assets and memory
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Target files:** `dadaia_workspace/public/**`, `specs/memory/**`
 - **Preconditions:** T-BUG-01 done
