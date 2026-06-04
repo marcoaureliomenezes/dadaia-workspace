@@ -201,7 +201,7 @@ Evidence:
 
 ### T-BUG-10 — Propagate assets and verify release
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** devops-engineer
 - **Target files:** `.dadaia/agentic/`, `.claude/`, `.codex/`, `.opencode/`,
   `.agents/` (generated projections)
