@@ -76,7 +76,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-06 — Doctor invariants for orphan/stale/duplicate locks
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python + devops-engineer
 - **Write set:**
   - `dadaia_workspace/features/specs/` — doctor check implementations
