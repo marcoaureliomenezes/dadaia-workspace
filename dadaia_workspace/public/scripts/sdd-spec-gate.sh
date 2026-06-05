@@ -137,6 +137,13 @@ if [ -z "$CONTEXT_SLUG" ]; then
     _log "WARN context-resolution: could not resolve bound context (DADAIA_CONTEXT unset, spec_contexts.json absent/empty, no session); gate will fail-open on IS_PROD check"
 fi
 
+# T-R1-04: Sanitize CONTEXT_SLUG before any path construction (CWE-22).
+# Strip all characters except alphanumerics, hyphens, and underscores.
+# This prevents path traversal (e.g. "../../etc") injected via DADAIA_CONTEXT env var.
+if [ -n "$CONTEXT_SLUG" ]; then
+    CONTEXT_SLUG=$(printf '%s' "$CONTEXT_SLUG" | tr -cd 'a-zA-Z0-9_-')
+fi
+
 # Resolve active release id, segment, and phase from <CONTEXT_SPECS>/releases/ACTIVE.md
 # Schema v2 (ADR-1/ADR-5): an optional `segment:` line (alpha-N/rc-N) selects the
 # active segment's TASKS.md. Absent/`none` segment → flat release (back-compat).
@@ -533,11 +540,16 @@ PYEOF
     # resolved context. The lock file records session_id, so `dadaia context bind`
     # from ANY shell (including an in-session `! dadaia context bind ...`) unblocks
     # writes — no relaunch. A stale lock is never adopted.
-    if [ -z "$sess_id" ] && [ -n "$CONTEXT_SLUG" ]; then
+    if [ -z "$sess_id" ] && [ -n "$CONTEXT_SLUG" ] && [ -n "$ACTIVE_RELEASE" ]; then
         local _semaf_lockdir="$WS/.dadaia/locks/implementation"
         if [ -d "$_semaf_lockdir" ]; then
             local _semaf_lf
-            for _semaf_lf in "$_semaf_lockdir/${CONTEXT_SLUG}__"*.json; do
+            # T-R1-04: narrow the lock lookup to the ACTIVE release only. The old
+            # glob ${CONTEXT_SLUG}__*.json adopted ANY release's lock for this
+            # context — non-deterministic when two releases held locks at once.
+            # Match the active release exactly so env-free adoption is stable and
+            # a lock for a different (e.g. older) release is never adopted.
+            for _semaf_lf in "$_semaf_lockdir/${CONTEXT_SLUG}__${ACTIVE_RELEASE}.json"; do
                 [ -f "$_semaf_lf" ] || continue
                 local _semaf_state
                 _semaf_state=$("$PYTHON_BIN" - "$_semaf_lf" 2>/dev/null <<'PYEOF'
@@ -780,7 +792,12 @@ except Exception:
     print("held")
 PYEOF
 )
-                        if [ "$lstate2" = "held" ]; then
+                        # T-R1-04: only adopt the held lock OWNED BY the resolved
+                        # session. The previous logic took the first held lock for
+                        # the context and compared afterwards, so an unrelated
+                        # release's lock (alphabetically earlier) shadowed the real
+                        # owner and produced a spurious "does not own the lock" block.
+                        if [ "$lstate2" = "held" ] && [ "$owner_sess" = "$sess_id" ]; then
                             found_owner="$owner_sess"
                             break
                         fi
