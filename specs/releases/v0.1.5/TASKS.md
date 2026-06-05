@@ -1,6 +1,6 @@
 # TASKS: v0.1.5 - bug-backlog-release-governance
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** v0.1.5
 **Owner:** product-engineer
 **Created:** 2026-06-04
@@ -58,7 +58,7 @@ applies the lib-origination + gate workflow per task.
 - **Acceptance:** concise always-on rule; projects to `.claude/rules/` + `.codex/rules/`.
 
 ### T-GATE-01 — Mandatory pre-push CI gate
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python + devops-engineer
 - **Write set:** `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`; install
   wiring (`infrastructure/public_assets.py`); tests

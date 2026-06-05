@@ -1,6 +1,6 @@
 # PLAN: v0.1.5 - bug-backlog-release-governance
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** v0.1.5
 **Owner:** product-engineer
 **Created:** 2026-06-04
