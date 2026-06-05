@@ -468,16 +468,71 @@ _rule_e() {
     # Step 1 — Resolve DADAIA_SESSION_ID
     local sess_id="${DADAIA_SESSION_ID:-}"
 
-    # Step 1b (T-SEMA-01 / FEAT-SESSION-SEMAPHORE-01 root cause #1) —
-    # Env-free session resolution. A running agent runtime cannot inject
-    # DADAIA_SESSION_ID into its own (parent) environment, so requiring it from
-    # env alone fails closed whenever the runtime was not launched with the
-    # export — a stop-the-flow defect with no in-session recovery. Fallback:
-    # when the env var is absent, adopt the session that already owns a
-    # NON-STALE implementation lock for the resolved context. The lock file
-    # records session_id, so `dadaia context bind` from ANY shell (including an
-    # in-session `! dadaia context bind ...`) unblocks writes — no relaunch.
-    # A stale lock is never adopted. When the env var IS set it still wins.
+    # Step 1b (T-R1-01) — Runtime→session pointer file resolution.
+    # ctx-inject.sh writes .dadaia/sessions/runtime/<session_id>.ptr at session
+    # start (when DADAIA_SESSION_ID is set in the bind shell). The agent runtime
+    # process inherits DADAIA_SESSION_ID from the bind shell through the ptr file
+    # rather than requiring the env var to be re-exported into every spawned
+    # subprocess. Resolution: scan .dadaia/sessions/runtime/*.ptr; if exactly one
+    # fresh ptr file exists, adopt its session_id. Multiple ptr files (concurrent
+    # sessions) are not adopted — require env var or lock fallback.
+    # When the env var IS set, it always wins (Step 1 above).
+    if [ -z "$sess_id" ]; then
+        local _runtime_dir="$WS/.dadaia/sessions/runtime"
+        if [ -d "$_runtime_dir" ]; then
+            local _ptr_count=0
+            local _ptr_sess=""
+            local _pf
+            for _pf in "$_runtime_dir"/*.ptr; do
+                [ -f "$_pf" ] || continue
+                local _candidate
+                _candidate=$(cat "$_pf" 2>/dev/null)
+                [ -n "$_candidate" ] || continue
+                # Verify the session file exists and is non-stale
+                local _sf="$WS/.dadaia/sessions/${_candidate}.json"
+                if [ -f "$_sf" ]; then
+                    local _stale
+                    _stale=$("$PYTHON_BIN" - "$_sf" 2>/dev/null <<'PYEOF'
+import json, sys
+from datetime import datetime, timezone
+try:
+    d = json.load(open(sys.argv[1]))
+    ttl = int(d.get("ttl_seconds", 300))
+    ls = d.get("last_seen_at", "")
+    if not ls:
+        print("ok"); sys.exit(0)
+    elapsed = (datetime.now(tz=timezone.utc) - datetime.fromisoformat(ls.replace("Z", "+00:00"))).total_seconds()
+    print("stale" if elapsed > ttl else "ok")
+except Exception:
+    print("ok")
+PYEOF
+)
+                    if [ "$_stale" = "ok" ]; then
+                        _ptr_count=$(( _ptr_count + 1 ))
+                        _ptr_sess="$_candidate"
+                    fi
+                fi
+            done
+            if [ "$_ptr_count" -eq 1 ] && [ -n "$_ptr_sess" ]; then
+                sess_id="$_ptr_sess"
+                export DADAIA_SESSION_ID="$sess_id"
+                _log "RULE-E ptr-file: adopted session '$sess_id' from runtime ptr file (DADAIA_SESSION_ID was unset)"
+            elif [ "$_ptr_count" -gt 1 ]; then
+                _log "RULE-E ptr-file: multiple ($_ptr_count) active ptr files; cannot auto-adopt — require DADAIA_SESSION_ID env var"
+            fi
+        fi
+    fi
+
+    # Step 1c (T-SEMA-01 / FEAT-SESSION-SEMAPHORE-01 root cause #1) —
+    # Lock-file env-free session resolution (fallback when ptr file not available).
+    # A running agent runtime cannot inject DADAIA_SESSION_ID into its own (parent)
+    # environment, so requiring it from env alone fails closed whenever the runtime
+    # was not launched with the export — a stop-the-flow defect with no in-session
+    # recovery. Fallback: when the env var is absent and no ptr file resolved,
+    # adopt the session that already owns a NON-STALE implementation lock for the
+    # resolved context. The lock file records session_id, so `dadaia context bind`
+    # from ANY shell (including an in-session `! dadaia context bind ...`) unblocks
+    # writes — no relaunch. A stale lock is never adopted.
     if [ -z "$sess_id" ] && [ -n "$CONTEXT_SLUG" ]; then
         local _semaf_lockdir="$WS/.dadaia/locks/implementation"
         if [ -d "$_semaf_lockdir" ]; then
