@@ -116,7 +116,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-D5-02 — Hard PreToolUse gate for specs/backlog/**
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Write set:**
   - Gate hook source (mirrors memory-atomicity gate pattern)
