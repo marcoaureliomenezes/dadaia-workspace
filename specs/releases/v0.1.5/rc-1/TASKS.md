@@ -90,7 +90,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-07 — E2E concurrent-session test
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:** `tests/` — new E2E test for concurrent writers
 - **Acceptance:**
