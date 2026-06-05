@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
 
 import typer
 
+from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_hotfix_release
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.infrastructure.bug_reporter import (
     load_open_bugs,
     mark_bugs_in_release,

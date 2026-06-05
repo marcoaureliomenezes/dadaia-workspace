@@ -43,6 +43,9 @@ STALE_AGENTS = {
 }
 
 EXPECTED_SKILLS = {
+    "ai-context-engineering",
+    "ai-harness-claude-code",
+    "ai-harness-codex",
     "dadaia-grill-me",
     "dadaia-handoff-emitter",
     "dadaia-release-closure",
@@ -58,6 +61,7 @@ EXPECTED_SKILLS = {
     "drift-detection",
     "frontend-design",
     "frontend-implementation-quality",
+    "harness-primitives",
     "project-orchestration",
     "ux-ui-review",
 }

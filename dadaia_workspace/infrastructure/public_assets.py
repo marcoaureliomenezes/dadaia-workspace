@@ -1978,9 +1978,7 @@ class FileSystemPublicAssetManager:
                 lowered = text.lower()
                 for term, reason in denylist:
                     if term.lower() in lowered:
-                        rel = (
-                            path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
-                        )
+                        rel = path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
                         findings.append(
                             f"[error] public-privacy:{rel.as_posix()}: contains '{term}' ({reason})"
                         )
@@ -2129,9 +2127,7 @@ class FileSystemPublicAssetManager:
                             {
                                 "type": "command",
                                 "command": "DADAIA_HOOK_OUTPUT=codex-json "
-                                + str(
-                                    workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"
-                                ),
+                                + str(workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"),
                                 "statusMessage": "Loading dadaia context",
                             }
                         ],

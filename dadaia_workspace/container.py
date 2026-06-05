@@ -9,6 +9,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
 from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
+from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
@@ -61,7 +62,6 @@ from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWork
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
-from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 
 
 def _states_dir(workspace_root: Path) -> Path:

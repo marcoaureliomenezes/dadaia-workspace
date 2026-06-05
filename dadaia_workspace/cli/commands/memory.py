@@ -7,9 +7,9 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.spec_artifacts.memory import memory_product_add
 from dadaia_workspace.features.specs.catalog import generate_catalog, write_catalog
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 
 app = typer.Typer(help="Memory catalog management commands.")
 product_app = typer.Typer(help="Product memory catalog commands.")

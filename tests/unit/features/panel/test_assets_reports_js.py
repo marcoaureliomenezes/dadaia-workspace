@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPORTS_JS = (
     Path(__file__).resolve().parents[4]
     / "dadaia_workspace"

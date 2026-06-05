@@ -89,15 +89,19 @@ class ReportRetentionService:
         for artifact, handoffs in handoffs_by_artifact.items():
             if artifact in records:
                 continue
-            report = self._artifact_to_report_path(artifact)
-            if report is None or not report.is_file() or report.suffix.lower() != ".html":
+            report_path = self._artifact_to_report_path(artifact)
+            if (
+                report_path is None
+                or not report_path.is_file()
+                or report_path.suffix.lower() != ".html"
+            ):
                 continue
             records[artifact] = ReportRecord(
                 artifact_path=artifact,
-                report_path=report,
+                report_path=report_path,
                 handoff_paths=tuple(handoffs),
-                effective_timestamp=self._effective_timestamp(report, handoffs),
-                important=self._node_is_important(artifact, [report, *handoffs], important),
+                effective_timestamp=self._effective_timestamp(report_path, handoffs),
+                important=self._node_is_important(artifact, [report_path, *handoffs], important),
                 malformed_handoffs=tuple(malformed),
             )
 
@@ -120,7 +124,8 @@ class ReportRetentionService:
                 continue
             paths = tuple(
                 p
-                for p in ((record.report_path,) if record.report_path else ()) + record.handoff_paths
+                for p in ((record.report_path,) if record.report_path else ())
+                + record.handoff_paths
                 if p is not None
             )
             candidates.append(
@@ -236,7 +241,9 @@ class ReportRetentionService:
         """Return retention counters for doctor/status surfaces."""
         reports = self.list_reports()
         candidates = self.cleanup_candidates(older_than=older_than)
-        stale_handoffs = sum(1 for c in candidates for p in c.paths if p.name.endswith(".handoff.json"))
+        stale_handoffs = sum(
+            1 for c in candidates for p in c.paths if p.name.endswith(".handoff.json")
+        )
         stale_reports = sum(1 for c in candidates for p in c.paths if p.suffix.lower() == ".html")
         live_handoffs = {handoff for report in reports for handoff in report.handoff_paths}
         handoffs_by_artifact, _malformed = self._handoffs_by_artifact()

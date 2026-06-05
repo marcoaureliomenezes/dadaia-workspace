@@ -1579,9 +1579,7 @@ class TestConfigGenerators:
         pre_tool_use = settings["hooks"]["PreToolUse"]
         # Collect all hook commands across all PreToolUse entries
         all_commands = [
-            str(hook["command"])
-            for entry in pre_tool_use
-            for hook in entry.get("hooks", [])
+            str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
         assert any(cmd.endswith("root-whitelist-gate.sh") for cmd in all_commands), (
             "root-whitelist-gate.sh not found in claude settings PreToolUse hooks"
@@ -1594,9 +1592,7 @@ class TestConfigGenerators:
         pre_tool_use = config["hooks"]["PreToolUse"]
         # Collect all hook commands across all PreToolUse entries
         all_commands = [
-            str(hook["command"])
-            for entry in pre_tool_use
-            for hook in entry.get("hooks", [])
+            str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
         assert any(cmd.endswith("root-whitelist-gate.sh") for cmd in all_commands), (
             "root-whitelist-gate.sh not found in codex hooks PreToolUse hooks"
@@ -1637,7 +1633,9 @@ class TestConfigGenerators:
         repo_agents.parent.mkdir(parents=True)
         repo_agents.write_text("# AGENTS\n", encoding="utf-8")
         (states_dir / "spec_contexts.json").write_text(
-            json.dumps({"version": 2, "contexts": [{"name": "My Project", "repo_slug": repo_slug}]}),
+            json.dumps(
+                {"version": 2, "contexts": [{"name": "My Project", "repo_slug": repo_slug}]}
+            ),
             encoding="utf-8",
         )
         config = manager._opencode_config(tmp_path)

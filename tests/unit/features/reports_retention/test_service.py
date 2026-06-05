@@ -9,7 +9,6 @@ import pytest
 
 from dadaia_workspace.features.reports_retention import ReportRetentionService
 
-
 NOW = dt.datetime(2026, 6, 4, 12, 0, tzinfo=dt.UTC)
 
 
