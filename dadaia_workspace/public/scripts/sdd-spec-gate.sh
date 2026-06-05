@@ -140,8 +140,13 @@ fi
 # T-R1-04: Sanitize CONTEXT_SLUG before any path construction (CWE-22).
 # Strip all characters except alphanumerics, hyphens, and underscores.
 # This prevents path traversal (e.g. "../../etc") injected via DADAIA_CONTEXT env var.
+# CONTEXT_SPECS is REBUILT from the sanitized slug here: the resolution steps above
+# constructed it from the raw (pre-sanitization) value, so it must be re-derived or
+# a traversal slug would still reach every downstream file read (T-SHIP-03 Finding 1).
 if [ -n "$CONTEXT_SLUG" ]; then
     CONTEXT_SLUG=$(printf '%s' "$CONTEXT_SLUG" | tr -cd 'a-zA-Z0-9_-')
+    CONTEXT_SPECS="$WS/repos/$CONTEXT_SLUG/specs"
+    _log "context-resolution sanitized: slug=$CONTEXT_SLUG specs=$CONTEXT_SPECS"
 fi
 
 # Resolve active release id, segment, and phase from <CONTEXT_SPECS>/releases/ACTIVE.md

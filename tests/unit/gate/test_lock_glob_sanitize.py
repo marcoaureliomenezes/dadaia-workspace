@@ -259,3 +259,30 @@ def test_tr104_slug_sanitization_removes_special_chars(workspace: Path) -> None:
 
     assert result.returncode == 0
     assert result.stdout == "" or "block" not in result.stdout
+
+
+def test_tr104_context_specs_rebuilt_from_sanitized_slug(workspace: Path) -> None:
+    """T-SHIP-03 Finding 1: CONTEXT_SPECS must be rebuilt from the SANITIZED slug.
+
+    The resolution steps construct CONTEXT_SPECS from the raw DADAIA_CONTEXT before
+    sanitization, so a traversal slug would otherwise reach every downstream file
+    read. The gate logs the post-sanitization path; assert it contains no '..' and
+    stays under the workspace root.
+    """
+    _install_gate(workspace)
+    safe_slug = "my-proj"
+    specs = workspace / "repos" / safe_slug / "specs"
+    _make_active_release(specs, "v1")
+    _make_context(workspace, safe_slug)
+
+    target = workspace / "repos" / safe_slug / "src" / "main.py"
+    _run_gate(workspace, target, extra_env={"DADAIA_CONTEXT": "my-proj/../../../etc"})
+
+    log = (workspace / ".dadaia" / "test.log").read_text()
+    sanitized = [ln for ln in log.splitlines() if "context-resolution sanitized" in ln]
+    assert sanitized, f"expected a 'context-resolution sanitized' log line; got: {log!r}"
+    specs_field = sanitized[-1].split("specs=", 1)[1].strip()
+    assert ".." not in specs_field, f"CONTEXT_SPECS still contains traversal: {specs_field!r}"
+    assert specs_field.startswith(str(workspace)), (
+        f"CONTEXT_SPECS escaped the workspace root: {specs_field!r}"
+    )
