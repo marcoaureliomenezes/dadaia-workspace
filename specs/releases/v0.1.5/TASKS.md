@@ -88,3 +88,77 @@ applies the lib-origination + gate workflow per task.
 - **Write set:** projections (generated)
 - **Acceptance:** `public stage` + `install --force` + `doctor` exit 0; manual
   persona-projection check; full CI-equivalent suite green locally.
+
+---
+
+## Engine tasks (ADR-5 — alpha/rc mechanics folded into v0.1.5)
+
+### T-ENG-01 — ACTIVE.md schema v2 (`segment:` field) + readers
+- **Status:** [ ]
+- **Owner:** software-engineer-python
+- **Write set:** `dadaia_workspace/features/specs/doctor.py` (`_read_active_md`),
+  any other ACTIVE.md parser; tests
+- **Acceptance:** ACTIVE.md may carry `segment:` (e.g. `alpha-2`); readers return
+  `(release, segment, phase)`; `segment` optional/None for flat releases (back-compat);
+  unit tests for both flat and segmented ACTIVE.md.
+
+### T-ENG-02 — Scaffolder for `alpha-N`/`rc-N` segments
+- **Status:** [ ]
+- **Owner:** software-engineer-python
+- **Write set:** `dadaia_workspace/features/specs/scaffolder.py`; tests
+- **Acceptance:** `scaffold_release_segment(specs_dir, version, segment)` creates
+  `releases/v<x>/<segment>/{SPEC,PLAN,TASKS}.md` from templates; validates
+  `segment` matches `^(alpha|rc)-\d+$`; pure module + unit tests.
+
+### T-ENG-03 — CLI `dadaia specs release open` + `segment open`
+- **Status:** [ ]
+- **Owner:** software-engineer-python
+- **Write set:** `dadaia_workspace/cli/commands/specs.py`; tests
+- **Acceptance:** `dadaia specs release open v<x>` creates the parent + `alpha-1`
+  + sets ACTIVE; `dadaia specs segment open <alpha-N|rc-N>` opens the next segment
+  + updates ACTIVE `segment:`; CLI contract tests.
+
+### T-ENG-04 — Gate path-resolution to active segment
+- **Status:** [ ]
+- **Owner:** software-engineer-python + devops-engineer
+- **Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`; gate tests
+- **Acceptance:** when ACTIVE has a `segment:`, the gate searches
+  `releases/<ver>/<segment>/TASKS.md` for the `[-]` marker; flat releases still
+  resolve `releases/<release>/TASKS.md` (back-compat); gate-lock test coverage.
+
+### T-ENG-05 — Doctor: segment-aware checks
+- **Status:** [ ]
+- **Owner:** software-engineer-python
+- **Write set:** `dadaia_workspace/features/specs/doctor.py`; tests
+- **Acceptance:** SPEC-DOC-004 validates the active **segment's** SPEC/PLAN/TASKS;
+  the flat SemVer SPEC-DOC-016 is replaced by a segment-structure check
+  (`v<x>/<alpha|rc>-N/`); archived flat releases still pass; unit tests.
+
+### T-ENG-06 — `.gitignore` tracks segment files
+- **Status:** [ ]
+- **Owner:** devops-engineer
+- **Write set:** `.gitignore`
+- **Acceptance:** `releases/*/alpha-*/{SPEC,PLAN,TASKS,CLOSURE}.md` and
+  `rc-*/...` are tracked; segment dirs no longer ignored; flat policy preserved.
+
+### T-ENG-07 — Hotfix reconciliation (ADR-2)
+- **Status:** [ ]
+- **Owner:** software-engineer-python
+- **Write set:** `dadaia_workspace/cli/commands/specs.py`,
+  `dadaia_workspace/features/specs/scaffolder.py`, hotfix templates; tests
+- **Acceptance:** hotfix flows unified under the segment model (a hotfix release
+  opens `alpha-1`); flat-only assumptions retired or reconciled; tests updated.
+
+### T-ENG-08 — CI `feature/{version}` branch trigger
+- **Status:** [ ]
+- **Owner:** devops-engineer
+- **Write set:** `.github/workflows/ci.yml`
+- **Acceptance:** CI triggers on `feature/*` branches; branch-name validation for
+  `feature/<semver>`; existing triggers preserved.
+
+### T-ENG-09 — Skill docs updated for segments
+- **Status:** [ ]
+- **Owner:** ai-engineer
+- **Write set:** `dadaia_workspace/public/skills/{dadaia-workspace-spec-navigator,dadaia-release-closure,dadaia-task-manager,dadaia-workspace-spec-reviewer}/SKILL.md`
+- **Acceptance:** navigator resolves active segment; closure/task-manager/reviewer
+  reference `releases/<ver>/<segment>/`; projections verified.
