@@ -37,7 +37,7 @@ applies the lib-origination + gate workflow per task.
   dispatch flow + mandatory-grill gate; `.claude/` + `.codex/` projections verified.
 
 ### T-GOV-03 — Rewrite `project-orchestration` review contract + playbook
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/skills/project-orchestration/SKILL.md`;
   affected contract/e2e tests
