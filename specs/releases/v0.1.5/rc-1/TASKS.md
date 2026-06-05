@@ -183,7 +183,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R3-05 — ai-engineer persona specialization
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/agents/ai-engineer.md` + any new skill files identified in T-R3-01
 - **Acceptance:**
