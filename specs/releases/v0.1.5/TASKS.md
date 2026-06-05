@@ -67,7 +67,7 @@ applies the lib-origination + gate workflow per task.
   tests cover pass + fail paths; demonstrated blocking a deliberate failure.
 
 ### T-SANI-01 — Sanitize stale bugs/backlog + v0.1.3 draft
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** product-engineer
 - **Write set:** `specs/releases/v0.1.3/*` (disposition), `specs/backlog/*`,
   `specs/bugs/*`

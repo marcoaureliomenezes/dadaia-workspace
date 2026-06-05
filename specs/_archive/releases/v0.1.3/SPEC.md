@@ -5,6 +5,13 @@
 **Owner:** product-engineer
 **Created:** 2026-06-02
 
+> **ABANDONED — sanitized by v0.1.5 / T-SANI-01 (2026-06-05).** This Draft was
+> never implemented and is superseded: Codex runtime readiness was delivered
+> piecemeal across the v0.1.4 family (codex-agent-orchestration-parity, gate
+> env-free session resolution, ai-engineer harness mastery). Archived without a
+> CLOSURE; kept for history. Do not resume — open a fresh release if Codex
+> readiness work is still needed.
+
 ---
 
 ## 1. Objective
