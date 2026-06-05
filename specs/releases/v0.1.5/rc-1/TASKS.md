@@ -143,7 +143,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R3-02 — product-engineer persona specialization
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/agents/product-engineer.md` + any new skill files identified in T-R3-01
 - **Acceptance:**
