@@ -1,2 +1,3 @@
 release: v0.1.5
-phase: IMPLEMENTATION
+segment: rc-1
+phase: IMPLEMENT
