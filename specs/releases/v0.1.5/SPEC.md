@@ -24,9 +24,12 @@ A third deliverable was added from a v0.1.4 post-mortem (see §3.4): a **mandato
 pre-push CI gate**.
 
 This release delivers the **governance layer** (personas, skills, rules, ADRs,
-memory + the pre-push gate). The **structural engine** that physically creates
-`alpha-N/rc-N` folders (scaffolder, ACTIVE.md schema, gate path-resolution,
-doctor checks, CLI) is **out of scope** and deferred to **v0.1.6** (see §5).
+memory + the pre-push gate) AND — folded in per operator decision 2026-06-05
+(ADR-5) — the **structural engine** that physically creates `alpha-N/rc-N`
+folders (scaffolder, ACTIVE.md schema v2, gate path-resolution, doctor checks,
+CLI). The engine was originally deferred to v0.1.6; it is now in scope for v0.1.5.
+Any remaining "v0.1.6"/"deferred" wording below (§4, §5, ADR-1, ADR-2) is
+**superseded by ADR-5 and the T-ENG-\* tasks**.
 
 ## 2. Context & motivation
 
@@ -173,3 +176,25 @@ backlog TASKS cover the bug's acceptance). Stale/invalid items are **sanitized**
 **mandatory** when defining a release from bugs+backlog. Consequence: bugs can't
 be lost; backlog stays sanitized; releases start from refined understanding.
 Implemented by T-GOV-01..05.
+
+### ADR-5 — fold the alpha/rc engine into v0.1.5
+**Date:** 2026-06-05 · **Deciders:** operator, software-architect, product-engineer
+**Decision.** The structural engine that ADR-1/ADR-2 deferred to v0.1.6 is **folded
+into v0.1.5**. Rationale: v0.1.5 is unshipped on `feature/0.1.5`; building the
+engine in the same release avoids stacking a separate v0.1.6 branch on top of
+unmerged governance, and keeps model + mechanics in one coherent release. This
+**supersedes** the "engine = v0.1.6 / out of scope" wording in §1, §4, §5, ADR-1,
+and ADR-2. The engine is delivered by **T-ENG-01..09**:
+- **T-ENG-01** ACTIVE.md schema v2 (`segment:` field) + all readers + tests.
+- **T-ENG-02** scaffolder for `alpha-N`/`rc-N` segment folders + tests.
+- **T-ENG-03** CLI `dadaia specs release open` + `segment open` + tests.
+- **T-ENG-04** `sdd-spec-gate.sh` path-resolution to `releases/<ver>/<segment>/TASKS.md` + gate tests.
+- **T-ENG-05** doctor: segment-aware SPEC-DOC-004 + replace flat SemVer SPEC-DOC-016 with a segment check + tests.
+- **T-ENG-06** `.gitignore`: track `alpha-*/rc-*` segment SPEC/PLAN/TASKS/CLOSURE.
+- **T-ENG-07** hotfix reconciliation (ADR-2): unify `dadaia specs hotfix open` + supersede the flat track.
+- **T-ENG-08** CI `feature/{version}` branch trigger + branch-name validation.
+- **T-ENG-09** navigator/closure/task-manager/spec-reviewer skill docs updated for segments.
+
+**Consequence.** v0.1.5 grows from "govern now" to "govern + build the engine".
+The first release to physically use `alpha-N/rc-N` is the first one created with
+the new CLI after v0.1.5 ships (v0.1.5 itself remains authored flat — bootstrap).
