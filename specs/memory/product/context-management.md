@@ -3,25 +3,28 @@ slug: context-management
 title: context-management
 category: product
 tldr: multi-context lifecycle ALIVE/DEAD (sem global primary); session binding via
-  eval $(dadaia context bind --mode) exporta DADAIA_SESSION_ID; três camadas de lo...
+  eval $(dadaia context bind --mode) exporta DADAIA_SESSION_ID + escreve runtime ptr;
+  quatro camadas de locking (workspace fcntl / per-context fcntl / per-release Lock 3
+  JSON / per-context semaphore JSON com heartbeat TTL 300 s).
 summary: multi-context lifecycle ALIVE/DEAD (sem global primary); session binding
-  via eval $(dadaia context bind --mode) exporta DADAIA_SESSION_ID; três camadas de
-  locking (workspace fcntl / per-context fcntl / per-release Lock 3 JSON com heartbeat
-  TTL 300 s); dadaia migrate [--dry-run|--yes] (v1→v2); scaffold canonical tree v2;
-  CLIs dadaia release new, dadaia backlog new, dadaia bug new, dadaia memory product
-  add, dadaia migrate tree-v2.
+  via eval $(dadaia context bind --mode) exporta DADAIA_SESSION_ID e escreve
+  runtime ptr file (`.dadaia/sessions/runtime/<pid>.ptr`); quatro camadas de locking
+  (workspace fcntl / per-context fcntl / per-release Lock 3 JSON com heartbeat
+  TTL 300 s / per-context semaphore JSON); dadaia migrate [--dry-run|--yes] (v1→v2);
+  scaffold canonical tree v2; CLIs dadaia release new, dadaia backlog new, dadaia bug
+  new, dadaia memory product add, dadaia migrate tree-v2.
 tags:
 - context
 - lifecycle
 - session
 - locking
 agent_tier: self-pull
-token_estimate: 1658
-last_updated: '2026-06-04'
-release_origin: v0.1.4.2
+token_estimate: 1900
+last_updated: '2026-06-05'
+release_origin: v0.1.5
 ---
 
-CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2` · Closure: r2-lock-toctou-hardening-v1
+CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2` · Closure: v0.1.5/rc-1
 
 ## Propósito
 
@@ -39,21 +42,23 @@ stateDiagram-v2
     DEAD --> [*] : context delete
 ```
 
-### Session binding e três camadas de locking
+### Session binding e quatro camadas de locking
 
 Uma sessão de agente obtém identidade via:
 
 
     eval $(dadaia context bind <name> --mode implementation --release <id>)
     # → exporta DADAIA_CONTEXT, DADAIA_SESSION_ID (sess_<uuid4>), DADAIA_MODE=IMPLEMENTATION
+    # → ctx-inject.sh escreve .dadaia/sessions/runtime/<pid>.ptr (runtime pointer, T-R1-01)
 
-Três camadas de lock garantem operações concorrentes seguras:
+Quatro camadas de lock garantem operações concorrentes seguras:
 
 Lock| Caminho| Impl| Escopo
 ---|---|---|---
 Lock 1 (workspace)| `.dadaia/states/.ws_lock`| fcntl LOCK_EX, 5 s timeout| Toda mutação em `spec_contexts.json` (`alive()`, `dead()`, `create()`, `delete()`, `DoctorService.fix()`, `context bind`, `context release`)
 Lock 2 (per-context)| `.dadaia/states/ctx_locks/<slug>.lock`| fcntl LOCK_EX, 5 s timeout| `git clone` e `shutil.rmtree` por context (fora do Lock 1; L1>L2 é a única direção safe)
 Lock 3 (per-release)| `.dadaia/locks/implementation/<ctx>__<release>.json`| JSON state machine (FREE → HELD → STALE → RECLAIMED)| Direito de BOUND_IMPLEMENTATION para um par context/release; heartbeat TTL 300 s; PID liveness fast-path
+Lock 4 (per-context semaphore)| `.dadaia/states/ctx_locks/<ctx>.semaphore.json`| JSON com campos `owner`, `phase`, `release`, `write_set`, `acquired_at`, `ttl`, `heartbeat`| No máximo um holder ativo implement+review por context; sessões read/spec nunca bloqueadas; adquirido em `context bind --mode implementation`; liberado em `context release`. Limitação: reclaim só por TTL expiry (300 s); sem liveness reclaim para PID morto — ver `specs/bugs/semaphore-no-liveness-reclaim.md`
 
 ### Modos de sessão (--mode)
 
@@ -66,7 +71,9 @@ Mode| Cria Lock 3?| Semântica
 
 ### Heartbeat e reclaim
 
-O hook PostToolUse `sdd-post-gate.sh` renova `last_seen_at` atomicamente a cada tool call da sessão. TTL default: 300 s. Lock com `last_seen_at` mais antigo que TTL → estado STALE. PID inativo → STALE imediato. Reclaim: `dadaia context bind --force --reason <texto>` (reason obrigatório; evento RECLAIMED gravado em `lock-events.jsonl`). `dadaia context heartbeat` renova manualmente para sessões read-only longas.
+O hook PostToolUse `sdd-post-gate.sh` renova `last_seen_at` atomicamente a cada tool call da sessão — tanto no session file quanto no Lock 3 e no semaphore (T-R1-03 dual heartbeat). TTL default: 300 s. Lock com `last_seen_at` mais antigo que TTL → estado STALE. PID inativo → STALE imediato para Lock 3. Reclaim de Lock 3: `dadaia context bind --force --reason <texto>` (reason obrigatório; evento RECLAIMED gravado em `lock-events.jsonl`). `dadaia context heartbeat` renova manualmente para sessões read-only longas.
+
+**Doctor invariants (T-R1-06):** `dadaia doctor` detecta locks orphan (sessão ausente), stale (TTL expirado), e duplicate (dois locks para o mesmo context). Códigos: `LOCK-5` (orphan), `LOCK-6` (stale), `LOCK-7` (duplicate). `dadaia doctor --fix` reclaim stale/orphan com audit trail. O semaphore (Lock 4) não tem `--fix` ainda — limitação conhecida `semaphore-no-liveness-reclaim`.
 
 ### Migração v1→v2 (`dadaia migrate`)
 
@@ -129,7 +136,9 @@ Sem context management v2, múltiplos agentes em paralelo podem editar a mesma r
   * `.dadaia/states/spec_contexts.json` — registro de todos os contexts (`schema_version: "2"`; state ALIVE/DEAD; `alive_since`; `dead_since`; sem flag global)
   * `.dadaia/states/.ws_lock` — fcntl workspace lock (gitignored; criado em runtime)
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored)
+  * `.dadaia/states/ctx_locks/<ctx>.semaphore.json` — Lock 4 per-context semaphore (criado por bind IMPLEMENTATION; liberado por context release; TTL 300 s)
   * `.dadaia/sessions/<sess_*>.json` — session files (criados por `context bind`; deletados por `context release`)
+  * `.dadaia/sessions/runtime/<pid>.ptr` — runtime→session pointer (escrito por `ctx-inject.sh` no session start; removido no session end; T-R1-01)
   * `.dadaia/locks/implementation/<ctx>__<release>.json` — Lock 3 implementation lock (criado por bind IMPLEMENTATION; deletado por release)
   * `.dadaia/logs/lock-events.jsonl` — audit log append-only (eventos: ACQUIRED, RELEASED, STALE_DETECTED, RECLAIMED, HEARTBEAT, BLOCKED_ATTEMPT)
   * `repos/<repo_slug>/` — repo clonado durante `alive`, removido em `dead`

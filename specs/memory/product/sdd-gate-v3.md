@@ -2,24 +2,25 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh; RULE E resolves session from env or non-stale lock; RULE C accepts both marker forms."
+tldr: "hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh; RULE E resolves session via env → runtime ptr file → non-stale lock → deny (no relaunch). Context semaphore enforces at most one impl+review holder per context."
 summary: hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh
-  (heartbeat); RULE E resolves session from DADAIA_SESSION_ID env var or, when
-  absent, from the non-stale implementation lock on disk (env-free, no relaunch);
-  RULE C accepts both `- [-] T-xxx` and `- **Status:** [-]` marker forms; production
-  writes without a resolvable non-stale session still fail closed.
+  (heartbeat); RULE E resolves session via env var → runtime ptr file
+  (`.dadaia/sessions/runtime/<pid>.ptr`) → non-stale lock → deny (env-free,
+  no relaunch); RULE C accepts both `- [-] T-xxx` and `- **Status:** [-]` marker
+  forms; CONTEXT_SLUG sanitized before path construction (CWE-22); lock glob
+  narrowed to exact active-release match.
 tags:
 - sdd
 - gate
 - hooks
 - enforcement
 agent_tier: self-pull
-token_estimate: 1540
-last_updated: '2026-06-04'
-release_origin: v0.1.4.5
+token_estimate: 1700
+last_updated: '2026-06-05'
+release_origin: v0.1.5
 ---
 
-Assets: `.dadaia/scripts/sdd-spec-gate.sh` (PreToolUse) · `.dadaia/scripts/sdd-post-gate.sh` (PostToolUse) · Codex also projects `UserPromptSubmit` where supported · Closure: public-agentic-hygiene-codex-readiness
+Assets: `.dadaia/scripts/sdd-spec-gate.sh` (PreToolUse) · `.dadaia/scripts/sdd-post-gate.sh` (PostToolUse) · Codex also projects `UserPromptSubmit` where supported · Closure: v0.1.5/rc-1
 
 ## Propósito
 
@@ -48,10 +49,15 @@ implementation session. Temporary paths remain allowed by RULE F.
 Ordem de resolução da identidade da sessão (a mesma em todos os runtimes):
 
   1. **`DADAIA_SESSION_ID` env var** — exportado por `eval $(dadaia context bind ...)`. É a chave estável e portável. O gate usa este como primary.
-  2. **Env-free fallback (v0.1.4.5, SCOPE-01)** — quando `DADAIA_SESSION_ID` está ausente do ambiente e `CONTEXT_SLUG` é conhecido, o gate itera `.dadaia/locks/implementation/<CONTEXT_SLUG>__*.json`, adota o `session_id` do primeiro lock **não-stale**, exporta `DADAIA_SESSION_ID` para o restante do run do hook, e prossegue com os checks de staleness/mode/ownership já existentes. Locks stale nunca são adotados (fail-safe). Se nenhum lock não-stale existir, bloqueia com mensagem orientando `dadaia context bind` a partir de qualquer shell — **sem necessidade de relaunch**.
-  3. **Fail-closed** — sem env var e sem lock não-stale, o gate bloqueia escrita de produção.
+  2. **Runtime ptr file (v0.1.5/rc-1, T-R1-01)** — quando `DADAIA_SESSION_ID` está ausente, o gate lê `.dadaia/sessions/runtime/<pid>.ptr` para o PID do processo atual (escrito por `ctx-inject.sh` no session start e limpo no session end). Isso elimina a necessidade de o operador exportar env vars manualmente entre fases.
+  3. **Env-free lock fallback (v0.1.4.5, SCOPE-01)** — quando runtime ptr também está ausente e `CONTEXT_SLUG` é conhecido, o gate itera `.dadaia/locks/implementation/<CONTEXT_SLUG>__<ACTIVE_RELEASE>.json` (glob **narrowed** para o release ativo exato — T-R1-04, elimina não-determinismo multi-lock), adota o `session_id` do primeiro lock **não-stale**, exporta `DADAIA_SESSION_ID` para o restante do run do hook, e prossegue. Locks stale nunca são adotados (fail-safe). Se nenhum lock não-stale existir, bloqueia orientando `dadaia context bind` — **sem necessidade de relaunch**.
+  4. **Fail-closed** — sem env var, sem runtime ptr e sem lock não-stale, o gate bloqueia escrita de produção.
 
-**Durable lock heartbeat (v0.1.4.5, SCOPE-02):** o heartbeat inline do gate (disparado em cada write permitido) agora renova também o `last_seen_at` do implementation lock cujo `session_id` corresponde à sessão ativa, além do session file. Isso mantém o lock não-stale durante sessões longas, preservando o funcionamento do fallback SCOPE-01 entre bursts de escrita. Best-effort: falhas de I/O são engolidas; o gate nunca bloqueia por falha no heartbeat.
+**CONTEXT_SLUG sanitization (T-R1-04, CWE-22 hardening):** `CONTEXT_SLUG` é sanitizado (strip de caracteres não-alfanuméricos exceto `-_`) antes de qualquer construção de path no gate. Isso impede path-traversal via nomes de context malformados.
+
+**Durable heartbeat (v0.1.5/rc-1, T-R1-03 + SCOPE-02):** o heartbeat inline do gate renova `last_seen_at` do session file, do implementation lock, **e do context semaphore** (quando presente). Best-effort: falhas de I/O são engolidas; o gate nunca bloqueia por falha no heartbeat.
+
+**Context semaphore (v0.1.5/rc-1, T-R1-02):** per-context semaphore em `.dadaia/states/ctx_locks/<context>.semaphore.json` com campos `owner`, `phase`, `release`, `write_set`, `acquired_at`, `ttl`, `heartbeat`. No máximo um holder ativo (implement+review) por context. `dadaia context bind --mode implementation` adquire o semaphore; uma segunda tentativa é negada com o holder identificado no erro. Sessões read/spec nunca são bloqueadas pelo semaphore. `dadaia doctor` detecta semaphores orphan/stale/duplicate. Limitação conhecida: liveness reclaim (PID morto, session file ausente) só acontece no TTL (300 s); sem `doctor --fix` para semaphore ainda — ver [[semaphore-no-liveness-reclaim]] em `specs/bugs/`.
 
 O `session_id` nativo do stdin payload do Claude Code é usado apenas para correlation logging, não como chave de identidade.
 
@@ -89,6 +95,8 @@ sequenceDiagram
     participant G as sdd-spec-gate.sh
     participant A as releases/ACTIVE.md
     participant S as .dadaia/sessions/sess_*.json
+    participant P as .dadaia/sessions/runtime/<pid>.ptr
+    participant SEM as .dadaia/states/ctx_locks/<ctx>.semaphore.json
     participant L as .dadaia/locks/implementation/
     participant K as releases/<id>/TASKS.md
     participant PostH as PostToolUse Hook
@@ -98,10 +106,11 @@ sequenceDiagram
     G->>A: read phase
     G->>G: RULE A: memory/* + phase≠CLOSURE → block
     G->>G: RULE B: _archive/* → block
-    G->>G: RULE D: path-scope allowlist check
-    G->>S: read session (DADAIA_SESSION_ID)
+    G->>G: RULE D: path-scope allowlist check + CONTEXT_SLUG sanitize
+    G->>S: read session (DADAIA_SESSION_ID env var)
     alt DADAIA_SESSION_ID set
         G->>G: check staleness (last_seen_at + TTL)
+        G->>SEM: check semaphore (holder, phase, TTL)
         G->>L: read impl lock (if IMPLEMENTATION mode)
         G->>G: RULE E: path-policy matrix
         alt allowed
@@ -115,12 +124,12 @@ sequenceDiagram
             G-->>PreH: {block: reason + owner session_id}
         end
     else DADAIA_SESSION_ID absent
-        G->>L: scan context__*.json for non-stale lock (SCOPE-01)
-        alt non-stale lock found
-            G->>G: adopt session_id; export DADAIA_SESSION_ID
+        G->>P: read runtime ptr for current PID (T-R1-01)
+        alt ptr file found
+            G->>G: adopt session_id from ptr; export DADAIA_SESSION_ID
             G->>G: RULE E: path-policy matrix (same checks)
             alt allowed
-                G->>K: grep [-] marker RULE C (both forms)
+                G->>K: grep [-] marker RULE C
                 alt task [-] found
                     G-->>PreH: exit 0 (allow)
                 else
@@ -129,15 +138,32 @@ sequenceDiagram
             else blocked
                 G-->>PreH: {block: reason}
             end
-        else no non-stale lock
-            G-->>PreH: block; orient to dadaia context bind (no relaunch needed)
+        else no ptr file
+            G->>L: scan context__<active_release>.json for non-stale lock (SCOPE-01 narrow glob, T-R1-04)
+            alt non-stale lock found
+                G->>G: adopt session_id; export DADAIA_SESSION_ID
+                G->>G: RULE E: path-policy matrix
+                alt allowed
+                    G->>K: grep [-] marker RULE C
+                    alt task [-] found
+                        G-->>PreH: exit 0 (allow)
+                    else
+                        G-->>PreH: {block: nenhuma task [-]}
+                    end
+                else blocked
+                    G-->>PreH: {block: reason}
+                end
+            else no non-stale lock
+                G-->>PreH: block; orient to dadaia context bind (no relaunch needed)
+            end
         end
     end
     PreH-->>T: allow/block
     T->>PostH: tool completed
     PostH->>PG: DADAIA_SESSION_ID
     PG->>S: renew last_seen_at (atomic tmp→replace)
-    PG->>L: renew lock last_seen_at (SCOPE-02 inline heartbeat)
+    PG->>L: renew lock last_seen_at (T-R1-03 dual heartbeat)
+    PG->>SEM: renew semaphore heartbeat (T-R1-03)
     PG->>L: append HEARTBEAT to lock-events.jsonl
 ```
 
@@ -151,8 +177,9 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 
 ## Estado runtime tocado
 
-  * Read-only pelo PreToolUse gate: `releases/ACTIVE.md`, `releases/<active-id>/TASKS.md`, `.dadaia/sessions/<sess_*>.json`, `.dadaia/locks/implementation/<ctx>__<release>.json`. Em modo legado (`SDD_LEGACY_FEATURES=1`): também `features/*/TASKS.md`.
-  * Write pelo PreToolUse gate (inline heartbeat, SCOPE-02): `.dadaia/sessions/<sess_*>.json` (`last_seen_at`, renovado atomicamente); `.dadaia/locks/implementation/<ctx>__<release>.json` (`last_seen_at`, renovado atomicamente quando o `session_id` do lock corresponde à sessão ativa). Best-effort — falhas engolidas.
+  * Read-only pelo PreToolUse gate: `releases/ACTIVE.md`, `releases/<active-id>/TASKS.md`, `.dadaia/sessions/<sess_*>.json`, `.dadaia/sessions/runtime/<pid>.ptr` (runtime ptr lookup, T-R1-01), `.dadaia/locks/implementation/<ctx>__<release>.json` (glob narrowed, T-R1-04), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (semaphore check, T-R1-02). Em modo legado (`SDD_LEGACY_FEATURES=1`): também `features/*/TASKS.md`.
+  * Write pelo PreToolUse gate (inline heartbeat): `.dadaia/sessions/<sess_*>.json` (`last_seen_at`, renovado atomicamente); `.dadaia/locks/implementation/<ctx>__<release>.json` (`last_seen_at`); `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (`heartbeat`, T-R1-03). Best-effort — falhas engolidas.
+  * Write pelo `ctx-inject.sh` (session start/end): `.dadaia/sessions/runtime/<pid>.ptr` criado no start; removido no end (T-R1-01).
   * Write pelo PostToolUse gate (`sdd-post-gate.sh`): `.dadaia/sessions/<sess_*>.json` (`last_seen_at`); `.dadaia/logs/lock-events.jsonl` (append HEARTBEAT event).
   * Write: `/tmp/sdd-gate.log` (append-only audit log do gate).
   * Saída: STDOUT JSON quando bloqueia; exit 0 (silencioso) quando permite.
