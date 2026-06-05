@@ -1,0 +1,8 @@
+# Repo-local poetry config — overrides global settings for this project.
+# The virtualenv MUST NOT live inside the repo: an in-repo `.venv` violates the
+# workspace `tmp-file-guardrail` ("no .venv inside repos") and trips the pytest
+# session-pollution guard (tests/conftest.py), flipping every local run to exit 1.
+# Keep the venv in poetry's cache dir (~/.cache/pypoetry/virtualenvs), which CI
+# already caches via the `~/.cache/pypoetry` path.
+[virtualenvs]
+in-project = false
