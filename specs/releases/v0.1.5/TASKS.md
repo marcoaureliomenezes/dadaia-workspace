@@ -29,7 +29,7 @@ applies the lib-origination + gate workflow per task.
   sanitize / mandatory-grill; projects to runtimes; appears in `EXPECTED_SKILLS`.
 
 ### T-GOV-02 — Persona edits: product-engineer + project-manager
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/agents/{product-engineer,project-manager}.md`
 - **Acceptance:** product-engineer gains release-definition responsibility
