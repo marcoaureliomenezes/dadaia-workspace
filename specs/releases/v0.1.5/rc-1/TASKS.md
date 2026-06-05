@@ -270,7 +270,8 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-SHIP-05 — Push, PR, CLOSURE, tag, publish (on trio APPROVE)
 
-- **Status:** [ ]
+- **Status:** [-]
+  - Sub-note (2026-06-05): CLOSURE bookkeeping DONE (CLOSURE.md authored, memory atoms updated). Push / PR / tag / PyPI publish / live-instance propagation are HELD pending explicit operator go-ahead.
 - **Owner:** devops-engineer (push/PR/merge) + product-engineer (CLOSURE + memory)
 - **Write set:**
   - `feature/0.1.5` branch push + PR
