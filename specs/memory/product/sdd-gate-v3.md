@@ -2,20 +2,21 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: hook PreToolUse (RULE A/B/D/E/C) + PostToolUse sdd-post-gate.sh (heartbeat);
-  RULE E valida DADAIA_SESSION_ID, mode-based path-policy matrix, ownership do Loc...
+tldr: "hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh; RULE E resolves session from env or non-stale lock; RULE C accepts both marker forms."
 summary: hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh
-  (heartbeat); RULE E validates DADAIA_SESSION_ID, mode-based path policy, and
-  Lock 3 ownership; production writes without a bound session fail closed.
+  (heartbeat); RULE E resolves session from DADAIA_SESSION_ID env var or, when
+  absent, from the non-stale implementation lock on disk (env-free, no relaunch);
+  RULE C accepts both `- [-] T-xxx` and `- **Status:** [-]` marker forms; production
+  writes without a resolvable non-stale session still fail closed.
 tags:
 - sdd
 - gate
 - hooks
 - enforcement
 agent_tier: self-pull
-token_estimate: 1372
+token_estimate: 1540
 last_updated: '2026-06-04'
-release_origin: v0.1.4.2
+release_origin: v0.1.4.5
 ---
 
 Assets: `.dadaia/scripts/sdd-spec-gate.sh` (PreToolUse) · `.dadaia/scripts/sdd-post-gate.sh` (PostToolUse) · Codex also projects `UserPromptSubmit` where supported · Closure: public-agentic-hygiene-codex-readiness
@@ -32,7 +33,7 @@ scripts decidem se o payload é relevante.
   * **RULE B (archive read-only):** bloqueia qualquer write em `specs/_archive/**`.
   * **RULE D (path-scope):** valida `file_path` contra `paths.write_allowlist` do frontmatter do agente ativo.
   * **RULE E (session + lock enforcement, T-13/T-8 completion):** valida identidade de sessão e ownership do implementation lock. Ver detalhes abaixo.
-  * **RULE C (task marker):** exige que exista pelo menos uma task `[-]` em `specs/releases/<active-release-id>/TASKS.md`. Para sessões IMPLEMENTATION-mode, o release ativo é resolvido do lock file — não do `ACTIVE.md` (T-8 completion, ADR D-9).
+  * **RULE C (task marker):** exige que exista pelo menos uma task `[-]` em `specs/releases/<active-release-id>/TASKS.md`. Aceita **ambas** as formas de marker: inline `- [-] T-xxx` e canônica `- **Status:** [-]`. Ainda rejeita `[ ]` e `[x]`. Para sessões IMPLEMENTATION-mode, o release ativo é resolvido do lock file — não do `ACTIVE.md` (T-8 completion, ADR D-9).
   * **RULE F (temporary paths):** permite imediatamente writes sob `.dadaia/tmp/` antes das checagens de produção.
 
 
@@ -47,9 +48,10 @@ implementation session. Temporary paths remain allowed by RULE F.
 Ordem de resolução da identidade da sessão (a mesma em todos os runtimes):
 
   1. **`DADAIA_SESSION_ID` env var** — exportado por `eval $(dadaia context bind ...)`. É a chave estável e portável. O gate usa este como primary.
-  2. **Fail-closed for production paths** — se ausente, o gate bloqueia e orienta o operador a rodar `eval $(dadaia context bind <ctx> --mode implementation --release <release-id>)`.
+  2. **Env-free fallback (v0.1.4.5, SCOPE-01)** — quando `DADAIA_SESSION_ID` está ausente do ambiente e `CONTEXT_SLUG` é conhecido, o gate itera `.dadaia/locks/implementation/<CONTEXT_SLUG>__*.json`, adota o `session_id` do primeiro lock **não-stale**, exporta `DADAIA_SESSION_ID` para o restante do run do hook, e prossegue com os checks de staleness/mode/ownership já existentes. Locks stale nunca são adotados (fail-safe). Se nenhum lock não-stale existir, bloqueia com mensagem orientando `dadaia context bind` a partir de qualquer shell — **sem necessidade de relaunch**.
+  3. **Fail-closed** — sem env var e sem lock não-stale, o gate bloqueia escrita de produção.
 
-
+**Durable lock heartbeat (v0.1.4.5, SCOPE-02):** o heartbeat inline do gate (disparado em cada write permitido) agora renova também o `last_seen_at` do implementation lock cujo `session_id` corresponde à sessão ativa, além do session file. Isso mantém o lock não-stale durante sessões longas, preservando o funcionamento do fallback SCOPE-01 entre bursts de escrita. Best-effort: falhas de I/O são engolidas; o gate nunca bloqueia por falha no heartbeat.
 
 O `session_id` nativo do stdin payload do Claude Code é usado apenas para correlation logging, não como chave de identidade.
 
@@ -98,14 +100,12 @@ sequenceDiagram
     G->>G: RULE B: _archive/* → block
     G->>G: RULE D: path-scope allowlist check
     G->>S: read session (DADAIA_SESSION_ID)
-    alt DADAIA_SESSION_ID absent
-        G-->>PreH: block production write; tmp paths were already allowed by RULE F
-    else session present
+    alt DADAIA_SESSION_ID set
         G->>G: check staleness (last_seen_at + TTL)
         G->>L: read impl lock (if IMPLEMENTATION mode)
         G->>G: RULE E: path-policy matrix
         alt allowed
-            G->>K: grep [-] marker (RULE C)
+            G->>K: grep [-] marker RULE C (both forms)
             alt task [-] found
                 G-->>PreH: exit 0 (allow)
             else
@@ -114,11 +114,30 @@ sequenceDiagram
         else blocked
             G-->>PreH: {block: reason + owner session_id}
         end
+    else DADAIA_SESSION_ID absent
+        G->>L: scan context__*.json for non-stale lock (SCOPE-01)
+        alt non-stale lock found
+            G->>G: adopt session_id; export DADAIA_SESSION_ID
+            G->>G: RULE E: path-policy matrix (same checks)
+            alt allowed
+                G->>K: grep [-] marker RULE C (both forms)
+                alt task [-] found
+                    G-->>PreH: exit 0 (allow)
+                else
+                    G-->>PreH: {block: nenhuma task [-]}
+                end
+            else blocked
+                G-->>PreH: {block: reason}
+            end
+        else no non-stale lock
+            G-->>PreH: block; orient to dadaia context bind (no relaunch needed)
+        end
     end
     PreH-->>T: allow/block
     T->>PostH: tool completed
     PostH->>PG: DADAIA_SESSION_ID
     PG->>S: renew last_seen_at (atomic tmp→replace)
+    PG->>L: renew lock last_seen_at (SCOPE-02 inline heartbeat)
     PG->>L: append HEARTBEAT to lock-events.jsonl
 ```
 
@@ -133,13 +152,14 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 ## Estado runtime tocado
 
   * Read-only pelo PreToolUse gate: `releases/ACTIVE.md`, `releases/<active-id>/TASKS.md`, `.dadaia/sessions/<sess_*>.json`, `.dadaia/locks/implementation/<ctx>__<release>.json`. Em modo legado (`SDD_LEGACY_FEATURES=1`): também `features/*/TASKS.md`.
+  * Write pelo PreToolUse gate (inline heartbeat, SCOPE-02): `.dadaia/sessions/<sess_*>.json` (`last_seen_at`, renovado atomicamente); `.dadaia/locks/implementation/<ctx>__<release>.json` (`last_seen_at`, renovado atomicamente quando o `session_id` do lock corresponde à sessão ativa). Best-effort — falhas engolidas.
   * Write pelo PostToolUse gate (`sdd-post-gate.sh`): `.dadaia/sessions/<sess_*>.json` (`last_seen_at`); `.dadaia/logs/lock-events.jsonl` (append HEARTBEAT event).
   * Write: `/tmp/sdd-gate.log` (append-only audit log do gate).
   * Saída: STDOUT JSON quando bloqueia; exit 0 (silencioso) quando permite.
 
 
 
-**Removido em v2:** o gate não lê mais o marcador global de contexto legado. Production/release writes require `DADAIA_SESSION_ID` and a matching session file; `DADAIA_CONTEXT` is contextual metadata, not an authorization fallback. There is no first-ALIVE or workspace-scan fallback for write authorization.
+**Removido em v2:** o gate não lê mais o marcador global de contexto legado. `DADAIA_CONTEXT` é metadado contextual, não fallback de autorização. Não há first-ALIVE nem workspace-scan fallback para autorização de escrita. A resolução env-free adicionada em v0.1.4.5 (SCOPE-01) adota o `session_id` de um **lock de implementação não-stale em disco** — isso é diferente de um workspace-scan; requer que `dadaia context bind --mode implementation` tenha sido executado previamente de qualquer shell.
 
 ## Dependências
 
