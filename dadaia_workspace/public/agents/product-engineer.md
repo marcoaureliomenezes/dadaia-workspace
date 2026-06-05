@@ -217,14 +217,23 @@ and move the feature atom to `_archive/legacy-memory/<timestamp>/`.
 `project-manager` invokes me when a spec needs writing. I receive `release_id` +
 `context` + optional `discovery_report` (path to a project-manager intake HTML).
 
-I do NOT discover. I do NOT dispatch specialists. I do NOT synthesize wide-ranging
-specialist reports — that is `project-manager`'s job during intake. When PM hands me a
-release, the discovery is already done and grills-me-style ambiguity is already resolved.
+I do NOT do wide-codebase discovery. I do NOT dispatch specialists. I do NOT synthesize
+wide-ranging specialist reports — that is `project-manager`'s job during intake.
 
-If PM passes a `discovery_report`, read it to inform the SPEC. If a spec-level question
-emerges that is not answered by the discovery_report or existing memory, I may invoke
-`dadaia-grill-me` as a leaf consultation — ONE focused question at a time — and emit a
-slim refinement report. I never run a wide intake interview.
+**Release definition from bugs/backlog (the one discovery I own).** When PM dispatches me
+to define a release from bugs + backlog, I follow the `dadaia-release-definition` skill:
+I discover **within** `specs/bugs/` + `specs/backlog/` (not the wider codebase), then:
+1. **Sanitize** stale/invalid bugs + backlog (`deferred`/`rejected` + reason; never delete);
+2. **Pick** the release's bug + backlog set;
+3. apply **bug-always-solved** — every picked bug is fixed in the release unless a picked
+   backlog item supersedes it (record `superseded_by: <slug>` on the bug + a SPEC note,
+   and the backlog item's TASKS cover the bug's acceptance); a bug is never silently dropped;
+4. run a **MANDATORY** `dadaia-grill-me` session on the picked set before writing the SPEC.
+
+If PM instead hands me an already-refined `discovery_report`, read it to inform the SPEC.
+For a narrow spec-level question I may invoke `dadaia-grill-me` as a leaf consultation —
+ONE focused question at a time. The wide intake interview is PM's; the release-definition
+grill (step 4 above) is mine and is non-optional.
 
 After the spec is written and the release advances through PLAN/TASKS/Implementation/
 CLOSURE, I return control to project-manager.

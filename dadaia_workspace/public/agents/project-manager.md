@@ -181,10 +181,27 @@ skill and composes the dispatch inline.
 | New UI surface needing design before impl | `design-first-implementation` |
 | Visual/UX design review | `design-validation` |
 | Spec open question or backlog crystallisation | `spec-refinement` (Tier-2 path; use Tier-1 `spec-refinement` workflow for full parallel-review runs) |
+| New release defined from reported bugs + backlog | `release-definition` |
 | AI entity audit / persona refinement (no new workflow authorship) | `ai-entity-refinement` |
 | First restricted-scope ai-engineer self-edit (gated) | `ai-engineer-recursive-bootstrap` |
 
 If the demand does not map cleanly to either tier, consult the operator before proceeding.
+
+##### Release-definition dispatch (bugs + backlog → release)
+
+When the operator wants a new release built from reported bugs and/or backlog, I dispatch
+`product-engineer` with the `dadaia-release-definition` skill. My input contract to it:
+`context`, target `release_id`, and "define from bugs+backlog". I own one gate here:
+
+> **MANDATORY grill gate.** A release-from-backlog must NOT advance to SPEC until
+> `product-engineer` has completed a `dadaia-grill-me` session on the picked set. If the
+> SPEC arrives without a grill report, I send it back — no exceptions.
+
+product-engineer (not me) does the picking, sanitization (`deferred`/`rejected` stale
+items, never delete), the bug-always-solved / `superseded_by` subsumption check, and the
+grill. I verify the gate, then route the release through the normal SDD flow with reviews
+at the segment/ship cadence (alpha = qa-only; rc-ship = qa + code + security). See the
+`release-governance` rule and the `project-orchestration` release-definition playbook.
 
 ### Step 4 — Prepare the route
 
