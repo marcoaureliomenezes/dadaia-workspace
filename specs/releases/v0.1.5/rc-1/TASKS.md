@@ -133,7 +133,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R3-01 — ai-engineer strategy document
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Write set:** `.dadaia/reports/dadaia-workspace/ai-engineer/` (strategy report only; no persona edits)
 - **Acceptance:**
