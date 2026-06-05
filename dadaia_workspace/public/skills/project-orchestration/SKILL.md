@@ -98,6 +98,25 @@ This contract applies to every implementation task in an approved SDD release.
 `project-manager` owns orchestration discipline; `product-engineer` owns SDD
 artifact approval; implementers and reviewers own their evidence.
 
+**Review cadence (ADR-3 — segment/ship boundaries, not per task).** A release
+matures on a single `feature/{version}` branch through `alpha-N → rc-N` segments.
+The reviewer fan-out attaches to **segment and ship boundaries** — this replaces
+the old per-task reviewer fan-out:
+
+- **Per task** — implementer discipline only (sections 0–1): TDD, unit/integration
+  tests, the mandatory pre-push CI gate, and an `implementation-complete` handoff.
+  The `[-]`→`[x]` marker discipline (per `dadaia-task-manager`) is unchanged; there
+  is no per-task reviewer gate.
+- **End of each `alpha-N`** — `qa-engineer` only (section 2) returns `APPROVE` or
+  `REQUEST_CHANGES`, then a commit lands on the feature branch. No push, no PR, no
+  `code-reviewer`/`security-reviewer`.
+- **At `rc-N` ship** (operator elects to ship) — the full Review/QA Fan-Out
+  (section 2) and the Ship Gate (section 3): `qa-engineer` + `code-reviewer` +
+  `security-reviewer` must all `APPROVE` before the release ships. If the operator
+  instead iterates, open `rc-(N+1)` and continue.
+
+Sections 0–3 below define the mechanics applied at those boundaries.
+
 ### 0. Pre-Implementation Agreement
 
 Before `TASKS.md` is approved, the task definition must be agreed by:
@@ -122,23 +141,27 @@ security/privacy-sensitive areas. The task marker stays `[-]`.
 
 ### 2. Review/QA Fan-Out
 
-`project-manager` dispatches all required validators after the implementation
-handoff:
+`project-manager` dispatches validators at the **segment/ship boundary** (not per
+task):
 
-- `qa-engineer` validates the E2E/acceptance plan and operator-visible behavior
-- `code-reviewer` reviews architecture, maintainability, tests, and regressions
-- `security-reviewer` reviews security, privacy, secrets, dependency, and deploy leakage risk
-- `design-specialist` reviews UI/design compliance when applicable
+- **End of each `alpha-N`** — `qa-engineer` only: validates the E2E/acceptance
+  plan and operator-visible behavior for the segment.
+- **At `rc-N` ship** — the full set:
+  - `qa-engineer` validates the E2E/acceptance plan and operator-visible behavior
+  - `code-reviewer` reviews architecture, maintainability, tests, and regressions
+  - `security-reviewer` reviews security, privacy, secrets, dependency, and deploy leakage risk
+  - `design-specialist` reviews UI/design compliance when applicable
 
 Each validator returns `APPROVE` or `REQUEST_CHANGES` in its handoff JSON.
 Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing
-evidence, or stale report sends the task back to implementation. The rework loop
+evidence, or stale report sends the work back to implementation. The rework loop
 continues until every required validator approves the same implementation commit
 or the operator explicitly stops the release.
 
-### 3. Done Gate
+### 3. Ship Gate
 
-Only after all required validators approve may the orchestrator or task owner:
+Only after all required validators approve (qa-only at an alpha commit; the full
+trio at an rc ship) may the orchestrator or task owner:
 
 - mark the task `[x]`
 - push implementation commits
@@ -146,9 +169,10 @@ Only after all required validators approve may the orchestrator or task owner:
 - merge, deploy, or close the release
 - write release `CLOSURE.md` or memory updates
 
-Before this gate, those actions are forbidden. A local commit is acceptable as
-workspace evidence, but it is not release completion and must not be represented
-as approved work.
+Within an alpha, push/PR/merge/CLOSURE are **not** available — only the qa-gated
+commit on `feature/{version}`. Before the applicable gate, those actions are
+forbidden. A local commit is acceptable as workspace evidence, but it is not
+release completion and must not be represented as approved work.
 
 ## Decision Authority
 
@@ -231,6 +255,20 @@ Entry: the surface implementer.
 
 Use for a reproducible defect with narrow blast radius. Include reproduction
 steps, expected/actual behavior, suspected files, and validation command.
+
+### Playbook — release-definition
+
+Entry: `product-engineer` (dispatched by `project-manager`).
+
+Use when the operator wants a new release built from reported bugs + backlog.
+`project-manager` dispatches `product-engineer` with the
+`dadaia-release-definition` skill. Steps: (1) sanitize stale bugs/backlog
+(`deferred`/`rejected` + reason, never delete); (2) pick the bug + backlog set;
+(3) apply bug-always-solved — every picked bug is fixed in the release unless a
+picked backlog item supersedes it (`superseded_by: <slug>` on the bug + SPEC
+note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
+the SPEC. `project-manager` owns the gate: a release-from-backlog must not reach
+SPEC without the grill report. See the `release-governance` rule.
 
 ### Playbook — security-patch
 
