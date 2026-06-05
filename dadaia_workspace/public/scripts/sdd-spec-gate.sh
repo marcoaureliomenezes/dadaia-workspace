@@ -137,14 +137,22 @@ if [ -z "$CONTEXT_SLUG" ]; then
     _log "WARN context-resolution: could not resolve bound context (DADAIA_CONTEXT unset, spec_contexts.json absent/empty, no session); gate will fail-open on IS_PROD check"
 fi
 
-# Resolve active release id and phase from <CONTEXT_SPECS>/releases/ACTIVE.md
+# Resolve active release id, segment, and phase from <CONTEXT_SPECS>/releases/ACTIVE.md
+# Schema v2 (ADR-1/ADR-5): an optional `segment:` line (alpha-N/rc-N) selects the
+# active segment's TASKS.md. Absent/`none` segment → flat release (back-compat).
 ACTIVE_RELEASE=""
+ACTIVE_SEGMENT=""
 ACTIVE_PHASE=""
 if [ -n "$CONTEXT_SPECS" ] && [ -f "$CONTEXT_SPECS/releases/ACTIVE.md" ]; then
     ACTIVE_RELEASE=$(grep -E '^release:' "$CONTEXT_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')
+    ACTIVE_SEGMENT=$(grep -E '^segment:' "$CONTEXT_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^segment:[[:space:]]*//; s/[[:space:]]*$//')
     ACTIVE_PHASE=$(grep -E '^phase:' "$CONTEXT_SPECS/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//')
 fi
-[ -n "$ACTIVE_RELEASE" ] && _log "active_release=$ACTIVE_RELEASE phase=$ACTIVE_PHASE"
+[ "$ACTIVE_SEGMENT" = "none" ] && ACTIVE_SEGMENT=""
+# Relative release path: <release>/<segment> when a segment is active, else <release>.
+ACTIVE_REL_PATH="$ACTIVE_RELEASE"
+[ -n "$ACTIVE_SEGMENT" ] && ACTIVE_REL_PATH="$ACTIVE_RELEASE/$ACTIVE_SEGMENT"
+[ -n "$ACTIVE_RELEASE" ] && _log "active_release=$ACTIVE_RELEASE segment=${ACTIVE_SEGMENT:-<none>} phase=$ACTIVE_PHASE rel_path=$ACTIVE_REL_PATH"
 
 # v3 RULE A — Memory atomicity. Markdown is the sole editable memory source.
 # Legacy specs/memory/*.html and YAML atoms are always read-only. Markdown atoms
@@ -794,9 +802,12 @@ ACTIVE=""
 # RULE C never matches a real release marker and every production write blocks.
 GREP_PAT='^[[:space:]]*-[[:space:]]*(\*\*Status:\*\*[[:space:]]*)?\[-\]'
 
-if [ -n "$ACTIVE_RELEASE" ] && [ -f "$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" ]; then
-    if grep -qE "$GREP_PAT" "$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md" 2>/dev/null; then
-        ACTIVE="$CONTEXT_SPECS/releases/$ACTIVE_RELEASE/TASKS.md"
+# Priority 1: the active release's TASKS.md — the active segment's
+# (releases/<release>/<segment>/TASKS.md) when ACTIVE.md carries a segment:,
+# else the flat release's (releases/<release>/TASKS.md). ADR-1/ADR-5.
+if [ -n "$ACTIVE_RELEASE" ] && [ -f "$CONTEXT_SPECS/releases/$ACTIVE_REL_PATH/TASKS.md" ]; then
+    if grep -qE "$GREP_PAT" "$CONTEXT_SPECS/releases/$ACTIVE_REL_PATH/TASKS.md" 2>/dev/null; then
+        ACTIVE="$CONTEXT_SPECS/releases/$ACTIVE_REL_PATH/TASKS.md"
     fi
 fi
 

@@ -119,7 +119,7 @@ applies the lib-origination + gate workflow per task.
   + updates ACTIVE `segment:`; CLI contract tests.
 
 ### T-ENG-04 — Gate path-resolution to active segment
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python + devops-engineer
 - **Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`; gate tests
 - **Acceptance:** when ACTIVE has a `segment:`, the gate searches
@@ -127,7 +127,7 @@ applies the lib-origination + gate workflow per task.
   resolve `releases/<release>/TASKS.md` (back-compat); gate-lock test coverage.
 
 ### T-ENG-05 — Doctor: segment-aware checks
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/features/specs/doctor.py`; tests
 - **Acceptance:** SPEC-DOC-004 validates the active **segment's** SPEC/PLAN/TASKS;
