@@ -211,7 +211,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R4-01 — Audit generic agents for over/under-fitting
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Write set:** `.dadaia/reports/dadaia-workspace/ai-engineer/` (audit report only; no persona edits)
 - **Acceptance:**
