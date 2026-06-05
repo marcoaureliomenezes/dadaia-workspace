@@ -1100,3 +1100,34 @@ def test_cat1_both_stale_and_extra_emit_separate_warnings(tmp_path: Path) -> Non
     assert len(cat1) >= 2, (
         f"Expected at least 2 CAT-1 WARNINGs; got {len(cat1)}: {[i.description for i in cat1]}"
     )
+
+
+# ---- T-ENG-05: segment-aware active-release artifact checks (ADR-5) ----
+
+
+def _segment_active(specs: Path, release_id: str, segment: str) -> None:
+    """Convert a flat clean tree into a segmented one (move SPEC/PLAN/TASKS)."""
+    rel = specs / "releases" / release_id
+    seg = rel / segment
+    seg.mkdir(parents=True, exist_ok=True)
+    for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        (seg / fname).write_text((rel / fname).read_text(encoding="utf-8"), encoding="utf-8")
+        (rel / fname).unlink()
+    (specs / "releases" / "ACTIVE.md").write_text(
+        f"release: {release_id}\nsegment: {segment}\nphase: IMPLEMENTATION\n", encoding="utf-8"
+    )
+
+
+def test_segmented_active_release_artifacts_ok(tmp_path: Path) -> None:
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
+    _segment_active(specs, "v0.1.6", "alpha-1")
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-004" not in _codes(issues)
+
+
+def test_segmented_active_release_missing_tasks_reports_doc_004(tmp_path: Path) -> None:
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
+    _segment_active(specs, "v0.1.6", "alpha-1")
+    (specs / "releases" / "v0.1.6" / "alpha-1" / "TASKS.md").unlink()
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-004" in _codes(issues)

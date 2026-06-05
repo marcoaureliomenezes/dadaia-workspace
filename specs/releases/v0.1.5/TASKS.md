@@ -127,7 +127,7 @@ applies the lib-origination + gate workflow per task.
   resolve `releases/<release>/TASKS.md` (back-compat); gate-lock test coverage.
 
 ### T-ENG-05 — Doctor: segment-aware checks
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/features/specs/doctor.py`; tests
 - **Acceptance:** SPEC-DOC-004 validates the active **segment's** SPEC/PLAN/TASKS;
@@ -135,7 +135,7 @@ applies the lib-origination + gate workflow per task.
   (`v<x>/<alpha|rc>-N/`); archived flat releases still pass; unit tests.
 
 ### T-ENG-06 — `.gitignore` tracks segment files
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** devops-engineer
 - **Write set:** `.gitignore`
 - **Acceptance:** `releases/*/alpha-*/{SPEC,PLAN,TASKS,CLOSURE}.md` and

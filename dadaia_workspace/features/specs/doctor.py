@@ -738,7 +738,11 @@ class SpecsDoctor:
         release, segment, phase, err = _read_active_md(path)
         if err or not release or release == "none":
             return issues
+        # Schema v2 (ADR-1/ADR-5): when ACTIVE.md carries a segment, the active
+        # SPEC/PLAN/TASKS live in releases/<release>/<segment>/; else flat.
         rdir = self.specs_dir / "releases" / release
+        if segment:
+            rdir = rdir / segment
         if not rdir.exists():
             return issues  # already reported by check 9
         for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
@@ -1434,6 +1438,8 @@ class SpecsDoctor:
         if phase not in ("IMPLEMENTATION", "CLOSURE"):
             return issues
         rdir = self.specs_dir / "releases" / release
+        if segment:  # schema v2: artifacts live in the active segment dir
+            rdir = rdir / segment
         if not rdir.exists():
             return issues  # already reported by SPEC-DOC-009
         for fname in _TREE6_IMPL_ARTIFACTS:
