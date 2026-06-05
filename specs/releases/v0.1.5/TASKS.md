@@ -94,7 +94,7 @@ applies the lib-origination + gate workflow per task.
 ## Engine tasks (ADR-5 — alpha/rc mechanics folded into v0.1.5)
 
 ### T-ENG-01 — ACTIVE.md schema v2 (`segment:` field) + readers
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/features/specs/doctor.py` (`_read_active_md`),
   any other ACTIVE.md parser; tests
@@ -103,7 +103,7 @@ applies the lib-origination + gate workflow per task.
   unit tests for both flat and segmented ACTIVE.md.
 
 ### T-ENG-02 — Scaffolder for `alpha-N`/`rc-N` segments
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/features/specs/scaffolder.py`; tests
 - **Acceptance:** `scaffold_release_segment(specs_dir, version, segment)` creates

@@ -350,24 +350,35 @@ def _parse_memory_html(path: Path) -> _MemoryHtmlSummary:
     )
 
 
-def _read_active_md(path: Path) -> tuple[str | None, str | None, str | None]:
-    """Returns (release_id, phase, error_message_or_none)."""
+def _read_active_md(
+    path: Path,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """Returns (release_id, segment, phase, error_message_or_none).
+
+    Schema v2 (ADR-1/ADR-5): ACTIVE.md may carry an optional ``segment:`` line
+    (e.g. ``alpha-2``, ``rc-1``) identifying the active segment of a release.
+    ``segment`` is ``None`` for flat (pre-segment) releases — back-compatible.
+    """
     if not path.exists():
-        return None, None, "ACTIVE.md not found"
+        return None, None, None, "ACTIVE.md not found"
     text = path.read_text(encoding="utf-8")
     release = None
+    segment = None
     phase = None
     for line in text.splitlines():
         line = line.strip()
         if line.startswith("release:"):
             value = line.split(":", 1)[1].strip()
             release = value if value else None
+        elif line.startswith("segment:"):
+            value = line.split(":", 1)[1].strip()
+            segment = value if value and value != "none" else None
         elif line.startswith("phase:"):
             value = line.split(":", 1)[1].strip()
             phase = value if value else None
     if release is None or phase is None:
-        return release, phase, "ACTIVE.md missing 'release:' or 'phase:' line"
-    return release, phase, None
+        return release, segment, phase, "ACTIVE.md missing 'release:' or 'phase:' line"
+    return release, segment, phase, None
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -682,7 +693,7 @@ class SpecsDoctor:
     def _check_active_md(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
         path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, phase, err = _read_active_md(path)
+        release, segment, phase, err = _read_active_md(path)
         if err:
             issues.append(
                 SpecsDoctorIssue(
@@ -724,7 +735,7 @@ class SpecsDoctor:
     def _check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
         path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, phase, err = _read_active_md(path)
+        release, segment, phase, err = _read_active_md(path)
         if err or not release or release == "none":
             return issues
         rdir = self.specs_dir / "releases" / release
@@ -1417,7 +1428,7 @@ class SpecsDoctor:
         """
         issues: list[SpecsDoctorIssue] = []
         active_path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, phase, err = _read_active_md(active_path)
+        release, segment, phase, err = _read_active_md(active_path)
         if err or not release or release == "none":
             return issues
         if phase not in ("IMPLEMENTATION", "CLOSURE"):
