@@ -41,6 +41,11 @@ from dadaia_workspace.features.spec_context.locking import (
     renew_heartbeat,
     workspace_lock,
 )
+from dadaia_workspace.features.spec_context.semaphore import (
+    SemaphoreAlreadyHeldError,
+    acquire_context_semaphore,
+    release_context_semaphore,
+)
 from dadaia_workspace.features.spec_context.service import SpecContextService
 
 app = typer.Typer(help="Manage Spec Context Projects.")
@@ -81,6 +86,23 @@ def _now_iso() -> str:
 
 def _sessions_dir(workspace_root: Path) -> Path:
     return workspace_root / ".dadaia" / "sessions"
+
+
+def _runtime_ptr_dir(workspace_root: Path) -> Path:
+    return workspace_root / ".dadaia" / "sessions" / "runtime"
+
+
+def _write_runtime_ptr(workspace_root: Path, session_id: str) -> None:
+    """Write a runtime→session pointer file for env-free gate resolution (T-R1-01/T-R1-05).
+
+    The SDD gate's RULE E scans .dadaia/sessions/runtime/*.ptr to resolve the session_id
+    when DADAIA_SESSION_ID is not set in the agent runtime environment.
+    """
+    ptr_dir = _runtime_ptr_dir(workspace_root)
+    ptr_dir.mkdir(parents=True, exist_ok=True)
+    ptr_file = ptr_dir / f"{session_id}.ptr"
+    with contextlib.suppress(OSError):
+        ptr_file.write_text(session_id, encoding="utf-8")
 
 
 def _locks_dir(workspace_root: Path) -> Path:
@@ -259,7 +281,17 @@ def dead(name: str = typer.Argument(..., help="Context name to make DEAD")) -> N
 @app.command()
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
-    mode: str = typer.Option(..., "--mode", help="Binding mode: read|spec|implementation|review"),
+    mode: str = typer.Option(
+        ...,
+        "--mode",
+        help=(
+            "Binding mode: read | spec | implementation | review. "
+            "read/spec are never blocked. "
+            "implementation/review acquire the per-context semaphore "
+            "(at most one exclusive holder per context; second bind is denied "
+            "and names the current holder)."
+        ),
+    ),
     release: str | None = typer.Option(
         None, "--release", help="Release ID (required for implementation and review modes)"
     ),
@@ -274,6 +306,15 @@ def bind(
 
     Outputs eval-compatible export lines to set DADAIA_CONTEXT, DADAIA_SESSION_ID,
     and DADAIA_MODE in the current shell.
+
+    Exclusive modes (implementation, review) acquire the per-context semaphore so
+    that at most one writing session is active per context at any time. Phase
+    progression does NOT require a new bind — the semaphore remains held until
+    dadaia context release is called.
+
+    A runtime→session pointer (.dadaia/sessions/runtime/<session_id>.ptr) is
+    always written so the SDD gate can resolve the session without requiring
+    DADAIA_SESSION_ID to be manually exported into the agent runtime environment.
     """
     mode_upper = mode.upper()
     if mode_upper not in ("READ", "SPEC", "IMPLEMENTATION", "REVIEW"):
@@ -391,6 +432,18 @@ def bind(
                     pid=pid,
                 )
 
+            # Acquire the per-context semaphore for IMPLEMENTATION (T-R1-05).
+            # This check comes AFTER the per-release impl lock succeeds so that
+            # the semaphore is the outer guard and the lock is the inner guard.
+            # SemaphoreAlreadyHeldError names the holder; read/spec phases bypass.
+            acquire_context_semaphore(
+                workspace_root,
+                context=name,
+                session_id=session_id,
+                phase="BOUND_IMPLEMENTATION",
+                release=release or "",
+            )
+
         elif mode_upper == "REVIEW":
             assert release is not None  # guaranteed above
 
@@ -420,6 +473,18 @@ def bind(
                 )
                 raise
 
+            # Acquire the per-context semaphore for REVIEW (T-R1-05).
+            acquire_context_semaphore(
+                workspace_root,
+                context=name,
+                session_id=session_id,
+                phase="BOUND_REVIEW",
+                release=release or "",
+            )
+
+    except SemaphoreAlreadyHeldError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
     except LockHeldError as e:
         audit_blocked(
             workspace_root,
@@ -458,6 +523,11 @@ def bind(
         with workspace_lock(workspace_root):
             session_file = sessions_dir / f"{session_id}.json"
             session_file.write_text(json.dumps(session_data, indent=2))
+
+    # Always write the runtime→session pointer file (T-R1-01/T-R1-05).
+    # This allows the SDD gate (RULE E) to resolve the session without requiring
+    # DADAIA_SESSION_ID to be manually exported into the agent runtime environment.
+    _write_runtime_ptr(workspace_root, session_id)
 
     # Output eval-compatible export lines
     dadaia_mode = mode_upper
@@ -517,6 +587,17 @@ def release_cmd() -> None:
                 runtime=runtime,
                 pid=pid,
             )
+
+    # Release the per-context semaphore if this session owned it (T-R1-05).
+    # Works for both BOUND_IMPLEMENTATION and BOUND_REVIEW.
+    if session_data:
+        ctx_name = session_data.get("context", "")
+        if ctx_name:
+            release_context_semaphore(workspace_root, ctx_name, session_id)
+
+    # Clean up the runtime→session pointer file (T-R1-01/T-R1-05).
+    ptr_file = _runtime_ptr_dir(workspace_root) / f"{session_id}.ptr"
+    ptr_file.unlink(missing_ok=True)
 
     console.print(f"[green]✓[/green] Session '[bold]{session_id}[/bold]' released")
 
