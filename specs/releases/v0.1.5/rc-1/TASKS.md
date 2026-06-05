@@ -170,7 +170,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R3-04 — project-auditor persona specialization
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/agents/project-auditor.md` + any new skill files identified in T-R3-01
 - **Acceptance:**
