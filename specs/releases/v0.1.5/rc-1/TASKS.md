@@ -65,7 +65,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-05 — Update `dadaia context bind` CLI for semaphore + runtime pointer
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/cli/context.py` (bind command)
 - **Acceptance:**
