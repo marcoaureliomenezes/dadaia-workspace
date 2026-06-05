@@ -135,7 +135,7 @@ applies the lib-origination + gate workflow per task.
   (`v<x>/<alpha|rc>-N/`); archived flat releases still pass; unit tests.
 
 ### T-ENG-06 — `.gitignore` tracks segment files
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** devops-engineer
 - **Write set:** `.gitignore`
 - **Acceptance:** `releases/*/alpha-*/{SPEC,PLAN,TASKS,CLOSURE}.md` and
@@ -150,7 +150,7 @@ applies the lib-origination + gate workflow per task.
   opens `alpha-1`); flat-only assumptions retired or reconciled; tests updated.
 
 ### T-ENG-08 — CI `feature/{version}` branch trigger
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** devops-engineer
 - **Write set:** `.github/workflows/ci.yml`
 - **Acceptance:** CI triggers on `feature/*` branches; branch-name validation for

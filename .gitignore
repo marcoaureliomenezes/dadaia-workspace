@@ -107,6 +107,19 @@ pip-wheel-metadata/
 !/specs/releases/*/PLAN.md
 !/specs/releases/*/TASKS.md
 !/specs/releases/*/CLOSURE.md
+# alpha/rc segment files (ADR-1/ADR-5): track the 4 canonical files per segment.
+!/specs/releases/*/alpha-*/
+/specs/releases/*/alpha-*/*
+!/specs/releases/*/alpha-*/SPEC.md
+!/specs/releases/*/alpha-*/PLAN.md
+!/specs/releases/*/alpha-*/TASKS.md
+!/specs/releases/*/alpha-*/CLOSURE.md
+!/specs/releases/*/rc-*/
+/specs/releases/*/rc-*/*
+!/specs/releases/*/rc-*/SPEC.md
+!/specs/releases/*/rc-*/PLAN.md
+!/specs/releases/*/rc-*/TASKS.md
+!/specs/releases/*/rc-*/CLOSURE.md
 !/specs/_archive/
 !/specs/_archive/releases/
 !/specs/_archive/releases/*/
@@ -115,3 +128,15 @@ pip-wheel-metadata/
 !/specs/_archive/releases/*/PLAN.md
 !/specs/_archive/releases/*/TASKS.md
 !/specs/_archive/releases/*/CLOSURE.md
+!/specs/_archive/releases/*/alpha-*/
+/specs/_archive/releases/*/alpha-*/*
+!/specs/_archive/releases/*/alpha-*/SPEC.md
+!/specs/_archive/releases/*/alpha-*/PLAN.md
+!/specs/_archive/releases/*/alpha-*/TASKS.md
+!/specs/_archive/releases/*/alpha-*/CLOSURE.md
+!/specs/_archive/releases/*/rc-*/
+/specs/_archive/releases/*/rc-*/*
+!/specs/_archive/releases/*/rc-*/SPEC.md
+!/specs/_archive/releases/*/rc-*/PLAN.md
+!/specs/_archive/releases/*/rc-*/TASKS.md
+!/specs/_archive/releases/*/rc-*/CLOSURE.md
