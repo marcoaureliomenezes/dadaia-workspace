@@ -14,7 +14,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-01 — Design and implement runtime→session pointer (env-free resolution)
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:**
   - `dadaia_workspace/public/scripts/ctx-inject.sh`
@@ -29,7 +29,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-02 — Implement per-context semaphore (ctx_locks)
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:**
   - `dadaia_workspace/features/specs/` — lock acquire/renew/release logic

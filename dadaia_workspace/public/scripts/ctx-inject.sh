@@ -16,6 +16,24 @@ mkdir -p "$TMP_DIR"
 PAYLOAD_FILE="$(mktemp "$TMP_DIR/ctx-inject-payload.XXXXXX")"
 trap 'rm -f "$PAYLOAD_FILE"' EXIT
 
+# ---------------------------------------------------------------------------
+# T-R1-01: Write runtime→session pointer file (runs before any early exit).
+# When DADAIA_SESSION_ID is set (from eval $(dadaia context bind ...)), write
+# a pointer file at .dadaia/sessions/runtime/<session_id>.ptr so that the SDD
+# gate can resolve the session without requiring DADAIA_SESSION_ID to be
+# manually exported into the agent runtime environment.
+# This runs unconditionally early — before the context/specs guard — so the
+# ptr file is always registered even if specs are missing.
+# Cleanup: `dadaia context release` is the authoritative cleanup path; the
+# EXIT trap here handles per-invocation cleanup only.
+# ---------------------------------------------------------------------------
+if [ -n "${DADAIA_SESSION_ID:-}" ]; then
+    _RUNTIME_PTR_DIR="$WORKSPACE_ROOT/.dadaia/sessions/runtime"
+    mkdir -p "$_RUNTIME_PTR_DIR" 2>/dev/null || true
+    _PTR_FILE="$_RUNTIME_PTR_DIR/${DADAIA_SESSION_ID}.ptr"
+    printf '%s' "$DADAIA_SESSION_ID" > "$_PTR_FILE" 2>/dev/null || true
+fi
+
 emit_payload() {
     if [ "$DADAIA_HOOK_OUTPUT" = "codex-json" ] || [ "$DADAIA_HOOK_OUTPUT" = "json" ]; then
         "$PYTHON_BIN" - "$PAYLOAD_FILE" <<'PY'
