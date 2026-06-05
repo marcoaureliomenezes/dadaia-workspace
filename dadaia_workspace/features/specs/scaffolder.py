@@ -317,3 +317,118 @@ def scaffold_hotfix_release(
     _write(release_dir / "TASKS.md", tasks_content)
 
     return result
+
+
+# Segment naming (ADR-1/ADR-5): alpha-N or rc-N (1-indexed, hyphenated).
+_SEGMENT_RE = re.compile(r"^(alpha|rc)-\d+$")
+
+_SEGMENT_SPEC_STUB = """\
+# SPEC: {version_id} {segment} - <slug>
+
+**Status:** Draft
+**Release ID:** {version_id}
+**Segment:** {segment}
+**Owner:** product-engineer
+**Created:** {today}
+
+---
+
+## Objective
+
+(Define this segment's objective.)
+"""
+
+_SEGMENT_PLAN_STUB = """\
+# PLAN: {version_id} {segment} - <slug>
+
+**Status:** Draft
+**Release ID:** {version_id}
+**Segment:** {segment}
+**Owner:** product-engineer
+**Created:** {today}
+
+---
+
+## Approach
+
+(Define the implementation approach for this segment.)
+"""
+
+_SEGMENT_TASKS_STUB = """\
+# TASKS: {version_id} {segment} - <slug>
+
+**Status:** Draft
+**Release ID:** {version_id}
+**Segment:** {segment}
+**Owner:** product-engineer
+**Created:** {today}
+
+Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
+
+---
+
+## Tasks
+
+### T1 — (Add tasks here)
+
+- **Status:** [ ]
+- **Owner:** software-engineer
+- **Acceptance:** (acceptance criteria)
+"""
+
+
+def scaffold_release_segment(
+    specs_dir: Path,
+    version_id: str,
+    segment: str,
+    force: bool = False,
+) -> ScaffoldResult:
+    """Scaffold a release **segment** under specs/releases/<version_id>/<segment>/.
+
+    Creates SPEC.md + PLAN.md + TASKS.md stubs for an `alpha-N` or `rc-N` segment
+    (ADR-1/ADR-5). The parent release directory is created if absent.
+
+    Args:
+        specs_dir: Target specs/ directory.
+        version_id: SemVer release id (e.g. ``v0.1.6``); must match ``^v\\d+\\.\\d+\\.\\d+$``.
+        segment: Segment name; must match ``^(alpha|rc)-\\d+$`` (e.g. ``alpha-1``, ``rc-2``).
+        force: Overwrite existing files when True; otherwise skip them.
+
+    Returns:
+        ScaffoldResult with created/skipped/errors.
+
+    Raises:
+        ValueError: If version_id is not SemVer or segment is malformed.
+    """
+    if not _RELEASE_SEMVER_RE.match(version_id):
+        raise ValueError(
+            f"version_id {version_id!r} does not match SemVer pattern "
+            "^v<MAJOR>.<MINOR>.<PATCH>$ (e.g. v0.1.6)."
+        )
+    if not _SEGMENT_RE.match(segment):
+        raise ValueError(
+            f"segment {segment!r} is not valid. Use 'alpha-<N>' or 'rc-<N>' "
+            "(1-indexed, hyphenated), e.g. alpha-1, rc-2."
+        )
+
+    result = ScaffoldResult()
+    today = datetime.date.today().isoformat()
+    seg_dir = specs_dir / "releases" / version_id / segment
+    ctx = {"version_id": version_id, "segment": segment, "today": today}
+
+    def _write(path: Path, content: str) -> None:
+        if path.exists() and not force:
+            result.skipped.append(path)
+            return
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+            result.created.append(path)
+        except OSError as exc:
+            result.errors.append(f"Failed to write {path}: {exc}")
+
+    _write(seg_dir / "SPEC.md", _SEGMENT_SPEC_STUB.format(**ctx))
+    _write(seg_dir / "PLAN.md", _SEGMENT_PLAN_STUB.format(**ctx))
+    _write(seg_dir / "TASKS.md", _SEGMENT_TASKS_STUB.format(**ctx))
+
+    return result
