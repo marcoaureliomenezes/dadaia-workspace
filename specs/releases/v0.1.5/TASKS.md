@@ -46,13 +46,13 @@ applies the lib-origination + gate workflow per task.
   `release-definition` playbook defined; review-gate contract tests updated + green.
 
 ### T-GOV-04 — `dadaia-grill-me` mandatory-at-release-definition trigger
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md`
 - **Acceptance:** release-definition listed as a mandatory grill trigger.
 
 ### T-GOV-05 — Always-on rule `release-governance`
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/rules/release-governance.md`
 - **Acceptance:** concise always-on rule; projects to `.claude/rules/` + `.codex/rules/`.
