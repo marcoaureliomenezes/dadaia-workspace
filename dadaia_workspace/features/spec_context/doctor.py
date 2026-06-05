@@ -501,6 +501,41 @@ class DoctorService:
                         )
                     )
 
+        # LOCK-7: orphan lock — implementation lock file exists but the owning
+        # session file is absent from .dadaia/sessions/. Distinct from:
+        #   LOCK-2 (lock for DEAD context — skipped here)
+        #   LOCK-3 (lock stale by TTL — may co-occur; LOCK-7 fires on session absence)
+        # Scenario: session file deleted manually/by bug; lock remains; owner is gone.
+        # AUTO-FIX: delete orphan lock file + append audit event.
+        if locks_dir.exists():
+            for f in sorted(locks_dir.iterdir()):
+                if f.suffix != ".json":
+                    continue
+                lock_data = self._read_lock(f)
+                if lock_data is None:
+                    continue
+                ctx_name, release = self._parse_key(f.stem)
+                # Skip DEAD-context locks — those are LOCK-2
+                if ctx_name in dead_names:
+                    continue
+                session_id = self._str(lock_data, "session_id")
+                if not session_id:
+                    continue
+                session_file = sessions_dir / f"{session_id}.json"
+                if not session_file.exists():
+                    issues.append(
+                        DoctorIssue(
+                            code="LOCK-7",
+                            description=(
+                                f"Orphan lock '{f.name}': session file for "
+                                f"'{session_id}' is absent "
+                                f"(context={ctx_name}, release={release}). "
+                                "The owning session is gone; lock can be safely reclaimed."
+                            ),
+                            fixable=True,
+                        )
+                    )
+
         # ---- ROOT invariants (T-SANI-05) ----
         exc_globs = self._root_exception_globs()
         issues.extend(self._check_root_1(exc_globs))
@@ -663,6 +698,51 @@ class DoctorService:
                         f.unlink(missing_ok=True)
                         actions.append(
                             f"LOCK-6: deleted BOUND_REVIEW session '{f.name}' for DEAD context '{ctx_name}'"
+                        )
+
+            # LOCK-7: reclaim orphan locks (session file absent, context ALIVE, NOT stale).
+            # Only applies when the lock is NOT already handled by LOCK-3 (stale by TTL):
+            # if check_lock_state returns STALE the lock goes through LOCK-3 (mark STALE,
+            # no delete). LOCK-7 in fix() only deletes locks that appear HELD by TTL
+            # (fresh timestamp + live pid) but whose session file is absent.
+            sessions_dir = self._sessions_dir()
+            if locks_dir.exists():
+                for f in sorted(locks_dir.iterdir()):
+                    if f.suffix != ".json":
+                        continue
+                    lock7_data: dict[str, object] | None = self._read_lock(f)
+                    if lock7_data is None:
+                        continue
+                    ctx_name, release = self._parse_key(f.stem)
+                    # Skip DEAD-context locks (LOCK-2 handles those)
+                    if ctx_name in dead_names:
+                        continue
+                    # Skip locks that are stale by TTL/dead-pid — LOCK-3 handles those
+                    lock7_state = check_lock_state(self._workspace_root, ctx_name, release)
+                    if lock7_state == LockState.STALE:
+                        continue
+                    session_id = self._str(lock7_data, "session_id")
+                    if not session_id:
+                        continue
+                    session_file = sessions_dir / f"{session_id}.json"
+                    if not session_file.exists():
+                        _append_audit_event(
+                            self._workspace_root,
+                            event="LOCK_ORPHAN_RECLAIMED",
+                            context=ctx_name,
+                            release=release,
+                            session_id=session_id,
+                            runtime=self._str(lock7_data, "runtime", "doctor"),
+                            pid=self._int(lock7_data, "pid", 0),
+                            reason=(
+                                f"LOCK-7: orphan lock '{f.name}' reclaimed — "
+                                f"session file for '{session_id}' is absent"
+                            ),
+                        )
+                        f.unlink(missing_ok=True)
+                        actions.append(
+                            f"LOCK-7: reclaimed orphan lock '{f.name}' "
+                            f"(session '{session_id}' file absent, context={ctx_name})"
                         )
 
         # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
