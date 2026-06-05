@@ -156,7 +156,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R3-03 — project-manager persona specialization + D4 model bump
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/agents/project-manager.md` + any new skill files identified in T-R3-01
 - **Acceptance:**
