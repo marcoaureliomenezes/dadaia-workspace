@@ -103,7 +103,7 @@ applies the lib-origination + gate workflow per task.
   unit tests for both flat and segmented ACTIVE.md.
 
 ### T-ENG-02 — Scaffolder for `alpha-N`/`rc-N` segments
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/features/specs/scaffolder.py`; tests
 - **Acceptance:** `scaffold_release_segment(specs_dir, version, segment)` creates
@@ -111,7 +111,7 @@ applies the lib-origination + gate workflow per task.
   `segment` matches `^(alpha|rc)-\d+$`; pure module + unit tests.
 
 ### T-ENG-03 — CLI `dadaia specs release open` + `segment open`
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/cli/commands/specs.py`; tests
 - **Acceptance:** `dadaia specs release open v<x>` creates the parent + `alpha-1`
