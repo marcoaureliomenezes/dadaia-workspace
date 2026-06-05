@@ -192,6 +192,68 @@ case "$FPATH" in
         ;;
 esac
 
+# v0.1.5 RULE A2 — Backlog ownership (T-D5-02).
+# Only project-manager may create/edit specs/backlog/** entries; every other agent
+# is a read-only consumer (rule: backlog-ownership). This MUST run before the
+# meta-edit short-circuit below, whose */backlog/*.md case would otherwise allow any
+# agent to write backlog files. The writing persona is resolved via the same layered
+# chain RULE D uses: DADAIA_AGENT_PERSONA → CLAUDE_/CODEX_/OPENCODE_AGENT_PERSONA →
+# tool_input._meta.agent_persona → fail-open. Mirrors RULE A (memory atomicity):
+# self-contained, evaluated early, blocks with a clear agent-naming reason.
+_backlog_ownership_check() {
+    # Only fire for specs/backlog/** writes; otherwise return and continue the gate.
+    case "$FPATH" in
+        */specs/backlog/*) ;;
+        *) return ;;
+    esac
+
+    # Resolve persona via the layered chain (priority order matches RULE D).
+    local persona=""
+    if [ -n "${DADAIA_AGENT_PERSONA:-}" ]; then
+        persona="$DADAIA_AGENT_PERSONA"
+    fi
+    if [ -z "$persona" ]; then
+        local _var _val
+        for _var in CLAUDE_AGENT_PERSONA CODEX_AGENT_PERSONA OPENCODE_AGENT_PERSONA; do
+            _val="${!_var:-}"
+            if [ -n "$_val" ]; then
+                persona="$_val"
+                break
+            fi
+        done
+    fi
+    if [ -z "$persona" ]; then
+        persona=$("$PYTHON_BIN" - "$TMP" 2>/dev/null <<'PYEOF'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    ti = d.get("tool_input") or {}
+    meta = ti.get("_meta") or {}
+    v = meta.get("agent_persona", "")
+    print(v if isinstance(v, str) else "")
+except Exception:
+    print("")
+PYEOF
+)
+    fi
+
+    # Persona undetectable → fail-open (cannot prove a violation). Consistent with
+    # RULE D: the gate never hard-blocks on an unknown writer.
+    if [ -z "$persona" ]; then
+        _log "FAIL-OPEN backlog-ownership: no agent persona detected; allowing backlog write to $FPATH"
+        return
+    fi
+
+    if [ "$persona" = "project-manager" ]; then
+        _log "allowed — backlog-ownership ok: project-manager writing $FPATH"
+        return
+    fi
+
+    _block "[BACKLOG OWNERSHIP ERROR] agent ${persona} cannot write to specs/backlog/ — only project-manager creates or edits backlog entries (rule: backlog-ownership). product-engineer and specialists are read-only consumers; PE reads PM-created backlog to author release specs."
+}
+
+_backlog_ownership_check
+
 # Meta-edits to spec/task files are always allowed — they are the very mechanism
 # that creates the [-] marker the gate relies on (deadlock prevention).
 #
