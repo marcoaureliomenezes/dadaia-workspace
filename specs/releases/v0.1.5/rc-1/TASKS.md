@@ -240,7 +240,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-SHIP-02 — QA review (qa-engineer)
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** qa-engineer
 - **Write set:** `.dadaia/reports/dadaia-workspace/qa-engineer/` (review report only)
 - **Acceptance:**
@@ -250,7 +250,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-SHIP-03 — Code review (code-reviewer)
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** code-reviewer
 - **Write set:** `.dadaia/reports/dadaia-workspace/code-reviewer/` (review report only)
 - **Acceptance:**
@@ -260,7 +260,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-SHIP-04 — Security review (security-reviewer)
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** security-reviewer
 - **Write set:** `.dadaia/reports/dadaia-workspace/security-reviewer/` (review report only)
 - **Acceptance:**
