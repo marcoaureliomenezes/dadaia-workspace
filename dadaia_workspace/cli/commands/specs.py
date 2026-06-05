@@ -259,6 +259,13 @@ def hotfix_open(
 
     Pre-condition (human audit, D4): there should be a matching bullet in
     specs/backlog/candidates.md ## Hotfixes pendentes before running this command.
+
+    Reconciliation (ADR-2/ADR-5): the alpha/rc model unifies all releases — a
+    hotfix is just a release that usually ships at ``alpha-1``. Prefer
+    ``dadaia specs release open <version>`` (which opens the parent + ``alpha-1``
+    and sets the ACTIVE segment) for new hotfixes going forward. This condensed,
+    flat ``hotfix open`` command is retained for back-compatibility and for the
+    D4 backlog-origin audit; it does not create segment folders.
     """
     target = _resolve_specs_dir(specs_dir)
 
