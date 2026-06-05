@@ -436,13 +436,22 @@ def bind(
             # This check comes AFTER the per-release impl lock succeeds so that
             # the semaphore is the outer guard and the lock is the inner guard.
             # SemaphoreAlreadyHeldError names the holder; read/spec phases bypass.
-            acquire_context_semaphore(
-                workspace_root,
-                context=name,
-                session_id=session_id,
-                phase="BOUND_IMPLEMENTATION",
-                release=release or "",
-            )
+            # If the semaphore is already held, roll the impl lock back so a failed
+            # bind never leaves an orphan lock with no owning session
+            # (T-SHIP-03 Finding 2).
+            try:
+                acquire_context_semaphore(
+                    workspace_root,
+                    context=name,
+                    session_id=session_id,
+                    phase="BOUND_IMPLEMENTATION",
+                    release=release or "",
+                )
+            except SemaphoreAlreadyHeldError:
+                release_impl_lock(
+                    workspace_root, context=name, release=release, session_id=session_id
+                )
+                raise
 
         elif mode_upper == "REVIEW":
             assert release is not None  # guaranteed above

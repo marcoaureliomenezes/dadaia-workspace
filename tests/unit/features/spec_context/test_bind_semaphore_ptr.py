@@ -189,3 +189,35 @@ def test_tr105_read_bind_registers_runtime_ptr(workspace: Path) -> None:
 
     ptr_file = workspace / ".dadaia" / "sessions" / "runtime" / f"{session_id}.ptr"
     assert ptr_file.exists(), f"Runtime ptr file should exist at {ptr_file} even for read bind"
+
+
+# ---------------------------------------------------------------------------
+# T-SHIP-03 Finding 2: impl lock is rolled back when the semaphore denies the bind
+# ---------------------------------------------------------------------------
+
+
+def test_tr105_impl_lock_rolled_back_on_semaphore_denial(workspace: Path) -> None:
+    """A second impl bind on the same context but a DIFFERENT release creates its
+    own per-release impl lock, then is denied by the per-context semaphore. The
+    just-created impl lock must be rolled back so a failed bind never orphans a
+    lock (T-SHIP-03 Finding 2)."""
+    _register_alive_ctx(workspace)
+
+    # First holder: takes the per-context semaphore + impl lock for v1.
+    result1 = _runner.invoke(
+        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
+    )
+    assert result1.exit_code == 0, result1.output
+
+    # Second bind for a different release: its v2 impl lock is created, then the
+    # per-context semaphore (held by the first holder) denies the bind.
+    result2 = _runner.invoke(
+        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v2"]
+    )
+    assert result2.exit_code != 0, "Second impl bind (different release) must be denied"
+
+    locks = workspace / ".dadaia" / "locks" / "implementation"
+    assert not (locks / "myctx__v2.json").exists(), (
+        "Impl lock for the denied bind must be rolled back, not orphaned"
+    )
+    assert (locks / "myctx__v1.json").exists(), "First holder's impl lock must remain intact"
