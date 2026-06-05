@@ -44,7 +44,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-03 — Fix heartbeat renewal (Bug C — both session file and lock)
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/public/scripts/sdd-post-gate.sh`
 - **Acceptance:**
@@ -54,7 +54,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-04 — Fix multi-lock non-determinism (narrow glob) and CONTEXT_SLUG sanitization
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh` (RULE E lock lookup)
 - **Acceptance:**
