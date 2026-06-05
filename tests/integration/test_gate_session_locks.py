@@ -329,6 +329,36 @@ def test_ac_t13_4_fresh_session_owns_lock_allowed(workspace: Path) -> None:
     assert result.stdout == "" or "block" not in result.stdout
 
 
+def test_eng04_segmented_active_release_marker_resolved(workspace: Path) -> None:
+    """T-ENG-04: with a `segment:` in ACTIVE.md, the gate finds the [-] marker in
+    releases/<release>/<segment>/TASKS.md and allows the lock owner's write."""
+    scripts = _install_scripts(workspace)
+    slug = "my-proj"
+    release_id = "v0.1.6"
+    segment = "alpha-1"
+    specs = workspace / "repos" / slug / "specs"
+    seg_dir = specs / "releases" / release_id / segment
+    seg_dir.mkdir(parents=True, exist_ok=True)
+    # Only the SEGMENT TASKS.md exists (no flat releases/<rel>/TASKS.md).
+    (specs / "releases" / "ACTIVE.md").write_text(
+        f"release: {release_id}\nsegment: {segment}\nphase: IMPLEMENTATION\n"
+    )
+    (seg_dir / "TASKS.md").write_text("# Tasks\n\n- **Status:** [-]\n")
+    _make_primary_context(workspace, slug, specs)
+
+    sess_id = "sess_seg01"
+    _make_session_file(
+        workspace, sess_id, mode="BOUND_IMPLEMENTATION", context=slug, release=release_id
+    )
+    _make_impl_lock(workspace, slug, release_id, sess_id)
+
+    target_file = workspace / "repos" / slug / "src" / "main.py"
+    result = _run_gate(scripts, workspace, target_file, session_id=sess_id)
+
+    assert result.returncode == 0
+    assert result.stdout == "" or "block" not in result.stdout
+
+
 # ---------------------------------------------------------------------------
 # AC-T13-5: SPEC-mode session blocks write to releases/<id>/SPEC.md when impl lock HELD
 # ---------------------------------------------------------------------------
