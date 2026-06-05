@@ -105,7 +105,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-D5-01 — New rule: backlog-ownership (always-on)
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/rules/backlog-ownership.md`
 - **Acceptance:**
