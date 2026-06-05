@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import json as _json
 import os
-import datetime as _dt
 from pathlib import Path
 
 import typer
@@ -18,6 +18,10 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.reports_retention import (
+    CleanupCandidate,
+    ReportRetentionService,
+)
 from dadaia_workspace.features.reports_validation.service import ValidationResult
 
 app = typer.Typer(help="Inspect and validate agent handoff reports.")
@@ -46,7 +50,7 @@ def _parse_duration(value: str) -> _dt.timedelta:
     return duration
 
 
-def _retention_service():
+def _retention_service() -> ReportRetentionService:
     try:
         workspace_root = resolve_workspace_root()
         return container.build_reports_retention_service(workspace_root)
@@ -57,7 +61,7 @@ def _retention_service():
         raise typer.Exit(3) from None
 
 
-def _candidate_payload(candidate) -> dict[str, object]:
+def _candidate_payload(candidate: CleanupCandidate) -> dict[str, object]:
     return {
         "artifact_path": candidate.artifact_path,
         "reason": candidate.reason,
@@ -140,7 +144,9 @@ def _check_v10_compat(path: Path, doc: dict[str, object]) -> tuple[bool, list[st
 @app.command(name="cleanup")
 def cleanup(
     older_than: str = typer.Option("48h", "--older-than", help="TTL threshold, e.g. 48h or 2d."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="List eligible deletions without deleting."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="List eligible deletions without deleting."
+    ),
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON instead of text."
     ),
@@ -169,7 +175,9 @@ def cleanup(
         raise typer.Exit(0)
 
     action = "Would delete" if dry_run else "Deleted"
-    console.print(f"{action} {len(result.deleted_paths) if not dry_run else len(result.candidates)} item(s).")
+    console.print(
+        f"{action} {len(result.deleted_paths) if not dry_run else len(result.candidates)} item(s)."
+    )
     for candidate in result.candidates:
         console.print(f"- {candidate.artifact_path}: {candidate.reason}")
         for path in candidate.paths:
@@ -453,10 +461,7 @@ def lint(
 
     reports_root = workspace_root / ".dadaia" / "reports"
     handoff_root = workspace_root / ".dadaia" / "handoff"
-    if directory is None:
-        directories = [reports_root, handoff_root]
-    else:
-        directories = [directory]
+    directories = [reports_root, handoff_root] if directory is None else [directory]
 
     existing_directories = [item for item in directories if item.exists()]
     if not existing_directories:
@@ -528,7 +533,9 @@ def _handoff_artifact_paths(handoff_root: Path, workspace_root: Path) -> set[str
             path = artifact.get("path")
             if isinstance(path, str) and path:
                 refs.add(path)
-                artifact_path = workspace_root / path if path.startswith(".dadaia/") else filepath.parent / path
+                artifact_path = (
+                    workspace_root / path if path.startswith(".dadaia/") else filepath.parent / path
+                )
                 refs.add(_workspace_relative_ref(artifact_path, workspace_root))
     return refs
 

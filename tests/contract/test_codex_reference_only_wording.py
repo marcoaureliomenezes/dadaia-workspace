@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = REPO_ROOT / "dadaia_workspace" / "public" / "workflows"
 AGENTS_DIR = REPO_ROOT / "dadaia_workspace" / "public" / "agents"
@@ -33,8 +32,7 @@ def test_parallel_workflows_state_codex_reference_only_mode() -> None:
             continue
         lowered = content.lower()
         if not (
-            "codex receives manual/reference" in lowered
-            and "does not spawn subagents" in lowered
+            "codex receives manual/reference" in lowered and "does not spawn subagents" in lowered
         ):
             missing.append(path.name)
 
@@ -43,7 +41,11 @@ def test_parallel_workflows_state_codex_reference_only_mode() -> None:
 
 def test_codex_facing_text_does_not_promise_spawned_parallelism() -> None:
     """Codex-facing public text must not claim runtime spawning or fake tools."""
-    paths = [AGENT_ORCHESTRATION, *sorted(AGENTS_DIR.glob("*.md")), *sorted(WORKFLOWS_DIR.glob("*.workflow.md"))]
+    paths = [
+        AGENT_ORCHESTRATION,
+        *sorted(AGENTS_DIR.glob("*.md")),
+        *sorted(WORKFLOWS_DIR.glob("*.workflow.md")),
+    ]
     failures: list[str] = []
 
     for path in paths:

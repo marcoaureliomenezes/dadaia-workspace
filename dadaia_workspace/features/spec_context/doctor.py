@@ -64,9 +64,7 @@ _ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
 
 #: Tool config files that have canonical homes elsewhere but are currently
 #: tolerated at root with a WARN (ROOT-3, lenient).
-_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset(
-    {".mcp.json", "opencode.json", "CLAUDE.md"}
-)
+_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json", "opencode.json", "CLAUDE.md"})
 
 #: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4).
 _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
@@ -680,8 +678,6 @@ class DoctorService:
                         f"ROOT-2: deleted forbidden cache/output '{cache_name}' from workspace root"
                     )
                 except OSError as exc:
-                    actions.append(
-                        f"ROOT-2: failed to delete '{cache_name}': {exc}"
-                    )
+                    actions.append(f"ROOT-2: failed to delete '{cache_name}': {exc}")
 
         return actions

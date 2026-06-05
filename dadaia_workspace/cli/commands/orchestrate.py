@@ -14,8 +14,8 @@ from dadaia_workspace.core.exceptions import (
     WorkflowSchemaError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 
 app = typer.Typer(help="Run and manage multi-agent workflows.")

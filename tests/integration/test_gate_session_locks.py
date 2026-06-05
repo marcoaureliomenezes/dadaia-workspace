@@ -1022,9 +1022,7 @@ def test_sema01_env_absent_status_marker_form_allows(workspace: Path) -> None:
 
     # Overwrite TASKS.md with the canonical release marker form.
     tasks = specs / "releases" / release_id / "TASKS.md"
-    tasks.write_text(
-        "# Tasks\n\n### T-001 — work\n- **Owner:** someone\n- **Status:** [-]\n"
-    )
+    tasks.write_text("# Tasks\n\n### T-001 — work\n- **Owner:** someone\n- **Status:** [-]\n")
 
     sess_id = "sess_statusform01"
     _make_session_file(

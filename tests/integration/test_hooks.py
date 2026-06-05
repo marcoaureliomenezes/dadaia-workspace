@@ -135,7 +135,9 @@ def _make_primary_context(workspace: Path, slug: str, specs_dir: Path) -> None:
     (states / "spec_contexts.json").write_text(json.dumps(ctx_data, indent=2))
 
 
-def _bind_impl_session(workspace: Path, slug: str, release: str, session_id: str = "sess_impl") -> dict[str, str]:
+def _bind_impl_session(
+    workspace: Path, slug: str, release: str, session_id: str = "sess_impl"
+) -> dict[str, str]:
     now = datetime.now(tz=UTC).isoformat()
     sessions = workspace / ".dadaia" / "sessions"
     sessions.mkdir(parents=True, exist_ok=True)
@@ -720,9 +722,7 @@ def test_sdd_gate_rule_f_tmp_path_exits_0(workspace: Path) -> None:
 def test_sdd_gate_rule_f_tmp_nested_subdir_exits_0(workspace: Path) -> None:
     """RULE F: deeply nested paths under .dadaia/tmp/ are also fast-allowed."""
     scripts = _install_scripts(workspace)
-    tmp_target = (
-        workspace / ".dadaia" / "tmp" / "qa-engineer" / "2026" / "06" / "screenshot.png"
-    )
+    tmp_target = workspace / ".dadaia" / "tmp" / "qa-engineer" / "2026" / "06" / "screenshot.png"
     env = {**os.environ, "WORKSPACE_ROOT": str(workspace)}
 
     payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(tmp_target)}})
@@ -790,7 +790,7 @@ def test_sdd_gate_one_minus_warn_two_markers_no_parallel_declaration(workspace: 
     log_content = log_file.read_text() if log_file.exists() else ""
     assert "WARN" in log_content and (
         "one-active-task" in log_content or "multiple [-]" in log_content
-    ), (f"Expected WARN one-active-task in log. Log:\n{log_content!r}")
+    ), f"Expected WARN one-active-task in log. Log:\n{log_content!r}"
     # The count (2) must appear in the log message
     assert "2" in log_content, f"Expected count '2' in WARN log. Log:\n{log_content!r}"
 

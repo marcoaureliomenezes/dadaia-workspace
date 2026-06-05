@@ -14,13 +14,13 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.migrate.state_v2 import (
     MigrationPlan,
     execute_migration,
     plan_migration,
 )
 from dadaia_workspace.features.migrate.tree_v2 import migrate_tree_v2
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 
 app = typer.Typer(
     help="Migration helpers for dadaia workspace and spec trees.",

@@ -194,7 +194,9 @@ def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
     report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
     report_path.parent.mkdir(parents=True)
     report_path.write_text("<html>qa</html>", encoding="utf-8")
-    handoff_path = tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-04T000000Z-qa-engineer-qa.handoff.json"
+    handoff_path = (
+        tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-04T000000Z-qa-engineer-qa.handoff.json"
+    )
     handoff_path.parent.mkdir(parents=True)
     handoff_path.write_text(
         json.dumps(
@@ -283,9 +285,7 @@ def test_mark_and_unmark_report_important_views(tmp_path: Path) -> None:
     service = _build_service(workspace_root=tmp_path)
 
     mark_status, _, mark_body = mark_report_important(service)(path="ctx/qa-engineer/qa.html")
-    unmark_status, _, unmark_body = unmark_report_important(service)(
-        path="ctx/qa-engineer/qa.html"
-    )
+    unmark_status, _, unmark_body = unmark_report_important(service)(path="ctx/qa-engineer/qa.html")
 
     assert mark_status == 200
     assert json.loads(mark_body)["important"] is True
@@ -394,7 +394,9 @@ def test_delete_report_removes_handoff_from_canonical_root(tmp_path: Path) -> No
     report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
     report_path.parent.mkdir(parents=True)
     report_path.write_text("<html>qa</html>", encoding="utf-8")
-    handoff_path = tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-04T000000Z-qa-engineer-qa.handoff.json"
+    handoff_path = (
+        tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-04T000000Z-qa-engineer-qa.handoff.json"
+    )
     handoff_path.parent.mkdir(parents=True)
     handoff_path.write_text(
         json.dumps(

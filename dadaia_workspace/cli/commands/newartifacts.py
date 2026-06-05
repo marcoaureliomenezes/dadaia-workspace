@@ -13,12 +13,12 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.spec_artifacts.new_artifacts import (
     backlog_new,
     bug_new,
     release_new,
 )
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 
 # ── shared typer apps ─────────────────────────────────────────────────────────
 
