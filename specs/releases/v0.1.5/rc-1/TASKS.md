@@ -29,7 +29,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-02 — Implement per-context semaphore (ctx_locks)
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:**
   - `dadaia_workspace/features/specs/` — lock acquire/renew/release logic
@@ -44,7 +44,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-03 — Fix heartbeat renewal (Bug C — both session file and lock)
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/public/scripts/sdd-post-gate.sh`
 - **Acceptance:**
