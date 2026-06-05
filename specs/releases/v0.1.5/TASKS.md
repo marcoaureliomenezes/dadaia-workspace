@@ -83,7 +83,7 @@ applies the lib-origination + gate workflow per task.
   `dadaia specs doctor` memory lint OK.
 
 ### T-PROP-01 — Propagate + verify projections + full suite green
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** devops-engineer
 - **Write set:** projections (generated)
 - **Acceptance:** `public stage` + `install --force` + `doctor` exit 0; manual
