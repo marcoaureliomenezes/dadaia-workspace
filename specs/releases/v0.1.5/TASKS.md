@@ -22,7 +22,7 @@ applies the lib-origination + gate workflow per task.
   `feature/{version}` branch; ADR-4 records the bug/backlog rules.
 
 ### T-GOV-01 — New skill `dadaia-release-definition`
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/skills/dadaia-release-definition/SKILL.md`
 - **Acceptance:** encodes pick / bug-always-solved / `superseded_by` subsumption /

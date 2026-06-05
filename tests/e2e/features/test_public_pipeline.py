@@ -49,6 +49,7 @@ EXPECTED_SKILLS = {
     "dadaia-grill-me",
     "dadaia-handoff-emitter",
     "dadaia-release-closure",
+    "dadaia-release-definition",
     "dadaia-step0-memory-bootstrap",
     "dadaia-task-manager",
     "dadaia-workspace-doctor",
