@@ -762,6 +762,13 @@ PYEOF
                 # Verify the session owns the impl lock for CONTEXT_SLUG
                 local lock_file="$WS/.dadaia/locks/implementation"
                 local found_owner=""
+                local conflict_owner=""
+                # T-R1-04: prefer the held lock OWNED BY this session (across any
+                # release — IMPLEMENTATION resolves release from the lock, not
+                # ACTIVE.md, per ADR D-9). Preferring our own lock removes the
+                # multi-lock non-determinism where an unrelated release's lock
+                # shadowed ownership; a held lock owned by another session is
+                # remembered so the block message can name the real holder.
                 if [ -d "$lock_file" ] && [ -n "$CONTEXT_SLUG" ]; then
                     for lf in "$lock_file/${CONTEXT_SLUG}__"*.json; do
                         [ -f "$lf" ] || continue
@@ -792,22 +799,19 @@ except Exception:
     print("held")
 PYEOF
 )
-                        # T-R1-04: only adopt the held lock OWNED BY the resolved
-                        # session. The previous logic took the first held lock for
-                        # the context and compared afterwards, so an unrelated
-                        # release's lock (alphabetically earlier) shadowed the real
-                        # owner and produced a spurious "does not own the lock" block.
-                        if [ "$lstate2" = "held" ] && [ "$owner_sess" = "$sess_id" ]; then
-                            found_owner="$owner_sess"
+                        [ "$lstate2" = "held" ] || continue
+                        if [ "$owner_sess" = "$sess_id" ]; then
+                            found_owner="$sess_id"
                             break
                         fi
+                        [ -z "$conflict_owner" ] && conflict_owner="$owner_sess"
                     done
                 fi
                 if [ -z "$found_owner" ]; then
+                    if [ -n "$conflict_owner" ]; then
+                        _block "[RULE E] Session '${sess_id}' does not own the implementation lock for '${CONTEXT_SLUG:-<unknown>}'. Lock is owned by session '${conflict_owner}'. Cannot write to production paths."
+                    fi
                     _block "[RULE E] Session '${sess_id}' (mode=BOUND_IMPLEMENTATION) has no HELD implementation lock for context '${CONTEXT_SLUG:-<unknown>}'. Acquire lock via: eval \$(dadaia context bind ${CONTEXT_SLUG:-<ctx>} --mode implementation --release <release-id>)"
-                fi
-                if [ "$found_owner" != "$sess_id" ]; then
-                    _block "[RULE E] Session '${sess_id}' does not own the implementation lock for '${CONTEXT_SLUG:-<unknown>}'. Lock is owned by session '${found_owner}'. Cannot write to production paths."
                 fi
                 # Owns the lock — resolve active release from lock file (T-8 completion / ADR D-9)
                 # For IMPLEMENTATION mode, ACTIVE.md is NOT consulted; release comes from the lock.
