@@ -14,20 +14,17 @@ in locking.py and the per-release implementation lock).
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.features.spec_context.semaphore import (
-    ContextSemaphoreError,
+    SemaphoreAlreadyHeldError,
     acquire_context_semaphore,
     release_context_semaphore,
     renew_context_semaphore,
-    SemaphoreAlreadyHeldError,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

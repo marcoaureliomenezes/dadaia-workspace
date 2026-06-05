@@ -66,9 +66,7 @@ def _make_active_release(specs_dir: Path, release_id: str) -> Path:
     (specs_dir / "releases" / "ACTIVE.md").write_text(
         f"release: {release_id}\nphase: IMPLEMENTATION\n"
     )
-    (rel_dir / "TASKS.md").write_text(
-        "# Tasks\n\n### T-001 — work\n- **Status:** [-]\n"
-    )
+    (rel_dir / "TASKS.md").write_text("# Tasks\n\n### T-001 — work\n- **Status:** [-]\n")
     return rel_dir
 
 
@@ -85,7 +83,7 @@ def _make_session_file(
     sessions_dir.mkdir(parents=True, exist_ok=True)
     import datetime
 
-    now = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+    now = datetime.datetime.now(tz=datetime.UTC).isoformat()
     data = {
         "session_id": session_id,
         "context": context,
@@ -109,7 +107,7 @@ def _make_impl_lock(workspace: Path, context: str, release: str, session_id: str
 
     locks_dir = workspace / ".dadaia" / "locks" / "implementation"
     locks_dir.mkdir(parents=True, exist_ok=True)
-    now = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+    now = datetime.datetime.now(tz=datetime.UTC).isoformat()
     lock_data = {
         "lock_type": "implementation",
         "context": context,
@@ -242,9 +240,11 @@ def test_tr101_ptr_file_path_allows_production_write(
     # Verify some form of env-free resolution was logged (ptr or lock fallback)
     log_file = workspace / ".dadaia" / "sdd-gate-test.log"
     log_content = log_file.read_text() if log_file.exists() else ""
-    assert "env-free" in log_content.lower() or "ptr" in log_content.lower() or "runtime" in log_content.lower(), (
-        f"Expected env-free resolution log entry, got: {log_content!r}"
-    )
+    assert (
+        "env-free" in log_content.lower()
+        or "ptr" in log_content.lower()
+        or "runtime" in log_content.lower()
+    ), f"Expected env-free resolution log entry, got: {log_content!r}"
 
 
 def test_tr101_ptr_file_env_var_wins_over_ptr(
@@ -290,7 +290,10 @@ def test_tr101_deny_path_blocks_when_no_session(
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert data["decision"] == "block"
-    assert "No active implementation session" in data["reason"] or "no relaunch" in data["reason"].lower()
+    assert (
+        "No active implementation session" in data["reason"]
+        or "no relaunch" in data["reason"].lower()
+    )
 
 
 # ---------------------------------------------------------------------------

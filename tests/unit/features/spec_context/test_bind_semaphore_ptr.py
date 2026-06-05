@@ -10,18 +10,12 @@ Tests verify the acceptance criteria:
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.spec_context.semaphore import (
-    SemaphoreAlreadyHeldError,
-    is_semaphore_held,
-    read_semaphore,
-)
 
 _runner = CliRunner()
 
@@ -158,7 +152,6 @@ def test_tr105_review_bind_denied_when_semaphore_held(workspace: Path) -> None:
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
     )
     assert result1.exit_code == 0, result1.output
-    first_session_id = _extract_session_id(result1.output)
 
     # Review bind — may be denied by semaphore or by the lock XOR check
     result2 = _runner.invoke(

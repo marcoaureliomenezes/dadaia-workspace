@@ -35,13 +35,23 @@ def _make_context(workspace: Path, slug: str) -> None:
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
     (states / "spec_contexts.json").write_text(
-        json.dumps({
-            "schema_version": "2",
-            "contexts": [{"name": slug, "state": "alive", "repo_slug": slug,
-                          "repo_url": "", "created_at": "2026-01-01T00:00:00+00:00",
-                          "alive_since": "2026-01-01T00:00:00+00:00",
-                          "dead_since": None, "current_branch": "main"}],
-        })
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    {
+                        "name": slug,
+                        "state": "alive",
+                        "repo_slug": slug,
+                        "repo_url": "",
+                        "created_at": "2026-01-01T00:00:00+00:00",
+                        "alive_since": "2026-01-01T00:00:00+00:00",
+                        "dead_since": None,
+                        "current_branch": "main",
+                    }
+                ],
+            }
+        )
     )
 
 
@@ -63,9 +73,15 @@ def _make_session(workspace: Path, session_id: str, context: str, release: str) 
     sessions_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now(tz=UTC).isoformat()
     data = {
-        "session_id": session_id, "context": context, "mode": "BOUND_IMPLEMENTATION",
-        "release": release, "runtime": "test", "pid": os.getpid(),
-        "bound_at": now, "last_seen_at": now, "ttl_seconds": 300,
+        "session_id": session_id,
+        "context": context,
+        "mode": "BOUND_IMPLEMENTATION",
+        "release": release,
+        "runtime": "test",
+        "pid": os.getpid(),
+        "bound_at": now,
+        "last_seen_at": now,
+        "ttl_seconds": 300,
     }
     session_file = sessions_dir / f"{session_id}.json"
     session_file.write_text(json.dumps(data))
@@ -77,9 +93,15 @@ def _make_lock(workspace: Path, context: str, release: str, session_id: str) -> 
     locks_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now(tz=UTC).isoformat()
     data = {
-        "lock_type": "implementation", "context": context, "release": release,
-        "session_id": session_id, "runtime": "test", "pid": os.getpid(),
-        "mode": "BOUND_IMPLEMENTATION", "started_at": now, "last_seen_at": now,
+        "lock_type": "implementation",
+        "context": context,
+        "release": release,
+        "session_id": session_id,
+        "runtime": "test",
+        "pid": os.getpid(),
+        "mode": "BOUND_IMPLEMENTATION",
+        "started_at": now,
+        "last_seen_at": now,
         "ttl_seconds": 300,
     }
     lock_file = locks_dir / f"{context}__{release}.json"
@@ -87,7 +109,9 @@ def _make_lock(workspace: Path, context: str, release: str, session_id: str) -> 
     return lock_file
 
 
-def _run_gate(workspace: Path, target: Path, *, extra_env: dict | None = None) -> subprocess.CompletedProcess:  # type: ignore[type-arg]
+def _run_gate(
+    workspace: Path, target: Path, *, extra_env: dict | None = None
+) -> subprocess.CompletedProcess:  # type: ignore[type-arg]
     gate = workspace / ".dadaia" / "scripts" / "sdd-spec-gate.sh"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target)}})
     log_file = workspace / ".dadaia" / "test.log"
@@ -146,11 +170,13 @@ def test_tr104_narrow_glob_only_active_release_adopted(workspace: Path) -> None:
         f"Expected ALLOW (active release lock adopted) but got: {result.stdout!r}"
     )
 
-    log = (workspace / ".dadaia" / "test.log").read_text() if (workspace / ".dadaia" / "test.log").exists() else ""
-    # Verify active session was adopted (not the other one)
-    assert active_sess in log, (
-        f"Expected active_sess '{active_sess}' in log, got: {log!r}"
+    log = (
+        (workspace / ".dadaia" / "test.log").read_text()
+        if (workspace / ".dadaia" / "test.log").exists()
+        else ""
     )
+    # Verify active session was adopted (not the other one)
+    assert active_sess in log, f"Expected active_sess '{active_sess}' in log, got: {log!r}"
 
 
 def test_tr104_narrow_glob_non_active_release_lock_not_adopted(workspace: Path) -> None:
