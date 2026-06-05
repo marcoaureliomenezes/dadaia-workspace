@@ -142,7 +142,7 @@ applies the lib-origination + gate workflow per task.
   `rc-*/...` are tracked; segment dirs no longer ignored; flat policy preserved.
 
 ### T-ENG-07 — Hotfix reconciliation (ADR-2)
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/cli/commands/specs.py`,
   `dadaia_workspace/features/specs/scaffolder.py`, hotfix templates; tests
