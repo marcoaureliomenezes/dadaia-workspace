@@ -14,7 +14,7 @@ applies the lib-origination + gate workflow per task.
 ## Tasks
 
 ### T-ADR-01 — Author ADR-1..4 (alpha/rc model, hotfix unification, cadence, bug/backlog)
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** software-architect + product-engineer
 - **Write set:** `specs/releases/v0.1.5/adr/ADR-1..4.md`
 - **Acceptance:** four ADRs `Aprovado`; ADR-1 sketches `ACTIVE.md` schema-v2
