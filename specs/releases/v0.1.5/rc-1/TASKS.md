@@ -227,7 +227,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-SHIP-01 — rc-1 pre-ship CI gate
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** software-engineer-python + devops-engineer
 - **Write set:** none (verification only)
 - **Acceptance:**

@@ -38,12 +38,9 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from tests.fakes import FakeContextStore, FakeGitClient
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -297,8 +294,7 @@ def test_lock7_fix_appends_audit_trail(tmp_path: Path) -> None:
     assert len(lines) >= 1
     events = [json.loads(ln) for ln in lines]
     orphan_events = [
-        e for e in events
-        if "ORPHAN" in e.get("event", "") or "orphan" in str(e).lower()
+        e for e in events if "ORPHAN" in e.get("event", "") or "orphan" in str(e).lower()
     ]
     assert orphan_events, f"Expected at least one orphan audit event, got: {events}"
 

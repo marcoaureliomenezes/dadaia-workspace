@@ -87,9 +87,7 @@ def _make_semaphore_file(
     return sem_file
 
 
-def _run_post_gate(
-    workspace: Path, *, session_id: str
-) -> subprocess.CompletedProcess:  # type: ignore[type-arg]
+def _run_post_gate(workspace: Path, *, session_id: str) -> subprocess.CompletedProcess:  # type: ignore[type-arg]
     script = workspace / ".dadaia" / "scripts" / "sdd-post-gate.sh"
     log_file = workspace / ".dadaia" / "sdd-post-gate-test.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -172,13 +170,9 @@ def test_tr103_post_gate_renews_semaphore_heartbeat(workspace: Path) -> None:
     # Verify semaphore heartbeat was renewed (Bug C fix)
     sem_updated = json.loads(sem_file.read_text())
     new_hb = datetime.fromisoformat(sem_updated["heartbeat"])
-    assert new_hb >= before, (
-        f"Semaphore heartbeat ({new_hb}) should be >= before_run ({before})"
-    )
+    assert new_hb >= before, f"Semaphore heartbeat ({new_hb}) should be >= before_run ({before})"
     assert new_hb <= after + timedelta(seconds=1)
-    assert sem_updated["heartbeat"] != old_ts, (
-        "Semaphore heartbeat should be updated (Bug C fix)"
-    )
+    assert sem_updated["heartbeat"] != old_ts, "Semaphore heartbeat should be updated (Bug C fix)"
 
 
 def test_tr103_post_gate_both_timestamps_updated(workspace: Path) -> None:
