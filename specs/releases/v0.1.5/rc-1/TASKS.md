@@ -195,7 +195,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R3-06 — Propagate R3 + D4 to all runtimes and verify
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer + devops-engineer
 - **Write set:** lib-originated projections only (via `dadaia public install`)
 - **Acceptance:**
