@@ -150,14 +150,14 @@ applies the lib-origination + gate workflow per task.
   opens `alpha-1`); flat-only assumptions retired or reconciled; tests updated.
 
 ### T-ENG-08 — CI `feature/{version}` branch trigger
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** devops-engineer
 - **Write set:** `.github/workflows/ci.yml`
 - **Acceptance:** CI triggers on `feature/*` branches; branch-name validation for
   `feature/<semver>`; existing triggers preserved.
 
 ### T-ENG-09 — Skill docs updated for segments
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/skills/{dadaia-workspace-spec-navigator,dadaia-release-closure,dadaia-task-manager,dadaia-workspace-spec-reviewer}/SKILL.md`
 - **Acceptance:** navigator resolves active segment; closure/task-manager/reviewer

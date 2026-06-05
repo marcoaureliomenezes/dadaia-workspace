@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'hotfix/v*'
+      - 'feature/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
