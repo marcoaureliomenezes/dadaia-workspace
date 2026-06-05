@@ -36,20 +36,23 @@ canonical order for the current task.
    Read Markdown atoms directly. Use `catalog.json` to select the 1-3 feature
    atoms relevant to the task; do not load every product atom by default.
 
-3. **Resolve the active release.**
-   - Read `<specs-dir>/releases/ACTIVE.md`. Expected format:
+3. **Resolve the active release (and segment).**
+   - Read `<specs-dir>/releases/ACTIVE.md`. Format (schema v2, ADR-1/ADR-5):
      ```
      release: <release-id>
+     segment: <alpha-N|rc-N>   # optional — present for segmented releases
      phase: <DISCOVERY|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
      ```
    - If file is missing or `release: none`: no active release. Inform the operator and
      stop before implementation.
+   - Let `<rel-path>` = `<release-id>/<segment>` when a `segment:` is present, else
+     `<release-id>`.
 
-4. **Read the active release's specs in order:**
-   - `<specs-dir>/releases/<release-id>/SPEC.md`
-   - `<specs-dir>/releases/<release-id>/PLAN.md` (if planning/implementation in scope)
-   - `<specs-dir>/releases/<release-id>/TASKS.md` (if implementation in scope)
-   - `<specs-dir>/releases/<release-id>/CLOSURE.md` (only if phase = `CLOSURE` or
+4. **Read the active release's specs in order** (under `releases/<rel-path>/`):
+   - `<specs-dir>/releases/<rel-path>/SPEC.md`
+   - `<specs-dir>/releases/<rel-path>/PLAN.md` (if planning/implementation in scope)
+   - `<specs-dir>/releases/<rel-path>/TASKS.md` (if implementation in scope)
+   - `<specs-dir>/releases/<rel-path>/CLOSURE.md` (only if phase = `CLOSURE` or
      `ARCHIVED`)
 
 5. **Approval verification.**

@@ -145,3 +145,7 @@ do PR — política de cada repo.
 > Antes de tocar qualquer arquivo de produção: declare a task com `[-]` e
 > commit. Antes de encerrar: só feche com `[x]` depois de QA/code/security
 > aprovarem o handoff de implementação. Sem exceção.
+
+## Segments (ADR-1/ADR-5)
+
+For a segmented release, the active TASKS.md lives at `specs/releases/<release-id>/<segment>/TASKS.md` (segment = `alpha-N`/`rc-N` from `ACTIVE.md`'s `segment:` line). Reserve/flip `[ ] -> [-] -> [x]` markers there. Flat (no-segment) releases keep `releases/<release-id>/TASKS.md`. The SDD gate resolves the same path automatically.
