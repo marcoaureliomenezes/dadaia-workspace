@@ -240,7 +240,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-SHIP-02 — QA review (qa-engineer)
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** qa-engineer
 - **Write set:** `.dadaia/reports/dadaia-workspace/qa-engineer/` (review report only)
 - **Acceptance:**
