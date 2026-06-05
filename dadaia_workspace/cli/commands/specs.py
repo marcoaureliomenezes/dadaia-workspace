@@ -11,7 +11,12 @@ import typer
 
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_hotfix_release
+from dadaia_workspace.features.specs.doctor import _read_active_md
+from dadaia_workspace.features.specs.scaffolder import (
+    scaffold,
+    scaffold_hotfix_release,
+    scaffold_release_segment,
+)
 from dadaia_workspace.infrastructure.bug_reporter import (
     load_open_bugs,
     mark_bugs_in_release,
@@ -22,6 +27,21 @@ app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 # Sub-app for `dadaia specs hotfix <verb>`
 hotfix_app = typer.Typer(help="Hotfix release helpers.")
 app.add_typer(hotfix_app, name="hotfix")
+
+# Sub-apps for the alpha/rc release-segment model (ADR-1/ADR-5).
+release_app = typer.Typer(help="Release scaffolding (parent + alpha/rc segments).")
+app.add_typer(release_app, name="release")
+segment_app = typer.Typer(help="Open the next alpha/rc segment of the active release.")
+app.add_typer(segment_app, name="segment")
+
+
+def _write_active(specs_dir: Path, release: str, segment: str | None, phase: str) -> None:
+    """Write specs/releases/ACTIVE.md (schema v2 — optional segment line)."""
+    lines = [f"release: {release}"]
+    if segment:
+        lines.append(f"segment: {segment}")
+    lines.append(f"phase: {phase}")
+    (specs_dir / "releases" / "ACTIVE.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
@@ -305,3 +325,68 @@ def hotfix_open(
         "  3. Update specs/releases/ACTIVE.md to point to this release.\n"
         "  4. Add tasks to TASKS.md and begin implementation."
     )
+
+
+@release_app.command("open")
+def release_open(
+    version_id: str = typer.Argument(..., help="SemVer release id, e.g. v0.1.6."),
+    specs_dir: str | None = typer.Option(None, "--specs-dir", help="Path to specs/."),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing segment files."),
+) -> None:
+    """Open a new release: scaffold the parent + its first segment (alpha-1).
+
+    Sets specs/releases/ACTIVE.md to ``release: <version> / segment: alpha-1 /
+    phase: SPEC`` (schema v2, ADR-1/ADR-5).
+    """
+    target = _resolve_specs_dir(specs_dir)
+    try:
+        result = scaffold_release_segment(target, version_id, "alpha-1", force=force)
+    except ValueError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from exc
+    for path in result.created:
+        typer.echo(f"[created] {path}")
+    for error in result.errors:
+        typer.echo(f"[error] {error}", err=True)
+    if result.errors:
+        raise typer.Exit(1)
+    _write_active(target, version_id, "alpha-1", "SPEC")
+    typer.echo(
+        f"[ok] Release {version_id} opened at segment alpha-1; "
+        "ACTIVE.md -> release/segment/phase set. Author SPEC.md next."
+    )
+
+
+@segment_app.command("open")
+def segment_open(
+    segment: str = typer.Argument(..., help="Segment to open, e.g. alpha-2 or rc-1."),
+    specs_dir: str | None = typer.Option(None, "--specs-dir", help="Path to specs/."),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing segment files."),
+) -> None:
+    """Open the next segment (alpha-N/rc-N) of the active release.
+
+    Reads the active release from ACTIVE.md, scaffolds the segment, and advances
+    ACTIVE.md's ``segment:`` to it (phase reset to SPEC).
+    """
+    target = _resolve_specs_dir(specs_dir)
+    release, _segment, _phase, err = _read_active_md(target / "releases" / "ACTIVE.md")
+    if err is not None or not release or release == "none":
+        typer.echo(
+            f"[error] no active release in ACTIVE.md ({err or 'release: none'}). "
+            "Open a release first: dadaia specs release open <version>.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        result = scaffold_release_segment(target, release, segment, force=force)
+    except ValueError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from exc
+    for path in result.created:
+        typer.echo(f"[created] {path}")
+    for error in result.errors:
+        typer.echo(f"[error] {error}", err=True)
+    if result.errors:
+        raise typer.Exit(1)
+    _write_active(target, release, segment, "SPEC")
+    typer.echo(f"[ok] Segment {segment} opened for {release}; ACTIVE.md segment advanced.")
