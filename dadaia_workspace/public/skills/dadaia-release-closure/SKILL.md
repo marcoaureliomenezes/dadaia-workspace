@@ -141,3 +141,7 @@ snapshot.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
 - Editing memory outside CLOSURE phase (gate-blocked).
 - Re-opening an archived release. Once archived, a new release supersedes it.
+
+## Segments (ADR-1/ADR-5)
+
+When the active release carries a `segment:` in `ACTIVE.md` (schema v2), each segment closes independently: write `specs/releases/<release-id>/<segment>/CLOSURE.md` for that segment. Per ADR-3, qa-only gates an `alpha-N` (commit, no closure/ship), and the full trio + release CLOSURE + archive happen at the shipping `rc-N`. Flat releases are unchanged.

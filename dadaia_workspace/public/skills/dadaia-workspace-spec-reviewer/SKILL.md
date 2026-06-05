@@ -66,3 +66,7 @@ TASKS → CLOSURE) and the atomic memory contract.
 - If no blocking issues remain, say so explicitly.
 - For each finding cite the path + (when applicable) the HTML attribute or markdown
   marker that triggered it.
+
+## Segments (ADR-1/ADR-5)
+
+Segmented releases (ADR-1/ADR-5) place SPEC/PLAN/TASKS/CLOSURE under `releases/<release-id>/<segment>/` (`alpha-N`/`rc-N`). When reviewing, resolve the active segment from `ACTIVE.md`'s `segment:` line and audit that segment's artifacts; flat releases keep `releases/<release-id>/`.
