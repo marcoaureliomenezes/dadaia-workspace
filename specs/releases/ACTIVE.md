@@ -1,2 +1,2 @@
-release: none
-phase: none
+release: v0.1.5
+phase: SPEC
