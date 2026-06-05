@@ -65,7 +65,7 @@ All persona/skill/rule files are **lib-originated** — edited at source under
 - **Optional rule** `release-governance.md` (always-on, concise).
 
 ### 3.2 Release-architecture decision (ADRs only — engine is v0.1.6)
-Authored under `specs/releases/v0.1.5/adr/`:
+Recorded in §8 (ADR-1..4):
 - **ADR-1** — alpha/rc nested model: `v<M>.<m>.<p>/alpha-N/` + `…/rc-N/`, each
   with own SPEC/PLAN/TASKS/CLOSURE; `ACTIVE.md` schema v2 adds a `segment:` field.
   Kills the 4-segment anti-pattern.
@@ -127,3 +127,49 @@ use `alpha-N/rc-N` is the first one created **after** v0.1.6 ships.
 - Memory: `feedback_prepush_ci_gate`, `sdd-hotfix-track` (to be superseded),
   `sdd-release-lifecycle`.
 - Backlog sanitization candidate: `specs/releases/v0.1.3` (stale Draft).
+
+---
+
+## 8. Architectural Decision Records
+
+> Recorded inline (the repo's `.gitignore` tracks only SPEC/PLAN/TASKS/CLOSURE
+> per release dir; a dedicated ADR location is an SDD-structure change deferred to
+> v0.1.6). Each ADR is `Aprovado` for v0.1.5.
+
+### ADR-1 — alpha/rc nested release model
+**Decision.** A release is a `major.minor.patch` parent folder maturing through
+ordered segments `alpha-1 → … → rc-1 → …`, each with its own SPEC/PLAN/TASKS/
+CLOSURE. Always starts at `alpha-1`; may ship from any segment. Naming: parent
+keeps `v` prefix, segments hyphenated (`v0.1.5/alpha-1/`, `v0.1.5/rc-1/`).
+`ACTIVE.md` gains a `segment:` field (schema v2). **Engine (scaffolder, gate
+path-resolution, doctor nested-segment check, CLI) is deferred to v0.1.6**; v0.1.5
+is authored flat. Consequence: maturity is first-class and the 4-segment
+collision class (two `v0.1.4.3`) is eliminated; the engine is real work for v0.1.6.
+
+### ADR-2 — hotfix unification
+**Decision.** Unify all releases (feature and hotfix) under the ADR-1 parent +
+segment model. A hotfix is a release that usually ships at `alpha-1`. The flat
+`sdd-hotfix-track` is superseded (memory atom annotated, not deleted); the
+bug→hotfix origin discipline folds into ADR-4. Mechanical reconciliation of
+`dadaia specs hotfix open` + SPEC-DOC-016 happens in v0.1.6. Consequence: one
+model/toolchain; archived `v0.1.4.x` folders keep emitting SemVer WARNINGs until
+SPEC-DOC-016 is replaced.
+
+### ADR-3 — review cadence & branch model
+**Decision.** One long-lived `feature/{version}` branch per release. End of each
+`alpha-N` → `qa-engineer` only → commit (no push/PR/other reviewers). End of each
+`rc-N` → operator chooses **ship** (spawn qa + code + security; all APPROVE →
+push + PR → merge → CLOSURE) or **iterate** (open `rc-(N+1)`). Replaces the
+per-TASK reviewer fan-out (per-task implementer discipline unchanged). Consequence:
+review effort scales with maturity; the pre-push CI gate (T-GATE-01) + qa-per-alpha
+mitigate late code/security review.
+
+### ADR-4 — bug/backlog → release governance
+**Decision.** `product-engineer` picks bugs+backlog (dispatched by
+`project-manager`). Every picked **bug must be solved** in the release unless a
+picked backlog item supersedes it (recorded `superseded_by: <slug>` + SPEC note,
+backlog TASKS cover the bug's acceptance). Stale/invalid items are **sanitized**
+(`deferred`/`rejected` + reason, never deleted). A `dadaia-grill-me` session is
+**mandatory** when defining a release from bugs+backlog. Consequence: bugs can't
+be lost; backlog stays sanitized; releases start from refined understanding.
+Implemented by T-GOV-01..05.
