@@ -31,6 +31,15 @@ Identify and resolve — before implementation — the problems that destroy spe
 
 **The operator only answers what the code cannot answer.** The model inspects first.
 
+### Mandatory trigger — release definition
+
+A `dadaia-grill-me` session is **mandatory** when a release is being defined from
+bugs + backlog (the `dadaia-release-definition` protocol). `product-engineer` runs
+it on the picked bug + backlog set **before** writing the SPEC; `project-manager`
+will not let the release advance to SPEC without the resulting refinement report.
+This is not optional even when the scope "looks obvious". See the
+`release-governance` rule and the `dadaia-release-definition` skill.
+
 ---
 
 ## How to Invoke
