@@ -14,7 +14,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-R1-01 — Design and implement runtime→session pointer (env-free resolution)
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Write set:**
   - `dadaia_workspace/public/scripts/ctx-inject.sh`
