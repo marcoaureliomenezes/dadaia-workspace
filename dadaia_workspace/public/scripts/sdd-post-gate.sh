@@ -71,22 +71,10 @@ tmp = sess_file.with_suffix(f".{tmp_suffix}.tmp")
 tmp.write_text(json.dumps(data, indent=2))
 os.replace(tmp, sess_file)
 
-# Step 3b (T-R1-03 Bug C fix): Renew the per-context semaphore heartbeat.
-# The semaphore file lives at .dadaia/states/ctx_locks/<context>.semaphore.json.
-# We only renew if this session owns the semaphore (owner == sess_id).
+# v0.1.6: the per-context semaphore is retired. The single TTL-lease
+# (.dadaia/states/ctx_locks/<ctx>.lock.json) is renewed by the PreToolUse gate's
+# acquire (RENEWED branch) — no PostToolUse semaphore renewal remains.
 context = data.get("context", "")
-if context:
-    sem_path = ws / ".dadaia" / "states" / "ctx_locks" / f"{context}.semaphore.json"
-    if sem_path.exists():
-        try:
-            sem_data = json.loads(sem_path.read_text())
-            if sem_data.get("owner") == sess_id:
-                sem_data["heartbeat"] = now
-                sem_tmp = sem_path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-                sem_tmp.write_text(json.dumps(sem_data, indent=2))
-                os.replace(sem_tmp, sem_path)
-        except (json.JSONDecodeError, OSError):
-            pass  # best-effort; never block
 
 # Step 4: Append HEARTBEAT event to lock-events.jsonl
 release = data.get("release", "") or ""
