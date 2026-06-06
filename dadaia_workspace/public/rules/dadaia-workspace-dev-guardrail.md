@@ -22,8 +22,14 @@ Files listed in `.dadaia/agentic/manifest.json` are **lib-originated** (generate
 **Correct edit workflow:**
 1. Edit the source in `repos/dadaia-workspace/dadaia_workspace/public/<type>/<file>`
 2. `dadaia public stage` — re-stages with updated SHA256
-3. `dadaia public install --target all` — projects to all runtimes
+3. `dadaia public install --target all` — projects to all runtimes. Plain `install`
+   propagates updates: it overwrites a projected file whenever the staged hash differs
+   from the projected hash (no `--force` needed for ordinary edits).
 4. `dadaia public doctor` — verify exit 0
+
+`--force` is only for clobbering a **locally-diverged** projection (a projected file
+hand-edited to differ from both source and staging). Ordinary source edits propagate
+with plain `install`.
 
 If an agent proposes editing a lib-originated file directly, respond:
 
@@ -35,17 +41,24 @@ Edit the source at repos/dadaia-workspace/dadaia_workspace/public/<type>/<file>,
 
 ## 2. Drift Detection and Repair
 
-When the library evolves, projections can drift. Drift repair is the responsibility of the operator or devops-engineer. No other agent may use `--force` without explicit operator authorization.
+When the library evolves, projections can drift. `dadaia public doctor` compares the
+staged asset against the projected file (staging↔projected) and **exits non-zero** on any
+mismatch — it is no longer blind to stale projections. Drift repair is the responsibility
+of the operator or devops-engineer.
 
 **Detection:** `dadaia public doctor` — status codes:
-- `[ok]` — matches source; no action
-- `[drift]` — differs from source; run `dadaia public install --force --target all`
+- `[ok]` — projection matches staging; no action
+- `[drift]` — projection differs from staging; run `dadaia public install --target all`
+  to re-propagate (plain `install` overwrites on hash mismatch). Exits non-zero.
 - `[missing]` — absent from projection; run `dadaia public install --target all`
 - `[unsupported]` / `[not-applicable]` — no action
 
+`--force` is only needed when the projection was hand-edited to diverge from staging and
+must be clobbered back to canonical; ordinary drift is repaired by plain `install`.
+
 **Repair:**
 ```
-dadaia public stage && dadaia public install --force --target all
+dadaia public stage && dadaia public install --target all
 dadaia public doctor  # must exit 0 before agent dispatch resumes
 ```
 
@@ -60,4 +73,9 @@ dadaia public doctor  # must exit 0 before agent dispatch resumes
 3. Propagate: `dadaia public stage && dadaia public install --target all`
 4. Verify: `dadaia public doctor` (exit 0)
 
-**Critical:** `dadaia public doctor` compares working-tree source vs staging vs projection — it does NOT compare `git HEAD` vs working tree. An uncommitted edit shows as `[ok]`. True drift check: `git diff HEAD -- dadaia_workspace/public/`. Never insert consumer-specific paths, names, or IPs into `public/` assets — they are canonical source for all consumers.
+**Critical:** `dadaia public doctor` validates source↔staging↔projection (and now flags
+staging↔projected drift with a non-zero exit). It does NOT compare `git HEAD` vs the
+working tree, so a staged-and-installed-but-uncommitted edit is consistent end-to-end and
+shows `[ok]`. To catch uncommitted source changes use `git diff HEAD -- dadaia_workspace/public/`.
+Never insert consumer-specific paths, names, or IPs into `public/` assets — they are
+canonical source for all consumers.
