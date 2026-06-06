@@ -3,7 +3,7 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots.
-summary: Describes the canonical public asset chain, privacy gate, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
@@ -11,9 +11,9 @@ tags:
 - projection
 - privacy
 agent_tier: self-pull
-token_estimate: 450
-last_updated: '2026-06-04'
-release_origin: v0.1.4.1
+token_estimate: 520
+last_updated: '2026-06-06'
+release_origin: v0.1.5
 ---
 
 ## Propósito
@@ -34,7 +34,18 @@ Default public assets must be generic and safe for any consumer. They must not
 ship private project names, private repo paths, hostnames, IP addresses,
 credentials, vendor/domain packs, or personal operational rules.
 
-`dadaia public doctor` includes a public privacy gate. It scans source/staged
+`dadaia public install` performs a SHA256 content-hash comparison before skipping
+an existing projected file. When the staged hash differs from the projected file's
+hash, the file is overwritten without requiring `--force`. This makes plain `install`
+the correct propagation step for all legitimate source edits. `--force` is reserved
+for repairing locally-divergent projections (e.g. a file an operator edited in-place).
+
+`dadaia public doctor` performs three comparison passes: source vs staging, staging
+vs projected (one pass per runtime target). Any mismatch emits `[drift] <path>` and
+returns a non-zero exit code, giving an accurate all-clear only when all three tiers
+agree. The `dadaia-workspace-dev-guardrail` rule reflects this corrected workflow.
+
+`dadaia public doctor` also includes a public privacy gate. It scans source/staged
 public assets with a denylist for private identifiers and reports
 `[ok] public-privacy` only when the distributed surface is clean. CI treats this
 as a release gate.
@@ -74,9 +85,10 @@ Staged temp workspaces remain supported.
 - OpenCode: `.opencode/agents`, plugins/hooks, config, skills.
 - Shared: `.agents/skills` and workspace/repo AGENTS.md/CLAUDE.md pairs.
 
-`public doctor` compares canonical source, staging, and projections; filters
-cache files such as `__pycache__/` and `*.pyc`; and reports drift as actionable
-`[missing]`, `[drift]`, `[ok]`, or reference-only runtime status.
+`public doctor` compares canonical source, staging, and projections across three
+passes; filters cache files such as `__pycache__/` and `*.pyc`; and reports drift
+as actionable `[missing]`, `[drift]`, `[ok]`, or reference-only runtime status. A
+non-zero exit code is returned on any source↔staging or staging↔projected mismatch.
 
 Codex hook projection writes the nested Codex hook schema under `.codex/hooks.json`.
 `PreToolUse` and `PostToolUse` match write-like tools (`apply_patch`, `Edit`,

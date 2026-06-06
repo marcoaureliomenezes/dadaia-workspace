@@ -11,8 +11,8 @@ tags:
 - repair
 agent_tier: self-pull
 token_estimate: 779
-last_updated: '2026-06-01'
-release_origin: memory-markdown-source-v1
+last_updated: '2026-06-06'
+release_origin: v0.1.5
 ---
 
 CLI surface: `dadaia doctor [--fix]` · Closure: spec-context-session-locks-v1
@@ -32,7 +32,7 @@ Com o modelo v2 (ALIVE/DEAD), dois invariantes cobrem o ciclo de vida do context
 
 Os antigos INV-1, INV-2, INV-3, INV-6 (guards do marcador global de contexto legado) foram removidos em v2. Não existem mais checks de flag global duplicada ou contexto global sem arquivo — esse conceito foi eliminado pelo modelo de session binding.
 
-### Invariantes de lock (LOCK-1..LOCK-6)
+### Invariantes de lock (LOCK-1..LOCK-6) e semaphore (SEM-1)
 
 Invariante| O que detecta| Auto-fix
 ---|---|---
@@ -42,12 +42,14 @@ LOCK-3| Lock HELD com `last_seen_at` mais antigo que `ttl_seconds` (default 300 
 LOCK-4| Mutação de arquivo de produção em `lock-events.jsonl` sem campo `task_id`| NO AUTO-FIX: reporta; bloqueia CLOSURE até reconciliação.
 LOCK-5| `lock-events.jsonl` contém evento `BLOCKED_ATTEMPT` (sessão não-owner tentou escrever)| NO AUTO-FIX: sinaliza como audit signal no report do doctor; nenhuma ação automática.
 LOCK-6| Session file `BOUND_REVIEW` em `.dadaia/sessions/` pertence a um context com `state=DEAD`| AUTO-FIX: deleta o session file; appenda audit record. Estende cobertura do LOCK-2 para review sessions.
+SEM-1 (orphan)| `ctx_locks/*.semaphore.json` cujo campo `context` não tem entrada ALIVE em `spec_contexts.json`| AUTO-FIX (`--fix`): deleta o semaphore file; appenda entrada em `.dadaia/states/audit/semaphore-reclaims.jsonl`. Emite `[orphan-semaphore] <path>`.
+SEM-1 (stale)| `ctx_locks/*.semaphore.json` cujo holder está morto (PID inativo via `os.kill(pid, 0)` ou session file ausente) ou TTL expirado| AUTO-FIX (`--fix`): deleta o semaphore file; appenda entrada em `.dadaia/states/audit/semaphore-reclaims.jsonl`. Emite `[stale-semaphore] <path>`.
 
 Mensagens de erro para locks STALE ou bloqueios de gate incluem: runtime do owner, session ID, e `last_seen_at` — para o operador decidir sobre reclaim.
 
 ## Fluxo de uso
 
-  1. `dadaia doctor` — executa checklist de invariantes (INV-4, INV-5, LOCK-1..6) e lista issues com flag `[fixable]` ou `[manual]`.
+  1. `dadaia doctor` — executa checklist de invariantes (INV-4, INV-5, LOCK-1..6, SEM-1) e lista issues com flag `[fixable]` ou `[manual]`.
   2. Operador inspeciona os issues; se todos forem `[fixable]`, roda `dadaia doctor --fix`.
   3. Doctor aplica os reparos e mostra a lista de ações realizadas.
   4. Re-rodar `dadaia doctor` deve retornar "All invariants OK".
@@ -60,7 +62,7 @@ Após crash de sessão de agente (verificar se locks STALE existem), após upgra
 
 ## Diferencial
 
-Sem este guardrail, locks de implementação abandonados (crash de sessão) bloqueariam futuros binders indefinidamente (R-10). Os invariantes LOCK-3 e LOCK-6 detectam e marcam como STALE esses locks orpfãos; o operador reclaim com evidência em vez de editar JSON manualmente. LOCK-2 e LOCK-6 limpam automaticamente locks e sessions de contexts mortos (DEAD), mantendo o estado de `.dadaia/locks/` e `.dadaia/sessions/` consistente com o estado real dos contexts.
+Sem este guardrail, locks de implementação abandonados (crash de sessão) bloqueariam futuros binders indefinidamente (R-10). Os invariantes LOCK-3 e LOCK-6 detectam e marcam como STALE esses locks órfãos; o operador reclaim com evidência em vez de editar JSON manualmente. LOCK-2 e LOCK-6 limpam automaticamente locks e sessions de contexts mortos (DEAD). O invariante SEM-1 (v0.1.5/rc-2) estende a cobertura ao semaphore surface (Lock 4): semáforos cujo holder está morto ou cujo context não existe mais são detectados e reclamados automaticamente com `--fix`, eliminando o delay de TTL (até 300 s) que uma bind atrás de holder morto sofreria sem liveness check.
 
 ## Estado runtime tocado
 

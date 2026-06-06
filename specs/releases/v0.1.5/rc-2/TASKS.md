@@ -162,7 +162,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-SHIP-05 — CLOSURE
 
-- **Status:** [ ]
+- **Status:** [-] CLOSURE bookkeeping DONE; push/PR/tag/PyPI/propagation HELD pending operator go.
 - **Owner:** product-engineer
 - **Preconditions:** T-SHIP-02, T-SHIP-03, T-SHIP-04 all `[x]` with `verdict: APPROVED`
 - **Write set:** `specs/releases/v0.1.5/rc-2/CLOSURE.md`; memory atoms in `specs/memory/` (CLOSURE phase only); `specs/releases/ACTIVE.md`
