@@ -141,34 +141,31 @@ def test_dead_not_found_raises(service: SpecContextService) -> None:
 def test_dead_raises_context_locked_when_impl_lock_held(
     service: SpecContextService, workspace_root: Path
 ) -> None:
-    """AC-T10b-4: dead() when a HELD implementation lock exists raises ContextLockedError.
+    """v0.1.6: dead() when a LIVE TTL-lease record exists raises ContextLockedError.
 
-    T-11: the lock must be HELD (file exists + fresh last_seen_at + pid alive).
-    The T-10b test used a stale timestamp; updated to use a fresh timestamp so
-    the T-11 state machine recognises it as HELD.
+    The four-store lock model is retired; a live single-record lease
+    (.dadaia/states/ctx_locks/<ctx>.lock.json, fresh heartbeat) is the guard.
     """
-    import os
     from datetime import UTC
     from datetime import datetime as _datetime
 
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
 
-    # Create an implementation lock file with a FRESH timestamp and LIVE PID
-    locks_dir = workspace_root / ".dadaia" / "locks" / "implementation"
-    locks_dir.mkdir(parents=True, exist_ok=True)
-    lock_file = locks_dir / "proj__v1.json"
+    # Create a LIVE lease record (fresh heartbeat → is_held True).
+    lock_dir = workspace_root / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
     now = _datetime.now(tz=UTC).isoformat()
-    lock_file.write_text(
+    (lock_dir / "proj.lock.json").write_text(
         json.dumps(
             {
-                "lock_type": "implementation",
-                "session_id": "sess_abc123",
                 "context": "proj",
                 "release": "v1",
-                "pid": os.getpid(),  # live PID so state = HELD
-                "last_seen_at": now,
-                "ttl_seconds": 300,
+                "session_id": "sess_abc123",
+                "mode": "IMPLEMENTATION",
+                "acquired_at": now,
+                "heartbeat": now,
+                "ttl": 1800,
             }
         )
     )

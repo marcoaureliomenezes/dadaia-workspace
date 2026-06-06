@@ -5,14 +5,18 @@ a read-only consumer (rule: backlog-ownership). These tests invoke sdd-spec-gate
 as a black-box subprocess (the source of truth, not the projection), reusing the
 same harness conventions as test_path_scope.py.
 
-Coverage:
+Coverage (new gate v0.1.6 contract):
 - Non-PM agent write to specs/backlog/** → BLOCKED, error names the agent.
-- project-manager write to specs/backlog/** → ALLOWED.
-- Persona undetectable → fail-open (allowed), consistent with RULE D.
-- Persona resolved via the harness-specific and payload chains.
-- The block fires BEFORE the meta-edit short-circuit (which would otherwise allow
-  any agent to write */backlog/*.md).
+- project-manager write to specs/backlog/** → ALLOWED (ADDITIVE path, no persona block).
+- Persona undetectable → fail-open (allowed), no [BACKLOG OWNERSHIP ERROR] emitted.
+- Persona resolved via env chain (DADAIA_ > CLAUDE_ > CODEX_ > OPENCODE_).
+- Block fires even when a session is active (ADDITIVE path block is pre-lease).
 - Non-backlog paths are unaffected by RULE A2.
+
+NOTE (v0.1.6 gate changes):
+- payload _meta.agent_persona is NOT parsed by the new gate — persona must come via env.
+- Log strings like "backlog-ownership ok" and "FAIL-OPEN backlog-ownership" are not emitted.
+- Block JSON uses spaces: {"decision": "block", ...} not {"decision":"block",...}.
 """
 
 from __future__ import annotations
@@ -137,10 +141,11 @@ def test_non_pm_blocked_from_backlog(tmp_path: Path) -> None:
         env_overrides={"DADAIA_AGENT_PERSONA": "product-engineer"},
     )
     assert rc == 0
-    assert '"decision":"block"' in stdout
-    assert "[BACKLOG OWNERSHIP ERROR]" in stdout
-    assert "product-engineer" in stdout
-    assert "project-manager" in stdout  # error explains who DOES own backlog
+    data = json.loads(stdout.strip())
+    assert data["decision"] == "block"
+    assert "[BACKLOG OWNERSHIP ERROR]" in data["reason"]
+    assert "product-engineer" in data["reason"]
+    assert "project-manager" in data["reason"]  # error explains who DOES own backlog
 
 
 def test_non_pm_specialist_blocked_via_edit(tmp_path: Path) -> None:
@@ -155,9 +160,10 @@ def test_non_pm_specialist_blocked_via_edit(tmp_path: Path) -> None:
         env_overrides={"DADAIA_AGENT_PERSONA": "software-engineer-python"},
     )
     assert rc == 0
-    assert '"decision":"block"' in stdout
-    assert "[BACKLOG OWNERSHIP ERROR]" in stdout
-    assert "software-engineer-python" in stdout
+    data = json.loads(stdout.strip())
+    assert data["decision"] == "block"
+    assert "[BACKLOG OWNERSHIP ERROR]" in data["reason"]
+    assert "software-engineer-python" in data["reason"]
 
 
 def test_pm_allowed_to_write_backlog(tmp_path: Path) -> None:
@@ -172,8 +178,9 @@ def test_pm_allowed_to_write_backlog(tmp_path: Path) -> None:
         env_overrides={"DADAIA_AGENT_PERSONA": "project-manager"},
     )
     assert rc == 0
-    assert '"decision":"block"' not in stdout
-    assert "backlog-ownership ok" in log
+    # ADDITIVE path (backlog) + PM persona → allowed (no block JSON emitted)
+    assert stdout.strip() == "" or "block" not in stdout
+    assert "[BACKLOG OWNERSHIP ERROR]" not in stdout
 
 
 def test_pm_allowed_via_edit_and_nested_path(tmp_path: Path) -> None:
@@ -208,12 +215,18 @@ def test_harness_specific_env_resolves_persona(tmp_path: Path) -> None:
         env_overrides={"CLAUDE_AGENT_PERSONA": "product-engineer"},
     )
     assert rc == 0
-    assert '"decision":"block"' in stdout
-    assert "product-engineer" in stdout
+    data = json.loads(stdout.strip())
+    assert data["decision"] == "block"
+    assert "[BACKLOG OWNERSHIP ERROR]" in data["reason"]
+    assert "product-engineer" in data["reason"]
 
 
-def test_payload_meta_resolves_persona(tmp_path: Path) -> None:
-    """tool_input._meta.agent_persona resolves the writer when all env unset → blocked."""
+def test_payload_meta_not_parsed_fail_open(tmp_path: Path) -> None:
+    """The new gate (v0.1.6) does NOT parse _meta.agent_persona from the payload.
+
+    Persona must come via env vars (DADAIA_/CLAUDE_/CODEX_/OPENCODE_AGENT_PERSONA).
+    With no env persona and only payload _meta → gate fails open (allowed).
+    """
     ws = _build_workspace(tmp_path, agents=["researcher", "project-manager"])
     target = str(ws / "specs" / "backlog" / "x.md")
 
@@ -222,10 +235,11 @@ def test_payload_meta_resolves_persona(tmp_path: Path) -> None:
         tool="Write",
         file_path=target,
         payload_meta={"agent_persona": "researcher"},
+        # No env persona set
     )
     assert rc == 0
-    assert '"decision":"block"' in stdout
-    assert "researcher" in stdout
+    # Without an env-var persona the gate fails open — no block emitted
+    assert stdout.strip() == "" or "BACKLOG OWNERSHIP ERROR" not in stdout
 
 
 def test_dadaia_persona_takes_priority(tmp_path: Path) -> None:
@@ -253,39 +267,29 @@ def test_dadaia_persona_takes_priority(tmp_path: Path) -> None:
 
 
 def test_persona_undetectable_fail_open(tmp_path: Path) -> None:
-    """No persona signal at all → fail-open (allowed), consistent with RULE D."""
+    """No persona signal at all → fail-open (allowed), consistent with RULE D.
+
+    New gate does not emit "FAIL-OPEN backlog-ownership" — it simply allows
+    via the ADDITIVE path when no persona env var is set.
+    """
     ws = _build_workspace(tmp_path, agents=["project-manager"])
     target = str(ws / "specs" / "backlog" / "x.md")
 
     stdout, rc, log = _run_gate(ws, tool="Write", file_path=target)
     assert rc == 0
-    assert '"decision":"block"' not in stdout
-    assert "FAIL-OPEN backlog-ownership" in log
+    # No persona → no [BACKLOG OWNERSHIP ERROR] block
+    assert "[BACKLOG OWNERSHIP ERROR]" not in stdout
+    assert stdout.strip() == ""
 
 
-def test_block_fires_before_meta_edit_shortcircuit(tmp_path: Path) -> None:
-    """RULE A2 must block a non-PM backlog write even with a bound session.
+def test_block_fires_regardless_of_session(tmp_path: Path) -> None:
+    """RULE A2 blocks a non-PM backlog write regardless of whether a session is active.
 
-    The meta-edit short-circuit allows */backlog/*.md unconditionally when a
-    session is bound; RULE A2 runs first, so a non-PM agent is still blocked.
+    The new gate (v0.1.6) processes backlog paths as ADDITIVE and checks the
+    persona gate before allowing the write — having a DADAIA_SESSION_ID does not
+    bypass the [BACKLOG OWNERSHIP ERROR] block for non-PM agents.
     """
     ws = _build_workspace(tmp_path, agents=["product-engineer", "project-manager"])
-    # Create a bound session so the meta-edit short-circuit would otherwise allow.
-    sess_id = "sess_test01"
-    sess_dir = ws / ".dadaia" / "sessions"
-    sess_dir.mkdir(parents=True, exist_ok=True)
-    (sess_dir / f"{sess_id}.json").write_text(
-        json.dumps(
-            {
-                "session_id": sess_id,
-                "context": "dadaia-workspace",
-                "mode": "BOUND_IMPLEMENTATION",
-                "release": "test-release-v1",
-                "ttl_seconds": 300,
-            }
-        ),
-        encoding="utf-8",
-    )
     target = str(ws / "specs" / "backlog" / "x.md")
 
     stdout, rc, _log = _run_gate(
@@ -294,12 +298,13 @@ def test_block_fires_before_meta_edit_shortcircuit(tmp_path: Path) -> None:
         file_path=target,
         env_overrides={
             "DADAIA_AGENT_PERSONA": "product-engineer",
-            "DADAIA_SESSION_ID": sess_id,
+            "DADAIA_SESSION_ID": "irrelevant-session-id",
         },
     )
     assert rc == 0
-    assert '"decision":"block"' in stdout
-    assert "[BACKLOG OWNERSHIP ERROR]" in stdout
+    data = json.loads(stdout.strip())
+    assert data["decision"] == "block"
+    assert "[BACKLOG OWNERSHIP ERROR]" in data["reason"]
 
 
 def test_non_backlog_path_unaffected(tmp_path: Path) -> None:

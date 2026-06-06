@@ -348,8 +348,11 @@ def _main(argv: list[str] | None = None) -> int:
 
     from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
+    # The gate passes WORKSPACE_ROOT so the lease acts on the same workspace it
+    # classified (hermetic); fall back to CWD resolution for direct CLI use.
+    ws_env = os.environ.get("WORKSPACE_ROOT")
     try:
-        workspace = resolve_workspace_root()
+        workspace = Path(ws_env) if ws_env else resolve_workspace_root()
     except Exception as exc:  # noqa: BLE001 — fail-open: gate must never deadlock
         print(f"WORKSPACE_UNRESOLVED: {exc}", file=sys.stderr)
         return 0

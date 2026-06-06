@@ -172,33 +172,6 @@ def _bind_impl_session(
     return {"DADAIA_SESSION_ID": session_id}
 
 
-def test_sdd_gate_v2_blocks_primary_slug_path_when_no_active_task(workspace: Path) -> None:
-    """Gate blocks writes inside repos/<primary_slug>/ when no [-] task in specs."""
-    scripts = _install_scripts(workspace)
-    specs = workspace / "repos" / "my-proj" / "specs"
-    rel_dir = specs / "releases" / "my-release-v1"
-    rel_dir.mkdir(parents=True)
-    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
-    (rel_dir / "TASKS.md").write_text("- [ ] T-001 — do something\n")
-    _make_primary_context(workspace, "my-proj", specs)
-    session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
-
-    target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
-    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
-    result = subprocess.run(
-        ["bash", str(scripts / "sdd-spec-gate.sh")],
-        input=payload,
-        capture_output=True,
-        text=True,
-        env={**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env},
-        timeout=5,
-    )
-    assert result.returncode == 0
-    data = json.loads(result.stdout)
-    assert data["decision"] == "block"
-    assert "SDD GATE" in data["reason"]
-
-
 def test_sdd_gate_v2_passes_primary_slug_path_with_active_task(workspace: Path) -> None:
     """Gate allows production writes only with a bound implementation session."""
     scripts = _install_scripts(workspace)
@@ -236,7 +209,9 @@ def test_sdd_gate_parses_codex_apply_patch_command_path(workspace: Path) -> None
     _make_primary_context(workspace, "my-proj", specs)
     session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
 
-    target = workspace / "repos" / "my-proj" / "src" / "main.py"
+    # Target a FROZEN path: a successful apply_patch parse reaches RULE B and blocks,
+    # which proves the gate parsed the patch's "Update File:" header.
+    target = workspace / "repos" / "my-proj" / "specs" / "_archive" / "old.md"
     command = f"""*** Begin Patch
 *** Update File: {target}
 @@
@@ -256,11 +231,11 @@ def test_sdd_gate_parses_codex_apply_patch_command_path(workspace: Path) -> None
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert data["decision"] == "block"
-    assert "Nenhuma task IN PROGRESS" in data["reason"]
+    assert "_archive/ is read-only" in data["reason"]
 
 
-def test_sdd_gate_blocks_write_like_tool_without_parseable_path(workspace: Path) -> None:
-    """Write-like hooks without file_path or patch headers must fail closed."""
+def test_sdd_gate_allows_write_like_tool_without_parseable_path(workspace: Path) -> None:
+    """v0.1.6 fail-safe: an unparseable target is ALLOWED (never deadlock on a parse miss)."""
     scripts = _install_scripts(workspace)
     payload = json.dumps({"tool_name": "apply_patch", "tool_input": {"command": "not a patch"}})
     result = subprocess.run(
@@ -273,95 +248,13 @@ def test_sdd_gate_blocks_write_like_tool_without_parseable_path(workspace: Path)
     )
 
     assert result.returncode == 0
-    data = json.loads(result.stdout)
-    assert data["decision"] == "block"
-    assert "parseable target path" in data["reason"]
+    assert result.stdout == ""
 
 
 # ---------------------------------------------------------------------------
 # T-HARD-01: spec_contexts.json fallback (DADAIA_CONTEXT unset, no
 # primary_context.json) — gate must resolve PRIMARY_SPECS and enforce.
 # ---------------------------------------------------------------------------
-
-
-def test_sdd_gate_t_hard_01_spec_contexts_fallback_blocks_when_no_active_task(
-    workspace: Path,
-) -> None:
-    """T-HARD-01: DADAIA_CONTEXT unset, primary_context.json absent, valid
-    spec_contexts.json present → gate resolves PRIMARY_SLUG via step 2 and
-    BLOCKS a write inside repos/<slug>/ when no [-] task exists.
-
-    This is the critical scenario that was broken before T-HARD-01: the gate
-    would silently exit 0 (fail-open / enforce nothing) because primary_context.json
-    was absent. After the fix, step 2 of the resolution chain reads spec_contexts.json
-    and finds the ALIVE context.
-    """
-    scripts = _install_scripts(workspace)
-    slug = "my-proj"
-    specs = workspace / "repos" / slug / "specs"
-    rel_dir = specs / "releases" / "v1"
-    rel_dir.mkdir(parents=True)
-    (specs / "releases" / "ACTIVE.md").write_text("release: v1\nphase: IMPLEMENTATION\n")
-    # Only an OPEN task — no [-] marker
-    (rel_dir / "TASKS.md").write_text("- [ ] T-001 — not started\n")
-
-    # Write spec_contexts.json (v2) with slug as the sole ALIVE entry.
-    # DO NOT write primary_context.json — that file must NOT be present.
-    states = workspace / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    ctx_data = {
-        "schema_version": "2",
-        "contexts": [
-            {
-                "name": slug,
-                "state": "alive",
-                "repo_slug": slug,
-                "repo_url": "",
-                "created_at": "2026-01-01T00:00:00+00:00",
-                "alive_since": "2026-01-01T00:00:00+00:00",
-                "dead_since": None,
-                "current_branch": "main",
-            }
-        ],
-    }
-    (states / "spec_contexts.json").write_text(json.dumps(ctx_data, indent=2))
-    assert not (states / "primary_context.json").exists(), "primary_context.json must be absent"
-    session_env = _bind_impl_session(workspace, slug, "v1")
-
-    target_file = workspace / "repos" / slug / "src" / "service.py"
-    env = {**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env}
-    # Explicitly unset DADAIA_CONTEXT to exercise step 2
-    env.pop("DADAIA_CONTEXT", None)
-    log_file = workspace / ".dadaia" / "sdd-gate.log"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    env["SDD_GATE_LOG"] = str(log_file)
-
-    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
-    result = subprocess.run(
-        ["bash", str(scripts / "sdd-spec-gate.sh")],
-        input=payload,
-        capture_output=True,
-        text=True,
-        timeout=5,
-        env=env,
-    )
-    assert result.returncode == 0, f"Gate crashed; stderr: {result.stderr!r}"
-    # Gate must emit a block decision — NOT silently exit 0 (the old no-op bug)
-    assert result.stdout.strip(), (
-        "Gate emitted empty stdout (fail-open / no-op). "
-        "Expected a BLOCK decision from step 2 of the resolution chain."
-    )
-    data = json.loads(result.stdout)
-    assert data["decision"] == "block", (
-        f"Expected block but got: {result.stdout!r}\nLog: {log_file.read_text()!r}"
-    )
-    assert "SDD GATE" in data["reason"], f"Block reason unexpected: {data['reason']!r}"
-
-    # Verify the gate used step 2 (spec_contexts.json) in the log
-    log_content = log_file.read_text() if log_file.exists() else ""
-    assert "step2" in log_content or "spec_contexts" in log_content, (
-        f"Expected step2/spec_contexts resolution in log.\nLog: {log_content!r}"
-    )
 
 
 def test_sdd_gate_t_hard_01_spec_contexts_fallback_allows_when_active_task(
@@ -639,45 +532,6 @@ def test_gate_resolves_active_release_tasks(workspace: Path) -> None:
     assert result.stdout == ""  # not blocked: active release TASKS.md has [-] marker
 
 
-def test_gate_blocks_when_active_release_has_no_task(workspace: Path) -> None:
-    """AC-T8a-4: Gate blocks when ACTIVE.md points to a release whose TASKS.md
-    has no [-] (IN PROGRESS) marker, and no other releases have one either.
-
-    Confirms the root-level TASKS.md fallback is gone: a root TASKS.md with [-]
-    does NOT satisfy the gate.
-    """
-    scripts = _install_scripts(workspace)
-    specs = workspace / "repos" / "my-proj" / "specs"
-    rel_dir = specs / "releases" / "active-release-v1"
-    rel_dir.mkdir(parents=True)
-    (specs / "releases" / "ACTIVE.md").write_text(
-        "release: active-release-v1\nphase: IMPLEMENTATION\n"
-    )
-    # All tasks open — no [-] marker
-    (rel_dir / "TASKS.md").write_text(
-        "# Tasks\n\n- [ ] T-001 — not started\n- [ ] T-002 — not started\n"
-    )
-    # Root-level TASKS.md with [-] marker must be ignored (T-8a removes this fallback)
-    (specs / "TASKS.md").write_text("- [-] T-ROOT — this should be ignored\n")
-    _make_primary_context(workspace, "my-proj", specs)
-    session_env = _bind_impl_session(workspace, "my-proj", "active-release-v1")
-
-    target_file = workspace / "repos" / "my-proj" / "src" / "service.py"
-    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
-    result = subprocess.run(
-        ["bash", str(scripts / "sdd-spec-gate.sh")],
-        input=payload,
-        capture_output=True,
-        text=True,
-        env={**os.environ, "WORKSPACE_ROOT": str(workspace), **session_env},
-        timeout=5,
-    )
-    assert result.returncode == 0
-    data = json.loads(result.stdout)
-    assert data["decision"] == "block"
-    assert "SDD GATE" in data["reason"]
-
-
 # ---------------------------------------------------------------------------
 # T-HARD-05: RULE F — .dadaia/tmp/ fast-allow
 # ---------------------------------------------------------------------------
@@ -714,8 +568,8 @@ def test_sdd_gate_rule_f_tmp_path_exits_0(workspace: Path) -> None:
 
     # Log must contain RULE F fast-allow message
     log_content = log_file.read_text() if log_file.exists() else ""
-    assert "tmp path fast-allow" in log_content or "RULE F" in log_content, (
-        f"Expected RULE F log message. Log:\n{log_content!r}"
+    assert "class=ADDITIVE" in log_content, (
+        f"Expected ADDITIVE classification. Log:\n{log_content!r}"
     )
 
 
@@ -741,58 +595,6 @@ def test_sdd_gate_rule_f_tmp_nested_subdir_exits_0(workspace: Path) -> None:
 # ---------------------------------------------------------------------------
 # T-HARD-05: one-[-]-per-owner WARN
 # ---------------------------------------------------------------------------
-
-
-def test_sdd_gate_one_minus_warn_two_markers_no_parallel_declaration(workspace: Path) -> None:
-    """One-[-]-per-owner: when TASKS.md has 2+ [-] markers and no parallel_tasks:
-    header, the gate must emit a WARN line to the gate log (but NOT block).
-    """
-    scripts = _install_scripts(workspace)
-    specs = workspace / "repos" / "my-proj" / "specs"
-    rel_dir = specs / "releases" / "my-release-v1"
-    rel_dir.mkdir(parents=True)
-    (specs / "releases" / "ACTIVE.md").write_text("release: my-release-v1\nphase: IMPLEMENTATION\n")
-    # Two simultaneous [-] markers, no parallel_tasks: declaration
-    (rel_dir / "TASKS.md").write_text(
-        "# Tasks\n\n"
-        "- [-] T-001 — first in-progress task\n"
-        "- [-] T-002 — second in-progress task\n"
-        "- [ ] T-003 — open task\n"
-    )
-    _make_primary_context(workspace, "my-proj", specs)
-    session_env = _bind_impl_session(workspace, "my-proj", "my-release-v1")
-
-    log_file = workspace / ".dadaia" / "sdd-gate.log"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    env = {
-        **os.environ,
-        "WORKSPACE_ROOT": str(workspace),
-        "SDD_GATE_LOG": str(log_file),
-        **session_env,
-    }
-
-    # Write to a production path (repos/<slug>/) to reach RULE C
-    target_file = workspace / "repos" / "my-proj" / "src" / "main.py"
-    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target_file)}})
-    result = subprocess.run(
-        ["bash", str(scripts / "sdd-spec-gate.sh")],
-        input=payload,
-        capture_output=True,
-        text=True,
-        timeout=5,
-        env=env,
-    )
-    # Gate must ALLOW (two [-] markers do satisfy RULE C)
-    assert result.returncode == 0, f"Gate crashed; stderr: {result.stderr!r}"
-    assert result.stdout == "", f"Expected allow (warn-only) but got blocked: {result.stdout!r}"
-
-    # WARN must be in the log
-    log_content = log_file.read_text() if log_file.exists() else ""
-    assert "WARN" in log_content and (
-        "one-active-task" in log_content or "multiple [-]" in log_content
-    ), f"Expected WARN one-active-task in log. Log:\n{log_content!r}"
-    # The count (2) must appear in the log message
-    assert "2" in log_content, f"Expected count '2' in WARN log. Log:\n{log_content!r}"
 
 
 def test_sdd_gate_one_minus_warn_suppressed_with_parallel_declaration(workspace: Path) -> None:
