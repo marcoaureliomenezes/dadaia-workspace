@@ -199,7 +199,10 @@ def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
     import datetime
 
     now_iso = (
-        datetime.datetime.now(tz=datetime.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        datetime.datetime.now(tz=datetime.UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
     )
 
     report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
