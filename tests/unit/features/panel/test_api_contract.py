@@ -191,6 +191,17 @@ def test_api_servers_stale_status_string() -> None:
 
 
 def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
+    """Panel discovery contract: canonical handoff under .dadaia/handoff/ enriches the report.
+
+    The handoff's produced_at is stamped to "now" (within the 48 h retention
+    window) so the test is deterministic regardless of the calendar date.
+    """
+    import datetime
+
+    now_iso = (
+        datetime.datetime.now(tz=datetime.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+
     report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
     report_path.parent.mkdir(parents=True)
     report_path.write_text("<html>qa</html>", encoding="utf-8")
@@ -204,7 +215,7 @@ def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
                 "schema_version": "handoff-v1.1",
                 "agent": "qa-engineer",
                 "context": "ctx",
-                "produced_at": "2026-06-04T00:00:00Z",
+                "produced_at": now_iso,
                 "artifact": {
                     "type": "report",
                     "path": ".dadaia/reports/ctx/qa-engineer/qa.html",

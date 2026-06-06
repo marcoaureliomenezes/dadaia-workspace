@@ -43,9 +43,48 @@ def test_public_install_force_flag(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_public_doctor_outputs_status(tmp_path: Path, monkeypatch) -> None:
+    """T-PROP-02 integration: doctor CLI exits 0 on clean workspace, non-zero on drift.
+
+    The two sub-cases are tested using patched service responses so the test
+    is deterministic regardless of the real workspace state.  The CLI layer
+    (command/exit-code routing) is exercised in full; only the service return
+    value is stubbed.
+    """
+    from unittest.mock import MagicMock, patch
+
     _init_ws(tmp_path)
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["public", "doctor"])
-    assert result.exit_code == 0, result.output
-    output = result.output
-    assert any(tag in output for tag in ("[ok]", "[missing]", "[drift]", "[unsupported]", "No"))
+
+    # --- Case 1: clean workspace → exit 0, only [ok]/[not-applicable] lines ---
+    ok_lines = ["[ok] stage:agents/qa-engineer.md", "[not-applicable] codex:config.toml"]
+    with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
+        mock_svc = MagicMock()
+        mock_svc.doctor.return_value = ok_lines
+        mock_container.build_public_service.return_value = mock_svc
+        with patch(
+            "dadaia_workspace.cli.commands.public.resolve_workspace_root",
+            return_value=tmp_path,
+        ):
+            result = _runner.invoke(app, ["public", "doctor"])
+
+    assert result.exit_code == 0, (
+        f"Expected exit 0 for clean workspace, got {result.exit_code}. Output:\n{result.output}"
+    )
+    assert "[ok]" in result.output
+
+    # --- Case 2: drift detected → non-zero exit, [drift] in output ---
+    drift_lines = ["[ok] stage:agents/qa-engineer.md", "[drift] claude:rules/some-rule.md"]
+    with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
+        mock_svc = MagicMock()
+        mock_svc.doctor.return_value = drift_lines
+        mock_container.build_public_service.return_value = mock_svc
+        with patch(
+            "dadaia_workspace.cli.commands.public.resolve_workspace_root",
+            return_value=tmp_path,
+        ):
+            result = _runner.invoke(app, ["public", "doctor"])
+
+    assert result.exit_code != 0, (
+        f"Expected non-zero exit for drift, got {result.exit_code}. Output:\n{result.output}"
+    )
+    assert "[drift]" in result.output, f"Expected '[drift]' in output, got:\n{result.output}"
