@@ -86,6 +86,16 @@ def _sessions_dir(workspace_root: Path) -> Path:
     return workspace_root / ".dadaia" / "sessions"
 
 
+def _safe_session_filename(owner: str) -> str:
+    """Sanitize an owner/session id before path construction (CWE-22).
+
+    ``owner`` is read from the semaphore JSON on disk; strip anything outside the
+    session-id charset so a crafted ``owner`` (e.g. ``../../etc``) cannot escape
+    the sessions directory when its session file is existence-checked.
+    """
+    return "".join(c for c in owner if c.isalnum() or c in "_-")
+
+
 def _is_stale(
     data: dict,  # type: ignore[type-arg]
     workspace_root: Path | None = None,
@@ -124,7 +134,7 @@ def _is_stale(
                 # check when a pid is present so that lightweight callers (e.g.
                 # unit tests that call acquire_context_semaphore directly without
                 # going through the full bind flow) are not mis-classified as stale.
-                owner = str(data.get("owner", ""))
+                owner = _safe_session_filename(str(data.get("owner", "")))
                 if owner:
                     session_file = _sessions_dir(workspace_root) / f"{owner}.json"
                     if not session_file.exists():
@@ -225,7 +235,7 @@ def acquire_context_semaphore(
                 except (TypeError, ValueError):
                     pass
             if not reason_parts:
-                owner_str = str(holder)
+                owner_str = _safe_session_filename(str(holder))
                 session_file = _sessions_dir(workspace_root) / f"{owner_str}.json"
                 if not session_file.exists():
                     reason_parts.append("missing-session-file")
