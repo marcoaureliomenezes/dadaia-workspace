@@ -80,8 +80,22 @@ eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode implementation --rele
 eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode review --release <release-id>)
 ```
 
-Implementation binds acquire the implementation lock for the selected
-context/release. Review binds are mutually exclusive with implementation locks.
+Implementation binds acquire the single per-context release **lease** (v0.1.6 model:
+one MUTATING lease per context, coordinated by project-manager — see constitution §8/§9).
+`read` and `spec` binds never block. The lease record is
+`{context, release, session_id, mode, acquired_at, heartbeat, ttl}` (no PID); liveness is
+`now − heartbeat ≤ ttl` (TTL 1800s), and the gate is fail-safe — it never blocks on an
+expired or absent lease.
+
+### Lease recovery
+
+```bash
+dadaia lock steal <context>          # reclaim a stale/abandoned release lease for <context>
+```
+
+Use `dadaia lock steal` when a lease is held by a dead session and the SDD gate blocks a
+legitimate write. There is no per-session "implementation lock" vs "review lock" pair —
+v0.1.6 collapsed that into one release lease keyed to the coordinator session.
 
 ### Supporting commands
 
@@ -165,4 +179,4 @@ remove that repo from disk.
 |---|---|---|
 | INV-4 | `alive` context has repo on disk at `repos/<slug>/` | No (run `dadaia context alive <name>`) |
 | INV-5 | `dead` context does not have repo on disk | Yes |
-| LOCK | Implementation/review lock files are consistent with context state | Some cases |
+| LEASE | The per-context release lease record is consistent with context state; stale leases are reclaimable via `dadaia lock steal <context>` | Some cases |

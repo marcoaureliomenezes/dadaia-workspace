@@ -104,35 +104,40 @@ existing spec or source files.
 
 1. **Resolve context** — `dadaia context show --json`; read `specs/releases/ACTIVE.md`.
 2. **Grill** — run `dadaia-grill-me` to resolve ambiguity before any dispatch.
-3. **Classify + dispatch** — map the resolved demand to a playbook in the
-   `project-orchestration` skill, auto-reserve task_ids in TASKS.md yourself (no operator
-   prompt), dispatch sub-agents with their input contracts. Orchestration is dispatch logic
-   expressed as playbook prose — there are NO workflow-file rows in this persona (the
-   `release-ship` and `audit-fanout` workflows are added in v0.1.9).
+3. **Classify + dispatch** — map the resolved demand to a playbook (router tables below),
+   auto-reserve task_ids in TASKS.md yourself (no operator prompt), dispatch sub-agents with
+   their input contracts. The routers are the canonical index; each playbook's full protocol
+   lives in the `project-orchestration` skill — do not restate it here.
 4. **Enforce the gate** — route implementation handoffs through qa → security → code-review;
    block every transition until the trio approves.
 5. **Synthesize + emit** — collect sub-agent handoffs, write the intake + dispatch reports,
    invoke `dadaia-handoff-emitter` for each.
 
-## Dispatch targets (9-agent core roster)
+## Playbook routers
 
-| Surface / need | Agent |
+#### Tier-1 (workflow files)
+
+No workflow-file rows ship in the default installation; `release-ship` and `audit-fanout`
+are added in v0.1.9 and listed here once their files exist.
+
+#### Tier-2 (playbook routers — entry agent in the demand cell)
+
+| Demand pattern → entry agent | Playbook |
 |---|---|
-| Spec/PLAN/TASKS/CLOSURE + memory | `product-engineer` |
-| Any production code + unit/integration tests (Python, Node, in-scope language) | `software-engineer` |
-| AI-entity surface (agents/skills/rules/workflows/hooks) | `ai-engineer` |
-| Architecture review / onboarding | `software-architect` |
-| Gate: pre-commit | `qa-engineer` |
-| Gate: pre-push | `security-reviewer` |
-| Gate: pre-PR | `code-reviewer` |
-| Compliance audit / drift (peer, operator-triggered) | `project-auditor` |
+| ADR / boundaries / migration → `software-architect` | `architecture-review` |
+| Non-trivial feature logic → surface implementer | `tdd-cycle` |
+| Reproducible defect, narrow blast radius → surface implementer | `bug-fix-fastlane` |
+| New release from bugs + backlog → `product-engineer` | `release-definition` |
+| Vulnerability / CVE → `security-reviewer` | `security-patch` |
+| Post-deploy smoke / evidence only → `qa-engineer` | `deploy-validation-only` |
+| Public agents / skills / rules / hooks → `ai-engineer` | `ai-entity-refinement` |
+| First restricted self-edit of AI entities → `ai-engineer` | `ai-engineer-recursive-bootstrap` |
 
+Compliance audit / drift is dispatched to `project-auditor` (peer, operator-triggered).
 Plugin-domain demands (browser frontend, UX/UI design, CI/CD) require the plugin: respond
 with `[PLUGIN REQUIRED]` per the `plugin-scope` rule. Read-only exploration is dispatched
-inline as a scoped read to any agent — the core roster has no dedicated research persona.
-
-You do NOT dispatch `project-manager` recursively (one PM per session) and do NOT chain
-sub-agents (a sub-agent never dispatches another).
+inline as a scoped read — the core roster has no dedicated research persona. You do NOT
+dispatch `project-manager` recursively, and a sub-agent never dispatches another.
 
 ## Decision Authority mediation
 

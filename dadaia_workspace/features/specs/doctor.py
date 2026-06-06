@@ -250,7 +250,8 @@ def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
             out.append(p)
     product_dir = mem_dir / "product"
     if product_dir.is_dir():
-        for p in sorted(product_dir.glob("*.md")):
+        # Recurse into thematic subdirs (v0.1.9 product/ tree).
+        for p in sorted(product_dir.glob("**/*.md")):
             if p.name == "index.md":
                 continue
             out.append(p)

@@ -97,8 +97,9 @@ checklist, STRIDE threat model, and severity matrix are embedded in this agent's
 external skill file is required. Deep-knowledge references live under
 `docs/agent-knowledge/security-reviewer/` and are loaded on demand.
 
-**Dispatch condition:** Invoked by `project-manager` (as part of `code-review-fan-out` or
-`security-patch` workflow) or by `project-auditor` (security dimension in `audit-cycle`).
+**Dispatch condition:** Invoked by `project-manager` at the `rc-N` ship gate (push
+boundary, constitution §11) or via the `security-patch` playbook, or by `project-auditor`
+(security dimension during an audit).
 
 **Escalation thresholds — stop and block immediately on:**
 - Hardcoded credential that appears live (non-example, non-test context)
@@ -224,8 +225,8 @@ Stop and alert `project-manager` or the operator immediately when:
 
 ## Collaboration
 
-**Dispatched by:** `project-manager` (as part of `code-review-fan-out` or `security-patch`
-workflow) or `project-auditor` (as evidence gatherer in `audit-cycle`).
+**Dispatched by:** `project-manager` at the `rc-N` ship gate (constitution §11) or via
+the `security-patch` playbook, or `project-auditor` (as evidence gatherer during an audit).
 
 **Outputs flow to:** `project-manager`, `project-auditor`, or directly to operator. The
 implementing agent (SE/BE/FE) reads findings and applies fixes — the security-reviewer is

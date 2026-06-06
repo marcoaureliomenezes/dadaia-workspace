@@ -183,7 +183,8 @@ def generate_catalog(
         return None, [f"product/ subdirectory not found in '{memory_dir}'."]
 
     # index.md is the GENERATED TOC, not a feature atom — never index itself.
-    md_files = sorted(p for p in product_dir.glob("*.md") if p.name != "index.md")
+    # Recurse into thematic subdirs (v0.1.9 product/ tree).
+    md_files = sorted(p for p in product_dir.glob("**/*.md") if p.name != "index.md")
     if not md_files:
         # Empty product dir is valid — return an empty catalog.
         catalog: dict[str, Any] = {

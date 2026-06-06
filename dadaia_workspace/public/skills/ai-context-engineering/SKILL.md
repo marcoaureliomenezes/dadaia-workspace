@@ -412,3 +412,15 @@ finds repeated context across personas.
 - **Auditing** the fleet (efficiency report): use §1 estimation to rank files by lifetime
   cost, §2/§3 detection protocols to find structural drift, §4 to recommend tier moves,
   and the §5 skill-extraction trigger to recommend deduplication.
+
+---
+
+## Authoring guardrails (apply every time)
+
+- This skill is restricted to `ai-engineer` (`harness-skill-scope` rule). General
+  agents use `harness-primitives`. Phase mapping: ai-engineer / harness literacy.
+- All authoring targets are `dadaia_workspace/public/...` source. Never hand-edit
+  `.claude/`, `.codex/`, `.agents/`, `.opencode/` projections; propagate via
+  `dadaia public stage && dadaia public install`.
+- No consumer-specific names, hostnames, IPs, private repo slugs, secrets, or
+  operator-private data in any authored asset.

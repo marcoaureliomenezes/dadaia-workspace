@@ -274,7 +274,7 @@ Stop and alert the operator when:
 
 ## Collaboration
 
-**Dispatched by:** `project-manager` (as part of `audit-cycle` workflow) or operator
+**Dispatched by:** `project-manager` (via the `audit-fanout` workflow) or operator
 directly for an ad-hoc audit.
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `qa-engineer`, `software-architect`,

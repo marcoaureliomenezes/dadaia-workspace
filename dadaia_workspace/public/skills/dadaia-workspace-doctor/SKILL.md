@@ -16,7 +16,7 @@ This skill handles **operational state** only:
 1. Lib canonical vs installed `.claude/` drift
 2. JSON schema migration in `.dadaia/states/*.json`
 
-Spec↔code drift (feature behavior vs approved SPEC.md) belongs to `product-auditor-agent`.
+Spec↔code drift (feature behavior vs approved SPEC.md) belongs to `project-auditor`.
 
 ---
 

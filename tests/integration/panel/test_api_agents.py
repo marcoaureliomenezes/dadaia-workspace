@@ -98,7 +98,7 @@ class StubTelemetryService:
     """Returns a controlled AgentListResult with one active and one inactive agent.
 
     The two summaries target real agent IDs present in the staged catalog:
-      - "software-engineer-python"  → recent activity (active)
+      - "software-engineer"  → recent activity (active)
       - "qa-engineer"               → activity 400 days ago (inactive with default window)
     """
 
@@ -119,7 +119,7 @@ class StubTelemetryService:
             pricing_age_days=30,
             pricing_model_date="2026-04-01",
             agents=[
-                _make_agent_summary("software-engineer-python", active_ts),
+                _make_agent_summary("software-engineer", active_ts),
                 _make_agent_summary("qa-engineer", inactive_ts),
             ],
         )
@@ -270,7 +270,7 @@ class TestBearerEnforcement:
 class TestTelemetryOverlayMerge:
     """Telemetry data must be merged over canonical agents.
 
-    The stub returns data for "software-engineer-python" and "qa-engineer" which
+    The stub returns data for "software-engineer" and "qa-engineer" which
     are real agents in the staged catalog. The overlay must inject their
     telemetry sub-objects.
     """
@@ -290,8 +290,8 @@ class TestTelemetryOverlayMerge:
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
         agent_ids = {a["agent_id"] for a in data["agents"]}
-        # The staged catalog has software-engineer-python and qa-engineer
-        assert "software-engineer-python" in agent_ids
+        # The staged catalog has software-engineer and qa-engineer
+        assert "software-engineer" in agent_ids
         assert "qa-engineer" in agent_ids
 
     def test_telemetry_overlay_injected(self, agents_server: Any) -> None:
@@ -300,7 +300,7 @@ class TestTelemetryOverlayMerge:
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
         by_id = {a["agent_id"]: a for a in data["agents"]}
-        se = by_id.get("software-engineer-python")
+        se = by_id.get("software-engineer")
         assert se is not None
         assert "telemetry" in se
         assert se["telemetry"]["session_count"] == 5
@@ -310,7 +310,7 @@ class TestTelemetryOverlayMerge:
         base, token, _ = agents_server
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
-        # The stub injects data for "software-engineer-python" and "qa-engineer" — only
+        # The stub injects data for "software-engineer" and "qa-engineer" — only
         # those present in the canonical files should appear. Telemetry-only agents excluded.
         canonical_ids = {a["agent_id"] for a in data["agents"]}
         # All returned agents must have a real on-disk file in the staged catalog
@@ -326,7 +326,7 @@ class TestTelemetryOverlayMerge:
         _, _, body = _get(f"{base}/api/agents", token=token)
         data = json.loads(body)
         by_id = {a["agent_id"]: a for a in data["agents"]}
-        se = by_id.get("software-engineer-python")
+        se = by_id.get("software-engineer")
         assert se is not None
         assert se["status"] == "active"
 
@@ -421,13 +421,13 @@ class TestAgentPromptTraversalDefence:
         assert data.get("error") == "invalid_agent_id"
 
     def test_prompt_valid_known_agent_200(self, agents_server: Any) -> None:
-        """GET /api/agents/software-engineer-python/prompt → 200 with system_prompt key."""
+        """GET /api/agents/software-engineer/prompt → 200 with system_prompt key."""
         base, token, _ = agents_server
-        status, _, body = _get(f"{base}/api/agents/software-engineer-python/prompt", token=token)
+        status, _, body = _get(f"{base}/api/agents/software-engineer/prompt", token=token)
         assert status == 200
         data = json.loads(body)
         assert "system_prompt" in data
-        assert data["agent_id"] == "software-engineer-python"
+        assert data["agent_id"] == "software-engineer"
 
     def test_prompt_unknown_agent_404(self, agents_server: Any) -> None:
         """GET /api/agents/does-not-exist/prompt → 404."""
@@ -436,7 +436,7 @@ class TestAgentPromptTraversalDefence:
         assert status == 404
 
     def test_prompt_401_without_token(self, agents_server: Any) -> None:
-        """GET /api/agents/software-engineer-python/prompt without token → 401."""
+        """GET /api/agents/software-engineer/prompt without token → 401."""
         base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents/software-engineer-python/prompt")
+        status, _, _ = _get(f"{base}/api/agents/software-engineer/prompt")
         assert status == 401

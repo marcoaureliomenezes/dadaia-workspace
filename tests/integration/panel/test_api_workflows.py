@@ -161,13 +161,13 @@ class TestWorkflowsBearerEnforcement:
     def test_workflow_detail_401_without_token(self, workflows_server: Any) -> None:
         """GET /api/workflows/<name> without Authorization → 401."""
         base, token = workflows_server
-        status, _, _ = _get(f"{base}/api/workflows/hotfix-release")
+        status, _, _ = _get(f"{base}/api/workflows/audit-fanout")
         assert status == 401
 
     def test_workflow_detail_200_with_token(self, workflows_server: Any) -> None:
-        """GET /api/workflows/hotfix-release with Bearer → 200."""
+        """GET /api/workflows/audit-fanout with Bearer → 200."""
         base, token = workflows_server
-        status, _, _ = _get(f"{base}/api/workflows/hotfix-release", token=token)
+        status, _, _ = _get(f"{base}/api/workflows/audit-fanout", token=token)
         assert status == 200
 
 
@@ -193,19 +193,19 @@ class TestWorkflowsListShape:
         assert data["source_hint"] == ".dadaia/agentic/workflows/"
 
     def test_workflows_list_contains_real_workflow(self, workflows_server: Any) -> None:
-        """Response lists at least the 'hotfix-release' workflow from disk."""
+        """Response lists at least the 'audit-fanout' workflow from disk."""
         base, token = workflows_server
         _, _, body = _get(f"{base}/api/workflows", token=token)
         data = json.loads(body)
         names = {w["name"] for w in data["workflows"]}
-        assert "hotfix-release" in names
+        assert "audit-fanout" in names
 
     def test_workflow_item_shape(self, workflows_server: Any) -> None:
         """Each workflow item has required SPEC §5.3 fields; no stages[] or diagram_svg."""
         base, token = workflows_server
         _, _, body = _get(f"{base}/api/workflows", token=token)
         data = json.loads(body)
-        item = next(w for w in data["workflows"] if w["name"] == "hotfix-release")
+        item = next(w for w in data["workflows"] if w["name"] == "audit-fanout")
         for key in (
             "name",
             "display_name",
@@ -231,9 +231,9 @@ class TestWorkflowsListShape:
 
 class TestWorkflowDetailShape:
     def test_detail_top_level_keys(self, workflows_server: Any) -> None:
-        """GET /api/workflows/hotfix-release → has name, stages, diagram_svg."""
+        """GET /api/workflows/audit-fanout → has name, stages, diagram_svg."""
         base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows/hotfix-release", token=token)
+        _, _, body = _get(f"{base}/api/workflows/audit-fanout", token=token)
         data = json.loads(body)
         for key in ("name", "stages", "diagram_svg", "inputs", "agent_ids"):
             assert key in data, f"missing detail key: {key}"
@@ -241,7 +241,7 @@ class TestWorkflowDetailShape:
     def test_detail_stages_shape(self, workflows_server: Any) -> None:
         """Each stage item has id, agent, needs, gate, on_failure keys."""
         base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows/hotfix-release", token=token)
+        _, _, body = _get(f"{base}/api/workflows/audit-fanout", token=token)
         data = json.loads(body)
         for stage in data["stages"]:
             for key in ("id", "agent", "needs", "gate", "on_failure"):

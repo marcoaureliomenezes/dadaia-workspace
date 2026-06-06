@@ -7,7 +7,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = REPO_ROOT / "dadaia_workspace" / "public" / "workflows"
 AGENTS_DIR = REPO_ROOT / "dadaia_workspace" / "public" / "agents"
-AGENT_ORCHESTRATION = REPO_ROOT / "specs" / "memory" / "product" / "agent-orchestration.md"
+# agent-orchestration.md lives under specs/memory/product/agents/ (moved in v0.1.8 restructure)
+AGENT_ORCHESTRATION = (
+    REPO_ROOT / "specs" / "memory" / "product" / "agents" / "agent-orchestration.md"
+)
 
 FORBIDDEN_CODEX_PROMISES = (
     "Codex best-effort parallel",

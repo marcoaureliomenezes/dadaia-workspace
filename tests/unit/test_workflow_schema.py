@@ -169,6 +169,42 @@ _PUBLIC_ROOT = Path(__file__).parents[2] / "dadaia_workspace" / "public"
 _PUBLIC_WORKFLOWS_DIR = _PUBLIC_ROOT / "workflows"
 _PUBLIC_AGENTS_DIR = _PUBLIC_ROOT / "agents"
 
+# Synthetic workflow with parallel_group stages — decoupled from canonical workflow content.
+# The canonical workflows (audit-fanout, release-ship) are linear; the parallel_group
+# schema feature is validated through this synthetic fixture instead.
+_SYNTHETIC_PARALLEL_WORKFLOW = """\
+---
+name: synthetic-parallel-schema-test
+description: Synthetic fixture for testing parallel_group schema validation.
+version: 0.0.1
+schema_version: "1"
+stages:
+  - id: review_a
+    agent: qa-engineer
+    parallel_group: review_batch
+    expected_output:
+      path: ".dadaia/handoff/{context}/{run_ts}-qa-engineer-review-a.handoff.json"
+  - id: review_b
+    agent: code-reviewer
+    parallel_group: review_batch
+    expected_output:
+      path: ".dadaia/handoff/{context}/{run_ts}-code-reviewer-review-b.handoff.json"
+  - id: review_c
+    agent: security-reviewer
+    parallel_group: review_batch
+    expected_output:
+      path: ".dadaia/handoff/{context}/{run_ts}-security-reviewer-review-c.handoff.json"
+  - id: finalize
+    agent: project-manager
+    needs: [review_a, review_b, review_c]
+    expected_output:
+      path: ".dadaia/handoff/{context}/{run_ts}-project-manager-finalize.handoff.json"
+---
+# synthetic-parallel-schema-test
+
+Synthetic fixture for parallel_group schema validation.
+"""
+
 
 def _public_agent_ids() -> list[str]:
     return [path.stem for path in _PUBLIC_AGENTS_DIR.glob("*.md")]
@@ -189,16 +225,22 @@ def test_public_workflows_load_against_public_agent_catalog() -> None:
     assert set(workflows) == expected_names
 
 
-def test_public_audit_and_review_workflows_preserve_parallel_groups() -> None:
-    """Current fan-out workflows keep their public parallel review/audit groups."""
-    workflows = _public_workflows()
-    audit_parallel = [
-        stage for stage in workflows["audit-cycle"].stages if stage.parallel_group == "audit"
-    ]
-    review_parallel = [
-        stage
-        for stage in workflows["code-review-fan-out"].stages
-        if stage.parallel_group == "review"
-    ]
-    assert len(audit_parallel) == 4
-    assert len(review_parallel) == 3
+def test_public_audit_and_review_workflows_preserve_parallel_groups(tmp_path: Path) -> None:
+    """Parallel-group schema is preserved when a workflow declares parallel stages.
+
+    The canonical public workflows (audit-fanout, release-ship) are linear after the
+    v0.1.9 surface reduction. This test validates the parallel_group feature through a
+    synthetic fixture decoupled from any specific shipped workflow name.
+    """
+    wf_file = tmp_path / "synthetic-parallel-schema-test.workflow.md"
+    wf_file.write_text(_SYNTHETIC_PARALLEL_WORKFLOW, encoding="utf-8")
+    store = MarkdownWorkflowStore(
+        tmp_path,
+        agent_catalog=["qa-engineer", "code-reviewer", "security-reviewer", "project-manager"],
+    )
+    workflows = {w.name: w for w in store.list()}
+    wf = workflows["synthetic-parallel-schema-test"]
+    parallel_stages = [s for s in wf.stages if s.parallel_group == "review_batch"]
+    assert len(parallel_stages) == 3, (
+        f"Expected 3 parallel stages in synthetic fixture, got {len(parallel_stages)}"
+    )

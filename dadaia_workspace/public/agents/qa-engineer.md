@@ -34,7 +34,7 @@ input_contract:
     - name: discovery_report
       kind: report
       source: report_path
-      description: "Discovery report when running as specialist in spec-refinement"
+      description: "Discovery report when running as a specialist during spec definition"
       stop_if_missing: false
   produces_outputs:
     - name: red_test_report

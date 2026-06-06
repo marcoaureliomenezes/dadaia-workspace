@@ -99,9 +99,9 @@ external skill file is required. Deep-knowledge references (layering rules, patt
 OOP/SOLID heuristics, complexity rubric) live under `docs/agent-knowledge/code-reviewer/`
 and are loaded on demand.
 
-**Dispatch condition:** Invoked by `project-manager` after a PR opens (as part of
-`code-review-fan-out` workflow), or by `project-auditor` when code-level evidence is
-required in an `audit-cycle`. NOT for SPEC/PLAN review — that is `product-engineer`.
+**Dispatch condition:** Invoked by `project-manager` at the `rc-N` ship gate (the
+PR/merge review boundary, constitution §11), or by `project-auditor` when code-level
+evidence is required during an audit. NOT for SPEC/PLAN review — that is `product-engineer`.
 
 ## Skills consumed
 
@@ -209,8 +209,8 @@ Stop and alert the operator or `project-manager` when:
 
 ## Collaboration
 
-**Dispatched by:** `project-manager` (as part of `code-review-fan-out` workflow) or
-`project-auditor` (as evidence gatherer in `audit-cycle`).
+**Dispatched by:** `project-manager` at the `rc-N` ship gate (constitution §11) or
+`project-auditor` (as evidence gatherer during an audit).
 
 **Outputs flow to:** `project-manager` for verdict consolidation; operator for final
 merge decision.
