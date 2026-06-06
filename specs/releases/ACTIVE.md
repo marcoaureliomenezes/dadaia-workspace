@@ -1,3 +1,3 @@
-release: v0.1.5
-segment: rc-2
-phase: CLOSURE
+release: v0.2.0
+segment: none
+phase: SPEC
