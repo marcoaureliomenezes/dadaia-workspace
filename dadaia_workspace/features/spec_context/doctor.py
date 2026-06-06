@@ -5,7 +5,7 @@ import json
 import os
 import shutil
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.models.spec_context import ContextState
@@ -19,6 +19,10 @@ from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     check_lock_state,
     context_lock,
     workspace_lock,
+)
+from dadaia_workspace.features.spec_context.semaphore import (
+    _is_stale,
+    read_semaphore,
 )
 
 # Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5
@@ -95,6 +99,38 @@ _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
 )
 
 
+def _semaphore_audit_log_path(workspace_root: Path) -> Path:
+    """Path to the semaphore-specific audit log (separate from lock-events.jsonl)."""
+    return workspace_root / ".dadaia" / "states" / "audit" / "semaphore-reclaims.jsonl"
+
+
+def _append_semaphore_audit(
+    workspace_root: Path,
+    *,
+    event: str,
+    context: str,
+    session_id: str,
+    reason: str,
+) -> None:
+    """Append one audit record to semaphore-reclaims.jsonl atomically via O_APPEND."""
+    audit_path = _semaphore_audit_log_path(workspace_root)
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    record: dict[str, object] = {
+        "ts": datetime.now(tz=UTC).isoformat(),
+        "event": event,
+        "context": context,
+        "session_id": session_id,
+        "reason": reason,
+    }
+    line = json.dumps(record) + "\n"
+    encoded = line.encode("utf-8")
+    fd = os.open(str(audit_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    try:
+        os.write(fd, encoded)
+    finally:
+        os.close(fd)
+
+
 @dataclass(frozen=True)
 class DoctorIssue:
     code: str
@@ -121,6 +157,9 @@ class DoctorService:
 
     def _sessions_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "sessions"
+
+    def _ctx_locks_dir(self) -> Path:
+        return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
 
     # ------------------------------------------------------------------
     # Helper: read all lock files grouped by <context>__<release> key
@@ -329,6 +368,65 @@ class DoctorService:
                     fixable=False,
                 )
             )
+        return issues
+
+    # ------------------------------------------------------------------
+    # SEM-1 invariant helpers
+    # ------------------------------------------------------------------
+
+    def _check_sem_1(self, alive_names: frozenset[str]) -> list[DoctorIssue]:
+        """SEM-1: scan ctx_locks/*.semaphore.json for orphan or stale entries.
+
+        Orphan: the semaphore's context name is NOT in the set of alive contexts.
+        Stale:  the semaphore IS for an alive context, but _is_stale() returns True
+                (dead PID, missing session file, or TTL exceeded).
+
+        Both are fixable via fix().
+        """
+        issues: list[DoctorIssue] = []
+        ctx_locks_dir = self._ctx_locks_dir()
+        if not ctx_locks_dir.exists():
+            return issues
+
+        for sem_file in sorted(ctx_locks_dir.iterdir()):
+            if not sem_file.name.endswith(".semaphore.json"):
+                continue
+            # Derive context name: strip ".semaphore.json" suffix
+            context = sem_file.name[: -len(".semaphore.json")]
+            data = read_semaphore(self._workspace_root, context)
+            if data is None:
+                # Unreadable file — cannot assess; skip silently
+                continue
+
+            if context not in alive_names:
+                # Orphan: context not alive (unknown or dead)
+                issues.append(
+                    DoctorIssue(
+                        code="SEM-1",
+                        description=(
+                            f"[orphan-semaphore] {sem_file}: context '{context}' is not in "
+                            "the alive context set. The semaphore was left by a gone/dead context. "
+                            "Run 'dadaia doctor --fix' to reclaim."
+                        ),
+                        fixable=True,
+                    )
+                )
+            elif _is_stale(data, workspace_root=self._workspace_root):
+                # Stale: alive context but dead holder
+                owner = str(data.get("owner", "unknown"))
+                issues.append(
+                    DoctorIssue(
+                        code="SEM-1",
+                        description=(
+                            f"[stale-semaphore] {sem_file}: semaphore for alive context "
+                            f"'{context}' is stale (owner={owner}, "
+                            f"pid={data.get('pid', 'none')}, "
+                            f"heartbeat={data.get('heartbeat', 'none')}). "
+                            "Run 'dadaia doctor --fix' to reclaim."
+                        ),
+                        fixable=True,
+                    )
+                )
         return issues
 
     def check(self) -> list[DoctorIssue]:
@@ -542,6 +640,12 @@ class DoctorService:
         issues.extend(self._check_root_2())
         issues.extend(self._check_root_3(exc_globs))
         issues.extend(self._check_root_4())
+
+        # ---- SEM-1 invariant (T-SEMA-02) ----
+        alive_names: frozenset[str] = frozenset(
+            ctx.name for ctx in contexts if ctx.state == ContextState.ALIVE
+        )
+        issues.extend(self._check_sem_1(alive_names))
 
         return issues
 
@@ -759,5 +863,45 @@ class DoctorService:
                     )
                 except OSError as exc:
                     actions.append(f"ROOT-2: failed to delete '{cache_name}': {exc}")
+
+        # SEM-1: reclaim orphan and stale semaphores (T-SEMA-02).
+        # Runs outside the workspace_lock because:
+        #   a) semaphore files live in ctx_locks/, distinct from impl locks,
+        #   b) semaphore acquire/release already uses atomic tmp→os.replace,
+        #   c) adding Lock 1 here would risk a deadlock when the caller holds the
+        #      semaphore and also requests fix() — keep it lightweight.
+        all_contexts = self._store.list_all()
+        alive_names: frozenset[str] = frozenset(
+            ctx.name for ctx in all_contexts if ctx.state == ContextState.ALIVE
+        )
+        ctx_locks_dir = self._ctx_locks_dir()
+        if ctx_locks_dir.exists():
+            for sem_file in sorted(ctx_locks_dir.iterdir()):
+                if not sem_file.name.endswith(".semaphore.json"):
+                    continue
+                context = sem_file.name[: -len(".semaphore.json")]
+                data = read_semaphore(self._workspace_root, context)
+                if data is None:
+                    continue
+                reclaim = False
+                reason = ""
+                if context not in alive_names:
+                    reclaim = True
+                    reason = f"SEM-1: orphan semaphore — context '{context}' not in alive set"
+                elif _is_stale(data, workspace_root=self._workspace_root):
+                    reclaim = True
+                    owner = str(data.get("owner", "unknown"))
+                    reason = f"SEM-1: stale semaphore for alive context '{context}' (owner={owner})"
+                if reclaim:
+                    session_id = str(data.get("owner", "unknown"))
+                    _append_semaphore_audit(
+                        self._workspace_root,
+                        event="SEMAPHORE_RECLAIMED",
+                        context=context,
+                        session_id=session_id,
+                        reason=reason,
+                    )
+                    sem_file.unlink(missing_ok=True)
+                    actions.append(f"SEM-1: reclaimed semaphore '{sem_file.name}' — {reason}")
 
         return actions
