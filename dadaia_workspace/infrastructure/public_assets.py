@@ -437,6 +437,41 @@ def _parse_agent_frontmatter(text: str) -> dict[str, object]:
     return result
 
 
+def _parse_write_allowlist(text: str) -> list[str]:
+    """Extract ``paths.write_allowlist`` globs from agent .md frontmatter (stdlib only).
+
+    Used to pre-compile ``.dadaia/agentic/agents.index.json`` (T-016-00) so the SDD
+    gate's RULE D performs an O(1) JSON lookup instead of an inline YAML parse on
+    every PreToolUse. Returns ``[]`` when the agent declares no write_allowlist.
+    """
+    if not text.startswith("---\n"):
+        return []
+    end_idx = text.find("\n---\n", 4)
+    if end_idx == -1:
+        return []
+
+    in_paths = False
+    in_wl = False
+    items: list[str] = []
+    for line in text[4 : end_idx + 1].splitlines():
+        if not line.strip():
+            continue
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+        if indent == 0:
+            in_paths = stripped == "paths:"
+            in_wl = False
+            continue
+        if not in_paths:
+            continue
+        if in_wl and stripped.startswith("- "):
+            items.append(stripped[2:].strip())
+            continue
+        # A sub-key under `paths:` (write_allowlist:, read_allowlist:, …).
+        in_wl = stripped == "write_allowlist:"
+    return items
+
+
 def _parse_skills_from_frontmatter(text: str) -> list[str]:
     """Extract the ``skills:`` list from agent YAML frontmatter.
 
@@ -904,7 +939,25 @@ class FileSystemPublicAssetManager:
         manifest_path = agentic_dir / "manifest.json"
         manifest_path.write_text(_json_dump(self._build_manifest(agentic_dir)), encoding="utf-8")
         staged.append(f"[stage] {manifest_path}")
+
+        # T-016-00: pre-compile the agent write-allowlist index for the SDD gate's
+        # RULE D (O(1) JSON lookup instead of inline YAML parse per PreToolUse).
+        # Written after the manifest so it is not itself a manifest-tracked asset.
+        index_path = agentic_dir / "agents.index.json"
+        index_path.write_text(_json_dump(self._build_agents_index(agentic_dir)), encoding="utf-8")
+        staged.append(f"[stage] {index_path}")
         return staged
+
+    @staticmethod
+    def _build_agents_index(agentic_dir: Path) -> dict[str, list[str]]:
+        """Map every staged agent → its ``paths.write_allowlist`` globs (T-016-00)."""
+        agents_dir = agentic_dir / "agents"
+        index: dict[str, list[str]] = {}
+        if not agents_dir.exists():
+            return index
+        for md_file in sorted(agents_dir.glob("*.md")):
+            index[md_file.stem] = _parse_write_allowlist(md_file.read_text(encoding="utf-8"))
+        return index
 
     def _validate_workflows(self, agentic_dir: Path) -> None:
         """Validate every *.workflow.md against schema; abort stage if any fails."""
@@ -1024,6 +1077,17 @@ class FileSystemPublicAssetManager:
 
         if not (agentic_dir / "manifest.json").exists():
             reports.append("[missing] stage:manifest.json")
+
+        # T-016-00: agents.index.json must exist and be valid JSON for the gate RULE D.
+        index_path = agentic_dir / "agents.index.json"
+        if not index_path.exists():
+            reports.append("[missing] stage:agents.index.json")
+        else:
+            try:
+                json.loads(index_path.read_text(encoding="utf-8"))
+                reports.append("[ok] stage:agents.index.json")
+            except (json.JSONDecodeError, OSError):
+                reports.append("[drift] stage:agents.index.json (invalid JSON)")
 
         for expected_src, dst, label, transform in self._runtime_expectations(
             agentic_dir, workspace_root
