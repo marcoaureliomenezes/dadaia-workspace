@@ -16,7 +16,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-PROP-01 — install hash-compare overwrite
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Write set:** `dadaia_workspace/features/public_assets/public_assets.py`, `tests/unit/features/public_assets/test_install_hash_compare.py`
 - **Preconditions:** none (independent of other G2 tasks at implementation level)
