@@ -128,12 +128,16 @@ def doctor() -> None:
     """Diagnose drift between package source, staging, and runtime projections."""
     workspace_root = resolve_workspace_root()
     reports = container.build_public_service().doctor(workspace_root)
+    has_issues = False
     for item in reports:
         if item.startswith("[ok]"):
             console.print(item, style="green", markup=False)
         elif item.startswith("[missing]") or item.startswith("[drift]"):
             console.print(item, style="yellow", markup=False)
+            has_issues = True
         elif item.startswith("[not-applicable]") or item.startswith("[unsupported]"):
             console.print(item, style="cyan", markup=False)
         else:
             console.print(item, markup=False)
+    if has_issues:
+        raise typer.Exit(1)

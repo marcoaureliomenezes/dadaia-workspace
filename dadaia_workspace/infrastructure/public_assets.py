@@ -1881,6 +1881,21 @@ class FileSystemPublicAssetManager:
 
         yield (None, workspace_root / ".opencode" / "hooks", "opencode:hooks", False)
 
+        # T-PROP-02: staging↔projected check for shell scripts.
+        # Scripts are staged to agentic_dir/scripts/ and projected to
+        # workspace_root/.dadaia/scripts/.  This was the only projection surface
+        # previously omitted from _runtime_expectations, causing doctor to report
+        # [ok] even when the projected hook scripts were stale.
+        scripts_base = agentic_dir / "scripts"
+        for src in self._iter_files(scripts_base):
+            rel = src.relative_to(scripts_base)
+            yield (
+                src,
+                workspace_root / ".dadaia" / "scripts" / rel,
+                f"dadaia:scripts/{rel.as_posix()}",
+                False,
+            )
+
     def _agents_md_source(self, agentic_dir: Path) -> Path | None:
         for path in (agentic_dir / "templates" / "AGENTS.md", agentic_dir / "data" / "AGENTS.md"):
             if path.exists():
