@@ -92,7 +92,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-PANEL-01 — qa verify of commit 028ffd5
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** qa-engineer
 - **Preconditions:** G2 and G3 committed (verify against stable branch state)
 - **Write set:** `specs/backlog/candidates.md` (add `resolved_in` annotation to BUG-PANEL-REPORTS-01 if verified); `.dadaia/handoff/dadaia-workspace/<UTC>-qa-engineer-panel-reports-verify.handoff.json`
