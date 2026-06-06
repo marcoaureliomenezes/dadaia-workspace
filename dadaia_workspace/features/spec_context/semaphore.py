@@ -26,10 +26,13 @@ higher-level "is any writing session active on this context?" guard.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ContextSemaphoreError",
@@ -66,8 +69,72 @@ def _now_iso() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
-def _is_stale(data: dict) -> bool:  # type: ignore[type-arg]
-    """Return True if the semaphore's heartbeat has exceeded its TTL."""
+def _is_pid_alive(pid: int) -> bool:
+    """Return True if *pid* is alive (conservative: PermissionError → alive)."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # alive but un-ownable (e.g. root-owned)
+    except OSError:
+        return True  # conservative
+
+
+def _sessions_dir(workspace_root: Path) -> Path:
+    return workspace_root / ".dadaia" / "sessions"
+
+
+def _is_stale(
+    data: dict,  # type: ignore[type-arg]
+    workspace_root: Path | None = None,
+) -> bool:
+    """Return True if the semaphore is stale.
+
+    A semaphore is stale when ANY of the following hold:
+    1. The owner's PID is not alive (``data["pid"]`` checked via ``os.kill(pid, 0)``).
+    2. The owner's session file (``.dadaia/sessions/<owner>.json``) does not exist.
+    3. The heartbeat timestamp has exceeded the TTL (existing TTL-only behavior).
+
+    Checks are applied in order; the first True short-circuits.
+
+    Args:
+        data: Semaphore data dict (deserialized JSON).
+        workspace_root: Optional workspace root used to locate session files.
+            When ``None``, PID and session-file liveness checks are skipped and
+            only the TTL check applies (preserving backward-compat for callers
+            that do not pass the workspace root).
+    """
+    # ------------------------------------------------------------------
+    # Liveness checks (T-SEMA-01) — require workspace_root to locate files.
+    # ------------------------------------------------------------------
+    if workspace_root is not None:
+        pid_raw = data.get("pid")
+        if pid_raw is not None:
+            try:
+                pid = int(pid_raw)
+                # Check 1: dead PID → stale immediately.
+                if not _is_pid_alive(pid):
+                    return True
+
+                # Check 2: PID is alive but session file is absent → stale.
+                # Session files are written by the bind command; an alive process
+                # that has no session file is an orphan holder.  We only apply this
+                # check when a pid is present so that lightweight callers (e.g.
+                # unit tests that call acquire_context_semaphore directly without
+                # going through the full bind flow) are not mis-classified as stale.
+                owner = str(data.get("owner", ""))
+                if owner:
+                    session_file = _sessions_dir(workspace_root) / f"{owner}.json"
+                    if not session_file.exists():
+                        return True
+            except (TypeError, ValueError):
+                pass
+
+    # ------------------------------------------------------------------
+    # TTL check (original behavior — always applies).
+    # ------------------------------------------------------------------
     try:
         heartbeat_raw = data.get("heartbeat", "")
         ttl = int(data.get("ttl", _DEFAULT_TTL))
@@ -97,7 +164,7 @@ def is_semaphore_held(workspace_root: Path, context: str) -> bool:
     data = read_semaphore(workspace_root, context)
     if data is None:
         return False
-    return not _is_stale(data)
+    return not _is_stale(data, workspace_root=workspace_root)
 
 
 def acquire_context_semaphore(
@@ -144,9 +211,35 @@ def acquire_context_semaphore(
 
     # Check existing semaphore
     existing = read_semaphore(workspace_root, context)
-    if existing is not None and not _is_stale(existing):
-        holder = existing.get("owner", "unknown")
-        if holder != session_id:
+    if existing is not None:
+        stale = _is_stale(existing, workspace_root=workspace_root)
+        if stale:
+            # Stale by TTL, dead PID, or missing session — reclaim with audit log.
+            holder = existing.get("owner", "unknown")
+            reason_parts: list[str] = []
+            pid_raw = existing.get("pid")
+            if pid_raw is not None:
+                try:
+                    if not _is_pid_alive(int(pid_raw)):
+                        reason_parts.append(f"dead-pid={pid_raw}")
+                except (TypeError, ValueError):
+                    pass
+            if not reason_parts:
+                owner_str = str(holder)
+                session_file = _sessions_dir(workspace_root) / f"{owner_str}.json"
+                if not session_file.exists():
+                    reason_parts.append("missing-session-file")
+            if not reason_parts:
+                reason_parts.append("ttl-expired")
+            reason = ",".join(reason_parts)
+            logger.info(
+                "Reclaiming stale semaphore for context '%s' (holder=%s, reason=%s)",
+                context,
+                holder,
+                reason,
+            )
+        elif existing.get("owner") != session_id:
+            holder = existing.get("owner", "unknown")
             raise SemaphoreAlreadyHeldError(
                 f"Context '{context}' semaphore is already held by session '{holder}' "
                 f"(phase={existing.get('phase', 'unknown')}, "
@@ -154,11 +247,12 @@ def acquire_context_semaphore(
                 f"acquired_at={existing.get('acquired_at', 'unknown')}). "
                 "Wait for the holder to release or its TTL to expire, then retry."
             )
-        # Idempotent re-acquire: just renew
-        existing["heartbeat"] = _now_iso()
-        existing["phase"] = phase
-        _atomic_write(sem_path, existing)
-        return existing
+        else:
+            # Idempotent re-acquire: just renew
+            existing["heartbeat"] = _now_iso()
+            existing["phase"] = phase
+            _atomic_write(sem_path, existing)
+            return existing
 
     # Write new semaphore (also overwrites stale)
     now = _now_iso()
