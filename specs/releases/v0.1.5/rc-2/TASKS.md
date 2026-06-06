@@ -104,7 +104,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-PANEL-02 — dadaia reports doctor RPT-1 invariant + optional dedup polish
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer-python
 - **Preconditions:** T-PANEL-01 completed (scope depends on qa verdict: full scope if gap found, invariant-only if no gap)
 - **Write set:** `dadaia_workspace/features/specs/doctor.py` or new `dadaia_workspace/features/panel/reports_doctor.py`; `tests/unit/features/panel/test_reports_doctor_invariant.py`; (optionally) `dadaia_workspace/features/panel/views/api.py` if T-PANEL-01 finds a gap
