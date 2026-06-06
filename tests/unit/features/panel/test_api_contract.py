@@ -242,14 +242,21 @@ def test_api_reports_reads_handoffs_from_canonical_root(tmp_path: Path) -> None:
 
 
 def test_api_reports_lists_html_report_without_handoff(tmp_path: Path) -> None:
-    report_path = (
-        tmp_path
-        / ".dadaia"
-        / "reports"
-        / "ctx"
-        / "project-auditor"
-        / "2026-06-04T153239Z-workflow-audit.html"
+    import datetime
+
+    # Time-robust: derive the report timestamp from now − 1h so the 48h retention
+    # window never lapses during the test run (the old hardcoded date became
+    # "expired" once wall-clock crossed it, filtering the report out).
+    created = datetime.datetime.now(tz=datetime.UTC).replace(microsecond=0) - datetime.timedelta(
+        hours=1
     )
+    expires = created + datetime.timedelta(hours=48)
+    stamp = created.strftime("%Y-%m-%dT%H%M%SZ")
+    created_iso = created.strftime("%Y-%m-%dT%H:%M:%SZ")
+    expires_iso = expires.strftime("%Y-%m-%dT%H:%M:%SZ")
+    title = f"{stamp}-workflow-audit"
+
+    report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "project-auditor" / f"{title}.html"
     report_path.parent.mkdir(parents=True)
     report_path.write_text("<html>audit</html>", encoding="utf-8")
 
@@ -260,14 +267,14 @@ def test_api_reports_lists_html_report_without_handoff(tmp_path: Path) -> None:
     data = json.loads(body)
     assert data["reports"] == [
         {
-            "title": "2026-06-04T153239Z-workflow-audit",
+            "title": title,
             "agent": "project-auditor",
             "context": "ctx",
-            "created_at": "2026-06-04T15:32:39Z",
-            "path": "ctx/project-auditor/2026-06-04T153239Z-workflow-audit.html",
+            "created_at": created_iso,
+            "path": f"ctx/project-auditor/{title}.html",
             "findings_summary": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
             "important": False,
-            "expires_at": "2026-06-06T15:32:39Z",
+            "expires_at": expires_iso,
             "is_expired": False,
             "retention_reason": "Expires after 48h",
             "retention_status": "expires",

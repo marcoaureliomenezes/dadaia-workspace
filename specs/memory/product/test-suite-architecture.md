@@ -21,6 +21,10 @@ last_updated: '2026-06-04'
 release_origin: v0.1.4
 ---
 
+> **SUPERSEDED** — Content absorbed into `quality-assurance.md` (v0.1.7).
+> This file will be moved to `specs/_archive/legacy-memory/` at v0.2.0 CLOSURE.
+> Do not edit. Read `quality-assurance.md` instead.
+
 ## Propósito
 
 dadaia-workspace has an enforced five-layer test architecture introduced in release

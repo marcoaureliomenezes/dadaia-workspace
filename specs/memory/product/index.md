@@ -30,7 +30,8 @@
 | `sdd-hotfix-track` | sdd-hotfix-track (SUPERSEDED — ver sdd-bug-backlog-governance ADR-2) | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
 | `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD de specs/: SPEC-DOC + TREE-1..7 + LINT-1 (atomicidade .md); --fix auto-repara TREE-3/4. |
-| `test-suite-architecture` | test-suite-architecture | Five-layer pytest architecture: unit/contract/integration/e2e/tmp with marker taxonomy, CI split into 7 jobs, no-slop policy, coverage CI-only. |
+| `quality-assurance` | quality-assurance | Five-layer pytest architecture, CI 7-job split, no-slop policy — design-of-record for implementers and qa-engineer. |
+| `test-suite-architecture` | test-suite-architecture (SUPERSEDED — see quality-assurance.md) | Five-layer pytest architecture: unit/contract/integration/e2e/tmp with marker taxonomy, CI split into 7 jobs, no-slop policy, coverage CI-only. |
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional. |
 | `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente. |
 | `workspace-portability` | workspace-portability | export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas. |

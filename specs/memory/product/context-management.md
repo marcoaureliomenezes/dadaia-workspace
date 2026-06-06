@@ -2,17 +2,15 @@
 slug: context-management
 title: context-management
 category: product
-tldr: multi-context lifecycle ALIVE/DEAD (sem global primary); session binding via
-  eval $(dadaia context bind --mode) exporta DADAIA_SESSION_ID + escreve runtime ptr;
-  quatro camadas de locking (workspace fcntl / per-context fcntl / per-release Lock 3
-  JSON / per-context semaphore JSON com heartbeat TTL 300 s).
-summary: multi-context lifecycle ALIVE/DEAD (sem global primary); session binding
-  via eval $(dadaia context bind --mode) exporta DADAIA_SESSION_ID e escreve
-  runtime ptr file (`.dadaia/sessions/runtime/<pid>.ptr`); quatro camadas de locking
-  (workspace fcntl / per-context fcntl / per-release Lock 3 JSON com heartbeat
-  TTL 300 s / per-context semaphore JSON); dadaia migrate [--dry-run|--yes] (v1→v2);
-  scaffold canonical tree v2; CLIs dadaia release new, dadaia backlog new, dadaia bug
-  new, dadaia memory product add, dadaia migrate tree-v2.
+tldr: multi-context ALIVE/DEAD lifecycle; bind exports DADAIA_SESSION_ID; one
+  TTL-lease per context (O_EXCL CAS) + fcntl Lock-1/Lock-2.
+summary: multi-context lifecycle ALIVE/DEAD (no global primary); session binding via
+  eval $(dadaia context bind --mode) exports DADAIA_SESSION_ID; locking (v0.1.6) =
+  ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`,
+  O_EXCL CAS acquire, heartbeat TTL 1800 s) plus retained fcntl Lock-1 (workspace) and
+  Lock-2 (per-context git ops); the old 4-store/semaphore/runtime-ptr model is retired;
+  dadaia migrate [--dry-run|--yes] (v1→v2); scaffold canonical tree v2; CLIs dadaia
+  release new, dadaia backlog new, dadaia bug new, dadaia memory product add.
 tags:
 - context
 - lifecycle

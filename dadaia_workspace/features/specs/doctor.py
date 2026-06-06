@@ -63,6 +63,7 @@ import yaml
 CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
 CANONICAL_PHASES = {
     "DISCOVERY",
+    "DEFINITION",  # v0.1.7: release-definition phase; product-engineer authors memory here
     "SPEC",
     "PLAN",
     "TASKS",

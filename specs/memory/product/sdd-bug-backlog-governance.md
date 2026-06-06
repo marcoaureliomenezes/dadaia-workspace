@@ -3,16 +3,13 @@ slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
 tldr: >-
-  How bugs+backlog become releases — PE picks (PM-dispatched), bug-always-solved
-  unless subsumed, sanitize stale, mandatory grill; alpha-N/rc-N model; PM owns
-  backlog creation (hard gate blocks all non-PM writes to specs/backlog/**).
+  Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless
+  subsumed, mandatory grill; alpha-N/rc-N; PM-only backlog writes (hard gate).
 summary: >-
-  Full lifecycle governance: bug/backlog → release (pick, subsumption,
-  sanitize, mandatory grill), the alpha-N/rc-N maturity model (ADR-1/ADR-5),
-  hotfix unification (ADR-2), review cadence (ADR-3, alpha=qa-only-commit /
-  rc=ship-trio-or-iterate), the mandatory pre-push CI gate (T-GATE-01), and the
-  backlog-ownership enforcement: only project-manager creates specs/backlog/**
-  entries (backed by always-on rule + hard PreToolUse gate, D5/v0.1.5-rc-1).
+  Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill),
+  alpha-N/rc-N maturity model (ADR-1..5), review cadence (alpha=qa-commit /
+  rc=ship-trio), pre-push CI gate, and backlog-ownership enforcement (PM only
+  writes specs/backlog/**; hard PreToolUse gate, D5).
 tags:
   - sdd
   - governance

@@ -2,13 +2,12 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh; RULE E resolves session via env → runtime ptr file → non-stale lock → deny (no relaunch). Context semaphore enforces at most one impl+review holder per context."
-summary: hook PreToolUse (RULE A/B/D/E/C/F) + PostToolUse sdd-post-gate.sh
-  (heartbeat); RULE E resolves session via env var → runtime ptr file
-  (`.dadaia/sessions/runtime/<pid>.ptr`) → non-stale lock → deny (env-free,
-  no relaunch); RULE C accepts both `- [-] T-xxx` and `- **Status:** [-]` marker
-  forms; CONTEXT_SLUG sanitized before path construction (CWE-22); lock glob
-  narrowed to exact active-release match.
+tldr: "PreToolUse SDD gate (v0.1.6): path-classifier ADDITIVE/MEMORY/FROZEN/MUTATING/UNGATED; MUTATING acquires one TTL-lease via O_EXCL CAS; fail-safe, <=175 lines."
+summary: >-
+  PreToolUse gate (v0.1.6 rewrite, ~171 lines): a path-classifier routes each write
+  to ADDITIVE (allow), MEMORY (phase gate), FROZEN (block), MUTATING (single TTL-lease
+  acquire via O_EXCL CAS — only a live conflict blocks), or UNGATED (allow). Fail-safe:
+  inconclusive states allow. RULE A2 backlog-ownership + RULE D allowlist on MUTATING.
 tags:
 - sdd
 - gate
@@ -57,7 +56,7 @@ Ordem de resolução da identidade da sessão (a mesma em todos os runtimes):
 
 **Durable heartbeat (v0.1.5/rc-1, T-R1-03 + SCOPE-02):** o heartbeat inline do gate renova `last_seen_at` do session file, do implementation lock, **e do context semaphore** (quando presente). Best-effort: falhas de I/O são engolidas; o gate nunca bloqueia por falha no heartbeat.
 
-**Context semaphore (v0.1.5/rc-1, T-R1-02):** per-context semaphore em `.dadaia/states/ctx_locks/<context>.semaphore.json` com campos `owner`, `phase`, `release`, `write_set`, `acquired_at`, `ttl`, `heartbeat`. No máximo um holder ativo (implement+review) por context. `dadaia context bind --mode implementation` adquire o semaphore; uma segunda tentativa é negada com o holder identificado no erro. Sessões read/spec nunca são bloqueadas pelo semaphore. `dadaia doctor` detecta semaphores orphan/stale/duplicate. Limitação conhecida: liveness reclaim (PID morto, session file ausente) só acontece no TTL (300 s); sem `doctor --fix` para semaphore ainda — ver [[semaphore-no-liveness-reclaim]] em `specs/bugs/`.
+**Context semaphore (v0.1.5/rc-1, T-R1-02):** per-context semaphore em `.dadaia/states/ctx_locks/<context>.semaphore.json` com campos `owner`, `phase`, `release`, `write_set`, `acquired_at`, `ttl`, `heartbeat`. No máximo um holder ativo (implement+review) por context. `dadaia context bind --mode implementation` adquire o semaphore; uma segunda tentativa é negada com o holder identificado no erro. Sessões read/spec nunca são bloqueadas pelo semaphore. `dadaia doctor` detecta semaphores orphan/stale/duplicate. Limitação conhecida: liveness reclaim (PID morto, session file ausente) só acontece no TTL (300 s); sem `doctor --fix` para semaphore ainda — tracked in `specs/bugs/`.
 
 O `session_id` nativo do stdin payload do Claude Code é usado apenas para correlation logging, não como chave de identidade.
 
