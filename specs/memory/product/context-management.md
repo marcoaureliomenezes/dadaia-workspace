@@ -20,7 +20,7 @@ tags:
 - locking
 agent_tier: self-pull
 token_estimate: 1900
-last_updated: '2026-06-05'
+last_updated: '2026-06-06'
 release_origin: v0.1.5
 ---
 
@@ -58,7 +58,7 @@ Lock| Caminho| Impl| Escopo
 Lock 1 (workspace)| `.dadaia/states/.ws_lock`| fcntl LOCK_EX, 5 s timeout| Toda mutação em `spec_contexts.json` (`alive()`, `dead()`, `create()`, `delete()`, `DoctorService.fix()`, `context bind`, `context release`)
 Lock 2 (per-context)| `.dadaia/states/ctx_locks/<slug>.lock`| fcntl LOCK_EX, 5 s timeout| `git clone` e `shutil.rmtree` por context (fora do Lock 1; L1>L2 é a única direção safe)
 Lock 3 (per-release)| `.dadaia/locks/implementation/<ctx>__<release>.json`| JSON state machine (FREE → HELD → STALE → RECLAIMED)| Direito de BOUND_IMPLEMENTATION para um par context/release; heartbeat TTL 300 s; PID liveness fast-path
-Lock 4 (per-context semaphore)| `.dadaia/states/ctx_locks/<ctx>.semaphore.json`| JSON com campos `owner`, `phase`, `release`, `write_set`, `acquired_at`, `ttl`, `heartbeat`| No máximo um holder ativo implement+review por context; sessões read/spec nunca bloqueadas; adquirido em `context bind --mode implementation`; liberado em `context release`. Limitação: reclaim só por TTL expiry (300 s); sem liveness reclaim para PID morto — ver `specs/bugs/semaphore-no-liveness-reclaim.md`
+Lock 4 (per-context semaphore)| `.dadaia/states/ctx_locks/<ctx>.semaphore.json`| JSON com campos `owner`, `phase`, `release`, `write_set`, `acquired_at`, `ttl`, `heartbeat`| No máximo um holder ativo implement+review por context; sessões read/spec nunca bloqueadas; adquirido em `context bind --mode implementation`; liberado em `context release`. Reclaim por TTL expiry (300 s) **ou** por liveness: PID morto detectado via `os.kill(pid, 0)` ou session file ausente → reclaim imediato sem esperar TTL. `dadaia doctor --fix` reclaim semáforos órfãos/stale via invariante SEM-1.
 
 ### Modos de sessão (--mode)
 
@@ -73,7 +73,7 @@ Mode| Cria Lock 3?| Semântica
 
 O hook PostToolUse `sdd-post-gate.sh` renova `last_seen_at` atomicamente a cada tool call da sessão — tanto no session file quanto no Lock 3 e no semaphore (T-R1-03 dual heartbeat). TTL default: 300 s. Lock com `last_seen_at` mais antigo que TTL → estado STALE. PID inativo → STALE imediato para Lock 3. Reclaim de Lock 3: `dadaia context bind --force --reason <texto>` (reason obrigatório; evento RECLAIMED gravado em `lock-events.jsonl`). `dadaia context heartbeat` renova manualmente para sessões read-only longas.
 
-**Doctor invariants (T-R1-06):** `dadaia doctor` detecta locks orphan (sessão ausente), stale (TTL expirado), e duplicate (dois locks para o mesmo context). Códigos: `LOCK-5` (orphan), `LOCK-6` (stale), `LOCK-7` (duplicate). `dadaia doctor --fix` reclaim stale/orphan com audit trail. O semaphore (Lock 4) não tem `--fix` ainda — limitação conhecida `semaphore-no-liveness-reclaim`.
+**Doctor invariants (T-R1-06 + T-SEMA-02):** `dadaia doctor` detecta locks orphan (sessão ausente), stale (TTL expirado), e duplicate (dois locks para o mesmo context). Códigos: `LOCK-5` (orphan), `LOCK-6` (stale), `LOCK-7` (duplicate). `dadaia doctor --fix` reclaim stale/orphan com audit trail. O semaphore (Lock 4) é coberto pelo invariante `SEM-1`: `dadaia doctor` emite `[orphan-semaphore]` para semáforos cujo context não tem entrada ALIVE em `spec_contexts.json`, e `[stale-semaphore]` para semáforos cujo holder está morto (PID ou session file ausente) ou TTL expirado. `dadaia doctor --fix` deleta semáforos flagrados e appenda entradas em `.dadaia/states/audit/semaphore-reclaims.jsonl`.
 
 ### Migração v1→v2 (`dadaia migrate`)
 
