@@ -26,7 +26,8 @@
 | `public-asset-distribution` | public-asset-distribution | canonical → .dadaia/agentic/ → projeções multi-tool (.claude/, .codex/, .opencode/, .agents/). |
 | `repos-catalog` | repos-catalog | lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL. |
 | `sdd-gate-v3` | sdd-gate-v3 | hook PreToolUse (RULE A/B/D/E/C) + PostToolUse sdd-post-gate.sh (heartbeat); RULE E valida DADAIA_SESSION_ID, mode-based path-policy matrix, ownership do Loc... |
-| `sdd-hotfix-track` | sdd-hotfix-track | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Governa como bugs+backlog viram releases (pick/subsumption/sanitize/grill), modelo alpha-N/rc-N (ADR-1/ADR-5), revisão cadence (ADR-3), pre-push gate. |
+| `sdd-hotfix-track` | sdd-hotfix-track (SUPERSEDED — ver sdd-bug-backlog-governance ADR-2) | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
 | `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD de specs/: SPEC-DOC + TREE-1..7 + LINT-1 (atomicidade .md); --fix auto-repara TREE-3/4. |
 | `test-suite-architecture` | test-suite-architecture | Five-layer pytest architecture: unit/contract/integration/e2e/tmp with marker taxonomy, CI split into 7 jobs, no-slop policy, coverage CI-only. |

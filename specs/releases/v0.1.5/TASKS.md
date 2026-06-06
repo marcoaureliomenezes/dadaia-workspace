@@ -75,7 +75,7 @@ applies the lib-origination + gate workflow per task.
   open bugs/backlog reviewed for staleness per the new sanitize protocol.
 
 ### T-MEM-01 — CLOSURE memory atoms
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** product-engineer (CLOSURE phase only)
 - **Write set:** `specs/memory/product/{sdd-bug-backlog-governance,sdd-hotfix-track}.md`,
   release-lifecycle atom
