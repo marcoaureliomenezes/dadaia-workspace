@@ -110,7 +110,14 @@ def test_problematic_skill_files_have_frontmatter() -> None:
         assert "\ndescription: " in frontmatter
 
 
-def test_install_preserves_existing_files_without_force(tmp_path: Path) -> None:
+def test_install_overwrites_stale_file_without_force(tmp_path: Path) -> None:
+    """T-PROP-01: install without --force overwrites stale projected files (hash-compare).
+
+    The OLD behavior preserved any existing file when force=False. The NEW behavior
+    compares SHA256: if staged != projected, the file is overwritten even without --force.
+    A 'custom\\n' placeholder has a different hash from the canonical staged AGENTS.md,
+    so it must be overwritten with the canonical content.
+    """
     workspace = tmp_path / "ws"
     agents_md = workspace / "AGENTS.md"
     agents_md.parent.mkdir(parents=True, exist_ok=True)
@@ -118,7 +125,27 @@ def test_install_preserves_existing_files_without_force(tmp_path: Path) -> None:
 
     FileSystemPublicAssetManager().install(workspace, target="all")
 
-    assert agents_md.read_text(encoding="utf-8") == "custom\n"
+    content = agents_md.read_text(encoding="utf-8")
+    # Hash mismatch → overwritten with canonical AGENTS.md content.
+    assert content != "custom\n", "Expected stale AGENTS.md to be overwritten"
+    assert "AI agent" in content or "dadaia" in content.lower()
+
+
+def test_install_skips_file_when_already_canonical(tmp_path: Path) -> None:
+    """T-PROP-01: install without --force is a no-op when projected hash == staged hash."""
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    # First install: writes canonical content.
+    manager.install(workspace, target="all")
+    agents_md = workspace / "AGENTS.md"
+    canonical_content = agents_md.read_text(encoding="utf-8")
+    mtime_before = agents_md.stat().st_mtime
+
+    # Second install: same hash → skip.
+    manager.install(workspace, target="all")
+
+    assert agents_md.read_text(encoding="utf-8") == canonical_content
+    assert agents_md.stat().st_mtime == mtime_before
 
 
 def test_install_overwrites_existing_files_with_force(tmp_path: Path) -> None:

@@ -641,14 +641,24 @@ class TestInstallWorkspaceGuardrailPair:
         _install_workspace_guardrail_pair(src, tmp_path, force=True)
         assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
 
-    def test_force_false_skips_existing(self, tmp_path: Path) -> None:
-        src = _make_source_file(tmp_path, "# NEW\n")
-        original = "# ORIGINAL\n"
-        (tmp_path / "AGENTS.md").write_text(original, encoding="utf-8")
+    def test_force_false_skips_when_identical(self, tmp_path: Path) -> None:
+        """force=False: identical content is a no-op (T-PROP-01 hash-compare)."""
+        content = "# SAME CONTENT\n"
+        src = _make_source_file(tmp_path, content)
+        (tmp_path / "AGENTS.md").write_text(content, encoding="utf-8")
         installed: list[str] = []
         _install_workspace_guardrail_pair(src, tmp_path, force=False, installed=installed)
-        assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == original
+        assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == content
         assert any("[skip]" in e for e in installed)
+
+    def test_force_false_overwrites_when_different(self, tmp_path: Path) -> None:
+        """force=False: differing content is updated (T-PROP-01 hash-compare)."""
+        src = _make_source_file(tmp_path, "# NEW\n")
+        (tmp_path / "AGENTS.md").write_text("# OLD\n", encoding="utf-8")
+        installed: list[str] = []
+        _install_workspace_guardrail_pair(src, tmp_path, force=False, installed=installed)
+        assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "# NEW\n"
+        assert any("[ok]" in e for e in installed)
 
     def test_force_true_overwrites_existing(self, tmp_path: Path) -> None:
         src = _make_source_file(tmp_path, "# NEW\n")
@@ -706,25 +716,47 @@ class TestInstallWorkspaceRootGuardrailPair:
         _install_workspace_root_guardrail_pair(src, tmp_path, force=True)
         assert not (consumer / "AGENTS.md").exists()
 
-    def test_force_false_skips_existing(self, tmp_path: Path) -> None:
+    def test_force_false_skips_when_identical(self, tmp_path: Path) -> None:
+        """force=False: identical content is a no-op (T-PROP-01 hash-compare)."""
+        content = "# SAME CONTENT\n"
+        src = _make_source_file(tmp_path, content)
+        (tmp_path / "AGENTS.md").write_text(content, encoding="utf-8")
+        installed: list[str] = []
+        _install_workspace_root_guardrail_pair(src, tmp_path, force=False, installed=installed)
+        assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == content
+        assert any("[skip]" in e for e in installed)
+
+    def test_force_false_overwrites_when_different(self, tmp_path: Path) -> None:
+        """force=False: differing content is updated (T-PROP-01 hash-compare)."""
         src = _make_source_file(tmp_path, "# NEW\n")
         (tmp_path / "AGENTS.md").write_text("# OLD\n", encoding="utf-8")
         installed: list[str] = []
         _install_workspace_root_guardrail_pair(src, tmp_path, force=False, installed=installed)
-        assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "# OLD\n"
-        assert any("[skip]" in e for e in installed)
+        assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "# NEW\n"
+        assert any("[ok]" in e for e in installed)
 
     def test_claude_md_contains_stub(self, tmp_path: Path) -> None:
         src = _make_source_file(tmp_path)
         _install_workspace_root_guardrail_pair(src, tmp_path, force=True)
         assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
 
-    def test_force_false_claude_md_skips(self, tmp_path: Path) -> None:
+    def test_force_false_claude_md_updates_when_different(self, tmp_path: Path) -> None:
+        """force=False: CLAUDE.md with wrong content is updated (T-PROP-01 hash-compare)."""
         src = _make_source_file(tmp_path)
         (tmp_path / "CLAUDE.md").write_text("# OLD CLAUDE\n", encoding="utf-8")
         installed: list[str] = []
         _install_workspace_root_guardrail_pair(src, tmp_path, force=False, installed=installed)
-        assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == "# OLD CLAUDE\n"
+        # CLAUDE.md was stale (not the stub) — it must be updated.
+        assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
+        assert any("[ok]" in e and "CLAUDE" in e for e in installed)
+
+    def test_force_false_claude_md_skips_when_already_stub(self, tmp_path: Path) -> None:
+        """force=False: CLAUDE.md already containing stub is a no-op."""
+        src = _make_source_file(tmp_path)
+        (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
+        installed: list[str] = []
+        _install_workspace_root_guardrail_pair(src, tmp_path, force=False, installed=installed)
+        assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
         assert any("[skip]" in e and "CLAUDE" in e for e in installed)
 
     def test_installed_defaults_to_none(self, tmp_path: Path) -> None:
@@ -763,14 +795,26 @@ class TestInstallConsumerReposGuardrailPair:
         captured = capsys.readouterr()
         assert "self-projection" in captured.err
 
-    def test_force_false_skips_existing(self, tmp_path: Path) -> None:
+    def test_force_false_skips_when_identical(self, tmp_path: Path) -> None:
+        """force=False: identical content is a no-op (T-PROP-01 hash-compare)."""
+        content = "# SAME CONTENT\n"
+        src = _make_source_file(tmp_path, content)
+        consumer = _add_marker_consumer(tmp_path, "my-repo")
+        (consumer / "AGENTS.md").write_text(content, encoding="utf-8")
+        installed: list[str] = []
+        _install_consumer_repos_guardrail_pair(src, tmp_path, force=False, installed=installed)
+        assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == content
+        assert any("[skip]" in e for e in installed)
+
+    def test_force_false_overwrites_when_different(self, tmp_path: Path) -> None:
+        """force=False: differing content is updated (T-PROP-01 hash-compare)."""
         src = _make_source_file(tmp_path, "# NEW\n")
         consumer = _add_marker_consumer(tmp_path, "my-repo")
         (consumer / "AGENTS.md").write_text("# OLD\n", encoding="utf-8")
         installed: list[str] = []
         _install_consumer_repos_guardrail_pair(src, tmp_path, force=False, installed=installed)
-        assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == "# OLD\n"
-        assert any("[skip]" in e for e in installed)
+        assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == "# NEW\n"
+        assert any("[ok]" in e for e in installed)
 
     def test_no_consumer_repos_no_write(self, tmp_path: Path) -> None:
         src = _make_source_file(tmp_path)
@@ -1267,22 +1311,56 @@ class TestInstallCodexAgents:
         assert data.get("name") == "my-agent"
         assert "developer_instructions" in data
 
-    def test_skip_existing_when_force_false(self, tmp_path: Path) -> None:
+    def test_overwrites_on_hash_mismatch_when_force_false(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + stale TOML → overwrite with generated content.
+
+        Under the new hash-compare overwrite semantics, a locally-modified (or stale)
+        TOML that differs from the freshly generated content is overwritten without
+        needing --force.
+        """
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         agents_src = agentic_dir / "agents"
         agents_src.mkdir()
         (agents_src / "my-agent.md").write_text(_make_agent_md("my-agent"), encoding="utf-8")
         codex_agents = workspace_root / ".codex" / "agents"
         codex_agents.mkdir(parents=True)
-        existing_content = (
+        # Write stale content that differs from what _install_codex_agents would generate.
+        stale_content = (
             'name = "my-agent"\nmodel = "gpt-4o"\ndeveloper_instructions = """\noriginal\n"""\n'
         )
-        (codex_agents / "my-agent.toml").write_text(existing_content, encoding="utf-8")
+        toml_path = codex_agents / "my-agent.toml"
+        toml_path.write_text(stale_content, encoding="utf-8")
         installed: list[str] = []
         manager = FileSystemPublicAssetManager()
         manager._install_codex_agents(agentic_dir, workspace_root, force=False, installed=installed)
-        assert (codex_agents / "my-agent.toml").read_text(encoding="utf-8") == existing_content
+        # Hash mismatch → overwritten with fresh generated content.
+        result = toml_path.read_text(encoding="utf-8")
+        assert result != stale_content, "Expected stale TOML to be overwritten"
+        assert any("[ok]" in e for e in installed)
+        assert not any("[skip]" in e for e in installed)
+
+    def test_skips_when_generated_content_matches(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + identical TOML → no-op (hash match → skip)."""
+
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        agents_src = agentic_dir / "agents"
+        agents_src.mkdir()
+        (agents_src / "my-agent.md").write_text(_make_agent_md("my-agent"), encoding="utf-8")
+        codex_agents = workspace_root / ".codex" / "agents"
+        codex_agents.mkdir(parents=True)
+        toml_path = codex_agents / "my-agent.toml"
+        # First install with force=True to generate the canonical TOML.
+        manager = FileSystemPublicAssetManager()
+        manager._install_codex_agents(agentic_dir, workspace_root, force=True, installed=[])
+        canonical_content = toml_path.read_text(encoding="utf-8")
+        mtime_before = toml_path.stat().st_mtime
+        # Second install with force=False — same content, must skip.
+        installed: list[str] = []
+        manager._install_codex_agents(agentic_dir, workspace_root, force=False, installed=installed)
+        assert toml_path.read_text(encoding="utf-8") == canonical_content
+        assert toml_path.stat().st_mtime == mtime_before
         assert any("[skip]" in e for e in installed)
+        assert not any("[ok]" in e for e in installed)
 
     def test_agent_without_name_skipped(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -1349,16 +1427,38 @@ class TestInstallOpencode:
         # tools: block must be stripped
         assert "tools:" not in content
 
-    def test_skip_existing_when_force_false(self, tmp_path: Path) -> None:
+    def test_overwrites_stale_opencode_json_when_force_false(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + stale opencode.json → overwrite (hash-compare).
+
+        The OLD behavior skipped any existing file. The NEW behavior overwrites when the
+        generated content differs from the projected file.
+        """
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         opencode_json = workspace_root / "opencode.json"
         opencode_json.write_text('{"old": true}\n', encoding="utf-8")
         installed: list[str] = []
         manager = FileSystemPublicAssetManager()
         manager._install_opencode(agentic_dir, workspace_root, force=False, installed=installed)
-        # Existing opencode.json must not be overwritten
-        assert opencode_json.read_text(encoding="utf-8") == '{"old": true}\n'
-        assert any("[skip]" in e for e in installed)
+        # Hash mismatch → stale opencode.json must be overwritten with generated content.
+        result = opencode_json.read_text(encoding="utf-8")
+        assert result != '{"old": true}\n', "Expected stale opencode.json to be overwritten"
+        assert any("[ok]" in e and "opencode.json" in e for e in installed)
+
+    def test_skips_opencode_json_when_content_matches(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + identical opencode.json → no-op (skip)."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        # First install with force=True to generate canonical opencode.json.
+        manager = FileSystemPublicAssetManager()
+        manager._install_opencode(agentic_dir, workspace_root, force=True, installed=[])
+        opencode_json = workspace_root / "opencode.json"
+        canonical_content = opencode_json.read_text(encoding="utf-8")
+        mtime_before = opencode_json.stat().st_mtime
+        # Second install with force=False — same content, must skip.
+        installed: list[str] = []
+        manager._install_opencode(agentic_dir, workspace_root, force=False, installed=installed)
+        assert opencode_json.read_text(encoding="utf-8") == canonical_content
+        assert opencode_json.stat().st_mtime == mtime_before
+        assert any("[skip]" in e and "opencode.json" in e for e in installed)
 
 
 # ---------------------------------------------------------------------------
@@ -1846,7 +1946,12 @@ class TestDoctorMethod:
 
 
 class TestInstallClaudeSettingsSkip:
-    def test_existing_settings_skipped_when_force_false(self, tmp_path: Path) -> None:
+    def test_stale_settings_overwritten_when_force_false(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + stale settings.json → overwrite (hash-compare).
+
+        The OLD behavior unconditionally skipped existing settings.json. The NEW behavior
+        overwrites when the generated settings differ from the projected file.
+        """
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         claude_dir = workspace_root / ".claude"
         claude_dir.mkdir(parents=True)
@@ -1855,8 +1960,26 @@ class TestInstallClaudeSettingsSkip:
         installed: list[str] = []
         manager = FileSystemPublicAssetManager()
         manager._install_claude(agentic_dir, workspace_root, force=False, installed=installed)
-        # settings.json must not be overwritten
-        assert settings_path.read_text(encoding="utf-8") == '{"existing": true}\n'
+        # Hash mismatch → stale settings.json must be overwritten with generated content.
+        result = settings_path.read_text(encoding="utf-8")
+        assert result != '{"existing": true}\n', "Expected stale settings.json to be overwritten"
+        assert any("[ok]" in e and "settings.json" in e for e in installed)
+
+    def test_settings_skipped_when_content_matches(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + identical settings.json → no-op (skip)."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        # First install to generate canonical settings.json.
+        manager = FileSystemPublicAssetManager()
+        manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+        claude_dir = workspace_root / ".claude"
+        settings_path = claude_dir / "settings.json"
+        canonical_content = settings_path.read_text(encoding="utf-8")
+        mtime_before = settings_path.stat().st_mtime
+        # Second install with force=False — same content, must skip.
+        installed: list[str] = []
+        manager._install_claude(agentic_dir, workspace_root, force=False, installed=installed)
+        assert settings_path.read_text(encoding="utf-8") == canonical_content
+        assert settings_path.stat().st_mtime == mtime_before
         assert any("[skip]" in e and "settings.json" in e for e in installed)
 
 
@@ -2035,8 +2158,13 @@ class TestInstallCodexRuntimeAdapters:
         manager._install_codex_runtime_adapters(workspace_root, force=True, installed=installed)
         assert installed == []
 
-    def test_force_false_skips_existing(self, tmp_path: Path) -> None:
-        """force=False: existing destination is not overwritten."""
+    def test_force_false_overwrites_on_hash_mismatch(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + stale projection → overwrite (hash-compare overwrite).
+
+        Under the new behavior, force=False does NOT unconditionally skip existing files.
+        When staged content differs from projected content, it is overwritten even without
+        --force.  A plain 'skip-all-existing' is the OLD (pre-T-PROP-01) contract.
+        """
         public_dir = tmp_path / "public"
         runtime_codex = public_dir / "runtime" / "codex" / "my-adapter"
         runtime_codex.mkdir(parents=True)
@@ -2049,8 +2177,32 @@ class TestInstallCodexRuntimeAdapters:
         installed: list[str] = []
         manager = self._make_manager_with_fake_public(public_dir)
         manager._install_codex_runtime_adapters(workspace_root, force=False, installed=installed)
-        assert dst.read_text(encoding="utf-8") == "# ORIGINAL\n"
+        # Hash mismatch → projected file must be overwritten with staged content.
+        assert dst.read_text(encoding="utf-8") == "# NEW\n"
+        assert any("[ok]" in e for e in installed)
+        assert not any("[skip]" in e for e in installed)
+
+    def test_force_false_skips_when_hashes_match(self, tmp_path: Path) -> None:
+        """T-PROP-01: force=False + identical projected content → no-op (skip)."""
+        identical_content = "# SAME CONTENT\n"
+        public_dir = tmp_path / "public"
+        runtime_codex = public_dir / "runtime" / "codex" / "my-adapter"
+        runtime_codex.mkdir(parents=True)
+        (runtime_codex / "SKILL.md").write_text(identical_content, encoding="utf-8")
+        workspace_root = tmp_path / "workspace"
+        workspace_root.mkdir()
+        dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text(identical_content, encoding="utf-8")
+        mtime_before = dst.stat().st_mtime
+        installed: list[str] = []
+        manager = self._make_manager_with_fake_public(public_dir)
+        manager._install_codex_runtime_adapters(workspace_root, force=False, installed=installed)
+        # Hash match → no write, mtime unchanged, [skip] reported.
+        assert dst.read_text(encoding="utf-8") == identical_content
+        assert dst.stat().st_mtime == mtime_before
         assert any("[skip]" in e for e in installed)
+        assert not any("[ok]" in e for e in installed)
 
     def test_does_not_write_to_claude_or_opencode(self, tmp_path: Path) -> None:
         """Codex-only adapters are never written to .claude/ or .opencode/."""

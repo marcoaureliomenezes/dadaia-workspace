@@ -674,15 +674,26 @@ def _install_workspace_guardrail_pair(
         agents_dst = target_dir / "AGENTS.md"
         agents_dst.parent.mkdir(parents=True, exist_ok=True)
         if agents_dst.exists() and not force:
-            installed.append(f"[skip] {agents_dst}")
+            # Hash-compare: skip only when content is identical (T-PROP-01).
+            if hashlib.sha256(agents_dst.read_bytes()).hexdigest() == _src_sha:
+                installed.append(f"[skip] {agents_dst}")
+            else:
+                shutil.copy2(source, agents_dst)
+                installed.append(f"[ok]   {agents_dst}")
         else:
             shutil.copy2(source, agents_dst)
             installed.append(f"[ok]   {agents_dst}")
         # CLAUDE.md — 1-line stub only (T-41: delegates to AGENTS.md).
         claude_dst = target_dir / "CLAUDE.md"
         claude_dst.parent.mkdir(parents=True, exist_ok=True)
+        _stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
         if claude_dst.exists() and not force:
-            installed.append(f"[skip] {claude_dst}")
+            # Hash-compare: skip only when stub content is identical (T-PROP-01).
+            if hashlib.sha256(claude_dst.read_bytes()).hexdigest() == _stub_sha:
+                installed.append(f"[skip] {claude_dst}")
+            else:
+                _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+                installed.append(f"[ok]   {claude_dst}")
         else:
             _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
             installed.append(f"[ok]   {claude_dst}")
@@ -722,10 +733,18 @@ def _install_workspace_root_guardrail_pair(
     if installed is None:
         installed = []
 
+    src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
+
     agents_dst = workspace_root / "AGENTS.md"
     agents_dst.parent.mkdir(parents=True, exist_ok=True)
     if agents_dst.exists() and not force:
-        installed.append(f"[skip] {agents_dst}")
+        # Hash-compare: skip only when content is identical (T-PROP-01).
+        if hashlib.sha256(agents_dst.read_bytes()).hexdigest() == src_sha:
+            installed.append(f"[skip] {agents_dst}")
+        else:
+            shutil.copy2(source, agents_dst)
+            installed.append(f"[ok]   {agents_dst}")
     else:
         shutil.copy2(source, agents_dst)
         installed.append(f"[ok]   {agents_dst}")
@@ -733,7 +752,12 @@ def _install_workspace_root_guardrail_pair(
     claude_dst = workspace_root / "CLAUDE.md"
     claude_dst.parent.mkdir(parents=True, exist_ok=True)
     if claude_dst.exists() and not force:
-        installed.append(f"[skip] {claude_dst}")
+        # Hash-compare: skip only when stub content is identical (T-PROP-01).
+        if hashlib.sha256(claude_dst.read_bytes()).hexdigest() == stub_sha:
+            installed.append(f"[skip] {claude_dst}")
+        else:
+            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+            installed.append(f"[ok]   {claude_dst}")
     else:
         _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
         installed.append(f"[ok]   {claude_dst}")
@@ -762,6 +786,9 @@ def _install_consumer_repos_guardrail_pair(
     if installed is None:
         installed = []
 
+    src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
+
     for consumer in _consumer_repos_for_root(workspace_root):
         if _is_self_repo(consumer):
             v = _package_version()
@@ -773,7 +800,12 @@ def _install_consumer_repos_guardrail_pair(
         agents_dst = consumer / "AGENTS.md"
         agents_dst.parent.mkdir(parents=True, exist_ok=True)
         if agents_dst.exists() and not force:
-            installed.append(f"[skip] {agents_dst}")
+            # Hash-compare: skip only when content is identical (T-PROP-01).
+            if hashlib.sha256(agents_dst.read_bytes()).hexdigest() == src_sha:
+                installed.append(f"[skip] {agents_dst}")
+            else:
+                shutil.copy2(source, agents_dst)
+                installed.append(f"[ok]   {agents_dst}")
         else:
             shutil.copy2(source, agents_dst)
             installed.append(f"[ok]   {agents_dst}")
@@ -781,7 +813,12 @@ def _install_consumer_repos_guardrail_pair(
         claude_dst = consumer / "CLAUDE.md"
         claude_dst.parent.mkdir(parents=True, exist_ok=True)
         if claude_dst.exists() and not force:
-            installed.append(f"[skip] {claude_dst}")
+            # Hash-compare: skip only when stub content is identical (T-PROP-01).
+            if hashlib.sha256(claude_dst.read_bytes()).hexdigest() == stub_sha:
+                installed.append(f"[skip] {claude_dst}")
+            else:
+                _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
+                installed.append(f"[ok]   {claude_dst}")
         else:
             _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
             installed.append(f"[ok]   {claude_dst}")
@@ -1457,15 +1494,16 @@ class FileSystemPublicAssetManager:
 
         if only is None:
             settings_path = claude_dir / "settings.json"
-            if settings_path.exists() and not force:
-                installed.append(f"[skip] {settings_path}")
-            else:
-                self._write_generated(
-                    settings_path,
-                    _json_dump(self._claude_settings(workspace_root)),
-                    True,
-                    installed,
-                )
+            # Always use _write_generated with hash-compare so updates propagate
+            # without --force (T-PROP-01). The settings.json is a generated file
+            # derived from workspace config; we pass force=force so the caller
+            # controls whether local edits are overwritten.
+            self._write_generated(
+                settings_path,
+                _json_dump(self._claude_settings(workspace_root)),
+                force,
+                installed,
+            )
 
     def _install_codex(
         self,
@@ -1616,7 +1654,14 @@ class FileSystemPublicAssetManager:
 
             dst = agents_dst / f"{agent_name}.toml"
             if dst.exists() and not force:
-                installed.append(f"[skip] {dst}")
+                # Hash-compare: skip only when generated content is identical (T-PROP-01).
+                dst_sha = _sha256(dst)
+                src_sha = hashlib.sha256(toml_content.encode("utf-8")).hexdigest()
+                if dst_sha == src_sha:
+                    installed.append(f"[skip] {dst}")
+                else:
+                    dst.write_text(toml_content, encoding="utf-8")
+                    installed.append(f"[ok]   {dst}")
             else:
                 dst.write_text(toml_content, encoding="utf-8")
                 installed.append(f"[ok]   {dst}")
@@ -1693,10 +1738,15 @@ class FileSystemPublicAssetManager:
         for src in self._iter_files(src_dir):
             dst = dst_dir / src.relative_to(src_dir)
             dst.parent.mkdir(parents=True, exist_ok=True)
-            if dst.exists() and not force:
-                installed.append(f"[skip] {dst}")
-                continue
             content = _prepare_agent_for_opencode(src.read_text(encoding="utf-8"))
+            if dst.exists() and not force:
+                # Hash-compare: skip only when generated content is identical (T-PROP-01).
+                dst_sha = _sha256(dst)
+                src_sha = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                if dst_sha == src_sha:
+                    installed.append(f"[skip] {dst}")
+                    continue
+                # Hashes differ -> fall through to overwrite.
             dst.write_text(content, encoding="utf-8")
             installed.append(f"[ok]   {dst}")
 
@@ -1907,16 +1957,27 @@ class FileSystemPublicAssetManager:
     def _copy_file(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and not force:
-            installed.append(f"[skip] {dst}")
-            return
+            # Hash-compare: skip only when content is identical (T-PROP-01).
+            src_sha = _sha256(src)
+            dst_sha = _sha256(dst)
+            if src_sha == dst_sha:
+                installed.append(f"[skip] {dst}")
+                return
+            # Hashes differ -> fall through to overwrite (content-driven update).
         shutil.copy2(src, dst)
         installed.append(f"[ok]   {dst}")
 
     def _write_generated(self, dst: Path, content: str, force: bool, installed: list[str]) -> None:
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and not force:
-            installed.append(f"[skip] {dst}")
-            return
+            # Hash-compare: skip only when generated content matches projected (T-PROP-01).
+            content_bytes = content.encode("utf-8")
+            src_sha = hashlib.sha256(content_bytes).hexdigest()
+            dst_sha = _sha256(dst)
+            if src_sha == dst_sha:
+                installed.append(f"[skip] {dst}")
+                return
+            # Hashes differ -> fall through to overwrite (content-driven update).
         _atomic_write_text(dst, content)
         installed.append(f"[ok]   {dst}")
 
