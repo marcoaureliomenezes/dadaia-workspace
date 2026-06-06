@@ -59,7 +59,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-SEMA-01 — _is_stale liveness check + acquire reclaim
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Preconditions:** none (independent of G2)
 - **Write set:** `dadaia_workspace/features/spec_context/semaphore.py`, `tests/unit/features/spec_context/test_semaphore_liveness.py`
