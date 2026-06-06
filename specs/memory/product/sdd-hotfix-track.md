@@ -10,11 +10,18 @@ tags:
 - sdd
 - hotfix
 - semver
+- superseded
 agent_tier: self-pull
 token_estimate: 852
-last_updated: '2026-06-01'
+last_updated: '2026-06-05'
 release_origin: memory-markdown-source-v1
 ---
+
+> **SUPERSEDED** — This atom is superseded by ADR-2 (release v0.1.5). Hotfix
+> releases are now unified under the `alpha-N/rc-N` segment model documented in
+> [[sdd-bug-backlog-governance]]. The mechanical reconciliation of
+> `dadaia specs hotfix open` was delivered by T-ENG-07. This atom is retained for
+> historical reference only — do not author new hotfix releases from this flow.
 
 CLI surface: `dadaia specs hotfix open <v-id> --patches <release-id> [--severity LOW|MEDIUM|HIGH|CRITICAL]` · Closure: sdd-hotfix-track-v1
 
