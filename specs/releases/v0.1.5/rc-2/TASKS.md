@@ -135,7 +135,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-SHIP-02 — QA review
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** qa-engineer
 - **Preconditions:** T-SHIP-01 `[x]`
 - **Write set:** `.dadaia/handoff/dadaia-workspace/<UTC>-qa-engineer-rc-2-review.handoff.json`
@@ -144,7 +144,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-SHIP-03 — Code review
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** code-reviewer
 - **Preconditions:** T-SHIP-01 `[x]`
 - **Write set:** `.dadaia/handoff/dadaia-workspace/<UTC>-code-reviewer-rc-2-review.handoff.json`
@@ -153,7 +153,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-SHIP-04 — Security review
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** security-reviewer
 - **Preconditions:** T-SHIP-01 `[x]`
 - **Write set:** `.dadaia/handoff/dadaia-workspace/<UTC>-security-reviewer-rc-2-review.handoff.json`
