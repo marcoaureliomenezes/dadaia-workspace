@@ -381,10 +381,21 @@ def test_api_reports_deduplicates_canonical_and_legacy_handoffs(tmp_path: Path) 
     report_path = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "qa.html"
     report_path.parent.mkdir(parents=True)
     report_path.write_text("<html>qa</html>", encoding="utf-8")
+    # Stamp produced_at to "now" so the report stays inside the 48h retention
+    # window and is not pruned by ReportRetentionService.cleanup() before the
+    # dedup assertion (time-robust; mirrors the canonical-root test).
+    import datetime
+
+    now_iso = (
+        datetime.datetime.now(tz=datetime.UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     handoff_payload = {
         "agent": "qa-engineer",
         "context": "ctx",
-        "produced_at": "2026-06-04T03:00:00Z",
+        "produced_at": now_iso,
         "artifact": {"path": ".dadaia/reports/ctx/qa-engineer/qa.html"},
         "findings": [{"severity": "HIGH", "message": "issue"}],
     }
