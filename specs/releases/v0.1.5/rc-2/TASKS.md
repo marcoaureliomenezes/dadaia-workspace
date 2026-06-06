@@ -42,7 +42,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-PROP-03 — update dadaia-workspace-dev-guardrail rule
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** ai-engineer
 - **Preconditions:** T-PROP-01 and T-PROP-02 committed (rule must describe the fixed behavior accurately)
 - **Write set:** `dadaia_workspace/public/rules/dadaia-workspace-dev-guardrail.md`; bug frontmatter: `specs/bugs/install-skips-existing-files.md`, `specs/bugs/doctor-blind-to-projected-drift.md`
