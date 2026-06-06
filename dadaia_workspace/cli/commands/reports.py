@@ -18,6 +18,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.panel.reports_doctor import ReportsDoctor
 from dadaia_workspace.features.reports_retention import (
     CleanupCandidate,
     ReportRetentionService,
@@ -517,6 +518,71 @@ def lint(
         console.print("OK: No issues found.")
 
     raise typer.Exit(0)
+
+
+# ---------------------------------------------------------------------------
+# doctor subcommand (T-PANEL-02)
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="doctor")
+def doctor(
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON instead of human-readable text."
+    ),
+) -> None:
+    """Diagnose structural invariants in .dadaia/reports/ and .dadaia/handoff/.
+
+    \b
+    Invariants checked:
+      RPT-1: handoff artifact.path must point to an existing .html under .dadaia/reports/.
+
+    \b
+    Flags emitted:
+      [dangling-artifact-path] <sidecar> → <artifact.path>  (RPT-1 violation)
+
+    \b
+    Exit codes:
+      0  No issues found.
+      1  One or more invariant violations detected.
+
+    \b
+    Examples:
+      dadaia reports doctor
+      dadaia reports doctor --json
+    """
+    workspace_root = resolve_workspace_root()
+    reports_doctor = ReportsDoctor(workspace_root)
+    result = reports_doctor.check()
+
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {
+                    "ok": result.ok,
+                    "issue_count": len(result.issues),
+                    "issues": [
+                        {
+                            "code": i.code,
+                            "message": i.message,
+                            "sidecar_path": str(i.sidecar_path),
+                            "artifact_path": i.artifact_path,
+                        }
+                        for i in result.issues
+                    ],
+                }
+            )
+        )
+        raise typer.Exit(0 if result.ok else 1)
+
+    if result.ok:
+        console.print("[green]OK[/green] No RPT-1 issues found.")
+        raise typer.Exit(0)
+
+    for issue in result.issues:
+        console.print(f"[red]{issue.code}[/red] {issue.message}", markup=False)
+    console.print(f"\n{len(result.issues)} issue(s) found.")
+    raise typer.Exit(1)
 
 
 def _handoff_artifact_paths(handoff_root: Path, workspace_root: Path) -> set[str]:
