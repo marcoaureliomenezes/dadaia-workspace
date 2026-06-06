@@ -2030,8 +2030,23 @@ class FileSystemPublicAssetManager:
     def _copy_tree(self, src_dir: Path, dst_dir: Path, force: bool, installed: list[str]) -> None:
         if not src_dir.exists():
             return
+        managed: set[Path] = set()
         for src in self._iter_files(src_dir):
-            self._copy_file(src, dst_dir / src.relative_to(src_dir), force, installed)
+            rel = src.relative_to(src_dir)
+            managed.add(rel)
+            self._copy_file(src, dst_dir / rel, force, installed)
+        # Install-prune (bug: install-does-not-prune-orphan-projections). These runtime
+        # projection dirs are fully lib-managed, so any projected file whose source no
+        # longer exists in staging is an orphan (e.g. a deleted persona/skill/workflow)
+        # and is removed — keeping the instance drift-free without a manual sweep.
+        for dst in self._iter_files(dst_dir):
+            if dst.relative_to(dst_dir) not in managed:
+                dst.unlink(missing_ok=True)
+                installed.append(f"[prune] {dst}")
+        # Drop now-empty directories (deepest first) left behind by pruning.
+        for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
+            if not any(d.iterdir()):
+                d.rmdir()
 
     def _copy_file(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
         dst.parent.mkdir(parents=True, exist_ok=True)
