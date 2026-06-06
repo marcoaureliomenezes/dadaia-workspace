@@ -1,3 +1,3 @@
 release: v0.1.5
-segment: rc-1
-phase: CLOSURE
+segment: rc-2
+phase: IMPLEMENTATION
