@@ -30,7 +30,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-PROP-02 — doctor staging-vs-projected check
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Preconditions:** T-PROP-01 committed (staging SHA logic must be stable before doctor reads it)
 - **Write set:** `dadaia_workspace/features/public_assets/public_assets.py` (doctor delegate), `tests/unit/features/public_assets/test_doctor_projected_drift.py`
