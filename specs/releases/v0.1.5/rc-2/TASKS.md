@@ -74,7 +74,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-SEMA-02 — doctor SEM-1 invariant + --fix
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer-python
 - **Preconditions:** T-SEMA-01 committed (doctor reuses the liveness logic from semaphore.py)
 - **Write set:** `dadaia_workspace/features/spec_context/doctor.py`, `tests/unit/features/spec_context/test_doctor_semaphore_invariant.py`
