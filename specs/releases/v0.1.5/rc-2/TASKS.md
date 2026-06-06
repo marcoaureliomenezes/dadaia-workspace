@@ -121,7 +121,7 @@ Execution order: G2 → G3 → G1 → SHIP.
 
 ### T-SHIP-01 — Pre-ship CI gate
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** software-engineer-python (or devops-engineer)
 - **Preconditions:** all G1/G2/G3 tasks `[x]`
 - **Write set:** none (validation only; update TASKS.md marker)
