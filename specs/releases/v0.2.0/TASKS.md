@@ -27,4 +27,8 @@ milestone before the next opens.
 
 **Review status:** all five milestones specialist-reviewed (software-architect: v0.1.6 + integration;
 ai-engineer: v0.1.7/v0.1.8/v0.1.9) and findings incorporated. v0.1.6 NO-GO -> resolved. Remaining verdicts
-were GO-WITH-CHANGES, all changes applied. Awaiting operator review -> Aprovado.
+were GO-WITH-CHANGES, all changes applied.
+
+**Soul-fold amendment (2026-06-06):** audit findings D1–D13 folded into the in-flight program before deploy per the pre-deploy hold decision. Milestone task counts updated: v0.1.6 gains 7 tasks (T-016-11..17); v0.1.7 gains 3 tasks (T-017-04..06); integration T-020-05 extended with D7/D11/D12 scope + workspace-doctor.md write-set + /goal acceptance checklist. Umbrella SPEC §10 added. No existing tasks re-opened; new tasks appended after the existing [x] DONE task chains.
+
+Awaiting operator review + confirmation of 4 open items (OI-1..4 in soul-fold grill report) -> Aprovado.

@@ -20,8 +20,9 @@ canonical order for the current task.
        `<workspace-root>/repos/<DADAIA_CONTEXT>/specs/`.
      - **b) `spec_contexts.json`** — read `.dadaia/states/spec_contexts.json`, find the first
        entry with `state: alive`, and derive `repos/<slug>/specs/`. Fallback: `dadaia context show --json`.
-   - If neither resolves: stop and tell the operator to bind a context first
-     (`eval $(dadaia context bind <name> --mode read)`).
+   - Context resolves automatically from the registry — never halt to ask the
+     operator to bind or rebind. Binding is optional. Only if the workspace has no
+     ALIVE context at all is there nothing to navigate.
 
 2. **Read constitution and atomic memory (Markdown).**
    - `<specs-dir>/constitution.md`

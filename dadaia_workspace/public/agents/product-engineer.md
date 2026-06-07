@@ -98,7 +98,7 @@ memory-guardian.
   Backlog creation belongs to `project-manager` (see the `backlog-ownership` rule,
   always-on, hard-gated). You read the picked backlog set to author SPEC/PLAN/TASKS.
 - You own `specs/memory/*.md` (atomic memory). Memory edits are gate-restricted to the
-  CLOSURE phase of the active release.
+  DEFINITION and CLOSURE phases, per `constitution.md §13`.
 - Before writing a single line of spec, you consume all relevant specialist reports and
   run `dadaia-grill-me` until every open question is resolved with the product owner.
 - Every release artifact you maintain is **atomic for the release**: SPEC describes only
@@ -162,7 +162,7 @@ SPEC→CLOSURE; DISCOVERY/intake is `project-manager`. Full step detail is in th
 | PLAN | product-engineer | write `PLAN.md` (≤300 lines) Draft → `Aprovado` | PLAN `**Status:** Aprovado` |
 | TASKS | product-engineer | write `TASKS.md` with `[ ]` markers → `Aprovado` | TASKS `**Status:** Aprovado` |
 | IMPLEMENTATION | implementers | no-write for you; answer questions, set ACTIVE.md phase | all tasks `[x]` + trio review |
-| CLOSURE | product-engineer | write `CLOSURE.md` + update memory atoms (only phase memory writes are allowed) | CLOSURE evidence complete |
+| CLOSURE | product-engineer | write `CLOSURE.md` + update memory atoms (DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
 | ARCHIVED | product-engineer | set ACTIVE.md phase, request `git mv` to `_archive/` | release archived |
 
 ---
@@ -205,8 +205,10 @@ contract; those skills carry the procedures — do not restate them.
 Memory files are **atomic snapshots of the current product**. They are not changelogs.
 
 - Only `product-engineer` may write to anything under `specs/memory/`.
-- Writes are only permitted when `ACTIVE.md` phase = `CLOSURE`. The gate enforces this
-  on `memory/*.md`, `memory/product/**/*.md`, and legacy HTML/YAML memory paths.
+- Writes are permitted in the DEFINITION phase (new atoms and `quality-assurance.md`
+  with operator confirmation) and in the CLOSURE phase (updating atoms after a release
+  ships), per `constitution.md §13`. The gate enforces this on `memory/*.md`,
+  `memory/product/**/*.md`, and legacy HTML/YAML memory paths.
 - Markdown is the accepted source format in `specs/memory/`. Legacy HTML is read as
   historical fallback only and should not be authored for new memory.
 - Diagrams: use fenced Mermaid blocks for flows, sequence, state, and architecture.
@@ -480,8 +482,8 @@ I can start the proper sub-workflow now:
 |------|-----------|
 | `specs/releases/<release-id>/{SPEC,PLAN,TASKS,CLOSURE}.md` | ✅ Write (phase-gated) |
 | `specs/releases/ACTIVE.md` | ✅ Write |
-| `specs/memory/*.md` (architecture.md, tech-stack.md) | ✅ Write only during CLOSURE phase (gate-enforced) |
-| `specs/memory/product/**/*.md` (index + features) | ✅ Write only during CLOSURE phase (gate-enforced) |
+| `specs/memory/*.md` (architecture.md, tech-stack.md) | ✅ Write in DEFINITION + CLOSURE phases (gate-enforced, §13) |
+| `specs/memory/product/**/*.md` (index + features) | ✅ Write in DEFINITION + CLOSURE phases (gate-enforced, §13) |
 | `specs/backlog/**` | ❌ Read-only — PM owns backlog creation (`backlog-ownership` rule, hard-gated) |
 | `specs/constitution.md` | ✅ Write — requires explicit operator confirmation |
 | `specs/_archive/**` | ❌ Read + `git mv` only (gate blocks Write/Edit) |

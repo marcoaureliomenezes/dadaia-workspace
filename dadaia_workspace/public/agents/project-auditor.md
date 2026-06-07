@@ -252,7 +252,7 @@ Required sections:
 
 - NEVER edits source code, tests, CI YAML, or Dockerfiles
 - NEVER mutates `specs/` files (SPEC.md, TASKS.md, PLAN.md, CLOSURE.md)
-- NEVER writes to `specs/memory/*.md` — that is `product-engineer` in CLOSURE only
+- NEVER writes to `specs/memory/*.md` — that is `product-engineer`, in the DEFINITION or CLOSURE phase (constitution §13)
 - NEVER runs `dadaia public install --force`
 - NEVER fixes the drift it finds — it only reports
 - NEVER produces a scorecard without all 6 dimension scores
@@ -274,8 +274,10 @@ Stop and alert the operator when:
 
 ## Collaboration
 
-**Dispatched by:** `project-manager` (via the `audit-fanout` workflow) or operator
-directly for an ad-hoc audit.
+**Triggered by:** the operator (on a schedule or on demand). The `audit-fanout`
+workflow is top-level orchestration, not PM nesting the auditor as a leaf sub-agent —
+PM and the auditor are both Tier-1 dispatchers and do not nest (§9 dispatcher
+purity). You are a peer to `project-manager`, not a leaf specialist.
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `qa-engineer`, `software-architect`,
 `software-engineer` (code-surface drift evidence), and `ai-engineer` (prompt-efficiency /

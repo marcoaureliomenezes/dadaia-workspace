@@ -19,7 +19,13 @@ Resolve specs_dir in priority order:
 1. `DADAIA_CONTEXT` env var → `repos/<slug>/specs/`
 2. `.dadaia/states/spec_contexts.json` — find the first ALIVE entry and derive `repos/<slug>/specs/`
 3. `dadaia context show --json`
-If none resolves: stop and ask operator to run `eval $(dadaia context bind <name> --mode read)`.
+
+Context resolves automatically — the same fallback the SDD gate and `ctx-inject`
+use. **Never halt the flow to ask the operator to bind or rebind a context.** A
+`context bind` is optional convenience for pinning a non-default context; it is
+never a precondition for doing work. If step 2 finds an ALIVE context, use it and
+proceed. Only when the workspace has *no* ALIVE context at all should you tell the
+operator there is nothing to work on.
 
 ## 3. Task lifecycle
 1. Read ACTIVE.md → confirm release + phase.
@@ -36,7 +42,7 @@ If none resolves: stop and ask operator to run `eval $(dadaia context bind <name
 - Reports > 30 KB: split into multi-HTML with `index.html` entry point.
 
 ## 5. Memory atomicity
-`specs/memory/**/*.md` files are write-locked for all agents EXCEPT `product-engineer` during CLOSURE phase. Never edit memory atoms in any earlier phase.
+`specs/memory/**/*.md` files are write-locked for all agents EXCEPT `product-engineer`, who may write in the DEFINITION and CLOSURE phases per `constitution.md §13`. No other agent edits memory atoms in any phase.
 
 ## 6. Write-allowlist enforcement
 Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. The SDD gate enforces this at runtime.

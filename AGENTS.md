@@ -108,7 +108,7 @@ Memory is current product truth, not history.
 
 - Read memory before changing production behavior.
 - Do not write `specs/memory/**` during implementation.
-- Only `product-engineer` writes memory, and only during `CLOSURE`.
+- Only `product-engineer` writes memory, in the `DEFINITION` or `CLOSURE` phase (constitution §13).
 - Changelog/history belongs in `CLOSURE.md` and `_archive/`.
 
 ## Reports and Panel

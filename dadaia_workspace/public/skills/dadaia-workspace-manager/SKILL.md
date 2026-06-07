@@ -84,18 +84,29 @@ Implementation binds acquire the single per-context release **lease** (v0.1.6 mo
 one MUTATING lease per context, coordinated by project-manager — see constitution §8/§9).
 `read` and `spec` binds never block. The lease record is
 `{context, release, session_id, mode, acquired_at, heartbeat, ttl}` (no PID); liveness is
-`now − heartbeat ≤ ttl` (TTL 1800s), and the gate is fail-safe — it never blocks on an
-expired or absent lease.
+`now − heartbeat ≤ LEASE_TTL_SECONDS` where `LEASE_TTL_SECONDS = 120` (short heartbeat,
+OQ-1 operator decision 2026-06-06). The holder renews its heartbeat on every tool call;
+a fully-idle holder becomes reclaimable after ~120s.
 
-### Lease recovery
+### Liveness & recovery (reclaim-iff-stale / yield-iff-live-foreign)
 
-```bash
-dadaia lock steal <context>          # reclaim a stale/abandoned release lease for <context>
-```
+The gate never freezes the flow, and the operator is **never** asked to rebind,
+relaunch, or steal a lock. Behaviour on acquire:
 
-Use `dadaia lock steal` when a lease is held by a dead session and the SDD gate blocks a
-legitimate write. There is no per-session "implementation lock" vs "review lock" pair —
-v0.1.6 collapsed that into one release lease keyed to the coordinator session.
+- **Your own session (even relaunched)** → RENEW. Stable identity via
+  `.dadaia/sessions/runtime/<ctx>.ptr` means a relaunched/continuing session resolves to
+  the same identity, so you never block yourself.
+- **Stale or absent lease** (no heartbeat within ~120s) → reclaimed automatically on the
+  next write (fail-open). A finished or dead holder frees the lease by itself.
+- **Live foreign lease** (a genuinely different concurrent session) → the gate **yields**:
+  this session does not mutate (informative `LockHeldError`, additive writes still allowed),
+  and acquires automatically once the other session goes idle / expires. This is the
+  exactly-one-mutating-session invariant (§8) — not a freeze, and it requires no manual step.
+
+There is no per-session "implementation lock" vs "review lock" pair — v0.1.6 collapsed
+that into one release lease keyed to the coordinator session. `dadaia lock steal` exists
+only as an administrative/observability escape; it is **never** part of the normal flow,
+because reclaim-iff-stale already frees an abandoned lease without it.
 
 ### Supporting commands
 

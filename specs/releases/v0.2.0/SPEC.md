@@ -47,7 +47,7 @@ Two activity classes partition every action; the partition is simultaneously the
 
 | # | Decision | Resolution |
 |---|---|---|
-| TTL/heartbeat (OD-2) | idle-but-alive false-reclaim window | **TTL = 1800s (30 min); heartbeat renews on every PreToolUse (any tool).** No background thread (cross-platform). An actively-working coordinator renews constantly; only a >30-min fully-idle holder is reclaimable. |
+| TTL/heartbeat (OD-2) | idle-but-alive false-reclaim window | **`LEASE_TTL_SECONDS = 120` (short heartbeat); heartbeat renews on every PreToolUse (any tool).** No background thread (cross-platform). An actively-working coordinator renews constantly; only a >~2-min fully-idle holder is reclaimable. *(OQ-1 re-opened and resolved by operator decision 2026-06-06: 120s short heartbeat over the original 1800s — the short window removes the freeze root cause rather than masking it; see v0.1.6 SPEC §2 and constitution §8.)* |
 | Workflows (OD-1) | redesign vs delete | **Delete all 7 stale workflows.** Orchestration is the coordinator's dispatch logic, not scripted files. Author NEW workflows ONLY for deterministic, non-judgment sequences where scripting beats dispatch — provisionally: `release-ship` (the deploy gate sequence) and `audit-fanout`. Net surface shrinks; PM personas carry the orchestration. |
 | Memory tree (OD-3) | `product/` grouping | **`product/{agents,sdd,panel,platform,distribution,philosophy}/`** + `index.md` with wikilinks. project-auditor refines exact placement during v0.1.9. |
 | devops-engineer (OD-4) | stub vs remove | **Remove from `public/agents/`; ship as a plugin.** Fresh `dadaia init` emits nothing for it; `plugin-scope` rule references the plugin. |
@@ -92,9 +92,33 @@ Each milestone obeys the v0.1.7 gate sequence locally: all tests run → **qa-en
 ## 9. Open items for operator review (flagged, not blocking)
 
 - Milestone version labels 0.1.6–0.1.9 are **internal checkpoints**, not published versions; `pyproject` stays at the base until the v0.2.0 bump. Confirm this is the intended meaning of "break it on 0.1.6, 0.1.7…".
-- TTL=1800s/renew-on-tool-use (§5) — confirm the idle window is acceptable for your working style.
+- TTL (§5) — RESOLVED: `LEASE_TTL_SECONDS = 120`/renew-on-tool-use. The D1 soul-fold adds stable-session-identity (`.dadaia/sessions/runtime/<ctx>.ptr`) so a relaunched session RENEWs (freeze root cause removed), AND shortens the TTL 1800s→120s so a truly abandoned lease reclaims in ~2 min (operator decision 2026-06-06).
 - The redesigned workflow set (§5 OD-1: `release-ship`, `audit-fanout`) — confirm scope or name others.
 - `product/` tree groups (§5 OD-3) — confirm or re-cut.
+
+## 10. Soul & correctness fold — pre-deploy amendment
+
+**Source:** audit findings D1–D13 (`specs/audits/2026-06-06T213731Z/workspace-lifecycle-review.md`); backlog `v0.2.0-soul-and-correctness-fold.md`. Folded before deploy per the pre-deploy hold decision (ACTIVE.md phase=DEFINITION, T-020-04/05 open, nothing on PyPI).
+
+The fold extends in-flight milestone SPEC/TASKS and does not change the deploy model. Key additions:
+
+| Finding | Description | Where landed |
+|---------|-------------|--------------|
+| D1 | Stable-session-identity: restore exactly-one-mutating (T-016-11..17) | v0.1.6 soul-fold tasks |
+| D2 | 3-channel report model + `specs/audits/**` ADDITIVE gate + constitution | v0.1.6 T-016-13 + v0.1.7 T-017-04 |
+| D3 | Dispatcher-purity as law | v0.1.7 T-017-04 |
+| D4 | Spec-review sequence in §11 | v0.1.7 T-017-04 |
+| D5 | "Gate" → "coordinator-enforced checkpoint" relabel | v0.1.7 T-017-04 |
+| D6 | Collision-safe naming law + gate comment | v0.1.6 T-016-13 + v0.1.7 T-017-04 |
+| D7 | Stale semaphore docs purge | integration T-020-05 (CLOSURE) |
+| D10 | Constitution §0 Identity + Spec Context Project | v0.1.7 T-017-04 |
+| D11 | `architecture.md` full rewrite | integration T-020-05 (CLOSURE) |
+| D12 | Spec Context Project elevation in memory | integration T-020-05 (CLOSURE) |
+| D13 | Agent philosophy in constitution §0 | v0.1.7 T-017-04 |
+
+**Operator /goal gate (hard prerequisite for deploy):** Before T-020-04 (deploy), the operator must read `specs/constitution.md §0` and `specs/memory/architecture.md` and confirm YES to the 5-point identity checklist (integration/SPEC.md §7b). AC-17 of the integration SPEC encodes this gate. The deploy is blocked until AC-17 is satisfied.
+
+**D8** (deploy + close) is satisfied by the deploy itself (T-020-04/05). **D9** (5 vs 8 phases note) requires no spec change; the 8-phase §7 matrix is already normative.
 
 ---
 

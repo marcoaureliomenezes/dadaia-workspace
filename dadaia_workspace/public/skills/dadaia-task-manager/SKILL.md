@@ -111,8 +111,10 @@ Significa que:
   tentando editar produção, ou
 - (b) a resolução do contexto ativo falhou (env var `DADAIA_CONTEXT` ausente e nenhum context `alive` em `spec_contexts.json`).
 
-Em (a): volte ao Passo 1–2. Em (b): rode `dadaia context show --json` para verificar
-o context ativo; se ausente, execute `eval $(dadaia context bind <name> --mode read)` ou peça ao operador.
+Em (a): volte ao Passo 1–2. (b) não deve mais acontecer: o contexto resolve
+automaticamente a partir do primeiro context `alive` em `spec_contexts.json`, e o
+gate é fail-safe — nunca bloqueia o fluxo por contexto/lock. Nunca peça ao operador
+para fazer rebind da sessão.
 
 ## Onde TASKS.md vive
 
