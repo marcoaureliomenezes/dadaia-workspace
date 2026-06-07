@@ -366,4 +366,4 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** CLOSURE.md written; memory atoms updated; `dadaia specs doctor` exit 0;
   release archived.
 
-[ ] T-021-LAST
+[x] T-021-LAST
