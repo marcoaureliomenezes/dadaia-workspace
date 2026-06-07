@@ -16,8 +16,8 @@ tags:
   - test-architecture
 agent_tier: self-pull
 token_estimate: 900
-last_updated: '2026-06-06'
-release_origin: v0.1.7
+last_updated: '2026-06-07'
+release_origin: v0.2.1
 ---
 
 ## Propósito
@@ -39,8 +39,10 @@ deleted code remains deleted; private constants must not be duplicated into test
 code as the source of truth; one-off debugging tests go to `tests/tmp/` only with
 an expiry note.
 
-This atom is the design-of-record for implementers and qa-engineer. It absorbs
-`test-suite-architecture.md`, which is staged for archive at v0.2.0 CLOSURE.
+This atom is the design-of-record for implementers and qa-engineer. It is the
+canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the
+normative vision §6. The former location `specs/memory/product/sdd/quality-assurance.md`
+is non-conformant and staged for deletion at v0.2.1 CLOSURE.
 
 ## Fluxo de uso
 

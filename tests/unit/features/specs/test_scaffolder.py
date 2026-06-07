@@ -28,6 +28,7 @@ _EXPECTED_FILES = [
     "constitution.md",
     "memory/architecture.md",
     "memory/tech-stack.md",
+    "memory/quality-assurance.md",
     "memory/product/index.md",
     "releases/ACTIVE.md",
     "backlog/candidates.md",

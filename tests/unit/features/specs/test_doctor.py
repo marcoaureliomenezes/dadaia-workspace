@@ -117,6 +117,13 @@ def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
         MINIMAL_MEMORY_ARCHITECTURE_MD, encoding="utf-8"
     )
     (specs / "memory" / "tech-stack.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
+    (specs / "memory" / "quality-assurance.md").write_text(
+        "---\nslug: quality-assurance\ntitle: Quality Assurance\ncategory: core\n"
+        "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"
+        "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\nlast_updated: '2026-06-07'\n"
+        "release_origin: test-release\n---\n\n## Standards\n\nQA standards.\n",
+        encoding="utf-8",
+    )
     (specs / "releases" / "ACTIVE.md").write_text(
         f"release: {release_id}\nphase: IMPLEMENTATION\n", encoding="utf-8"
     )
@@ -1131,3 +1138,162 @@ def test_segmented_active_release_missing_tasks_reports_doc_004(tmp_path: Path) 
     (specs / "releases" / "v0.1.6" / "alpha-1" / "TASKS.md").unlink()
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-004" in _codes(issues)
+
+
+# ---- T-021-01: flat-glob fix — subdir atom discovery in CAT-1 and SPEC-DOC-002 ----
+
+
+def test_cat1_subdir_atom_is_found_no_phantom_warning(tmp_path: Path) -> None:
+    """CAT-1 T-021-01: a product/<subdir>/atom.md is discovered by rglob.
+
+    A catalog listing the slug and a matching .md in a subdirectory must produce
+    zero CAT-1 warnings (the flat-glob bug would emit a phantom warning because
+    it missed the nested atom).
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    subdir = product_dir / "philosophy"
+    subdir.mkdir(parents=True, exist_ok=True)
+    (subdir / "product-vision.md").write_text(
+        "---\nslug: product-vision\ntitle: Product Vision\ncategory: product\n"
+        "tldr: 'Vision.'\nsummary: 'Vision summary.'\ntags: []\nagent_tier: self-pull\n"
+        "token_estimate: 100\nlast_updated: '2026-06-07'\nrelease_origin: test-release\n---\n\n"
+        "## Vision\n\nThe vision.\n",
+        encoding="utf-8",
+    )
+    # catalog lists feature-a (flat) and product-vision (nested)
+    _make_catalog_json(product_dir, ["feature-a", "product-vision"])
+    issues = SpecsDoctor(specs).check()
+    cat1 = [i for i in issues if i.code == "CAT-1"]
+    assert cat1 == [], (
+        f"Expected 0 CAT-1 warnings with subdir atom in sync; got: {[i.description for i in cat1]}"
+    )
+
+
+def test_spec_doc_002_subdir_atom_parsed_without_error(tmp_path: Path) -> None:
+    """SPEC-DOC-002 T-021-01: a product/<subdir>/atom.md with a valid heading must parse cleanly.
+
+    The rglob fix ensures nested atoms are validated; this test confirms a valid
+    nested atom produces no SPEC-DOC-002 error.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    product_dir = specs / "memory" / "product"
+    subdir = product_dir / "sdd"
+    subdir.mkdir(parents=True, exist_ok=True)
+    (subdir / "specs-doctor.md").write_text(
+        "---\nslug: specs-doctor\ntitle: Specs Doctor\ncategory: product\n"
+        "tldr: 'Doctor checks.'\nsummary: 'Doctor structural checks.'\ntags: []\n"
+        "agent_tier: self-pull\ntoken_estimate: 100\nlast_updated: '2026-06-07'\n"
+        "release_origin: test-release\n---\n\n## Propósito\n\nValidates specs.\n",
+        encoding="utf-8",
+    )
+    issues = SpecsDoctor(specs).check()
+    spec_doc_002 = [
+        i for i in issues if i.code == "SPEC-DOC-002" and "specs-doctor.md" in (i.path or "")
+    ]
+    assert spec_doc_002 == [], (
+        f"Expected no SPEC-DOC-002 for valid subdir atom; got: {[i.description for i in spec_doc_002]}"
+    )
+
+
+# ---- T-021-02: quality-assurance.md is canonical top-level + required by TREE-3 ----
+
+
+def test_quality_assurance_md_not_flagged_as_legacy(tmp_path: Path) -> None:
+    """T-021-02: specs/memory/quality-assurance.md must NOT be flagged as SPEC-DOC-002L.
+
+    It is a canonical top-level memory atom (added to TOPLEVEL_MEMORY_FILES), so the
+    legacy-orphan check must exempt it — identical to how architecture.md and tech-stack.md
+    are exempted.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    # quality-assurance.md is already in the clean tree; doctor must not flag it
+    issues = SpecsDoctor(specs).check()
+    doc_002l = [
+        i for i in issues if i.code == "SPEC-DOC-002L" and "quality-assurance.md" in (i.path or "")
+    ]
+    assert doc_002l == [], (
+        f"quality-assurance.md must not be flagged as legacy: {[i.description for i in doc_002l]}"
+    )
+
+
+def test_tree3_missing_quality_assurance_md_triggers_warning(tmp_path: Path) -> None:
+    """TREE-3 T-021-02: absence of top-level quality-assurance.md emits a TREE-3 WARNING."""
+    specs = _make_clean_specs_tree(tmp_path)
+    qa_md = specs / "memory" / "quality-assurance.md"
+    qa_md.unlink()
+    issues = SpecsDoctor(specs).check()
+    tree3 = [
+        i for i in issues if i.code == "TREE-3" and "quality-assurance.md" in (i.description or "")
+    ]
+    assert tree3, "Expected TREE-3 WARNING for missing quality-assurance.md"
+    assert tree3[0].severity == Severity.WARNING
+    assert not tree3[0].fixable
+
+
+def test_quality_assurance_md_required_by_tree3_validated_by_spec_doc_002(tmp_path: Path) -> None:
+    """T-021-02: quality-assurance.md is also checked by SPEC-DOC-002 (required top-level check).
+
+    SPEC-DOC-002 must flag absence of quality-assurance.md as a missing required atom.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    qa_md = specs / "memory" / "quality-assurance.md"
+    qa_md.unlink()
+    issues = SpecsDoctor(specs).check()
+    # SPEC-DOC-002 covers required top-level files → must fire for missing quality-assurance.md
+    spec_doc_002 = [
+        i
+        for i in issues
+        if i.code == "SPEC-DOC-002" and "quality-assurance.md" in (i.description or "")
+    ]
+    assert spec_doc_002, (
+        "Expected SPEC-DOC-002 for missing quality-assurance.md; "
+        f"got: {[i.to_dict() for i in issues if 'quality' in str(i)]}"
+    )
+
+
+# ---- T-021-03: specs/memory/AGENTS.md check is WARN-level (TREE-5M) ----
+
+
+def test_memory_agents_md_absent_emits_tree5m_warning(tmp_path: Path) -> None:
+    """T-021-03: absence of specs/memory/AGENTS.md emits a TREE-5M WARNING (never ERROR)."""
+    specs = _make_clean_specs_tree(tmp_path)
+    # Ensure memory/AGENTS.md is absent
+    memory_agents = specs / "memory" / "AGENTS.md"
+    if memory_agents.exists():
+        memory_agents.unlink()
+    issues = SpecsDoctor(specs).check()
+    tree5m = [i for i in issues if i.code == "TREE-5M"]
+    assert tree5m, "Expected TREE-5M WARNING for missing specs/memory/AGENTS.md"
+    assert tree5m[0].severity == Severity.WARNING, (
+        f"TREE-5M must be WARNING, got: {tree5m[0].severity}"
+    )
+    assert not tree5m[0].fixable
+
+
+def test_memory_agents_md_absent_does_not_cause_errors(tmp_path: Path) -> None:
+    """T-021-03: absence of specs/memory/AGENTS.md must NOT make doctor exit non-zero.
+
+    TREE-5M is always WARNING-level; the doctor exit code is driven by ERROR severity.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    memory_agents = specs / "memory" / "AGENTS.md"
+    if memory_agents.exists():
+        memory_agents.unlink()
+    issues = SpecsDoctor(specs).check()
+    errors = [i for i in issues if i.severity == Severity.ERROR]
+    assert errors == [], (
+        f"No errors expected when memory/AGENTS.md is absent; got: {[i.to_dict() for i in errors]}"
+    )
+
+
+def test_memory_agents_md_present_suppresses_tree5m(tmp_path: Path) -> None:
+    """T-021-03: when specs/memory/AGENTS.md exists, TREE-5M must not fire."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "memory" / "AGENTS.md").write_text(
+        "# Memory Ownership Contract\n\nWrite-locked to product-engineer during CLOSURE.\n",
+        encoding="utf-8",
+    )
+    issues = SpecsDoctor(specs).check()
+    tree5m = [i for i in issues if i.code == "TREE-5M"]
+    assert tree5m == [], f"Unexpected TREE-5M when memory/AGENTS.md is present: {tree5m}"
