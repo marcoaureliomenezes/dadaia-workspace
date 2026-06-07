@@ -3,7 +3,7 @@ slug: harness-primitives
 title: harness-primitives
 category: product
 tldr: 'Middle-depth harness literacy for all agents: primitive definitions, Claude Code vs Codex deltas, dadaia projection mechanics, and ai-engineer defer checklist.'
-summary: Available to all 15 default agents. Defines at middle depth what each AI harness
+summary: Available to all 9 core agents. Defines at middle depth what each AI harness
   primitive is (agent persona, subagent, skill, rule, hook, AGENTS.md, MCP), how Claude Code
   and Codex differ in naming and enforcement for each primitive, how dadaia stages and projects
   them (public/ -> stage -> install -> .claude/.codex/.opencode/.agents; manifest SHA256;

@@ -67,9 +67,9 @@ Skill standalone em `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL
 
 Handoff mínimo: ~500 bytes (apenas obrigatórios); típico: <2 KB; warning se >4 KB. Para report HTML médio de 50–70 KB, overhead ~3% no pior caso (NFR5).
 
-## Adoção (15 de 15 agentes)
+## Adoção (9 agentes core)
 
-Os agentes públicos default declaram `dadaia-handoff-emitter` quando produzem
+Os 9 agentes públicos core declaram `dadaia-handoff-emitter` quando produzem
 reports/handoffs que precisam de sidecar machine-readable. Optional packs podem
 adotar o mesmo contrato, mas não fazem parte da topologia pública default.
 

@@ -2,89 +2,122 @@
 slug: agent-orchestration
 title: agent-orchestration
 category: product
-tldr: Generic multi-agent orchestration over public default agents and workflows, with runtime-specific dispatch for Claude Code, Codex, OpenCode, and CLI.
-summary: Defines the public default agent topology, workflow inventory, dispatcher boundaries, review/QA gate, path-scope ownership, and report/handoff expectations.
+tldr: "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 2 workflows; dispatcher purity."
+summary: Defines the public default 9-core agent topology with coordinator+sub-agent
+  architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch),
+  ADDITIVE vs MUTATING activity classes, and the minimal 2-workflow set.
 tags:
 - orchestration
 - agents
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 506
-last_updated: '2026-06-04'
-release_origin: v0.1.4.6
+token_estimate: 865
+last_updated: '2026-06-06'
+release_origin: v0.2.0
 ---
 
 ## Propósito
 
 `dadaia-workspace` orchestrates specialist agents through SDD-aware workflows and
-project-manager playbooks. The public default topology is generic and safe for
+project-manager coordinator logic. The public default topology is generic and safe for
 all consumers; project-specific, game-specific, data-vendor-specific, or private
 agents belong in optional packs or local overlays.
 
 ## Fluxo de uso
 
-The public default has 15 agents in 3 tiers:
+The public default has **9 core agents** in the coordinator + sub-agent architecture
+defined by constitution §9:
 
-- Tier 1 dispatchers: `project-manager`, `project-auditor`.
-- Tier 2 curator: `product-engineer`.
-- Tier 3 leaf specialists: `ai-engineer`, `backend-engineer`, `code-reviewer`,
-  `design-specialist`, `devops-engineer`, `frontend-engineer`, `qa-engineer`,
-  `researcher`, `security-reviewer`, `software-architect`,
-  `software-engineer-node`, `software-engineer-python`.
+**Dispatchers (only 2 may dispatch via Agent tool — constitution §9):**
+- `project-manager` — lease coordinator; holds the single MUTATING lease through
+  phases 5→6→8; dispatches product-engineer and software-engineer as sub-agents.
+- `project-auditor` — audit fan-out dispatcher; dispatches audit workers (ADDITIVE).
 
-Dispatchers classify work, coordinate specialists, and synthesize reports. The
-curator owns SPEC/PLAN/TASKS/CLOSURE and memory updates. Leaf specialists do not
-chain further dispatch unless a runtime-specific orchestration layer explicitly
-assigns that responsibility.
+**Curator (1):**
+- `product-engineer` — owns SPEC/PLAN/TASKS/CLOSURE and memory updates; runs as
+  PM sub-agent; no independent lease acquire.
 
-Seven workflows ship by default:
+**Leaf specialists (6 core):**
+- `software-engineer` — implementation (production code + tests); PM sub-agent.
+- `qa-engineer` — review → commit gate (ADDITIVE evidence; votes).
+- `security-reviewer` — review → push gate (ADDITIVE evidence; votes).
+- `code-reviewer` — review → PR gate (ADDITIVE evidence; votes).
+- `ai-engineer` — owns `dadaia_workspace/public/**` AI-entity surface.
+- `software-architect` — architectural review; feeds findings into phases 4/5 (ADDITIVE).
 
-- `spec-refinement`
-- `cross-cutting-feature`
-- `onboarding-new-repo`
-- `hotfix-release`
-- `audit-cycle`
-- `code-review-fan-out`
-- `design-first-implementation`
+**Plugins (not in core roster):** `frontend-engineer`, `design-specialist` (plugin
+`frontend-design`); `devops-engineer` (plugin `devops`).
 
-Domain workflows such as game development, dashboard publication, or
-vendor-specific data pipelines are not part of the default public install.
+### Dispatcher purity (constitution §9)
 
-Claude Code uses Claude-native agent/tool semantics. Codex projections are
-reference-only for workflow execution unless the host conversation exposes a
-real subagent/delegation tool. Codex personas may reference `tool_search` only
-to discover available host-conversation tools; they must not claim that
-`dadaia orchestrate --runtime codex` spawned subagents or executed parallel
-groups. OpenCode uses its own agent and plugin projection.
+Only `project-manager` and `project-auditor` may dispatch sub-agents via the Agent tool.
+All other personas are workers — they reply only to their dispatcher and never invoke
+another agent. A worker that perceives a need for another agent's work surfaces it to its
+dispatcher; it never spawns the agent itself. Worker→worker dispatch is a structural
+impossibility and keeps the dispatch topology auditable.
 
-The dispatcher layer must report unsupported runtime capabilities honestly
-instead of simulating success. In Codex, parallel workflow groups are topology
-metadata and manual handoff files, not a promise of runtime concurrency.
+### Coordinator + sub-agent architecture
 
-Before TASKS approval, the owning implementer agents, `qa-engineer`,
-`code-reviewer`, and `security-reviewer` must agree that each task is
-implementable, testable, reviewable, and security-checkable. UI-visible tasks
-also require `design-specialist` agreement. After implementation, an
-implementer emits an implementation-complete handoff; the task remains active
-until QA, code review, and security review approve the same commit or artifact.
-Any rejection routes back to the owning implementer for rework and re-review.
-Task `[x]`, push, PR, merge, deploy, release closure, and memory updates are
-blocked until the review/QA gate is green.
+`project-manager` is the lease coordinator for a release. When a release enters its
+MUTATING span (phase 5), PM acquires ONE lease and holds it through definition →
+implementation → review-closure. `product-engineer` and `software-engineer` run as
+PM sub-agents under that single lease. They never independently bind a session, so
+there is no session handoff and no second lock.
+
+### ADDITIVE vs MUTATING activity classes
+
+| Class | Phases | Lease |
+|-------|--------|-------|
+| ADDITIVE | Backlog def, bug filing, research, audit, review gates | None — concurrent |
+| MUTATING | Release definition (5), implementation (6), closure (8) | Single PM-held lease |
+
+### Workflows (2 default)
+
+Two workflows ship by default (stale workflows deleted in v0.1.9):
+
+- `release-ship` — the deploy gate sequence (deterministic, non-judgment steps).
+- `audit-fanout` — fan-out pattern for project-auditor audit dispatches.
+
+Domain workflows such as game development, dashboard publication, or vendor-specific
+data pipelines are not part of the default public install.
+
+### Review checkpoint sequence (constitution §11)
+
+During release definition (phase 5): qa-engineer first → software-architect optional
+(parallel) → software-engineer last.
+
+During implementation checkpoints (rc-N ship): qa → commit; security → push;
+code-review → PR; product-engineer memory update → after code-review checkpoint.
+
+Before TASKS approval: owning implementer, `qa-engineer`, `code-reviewer`, and
+`security-reviewer` must agree tasks are implementable, testable, reviewable. Task `[x]`,
+push, PR, merge, deploy, and memory updates are blocked until all required reviewers APPROVE.
+
+### Runtime dispatch honesty
+
+Claude Code uses Claude-native agent/tool semantics with real Agent tool dispatch.
+Codex projections are **reference-only** for workflow execution unless the host
+conversation exposes a real subagent/delegation tool: a Codex "dispatch" writes a
+**manual handoff** sidecar for a human/coordinator to action.
+It is **not a promise of runtime concurrency**.
+OpenCode uses its own agent and plugin projection. The dispatcher layer must report
+unsupported runtime capabilities honestly instead of simulating success.
 
 ## Estado runtime tocado
 
 `ai-engineer` owns public AI entities under
 `dadaia_workspace/public/{agents,skills,rules,workflows,commands,hooks}/**`.
-Python/Node implementation agents own implementation code and tests, not public
-agentic assets. `product-engineer` owns specs and memory according to SDD phase.
+`software-engineer` owns implementation code and tests, not public agentic assets.
+`product-engineer` owns specs and memory according to SDD phase.
 
 The SDD gate validates write allowlists, task ownership, active context, and
 memory phase rules. Reports are emitted under `.dadaia/reports/<context>/<agent>/`
-with machine-readable handoff sidecars where required.
+with machine-readable handoff sidecars. Agent↔agent handoffs go to
+`.dadaia/handoff/<context>/`. Audit results go to `specs/audits/<ts>-<session_id_8chars>/`
+(committed Markdown — constitution §11).
 
-`ai-engineer` model assignment: `claude-opus-4-8` (operator-approved v0.1.4.6 —
-synthesis-heavy harness-mastery workload justifies Opus tier).
+`ai-engineer` model assignment: `claude-opus-4-8` (synthesis-heavy harness-mastery workload).
 
 `ai-engineer` exclusive skills (restricted by `harness-skill-scope` rule):
 `ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`.

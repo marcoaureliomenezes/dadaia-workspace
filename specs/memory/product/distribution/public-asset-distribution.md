@@ -11,7 +11,7 @@ tags:
 - projection
 - privacy
 agent_tier: self-pull
-token_estimate: 520
+token_estimate: 678
 last_updated: '2026-06-06'
 release_origin: v0.1.5
 ---

@@ -41,13 +41,13 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 ## Agent runtimes
 
   * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`.
-  * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..5. 20 agentes TOML em `.codex/agents/`. Zero leak `claude-*`. Workflows em `.codex/workflows/`.
+  * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..5. 9 agentes core TOML em `.codex/agents/`. Zero leak `claude-*`. Workflows em `.codex/workflows/`.
   * **OpenCode** : projeção via strip de frontmatter de tools; workflows e skills projetados em `.opencode/`.
   * **CLI** : agentes invocados via `claude --agent <name>` ou equivalente; modo manual sem paralelização automática.
 
 
 
-## Model assignments (20 agentes)
+## Model assignments (9 core agents + 3 plugin stubs)
 
 Modelo padrão da topologia pública: `claude-sonnet-4-6` para os agentes default,
 com override per-dispatch via `DADAIA_MODEL_OVERRIDE=opus` quando a política do
@@ -56,14 +56,18 @@ modelos próprios fora do default público.
 
 Agente| Modelo| Nota
 ---|---|---
-project-manager| `claude-sonnet-4-6`| Tier 1 orquestrador
-project-auditor| `claude-sonnet-4-6`| Tier 1 orquestrador
-product-engineer| `claude-sonnet-4-6`| Tier 2 curator
-software-architect| `claude-sonnet-4-6`| Tier 3 leaf
-ai-engineer| `claude-opus-4-8`| Tier 3 leaf (upgraded v0.1.4.6: harness-mastery synthesis workload)
-researcher| `claude-haiku-4-5-20251001`| Haiku 4.5; canônico em fan-out evidence-heavy (ADR-X6)
-security-reviewer| `claude-sonnet-4-6` (triage) / `claude-haiku-4-5` (scan)| Dispatcher declara o modo explicitamente
-code-reviewer, software-engineer-python, software-engineer-node, backend-engineer, frontend-engineer, qa-engineer, devops-engineer, design-specialist| `claude-sonnet-4-6`| Tier 3 leaves restantes (8)
+project-manager| `claude-sonnet-4-6`| Dispatcher / lease coordinator
+project-auditor| `claude-sonnet-4-6`| Dispatcher / audit fan-out
+product-engineer| `claude-sonnet-4-6`| Curator / memory guardian
+software-engineer| `claude-sonnet-4-6`| Implementation leaf (absorbs python/node/backend)
+ai-engineer| `claude-opus-4-8`| AI-entity surface owner (harness-mastery synthesis workload)
+software-architect| `claude-sonnet-4-6`| Architectural review leaf (ADDITIVE)
+qa-engineer| `claude-sonnet-4-6`| Review → commit gate leaf
+security-reviewer| `claude-sonnet-4-6`| Review → push gate leaf
+code-reviewer| `claude-sonnet-4-6`| Review → PR gate leaf
+frontend-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
+design-specialist (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
+devops-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (devops); no behavior without plugin
 
 ## Plugin inventory
 
@@ -77,7 +81,7 @@ Plugin| Status| Escopo
 
 ## Schema handoff-v1.1
 
-O contrato de sidecar JSON entre agentes é versionado em `dadaia_workspace/public/schemas/handoff-v1.schema.json`. A versão corrente é **v1.1** (ADR-X5). Campos obrigatórios novos: `findings[].detail_md`, `findings[].fix_recommendation`, `scope`, `metrics`. Campo `artifact.path` tornou-se opcional. `schema_version` aceita `"handoff-v1"` e `"handoff-v1.1"`. Validação via `dadaia reports validate`; lint orphan/oversized/missing-fields via `dadaia reports lint <dir>`. Default de emissão dos 20 agentes: sidecar-only; HTML apenas sob `--with-report` ou `next_handoff.agent == "human"`.
+O contrato de sidecar JSON entre agentes é versionado em `dadaia_workspace/public/schemas/handoff-v1.schema.json`. A versão corrente é **v1.1** (ADR-X5). Campos obrigatórios novos: `findings[].detail_md`, `findings[].fix_recommendation`, `scope`, `metrics`. Campo `artifact.path` tornou-se opcional. `schema_version` aceita `"handoff-v1"` e `"handoff-v1.1"`. Validação via `dadaia reports validate`; lint orphan/oversized/missing-fields via `dadaia reports lint <dir>`. Default de emissão dos 9 agentes core: sidecar-only; HTML apenas sob `--with-report` ou `next_handoff.agent == "human"`.
 
 ## Dependências aprovadas
 
