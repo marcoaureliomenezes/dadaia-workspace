@@ -4,23 +4,20 @@ Provides :func:`transform_for_codex` — a deterministic function that adapts th
 canonical body of an agent persona (with frontmatter already stripped) to the
 Codex runtime.
 
-Transformations applied (v1, per ADR-2 §Transformações obrigatórias):
+Transformations applied:
 
-1. Replace references to the Claude Code ``Agent`` tool with Codex-native
-   multi-agent wording:
-   - `` `Agent` tool `` → ``deferred multi-agent tool via tool_search``
-   - ``Agent tool``     → ``deferred multi-agent tool via tool_search``
-   - ``Agent.dispatch`` → ``multi-agent dispatch discovered via tool_search``
-   - `` `Agent` ``      → ``multi-agent tool discovered via tool_search``
+1. Replace references to the Claude Code ``Agent`` tool with Codex custom-agent
+   delegation wording. Codex has native custom agents/subagents; workflow
+   Markdown remains documentation and does not auto-execute fan-out.
 
 2. Preserve hook semantics. Claude-authored references to ``PreToolUse``,
    ``PostToolUse``, and ``UserPromptSubmit`` remain visible because Codex
    receives equivalent generated hooks where the runtime supports them.
 
-3. Replace Claude model identifiers (``claude-*``) appearing in body text with
-   their Codex equivalents from the model mapping table (ADR-5).  This prevents
-   AC3 violations when agent body prose documents Claude model names in tables
-   or capability descriptions.
+3. Replace only known Claude model identifiers with their Codex equivalents
+   from the model mapping table. Other ``claude-*`` identifiers are preserved
+   because they may be legitimate skill names such as
+   ``ai-harness-claude-code``.
 
 4. Preserve all remaining content verbatim.
 
@@ -38,14 +35,11 @@ from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MOD
 # ---------------------------------------------------------------------------
 
 _REPLACEMENTS: tuple[tuple[str, str], ...] = (
-    # "`Agent` tool" → Codex deferred tool-discovery wording.
-    ("`Agent` tool", "deferred multi-agent tool via `tool_search`"),
-    # "Agent tool" (unquoted) → Codex deferred tool-discovery wording.
-    ("Agent tool", "deferred multi-agent tool via `tool_search`"),
-    # "Agent.dispatch" → Codex dispatch wording.
-    ("Agent.dispatch", "multi-agent dispatch discovered via `tool_search`"),
-    # "`Agent`" alone (e.g. tool-table entries) → Codex tool-discovery wording.
-    ("`Agent`", "multi-agent tool discovered via `tool_search`"),
+    (".claude/rules/workspace-protocol.md", "AGENTS.md and projected workspace protocols"),
+    ("`Agent` tool", "Codex custom-agent delegation"),
+    ("Agent tool", "Codex custom-agent delegation"),
+    ("Agent.dispatch", "Codex custom-agent delegation"),
+    ("`Agent`", "Codex custom-agent delegation"),
 )
 
 # Pattern matching any ``claude-<identifier>`` token in body prose.
@@ -54,14 +48,6 @@ _REPLACEMENTS: tuple[tuple[str, str], ...] = (
 _KNOWN_MODEL_RE: re.Pattern[str] = re.compile(
     r"(" + "|".join(re.escape(k) for k in sorted(MODEL_MAP, key=len, reverse=True)) + r")"
 )
-
-# Catch-all for any remaining ``claude-*`` identifiers not in MODEL_MAP
-# (e.g. ``claude-haiku`` without version suffix).  These are replaced with the
-# default Codex model name so that AC3 (zero ``claude-*`` in .codex/) is met.
-_CLAUDE_GENERIC_RE: re.Pattern[str] = re.compile(r"claude-[\w.-]+")
-
-# Default Codex model used when no exact mapping exists.
-_CODEX_DEFAULT_MODEL = "gpt-5.3-codex"
 
 
 def transform_for_codex(canonical_body: str, agent_id: str) -> str:  # noqa: ARG001
@@ -88,9 +74,5 @@ def transform_for_codex(canonical_body: str, agent_id: str) -> str:  # noqa: ARG
 
     # Replace known Claude model identifiers in body prose (ADR-5 / AC3).
     result = _KNOWN_MODEL_RE.sub(lambda m: MODEL_MAP[m.group(1)], result)
-
-    # Replace any remaining ``claude-*`` identifiers not covered by MODEL_MAP
-    # (e.g. bare ``claude-haiku`` without version suffix) with the default model.
-    result = _CLAUDE_GENERIC_RE.sub(_CODEX_DEFAULT_MODEL, result)
 
     return result

@@ -1,4 +1,4 @@
-"""Codex orchestration wording must stay reference-only unless spawning exists."""
+"""Codex orchestration wording must distinguish agents from workflow docs."""
 
 from __future__ import annotations
 
@@ -13,11 +13,9 @@ AGENT_ORCHESTRATION = (
 )
 
 FORBIDDEN_CODEX_PROMISES = (
-    "Codex best-effort parallel",
-    "Codex supports best-effort parallel",
     "deferred multi-agent tools when that capability is available",
     "fake literal `subagent` tool",
-    "parallel stages may be dispatched in parallel",
+    "tool_search",
 )
 
 
@@ -25,8 +23,8 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_parallel_workflows_state_codex_reference_only_mode() -> None:
-    """Any public workflow with parallel topology must include the Codex caveat."""
+def test_parallel_workflows_state_codex_workflow_docs_boundary() -> None:
+    """Workflow docs must state that Codex does not auto-execute the file itself."""
     missing: list[str] = []
 
     for path in sorted(WORKFLOWS_DIR.glob("*.workflow.md")):
@@ -35,15 +33,15 @@ def test_parallel_workflows_state_codex_reference_only_mode() -> None:
             continue
         lowered = content.lower()
         if not (
-            "codex receives manual/reference" in lowered and "does not spawn subagents" in lowered
+            "codex" in lowered and "workflow" in lowered and "does not auto-execute" in lowered
         ):
             missing.append(path.name)
 
     assert missing == []
 
 
-def test_codex_facing_text_does_not_promise_spawned_parallelism() -> None:
-    """Codex-facing public text must not claim runtime spawning or fake tools."""
+def test_codex_facing_text_does_not_promise_fake_tools() -> None:
+    """Codex-facing public text must not claim fake deferred tools."""
     paths = [
         AGENT_ORCHESTRATION,
         *sorted(AGENTS_DIR.glob("*.md")),
@@ -60,9 +58,9 @@ def test_codex_facing_text_does_not_promise_spawned_parallelism() -> None:
     assert failures == []
 
 
-def test_codex_dispatcher_memory_names_manual_handoff_boundary() -> None:
-    """Memory product truth must describe Codex orchestration as manual/reference."""
+def test_codex_dispatcher_memory_names_custom_agent_boundary() -> None:
+    """Memory product truth must distinguish custom agents from workflow docs."""
     content = _text(AGENT_ORCHESTRATION).lower()
-    assert "reference-only" in content
-    assert "manual handoff" in content
-    assert "not a promise of runtime concurrency" in content
+    assert "codex custom agents" in content
+    assert "workflow markdown" in content
+    assert "does not auto-execute" in content

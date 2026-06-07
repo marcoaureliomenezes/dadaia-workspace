@@ -5,7 +5,7 @@
 
 ---
 
-- [-] T-CX-1 — Fix Codex semantic transformer and model mapping
+- [x] T-CX-1 — Fix Codex semantic transformer and model mapping
   - Owner: software-engineer
   - Write set:
     - `dadaia_workspace/infrastructure/runtime_transforms/**`
@@ -14,7 +14,7 @@
     - `ai-harness-claude-code` is preserved as a skill name.
     - Model identifiers map only in model contexts.
 
-- [ ] T-CX-2 — Generate Codex-native command `.rules`
+- [x] T-CX-2 — Generate Codex-native command `.rules`
   - Owner: software-engineer
   - Write set:
     - `dadaia_workspace/infrastructure/public_assets.py`
@@ -24,7 +24,7 @@
     - `.codex/rules/*.rules` is generated.
     - Markdown protocol docs do not masquerade as executable Codex Rules.
 
-- [ ] T-CX-3 — Add Codex custom-agent config boundaries
+- [x] T-CX-3 — Add Codex custom-agent config boundaries
   - Owner: software-engineer
   - Write set:
     - `dadaia_workspace/infrastructure/public_assets.py`
@@ -34,7 +34,7 @@
     - Generated TOML includes supported role-boundary config.
     - Provider/auth/telemetry remain absent.
 
-- [ ] T-CX-4 — Update Codex AI-surface wording
+- [x] T-CX-4 — Update Codex AI-surface wording
   - Owner: ai-engineer
   - Write set:
     - `dadaia_workspace/public/agents/**`
@@ -46,7 +46,7 @@
     - Codex subagent/custom-agent wording is current.
     - `.claude/rules/...` is not emitted into Codex agents.
 
-- [ ] T-CX-5 — Expand public doctor semantic checks
+- [x] T-CX-5 — Expand public doctor semantic checks
   - Owner: software-engineer
   - Write set:
     - `dadaia_workspace/infrastructure/public_assets.py`
@@ -54,7 +54,7 @@
   - Acceptance:
     - Doctor fails on non-existent Codex skill references, stale Claude path leaks, missing TOML files, bad rules/config/hooks.
 
-- [ ] T-CX-6 — Stage/install and eliminate runtime projection drift
+- [x] T-CX-6 — Stage/install and eliminate runtime projection drift
   - Owner: software-engineer
   - Write set:
     - `.dadaia/agentic/**`
@@ -68,7 +68,7 @@
     - `dadaia public stage && dadaia public install --target all && dadaia public doctor` passes.
     - Instantiated workspace projection matches library source.
 
-- [ ] T-CX-7 — Memory update, closure, archive, PR
+- [x] T-CX-7 — Memory update, closure, archive, PR
   - Owner: product-engineer
   - Write set:
     - `specs/memory/**`

@@ -13,8 +13,8 @@ tags:
 - dispatch
 agent_tier: self-pull
 token_estimate: 865
-last_updated: '2026-06-06'
-release_origin: v0.2.0
+last_updated: '2026-06-07'
+release_origin: v0.2.2
 ---
 
 ## Propósito
@@ -29,7 +29,7 @@ agents belong in optional packs or local overlays.
 The public default has **9 core agents** in the coordinator + sub-agent architecture
 defined by constitution §9:
 
-**Dispatchers (only 2 may dispatch via Agent tool — constitution §9):**
+**Dispatchers (only 2 may dispatch through the active harness's delegation primitive — constitution §9):**
 - `project-manager` — lease coordinator; holds the single MUTATING lease through
   phases 5→6→8; dispatches product-engineer and software-engineer as sub-agents.
 - `project-auditor` — audit fan-out dispatcher; dispatches audit workers (ADDITIVE).
@@ -97,12 +97,12 @@ push, PR, merge, deploy, and memory updates are blocked until all required revie
 ### Runtime dispatch honesty
 
 Claude Code uses Claude-native agent/tool semantics with real Agent tool dispatch.
-Codex projections are **reference-only** for workflow execution unless the host
-conversation exposes a real subagent/delegation tool: a Codex "dispatch" writes a
-**manual handoff** sidecar for a human/coordinator to action.
-It is **not a promise of runtime concurrency**.
-OpenCode uses its own agent and plugin projection. The dispatcher layer must report
-unsupported runtime capabilities honestly instead of simulating success.
+Codex custom agents are real configured delegates projected under `.codex/agents/*.toml`;
+they are not simulated with fake tool names or stale tool-discovery promises. Codex
+workflow Markdown is still documentation: it does not auto-execute, schedule fan-out, or
+turn a workflow file into a runtime primitive by itself. OpenCode uses its own agent and
+plugin projection. The dispatcher layer must report unsupported runtime capabilities
+honestly instead of simulating success.
 
 ## Estado runtime tocado
 

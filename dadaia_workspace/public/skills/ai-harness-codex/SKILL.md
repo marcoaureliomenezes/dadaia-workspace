@@ -64,17 +64,16 @@ in this workspace. The word "rule" means two unrelated things.
 
 | You see / hear | What it actually is | Executable? | Enforces? |
 |---|---|---|---|
-| Codex **"Rules"** | Starlark `.rules` files using `prefix_rule()` | Yes (Starlark) | Command approval: `allow` / `prompt` / `forbidden` |
-| dadaia **"rules"** (`.codex/rules/*.md`, `public/rules/*.md`) | Markdown workspace-protocol / agent-guidance docs | No | Nothing automatically — advisory text the model reads |
+| Codex **"Rules"** | Starlark `.rules` files under `.codex/rules/*.rules` | Yes (Starlark) | Command approval / prompt policy |
+| dadaia **"rules"** (`public/rules/*.md`) | Markdown workspace-protocol / agent-guidance docs | No | Nothing automatically — advisory text the model reads through projected guidance surfaces |
 
 Disambiguation heuristics when reading:
 
 - **File extension is the ground truth.** `.rules` = official Codex command policy.
-  `.md` = dadaia advisory protocol, regardless of the folder being named `rules/`.
-- A `.codex/rules/foo.md` file looks like enforcement but is **only documentation**.
-  Treat the name as a known false-friend. Prefer the term "workflow-protocol" or
-  "agent-guidance" in your own prose so you never imply automatic enforcement that
-  does not exist.
+  `.md` = dadaia advisory protocol. Current dadaia projection must not install Markdown
+  protocols into `.codex/rules/`.
+- A `.codex/rules/foo.md` file is projection drift. Report it and fix the source
+  installer/doctor rather than treating it as enforcement.
 - In logs: an `allow`/`prompt`/`forbidden` decision on a command = a real Starlark
   Rule fired. Plain instruction-following with no approval gate = a Markdown doc was
   merely in context.

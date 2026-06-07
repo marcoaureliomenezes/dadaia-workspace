@@ -55,10 +55,10 @@ Cites constitution §1 matrix: **activity class ADDITIVE, lifecycle phase Resear
 phase 4, audit). The audit writes only to `.dadaia/reports/**` and `.dadaia/handoff/**` and
 takes no lease (§8 ADDITIVE).
 
-> **Honesty note.** This is a dispatch-reference document. Claude Code and Codex do NOT
-> auto-load `.claude/workflows/` files at runtime (constitution §4). This file is read by
-> an agent only when `project-manager` explicitly loads it as context. It does not execute
-> by itself and is not a Claude Code or Codex runtime primitive.
+> **Honesty note.** This is a dispatch-reference document. Claude Code and Codex workflow
+> Markdown does not auto-execute at runtime (constitution §4). This file is read by an
+> agent only when `project-manager` explicitly loads it as context. It is not a Claude Code
+> or Codex runtime primitive.
 
 ## When to use
 

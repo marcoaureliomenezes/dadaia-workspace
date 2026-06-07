@@ -1,9 +1,10 @@
-"""Integration tests for doctor() Codex drift checks D-CX-1 through D-CX-5.
+"""Integration tests for doctor() Codex drift checks D-CX-1 through D-CX-10.
 
 Covers acceptance criteria:
   - D-CX-1: missing TOML is reported as [missing] and not [ok]
   - D-CX-3: artificial removal of a workflow is reported as [missing]
   - D-CX-5: corrupted developer_instructions in a TOML reports the agent
+  - D-CX-7/D-CX-8/D-CX-9/D-CX-10: semantic Codex projection drift is caught
 
 Strategy
 --------
@@ -173,3 +174,65 @@ def test_ac9_missing_toml_no_ok_reported(installed_workspace: Path) -> None:
         "Expected '[missing] codex:agents/qa-engineer.toml (D-CX-1)' report. "
         "All reports:\n" + "\n".join(reports)
     )
+
+
+def test_dcx4_allows_claude_code_skill_but_rejects_model_ids(installed_workspace: Path) -> None:
+    toml_path = installed_workspace / ".codex" / "agents" / "ai-engineer.toml"
+    text = toml_path.read_text(encoding="utf-8")
+    assert "ai-harness-claude-code" in text
+    assert "ai-harness-gpt" not in text
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+    assert not any("D-CX-4" in r and "ai-harness-claude-code" in r for r in reports)
+
+    toml_path.write_text(text + "\nClaude model leak: claude-opus-4-7\n", encoding="utf-8")
+    drift_reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-4" in r and "ai-engineer.toml" in r for r in drift_reports)
+
+
+def test_dcx7_missing_codex_skill_reference_detected(installed_workspace: Path) -> None:
+    toml_path = installed_workspace / ".codex" / "agents" / "ai-engineer.toml"
+    original = toml_path.read_text(encoding="utf-8")
+    toml_path.write_text(
+        original.replace("`ai-harness-claude-code`", "`ai-harness-gpt-5.3-codex`", 1),
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-7" in r and "ai-harness-gpt-5.3-codex" in r for r in reports)
+
+
+def test_dcx8_markdown_rules_rejected(installed_workspace: Path) -> None:
+    rules_dir = installed_workspace / ".codex" / "rules"
+    assert (rules_dir / "dadaia-command-policy.rules").exists()
+
+    (rules_dir / "workspace-protocol.md").write_text("# not executable\n", encoding="utf-8")
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-8" in r and "workspace-protocol.md" in r for r in reports)
+
+
+def test_dcx9_missing_hook_script_detected(installed_workspace: Path) -> None:
+    script = installed_workspace / ".dadaia" / "scripts" / "ctx-inject.sh"
+    assert script.exists()
+    script.unlink()
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-9" in r and "ctx-inject.sh" in r for r in reports)
+
+
+def test_dcx10_missing_agent_boundary_detected(installed_workspace: Path) -> None:
+    toml_path = installed_workspace / ".codex" / "agents" / "qa-engineer.toml"
+    text = toml_path.read_text(encoding="utf-8")
+    toml_path.write_text(
+        re.sub(r"^sandbox_mode = .+\n", "", text, flags=re.MULTILINE),
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-10" in r and "qa-engineer.toml" in r and "sandbox_mode" in r for r in reports)

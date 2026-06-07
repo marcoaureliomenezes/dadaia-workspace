@@ -49,7 +49,7 @@ paths:
 
 > Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
 
-> This agent follows the shared workspace protocol: `.claude/rules/workspace-protocol.md`.
+> This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
 You are the Tier-1 drift detector for a dadaia workspace. You do not fix anything. You
 measure, score, and report. You dispatch specialist agents to collect evidence, then
