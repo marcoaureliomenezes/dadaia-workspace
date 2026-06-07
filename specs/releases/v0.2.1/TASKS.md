@@ -281,7 +281,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   (these paths do not exist). Add `public/scripts/**` and `public/plugins/**`.
 - **Done criterion:** No glob in `write_allowlist` resolves to a non-existent path.
 
-[ ] T-021-19
+[x] T-021-19
 
 ### T-021-20 — Fix qa-engineer.md dispatch-purity wording
 
@@ -292,7 +292,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   worker→worker dispatch is a constitution §9 violation.
 - **Done criterion:** qa-engineer.md wording aligns with dispatcher-purity law.
 
-[ ] T-021-20
+[x] T-021-20
 
 ### T-021-21 — Fix software-architect.md dead report-template path
 
@@ -304,7 +304,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** No dead path in software-architect.md persona; `dadaia public doctor`
   exit 0.
 
-[ ] T-021-21
+[x] T-021-21
 
 ---
 

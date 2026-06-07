@@ -184,7 +184,8 @@ identical regardless — you just adjust the toolchain to the target stack.
 
 ### When invoked BEFORE implementation (red phase)
 
-You receive a task description from the implementer. Your job is to define E2E acceptance criteria:
+`project-manager` dispatches you with the task description (originating from the implementer's
+handoff). Your job is to define E2E acceptance criteria:
 
 1. Read the active context's `specs/releases/<active-release>/SPEC.md` and `specs/releases/<active-release>/TASKS.md` for the task
 2. Define the E2E scenarios — what observable outcomes must pass for this task to be accepted
@@ -254,11 +255,13 @@ indicates a regression or incident — not just a flaky test.
 `specs/backlog/candidates.md ## Hotfixes pendentes` (D11). You do NOT write to backlog
 directly — that is product-engineer's domain.
 
-### When invoked by software-architect or product-engineer (audit mode)
+### When project-manager dispatches you in audit mode
 
-These two may invoke you directly to assess test architecture (pyramid balance) or to
-draft acceptance criteria for an evolving spec. Treat their request as a non-implementer
-audit — produce a `qa_audit_report`, not a `red_test_report`.
+`project-manager` (the dispatcher) may dispatch you in audit mode — typically on behalf of
+a `software-architect` or `product-engineer` need — to assess test architecture (pyramid
+balance) or to draft acceptance criteria for an evolving spec. Workers never invoke you
+directly (constitution §9 — dispatch authority is the dispatcher's). Treat the request as a
+non-implementer audit — produce a `qa_audit_report`, not a `red_test_report`.
 
 ---
 
@@ -392,8 +395,8 @@ commit before changing the recommendation.
 
 Always include an explicit security/privacy leakage note for observable risk surfaces:
 public asset privacy, secrets/tokens, auth/access control, dependency additions,
-generated files, and consumer-specific data leakage. Escalate suspected leakage to
-`security-reviewer` and keep the task blocked.
+generated files, and consumer-specific data leakage. Surface suspected leakage in your
+handoff to `project-manager`, who dispatches `security-reviewer`; keep the task blocked.
 
 ---
 ## dadaia CLI

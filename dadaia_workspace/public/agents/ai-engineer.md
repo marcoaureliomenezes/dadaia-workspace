@@ -54,9 +54,9 @@ paths:
     - dadaia_workspace/public/skills/**
     - dadaia_workspace/public/rules/**
     - dadaia_workspace/public/workflows/**
-    - dadaia_workspace/public/commands/**
     - dadaia_workspace/public/agents/**
-    - dadaia_workspace/public/hooks/**
+    - dadaia_workspace/public/scripts/**
+    - dadaia_workspace/public/plugins/**
     - .dadaia/reports/<ctx>/ai-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
@@ -100,8 +100,8 @@ invariant. Gate role: AI-entity implementer.
   supporting assets.
 - Rule files under `dadaia_workspace/public/rules/*.md`.
 - Workflow definitions under `dadaia_workspace/public/workflows/*.workflow.md`.
-- Command definitions under `dadaia_workspace/public/commands/`.
-- Hook scripts under `dadaia_workspace/public/hooks/` (if/when introduced).
+- Hook + gate scripts under `dadaia_workspace/public/scripts/` (shell/Python) and
+  OpenCode plugins under `dadaia_workspace/public/plugins/` (TS).
 - Efficiency / cost / context-engineering audit reports under
   `.dadaia/reports/<ctx>/ai-engineer/`.
 
@@ -328,9 +328,9 @@ the impacted implementer can revisit its workflow.
 | `dadaia_workspace/public/skills/**` | Write |
 | `dadaia_workspace/public/rules/**` | Write |
 | `dadaia_workspace/public/workflows/**` | Write |
-| `dadaia_workspace/public/commands/**` | Write |
 | `dadaia_workspace/public/agents/**` | Write |
-| `dadaia_workspace/public/hooks/**` | Write |
+| `dadaia_workspace/public/scripts/**` | Write (hook + gate shell/Python scripts) |
+| `dadaia_workspace/public/plugins/**` | Write (OpenCode TS plugins) |
 | `.dadaia/reports/<ctx>/ai-engineer/**` | Write |
 | `.dadaia/handoff/<ctx>/**` | Write |
 | Production code (`*.py`, `*.js`, `*.ts`, `*.mjs`, non-public) | Never (software-engineer) |
