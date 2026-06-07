@@ -66,7 +66,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Wikilink in non-dadaia-workspace context resolves to the correct
   context slug, not hardcoded `dadaia-workspace`.
 
-[ ] T-016-P04
+[-] T-016-P04
 
 ### T-016-P05 — Auth route unification
 
