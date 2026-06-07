@@ -4,6 +4,102 @@ This document is the permanent product law for `dadaia-workspace`. Agents and
 contributors must read it before changing architecture, public agentic assets,
 SDD behavior, memory, or distribution rules.
 
+## 0. Identity & Core Concepts
+
+This section defines what `dadaia-workspace` is and the vocabulary the rest of
+this law uses. It is **declarative, not normative**: it imposes no new constraint;
+it names the concepts that §1–§14 encode. The lifecycle (§7), the roster (§14),
+the concurrency/lock contract (§8–§9), and the gate sequence (§11) are all
+derivable from the definitions stated here.
+
+### What dadaia-workspace is
+
+`dadaia-workspace` is a **multi-AI-harness × multi-project × SDD-oriented ×
+multi-agent** development workspace. It runs the same agent fleet across more than
+one AI coding harness (Claude Code, Codex, and — when installed — OpenCode), over
+more than one software project at once, under Spec-Driven Development, coordinated
+by a roster of specialized agents. Its product is not any single project's code: it
+is the **workspace-level context-engineering** that orients an otherwise generic
+agent fleet so those agents can build many projects safely, in an organized way,
+and in parallel — without re-deriving how to work each time and without colliding
+with one another.
+
+### The Spec Context Project (the keystone concept)
+
+The **Spec Context Project** is the central concept of dadaia-workspace, and the
+unit through which all of the above is delivered. A Spec Context Project is **one
+canonical specs folder bound to one repository**. The specs folder is a fixed
+pattern — `backlog/`, `bugs/`, `memory/`, `releases/`, plus `constitution.md` and
+`AGENTS.md` — and the repository is the code the specs govern.
+
+A Spec Context Project is **bindable to a terminal session**. Binding is the value
+chain that makes the workspace work:
+
+1. **Bind** — a session attaches to one Spec Context Project (the active context).
+2. **Inject** — binding injects that context's `constitution.md` and its `memory/`
+   into the session, by **lazy product-feature consumption** (the constitution and
+   the memory index load up front; individual feature atoms are pulled on demand,
+   so a session is grounded without paying for the whole product catalog at once).
+3. **Enforce** — the SDD lifecycle (§7) is enforced for every production write under
+   that context: no production change without an approved release and a reserved task.
+4. **Parallel multi-project** — because each context carries exactly one MUTATING
+   lease (§8), multiple Spec Context Projects can be worked concurrently in different
+   sessions, and ADDITIVE work within any context runs in parallel — safely, because
+   the lock contract makes exactly-one-mutating-writer-per-context structural.
+
+This bind → inject → enforce → parallel-multi-project chain is what lets a generic
+agent fleet build real projects safely and in an organized way. Everything else in
+this constitution is machinery in service of it.
+
+### Development lifecycle phases
+
+Work in a Spec Context Project flows through eight phases, partitioned into two
+activity classes that determine concurrency:
+
+- **ADDITIVE** phases run in parallel and never take a lease: backlog definition,
+  bug filing, research, audit, and the review checkpoints. Their writes append
+  evidence or candidates; they never mutate the product's source of truth.
+- **MUTATING** phases serialize under exactly one lease per context: release
+  definition (SPEC/PLAN/TASKS), implementation, and closure (memory + ACTIVE).
+
+The full eight-phase matrix — owner, write target, activity class, and lease
+behavior per phase — is the normative §7. The concurrency contract that partitions
+them is §8; the coordinator model that holds the single lease across the MUTATING
+span is §9.
+
+### Agent philosophy
+
+dadaia-workspace agents are **generic AI implementations specialized only in their
+dadaia-workspace SDD role.** An agent's expertise is: how it fits the lifecycle,
+which phases it owns or gates, how it interconnects with the other agents, and a
+minimal set of role-tailored skills carried by a context-engineered system prompt.
+Agents hold **no project-domain knowledge** — that lives entirely in the bound Spec
+Context's `specs/` (constitution + memory). The same fleet therefore works any
+project; only the injected context changes.
+
+Each agent is specialized along one axis:
+
+- **ai-engineer** — the multi-harness AI-entity surface: agent personas, skills,
+  rules, workflows, hooks, and the context-engineering that drives them.
+- **product-engineer** — specs and memory: SPEC/PLAN/TASKS/CLOSURE, the memory
+  canon, and anti-slop guardianship of the single-source-of-truth law.
+- **project-manager** — the full lifecycle as coordinator: it knows every agent's
+  attributions and acts as the delegator that holds and routes the release lease.
+- **software-engineer** — production code under TDD and SDD task discipline.
+
+The remaining core agents (project-auditor, qa-engineer, security-reviewer,
+code-reviewer, software-architect) are each specialized to the phase they own or
+gate in §7. The canonical roster is §14; the dispatcher-purity rule (only
+project-manager and project-auditor dispatch sub-agents) is §9.
+
+### Value proposition
+
+An operator chooses dadaia-workspace because it turns a generic agent fleet into a
+disciplined, parallel, multi-project software team: bind a context, and the
+constitution and memory orient the agents, the SDD gate keeps them honest, and the
+single-lease concurrency model lets several projects advance at once without
+collision or re-derivation.
+
 ## 1. SDD Is Binding
 
 `dadaia-workspace` is developed through release-lifecycle SDD. Production
@@ -77,7 +173,7 @@ normative source once committed. The consolidated roadmap §1 is supporting cont
 | 1 | Backlog definition | project-manager | `specs/backlog/**` | ADDITIVE | no lease — parallel |
 | 2 | Bug filing | any agent / auto | `specs/bugs/**` | ADDITIVE | no lease — parallel |
 | 3 | Research | researcher / PM-dispatched | `.dadaia/reports/**` | ADDITIVE | no lease — parallel |
-| 4 | Audit | project-auditor | `.dadaia/reports/**` | ADDITIVE | no lease — parallel |
+| 4 | Audit | project-auditor | `specs/audits/<ts>-<session_id_8chars>/` | ADDITIVE | no lease — parallel |
 | 5 | Release definition (SPEC/PLAN/TASKS) | product-engineer | `specs/releases/<id>/**` | MUTATING | acquires the release lease |
 | 6 | Implementation | software-engineer | `repos/<ctx>/` prod + tests (or `dadaia_workspace/**` when dadaia-workspace is the bound context) | MUTATING | holds the release lease |
 | 7 | Review gates (qa→commit · security→push · code-review→PR) | qa-engineer · security-reviewer · code-reviewer | `.dadaia/handoff/**` · `.dadaia/reports/**` | ADDITIVE evidence; gates transitions | no lease — they vote |
@@ -90,14 +186,31 @@ and never touch the lease.
 The 4-row summary in v0.2.0/SPEC.md §3 maps to phases {1,2}/{3,4}/{5,6,8}/{7};
 constitution §7 is normative.
 
+Audit output (phase 4) is **committed Markdown** in the Spec Context's
+`specs/audits/` tree — not HTML, not `.dadaia/reports/`. This is channel 3 of the
+report/comms model (§11): the project-auditor's findings are versioned alongside the
+specs they audit.
+
 ## 8. Concurrency Model
 
 Two activity classes partition every action in the workspace. The partition is
 simultaneously the lock model, the agent-coordination model, and the lifecycle.
 
 **ADDITIVE phases (1/2/3/4/7):** write targets are `specs/backlog/**`,
-`specs/bugs/**`, `.dadaia/reports/**`, `.dadaia/handoff/**`. No lease required.
-Concurrent sessions allowed. Gate allows unconditionally for these paths.
+`specs/bugs/**`, `specs/audits/**`, `.dadaia/reports/**`, `.dadaia/handoff/**`. No
+lease required. Concurrent sessions allowed. Gate allows unconditionally for these
+paths.
+
+**Collision-safe naming for parallel additive output.** Because additive phases
+allow concurrent sessions, any Markdown written into a parallel-writable additive
+tree (`specs/audits/`, and any future parallel additive tree) MUST carry a session
+discriminator so two concurrent sessions never collide on a path:
+
+- Directories: `<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/`
+- Files: `<YYYYMMDDTHHMMSSZ>-<session_id_8chars>-<slug>.md`
+
+(`specs/backlog/**` is exempt because `project-manager` is its sole writer; the rule
+binds wherever multiple sessions may write the same tree.)
 
 **MUTATING phases (5/6/8):** write targets are `specs/releases/<id>/**`, the
 active context's production tree (`repos/<ctx>/` for a consumer repo, or
@@ -107,11 +220,21 @@ live-lease conflict.
 
 The lease record schema (as implemented in v0.1.6):
 `{context, release, session_id, mode, acquired_at, heartbeat, ttl}`. No PID
-field. Liveness = `now − heartbeat ≤ ttl` (TTL = 1800s). Heartbeat renewed on
-every PreToolUse event by the actively-working holder. A fully-idle holder is
-reclaimable after TTL. Fail-safe: the gate never blocks on an expired or absent
-lease — it heals and allows. Acquire mechanism: `O_EXCL` CAS (atomic file
-creation; second caller gets EEXIST and is blocked).
+field. Liveness = `now − heartbeat ≤ LEASE_TTL_SECONDS` where
+`LEASE_TTL_SECONDS = 120` (short-heartbeat liveness — OQ-1 operator decision
+2026-06-06, superseding the earlier 1800s value). Heartbeat is renewed on every
+PreToolUse event by the actively-working holder; a fully-idle holder is reclaimable
+after ~120s. Stable session identity is carried by
+`.dadaia/sessions/runtime/<id>.ptr`, so a relaunched or continuing session resolves
+to the same identity and RENEWs its own lease rather than self-blocking. Acquire
+mechanism: `O_EXCL` CAS (atomic file creation; the second caller gets EEXIST).
+
+Lock resolution is **reclaim-iff-stale, yield-iff-live-foreign**: the gate reclaims
+and heals on an absent or expired lease (it never blocks on a stale or missing
+lease); on a live foreign lease it yields informatively. The gate **never** instructs
+the operator to rebind, relaunch, or steal a session — that instruction is forbidden
+law. Context resolves automatically from the registry; the flow is never halted to
+ask the operator to bind.
 
 ## 9. Coordinator + Sub-Agent Architecture
 
@@ -134,6 +257,13 @@ for the context; ai-engineer's ad-hoc lease is blocked by the gate if a PM lease
 is live. The exclusivity invariant is preserved: the gate enforces at most one
 holder regardless of whether the holder is PM or ai-engineer.
 
+**Dispatcher purity.** Only `project-manager` (lifecycle coordination) and
+`project-auditor` (audit fan-out) may dispatch sub-agents via the Agent tool. All
+other personas are workers — they reply only to their dispatcher and never invoke
+another agent. A worker that perceives a need for another agent's work surfaces it
+to its dispatcher; it never spawns the agent itself. This closes worker→worker
+dispatch as a structural impossibility and keeps the dispatch topology auditable.
+
 ## 10. Backlog-Definition Process
 
 project-manager is the sole owner of `specs/backlog/**`. The process:
@@ -154,26 +284,63 @@ project-manager is the sole owner of `specs/backlog/**`. The process:
 6. product-engineer writes the SPEC.md Draft; PM does not unblock the release
    until SPEC has `**Status:** Aprovado`.
 
-## 11. Review-Gate Sequence
+## 11. Review Checkpoints & Report Channels
 
-Gate sequence for every rc-N (ship) segment:
+### Terminology — checkpoint vs gate
+
+The reviewer transitions below are **coordinator-enforced checkpoints**, not
+mechanical blocks. They are enforced by `project-manager`'s discipline: PM will not
+advance a transition without the reviewer's APPROVE handoff. The word "gate" is
+reserved in this constitution for the genuinely **mechanical** enforcers — the SDD
+path gate (`sdd-spec-gate.sh` PreToolUse block) and the pre-push CI gate
+(`dadaia ci preflight`). A checkpoint is PM-mediated; a gate is a shell block. Do
+not conflate them.
+
+### Spec-review sequence (release-definition checkpoints)
+
+During release definition (phase 5), the SPEC and its PLAN/TASKS pass a review
+ordering distinct from the implementation checkpoints below:
+
+1. **qa-engineer reviews the SPEC first (mandatory)** — for testability and
+   quality-checkpoint clarity. No SPEC advances without QA APPROVE.
+2. **software-architect may review in parallel (optional)** — for architectural
+   soundness; runs alongside QA, never blocking it.
+3. **software-engineer reviews LAST (after QA APPROVE)** — confirms PLAN/TASKS are
+   implementable.
+
+The ordering is sequential QA → SE (SE never reviews before QA APPROVE); the
+architect review is parallel and optional. PM mediates throughout.
+
+### Implementation checkpoints (rc-N ship segment)
 
 1. qa-engineer reviews → APPROVE verdict → commit to feature branch allowed.
 2. security-reviewer reviews → APPROVE verdict → push to feature branch allowed.
 3. code-reviewer reviews → APPROVE verdict → PR merge allowed.
-4. product-engineer updates `specs/memory/**` → only after code-reviewer gate.
+4. product-engineer updates `specs/memory/**` → only after the code-reviewer
+   checkpoint.
 
-For alpha-N segments: qa-engineer gate only → commit. No push, no PR, no other
-reviewers.
+For alpha-N segments: qa-engineer checkpoint only → commit. No push, no PR, no
+other reviewers.
 
-Each gate requires a handoff JSON with `"verdict": "APPROVED"`. A REJECT verdict
-blocks the transition and re-opens the relevant implementation task (marker flipped
-back to `[ ]`). The failing task stays `[ ]` until the fix is committed and the
-gate is re-run.
+Each checkpoint requires a handoff JSON with `"verdict": "APPROVED"`. A REJECT
+verdict blocks the transition and re-opens the relevant implementation task (marker
+flipped back to `[ ]`). The failing task stays `[ ]` until the fix is committed and
+the checkpoint is re-run.
 
-Reviewer evidence lands exclusively in `.dadaia/handoff/<context>/` and
-`.dadaia/reports/<context>/`. No `specs/releases/<id>/evidence/` subtree exists or
-is authorized.
+### The three report/comms channels
+
+dadaia-workspace has exactly three report/communication channels, each with a single
+canonical destination:
+
+1. **User reports** — HTML, written to `.dadaia/reports/<context>/<agent>/`, surfaced
+   in the panel. For human consumption when explicitly requested.
+2. **Agent↔agent communication** — JSON handoffs, written to
+   `.dadaia/handoff/<context>/` only. This is the machine contract between agents.
+3. **Audit results** — committed Markdown, written to
+   `specs/audits/<ts>-<session_id_8chars>/` (archive: `specs/audits/_archive/`).
+
+Reviewer checkpoint evidence lands in channels 1 and 2 only. No
+`specs/releases/<id>/evidence/` subtree exists or is authorized.
 
 ## 12. Anti-Slop Law
 
@@ -184,9 +351,14 @@ Three hard rules that apply to every artifact shipped in this workspace:
    removed.
 2. No store is created without a GC mechanism. Every state file, lock, session
    record, or cache must have a defined expiry and a cleanup path.
-3. No fact is recorded in two sources. The constitution is the single source of
-   truth for lifecycle law; skills and personas cite it, never duplicate it.
-   Evidence paths are `.dadaia/handoff/` and `.dadaia/reports/` only.
+3. No fact is recorded in two sources, and no fact in two channels. The
+   constitution is the single source of truth for lifecycle law; skills and personas
+   cite it, never duplicate it. The three report/comms channels (§11) are exclusive:
+   user reports → `.dadaia/reports/`; agent↔agent → `.dadaia/handoff/`; audit results
+   → `specs/audits/`. Markdown written by parallel sessions into a parallel-writable
+   additive tree (e.g. `specs/audits/`) MUST use the collision-safe
+   `<ts>-<session_id_8chars>` naming convention of §8, so two concurrent sessions
+   never overwrite each other.
 
 ## 13. Memory Canon
 
@@ -236,3 +408,9 @@ table above.
 Persona-existence rule: every surviving persona in `dadaia_workspace/public/agents/`
 must reference a phase from the §7 matrix that it owns or gates. Personas for
 removed agents must not exist in the public agents directory.
+
+Agent philosophy: every agent in this roster is a generic AI implementation
+specialized only in its dadaia-workspace SDD role, carrying no project-domain
+knowledge (that lives in the bound Spec Context's `specs/`). The per-agent
+specialization axes and the value proposition are stated once in §0 "Agent
+Philosophy"; this roster does not restate them.
