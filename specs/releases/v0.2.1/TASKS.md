@@ -201,7 +201,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   data source).
 - **Done criterion:** Three stubs present in `public/scaffold/`.
 
-[ ] T-021-14
+[-] T-021-14
 
 ### T-021-15 — Fix alive(): safe-preserve existing specs/ on scaffold
 
