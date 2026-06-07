@@ -26,11 +26,67 @@ import mistune
 from mistune import InlineParser, InlineState, Markdown
 from mistune.renderers.html import HTMLRenderer
 
-__all__ = ["Markdown", "build_renderer", "render_md_to_html"]
+__all__ = [
+    "Markdown",
+    "build_renderer",
+    "memory_raw_url",
+    "memory_view_url",
+    "render_md_to_html",
+]
 
 # ---------------------------------------------------------------------------
-# Route convention: panel memory viewer wrapper uses /memory-view/<slug>/<file>
+# Canonical memory-URL builder (single source of truth — T-016-P03)
+#
+# ALL panel code that produces a URL referencing a memory atom MUST use these
+# two functions.  Never hardcode extensions or route prefixes outside this
+# module.
+#
+# Route conventions:
+#   /memory-view/<slug>/<path>  — wrapper page (back-bar + iframe)
+#   /memory/<slug>/<path>       — raw rendered HTML (served by memory.py)
+#
+# Extension convention: atoms are .md on disk.  Paths are always .md.
 # ---------------------------------------------------------------------------
+
+
+def memory_view_url(slug: str, path: str) -> str:
+    """Return the /memory-view/ URL for a memory atom.
+
+    Parameters
+    ----------
+    slug:
+        Spec context project slug (e.g. "dadaia-workspace").
+    path:
+        Relative path to the atom within ``specs/memory/``, with ``.md``
+        extension (e.g. "architecture.md", "product/index.md").
+
+    Returns
+    -------
+    str
+        Absolute path URL: ``/memory-view/<slug>/<path>``.
+    """
+    return f"/memory-view/{slug}/{path}"
+
+
+def memory_raw_url(slug: str, path: str) -> str:
+    """Return the /memory/ raw URL for a memory atom.
+
+    Parameters
+    ----------
+    slug:
+        Spec context project slug.
+    path:
+        Relative path to the atom within ``specs/memory/``, with ``.md``
+        extension.
+
+    Returns
+    -------
+    str
+        Absolute path URL: ``/memory/<slug>/<path>``.
+    """
+    return f"/memory/{slug}/{path}"
+
+
 _MEMORY_VIEW_PREFIX = "/memory-view"
 
 # ---------------------------------------------------------------------------
@@ -80,9 +136,14 @@ def _parse_wikilink(inline: InlineParser, m: re.Match[str], state: InlineState) 
 
 
 def _render_wikilink(renderer: HTMLRenderer, text: str) -> str:  # noqa: ARG001
-    """Render a wikilink token as an anchor to the panel memory route."""
+    """Render a wikilink token as an anchor to the panel memory route.
+
+    NOTE: This default renderer uses "dadaia-workspace" as the slug.
+    Use :func:`build_renderer` with a ``slug`` argument (T-016-P04) to
+    produce a context-aware renderer that closes over the active slug.
+    """
     slug = text
-    href = f"{_MEMORY_VIEW_PREFIX}/dadaia-workspace/{slug}"
+    href = memory_view_url("dadaia-workspace", f"{slug}.md")
     return f'<a href="{href}">{slug}</a>'
 
 

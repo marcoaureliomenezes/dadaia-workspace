@@ -354,9 +354,9 @@ def test_project_card_contract() -> None:
         'aria-live="polite"',
         'class="card-zone-d card-chips"',
         'class="memory-chip"',
-        'href="/memory-view/my-workspace/architecture.html"',
-        'href="/memory-view/my-workspace/tech-stack.html"',
-        'href="/memory-view/my-workspace/product/index.html"',
+        'href="/memory-view/my-workspace/architecture.md"',
+        'href="/memory-view/my-workspace/tech-stack.md"',
+        'href="/memory-view/my-workspace/product/index.md"',
         ">Architecture<",
         ">Tech Stack<",
         ">Product<",
@@ -365,9 +365,10 @@ def test_project_card_contract() -> None:
 
     assert card.find('class="card-zone-b"') < card.find('class="card-zone-c"')
     assert card.find('class="card-zone-c"') < card.find('class="card-zone-d')
-    assert ">architecture.html<" not in card
-    assert ">tech-stack.html<" not in card
-    assert ">product/index.html<" not in card
+    # T-016-P03 regression guard: chip hrefs must use .md, never .html
+    assert 'href="/memory-view/my-workspace/architecture.html"' not in card
+    assert 'href="/memory-view/my-workspace/tech-stack.html"' not in card
+    assert 'href="/memory-view/my-workspace/product/index.html"' not in card
 
 
 def test_projects_css_contract() -> None:

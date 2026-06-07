@@ -26,6 +26,7 @@ import html
 from collections.abc import Callable, Sequence
 
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
+from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
 from dadaia_workspace.features.panel.views.agents import render_agents_section
 from dadaia_workspace.features.panel.views.reports import render_reports_section
@@ -228,9 +229,9 @@ def _render_context_card(ctx: PanelContext) -> str:
         f"</div>"
         f"{zone_c}"
         f'<nav class="card-zone-d card-chips" aria-label="Memory links">'
-        f'<a class="memory-chip" href="/memory-view/{slug}/architecture.html">Architecture</a>'
-        f'<a class="memory-chip" href="/memory-view/{slug}/tech-stack.html">Tech Stack</a>'
-        f'<a class="memory-chip" href="/memory-view/{slug}/product/index.html">Product</a>'
+        f'<a class="memory-chip" href="{memory_view_url(slug, "architecture.md")}">Architecture</a>'
+        f'<a class="memory-chip" href="{memory_view_url(slug, "tech-stack.md")}">Tech Stack</a>'
+        f'<a class="memory-chip" href="{memory_view_url(slug, "product/index.md")}">Product</a>'
         f"</nav>"
         f"</article>"
     )
