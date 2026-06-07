@@ -201,7 +201,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   data source).
 - **Done criterion:** Three stubs present in `public/scaffold/`.
 
-[-] T-021-14
+[x] T-021-14
 
 ### T-021-15 — Fix alive(): safe-preserve existing specs/ on scaffold
 
@@ -215,7 +215,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `alive()` with a pre-existing `specs/` results in backup + fresh
   canonical scaffold; callers unaffected.
 
-[ ] T-021-15
+[x] T-021-15
 
 ### T-021-16 — Confirm TREE-4 covers audits/ auto-create; regression tests
 
@@ -229,7 +229,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   or skipped). Run full pytest suite — green.
 - **Done criterion:** Both regression tests pass; `dadaia specs doctor` exit 0.
 
-[ ] T-021-16
+[x] T-021-16
 
 ---
 

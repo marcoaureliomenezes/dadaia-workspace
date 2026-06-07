@@ -620,11 +620,11 @@ def test_semver_folder_name_before_cutoff_not_checked(tmp_path: Path) -> None:
 
 
 def _make_full_tree(root: Path) -> Path:
-    """Like _make_clean_specs_tree but also adds backlog/, bugs/, releases/ dirs,
+    """Like _make_clean_specs_tree but also adds audits/, backlog/, bugs/, releases/ dirs,
     and specs/AGENTS.md from the canonical template so TREE invariants pass."""
     specs = _make_clean_specs_tree(root)
-    # TREE-4: ensure all required dirs exist
-    for dirname in ("backlog", "bugs", "releases"):
+    # TREE-4: ensure all required dirs exist (including audits/ added in T-021-16)
+    for dirname in ("audits", "backlog", "bugs", "releases"):
         d = specs / dirname
         d.mkdir(exist_ok=True)
         (d / ".gitkeep").write_text("", encoding="utf-8")
@@ -1297,3 +1297,63 @@ def test_memory_agents_md_present_suppresses_tree5m(tmp_path: Path) -> None:
     issues = SpecsDoctor(specs).check()
     tree5m = [i for i in issues if i.code == "TREE-5M"]
     assert tree5m == [], f"Unexpected TREE-5M when memory/AGENTS.md is present: {tree5m}"
+
+
+# ============================================================================
+# T-021-16: TREE-4 covers audits/ + scaffold regression tests
+# ============================================================================
+
+
+def test_tree4_missing_audits_triggers_warning(tmp_path: Path) -> None:
+    """T-021-16 (i): specs/audits/ absent emits a TREE-4 WARNING."""
+    specs = _make_clean_specs_tree(tmp_path)
+    # Ensure audits/ is absent
+    audits = specs / "audits"
+    if audits.exists():
+        import shutil
+
+        shutil.rmtree(audits)
+    doctor = SpecsDoctor(specs, public_dir=_PUBLIC_DIR)
+    issues = doctor.check()
+    tree4 = [i for i in issues if i.code == "TREE-4"]
+    assert any("audits" in i.description for i in tree4), (
+        f"Expected TREE-4 for missing audits/; got {[i.description for i in tree4]}"
+    )
+    assert all(i.severity == Severity.WARNING for i in tree4)
+
+
+def test_tree4_fix_creates_audits_dir(tmp_path: Path) -> None:
+    """T-021-16 (i): TREE-4 auto-fix creates audits/ with README.md and .gitkeep."""
+    specs = _make_clean_specs_tree(tmp_path)
+    audits = specs / "audits"
+    if audits.exists():
+        import shutil
+
+        shutil.rmtree(audits)
+    doctor = SpecsDoctor(specs, public_dir=_PUBLIC_DIR)
+    issues = doctor.check()
+    tree4_audits = [i for i in issues if i.code == "TREE-4" and "audits" in i.description]
+    assert tree4_audits, "Pre-condition: TREE-4 for audits/ must be present"
+    doctor.fix(issues)
+    assert audits.exists(), "specs/audits/ must be created by fix()"
+    assert (audits / "README.md").exists(), "specs/audits/README.md must be created"
+    assert (audits / ".gitkeep").exists(), "specs/audits/.gitkeep must be created"
+    # No residual TREE-4 for audits after fix
+    residual = [i for i in doctor.check() if i.code == "TREE-4" and "audits" in i.description]
+    assert residual == [], f"Residual TREE-4 for audits/ after fix: {residual}"
+
+
+def test_scaffold_canonical_tree_includes_audits_and_memory_agents(tmp_path: Path) -> None:
+    """T-021-16 (a): fresh scaffold via shutil.copytree from scaffold source yields full
+    canonical tree: audits/, memory/AGENTS.md, and memory/quality-assurance.md."""
+    import shutil
+
+    specs_dir = tmp_path / "specs"
+    shutil.copytree(str(_SCAFFOLD_DIR), str(specs_dir))
+
+    assert (specs_dir / "audits").is_dir(), "audits/ must exist in scaffolded tree"
+    assert (specs_dir / "audits" / "README.md").exists(), "audits/README.md must exist"
+    assert (specs_dir / "memory" / "AGENTS.md").exists(), "memory/AGENTS.md must exist"
+    assert (specs_dir / "memory" / "quality-assurance.md").exists(), (
+        "memory/quality-assurance.md must exist"
+    )
