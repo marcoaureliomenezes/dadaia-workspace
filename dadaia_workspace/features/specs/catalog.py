@@ -140,8 +140,8 @@ def generate_catalog(specs_dir: Path) -> dict[str, Any]:
     if not product_dir.is_dir():
         raise FileNotFoundError(f"product/ directory not found at expected path: {product_dir}")
 
-    # Discover feature atoms: *.md excluding index.md
-    md_files = sorted(p for p in product_dir.glob("*.md") if p.name != "index.md")
+    # Discover feature atoms: *.md recursively excluding index.md at any depth
+    md_files = sorted(p for p in product_dir.rglob("*.md") if p.name != "index.md")
 
     # Derive context name from the parent of specs_dir (the repo/project name)
     context_name = Path(specs_dir).parent.name
