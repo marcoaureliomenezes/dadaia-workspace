@@ -54,7 +54,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Clicking Architecture/Tech Stack/Product chips each returns 200 with
   real body in e2e test; E2E-SCP-03/04/05/06 pass; E2E-GUARD-01/02 stay green.
 
-[ ] T-016-P03
+[-] T-016-P03
 
 ### T-016-P04 — Wikilink renderer parameterized by context slug
 
