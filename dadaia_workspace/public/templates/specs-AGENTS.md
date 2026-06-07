@@ -45,7 +45,7 @@ editing production.
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |
 | `releases/<id>/CLOSURE.md` | `product-engineer` in `CLOSURE` |
 | `memory/**` | `product-engineer` in `CLOSURE` only |
-| `backlog/**` | `product-engineer` or operator intake |
+| `backlog/**` | `project-manager` only (sole backlog author; `product-engineer` is a read-only consumer) |
 | `bugs/**` | any agent may file; `product-engineer` resolves into release work |
 
 ## Task Markers

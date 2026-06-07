@@ -158,7 +158,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   Mermaid, no changelog sections), and link to constitution §13 for gate details.
 - **Done criterion:** File exists; projects to `specs/memory/AGENTS.md` after install.
 
-[ ] T-021-11
+[x] T-021-11
 
 ### T-021-12 — Fix backlog-authority line in specs-AGENTS.md template
 
@@ -169,7 +169,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   (backlog-ownership rule: PM is sole author of specs/backlog/**).
 - **Done criterion:** Line 48 names `project-manager` as backlog-authority.
 
-[ ] T-021-12
+[x] T-021-12
 
 ### T-021-13 — Stage, install, and verify all 8 scoped surfaces
 
@@ -181,7 +181,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   workspace. TREE-5 must no longer fire.
 - **Done criterion:** `dadaia public doctor` exit 0; 8 scoped AGENTS.md files present.
 
-[ ] T-021-13
+[x] T-021-13
 
 ---
 
