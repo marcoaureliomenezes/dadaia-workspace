@@ -12,6 +12,12 @@ it names the concepts that §1–§14 encode. The lifecycle (§7), the roster (�
 the concurrency/lock contract (§8–§9), and the gate sequence (§11) are all
 derivable from the definitions stated here.
 
+The normative human-readable Product Vision is `docs/01_medium_codex.md`. It
+describes the intended shape of the workspace — what it must be, its pillars, its
+scaffold, its agent model, and its operating philosophy. This constitution
+operationalizes that vision into binding law. When a detail is unclear in these
+sections, agents and contributors must read `docs/01_medium_codex.md` first.
+
 ### What dadaia-workspace is
 
 `dadaia-workspace` is a **multi-AI-harness × multi-project × SDD-oriented ×
@@ -99,6 +105,38 @@ disciplined, parallel, multi-project software team: bind a context, and the
 constitution and memory orient the agents, the SDD gate keeps them honest, and the
 single-lease concurrency model lets several projects advance at once without
 collision or re-derivation.
+
+### Workspace root & operational layout
+
+The workspace root is not a git repo. The nine allowed root entries are:
+
+1. `.agents/` — universal agent assets and shared skills.
+2. `.claude/` — Claude Code projection.
+3. `.codex/` — Codex projection.
+4. `.dadaia/` — operational data for the workspace.
+5. `.opencode/` — OpenCode projection.
+6. `repos/` — alive repos associated with Spec Context Projects.
+7. `AGENTS.md` — root workspace rules (the primary agent instruction file).
+8. `CLAUDE.md` — required Claude Code bridge. Claude Code does not read `AGENTS.md`
+   natively (per official Claude Code documentation); a root `CLAUDE.md` containing
+   `@AGENTS.md` is the correct import bridge. This entry is therefore mandatory
+   for Claude Code users and is authorized as a permanent root entry.
+9. `prompt.md` — optional human-created long prompt file for operator use.
+
+Agents must not create extra root files or directories. Human-created exceptions are
+allowed, but default agent behavior must preserve root cleanliness. This list
+supersedes any prior "under investigation" or "T-SANI-02 pending" stance on
+`CLAUDE.md` or `prompt.md`.
+
+`.dadaia/` is the operational home for the workspace runtime. Authorized
+sub-directories:
+
+- `.dadaia/.venv/` — workspace Python environment and CLI dependencies.
+- `.dadaia/handoff/` — machine-readable agent-to-agent communication (JSON).
+- `.dadaia/reports/` — human-readable HTML reports served by the panel.
+- `.dadaia/states/` — JSON state for workspace features (read via CLI, not direct edit).
+- `.dadaia/tmp/` — temporary output and short-lived agent artifacts.
+- `.dadaia/mcps/` — working areas for MCP-style tooling when needed (reserved).
 
 ## 1. SDD Is Binding
 
@@ -332,12 +370,19 @@ the checkpoint is re-run.
 dadaia-workspace has exactly three report/communication channels, each with a single
 canonical destination:
 
-1. **User reports** — HTML, written to `.dadaia/reports/<context>/<agent>/`, surfaced
-   in the panel. For human consumption when explicitly requested.
+1. **User reports** — HTML, written to `.dadaia/reports/<context>/<agent>/`. These
+   are for human consumption and are surfaced exclusively by the panel. The panel
+   serves **only** `.dadaia/reports/` HTML — it never surfaces `.dadaia/handoff/` JSON.
 2. **Agent↔agent communication** — JSON handoffs, written to
-   `.dadaia/handoff/<context>/` only. This is the machine contract between agents.
+   `.dadaia/handoff/<context>/` only. This is the machine-readable contract between
+   agents. Handoff JSON is **never** served by the panel, never shown in the UI, and
+   never written to `.dadaia/reports/`. Its sole purpose is agent-to-agent structured
+   communication.
 3. **Audit results** — committed Markdown, written to
    `specs/audits/<ts>-<session_id_8chars>/` (archive: `specs/audits/_archive/`).
+
+The panel surfaces: contexts, user HTML reports, registered servers, sessions,
+workflows, agents, and workspace state. It does not surface handoffs.
 
 Reviewer checkpoint evidence lands in channels 1 and 2 only. No
 `specs/releases/<id>/evidence/` subtree exists or is authorized.
@@ -370,9 +415,10 @@ The four authoritative memory areas that define the current state of the product
   users, catalog, capability-map, limits) + one `.md` atom per production feature.
 - `specs/memory/tech-stack.md` — approved technologies, constraints, canonical
   commands.
-- `specs/memory/product/quality-assurance.md` — test pyramid, layer taxonomy,
+- `specs/memory/quality-assurance.md` — test pyramid, layer taxonomy,
   CI job split, no-slop policy; single source of truth for quality architecture,
-  absorbing `test-suite-architecture.md`.
+  absorbing `test-suite-architecture.md`. This file lives at top level in `memory/`,
+  not under `memory/product/`.
 
 Memory files are the atomic snapshot of the current product. They are NOT
 changelogs. Historical detail belongs in release `CLOSURE.md` and archived release

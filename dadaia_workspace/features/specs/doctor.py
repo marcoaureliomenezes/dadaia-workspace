@@ -8,10 +8,10 @@ registry coherence invariant, plus the 7 TREE invariants from release
 `memory-markdown-source-v1`:
 
   1. specs/constitution.md exists
-  2. specs/memory/architecture.md and tech-stack.md exist with non-empty first
-     heading; specs/memory/product/index.md exists (folder catalog entry); legacy
-     product.html at memory/ root reported as error; stray .html atoms flagged as
-     legacy; broken [[slug]] wikilinks from product/*.md reported as warning
+  2. specs/memory/architecture.md, tech-stack.md and quality-assurance.md exist with
+     non-empty first heading; specs/memory/product/index.md exists (folder catalog
+     entry); legacy product.html at memory/ root reported as error; stray .html atoms
+     flagged as legacy; broken [[slug]] wikilinks from product/*.md reported as warning
   3. specs/releases/ACTIVE.md exists, parseable, phase canonical
   4. active release has SPEC+PLAN+TASKS with Status: Aprovado (warn if Draft + phase != ARCHIVED)
   5. PLAN <= 300 lines (warning <= 2026-05-16; error >= 2026-05-17)
@@ -29,9 +29,10 @@ registry coherence invariant, plus the 7 TREE invariants from release
 TREE invariants (spec-context-tree-v2):
   TREE-1. specs/foundation/ exists → WARN-ONLY (migration: dadaia migrate tree-v2)
   TREE-2. specs/SPEC.md at tree root → WARN-ONLY (migration: dadaia migrate tree-v2)
-  TREE-3. memory/architecture.md | tech-stack.md | product/index.md absent → WARNING
+  TREE-3. memory/architecture.md | tech-stack.md | quality-assurance.md | product/index.md absent → WARNING
   TREE-4. backlog/ | bugs/ | releases/ absent → AUTO-FIX (create dir + README.md + .gitkeep)
   TREE-5. specs/AGENTS.md absent or hash differs from canonical template → WARN-ONLY (drift)
+  TREE-5M. specs/memory/AGENTS.md absent → WARN-ONLY (projected later by ai-engineer WS-2)
   TREE-6. releases/<id>/ missing mandatory SDD artifact for its phase → NO AUTO-FIX
   TREE-7. bugs/<slug>.md missing session_id frontmatter field → NO AUTO-FIX
 
@@ -80,7 +81,7 @@ BACKLOG_HOTFIX_RE = re.compile(
 )
 FORBIDDEN_MEMORY_H2_RE = re.compile(r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE)
 # Top-level memory files (.md canonical source).
-TOPLEVEL_MEMORY_FILES = ("architecture.md", "tech-stack.md")
+TOPLEVEL_MEMORY_FILES = ("architecture.md", "tech-stack.md", "quality-assurance.md")
 # Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
 PRODUCT_INDEX_REL = "product/index.md"
 HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
@@ -131,6 +132,7 @@ _HOTFIX_STALE_HOURS = 72
 _TREE3_MEMORY_FILES: tuple[str, ...] = (
     "architecture.md",
     "tech-stack.md",
+    "quality-assurance.md",
     "product/index.md",
 )
 
@@ -504,6 +506,7 @@ class SpecsDoctor:
         issues.extend(self._check_tree3_memory_md())
         issues.extend(self._check_tree4_required_dirs())
         issues.extend(self._check_tree5_agents_md())
+        issues.extend(self._check_memory_agents_md())
         issues.extend(self._check_tree6_release_artifacts())
         issues.extend(self._check_tree7_bug_session_id())
         # CAT-1 (memory-context-enforcement-v1) — now based on .md files
@@ -581,8 +584,8 @@ class SpecsDoctor:
         feature_files: list[tuple[str, Path]] = []
         if product_dir.is_dir():
             feature_files = [
-                (f"product/{p.name}", p)
-                for p in sorted(product_dir.glob("*.md"))
+                (f"product/{p.relative_to(product_dir)}", p)
+                for p in sorted(product_dir.rglob("*.md"))
                 if p.name != "index.md"
             ]
 
@@ -1280,7 +1283,7 @@ class SpecsDoctor:
         """TREE-3: required memory .md atom files must exist.
 
         Checks: memory/architecture.md, memory/tech-stack.md,
-        memory/product/index.md.
+        memory/quality-assurance.md, memory/product/index.md.
 
         .md is the canonical source (memory-markdown-source-v1 / D-4).
         No auto-fix: .md atoms are operator-authored, not generated from templates.
@@ -1413,6 +1416,31 @@ class SpecsDoctor:
                     "Canonical template: dadaia_workspace/public/templates/specs-AGENTS.md"
                 ),
                 path=str(agents_md),
+                fixable=False,
+            )
+        ]
+
+    def _check_memory_agents_md(self) -> list[SpecsDoctorIssue]:
+        """Check: specs/memory/AGENTS.md must exist (WARNING only).
+
+        The file is created during WS-2 (ai-engineer projects it from
+        dadaia_workspace/public/data/memory-AGENTS.md).  It is expected to be
+        absent on fresh scaffolds and early in the lifecycle, so absence is
+        flagged as WARN (never ERROR) and does NOT cause doctor to exit non-zero.
+        """
+        memory_agents_md = self.specs_dir / "memory" / "AGENTS.md"
+        if memory_agents_md.exists():
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="TREE-5M",
+                severity=Severity.WARNING,
+                description=(
+                    "specs/memory/AGENTS.md is missing — expected memory ownership contract. "
+                    "Project it by running `dadaia public install --target all` after "
+                    "dadaia_workspace/public/data/memory-AGENTS.md has been created."
+                ),
+                path=str(memory_agents_md),
                 fixable=False,
             )
         ]
@@ -1622,8 +1650,8 @@ class SpecsDoctor:
         if not product_dir.is_dir():
             return issues
 
-        # Collect slugs from .md feature atoms (excluding index.md)
-        md_slugs: set[str] = {p.stem for p in product_dir.glob("*.md") if p.name != "index.md"}
+        # Collect slugs from .md feature atoms (excluding index.md), recursing into subdirs
+        md_slugs: set[str] = {p.stem for p in product_dir.rglob("*.md") if p.name != "index.md"}
 
         if not catalog_path.exists():
             if md_slugs:

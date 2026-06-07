@@ -29,6 +29,7 @@ Features grouped by thematic area. Each link is a relative path to the atom.
 <ol class="catalog">
 
 **philosophy/** — foundational concepts and design stance
+<li><a href="philosophy/product-vision.md">product-vision</a> — Identity, pillars, lifecycle, concurrency, agent model, and anti-slop stance; distillation of docs/01_medium_codex.md (the normative Product Vision)</li>
 <li><a href="philosophy/spec-context-project.md">spec-context-project</a> — The keystone concept: one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0)</li>
 <li><a href="philosophy/repos-catalog.md">repos-catalog</a> — the spec-context repos catalog model</li>
 

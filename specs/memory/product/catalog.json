@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T02:27:57Z",
+  "generated_at": "2026-06-07T06:33:12Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -241,6 +241,30 @@
     },
     {
       "rank": 13,
+      "slug": "product-vision",
+      "title": "product-vision",
+      "category": "product",
+      "tldr": "Identity, pillars, lifecycle, concurrency model, agent roster, and anti-slop stance — the normative shape of dadaia-workspace from docs/01_medium_codex.md.",
+      "summary": "Current-truth distillation of the normative Product Vision (docs/01_medium_codex.md). Covers the workspace identity (what it is and is not), the five design pillars, the canonical scaffold and operational layout, the development lifecycle phases, the concurrency model, the nine-core agent model, and the anti-slop operating stance. Constitution §0 operationalizes this vision into binding law; this atom cites, does not duplicate, constitution sections.",
+      "path": "specs/memory/product/philosophy/product-vision.md",
+      "tags": [
+        "vision",
+        "philosophy",
+        "identity",
+        "lifecycle",
+        "anti-slop"
+      ],
+      "token_estimate": 950,
+      "agent_tier": "self-pull",
+      "depends_on": [
+        "spec-context-project",
+        "agent-sdd-alignment",
+        "sdd-gate-v3",
+        "public-asset-distribution"
+      ]
+    },
+    {
+      "rank": 14,
       "slug": "repos-catalog",
       "title": "repos-catalog",
       "category": "product",
@@ -260,7 +284,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "category": "product",
@@ -283,7 +307,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
@@ -306,7 +330,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -325,7 +349,7 @@
       "depends_on": []
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -346,7 +370,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -368,7 +392,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
@@ -386,7 +410,7 @@
       "depends_on": []
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -404,30 +428,6 @@
       "depends_on": [
         "context-management",
         "workspace-init"
-      ]
-    },
-    {
-      "rank": 21,
-      "slug": "quality-assurance",
-      "title": "quality-assurance",
-      "category": "product",
-      "tldr": "Five-layer pytest architecture, CI 7-job split, no-slop policy — design-of-record for implementers and qa-engineer.",
-      "summary": "Enforced five-layer test architecture (unit/contract/integration/e2e/tmp) with machine-readable pytest markers, a CI split into 7 jobs with explicit timeouts, and a no-slop policy. This atom is the single source of truth for test design, absorbing test-suite-architecture.md (v0.1.7).",
-      "path": "specs/memory/product/sdd/quality-assurance.md",
-      "tags": [
-        "testing",
-        "pytest",
-        "ci",
-        "quality",
-        "test-architecture"
-      ],
-      "token_estimate": 900,
-      "agent_tier": "self-pull",
-      "depends_on": [
-        "specs-doctor",
-        "public-asset-distribution",
-        "agent-comms",
-        "sdd-gate-v3"
       ]
     },
     {

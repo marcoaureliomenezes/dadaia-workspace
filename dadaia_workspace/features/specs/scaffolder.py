@@ -158,6 +158,7 @@ def scaffold(
     _memory_md_stubs = [
         ("architecture.md", specs_dir / "memory" / "architecture.md"),
         ("tech-stack.md", specs_dir / "memory" / "tech-stack.md"),
+        ("quality-assurance.md", specs_dir / "memory" / "quality-assurance.md"),
         ("product/index.md", specs_dir / "memory" / "product" / "index.md"),
     ]
     for rel, dest in _memory_md_stubs:
