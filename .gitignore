@@ -140,3 +140,6 @@ pip-wheel-metadata/
 !/specs/_archive/releases/*/rc-*/PLAN.md
 !/specs/_archive/releases/*/rc-*/TASKS.md
 !/specs/_archive/releases/*/rc-*/CLOSURE.md
+
+# Operator private working draft — never commit
+docs/00_medium_mine.md
