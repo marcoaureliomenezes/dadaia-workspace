@@ -1,15 +1,16 @@
 """Unit tests for the canonical memory-URL builder in views/_md_render.py.
 
 T-016-P03: Single source of truth for memory URL construction.
+T-016-P04: Parameterized wikilink renderer by context slug.
 """
 
 from __future__ import annotations
 
 from dadaia_workspace.features.panel.views._md_render import (
+    build_renderer,
     memory_raw_url,
     memory_view_url,
 )
-
 
 # ---------------------------------------------------------------------------
 # memory_view_url
@@ -99,8 +100,8 @@ class TestIndexChipHrefs:
         from pathlib import Path
         from unittest.mock import MagicMock
 
-        from dadaia_workspace.features.panel.views.index import render_index
         from dadaia_workspace.features.panel.service import PanelContext, PanelService
+        from dadaia_workspace.features.panel.views.index import render_index
 
         ctx = PanelContext(
             name="Test Context",
@@ -130,3 +131,54 @@ class TestIndexChipHrefs:
         assert "architecture.html" not in html, "No .html chip hrefs should remain"
         assert "tech-stack.html" not in html, "No .html chip hrefs should remain"
         assert "product/index.html" not in html, "No .html chip hrefs should remain"
+
+
+# ---------------------------------------------------------------------------
+# T-016-P04: Parameterized wikilink renderer
+# ---------------------------------------------------------------------------
+
+
+class TestWikilinkRendererParamBySlug:
+    """build_renderer(slug) closes over the context slug for wikilink hrefs."""
+
+    def test_wikilink_uses_given_slug(self) -> None:
+        """Wikilink rendered in 'my-project' context → /memory-view/my-project/..."""
+        md = build_renderer("my-project")
+        result: str = md("[[architecture]]")  # type: ignore[assignment]
+        assert "/memory-view/my-project/architecture.md" in result, (
+            "Wikilink href must use the provided slug, not hardcoded 'dadaia-workspace'"
+        )
+
+    def test_wikilink_default_slug_is_dadaia_workspace(self) -> None:
+        """Calling build_renderer() without slug defaults to 'dadaia-workspace'."""
+        md = build_renderer()
+        result: str = md("[[tech-stack]]")  # type: ignore[assignment]
+        assert "/memory-view/dadaia-workspace/tech-stack.md" in result
+
+    def test_wikilink_non_default_slug_does_not_contain_dadaia_workspace(self) -> None:
+        """A non-default slug renderer must NOT reference 'dadaia-workspace'."""
+        md = build_renderer("other-project")
+        result: str = md("[[architecture]]")  # type: ignore[assignment]
+        assert "dadaia-workspace" not in result, (
+            "Non-default context renderer must not hardcode 'dadaia-workspace'"
+        )
+        assert "/memory-view/other-project/architecture.md" in result
+
+    def test_renderer_cache_per_slug(self) -> None:
+        """build_renderer returns same instance for same slug (cache hit)."""
+        md_a = build_renderer("project-a")
+        md_b = build_renderer("project-a")
+        assert md_a is md_b, "Same slug should return the same cached renderer instance"
+
+    def test_renderer_cache_different_slugs(self) -> None:
+        """build_renderer returns different instances for different slugs."""
+        md_a = build_renderer("project-a")
+        md_b = build_renderer("project-b")
+        assert md_a is not md_b, "Different slugs must return distinct renderer instances"
+
+    def test_wikilink_md_extension_in_href(self) -> None:
+        """Wikilink href must end with .md, not .html."""
+        md = build_renderer("some-context")
+        result: str = md("[[product]]")  # type: ignore[assignment]
+        assert "/memory-view/some-context/product.md" in result
+        assert "product.html" not in result

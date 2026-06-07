@@ -21,6 +21,7 @@ Arch note (architect D4.A):
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 import mistune
 from mistune import InlineParser, InlineState, Markdown
@@ -135,28 +136,39 @@ def _parse_wikilink(inline: InlineParser, m: re.Match[str], state: InlineState) 
     return m.end()
 
 
-def _render_wikilink(renderer: HTMLRenderer, text: str) -> str:  # noqa: ARG001
-    """Render a wikilink token as an anchor to the panel memory route.
+def _make_render_wikilink(context_slug: str) -> Callable[[HTMLRenderer, str], str]:
+    """Return a wikilink render function that closes over *context_slug*.
 
-    NOTE: This default renderer uses "dadaia-workspace" as the slug.
-    Use :func:`build_renderer` with a ``slug`` argument (T-016-P04) to
-    produce a context-aware renderer that closes over the active slug.
+    Parameters
+    ----------
+    context_slug:
+        The active Spec Context Project slug.  Every ``[[wikilink]]`` in an
+        atom rendered under this context will resolve to
+        ``/memory-view/<context_slug>/<link>.md``.
     """
-    slug = text
-    href = memory_view_url("dadaia-workspace", f"{slug}.md")
-    return f'<a href="{href}">{slug}</a>'
+
+    def _render_wikilink(renderer: HTMLRenderer, text: str) -> str:  # noqa: ARG001
+        href = memory_view_url(context_slug, f"{text}.md")
+        return f'<a href="{href}">{text}</a>'
+
+    return _render_wikilink
 
 
-def _wikilink_plugin(md: Markdown) -> None:
-    """Register wikilink grammar and renderer into a Markdown instance."""
-    md.inline.register(
-        "wikilink",
-        _WIKILINK_PATTERN,
-        _parse_wikilink,
-        before="link",
-    )
-    if md.renderer and md.renderer.NAME == "html":
-        md.renderer.register("wikilink", _render_wikilink)
+def _make_wikilink_plugin(context_slug: str) -> Callable[[Markdown], None]:
+    """Return a wikilink plugin that closes over *context_slug*."""
+    render_fn = _make_render_wikilink(context_slug)
+
+    def _wikilink_plugin(md: Markdown) -> None:
+        md.inline.register(
+            "wikilink",
+            _WIKILINK_PATTERN,
+            _parse_wikilink,
+            before="link",
+        )
+        if md.renderer and md.renderer.NAME == "html":
+            md.renderer.register("wikilink", render_fn)
+
+    return _wikilink_plugin
 
 
 # ---------------------------------------------------------------------------
@@ -184,14 +196,30 @@ def _sanitise(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Public factory
+# Public factory + per-slug cache
 # ---------------------------------------------------------------------------
 
+# Cache: slug → Markdown instance.  Renderers are stateless once built so
+# sharing across requests is safe.  We cache per slug because each slug has
+# its own wikilink closure.
+_RENDERER_CACHE: dict[str, Markdown] = {}
 
-def build_renderer() -> Markdown:
-    """Build and return a configured Markdown renderer.
+_DEFAULT_SLUG = "dadaia-workspace"
 
-    The renderer instance is stateless and thread-safe for repeated calls.
+
+def build_renderer(slug: str = _DEFAULT_SLUG) -> Markdown:
+    """Build and return a configured Markdown renderer for *slug*.
+
+    Renderers are cached per slug.  Calling ``build_renderer("x")`` twice
+    returns the same instance, so the caller can freely call this function on
+    every request without paying the construction cost each time.
+
+    Parameters
+    ----------
+    slug:
+        Spec Context Project slug.  Wikilinks in atoms rendered with this
+        renderer resolve to ``/memory-view/<slug>/<link>.md``.
+        Defaults to ``"dadaia-workspace"`` for backward compatibility.
 
     Returns
     -------
@@ -199,14 +227,16 @@ def build_renderer() -> Markdown:
         A ``mistune.Markdown`` instance with:
         - GFM table support (via mistune table plugin).
         - Mermaid fence → ``<pre class="mermaid">`` passthrough.
-        - ``[[wikilink]]`` → panel ``<a>`` anchor.
+        - ``[[wikilink]]`` → panel ``<a>`` anchor for *slug*.
         - ``escape=True`` so inline/block HTML is entity-escaped by default.
     """
-    renderer = _MemoryHTMLRenderer(escape=True)
-    return Markdown(
-        renderer=renderer,
-        plugins=[_wikilink_plugin, mistune.import_plugin("table")],  # type: ignore[attr-defined]
-    )
+    if slug not in _RENDERER_CACHE:
+        renderer = _MemoryHTMLRenderer(escape=True)
+        _RENDERER_CACHE[slug] = Markdown(
+            renderer=renderer,
+            plugins=[_make_wikilink_plugin(slug), mistune.import_plugin("table")],  # type: ignore[attr-defined,list-item]
+        )
+    return _RENDERER_CACHE[slug]
 
 
 def render_md_to_html(source: str, renderer: Markdown | None = None) -> str:
