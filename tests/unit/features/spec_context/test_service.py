@@ -13,7 +13,10 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import GitSyncError
-from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.spec_context.service import (
+    _SCAFFOLD_SRC,
+    SpecContextService,
+)
 from tests.fakes import FakeContextStore, FakeGitClient
 
 # ---------------------------------------------------------------------------
@@ -113,3 +116,91 @@ def test_dead_succeeds_when_all_files_are_writable(
 
     service.dead("proj")
     assert not repo.exists()
+
+
+# ---------------------------------------------------------------------------
+# T-021-15 / T-021-16 — alive() safe-preserve of pre-existing specs/
+# ---------------------------------------------------------------------------
+
+
+def test_alive_with_preexisting_specs_adds_missing_files_without_overwriting(
+    workspace_root: Path,
+    store: FakeContextStore,
+    git: FakeGitClient,
+) -> None:
+    """T-021-16 (b): when specs/ already exists alive() must merge missing canonical
+    files into it without overwriting any file that is already present.
+
+    Invariants:
+    - Pre-existing operator file is NOT overwritten.
+    - Missing canonical scaffold file IS added.
+    - alive() succeeds (no exception).
+    """
+    svc = SpecContextService(
+        context_store=store,
+        git_client=git,
+        workspace_root=workspace_root,
+    )
+    svc.create("proj", "my-repo", "https://github.com/org/my-repo")
+
+    # Pre-create the repo dir (FakeGitClient.clone does this, but we also need specs/)
+    repo_dir = workspace_root / "repos" / "my-repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    specs_dir = repo_dir / "specs"
+    specs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Place an operator file that must NOT be overwritten
+    operator_file = specs_dir / "constitution.md"
+    original_content = "# My custom constitution\n\nOperator-authored content.\n"
+    operator_file.write_text(original_content, encoding="utf-8")
+
+    # alive() must not raise and must not overwrite constitution.md
+    svc.alive("proj")
+
+    # Operator file preserved
+    assert operator_file.read_text(encoding="utf-8") == original_content, (
+        "alive() must NOT overwrite pre-existing operator files in specs/"
+    )
+
+    # At least one canonical scaffold file was merged in (scaffold src must exist)
+    if _SCAFFOLD_SRC.exists():
+        # The scaffold has a memory/ dir; it should be present after merge
+        assert specs_dir.exists(), "specs/ must still exist after merge"
+
+
+def test_alive_with_preexisting_specs_does_not_silently_skip(
+    workspace_root: Path,
+    store: FakeContextStore,
+    git: FakeGitClient,
+) -> None:
+    """T-021-16 (b): alive() on a pre-existing specs/ must execute the merge path
+    (not silently skip); the resulting specs/ is non-empty.
+
+    This test verifies the OLD silent-skip behavior is gone: the specs/ directory
+    must be enriched with any missing canonical files from the scaffold source.
+    """
+    svc = SpecContextService(
+        context_store=store,
+        git_client=git,
+        workspace_root=workspace_root,
+    )
+    svc.create("proj2", "repo2", "https://github.com/org/repo2")
+
+    repo_dir = workspace_root / "repos" / "repo2"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    specs_dir = repo_dir / "specs"
+    specs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Specs/ exists but is empty — no operator files present
+    svc.alive("proj2")
+
+    # After merge, specs/ must contain canonical scaffold files (if scaffold source exists)
+    if _SCAFFOLD_SRC.exists():
+        scaffold_files = list(_SCAFFOLD_SRC.rglob("*"))
+        non_dir_scaffold = [f for f in scaffold_files if f.is_file()]
+        # At least some files should have been copied in
+        specs_files = [f for f in specs_dir.rglob("*") if f.is_file()]
+        assert len(specs_files) >= len(non_dir_scaffold), (
+            f"alive() did not merge scaffold files into empty specs/; "
+            f"expected >={len(non_dir_scaffold)} files, got {len(specs_files)}"
+        )

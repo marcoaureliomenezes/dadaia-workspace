@@ -138,7 +138,7 @@ _TREE3_MEMORY_FILES: tuple[str, ...] = (
 
 # TREE-4: directories that must exist.  Value = README.md content source file (relative
 # to the scaffold source dir embedded in the package).
-_TREE4_REQUIRED_DIRS = ("backlog", "bugs", "releases")
+_TREE4_REQUIRED_DIRS = ("audits", "backlog", "bugs", "releases")
 
 # TREE-6: mandatory artifacts per phase bucket.
 # For the ACTIVE release, if phase is IMPLEMENTATION or CLOSURE, all three must exist.

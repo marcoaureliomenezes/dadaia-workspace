@@ -1,6 +1,7 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
 import contextlib
+import logging
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -27,9 +28,45 @@ from dadaia_workspace.features.spec_context.locking import (
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
 _SCAFFOLD_SRC = _PUBLIC_DIR / "scaffold"
 
+_log = logging.getLogger(__name__)
+
 
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+def _merge_scaffold_into(
+    scaffold_src: Path,
+    target_dir: Path,
+    *,
+    timestamp: str | None = None,
+) -> list[str]:
+    """Walk *scaffold_src* and copy only files/dirs that are MISSING in *target_dir*.
+
+    Never overwrites any existing file.  Returns the list of relative paths that were
+    added (empty list when nothing was missing).
+
+    If *timestamp* is None the current UTC time is used.  Callers may inject a fixed
+    timestamp for deterministic testing.
+    """
+    if timestamp is None:
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+
+    added: list[str] = []
+    for src_path in scaffold_src.rglob("*"):
+        rel = src_path.relative_to(scaffold_src)
+        dst_path = target_dir / rel
+        if src_path.is_dir():
+            if not dst_path.exists():
+                dst_path.mkdir(parents=True, exist_ok=True)
+                _log.info("scaffold merge: created directory %s", rel)
+        else:
+            if not dst_path.exists():
+                dst_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(src_path), str(dst_path))
+                added.append(str(rel))
+                _log.info("scaffold merge: added missing file %s", rel)
+    return added
 
 
 class SpecContextService:
@@ -155,14 +192,28 @@ class SpecContextService:
             except Exception:
                 actual_branch = None
 
-            # Scaffold specs/ if absent
+            # Scaffold specs/ — safe-preserve any pre-existing tree.
             specs_dir = self._specs_dir(repo_slug)
             if not specs_dir.exists():
+                # Fresh scaffold: copy the whole scaffold source tree.
                 if _SCAFFOLD_SRC.exists():
                     shutil.copytree(_SCAFFOLD_SRC, specs_dir)
                 else:
                     for subdir in ("", "memory", "features"):
                         (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
+            else:
+                # specs/ already exists — merge missing canonical files without
+                # overwriting operator content (never silently skip).
+                if _SCAFFOLD_SRC.exists():
+                    added = _merge_scaffold_into(_SCAFFOLD_SRC, specs_dir)
+                    if added:
+                        _log.info(
+                            "scaffold merge into pre-existing specs/: %d file(s) added: %s",
+                            len(added),
+                            added,
+                        )
+                    else:
+                        _log.info("scaffold merge into pre-existing specs/: no missing files found")
 
             # Copy repo-AGENTS.md template if not already present
             repo_agents_dst = repo_path / "AGENTS.md"
