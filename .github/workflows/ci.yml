@@ -230,6 +230,15 @@ jobs:
             "specs_dir": "$PWD/specs"
           }
           JSON
+          # Fast-fail: verify the repo's own memory atoms are accessible so
+          # data-dependent panel paths (memory chip clicks) run in CI.
+          test -f "$PWD/specs/memory/architecture.md" || \
+            { echo "ERROR: specs/memory/architecture.md missing"; exit 1; }
+          test -f "$PWD/specs/memory/tech-stack.md" || \
+            { echo "ERROR: specs/memory/tech-stack.md missing"; exit 1; }
+          test -f "$PWD/specs/memory/product/index.md" || \
+            { echo "ERROR: specs/memory/product/index.md missing"; exit 1; }
+          echo "Memory atoms verified OK"
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903  # v6.0.0
         with:
           node-version: "22"

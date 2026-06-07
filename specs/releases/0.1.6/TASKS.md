@@ -27,7 +27,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   data-dependent paths run. Verify existing e2e suite passes with guards active.
 - **Done criterion:** guard helpers merged; CI `e2e-panel` job bootstraps a context; E2E-GUARD-01/02 active.
 
-[-] T-016-P01
+[x] T-016-P01
 
 ### T-016-P02 — Token file atomic restricted-mode create
 
