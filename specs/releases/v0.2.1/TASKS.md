@@ -324,7 +324,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `specs/releases/v0.1.5/` is absent; archived copy present;
   `dadaia specs doctor` exit 0.
 
-[ ] T-021-22
+[x] T-021-22
 
 ### T-021-23 — Add status: resolved to semaphore bug frontmatter
 
@@ -336,7 +336,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   `superseded_by`; only the explicit `status:` field is missing.
 - **Done criterion:** Frontmatter includes `status: resolved`; file otherwise unchanged.
 
-[ ] T-021-23
+[x] T-021-23
 
 ---
 
