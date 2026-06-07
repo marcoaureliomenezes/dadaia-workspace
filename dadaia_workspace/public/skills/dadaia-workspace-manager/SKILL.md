@@ -190,4 +190,4 @@ remove that repo from disk.
 |---|---|---|
 | INV-4 | `alive` context has repo on disk at `repos/<slug>/` | No (run `dadaia context alive <name>`) |
 | INV-5 | `dead` context does not have repo on disk | Yes |
-| LEASE | The per-context release lease record is consistent with context state; stale leases are reclaimable via `dadaia lock steal <context>` | Some cases |
+| LEASE | The per-context release lease record is consistent with context state; a stale lease auto-reclaims after the heartbeat window (~120s, no manual action). `dadaia lock steal` exists only as an admin/observability escape — never a routine unblock step | Auto (reclaim-iff-stale) |

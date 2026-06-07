@@ -116,5 +116,11 @@ def evaluate(
     try:
         lease.acquire(workspace, ctx, session_id, release, mode, clock=clock)
     except LockHeldError as exc:
+        # Genuine live-foreign conflict — BLOCK with the informative yield message.
         return Decision.BLOCK, str(exc)
+    except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead
+        # Any unexpected lease-subsystem error (OSError, corrupt record, ValueError,
+        # …) must NOT freeze the flow. Fail OPEN (heal-and-allow), matching the shell
+        # gate's fail-open exit path — the guarantee holds for direct API callers too.
+        return Decision.ALLOW, ""
     return Decision.ALLOW, ""

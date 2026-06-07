@@ -185,3 +185,33 @@ def test_mutating_no_ptr_match_live_foreign_yields(tmp_path: Path) -> None:
         "Yield message must never instruct to bind --mode write"
     )
     assert "relaunch" not in message, "Yield message must never instruct to relaunch"
+
+
+def test_mutating_unexpected_lease_error_fails_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC-04 fail-safe: an unexpected lease-subsystem error must ALLOW, never raise.
+
+    The 'never fail-dead' contract must hold for direct API callers, not only the
+    shell gate. If lease.acquire raises something other than LockHeldError (e.g.
+    OSError from a corrupt/unreadable lock store), evaluate() heals-and-allows.
+    """
+
+    def _boom(*_args: object, **_kwargs: object) -> tuple[str, dict[str, object]]:
+        raise OSError("simulated unreadable lock store")
+
+    monkeypatch.setattr(lease, "acquire", _boom)
+
+    decision, message = evaluate(
+        tmp_path,
+        "specs/releases/v0.2.0/SPEC.md",
+        ctx=CTX,
+        phase="SPEC",
+        session_id="mine",
+        release="v0.2.0",
+        mode="IMPLEMENTATION",
+        clock=fixed(BASE),
+    )
+    assert decision == Decision.ALLOW, (
+        "Unexpected lease error must fail OPEN (heal-and-allow), never freeze the flow"
+    )
