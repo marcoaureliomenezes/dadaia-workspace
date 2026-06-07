@@ -25,7 +25,8 @@ take precedence.
 The workspace **root** may contain **only**:
 
 - Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.opencode/`, `repos/`
-- File: `AGENTS.md`
+- Files: `AGENTS.md`, `CLAUDE.md` (Claude Code bridge importing `@AGENTS.md`),
+  `prompt.md` (optional operator long-prompt file)
 
 **Operator exception:** any file or directory created by the human operator is always
 allowed and MUST never be auto-deleted (e.g. `prompt.md`, screenshots). Operator

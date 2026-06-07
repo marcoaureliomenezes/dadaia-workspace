@@ -3,7 +3,9 @@
 #
 # The Law: the workspace root may contain ONLY:
 #   Directories: .agents/ .claude/ .codex/ .dadaia/ .opencode/ repos/
-#   File:        AGENTS.md
+#   Files:       AGENTS.md CLAUDE.md prompt.md
+#   (CLAUDE.md = Claude Code bridge importing @AGENTS.md; prompt.md = optional
+#    operator long-prompt file. Both authorized per constitution §3.)
 #   Operator exception: any human-operator-created file/dir is always allowed and
 #                       MUST never be auto-deleted. Operator origin is checked via
 #                       .dadaia/states/root_exceptions.txt (one glob per line).
@@ -101,7 +103,7 @@ BASENAME="$(basename "$FPATH")"
 
 # Whitelisted root entries (The Law)
 case "$BASENAME" in
-    .agents|.claude|.codex|.dadaia|.opencode|repos|AGENTS.md)
+    .agents|.claude|.codex|.dadaia|.opencode|repos|AGENTS.md|CLAUDE.md|prompt.md)
         _log "allowed — whitelisted root entry: $BASENAME"
         exit 0
         ;;
@@ -134,4 +136,4 @@ EOF
 fi
 
 # Block: this is a non-whitelisted root-level entry
-_block "[ROOT WHITELIST GATE] Writing '$BASENAME' at workspace root is forbidden. The workspace root may only contain: .agents/ .claude/ .codex/ .dadaia/ .opencode/ repos/ AGENTS.md. Redirect output to .dadaia/<subdir> (temp files: .dadaia/tmp/<agent>/<date>/; tool caches: .dadaia/; MCP output: .dadaia/mcps/<server>/). If this entry is genuinely required at root, add a glob pattern to .dadaia/states/root_exceptions.txt and retry. Operator-created files are exempt — add them to root_exceptions.txt."
+_block "[ROOT WHITELIST GATE] Writing '$BASENAME' at workspace root is forbidden. The workspace root may only contain: .agents/ .claude/ .codex/ .dadaia/ .opencode/ repos/ AGENTS.md CLAUDE.md prompt.md. Redirect output to .dadaia/<subdir> (temp files: .dadaia/tmp/<agent>/<date>/; tool caches: .dadaia/; MCP output: .dadaia/mcps/<server>/). If this entry is genuinely required at root, add a glob pattern to .dadaia/states/root_exceptions.txt and retry. Operator-created files are exempt — add them to root_exceptions.txt."

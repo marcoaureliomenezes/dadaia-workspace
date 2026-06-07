@@ -41,13 +41,17 @@ The workspace root may contain **only** the following entries:
 | `.opencode/` | dir | lib-originated projection |
 | `repos/` | dir | spec context project repos |
 | `AGENTS.md` | file | lib-originated (dadaia public install) |
+| `CLAUDE.md` | file | Claude Code bridge importing `@AGENTS.md` (constitution §3) |
+| `prompt.md` | file | optional operator long-prompt file (constitution §3) |
 
-**Nothing else belongs at root.** Files such as `CLAUDE.md`, `opencode.json`,
-`.mcp.json`, and `scripts/` are NOT default-whitelisted. Their placement at root
-is under investigation (T-SANI-02); pending that research, they are not authorized
-root entries. If a specific tool genuinely requires one of these at root, it must
-be added as a documented exception in `.dadaia/states/root_exceptions.txt` (one
-glob per line) after operator approval.
+`CLAUDE.md` is required: Claude Code does not read `AGENTS.md` natively, so a root
+`CLAUDE.md` containing `@AGENTS.md` is the authorized import bridge that loads the
+workspace law. `prompt.md` is an optional operator-authored long-prompt file.
+
+**Nothing else belongs at root.** Files such as `opencode.json`, `.mcp.json`,
+and `scripts/` are NOT default-whitelisted. If a specific tool genuinely requires
+one of these at root, it must be added as a documented exception in
+`.dadaia/states/root_exceptions.txt` (one glob per line) after operator approval.
 
 **Operator exception:** any file or directory created by the human operator is always
 allowed and must never be auto-deleted (e.g. `prompt.md`, `sessions-tab-1280.png`).

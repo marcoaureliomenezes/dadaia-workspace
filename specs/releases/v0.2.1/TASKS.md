@@ -249,7 +249,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** All three files name `CLAUDE.md` and `prompt.md` as allowed root
   entries.
 
-[ ] T-021-17
+[x] T-021-17
 
 ### T-021-18 — Add CLAUDE.md scaffold file; upgrade live root CLAUDE.md
 
@@ -264,7 +264,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `dadaia public doctor` exit 0; root-whitelist gate does not flag
   `CLAUDE.md` or `prompt.md` on the live workspace; live `CLAUDE.md` contains `@AGENTS.md`.
 
-[ ] T-021-18
+[x] T-021-18
 
 ---
 
