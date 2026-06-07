@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
 
 forbidden_tracked_regex='^(\.(claude|agents|codex|opencode)/|\.dadaia/|CLAUDE\.md$|opencode\.json$|Makefile$|playwright\.config\.ts$|playwright-report/|test-results/)'

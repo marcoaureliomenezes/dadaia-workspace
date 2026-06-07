@@ -143,11 +143,15 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
       - name: Install Node deps
+        working-directory: tests/e2e
         run: npm ci
       - name: Install Chromium
+        working-directory: tests/e2e
         run: npx playwright install --with-deps chromium
       - name: playwright panel e2e
+        working-directory: tests/e2e
         env:
           PANEL_WEB_SERVER_COMMAND: poetry run python -m dadaia_workspace.cli.main panel --port 4999 --no-open
         run: npm run test:e2e

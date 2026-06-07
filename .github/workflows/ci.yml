@@ -234,11 +234,15 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
       - name: Install Node deps
+        working-directory: tests/e2e
         run: npm ci
       - name: Install Chromium
+        working-directory: tests/e2e
         run: npx playwright install --with-deps chromium
       - name: playwright panel e2e
+        working-directory: tests/e2e
         env:
           PANEL_WEB_SERVER_COMMAND: poetry run python -m dadaia_workspace.cli.main panel --port 4999 --no-open
         run: npm run test:e2e
@@ -266,7 +270,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
       - name: Fail if projection or runtime files are git-tracked
-        run: bash scripts/check_no_repo_local_claude.sh
+        run: bash .github/scripts/check_no_repo_local_claude.sh
 
   hotfix-branch-name:
     name: Hotfix branch SemVer (PATCH>=1)
@@ -310,4 +314,4 @@ jobs:
           QA_HANDOFF: ${{ github.event.inputs.qa_sidecar || '' }}
           SECURITY_HANDOFF: ${{ github.event.inputs.security_sidecar || '' }}
           RELEASE_ID: ${{ github.event.inputs.release_id || '' }}
-        run: bash scripts/check-verdict.sh
+        run: bash .github/scripts/check-verdict.sh

@@ -368,18 +368,18 @@ that alters the dispatch graph / allowlists / tool grants across personas):
   1. Confirm an operator-approved release task authorizes the specific change
      (tier bump, allowlist edit, tool grant). No self-granted privileges.
   2. Make the edit minimal and single-purpose.
-  3. Run the topology guard:
-        python scripts/check_agent_topology.py    # if present in the workspace
-     The guard validates the dispatch graph and allowlist invariants across the
-     whole agent set — it catches a self-edit that broke another agent's
-     expectations.
+  3. Re-verify the topology invariants by hand: persona count matches the
+     canonical roster; every persona has the required frontmatter keys
+     (name/description/tier/model/tools/paths.write_allowlist, non-empty); and
+     project-manager + project-auditor each still name every leaf agent. This
+     catches a self-edit that broke another agent's expectations.
   4. Pair with security-reviewer for any change that adds a powerful tool
      (Agent/dispatch, broad WebSearch, network) or widens an allowlist; hooks
      (executable surface) always require security-reviewer.
   5. Re-validate frontmatter via the workspace reader test so the parse still
      succeeds.
 
-INVOKE THE TOPOLOGY GUARD WHENEVER:
+RE-VERIFY THE TOPOLOGY INVARIANTS WHENEVER:
   - any persona's paths.write_allowlist changes,
   - any persona's tools list changes (especially adding Agent/dispatch),
   - any persona is added or removed,

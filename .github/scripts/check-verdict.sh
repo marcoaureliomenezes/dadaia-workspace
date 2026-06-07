@@ -18,9 +18,9 @@
 #   CONTEXT          optional context that both reviewer handoffs must match
 #
 # Usage:
-#   ./scripts/check-verdict.sh
+#   ./.github/scripts/check-verdict.sh
 #   QA_HANDOFF=path/to/qa.handoff.json SECURITY_HANDOFF=path/to/sec.handoff.json \
-#     ./scripts/check-verdict.sh
+#     ./.github/scripts/check-verdict.sh
 
 set -euo pipefail
 
