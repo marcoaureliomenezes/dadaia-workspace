@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.exceptions import LockHeldError
 from dadaia_workspace.features.spec_context import lease
 
 
@@ -43,6 +42,15 @@ def test_concurrent_cas_fails_exactly_one_record(
     status2, _ = lease.acquire(tmp_path, ctx, "sessA", "v1", "IMPLEMENTATION")
     assert status2 == "RENEWED"
 
-    # A different live session is denied — no double-acquire.
-    with pytest.raises(LockHeldError):
+    # D1 soul-fold: a different session without a matching .ptr sees a live foreign
+    # lease and is blocked with yield-iff-live-foreign (FR-P1-15). The record stays
+    # owned by sessA; the sentinel is released even on the LockHeldError path.
+    from dadaia_workspace.core.exceptions import LockHeldError
+
+    with pytest.raises(LockHeldError) as exc_info:
         lease.acquire(tmp_path, ctx, "sessB", "v1", "IMPLEMENTATION")
+    assert "dadaia lock steal" in str(exc_info.value) or "actively mutating" in str(exc_info.value), (
+        "Yield message must be informative (mention lock steal or 'actively mutating')"
+    )
+    assert lease.read_record(tmp_path, ctx)["session_id"] == "sessA"  # record unchanged
+    assert not sentinel.exists()  # sentinel always cleaned up

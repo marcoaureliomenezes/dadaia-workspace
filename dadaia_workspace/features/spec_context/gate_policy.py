@@ -25,9 +25,13 @@ from dadaia_workspace.features.spec_context import lease
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
 #: Ordered ADDITIVE prefixes — always allowed (never blocked, never locked).
+#: specs/audits/ is ADDITIVE (FR-P1-14/D2): parallel audit sessions write here
+#: without a MUTATING lease. Audit dirs use collision-safe naming per FR-P1-16:
+#:   specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
 _ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/backlog/",
     "specs/bugs/",
+    "specs/audits/",
     ".dadaia/reports/",
     ".dadaia/handoff/",
     ".dadaia/tmp/",
@@ -84,8 +88,13 @@ def evaluate(
     """Return the gate decision for one write target — the fail-safe contract.
 
     Guarantees (AC-04): the return is always one of {ALLOW, BLOCK-with-actionable-
-    message}; never an unhandled exception. Every BLOCK on a MUTATING live conflict
-    carries the ``dadaia lock steal`` unblock path.
+    message}; never an unhandled exception.
+
+    MUTATING paths are BLOCKed on a live foreign lease (yield-iff-live-foreign,
+    FR-P1-15): the block message is always actionable (never "bind --mode write",
+    never "relaunch"). A relaunched session with a matching ``.ptr`` is recognised
+    as the incumbent and RENEWs (never blocks). The flow only stops on a genuinely
+    concurrent foreign live session — and even then, additive writes are unblocked.
     """
     cls = classify_path(rel_path)
 

@@ -1,14 +1,15 @@
 #!/bin/bash
-# sdd-spec-gate.sh — PreToolUse hook for SDD enforcement (v0.1.6 fail-safe rewrite).
-# Classifier (first match wins): ADDITIVE(backlog/bugs/.dadaia reports,handoff,tmp)->ALLOW;
+# sdd-spec-gate.sh — PreToolUse hook for SDD enforcement (v0.1.6 + D1/D2/D6 soul-fold).
+# Classifier (first match wins): ADDITIVE(backlog/bugs/audits/.dadaia/reports,handoff,tmp)->ALLOW;
 # MEMORY(specs/memory)->phase gate; FROZEN(specs/_archive)->block; MUTATING(specs/releases,
-# repos/<ctx>)->TTL-lease acquire; UNGATED->ALLOW. The gate is the SINGLE lease acquisition
-# point (O_EXCL CAS in lease.py). Fail-safe: inconclusive ALLOWs+logs; only a live-lease
-# conflict blocks.
+# repos/<ctx>)->TTL-lease acquire; UNGATED->ALLOW. Gate is the SINGLE lease acquisition
+# point (O_EXCL CAS in lease.py). Fail-safe: inconclusive ALLOWs+logs; only a live-foreign
+# lease conflict blocks (yield-iff-live-foreign, FR-P1-15).
 # Cross-harness enforcement honesty:
 #   Claude Code: real PreToolUse block (decision: block)
 #   Codex:       real block in trusted workspace; hooks parallel — must be idempotent
 #   opencode:    advisory only — JSON PreToolUse unsupported; lease record + doctor enforce.
+# Audit dirs (FR-P1-16/D6): specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
 LOG="${SDD_GATE_LOG:-/tmp/sdd-gate.log}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
@@ -60,14 +61,11 @@ except Exception:
 PYEOF
 )
 # Fail-safe: unparseable target → ALLOW + log (never deadlock on a parse miss).
-if [ -z "$FPATH" ]; then
-    _log "ALLOW: unparseable target for tool=$TOOL"
-    exit 0
-fi
+if [ -z "$FPATH" ]; then _log "ALLOW: unparseable target for tool=$TOOL"; exit 0; fi
 [[ "$FPATH" != /* ]] && FPATH="$WS/$FPATH"
 _log "tool=$TOOL path=$FPATH"
-# Resolve bound context slug: DADAIA_CONTEXT -> first ALIVE in spec_contexts.json
-# -> session file. Sanitized to [A-Za-z0-9_-] (CWE-22).
+# Resolve bound context slug: DADAIA_CONTEXT -> first ALIVE in spec_contexts.json.
+# Sanitized to [A-Za-z0-9_-] (CWE-22).
 CONTEXT_SLUG=$("$PYTHON_BIN" - "$WS" "${DADAIA_CONTEXT:-}" "${DADAIA_SESSION_ID:-}" 2>/dev/null <<'PYEOF'
 import json, os, re, sys
 ws, env_ctx, sess = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -99,8 +97,10 @@ _phase_of() { # $1 = a specs dir; echoes phase from releases/ACTIVE.md
     grep -E '^phase:' "$1/releases/ACTIVE.md" 2>/dev/null | head -1 |
         sed -E 's/^phase:[[:space:]]*//; s/[[:space:]]*$//'
 }
+# specs/audits/ is ADDITIVE (FR-P1-14/D2): no lease check, no phase check.
 case "$FPATH" in
-    */specs/backlog/* | */specs/bugs/* | */.dadaia/reports/* | */.dadaia/handoff/* | */.dadaia/tmp/*)
+    */specs/backlog/* | */specs/bugs/* | */specs/audits/* | \
+    */.dadaia/reports/* | */.dadaia/handoff/* | */.dadaia/tmp/*)
         CLASS=ADDITIVE ;;
     */specs/memory/*) CLASS=MEMORY ;;
     */specs/_archive/*) CLASS=FROZEN ;;
@@ -118,25 +118,19 @@ if [ "$CLASS" = "ADDITIVE" ]; then
             PERSONA="${DADAIA_AGENT_PERSONA:-${CLAUDE_AGENT_PERSONA:-${CODEX_AGENT_PERSONA:-${OPENCODE_AGENT_PERSONA:-}}}}"
             if [ -n "$PERSONA" ] && [ "$PERSONA" != "project-manager" ]; then
                 _block "[BACKLOG OWNERSHIP ERROR] agent ${PERSONA} cannot write to specs/backlog/ — only project-manager creates or edits backlog entries (rule: backlog-ownership)."
-            fi
-            ;;
+            fi ;;
     esac
     exit 0
 fi
 if [ "$CLASS" = "MEMORY" ]; then
-    case "$FPATH" in
-        *.md) ;;
-        *) _block "[SDD GATE] memory/ uses Markdown as the sole source; .html/.yaml/.yml atoms are read-only legacy." ;;
-    esac
+    case "$FPATH" in *.md) ;; *) _block "[SDD GATE] memory/ uses Markdown as the sole source; .html/.yaml/.yml atoms are read-only legacy." ;; esac
     PHASE="$(_phase_of "$(echo "$FPATH" | sed -E 's|/specs/.*|/specs|')")"
     case "$PHASE" in
         CLOSURE | DEFINITION) _log "ALLOW: memory edit in phase=$PHASE"; exit 0 ;;
         *) _block "[SDD GATE] memory/ is atomic — only product-engineer in DEFINITION or CLOSURE phase may edit (current phase: ${PHASE:-none})." ;;
     esac
 fi
-if [ "$CLASS" = "FROZEN" ]; then
-    _block "[SDD GATE] specs/_archive/ is read-only. Use 'git mv' to archive a finished release; never edit archived files."
-fi
+[ "$CLASS" = "FROZEN" ] && _block "[SDD GATE] specs/_archive/ is read-only. Use 'git mv' to archive a finished release; never edit archived files."
 # RULE D — write-allowlist via pre-compiled agents.index.json. Fail-open when no
 # persona / no index entry (the gate never hard-blocks on an unknown writer).
 PERSONA="${DADAIA_AGENT_PERSONA:-${CLAUDE_AGENT_PERSONA:-${CODEX_AGENT_PERSONA:-${OPENCODE_AGENT_PERSONA:-}}}}"
@@ -156,16 +150,19 @@ PYEOF
 )
     [ "$RD" = "deny" ] && _block "[SDD GATE] agent ${PERSONA} write_allowlist does not permit '${FPATH#"$WS"/}' (rule: agent path-scope)."
 fi
-if [ -z "$CONTEXT_SLUG" ]; then
-    _log "ALLOW: MUTATING path but no context resolved (fail-open)"
-    exit 0
-fi
+if [ -z "$CONTEXT_SLUG" ]; then _log "ALLOW: MUTATING path but no context resolved (fail-open)"; exit 0; fi
 REL="$(grep -E '^release:' "$WS/repos/$CONTEXT_SLUG/specs/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')"
 MODE="${DADAIA_MODE:-IMPLEMENTATION}"
-RESULT=$(WORKSPACE_ROOT="$WS" "$PYTHON_BIN" -m dadaia_workspace.features.spec_context.lease acquire \
+LEASE_OUT=$(WORKSPACE_ROOT="$WS" "$PYTHON_BIN" -m dadaia_workspace.features.spec_context.lease acquire \
     "$CONTEXT_SLUG" "$SESSION_ID" "${REL:-none}" "$MODE" 2>>"$LOG")
-case "$RESULT" in
-    ACQUIRED | RENEWED) _log "ALLOW: lease $RESULT ctx=$CONTEXT_SLUG session=$SESSION_ID"; exit 0 ;;
-    "[SDD LOCK]"*) _block "$RESULT" ;;
-    *) _log "ALLOW: lease check inconclusive (result='$RESULT'); fail-open"; exit 0 ;;
-esac
+LEASE_EXIT=$?
+# exit 0 (ACQUIRED/RENEWED) → ALLOW. exit 1 (live-foreign LockHeldError,
+# FR-P1-15 yield) → BLOCK with informative message (never "bind --mode write"/
+# "relaunch"; steal only as conditional emergency escape). Other exit → ALLOW (fail-open).
+if [ "$LEASE_EXIT" -eq 0 ]; then
+    _log "ALLOW: lease $LEASE_OUT ctx=$CONTEXT_SLUG session=$SESSION_ID"; exit 0
+elif [ "$LEASE_EXIT" -eq 1 ]; then
+    _log "BLOCKED: live-foreign lease ctx=$CONTEXT_SLUG session=$SESSION_ID"; _block "$LEASE_OUT"
+else
+    _log "ALLOW: lease subsystem error (exit=$LEASE_EXIT) — fail-open"; exit 0
+fi

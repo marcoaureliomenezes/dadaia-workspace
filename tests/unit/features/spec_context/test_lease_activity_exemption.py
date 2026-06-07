@@ -17,6 +17,7 @@ import pytest
 
 from dadaia_workspace.features.spec_context import lease
 from dadaia_workspace.features.spec_context.gate_policy import Decision, evaluate
+from dadaia_workspace.features.spec_context.lease import LEASE_TTL_SECONDS
 
 BASE = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 CTX = "myctx"
@@ -33,7 +34,7 @@ def fixed(dt: datetime) -> Callable[[], datetime]:
     return lambda: dt
 
 
-def _seed(workspace: Path, session_id: str, heartbeat: datetime, ttl: int = 1800) -> None:
+def _seed(workspace: Path, session_id: str, heartbeat: datetime, ttl: int = LEASE_TTL_SECONDS) -> None:
     lease._record_path(workspace, CTX).write_text(
         json.dumps(
             {
@@ -58,13 +59,16 @@ def _apply_state(workspace: Path, state: str) -> None:
     elif state == "live_other":
         _seed(workspace, "other", BASE)
     elif state == "expired":
-        _seed(workspace, "other", BASE - timedelta(seconds=4000))
+        _seed(workspace, "other", BASE - timedelta(seconds=LEASE_TTL_SECONDS + 60))
 
 
 # 16 cells: (path_class, lease_state) -> expected. Phase=SPEC throughout.
+# With D1 stable-identity: live_other → BLOCK (yield-iff-live-foreign, FR-P1-15).
+# No .ptr file is seeded, so session "mine" sees a live foreign lease and blocks.
 _EXPECTED = {
     ("mutating", "absent"): Decision.ALLOW,
     ("mutating", "live_mine"): Decision.ALLOW,
+    # Foreign live lease → yield-iff-live-foreign BLOCK (D1 soul-fold, FR-P1-15).
     ("mutating", "live_other"): Decision.BLOCK,
     ("mutating", "expired"): Decision.ALLOW,
     ("additive", "absent"): Decision.ALLOW,
@@ -122,6 +126,25 @@ def test_memory_closure_allow(tmp_path: Path) -> None:
         _PATHS["memory"],
         ctx=CTX,
         phase="CLOSURE",
+        session_id="mine",
+        release="v0.2.0",
+        mode="IMPLEMENTATION",
+        clock=fixed(BASE),
+    )
+    assert decision == Decision.ALLOW
+
+
+def test_audits_path_additive_allow(tmp_path: Path) -> None:
+    """T-016-13 AC-14: specs/audits/** is classified ADDITIVE — always ALLOW (D2 soul-fold).
+
+    Audit dirs use collision-safe naming: specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
+    The gate never requires a lease check for audit writes.
+    """
+    decision, _msg = evaluate(
+        tmp_path,
+        "specs/audits/2026-01-01T000000Z-abc12345/audit.md",
+        ctx=CTX,
+        phase="SPEC",
         session_id="mine",
         release="v0.2.0",
         mode="IMPLEMENTATION",

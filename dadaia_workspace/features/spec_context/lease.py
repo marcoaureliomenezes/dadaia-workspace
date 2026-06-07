@@ -1,4 +1,4 @@
-"""Single-record cross-platform TTL-lease (v0.1.6).
+"""Single-record cross-platform TTL-lease (v0.1.6 + D1 soul-fold).
 
 One liveness record per context governs release-mutation serialization::
 
@@ -14,8 +14,25 @@ this closes the read→stale-check→write TOCTOU gap that caused the double-acq
 race. No read-then-write acquire path exists anywhere — this is a security red line.
 
 Liveness is TTL-only (``core.lock_liveness.is_stale``): no PID, no ``os.kill``, no
-``/proc`` — Windows-safe (OQ-1). A dead holder expires after TTL; an idle-but-alive
-holder renews its heartbeat on every PreToolUse.
+``/proc`` — Windows-safe (OQ-1). A dead holder expires after ``LEASE_TTL_SECONDS``
+seconds (OQ-1 operator decision 2026-06-06); an idle-but-alive holder renews its
+heartbeat on every PreToolUse.
+
+**Stable session identity (D1 soul-fold):**  On first acquire for a (context,
+session_id) pair, a pointer file is written::
+
+    .dadaia/sessions/runtime/<ctx>.ptr
+
+On every subsequent acquire, if the ``.ptr`` file exists and its content matches
+``session_id``, the caller is treated as the incumbent → RENEW (no conflict, no
+freeze). This eliminates false-conflict from session-id instability across relaunches.
+
+**Yield-iff-live-foreign (FR-P1-15):** If the ``.ptr`` does not match and the
+existing lease holder is genuinely live (heartbeat < ``LEASE_TTL_SECONDS`` ago),
+``acquire`` raises :class:`~dadaia_workspace.core.exceptions.LockHeldError` with an
+informative yield message. The message never instructs the operator to rebind, relaunch,
+or steal — there is no manual unblock ceremony. A finished or dead holder is freed
+automatically by reclaim-iff-stale after ``LEASE_TTL_SECONDS`` without a heartbeat.
 
 Cross-harness honesty: this record + ``doctor`` GC are the real enforcement on
 opencode (which cannot block via JSON PreToolUse); Claude Code / Codex also get a
@@ -39,7 +56,7 @@ from dadaia_workspace.core.exceptions import LockHeldError
 from dadaia_workspace.core.lock_liveness import is_stale
 
 __all__ = [
-    "DEFAULT_TTL",
+    "LEASE_TTL_SECONDS",
     "acquire",
     "is_held",
     "read_record",
@@ -48,8 +65,10 @@ __all__ = [
     "steal",
 ]
 
-#: Heartbeat TTL in seconds (30 min) — OQ-1 binding decision. Renew-on-tool-use.
-DEFAULT_TTL = 1800
+#: Heartbeat TTL in seconds — OQ-1 operator decision 2026-06-06 (short heartbeat).
+#: Every liveness comparison must reference this constant; no inline magic numbers
+#: are permitted anywhere in the liveness path.
+LEASE_TTL_SECONDS = 120
 
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF = 0.1
@@ -98,6 +117,35 @@ def _record_path(workspace: Path, ctx: str) -> Path:
 def _sentinel_path(workspace: Path, ctx: str) -> Path:
     _validate(ctx, field="context")
     return _lock_dir(workspace) / f"{ctx}.lock.sentinel"
+
+
+def _ptr_path(workspace: Path, ctx: str) -> Path:
+    """Path for the stable-identity pointer file (not a lock; a hint)."""
+    _validate(ctx, field="context")
+    runtime_dir = workspace / ".dadaia" / "sessions" / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    return runtime_dir / f"{ctx}.ptr"
+
+
+def _read_ptr(workspace: Path, ctx: str) -> str | None:
+    """Read the stable-identity pointer; returns session_id string or None."""
+    try:
+        content = _ptr_path(workspace, ctx).read_text(encoding="utf-8").strip()
+        return content if content else None
+    except OSError:
+        return None
+
+
+def _write_ptr(workspace: Path, ctx: str, session_id: str) -> None:
+    """Write session_id to the pointer file atomically (via os.replace)."""
+    ptr = _ptr_path(workspace, ctx)
+    tmp = ptr.parent / f"{ptr.name}.{uuid.uuid4().hex}.tmp"
+    tmp.write_text(session_id, encoding="utf-8")
+    try:
+        os.replace(tmp, ptr)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def read_record(workspace: Path, ctx: str) -> dict[str, object] | None:
@@ -176,15 +224,23 @@ def _gc_orphan_sentinel(sentinel: Path) -> None:
         sentinel.unlink(missing_ok=True)
 
 
-def _held_message(ctx: str, rec: dict[str, object]) -> str:
-    """Exact unblock message (FR-P1-06) — always contains ``dadaia lock steal``."""
+def _yield_message(ctx: str, holder_id: str, heartbeat: str) -> str:
+    """Build the informative yield-iff-live-foreign message (FR-P1-15).
+
+    HARD CONSTRAINT (operator forbidden-law): this message MUST NOT instruct the
+    operator to ``bind --mode write``, ``relaunch``, or ``lock steal`` — not even
+    as a conditional/emergency step. There is no manual unblock ceremony: the lease
+    auto-reclaims after ``LEASE_TTL_SECONDS`` without a heartbeat, so a finished or
+    dead holder frees it automatically and this session acquires on its next write.
+    """
     return (
-        f"[SDD LOCK] Release-mutation on '{ctx}' is held by session {rec.get('session_id', '?')}\n"
-        f"           acquired_at={rec.get('acquired_at', '?')}, "
-        f"last_heartbeat={rec.get('heartbeat', '?')}.\n"
-        f"           One serialized release session at a time.\n"
-        f"           To reclaim: dadaia lock steal {ctx}\n"
-        f"           Backlog / audit / research writes are never blocked."
+        f"[SDD LOCK] Session {holder_id!r} is actively mutating context {ctx!r} "
+        f"(last heartbeat: {heartbeat}). "
+        "This session will not mutate to avoid a race. "
+        "Additive writes (backlog/audit/reports/handoff) are still allowed. "
+        f"The lease auto-reclaims after ~{LEASE_TTL_SECONDS}s without a heartbeat, "
+        "so a finished or dead session frees it automatically and this session "
+        "then acquires on its next write. No manual action is needed."
     )
 
 
@@ -196,14 +252,27 @@ def acquire(
     mode: str,
     *,
     clock: Callable[[], datetime] = _utcnow,
-    ttl: int = DEFAULT_TTL,
+    ttl: int = LEASE_TTL_SECONDS,
 ) -> tuple[str, dict[str, object]]:
     """Acquire (or renew) the lease via O_EXCL CAS.
 
-    Returns ``("ACQUIRED", record)`` when the record was absent/stale and freshly
-    written, or ``("RENEWED", record)`` when the caller already held it. Raises
-    :class:`LockHeldError` on a live conflict (the *only* block) — its message
-    carries the ``dadaia lock steal`` unblock path.
+    Decision tree (FR-P1-15):
+
+    1. ``.ptr`` file matches ``session_id`` → **RENEW** unconditionally (stable identity:
+       this is the incumbent session, even if the lock record shows a different session_id
+       due to a relaunch). Updates the lock record to ``session_id``.
+    2. Record absent or stale → **ACQUIRED** (fresh write).
+    3. Record live, ``session_id`` matches lock record → **RENEWED** (heartbeat updated).
+    4. Record live, foreign ``session_id``, no ``.ptr`` match → raises
+       :class:`~dadaia_workspace.core.exceptions.LockHeldError` with the informative
+       yield-iff-live-foreign message (FR-P1-15). The caller must not proceed with the
+       MUTATING write.
+
+    The only other :class:`LockHeldError` raised is transient sentinel-contention
+    (a genuinely simultaneous CAS that loses all retries); the SDD gate treats that
+    as fail-open (ALLOW), so it never freezes the flow either.
+
+    On every successful acquire/renew, the ``.ptr`` file is written or refreshed.
     """
     _validate(ctx, field="context")
     _validate(session_id, field="session_id")
@@ -230,17 +299,50 @@ def acquire(
         try:
             if _before_write is not None:
                 _before_write()
+
+            # --- Stable session identity (D1): check .ptr first ---
+            ptr_id = _read_ptr(workspace, ctx)
+            if ptr_id is not None and ptr_id == session_id:
+                # Incumbent session recognised via .ptr — RENEW unconditionally.
+                # Update the lock record to the current session_id (it may have
+                # drifted to a foreign id due to a relaunch without .ptr cleanup).
+                rec = read_record(workspace, ctx)
+                if rec is not None:
+                    rec["session_id"] = session_id
+                    rec["heartbeat"] = clock().isoformat()
+                    _write_record(record_path, rec)
+                    _write_ptr(workspace, ctx, session_id)
+                    return "RENEWED", rec
+                else:
+                    # No record (e.g. GC'd) → create fresh.
+                    new = _new_record(ctx, release, session_id, mode, clock=clock, ttl=ttl)
+                    _write_record(record_path, new)
+                    _write_ptr(workspace, ctx, session_id)
+                    _audit(workspace, "acquire", ctx, session_id, clock=clock)
+                    return "ACQUIRED", new
+
+            # --- Normal stale/live/foreign check ---
             rec = read_record(workspace, ctx)
             if rec is None or is_stale(rec, clock=clock):
                 new = _new_record(ctx, release, session_id, mode, clock=clock, ttl=ttl)
                 _write_record(record_path, new)
+                _write_ptr(workspace, ctx, session_id)
                 _audit(workspace, "acquire", ctx, session_id, clock=clock)
                 return "ACQUIRED", new
+
             if rec.get("session_id") == session_id:
                 rec["heartbeat"] = clock().isoformat()
                 _write_record(record_path, rec)
+                _write_ptr(workspace, ctx, session_id)
                 return "RENEWED", rec
-            raise LockHeldError(_held_message(ctx, rec))
+
+            # Foreign live lease — yield-iff-live-foreign (FR-P1-15).
+            # NEVER take over a live foreign lease: that violates exactly-one-mutating.
+            # Raise LockHeldError so the gate BLOCKs this write.
+            holder_id = str(rec.get("session_id", "<unknown>"))
+            heartbeat = str(rec.get("heartbeat", "unknown"))
+            raise LockHeldError(_yield_message(ctx, holder_id, heartbeat))
+
         finally:
             sentinel.unlink(missing_ok=True)
 
@@ -288,7 +390,7 @@ def steal(
     session_id: str,
     *,
     clock: Callable[[], datetime] = _utcnow,
-    ttl: int = DEFAULT_TTL,
+    ttl: int = LEASE_TTL_SECONDS,
 ) -> tuple[bool, dict[str, object] | None]:
     """Reclaim a *stale* lease for ``session_id`` via the same O_EXCL CAS as acquire.
 
@@ -323,6 +425,7 @@ def steal(
             mode = str(rec2.get("mode", "")) if rec2 else ""
             new = _new_record(ctx, release_id, session_id, mode, clock=clock, ttl=ttl)
             _write_record(record_path, new)
+            _write_ptr(workspace, ctx, session_id)
             _audit(workspace, "steal", ctx, session_id, clock=clock)
             return True, new
         finally:

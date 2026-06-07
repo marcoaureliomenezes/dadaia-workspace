@@ -1,8 +1,9 @@
-"""T-016-02: 9-row fail-safe property table (SPEC §8 AC-04).
+"""T-016-02 + T-016-14: fail-safe property table (SPEC §8 AC-04).
 
 Every row's decision is one of {ALLOW, BLOCK}; every BLOCK carries an actionable
-message; every MUTATING live-conflict BLOCK contains ``dadaia lock steal``; no row
-raises an unhandled exception. All timing uses FakeClock.
+message; no row raises an unhandled exception. D1 soul-fold: a MUTATING live-other
+conflict BLOCKS with yield-iff-live-foreign (FR-P1-15) when no .ptr match; a
+relaunched session with .ptr match RENEWs (ALLOW). All timing uses FakeClock.
 """
 
 from __future__ import annotations
@@ -62,6 +63,8 @@ _ROWS = [
         Decision.ALLOW,
     ),
     (
+        # D1 soul-fold: foreign live lease → yield-iff-live-foreign BLOCK (FR-P1-15).
+        # No .ptr file → session "mine" sees live foreign "other" and is blocked.
         "4_live_other_mutating",
         "specs/releases/v0.2.0/SPEC.md",
         "SPEC",
@@ -106,6 +109,75 @@ def test_fail_safe_property(row: tuple, tmp_path: Path) -> None:  # type: ignore
     if decision == Decision.BLOCK:
         assert message, f"row {row_id}: BLOCK must carry an actionable message"
 
-    # MUTATING live-other must always print the steal unblock path.
+    # D1 soul-fold: a MUTATING live-other conflict BLOCKS with yield-iff-live-foreign
+    # message (FR-P1-15). The message is informative and actionable, and per the operator
+    # forbidden-law contains NO manual unblock ceremony — neither "bind --mode write",
+    # "relaunch", nor "lock steal" — because reclaim-iff-stale frees a dead holder by itself.
     if row_id == "4_live_other_mutating":
-        assert "dadaia lock steal" in message
+        assert decision == Decision.BLOCK
+        assert message, "yield-iff-live-foreign BLOCK must carry an actionable message"
+        for forbidden in ("bind --mode write", "relaunch", "lock steal"):
+            assert forbidden not in message, f"forbidden-law: BLOCK message must not contain {forbidden!r}"
+
+
+# ---------------------------------------------------------------------------
+# T-016-14: soul-fold property rows (D1) — stable-identity renewal + yield block
+# ---------------------------------------------------------------------------
+
+
+def test_mutating_stable_identity_match_live_foreign_renews(tmp_path: Path) -> None:
+    """D1 soul-fold row: MUTATING + stable-identity-match + live-foreign-lock → RENEW (ALLOW).
+
+    When a .ptr file matches the caller's session_id, acquire() RENEWs regardless
+    of whether the lock record shows a different (foreign-looking) session_id. This
+    is the relaunched-session scenario: the session is recognised as the incumbent.
+    """
+    # Seed lock record with "foreign-looking" session_id (simulating a relaunch that
+    # caused the session env var to diverge from the record).
+    _seed(tmp_path, "old-session-id", BASE)
+    # Write .ptr for "mine" — signals that "mine" is the incumbent for this context.
+    ptr = lease._ptr_path(tmp_path, CTX)
+    ptr.write_text("mine", encoding="utf-8")
+
+    decision, _msg = evaluate(
+        tmp_path,
+        "specs/releases/v0.2.0/SPEC.md",
+        ctx=CTX,
+        phase="SPEC",
+        session_id="mine",
+        release="v0.2.0",
+        mode="IMPLEMENTATION",
+        clock=fixed(BASE),
+    )
+    assert decision == Decision.ALLOW, (
+        "Stable-identity match (.ptr == session_id) must RENEW even when lock record "
+        "shows a foreign-looking session_id (D1 soul-fold, FR-P1-15)"
+    )
+
+
+def test_mutating_no_ptr_match_live_foreign_yields(tmp_path: Path) -> None:
+    """D1 soul-fold row: MUTATING + no-ptr-match + live-foreign-lock → yield BLOCK (ALLOW escape).
+
+    When no .ptr matches and the lock record has a live foreign session_id,
+    acquire() raises LockHeldError with yield-iff-live-foreign message. The block
+    is always escapable (via additive writes; steal only as conditional emergency).
+    """
+    # Seed a live foreign lock record with no .ptr for "mine".
+    _seed(tmp_path, "genuinely-other-session", BASE)
+
+    decision, message = evaluate(
+        tmp_path,
+        "specs/releases/v0.2.0/SPEC.md",
+        ctx=CTX,
+        phase="SPEC",
+        session_id="mine",
+        release="v0.2.0",
+        mode="IMPLEMENTATION",
+        clock=fixed(BASE),
+    )
+    assert decision == Decision.BLOCK, (
+        "No-.ptr-match + live-foreign lease must BLOCK with yield message (D1, FR-P1-15)"
+    )
+    assert message, "Yield block must carry an informative, actionable message"
+    assert "bind --mode write" not in message, "Yield message must never instruct to bind --mode write"
+    assert "relaunch" not in message, "Yield message must never instruct to relaunch"

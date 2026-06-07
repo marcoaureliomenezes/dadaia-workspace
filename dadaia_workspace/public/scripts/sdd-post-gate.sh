@@ -42,9 +42,10 @@ if [ ! -f "$SESS_FILE" ]; then
     exit 0
 fi
 
-# Step 3 — Renew last_seen_at atomically (tmp → os.replace())
-# Step 3b (T-R1-03 Bug C fix) — Also renew the context semaphore heartbeat
+# Step 3 — Renew session last_seen_at atomically (tmp → os.replace())
 # Step 4 — Append HEARTBEAT event to .dadaia/logs/lock-events.jsonl
+# (The per-context semaphore was retired in v0.1.6; there is no semaphore to
+#  renew here — the single TTL lease is renewed by the PreToolUse gate.)
 "$PYTHON_BIN" - "$SESS_FILE" "$WS" "$SESS_ID" 2>/dev/null <<'PYEOF'
 import json
 import os

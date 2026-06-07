@@ -29,17 +29,22 @@ def workspace(tmp_path: Path) -> Path:
     return tmp_path / "ws"
 
 
-def test_ctx_inject_reports_none_when_no_primary(workspace: Path) -> None:
+def test_ctx_inject_silent_and_never_nags_when_no_context(workspace: Path) -> None:
+    """No ALIVE context → ctx-inject stays silent. It must NEVER nag the operator to
+    bind/rebind a context (that instruction was a flow-breaking bug and is deleted)."""
     scripts = _install_scripts(workspace)
     result = subprocess.run(
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
         text=True,
         cwd="/tmp",
+        env={k: v for k, v in os.environ.items() if k != "DADAIA_CONTEXT"},
         timeout=5,
     )
     assert result.returncode == 0
-    assert "[context: none]" in result.stdout
+    assert "context: none" not in result.stdout
+    assert "context bind" not in result.stdout
+    assert "--mode" not in result.stdout
 
 
 def test_ctx_inject_reports_active_context(workspace: Path) -> None:

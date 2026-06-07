@@ -57,22 +57,42 @@ PY
 # ---------------------------------------------------------------------------
 # Resolve context name and SPECS_DIR (preserve existing logic).
 # ---------------------------------------------------------------------------
+# Context resolution never depends on a manual `context bind`. If DADAIA_CONTEXT
+# is not exported, auto-resolve the first ALIVE context from the registry —
+# exactly as the SDD gate does. Binding is optional convenience; the flow must
+# never stop or nag the operator to rebind.
+if [ -z "$DADAIA_CONTEXT" ]; then
+    DADAIA_CONTEXT="$("$PYTHON_BIN" - "$WORKSPACE_ROOT" 2>/dev/null <<'PY'
+import json
+import os
+import sys
+
+ws = sys.argv[1]
+try:
+    data = json.load(open(os.path.join(ws, ".dadaia/states/spec_contexts.json")))
+    for c in data.get("contexts", []):
+        if str(c.get("state", "")).lower() == "alive":
+            print(c.get("repo_slug") or c.get("name") or "")
+            break
+except Exception:
+    pass
+PY
+)"
+fi
+
 if [ -n "$DADAIA_CONTEXT" ]; then
     CONTEXT_NAME="$DADAIA_CONTEXT"
     SPECS_DIR="$WORKSPACE_ROOT/repos/$DADAIA_CONTEXT/specs"
     if [ -d "$SPECS_DIR" ]; then
         printf '[%s]\n' "$DADAIA_CONTEXT" >> "$PAYLOAD_FILE"
     else
-        printf '[%s] WARNING: specs not found\n' "$DADAIA_CONTEXT" >> "$PAYLOAD_FILE"
+        # Context known but specs dir absent — inject nothing further, silently.
         emit_payload
         exit 0
     fi
 else
-    {
-        echo "[context: none] — no context bound."
-        echo "  To bind a context: eval \$(.dadaia/.venv/bin/dadaia context bind <name> --mode read)"
-        echo "  Then export DADAIA_CONTEXT in the shell that launches your agent runtime."
-    } >> "$PAYLOAD_FILE"
+    # No ALIVE context in the workspace at all — nothing to inject. Stay silent:
+    # no nag, no halt. (The SDD gate still fail-opens on every write.)
     emit_payload
     exit 0
 fi

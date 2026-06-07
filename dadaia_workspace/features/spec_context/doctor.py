@@ -122,6 +122,9 @@ class DoctorService:
     def _sessions_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "sessions"
 
+    def _sessions_runtime_dir(self) -> Path:
+        return self._workspace_root / ".dadaia" / "sessions" / "runtime"
+
     def _ctx_locks_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
 
@@ -561,6 +564,28 @@ class DoctorService:
                 if (now_ts - mtime) > _SENTINEL_ORPHAN_AGE:
                     sentinel_file.unlink(missing_ok=True)
                     actions.append(f"SENTINEL-GC: deleted orphan sentinel '{sentinel_file.name}'")
+
+        # Stable-identity .ptr GC (D1 soul-fold): delete orphan .ptr files where
+        # the corresponding .lock.json does not exist or is expired (is_stale).
+        # .ptr is a hint, not a lock; orphans must not persist after the lease expires.
+        runtime_dir = self._sessions_runtime_dir()
+        if runtime_dir.exists():
+            ctx_locks_dir = self._ctx_locks_dir()
+            for ptr_file in sorted(runtime_dir.iterdir()):
+                if not ptr_file.name.endswith(".ptr"):
+                    continue
+                ctx_name = ptr_file.name[: -len(".ptr")]
+                lock_file = ctx_locks_dir / f"{ctx_name}.lock.json"
+                is_orphan = False
+                if not lock_file.exists():
+                    is_orphan = True
+                else:
+                    lock_data = self._read_lock(lock_file)
+                    if lock_data is None or is_stale(lock_data):
+                        is_orphan = True
+                if is_orphan:
+                    ptr_file.unlink(missing_ok=True)
+                    actions.append(f"PTR-GC: deleted orphan session pointer '{ptr_file.name}'")
 
         # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
         for cache_name in sorted(_ROOT_FORBIDDEN_CACHES):
