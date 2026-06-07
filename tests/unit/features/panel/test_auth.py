@@ -5,8 +5,6 @@ from __future__ import annotations
 import inspect
 import os
 import pathlib
-import stat
-import threading
 import unittest.mock
 
 # ---------------------------------------------------------------------------
