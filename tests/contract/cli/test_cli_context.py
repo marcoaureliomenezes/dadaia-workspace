@@ -232,8 +232,9 @@ def test_context_bind_spec_outputs_eval_lines(workspace: Path) -> None:
     assert "export DADAIA_MODE=SPEC" in result.output
 
 
-def test_context_bind_implementation_creates_lock_file(workspace: Path) -> None:
-    """AC-T10d-3: bind --mode implementation creates session + lock files."""
+def test_context_bind_implementation_creates_session_no_impl_lock(workspace: Path) -> None:
+    """v0.1.6: bind --mode implementation exports env + creates a session file but
+    NO impl lock (Lock-3 retired; serialization is the gate's TTL-lease at write time)."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
@@ -243,16 +244,16 @@ def test_context_bind_implementation_creates_lock_file(workspace: Path) -> None:
     assert "export DADAIA_SESSION_ID=" in result.output
     assert "export DADAIA_MODE=IMPLEMENTATION" in result.output
 
-    # Lock file must exist
-    lock_file = workspace / ".dadaia" / "locks" / "implementation" / "myctx__v1.json"
-    assert lock_file.exists(), "Implementation lock file must be created"
-
     # Session file must exist
     lines = result.output.strip().split("\n")
     session_line = next(line for line in lines if "DADAIA_SESSION_ID" in line)
     session_id = session_line.split("=")[1].strip()
     session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
     assert session_file.exists(), "Session file must be created"
+
+    # Lock-3 retired: no per-release implementation lock file is written on bind.
+    lock_file = workspace / ".dadaia" / "locks" / "implementation" / "myctx__v1.json"
+    assert not lock_file.exists(), "bind must NOT create a Lock-3 implementation lock (v0.1.6)"
 
 
 def test_context_bind_implementation_requires_release(workspace: Path) -> None:
@@ -262,22 +263,18 @@ def test_context_bind_implementation_requires_release(workspace: Path) -> None:
     assert result.exit_code != 0
 
 
-def test_context_bind_implementation_lock_held_raises(workspace: Path) -> None:
-    """AC-T10d-4: second bind --mode implementation with same context/release raises LockHeldError."""
+def test_context_bind_second_implementation_does_not_block(workspace: Path) -> None:
+    """v0.1.6: bind no longer serializes — a second implementation bind succeeds
+    (the gate's single TTL-lease, not bind, enforces one writer at write time)."""
     _register_alive_ctx(workspace)
-    # First bind
     result1 = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
     )
     assert result1.exit_code == 0, result1.output
-
-    # Second bind — must fail
     result2 = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
     )
-    assert result2.exit_code != 0
-    combined = (result2.output or "") + (result2.stderr or "")
-    assert "HELD" in combined or "held" in combined.lower() or "lock" in combined.lower()
+    assert result2.exit_code == 0, result2.output
 
 
 def test_context_bind_review_no_lock_file_created(workspace: Path) -> None:
@@ -296,76 +293,6 @@ def test_context_bind_review_no_lock_file_created(workspace: Path) -> None:
     assert not lock_file.exists(), "Review bind must NOT create implementation lock"
 
 
-def test_context_bind_review_blocks_when_impl_lock_held(workspace: Path) -> None:
-    """AC-T10d-9: bind --mode review when impl lock HELD raises ReviewBlockedByImplementationError."""
-    import os
-    from datetime import UTC
-    from datetime import datetime as _dt
-
-    _register_alive_ctx(workspace)
-
-    # Create a HELD impl lock (fresh timestamp + live PID so T-11 state machine = HELD)
-    locks_dir = workspace / ".dadaia" / "locks" / "implementation"
-    locks_dir.mkdir(parents=True, exist_ok=True)
-    lock_file = locks_dir / "myctx__v1.json"
-    now = _dt.now(tz=UTC).isoformat()
-    lock_file.write_text(
-        json.dumps(
-            {
-                "lock_type": "implementation",
-                "session_id": "sess_owner123",
-                "context": "myctx",
-                "release": "v1",
-                "pid": os.getpid(),
-                "last_seen_at": now,
-                "ttl_seconds": 300,
-            }
-        )
-    )
-
-    result = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "review", "--release", "v1"]
-    )
-    assert result.exit_code != 0
-    combined = (result.output or "") + (result.stderr or "")
-    assert "sess_owner123" in combined or "implementation" in combined.lower()
-
-
-def test_context_bind_implementation_blocks_when_review_session_exists(workspace: Path) -> None:
-    """AC-T10d-10: bind --mode implementation raises ImplementationBlockedByReviewError when BOUND_REVIEW exists."""
-    _register_alive_ctx(workspace)
-
-    # Create a review session directly
-    from datetime import UTC, datetime
-
-    sessions_dir = workspace / ".dadaia" / "sessions"
-    sessions_dir.mkdir(parents=True, exist_ok=True)
-    session_file = sessions_dir / "sess_review001.json"
-    session_file.write_text(
-        json.dumps(
-            {
-                "session_id": "sess_review001",
-                "context": "myctx",
-                "mode": "BOUND_REVIEW",
-                "release": "v1",
-                "runtime": "claude-code",
-                "pid": 12345,
-                "bound_at": datetime.now(tz=UTC).isoformat(),
-                "last_seen_at": datetime.now(tz=UTC).isoformat(),
-                "ttl_seconds": 300,
-                "is_stale": False,
-            }
-        )
-    )
-
-    result = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
-    )
-    assert result.exit_code != 0
-    combined = (result.output or "") + (result.stderr or "")
-    assert "sess_review001" in combined or "review" in combined.lower()
-
-
 def test_context_bind_invalid_mode(workspace: Path) -> None:
     """Unsupported mode exits non-zero."""
     _register_alive_ctx(workspace)
@@ -378,8 +305,8 @@ def test_context_bind_invalid_mode(workspace: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_context_release_deletes_session_and_lock(workspace: Path) -> None:
-    """AC-T10d-5: release deletes session file and implementation lock."""
+def test_context_release_deletes_session(workspace: Path) -> None:
+    """v0.1.6: release deletes the session file (Lock-3 retired — no lock file to delete)."""
     _register_alive_ctx(workspace)
     bind_result = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
@@ -390,9 +317,7 @@ def test_context_release_deletes_session_and_lock(workspace: Path) -> None:
     session_line = next(line for line in lines if "DADAIA_SESSION_ID" in line)
     session_id = session_line.split("=")[1].strip()
 
-    lock_file = workspace / ".dadaia" / "locks" / "implementation" / "myctx__v1.json"
     session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
-    assert lock_file.exists()
     assert session_file.exists()
 
     # Release with DADAIA_SESSION_ID env var set
@@ -405,7 +330,6 @@ def test_context_release_deletes_session_and_lock(workspace: Path) -> None:
         env=env,
     )
     assert release_result.exit_code == 0, release_result.output
-    assert not lock_file.exists(), "Lock file must be deleted after release"
     assert not session_file.exists(), "Session file must be deleted after release"
 
 

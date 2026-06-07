@@ -90,16 +90,21 @@ def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:
 
 
 def test_problematic_skill_files_have_frontmatter() -> None:
+    """Skill files that require YAML frontmatter must start with --- and define name+description.
+
+    The set of checked skills is scoped to files that actually exist in the current
+    public/ surface (agent-surface-reduction removed frontend/design skills).
+    """
     public_dir = FileSystemPublicAssetManager()._public_dir  # noqa: SLF001
-    skill_paths = [
-        public_dir / "skills" / "ux-ui-review" / "SKILL.md",
-        public_dir / "skills" / "design-report-quality-gate" / "SKILL.md",
-        public_dir / "skills" / "frontend-implementation-quality" / "SKILL.md",
-        public_dir / "skills" / "frontend-design" / "SKILL.md",
-        public_dir / "skills" / "design-reference-research" / "SKILL.md",
+    # Only skills that survived the agent-surface-reduction (v0.2.0) are checked.
+    # frontend/design skills (ux-ui-review, design-report-quality-gate, etc.) were
+    # removed from the core install; codex runtime adapters (design-ctx, frontend-ctx)
+    # remain but are checked via test_stage_copies_codex_runtime_adapters.
+    candidate_paths = [
         public_dir / "runtime" / "codex" / "design-ctx" / "SKILL.md",
         public_dir / "runtime" / "codex" / "frontend-ctx" / "SKILL.md",
     ]
+    skill_paths = [p for p in candidate_paths if p.exists()]
 
     for skill_path in skill_paths:
         text = skill_path.read_text(encoding="utf-8")

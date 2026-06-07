@@ -31,8 +31,8 @@ def test_orchestrate_list_returns_seed_workflows(tmp_path: Path, monkeypatch) ->
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["orchestrate", "list"])
     assert result.exit_code == 0, result.output
-    assert "spec-refinement" in result.output
-    assert "hotfix-release" in result.output
+    assert "audit-fanout" in result.output
+    assert "release-ship" in result.output
 
 
 def test_orchestrate_run_rejects_without_context(tmp_path: Path, monkeypatch) -> None:
@@ -41,7 +41,7 @@ def test_orchestrate_run_rejects_without_context(tmp_path: Path, monkeypatch) ->
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     result = _runner.invoke(
         app,
-        ["orchestrate", "run", "spec-refinement", "--runtime", "cli"],
+        ["orchestrate", "run", "audit-fanout", "--runtime", "cli"],
     )
     assert result.exit_code != 0
 
@@ -55,13 +55,11 @@ def test_orchestrate_run_happy_path(tmp_path: Path, monkeypatch) -> None:
         [
             "orchestrate",
             "run",
-            "spec-refinement",
+            "audit-fanout",
             "--runtime",
             "cli",
             "--input",
             "context=test-ctx",
-            "--input",
-            "topic=demo",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -80,7 +78,7 @@ def test_orchestrate_dry_run_does_not_create_state(tmp_path: Path, monkeypatch) 
         [
             "orchestrate",
             "run",
-            "spec-refinement",
+            "audit-fanout",
             "--runtime",
             "cli",
             "--input",
@@ -102,7 +100,7 @@ def test_input_kv_parsing_error(tmp_path: Path, monkeypatch) -> None:
         [
             "orchestrate",
             "run",
-            "spec-refinement",
+            "audit-fanout",
             "--runtime",
             "cli",
             "--input",
@@ -115,10 +113,10 @@ def test_input_kv_parsing_error(tmp_path: Path, monkeypatch) -> None:
 def test_orchestrate_show_json_output(tmp_path: Path, monkeypatch) -> None:
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["orchestrate", "show", "spec-refinement", "--json"])
+    result = _runner.invoke(app, ["orchestrate", "show", "audit-fanout", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert data["name"] == "spec-refinement"
+    assert data["name"] == "audit-fanout"
     assert "stages" in data
     assert "inputs" in data
 
@@ -139,13 +137,11 @@ def test_orchestrate_status_all_json_output(tmp_path: Path, monkeypatch) -> None
         [
             "orchestrate",
             "run",
-            "spec-refinement",
+            "audit-fanout",
             "--runtime",
             "cli",
             "--input",
             "context=test-ctx",
-            "--input",
-            "topic=demo",
         ],
     )
     result = _runner.invoke(app, ["orchestrate", "status", "--json"])

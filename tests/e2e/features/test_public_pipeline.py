@@ -19,7 +19,6 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 
 EXPECTED_AGENTS = {
     "ai-engineer",
-    "backend-engineer",
     "code-reviewer",
     "design-specialist",
     "devops-engineer",
@@ -28,11 +27,9 @@ EXPECTED_AGENTS = {
     "project-auditor",
     "project-manager",
     "qa-engineer",
-    "researcher",
     "security-reviewer",
     "software-architect",
-    "software-engineer-node",
-    "software-engineer-python",
+    "software-engineer",
 }
 
 # These must NEVER appear in any staging or runtime target
@@ -56,15 +53,10 @@ EXPECTED_SKILLS = {
     "dadaia-workspace-manager",
     "dadaia-workspace-spec-navigator",
     "dadaia-workspace-spec-reviewer",
-    "design-reference-research",
-    "design-report-quality-gate",
     "dev-server-registry",
     "drift-detection",
-    "frontend-design",
-    "frontend-implementation-quality",
     "harness-primitives",
     "project-orchestration",
-    "ux-ui-review",
 }
 
 # Required YAML fields in every agent's frontmatter
@@ -109,11 +101,83 @@ def _parse_skills_list(content: str) -> list[str]:
     return [line.strip().lstrip("- ").strip() for line in m.group(1).splitlines() if line.strip()]
 
 
+def _is_plugin_stub(content: str) -> bool:
+    """Return True when the agent file is a plugin stub (has ``plugin: true`` in frontmatter).
+
+    Plugin stubs declare a minimal frontmatter (name + description + plugin: true) and
+    intentionally omit ``model``, ``tools``, and behavior body. They must not be tested
+    for full-agent frontmatter completeness.
+    """
+    if not content.startswith("---\n"):
+        return False
+    end = content.find("\n---\n", 4)
+    if end == -1:
+        return False
+    frontmatter = content[4:end]
+    return bool(re.search(r"^plugin:\s*true\b", frontmatter, re.MULTILINE))
+
+
 def _staged_install(workspace: Path) -> FileSystemPublicAssetManager:
     """Stage then install; return the manager for further assertions."""
     mgr = _manager()
     mgr.install(workspace, target="all", force=True)
     return mgr
+
+
+# Synthetic workflow with parallel_group — decoupled from canonical workflow content.
+# The filename stem must match the 'name' field exactly (MarkdownWorkflowStore validation).
+_SYNTHETIC_PARALLEL_WORKFLOW_NAME = "synthetic-parallel"
+_SYNTHETIC_PARALLEL_WORKFLOW_FILENAME = f"{_SYNTHETIC_PARALLEL_WORKFLOW_NAME}.workflow.md"
+_SYNTHETIC_PARALLEL_WORKFLOW_CONTENT = """\
+---
+name: synthetic-parallel
+description: Synthetic test fixture with a parallel_group stage for doctor classification tests.
+version: 0.0.1
+schema_version: "1"
+stages:
+  - id: review_a
+    agent: qa-engineer
+    parallel_group: review_batch
+    expected_output:
+      path: ".dadaia/handoff/{context}/{run_ts}-qa-engineer-review-a.handoff.json"
+  - id: review_b
+    agent: code-reviewer
+    parallel_group: review_batch
+    expected_output:
+      path: ".dadaia/handoff/{context}/{run_ts}-code-reviewer-review-b.handoff.json"
+  - id: finalize
+    agent: project-manager
+    needs: [review_a, review_b]
+    expected_output:
+      path: ".dadaia/handoff/{context}/{run_ts}-project-manager-finalize.handoff.json"
+---
+
+# synthetic-parallel
+
+Synthetic fixture for test_public_pipeline.py — validates doctor [partial]/[reference-only]
+classification when a workflow contains parallel_group stages.
+"""
+
+
+def _inject_synthetic_parallel_workflow(workspace: Path) -> None:
+    """Write the synthetic parallel workflow into the staged area and all runtime targets.
+
+    The doctor reads workflow classification from the staged area
+    (``.dadaia/agentic/workflows/``). All runtime dirs must also contain the file so
+    that D-CX-3 (codex drift check) does not produce a spurious [missing] report that
+    would shadow the [partial]/[reference-only] lines under test.
+    """
+    content = _SYNTHETIC_PARALLEL_WORKFLOW_CONTENT
+    filename = _SYNTHETIC_PARALLEL_WORKFLOW_FILENAME
+    # Staged area (what _classify_workflows reads).
+    staged_dir = workspace / ".dadaia" / "agentic" / "workflows"
+    staged_dir.mkdir(parents=True, exist_ok=True)
+    (staged_dir / filename).write_text(content, encoding="utf-8")
+    # Runtime targets (needed to satisfy D-CX-3 codex mirror check).
+    for runtime in (".agents", ".claude", ".codex", ".opencode"):
+        rt_dir = workspace / runtime / "workflows"
+        rt_dir.mkdir(parents=True, exist_ok=True)
+        (rt_dir / filename).write_text(content, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -274,6 +338,9 @@ class TestContentConsistency:
         agents_dir = workspace / ".dadaia" / "agentic" / "agents"
         for agent_file in sorted(agents_dir.glob("*.md")):
             content = agent_file.read_text(encoding="utf-8")
+            # Plugin stubs (plugin: true) intentionally omit model/tools — skip them.
+            if _is_plugin_stub(content):
+                continue
             keys = _parse_frontmatter_keys(content)
             missing = _REQUIRED_FRONTMATTER - keys
             assert not missing, (
@@ -316,6 +383,9 @@ class TestContentConsistency:
         agents_dir = workspace / ".claude" / "agents"
         for agent_file in sorted(agents_dir.glob("*.md")):
             content = agent_file.read_text(encoding="utf-8")
+            # Plugin stubs (plugin: true) intentionally omit tools — skip them.
+            if _is_plugin_stub(content):
+                continue
             assert "tools:" in content, (
                 f".claude/agents/{agent_file.name} is missing 'tools:' in frontmatter — "
                 "Claude projection must retain it"
@@ -355,16 +425,14 @@ class TestDoctor:
         mgr.install(workspace, target="all", force=True)
 
         # Introduce drift in a Claude agent file
-        target = workspace / ".claude" / "agents" / "software-engineer-python.md"
+        target = workspace / ".claude" / "agents" / "software-engineer.md"
         target.write_text(target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8")
 
         report = mgr.doctor(workspace)
 
-        drift_lines = [
-            line for line in report if "[drift]" in line and "software-engineer-python" in line
-        ]
+        drift_lines = [line for line in report if "[drift]" in line and "software-engineer" in line]
         assert drift_lines, (
-            "Doctor did not detect drift in .claude/agents/software-engineer-python.md.\n"
+            "Doctor did not detect drift in .claude/agents/software-engineer.md.\n"
             "Full report:\n" + "\n".join(report)
         )
 
@@ -391,13 +459,8 @@ class TestDoctor:
 
 
 EXPECTED_WORKFLOWS = {
-    "audit-cycle",
-    "code-review-fan-out",
-    "cross-cutting-feature",
-    "design-first-implementation",
-    "hotfix-release",
-    "onboarding-new-repo",
-    "spec-refinement",
+    "audit-fanout",
+    "release-ship",
 }
 
 
@@ -420,31 +483,49 @@ class TestWorkflows:
                 assert projected.exists(), f"workflow not projected to {projected}"
 
     def test_doctor_reports_partial_for_opencode_when_parallel_group(self, tmp_path: Path) -> None:
+        """Doctor emits [partial] for opencode when a workflow contains parallel_group stages.
+
+        The two canonical workflows shipped by v0.1.9+ are both serial. This test injects a
+        synthetic workflow with an explicit parallel_group into the staged and runtime dirs so the
+        assertion is decoupled from which canonical workflows happen to ship.
+        """
         workspace = tmp_path / "ws"
         _staged_install(workspace)
+
+        # Inject a synthetic workflow with parallel_group into the staged area and all runtimes.
+        _inject_synthetic_parallel_workflow(workspace)
+
         report = _manager().doctor(workspace)
         partial_lines = [
-            line for line in report if line.startswith("[partial]") and "spec-refinement" in line
+            line for line in report if line.startswith("[partial]") and "synthetic-parallel" in line
         ]
         assert partial_lines, (
-            "Doctor did not emit [partial] for opencode:spec-refinement.\n"
+            "Doctor did not emit [partial] for opencode:synthetic-parallel.\n"
             "Full report:\n" + "\n".join(report)
         )
 
     def test_doctor_reports_reference_only_for_codex_when_parallel_group(
         self, tmp_path: Path
     ) -> None:
+        """Doctor emits [reference-only] for codex regardless of parallel_group.
+
+        Same synthetic-parallel fixture as the [partial] test. Codex always gets
+        [reference-only] for any workflow — it has no workflow executor.
+        """
         workspace = tmp_path / "ws"
         _staged_install(workspace)
+
+        # Inject a synthetic workflow with parallel_group into the staged area and all runtimes.
+        _inject_synthetic_parallel_workflow(workspace)
+
         report = _manager().doctor(workspace)
-        # Codex workflows are installed as reference documents, not executable runtime jobs.
         reference_lines = [
             line
             for line in report
-            if line.startswith("[reference-only]") and "codex:workflows/spec-refinement" in line
+            if line.startswith("[reference-only]") and "codex:workflows/synthetic-parallel" in line
         ]
         assert reference_lines, (
-            "Doctor did not emit [reference-only] for codex:spec-refinement.\n"
+            "Doctor did not emit [reference-only] for codex:synthetic-parallel.\n"
             "Full report:\n" + "\n".join(report)
         )
 
@@ -452,22 +533,22 @@ class TestWorkflows:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
         report = _manager().doctor(workspace)
-        # hotfix-release has no parallel_group → opencode and claude should be [ok];
-        # codex emits [reference-only] because workflows are installed reference docs.
+        # audit-fanout is a canonical serial workflow (no parallel_group) shipped by v0.1.9+.
+        # opencode and claude should be [ok]; codex emits [reference-only].
         ok_lines = [
             line
             for line in report
-            if line.startswith("[ok]") and "hotfix-release" in line and ":workflows/" in line
+            if line.startswith("[ok]") and "audit-fanout" in line and ":workflows/" in line
         ]
         assert any("opencode" in line for line in ok_lines)
         assert any("claude" in line for line in ok_lines)
-        # Codex check moved to a [reference-only] assertion below.
+        # Codex check: [reference-only] because workflows are installed reference docs.
         ref_lines = [
             line
             for line in report
-            if line.startswith("[reference-only]") and "codex:workflows/hotfix-release" in line
+            if line.startswith("[reference-only]") and "codex:workflows/audit-fanout" in line
         ]
-        assert ref_lines, "Doctor did not emit [reference-only] for codex:hotfix-release"
+        assert ref_lines, "Doctor did not emit [reference-only] for codex:audit-fanout"
 
     def test_seed_workflows_pass_schema_validation(self, tmp_path: Path) -> None:
         """`dadaia public stage` aborts if any workflow fails schema validation."""

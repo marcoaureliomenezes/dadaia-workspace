@@ -80,8 +80,33 @@ eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode implementation --rele
 eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode review --release <release-id>)
 ```
 
-Implementation binds acquire the implementation lock for the selected
-context/release. Review binds are mutually exclusive with implementation locks.
+Implementation binds acquire the single per-context release **lease** (v0.1.6 model:
+one MUTATING lease per context, coordinated by project-manager — see constitution §8/§9).
+`read` and `spec` binds never block. The lease record is
+`{context, release, session_id, mode, acquired_at, heartbeat, ttl}` (no PID); liveness is
+`now − heartbeat ≤ LEASE_TTL_SECONDS` where `LEASE_TTL_SECONDS = 120` (short heartbeat,
+OQ-1 operator decision 2026-06-06). The holder renews its heartbeat on every tool call;
+a fully-idle holder becomes reclaimable after ~120s.
+
+### Liveness & recovery (reclaim-iff-stale / yield-iff-live-foreign)
+
+The gate never freezes the flow, and the operator is **never** asked to rebind,
+relaunch, or steal a lock. Behaviour on acquire:
+
+- **Your own session (even relaunched)** → RENEW. Stable identity via
+  `.dadaia/sessions/runtime/<ctx>.ptr` means a relaunched/continuing session resolves to
+  the same identity, so you never block yourself.
+- **Stale or absent lease** (no heartbeat within ~120s) → reclaimed automatically on the
+  next write (fail-open). A finished or dead holder frees the lease by itself.
+- **Live foreign lease** (a genuinely different concurrent session) → the gate **yields**:
+  this session does not mutate (informative `LockHeldError`, additive writes still allowed),
+  and acquires automatically once the other session goes idle / expires. This is the
+  exactly-one-mutating-session invariant (§8) — not a freeze, and it requires no manual step.
+
+There is no per-session "implementation lock" vs "review lock" pair — v0.1.6 collapsed
+that into one release lease keyed to the coordinator session. `dadaia lock steal` exists
+only as an administrative/observability escape; it is **never** part of the normal flow,
+because reclaim-iff-stale already frees an abandoned lease without it.
 
 ### Supporting commands
 
@@ -165,4 +190,4 @@ remove that repo from disk.
 |---|---|---|
 | INV-4 | `alive` context has repo on disk at `repos/<slug>/` | No (run `dadaia context alive <name>`) |
 | INV-5 | `dead` context does not have repo on disk | Yes |
-| LOCK | Implementation/review lock files are consistent with context state | Some cases |
+| LEASE | The per-context release lease record is consistent with context state; a stale lease auto-reclaims after the heartbeat window (~120s, no manual action). `dadaia lock steal` exists only as an admin/observability escape — never a routine unblock step | Auto (reclaim-iff-stale) |

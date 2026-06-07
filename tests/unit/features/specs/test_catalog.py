@@ -292,3 +292,150 @@ class TestWriteCatalog:
         out_path = write_catalog(specs, catalog)
         parsed = json.loads(out_path.read_text(encoding="utf-8"))
         assert isinstance(parsed, dict)
+
+
+# ---------------------------------------------------------------------------
+# T-MCE-RGLOB: Regression — atoms in subdirectories ARE discovered (rglob fix)
+#
+# This test FAILS against the old glob("*.md") implementation and
+# PASSES with the rglob("*.md") fix.
+# ---------------------------------------------------------------------------
+
+
+class TestSubdirectoryAtomDiscovery:
+    """Regression test for the catalog-empty bug.
+
+    Before the fix, product_dir.glob("*.md") only matched direct children of
+    specs/memory/product/, missing ALL atoms stored in subdirectories
+    (agents/, sdd/, platform/, distribution/, panel/, philosophy/).
+    The fix uses rglob("*.md") to recurse into subdirectories.
+    """
+
+    def _write_subdir_atom(self, product_dir: Path, subdir: str, slug: str) -> Path:
+        """Write a valid atom .md file inside product_dir/<subdir>/."""
+        atom_dir = product_dir / subdir
+        atom_dir.mkdir(parents=True, exist_ok=True)
+        md_path = atom_dir / f"{slug}.md"
+        md_path.write_text(
+            _FRONTMATTER_TEMPLATE.format(
+                slug=slug,
+                title=slug,
+                tldr=f"{slug} feature.",
+                summary=f"{slug} summary.",
+                tags="[]",
+                purpose=f"Describes {slug}.",
+            ),
+            encoding="utf-8",
+        )
+        return md_path
+
+    def test_subdir_atom_is_in_catalog(self, tmp_path: Path) -> None:
+        """An atom in a subdirectory must appear in the generated catalog."""
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+
+        # index.md at root must be excluded
+        (product_dir / "index.md").write_text(
+            "---\nslug: index\ntitle: index\ncategory: core\ntldr: index\nsummary: index\n"
+            "tags: []\nagent_tier: inject\ntoken_estimate: 0\n---\n\n## Index\n",
+            encoding="utf-8",
+        )
+
+        # One atom directly at root (ensures root atoms still work)
+        _write_atom(
+            product_dir,
+            {
+                "slug": "workspace-init",
+                "title": "workspace-init",
+                "tldr": "root-level atom.",
+                "summary": "root-level atom.",
+                "tags": "[]",
+                "purpose": "Root atom.",
+            },
+        )
+
+        # One atom in a subdirectory (the case that was broken)
+        self._write_subdir_atom(product_dir, "philosophy", "spec-context-project")
+
+        catalog = generate_catalog(specs)
+        slugs = {f["slug"] for f in catalog["features"]}
+
+        # Subdir atom MUST be found
+        assert "spec-context-project" in slugs, (
+            "spec-context-project in philosophy/ subdir was not discovered; "
+            "glob('*.md') only matches direct children — use rglob('*.md')"
+        )
+        # Root atom still present
+        assert "workspace-init" in slugs
+        # index.md excluded at every depth
+        assert "index" not in slugs
+
+    def test_index_md_excluded_at_any_depth(self, tmp_path: Path) -> None:
+        """index.md files are excluded whether at root or in a subdirectory."""
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+
+        # index.md at root
+        (product_dir / "index.md").write_text(
+            "---\nslug: index\ntitle: index\ncategory: core\ntldr: t\nsummary: s\n"
+            "tags: []\nagent_tier: inject\ntoken_estimate: 0\n---\n\n## Index\n",
+            encoding="utf-8",
+        )
+        # index.md inside a subdir (should also be excluded)
+        subdir = product_dir / "philosophy"
+        subdir.mkdir()
+        (subdir / "index.md").write_text(
+            "---\nslug: index\ntitle: index\ncategory: core\ntldr: t\nsummary: s\n"
+            "tags: []\nagent_tier: inject\ntoken_estimate: 0\n---\n\n## Subdir index\n",
+            encoding="utf-8",
+        )
+        # A real atom in the subdir
+        self._write_subdir_atom(product_dir, "philosophy", "spec-context-project")
+
+        catalog = generate_catalog(specs)
+        slugs = {f["slug"] for f in catalog["features"]}
+
+        assert "index" not in slugs, "index.md must be excluded at every depth"
+        assert "spec-context-project" in slugs
+
+    def test_subdir_atom_rel_path_is_correct(self, tmp_path: Path) -> None:
+        """rel_path for a subdirectory atom is specs/memory/product/<subdir>/<slug>.md."""
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+
+        self._write_subdir_atom(product_dir, "philosophy", "spec-context-project")
+
+        catalog = generate_catalog(specs)
+        assert len(catalog["features"]) == 1
+
+        entry = catalog["features"][0]
+        expected_path = "specs/memory/product/philosophy/spec-context-project.md"
+        assert entry["path"] == expected_path, (
+            f"Expected rel_path {expected_path!r}, got {entry['path']!r}"
+        )
+
+    def test_multiple_subdirs_all_discovered(self, tmp_path: Path) -> None:
+        """Atoms in multiple subdirectories (agents/, sdd/, platform/) are all found."""
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+
+        subdirs_and_slugs = [
+            ("agents", "agent-orchestration"),
+            ("sdd", "specs-doctor"),
+            ("platform", "workspace-init"),
+            ("philosophy", "spec-context-project"),
+        ]
+        for subdir, slug in subdirs_and_slugs:
+            self._write_subdir_atom(product_dir, subdir, slug)
+
+        catalog = generate_catalog(specs)
+        slugs = {f["slug"] for f in catalog["features"]}
+
+        for _, slug in subdirs_and_slugs:
+            assert slug in slugs, f"Atom {slug!r} from subdir was not discovered"
+
+        assert len(catalog["features"]) == len(subdirs_and_slugs)

@@ -1,6 +1,6 @@
 ---
 name: dadaia-release-closure
-description: "Use when: closing a release that has all TASKS marked [x] DONE. Defines the CLOSURE.md template, the memory Markdown update protocol, the evidence-triple validation format, and the move-to-archive command. Only product-engineer in CLOSURE phase invokes this skill — gate enforces that memory writes only happen here."
+description: "Use when: closing a release that has all TASKS marked [x] DONE. Defines the CLOSURE.md template, the memory Markdown update protocol, the evidence-triple validation format, and the move-to-archive command. Only product-engineer invokes this skill, and only in the CLOSURE phase. (product-engineer also holds memory-write permission in the DEFINITION phase per constitution §13 — that authorization is separate from this closure skill.)"
 applyTo: "specs/releases/*/CLOSURE.md"
 ---
 
@@ -139,7 +139,10 @@ snapshot.
 
 - Writing source code, tests, or pipelines (other agents).
 - Modifying `specs/constitution.md` (requires explicit operator approval).
-- Editing memory outside CLOSURE phase (gate-blocked).
+- Memory updates via this skill happen in the CLOSURE phase only. (product-engineer
+  may also write memory in the DEFINITION phase under a separate §13 authorization —
+  that path is not this skill.) Memory edits by any other agent, or in any other phase,
+  are gate-blocked.
 - Re-opening an archived release. Once archived, a new release supersedes it.
 
 ## Segments (ADR-1/ADR-5)

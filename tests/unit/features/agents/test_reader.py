@@ -587,16 +587,27 @@ def _public_agents() -> tuple[AgentDTO, ...]:
     return tuple(read_canonical_agents(workspace_root=Path("/does/not/matter")))
 
 
+def _is_plugin_stub(agent: "AgentDTO") -> bool:  # noqa: F821
+    """Return True when *agent* is a plugin stub (no model/tools/skills, plugin: true marker).
+
+    Plugin stubs (frontend-engineer, design-specialist, devops-engineer) are intentionally
+    minimal — they carry no runtime behavior and must be skipped for full-agent assertions.
+    """
+    return not agent.model and not agent.skills and not agent.tools
+
+
 def test_all_public_agents_have_valid_write_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Every public agent declares a non-empty string write allowlist."""
+    """Every non-plugin-stub public agent declares a non-empty string write allowlist."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = _public_agents()
-    without_paths = [a.id for a in agents if a.paths is None]
+    # Skip plugin stubs — they intentionally have no paths block.
+    core_agents = [a for a in agents if not _is_plugin_stub(a)]
+    without_paths = [a.id for a in core_agents if a.paths is None]
     empty_allowlist: list[str] = []
     bad: list[tuple[str, object]] = []
-    for agent in agents:
+    for agent in core_agents:
         if agent.paths is None:
             continue
         wl = agent.paths.get("write_allowlist", [])
@@ -605,9 +616,9 @@ def test_all_public_agents_have_valid_write_allowlist(
         for entry in wl:
             if not isinstance(entry, str) or not entry.strip():
                 bad.append((agent.id, entry))
-    assert without_paths == [], f"Agents missing 'paths' block: {without_paths}"
+    assert without_paths == [], f"Core agents missing 'paths' block: {without_paths}"
     assert empty_allowlist == [], (
-        f"Agents with empty or absent 'write_allowlist': {empty_allowlist}"
+        f"Core agents with empty or absent 'write_allowlist': {empty_allowlist}"
     )
     assert bad == [], f"Non-string or empty entries in write_allowlist: {bad}"
 
@@ -629,32 +640,46 @@ def test_all_public_agent_files_are_loadable(
 def test_all_public_agents_have_model_and_skills(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Every public agent declares a runtime model and at least one skill."""
+    """Every non-plugin-stub public agent declares a runtime model and at least one skill.
+
+    Plugin stubs (frontend-engineer, design-specialist, devops-engineer) intentionally
+    omit model and skills — they are skipped here.
+    """
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = _public_agents()
-    missing_model = [agent.id for agent in agents if not agent.model]
-    missing_skills = [agent.id for agent in agents if not agent.skills]
-    assert missing_model == [], f"Public agents missing model: {missing_model}"
-    assert missing_skills == [], f"Public agents missing skills: {missing_skills}"
+    core_agents = [a for a in agents if not _is_plugin_stub(a)]
+    missing_model = [agent.id for agent in core_agents if not agent.model]
+    missing_skills = [agent.id for agent in core_agents if not agent.skills]
+    assert missing_model == [], f"Core public agents missing model: {missing_model}"
+    assert missing_skills == [], f"Core public agents missing skills: {missing_skills}"
 
 
-def test_public_agent_roster_uses_python_node_split(
+def test_public_agent_roster_uses_unified_software_engineer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The public roster exposes Python and Node specialists as separate agents."""
+    """The v0.1.8 public roster uses a single unified software-engineer (not language-split).
+
+    The v0.1.8 surface reduction merged software-engineer-python and software-engineer-node
+    into a single software-engineer agent. This test validates the new roster shape.
+    """
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = _public_agents()
     ids = {a.id for a in agents}
-    assert "software-engineer-python" in ids
-    assert "software-engineer-node" in ids
-    assert "software-engineer" not in ids, (
-        f"The public roster must use language-specific software-engineer agents: {sorted(ids)}"
+    assert "software-engineer" in ids, (
+        f"The public roster must contain 'software-engineer': {sorted(ids)}"
+    )
+    assert "software-engineer-python" not in ids, (
+        f"Deleted agent 'software-engineer-python' must not appear in public roster: {sorted(ids)}"
+    )
+    assert "software-engineer-node" not in ids, (
+        f"Deleted agent 'software-engineer-node' must not appear in public roster: {sorted(ids)}"
     )
 
 
 _TIER1_AGENTS = {"project-manager", "project-auditor"}
 _TIER2_AGENTS = {"product-engineer"}
-_TIER3_SAMPLE = {"software-engineer-python", "frontend-engineer", "qa-engineer"}
+# v0.1.8: software-engineer-python replaced by software-engineer; frontend-engineer is a plugin stub.
+_TIER3_SAMPLE = {"software-engineer", "qa-engineer", "ai-engineer"}
 
 
 def test_all_agents_have_tier_field(

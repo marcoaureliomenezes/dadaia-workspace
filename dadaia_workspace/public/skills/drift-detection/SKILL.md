@@ -11,8 +11,8 @@ applyTo: ".dadaia/reports/**"
 
 ## Memory Atom Inventory
 
-All spec memory is stored as atomic HTML files under `<specs-dir>/memory/`.
-Load each atom in order; extract content by parsing HTML as text.
+All spec memory is stored as atomic Markdown files (`*.md`, with YAML frontmatter)
+under `<specs-dir>/memory/`. Load each atom in order; read the Markdown directly.
 
 | Atom | Path | What it declares | Sections of interest |
 |---|---|---|---|

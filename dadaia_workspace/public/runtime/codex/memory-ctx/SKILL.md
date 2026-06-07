@@ -44,7 +44,9 @@ Resolve in priority order:
 2. Otherwise: read `.dadaia/states/spec_contexts.json`, find the first entry with `state: alive`,
    and derive `repos/<slug>/specs/`.
 
-If neither resolves, stop and ask the operator to run `eval $(dadaia context bind <name> --mode read)`.
+Context resolves automatically from the registry — never halt to ask the operator to
+bind or rebind. Binding is optional. Only if the workspace has no ALIVE context at all
+is there nothing to load.
 
 ```
 DADAIA_CONTEXT env var → repos/<slug>/specs/

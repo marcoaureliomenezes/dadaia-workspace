@@ -1,5 +1,6 @@
 """SpecContextService — full Spec Context Project lifecycle."""
 
+import contextlib
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -12,12 +13,13 @@ from dadaia_workspace.core.exceptions import (
     ContextStateError,
     GitSyncError,
 )
+from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
+from dadaia_workspace.features.spec_context import lease as _lease
 from dadaia_workspace.features.spec_context.locking import (
     context_lock,
-    has_implementation_lock,
     workspace_lock,
 )
 
@@ -51,11 +53,20 @@ class SpecContextService:
         return self._repo_path(repo_slug) / "specs"
 
     def _has_implementation_lock(self, name: str) -> bool:
-        """Return True if any HELD implementation lock exists for the named context.
+        """Return True if a live (non-stale) lease record exists for the named context.
 
-        T-11: delegates to locking.has_implementation_lock() which checks state machine.
+        v0.1.6: delegates to lease.is_held() (single-record TTL-lease).
+        Performs inline GC: if the record is stale, deletes it before returning False.
         """
-        return has_implementation_lock(self._workspace_root, name)
+        rec = _lease.read_record(self._workspace_root, name)
+        if rec is None:
+            return False
+        if is_stale(rec):
+            # Inline GC: delete the stale record (no CAS needed for deletion).
+            with contextlib.suppress(OSError):
+                _lease._record_path(self._workspace_root, name).unlink(missing_ok=True)
+            return False
+        return True
 
     # ------------------------------------------------------------------ create
 
@@ -188,7 +199,7 @@ class SpecContextService:
     def dead(self, name: str) -> SpecContextProject:
         """Transition a context from ALIVE to DEAD; sets dead_since, removes repo.
 
-        Raises ContextLockedError if an implementation lock exists for this context.
+        Raises ContextLockedError if a live lease record exists for this context.
 
         Lock 1 wraps the JSON write (spec_contexts.json update).
         Lock 2 wraps git push and shutil.rmtree (OUTSIDE Lock 1).
@@ -199,7 +210,7 @@ class SpecContextService:
         if ctx.state != ContextState.ALIVE:
             raise ContextStateError(f"Context '{name}' is not ALIVE. It cannot be made DEAD.")
 
-        # Block if an implementation lock is held for this context (T-10b AC-T10b-4 / T-11 AC-T11-9)
+        # Block if a live lease record exists for this context (T-10b AC-T10b-4 / T-11 AC-T11-9)
         if self._has_implementation_lock(name):
             raise ContextLockedError(
                 f"Context '{name}' has an active implementation lock. "

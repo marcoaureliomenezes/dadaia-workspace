@@ -15,39 +15,35 @@ slugs, or optional domain-pack assumptions.
 
 ## Agent Inventory
 
-Default topology: 15 generic agents.
+Default topology: 9 core agents (constitution §14 roster). Roles, phases, and lease
+relationships are normative in the §7/§14 matrices; this table is the dispatch view.
 
-| Agent | Primary mission | Dispatches to | Do not call when |
-|---|---|---|---|
-| `project-manager` | Cross-agent dispatch, workflow orchestration, mediation | any default agent | A single specialist can complete the task directly |
-| `project-auditor` | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
-| `product-engineer` | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, CLOSURE memory | software-architect, project-manager | Task is code-only and already approved |
-| `software-architect` | Architecture decisions, ADRs, dependency contracts | software-engineer-python, software-engineer-node, backend-engineer | No architectural trade-off exists |
-| `software-engineer-python` | Python CLI, library, tooling, tests | qa-engineer | Task is Node, browser UI, backend service, AI entity, docs-only, or CI-only |
-| `software-engineer-node` | Server-side Node/TypeScript tooling, tests | qa-engineer | Task is Python, browser UI, backend service, AI entity, docs-only, or CI-only |
-| `backend-engineer` | Backend services, APIs, persistence | software-architect, qa-engineer | Task is local tooling, browser-only UI, specs, or CI |
-| `frontend-engineer` | Browser UI implementation | design-specialist, qa-engineer | Task is backend, CLI, specs, or infra only |
-| `ai-engineer` | Agents, skills, rules, workflows, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
-| `qa-engineer` | E2E strategy, acceptance validation, smoke evidence | none | Only unit/integration tests are needed |
-| `devops-engineer` | CI/CD, deployment, projection install | software-engineer-python | No CI/deploy/projection change is in scope |
-| `security-reviewer` | Security audit, threat modeling, secret/leak review | devops-engineer, implementer | No security-relevant surface is involved |
-| `code-reviewer` | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
-| `researcher` | External-source investigation against trusted sources | none | Local code/spec inspection is enough |
-| `design-specialist` | UX/UI review, design spec, visual handoff | frontend-engineer | No user-facing UI is involved |
+| Agent | Phase (§7) | Primary mission | Dispatches to | Do not call when |
+|---|---|---|---|---|
+| `project-manager` | 1–2; coordinates all MUTATING phases | Backlog/bug intake, cross-agent dispatch, mediation, lease coordinator | any core agent | A single specialist can complete the task directly |
+| `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
+| `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
+| `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
+| `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec authorship, AI-entity surface, or pure review |
+| `ai-engineer` | surface owner (`dadaia_workspace/public/**`) | Agents, skills, rules, workflows, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
+| `qa-engineer` | 7 gate → commit | E2E strategy, acceptance validation, smoke evidence | none | Only unit/integration tests are needed |
+| `security-reviewer` | 7 gate → push | Security audit, threat modeling, secret/leak review | implementer | No security-relevant surface is involved |
+| `code-reviewer` | 7 gate → PR | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
+
+Plugins (not in core roster, constitution §14): `frontend-engineer`, `design-specialist`,
+`devops-engineer`. They may be dispatched within a release when their surface is in scope,
+but they do not appear in the default core topology above.
 
 ## Workflow Inventory
 
-Public default workflows:
+Workflows: see `public/workflows/` — exactly 2 workflows in the default installation.
+Each is a dispatch-reference document (Claude Code and Codex do not auto-load
+`.claude/workflows/` at runtime; PM loads them as context).
 
-| Workflow | File | Trigger | Entry |
+| Workflow | File | Trigger | Owner |
 |---|---|---|---|
-| `spec-refinement` | `public/workflows/spec-refinement.workflow.md` | Ambiguous feature scope or backlog item | project-manager |
-| `hotfix-release` | `public/workflows/hotfix-release.workflow.md` | Production defect requiring a patch | project-manager |
-| `code-review-fan-out` | `public/workflows/code-review-fan-out.workflow.md` | PR or staged diff review | code-reviewer |
-| `audit-cycle` | `public/workflows/audit-cycle.workflow.md` | Release CLOSURE or scheduled compliance audit | project-auditor |
-| `cross-cutting-feature` | `public/workflows/cross-cutting-feature.workflow.md` | Two or more implementation surfaces | software-architect |
-| `onboarding-new-repo` | `public/workflows/onboarding-new-repo.workflow.md` | New repo baseline assessment | project-manager |
-| `design-first-implementation` | `public/workflows/design-first-implementation.workflow.md` | UI work requiring design before implementation | design-specialist |
+| `release-ship` | `public/workflows/release-ship.workflow.md` | Operator elects to ship an rc-N | project-manager |
+| `audit-fanout` | `public/workflows/audit-fanout.workflow.md` | Operator requests audit, or CLOSURE checkpoint | project-manager |
 
 Optional packs may add workflows, agents, and rules, but they must not be part
 of the public default install unless explicitly selected by the operator.
@@ -125,7 +121,7 @@ Before `TASKS.md` is approved, the task definition must be agreed by:
 - `qa-engineer`
 - `code-reviewer`
 - `security-reviewer`
-- `design-specialist` when the task touches browser UI, visual UX, flows, or design tokens
+- the `design-specialist` plugin when the task touches browser UI, visual UX, flows, or design tokens (only if the plugin is installed)
 
 The approved task must state implementation scope, declared write set, unit and
 integration test plan, E2E/validation plan, code-review criteria, security and
@@ -150,7 +146,7 @@ task):
   - `qa-engineer` validates the E2E/acceptance plan and operator-visible behavior
   - `code-reviewer` reviews architecture, maintainability, tests, and regressions
   - `security-reviewer` reviews security, privacy, secrets, dependency, and deploy leakage risk
-  - `design-specialist` reviews UI/design compliance when applicable
+  - the `design-specialist` plugin reviews UI/design compliance when applicable (if installed)
 
 Each validator returns `APPROVE` or `REQUEST_CHANGES` in its handoff JSON.
 Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing
@@ -179,15 +175,11 @@ release completion and must not be represented as approved work.
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
 | Feature scope, SPEC, TASKS | product-engineer | all agents | product-engineer |
-| Architecture, ADRs, patterns | software-architect | implementers, security-reviewer | software-architect |
-| Python implementation | software-engineer-python | software-architect, security-reviewer | software-architect |
-| Node implementation | software-engineer-node | software-architect, security-reviewer | software-architect |
-| Backend services | backend-engineer | software-architect, security-reviewer | software-architect |
-| Browser UI | frontend-engineer | design-specialist, qa-engineer | design-specialist for visual disputes; software-architect for technical disputes |
+| Architecture, ADRs, patterns | software-architect | software-engineer, security-reviewer | software-architect |
+| Production implementation | software-engineer | software-architect, security-reviewer | software-architect |
 | AI entities | ai-engineer | product-engineer, security-reviewer | product-engineer |
-| CI/CD and projection install | devops-engineer | security-reviewer, software-engineer-python | devops-engineer |
-| E2E acceptance | qa-engineer | implementers, product-engineer | qa-engineer |
-| Security posture | security-reviewer | implementers, devops-engineer | security-reviewer |
+| E2E acceptance | qa-engineer | software-engineer, product-engineer | qa-engineer |
+| Security posture | security-reviewer | software-engineer | security-reviewer |
 | Drift scoring | project-auditor | product-engineer | product-engineer |
 | Orchestration | project-manager | any agent | operator |
 
@@ -275,8 +267,8 @@ SPEC without the grill report. See the `release-governance` rule.
 Entry: `security-reviewer`.
 
 Reviewer triages severity and blast radius. `project-manager` then dispatches
-the appropriate implementer or `devops-engineer`, followed by security
-verification.
+`software-engineer` (or the relevant plugin implementer when the surface is
+plugin-owned), followed by security verification.
 
 ### Playbook — deploy-validation-only
 
@@ -285,14 +277,6 @@ Entry: `qa-engineer`.
 Use when deployment already happened and only smoke/evidence is needed. QA
 captures command output, screenshots, logs, or endpoint probes and writes a
 validation report.
-
-### Playbook — design-validation
-
-Entry: `design-specialist`.
-
-Designer emits a handoff report with states, tokens, accessibility findings,
-and screenshots or sketches. `frontend-engineer` implements from that report,
-then QA validates the UI.
 
 ### Playbook — ai-entity-refinement
 

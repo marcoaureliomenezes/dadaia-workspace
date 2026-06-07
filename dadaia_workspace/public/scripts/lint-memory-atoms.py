@@ -266,13 +266,11 @@ def lint_atom(
     # --- (f) Wikilink resolution ---
     wikilinks = _extract_wikilinks(body)
     for wikilink_slug in wikilinks:
-        # Slugs may refer to product/ subdirectory atoms or top-level atoms.
-        candidate_top = memory_dir / f"{wikilink_slug}.md"
-        candidate_product = memory_dir / "product" / f"{wikilink_slug}.md"
-        if not candidate_top.exists() and not candidate_product.exists():
+        # Slugs may refer to a top-level atom or any atom nested anywhere under
+        # product/ (v0.1.9 thematic-subdir tree). Resolve by slug at any depth.
+        if not any(memory_dir.rglob(f"{wikilink_slug}.md")):
             result.error(
-                f"Wikilink [[{wikilink_slug}]] does not resolve to any .md file "
-                f"in {memory_dir} or {memory_dir / 'product'}."
+                f"Wikilink [[{wikilink_slug}]] does not resolve to any .md file under {memory_dir}."
             )
 
     # --- (g) token_estimate drift warning ---
@@ -311,7 +309,8 @@ def lint_directory(memory_dir: Path, schema: dict[str, Any]) -> list[AtomResult]
     # not a memory atom — exclude it like AGENTS.md.
     product_dir = memory_dir / "product"
     if product_dir.is_dir():
-        atom_files.extend(sorted(p for p in product_dir.glob("*.md") if p.name != "index.md"))
+        # Recurse into thematic subdirs (v0.1.9 tree). index.md is the catalog TOC.
+        atom_files.extend(sorted(p for p in product_dir.glob("**/*.md") if p.name != "index.md"))
 
     if not atom_files:
         print(f"WARNING: no .md atoms found in {memory_dir}", file=sys.stderr)

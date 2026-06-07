@@ -16,8 +16,8 @@ steps 1–4 below are complete.
 
 ## Inputs
 
-- `specs/bugs/*.md` — open bug reports (`dadaia bug list`, or read the dir).
-- `specs/backlog/*.md` + `candidates.md` / `ideas.md` — backlog (`dadaia backlog list`).
+- `specs/bugs/*.md` — open bug reports (read `specs/bugs/*.md` directly).
+- `specs/backlog/*.md` + `candidates.md` / `ideas.md` — backlog (read `specs/backlog/*.md` directly).
 - The operator's intent for the release (theme, urgency).
 
 ## Protocol

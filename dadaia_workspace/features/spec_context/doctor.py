@@ -2,27 +2,19 @@
 
 import fnmatch
 import json
-import os
 import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
 from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
-    _LOCK_TTL_DEFAULT,
-    LockState,
-    _append_audit_event,
     _audit_log_path,
-    check_lock_state,
     context_lock,
     workspace_lock,
-)
-from dadaia_workspace.features.spec_context.semaphore import (
-    _is_stale,
-    read_semaphore,
 )
 
 # Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5
@@ -98,37 +90,12 @@ _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
     }
 )
 
+# Sentinel files older than this are orphans (process SIGKILLed mid-CAS).
+_SENTINEL_ORPHAN_AGE = 30.0
 
-def _semaphore_audit_log_path(workspace_root: Path) -> Path:
-    """Path to the semaphore-specific audit log (separate from lock-events.jsonl)."""
-    return workspace_root / ".dadaia" / "states" / "audit" / "semaphore-reclaims.jsonl"
-
-
-def _append_semaphore_audit(
-    workspace_root: Path,
-    *,
-    event: str,
-    context: str,
-    session_id: str,
-    reason: str,
-) -> None:
-    """Append one audit record to semaphore-reclaims.jsonl atomically via O_APPEND."""
-    audit_path = _semaphore_audit_log_path(workspace_root)
-    audit_path.parent.mkdir(parents=True, exist_ok=True)
-    record: dict[str, object] = {
-        "ts": datetime.now(tz=UTC).isoformat(),
-        "event": event,
-        "context": context,
-        "session_id": session_id,
-        "reason": reason,
-    }
-    line = json.dumps(record) + "\n"
-    encoded = line.encode("utf-8")
-    fd = os.open(str(audit_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-    try:
-        os.write(fd, encoded)
-    finally:
-        os.close(fd)
+# Sessions expired beyond this age are graveyard entries eligible for GC.
+_SESSION_GC_TTL_FIELD = "ttl_seconds"
+_SESSION_HEARTBEAT_FIELD = "last_seen_at"
 
 
 @dataclass(frozen=True)
@@ -152,47 +119,14 @@ class DoctorService:
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
 
-    def _locks_dir(self) -> Path:
-        return self._workspace_root / ".dadaia" / "locks" / "implementation"
-
     def _sessions_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "sessions"
 
+    def _sessions_runtime_dir(self) -> Path:
+        return self._workspace_root / ".dadaia" / "sessions" / "runtime"
+
     def _ctx_locks_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
-
-    # ------------------------------------------------------------------
-    # Helper: read all lock files grouped by <context>__<release> key
-    # ------------------------------------------------------------------
-
-    def _grouped_lock_files(self) -> dict[str, list[Path]]:
-        """Return a mapping of <context>__<release> key → list of .json files."""
-        locks_dir = self._locks_dir()
-        grouped: dict[str, list[Path]] = {}
-        if not locks_dir.exists():
-            return grouped
-        for f in sorted(locks_dir.iterdir()):
-            if f.suffix != ".json":
-                continue
-            key = f.stem  # e.g. "myctx__v1"
-            grouped.setdefault(key, []).append(f)
-        return grouped
-
-    # ------------------------------------------------------------------
-    # Helper: parse last_seen_at from a lock file (returns 0 if missing)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _last_seen_epoch(path: Path) -> float:
-        try:
-            data = json.loads(path.read_text())
-            raw = data.get("last_seen_at", "")
-            if not raw:
-                return 0.0
-            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            return dt.timestamp()
-        except Exception:
-            return 0.0
 
     # ------------------------------------------------------------------
     # Helper: read lock data dict (None on error)
@@ -219,18 +153,6 @@ class DoctorService:
             return int(str(v))
         except (TypeError, ValueError):
             return default
-
-    # ------------------------------------------------------------------
-    # Helper: parse context name and release from a lock file stem
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _parse_key(key: str) -> tuple[str, str]:
-        """Split '<context>__<release>' into (context, release)."""
-        parts = key.split("__", 1)
-        if len(parts) == 2:
-            return parts[0], parts[1]
-        return key, ""
 
     # ------------------------------------------------------------------
     # Helper: load operator exception allowlist from .dadaia/states/root_exceptions.txt
@@ -371,58 +293,69 @@ class DoctorService:
         return issues
 
     # ------------------------------------------------------------------
-    # SEM-1 invariant helpers
+    # LOCK-NEW: single-record lease check
     # ------------------------------------------------------------------
 
-    def _check_sem_1(self, alive_names: frozenset[str]) -> list[DoctorIssue]:
-        """SEM-1: scan ctx_locks/*.semaphore.json for orphan or stale entries.
+    def _check_lease_records(self) -> list[DoctorIssue]:
+        """LOCK-NEW: scan ctx_locks/*.lock.json for invalid or stale records.
 
-        Orphan: the semaphore's context name is NOT in the set of alive contexts.
-        Stale:  the semaphore IS for an alive context, but _is_stale() returns True
-                (dead PID, missing session file, or TTL exceeded).
-
-        Both are fixable via fix().
+        - Invalid JSON / missing required fields → warn.
+        - Stale (per is_stale) → warn; --fix deletes it.
         """
         issues: list[DoctorIssue] = []
         ctx_locks_dir = self._ctx_locks_dir()
         if not ctx_locks_dir.exists():
             return issues
 
-        for sem_file in sorted(ctx_locks_dir.iterdir()):
-            if not sem_file.name.endswith(".semaphore.json"):
+        required_fields = {
+            "context",
+            "release",
+            "session_id",
+            "mode",
+            "acquired_at",
+            "heartbeat",
+            "ttl",
+        }
+        for lock_file in sorted(ctx_locks_dir.iterdir()):
+            if not lock_file.name.endswith(".lock.json"):
                 continue
-            # Derive context name: strip ".semaphore.json" suffix
-            context = sem_file.name[: -len(".semaphore.json")]
-            data = read_semaphore(self._workspace_root, context)
+            data = self._read_lock(lock_file)
             if data is None:
-                # Unreadable file — cannot assess; skip silently
-                continue
-
-            if context not in alive_names:
-                # Orphan: context not alive (unknown or dead)
                 issues.append(
                     DoctorIssue(
-                        code="SEM-1",
+                        code="LOCK-NEW",
                         description=(
-                            f"[orphan-semaphore] {sem_file}: context '{context}' is not in "
-                            "the alive context set. The semaphore was left by a gone/dead context. "
-                            "Run 'dadaia doctor --fix' to reclaim."
+                            f"[invalid-record] {lock_file}: unreadable or invalid JSON. "
+                            "Run 'dadaia doctor --fix' to delete it."
                         ),
                         fixable=True,
                     )
                 )
-            elif _is_stale(data, workspace_root=self._workspace_root):
-                # Stale: alive context but dead holder
-                owner = str(data.get("owner", "unknown"))
+                continue
+            missing = required_fields - set(data.keys())
+            if missing:
                 issues.append(
                     DoctorIssue(
-                        code="SEM-1",
+                        code="LOCK-NEW",
                         description=(
-                            f"[stale-semaphore] {sem_file}: semaphore for alive context "
-                            f"'{context}' is stale (owner={owner}, "
-                            f"pid={data.get('pid', 'none')}, "
+                            f"[invalid-record] {lock_file}: missing required fields "
+                            f"{sorted(missing)}. Run 'dadaia doctor --fix' to delete it."
+                        ),
+                        fixable=True,
+                    )
+                )
+                continue
+            if is_stale(data):
+                ctx_name = str(data.get("context", lock_file.stem.replace(".lock", "")))
+                session_id = str(data.get("session_id", "unknown"))
+                issues.append(
+                    DoctorIssue(
+                        code="LOCK-NEW",
+                        description=(
+                            f"[stale-record] {lock_file}: lease for context '{ctx_name}' "
+                            f"is stale (session={session_id}, "
                             f"heartbeat={data.get('heartbeat', 'none')}). "
-                            "Run 'dadaia doctor --fix' to reclaim."
+                            "Run 'dadaia doctor --fix' to delete it."
                         ),
                         fixable=True,
                     )
@@ -455,70 +388,6 @@ class DoctorService:
                         DoctorIssue(
                             code="INV-5",
                             description=f"Context '{ctx.name}' is dead but repo '{ctx.repo_slug}' is on disk",
-                            fixable=True,
-                        )
-                    )
-
-        # ---- LOCK invariants (T-12) ----
-
-        # LOCK-1: ≥2 .json files for the same <ctx>__<release> key
-        for key, files in self._grouped_lock_files().items():
-            if len(files) >= 2:
-                issues.append(
-                    DoctorIssue(
-                        code="LOCK-1",
-                        description=(
-                            f"Multiple lock files for key '{key}': "
-                            + ", ".join(str(f.name) for f in files)
-                            + " — keeping freshest; others renamed .conflicted; requires human review"
-                        ),
-                        fixable=True,  # semi-auto: rename + audit but flag for human review
-                    )
-                )
-
-        # LOCK-2: impl lock exists for a DEAD context
-        dead_names = {ctx.name for ctx in contexts if ctx.state == ContextState.DEAD}
-        locks_dir = self._locks_dir()
-        if locks_dir.exists():
-            for f in sorted(locks_dir.iterdir()):
-                if f.suffix != ".json":
-                    continue
-                ctx_name, _ = self._parse_key(f.stem)
-                if ctx_name in dead_names:
-                    issues.append(
-                        DoctorIssue(
-                            code="LOCK-2",
-                            description=(
-                                f"Implementation lock '{f.name}' exists for DEAD context '{ctx_name}'"
-                            ),
-                            fixable=True,
-                        )
-                    )
-
-        # LOCK-3: HELD lock with last_seen_at older than ttl
-        if locks_dir.exists():
-            for f in sorted(locks_dir.iterdir()):
-                if f.suffix != ".json":
-                    continue
-                data = self._read_lock(f)
-                if data is None:
-                    continue
-                if data.get("state") == "STALE":
-                    continue  # already marked stale, skip
-                ctx_name, release = self._parse_key(f.stem)
-                state = check_lock_state(self._workspace_root, ctx_name, release)
-                if state == LockState.STALE and data.get("state") != LockState.STALE:
-                    last_seen = data.get("last_seen_at", "unknown")
-                    ttl = data.get("ttl_seconds", _LOCK_TTL_DEFAULT)
-                    owner_runtime = data.get("runtime", "unknown")
-                    owner_session = data.get("session_id", "unknown")
-                    issues.append(
-                        DoctorIssue(
-                            code="LOCK-3",
-                            description=(
-                                f"HELD lock '{f.name}' is expired (last_seen_at={last_seen}, "
-                                f"ttl={ttl}s, runtime={owner_runtime}, session_id={owner_session})"
-                            ),
                             fixable=True,
                         )
                     )
@@ -574,66 +443,6 @@ class DoctorService:
             except OSError:
                 pass
 
-        # LOCK-6: BOUND_REVIEW session file for a DEAD context (AUTO-FIX)
-        sessions_dir = self._sessions_dir()
-        if sessions_dir.exists():
-            for f in sorted(sessions_dir.iterdir()):
-                if f.suffix != ".json":
-                    continue
-                try:
-                    data = json.loads(f.read_text())
-                except (json.JSONDecodeError, OSError):
-                    continue
-                if data.get("mode") != "BOUND_REVIEW":
-                    continue
-                ctx_name = data.get("context", "")
-                if ctx_name in dead_names:
-                    issues.append(
-                        DoctorIssue(
-                            code="LOCK-6",
-                            description=(
-                                f"BOUND_REVIEW session file '{f.name}' belongs to "
-                                f"DEAD context '{ctx_name}'"
-                            ),
-                            fixable=True,
-                        )
-                    )
-
-        # LOCK-7: orphan lock — implementation lock file exists but the owning
-        # session file is absent from .dadaia/sessions/. Distinct from:
-        #   LOCK-2 (lock for DEAD context — skipped here)
-        #   LOCK-3 (lock stale by TTL — may co-occur; LOCK-7 fires on session absence)
-        # Scenario: session file deleted manually/by bug; lock remains; owner is gone.
-        # AUTO-FIX: delete orphan lock file + append audit event.
-        if locks_dir.exists():
-            for f in sorted(locks_dir.iterdir()):
-                if f.suffix != ".json":
-                    continue
-                lock_data = self._read_lock(f)
-                if lock_data is None:
-                    continue
-                ctx_name, release = self._parse_key(f.stem)
-                # Skip DEAD-context locks — those are LOCK-2
-                if ctx_name in dead_names:
-                    continue
-                session_id = self._str(lock_data, "session_id")
-                if not session_id:
-                    continue
-                session_file = sessions_dir / f"{session_id}.json"
-                if not session_file.exists():
-                    issues.append(
-                        DoctorIssue(
-                            code="LOCK-7",
-                            description=(
-                                f"Orphan lock '{f.name}': session file for "
-                                f"'{session_id}' is absent "
-                                f"(context={ctx_name}, release={release}). "
-                                "The owning session is gone; lock can be safely reclaimed."
-                            ),
-                            fixable=True,
-                        )
-                    )
-
         # ---- ROOT invariants (T-SANI-05) ----
         exc_globs = self._root_exception_globs()
         issues.extend(self._check_root_1(exc_globs))
@@ -641,11 +450,8 @@ class DoctorService:
         issues.extend(self._check_root_3(exc_globs))
         issues.extend(self._check_root_4())
 
-        # ---- SEM-1 invariant (T-SEMA-02) ----
-        alive_names: frozenset[str] = frozenset(
-            ctx.name for ctx in contexts if ctx.state == ContextState.ALIVE
-        )
-        issues.extend(self._check_sem_1(alive_names))
+        # ---- Single-record lease check ----
+        issues.extend(self._check_lease_records())
 
         return issues
 
@@ -653,12 +459,9 @@ class DoctorService:
         """Fix detected issues.
 
         INV-5: remove stale repos for DEAD contexts.
-        LOCK-1: keep freshest lock file; rename others .conflicted + append audit.
-        LOCK-2: delete impl lock for DEAD context + append audit.
-        LOCK-3: set state=STALE on expired HELD lock (do NOT delete).
-        LOCK-6: delete BOUND_REVIEW session for DEAD context + append audit.
-
-        NO-FIX invariants (LOCK-4, LOCK-5) are only reported in check().
+        LOCK-NEW (--fix): delete stale/invalid ctx_locks/*.lock.json records.
+        Graveyard GC: delete TTL-expired .dadaia/sessions/*.json files.
+        Sentinel GC: delete orphan ctx_locks/*.lock.sentinel files (mtime > 30s).
 
         Lock ordering (ADR D-4 / T-11):
           Lock 1 (workspace_lock) wraps the spec_contexts.json load and all JSON
@@ -676,7 +479,6 @@ class DoctorService:
 
         with workspace_lock(self._workspace_root):
             all_contexts = self._store.list_all()
-            dead_names = {ctx.name for ctx in all_contexts if ctx.state == ContextState.DEAD}
 
             # INV-5: remove stale repos for DEAD contexts.
             # Acquire Lock 2 per slug so alive()'s filesystem ops (which hold
@@ -687,167 +489,103 @@ class DoctorService:
                     if repo_path.exists():
                         with context_lock(self._workspace_root, ctx.repo_slug):
                             # Re-confirm still DEAD after acquiring Lock 2.
-                            # alive() may have completed its FS work and is now
-                            # waiting for Lock 1 (which we hold).  The JSON has
-                            # not been updated yet (alive() updates JSON under
-                            # Lock 1), so we must check via the store — which
-                            # reads from disk and will still show DEAD at this
-                            # point.  Safe to rmtree only if still DEAD.
                             ctx_recheck = self._store.get(ctx.name)
                             if ctx_recheck is None or ctx_recheck.state != ContextState.DEAD:
-                                # Context transitioned — skip rmtree.
                                 continue
                             shutil.rmtree(repo_path)
                         actions.append(
                             f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'"
                         )
 
-            # LOCK-1: keep freshest; rename stale duplicates to .conflicted
-            for key, files in self._grouped_lock_files().items():
-                if len(files) < 2:
+        # LOCK-NEW: delete stale/invalid lease records (outside workspace_lock —
+        # lease files are independent of spec_contexts.json).
+        ctx_locks_dir = self._ctx_locks_dir()
+        required_fields = {
+            "context",
+            "release",
+            "session_id",
+            "mode",
+            "acquired_at",
+            "heartbeat",
+            "ttl",
+        }
+        if ctx_locks_dir.exists():
+            for lock_file in sorted(ctx_locks_dir.iterdir()):
+                if not lock_file.name.endswith(".lock.json"):
                     continue
-                # Sort descending by last_seen_at epoch (freshest first)
-                sorted_files = sorted(files, key=self._last_seen_epoch, reverse=True)
-                freshest = sorted_files[0]
-                for stale_file in sorted_files[1:]:
-                    conflicted = stale_file.with_suffix(".conflicted")
-                    stale_file.rename(conflicted)
-                    ctx_name, release = self._parse_key(key)
-                    freshest_data: dict[str, object] = self._read_lock(freshest) or {}
-                    _append_audit_event(
-                        self._workspace_root,
-                        event="LOCK_CONFLICT_RENAMED",
-                        context=ctx_name,
-                        release=release,
-                        session_id=self._str(freshest_data, "session_id", "unknown"),
-                        runtime=self._str(freshest_data, "runtime", "doctor"),
-                        pid=self._int(freshest_data, "pid", 0),
-                        reason=f"LOCK-1: duplicate lock file renamed to {conflicted.name}; requires human review",
-                    )
+                data = self._read_lock(lock_file)
+                should_delete = False
+                reason_label = ""
+                if data is None:
+                    should_delete = True
+                    reason_label = "invalid JSON"
+                elif required_fields - set(data.keys()):
+                    should_delete = True
+                    reason_label = "missing required fields"
+                elif is_stale(data):
+                    should_delete = True
+                    reason_label = "stale record"
+                if should_delete:
+                    lock_file.unlink(missing_ok=True)
                     actions.append(
-                        f"LOCK-1: renamed conflicting lock '{stale_file.name}' → '{conflicted.name}' "
-                        f"(kept '{freshest.name}'); REQUIRES HUMAN REVIEW"
+                        f"LOCK-NEW: deleted lease record '{lock_file.name}' ({reason_label})"
                     )
 
-            # LOCK-2: delete impl lock for DEAD context
-            locks_dir = self._locks_dir()
-            if locks_dir.exists():
-                for f in sorted(locks_dir.iterdir()):
-                    if f.suffix != ".json":
-                        continue
-                    ctx_name, release = self._parse_key(f.stem)
-                    if ctx_name in dead_names:
-                        lock_data: dict[str, object] = self._read_lock(f) or {}
-                        _append_audit_event(
-                            self._workspace_root,
-                            event="LOCK_DELETED_DEAD_CTX",
-                            context=ctx_name,
-                            release=release,
-                            session_id=self._str(lock_data, "session_id", "unknown"),
-                            runtime=self._str(lock_data, "runtime", "doctor"),
-                            pid=self._int(lock_data, "pid", 0),
-                            reason=f"LOCK-2: implementation lock deleted for DEAD context '{ctx_name}'",
-                        )
-                        f.unlink(missing_ok=True)
-                        actions.append(
-                            f"LOCK-2: deleted implementation lock '{f.name}' for DEAD context '{ctx_name}'"
-                        )
+        # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/
+        sessions_dir = self._sessions_dir()
+        if sessions_dir.exists():
+            for sess_file in sorted(sessions_dir.iterdir()):
+                if not sess_file.name.endswith(".json"):
+                    continue
+                if sess_file.parent.name == "runtime":
+                    continue
+                sess_data = self._read_lock(sess_file)
+                if sess_data is None:
+                    continue
+                # Build a TTL-check-compatible dict using session fields
+                gc_check: dict[str, object] = {
+                    "heartbeat": sess_data.get(_SESSION_HEARTBEAT_FIELD, ""),
+                    "ttl": sess_data.get(_SESSION_GC_TTL_FIELD, 300),
+                }
+                if is_stale(gc_check):
+                    sess_file.unlink(missing_ok=True)
+                    actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_file.name}'")
 
-            # LOCK-3: mark expired HELD locks as STALE (do NOT delete)
-            if locks_dir.exists():
-                for f in sorted(locks_dir.iterdir()):
-                    if f.suffix != ".json":
-                        continue
-                    lock3_data = self._read_lock(f)
-                    if lock3_data is None:
-                        continue
-                    if lock3_data.get("state") == LockState.STALE:
-                        continue  # already marked
-                    ctx_name, release = self._parse_key(f.stem)
-                    state = check_lock_state(self._workspace_root, ctx_name, release)
-                    if state == LockState.STALE:
-                        lock3_data["state"] = LockState.STALE
-                        tmp = f.with_suffix(".tmp")
-                        tmp.write_text(json.dumps(lock3_data, indent=2))
-                        os.replace(tmp, f)
-                        actions.append(
-                            f"LOCK-3: marked lock '{f.name}' as STALE "
-                            f"(last_seen_at={self._str(lock3_data, 'last_seen_at', 'unknown')})"
-                        )
+        # Sentinel GC: delete orphan *.lock.sentinel files older than 30 s
+        if ctx_locks_dir.exists():
+            now_ts = datetime.now(tz=UTC).timestamp()
+            for sentinel_file in sorted(ctx_locks_dir.iterdir()):
+                if not sentinel_file.name.endswith(".lock.sentinel"):
+                    continue
+                try:
+                    mtime = sentinel_file.stat().st_mtime
+                except OSError:
+                    continue
+                if (now_ts - mtime) > _SENTINEL_ORPHAN_AGE:
+                    sentinel_file.unlink(missing_ok=True)
+                    actions.append(f"SENTINEL-GC: deleted orphan sentinel '{sentinel_file.name}'")
 
-            # LOCK-6: delete BOUND_REVIEW session files for DEAD contexts
-            sessions_dir = self._sessions_dir()
-            if sessions_dir.exists():
-                for f in sorted(sessions_dir.iterdir()):
-                    if f.suffix != ".json":
-                        continue
-                    sess_data: dict[str, object] | None = self._read_lock(f)
-                    if sess_data is None:
-                        continue
-                    if sess_data.get("mode") != "BOUND_REVIEW":
-                        continue
-                    ctx_name = self._str(sess_data, "context")
-                    if ctx_name in dead_names:
-                        release = self._str(sess_data, "release")
-                        _append_audit_event(
-                            self._workspace_root,
-                            event="REVIEW_SESSION_DELETED_DEAD_CTX",
-                            context=ctx_name,
-                            release=release,
-                            session_id=self._str(sess_data, "session_id", "unknown"),
-                            runtime=self._str(sess_data, "runtime", "doctor"),
-                            pid=self._int(sess_data, "pid", 0),
-                            reason=f"LOCK-6: BOUND_REVIEW session deleted for DEAD context '{ctx_name}'",
-                        )
-                        f.unlink(missing_ok=True)
-                        actions.append(
-                            f"LOCK-6: deleted BOUND_REVIEW session '{f.name}' for DEAD context '{ctx_name}'"
-                        )
-
-            # LOCK-7: reclaim orphan locks (session file absent, context ALIVE, NOT stale).
-            # Only applies when the lock is NOT already handled by LOCK-3 (stale by TTL):
-            # if check_lock_state returns STALE the lock goes through LOCK-3 (mark STALE,
-            # no delete). LOCK-7 in fix() only deletes locks that appear HELD by TTL
-            # (fresh timestamp + live pid) but whose session file is absent.
-            sessions_dir = self._sessions_dir()
-            if locks_dir.exists():
-                for f in sorted(locks_dir.iterdir()):
-                    if f.suffix != ".json":
-                        continue
-                    lock7_data: dict[str, object] | None = self._read_lock(f)
-                    if lock7_data is None:
-                        continue
-                    ctx_name, release = self._parse_key(f.stem)
-                    # Skip DEAD-context locks (LOCK-2 handles those)
-                    if ctx_name in dead_names:
-                        continue
-                    # Skip locks that are stale by TTL/dead-pid — LOCK-3 handles those
-                    lock7_state = check_lock_state(self._workspace_root, ctx_name, release)
-                    if lock7_state == LockState.STALE:
-                        continue
-                    session_id = self._str(lock7_data, "session_id")
-                    if not session_id:
-                        continue
-                    session_file = sessions_dir / f"{session_id}.json"
-                    if not session_file.exists():
-                        _append_audit_event(
-                            self._workspace_root,
-                            event="LOCK_ORPHAN_RECLAIMED",
-                            context=ctx_name,
-                            release=release,
-                            session_id=session_id,
-                            runtime=self._str(lock7_data, "runtime", "doctor"),
-                            pid=self._int(lock7_data, "pid", 0),
-                            reason=(
-                                f"LOCK-7: orphan lock '{f.name}' reclaimed — "
-                                f"session file for '{session_id}' is absent"
-                            ),
-                        )
-                        f.unlink(missing_ok=True)
-                        actions.append(
-                            f"LOCK-7: reclaimed orphan lock '{f.name}' "
-                            f"(session '{session_id}' file absent, context={ctx_name})"
-                        )
+        # Stable-identity .ptr GC (D1 soul-fold): delete orphan .ptr files where
+        # the corresponding .lock.json does not exist or is expired (is_stale).
+        # .ptr is a hint, not a lock; orphans must not persist after the lease expires.
+        runtime_dir = self._sessions_runtime_dir()
+        if runtime_dir.exists():
+            ctx_locks_dir = self._ctx_locks_dir()
+            for ptr_file in sorted(runtime_dir.iterdir()):
+                if not ptr_file.name.endswith(".ptr"):
+                    continue
+                ctx_name = ptr_file.name[: -len(".ptr")]
+                lock_file = ctx_locks_dir / f"{ctx_name}.lock.json"
+                is_orphan = False
+                if not lock_file.exists():
+                    is_orphan = True
+                else:
+                    lock_data = self._read_lock(lock_file)
+                    if lock_data is None or is_stale(lock_data):
+                        is_orphan = True
+                if is_orphan:
+                    ptr_file.unlink(missing_ok=True)
+                    actions.append(f"PTR-GC: deleted orphan session pointer '{ptr_file.name}'")
 
         # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
         for cache_name in sorted(_ROOT_FORBIDDEN_CACHES):
@@ -863,45 +601,5 @@ class DoctorService:
                     )
                 except OSError as exc:
                     actions.append(f"ROOT-2: failed to delete '{cache_name}': {exc}")
-
-        # SEM-1: reclaim orphan and stale semaphores (T-SEMA-02).
-        # Runs outside the workspace_lock because:
-        #   a) semaphore files live in ctx_locks/, distinct from impl locks,
-        #   b) semaphore acquire/release already uses atomic tmp→os.replace,
-        #   c) adding Lock 1 here would risk a deadlock when the caller holds the
-        #      semaphore and also requests fix() — keep it lightweight.
-        all_contexts = self._store.list_all()
-        alive_names: frozenset[str] = frozenset(
-            ctx.name for ctx in all_contexts if ctx.state == ContextState.ALIVE
-        )
-        ctx_locks_dir = self._ctx_locks_dir()
-        if ctx_locks_dir.exists():
-            for sem_file in sorted(ctx_locks_dir.iterdir()):
-                if not sem_file.name.endswith(".semaphore.json"):
-                    continue
-                context = sem_file.name[: -len(".semaphore.json")]
-                data = read_semaphore(self._workspace_root, context)
-                if data is None:
-                    continue
-                reclaim = False
-                reason = ""
-                if context not in alive_names:
-                    reclaim = True
-                    reason = f"SEM-1: orphan semaphore — context '{context}' not in alive set"
-                elif _is_stale(data, workspace_root=self._workspace_root):
-                    reclaim = True
-                    owner = str(data.get("owner", "unknown"))
-                    reason = f"SEM-1: stale semaphore for alive context '{context}' (owner={owner})"
-                if reclaim:
-                    session_id = str(data.get("owner", "unknown"))
-                    _append_semaphore_audit(
-                        self._workspace_root,
-                        event="SEMAPHORE_RECLAIMED",
-                        context=context,
-                        session_id=session_id,
-                        reason=reason,
-                    )
-                    sem_file.unlink(missing_ok=True)
-                    actions.append(f"SEM-1: reclaimed semaphore '{sem_file.name}' — {reason}")
 
         return actions

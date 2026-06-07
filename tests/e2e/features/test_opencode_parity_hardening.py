@@ -26,8 +26,8 @@ COLOR_AGENTS: set[str] = set()
 # Agents migrated to handoff-emitter in Track C.
 MIGRATED_AGENTS = {
     "qa-engineer",
-    "devops-engineer",
-    "backend-engineer",
+    "security-reviewer",
+    "code-reviewer",
 }
 
 
@@ -85,8 +85,8 @@ class TestColorStripParity:
 class TestPermissionProjection:
     def test_permission_block_present_in_opencode(self, tmp_path: Path) -> None:
         _install(tmp_path)
-        # backend-engineer declares Read/Write/Edit/Bash/Glob/Grep.
-        content = (tmp_path / "ws" / ".opencode" / "agents" / "backend-engineer.md").read_text(
+        # software-engineer declares Read/Write/Edit/Bash/Glob.
+        content = (tmp_path / "ws" / ".opencode" / "agents" / "software-engineer.md").read_text(
             "utf-8"
         )
         assert "permission:" in content
@@ -95,16 +95,17 @@ class TestPermissionProjection:
 
     def test_agent_without_bash_denies_bash(self, tmp_path: Path) -> None:
         _install(tmp_path)
-        # researcher declares no Bash and no Agent tool, but has WebFetch.
-        content = (tmp_path / "ws" / ".opencode" / "agents" / "researcher.md").read_text("utf-8")
+        # product-engineer declares Read/Glob/Grep/Write/Edit — no Bash, no WebFetch.
+        content = (tmp_path / "ws" / ".opencode" / "agents" / "product-engineer.md").read_text(
+            "utf-8"
+        )
         assert "bash: deny" in content
         assert "task: deny" in content
-        assert "webfetch: allow" in content  # researcher has WebFetch
 
     def test_no_permission_block_in_claude(self, tmp_path: Path) -> None:
         _install(tmp_path)
         # permission: is OpenCode-only; Claude projection must not carry it.
-        content = (tmp_path / "ws" / ".claude" / "agents" / "backend-engineer.md").read_text(
+        content = (tmp_path / "ws" / ".claude" / "agents" / "software-engineer.md").read_text(
             "utf-8"
         )
         assert "permission:" not in content

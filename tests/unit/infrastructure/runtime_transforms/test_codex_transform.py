@@ -4,7 +4,7 @@ Covers (ADR-2 golden tests):
 - project-manager body: Agent tool references are replaced with Codex tool-search wording.
 - project-auditor body: Agent tool references are replaced with Codex tool-search wording.
 - software-architect body (no Agent tool): output is identical to input (verbatim).
-- All 15 canonical agents: output is non-empty after strip().
+- All 12 canonical agents (9 core + 3 plugin stubs): output is non-empty after strip().
 - Determinism: same input always produces the same output.
 """
 
@@ -49,12 +49,14 @@ def _load_body(agent_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# All 15 canonical agent IDs
+# All 12 canonical agent IDs (v0.1.8/v0.1.9 surface: 9 core + 3 plugin stubs)
+# Deleted: backend-engineer, researcher, software-engineer-python, software-engineer-node
+# Added/renamed: software-engineer (unified)
+# Plugin stubs: design-specialist, devops-engineer, frontend-engineer
 # ---------------------------------------------------------------------------
 
 _CANONICAL_AGENTS: tuple[str, ...] = (
     "ai-engineer",
-    "backend-engineer",
     "code-reviewer",
     "design-specialist",
     "devops-engineer",
@@ -63,11 +65,9 @@ _CANONICAL_AGENTS: tuple[str, ...] = (
     "project-auditor",
     "project-manager",
     "qa-engineer",
-    "researcher",
     "security-reviewer",
     "software-architect",
-    "software-engineer-node",
-    "software-engineer-python",
+    "software-engineer",
 )
 
 # ---------------------------------------------------------------------------

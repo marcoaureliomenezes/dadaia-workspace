@@ -19,11 +19,7 @@ from dadaia_workspace.core.exceptions import (
     ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
-    ImplementationBlockedByReviewError,
-    LockActiveError,
-    LockHeldError,
     RepoCatalogError,
-    ReviewBlockedByImplementationError,
     SchemaVersionError,
     WorkspaceLockTimeoutError,
     WorkspaceNotInitializedError,
@@ -31,20 +27,7 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.locking import (
-    audit_acquired,
-    audit_blocked,
-    audit_released,
-    check_impl_xor_review,
-    create_impl_lock,
-    reclaim_impl_lock,
-    release_impl_lock,
-    renew_heartbeat,
     workspace_lock,
-)
-from dadaia_workspace.features.spec_context.semaphore import (
-    SemaphoreAlreadyHeldError,
-    acquire_context_semaphore,
-    release_context_semaphore,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService
 
@@ -86,27 +69,6 @@ def _now_iso() -> str:
 
 def _sessions_dir(workspace_root: Path) -> Path:
     return workspace_root / ".dadaia" / "sessions"
-
-
-def _runtime_ptr_dir(workspace_root: Path) -> Path:
-    return workspace_root / ".dadaia" / "sessions" / "runtime"
-
-
-def _write_runtime_ptr(workspace_root: Path, session_id: str) -> None:
-    """Write a runtime→session pointer file for env-free gate resolution (T-R1-01/T-R1-05).
-
-    The SDD gate's RULE E scans .dadaia/sessions/runtime/*.ptr to resolve the session_id
-    when DADAIA_SESSION_ID is not set in the agent runtime environment.
-    """
-    ptr_dir = _runtime_ptr_dir(workspace_root)
-    ptr_dir.mkdir(parents=True, exist_ok=True)
-    ptr_file = ptr_dir / f"{session_id}.ptr"
-    with contextlib.suppress(OSError):
-        ptr_file.write_text(session_id, encoding="utf-8")
-
-
-def _locks_dir(workspace_root: Path) -> Path:
-    return workspace_root / ".dadaia" / "locks" / "implementation"
 
 
 def _load_session(sessions_dir: Path, session_id: str) -> dict[str, Any] | None:
@@ -284,21 +246,13 @@ def bind(
     mode: str = typer.Option(
         ...,
         "--mode",
-        help=(
-            "Binding mode: read | spec | implementation | review. "
-            "read/spec are never blocked. "
-            "implementation/review acquire the per-context semaphore "
-            "(at most one exclusive holder per context; second bind is denied "
-            "and names the current holder)."
-        ),
+        help=("Binding mode: read | spec | implementation | review. read/spec are never blocked."),
     ),
     release: str | None = typer.Option(
         None, "--release", help="Release ID (required for implementation and review modes)"
     ),
-    force: bool = typer.Option(False, "--force", help="Force-reclaim a STALE implementation lock"),
-    reason: str = typer.Option(
-        "", "--reason", help="Reason for forced reclaim (required with --force)"
-    ),
+    force: bool = typer.Option(False, "--force", help="Accepted but no-op (lock-steal replaces)"),
+    reason: str = typer.Option("", "--reason", help="Reason note (informational only)"),
 ) -> None:
     """Bind this shell session to a context.
 
@@ -306,15 +260,6 @@ def bind(
 
     Outputs eval-compatible export lines to set DADAIA_CONTEXT, DADAIA_SESSION_ID,
     and DADAIA_MODE in the current shell.
-
-    Exclusive modes (implementation, review) acquire the per-context semaphore so
-    that at most one writing session is active per context at any time. Phase
-    progression does NOT require a new bind — the semaphore remains held until
-    dadaia context release is called.
-
-    A runtime→session pointer (.dadaia/sessions/runtime/<session_id>.ptr) is
-    always written so the SDD gate can resolve the session without requiring
-    DADAIA_SESSION_ID to be manually exported into the agent runtime environment.
     """
     mode_upper = mode.upper()
     if mode_upper not in ("READ", "SPEC", "IMPLEMENTATION", "REVIEW"):
@@ -328,11 +273,6 @@ def bind(
         err_console.print(
             f"[red]Error:[/red] --release <id> is required for --mode {mode_upper.lower()}"
         )
-        raise typer.Exit(1) from None
-
-    # --force requires --reason
-    if force and not reason:
-        err_console.print("[red]Error:[/red] --reason is required when using --force")
         raise typer.Exit(1) from None
 
     workspace_root = resolve_workspace_root()
@@ -376,167 +316,12 @@ def bind(
     }
 
     try:
-        if mode_upper == "IMPLEMENTATION":
-            assert release is not None  # guaranteed above
-
-            if force:
-                # Force-reclaim path: XOR check + reclaim are not wrapped in
-                # workspace_lock because reclaim is a force-overwrite by definition
-                # (it always succeeds regardless of the current lock holder).
-                # workspace_lock is not needed for atomicity here.
-                check_impl_xor_review(workspace_root, name, release, "IMPLEMENTATION", session_id)
-                try:
-                    reclaim_impl_lock(
-                        workspace_root,
-                        context=name,
-                        release=release,
-                        new_session_id=session_id,
-                        runtime=runtime,
-                        pid=pid,
-                        reason=reason,
-                    )
-                except LockActiveError as e:
-                    err_console.print(f"[red]Error:[/red] {e}")
-                    raise typer.Exit(1) from None
-            else:
-                # Normal path: check_impl_xor_review + create_impl_lock are both
-                # inside a single workspace_lock critical section (Defect 2 fix).
-                # This eliminates the TOCTOU window between the XOR check and the
-                # lock creation: no other process can interleave after the check
-                # passes and before create_impl_lock writes the lock file.
-                #
-                # Deadlock audit (AC-REG-4): workspace_lock uses fcntl.flock with a
-                # fresh fd each call. create_impl_lock does NOT call workspace_lock
-                # internally (verified by code audit of locking.py). There is
-                # therefore no nested workspace_lock acquisition on any path through
-                # this critical section — no deadlock is possible.
-                with workspace_lock(workspace_root):
-                    check_impl_xor_review(
-                        workspace_root, name, release, "IMPLEMENTATION", session_id
-                    )
-                    create_impl_lock(
-                        workspace_root,
-                        context=name,
-                        release=release,
-                        session_id=session_id,
-                        runtime=runtime,
-                        pid=pid,
-                    )
-                # Emit ACQUIRED audit event (outside lock — non-critical)
-                audit_acquired(
-                    workspace_root,
-                    context=name,
-                    release=release,
-                    session_id=session_id,
-                    runtime=runtime,
-                    pid=pid,
-                )
-
-            # Acquire the per-context semaphore for IMPLEMENTATION (T-R1-05).
-            # This check comes AFTER the per-release impl lock succeeds so that
-            # the semaphore is the outer guard and the lock is the inner guard.
-            # SemaphoreAlreadyHeldError names the holder; read/spec phases bypass.
-            # If the semaphore is already held, roll the impl lock back so a failed
-            # bind never leaves an orphan lock with no owning session
-            # (T-SHIP-03 Finding 2).
-            try:
-                acquire_context_semaphore(
-                    workspace_root,
-                    context=name,
-                    session_id=session_id,
-                    phase="BOUND_IMPLEMENTATION",
-                    release=release or "",
-                )
-            except SemaphoreAlreadyHeldError:
-                release_impl_lock(
-                    workspace_root, context=name, release=release, session_id=session_id
-                )
-                raise
-
-        elif mode_upper == "REVIEW":
-            assert release is not None  # guaranteed above
-
-            # check_impl_xor_review + session-file write are both inside a single
-            # workspace_lock critical section (Defect 2 fix).
-            # The former separate workspace_lock block around session_file.write_text
-            # (below) is merged here so that no other process can interleave between
-            # the XOR check and the session file being written.
-            #
-            # Deadlock audit (AC-REG-4): _write_review_session (called below) and
-            # check_impl_xor_review do NOT call workspace_lock internally (verified by
-            # code audit). No nested acquisition — no deadlock possible.
-            try:
-                with workspace_lock(workspace_root):
-                    check_impl_xor_review(workspace_root, name, release, "REVIEW", session_id)
-                    session_file = sessions_dir / f"{session_id}.json"
-                    session_file.write_text(json.dumps(session_data, indent=2))
-            except ReviewBlockedByImplementationError:
-                audit_blocked(
-                    workspace_root,
-                    context=name,
-                    release=release,
-                    session_id=session_id,
-                    runtime=runtime,
-                    pid=pid,
-                    reason="review blocked by held implementation lock",
-                )
-                raise
-
-            # Acquire the per-context semaphore for REVIEW (T-R1-05).
-            acquire_context_semaphore(
-                workspace_root,
-                context=name,
-                session_id=session_id,
-                phase="BOUND_REVIEW",
-                release=release or "",
-            )
-
-    except SemaphoreAlreadyHeldError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except LockHeldError as e:
-        audit_blocked(
-            workspace_root,
-            context=name,
-            release=release or "",
-            session_id=session_id,
-            runtime=runtime,
-            pid=pid,
-            reason=str(e),
-        )
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except ReviewBlockedByImplementationError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except ImplementationBlockedByReviewError as e:
-        audit_blocked(
-            workspace_root,
-            context=name,
-            release=release or "",
-            session_id=session_id,
-            runtime=runtime,
-            pid=pid,
-            reason=str(e),
-        )
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except WorkspaceLockTimeoutError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    # Write session file inside workspace lock for all modes EXCEPT REVIEW
-    # (REVIEW mode already wrote the session file atomically inside its own
-    # workspace_lock critical section above, together with the XOR check).
-    if mode_upper != "REVIEW":
         with workspace_lock(workspace_root):
             session_file = sessions_dir / f"{session_id}.json"
             session_file.write_text(json.dumps(session_data, indent=2))
-
-    # Always write the runtime→session pointer file (T-R1-01/T-R1-05).
-    # This allows the SDD gate (RULE E) to resolve the session without requiring
-    # DADAIA_SESSION_ID to be manually exported into the agent runtime environment.
-    _write_runtime_ptr(workspace_root, session_id)
+    except WorkspaceLockTimeoutError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
     # Output eval-compatible export lines
     dadaia_mode = mode_upper
@@ -547,7 +332,7 @@ def bind(
 
 @app.command(name="release")
 def release_cmd() -> None:
-    """Release the current session's binding and its implementation lock (if owned).
+    """Release the current session's binding.
 
     Run: dadaia context release
     """
@@ -561,63 +346,19 @@ def release_cmd() -> None:
 
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
-
-    session_data = None
     session_file = sessions_dir / f"{session_id}.json"
 
-    # Load session under workspace lock, then remove session file + lock file atomically
     with workspace_lock(workspace_root):
-        if session_file.exists():
-            try:
-                session_data = json.loads(session_file.read_text())
-            except (json.JSONDecodeError, OSError):
-                session_data = None
-            session_file.unlink(missing_ok=True)
-
-        # If this session owned an implementation lock, remove it
-        if session_data and session_data.get("mode") == "BOUND_IMPLEMENTATION":
-            ctx_name = session_data.get("context", "")
-            rel = session_data.get("release", "")
-            if ctx_name and rel:
-                release_impl_lock(workspace_root, ctx_name, rel, session_id)
-
-    # Emit RELEASED audit event (outside lock)
-    if session_data and session_data.get("mode") == "BOUND_IMPLEMENTATION":
-        ctx_name = session_data.get("context", "")
-        rel = session_data.get("release", "")
-        runtime = session_data.get("runtime", "unknown")
-        pid = session_data.get("pid", os.getpid())
-        if ctx_name and rel:
-            audit_released(
-                workspace_root,
-                context=ctx_name,
-                release=rel,
-                session_id=session_id,
-                runtime=runtime,
-                pid=pid,
-            )
-
-    # Release the per-context semaphore if this session owned it (T-R1-05).
-    # Works for both BOUND_IMPLEMENTATION and BOUND_REVIEW.
-    if session_data:
-        ctx_name = session_data.get("context", "")
-        if ctx_name:
-            release_context_semaphore(workspace_root, ctx_name, session_id)
-
-    # Clean up the runtime→session pointer file (T-R1-01/T-R1-05).
-    ptr_file = _runtime_ptr_dir(workspace_root) / f"{session_id}.ptr"
-    ptr_file.unlink(missing_ok=True)
+        session_file.unlink(missing_ok=True)
 
     console.print(f"[green]✓[/green] Session '[bold]{session_id}[/bold]' released")
 
 
 @app.command()
 def heartbeat() -> None:
-    """Renew the heartbeat for the current session's implementation lock.
+    """Renew the heartbeat for the current session.
 
-    Reads DADAIA_SESSION_ID from the environment. Intended as a fallback
-    for long-running read-only sessions where the post-tool hook (T-13) is
-    not firing (e.g. no write operations in progress).
+    Reads DADAIA_SESSION_ID from the environment.
 
     Run: dadaia context heartbeat
     """
@@ -632,7 +373,6 @@ def heartbeat() -> None:
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
 
-    # Load the session file to discover which context/release this session owns
     session_data = _load_session(sessions_dir, session_id)
     if session_data is None:
         err_console.print(
@@ -641,35 +381,18 @@ def heartbeat() -> None:
         )
         raise typer.Exit(1) from None
 
-    mode = session_data.get("mode", "")
-    if mode != "BOUND_IMPLEMENTATION":
-        err_console.print(
-            f"[yellow]Warning:[/yellow] Session '{session_id}' is not an IMPLEMENTATION session "
-            f"(mode={mode}). Heartbeat only applies to implementation locks."
-        )
-        raise typer.Exit(0) from None
+    # Renew the lease heartbeat via lease module
+    from dadaia_workspace.features.spec_context import lease as _lease
 
     ctx_name = session_data.get("context", "")
-    release = session_data.get("release", "")
-    if not ctx_name or not release:
-        err_console.print(
-            f"[red]Error:[/red] Session '{session_id}' is missing context or release fields."
-        )
-        raise typer.Exit(1) from None
+    if ctx_name:
+        _lease.renew_heartbeat(workspace_root, ctx_name, session_id)
 
-    renewed = renew_heartbeat(workspace_root, ctx_name, release, session_id)
-    if renewed:
-        now = _now_iso()
-        console.print(
-            f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
-            f"(context={ctx_name}, release={release}, last_seen_at={now})"
-        )
-    else:
-        err_console.print(
-            f"[red]Error:[/red] Could not renew heartbeat for session '{session_id}'. "
-            "The lock may not exist or belongs to a different session."
-        )
-        raise typer.Exit(1) from None
+    now = _now_iso()
+    console.print(
+        f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
+        f"(context={ctx_name}, last_seen_at={now})"
+    )
 
 
 @app.command()
