@@ -34,7 +34,9 @@ def fixed(dt: datetime) -> Callable[[], datetime]:
     return lambda: dt
 
 
-def _seed(workspace: Path, session_id: str, heartbeat: datetime, ttl: int = LEASE_TTL_SECONDS) -> None:
+def _seed(
+    workspace: Path, session_id: str, heartbeat: datetime, ttl: int = LEASE_TTL_SECONDS
+) -> None:
     lease._record_path(workspace, CTX).write_text(
         json.dumps(
             {

@@ -88,7 +88,9 @@ def test_two_process_genuine_concurrent_session_yields(tmp_path: Path) -> None:
     # Forbidden-law: the yield message instructs NO manual unblock ceremony.
     lowered = output.lower()
     for forbidden in ("bind --mode write", "relaunch", "lock steal"):
-        assert forbidden not in lowered, f"yield message must not mention {forbidden!r}; out={output!r}"
+        assert forbidden not in lowered, (
+            f"yield message must not mention {forbidden!r}; out={output!r}"
+        )
     # It is informative: additive writes still allowed + auto-reclaim explained.
     assert "additive" in lowered
     assert "auto-reclaim" in lowered or "automatically" in lowered

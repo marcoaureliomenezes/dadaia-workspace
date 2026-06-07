@@ -77,9 +77,7 @@ def _seed_lock(workspace: Path, session_id: str, heartbeat: datetime) -> None:
 
 def test_lease_ttl_constant_is_120() -> None:
     """LEASE_TTL_SECONDS must be 120 (OQ-1 operator decision 2026-06-06)."""
-    assert LEASE_TTL_SECONDS == 120, (
-        f"LEASE_TTL_SECONDS must be 120; got {LEASE_TTL_SECONDS}"
-    )
+    assert LEASE_TTL_SECONDS == 120, f"LEASE_TTL_SECONDS must be 120; got {LEASE_TTL_SECONDS}"
 
 
 def test_no_inline_1800_in_lease_py() -> None:
@@ -133,9 +131,7 @@ def test_ptr_renews_on_matching_session(tmp_path: Path) -> None:
 
     status, rec = lease.acquire(ws, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE))
 
-    assert status == "RENEWED", (
-        f"Incumbent session recognised via .ptr must RENEW, got {status!r}"
-    )
+    assert status == "RENEWED", f"Incumbent session recognised via .ptr must RENEW, got {status!r}"
     assert rec["session_id"] == MY_SESSION, (
         f"Lock record session_id must be updated to '{MY_SESSION}'"
     )
@@ -211,9 +207,7 @@ def test_doctor_gc_removes_orphan_ptr(tmp_path: Path) -> None:
     doctor = _make_doctor(ws)
     actions = doctor.fix()
 
-    assert not ptr.exists(), (
-        f"Orphan .ptr file must be removed by doctor --fix. Actions: {actions}"
-    )
+    assert not ptr.exists(), f"Orphan .ptr file must be removed by doctor --fix. Actions: {actions}"
     assert any("PTR-GC" in a and f"{CTX}.ptr" in a for a in actions), (
         f"Expected PTR-GC action for {CTX}.ptr, got: {actions}"
     )
@@ -246,9 +240,7 @@ def test_doctor_gc_removes_ptr_with_stale_lock(tmp_path: Path) -> None:
     doctor = _make_doctor(ws)
     actions = doctor.fix()
 
-    assert not ptr.exists(), (
-        f"Stale-lock .ptr must be deleted by doctor --fix. Actions: {actions}"
-    )
+    assert not ptr.exists(), f"Stale-lock .ptr must be deleted by doctor --fix. Actions: {actions}"
     assert any("PTR-GC" in a and f"{CTX}.ptr" in a for a in actions), (
         f"Expected PTR-GC action for {CTX}.ptr, got: {actions}"
     )

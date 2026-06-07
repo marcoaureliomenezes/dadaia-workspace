@@ -117,7 +117,9 @@ def test_fail_safe_property(row: tuple, tmp_path: Path) -> None:  # type: ignore
         assert decision == Decision.BLOCK
         assert message, "yield-iff-live-foreign BLOCK must carry an actionable message"
         for forbidden in ("bind --mode write", "relaunch", "lock steal"):
-            assert forbidden not in message, f"forbidden-law: BLOCK message must not contain {forbidden!r}"
+            assert forbidden not in message, (
+                f"forbidden-law: BLOCK message must not contain {forbidden!r}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -179,5 +181,7 @@ def test_mutating_no_ptr_match_live_foreign_yields(tmp_path: Path) -> None:
         "No-.ptr-match + live-foreign lease must BLOCK with yield message (D1, FR-P1-15)"
     )
     assert message, "Yield block must carry an informative, actionable message"
-    assert "bind --mode write" not in message, "Yield message must never instruct to bind --mode write"
+    assert "bind --mode write" not in message, (
+        "Yield message must never instruct to bind --mode write"
+    )
     assert "relaunch" not in message, "Yield message must never instruct to relaunch"

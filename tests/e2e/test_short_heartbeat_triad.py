@@ -51,7 +51,9 @@ def _make_workspace(tmp_path: Path) -> Path:
     return ws
 
 
-def _seed_lock(ws: Path, session_id: str, heartbeat: datetime, ttl: int = LEASE_TTL_SECONDS) -> None:
+def _seed_lock(
+    ws: Path, session_id: str, heartbeat: datetime, ttl: int = LEASE_TTL_SECONDS
+) -> None:
     """Write a lock record directly (bypass CAS, for test setup only)."""
     path = lease._record_path(ws, CTX)
     path.write_text(
@@ -90,9 +92,7 @@ def test_relaunched_same_identity_renews(tmp_path: Path) -> None:
     ptr = lease._ptr_path(ws, CTX)
     ptr.write_text(MY_SESSION, encoding="utf-8")
 
-    status, rec = lease.acquire(
-        ws, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE)
-    )
+    status, rec = lease.acquire(ws, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE))
 
     assert status == "RENEWED", (
         f"Relaunched session with matching .ptr must RENEW; got {status!r}. "
@@ -114,7 +114,7 @@ def test_relaunched_same_identity_renews(tmp_path: Path) -> None:
     ("elapsed_seconds", "expected_status"),
     [
         (LEASE_TTL_SECONDS + 1, "ACQUIRED"),  # stale: elapsed > TTL → reclaim
-        (LEASE_TTL_SECONDS - 1, None),         # live: elapsed < TTL → block (LockHeldError)
+        (LEASE_TTL_SECONDS - 1, None),  # live: elapsed < TTL → block (LockHeldError)
     ],
     ids=["stale_reclaims", "live_blocks"],
 )
@@ -186,16 +186,12 @@ def test_live_foreign_yields_informatively(tmp_path: Path) -> None:
         msg = str(exc)
         raised = True
 
-    assert raised, (
-        "Live foreign lease must raise LockHeldError (yield-iff-live-foreign, AC-19c)"
-    )
+    assert raised, "Live foreign lease must raise LockHeldError (yield-iff-live-foreign, AC-19c)"
     assert msg, "Yield-iff-live-foreign block must produce a non-empty, actionable message"
     assert "bind --mode write" not in msg, (
         "AC-17: yield message must NOT contain 'bind --mode write'"
     )
-    assert "relaunch" not in msg, (
-        "AC-17: yield message must NOT contain 'relaunch'"
-    )
+    assert "relaunch" not in msg, "AC-17: yield message must NOT contain 'relaunch'"
     assert "lock steal" not in msg, (
         "AC-17 / operator forbidden-law: yield message must NOT mention 'lock steal' "
         "at all — reclaim-iff-stale auto-frees a dead holder after the heartbeat window, "

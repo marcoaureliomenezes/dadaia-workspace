@@ -49,8 +49,8 @@ def test_concurrent_cas_fails_exactly_one_record(
 
     with pytest.raises(LockHeldError) as exc_info:
         lease.acquire(tmp_path, ctx, "sessB", "v1", "IMPLEMENTATION")
-    assert "dadaia lock steal" in str(exc_info.value) or "actively mutating" in str(exc_info.value), (
-        "Yield message must be informative (mention lock steal or 'actively mutating')"
-    )
+    assert "dadaia lock steal" in str(exc_info.value) or "actively mutating" in str(
+        exc_info.value
+    ), "Yield message must be informative (mention lock steal or 'actively mutating')"
     assert lease.read_record(tmp_path, ctx)["session_id"] == "sessA"  # record unchanged
     assert not sentinel.exists()  # sentinel always cleaned up
