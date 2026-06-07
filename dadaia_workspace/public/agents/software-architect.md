@@ -255,7 +255,8 @@ Severity levels:
 
 ## Report Templates
 
-See [report templates](../../../docs/agent-knowledge/software-architect/templates/report-template.md).
+Reports are HTML files. The template and required sections live in `.dadaia/reports/AGENTS.md`
+(the same canonical reference noted at the top of this persona).
 
 
 ## Rules
