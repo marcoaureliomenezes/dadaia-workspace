@@ -1,8 +1,8 @@
 """Unit tests for dadaia_workspace.infrastructure.runtime_transforms.codex.
 
 Covers (ADR-2 golden tests):
-- project-manager body: Agent tool references are replaced with Codex tool-search wording.
-- project-auditor body: Agent tool references are replaced with Codex tool-search wording.
+- project-manager body: Agent tool references are replaced with Codex custom-agent wording.
+- project-auditor body: Agent tool references are replaced with Codex custom-agent wording.
 - software-architect body (no Agent tool): output is identical to input (verbatim).
 - All 12 canonical agents (9 core + 3 plugin stubs): output is non-empty after strip().
 - Determinism: same input always produces the same output.
@@ -91,7 +91,7 @@ def test_project_manager_agent_tool_replaced() -> None:
         "Expected '`Agent`' tool-table entry to be replaced in project-manager output"
     )
     assert "subagent dispatch" not in result
-    assert "`tool_search`" in result
+    assert "Codex custom-agent delegation" in result
 
 
 def test_project_auditor_agent_tool_replaced() -> None:
@@ -106,7 +106,27 @@ def test_project_auditor_agent_tool_replaced() -> None:
         "Expected '`Agent`' tool-table entry to be replaced in project-auditor output"
     )
     assert "subagent dispatch" not in result
-    assert "`tool_search`" in result
+    assert "Codex custom-agent delegation" in result
+
+
+def test_preserves_claude_code_skill_identifier() -> None:
+    """Harness skill names are not model identifiers and must survive intact."""
+    body = "Use `ai-harness-claude-code` when auditing Claude Code projections."
+
+    result = transform_for_codex(body, "ai-engineer")
+
+    assert "`ai-harness-claude-code`" in result
+    assert "ai-harness-gpt" not in result
+
+
+def test_maps_known_claude_model_identifiers_only() -> None:
+    body = "Model row: claude-sonnet-4-6. Skill row: ai-harness-claude-code."
+
+    result = transform_for_codex(body, "ai-engineer")
+
+    assert "gpt-5.3-codex" in result
+    assert "claude-sonnet-4-6" not in result
+    assert "ai-harness-claude-code" in result
 
 
 def test_generic_agent_preserved_verbatim() -> None:

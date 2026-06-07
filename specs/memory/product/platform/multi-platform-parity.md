@@ -2,10 +2,10 @@
 slug: multi-platform-parity
 title: multi-platform-parity
 category: product
-tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 17 skills / 2 workflows)."
+tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 17 skills / 2 workflows / Codex .rules)."
 summary: Codex uses native config, shared and Codex-specific skills, hook parity,
-  reference-only workflows, and Codex-native multi-agent wording. Public surface is
-  9 core agents, 17 skills, 2 workflows. Plugin stubs (frontend-engineer,
+  native Starlark .rules command policy, workflow docs that do not auto-execute,
+  and Codex custom-agent wording. Public surface is 9 core agents, 17 skills, 2 workflows. Plugin stubs (frontend-engineer,
   design-specialist, devops-engineer) project as thin stubs with no behavior until
   the plugin is installed.
 tags:
@@ -16,8 +16,8 @@ tags:
 - multi-platform
 agent_tier: self-pull
 token_estimate: 606
-last_updated: '2026-06-06'
-release_origin: v0.2.0
+last_updated: '2026-06-07'
+release_origin: v0.2.2
 ---
 
 ## Propósito
@@ -49,15 +49,21 @@ empty stubs — no behavior until the corresponding plugin is installed.
 Codex receives:
 
 - `AGENTS.md` as the automatically loaded workspace rule surface.
-- `.codex/config.toml` containing native `[agents.<name>]` blocks for all 9 core agents.
+- `.codex/config.toml` containing `[agents."<name>"] config_file = "agents/<name>.toml"`
+  entries for all projected agents.
+- `.codex/agents/*.toml` containing native custom-agent definitions, mapped Codex
+  models, `sandbox_mode`, `model_reasoning_effort`, and developer instructions.
 - `[skills] paths = [".agents/skills", ".codex/skills"]` so shared skills and
   Codex-only adapters are explicit.
+- `.codex/rules/dadaia-command-policy.rules` as the executable Starlark command-policy
+  rule. Markdown files under `public/rules/*.md` remain behavioral protocols and are not
+  projected as executable Codex Rules.
 - `.codex/hooks.json` with `PreToolUse`, `PostToolUse`, and `UserPromptSubmit`
   entries where the runtime supports them.
 - broad hook matchers; shell scripts decide whether a tool call is relevant.
-- workflows installed as reference docs, not as an executable workflow runtime.
-- dispatch wording based on Codex tool discovery (`tool_search`) and deferred
-  multi-agent tools when available, never a fake literal `subagent` tool.
+- workflows installed as reference docs; workflow Markdown does not auto-execute.
+- dispatch wording based on Codex custom agents, never fake tool names or stale
+  tool-discovery promises.
 
 Hook scripts prefer `.dadaia/.venv/bin/python` and fall back only when the
 workspace venv is absent.
@@ -75,7 +81,9 @@ same shell scripts used by the other runtimes.
 
 `dadaia public doctor` is the source of truth for projection state. It reports:
 - `.claude/agents/`: exactly 9 agent files; no orphan files from deleted personas.
-- `.codex/agents/`: 9 TOML agent files.
+- `.codex/agents/`: TOML agent files with no fake model-derived skill names.
+- `.codex/rules/`: native `.rules` command policy and no Markdown protocol masquerading
+  as executable rules.
 - `.claude/skills/`, `.agents/skills/`: 17 skill directories.
 - Codex workflows as reference-only, not missing runtime behavior.
 - OpenCode workflow limitations separately.

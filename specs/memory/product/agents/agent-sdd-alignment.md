@@ -13,8 +13,8 @@ tags:
 - release-lifecycle
 agent_tier: self-pull
 token_estimate: 695
-last_updated: '2026-06-06'
-release_origin: v0.2.0
+last_updated: '2026-06-07'
+release_origin: v0.2.2
 ---
 
 ## Propósito
@@ -51,9 +51,9 @@ structurally impossible.
 ## Dispatcher purity (constitution §9)
 
 Only `project-manager` (lifecycle coordination) and `project-auditor` (audit fan-out)
-may dispatch sub-agents via the Agent tool. All other personas are workers — they reply
-only to their dispatcher and never invoke another agent. Worker→worker dispatch is
-a structural impossibility.
+may dispatch sub-agents through the active harness's real delegation primitive. All other
+personas are workers — they reply only to their dispatcher and never invoke another agent.
+Worker→worker dispatch is a structural impossibility.
 
 ## Fluxo de uso
 

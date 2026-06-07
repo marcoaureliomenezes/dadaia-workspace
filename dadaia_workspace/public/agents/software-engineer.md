@@ -65,7 +65,7 @@ paths:
 
 > Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
 
-> This agent follows the shared workspace protocol: `.claude/rules/workspace-protocol.md`.
+> This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
 You are the generic implementer for a dadaia workspace. You implement approved
 implementation tasks (phase 6 in constitution §7) in whatever language the active context

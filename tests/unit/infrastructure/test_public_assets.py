@@ -1090,7 +1090,7 @@ class TestDcx4ClaudeStrings:
         (codex_dir / "test.toml").write_text('model = "claude-sonnet-4-6"\n', encoding="utf-8")
         manager = FileSystemPublicAssetManager()
         out = manager._dcx4_claude_strings(codex_dir)
-        assert any("[error]" in line and "claude-string" in line for line in out)
+        assert any("[error]" in line and "claude-model-or-path" in line for line in out)
 
     def test_no_report_when_no_claude_strings(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -1246,7 +1246,7 @@ class TestRuntimeExpectations:
         assert src is None
         assert transform is False  # "unsupported" branch
 
-    def test_codex_rules_only_executable_rules(self, tmp_path: Path) -> None:
+    def test_codex_rules_not_sourced_from_markdown_protocols(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         rules_dir = agentic_dir / "rules"
         rules_dir.mkdir()
@@ -1255,8 +1255,7 @@ class TestRuntimeExpectations:
         manager = self._make_manager()
         items = list(manager._runtime_expectations(agentic_dir, workspace_root))
         codex_rule_labels = [t[2] for t in items if t[2].startswith("codex:rules/")]
-        assert "codex:rules/exec.md" in codex_rule_labels
-        assert "codex:rules/prose.md" not in codex_rule_labels
+        assert codex_rule_labels == []
 
     def test_reports_agents_md_yielded(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -1763,7 +1762,7 @@ class TestConfigGenerators:
 
 
 class TestInstallCodexRules:
-    def test_only_executable_rules_copied(self, tmp_path: Path) -> None:
+    def test_native_command_policy_rules_generated(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         rules_dir = agentic_dir / "rules"
         rules_dir.mkdir()
@@ -1772,16 +1771,18 @@ class TestInstallCodexRules:
         installed: list[str] = []
         manager = FileSystemPublicAssetManager()
         manager._install_codex_rules(agentic_dir, workspace_root, force=True, installed=installed)
-        assert (workspace_root / ".codex" / "rules" / "exec.md").exists()
+        assert (workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
+        assert not (workspace_root / ".codex" / "rules" / "exec.md").exists()
         assert not (workspace_root / ".codex" / "rules" / "prose.md").exists()
-        assert any("[skip-behavioral]" in e for e in installed)
+        assert any("dadaia-command-policy.rules" in e for e in installed)
 
-    def test_no_rules_dir_returns_silently(self, tmp_path: Path) -> None:
+    def test_no_rules_dir_still_generates_policy(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         installed: list[str] = []
         manager = FileSystemPublicAssetManager()
         manager._install_codex_rules(agentic_dir, workspace_root, force=True, installed=installed)
-        assert installed == []
+        assert (workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
+        assert len(installed) == 1
 
 
 # ---------------------------------------------------------------------------

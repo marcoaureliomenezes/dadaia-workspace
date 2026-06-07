@@ -54,10 +54,10 @@ Cites constitution §1 matrix: **activity class MUTATING, lifecycle phase Closur
 phase 8). The deploy mutates `main`, the tag namespace, and the published package — a
 single MUTATING actor under the PM-held release lease (§8/§9).
 
-> **Honesty note.** This is a dispatch-reference document. Claude Code and Codex do NOT
-> auto-load `.claude/workflows/` files at runtime (constitution §4). This file is read by
-> an agent only when `project-manager` explicitly loads it as context. It does not execute
-> by itself and is not a Claude Code or Codex runtime primitive.
+> **Honesty note.** This is a dispatch-reference document. Claude Code and Codex workflow
+> Markdown does not auto-execute at runtime (constitution §4). This file is read by an
+> agent only when `project-manager` explicitly loads it as context. It is not a Claude Code
+> or Codex runtime primitive.
 
 ## When to use
 

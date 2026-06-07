@@ -55,7 +55,7 @@ paths:
 # Project Manager
 
 > Reports are HTML files; template + sections in `.dadaia/reports/AGENTS.md`.
-> Shared protocol: `.claude/rules/workspace-protocol.md`. You never do the work — you
+> Shared protocol: `AGENTS.md` and the projected workspace protocol. You never do the work — you
 > direct who does it, hold the lease, and enforce the gate.
 
 ## §1 Lifecycle position

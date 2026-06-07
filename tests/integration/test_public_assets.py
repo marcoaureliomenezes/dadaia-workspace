@@ -60,14 +60,11 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
-    # T-18 / ADR-1/D2: behavioral prose rules must NOT be projected to .codex/rules/.
-    # Only executable rules (those with YAML frontmatter) are projected.
+    # Codex receives Starlark .rules for command policy. Markdown behavioral
+    # protocols remain guidance, not executable Codex Rules.
     assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
-    # Executable rules with frontmatter ARE projected:
-    assert (workspace / ".codex" / "rules" / "dadaia-workspace-dev-guardrail.md").exists()
-    assert (workspace / ".codex" / "rules" / "plugin-scope.md").exists()
-    assert (workspace / ".codex" / "rules" / "workspace-protocol.md").exists()
+    assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
     assert (workspace / "opencode.json").exists()
 
 
@@ -373,7 +370,24 @@ def test_render_codex_agent_toml_emits_description() -> None:
     assert parsed["name"] == "ai-engineer"
     assert parsed["description"] == "AI entity authoring agent."
     assert parsed["model"] == "gpt-5.3-codex"
+    assert parsed["sandbox_mode"] == "workspace-write"
+    assert parsed["model_reasoning_effort"] == "high"
     assert parsed["developer_instructions"].strip() == "Follow the Codex persona."
+
+
+def test_render_codex_agent_toml_emits_read_only_boundary_for_reviewers() -> None:
+    result = _render_codex_agent_toml(
+        "qa-engineer",
+        "gpt-5.3-codex",
+        "Review without production edits.",
+    )
+
+    parsed = tomllib.loads(result)
+    assert parsed["sandbox_mode"] == "read-only"
+    assert parsed["model_reasoning_effort"] == "medium"
+    assert "provider" not in parsed
+    assert "api_key" not in parsed
+    assert "telemetry" not in parsed
 
 
 # ---------------------------------------------------------------------------
@@ -578,21 +592,19 @@ def test_install_codex_overwrites_legacy_workflow_file(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# T-18 — behavioral rules are NOT projected to .codex/rules/
+# Codex command policy is projected as native .rules
 # ---------------------------------------------------------------------------
 
 
-def test_install_codex_skips_behavioral_rules(tmp_path: Path) -> None:
-    """T-18 / ADR-1/D2 — behavioral prose rules (no frontmatter) are excluded from .codex/rules/."""
+def test_install_codex_generates_native_rules_only(tmp_path: Path) -> None:
+    """Markdown behavioral protocols are not projected as Codex Rules."""
     manager, workspace_root = _make_codex_install_manager(tmp_path)
 
     public_dir = manager._public_dir  # noqa: SLF001
     rules_src = public_dir / "rules"
-    # Behavioral rule (no frontmatter)
     (rules_src / "game-agents-coordination.md").write_text(
         "# game-agents-coordination\nProse rule\n", encoding="utf-8"
     )
-    # Executable rule (has frontmatter)
     (rules_src / "workspace-protocol.md").write_text(
         "---\nname: workspace-protocol\n---\n# body\n", encoding="utf-8"
     )
@@ -603,6 +615,5 @@ def test_install_codex_skips_behavioral_rules(tmp_path: Path) -> None:
     assert not (rules_dst / "game-agents-coordination.md").exists(), (
         "Behavioral rule should NOT be projected to .codex/rules/"
     )
-    assert (rules_dst / "workspace-protocol.md").exists(), (
-        "Executable rule (with frontmatter) SHOULD be projected to .codex/rules/"
-    )
+    assert not (rules_dst / "workspace-protocol.md").exists()
+    assert (rules_dst / "dadaia-command-policy.rules").exists()

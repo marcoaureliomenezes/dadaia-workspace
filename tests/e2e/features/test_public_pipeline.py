@@ -302,11 +302,10 @@ class TestInstallAll:
 
         assert (workspace / ".codex" / "hooks.json").exists(), ".codex/hooks.json not created"
         assert (workspace / ".codex" / "config.toml").exists(), ".codex/config.toml not created"
-        # Only rules with YAML frontmatter are projected to .codex/rules/ (behavioral
-        # prose rules are intentionally skipped — ADR-1/D2).
-        assert (workspace / ".codex" / "rules" / "workspace-protocol.md").exists(), (
-            ".codex/rules/workspace-protocol.md not installed"
+        assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists(), (
+            ".codex/rules/dadaia-command-policy.rules not installed"
         )
+        assert not (workspace / ".codex" / "rules" / "workspace-protocol.md").exists()
 
     def test_install_no_stale_agents_in_claude(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
