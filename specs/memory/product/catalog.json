@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T06:33:12Z",
+  "generated_at": "2026-06-07T07:32:47Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -508,7 +508,7 @@
       "title": "specs-doctor",
       "category": "product",
       "tldr": "Valida invariantes estruturais SDD de specs/: SPEC-DOC + TREE-1..7 + LINT-1 (atomicidade .md); --fix auto-repara TREE-3/4.",
-      "summary": "14 checks estruturais SDD pós memory-markdown-source-v1: 12 SPEC-DOC (memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional) + 7 TREE-1..7 (canonical tree v2 shape). STRUCT-1..4/SYNC-1/YAML-absent removidos; SPEC-DOC-008 byte-identity retirado; check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
+      "summary": "15 checks estruturais SDD pós v0.2.1: 12 SPEC-DOC (memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional) + 8 TREE-1..8 (canonical tree v2 shape; TREE-3 agora exige specs/memory/quality-assurance.md top-level; TREE-8 exige specs/memory/AGENTS.md; rglob fix: CAT-1 e SPEC-DOC-002 usam rglob para atoms nested). STRUCT-1..4/SYNC-1/YAML-absent removidos; SPEC-DOC-008 retirado; check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
