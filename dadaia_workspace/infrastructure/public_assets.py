@@ -22,10 +22,10 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 
 _SCHEMA_VERSION = "1"
-# T-41: CLAUDE.md is a 1-line stub that delegates to AGENTS.md.
-# Claude Code does not yet support `@AGENTS.md` include syntax natively, so we
-# use a comment-style redirect that is human-readable and forwards readers.
-_CLAUDE_MD_STUB = "# See AGENTS.md for workspace rules and agent personas.\n"
+# T-021-18: CLAUDE.md is the Claude Code bridge that imports @AGENTS.md — the single
+# source of workspace law. Claude Code reads CLAUDE.md natively and follows the @-import
+# to load AGENTS.md (see code.claude.com/docs/en/memory#agentsmd). One line is sufficient.
+_CLAUDE_MD_STUB = "@AGENTS.md\n"
 # OpenCode v1.14+ expects `tools` to be an object or omitted — not an array.
 # Strip it from agent frontmatter when deploying to the opencode projection.
 _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
