@@ -5,6 +5,9 @@ from __future__ import annotations
 import inspect
 import os
 import pathlib
+import stat
+import threading
+import unittest.mock
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -67,6 +70,71 @@ class TestEnsureToken:
         assert re.fullmatch(r"[A-Za-z0-9_\-]+", token), (
             f"Token contains non-urlsafe chars: {token!r}"
         )
+
+    def test_ensure_token_atomic_create_mode_0o600_no_widen_window(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Token file must be created with mode 0o600 atomically via O_EXCL.
+
+        This test verifies two invariants of the TOCTOU fix:
+        1. The file is created with O_EXCL (atomic) — no intermediate state
+           where the file exists with a wider mode before being restricted.
+        2. At the instant the file first appears on disk its mode is already
+           0o600 (never wider).
+
+        Strategy: intercept os.open to capture the flags and mode passed on
+        the first call, then assert O_CREAT|O_WRONLY|O_EXCL and mode 0o600
+        are used.  We do NOT call the real os.open (we call it via the spy)
+        so the file still gets created, but we record the arguments.
+        """
+        auth = _import_auth()
+        token_path = tmp_path / "state" / "panel.token"
+
+        recorded_calls: list[dict[str, object]] = []
+        _real_os_open = os.open
+
+        def _spy_open(path: str, flags: int, mode: int = 0o777, **kw: object) -> int:
+            recorded_calls.append({"path": path, "flags": flags, "mode": mode})
+            return _real_os_open(path, flags, mode, **kw)
+
+        with unittest.mock.patch("os.open", side_effect=_spy_open):
+            auth.ensure_token(token_path)
+
+        # At least one os.open call must have been made
+        assert recorded_calls, "ensure_token did not call os.open"
+
+        # The first call (file creation) must use O_EXCL | O_CREAT | O_WRONLY
+        creation_call = recorded_calls[0]
+        flags = int(creation_call["flags"])  # type: ignore[arg-type]
+        assert flags & os.O_CREAT, "O_CREAT flag must be set"
+        assert flags & os.O_WRONLY, "O_WRONLY flag must be set"
+        assert flags & os.O_EXCL, "O_EXCL flag must be set (prevents widen-then-narrow window)"
+
+        # Mode on creation must be 0o600
+        assert creation_call["mode"] == 0o600, (
+            f"Creation mode must be 0o600, got {oct(int(creation_call['mode']))}"  # type: ignore[arg-type]
+        )
+
+        # Resulting file on disk must also be 0o600
+        result_stat = os.stat(token_path)
+        assert result_stat.st_mode & 0o777 == 0o600, (
+            f"On-disk file mode must be 0o600, got {oct(result_stat.st_mode)}"
+        )
+
+    def test_ensure_token_already_exists_graceful(self, tmp_path: pathlib.Path) -> None:
+        """When the token file already exists, ensure_token returns its content gracefully.
+
+        This verifies the already-exists case does not raise EEXIST.
+        """
+        auth = _import_auth()
+        token_path = tmp_path / "panel.token"
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text("existing-token")
+        os.chmod(token_path, 0o600)
+
+        result = auth.ensure_token(token_path)
+
+        assert result == "existing-token"
 
 
 # ---------------------------------------------------------------------------
