@@ -1,3 +1,3 @@
-release: none
-segment: none
-phase: ARCHIVED
+release: v0.2.2
+segment: alpha-1
+phase: IMPLEMENTATION
