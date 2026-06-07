@@ -39,7 +39,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Unit test verifies resulting file has mode `0o600`; no window between
   create and restrict.
 
-[ ] T-016-P02
+[-] T-016-P02
 
 ### T-016-P03 — Canonical memory-URL builder + chip/iframe fix
 
