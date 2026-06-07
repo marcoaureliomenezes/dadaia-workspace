@@ -1,6 +1,6 @@
 # TASKS: v0.2.0 — milestone index (READ-ONLY)
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** v0.2.0
 
 > **This file is a read-only INDEX, not a task list.** (architect F-01: the umbrella must not duplicate

@@ -1,6 +1,6 @@
 # PLAN: v0.2.0 — Agentic Development Lifecycle
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** v0.2.0
 **Owner:** product-engineer
 **Created:** 2026-06-06
