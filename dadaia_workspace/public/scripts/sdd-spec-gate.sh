@@ -121,8 +121,30 @@ if [ "$CLASS" = "ADDITIVE" ]; then
             # owner-only exception to the gate's fail-open default; it does not touch
             # the lease/production path, so it cannot reintroduce the lease deadlock.
             PERSONA="${DADAIA_AGENT_PERSONA:-${CLAUDE_AGENT_PERSONA:-${CODEX_AGENT_PERSONA:-${OPENCODE_AGENT_PERSONA:-}}}}"
+            # T-017-15: persona session-pointer fallback. When no persona env var is
+            # exported (e.g. a runtime that dispatches agents without setting it), resolve
+            # the owning role the SAME way context already falls back to a session pointer
+            # (.dadaia/sessions/runtime/<ctx>.ptr). This is fail-CLOSED: it only ADDS a
+            # resolution source; if it yields nothing or a non-owner the blocks below still
+            # fire. It never silently allows. Sources, in order: a one-line .persona pointer,
+            # then the `persona` field of the session JSON the gate already reads for context.
+            if [ -z "$PERSONA" ] && [ -n "$SESSION_ID" ]; then
+                _PFILE="$WS/.dadaia/sessions/runtime/$SESSION_ID.persona"
+                [ -f "$_PFILE" ] && PERSONA=$(tr -cd 'a-zA-Z0-9_-' <"$_PFILE" 2>/dev/null)
+                if [ -z "$PERSONA" ]; then
+                    PERSONA=$("$PYTHON_BIN" - "$WS/.dadaia/sessions/$SESSION_ID.json" 2>/dev/null <<'PYEOF'
+import json, re, sys
+try:
+    p = json.load(open(sys.argv[1])).get("persona", "") or ""
+except Exception:
+    p = ""
+print(re.sub(r"[^A-Za-z0-9_-]", "", p))
+PYEOF
+)
+                fi
+            fi
             if [ -z "$PERSONA" ]; then
-                _block "[BACKLOG OWNERSHIP ERROR] writer persona unresolved — only project-manager may write specs/backlog/. Set DADAIA_AGENT_PERSONA=project-manager (the owning role) and retry (rule: backlog-ownership)."
+                _block "[BACKLOG OWNERSHIP ERROR] writer persona unresolved — only project-manager may write specs/backlog/. Set DADAIA_AGENT_PERSONA=project-manager (the owning role), or record it in the session pointer .dadaia/sessions/runtime/<session>.persona, and retry (rule: backlog-ownership)."
             elif [ "$PERSONA" != "project-manager" ]; then
                 _block "[BACKLOG OWNERSHIP ERROR] agent ${PERSONA} cannot write to specs/backlog/ — only project-manager creates or edits backlog entries (rule: backlog-ownership)."
             fi ;;

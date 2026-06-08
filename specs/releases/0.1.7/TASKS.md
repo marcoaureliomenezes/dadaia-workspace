@@ -207,9 +207,27 @@ dadaia_workspace/infrastructure/public_assets.py` returns ≤1 result.
 
 ---
 
-### [ ] T-017-11
+### [x] T-017-11 — DEFERRED TO 0.1.8 (explicit rc-gate decision)
 **Finding:** D-06 (W-8b)
 **Title:** `public_assets.py` module split (staged; finish or explicit rc-gate defer decision)
+
+**DEFER DECISION (2026-06-08, orchestrated rc-gate call):** Deferred to release 0.1.8.
+Reason: the concrete AR-04 *correctness* harm — triplicated guardrail-pair logic and
+duplicated consumer-repo discovery — was fully eliminated in **T-017-09** (3 funcs → 1
+`_install_guardrail_pair`; method delegates to single `_consumer_repos_for_root`).
+What remains (T-017-11) is a pure SRP/organization refactor (splitting the residual
+~2350-line module into `runtime_transforms/codex_assets.py` / `workspace_guardrail.py` /
+`privacy_check.py`). The software-architect classified this as a 2+ release, HIGH-blast-radius
+change; executing it immediately before the review/ship gate would risk a broken tree for
+no correctness gain. This is a **documented defer, not a silent drop** — it carries to 0.1.8
+with the concrete extraction plan already written below. No partial changes committed
+(public_assets.py stays in the consistent post-T-09 state).
+
+**0.1.8 plan (carry-over):** extract one cohesive submodule per commit, each maintaining
+re-exports in `infrastructure/__init__.py`, with `mypy --strict` + `pytest` + `dadaia public
+doctor` green after each: (1) `privacy_check.py` (lowest coupling), (2) `runtime_transforms/
+codex_assets.py`, (3) `workspace_guardrail.py`; residual `public_assets.py` < 600 lines.
+
 **Owner:** software-engineer
 **Write set:** `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/infrastructure/` (new sub-modules)
 **Precondition:** T-017-09 done
@@ -232,7 +250,7 @@ in this task's done note before marking `[x]`: "Deferred to 0.1.8: [reason]."
 
 ## Wave 4 — Gate Fix
 
-### [ ] T-017-15
+### [x] T-017-15
 **Finding:** NEW (gate bug — blocked PM backlog writes this session)
 **Title:** Fix backlog-ownership gate persona session-pointer fallback in `sdd-spec-gate.sh`
 **Owner:** software-engineer
