@@ -294,3 +294,110 @@ claim, not removal claim. `dadaia specs doctor` exits 0.
 gate tests live at `tests/unit/gate/` and `tests/integration/gate/`. Reference corrected.
 **Done criterion:** `grep 'test_gate_session_locks' specs/memory/quality-assurance.md`
 shows corrected paths. `dadaia specs doctor` exits 0.
+
+---
+
+## Wave 6 — rc-2 (iterate: clear ALL carry-over; no deferrals)
+
+Operator decision 2026-06-08 (rc-1 ship/iterate gate): **iterate**. Fix every
+remaining point from the re-audit `20260608T134914Z-ve4r8ifs` (NEW-01, NEW-02,
+T-017-11 un-deferred, audits-gitignored drift, NEW-03 CLOSURE memory) plus the
+operator-mandated **codex residual** fold-in, so 0.1.7 is deploy-ready with codex
+intact. Each task keeps `mypy --strict` + `pytest` + `dadaia public doctor` green.
+
+### [ ] T-017-16
+**Finding:** audits-gitignored-vs-committed drift (re-audit note; [[project_canonical_lifecycle_model]])
+**Title:** Track `specs/audits/**/*.md` (canonical: auditor MD is committed)
+**Owner:** software-engineer
+**Write set:** `.gitignore`
+**Work:** The `/specs/*` privacy backstop ignores `specs/audits/`. The canonical
+lifecycle model commits auditor markdown to `specs/audits/<ts>/`. Add opt-in
+carve-outs (mirroring the releases pattern) that track ONLY `*.md` under
+`specs/audits/*/` — keeping the privacy backstop for any non-markdown artifact.
+`git add` the existing audit + re-audit reports.
+**Done criterion:** `git check-ignore specs/audits/<id>/index.md` returns empty
+(tracked). `git ls-files specs/audits/` lists the audit + re-audit `.md` files.
+
+### [ ] T-017-17
+**Finding:** NEW-02
+**Title:** `AgentsProvider` protocol — panel/service.py off concrete `agents.reader`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/core/protocols/agents_provider.py` (new), `dadaia_workspace/core/models/` (AgentDTO move), `dadaia_workspace/features/panel/service.py`, `dadaia_workspace/features/agents/reader.py`, `dadaia_workspace/container.py`, tests
+**Precondition:** none
+**Work:** Introduce `AgentsProvider` Protocol in `core/protocols/` with the minimum
+surface PanelService uses (`list_canonical_agents`/`read_canonical_agents` + prompt
+read if shared). Move `AgentDTO` to `core/models/` (re-export from `agents.reader`
+for back-compat). PanelService imports the protocol + core DTO, not the concrete
+sibling feature. Wire the concrete impl in `container.py`.
+**Done criterion:** `grep 'from dadaia_workspace.features.agents.reader' dadaia_workspace/features/panel/service.py`
+returns empty. `mypy --strict` + `pytest` green.
+
+### [ ] T-017-18
+**Finding:** NEW-01
+**Title:** panel/views/api.py — remove residual `agents.reader` + telemetry imports
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/panel/views/api.py`, `dadaia_workspace/features/panel/service.py`, `dadaia_workspace/core/models/`, tests
+**Precondition:** T-017-17 done
+**Work:** Move `get_prompt` access behind `PanelService.get_agent_prompt(agent_id)`
+returning an `AgentPromptResult` DTO (body + source_path; raises core-typed errors).
+Expose telemetry `AgentSummary` to the view via a `core`-typed DTO (or via
+`PanelService`), removing the direct `telemetry.aggregator.models` import from the
+view. View imports only `PanelService` + core DTOs.
+**Done criterion:** `grep -E 'from dadaia_workspace.features.(agents|telemetry)' dadaia_workspace/features/panel/views/api.py`
+returns empty. `mypy --strict` + `pytest` green; panel integration tests pass.
+
+### [ ] T-017-11 (RE-OPENED for rc-2 — execute the split)
+**Finding:** D-06 (W-8b)
+**Title:** `public_assets.py` module split to < 600 lines
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/infrastructure/` (new sub-modules), `dadaia_workspace/infrastructure/runtime_transforms/`, tests
+**Precondition:** Wave 6 panel tasks green
+**Work:** Extract cohesive units into submodules with behavior-preserving re-exports,
+`mypy --strict` + `pytest` + `dadaia public doctor` green after each commit:
+1. `infrastructure/privacy_check.py` — privacy denylist + scan helpers.
+2. `infrastructure/runtime_transforms/codex_assets.py` — codex/opencode frontmatter
+   parsing + TOML/rules rendering free functions.
+3. `infrastructure/workspace_guardrail.py` — consumer-repo discovery + guardrail-pair
+   install/doctor.
+4. Extract the codex-drift doctor family (`_dcx*`) and/or install family as needed
+   to bring residual `public_assets.py` < 600 lines.
+**Done criterion:** `wc -l dadaia_workspace/infrastructure/public_assets.py` < 600.
+`dadaia public doctor` exits 0. `mypy --strict` + `pytest` green.
+
+### [ ] T-017-19
+**Finding:** NEW-03 (re-audit) + CLOSURE-memory carry-over
+**Title:** Record `core/lock_liveness.py` (`is_stale_session`) in architecture memory
+**Owner:** product-engineer
+**Write set:** `specs/memory/architecture.md`
+**Precondition:** CLOSURE phase (applied at rc-2 close)
+**Work:** Add the `lock_liveness` module entry documenting `is_stale_session` as the
+single source of truth for session-staleness (consumed by kanban + spec_context).
+**Done criterion:** `grep 'lock_liveness' specs/memory/architecture.md` non-empty.
+`dadaia specs doctor` exits 0.
+
+### [ ] T-017-20
+**Finding:** `codex-workflow-dispatch-not-deterministically-enforced` (High, open) + FEAT-CODEX-COMPAT-100 residual
+**Title:** Codex residual — dispatcher-preflight injection + route tests + truthful docs + status reconcile
+**Owner:** software-engineer (projector/tests); product-engineer (memory/status)
+**Write set:** `dadaia_workspace/public/scripts/ctx-inject.sh`, `tests/` (codex route/contract tests), `specs/memory/**` (codex orchestration truth), `specs/bugs/codex-workflow-dispatch-not-deterministically-enforced.md`, `specs/bugs/codex-agent-orchestration-mismatch.md` (already closed — leave), `specs/backlog/full-codex-compatibility.md`, `specs/backlog/codex-context-hook-and-workflow-enforcement-hotfix.md`
+**Precondition:** none
+**Work:** Codex bulk (custom agents, hooks, Starlark rules, D-CX-1..10 doctor, golden
+tests) was delivered in 0.1.6 and is verified green on this branch. rc-2 closes the
+residual to the maximum DETERMINISTIC extent:
+1. `ctx-inject.sh`: inject a dispatcher-preflight directive into the bound-context
+   block — resolve active context + owning role for the requested artifact class, and
+   when multi-agent / AI-surface work is requested, discover the subagent tool
+   (`tool_search`) BEFORE proceeding. Harness-neutral wording (applies to Codex +
+   Claude). Must stay valid JSON and not fail when no context is bound.
+2. Add a contract/route test asserting the injected context carries the
+   dispatcher-preflight + that a non-PM `specs/backlog/**` write is gate-blocked under
+   the codex hook path.
+3. Document the INHERENT limitation truthfully (acceptance #6 of the backlog): Codex
+   does not auto-spawn subagents from static workflow files; explicit dispatcher/
+   operator fan-out is required. Record in codex orchestration memory.
+4. Reconcile stale statuses: close the open bug with evidence; mark
+   FEAT-CODEX-COMPAT-100 + the hotfix backlog as delivered (0.1.6 bulk + 0.1.7
+   residual), file retained.
+**Done criterion:** new codex route/contract test passes; `ctx-inject.sh` re-projected
+(`dadaia public stage && dadaia public install --target all`); `dadaia public doctor`
+exit 0; bug status flipped to Closed with evidence; `pytest` green.

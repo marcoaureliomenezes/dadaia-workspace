@@ -1,3 +1,3 @@
 release: 0.1.7
-segment: alpha-1
+segment: rc-2
 phase: IMPLEMENTATION
