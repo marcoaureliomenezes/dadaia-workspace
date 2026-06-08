@@ -58,10 +58,12 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
+from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
+from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
 
 def _states_dir(workspace_root: Path) -> Path:
@@ -180,12 +182,15 @@ def build_panel_service(
     telemetry: object | None = None,
     academy: object | None = None,
 ) -> PanelService:
+    states = _states_dir(workspace_root)
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
         telemetry=telemetry,
         academy=academy,
+        workflow_launcher=SubprocessWorkflowLauncher(),
+        workflow_state_store=JsonWorkflowStateStore(states),
     )
 
 

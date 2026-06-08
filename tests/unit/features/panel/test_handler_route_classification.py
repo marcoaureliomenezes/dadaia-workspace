@@ -17,20 +17,15 @@ Invariants tested:
 
 from __future__ import annotations
 
-import re
-
-import pytest
-
 from dadaia_workspace.features.panel.handler import (
-    AuthClass,
     _BEARER_ONLY_ROUTE_NAMES,
     _COMPILED_DELETE_ROUTE_TABLE,
     _DELETE_ROUTE_TABLE,
     _ROUTE_TABLE,
     _SECOND_LOOP_AUTH_ROUTE_NAMES,
     _TELEMETRY_ROUTE_NAMES,
+    AuthClass,
 )
-
 
 # ---------------------------------------------------------------------------
 # 1. Every route has an explicit AuthClass
@@ -69,7 +64,9 @@ def test_no_duplicate_route_names() -> None:
 
 def test_delete_important_resolves_to_mark_important_not_delete() -> None:
     """DELETE /api/reports/ctx/agent/report.html/important → api_report_mark_important."""
-    test_path = "/api/reports/dadaia-workspace/software-engineer/2026-01-01T000000Z-task.html/important"
+    test_path = (
+        "/api/reports/dadaia-workspace/software-engineer/2026-01-01T000000Z-task.html/important"
+    )
     matched_name: str | None = None
     for pattern, name in _COMPILED_DELETE_ROUTE_TABLE:
         if pattern.match(test_path):
@@ -124,7 +121,7 @@ def test_delete_route_table_important_before_catchall() -> None:
 def test_bearer_only_set_matches_route_table() -> None:
     """_BEARER_ONLY_ROUTE_NAMES must exactly equal routes with AuthClass.BEARER."""
     expected = frozenset(name for _, name, auth in _ROUTE_TABLE if auth == AuthClass.BEARER)
-    assert _BEARER_ONLY_ROUTE_NAMES == expected, (
+    assert expected == _BEARER_ONLY_ROUTE_NAMES, (
         f"_BEARER_ONLY_ROUTE_NAMES {_BEARER_ONLY_ROUTE_NAMES!r} does not match "
         f"BEARER routes in _ROUTE_TABLE {expected!r}."
     )
@@ -135,7 +132,7 @@ def test_second_loop_set_matches_route_table() -> None:
     expected = frozenset(
         name for _, name, auth in _ROUTE_TABLE if auth == AuthClass.BEARER_SECOND_LOOP
     )
-    assert _SECOND_LOOP_AUTH_ROUTE_NAMES == expected, (
+    assert expected == _SECOND_LOOP_AUTH_ROUTE_NAMES, (
         f"_SECOND_LOOP_AUTH_ROUTE_NAMES {_SECOND_LOOP_AUTH_ROUTE_NAMES!r} does not match "
         f"BEARER_SECOND_LOOP routes in _ROUTE_TABLE {expected!r}."
     )
@@ -146,7 +143,7 @@ def test_telemetry_set_matches_route_table() -> None:
     expected = frozenset(
         name for _, name, auth in _ROUTE_TABLE if auth == AuthClass.BEARER_TELEMETRY
     )
-    assert _TELEMETRY_ROUTE_NAMES == expected, (
+    assert expected == _TELEMETRY_ROUTE_NAMES, (
         f"_TELEMETRY_ROUTE_NAMES {_TELEMETRY_ROUTE_NAMES!r} does not match "
         f"BEARER_TELEMETRY routes in _ROUTE_TABLE {expected!r}."
     )
