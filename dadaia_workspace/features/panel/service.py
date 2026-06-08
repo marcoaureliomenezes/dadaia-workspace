@@ -2,7 +2,7 @@
 
 Responsibilities
 ----------------
-- Fan out to ServerRegistryService and SpecContextService (injected via DI).
+- Fan out to ServerRegistryProvider and ContextProjectProvider (injected via DI).
 - Group server registry entries by project against active contexts using
   best-effort case-insensitive matching (D1.A from architect report).
 - Expose alive Spec Context Projects as PanelContext dataclasses, including the
@@ -41,11 +41,12 @@ from typing import Any
 
 from dadaia_workspace.core.models.server_registry import PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO
+from dadaia_workspace.core.protocols.context_project_provider import ContextProjectProvider
+from dadaia_workspace.core.protocols.server_registry_provider import ServerRegistryProvider
 from dadaia_workspace.core.protocols.workflow_launcher import WorkflowLauncher
+from dadaia_workspace.core.protocols.workflow_provider import WorkflowProvider
 from dadaia_workspace.features.agents.reader import AgentDTO, read_canonical_agents
-from dadaia_workspace.features.server_registry.service import ServerRegistryService
-from dadaia_workspace.features.spec_context.service import SpecContextService
-from dadaia_workspace.features.workflows.service import WorkflowsService, WorkflowSummaryDTO
 
 
 @dataclass
@@ -97,9 +98,9 @@ class PanelService:
     Parameters
     ----------
     registry:
-        A ServerRegistryService instance (injected).
+        A ServerRegistryProvider instance (injected).
     spec_context:
-        A SpecContextService instance (injected).
+        A ContextProjectProvider instance (injected).
     workspace_root:
         Absolute path to the workspace root directory.  Used to construct
         repo_path in PanelContext without reaching into SpecContextService
@@ -114,23 +115,23 @@ class PanelService:
 
     def __init__(
         self,
-        registry: ServerRegistryService,
-        spec_context: SpecContextService,
+        registry: ServerRegistryProvider,
+        spec_context: ContextProjectProvider,
         workspace_root: Path,
         telemetry: Any = None,
         academy: Any = None,
         workflow_launcher: WorkflowLauncher | None = None,
         workflow_state_store: Any = None,
-        workflows_service: WorkflowsService | None = None,
+        workflows_service: WorkflowProvider | None = None,
     ) -> None:
         """Initialise PanelService.
 
         Parameters
         ----------
         registry:
-            A ServerRegistryService instance (injected).
+            A ServerRegistryProvider instance (injected).
         spec_context:
-            A SpecContextService instance (injected).
+            A ContextProjectProvider instance (injected).
         workspace_root:
             Absolute path to the workspace root directory.
         telemetry:
@@ -150,7 +151,7 @@ class PanelService:
             State store for persisted PID tracking.
             When None, an in-memory dict is used (state lost on restart).
         workflows_service:
-            WorkflowsService instance (injected via DI, T-017-06).
+            WorkflowProvider instance (injected via DI, T-017-06/07).
             When None, a WorkflowsService is constructed lazily from
             workspace_root on first use (backward-compatible for callers
             that do not pass this parameter).
@@ -162,7 +163,7 @@ class PanelService:
         self.academy = academy
         # workflows_service is injected; fallback to lazy construction preserves
         # backward compatibility (T-017-06: no self-construction in __init__).
-        self._workflows_service: WorkflowsService | None = workflows_service
+        self._workflows_service: WorkflowProvider | None = workflows_service
         self._workflow_launcher = workflow_launcher
         self._workflow_state_store = workflow_state_store
         # In-memory fallback when no persistent state store is injected.
@@ -318,15 +319,20 @@ class PanelService:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _workflows_svc(self) -> WorkflowsService:
-        """Return the injected WorkflowsService, constructing lazily if not injected.
+    def _workflows_svc(self) -> WorkflowProvider:
+        """Return the injected WorkflowProvider.
 
-        T-017-06: WorkflowsService is injected through the constructor.  The lazy
-        fallback preserves backward compatibility for callers that do not pass the
-        parameter; the composition root (container.py) always injects it explicitly.
+        T-017-06: WorkflowsService is injected through the constructor.
+        T-017-07: the concrete class is no longer imported here; the composition root
+        (container.py) always injects a concrete WorkflowsService.  Callers that do not
+        inject a WorkflowProvider receive a clear error rather than a hidden construction.
         """
         if self._workflows_service is None:
-            self._workflows_service = WorkflowsService(self._workspace_root)
+            raise RuntimeError(
+                "PanelService requires a WorkflowProvider to be injected via "
+                "'workflows_service'. The composition root (container.py) always "
+                "provides one; pass a fake for tests."
+            )
         return self._workflows_service
 
     def _launcher(self) -> WorkflowLauncher:

@@ -3,6 +3,22 @@
 from dataclasses import dataclass, field
 
 
+@dataclass
+class WorkflowSummaryDTO:
+    """Card-level summary of a workflow definition (no stages[], no diagram_svg)."""
+
+    name: str
+    display_name: str
+    description: str
+    version: str
+    schema_version: str
+    stage_count: int
+    agent_ids: list[str]
+    has_parallel: bool
+    has_gates: bool
+    source_path: str
+
+
 @dataclass(frozen=True)
 class WorkflowInput:
     name: str
