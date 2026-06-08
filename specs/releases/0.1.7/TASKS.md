@@ -168,7 +168,7 @@ dadaia_workspace/features/panel/service.py` returns empty.
 
 ---
 
-### [-] T-017-08
+### [x] T-017-08
 **Finding:** AR-03
 **Title:** Panel views — move `ReportRetentionService` into `PanelService`; inject `ADAPTER_REGISTRY`
 **Owner:** software-engineer

@@ -41,10 +41,14 @@ def _write_agent(agents_dir: Path, agent_id: str, body: str = "You are a test ag
 
 
 class _FakeService:
-    """Minimal fake of PanelService exposing _workspace_root."""
+    """Minimal fake of PanelService exposing the public ``workspace_root``."""
 
     def __init__(self, workspace_root: Path) -> None:
         self._workspace_root = workspace_root
+
+    @property
+    def workspace_root(self) -> Path:
+        return self._workspace_root
 
 
 # ---------------------------------------------------------------------------

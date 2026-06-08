@@ -32,6 +32,7 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     SessionListResult,
     SessionRow,
 )
+from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -54,6 +55,7 @@ def _make_service(telemetry_stub: Any = None) -> PanelService:
         spec_context=_FakeSpecContextService(),  # type: ignore[arg-type]
         workspace_root=Path("/workspace"),
         telemetry=telemetry_stub,
+        adapter_registry=dict(ADAPTER_REGISTRY),
     )
     return svc
 

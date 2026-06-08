@@ -34,6 +34,7 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_servers,
     unmark_report_important,
 )
+from dadaia_workspace.features.reports_retention.service import ReportRetentionService
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -107,6 +108,7 @@ def _build_service(
         registry=FakeServerRegistryService(entries or []),  # type: ignore[arg-type]
         spec_context=FakeSpecContextService(contexts or []),  # type: ignore[arg-type]
         workspace_root=workspace_root,
+        report_retention=ReportRetentionService(workspace_root),
     )
 
 

@@ -111,6 +111,14 @@ class PanelService:
     workflow_state_store:
         Optional state store for persisting running-workflow PIDs.
         When None, state is kept in-memory only (survives current process only).
+    report_retention:
+        Optional ReportRetentionService instance (injected, T-017-08).
+        When None, a RuntimeError is raised on first use.  The container always
+        injects one; pass a fake for tests.
+    adapter_registry:
+        Optional mapping of runtime name -> RuntimeAdapter (injected, T-017-08).
+        When None defaults to an empty dict (no enrichment).  The container
+        always injects ADAPTER_REGISTRY; pass a fake mapping for tests.
     """
 
     def __init__(
@@ -123,6 +131,8 @@ class PanelService:
         workflow_launcher: WorkflowLauncher | None = None,
         workflow_state_store: Any = None,
         workflows_service: WorkflowProvider | None = None,
+        report_retention: Any = None,
+        adapter_registry: dict[str, Any] | None = None,
     ) -> None:
         """Initialise PanelService.
 
@@ -155,6 +165,12 @@ class PanelService:
             When None, a WorkflowsService is constructed lazily from
             workspace_root on first use (backward-compatible for callers
             that do not pass this parameter).
+        report_retention:
+            ReportRetentionService instance (injected, T-017-08).
+            When None, calling get_report_retention() raises RuntimeError.
+        adapter_registry:
+            Mapping of runtime name to RuntimeAdapter (injected, T-017-08).
+            When None, get_session_adapter() always returns None (no enrichment).
         """
         self._registry = registry
         self._spec_context = spec_context
@@ -168,10 +184,18 @@ class PanelService:
         self._workflow_state_store = workflow_state_store
         # In-memory fallback when no persistent state store is injected.
         self._running_workflows: dict[str, int] = {}
+        # AR-03: injected dependencies for report retention and adapter registry.
+        self._report_retention = report_retention
+        self._adapter_registry: dict[str, Any] = adapter_registry if adapter_registry is not None else {}
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    @property
+    def workspace_root(self) -> Path:
+        """Return the workspace root path (public accessor, T-017-08)."""
+        return self._workspace_root
 
     def list_servers_grouped(self) -> list[ServerGroup]:
         """Return all server registry entries grouped by matching context.
@@ -276,6 +300,33 @@ class PanelService:
         if override is not None:
             return list(override)
         return read_canonical_agents(self._workspace_root)
+
+    def get_report_retention(self) -> Any:
+        """Return the injected ReportRetentionService.
+
+        AR-03: views must not construct ReportRetentionService per-request.
+        The container always injects one; tests pass a fake.
+
+        Raises
+        ------
+        RuntimeError
+            When no ReportRetentionService was injected.
+        """
+        if self._report_retention is None:
+            raise RuntimeError(
+                "PanelService requires a ReportRetentionService to be injected via "
+                "'report_retention'. The composition root (container.py) always "
+                "provides one; pass a fake for tests."
+            )
+        return self._report_retention
+
+    def get_session_adapter(self, runtime: str) -> Any:
+        """Return the RuntimeAdapter for *runtime*, or None if not found.
+
+        AR-03: views must not import ADAPTER_REGISTRY directly.
+        The container injects the registry; tests pass a fake mapping.
+        """
+        return self._adapter_registry.get(runtime)
 
     def run_workflow(self, workflow_name: str) -> dict[str, object]:
         """Spawn ``dadaia orchestrate <workflow_name>`` in the background.

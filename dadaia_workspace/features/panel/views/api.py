@@ -96,9 +96,7 @@ from dadaia_workspace.features.agents.reader import (
     get_prompt,
 )
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.reports_retention import ReportRetentionService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary
-from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -391,7 +389,7 @@ def render_api_agent_prompt(
 
     def _view(agent_id: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
         try:
-            body, source_path = get_prompt(agent_id, service._workspace_root)
+            body, source_path = get_prompt(agent_id, service.workspace_root)
         except InvalidAgentIdError as exc:
             logger.warning("render_api_agent_prompt: invalid agent_id=%r: %s", agent_id, exc)
             error_body = json.dumps(
@@ -413,7 +411,7 @@ def render_api_agent_prompt(
 
         # Build a relative source_path hint for the response.
         try:
-            relative_hint = str(source_path.relative_to(service._workspace_root))
+            relative_hint = str(source_path.relative_to(service.workspace_root))
         except ValueError:
             relative_hint = str(source_path)
 
@@ -681,7 +679,7 @@ def render_api_sessions(
             return (503, "application/json; charset=utf-8", body)
 
         # Apply runtime adapter enrichment per row.
-        adapter = ADAPTER_REGISTRY.get(runtime)
+        adapter = service.get_session_adapter(runtime)
         enriched_sessions = []
         for row in result.sessions:
             if adapter is not None:
@@ -774,7 +772,7 @@ def render_api_session_detail(
             return (404, "application/json; charset=utf-8", body)
 
         # Apply runtime adapter enrichment.
-        adapter = ADAPTER_REGISTRY.get(runtime)
+        adapter = service.get_session_adapter(runtime)
         if adapter is not None:
             detail = adapter.enrich_detail(detail)
 
@@ -890,14 +888,14 @@ def render_api_reports(
 
     def _iter_handoffs(reports_root: Path) -> list[Path]:
         handoffs: list[Path] = []
-        for root in (service._workspace_root / ".dadaia" / "handoff", reports_root):
+        for root in (service.workspace_root / ".dadaia" / "handoff", reports_root):
             if root.exists():
                 handoffs.extend(root.rglob("*.handoff.json"))
         return handoffs
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
-        reports_root = (service._workspace_root / ".dadaia" / "reports").resolve()
-        retention = ReportRetentionService(service._workspace_root)
+        reports_root = (service.workspace_root / ".dadaia" / "reports").resolve()
+        retention = service.get_report_retention()
         try:
             retention.cleanup()
         except Exception as exc:  # noqa: BLE001
@@ -979,7 +977,7 @@ def mark_report_important(
     """Mark a report important from the Reports panel."""
 
     def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
-        retention = ReportRetentionService(service._workspace_root)
+        retention = service.get_report_retention()
         try:
             artifact = retention.mark_important(path)
         except ValueError as exc:
@@ -997,7 +995,7 @@ def unmark_report_important(
     """Remove important protection from a report from the Reports panel."""
 
     def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
-        retention = ReportRetentionService(service._workspace_root)
+        retention = service.get_report_retention()
         try:
             artifact = retention.unmark_important(path)
         except ValueError as exc:
@@ -1030,8 +1028,8 @@ def serve_report_file(
     """
 
     def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
-        reports_root = (service._workspace_root / ".dadaia" / "reports").resolve()
-        requested = (service._workspace_root / ".dadaia" / "reports" / path).resolve()
+        reports_root = (service.workspace_root / ".dadaia" / "reports").resolve()
+        requested = (service.workspace_root / ".dadaia" / "reports" / path).resolve()
         # Path-traversal guard (OWASP A01)
         try:
             requested.relative_to(reports_root)
@@ -1060,8 +1058,8 @@ def delete_report_file(
     """
 
     def _view(*, path: str, **_kwargs: object) -> tuple[int, str, bytes]:
-        reports_root = (service._workspace_root / ".dadaia" / "reports").resolve()
-        target = (service._workspace_root / ".dadaia" / "reports" / path).resolve()
+        reports_root = (service.workspace_root / ".dadaia" / "reports").resolve()
+        target = (service.workspace_root / ".dadaia" / "reports" / path).resolve()
         try:
             target.relative_to(reports_root)
         except ValueError:
@@ -1069,10 +1067,10 @@ def delete_report_file(
         if not target.exists():
             return (404, "application/json; charset=utf-8", b'{"error": "not found"}')
         target.unlink()
-        target_ref = target.relative_to(service._workspace_root).as_posix()
+        target_ref = target.relative_to(service.workspace_root).as_posix()
         for handoff_root in (
-            service._workspace_root / ".dadaia" / "handoff",
-            service._workspace_root / ".dadaia" / "reports",
+            service.workspace_root / ".dadaia" / "handoff",
+            service.workspace_root / ".dadaia" / "reports",
         ):
             if not handoff_root.exists():
                 continue

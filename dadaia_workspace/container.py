@@ -64,6 +64,7 @@ from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWork
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
+from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
 
@@ -198,6 +199,8 @@ def build_panel_service(
         workflow_launcher=SubprocessWorkflowLauncher(),
         workflow_state_store=JsonWorkflowStateStore(states),
         workflows_service=build_workflow_catalog_service(workspace_root),
+        report_retention=ReportRetentionService(workspace_root),
+        adapter_registry=dict(ADAPTER_REGISTRY),
     )
 
 
