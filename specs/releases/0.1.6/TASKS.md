@@ -142,7 +142,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Single consolidated tab; three separate tabs gone; Sessions tab
   unchanged; e2e test passes.
 
-[ ] T-016-P09
+[-] T-016-P09
 
 ---
 
