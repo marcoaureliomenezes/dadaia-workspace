@@ -108,7 +108,7 @@ dadaia_workspace/cli/commands/context.py` returns empty. `pytest` exits 0.
 Read `repos/dadaia-workspace/specs/audits/20260608T035551Z-da1a1b2c/architect-review.md`
 AR-01..AR-03 before starting any task in this wave.
 
-### [-] T-017-10
+### [x] T-017-10
 **Finding:** AR-08
 **Title:** Extract session-staleness predicate to `core/lock_liveness.py`
 **Owner:** software-engineer

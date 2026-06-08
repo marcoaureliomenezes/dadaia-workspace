@@ -20,7 +20,8 @@ modes now share the single ``impl_review`` column, so the mutual-exclusion visua
 no longer applies.
 
 Staleness is computed at read time from ``last_seen_at`` and ``ttl_seconds``
-(mirrors ``dadaia_workspace.features.spec_context.locking._session_is_stale``).
+using ``dadaia_workspace.core.lock_liveness.is_stale_session`` (single source
+of truth — v0.1.7 T-017-10).
 
 Security (OWASP A03, A06):
 - JSON files are parsed defensively; malformed/missing-field files are skipped.
@@ -36,6 +37,8 @@ import json
 import logging
 from collections.abc import Callable
 from pathlib import Path
+
+from dadaia_workspace.core.lock_liveness import is_stale_session
 
 logger = logging.getLogger(__name__)
 
@@ -59,26 +62,6 @@ _FALLBACK_COLUMN = "backlog"
 _REQUIRED_FIELDS: frozenset[str] = frozenset({"session_id", "mode", "context"})
 
 _DEFAULT_TTL_SECONDS = 300
-
-
-# ---------------------------------------------------------------------------
-# Staleness helper (mirrors locking._session_is_stale)
-# ---------------------------------------------------------------------------
-
-
-def _is_stale(last_seen_at: str, ttl_seconds: int) -> bool:
-    """Return True if the session's last_seen_at is beyond its TTL.
-
-    Handles ``Z`` suffix, missing value (→ not stale), and bad values (→ not stale).
-    """
-    if not last_seen_at:
-        return False
-    try:
-        last_seen_dt = datetime.datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
-        elapsed = (datetime.datetime.now(tz=datetime.UTC) - last_seen_dt).total_seconds()
-        return elapsed > ttl_seconds
-    except Exception:  # noqa: BLE001
-        return False
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +124,7 @@ def render_api_kanban(
             with contextlib.suppress(TypeError, ValueError):
                 ttl_seconds = int(data.get("ttl_seconds", _DEFAULT_TTL_SECONDS))
 
-            stale = _is_stale(last_seen_at, ttl_seconds)
+            stale = is_stale_session(last_seen_at, ttl_seconds)
             column = _MODE_TO_COLUMN.get(mode, _FALLBACK_COLUMN)
 
             card: dict[str, object] = {
