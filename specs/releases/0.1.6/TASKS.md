@@ -240,7 +240,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   `--workspace /tmp/freshws` from inside an existing workspace writes only to `/tmp/freshws`.
 - **Done criterion:** Unit test passes; no silent ancestor-workspace mutation.
 
-[ ] T-016-Z01
+[-] T-016-Z01
 
 ### T-016-Z02 — ROOT doctor invariants (ROOT-1..ROOT-4)
 
@@ -738,6 +738,35 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   exits 0; no dangling refs; roster count test passes.
 
 [ ] T-016-A07
+
+### T-016-A08 — software-architect anti-slop specialization
+
+- **Owner:** ai-engineer (persona + skill are lib-originated assets)
+- **Write set:** `dadaia_workspace/public/agents/software-architect.md` (persona),
+  `dadaia_workspace/public/skills/` (new or updated Core Workflow skill),
+  `dadaia_workspace/public/` (stage/manifest)
+- **Precondition:** T-016-A07 (roster settled) — may run independently if the
+  `software-architect` persona already exists at the start of this task.
+- **Work:** Rewrite the `software-architect` system-prompt into an anti-slop /
+  anti-spaghetti architecture specialist per backlog
+  `software-architect-anti-slop-specialization`: reviews all code/tests for slop;
+  never allows spaghetti; identifies bad practices (features built on rotted
+  foundations; AI "code-on-code" producing fragile layers); enforces strong
+  layers/encapsulation/block-by-block maintainable architecture; keeps projects
+  human-workable (assumes AI may be unavailable); OOP designs clean enough to derive
+  a UML; philosophy = simplicity-first, firm review positions, documents
+  layers/foundations/core/interfaces/test-architecture. Create or update a skill
+  giving the architect a **Core Workflow**: (1) Understand the Problem (core problem,
+  constraints, success criteria, assumptions; clarifying questions); (2) Research
+  Existing Solutions (WebSearch tools/patterns/pitfalls/comparisons; evaluate
+  maturity/fit/integration/cost/risk). Both persona and skill must be slop-free:
+  clear, organized, non-verbose, direct. Then run
+  `dadaia public stage && install --target all && doctor`.
+- **Done criterion:** `software-architect` persona reflects the anti-slop mandate
+  (clear/non-verbose); the Core Workflow skill exists and is scoped appropriately;
+  `dadaia public doctor` exits 0; no dangling refs.
+
+[ ] T-016-A08
 
 ---
 
