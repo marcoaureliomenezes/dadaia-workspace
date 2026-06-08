@@ -110,6 +110,28 @@ def test_ctx_inject_no_preflight_without_context(workspace: Path) -> None:
     assert "dispatcher preflight" not in result.stdout
 
 
+def test_ctx_inject_no_preflight_when_specs_dir_absent(workspace: Path) -> None:
+    """Context bound but its specs/ dir is absent → no preflight (and no context header).
+
+    Guards the `else` branch of the specs-dir check: the preflight is only written
+    when SPECS_DIR exists, so a context with no specs tree must emit neither.
+    """
+    scripts = _install_scripts(workspace)
+    # DADAIA_CONTEXT is set but repos/<ctx>/specs is intentionally NOT created.
+    env = {**os.environ, "DADAIA_CONTEXT": "ghost-ctx", "WORKSPACE_ROOT": str(workspace)}
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    assert "dispatcher preflight" not in result.stdout
+    assert "[ghost-ctx]" not in result.stdout
+
+
 def test_ctx_inject_preflight_in_valid_codex_json(workspace: Path) -> None:
     """T-017-20: under codex-json output the preflight rides inside a valid
     JSON envelope's additionalContext (Codex SessionStart contract)."""
