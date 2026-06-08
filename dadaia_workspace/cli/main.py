@@ -8,6 +8,7 @@ import typer
 from dadaia_workspace.cli.commands import (
     academy,
     ci,
+    clean,
     context,
     doctor,
     init,
@@ -41,6 +42,7 @@ app = typer.Typer(
 app.command(name="init")(init.init)
 app.command(name="export")(export)
 app.command(name="import")(import_workspace)
+app.add_typer(clean.app, name="clean")
 
 # Sub-command groups
 app.add_typer(context.app, name="context")
