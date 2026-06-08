@@ -782,7 +782,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   (clear/non-verbose); the Core Workflow skill exists and is scoped appropriately;
   `dadaia public doctor` exits 0; no dangling refs.
 
-[ ] T-016-A08
+[x] T-016-A08
 
 ---
 
