@@ -183,13 +183,15 @@ def test_index_renders_panel_sections(section_id: str, visible_text: str) -> Non
 def test_index_tablist_contract() -> None:
     """The nav must expose the current tab order and active default tab.
 
-    After T-016-P09: Agents, Workflows, and Kanban are merged into one "Ops" tab.
+    After T-016-P09: Agents, Workflows, and Kanban are merged into one "Agentic" tab.
+    After T-016-P10: "Spec Context Projects" tab is renamed to "Projects",
+                      "Ops" tab is renamed to "Agentic".
     There are 6 tabs instead of 8.
     """
     html = _render(_build_service())
     expected = [
-        ("tab-memories", "Spec Context Projects"),
-        ("tab-ops", "Ops"),
+        ("tab-memories", "Projects"),
+        ("tab-ops", "Agentic"),
         ("tab-sessions", "Sessions"),
         ("tab-reports", "Reports"),
         ("tab-academy", "Academy"),
@@ -210,7 +212,7 @@ def test_index_tablist_contract() -> None:
     servers_button = _button_fragment(html, "tab-servers")
     assert "active" in memories_button
     assert 'aria-selected="true"' in memories_button
-    assert 'aria-label="Spec Context Projects"' in memories_button
+    assert 'aria-label="Projects"' in memories_button
     assert 'aria-selected="false"' in servers_button
 
     # Old individual tabs must not exist

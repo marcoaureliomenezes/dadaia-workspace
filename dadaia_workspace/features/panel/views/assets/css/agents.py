@@ -22,8 +22,8 @@ AGENTS_CSS: str = """
 /* ── Agents grid ──────────────────────────────────────────────────── */
 .card-grid.agents-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.5rem;
   align-items: start;
 }
 @media (max-width: 767px) {
@@ -37,14 +37,14 @@ AGENTS_CSS: str = """
   display: block;
   width: 100%;
   text-align: left;
-  border: 2px solid var(--color-border-card, #dddddd);
-  border-left: 4px solid transparent;
-  border-radius: var(--radius-card, 6px);
-  padding: 1rem 1rem 0.875rem;
+  border: 1px solid var(--color-border-card, #dddddd);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-card, 4px);
+  padding: 0.45rem 0.55rem 0.4rem;
   background: var(--color-surface, #ffffff);
   cursor: pointer;
   font-family: var(--font-stack, -apple-system, sans-serif);
-  font-size: 1rem;
+  font-size: 0.82rem;
   color: var(--color-text, #222222);
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
@@ -63,13 +63,13 @@ AGENTS_CSS: str = """
   box-shadow: 0 0 0 4px var(--color-accent, #9cddc8);
 }
 
-/* Active agent: 4px left-border accent (matches tier accent weight).
+/* Active agent: 3px left-border accent (matches tier accent weight).
    Active accent is visible before JS populates data-tier (loading/skeleton phase).
    When both agent-card--active and data-tier are present, the tier selectors below
    win by CSS source order (they come after this rule), so the tier colour is always
    the authoritative left-stripe signal once tier data is available. */
 .agent-card.agent-card--active {
-  border-left: 4px solid var(--color-accent, #9cddc8);
+  border-left: 3px solid var(--color-accent, #9cddc8);
 }
 
 /* ── Tier-aware left-border accent (PR4-18) ─────────────────────────────────
@@ -78,13 +78,13 @@ AGENTS_CSS: str = """
    This means an active T1 card shows the red tier accent, not the mint accent.
    The active class is still visible via the status badge and overall border tint. */
 .agent-card[data-tier="1"] {
-  border-left: 4px solid var(--color-tier-1);
+  border-left: 3px solid var(--color-tier-1);
 }
 .agent-card[data-tier="2"] {
-  border-left: 4px solid var(--color-tier-2);
+  border-left: 3px solid var(--color-tier-2);
 }
 .agent-card[data-tier="3"] {
-  border-left: 4px solid var(--color-tier-3);
+  border-left: 3px solid var(--color-tier-3);
 }
 
 /* ── Tier label (PR4-18) ─────────────────────────────────────────────────────
@@ -93,26 +93,26 @@ AGENTS_CSS: str = """
    Displayed as a subtitle line below .agent-card__name in the card header row. */
 .agent-card__tier-label {
   display: block;
-  font-size: 0.75rem;     /* 12px — minimum renderable size; matches revised spec */
+  font-size: 0.65rem;     /* ~10.4px — below 12px but still legible at card size; WCAG 1.4.1 colour+text redundancy maintained */
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: var(--color-muted, #666666); /* #666666 on #fff = 5.74:1 — WCAG AA (4.5:1 min) */
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 /* ── Card header ──────────────────────────────────────────────────── */
 .agent-card__header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.3rem;
+  margin-bottom: 0.3rem;
 }
 
 /* ── Agent name ──────────────────────────────────────────────────── */
 .agent-card__name {
   flex: 1;
-  font-size: 1rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--color-cost, #633d2e);
   white-space: nowrap;
@@ -124,12 +124,12 @@ AGENTS_CSS: str = """
 .agent-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15em 0.55em;
-  border-radius: 3px;
-  font-size: 0.72rem;
+  gap: 0.2rem;
+  padding: 0.1em 0.35em;
+  border-radius: 2px;
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   white-space: nowrap;
   flex-shrink: 0;
@@ -154,36 +154,36 @@ AGENTS_CSS: str = """
 
 /* ── Description (2-line clamp) ──────────────────────────────────── */
 .agent-card__description {
-  font-size: 0.88rem;
+  font-size: 0.72rem;
   color: var(--color-muted, #666666);
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.35rem;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  line-height: 1.5;
+  line-height: 1.35;
 }
 
 /* ── Stat row (3 columns) ─────────────────────────────────────────── */
 .agent-card__stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 0.2rem;
+  margin-bottom: 0.3rem;
 }
 .agent-stat {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.05rem;
 }
 .agent-stat__label {
-  font-size: 0.72rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
   color: var(--color-muted, #666666);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 .agent-stat__value {
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--color-text, #222222);
 }
@@ -192,19 +192,19 @@ AGENTS_CSS: str = """
 .agent-card__skills {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 0.25rem;
+  gap: 0.2rem;
+  margin-bottom: 0.1rem;
 }
 .skill-chip {
   display: inline-block;
-  padding: 0.2em 0.55em;
-  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  border-radius: 2px;
   background: var(--color-accent-secondary, #bfd8ad);
   color: var(--color-chip-text, #3a3a3a); /* WCAG AA ≥5.0:1 on all accent-secondary chip backgrounds */
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-family: var(--font-mono, ui-monospace, monospace);
   white-space: nowrap;
-  max-width: 180px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
