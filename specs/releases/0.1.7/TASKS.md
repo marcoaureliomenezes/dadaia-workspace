@@ -124,7 +124,7 @@ shows import. `pytest` exits 0.
 
 ---
 
-### [ ] T-017-06
+### [-] T-017-06
 **Finding:** AR-02
 **Title:** Panel DI — inject `WorkflowsService`; fix `container.py` private-attr read
 **Owner:** software-engineer
