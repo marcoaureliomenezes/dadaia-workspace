@@ -37,9 +37,7 @@ class _FakeWorkflowsService:
 
 
 class _FakeServerRegistryService:
-    def list_entries(
-        self, project: str | None = None, include_stale: bool = True
-    ) -> list[object]:
+    def list_entries(self, project: str | None = None, include_stale: bool = True) -> list[object]:
         return []
 
 

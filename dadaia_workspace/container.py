@@ -45,6 +45,7 @@ from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.features.workflows.service import WorkflowsService
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
@@ -64,7 +65,6 @@ from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWork
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
-from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
 

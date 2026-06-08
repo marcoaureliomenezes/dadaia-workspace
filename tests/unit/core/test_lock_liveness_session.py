@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import datetime
 
-import pytest
-
 from dadaia_workspace.core.lock_liveness import is_stale_session
 
 
@@ -16,7 +14,7 @@ def _iso(dt: datetime.datetime) -> str:
     return dt.isoformat().replace("+00:00", "Z")
 
 
-_UTC = datetime.timezone.utc
+_UTC = datetime.UTC
 
 
 def test_stale_session_when_elapsed_exceeds_ttl() -> None:

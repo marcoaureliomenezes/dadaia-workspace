@@ -186,7 +186,9 @@ class PanelService:
         self._running_workflows: dict[str, int] = {}
         # AR-03: injected dependencies for report retention and adapter registry.
         self._report_retention = report_retention
-        self._adapter_registry: dict[str, Any] = adapter_registry if adapter_registry is not None else {}
+        self._adapter_registry: dict[str, Any] = (
+            adapter_registry if adapter_registry is not None else {}
+        )
 
     # ------------------------------------------------------------------
     # Public API

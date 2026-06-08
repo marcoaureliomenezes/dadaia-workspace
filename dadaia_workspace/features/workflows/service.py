@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO as WorkflowSummaryDTO  # re-export
+from dadaia_workspace.core.models.workflow import (
+    WorkflowSummaryDTO as WorkflowSummaryDTO,  # re-export
+)
 from dadaia_workspace.features.workflows.dag import render_dag_svg
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 

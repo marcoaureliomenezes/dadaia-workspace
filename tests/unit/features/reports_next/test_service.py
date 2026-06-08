@@ -182,4 +182,4 @@ def test_canonical_agents_exact_set() -> None:
             "software-engineer",
         }
     )
-    assert CANONICAL_AGENTS == expected
+    assert expected == CANONICAL_AGENTS
