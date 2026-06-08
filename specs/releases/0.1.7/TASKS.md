@@ -11,7 +11,7 @@ and may run in parallel (Wave 1). All other waves are sequential per PLAN.md.
 
 ## Wave 1 — Trivial / Safe (parallel-safe; disjoint write sets)
 
-### [-] T-017-01
+### [x] T-017-01
 **Finding:** D-01 / AR-05
 **Title:** Fix stale `CANONICAL_AGENTS` in `reports_next/service.py`
 **Owner:** software-engineer
@@ -27,7 +27,7 @@ shows exactly 12 names. `pytest tests/unit/features/reports_next/` exits 0.
 
 ---
 
-### [-] T-017-02
+### [x] T-017-02
 **Finding:** D-02 / AR-06
 **Title:** Replace `_WORKSPACE_ROOT` static derivation with `resolve_workspace_root()`
 **Owner:** software-engineer
@@ -43,7 +43,7 @@ and its contents. Add a one-line comment explaining the fix.
 
 ---
 
-### [-] T-017-03
+### [x] T-017-03
 **Finding:** D-04 / AR-07
 **Title:** Delete dead HTML-era classes in `specs/doctor.py`
 **Owner:** software-engineer
@@ -57,7 +57,7 @@ returns empty. `pytest tests/unit/features/specs/` exits 0.
 
 ---
 
-### [-] T-017-04
+### [x] T-017-04
 **Finding:** D-10
 **Title:** Remove 4 hidden deprecated `context` stubs
 **Owner:** software-engineer
@@ -72,7 +72,7 @@ dadaia_workspace/cli/commands/context.py` returns empty. `pytest` exits 0.
 
 ---
 
-### [-] T-017-05
+### [x] T-017-05
 **Finding:** D-08 / D-09
 **Title:** Test slop cleanup — duplicate contrast tests, dead dashboard test, misplaced test
 **Owner:** software-engineer
@@ -92,7 +92,7 @@ dadaia_workspace/cli/commands/context.py` returns empty. `pytest` exits 0.
 
 ---
 
-### [-] T-017-14
+### [x] T-017-14
 **Finding:** W-5
 **Title:** Bump `pyproject.toml` version 0.1.5 → 0.1.7
 **Owner:** software-engineer

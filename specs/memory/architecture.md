@@ -265,7 +265,9 @@ Locais canônicos de estado em disco e seu propósito:
   * `specs/memory/product/catalog.json` — gerado por `generate-memory-catalog.py` a partir do frontmatter dos `.md`; committed; índice machine-readable.
   * `specs/_archive/releases/<id>/` — releases concluídas com CLOSURE.
 
-**Removido em v0.1.6:** os stores `.dadaia/sessions/<sess_*>.json`, `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (Lock 4 / semaphore), e `.dadaia/logs/semaphore-reclaims.jsonl`. O modelo 4-store foi substituído pelo single-record JSON TTL-lease. `semaphore.py` foi deletado. RULE E do gate foi removido. O antigo marcador global de contexto foi eliminado na migração v1→v2.
+**Removido em v0.1.6:** os stores `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (Lock 4 / semaphore), e `.dadaia/logs/semaphore-reclaims.jsonl`. O modelo 4-store foi substituído pelo single-record JSON TTL-lease. `semaphore.py` foi deletado. RULE E do gate foi removido. O antigo marcador global de contexto foi eliminado na migração v1→v2.
+
+**Retido em v0.1.6:** `.dadaia/sessions/<sess_*>.json` — session binding files gravados por `cli/commands/context.py:bind` (linha 334-335) e lidos por `panel/views/kanban.py` para exibir o estado de sessões ativas na aba Kanban. Estes arquivos não são o mecanismo de locking (Lock-3 foi removido); servem exclusivamente para display de sessão (Kanban view e context bind/release). O mecanismo de locking é agora exclusivamente o TTL-lease em `.dadaia/states/ctx_locks/<ctx>.lock.json`.
 
 ## Memory injection subsystem
 

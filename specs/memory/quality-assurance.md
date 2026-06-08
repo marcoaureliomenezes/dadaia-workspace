@@ -105,5 +105,5 @@ Files the test suite reads or writes at runtime:
   `tests/unit/features/public/` hold contracts for the public asset pipeline.
 - [[agent-comms]] — `tests/contract/test_handoff_schema_contract.py` protects the
   handoff-v1.1 JSON schema contract.
-- [[sdd-gate-v3]] — `tests/integration/test_gate_session_locks.py` holds
-  integration tests for the SDD enforcement gate.
+- [[sdd-gate-v3]] — `tests/unit/gate/` and `tests/integration/gate/` hold
+  the unit and integration tests for the SDD enforcement gate.

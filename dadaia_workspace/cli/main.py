@@ -30,6 +30,8 @@ from dadaia_workspace.cli.commands.newartifacts import (
     bug_app,
     release_app,
 )
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.infrastructure.bug_reporter import report_exception as _report_exc
 
 app = typer.Typer(
@@ -63,20 +65,25 @@ app.add_typer(release_app, name="release")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(bug_app, name="bug")
 
-# Workspace root resolved from the editable install location:
-# cli/main.py → cli/ → dadaia_workspace/ → repos/dadaia-workspace/ → workspace root
-_WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-
 
 def _safe_app() -> None:
-    """Entry point that captures unexpected exceptions and persists them before re-raising."""
+    """Entry point that captures unexpected exceptions and persists them before re-raising.
+
+    Bug reports are written to the real workspace .dadaia/bugs/ — resolved dynamically
+    via resolve_workspace_root() so they never land inside a sub-repo (T-017-02).
+    Falls back to /tmp on WorkspaceNotInitializedError.
+    """
     try:
         app()
     except (SystemExit, KeyboardInterrupt):
         raise
     except Exception as exc:
         command = " ".join(sys.argv)
-        _report_exc(_WORKSPACE_ROOT, command, exc)
+        try:
+            workspace_root = resolve_workspace_root()
+        except WorkspaceNotInitializedError:
+            workspace_root = Path("/tmp/dadaia-bugs")
+        _report_exc(workspace_root, command, exc)
         raise  # re-raise so Typer still exits with error
 
 

@@ -420,46 +420,4 @@ def delete(name: str = typer.Argument(..., help="Context name to delete")) -> No
         raise typer.Exit(1) from None
 
 
-# ---------------------------------------------------------------------------
-# Deprecated verbs — exit non-zero with pointer to new verbs (AC-T10d-7)
-# ---------------------------------------------------------------------------
-
-
-@app.command(hidden=True)
-def activate(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'activate' was removed in v2."""
-    print(
-        "Error: 'activate' was removed in v2. Use: dadaia context alive <name>",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
-
-
-@app.command(hidden=True)
-def deactivate(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'deactivate' was removed in v2."""
-    print(
-        "Error: 'deactivate' was removed in v2. Use: dadaia context dead <name>",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
-
-
-@app.command(hidden=True)
-def promote(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'promote' was removed in v2."""
-    print(
-        "Error: 'promote' was removed in v2. Use: dadaia context bind <name> --mode spec",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
-
-
-@app.command(hidden=True)
-def use(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'use' was removed in v2."""
-    print(
-        "Error: 'use' was removed in v2. Use: dadaia context bind <name> --mode read",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
+# v2 removals: activate/deactivate/promote/use removed in v0.1.7
