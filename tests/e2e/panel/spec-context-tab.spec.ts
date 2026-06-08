@@ -61,9 +61,9 @@ test('E2E-SCP-02 — Internal DOM IDs section-memories and tab-memories are pres
   const tabExists = await page.$('#tab-memories');
   expect(tabExists).not.toBeNull();
 
-  // Visible label is "Spec Context Projects", not "Memories"
+  // Visible label is "Projects"
   const tabLabel = await page.$eval('#tab-memories', (el) => el.textContent?.trim() ?? '');
-  expect(tabLabel).toBe('Spec Context Projects');
+  expect(tabLabel).toBe('Projects');
 });
 
 // ---------------------------------------------------------------------------

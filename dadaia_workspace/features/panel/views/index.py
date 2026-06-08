@@ -107,8 +107,8 @@ def render_index(
     </div>
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
-    <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Spec Context Projects">Spec Context Projects</button>
-    <button class="nav-tab" data-section="ops" aria-selected="false" role="tab" id="tab-ops">Ops</button>
+    <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
+    <button class="nav-tab" data-section="ops" aria-selected="false" role="tab" id="tab-ops" aria-label="Agentic">Agentic</button>
     <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
@@ -144,7 +144,7 @@ def render_index(
 
     <section id="section-ops" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-ops">
       <div class="section-header">
-        <h2>Ops</h2>
+        <h2>Agentic</h2>
         <p>Agents, Workflows and Kanban &mdash; stacked below.</p>
       </div>
 

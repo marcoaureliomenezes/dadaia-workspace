@@ -160,7 +160,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Nav shows "Projects" and "Agentic"; `data-section` ids are unchanged;
   full panel e2e suite green with E2E-GUARD-01/02 active.
 
-[-] T-016-P10
+[x] T-016-P10
 
 ### T-016-P11 — Reorder Agentic tab sections (Kanban top, then Workflows, then Agents)
 

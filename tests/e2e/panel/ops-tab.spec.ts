@@ -19,7 +19,7 @@ import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
 // ---------------------------------------------------------------------------
 // OPS-01 — Ops tab present; individual Agents/Workflows/Kanban tabs absent
 // ---------------------------------------------------------------------------
-test('OPS-01 — Ops tab present; individual Agents/Workflows/Kanban tabs are absent', async ({ page }) => {
+test('OPS-01 — Agentic tab present; individual Agents/Workflows/Kanban tabs are absent', async ({ page }) => {
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
@@ -27,7 +27,7 @@ test('OPS-01 — Ops tab present; individual Agents/Workflows/Kanban tabs are ab
     els.map((el) => el.textContent?.trim() ?? '')
   );
 
-  expect(tabTexts).toContain('Ops');
+  expect(tabTexts).toContain('Agentic');
   expect(tabTexts).not.toContain('Agents');
   expect(tabTexts).not.toContain('Workflows');
   expect(tabTexts).not.toContain('Kanban');

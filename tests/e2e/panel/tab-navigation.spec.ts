@@ -26,8 +26,8 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
   );
 
   expect(tabs).toEqual([
-    'Spec Context Projects',
-    'Ops',
+    'Projects',
+    'Agentic',
     'Sessions',
     'Reports',
     'Academy',
@@ -43,7 +43,7 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
 // ---------------------------------------------------------------------------
 // E2E-TAB-02 — Default active tab
 // ---------------------------------------------------------------------------
-test('E2E-TAB-02 — Default active tab is Spec Context Projects', async ({ page }) => {
+test('E2E-TAB-02 — Default active tab is Projects', async ({ page }) => {
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
