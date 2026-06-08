@@ -638,7 +638,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   edit per persona; how merged `software-engineer` subsumes three prior implementers.
 - **Done criterion:** Strategy document reviewed and approved by PM before T-016-A03 starts.
 
-[ ] T-016-A01
+[x] T-016-A01
 
 ### T-016-A02 — `dadaia public install` prune + doctor orphan detection
 
@@ -654,7 +654,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Orphan detection regression test passes; doctor exit non-zero on
   orphan; prune removes orphan.
 
-[ ] T-016-A02
+[x] T-016-A02
 
 ### T-016-A03 — Agent skill surface slop — strip dangling refs
 
@@ -670,7 +670,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** No generic persona references a skill absent from `public/skills/`;
   `dadaia public doctor` exits 0.
 
-[ ] T-016-A03
+[x] T-016-A03
 
 ### T-016-A04 — Update agent-skill-surface-slop bug adopted field
 
@@ -680,7 +680,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Work:** Update `adopted:` frontmatter from `v0.2.0` to `0.1.6`.
 - **Done criterion:** Frontmatter updated.
 
-[ ] T-016-A04
+[x] T-016-A04
 
 ### T-016-A05 — Constitution/persona single-source drift fix (P1a–P1d, P2a–P2c)
 
@@ -700,7 +700,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Single-source lint clean; `dadaia specs doctor` exit 0; `dadaia public
   doctor` exit 0.
 
-[ ] T-016-A05
+[x] T-016-A05
 
 ### T-016-A06 — Update constitution-persona-single-source-drift bug adopted field
 
@@ -710,7 +710,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Work:** Update `adopted:` frontmatter from `v0.2.0` to `0.1.6`.
 - **Done criterion:** Frontmatter updated.
 
-[ ] T-016-A06
+[x] T-016-A06
 
 ### T-016-A07 — Roster reduction 15 → 9
 
@@ -737,7 +737,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Exactly 9 core personas in `public/agents/`; `dadaia public doctor`
   exits 0; no dangling refs; roster count test passes.
 
-[ ] T-016-A07
+[x] T-016-A07
 
 ### T-016-A08 — software-architect anti-slop specialization
 
