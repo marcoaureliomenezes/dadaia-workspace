@@ -364,7 +364,7 @@ returns empty. `mypy --strict` + `pytest` green; panel integration tests pass.
 **Done criterion:** `wc -l dadaia_workspace/infrastructure/public_assets.py` < 600.
 `dadaia public doctor` exits 0. `mypy --strict` + `pytest` green.
 
-### [ ] T-017-19
+### [x] T-017-19
 **Finding:** NEW-03 (re-audit) + CLOSURE-memory carry-over
 **Title:** Record `core/lock_liveness.py` (`is_stale_session`) in architecture memory
 **Owner:** product-engineer

@@ -134,6 +134,8 @@ Lógica de acquire (FR-P1-15):
 
 **fcntl Lock-1/Lock-2 retidos** em `locking.py` — serializam curtas git ops no mesmo processo (workspace-level e per-context). Não são usados para mutex de release.
 
+**Staleness predicate — `core/lock_liveness.py`:** `is_stale_session(last_seen_at, ttl_seconds)` é a única fonte de verdade para decidir se uma sessão/lease está stale (TTL excedido a partir do último heartbeat). Consumido pelo reclaim-iff-stale do lease, pelo painel Kanban (`features/panel/views/kanban.py`) e por `features/spec_context/locking.py` — antes da extração (v0.1.7 / T-017-10) cada um tinha sua própria cópia do predicado `_is_stale`.
+
 ## Os 3 canais de reporte/comunicação (constitution §11)
 
 dadaia-workspace tem exatamente três canais, cada um com um único destino canônico:
