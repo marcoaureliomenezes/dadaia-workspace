@@ -143,7 +143,7 @@ returns empty. `grep '_workflows_service' dadaia_workspace/container.py` returns
 
 ---
 
-### [ ] T-017-07
+### [-] T-017-07
 **Finding:** D-03 / AR-01
 **Title:** Panel protocols — declare 3 `core/protocols/` interfaces; update `panel/service.py` imports
 **Owner:** software-engineer
