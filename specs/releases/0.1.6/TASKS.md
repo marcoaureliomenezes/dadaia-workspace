@@ -267,7 +267,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `dadaia clean --dry-run` lists stale files; `dadaia clean` removes
   them; no operator file ever deleted; unit tests pass.
 
-[ ] T-016-Z03
+[-] T-016-Z03
 
 ### T-016-Z04 — Fix malformed duplicate UserPromptSubmit hook write
 
