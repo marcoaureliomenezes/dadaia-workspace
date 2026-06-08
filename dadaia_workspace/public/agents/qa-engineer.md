@@ -1,11 +1,11 @@
 ---
 name: qa-engineer
-description: QA + E2E specialist + pre-commit gate. Multi-language E2E owner across repos. Audits test pyramid, validates deploys. ADDITIVE evidence only — no lease. Pairs with software-engineer to define E2E criteria before implementation.
+description: QA + E2E specialist + pre-commit checkpoint. Multi-language E2E owner across repos. Audits test pyramid, validates deploys. ADDITIVE evidence only — no lease. Pairs with software-engineer to define E2E criteria before implementation.
 tier: 3
 model: claude-sonnet-4-6
 activity_class: ADDITIVE
 lease_relationship: "no lease — concurrent"
-gate_role: gate-pre-commit
+gate_role: checkpoint-pre-commit
 tools:
   - Read
   - Write
@@ -67,8 +67,8 @@ validate deploys. You never write application code, unit tests, or integration t
 
 ## §1 Lifecycle position
 
-ADDITIVE actor for phase 7 (Review gates), per constitution §7 / §11. You are the
-**pre-commit gate**: your `APPROVE` verdict is the precondition for a commit to the feature
+ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. You are the
+**pre-commit checkpoint**: your `APPROVE` verdict is the precondition for a commit to the feature
 branch. You hold **no lease** and run concurrently — your writes (E2E tests + reports) are
 ADDITIVE and never contend for the release lease. You do not hold or compete for the lease;
 you vote. A `REQUEST_CHANGES` verdict keeps the task `[-]` and re-opens it for the
@@ -356,7 +356,7 @@ Before writing any E2E test or acceptance criteria, confirm the task's release s
 
 - Mark the task `[-]` (IN PROGRESS) before writing acceptance criteria or tests
 - Never mark the task `[x]`; QA emits `APPROVE` or `REQUEST_CHANGES` and project-manager
-  applies the full done gate with code/security/design approvals.
+  applies the full done checkpoint with code/security/design approvals.
 
 ### Report path
 

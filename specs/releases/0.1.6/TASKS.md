@@ -567,7 +567,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Unit tests: CAS prevents double-acquire; injectable clock makes
   staleness deterministic; `O_EXCL` test passes.
 
-[ ] T-016-L01
+[x] T-016-L01
 
 ### T-016-L02 — Delete Lock-3 + retire semaphore.py + gate shrink (atomic)
 
@@ -585,7 +585,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Gate reads only the new TTL-lease record; Lock-3 and semaphore.py
   deleted; migration is one commit; regression tests green; MUST-NOT-SHIP red line satisfied.
 
-[ ] T-016-L02
+[x] T-016-L02
 
 ### T-016-L03 — Doctor GC + lock steal CLI verb
 
@@ -599,7 +599,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** GC deletes stale locks; doctor exit 0 on clean workspace; `lock steal`
   command works.
 
-[ ] T-016-L03
+[x] T-016-L03
 
 ### T-016-L04 — Review-gate honest relabel (FORK-1: option b)
 
@@ -618,7 +618,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   constitution §11 and all reviewer/PM personas; `dadaia specs doctor` exits 0 with no
   single-source contradiction; `dadaia public doctor` exits 0; no new hook introduced.
 
-[ ] T-016-L04
+[x] T-016-L04
 
 ---
 
