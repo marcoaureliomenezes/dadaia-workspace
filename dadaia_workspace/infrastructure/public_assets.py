@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import hashlib
 import json
 import os
@@ -715,23 +716,26 @@ def _is_source_repo_root(path: Path) -> bool:
     return poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace"
 
 
-def _install_workspace_guardrail_pair(
+def _install_guardrail_pair(
     source: Path,
     workspace_root: Path,
     force: bool,
     installed: list[str] | None = None,
+    targets: set[Literal["workspace", "repos"]] | None = None,
 ) -> None:
-    """Fan ``source`` (``data/AGENTS.md``) out to workspace root + all consumer repos.
+    """Write the AGENTS.md + CLAUDE.md guardrail pair to the requested targets.
 
-    Projection targets per call (Option C, ADR):
-    1. ``workspace_root / "AGENTS.md"``
-    2. ``workspace_root / "CLAUDE.md"``
-    3. ``<consumer> / "AGENTS.md"`` — for each marker-bearing consumer (R13)
-    4. ``<consumer> / "CLAUDE.md"`` — same consumer
+    This is the single implementation for all three scope variants:
+    - ``targets={"workspace", "repos"}`` — workspace root + all consumer repos (scope="all")
+    - ``targets={"workspace"}``          — workspace root only (scope="workspace-only")
+    - ``targets={"repos"}``              — consumer repos only (scope="repos-only")
 
-    Self-skip (R14): if a consumer's manifest ``package_version`` matches our
-    own, that consumer is the dadaia-workspace source repo — skip both files
-    to avoid overwriting the source.
+    Hash-compare logic (T-PROP-01): files are overwritten only when the source
+    SHA-256 differs from the destination, even when ``force=False``.
+
+    Self-skip (R14): consumer repos whose manifest ``package_version`` matches
+    the installed package version are skipped (they are the dadaia-workspace
+    source tree).
 
     Marker-less repos under ``repos/`` emit ``[skip]`` to stderr and are never
     written.  The function never raises on missing/unexpected paths.
@@ -741,143 +745,19 @@ def _install_workspace_guardrail_pair(
         workspace_root: Workspace root directory.
         force: When True, overwrite existing files; when False, skip if present.
         installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+        targets: Which targets to write. Defaults to ``{"workspace", "repos"}``.
     """
     if installed is None:
         installed = []
+    if targets is None:
+        targets = {"workspace", "repos"}
 
-    # Read source bytes once; compute SHA-256 for integrity tracking.
-    source_bytes = source.read_bytes()
-    _src_sha = hashlib.sha256(source_bytes).hexdigest()  # available for callers
+    src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
 
     def _write_pair(target_dir: Path) -> None:
         # AGENTS.md — full canonical content copied from source.
         agents_dst = target_dir / "AGENTS.md"
-        agents_dst.parent.mkdir(parents=True, exist_ok=True)
-        if agents_dst.exists() and not force:
-            # Hash-compare: skip only when content is identical (T-PROP-01).
-            if hashlib.sha256(agents_dst.read_bytes()).hexdigest() == _src_sha:
-                installed.append(f"[skip] {agents_dst}")
-            else:
-                shutil.copy2(source, agents_dst)
-                installed.append(f"[ok]   {agents_dst}")
-        else:
-            shutil.copy2(source, agents_dst)
-            installed.append(f"[ok]   {agents_dst}")
-        # CLAUDE.md — 1-line stub only (T-41: delegates to AGENTS.md).
-        claude_dst = target_dir / "CLAUDE.md"
-        claude_dst.parent.mkdir(parents=True, exist_ok=True)
-        _stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
-        if claude_dst.exists() and not force:
-            # Hash-compare: skip only when stub content is identical (T-PROP-01).
-            if hashlib.sha256(claude_dst.read_bytes()).hexdigest() == _stub_sha:
-                installed.append(f"[skip] {claude_dst}")
-            else:
-                _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
-                installed.append(f"[ok]   {claude_dst}")
-        else:
-            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
-            installed.append(f"[ok]   {claude_dst}")
-
-    # Workspace-root write set (always).
-    _write_pair(workspace_root)
-
-    # Consumer-repo enumeration (R13).
-    for consumer in _consumer_repos_for_root(workspace_root):
-        if _is_self_repo(consumer):
-            v = _package_version()
-            sys.stderr.write(
-                f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
-            )
-            continue
-        _write_pair(consumer)
-
-
-def _install_workspace_root_guardrail_pair(
-    source: Path,
-    workspace_root: Path,
-    force: bool,
-    installed: list[str] | None = None,
-) -> None:
-    """Write the guardrail pair to *workspace_root* only (no consumer repos).
-
-    Variant of ``_install_workspace_guardrail_pair`` that skips the consumer-repo
-    enumeration.  Used when ``scope="workspace-only"`` is passed to
-    ``FileSystemPublicAssetManager.install()``.
-
-    Args:
-        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
-        workspace_root: Workspace root directory.
-        force: When True, overwrite existing files; when False, skip if present.
-        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
-    """
-    if installed is None:
-        installed = []
-
-    src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
-    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
-
-    agents_dst = workspace_root / "AGENTS.md"
-    agents_dst.parent.mkdir(parents=True, exist_ok=True)
-    if agents_dst.exists() and not force:
-        # Hash-compare: skip only when content is identical (T-PROP-01).
-        if hashlib.sha256(agents_dst.read_bytes()).hexdigest() == src_sha:
-            installed.append(f"[skip] {agents_dst}")
-        else:
-            shutil.copy2(source, agents_dst)
-            installed.append(f"[ok]   {agents_dst}")
-    else:
-        shutil.copy2(source, agents_dst)
-        installed.append(f"[ok]   {agents_dst}")
-
-    claude_dst = workspace_root / "CLAUDE.md"
-    claude_dst.parent.mkdir(parents=True, exist_ok=True)
-    if claude_dst.exists() and not force:
-        # Hash-compare: skip only when stub content is identical (T-PROP-01).
-        if hashlib.sha256(claude_dst.read_bytes()).hexdigest() == stub_sha:
-            installed.append(f"[skip] {claude_dst}")
-        else:
-            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
-            installed.append(f"[ok]   {claude_dst}")
-    else:
-        _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
-        installed.append(f"[ok]   {claude_dst}")
-
-
-def _install_consumer_repos_guardrail_pair(
-    source: Path,
-    workspace_root: Path,
-    force: bool,
-    installed: list[str] | None = None,
-) -> None:
-    """Write the guardrail pair to each marker-bearing consumer repo only.
-
-    Skips the workspace-root write.  Used when ``scope="repos-only"`` is passed
-    to ``FileSystemPublicAssetManager.install()``.
-
-    Self-skip (R14): if a consumer's manifest ``package_version`` matches our
-    own, that consumer is the dadaia-workspace source repo — skip it.
-
-    Args:
-        source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
-        workspace_root: Workspace root directory.
-        force: When True, overwrite existing files; when False, skip if present.
-        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
-    """
-    if installed is None:
-        installed = []
-
-    src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
-    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
-
-    for consumer in _consumer_repos_for_root(workspace_root):
-        if _is_self_repo(consumer):
-            v = _package_version()
-            sys.stderr.write(
-                f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
-            )
-            continue
-
-        agents_dst = consumer / "AGENTS.md"
         agents_dst.parent.mkdir(parents=True, exist_ok=True)
         if agents_dst.exists() and not force:
             # Hash-compare: skip only when content is identical (T-PROP-01).
@@ -889,8 +769,8 @@ def _install_consumer_repos_guardrail_pair(
         else:
             shutil.copy2(source, agents_dst)
             installed.append(f"[ok]   {agents_dst}")
-
-        claude_dst = consumer / "CLAUDE.md"
+        # CLAUDE.md — 1-line stub only (T-41: delegates to AGENTS.md).
+        claude_dst = target_dir / "CLAUDE.md"
         claude_dst.parent.mkdir(parents=True, exist_ok=True)
         if claude_dst.exists() and not force:
             # Hash-compare: skip only when stub content is identical (T-PROP-01).
@@ -902,6 +782,42 @@ def _install_consumer_repos_guardrail_pair(
         else:
             _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
             installed.append(f"[ok]   {claude_dst}")
+
+    if "workspace" in targets:
+        _write_pair(workspace_root)
+
+    if "repos" in targets:
+        for consumer in _consumer_repos_for_root(workspace_root):
+            if _is_self_repo(consumer):
+                v = _package_version()
+                sys.stderr.write(
+                    f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
+                )
+                continue
+            _write_pair(consumer)
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatible aliases — delegate to _install_guardrail_pair.
+# These names are imported by tests and must remain importable.
+# Using functools.partial avoids duplicate def statements while preserving
+# the original call signatures (positional + keyword arguments all pass through).
+# ---------------------------------------------------------------------------
+
+_install_workspace_guardrail_pair = functools.partial(
+    _install_guardrail_pair, targets={"workspace", "repos"}
+)
+"""Fan source out to workspace root + all consumer repos (scope="all")."""
+
+_install_workspace_root_guardrail_pair = functools.partial(
+    _install_guardrail_pair, targets={"workspace"}
+)
+"""Write the guardrail pair to workspace_root only (scope="workspace-only")."""
+
+_install_consumer_repos_guardrail_pair = functools.partial(
+    _install_guardrail_pair, targets={"repos"}
+)
+"""Write the guardrail pair to consumer repos only (scope="repos-only")."""
 
 
 def _doctor_guardrail_pair(
@@ -1074,16 +990,18 @@ class FileSystemPublicAssetManager:
             # marker-bearing consumer repos.
             if scope == "all":
                 # Full fan-out: workspace-root pair + all consumer repos.
-                _install_workspace_guardrail_pair(data_agents_md, workspace_root, force, installed)
+                _install_guardrail_pair(
+                    data_agents_md, workspace_root, force, installed, targets={"workspace", "repos"}
+                )
             elif scope == "workspace-only":
                 # Workspace-root guardrail pair only — skip consumer repos.
-                _install_workspace_root_guardrail_pair(
-                    data_agents_md, workspace_root, force, installed
+                _install_guardrail_pair(
+                    data_agents_md, workspace_root, force, installed, targets={"workspace"}
                 )
             elif scope == "repos-only":
                 # Consumer repos only — skip workspace-root pair.
-                _install_consumer_repos_guardrail_pair(
-                    data_agents_md, workspace_root, force, installed
+                _install_guardrail_pair(
+                    data_agents_md, workspace_root, force, installed, targets={"repos"}
                 )
         else:
             # Legacy / scaffold path: templates/AGENTS.md → workspace-root only.
@@ -2087,24 +2005,10 @@ class FileSystemPublicAssetManager:
     def _consumer_repos(self, workspace_root: Path) -> list[Path]:
         """Return marker-bearing consumer repo directories under ``repos/``.
 
-        A directory qualifies when BOTH markers are present:
-        - ``<repo>/.dadaia/`` directory (signals dadaia-aware consumer)
-        - ``<repo>/.dadaia/agentic/`` directory (signals full agentic setup)
-
-        Non-qualifying directories emit a ``[skip]`` line to stderr.
+        Delegates to the module-level ``_consumer_repos_for_root`` function —
+        the single implementation of consumer-repo discovery (AR-04a).
         """
-        repos_dir = workspace_root / "repos"
-        if not repos_dir.is_dir():
-            return []
-        result: list[Path] = []
-        for p in sorted(repos_dir.iterdir()):
-            if not p.is_dir():
-                continue
-            if (p / ".dadaia").is_dir() and (p / ".dadaia" / "agentic").is_dir():
-                result.append(p)
-            else:
-                sys.stderr.write(f"[skip] {p}/AGENTS.md (no .dadaia/ marker)\n")
-        return result
+        return _consumer_repos_for_root(workspace_root)
 
     def _is_self_repo(self, consumer: Path) -> bool:
         """Return True when *consumer* is the dadaia-workspace repo itself.
