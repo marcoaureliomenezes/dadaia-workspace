@@ -400,6 +400,99 @@ def test_ctx_inject_codex_json_output_is_parseable(workspace: Path) -> None:
     assert "json-mode" in hook_output["additionalContext"]
 
 
+def test_ctx_inject_codex_stdin_session_id_idempotent(workspace: Path) -> None:
+    """T-016-C01: ctx-inject keys idempotence on the session_id Codex passes on stdin.
+
+    Two consecutive invocations in the same logical session inject exactly once; the
+    second produces NO output (not even a breadcrumb). The sentinel is keyed on the
+    stable session_id, never the volatile shell PID ($$)."""
+    scripts, memory_dir, _ = _make_full_context(workspace, "myctx")
+    (memory_dir / "tech-stack.md").write_text("# tech\n\nbootstrap marker\n")
+    env = {
+        **os.environ,
+        "WORKSPACE_ROOT": str(workspace),
+        "DADAIA_CONTEXT": "myctx",
+        "DADAIA_HOOK_OUTPUT": "codex-json",
+    }
+    # Strip harness session env vars so the stdin-session_id path is exercised
+    # (env vars correctly take precedence over stdin when present).
+    for _var in (
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "OPENCODE_SESSION_ID",
+        "DADAIA_SESSION_ID",
+    ):
+        env.pop(_var, None)
+    stdin_json = json.dumps({"session_id": "codex-sess-abc", "event": "startup"})
+    sentinel_dir = workspace / ".dadaia" / "tmp"
+    for f in sentinel_dir.glob("ctx-inject-fired-*"):
+        f.unlink(missing_ok=True)
+
+    def _run() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(scripts / "ctx-inject.sh")],
+            input=stdin_json,
+            capture_output=True,
+            text=True,
+            cwd="/tmp",
+            timeout=10,
+            env=env,
+        )
+
+    first = _run()
+    assert first.returncode == 0, first.stderr
+    assert "bootstrap marker" in first.stdout, "first invocation must inject full context"
+    # Sentinel keyed on the stdin session_id (not the PID).
+    assert (sentinel_dir / "ctx-inject-fired-codex-sess-abc").exists()
+    assert not list(sentinel_dir.glob("ctx-inject-fired-[0-9]*")), "no PID-keyed sentinel"
+
+    second = _run()
+    assert second.returncode == 0, second.stderr
+    assert second.stdout.strip() == "", "second prompt must produce no output (no breadcrumb)"
+
+
+def test_ctx_inject_opencode_session_guard(workspace: Path) -> None:
+    """T-016-C02: OpenCode first message injects bootstrap; second appends nothing.
+    Idempotence is keyed on OPENCODE_SESSION_ID."""
+    scripts, memory_dir, _ = _make_full_context(workspace, "myctx")
+    (memory_dir / "tech-stack.md").write_text("# tech\n\noc bootstrap\n")
+    env = {
+        **os.environ,
+        "WORKSPACE_ROOT": str(workspace),
+        "DADAIA_CONTEXT": "myctx",
+        "OPENCODE_SESSION_ID": "oc-sess-1",
+    }
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    env.pop("CODEX_SESSION_ID", None)
+    for f in (workspace / ".dadaia" / "tmp").glob("ctx-inject-fired-*"):
+        f.unlink(missing_ok=True)
+
+    def _run() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(scripts / "ctx-inject.sh")],
+            capture_output=True,
+            text=True,
+            cwd="/tmp",
+            timeout=10,
+            env=env,
+        )
+
+    first = _run()
+    assert first.returncode == 0, first.stderr
+    assert "oc bootstrap" in first.stdout
+    assert (workspace / ".dadaia" / "tmp" / "ctx-inject-fired-oc-sess-1").exists()
+    second = _run()
+    assert second.returncode == 0, second.stderr
+    assert second.stdout.strip() == ""
+
+
+def test_ctx_inject_no_pid_fallback(workspace: Path) -> None:
+    """T-016-C01: the $$ shell-PID fallback is removed from ctx-inject.sh."""
+    src = CTX_INJECT.read_text()
+    assert 'SESSION_ID="$$"' not in src
+    assert "CODEX_SESSION_ID" in src, "session id must be resolvable from the Codex env var"
+
+
 def test_ctx_inject_does_not_call_strip_script(workspace: Path) -> None:
     """T-MMS-07: ctx-inject.sh must not reference or invoke strip-memory-html.py."""
     ctx_inject_src = CTX_INJECT.read_text()

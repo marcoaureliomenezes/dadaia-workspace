@@ -34,17 +34,23 @@ if [ -n "${DADAIA_SESSION_ID:-}" ]; then
     printf '%s' "$DADAIA_SESSION_ID" > "$_PTR_FILE" 2>/dev/null || true
 fi
 
+# Hook event name carried in the JSON envelope. SessionStart (Codex/Claude once-per-
+# session) and UserPromptSubmit both inject via additionalContext; default keeps the
+# historical UserPromptSubmit value for callers that do not set it.
+DADAIA_HOOK_EVENT="${DADAIA_HOOK_EVENT:-UserPromptSubmit}"
+
 emit_payload() {
     if [ "$DADAIA_HOOK_OUTPUT" = "codex-json" ] || [ "$DADAIA_HOOK_OUTPUT" = "json" ]; then
-        "$PYTHON_BIN" - "$PAYLOAD_FILE" <<'PY'
+        "$PYTHON_BIN" - "$PAYLOAD_FILE" "$DADAIA_HOOK_EVENT" <<'PY'
 import json
 import pathlib
 import sys
 
 payload = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+event = sys.argv[2]
 print(json.dumps({
     "hookSpecificOutput": {
-        "hookEventName": "UserPromptSubmit",
+        "hookEventName": event,
         "additionalContext": payload,
     }
 }))
@@ -107,27 +113,34 @@ if [ ! -d "$MEMORY_DIR" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# First-message sentinel guard (OQ-1/OQ-2 working assumption).
-# Probe session env vars in preference order; fall back to shell PID.
-# NOTE for devops-engineer (T-MCE-09 / OQ-1 / OQ-2): confirm the real session
-# env var available in Claude Code and OpenCode and replace the probe below with
-# the confirmed var. If CLAUDE_CODE_SESSION_ID is reliable for Claude Code, it
-# is the preferred source. The PID fallback is safe but causes re-injection on
-# every new shell invocation of the script in the same logical session.
+# First-message sentinel guard — idempotence keyed on a STABLE session id.
+# Resolution order (no PID fallback — $$ changes per shell and breaks idempotence):
+#   1. Harness session env vars (Claude Code / Codex / OpenCode).
+#   2. Codex passes session_id as a JSON field on stdin at SessionStart; subagents
+#      inherit the parent session_id. Parse it when present.
+#   3. Degenerate fallback: a single stable per-workspace key so context still
+#      injects at most ONCE (never per-shell), never the volatile PID.
 # ---------------------------------------------------------------------------
-if [ -n "$CLAUDE_CODE_SESSION_ID" ]; then
-    SESSION_ID="$CLAUDE_CODE_SESSION_ID"
-elif [ -n "$OPENCODE_SESSION_ID" ]; then
-    SESSION_ID="$OPENCODE_SESSION_ID"
-else
-    SESSION_ID="$$"
+SESSION_ID="${CLAUDE_CODE_SESSION_ID:-${CODEX_SESSION_ID:-${OPENCODE_SESSION_ID:-}}}"
+if [ -z "$SESSION_ID" ] && [ ! -t 0 ]; then
+    # stdin is not a tty — it may carry the harness hook JSON with a session_id field.
+    # Bounded read so a hook invoked without stdin never blocks.
+    _STDIN_JSON="$(timeout 0.2 cat 2>/dev/null || true)"
+    if [ -n "$_STDIN_JSON" ]; then
+        SESSION_ID="$(printf '%s' "$_STDIN_JSON" | "$PYTHON_BIN" -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("session_id", "") or "")
+except Exception:
+    pass' 2>/dev/null)"
+    fi
 fi
+SESSION_ID="${SESSION_ID:-workspace}"
 
 SENTINEL="$TMP_DIR/ctx-inject-fired-${SESSION_ID}"
 
 if [ -f "$SENTINEL" ]; then
-    # Memory block already injected this session — emit only the context name (already done above).
-    emit_payload
+    # Context already injected this session. Per-prompt path is SILENT — no memory,
+    # no breadcrumb (SessionStart carries context once). Emit nothing, exit 0.
     exit 0
 fi
 

@@ -1657,6 +1657,20 @@ class TestConfigGenerators:
         assert prompt_command.startswith("DADAIA_HOOK_OUTPUT=codex-json ")
         assert prompt_command.endswith("ctx-inject.sh")
 
+    def test_codex_hooks_wire_sessionstart(self, tmp_path: Path) -> None:
+        """T-016-C01: Codex SessionStart carries context once per session
+        (matcher startup|resume), routed through ctx-inject in SessionStart mode."""
+        manager = FileSystemPublicAssetManager()
+        hooks = manager._codex_hooks(tmp_path)["hooks"]
+        assert "SessionStart" in hooks
+        ss = hooks["SessionStart"]
+        assert isinstance(ss, list) and ss
+        assert ss[0]["matcher"] == "startup|resume"
+        cmd = str(ss[0]["hooks"][0]["command"])
+        assert "DADAIA_HOOK_EVENT=SessionStart" in cmd
+        assert "DADAIA_HOOK_OUTPUT=codex-json" in cmd
+        assert cmd.endswith("ctx-inject.sh")
+
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
         settings = manager._claude_settings(tmp_path)

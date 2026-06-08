@@ -2394,6 +2394,24 @@ class FileSystemPublicAssetManager:
                         ],
                     }
                 ],
+                # SessionStart carries the full workspace context ONCE per logical
+                # session (matcher startup|resume). ctx-inject keys idempotence on the
+                # session_id Codex passes on stdin, so the per-prompt UserPromptSubmit
+                # path below stays silent after the first injection (T-016-C01).
+                "SessionStart": [
+                    {
+                        "matcher": "startup|resume",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": "DADAIA_HOOK_OUTPUT=codex-json "
+                                + "DADAIA_HOOK_EVENT=SessionStart "
+                                + str(workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"),
+                                "statusMessage": "Loading dadaia context",
+                            }
+                        ],
+                    }
+                ],
                 "UserPromptSubmit": [
                     {
                         "hooks": [

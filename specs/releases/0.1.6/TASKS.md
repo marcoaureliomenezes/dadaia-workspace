@@ -400,7 +400,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   prompt produces no output (not even a breadcrumb); `ctx-inject.sh` reads `session_id`
   from stdin; `$$` not used; `public_assets.py` wires the `SessionStart` hook; tests pass.
 
-[ ] T-016-C01
+[x] T-016-C01
 
 ### T-016-C02 — Claude duplicate hook hygiene + OpenCode regression proof
 
@@ -413,7 +413,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   message appends nothing. Tests cover both.
 - **Done criterion:** Single hook entry on fresh init; OpenCode session guard proven.
 
-[ ] T-016-C02
+[x] T-016-C02
 
 ### T-016-C03 — Deterministic Codex workflow preflight
 
