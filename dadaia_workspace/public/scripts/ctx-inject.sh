@@ -30,8 +30,13 @@ trap 'rm -f "$PAYLOAD_FILE"' EXIT
 if [ -n "${DADAIA_SESSION_ID:-}" ]; then
     _RUNTIME_PTR_DIR="$WORKSPACE_ROOT/.dadaia/sessions/runtime"
     mkdir -p "$_RUNTIME_PTR_DIR" 2>/dev/null || true
-    _PTR_FILE="$_RUNTIME_PTR_DIR/${DADAIA_SESSION_ID}.ptr"
-    printf '%s' "$DADAIA_SESSION_ID" > "$_PTR_FILE" 2>/dev/null || true
+    # Sanitize before using as a filename component — never let a session id with
+    # path separators escape the runtime dir (CWE-22; mirrors sdd-spec-gate.sh).
+    _SAFE_PTR_ID="$(printf '%s' "$DADAIA_SESSION_ID" | tr -cd 'a-zA-Z0-9_-')"
+    if [ -n "$_SAFE_PTR_ID" ]; then
+        _PTR_FILE="$_RUNTIME_PTR_DIR/${_SAFE_PTR_ID}.ptr"
+        printf '%s' "$DADAIA_SESSION_ID" > "$_PTR_FILE" 2>/dev/null || true
+    fi
 fi
 
 # Hook event name carried in the JSON envelope. SessionStart (Codex/Claude once-per-
@@ -134,6 +139,10 @@ except Exception:
     pass' 2>/dev/null)"
     fi
 fi
+SESSION_ID="${SESSION_ID:-workspace}"
+# Sanitize before using as a filename component — a session id containing '/' or
+# '..' must never escape $TMP_DIR (CWE-22; mirrors sdd-spec-gate.sh's strip).
+SESSION_ID="$(printf '%s' "$SESSION_ID" | tr -cd 'a-zA-Z0-9_-')"
 SESSION_ID="${SESSION_ID:-workspace}"
 
 SENTINEL="$TMP_DIR/ctx-inject-fired-${SESSION_ID}"

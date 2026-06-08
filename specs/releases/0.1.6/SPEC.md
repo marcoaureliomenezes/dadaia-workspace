@@ -598,8 +598,14 @@ Acceptance:
 - `dadaia_workspace/core/workspace_resolver.py` — `--workspace` flag honored (FR-Z01).
 - `dadaia_workspace/features/specs/doctor.py` — orphan-projection check; ROOT-1..ROOT-4;
   pattern-version check; upgrade recommendation.
-- `dadaia_workspace/features/migrate/` — migration-chain registry replacing single tree-v2
-  transform; `dadaia specs upgrade` command.
+- `dadaia_workspace/features/migrate/` — migration-chain registry + `dadaia specs upgrade`
+  orchestration (`registry.py`, `upgrade.py`), replacing the single tree-v2 transform.
+- `dadaia_workspace/core/specs_version.py`, `dadaia_workspace/core/specs_backup.py` — stdlib-only
+  pure modules (pattern-version read/write; backup-first snapshot). Placed in `core/` rather than
+  `features/migrate/` because both `features/migrate/upgrade.py` AND `features/specs/doctor.py` +
+  `features/spec_context/service.py` consume them — a `features/migrate/` home would force a
+  prohibited feature→feature import (architecture.md:163). Architecture-fidelity correction to the
+  literal write-set.
 - `dadaia_workspace/cli/main.py` — `specs upgrade` subcommand; `clean` command.
 - `dadaia_workspace/public/scripts/ctx-inject.sh` — Codex idempotence fix (stable session key).
 - `dadaia_workspace/public/scripts/sdd-spec-gate.sh` — TTL-lease redesign (gate shrink ~1050 →

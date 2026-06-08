@@ -795,7 +795,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Precondition:** all alpha tasks `[x]`
 - **Work:** Full qa-engineer review of the complete release. APPROVE verdict authorizes commit.
 
-[ ] T-016-R01
+[x] T-016-R01
 
 ### T-016-R02 — security-reviewer review
 
@@ -804,7 +804,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Precondition:** T-016-R01 APPROVED
 - **Work:** Security review. APPROVE verdict authorizes push.
 
-[ ] T-016-R02
+[x] T-016-R02
 
 ### T-016-R03 — code-reviewer review
 
@@ -813,7 +813,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Precondition:** T-016-R02 APPROVED
 - **Work:** Code review. APPROVE verdict authorizes PR merge.
 
-[ ] T-016-R03
+[x] T-016-R03
 
 ### T-016-R04 — CLOSURE and memory update
 

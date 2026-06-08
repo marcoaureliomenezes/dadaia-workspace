@@ -133,9 +133,13 @@ Gate: qa-engineer commit gate at end of alpha-2.
 
 **Write set (software-engineer):**
 - `dadaia_workspace/features/spec_context/service.py`
-- `dadaia_workspace/features/migrate/` (chain registry)
+- `dadaia_workspace/features/migrate/` (chain registry + upgrade orchestration)
+- `dadaia_workspace/core/specs_version.py`, `dadaia_workspace/core/specs_backup.py` (stdlib-only
+  pure modules — placed in `core/` to avoid a prohibited feature→feature import; consumed by both
+  `features/migrate/upgrade.py` and `features/specs/doctor.py` + `features/spec_context/service.py`)
 - `dadaia_workspace/features/specs/doctor.py` (pattern-version check, upgrade recommendation)
-- `dadaia_workspace/cli/main.py` (`dadaia specs upgrade` subcommand)
+- `dadaia_workspace/cli/commands/specs.py` (`dadaia specs upgrade` subcommand)
+- `dadaia_workspace/cli/commands/context.py` (alive() upgrade offer)
 - `tests/unit/` (migration chain, backup-first, idempotence, upgrade command)
 
 **Write set (product-engineer):**
