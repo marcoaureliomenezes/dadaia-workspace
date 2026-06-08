@@ -118,7 +118,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   improved"). Operator reviews the redesign before rc-N ship.
 - **Done criterion:** Operator-reviewed visual redesign; e2e tests pass E2E-GUARD-01/02.
 
-[ ] T-016-P08
+[-] T-016-P08
 
 ### T-016-P09 — Tab consolidation (Agents + Workflows + Kanban → one tab)
 
@@ -129,11 +129,16 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   `dadaia_workspace/features/panel/views/assets/js/agents.js`,
   `dadaia_workspace/features/panel/views/assets/js/workflows.js`,
   `dadaia_workspace/features/panel/views/assets/js/kanban.js`,
+  `dadaia_workspace/features/panel/views/index.py` (nav markup + section containers),
+  `dadaia_workspace/features/panel/views/assets/js/core.js` (tab-switch wiring),
   associated CSS constants
+  (write set widened during implementation: the nav/tab-switch wiring lives in
+  index.py + core.js, which the merge inherently must touch.)
 - **Precondition:** T-016-P01, T-016-P07 (guard active; functional theme fix landed)
-- **Work:** Merge three tabs into one consolidated tab with smaller cards for all three
-  sections. Sessions tab is untouched. Deep-interaction e2e test clicks through consolidated
-  tab and passes E2E-GUARD-01/02.
+- **Work:** Merge three tabs into one consolidated tab — **stacked sections (one scroll)**:
+  Agents, Workflows, Kanban each a labelled section with smaller/compact cards, in a single
+  scrollable tab. Sessions tab is untouched. Deep-interaction e2e test clicks through the
+  consolidated tab and passes E2E-GUARD-01/02.
 - **Done criterion:** Single consolidated tab; three separate tabs gone; Sessions tab
   unchanged; e2e test passes.
 
