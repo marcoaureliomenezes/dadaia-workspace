@@ -1,21 +1,26 @@
 """Kanban board CSS for the Dadaia Workspace Panel.
 
-panel-kanban-v1 K-2 (FE): Swimlane × 4-column Kanban layout.
-  - One swimlane per Spec Context Project; four phase columns per lane.
+panel-kanban-v1 K-2 (FE): Swimlane × 4-column Kanban layout (§7 lifecycle columns).
+  - One swimlane per Spec Context Project; four phase columns per lane:
+      Backlog | Release Definition | Implementation + Review | Closure
   - Board is horizontally scrollable below 800px.
   - Desktop (>=1280px): all 4 columns visible side-by-side.
   - Column min-width: var(--kanban-col-min-w, 200px).
+  - The combined "Implementation + Review" column may be wider at
+    --kanban-col-min-w to accommodate the longer label; responsive behaviour kept.
+  - XOR-lock dimming (.kanban-column--locked) is retired: impl and review share
+    one column so mutual-exclusion visual no longer applies.
   - Card anatomy: font-mono session ID + status dot, runtime line (muted),
     runtime·age line (muted). min-height: var(--kanban-card-min-h, 72px).
-  - Locked column: .kanban-column--locked with opacity var(--opacity-kanban-locked, 0.40).
+  - Per-card stale indicator preserved: data-stale="true" left-border accent.
   - Empty-column placeholder: dashed border, height var(--kanban-card-min-h).
   - Card appear animation: opacity 0→1 var(--duration-normal, 220ms) var(--easing-decelerate).
-    Lock transition: var(--duration-fast, 120ms). Both suppressed under prefers-reduced-motion.
-  - Column header concurrency badges: Definition ≤2, Implementation ×1, Review ×1.
+    Suppressed under prefers-reduced-motion.
+  - Column header concurrency badges: Release Definition ≤2, Implementation + Review ×2.
     Badge: --color-placeholder-bg bg, --color-muted text, --font-size-xs, --radius-pill.
   - All colour values reference design tokens from tokens.py — no new raw hex values.
   - WCAG AA: card title #111 on white → 18.5:1; card meta #666 on white → 5.52:1;
-    separator #888 on #fafafa → 3.54:1 (1.4.11 non-text); lock icon supplement (1.4.1).
+    separator #888 on #fafafa → 3.54:1 (1.4.11 non-text).
 """
 
 KANBAN_CSS: str = """
@@ -101,7 +106,9 @@ KANBAN_CSS: str = """
   }
 }
 
-/* ── Locked column ────────────────────────────────────────────────────── */
+/* ── Locked column (retired — XOR-lock dimming is no longer used since    */
+/* impl and review share one combined column; kept as CSS guard in case    */
+/* future features reintroduce the class.)                                 */
 .kanban-column--locked {
   opacity: var(--opacity-kanban-locked, 0.40);
 }
@@ -149,7 +156,7 @@ KANBAN_CSS: str = """
   /* Contrast: #666666 on #f7f7f7 → 4.56:1 (WCAG 2.1 AA ≥ 4.5:1 pass) */
 }
 
-/* ── Lock badge on column header ─────────────────────────────────────── */
+/* ── Lock badge on column header (retired — kept for forward-compat) ─── */
 .kanban-lock-badge {
   font-size: 0.78rem;
   /* lock icon is visual supplement; not sole conveyance of locked state */

@@ -3,12 +3,21 @@
 Reads `.dadaia/sessions/*.json` (R2 session files) and groups them into a
 Kanban board response: one swimlane per Spec Context Project, four phase columns.
 
-Session mode → column mapping:
-    READ                  → research
-    SPEC                  → spec
-    BOUND_IMPLEMENTATION  → implementation
-    BOUND_REVIEW          → review
-    Unknown / unrecognised → research  (fail-safe — never drop)
+Session mode → column mapping (canonical §7 lifecycle):
+
+    Column key      Label                    Session modes
+    -----------     -----------------------  ---------------------------------
+    backlog         Backlog                  READ
+    release_def     Release Definition       SPEC
+    impl_review     Implementation + Review  BOUND_IMPLEMENTATION, BOUND_REVIEW
+    closure         Closure                  (present-but-empty — no session
+                                             mode maps to closure phase yet)
+
+    Unknown / unrecognised mode → backlog  (fail-safe — never drop)
+
+The XOR-lock dimming between implementation and review columns is retired: both
+modes now share the single ``impl_review`` column, so the mutual-exclusion visual
+no longer applies.
 
 Staleness is computed at read time from ``last_seen_at`` and ``ttl_seconds``
 (mirrors ``dadaia_workspace.features.spec_context.locking._session_is_stale``).
@@ -34,14 +43,18 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-_COLUMN_KEYS = ("research", "spec", "implementation", "review")
+_COLUMN_KEYS = ("backlog", "release_def", "impl_review", "closure")
 
 _MODE_TO_COLUMN: dict[str, str] = {
-    "READ": "research",
-    "SPEC": "spec",
-    "BOUND_IMPLEMENTATION": "implementation",
-    "BOUND_REVIEW": "review",
+    "READ": "backlog",
+    "SPEC": "release_def",
+    "BOUND_IMPLEMENTATION": "impl_review",
+    "BOUND_REVIEW": "impl_review",
 }
+
+# No session mode currently maps to the "closure" column.
+# It is always present but empty until a closure-phase session mode is introduced.
+_FALLBACK_COLUMN = "backlog"
 
 _REQUIRED_FIELDS: frozenset[str] = frozenset({"session_id", "mode", "context"})
 
@@ -129,7 +142,7 @@ def render_api_kanban(
                 ttl_seconds = int(data.get("ttl_seconds", _DEFAULT_TTL_SECONDS))
 
             stale = _is_stale(last_seen_at, ttl_seconds)
-            column = _MODE_TO_COLUMN.get(mode, "research")
+            column = _MODE_TO_COLUMN.get(mode, _FALLBACK_COLUMN)
 
             card: dict[str, object] = {
                 "session_id": session_id,

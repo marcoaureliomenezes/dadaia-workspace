@@ -222,7 +222,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   Implementation + Review / Closure; impl and review contexts appear in the combined
   column; unit tests and e2e specs green; E2E-GUARD-01/02 active.
 
-[-] T-016-P13
+[x] T-016-P13
 
 ---
 

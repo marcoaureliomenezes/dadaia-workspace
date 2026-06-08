@@ -1,28 +1,27 @@
-// kanban.js — Kanban board tab UI (swimlanes, phase columns, XOR lock visual, auto-refresh)
-// panel-kanban-v1 K-2 (FE)
+// kanban.js — Kanban board tab UI (swimlanes, 4-stage lifecycle columns, auto-refresh)
+// panel-kanban-v1 K-2 (FE) — updated for §7 canonical lifecycle columns (T-016-P13)
 //
 // Depends on: window.authedFetch() and window.escHtml() defined in core.js (loaded before this).
 //
 // API contract (SPEC §3 K-1 response schema — normative):
 //   GET /api/kanban
 //     → { generated_at: "<ISO>", swimlanes: [ SwimLane, ... ] }
-//   SwimLane: { context: "<name>", columns: { research: [...], spec: [...],
-//               implementation: [...], review: [...] } }
+//   SwimLane: { context: "<name>", columns: { backlog: [...], release_def: [...],
+//               impl_review: [...], closure: [...] } }
 //   SessionCard: { session_id, mode, release, runtime, pid, last_seen_at, is_stale }
 //
-// Column label map:
-//   research        → "Research"
-//   spec            → "Definition"   (UI label per SPEC §3 K-2)
-//   implementation  → "Implementation"
-//   review          → "Review"
+// Column label map (canonical §7 SDD lifecycle):
+//   backlog      → "Backlog"                (READ sessions)
+//   release_def  → "Release Definition"     (SPEC sessions)
+//   impl_review  → "Implementation + Review" (BOUND_IMPLEMENTATION + BOUND_REVIEW sessions, combined)
+//   closure      → "Closure"               (closure-phase sessions; present-but-empty until supported)
 //
 // Behaviour summary:
-//   - On DOMContentLoaded: locate #section-kanban; if absent, exit (no-op).
+//   - On DOMContentLoaded: locate #section-kanban or #ops-subsection-kanban; if absent, exit (no-op).
 //   - fetchKanban() calls GET /api/kanban via authedFetch.
 //   - renderBoard(data): renders lanes and columns into #kanban-board.
-//   - XOR lock visual: if a lane has ≥1 card in review → dim implementation column
-//     of that lane (kanban-column--locked, data-locked="true", lock badge U+1F512,
-//     aria supplement). Vice versa when implementation is active and review is empty.
+//   - XOR lock dimming is RETIRED (impl and review share one combined column).
+//   - Per-card stale indicator preserved: data-stale="true" on stale cards.
 //   - Empty column → placeholder div with data-testid="kanban-empty-placeholder" + aria-hidden="true".
 //   - Empty lane → visible italic "No active sessions" (announced by screen reader).
 //   - Empty board → centred "No Spec Context Projects available".
@@ -36,20 +35,19 @@
   var AUTO_REFRESH_MS = 10000;
 
   var COLUMN_LABELS = {
-    research:       'Research',
-    spec:           'Definition',
-    implementation: 'Implementation',
-    review:         'Review',
+    backlog:     'Backlog',
+    release_def: 'Release Definition',
+    impl_review: 'Implementation + Review',
+    closure:     'Closure',
   };
 
   // Concurrency badges per column (undefined = no badge).
   var COLUMN_BADGES = {
-    spec:           '≤2',  // ≤2
-    implementation: '×1',  // ×1
-    review:         '×1',  // ×1
+    release_def: '≤2',  // ≤2 concurrent spec sessions
+    impl_review: '×2',  // ×2 (impl + review combined)
   };
 
-  var COLUMN_ORDER = ['research', 'spec', 'implementation', 'review'];
+  var COLUMN_ORDER = ['backlog', 'release_def', 'impl_review', 'closure'];
 
   // ── Module state ───────────────────────────────────────────────────────────
   var _loaded = false;
@@ -122,10 +120,7 @@
     var ctxSlug = ctx.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     var columns = lane.columns || {};
 
-    // Check XOR lock: review cards present → lock implementation; implementation cards present → lock review.
-    var hasReview = (columns.review || []).length > 0;
-    var hasImpl   = (columns.implementation || []).length > 0;
-
+    // XOR lock dimming is retired: impl and review share one combined column (impl_review).
     // Count total cards in all columns to detect empty lane.
     var totalCards = 0;
     COLUMN_ORDER.forEach(function (col) {
@@ -158,22 +153,7 @@
         });
         var headingId = 'col-' + esc(colKey) + '-' + esc(ctxSlug) + '-heading';
 
-        // Determine lock state for this column
-        var isLocked = false;
-        var lockReason = '';
-        if (colKey === 'implementation' && hasReview) {
-          isLocked = true;
-          lockReason = 'Implementation column, locked — context is in review';
-        } else if (colKey === 'review' && hasImpl) {
-          isLocked = true;
-          lockReason = 'Review column, locked — context is in implementation';
-        }
-
-        var lockedClass = isLocked ? ' kanban-column--locked' : '';
-        var lockedAttr = isLocked ? ' data-locked="true"' : '';
-
-        html += '<div class="kanban-column' + lockedClass + '"'
-          + lockedAttr
+        html += '<div class="kanban-column"'
           + ' role="group"'
           + ' aria-labelledby="' + headingId + '"'
           + '>';
@@ -182,14 +162,8 @@
         var badge = COLUMN_BADGES[colKey];
         html += '<div class="kanban-col-header">'
           + '<span class="kanban-col-title" id="' + headingId + '">'
-            + esc(label);
-
-        if (isLocked) {
-          // Lock icon supplement — not sole conveyance of locked state (WCAG 1.4.1)
-          html += ' <span class="kanban-lock-badge" aria-hidden="true">🔒</span>';
-        }
-
-        html += '</span>'
+            + esc(label)
+          + '</span>'
           + '<div class="kanban-col-header-right">';
 
         if (badge) {
@@ -199,11 +173,6 @@
         }
 
         html += '</div>';
-
-        // ARIA supplement for locked headers (screen-reader only)
-        if (isLocked) {
-          html += '<span class="sr-only">' + esc(lockReason) + '</span>';
-        }
 
         html += '</div>'; // .kanban-col-header
 
