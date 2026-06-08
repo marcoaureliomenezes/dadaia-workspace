@@ -144,6 +144,86 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 
 [x] T-016-P09
 
+### T-016-P10 — Rename nav tabs ("Projects" and "Agentic")
+
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/panel/views/index.py`,
+  `tests/e2e/panel/` (specs asserting old tab labels: `tab-navigation.spec.ts`,
+  `spec-context-tab.spec.ts`, `ops-tab.spec.ts`)
+- **Precondition:** T-016-P09
+- **Work:** Rename the "Spec Context Projects" nav tab to **"Projects"** and the "Ops" nav
+  tab to **"Agentic"** (visible label text and `aria-label` only). Keep `data-section`
+  attribute values stable (`data-section="memories"` and `data-section="ops"` remain
+  unchanged to avoid cascading JS/CSS breakage). Update any e2e spec assertions that match
+  the old label strings ("Spec Context Projects", "Ops") to the new labels ("Projects",
+  "Agentic").
+- **Done criterion:** Nav shows "Projects" and "Agentic"; `data-section` ids are unchanged;
+  full panel e2e suite green with E2E-GUARD-01/02 active.
+
+[-] T-016-P10
+
+### T-016-P11 — Reorder Agentic tab sections (Kanban top, then Workflows, then Agents)
+
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/panel/views/index.py` (section order within
+  the Agentic tab container), `dadaia_workspace/features/panel/views/assets/js/core.js`
+  (load order adjustment if needed), associated CSS
+- **Precondition:** T-016-P09
+- **Work:** Reorder the three stacked sub-sections inside the Agentic tab so the display
+  order from top to bottom is **Kanban → Workflows → Agents** (currently Agents →
+  Workflows → Kanban from the T-016-P09 implementation). Update any e2e assertions that
+  depend on section order within the tab.
+- **Done criterion:** Agentic tab renders Kanban first, Workflows second, Agents third;
+  e2e green with E2E-GUARD-01/02 active.
+
+[ ] T-016-P11
+
+### T-016-P12 — Agent cards ~40% smaller + layout tightening
+
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/panel/views/assets/css/agents.py` (or the
+  equivalent CSS constants file for agent card styles),
+  `dadaia_workspace/features/panel/views/assets/js/agents.js`
+- **Precondition:** T-016-P09
+- **Work:** Reduce the visual footprint of agent cards by approximately 40% (they are too
+  large after the tab consolidation). Tighten the grid layout: reduce `min-column-width`,
+  padding, stat-row line-height, and badge sizing while keeping all text legible. Run axe
+  accessibility checks to confirm WCAG AA is maintained after the resize. Update any e2e
+  assertions that depend on exact card dimensions.
+- **Done criterion:** Agent cards are visibly ~40% smaller with a clean, compact grid
+  layout; axe accessibility checks pass; E2E-GUARD-01/02 green; any agent-card axe tests
+  pass.
+
+[ ] T-016-P12
+
+### T-016-P13 — Kanban 4-stage lifecycle columns (constitution §7)
+
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/panel/views/kanban.py` (column model +
+  lock-mode → column mapping + docstring update),
+  `dadaia_workspace/features/panel/views/assets/js/kanban.js` (column labels + render
+  logic), `dadaia_workspace/features/panel/views/assets/css/kanban.py` (column layout
+  CSS), `tests/e2e/panel/` (kanban e2e specs), `tests/unit/features/panel/` (kanban unit
+  tests)
+- **Precondition:** T-016-P09
+- **Work:** Replace the current four kanban columns {research, spec, implementation,
+  review} with the canonical §7 release lifecycle: **Backlog | Release Definition |
+  Implementation + Review | Closure**. Lock-mode → column mapping:
+  - `READ` → **Backlog**
+  - `SPEC` → **Release Definition**
+  - `BOUND_IMPLEMENTATION` + `BOUND_REVIEW` → **Implementation + Review** (one combined
+    column; retire the XOR-lock-dimming logic since the two modes share one column; a
+    within-column sub-indicator is acceptable but not required)
+  - Closure phase → **Closure** (feed from sessions/contexts that have reached the
+    closure phase; present-but-empty if none are currently in closure)
+  Update `kanban.py` docstring and the column-label map. Update all kanban unit tests and
+  e2e specs to assert the new four-column layout.
+- **Done criterion:** Kanban renders exactly 4 columns: Backlog / Release Definition /
+  Implementation + Review / Closure; impl and review contexts appear in the combined
+  column; unit tests and e2e specs green; E2E-GUARD-01/02 active.
+
+[ ] T-016-P13
+
 ---
 
 ## alpha-2 — WS-SANITIZATION
@@ -188,6 +268,25 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   them; no operator file ever deleted; unit tests pass.
 
 [ ] T-016-Z03
+
+### T-016-Z04 — Fix malformed duplicate UserPromptSubmit hook write
+
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/workspace/service.py`,
+  `dadaia_workspace/infrastructure/public_assets.py`
+- **Precondition:** none
+- **Work:** `WorkspaceService._configure_hook` appends a flat-schema `UserPromptSubmit`
+  hook entry that duplicates / conflicts with the nested-schema entry written by
+  `public_assets.py`, causing Claude Code `/doctor` to report
+  `hooks.UserPromptSubmit.1.hooks: Expected array`. Make `_configure_hook` write the
+  canonical nested schema (or skip when the projection already provides it); no duplicate
+  malformed entry. Unit test: configuring hooks yields a single well-formed
+  `UserPromptSubmit` entry that passes the schema. See bug
+  `configure-hook-writes-malformed-duplicate-userpromptsubmit`.
+- **Done criterion:** `/doctor` no longer reports the malformed-array error; settings has one
+  well-formed UserPromptSubmit entry; unit test green.
+
+[ ] T-016-Z04
 
 ---
 
