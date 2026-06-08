@@ -99,6 +99,13 @@ pip-wheel-metadata/
 !/specs/constitution.md
 !/specs/memory/
 !/specs/memory/**
+# Auditor reports are repository truth (canonical lifecycle: auditor MD is committed).
+# Opt in ONLY *.md under specs/audits/<ts>/ — privacy backstop still hides any
+# non-markdown artifact an audit might emit.
+!/specs/audits/
+!/specs/audits/*/
+/specs/audits/*/*
+!/specs/audits/*/*.md
 !/specs/releases/
 !/specs/releases/ACTIVE.md
 !/specs/releases/*/

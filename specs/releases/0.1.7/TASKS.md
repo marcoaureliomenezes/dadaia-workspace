@@ -305,7 +305,7 @@ T-017-11 un-deferred, audits-gitignored drift, NEW-03 CLOSURE memory) plus the
 operator-mandated **codex residual** fold-in, so 0.1.7 is deploy-ready with codex
 intact. Each task keeps `mypy --strict` + `pytest` + `dadaia public doctor` green.
 
-### [ ] T-017-16
+### [x] T-017-16
 **Finding:** audits-gitignored-vs-committed drift (re-audit note; [[project_canonical_lifecycle_model]])
 **Title:** Track `specs/audits/**/*.md` (canonical: auditor MD is committed)
 **Owner:** software-engineer
