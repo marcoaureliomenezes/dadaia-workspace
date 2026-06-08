@@ -375,7 +375,7 @@ single source of truth for session-staleness (consumed by kanban + spec_context)
 **Done criterion:** `grep 'lock_liveness' specs/memory/architecture.md` non-empty.
 `dadaia specs doctor` exits 0.
 
-### [ ] T-017-20
+### [x] T-017-20
 **Finding:** `codex-workflow-dispatch-not-deterministically-enforced` (High, open) + FEAT-CODEX-COMPAT-100 residual
 **Title:** Codex residual — dispatcher-preflight injection + route tests + truthful docs + status reconcile
 **Owner:** software-engineer (projector/tests); product-engineer (memory/status)

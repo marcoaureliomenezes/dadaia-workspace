@@ -65,6 +65,79 @@ def test_ctx_inject_reports_active_context(workspace: Path) -> None:
     assert "[active-ctx]" in result.stdout
 
 
+def test_ctx_inject_emits_dispatcher_preflight(workspace: Path) -> None:
+    """T-017-20: when a context is bound, ctx-inject injects the dispatcher
+    preflight so SDD role-routing is a deterministic instruction (not advisory).
+
+    Covers the deployable/deterministic part of bug
+    codex-workflow-dispatch-not-deterministically-enforced.
+    """
+    scripts = _install_scripts(workspace)
+    (workspace / "repos" / "active-ctx" / "specs").mkdir(parents=True)
+    env = {**os.environ, "DADAIA_CONTEXT": "active-ctx", "WORKSPACE_ROOT": str(workspace)}
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    out = result.stdout
+    assert "dispatcher preflight" in out
+    # owning-role routing is named
+    assert "project-manager" in out
+    assert "ai-engineer" in out
+    # subagent-tool discovery before proceeding (the bug's core complaint)
+    assert "tool_search" in out
+    # truthful auto-spawn limitation (backlog acceptance #6)
+    assert "does NOT auto-spawn" in out
+
+
+def test_ctx_inject_no_preflight_without_context(workspace: Path) -> None:
+    """No ALIVE context → no dispatcher preflight (and no nag)."""
+    scripts = _install_scripts(workspace)
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        env={k: v for k, v in os.environ.items() if k != "DADAIA_CONTEXT"},
+        timeout=5,
+    )
+    assert result.returncode == 0
+    assert "dispatcher preflight" not in result.stdout
+
+
+def test_ctx_inject_preflight_in_valid_codex_json(workspace: Path) -> None:
+    """T-017-20: under codex-json output the preflight rides inside a valid
+    JSON envelope's additionalContext (Codex SessionStart contract)."""
+    scripts = _install_scripts(workspace)
+    (workspace / "repos" / "active-ctx" / "specs").mkdir(parents=True)
+    env = {
+        **os.environ,
+        "DADAIA_CONTEXT": "active-ctx",
+        "WORKSPACE_ROOT": str(workspace),
+        "DADAIA_HOOK_OUTPUT": "codex-json",
+        "DADAIA_HOOK_EVENT": "SessionStart",
+    }
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    envelope = json.loads(result.stdout)
+    hso = envelope["hookSpecificOutput"]
+    assert hso["hookEventName"] == "SessionStart"
+    assert "dispatcher preflight" in hso["additionalContext"]
+    assert "tool_search" in hso["additionalContext"]
+
+
 def test_ctx_inject_honors_dadaia_context_env(workspace: Path) -> None:
     scripts = _install_scripts(workspace)
     (workspace / "repos" / "envctx" / "specs").mkdir(parents=True)

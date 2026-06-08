@@ -96,6 +96,33 @@ if [ -n "$DADAIA_CONTEXT" ]; then
     SPECS_DIR="$WORKSPACE_ROOT/repos/$DADAIA_CONTEXT/specs"
     if [ -d "$SPECS_DIR" ]; then
         printf '[%s]\n' "$DADAIA_CONTEXT" >> "$PAYLOAD_FILE"
+        # ---------------------------------------------------------------------
+        # Dispatcher preflight (harness-neutral; applies to Codex + Claude +
+        # OpenCode). Makes SDD role-routing a deterministic instruction instead
+        # of relying on the lead agent's memory of specs/AGENTS.md. Closes the
+        # deterministic-routing gap in bug
+        # codex-workflow-dispatch-not-deterministically-enforced.
+        # ---------------------------------------------------------------------
+        {
+            echo "=== dispatcher preflight (SDD routing) ==="
+            echo "Before acting on a request in this workspace:"
+            echo "1. Resolve the active context (above) and the OWNING role for the"
+            echo "   artifact class you are about to touch: backlog → project-manager;"
+            echo "   SPEC/PLAN/TASKS → product-engineer; hooks/agents/skills/rules/"
+            echo "   workflows (the AI surface) → ai-engineer audit; production code →"
+            echo "   software-engineer; reviews → code/security/qa reviewers."
+            echo "2. Owner-only artifacts are GATE-ENFORCED (sdd-spec-gate.sh runs on"
+            echo "   PreToolUse for every harness): a non-owner write to specs/backlog/**"
+            echo "   is blocked, not advisory. Route through the owning role instead."
+            echo "3. If the operator asks for multi-agent / deep / AI-surface work and a"
+            echo "   subagent or dispatch tool is not in your active tool set, DISCOVER it"
+            echo "   first (e.g. tool_search for the agent/dispatch tool) BEFORE starting"
+            echo "   the main task — do not silently proceed as a generic single agent."
+            echo "4. Limitation (truthful): this harness does NOT auto-spawn subagents"
+            echo "   from static .codex/.claude workflow files. Workflow files are"
+            echo "   reference docs; explicit dispatcher/operator fan-out is required."
+            echo "=== end dispatcher preflight ==="
+        } >> "$PAYLOAD_FILE"
     else
         # Context known but specs dir absent — inject nothing further, silently.
         emit_payload
