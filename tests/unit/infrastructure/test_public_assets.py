@@ -119,7 +119,7 @@ class TestPackageVersion:
         from importlib.metadata import PackageNotFoundError
 
         with patch(
-            "dadaia_workspace.infrastructure.public_assets.version",
+            "dadaia_workspace.infrastructure.public_assets_common.version",
             side_effect=PackageNotFoundError,
         ):
             assert _package_version() == "editable"
@@ -543,7 +543,7 @@ class TestConsumerReposForRoot:
 class TestIsSelfRepo:
     def test_manifest_matching_package_version_returns_true(self, tmp_path: Path) -> None:
         with patch(
-            "dadaia_workspace.infrastructure.public_assets._package_version",
+            "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
             return_value=_INSTALLED_VERSION,
         ):
             consumer = _add_marker_consumer(tmp_path, "self", pkg_version=_INSTALLED_VERSION)
@@ -553,7 +553,7 @@ class TestIsSelfRepo:
         self, tmp_path: Path
     ) -> None:
         with patch(
-            "dadaia_workspace.infrastructure.public_assets._package_version",
+            "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
             return_value=_INSTALLED_VERSION,
         ):
             different = _add_marker_consumer(tmp_path, "other", pkg_version=_OTHER_VERSION)
@@ -676,7 +676,7 @@ class TestInstallWorkspaceGuardrailPair:
     def test_self_repo_skipped(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         src = _make_source_file(tmp_path, "# AGENTS\n")
         with patch(
-            "dadaia_workspace.infrastructure.public_assets._package_version",
+            "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
             return_value=_INSTALLED_VERSION,
         ):
             _add_marker_consumer(tmp_path, "self-repo", pkg_version=_INSTALLED_VERSION)
@@ -786,7 +786,7 @@ class TestInstallConsumerReposGuardrailPair:
     def test_self_repo_skipped(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         src = _make_source_file(tmp_path, "# AGENTS\n")
         with patch(
-            "dadaia_workspace.infrastructure.public_assets._package_version",
+            "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
             return_value=_INSTALLED_VERSION,
         ):
             _add_marker_consumer(tmp_path, "self-repo", pkg_version=_INSTALLED_VERSION)
@@ -894,7 +894,7 @@ class TestDoctorGuardrailPair:
         (tmp_path / "AGENTS.md").write_text(content, encoding="utf-8")
         (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
         with patch(
-            "dadaia_workspace.infrastructure.public_assets._package_version",
+            "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
             return_value=_INSTALLED_VERSION,
         ):
             _add_marker_consumer(tmp_path, "self-repo", pkg_version=_INSTALLED_VERSION)
@@ -2085,7 +2085,7 @@ class TestInstanceConsumerRepos:
 class TestInstanceIsSelfRepo:
     def test_matching_version_returns_true(self, tmp_path: Path) -> None:
         with patch(
-            "dadaia_workspace.infrastructure.public_assets._package_version",
+            "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
             return_value=_INSTALLED_VERSION,
         ):
             consumer = _add_marker_consumer(tmp_path, "self", pkg_version=_INSTALLED_VERSION)
@@ -2094,7 +2094,7 @@ class TestInstanceIsSelfRepo:
 
     def test_different_version_returns_false(self, tmp_path: Path) -> None:
         with patch(
-            "dadaia_workspace.infrastructure.public_assets._package_version",
+            "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
             return_value=_INSTALLED_VERSION,
         ):
             consumer = _add_marker_consumer(tmp_path, "other", pkg_version=_OTHER_VERSION)
