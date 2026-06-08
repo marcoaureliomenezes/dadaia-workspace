@@ -513,7 +513,29 @@ class SpecsDoctor:
         issues.extend(self._check_cat1_catalog_sync())
         # LINT-1 (memory-markdown-source-v1) — invoke lint-memory-atoms.py
         issues.extend(self._check_lint1_memory_atoms())
+        # SPECS-VERSION (specs-evolution / FR-S05) — pattern-version staleness
+        issues.extend(self._check_specs_pattern_version())
         return issues
+
+    def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
+        """WARN-only: the tree's ``specs_pattern_version`` is below the canonical
+        version the library ships. Recommends ``dadaia specs upgrade`` (FR-S05)."""
+        from dadaia_workspace.core import specs_version as _ver
+
+        current = _ver.read_pattern_version(self.specs_dir)
+        if current >= _ver.CANONICAL_SPECS_VERSION:
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="SPECS-VERSION",
+                severity=Severity.WARNING,
+                description=(
+                    f"specs_pattern_version is {current}, below the canonical "
+                    f"{_ver.CANONICAL_SPECS_VERSION}. Run: dadaia specs upgrade"
+                ),
+                path=str(self.specs_dir / "constitution.md"),
+            )
+        ]
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
         """Apply auto-fixes for all fixable issues.

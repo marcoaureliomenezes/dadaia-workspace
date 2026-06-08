@@ -146,6 +146,75 @@ def doctor(
     sys.exit(1 if has_errors else 0)
 
 
+@app.command("upgrade")
+def upgrade(
+    specs_dir: str | None = typer.Option(
+        None, "--specs-dir", help="Path to specs/ directory. Default: bound context."
+    ),
+    target: int | None = typer.Option(
+        None, "--target", help="Target pattern version. Default: the canonical version."
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Plan only — no backup, no writes."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the interactive confirmation."),
+) -> None:
+    """Upgrade a specs/ tree to the canonical pattern version.
+
+    Backup-first (``specs_bkp/<from>→<to>-<UTC>/``) → apply the migration chain →
+    re-stamp the constitution → re-run ``dadaia specs doctor``. Idempotent: already
+    at target ⇒ no-op. On a non-clean doctor after upgrade, the backup is the
+    recovery point.
+    """
+    from dadaia_workspace.core import specs_version as _ver
+    from dadaia_workspace.features.migrate import upgrade as _upgrade_feat
+
+    resolved = _resolve_specs_dir(specs_dir)
+    current = _ver.read_pattern_version(resolved)
+    goal = _ver.CANONICAL_SPECS_VERSION if target is None else target
+
+    if current >= goal:
+        typer.echo(f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op.")
+        sys.exit(0)
+
+    if dry_run:
+        result = _upgrade_feat.upgrade(resolved, target=target, dry_run=True)
+        typer.echo(f"[dry-run] {current} → {result.to_version}")
+        typer.echo(f"  backup would be: {result.backup_path}")
+        for key, step_result in result.steps:
+            typer.echo(f"  step {key}: {len(step_result.moved)} move(s) planned")
+        sys.exit(0)
+
+    if not yes:
+        confirm = typer.confirm(
+            f"Upgrade {resolved} from pattern version {current} → {goal}? (a backup is taken first)"
+        )
+        if not confirm:
+            typer.echo("[abort] upgrade cancelled.")
+            sys.exit(1)
+
+    result = _upgrade_feat.upgrade(resolved, target=target)
+    typer.echo(f"[upgrade] {result.from_version} → {result.to_version}")
+    typer.echo(f"  backup: {result.backup_path}")
+    for key, step_result in result.steps:
+        for src, dst in step_result.moved:
+            typer.echo(f"  [{key}] moved {src} → {dst}")
+
+    # Verify with doctor; point at the backup if it does not come back clean.
+    doctor_svc = SpecsDoctor(
+        resolved, public_dir=_resolve_public_dir(resolved), templates_dir=_TEMPLATES_DIR
+    )
+    issues = doctor_svc.check()
+    errors = [i for i in issues if i.severity == Severity.ERROR]
+    if errors:
+        typer.echo(
+            f"[fail] doctor reports {len(errors)} error(s) after upgrade. "
+            f"Restore from: {result.backup_path}",
+            err=True,
+        )
+        sys.exit(1)
+    typer.echo(f"[ok] {resolved} upgraded to pattern version {result.to_version}; doctor clean.")
+    sys.exit(0)
+
+
 # Canonical templates directory — inside the installed package
 _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
 

@@ -218,6 +218,20 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
         with contextlib.suppress(Exception):
             container.build_public_service().install(ws, target="opencode", force=True)
+        # FR-S05/S06: a pre-existing specs/ tree below the canonical pattern version is
+        # only safe-preserved + add-missing-merged — never silently upgraded. Offer the
+        # backup-protected upgrade explicitly so structural drift is the operator's choice.
+        with contextlib.suppress(Exception):
+            from dadaia_workspace.core import specs_version as _ver
+
+            specs_dir = ws / "repos" / ctx.repo_slug / "specs"
+            current = _ver.read_pattern_version(specs_dir)
+            if current < _ver.CANONICAL_SPECS_VERSION:
+                console.print(
+                    f"[yellow]![/yellow] specs pattern version {current} is below the "
+                    f"canonical {_ver.CANONICAL_SPECS_VERSION}. Run "
+                    f"[bold]dadaia specs upgrade[/bold] (backup-protected) to migrate."
+                )
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None

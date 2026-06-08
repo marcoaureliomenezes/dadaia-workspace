@@ -307,7 +307,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Comment is corrected; chosen path is implemented and tested; PLAN states
   which path was taken.
 
-[ ] T-016-S01
+[x] T-016-S01
 
 ### T-016-S02 — Pattern version stamp in constitution.md
 
@@ -321,7 +321,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `constitution.md` has valid YAML frontmatter with version stamp;
   library constant exists; absent-stamp treated as v0.
 
-[ ] T-016-S02
+[x] T-016-S02
 
 ### T-016-S03 — Migration-chain registry
 
@@ -333,7 +333,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   first step.
 - **Done criterion:** Registry exists; `tree-v2` is registered; idempotency tests pass.
 
-[ ] T-016-S03
+[x] T-016-S03
 
 ### T-016-S04 — Backup-first implementation
 
@@ -346,7 +346,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Backup created on every migration run; gitignored; `dadaia doctor`
   does not flag `specs_bkp/`.
 
-[ ] T-016-S04
+[x] T-016-S04
 
 ### T-016-S05 — `dadaia specs upgrade` command
 
@@ -359,7 +359,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** All flags work; `--dry-run` produces correct plan; integration test
   passes; doctor exits 0 on success.
 
-[ ] T-016-S05
+[x] T-016-S05
 
 ### T-016-S06 — Doctor + create/alive integration for upgrade
 
@@ -373,7 +373,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Doctor warn fires on a below-version tree; `context alive` on a
   stale-pattern tree offers upgrade; regression test covers both paths.
 
-[ ] T-016-S06
+[x] T-016-S06
 
 ---
 

@@ -168,6 +168,37 @@ def test_alive_with_preexisting_specs_adds_missing_files_without_overwriting(
         assert specs_dir.exists(), "specs/ must still exist after merge"
 
 
+def test_alive_safe_preserves_preexisting_specs_to_backup(
+    workspace_root: Path,
+    store: FakeContextStore,
+    git: FakeGitClient,
+) -> None:
+    """FR-S06 path a / T-016-S01: when a pre-existing specs/ is merge-enriched, the
+    exact prior tree is snapshotted to specs_bkp/preserve-<UTC>/ first (safe-preserve),
+    making the v0.2.1 T-021-15 claim literally true."""
+    if not _SCAFFOLD_SRC.exists():
+        return  # merge only runs when the scaffold source exists
+
+    svc = SpecContextService(
+        context_store=store,
+        git_client=git,
+        workspace_root=workspace_root,
+    )
+    svc.create("projbk", "repobk", "https://github.com/org/repobk")
+    repo_dir = workspace_root / "repos" / "repobk"
+    specs_dir = repo_dir / "specs"
+    specs_dir.mkdir(parents=True, exist_ok=True)
+    # An operator file so the merge has a tree worth preserving.
+    (specs_dir / "constitution.md").write_text("# operator\n", encoding="utf-8")
+
+    svc.alive("projbk")
+
+    # A backup snapshot of the pre-existing tree exists under specs_bkp/preserve-*.
+    backups = list((repo_dir / "specs_bkp").glob("preserve-*"))
+    assert backups, "alive() must safe-preserve the pre-existing specs/ before merging"
+    assert (backups[0] / "constitution.md").read_text(encoding="utf-8") == "# operator\n"
+
+
 def test_alive_with_preexisting_specs_does_not_silently_skip(
     workspace_root: Path,
     store: FakeContextStore,

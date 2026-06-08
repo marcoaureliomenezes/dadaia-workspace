@@ -1,3 +1,7 @@
+---
+specs_pattern_version: 1
+---
+
 # Constitution — dadaia-workspace
 
 This document is the permanent product law for `dadaia-workspace`. Agents and

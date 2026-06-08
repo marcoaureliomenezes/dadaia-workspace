@@ -143,3 +143,7 @@ pip-wheel-metadata/
 
 # Operator private working draft — never commit
 docs/00_medium_mine.md
+
+# specs-evolution migration backups (FR-S04) — never tracked
+specs_bkp/
+**/specs_bkp/
