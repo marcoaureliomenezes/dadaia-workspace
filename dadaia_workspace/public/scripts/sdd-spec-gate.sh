@@ -105,12 +105,22 @@ case "$FPATH" in
     */specs/memory/*) CLASS=MEMORY ;;
     */specs/_archive/*) CLASS=FROZEN ;;
     */specs/releases/*) CLASS=MUTATING ;;
+    # T-017-15 / SEC-01 (CWE-284): .dadaia/sessions/ holds CLI-owned runtime
+    # session state, incl. the persona pointers the backlog-ownership fallback
+    # trusts. Agents must NOT be able to write these via Write/Edit, else a
+    # confused-deputy agent could forge a project-manager persona pointer and
+    # bypass the owner-only backlog gate. The dadaia CLI/bootstrap writes these
+    # via Python (outside the tool gate), so it is unaffected by this block.
+    */.dadaia/sessions/*) CLASS=PROTECTED ;;
     *) CLASS=UNGATED ;;
 esac
 if [ "$CLASS" = "UNGATED" ] && [ -n "$CONTEXT_SLUG" ]; then
     case "$FPATH" in "$WS/repos/$CONTEXT_SLUG/"*) CLASS=MUTATING ;; esac
 fi
 _log "class=$CLASS ctx=${CONTEXT_SLUG:-<none>} session=$SESSION_ID"
+if [ "$CLASS" = "PROTECTED" ]; then
+    _block "[GATE] .dadaia/sessions/ is CLI-owned runtime state (incl. persona pointers the backlog-ownership gate trusts). Agents must not write here via Write/Edit — only the dadaia CLI/bootstrap may. Blocked to prevent persona-pointer forgery (SEC-01 / CWE-284, rule: backlog-ownership)."
+fi
 [ "$CLASS" = "UNGATED" ] && exit 0
 if [ "$CLASS" = "ADDITIVE" ]; then
     case "$FPATH" in
