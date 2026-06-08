@@ -62,6 +62,15 @@ test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, and 
   await expect(page.locator('#workflows-grid')).toBeAttached();
   // Kanban board must be in the DOM
   await expect(page.locator('#kanban-board')).toBeAttached();
+
+  // Subsection order: Kanban (top) → Workflows → Agents (bottom) — T-016-P11
+  const subsectionIds = await page.$$eval(
+    '#section-ops .ops-subsection',
+    (els) => els.map((el) => el.id)
+  );
+  expect(subsectionIds[0]).toBe('ops-subsection-kanban');
+  expect(subsectionIds[1]).toBe('ops-subsection-workflows');
+  expect(subsectionIds[2]).toBe('ops-subsection-agents');
 });
 
 // ---------------------------------------------------------------------------
