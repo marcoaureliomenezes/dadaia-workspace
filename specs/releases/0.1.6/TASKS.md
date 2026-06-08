@@ -267,7 +267,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `dadaia clean --dry-run` lists stale files; `dadaia clean` removes
   them; no operator file ever deleted; unit tests pass.
 
-[-] T-016-Z03
+[x] T-016-Z03
 
 ### T-016-Z04 — Fix malformed duplicate UserPromptSubmit hook write
 
@@ -286,7 +286,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `/doctor` no longer reports the malformed-array error; settings has one
   well-formed UserPromptSubmit entry; unit test green.
 
-[ ] T-016-Z04
+[x] T-016-Z04
 
 ---
 
@@ -760,8 +760,24 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   constraints, success criteria, assumptions; clarifying questions); (2) Research
   Existing Solutions (WebSearch tools/patterns/pitfalls/comparisons; evaluate
   maturity/fit/integration/cost/risk). Both persona and skill must be slop-free:
-  clear, organized, non-verbose, direct. Then run
-  `dadaia public stage && install --target all && doctor`.
+  clear, organized, non-verbose, direct.
+  **Operator mandate (2026-06-07) — add to the persona as release/spec review gate:**
+  In every spec/release review the architect MUST enforce two non-negotiable gates:
+  (a) **Root-cause gate:** every bug fix in the release addresses the actual root cause,
+  not a workaround; if a workaround is detected, the architect REJECTS the solution and
+  documents the root cause and required fix (the architect understands the difference
+  between a workaround and a root-cause fix and its downstream consequences: fragile
+  layers, hard-to-track side-effect bugs);
+  (b) **Architecture fidelity gate:** the SPEC correctly represents the architecture —
+  right abstractions, layers, and boundaries; if the SPEC misrepresents the
+  architecture, the architect REJECTS it with the required correction.
+  Both gates produce a REJECTED verdict if not satisfied; they are part of the
+  anti-slop specialization, alongside anti-spaghetti / strong-layers / Core-Workflow.
+  **Backlog reconciliation (mandatory):** `specs/backlog/software-architect-anti-slop-specialization.md`
+  (FEAT-SA-ANTISLOP-01) and `specs/backlog/software-architect-workspace-specialization.md`
+  (FEAT-SA-WORKSPACE-SPEC-01) MUST be reconciled into one acceptance set at execution time;
+  do not delete either file — annotate one as superseded by the other at the task level.
+  Then run `dadaia public stage && install --target all && doctor`.
 - **Done criterion:** `software-architect` persona reflects the anti-slop mandate
   (clear/non-verbose); the Core Workflow skill exists and is scoped appropriately;
   `dadaia public doctor` exits 0; no dangling refs.

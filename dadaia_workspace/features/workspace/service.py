@@ -105,8 +105,14 @@ class WorkspaceService:
             dest.chmod(0o755)
 
     def _configure_hook(self, workspace: Workspace) -> None:
-        hook_script = workspace.dadaia_dir / "scripts" / "ctx-inject.sh"
-        hook_entry = {"type": "command", "command": str(hook_script)}
+        hook_command = str(workspace.dadaia_dir / "scripts" / "ctx-inject.sh")
+        # Canonical Claude Code hook schema: a matcher entry carrying a nested
+        # `hooks` array. This is the same schema `public_assets.py` writes, so
+        # the two paths agree and never produce a malformed duplicate entry.
+        hook_entry = {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": hook_command}],
+        }
 
         claude_dir = workspace.claude_dir
         claude_dir.mkdir(parents=True, exist_ok=True)
@@ -121,9 +127,27 @@ class WorkspaceService:
 
         hooks = settings.setdefault("hooks", {})
         existing = hooks.get(_HOOK_KEY, [])
-        already_installed = any(
-            isinstance(e, dict) and e.get("command") == hook_entry["command"] for e in existing
-        )
-        if not already_installed:
-            hooks[_HOOK_KEY] = existing + [hook_entry]
-            settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+        if self._hook_command_present(existing, hook_command):
+            return
+        hooks[_HOOK_KEY] = existing + [hook_entry]
+        settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _hook_command_present(existing: object, hook_command: str) -> bool:
+        """True if ``hook_command`` is already registered, in either the nested
+        canonical schema (``entry["hooks"][i]["command"]``) or the legacy flat
+        schema (``entry["command"]``). Detecting both prevents the duplicate
+        malformed entry that broke Claude Code settings validation."""
+        if not isinstance(existing, list):
+            return False
+        for entry in existing:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("command") == hook_command:
+                return True
+            nested = entry.get("hooks")
+            if isinstance(nested, list) and any(
+                isinstance(h, dict) and h.get("command") == hook_command for h in nested
+            ):
+                return True
+        return False

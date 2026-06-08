@@ -78,6 +78,69 @@ def test_is_initialized_true_after_init(service: WorkspaceService, workspace_roo
     assert service.is_initialized(workspace_root)
 
 
+def _user_prompt_submit(settings_path: Path) -> list:  # type: ignore[type-arg]
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    return data["hooks"]["UserPromptSubmit"]
+
+
+def test_configure_hook_writes_canonical_nested_schema(
+    service: WorkspaceService, workspace_root: Path
+) -> None:
+    """_configure_hook must write the canonical nested Claude Code hook schema
+    (a matcher entry with a nested `hooks` array), never the legacy flat entry."""
+    from dadaia_workspace.core.models.workspace import Workspace
+
+    ws = Workspace.from_root(workspace_root)
+    service._configure_hook(ws)
+
+    entries = _user_prompt_submit(ws.claude_dir / "settings.json")
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["matcher"] == ""
+    assert isinstance(entry["hooks"], list) and entry["hooks"]
+    assert entry["hooks"][0]["type"] == "command"
+    assert entry["hooks"][0]["command"].endswith("ctx-inject.sh")
+    # Legacy flat schema must not leak to the top level.
+    assert "command" not in entry
+
+
+def test_configure_hook_no_duplicate_against_existing_nested_entry(
+    service: WorkspaceService, workspace_root: Path
+) -> None:
+    """Given the nested entry public_assets.py already wrote, _configure_hook must
+    detect it via the nested command and NOT append a duplicate (the bug that broke
+    Claude Code settings validation: hooks.UserPromptSubmit.1.hooks Expected array)."""
+    from dadaia_workspace.core.models.workspace import Workspace
+
+    ws = Workspace.from_root(workspace_root)
+    hook_command = str(ws.dadaia_dir / "scripts" / "ctx-inject.sh")
+    ws.claude_dir.mkdir(parents=True, exist_ok=True)
+    settings_path = ws.claude_dir / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "UserPromptSubmit": [
+                        {
+                            "matcher": "",
+                            "hooks": [{"type": "command", "command": hook_command}],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    service._configure_hook(ws)
+
+    entries = _user_prompt_submit(settings_path)
+    assert len(entries) == 1, "must not append a duplicate UserPromptSubmit entry"
+    # Every entry is schema-valid: carries a nested hooks array.
+    for entry in entries:
+        assert isinstance(entry.get("hooks"), list)
+
+
 def test_init_creates_server_registry_json(tmp_path: Path) -> None:
     WorkspaceService(
         public_assets=FakePublicAssetManager(),
