@@ -94,7 +94,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** No `subprocess.Popen` or `os.kill` in `features/` layer; state
   survives panel restart; unit test green.
 
-[ ] T-016-P06
+[-] T-016-P06
 
 ### T-016-P07 — Theme switcher functional fix
 
