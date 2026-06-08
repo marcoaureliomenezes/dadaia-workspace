@@ -176,7 +176,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Agentic tab renders Kanban first, Workflows second, Agents third;
   e2e green with E2E-GUARD-01/02 active.
 
-[ ] T-016-P11
+[-] T-016-P11
 
 ### T-016-P12 — Agent cards ~40% smaller + layout tightening
 
