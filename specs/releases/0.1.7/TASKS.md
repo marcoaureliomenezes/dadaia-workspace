@@ -188,7 +188,7 @@ returns empty (import removed). `pytest` exits 0; panel integration tests pass.
 
 ## Wave 3 — Refactors (public_assets.py)
 
-### [ ] T-017-09
+### [-] T-017-09
 **Finding:** D-06 / AR-04
 **Title:** Collapse triplicated guardrail-pair install functions + merge duplicate consumer-repo discovery
 **Owner:** software-engineer
