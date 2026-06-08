@@ -253,7 +253,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** All four checks present; tests pass; `dadaia doctor` ROOT-1..ROOT-4
   exit 0 on the clean live workspace.
 
-[ ] T-016-Z02
+[-] T-016-Z02
 
 ### T-016-Z03 — Canonical `.dadaia/` layout + `dadaia clean` command
 
