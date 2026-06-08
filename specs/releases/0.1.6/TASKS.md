@@ -118,7 +118,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   improved"). Operator reviews the redesign before rc-N ship.
 - **Done criterion:** Operator-reviewed visual redesign; e2e tests pass E2E-GUARD-01/02.
 
-[-] T-016-P08
+[x] T-016-P08
 
 ### T-016-P09 — Tab consolidation (Agents + Workflows + Kanban → one tab)
 

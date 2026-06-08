@@ -87,11 +87,21 @@ def render_index(
         aria-label="Switch colour theme" aria-controls="theme-menu">
         <span class="theme-btn-icon" aria-hidden="true">&#9680;</span>
         <span class="theme-btn-label">Theme</span>
+        <span class="theme-btn-caret" aria-hidden="true">&#9660;</span>
       </button>
       <ul id="theme-menu" role="menu" aria-label="Colour themes" hidden>
-        <li role="menuitemradio" tabindex="-1" aria-checked="true" data-theme-value="mint">Mint</li>
-        <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="sage">Sage</li>
-        <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="warm">Warm</li>
+        <li role="menuitemradio" tabindex="-1" aria-checked="true" data-theme-value="mint">
+          <span class="theme-swatch-dot theme-swatch-dot--mint" aria-hidden="true"></span>
+          <span class="theme-label">Mint</span>
+        </li>
+        <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="sage">
+          <span class="theme-swatch-dot theme-swatch-dot--sage" aria-hidden="true"></span>
+          <span class="theme-label">Sage</span>
+        </li>
+        <li role="menuitemradio" tabindex="-1" aria-checked="false" data-theme-value="warm">
+          <span class="theme-swatch-dot theme-swatch-dot--warm" aria-hidden="true"></span>
+          <span class="theme-label">Warm</span>
+        </li>
       </ul>
     </div>
     </div>
