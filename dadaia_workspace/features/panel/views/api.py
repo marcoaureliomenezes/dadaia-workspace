@@ -90,13 +90,9 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.features.agents.reader import (
-    AgentNotFoundError,
-    InvalidAgentIdError,
-    get_prompt,
-)
+from dadaia_workspace.core.models.agent import AgentNotFoundError, InvalidAgentIdError
+from dadaia_workspace.core.models.telemetry import AgentSummary
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +385,8 @@ def render_api_agent_prompt(
 
     def _view(agent_id: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
         try:
-            body, source_path = get_prompt(agent_id, service.workspace_root)
+            prompt = service.get_agent_prompt(agent_id)
+            body, source_path = prompt.body, prompt.source_path
         except InvalidAgentIdError as exc:
             logger.warning("render_api_agent_prompt: invalid agent_id=%r: %s", agent_id, exc)
             error_body = json.dumps(

@@ -18,9 +18,11 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.models.agent import AgentPromptResult
 from dadaia_workspace.features.agents.reader import (
     _AGENT_ID_RE,
     AgentNotFoundError,
+    FileSystemAgentsProvider,
     InvalidAgentIdError,
     _strip_frontmatter,
     get_prompt,
@@ -41,7 +43,13 @@ def _write_agent(agents_dir: Path, agent_id: str, body: str = "You are a test ag
 
 
 class _FakeService:
-    """Minimal fake of PanelService exposing the public ``workspace_root``."""
+    """Minimal fake of PanelService exposing ``workspace_root`` + ``get_agent_prompt``.
+
+    ``get_agent_prompt`` delegates to the real ``FileSystemAgentsProvider`` so the
+    view tests still exercise genuine prompt resolution, traversal defence, and
+    not-found behavior (NEW-01: the view depends on the service method now, not
+    the module-level ``get_prompt``).
+    """
 
     def __init__(self, workspace_root: Path) -> None:
         self._workspace_root = workspace_root
@@ -49,6 +57,9 @@ class _FakeService:
     @property
     def workspace_root(self) -> Path:
         return self._workspace_root
+
+    def get_agent_prompt(self, agent_id: str) -> AgentPromptResult:
+        return FileSystemAgentsProvider().get_prompt(agent_id, self._workspace_root)
 
 
 # ---------------------------------------------------------------------------

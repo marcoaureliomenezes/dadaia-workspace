@@ -318,7 +318,7 @@ carve-outs (mirroring the releases pattern) that track ONLY `*.md` under
 **Done criterion:** `git check-ignore specs/audits/<id>/index.md` returns empty
 (tracked). `git ls-files specs/audits/` lists the audit + re-audit `.md` files.
 
-### [ ] T-017-17
+### [x] T-017-17
 **Finding:** NEW-02
 **Title:** `AgentsProvider` protocol — panel/service.py off concrete `agents.reader`
 **Owner:** software-engineer
@@ -332,7 +332,7 @@ sibling feature. Wire the concrete impl in `container.py`.
 **Done criterion:** `grep 'from dadaia_workspace.features.agents.reader' dadaia_workspace/features/panel/service.py`
 returns empty. `mypy --strict` + `pytest` green.
 
-### [ ] T-017-18
+### [x] T-017-18
 **Finding:** NEW-01
 **Title:** panel/views/api.py — remove residual `agents.reader` + telemetry imports
 **Owner:** software-engineer

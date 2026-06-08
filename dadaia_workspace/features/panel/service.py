@@ -39,14 +39,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.models.agent import AgentDTO, AgentPromptResult
 from dadaia_workspace.core.models.server_registry import PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO
+from dadaia_workspace.core.protocols.agents_provider import AgentsProvider
 from dadaia_workspace.core.protocols.context_project_provider import ContextProjectProvider
 from dadaia_workspace.core.protocols.server_registry_provider import ServerRegistryProvider
 from dadaia_workspace.core.protocols.workflow_launcher import WorkflowLauncher
 from dadaia_workspace.core.protocols.workflow_provider import WorkflowProvider
-from dadaia_workspace.features.agents.reader import AgentDTO, read_canonical_agents
 
 
 @dataclass
@@ -133,6 +134,7 @@ class PanelService:
         workflows_service: WorkflowProvider | None = None,
         report_retention: Any = None,
         adapter_registry: dict[str, Any] | None = None,
+        agents_provider: AgentsProvider | None = None,
     ) -> None:
         """Initialise PanelService.
 
@@ -189,6 +191,9 @@ class PanelService:
         self._adapter_registry: dict[str, Any] = (
             adapter_registry if adapter_registry is not None else {}
         )
+        # NEW-02: agents read surface injected via the AgentsProvider protocol;
+        # lazy fallback keeps callers that do not inject one working.
+        self._agents_provider = agents_provider
 
     # ------------------------------------------------------------------
     # Public API
@@ -287,10 +292,28 @@ class PanelService:
         svc = override if override is not None else self._workflows_svc()
         return svc.list_summaries()
 
+    def _agents(self) -> AgentsProvider:
+        """Return the injected AgentsProvider.
+
+        NEW-02: PanelService depends only on the ``AgentsProvider`` protocol —
+        no concrete sibling-feature import (module-level or lazy). The
+        composition root (container.py) always injects ``FileSystemAgentsProvider``;
+        callers that do not inject one receive a clear error (same fail-clear
+        contract as ``_workflows_svc``). For tests, set ``_canonical_agents_override``
+        or pass a fake ``agents_provider``.
+        """
+        if self._agents_provider is None:
+            raise RuntimeError(
+                "PanelService requires an AgentsProvider to be injected via "
+                "'agents_provider'. The composition root (container.py) always "
+                "provides one; pass a fake for tests."
+            )
+        return self._agents_provider
+
     def list_canonical_agents(self) -> list[AgentDTO]:
         """Return the canonical agent catalog.
 
-        Resolution order (delegated to read_canonical_agents):
+        Resolution order (delegated to the AgentsProvider):
           1. $DADAIA_AGENTS_DIR env var
           2. <workspace_root>/.dadaia/agentic/agents/
           3. <workspace_root>/.claude/agents/
@@ -301,7 +324,17 @@ class PanelService:
         override = getattr(self, "_canonical_agents_override", None)
         if override is not None:
             return list(override)
-        return read_canonical_agents(self._workspace_root)
+        return self._agents().read_canonical_agents(self._workspace_root)
+
+    def get_agent_prompt(self, agent_id: str) -> AgentPromptResult:
+        """Resolve an agent ID to its system prompt and source path.
+
+        NEW-01: the panel view layer calls this instead of importing
+        ``features.agents.reader.get_prompt`` directly. Raises the core-typed
+        ``InvalidAgentIdError`` / ``AgentNotFoundError`` from
+        ``core.models.agent`` on bad input / missing agent.
+        """
+        return self._agents().get_prompt(agent_id, self._workspace_root)
 
     def get_report_retention(self) -> Any:
         """Return the injected ReportRetentionService.

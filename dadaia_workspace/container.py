@@ -11,6 +11,7 @@ from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
 from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
+from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
@@ -201,6 +202,7 @@ def build_panel_service(
         workflows_service=build_workflow_catalog_service(workspace_root),
         report_retention=ReportRetentionService(workspace_root),
         adapter_registry=dict(ADAPTER_REGISTRY),
+        agents_provider=FileSystemAgentsProvider(),
     )
 
 
