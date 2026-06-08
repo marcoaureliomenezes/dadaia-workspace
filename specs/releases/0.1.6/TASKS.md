@@ -194,7 +194,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   layout; axe accessibility checks pass; E2E-GUARD-01/02 green; any agent-card axe tests
   pass.
 
-[-] T-016-P12
+[x] T-016-P12
 
 ### T-016-P13 — Kanban 4-stage lifecycle columns (constitution §7)
 
@@ -222,7 +222,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   Implementation + Review / Closure; impl and review contexts appear in the combined
   column; unit tests and e2e specs green; E2E-GUARD-01/02 active.
 
-[ ] T-016-P13
+[-] T-016-P13
 
 ---
 
