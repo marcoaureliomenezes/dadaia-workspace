@@ -240,7 +240,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   `--workspace /tmp/freshws` from inside an existing workspace writes only to `/tmp/freshws`.
 - **Done criterion:** Unit test passes; no silent ancestor-workspace mutation.
 
-[-] T-016-Z01
+[x] T-016-Z01
 
 ### T-016-Z02 — ROOT doctor invariants (ROOT-1..ROOT-4)
 
