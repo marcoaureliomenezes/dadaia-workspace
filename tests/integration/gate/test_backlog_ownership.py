@@ -221,11 +221,12 @@ def test_harness_specific_env_resolves_persona(tmp_path: Path) -> None:
     assert "product-engineer" in data["reason"]
 
 
-def test_payload_meta_not_parsed_fail_open(tmp_path: Path) -> None:
-    """The new gate (v0.1.6) does NOT parse _meta.agent_persona from the payload.
+def test_payload_meta_not_parsed_blocks_when_persona_unresolved(tmp_path: Path) -> None:
+    """The gate does NOT parse _meta.agent_persona — persona must come via env vars.
 
-    Persona must come via env vars (DADAIA_/CLAUDE_/CODEX_/OPENCODE_AGENT_PERSONA).
-    With no env persona and only payload _meta → gate fails open (allowed).
+    T-016-C03 (FORK-4): with no env persona, a backlog write is FAIL-SAFE-BLOCKED.
+    The older fail-open was reclassified a bug in the 0.1.6 grill — owner-only paths
+    never silently allow an unresolved writer.
     """
     ws = _build_workspace(tmp_path, agents=["researcher", "project-manager"])
     target = str(ws / "specs" / "backlog" / "x.md")
@@ -235,11 +236,13 @@ def test_payload_meta_not_parsed_fail_open(tmp_path: Path) -> None:
         tool="Write",
         file_path=target,
         payload_meta={"agent_persona": "researcher"},
-        # No env persona set
+        # No env persona set → unresolved → blocked.
     )
     assert rc == 0
-    # Without an env-var persona the gate fails open — no block emitted
-    assert stdout.strip() == "" or "BACKLOG OWNERSHIP ERROR" not in stdout
+    data = json.loads(stdout.strip())
+    assert data["decision"] == "block"
+    assert "[BACKLOG OWNERSHIP ERROR]" in data["reason"]
+    assert "unresolved" in data["reason"]
 
 
 def test_dadaia_persona_takes_priority(tmp_path: Path) -> None:
@@ -266,20 +269,22 @@ def test_dadaia_persona_takes_priority(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_persona_undetectable_fail_open(tmp_path: Path) -> None:
-    """No persona signal at all → fail-open (allowed), consistent with RULE D.
+def test_persona_undetectable_blocks_owner_only_backlog(tmp_path: Path) -> None:
+    """No persona signal at all → FAIL-SAFE-BLOCK on the owner-only backlog path.
 
-    New gate does not emit "FAIL-OPEN backlog-ownership" — it simply allows
-    via the ADDITIVE path when no persona env var is set.
+    T-016-C03 (FORK-4): owner-only paths never silently allow an unresolved writer.
+    This is the narrow exception to the gate's fail-open default — it does not touch
+    the lease/production path, so it cannot reintroduce the lease soft-deadlock.
     """
     ws = _build_workspace(tmp_path, agents=["project-manager"])
     target = str(ws / "specs" / "backlog" / "x.md")
 
     stdout, rc, log = _run_gate(ws, tool="Write", file_path=target)
     assert rc == 0
-    # No persona → no [BACKLOG OWNERSHIP ERROR] block
-    assert "[BACKLOG OWNERSHIP ERROR]" not in stdout
-    assert stdout.strip() == ""
+    data = json.loads(stdout.strip())
+    assert data["decision"] == "block"
+    assert "[BACKLOG OWNERSHIP ERROR]" in data["reason"]
+    assert "unresolved" in data["reason"]
 
 
 def test_block_fires_regardless_of_session(tmp_path: Path) -> None:

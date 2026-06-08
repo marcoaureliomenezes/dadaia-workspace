@@ -161,8 +161,11 @@ Matcher semantics — the detail that bites:
 > `"matcher": ""` runs on `Read`, `Grep`, `Glob`, `WebFetch`, `TaskCreate` — taxing every
 > call and making enforcement hard to reason about. Scope write-gates to
 > `"Edit|Write|MultiEdit|NotebookEdit"` (add `Bash` only if the gate genuinely inspects
-> shell-side writes). Leave `UserPromptSubmit` context-injection unmatched — it *should*
-> fire every prompt.
+> shell-side writes). Leave `UserPromptSubmit` context-injection unmatched — the hook
+> *should* fire every prompt, but it injects the **full** static context only **once per
+> logical session** (a session-keyed sentinel makes every later prompt a silent no-op).
+> Hooks may fire every prompt; full static context loads once per session. Never wire a
+> hook that re-injects the whole bootstrap on each prompt — that is token waste and drift.
 
 Failure modes and the right primitive:
 - PreToolUse is a guardrail, not a hard boundary: a script that writes files itself can slip

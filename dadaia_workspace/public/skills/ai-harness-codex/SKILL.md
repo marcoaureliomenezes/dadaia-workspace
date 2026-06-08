@@ -292,6 +292,12 @@ Authoring consequences:
 Codex hooks can fire on: `SessionStart`, `UserPromptSubmit`, `PreToolUse`,
 `PostToolUse`, `PreCompact`, `PostCompact`, `SubagentStart`, `SubagentStop`, `Stop`.
 
+> **Inject full context once per session, not every prompt.** Wire the full static
+> context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the
+> `session_id` Codex passes on stdin. `UserPromptSubmit` hooks may fire every prompt,
+> but the bootstrap must stay a silent no-op after the first injection (session-keyed
+> sentinel). Re-injecting the whole bootstrap per prompt is token waste and drift.
+
 ### Lifecycle deltas vs Claude Code (authoring-relevant)
 
 | Property | Consequence for authoring |

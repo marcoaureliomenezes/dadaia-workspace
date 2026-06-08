@@ -441,7 +441,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   known agents; `SessionStart` routes active context + owning-role map; test covers the
   persona-empty path to `specs/backlog/**` being blocked; no silent fall-through.
 
-[ ] T-016-C03
+[x] T-016-C03
 
 ### T-016-C04 — CX-1: Fix Codex agent semantic projection
 
@@ -454,7 +454,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** `ai-engineer.toml` references real `ai-harness-claude-code` skill;
   golden tests pass; `dadaia public doctor` exits 0.
 
-[ ] T-016-C04
+[x] T-016-C04
 
 ### T-016-C05 — CX-2: Codex-native command Rules
 
@@ -468,7 +468,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** Sensitive commands have explicit allow/prompt/forbid policy; Starlark
   `.rules` are valid; security-reviewer APPROVED handoff before push.
 
-[ ] T-016-C05
+[x] T-016-C05
 
 ### T-016-C06 — CX-3: Codex hook live smoke test
 
@@ -480,7 +480,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   Codex JSON.
 - **Done criterion:** All three hook behaviors proven by smoke test.
 
-[ ] T-016-C06
+[x] T-016-C06
 
 ### T-016-C07 — CX-4: Codex custom-agent config mapping
 
@@ -492,7 +492,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   provider/auth/telemetry config).
 - **Done criterion:** Activity-class → config mapping documented and tested; TOML validates.
 
-[ ] T-016-C07
+[x] T-016-C07
 
 ### T-016-C08 — CX-5: Codex subagent/orchestration truth update
 
@@ -506,7 +506,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** No obsolete "Codex reference-only" blanket wording where it contradicts
   current Codex docs; memory matches current Codex runtime.
 
-[ ] T-016-C08
+[x] T-016-C08
 
 ### T-016-C09 — CX-6: Harness-neutral protocol references
 
@@ -518,7 +518,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   phrase. Doctor fails if `.codex/agents/*.toml` contains stale Claude-only governance paths.
 - **Done criterion:** No `.claude/rules` references in Codex agents; doctor check added.
 
-[ ] T-016-C09
+[x] T-016-C09
 
 ### T-016-C10 — CX-7: Semantic doctor + CI gate
 
@@ -531,7 +531,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** All 8 non-negotiable invariants from `full-codex-compatibility.md §2`
   hold; `dadaia public doctor` exits 0 on a canonical workspace.
 
-[ ] T-016-C10
+[x] T-016-C10
 
 ### T-016-C11 — Context-engineering documentation correction
 
@@ -545,7 +545,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** No skill or memory atom implies repeated full-bootstrap injection;
   harness skills and memory agree.
 
-[ ] T-016-C11
+[x] T-016-C11
 
 ---
 

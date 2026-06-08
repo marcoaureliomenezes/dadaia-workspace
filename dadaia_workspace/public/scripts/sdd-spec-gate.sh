@@ -115,8 +115,15 @@ _log "class=$CLASS ctx=${CONTEXT_SLUG:-<none>} session=$SESSION_ID"
 if [ "$CLASS" = "ADDITIVE" ]; then
     case "$FPATH" in
         */specs/backlog/*)
+            # T-016-C03 (FORK-4): backlog is owner-only — fail-safe-BLOCK, never
+            # silently allow. An unresolved/empty persona is blocked too (the prior
+            # fail-open was reclassified a bug in the 0.1.6 grill). This is the narrow
+            # owner-only exception to the gate's fail-open default; it does not touch
+            # the lease/production path, so it cannot reintroduce the lease deadlock.
             PERSONA="${DADAIA_AGENT_PERSONA:-${CLAUDE_AGENT_PERSONA:-${CODEX_AGENT_PERSONA:-${OPENCODE_AGENT_PERSONA:-}}}}"
-            if [ -n "$PERSONA" ] && [ "$PERSONA" != "project-manager" ]; then
+            if [ -z "$PERSONA" ]; then
+                _block "[BACKLOG OWNERSHIP ERROR] writer persona unresolved — only project-manager may write specs/backlog/. Set DADAIA_AGENT_PERSONA=project-manager (the owning role) and retry (rule: backlog-ownership)."
+            elif [ "$PERSONA" != "project-manager" ]; then
                 _block "[BACKLOG OWNERSHIP ERROR] agent ${PERSONA} cannot write to specs/backlog/ — only project-manager creates or edits backlog entries (rule: backlog-ownership)."
             fi ;;
     esac
