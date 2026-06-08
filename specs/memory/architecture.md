@@ -275,13 +275,13 @@ O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto.
 
 O bootstrap injetado é **tech-stack + catalog apenas** (~2.400 tokens). `architecture.md` é intencionalmente não injetado — é large e é self-pulled pelos agentes antes de qualquer trabalho arquitetural ou cross-layer, exatamente como feature atoms são pulled on demand.
 
-### ctx-inject.sh (Claude Code + OpenCode)
+### ctx-inject.sh (Claude Code + Codex + OpenCode)
 
-`dadaia_workspace/public/scripts/ctx-inject.sh` — lib-originated, projetado para `.dadaia/scripts/ctx-inject.sh`. Fires em cada `UserPromptSubmit` em Claude Code e em cada `chat.message` em OpenCode.
+`dadaia_workspace/public/scripts/ctx-inject.sh` — lib-originated, projetado para `.dadaia/scripts/ctx-inject.sh`. Em Codex roda no `SessionStart` (matcher `startup|resume`) carregando o contexto completo **uma vez por sessão**; em Claude Code roda no `UserPromptSubmit` e em OpenCode no `chat.message`. Os hooks podem disparar a cada prompt, mas a injeção completa ocorre só uma vez por sessão lógica.
 
 O script:
 1. Resolve `$SPECS_DIR` de `$DADAIA_CONTEXT`, session file ligado, ou flags explícitos.
-2. Verifica sentinel de first-message em `.dadaia/tmp/ctx-inject-fired-<SESSION_ID>`. Se existir, emite apenas a linha de context-name e sai — sem re-injeção em turns subsequentes da mesma sessão.
+2. Resolve um `SESSION_ID` **estável** (env `CLAUDE_CODE_SESSION_ID`/`CODEX_SESSION_ID`/`OPENCODE_SESSION_ID`, depois o `session_id` que o Codex passa no stdin; sem fallback de PID `$$`) e sanitiza-o antes de usá-lo como nome de arquivo. Verifica o sentinel de first-message em `.dadaia/tmp/ctx-inject-fired-<SESSION_ID>`. Se existir, **não emite nada** e sai — nem o breadcrumb de context-name (a injeção completa já ocorreu no SessionStart).
 3. Cria o sentinel e emite o payload completo dentro de bounded markers:
 
 ```

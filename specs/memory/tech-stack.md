@@ -21,7 +21,7 @@ release_origin: v0.1.4.6
 Linguagem| Versão| Uso
 ---|---|---
 Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest.
-Bash| 4+ POSIX-compatível| Hooks (`sdd-spec-gate.sh`, `ctx-inject.sh`), entry scripts. `ctx-inject.sh` injeta lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) em sessões Claude Code e OpenCode via first-message sentinel guard.
+Bash| 4+ POSIX-compatível| Hooks (`sdd-spec-gate.sh`, `ctx-inject.sh`), entry scripts. `ctx-inject.sh` injeta lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
 HTML5 + Mermaid| Mermaid via CDN| Reports em `.dadaia/reports/<ctx>/<agent>/*.html`; memory atoms são `.md` renderizados in-memory (D-4)
 Markdown| CommonMark| Memory atoms atômicos em `specs/memory/*.md` (frontmatter `memory-frontmatter-v1` + corpo Markdown); SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions
 YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows e memory atoms (`memory-frontmatter-v1`: `additionalProperties: false`)

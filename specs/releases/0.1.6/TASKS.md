@@ -823,4 +823,4 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Work:** Write CLOSURE.md per `dadaia-release-closure` template. Update memory atoms
   listed in SPEC §8. Update ACTIVE.md phase to ARCHIVED.
 
-[ ] T-016-R04
+[x] T-016-R04
