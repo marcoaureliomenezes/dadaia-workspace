@@ -94,7 +94,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** No `subprocess.Popen` or `os.kill` in `features/` layer; state
   survives panel restart; unit test green.
 
-[-] T-016-P06
+[x] T-016-P06
 
 ### T-016-P07 — Theme switcher functional fix
 
@@ -107,7 +107,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   across reload.
 - **Done criterion:** Theme applies and persists; e2e test passes E2E-GUARD-01/02.
 
-[ ] T-016-P07
+[-] T-016-P07
 
 ### T-016-P08 — Theme switcher visual redesign
 
