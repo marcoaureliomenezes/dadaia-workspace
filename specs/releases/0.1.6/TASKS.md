@@ -79,7 +79,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
 - **Done criterion:** No route can be added without classification; DELETE order enforced
   structurally; unit test passes.
 
-[-] T-016-P05
+[x] T-016-P05
 
 ### T-016-P06 — WorkflowLauncher extract to infrastructure layer
 
