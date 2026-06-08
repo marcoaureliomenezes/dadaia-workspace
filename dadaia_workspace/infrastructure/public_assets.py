@@ -7,7 +7,6 @@ import os
 import shutil
 import subprocess
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -26,13 +25,21 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     lint_legacy_software_engineer,
 )
 from dadaia_workspace.infrastructure.install_helpers import (
+    build_agents_index,
+    build_manifest,
     copy_agents_for_opencode,
     copy_file,
     copy_tree,
+    install_agents_md,
     install_codex_agents,
     install_codex_runtime_adapters,
+    install_dadaia_agents_md,
+    install_handoff_agents_md,
+    install_reports_agents_md,
+    install_universal_skills,
     remove_stale_files,
     runtime_expectations,
+    validate_workflows,
     write_generated,
 )
 
@@ -136,7 +143,9 @@ class FileSystemPublicAssetManager:
     def _install_codex_runtime_adapters(
         self, workspace_root: Path, force: bool, installed: list[str]
     ) -> None:
-        install_codex_runtime_adapters(self._public_dir, workspace_root, force, installed, copy_file)
+        install_codex_runtime_adapters(
+            self._public_dir, workspace_root, force, installed, copy_file
+        )
 
     def _install_codex_rules(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -218,14 +227,16 @@ class FileSystemPublicAssetManager:
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {dst}")
 
-        self._validate_workflows(agentic_dir)
+        validate_workflows(agentic_dir)
 
         manifest_path = agentic_dir / "manifest.json"
-        manifest_path.write_text(_json_dump(self._build_manifest(agentic_dir)), encoding="utf-8")
+        manifest_path.write_text(
+            _json_dump(build_manifest(agentic_dir, self._iter_files)), encoding="utf-8"
+        )
         staged.append(f"[stage] {manifest_path}")
 
         index_path = agentic_dir / "agents.index.json"
-        index_path.write_text(_json_dump(self._build_agents_index(agentic_dir)), encoding="utf-8")
+        index_path.write_text(_json_dump(build_agents_index(agentic_dir)), encoding="utf-8")
         staged.append(f"[stage] {index_path}")
         return staged
 
@@ -284,16 +295,18 @@ class FileSystemPublicAssetManager:
                 targets=guard_targets.get(scope, {"workspace", "repos"}),
             )
         elif scope in ("all", "workspace-only"):
-            self._install_agents_md(agentic_dir, workspace_root, force, installed)
+            install_agents_md(agentic_dir, workspace_root, force, installed, self._agents_md_source)
 
-        self._install_dadaia_agents_md(agentic_dir, workspace_root, force, installed)
-        self._install_reports_agents_md(agentic_dir, workspace_root, force, installed)
-        self._install_handoff_agents_md(agentic_dir, workspace_root, force, installed)
+        install_dadaia_agents_md(agentic_dir, workspace_root, force, installed)
+        install_reports_agents_md(agentic_dir, workspace_root, force, installed)
+        install_handoff_agents_md(agentic_dir, workspace_root, force, installed)
 
         for item in targets:
             if item == "agents":
                 if only is None or only == "skills":
-                    self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+                    install_universal_skills(
+                        agentic_dir, workspace_root, force, installed, self._iter_files
+                    )
             elif item == "claude":
                 self._install_claude(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "codex":
@@ -421,50 +434,6 @@ class FileSystemPublicAssetManager:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _build_agents_index(agentic_dir: Path) -> dict[str, list[str]]:
-        """Map every staged agent → its ``paths.write_allowlist`` globs (T-016-00)."""
-        agents_dir = agentic_dir / "agents"
-        index: dict[str, list[str]] = {}
-        if not agents_dir.exists():
-            return index
-        for md_file in sorted(agents_dir.glob("*.md")):
-            index[md_file.stem] = _parse_write_allowlist(md_file.read_text(encoding="utf-8"))
-        return index
-
-    def _validate_workflows(self, agentic_dir: Path) -> None:
-        workflows_dir = agentic_dir / "workflows"
-        if not workflows_dir.exists():
-            return
-        from dadaia_workspace.core.exceptions import WorkflowSchemaError
-        from dadaia_workspace.infrastructure.markdown_workflow_store import (
-            MarkdownWorkflowStore,
-        )
-
-        agent_catalog: list[str] = sorted(p.stem for p in (agentic_dir / "agents").glob("*.md"))
-        store = MarkdownWorkflowStore(workflows_dir, agent_catalog=agent_catalog or None)
-        try:
-            store.list()
-        except WorkflowSchemaError as e:
-            raise PublicAssetError(
-                "workflow schema validation failed during `dadaia public stage`: "
-                f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
-            ) from e
-
-    def _build_manifest(self, agentic_dir: Path) -> dict[str, object]:
-        assets: list[dict[str, str]] = []
-        for path in self._iter_files(agentic_dir):
-            if path.name == "manifest.json":
-                continue
-            rel = path.relative_to(agentic_dir).as_posix()
-            assets.append({"path": rel, "sha256": _sha256(path), "type": rel.split("/", 1)[0]})
-        return {
-            "schema_version": _SCHEMA_VERSION,
-            "package_version": _package_version(),
-            "generated_at": datetime.now(tz=UTC).isoformat(),
-            "assets": assets,
-        }
-
     def _agents_md_source(self, agentic_dir: Path) -> Path | None:
         for path in (agentic_dir / "templates" / "AGENTS.md", agentic_dir / "data" / "AGENTS.md"):
             if path.exists():
@@ -476,63 +445,6 @@ class FileSystemPublicAssetManager:
 
     def _is_self_repo(self, consumer: Path) -> bool:
         return _is_self_repo(consumer)
-
-    def _install_agents_md(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
-    ) -> None:
-        src = self._agents_md_source(agentic_dir)
-        if src is not None:
-            copy_file(src, workspace_root / "AGENTS.md", force, installed)
-
-    def _install_reports_agents_md(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
-    ) -> None:
-        src = agentic_dir / "data" / "reports-AGENTS.md"
-        if src.exists():
-            reports_dir = workspace_root / ".dadaia" / "reports"
-            reports_dir.mkdir(parents=True, exist_ok=True)
-            copy_file(src, reports_dir / "AGENTS.md", force, installed)
-
-    def _install_handoff_agents_md(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
-    ) -> None:
-        src = agentic_dir / "data" / "handoff-AGENTS.md"
-        if src.exists():
-            handoff_dir = workspace_root / ".dadaia" / "handoff"
-            handoff_dir.mkdir(parents=True, exist_ok=True)
-            copy_file(src, handoff_dir / "AGENTS.md", force, installed)
-
-    def _install_dadaia_agents_md(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
-    ) -> None:
-        mappings = (
-            ("dadaia-AGENTS.md", workspace_root / ".dadaia" / "AGENTS.md"),
-            ("tmp-AGENTS.md", workspace_root / ".dadaia" / "tmp" / "AGENTS.md"),
-            ("states-AGENTS.md", workspace_root / ".dadaia" / "states" / "AGENTS.md"),
-        )
-        for source_name, dst in mappings:
-            src = agentic_dir / "data" / source_name
-            if src.exists():
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                copy_file(src, dst, force, installed)
-
-    def _install_universal_skills(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
-    ) -> None:
-        copy_tree(
-            agentic_dir / "skills",
-            workspace_root / ".agents" / "skills",
-            force,
-            installed,
-            self._iter_files,
-        )
-        copy_tree(
-            agentic_dir / "workflows",
-            workspace_root / ".agents" / "workflows",
-            force,
-            installed,
-            self._iter_files,
-        )
 
     def _install_claude(
         self,
@@ -581,7 +493,9 @@ class FileSystemPublicAssetManager:
                 self._iter_files,
             )
         if only is None or only == "skills":
-            self._install_universal_skills(agentic_dir, workspace_root, force, installed)
+            install_universal_skills(
+                agentic_dir, workspace_root, force, installed, self._iter_files
+            )
         if only is None or only == "agents":
             install_codex_agents(agentic_dir, workspace_root, force, installed)
             install_codex_runtime_adapters(

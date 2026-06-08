@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.infrastructure.public_assets import (
-    FileSystemPublicAssetManager,
-    _parse_write_allowlist,
-)
+from dadaia_workspace.infrastructure.install_helpers import build_agents_index
+from dadaia_workspace.infrastructure.public_assets import _parse_write_allowlist
 
 _AGENT_WITH_WL = """---
 name: my-agent
@@ -50,7 +48,7 @@ def test_build_agents_index_maps_every_agent(tmp_path: Path) -> None:
     (agents_dir / "my-agent.md").write_text(_AGENT_WITH_WL, encoding="utf-8")
     (agents_dir / "bare-agent.md").write_text(_AGENT_NO_WL, encoding="utf-8")
 
-    index = FileSystemPublicAssetManager._build_agents_index(agentic_dir)
+    index = build_agents_index(agentic_dir)
 
     assert set(index) == {"my-agent", "bare-agent"}
     assert index["my-agent"] == ["specs/releases/<ctx>/**", ".dadaia/reports/<ctx>/my-agent/**"]
@@ -60,4 +58,4 @@ def test_build_agents_index_maps_every_agent(tmp_path: Path) -> None:
 def test_build_agents_index_empty_when_no_agents_dir(tmp_path: Path) -> None:
     agentic_dir = tmp_path / ".dadaia" / "agentic"
     agentic_dir.mkdir(parents=True)
-    assert FileSystemPublicAssetManager._build_agents_index(agentic_dir) == {}
+    assert build_agents_index(agentic_dir) == {}

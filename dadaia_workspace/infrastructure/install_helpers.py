@@ -10,14 +10,18 @@ from __future__ import annotations
 import hashlib
 import shutil
 from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets_common import (
+    _SCHEMA_VERSION,
     _atomic_write_text,
+    _package_version,
     _sha256,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
+    _parse_write_allowlist,
     _prepare_agent_for_opencode,
     _render_codex_agent_toml,
 )
@@ -25,6 +29,146 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (
     _consumer_repos_for_root,
     _is_self_repo,
 )
+
+# ---------------------------------------------------------------------------
+# Stage helpers (moved from FileSystemPublicAssetManager internal methods)
+# ---------------------------------------------------------------------------
+
+
+def build_agents_index(agentic_dir: Path) -> dict[str, list[str]]:
+    """Map every staged agent to its ``paths.write_allowlist`` globs (T-016-00)."""
+    agents_dir = agentic_dir / "agents"
+    index: dict[str, list[str]] = {}
+    if not agents_dir.exists():
+        return index
+    for md_file in sorted(agents_dir.glob("*.md")):
+        index[md_file.stem] = _parse_write_allowlist(md_file.read_text(encoding="utf-8"))
+    return index
+
+
+def validate_workflows(agentic_dir: Path) -> None:
+    """Validate all staged workflow files via MarkdownWorkflowStore."""
+    workflows_dir = agentic_dir / "workflows"
+    if not workflows_dir.exists():
+        return
+    from dadaia_workspace.core.exceptions import PublicAssetError, WorkflowSchemaError
+    from dadaia_workspace.infrastructure.markdown_workflow_store import (
+        MarkdownWorkflowStore,
+    )
+
+    agent_catalog: list[str] = sorted(p.stem for p in (agentic_dir / "agents").glob("*.md"))
+    store = MarkdownWorkflowStore(workflows_dir, agent_catalog=agent_catalog or None)
+    try:
+        store.list()
+    except WorkflowSchemaError as e:
+        raise PublicAssetError(
+            "workflow schema validation failed during `dadaia public stage`: "
+            f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
+        ) from e
+
+
+def build_manifest(
+    agentic_dir: Path,
+    iter_files_fn: Callable[[Path], Iterable[Path]],
+) -> dict[str, object]:
+    """Build the staging manifest dict from all files under *agentic_dir*."""
+    assets: list[dict[str, str]] = []
+    for path in iter_files_fn(agentic_dir):
+        if path.name == "manifest.json":
+            continue
+        rel = path.relative_to(agentic_dir).as_posix()
+        assets.append({"path": rel, "sha256": _sha256(path), "type": rel.split("/", 1)[0]})
+    return {
+        "schema_version": _SCHEMA_VERSION,
+        "package_version": _package_version(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
+        "assets": assets,
+    }
+
+
+def install_agents_md(
+    agentic_dir: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str],
+    agents_md_source_fn: Callable[[Path], Path | None],
+) -> None:
+    """Install the root AGENTS.md from the staged templates or data directory."""
+    src = agents_md_source_fn(agentic_dir)
+    if src is not None:
+        copy_file(src, workspace_root / "AGENTS.md", force, installed)
+
+
+def install_reports_agents_md(
+    agentic_dir: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str],
+) -> None:
+    """Install the reports-AGENTS.md into .dadaia/reports/AGENTS.md."""
+    src = agentic_dir / "data" / "reports-AGENTS.md"
+    if src.exists():
+        reports_dir = workspace_root / ".dadaia" / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        copy_file(src, reports_dir / "AGENTS.md", force, installed)
+
+
+def install_handoff_agents_md(
+    agentic_dir: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str],
+) -> None:
+    """Install the handoff-AGENTS.md into .dadaia/handoff/AGENTS.md."""
+    src = agentic_dir / "data" / "handoff-AGENTS.md"
+    if src.exists():
+        handoff_dir = workspace_root / ".dadaia" / "handoff"
+        handoff_dir.mkdir(parents=True, exist_ok=True)
+        copy_file(src, handoff_dir / "AGENTS.md", force, installed)
+
+
+def install_dadaia_agents_md(
+    agentic_dir: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str],
+) -> None:
+    """Install the various .dadaia/**/AGENTS.md files from staged data assets."""
+    mappings = (
+        ("dadaia-AGENTS.md", workspace_root / ".dadaia" / "AGENTS.md"),
+        ("tmp-AGENTS.md", workspace_root / ".dadaia" / "tmp" / "AGENTS.md"),
+        ("states-AGENTS.md", workspace_root / ".dadaia" / "states" / "AGENTS.md"),
+    )
+    for source_name, dst in mappings:
+        src = agentic_dir / "data" / source_name
+        if src.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            copy_file(src, dst, force, installed)
+
+
+def install_universal_skills(
+    agentic_dir: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str],
+    iter_files_fn: Callable[[Path], Iterable[Path]],
+) -> None:
+    """Install skills and workflows into .agents/ for all runtimes."""
+    copy_tree(
+        agentic_dir / "skills",
+        workspace_root / ".agents" / "skills",
+        force,
+        installed,
+        iter_files_fn,
+    )
+    copy_tree(
+        agentic_dir / "workflows",
+        workspace_root / ".agents" / "workflows",
+        force,
+        installed,
+        iter_files_fn,
+    )
+
 
 # ---------------------------------------------------------------------------
 # File-copy utilities

@@ -346,7 +346,7 @@ view. View imports only `PanelService` + core DTOs.
 **Done criterion:** `grep -E 'from dadaia_workspace.features.(agents|telemetry)' dadaia_workspace/features/panel/views/api.py`
 returns empty. `mypy --strict` + `pytest` green; panel integration tests pass.
 
-### [-] T-017-11 (RE-OPENED for rc-2 — execute the split)
+### [x] T-017-11 (RE-OPENED for rc-2 — execute the split) — DONE: public_assets.py 2350→596 lines
 **Finding:** D-06 (W-8b)
 **Title:** `public_assets.py` module split to < 600 lines
 **Owner:** software-engineer
