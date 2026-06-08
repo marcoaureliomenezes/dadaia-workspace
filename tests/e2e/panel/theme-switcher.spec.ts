@@ -268,6 +268,50 @@ test('E2E-THM-08 — Pressing Escape closes the theme dropdown and returns focus
 });
 
 // ---------------------------------------------------------------------------
+// E2E-THM-10 — Deep-interaction regression: open → option visible → apply →
+//              reload → persisted  (T-016-P07 fix regression)
+//
+// This test chains all steps that were broken before the T-016-P07 fix:
+// the dropdown menu was rendered inline (no CSS positioning) so options were
+// not visually accessible. Covers mint → sage → warm → reload persistence.
+// ---------------------------------------------------------------------------
+test('E2E-THM-10 — Deep-interaction: click control → option visible → theme applied → persists (T-016-P07)', async ({
+  page,
+}) => {
+  for (const theme of ['sage', 'warm', 'mint'] as const) {
+    // Step 1: navigate to a fresh panel page
+    await gotoPanel(page);
+
+    // Step 2: locate and click the real shipped theme button
+    const btn = page.locator('#theme-btn');
+    await expect(btn).toBeVisible({ timeout: 5000 });
+    await btn.click();
+
+    // Step 3: menu must be visible (not hidden) — this was broken before the fix
+    const menu = page.locator('#theme-menu');
+    await expect(menu).not.toHaveAttribute('hidden', { timeout: 3000 });
+
+    // Step 4: the target option must be in the DOM and clickable
+    const option = page.locator(`[data-theme-value="${theme}"]`);
+    await expect(option).toBeVisible({ timeout: 3000 });
+    await option.click();
+
+    // Step 5: dataset.theme on <html> must equal the chosen theme
+    const applied = await page.evaluate(() => document.documentElement.dataset.theme);
+    expect(applied).toBe(theme);
+
+    // Step 6: localStorage must be set
+    const stored = await page.evaluate(() => localStorage.getItem('dadaia-panel-theme'));
+    expect(stored).toBe(theme);
+
+    // Step 7: reload the page — the inline <head> script must restore the theme
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const persisted = await page.evaluate(() => document.documentElement.dataset.theme);
+    expect(persisted).toBe(theme);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // E2E-THM-09 — axe-core: all 3 themes pass on Agents tab
 // ---------------------------------------------------------------------------
 test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes', async ({

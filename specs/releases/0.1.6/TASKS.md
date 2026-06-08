@@ -107,7 +107,7 @@ At most one `[-]` per owner at a time. Flip `[ ]` → `[-]` before starting; fli
   across reload.
 - **Done criterion:** Theme applies and persists; e2e test passes E2E-GUARD-01/02.
 
-[-] T-016-P07
+[x] T-016-P07
 
 ### T-016-P08 — Theme switcher visual redesign
 

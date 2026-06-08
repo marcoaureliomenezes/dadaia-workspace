@@ -274,6 +274,89 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   }
 }
 
+/* ── Theme switcher dropdown (T-016-P07) ────────────────────────────────────
+   The .theme-switcher wrapper carries position:relative (inline in index.py).
+   .theme-btn is a button in the topbar; #theme-menu is the floating dropdown.
+   Without these rules the list renders inline (not floating), which makes the
+   switcher appear broken even though the JS correctly toggles [hidden].
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius, 4px);
+  color: var(--color-text, #222222);
+  font-family: var(--font-stack);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.theme-btn:hover {
+  background: var(--color-row-hover, #f5f5f5);
+  border-color: var(--color-accent, #9cddc8);
+}
+.theme-btn:focus-visible {
+  outline: 2px solid var(--color-accent, #9cddc8);
+  outline-offset: 2px;
+}
+.theme-btn-icon { font-size: 1em; line-height: 1; }
+.theme-btn-label { font-size: 0.85rem; }
+
+#theme-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius-card, 6px);
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,.12));
+  min-width: 110px;
+}
+/* The [hidden] attribute hides the menu; JS toggles it. */
+#theme-menu[hidden] { display: none; }
+
+#theme-menu [role="menuitemradio"] {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.88rem;
+  color: var(--color-text, #222222);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+#theme-menu [role="menuitemradio"]:hover {
+  background: var(--color-row-hover, #f5f5f5);
+}
+#theme-menu [role="menuitemradio"]:focus-visible {
+  outline: 2px solid var(--color-accent, #9cddc8);
+  outline-offset: -2px;
+}
+#theme-menu [role="menuitemradio"][aria-checked="true"] {
+  font-weight: 600;
+  color: var(--color-accent-dark, #2d7d9a);
+}
+#theme-menu [role="menuitemradio"][aria-checked="true"]::before {
+  content: "✓";
+  font-size: 0.8em;
+  color: var(--color-accent-dark, #2d7d9a);
+}
+#theme-menu [role="menuitemradio"][aria-checked="false"]::before {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+}
+
 /* ── Warm theme focus-visible override (E2E-THM-07) ─────────────────────────
    Amber alone fails the WCAG 3:1 UI-component contrast threshold on white.
    In the Warm theme the focus ring uses --color-accent-dark (brown) as the
