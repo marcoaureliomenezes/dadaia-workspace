@@ -121,6 +121,7 @@ class PanelService:
         academy: Any = None,
         workflow_launcher: WorkflowLauncher | None = None,
         workflow_state_store: Any = None,
+        workflows_service: WorkflowsService | None = None,
     ) -> None:
         """Initialise PanelService.
 
@@ -148,13 +149,20 @@ class PanelService:
         workflow_state_store:
             State store for persisted PID tracking.
             When None, an in-memory dict is used (state lost on restart).
+        workflows_service:
+            WorkflowsService instance (injected via DI, T-017-06).
+            When None, a WorkflowsService is constructed lazily from
+            workspace_root on first use (backward-compatible for callers
+            that do not pass this parameter).
         """
         self._registry = registry
         self._spec_context = spec_context
         self._workspace_root = workspace_root
         self.telemetry = telemetry
         self.academy = academy
-        self._workflows_service = WorkflowsService(workspace_root)
+        # workflows_service is injected; fallback to lazy construction preserves
+        # backward compatibility (T-017-06: no self-construction in __init__).
+        self._workflows_service: WorkflowsService | None = workflows_service
         self._workflow_launcher = workflow_launcher
         self._workflow_state_store = workflow_state_store
         # In-memory fallback when no persistent state store is injected.
@@ -243,11 +251,13 @@ class PanelService:
         Delegates to WorkflowsService.list_summaries(). Returns an empty list
         when no workflows directory is found.
 
-        For testing, ``_workflows_service_override`` may be set on the instance
-        to bypass the real service and return a controlled result.
+        For testing, inject a fake WorkflowsService via the constructor's
+        ``workflows_service`` parameter (T-017-06).  The legacy
+        ``_workflows_service_override`` attribute escape-hatch is still honoured
+        for backward compatibility with existing tests.
         """
         override = getattr(self, "_workflows_service_override", None)
-        svc = override if override is not None else self._workflows_service
+        svc = override if override is not None else self._workflows_svc()
         return svc.list_summaries()
 
     def list_canonical_agents(self) -> list[AgentDTO]:
@@ -280,7 +290,7 @@ class PanelService:
         Returns {"pid": int, "workflow": str} on success.
         """
         override = getattr(self, "_workflows_service_override", None)
-        svc = override if override is not None else self._workflows_service
+        svc = override if override is not None else self._workflows_svc()
         known = {s.name for s in svc.list_summaries()}
         if workflow_name not in known:
             raise RuntimeError(f"workflow not found: {workflow_name!r}")
@@ -307,6 +317,17 @@ class PanelService:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _workflows_svc(self) -> WorkflowsService:
+        """Return the injected WorkflowsService, constructing lazily if not injected.
+
+        T-017-06: WorkflowsService is injected through the constructor.  The lazy
+        fallback preserves backward compatibility for callers that do not pass the
+        parameter; the composition root (container.py) always injects it explicitly.
+        """
+        if self._workflows_service is None:
+            self._workflows_service = WorkflowsService(self._workspace_root)
+        return self._workflows_service
 
     def _launcher(self) -> WorkflowLauncher:
         """Return the injected launcher, or build a SubprocessWorkflowLauncher lazily."""

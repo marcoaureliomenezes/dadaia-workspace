@@ -31,6 +31,7 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_workflow_detail,
     render_api_workflows_list,
 )
+from dadaia_workspace.features.workflows.service import WorkflowsService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 # ---------------------------------------------------------------------------
@@ -83,11 +84,13 @@ def _build_server(
     token: str,
     workspace_root: Path,
 ) -> ThreadingHTTPServer:
+    workflows_service = WorkflowsService(workspace_root)
     panel_service = PanelService(
         registry=_StubRegistry(),  # type: ignore[arg-type]
         spec_context=_StubSpecContextService(),  # type: ignore[arg-type]
         workspace_root=workspace_root,
         telemetry=_StubTelemetry(),
+        workflows_service=workflows_service,
     )
 
     def _stub_html(**kw: Any) -> tuple[int, str, bytes]:
@@ -103,7 +106,7 @@ def _build_server(
         "api_agents": _stub_json,
         "api_agent_prompt": _stub_json,
         "api_workflows": render_api_workflows_list(panel_service),
-        "api_workflow_detail": render_api_workflow_detail(panel_service._workflows_service),
+        "api_workflow_detail": render_api_workflow_detail(workflows_service),
         "memory": _stub_html,
         "memory_view": _stub_html,
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
