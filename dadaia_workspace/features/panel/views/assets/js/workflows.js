@@ -650,9 +650,9 @@
 
   window.addEventListener('popstate', function () {
     var parsed = parseWorkflowHash(location.hash);
-    // Only handle if workflows tab is active
-    var workflowsSection = document.getElementById('section-workflows');
-    if (!workflowsSection || !workflowsSection.classList.contains('active')) { return; }
+    // Only handle if the Ops section (parent) is active — workflows now lives inside Ops.
+    var opsSection = document.getElementById('section-ops');
+    if (!opsSection || !opsSection.classList.contains('active')) { return; }
 
     if (parsed && parsed.params.get('detail')) {
       loadDetail(parsed.params.get('detail'));
@@ -672,8 +672,8 @@
     loaded = false;
     _cachedGrid = '';
     inDetailView = false;
-    // Only refetch if the Workflows section is currently active
-    var section = document.getElementById('section-workflows');
+    // Only refetch if the Ops section (parent) is currently active
+    var section = document.getElementById('section-ops');
     if (section && section.classList.contains('active')) {
       load();
     }

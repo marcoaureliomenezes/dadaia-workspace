@@ -426,6 +426,64 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   line-height: 1;
 }
 
+/* ── Ops consolidated tab — stacked sub-sections ─────────────────────────────
+   T-016-P09: Agents + Workflows + Kanban merged into one "Ops" nav tab.
+   Each sub-section is stacked vertically inside #section-ops with a labelled
+   header and compact cards.
+   ─────────────────────────────────────────────────────────────────────────── */
+.ops-subsection {
+  margin-bottom: var(--space-xl, 2rem);
+  padding-bottom: var(--space-lg, 1.25rem);
+  border-bottom: 1px solid var(--color-border, #dddddd);
+}
+.ops-subsection:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ops-subsection-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: var(--space-md, 1rem);
+  padding-bottom: var(--space-xs, 0.35rem);
+  border-bottom: 1px solid var(--color-border, #dddddd);
+}
+.ops-subsection-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-heading, #111111);
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Compact agent cards inside ops — smaller min-width so more fit per row */
+.agents-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+@media (max-width: 767px) {
+  .agents-grid--compact {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Compact workflow cards inside ops — 3 columns at >=1024px */
+.workflows-grid--compact {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 900px) {
+  .workflows-grid--compact {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .workflows-grid--compact {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Warm theme focus-visible override (E2E-THM-07) ─────────────────────────
    Amber alone fails the WCAG 3:1 UI-component contrast threshold on white.
    In the Warm theme the focus ring uses --color-accent-dark (brown) as the

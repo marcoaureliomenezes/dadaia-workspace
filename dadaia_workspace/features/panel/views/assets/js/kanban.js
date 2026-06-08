@@ -108,7 +108,7 @@
       + '>'
       + '<div class="kanban-card-title-row">'
         + '<span class="kanban-card-session-id">' + esc(id) + '</span>'
-        + '<span class="kanban-status-dot" data-stale="' + esc(staleAttr) + '"'
+        + '<span class="kanban-status-dot" role="img" data-stale="' + esc(staleAttr) + '"'
           + ' aria-label="' + esc(statusText) + '"></span>'
       + '</div>'
       + '<div class="kanban-card-meta">' + esc(runtime) + '</div>'
@@ -291,7 +291,11 @@
 
   // ── Initialise ─────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
-    var section = document.getElementById('section-kanban');
+    // Kanban lives inside the Ops section (#ops-subsection-kanban).
+    // Fall back to #section-kanban for isolated test scaffolds that embed
+    // only the kanban fragment (e.g. kanban-tab.spec.ts live-FE tests).
+    var section = document.getElementById('ops-subsection-kanban')
+      || document.getElementById('section-kanban');
     if (!section) { return; } // No kanban section in the DOM — no-op
 
     // Visibility change: resume refresh when tab is foregrounded

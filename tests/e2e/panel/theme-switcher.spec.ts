@@ -320,9 +320,10 @@ test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes
   const { AxeBuilder } = await import('@axe-core/playwright');
 
   for (const theme of ['mint', 'sage', 'warm'] as const) {
-    // Navigate fresh for each theme
+    // Navigate fresh for each theme.
+    // Agents are now inside the Ops tab (T-016-P09 consolidation).
     await gotoPanel(page);
-    await activateTab(page, 'agents');
+    await activateTab(page, 'ops');
     await page.waitForSelector(
       '#agents-grid .agent-card:not(.agent-card--skeleton)',
       { timeout: 15000 }

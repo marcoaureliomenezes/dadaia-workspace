@@ -37,19 +37,26 @@ import html
 
 
 def render_agents_section() -> str:
-    """Return the static HTML scaffold for the Agents tab.
+    """Return the static HTML scaffold for the Agents tab (legacy top-level section).
+
+    Kept for backward compatibility. Returns the sub-section HTML used inside
+    the consolidated Ops tab.
+    """
+    return render_agents_subsection()
+
+
+def render_agents_subsection() -> str:
+    """Return the compact sub-section HTML for Agents inside the Ops tab.
 
     JS fetches dynamic data from /api/agents and /api/agents/{id}/sessions after
-    tab activation. The server never serializes agent records into this HTML.
+    the Ops tab is activated. The server never serializes agent records into this HTML.
 
-    Card layout uses CSS grid (added to PANEL_CSS in _assets.py).
     All dynamic content is rendered client-side via the Agents module in PANEL_JS.
     """
     return (
-        '<section id="section-agents" class="section panel-section" '
-        'role="tabpanel" tabindex="0" aria-labelledby="tab-agents">\n'
-        '  <header class="section-header">\n'
-        "    <h2>Agents</h2>\n"
+        '<div class="ops-subsection" id="ops-subsection-agents">\n'
+        '  <div class="ops-subsection-header">\n'
+        '    <h3 class="ops-subsection-title">Agents</h3>\n'
         '    <p class="section-meta" id="agents-meta" aria-live="polite"></p>\n'
         '    <div class="runtime-switcher" role="radiogroup" aria-label="Active runtime" style="margin-left:auto;">\n'
         '      <button type="button" class="runtime-btn runtime-btn--claude" id="agents-runtime-btn-claude"\n'
@@ -63,9 +70,9 @@ def render_agents_section() -> str:
         '        <span class="runtime-btn-label">Codex</span>\n'
         "      </button>\n"
         "    </div>\n"
-        "  </header>\n"
+        "  </div>\n"
         '  <div id="agents-staleness-banner" class="warning-banner" hidden role="status"></div>\n'
-        '  <div id="agents-grid" class="card-grid agents-grid" aria-busy="false"></div>\n'
+        '  <div id="agents-grid" class="card-grid agents-grid agents-grid--compact" aria-busy="false"></div>\n'
         '  <p id="agents-empty" class="empty-state" hidden>'
         + html.escape("Nenhum agente observado ainda.")
         + "</p>\n"
@@ -85,5 +92,5 @@ def render_agents_section() -> str:
         "      </div>\n"
         "    </div>\n"
         "  </dialog>\n"
-        "</section>"
+        "</div>"
     )

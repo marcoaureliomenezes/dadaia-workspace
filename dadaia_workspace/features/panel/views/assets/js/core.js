@@ -225,29 +225,35 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── Tab activation hook — lazy fetch for agents/workflows/sessions/academy/reports ───
-  // Agents module: window.Agents (agents.js, loaded after this script).
-  // Workflows module: window.Workflows (workflows.js, loaded after this script).
+  // ── Tab activation hook — lazy fetch for ops/sessions/academy/reports ────────
+  // Ops tab activates Agents + Workflows + Kanban sub-sections together.
   // Sessions module: window.Sessions (sessions.js, loaded after this script).
   // Academy module: window.Academy (academy.js, loaded after this script).
   // Reports module: window.Reports (reports.js, loaded after this script).
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       var target = tab.getAttribute('data-section');
-      if (target === 'agents' && window.Agents && !window.Agents.isLoaded()) {
-        window.Agents.load();
-      }
-      if (target === 'workflows' && window.Workflows) {
-        if (!window.Workflows.isLoaded()) {
-          // PR3-17: respect hash on tab activation (e.g. user clicks tab while
-          // #workflows?detail=<name> is in the hash from a previous navigation).
-          if (window.Workflows.handleHashOnActivation) {
-            window.Workflows.handleHashOnActivation();
-          } else {
-            window.Workflows.load();
+
+      // ── Ops tab: load Agents, Workflows, and Kanban together ────────────────
+      if (target === 'ops') {
+        // Agents
+        if (window.Agents && !window.Agents.isLoaded()) {
+          window.Agents.load();
+        }
+        // Workflows — respect hash on activation
+        if (window.Workflows) {
+          if (!window.Workflows.isLoaded()) {
+            if (window.Workflows.handleHashOnActivation) {
+              window.Workflows.handleHashOnActivation();
+            } else {
+              window.Workflows.load();
+            }
           }
         }
+        // Kanban
+        window.Panel.activate('kanban');
       }
+
       if (target === 'sessions') {
         window.Panel.activate('sessions');
       }
@@ -257,33 +263,27 @@
       if (target === 'reports') {
         window.Panel.activate('reports');
       }
-      if (target === 'kanban') {
-        window.Panel.activate('kanban');
-      }
     });
   });
 
   // ── Hash-fragment routing on initial load ─────────────────────────────
+  // #agents, #workflows, and #kanban now live inside the Ops tab.
   (function () {
     var hash = location.hash;
     if (!hash) { return; }
-    if (hash.startsWith('#agents')) {
-      var agentsTab = document.getElementById('tab-agents');
-      if (agentsTab) {
-        agentsTab.click();
-        // applyHashFilter is called inside Agents.load() -> render() already,
-        // but call it again after a tick in case load finishes asynchronously.
-        setTimeout(function () {
-          if (window.Agents) { window.Agents.applyHashFilter(); }
-        }, 300);
-      }
-    } else if (hash.startsWith('#workflows')) {
-      var workflowsTab = document.getElementById('tab-workflows');
-      if (workflowsTab) {
-        // PR3-17: clicking the tab triggers the activation hook above, which
-        // will call handleHashOnActivation() — this handles both bare #workflows
-        // and #workflows?detail=<name> deep links in one code path.
-        workflowsTab.click();
+    if (hash.startsWith('#agents') || hash.startsWith('#workflows') || hash.startsWith('#kanban')) {
+      // Activate the Ops tab — its click handler will load all three sub-sections.
+      var opsTab = document.getElementById('tab-ops');
+      if (opsTab) {
+        opsTab.click();
+        // For agent filter deep-links, apply after Agents loads.
+        if (hash.startsWith('#agents')) {
+          setTimeout(function () {
+            if (window.Agents) { window.Agents.applyHashFilter(); }
+          }, 300);
+        }
+        // For workflow detail deep-links, handleHashOnActivation already ran
+        // via the click handler; nothing extra needed here.
       }
     } else if (hash.startsWith('#reports')) {
       var reportsTab = document.getElementById('tab-reports');
@@ -291,9 +291,6 @@
     } else if (hash.startsWith('#academy')) {
       var academyTab = document.getElementById('tab-academy');
       if (academyTab) { academyTab.click(); }
-    } else if (hash.startsWith('#kanban')) {
-      var kanbanTab = document.getElementById('tab-kanban');
-      if (kanbanTab) { kanbanTab.click(); }
     }
   })();
 

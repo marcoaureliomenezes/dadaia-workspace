@@ -27,12 +27,10 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
 
   expect(tabs).toEqual([
     'Spec Context Projects',
-    'Agents',
-    'Workflows',
+    'Ops',
     'Sessions',
     'Reports',
     'Academy',
-    'Kanban',
     'Servers',
   ]);
 
@@ -76,12 +74,10 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
   await page.waitForSelector('[role="tab"]');
 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
-    { tabId: '#tab-agents', sectionId: 'agents' },
-    { tabId: '#tab-workflows', sectionId: 'workflows' },
+    { tabId: '#tab-ops', sectionId: 'ops' },
     { tabId: '#tab-sessions', sectionId: 'sessions' },
     { tabId: '#tab-reports', sectionId: 'reports' },
     { tabId: '#tab-academy', sectionId: 'academy' },
-    { tabId: '#tab-kanban', sectionId: 'kanban' },
     { tabId: '#tab-servers', sectionId: 'servers' },
     { tabId: '#tab-memories', sectionId: 'memories' },
   ];
@@ -130,8 +126,8 @@ test('E2E-TAB-04 — No CSP violations on load and all tab activations', async (
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
-  // Navigate to each tab
-  for (const sectionId of ['agents', 'workflows', 'servers', 'memories'] as const) {
+  // Navigate to each tab (agents/workflows/kanban now merged under Ops)
+  for (const sectionId of ['ops', 'servers', 'memories'] as const) {
     await activateTab(page, sectionId);
   }
 

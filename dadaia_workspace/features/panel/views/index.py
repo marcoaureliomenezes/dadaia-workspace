@@ -28,11 +28,11 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
-from dadaia_workspace.features.panel.views.agents import render_agents_section
+from dadaia_workspace.features.panel.views.agents import render_agents_subsection
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
-from dadaia_workspace.features.panel.views.workflows import render_workflows_section
+from dadaia_workspace.features.panel.views.workflows import render_workflows_subsection
 
 
 def render_index(
@@ -52,8 +52,8 @@ def render_index(
 
         academy_section = render_academy_section()
         reports_section = render_reports_section()
-        agents_section = render_agents_section()
-        workflows_section = render_workflows_section()
+        agents_subsection = render_agents_subsection()
+        workflows_subsection = render_workflows_subsection()
         sessions_section = render_sessions_section()
 
         body = f"""<!DOCTYPE html>
@@ -108,12 +108,10 @@ def render_index(
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Spec Context Projects">Spec Context Projects</button>
-    <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents</button>
-    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows">Workflows</button>
+    <button class="nav-tab" data-section="ops" aria-selected="false" role="tab" id="tab-ops">Ops</button>
     <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
-    <button class="nav-tab" data-section="kanban" aria-selected="false" role="tab" id="tab-kanban">Kanban</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
   </nav>
   <main class="main" role="main">
@@ -144,23 +142,30 @@ def render_index(
       </div>
     </section>
 
-    {agents_section}
+    <section id="section-ops" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-ops">
+      <div class="section-header">
+        <h2>Ops</h2>
+        <p>Agents, Workflows and Kanban &mdash; stacked below.</p>
+      </div>
+
+      {agents_subsection}
+
+      {workflows_subsection}
+
+      <div class="ops-subsection" id="ops-subsection-kanban">
+        <div class="ops-subsection-header">
+          <h3 class="ops-subsection-title">Kanban</h3>
+          <p class="section-meta">Multi-agent workflow state &mdash; one swimlane per Spec Context Project.</p>
+          <span id="kanban-last-updated" class="kanban-last-updated" aria-live="polite" data-testid="kanban-last-updated"></span>
+        </div>
+        <div id="kanban-board" class="kanban-board" aria-label="Kanban board" aria-live="polite">
+        </div>
+      </div>
+    </section>
 
     {academy_section}
 
-    {workflows_section}
-
     {sessions_section}
-
-    <section id="section-kanban" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-kanban">
-      <header class="section-header">
-        <h2>Kanban</h2>
-        <p class="section-meta">Multi-agent workflow state — one swimlane per Spec Context Project.</p>
-        <span id="kanban-last-updated" class="kanban-last-updated" aria-live="polite" data-testid="kanban-last-updated"></span>
-      </header>
-      <div id="kanban-board" class="kanban-board" aria-label="Kanban board" aria-live="polite">
-      </div>
-    </section>
 
     {reports_section}
 

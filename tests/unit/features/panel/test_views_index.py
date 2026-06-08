@@ -159,32 +159,40 @@ def _button_fragment(html: str, tab_id: str) -> str:
     [
         ("section-servers", ">Servers<"),
         ("section-memories", ">Projects<"),
-        ("section-agents", "agents-grid"),
-        ("section-workflows", "workflows-grid"),
+        # Agents, Workflows, and Kanban are sub-sections inside section-ops (T-016-P09).
+        ("section-ops", "agents-grid"),
+        ("section-ops", "workflows-grid"),
+        ("section-ops", "kanban-board"),
         ("section-sessions", "sessions-tbody"),
         ("section-reports", "reports-list"),
         ("section-academy", "academy-content"),
-        ("section-kanban", "kanban-board"),
     ],
 )
 def test_index_renders_panel_sections(section_id: str, visible_text: str) -> None:
-    """The index shell must render every top-level panel section."""
+    """The index shell must render every top-level panel section.
+
+    After T-016-P09: agents-grid, workflows-grid, and kanban-board live inside
+    section-ops; there are no longer separate section-agents / section-workflows /
+    section-kanban top-level sections.
+    """
     html = _render(_build_service())
     assert f'id="{section_id}"' in html
     assert visible_text in html
 
 
 def test_index_tablist_contract() -> None:
-    """The nav must expose the current tab order and active default tab."""
+    """The nav must expose the current tab order and active default tab.
+
+    After T-016-P09: Agents, Workflows, and Kanban are merged into one "Ops" tab.
+    There are 6 tabs instead of 8.
+    """
     html = _render(_build_service())
     expected = [
         ("tab-memories", "Spec Context Projects"),
-        ("tab-agents", "Agents"),
-        ("tab-workflows", "Workflows"),
+        ("tab-ops", "Ops"),
         ("tab-sessions", "Sessions"),
         ("tab-reports", "Reports"),
         ("tab-academy", "Academy"),
-        ("tab-kanban", "Kanban"),
         ("tab-servers", "Servers"),
     ]
 
@@ -205,28 +213,36 @@ def test_index_tablist_contract() -> None:
     assert 'aria-label="Spec Context Projects"' in memories_button
     assert 'aria-selected="false"' in servers_button
 
+    # Old individual tabs must not exist
+    assert 'id="tab-agents"' not in html
+    assert 'id="tab-workflows"' not in html
+    assert 'id="tab-kanban"' not in html
+
 
 @pytest.mark.parametrize(
     ("section_id", "tab_id"),
     [
         ("section-memories", "tab-memories"),
-        ("section-agents", "tab-agents"),
-        ("section-workflows", "tab-workflows"),
+        # T-016-P09: Agents, Workflows, and Kanban merged into the Ops tab.
+        ("section-ops", "tab-ops"),
         ("section-sessions", "tab-sessions"),
         ("section-reports", "tab-reports"),
         ("section-academy", "tab-academy"),
-        ("section-kanban", "tab-kanban"),
         ("section-servers", "tab-servers"),
     ],
 )
 def test_index_tabpanel_contract(section_id: str, tab_id: str) -> None:
-    """Every section must be connected to its tab for keyboard and screen-reader users."""
+    """Every top-level section must be connected to its tab for keyboard and screen-reader users.
+
+    After T-016-P09 there are 6 sections (not 8); section-ops replaces the three
+    former sections (section-agents, section-workflows, section-kanban).
+    """
     html = _render(_build_service())
     section = _section_fragment(html, section_id)
     assert 'role="tabpanel"' in section
     assert 'tabindex="0"' in section
     assert f'aria-labelledby="{tab_id}"' in section
-    assert html.count('role="tabpanel"') == 8
+    assert html.count('role="tabpanel"') == 6
 
 
 def test_panel_js_keyboard_and_auth_contract() -> None:

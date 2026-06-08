@@ -649,7 +649,9 @@ test('E2E-SES-05 — Auto-refresh suspends when document.hidden is true', async 
 // (mirror render_agents_section() / render_workflows_section() output)
 // ---------------------------------------------------------------------------
 
-const REAL_AGENTS_SECTION_HTML = `<section id="section-agents" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-agents">
+// Agents and Workflows are now .ops-subsection divs inside #section-ops (T-016-P09).
+// They are NOT standalone .section elements — only #section-ops carries that class.
+const REAL_AGENTS_SECTION_HTML = `<div id="ops-subsection-agents" class="ops-subsection">
   <header class="section-header">
     <h2>Agents</h2>
     <p class="section-meta" id="agents-meta" aria-live="polite"></p>
@@ -657,9 +659,9 @@ const REAL_AGENTS_SECTION_HTML = `<section id="section-agents" class="section pa
   <div id="agents-staleness-banner" class="warning-banner" hidden role="status"></div>
   <div id="agents-grid" class="card-grid agents-grid" aria-busy="false"></div>
   <p id="agents-empty" class="empty-state" hidden>Nenhum agente observado ainda.</p>
-</section>`;
+</div>`;
 
-const REAL_WORKFLOWS_SECTION_HTML = `<section id="section-workflows" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-workflows">
+const REAL_WORKFLOWS_SECTION_HTML = `<div id="ops-subsection-workflows" class="ops-subsection">
   <header class="section-header">
     <h2>Workflows</h2>
     <p class="section-meta" id="workflows-meta" aria-live="polite"></p>
@@ -668,16 +670,17 @@ const REAL_WORKFLOWS_SECTION_HTML = `<section id="section-workflows" class="sect
   <div id="workflows-grid" class="workflows-card-grid" aria-busy="false"></div>
   <nav class="workflows-list" aria-label="Workflow list" id="workflows-list" hidden></nav>
   <div class="workflows-detail" id="workflows-detail" role="region" aria-label="Workflow detail" aria-live="polite" hidden></div>
-</section>`;
+</div>`;
 
 // ---------------------------------------------------------------------------
 // Full multi-tab panel page HTML
 //
 // Includes:
 //   - Runtime switcher (matches views/index.py topbar markup)
-//   - Nav tabs for Agents, Workflows, Sessions (Memories/Servers omitted — not
-//     needed for these tests)
-//   - All three content sections
+//   - Nav: single #tab-ops (Agents+Workflows+Kanban merged) + #tab-sessions
+//     (T-016-P09 consolidation — Agents/Workflows are subsections of #section-ops)
+//   - Sections: #section-ops wraps agentsSection + workflowsSection;
+//     sessionsSection is standalone as before.
 //   - runtime.js loaded first (synchronous), then core.js, agents.js,
 //     workflows.js, sessions.js (same order as views/index.py)
 // ---------------------------------------------------------------------------
@@ -726,13 +729,14 @@ function buildMultiTabPageHtml(
     </div>
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
-    <button class="nav-tab" data-section="agents" aria-selected="false" role="tab" id="tab-agents">Agents</button>
-    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows">Workflows</button>
+    <button class="nav-tab" data-section="ops" aria-selected="false" role="tab" id="tab-ops">Ops</button>
     <button class="nav-tab active" data-section="sessions" aria-selected="true" role="tab" id="tab-sessions">Sessions</button>
   </nav>
   <main class="main" role="main">
-    ${agentsSection}
-    ${workflowsSection}
+    <section id="section-ops" class="section" role="tabpanel" tabindex="0" aria-labelledby="tab-ops">
+      ${agentsSection}
+      ${workflowsSection}
+    </section>
     ${sessionsSection}
   </main>
   <!-- runtime.js: must load before agents.js, workflows.js, sessions.js -->
@@ -1051,8 +1055,9 @@ test('E2E-RT-01 — Runtime switcher reloads Agents tab with ?runtime=codex', as
 
   await loadMultiTabPanel(page);
 
-  // Activate the Agents tab — triggers Agents.load() via core.js tab hook.
-  await page.click('#tab-agents');
+  // Activate the Ops tab — triggers Agents.load() via core.js tab hook.
+  // (Agents is now a subsection of #section-ops, not a standalone tab — T-016-P09.)
+  await page.click('#tab-ops');
   await page.waitForSelector('#agents-grid[aria-busy="false"]', { timeout: 10_000 });
 
   // Initial fetch must have used ?runtime=claude (the default).
@@ -1063,7 +1068,7 @@ test('E2E-RT-01 — Runtime switcher reloads Agents tab with ?runtime=codex', as
 
   // Toggle runtime to Codex via Runtime.set() — this fires dadaia:runtime-change.
   // agents.js handles this by clearing promptCache, resetting loaded flag,
-  // and calling load() if section-agents is active.
+  // and calling load() if section-ops is active.
   await page.evaluate(() => {
     (window as any).Runtime.set('codex');
   });
@@ -1115,8 +1120,9 @@ test('E2E-RT-02 — Runtime switcher reloads Workflows tab with ?runtime=codex',
 
   await loadMultiTabPanel(page);
 
-  // Activate the Workflows tab — triggers Workflows.handleHashOnActivation() via core.js.
-  await page.click('#tab-workflows');
+  // Activate the Ops tab — triggers Workflows.handleHashOnActivation() via core.js.
+  // (Workflows is now a subsection of #section-ops, not a standalone tab — T-016-P09.)
+  await page.click('#tab-ops');
   await page.waitForSelector('#workflows-grid[aria-busy="false"]', { timeout: 10_000 });
 
   // Initial fetch must have used ?runtime=claude.

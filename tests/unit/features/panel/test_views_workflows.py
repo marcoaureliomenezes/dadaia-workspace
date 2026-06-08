@@ -2,7 +2,7 @@
 
 Covers:
   - render_workflows_section() returns a non-empty string
-  - Section carries role="tabpanel" and aria-labelledby="tab-workflows"
+  - T-016-P09: workflows are now a sub-section inside the Ops tab (no longer a tabpanel).
   - Grid container id="workflows-grid" is present
   - Empty-state id="workflows-empty" element is present
 
@@ -21,10 +21,17 @@ def test_render_workflows_section_returns_string() -> None:
 
 
 def test_section_has_role_tabpanel() -> None:
-    """Section must carry role="tabpanel" and aria-labelledby="tab-workflows"."""
+    """After T-016-P09 workflows are a sub-section (ops-subsection) inside the Ops tab.
+
+    The subsection no longer carries role="tabpanel" / aria-labelledby="tab-workflows"
+    because it is not a top-level tab target. Instead, verify the sub-section
+    container ID is present.
+    """
     html = render_workflows_section()
-    assert 'role="tabpanel"' in html
-    assert 'aria-labelledby="tab-workflows"' in html
+    # Sub-section container must be present (not a tabpanel any more)
+    assert 'id="ops-subsection-workflows"' in html
+    # workflows-grid must still be present for JS to target
+    assert 'id="workflows-grid"' in html
 
 
 def test_section_has_grid_container() -> None:

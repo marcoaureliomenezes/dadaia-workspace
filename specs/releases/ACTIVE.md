@@ -1,3 +1,3 @@
-release: none
+release: 0.1.6
 segment: none
-phase: ARCHIVED
+phase: IMPLEMENTATION
