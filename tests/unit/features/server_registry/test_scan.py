@@ -1,7 +1,13 @@
-"""Unit tests for scan_unregistered_listeners (v0.1.1 / Bug D)."""
+"""Unit tests for scan_unregistered_listeners (v0.1.1 / Bug D).
+
+Linux-only: these tests exercise /proc-dependent code paths.  Platform-guard
+behaviour (non-Linux early-return) is covered in test_scan_platform_guard.py
+which runs on all platforms.
+"""
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -9,6 +15,11 @@ import pytest
 from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.features.server_registry.scan import (
     scan_unregistered_listeners,
+)
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="scan.py /proc paths are Linux-only; platform-guard tests are in test_scan_platform_guard.py",
 )
 
 # A realistic `ss -tlnp` sample we can stub in.

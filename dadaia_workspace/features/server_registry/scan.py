@@ -5,9 +5,11 @@ is read-only: it never kills processes, never registers anything, never
 writes to disk.  The CLI (``dadaia server scan``) and panel "Unregistered"
 section both consume this.
 
-Linux-only.  ``ss`` is part of the iproute2 package and ships on every
-modern Linux distro.  On macOS / Windows the function returns an empty
-list with a warning — workspace is Linux-only by design.
+Linux-only (``/proc`` required).  ``ss`` is part of the iproute2 package and
+ships on every modern Linux distro.  On platforms without ``/proc``
+(macOS / Windows) the function returns an empty list with an INFO log.
+Use ``PLATFORM.has_proc_fs`` to guard all ``/proc`` access — never test
+``sys.platform`` directly in this module.
 
 Privacy invariant (T1): no message bodies, no file contents, no env vars
 are read.  Only ``/proc/<pid>/cmdline`` (the same data ``ps`` exposes) and
@@ -26,6 +28,7 @@ from dadaia_workspace.core.models.server_registry import (
     PortEntry,
     UnregisteredListener,
 )
+from dadaia_workspace.core.platform import PLATFORM
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +114,12 @@ def _parse_ss_line(line: str) -> tuple[int, str, int | None] | None:
 
 
 def _read_cmdline(pid: int) -> str:
+    """Read ``/proc/<pid>/cmdline``.
+
+    Returns empty string when ``/proc`` is unavailable on this platform.
+    """
+    if not PLATFORM.has_proc_fs:
+        return ""
     try:
         with open(f"/proc/{pid}/cmdline", "rb") as f:
             raw = f.read()
@@ -124,6 +133,12 @@ def _read_cmdline(pid: int) -> str:
 
 
 def _read_cwd(pid: int) -> str:
+    """Read ``/proc/<pid>/cwd`` symlink.
+
+    Returns empty string when ``/proc`` is unavailable on this platform.
+    """
+    if not PLATFORM.has_proc_fs:
+        return ""
     try:
         cwd = os.readlink(f"/proc/{pid}/cwd")
     except OSError:
@@ -134,8 +149,18 @@ def _read_cwd(pid: int) -> str:
 
 
 def _pid_belongs_to_current_user(pid: int) -> bool:
+    """Return True if ``pid`` is owned by the current UID.
+
+    Returns False when ``/proc`` is unavailable on this platform, or when
+    ``os.getuid`` does not exist (Windows).
+    """
+    if not PLATFORM.has_proc_fs:
+        return False
+    get_uid = getattr(os, "getuid", None)
+    if get_uid is None:
+        return False
     try:
-        return os.stat(f"/proc/{pid}").st_uid == os.getuid()
+        return bool(os.stat(f"/proc/{pid}").st_uid == get_uid())
     except OSError:
         return False
 
@@ -146,6 +171,10 @@ def scan_unregistered_listeners(
     _output_provider: object = None,
 ) -> list[UnregisteredListener]:
     """Return TCP listeners not present in the registry.
+
+    On platforms without ``/proc`` (macOS, Windows) this function returns
+    ``[]`` immediately with an INFO log.  Use ``PLATFORM.has_proc_fs`` to
+    detect this condition — do not compare ``sys.platform`` directly.
 
     Parameters
     ----------
@@ -159,6 +188,10 @@ def scan_unregistered_listeners(
     -------
     Sorted (by port) list of UnregisteredListener.
     """
+    if not PLATFORM.has_proc_fs:
+        logger.info("scan: /proc not available on this platform — orphan detection disabled")
+        return []
+
     registered_ports = {e.port for e in registry_entries}
 
     raw = _ss_command_output() if _output_provider is None else _output_provider()  # type: ignore[operator]
