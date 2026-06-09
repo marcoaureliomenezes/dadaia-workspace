@@ -15,8 +15,17 @@ from unittest.mock import patch
 
 import pytest
 
+from dadaia_workspace.core.platform import detect
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
+
+# These tests exercise the POSIX os.kill(pid, 0) liveness semantics by mocking
+# os.kill. On Windows the probe takes the OpenProcess branch instead (os.kill is
+# not a safe probe there), so force the POSIX capability via the PLATFORM seam so
+# the mocked-os.kill path runs on every host.
+_FORCE_POSIX = patch(
+    "dadaia_workspace.infrastructure.process_probe_adapter.PLATFORM", detect("linux")
+)
 
 # ---------------------------------------------------------------------------
 # 1–7: Migrated from test_process_probe.py
@@ -52,7 +61,7 @@ def test_permission_error_is_treated_as_alive(caplog: pytest.LogCaptureFixture) 
     and do NOT log a warning (PermissionError is expected for cross-user PIDs).
     """
     probe = OsProcessProbe()
-    with patch("os.kill", side_effect=PermissionError(1, "Operation not permitted")):
+    with _FORCE_POSIX, patch("os.kill", side_effect=PermissionError(1, "Operation not permitted")):
         assert probe.is_pid_alive(12345) is True
     # No warning emitted for PermissionError — it's expected, not anomalous.
     assert not any("unexpected OSError" in rec.message for rec in caplog.records)
@@ -60,7 +69,7 @@ def test_permission_error_is_treated_as_alive(caplog: pytest.LogCaptureFixture) 
 
 def test_process_lookup_error_is_treated_as_dead() -> None:
     probe = OsProcessProbe()
-    with patch("os.kill", side_effect=ProcessLookupError(3, "No such process")):
+    with _FORCE_POSIX, patch("os.kill", side_effect=ProcessLookupError(3, "No such process")):
         assert probe.is_pid_alive(12345) is False
 
 
@@ -74,6 +83,7 @@ def test_unexpected_oserror_is_treated_as_alive_with_warning(
 
     probe = OsProcessProbe()
     with (
+        _FORCE_POSIX,
         caplog.at_level(logging.WARNING),
         patch("os.kill", side_effect=OSError(99, "Some weird error")),
     ):
