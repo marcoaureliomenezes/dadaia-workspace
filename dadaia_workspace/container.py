@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
@@ -67,6 +68,28 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
+
+
+def _select_lock_adapter() -> Any:
+    """Return the appropriate file-lock adapter module for the current platform.
+
+    Reads ``PLATFORM.has_fcntl`` (the sole authorized platform capability flag)
+    and returns the POSIX adapter on platforms that provide ``fcntl``, or the
+    Windows adapter otherwise.  The import is lazy so that importing
+    ``container`` never triggers the Windows module's guard on Linux/macOS.
+
+    Returns:
+        The adapter module: ``infrastructure.file_lock_posix`` when
+        ``PLATFORM.has_fcntl`` is ``True``, or
+        ``infrastructure.file_lock_windows`` when ``False``.
+    """
+    from dadaia_workspace.core.platform import PLATFORM
+
+    if PLATFORM.has_fcntl:
+        import dadaia_workspace.infrastructure.file_lock_posix as _adapter
+    else:
+        import dadaia_workspace.infrastructure.file_lock_windows as _adapter  # type: ignore[no-redef]
+    return _adapter
 
 
 def _states_dir(workspace_root: Path) -> Path:

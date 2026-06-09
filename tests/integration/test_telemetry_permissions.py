@@ -11,13 +11,18 @@ operator data is read and no network calls are made.
 
 from __future__ import annotations
 
-import pathlib
-import sqlite3
-from datetime import date
-from typing import Any
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import pytest
 
-from dadaia_workspace.features.telemetry.service import TelemetryService
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
+pytest.importorskip("fcntl")
+
+import pathlib  # noqa: E402
+import sqlite3  # noqa: E402
+from datetime import date  # noqa: E402
+from typing import Any  # noqa: E402
+
+from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
+from dadaia_workspace.features.telemetry.store.dao import TelemetryDao  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Stubs — same pattern as tests/unit/features/telemetry/test_service.py

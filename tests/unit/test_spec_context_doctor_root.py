@@ -6,10 +6,17 @@ Each invariant gets:
 - a fixability check where applicable
 """
 
-from pathlib import Path
+from __future__ import annotations
 
-from dadaia_workspace.features.spec_context.doctor import DoctorService
-from tests.fakes import FakeContextStore, FakeGitClient
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import pytest
+
+pytest.importorskip("fcntl")
+
+from pathlib import Path  # noqa: E402
+
+from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixture helpers

@@ -20,14 +20,22 @@ conventions of test_backlog_ownership.py.
 
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-from pathlib import Path
+import json  # noqa: E402
+import os  # noqa: E402
+import subprocess  # noqa: E402
+import sys
+from pathlib import Path  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
-pytestmark = [pytest.mark.integration, pytest.mark.slow]
+# Guard: skip on Windows — sdd-spec-gate.sh is a POSIX shell script.
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.slow,
+    pytest.mark.skipif(
+        sys.platform == "win32", reason="POSIX shell scripts not available on Windows"
+    ),
+]
 
 _GATE = (
     Path(__file__).parent.parent.parent.parent

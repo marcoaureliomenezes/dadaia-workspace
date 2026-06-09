@@ -1,19 +1,24 @@
 """Unit tests for SpecContextService current ALIVE/DEAD behavior."""
 
-import json
-from pathlib import Path
+from __future__ import annotations
 
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
 import pytest
 
-from dadaia_workspace.core.exceptions import (
+pytest.importorskip("fcntl")
+
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from dadaia_workspace.core.exceptions import (  # noqa: E402
     ContextAlreadyExistsError,
     ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
 )
-from dadaia_workspace.core.models.spec_context import ContextState
-from dadaia_workspace.features.spec_context.service import SpecContextService
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
+from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 
 @pytest.fixture()

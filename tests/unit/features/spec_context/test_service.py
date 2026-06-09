@@ -7,17 +7,22 @@ Fix: detect non-writable files before rmtree and raise GitSyncError with
 T-10b: activate()/deactivate() removed; alive()/dead() replace them.
 """
 
-import stat
-from pathlib import Path
+from __future__ import annotations
 
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
 import pytest
 
-from dadaia_workspace.core.exceptions import GitSyncError
-from dadaia_workspace.features.spec_context.service import (
+pytest.importorskip("fcntl")
+
+import stat  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from dadaia_workspace.core.exceptions import GitSyncError  # noqa: E402
+from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     _SCAFFOLD_SRC,
     SpecContextService,
 )
-from tests.fakes import FakeContextStore, FakeGitClient
+from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures

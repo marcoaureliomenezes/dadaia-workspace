@@ -9,14 +9,19 @@ Acceptance criteria (SPEC §8 AC-08):
 
 from __future__ import annotations
 
-import json
-import os
-import time
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import pytest
 
-from dadaia_workspace.features.spec_context.doctor import DoctorService
-from tests.fakes import FakeContextStore, FakeGitClient
+pytest.importorskip("fcntl")
+
+import json  # noqa: E402
+import os  # noqa: E402
+import time  # noqa: E402
+from datetime import UTC, datetime, timedelta  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
