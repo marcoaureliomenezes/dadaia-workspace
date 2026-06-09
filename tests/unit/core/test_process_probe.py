@@ -19,7 +19,10 @@ from unittest.mock import patch
 
 import pytest
 
-from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
+# Migration note (T-018-03): OsProcessProbe moved to infrastructure.process_probe_adapter.
+# This import path is updated here; the full FILE DELETE of test_process_probe.py is
+# deferred until tests/unit/infrastructure/test_process_probe_adapter.py is green in CI.
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 
 
 def test_own_pid_is_alive() -> None:

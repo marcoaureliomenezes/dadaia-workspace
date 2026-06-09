@@ -39,7 +39,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   `PLATFORM` module-level singleton; unit tests monkeypatch `sys.platform` for linux/darwin/win32
   and verify all flags; mypy --strict passes; pytest green.
 
-### [-] T-018-03 — Step 2: Layer-boundary correction (OsProcessProbe MOVE, atomic 4-file commit)
+### [x] T-018-03 — Step 2: Layer-boundary correction (OsProcessProbe MOVE, atomic 4-file commit)
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/core/protocols/process_probe.py` (DELETE OsProcessProbe + dead imports)
