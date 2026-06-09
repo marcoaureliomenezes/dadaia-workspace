@@ -12,6 +12,7 @@ from typing import Any
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.core.exceptions import PlatformSecurityError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.panel.auth import ensure_token
 from dadaia_workspace.features.panel.handler import make_handler_class
@@ -83,6 +84,13 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
     except PermissionError as exc:
         logger.warning("Telemetry unavailable (permission denied on telemetry state dir): %s", exc)
         return None
+    except PlatformSecurityError as exc:
+        # Tier-2: telemetry dir permission restriction failed on this platform.
+        # The panel continues without telemetry (503 on telemetry endpoints).
+        logger.warning(
+            "Telemetry unavailable (platform security error restricting state dir): %s", exc
+        )
+        return None
     except OSError as exc:
         logger.warning("Telemetry unavailable (OS error initialising telemetry state): %s", exc)
         return None
@@ -107,8 +115,12 @@ def panel(
 
     workspace_root = resolve_workspace_root()
 
-    # Ensure Bearer token exists (generates once with 0o600 if missing).
-    token = ensure_token()
+    # Ensure Bearer token exists (generates once with owner-only permissions if missing).
+    # Use the platform-appropriate FilePermissionSetter for the parent dir restriction
+    # (TOCTOU option a on Windows, defense-in-depth on POSIX).
+    # PlatformSecurityError propagates — the panel MUST NOT start with an unprotected token.
+    permission_setter = container._build_permission_setter()
+    token = ensure_token(permission_setter=permission_setter)
 
     # Build telemetry first so it can be injected into the panel service,
     # enabling the canonical agent overlay (PR3-08).

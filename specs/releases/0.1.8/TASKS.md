@@ -185,7 +185,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
 
 ## Segment alpha-2 — Steps 5–9 (security, signals, venv paths, /proc guard, io-encoding)
 
-### [-] T-018-10 — Step 5: ADD `FilePermissionSetter` protocol + POSIX/Windows adapters; UPDATE security consumers [SEC]
+### [x] T-018-10 — Step 5: ADD `FilePermissionSetter` protocol + POSIX/Windows adapters; UPDATE security consumers [SEC]
 - **Owner:** software-engineer
 - **Security sign-off required:** security-reviewer must approve before `[x]`
 - **Write set:**

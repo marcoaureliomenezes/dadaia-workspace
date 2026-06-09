@@ -70,6 +70,33 @@ from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHando
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
 
+def _build_permission_setter() -> Any:
+    """Return the appropriate FilePermissionSetter for the current platform.
+
+    Reads ``PLATFORM.has_posix_chmod`` (the sole authorized platform capability
+    flag) and returns the POSIX adapter on platforms with effective chmod, or the
+    Windows ``icacls`` adapter otherwise.  The import is lazy so that importing
+    ``container`` never triggers the Windows module's guard on Linux/macOS.
+
+    Returns:
+        ``PosixFilePermissionSetter`` when ``PLATFORM.has_posix_chmod`` is ``True``,
+        or ``WindowsFilePermissionSetter`` when ``False``.
+    """
+    from dadaia_workspace.core.platform import PLATFORM
+
+    if PLATFORM.has_posix_chmod:
+        from dadaia_workspace.infrastructure.file_permission_posix import (
+            PosixFilePermissionSetter,
+        )
+
+        return PosixFilePermissionSetter()
+    from dadaia_workspace.infrastructure.file_permission_windows import (
+        WindowsFilePermissionSetter,
+    )
+
+    return WindowsFilePermissionSetter()
+
+
 def _select_lock_adapter() -> Any:
     """Return the appropriate file-lock adapter module for the current platform.
 

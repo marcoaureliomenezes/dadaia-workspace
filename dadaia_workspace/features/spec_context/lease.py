@@ -52,8 +52,9 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import LockHeldError
+from dadaia_workspace.core.exceptions import LockHeldError, PlatformSecurityError
 from dadaia_workspace.core.lock_liveness import is_stale
+from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
 
 __all__ = [
     "LEASE_TTL_SECONDS",
@@ -101,22 +102,46 @@ def _validate(name: str, *, field: str) -> str:
     return name
 
 
-def _lock_dir(workspace: Path) -> Path:
+def _lock_dir(
+    workspace: Path,
+    permission_setter: FilePermissionSetter | None = None,
+) -> Path:
     d = workspace / ".dadaia" / "states" / "ctx_locks"
     d.mkdir(parents=True, exist_ok=True)
-    with contextlib.suppress(OSError):
-        d.chmod(0o700)
+    # Tier-2: try to restrict the lock dir; if it fails (e.g. Windows icacls error)
+    # log INFO and continue — the lock itself still functions, just without ACL restriction.
+    if permission_setter is not None:
+        try:
+            permission_setter.restrict_dir_to_owner(d)
+        except PlatformSecurityError as exc:
+            import logging as _logging
+
+            _logging.getLogger(__name__).info(
+                "lease: cannot restrict ctx_locks dir permissions (%s) — continuing.",
+                exc,
+            )
+    else:
+        with contextlib.suppress(OSError):
+            d.chmod(0o700)
     return d
 
 
-def _record_path(workspace: Path, ctx: str) -> Path:
+def _record_path(
+    workspace: Path,
+    ctx: str,
+    permission_setter: FilePermissionSetter | None = None,
+) -> Path:
     _validate(ctx, field="context")
-    return _lock_dir(workspace) / f"{ctx}.lock.json"
+    return _lock_dir(workspace, permission_setter) / f"{ctx}.lock.json"
 
 
-def _sentinel_path(workspace: Path, ctx: str) -> Path:
+def _sentinel_path(
+    workspace: Path,
+    ctx: str,
+    permission_setter: FilePermissionSetter | None = None,
+) -> Path:
     _validate(ctx, field="context")
-    return _lock_dir(workspace) / f"{ctx}.lock.sentinel"
+    return _lock_dir(workspace, permission_setter) / f"{ctx}.lock.sentinel"
 
 
 def _ptr_path(workspace: Path, ctx: str) -> Path:
@@ -253,6 +278,7 @@ def acquire(
     *,
     clock: Callable[[], datetime] = _utcnow,
     ttl: int = LEASE_TTL_SECONDS,
+    permission_setter: FilePermissionSetter | None = None,
 ) -> tuple[str, dict[str, object]]:
     """Acquire (or renew) the lease via O_EXCL CAS.
 
@@ -276,8 +302,8 @@ def acquire(
     """
     _validate(ctx, field="context")
     _validate(session_id, field="session_id")
-    record_path = _record_path(workspace, ctx)
-    sentinel = _sentinel_path(workspace, ctx)
+    record_path = _record_path(workspace, ctx, permission_setter)
+    sentinel = _sentinel_path(workspace, ctx, permission_setter)
 
     backoff = _INITIAL_BACKOFF
     for attempt in range(_MAX_RETRIES + 1):
@@ -391,6 +417,7 @@ def steal(
     *,
     clock: Callable[[], datetime] = _utcnow,
     ttl: int = LEASE_TTL_SECONDS,
+    permission_setter: FilePermissionSetter | None = None,
 ) -> tuple[bool, dict[str, object] | None]:
     """Reclaim a *stale* lease for ``session_id`` via the same O_EXCL CAS as acquire.
 
@@ -403,8 +430,8 @@ def steal(
     if rec is not None and not is_stale(rec, clock=clock):
         return False, rec
 
-    sentinel = _sentinel_path(workspace, ctx)
-    record_path = _record_path(workspace, ctx)
+    sentinel = _sentinel_path(workspace, ctx, permission_setter)
+    record_path = _record_path(workspace, ctx, permission_setter)
     backoff = _INITIAL_BACKOFF
     for attempt in range(_MAX_RETRIES + 1):
         _gc_orphan_sentinel(sentinel)

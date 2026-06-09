@@ -32,6 +32,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
 from dadaia_workspace.core.protocols.telemetry_lock import TelemetryRefreshLock
 from dadaia_workspace.features.telemetry import budget as _budget
 from dadaia_workspace.features.telemetry.aggregator.models import (
@@ -99,6 +100,12 @@ class TelemetryService:
     refresh_lock:
         TelemetryRefreshLock implementation for serializing concurrent refreshes.
         Defaults to a platform-appropriate adapter (POSIX or Windows).
+    permission_setter:
+        Optional ``FilePermissionSetter`` for restricting the telemetry state
+        directory permissions.  When ``None`` (default), falls back to the
+        direct ``os.chmod`` call (Tier-2: if a setter is provided and raises
+        ``PlatformSecurityError``, telemetry degrades to ``None``; the panel
+        starts but telemetry endpoints return 503).
     _now_fn:
         Injectable for tests: returns float (monotonic seconds).
     _getuid_fn:
@@ -115,6 +122,7 @@ class TelemetryService:
         state_dir: pathlib.Path = _DEFAULT_STATE_DIR,
         spec_context_service: Any = None,
         refresh_lock: TelemetryRefreshLock | None = None,
+        permission_setter: FilePermissionSetter | None = None,
         _now_fn: Callable[[], float] | None = None,
         _getuid_fn: Callable[[], int] | None = None,
     ) -> None:
@@ -140,12 +148,31 @@ class TelemetryService:
         self._scs = spec_context_service
         self._now_fn: Callable[[], float] = _now_fn or time.monotonic
         self._refresh_lock: TelemetryRefreshLock = refresh_lock or _default_refresh_lock()
+        self._permission_setter: FilePermissionSetter | None = permission_setter
 
         # Ensure state directory exists with strict permissions (T-AM-20 / devops T2).
-        # We create parents first, then chmod the leaf dir to 0o700 so that the
+        # We create parents first, then restrict the leaf dir to 0o700 so that the
         # telemetry state is only readable by the owning user.
+        # Tier-2: if the permission setter raises PlatformSecurityError, log INFO and
+        # continue — the panel starts but telemetry degraded (unlike panel auth token
+        # which is Tier-1 fail-loud).
         self._state_dir.mkdir(parents=True, exist_ok=True)
-        os.chmod(self._state_dir, 0o700)
+        if self._permission_setter is not None:
+            try:
+                self._permission_setter.restrict_dir_to_owner(self._state_dir)
+            except Exception as _perm_exc:  # noqa: BLE001
+                from dadaia_workspace.core.exceptions import PlatformSecurityError
+
+                if isinstance(_perm_exc, PlatformSecurityError):
+                    logger.info(
+                        "TelemetryService: cannot restrict state_dir permissions "
+                        "(%s) — telemetry continues in degraded mode.",
+                        _perm_exc,
+                    )
+                else:
+                    raise
+        else:
+            os.chmod(self._state_dir, 0o700)
 
         # Verify the panel auth token file (written by auth.py) has 0o600 perms.
         # If permissions have drifted (e.g. umask misconfiguration), log a warning
