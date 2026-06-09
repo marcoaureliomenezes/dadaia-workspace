@@ -127,7 +127,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   - `poetry run lint-imports` passes;
   - mypy green.
 
-### [ ] T-018-08 — Step 4b: ADD `pytest.importorskip` / `skipif` markers to 12 test files; ADD CLI safe_app test + classifier contract test
+### [-] T-018-08 — Step 4b: ADD `pytest.importorskip` / `skipif` markers to 12 test files; ADD CLI safe_app test + classifier contract test
 - **Owner:** software-engineer
 - **Write set:**
   - `tests/unit/test_spec_context_lock_reclaim.py` (`pytest.importorskip('fcntl')`)
