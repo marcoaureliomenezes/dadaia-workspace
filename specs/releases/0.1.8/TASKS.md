@@ -409,7 +409,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
 - **Done criterion:** module-level `pytestmark` limits to `sys.platform == 'linux'`; all
   `cwd='/tmp'` occurrences replaced with `str(tmp_path)` or portable temp dir; pytest green.
 
-### [ ] T-018-21 — Step 10g: CI Phase 2 matrix — unit-fast + contract-coverage Windows/macOS allow-fail
+### [x] T-018-21 — Step 10g: CI Phase 2 matrix — unit-fast + contract-coverage Windows/macOS allow-fail
 - **Owner:** software-engineer
 - **Write set:**
   - `.github/workflows/ci.yml` (Phase 2 matrix addition)
