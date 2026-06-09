@@ -16,22 +16,28 @@ Acceptance criteria covered here:
 
 from __future__ import annotations
 
-import fcntl as _fcntl
-import json
-import os
-import threading
-import time as _time
-from pathlib import Path
-
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+# The locking adapters tested here rely on fcntl under the hood on POSIX platforms.
 import pytest
 
-from dadaia_workspace.core.exceptions import (
+pytest.importorskip("fcntl")
+
+import fcntl as _fcntl  # noqa: E402
+import json  # noqa: E402
+import os  # noqa: E402
+import threading  # noqa: E402
+import time as _time  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from dadaia_workspace.core.exceptions import (  # noqa: E402
     WorkspaceLockTimeoutError,
 )
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.features.spec_context.doctor import DoctorService
-from dadaia_workspace.features.spec_context.locking import (
-    _acquire_flock,
+from dadaia_workspace.core.models.spec_context import (  # noqa: E402
+    ContextState,
+    SpecContextProject,
+)
+from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from dadaia_workspace.features.spec_context.locking import (  # noqa: E402
     _audit_log_path,
     audit_acquired,
     audit_blocked,
@@ -39,9 +45,13 @@ from dadaia_workspace.features.spec_context.locking import (
     context_lock,
     workspace_lock,
 )
-from dadaia_workspace.features.spec_context.service import SpecContextService
-from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fakes import FakeContextStore, FakeGitClient
+from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+
+# _acquire_flock is no longer re-exported from locking.py (LV-1, T-018-05).
+# Tests that need it import directly from the infrastructure adapter.
+from dadaia_workspace.infrastructure.file_lock_posix import _acquire_flock  # noqa: E402
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures
