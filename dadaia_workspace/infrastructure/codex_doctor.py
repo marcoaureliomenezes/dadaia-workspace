@@ -246,7 +246,12 @@ def dcx8_codex_rules_shape(codex_dir: Path) -> list[str]:
 
 
 def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
-    """D-CX-9: generated Codex hooks must call existing dadaia scripts."""
+    """D-CX-9: generated Codex hooks must invoke the Python governance hooks.
+
+    T-018-17: hook commands are emitted as ``<python> -m dadaia_workspace.hooks.<name>``
+    (cross-platform — the bash ``.sh`` hooks are dead on stock Windows), so the check
+    verifies the Python module references rather than ``.dadaia/scripts/*.sh`` paths.
+    """
     hooks_path = workspace_root / ".codex" / "hooks.json"
     out: list[str] = []
     try:
@@ -254,17 +259,14 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError):
         return ["[error] codex:hooks.json missing or invalid (D-CX-9)"]
     text = json.dumps(hooks)
-    for rel in (
-        ".dadaia/scripts/sdd-spec-gate.sh",
-        ".dadaia/scripts/root-whitelist-gate.sh",
-        ".dadaia/scripts/sdd-post-gate.sh",
-        ".dadaia/scripts/ctx-inject.sh",
+    for module in (
+        "dadaia_workspace.hooks.sdd_gate",
+        "dadaia_workspace.hooks.root_whitelist",
+        "dadaia_workspace.hooks.sdd_post_gate",
+        "dadaia_workspace.hooks.ctx_inject",
     ):
-        script = workspace_root / rel
-        if str(script) not in text:
-            out.append(f"[missing] codex:hooks.json command for {rel} (D-CX-9)")
-        elif not script.exists():
-            out.append(f"[missing] codex hook script {rel} (D-CX-9)")
+        if module not in text:
+            out.append(f"[missing] codex:hooks.json command for {module} (D-CX-9)")
     if "DADAIA_HOOK_OUTPUT=codex-json" not in text:
         out.append("[missing] codex:hooks.json codex-json prompt output (D-CX-9)")
     return out

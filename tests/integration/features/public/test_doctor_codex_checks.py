@@ -215,14 +215,22 @@ def test_dcx8_markdown_rules_rejected(installed_workspace: Path) -> None:
     assert any("D-CX-8" in r and "workspace-protocol.md" in r for r in reports)
 
 
-def test_dcx9_missing_hook_script_detected(installed_workspace: Path) -> None:
-    script = installed_workspace / ".dadaia" / "scripts" / "ctx-inject.sh"
-    assert script.exists()
-    script.unlink()
+def test_dcx9_missing_hook_command_detected(installed_workspace: Path) -> None:
+    # T-018-17: codex hooks invoke the Python governance hooks
+    # (``<python> -m dadaia_workspace.hooks.<name>``), not the bash ``.sh`` scripts.
+    # D-CX-9 now verifies the Python module references in .codex/hooks.json; strip one
+    # and assert it is flagged.
+    hooks_path = installed_workspace / ".codex" / "hooks.json"
+    text = hooks_path.read_text(encoding="utf-8")
+    assert "dadaia_workspace.hooks.ctx_inject" in text
+    hooks_path.write_text(
+        text.replace("dadaia_workspace.hooks.ctx_inject", "dadaia_workspace.hooks.DELETED"),
+        encoding="utf-8",
+    )
 
     reports = FileSystemPublicAssetManager().doctor(installed_workspace)
 
-    assert any("D-CX-9" in r and "ctx-inject.sh" in r for r in reports)
+    assert any("D-CX-9" in r and "dadaia_workspace.hooks.ctx_inject" in r for r in reports)
 
 
 def test_dcx10_missing_agent_boundary_detected(installed_workspace: Path) -> None:
