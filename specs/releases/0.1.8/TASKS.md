@@ -428,7 +428,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
 
 ## Segment rc-1 — Ship gate
 
-### [ ] T-018-22 — Propagate + verify projections + full suite green
+### [x] T-018-22 — Propagate + verify projections + full suite green
 - **Owner:** software-engineer
 - **Write set:** lib-originated projections (`.claude/agents/`, `.codex/agents/`, etc.)
 - **Precondition:** T-018-19 `[x]`
