@@ -351,7 +351,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   to shell sentinel; `sdd_post_gate.py` uses `os.replace` atomic renewal; all 5 parity tests
   above pass on Linux; `encoding='utf-8'` on all file reads; security-reviewer handoff approves.
 
-### [ ] T-018-17 — Step 10c: UPDATE `runtime_config.py` + `workspace/service.py` to emit Python hook commands
+### [-] T-018-17 — Step 10c: UPDATE `runtime_config.py` + `workspace/service.py` to emit Python hook commands
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/infrastructure/runtime_config.py`
