@@ -754,7 +754,10 @@ class TestInstallWorkspaceRootGuardrailPair:
     def test_force_false_claude_md_skips_when_already_stub(self, tmp_path: Path) -> None:
         """force=False: CLAUDE.md already containing stub is a no-op."""
         src = _make_source_file(tmp_path)
-        (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
+        # newline="" so the pre-existing stub is LF-exact, matching how production
+        # writes it (_atomic_write_text). A plain write_text would emit CRLF on
+        # Windows, so the byte-hash skip-compare would (correctly) not match.
+        (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8", newline="")
         installed: list[str] = []
         _install_workspace_root_guardrail_pair(src, tmp_path, force=False, installed=installed)
         assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB

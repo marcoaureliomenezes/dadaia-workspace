@@ -41,6 +41,7 @@ def test_safe_app_fallback_uses_platform_tmp_dir(tmp_path: Path) -> None:
         has_proc_fs=True,
         has_posix_chmod=True,
         has_sigterm=True,
+        has_os_kill_liveness=True,
         venv_scripts_dir="bin",
         venv_exe_suffix="",
         tmp_dir=custom_tmp,

@@ -407,10 +407,13 @@ def install_codex_agents(
             if dst_sha == src_sha:
                 installed.append(f"[skip] {dst}")
             else:
-                dst.write_text(toml_content, encoding="utf-8")
+                # _atomic_write_text writes LF-exact (newline="") so the bytes on
+                # disk match the LF hash above; a plain write_text would emit CRLF
+                # on Windows and the skip would never fire. See FR-RC2-2.
+                _atomic_write_text(dst, toml_content)
                 installed.append(f"[ok]   {dst}")
         else:
-            dst.write_text(toml_content, encoding="utf-8")
+            _atomic_write_text(dst, toml_content)
             installed.append(f"[ok]   {dst}")
 
 
@@ -461,7 +464,8 @@ def copy_agents_for_opencode(
             if dst_sha == src_sha:
                 installed.append(f"[skip] {dst}")
                 continue
-        dst.write_text(content, encoding="utf-8")
+        # LF-exact write so the skip hash-compare matches on Windows (FR-RC2-2).
+        _atomic_write_text(dst, content)
         installed.append(f"[ok]   {dst}")
     # Prune orphan projections (rc-4 / T-017-32 — fixes install-does-not-prune-orphan-
     # projections): an agent .md removed from source must not linger in .opencode/agents/.

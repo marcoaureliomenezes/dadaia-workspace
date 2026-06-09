@@ -38,6 +38,7 @@ def test_linux_flags() -> None:
     assert caps.has_proc_fs is True
     assert caps.has_posix_chmod is True
     assert caps.has_sigterm is True
+    assert caps.has_os_kill_liveness is True
     assert caps.venv_scripts_dir == "bin"
     assert caps.venv_exe_suffix == ""
 
@@ -60,6 +61,7 @@ def test_darwin_flags() -> None:
     assert caps.has_proc_fs is False  # /proc not available on macOS
     assert caps.has_posix_chmod is True
     assert caps.has_sigterm is True
+    assert caps.has_os_kill_liveness is True
     assert caps.venv_scripts_dir == "bin"
     assert caps.venv_exe_suffix == ""
 
@@ -75,6 +77,7 @@ def test_win32_flags() -> None:
     assert caps.has_proc_fs is False
     assert caps.has_posix_chmod is False
     assert caps.has_sigterm is False
+    assert caps.has_os_kill_liveness is False
     assert caps.venv_scripts_dir == "Scripts"
     assert caps.venv_exe_suffix == ".exe"
 

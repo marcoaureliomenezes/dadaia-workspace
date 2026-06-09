@@ -41,6 +41,13 @@ class Capabilities:
         has_sigterm:     True on platforms where ``signal.SIGTERM`` can be
                          registered via ``signal.signal()`` (Linux, macOS).
                          False on Windows (SIGTERM raises OSError).
+        has_os_kill_liveness:
+                         True where ``os.kill(pid, 0)`` is a safe, non-destructive
+                         liveness probe (POSIX).  False on Windows, where CPython
+                         implements ``os.kill`` as ``OpenProcess(PROCESS_ALL_ACCESS)``
+                         + ``TerminateProcess`` — calling it would *kill* the target,
+                         and it returns ERROR_INVALID_PARAMETER (not ESRCH) for a
+                         dead PID.  Windows must probe via read-only ``OpenProcess``.
         venv_scripts_dir: Subdirectory name inside a venv that holds Python
                          executables.  ``"bin"`` on POSIX; ``"Scripts"`` on
                          Windows.
@@ -55,6 +62,7 @@ class Capabilities:
     has_proc_fs: bool
     has_posix_chmod: bool
     has_sigterm: bool
+    has_os_kill_liveness: bool
     venv_scripts_dir: str
     venv_exe_suffix: str
     tmp_dir: Path
@@ -84,6 +92,7 @@ class Capabilities:
             has_proc_fs=is_linux,
             has_posix_chmod=is_posix,
             has_sigterm=is_posix,
+            has_os_kill_liveness=is_posix,
             venv_scripts_dir="Scripts" if is_win else "bin",
             venv_exe_suffix=".exe" if is_win else "",
             tmp_dir=Path(tempfile.gettempdir()),

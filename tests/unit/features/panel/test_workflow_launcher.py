@@ -133,7 +133,9 @@ def test_run_workflow_delegates_to_launcher() -> None:
     assert len(launcher.launched) == 1
     name, cwd, exe = launcher.launched[0]
     assert name == "deploy"
-    assert cwd == "/workspace"
+    # run_workflow passes str(workspace_root); on Windows that's the native
+    # "\workspace", the correct cwd for the subprocess on that host.
+    assert cwd == str(Path("/workspace"))
     assert result["workflow"] == "deploy"
     assert isinstance(result["pid"], int)
 

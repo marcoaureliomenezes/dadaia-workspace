@@ -222,7 +222,8 @@ def test_patch_json_paths_skips_missing_files(tmp_path: Path) -> None:
 def test_rewrite_paths_in_value_string_exact(tmp_path: Path) -> None:
     svc = ImportService(workspace_root=tmp_path)
     result, count = svc._rewrite_paths_in_value("/old/ws", "/old/ws", "/new/ws")
-    assert result == "/new/ws"
+    # Exact-match rebuilds to the host-native new root (see _string_prefix above).
+    assert result == str(Path("/new/ws"))
     assert count == 1
 
 
