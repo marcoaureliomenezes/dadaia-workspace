@@ -12,6 +12,11 @@ from pathlib import Path
 
 import pytest
 
+# Collection-safe guard (F-14): the infrastructure imports below pull in fcntl at
+# import time, before any skipif mark applies — importorskip skips the whole module
+# on platforms without fcntl (Windows) instead of erroring collection.
+pytest.importorskip("fcntl")
+
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="fcntl file locks are only available on POSIX platforms",
