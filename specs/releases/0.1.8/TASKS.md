@@ -79,7 +79,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   or raw fd access remains in `features/`; importing `file_lock_windows` on non-Windows raises
   `PlatformCapabilityError`; pytest green on Linux.
 
-### [ ] T-018-05 — Step 3b: UPDATE `locking.py` — remove `import fcntl`, inject via lazy default
+### [-] T-018-05 — Step 3b: UPDATE `locking.py` — remove `import fcntl`, inject via lazy default
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/features/spec_context/locking.py`
