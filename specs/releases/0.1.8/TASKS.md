@@ -381,7 +381,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   hook content assertion reflects the actual hook being installed (`.sh` path — not a `pre_push_ci`
   Python module reference); pytest green.
 
-### [ ] T-018-19 — Step 10e: UPDATE `sdd-gate.ts` + `ctx-inject.ts` to call Python hooks [ADR-7]
+### [-] T-018-19 — Step 10e: UPDATE `sdd-gate.ts` + `ctx-inject.ts` to call Python hooks [ADR-7]
 - **Owner:** ai-engineer
 - **Write set:**
   - `dadaia_workspace/public/plugins/sdd-gate.ts`
