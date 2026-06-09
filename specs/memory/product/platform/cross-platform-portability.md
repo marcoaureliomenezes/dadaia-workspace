@@ -7,8 +7,9 @@ summary: Establishes the cross-platform foundation for dadaia-workspace v0.1.8 â
   PLATFORM singleton (sole sys.platform call site), typed platform exceptions, 4 protocol
   ports, 9 infrastructure adapters, a Python governance hooks package, and a phased 3-OS
   CI matrix. Defines the 3-tier resilience contract (fail-loud for security, degrade-with-log
-  for non-security, unsupported-platform at construction). Current classifier is POSIX::Linux
-  pending Phase-3 CI graduation (ADR-3).
+  for non-security, unsupported-platform at construction). As of 0.1.8 rc-2 the Windows +
+  macOS unit/contract/importability CI legs are GREEN and HARD-GATED (branch-protection
+  required), and the classifier advertises POSIX::Linux + MacOS + Microsoft::Windows.
 tags:
 - platform
 - cross-platform

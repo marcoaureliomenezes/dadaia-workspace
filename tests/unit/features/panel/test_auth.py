@@ -58,10 +58,14 @@ class TestEnsureToken:
 
     def test_ensure_token_generates_url_safe(self, tmp_path: pathlib.Path) -> None:
         """Fresh path generates a URL-safe token of length >= 32 with no whitespace."""
+        from tests.fakes import FakeFilePermissionSetter
+
         auth = _import_auth()
         token_path = tmp_path / "subdir" / "panel.token"
 
-        token = auth.ensure_token(token_path)
+        # Inject a setter so this format-only test runs on every OS: without one,
+        # ensure_token correctly refuses on platforms where chmod is a no-op (Windows).
+        token = auth.ensure_token(token_path, permission_setter=FakeFilePermissionSetter())
 
         assert len(token) >= 32, f"Token too short: {len(token)}"
         assert not any(c.isspace() for c in token), "Token must not contain whitespace"
@@ -73,6 +77,10 @@ class TestEnsureToken:
             f"Token contains non-urlsafe chars: {token!r}"
         )
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="asserts on-disk 0o600 mode bits, which are a no-op on Windows",
+    )
     def test_ensure_token_atomic_create_mode_0o600_no_widen_window(
         self, tmp_path: pathlib.Path
     ) -> None:

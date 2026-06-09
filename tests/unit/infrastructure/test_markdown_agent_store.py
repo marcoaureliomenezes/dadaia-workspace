@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.infrastructure.markdown_agent_store import (
     MarkdownAgentStore,
     _parse_file,
@@ -99,17 +101,23 @@ def test_parse_file_yaml_list_frontmatter_returns_none(tmp_path: Path) -> None:
     assert _parse_file(path) is None
 
 
-def test_parse_file_oserror_returns_none(tmp_path: Path) -> None:
+def test_parse_file_oserror_returns_none(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """When the file cannot be read (OSError), None is returned without raising."""
     path = tmp_path / "unreadable.md"
     path.write_text("---\nname: x\n---\n")
-    # Make unreadable
-    path.chmod(0o000)
-    try:
-        result = _parse_file(path)
-        assert result is None
-    finally:
-        path.chmod(0o644)  # restore so tmp_path cleanup succeeds
+    # Force the OSError via monkeypatch rather than chmod(0o000): chmod mode bits
+    # are a no-op on Windows, so the file would stay readable there. This exercises
+    # the OSError-handling branch on every OS.
+    real_read = Path.read_text
+
+    def boom(self: Path, *args: object, **kwargs: object) -> str:
+        if self == path:
+            raise OSError("simulated unreadable file")
+        return real_read(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", boom)
+    result = _parse_file(path)
+    assert result is None
 
 
 def test_parse_file_nonexistent_file_returns_none(tmp_path: Path) -> None:
@@ -175,7 +183,9 @@ def test_store_list_raw_returns_empty_for_missing_dir(tmp_path: Path) -> None:
     assert store.list_raw() == []
 
 
-def test_store_list_raw_skips_unreadable_file(tmp_path: Path) -> None:
+def test_store_list_raw_skips_unreadable_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """list_raw() skips files that cannot be read (OSError) and continues."""
     agents_dir = tmp_path / "agents"
     agents_dir.mkdir()
@@ -183,15 +193,21 @@ def test_store_list_raw_skips_unreadable_file(tmp_path: Path) -> None:
     bad = agents_dir / "bad.md"
     good.write_text("---\nname: good\ndescription: OK.\n---\n# Body\n")
     bad.write_text("---\nname: bad\ndescription: Bad.\n---\n# Body\n")
-    bad.chmod(0o000)
-    try:
-        store = MarkdownAgentStore(agents_dir)
-        results = store.list_raw()
-        names = [r["name"] for r in results]
-        assert "good" in names
-        assert "bad" not in names
-    finally:
-        bad.chmod(0o644)
+    # Force OSError on the bad file via monkeypatch (chmod(0o000) is a no-op on
+    # Windows). Cross-platform exercise of the skip-on-unreadable path.
+    real_read = Path.read_text
+
+    def boom(self: Path, *args: object, **kwargs: object) -> str:
+        if self == bad:
+            raise OSError("simulated unreadable file")
+        return real_read(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", boom)
+    store = MarkdownAgentStore(agents_dir)
+    results = store.list_raw()
+    names = [r["name"] for r in results]
+    assert "good" in names
+    assert "bad" not in names
 
 
 def test_store_list_raw_skips_files_without_frontmatter(tmp_path: Path) -> None:

@@ -33,15 +33,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # CI matrix Phase 1 (T-018-09 / WS-2): cross-platform importability smoke.
+  # CI matrix (T-018-09 / WS-2): cross-platform importability smoke.
   # Windows + macOS ONLY (ubuntu is already covered by the hard-gating jobs below).
-  # allow-fail (continue-on-error) so the import crash is VISIBLE without blocking PRs;
-  # graduates to a hard gate once F-01 (fcntl crash) is confirmed fixed on these OSes.
+  # GRADUATED to a hard gate in 0.1.8 rc-2 (F-01 fcntl crash fixed; green on both OSes).
   importability-smoke:
-    name: Importability smoke (Windows/macOS, allow-fail)
+    name: Importability smoke (Windows/macOS)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -164,15 +162,14 @@ jobs:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
         run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
 
-  # CI matrix Phase 2 (T-018-21 / WS-2): unit + contract on Windows/macOS, allow-fail.
-  # Ubuntu hard-gating jobs above are unchanged (separate companion jobs keep the required
-  # status-check names intact). Graduation to hard-gate: when both legs are green on a named
-  # feature/0.1.8 run (recorded in CLOSURE), delete the GRADUATION-GATE continue-on-error line.
+  # CI matrix (T-018-21 / WS-2 → GRADUATED in 0.1.8 rc-2): unit + contract on Windows/macOS.
+  # Ubuntu hard-gating jobs above remain separate companion jobs so the original required
+  # status-check names stay intact. These legs are now hard gates (green on both OSes on the
+  # feature/0.1.8 graduation run recorded in CLOSURE) — no continue-on-error.
   unit-fast-cross:
-    name: Unit fast (Windows/macOS, allow-fail)
+    name: Unit fast (Windows/macOS)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 8
-    continue-on-error: true  # GRADUATION-GATE: delete this line when ready to hard-gate
     strategy:
       fail-fast: false
       matrix:
@@ -193,10 +190,9 @@ jobs:
         run: poetry run pytest -q -m "unit and not slow" tests/unit
 
   contract-coverage-cross:
-    name: Contract coverage (Windows/macOS, allow-fail)
+    name: Contract coverage (Windows/macOS)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 8
-    continue-on-error: true  # GRADUATION-GATE: delete this line when ready to hard-gate
     strategy:
       fail-fast: false
       matrix:
@@ -326,7 +322,7 @@ jobs:
           test -f "$PWD/specs/memory/product/index.md" || \
             { echo "ERROR: specs/memory/product/index.md missing"; exit 1; }
           echo "Memory atoms verified OK"
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903  # v6.0.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: "22"
           cache: npm

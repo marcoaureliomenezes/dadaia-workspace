@@ -780,15 +780,22 @@ def test_get_prompt_unreadable_file_raises_not_found(
     This covers the unreadable prompt-file branch.
     """
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
-    agent_file = _write_agent(
+    _write_agent(
         _agentic_dir(tmp_path),
         "locked-agent.md",
         "name: locked-agent\ndescription: Locked.\n",
         "# Locked\n",
     )
-    agent_file.chmod(0o000)
-    try:
-        with pytest.raises(AgentNotFoundError, match="Cannot read"):
-            get_prompt("locked-agent", workspace_root=tmp_path)
-    finally:
-        agent_file.chmod(0o644)
+    # Force the OSError via monkeypatch rather than chmod(0o000): chmod mode bits
+    # are a no-op on Windows, so the file would stay readable there. This exercises
+    # the unreadable-file -> AgentNotFoundError branch on every OS.
+    real_read = Path.read_text
+
+    def boom(self: Path, *args: object, **kwargs: object) -> str:
+        if self.name == "locked-agent.md":
+            raise OSError("simulated unreadable file")
+        return real_read(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", boom)
+    with pytest.raises(AgentNotFoundError, match="Cannot read"):
+        get_prompt("locked-agent", workspace_root=tmp_path)

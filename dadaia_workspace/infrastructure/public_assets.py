@@ -230,14 +230,14 @@ class FileSystemPublicAssetManager:
 
         validate_workflows(agentic_dir)
 
+        # LF-exact, atomic writes: staged JSON is hash-compared by doctor, so it must
+        # not pick up Windows CRLF translation (FR-RC2-2).
         manifest_path = agentic_dir / "manifest.json"
-        manifest_path.write_text(
-            _json_dump(build_manifest(agentic_dir, self._iter_files)), encoding="utf-8"
-        )
+        _atomic_write_text(manifest_path, _json_dump(build_manifest(agentic_dir, self._iter_files)))
         staged.append(f"[stage] {manifest_path}")
 
         index_path = agentic_dir / "agents.index.json"
-        index_path.write_text(_json_dump(build_agents_index(agentic_dir)), encoding="utf-8")
+        _atomic_write_text(index_path, _json_dump(build_agents_index(agentic_dir)))
         staged.append(f"[stage] {index_path}")
         return staged
 

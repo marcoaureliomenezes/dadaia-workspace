@@ -219,7 +219,90 @@ The following items were identified during implementation but are out of scope f
 
 ---
 
+## rc-2 — Windows Graduation (operator-requested; same 0.1.8 release, no new version)
+
+rc-1 shipped the cross-platform foundation with the Windows unit/contract CI legs on
+`continue-on-error` (the GRADUATION-GATE). rc-2 finished the job **inside 0.1.8** — root-caused
+every Windows-runner failure, made the legs genuinely green, hard-gated them, exercised the
+msvcrt/icacls adapters on a real Windows runner, and broadened the classifier. The
+`ci-phase3-graduation` follow-up listed above is now **DONE** (in this release).
+
+### Tasks (T-018-27..31)
+
+- **T-018-27** — 4 cross-platform **product** bugs fixed:
+  - FR-RC2-1 `features/specs/catalog.py`: memory-atom `path` slugs emitted via `.as_posix()`
+    (POSIX `/` on every OS — they are stable panel/handoff identifiers).
+  - FR-RC2-2 `infrastructure/public_assets_common.py::_atomic_write_text`: writes `newline=""`
+    so on-disk bytes equal the LF content the installer hashes; Windows CRLF translation was
+    breaking the "skip when content matches" contract (every install rewrote every file). Also
+    routed the codex `.toml`, opencode-agent, and staged `manifest.json`/`agents.index.json`
+    writers through `_atomic_write_text` (`install_helpers.py`, `public_assets.py`).
+  - FR-RC2-3 `features/reports_retention/service.py`: absolute-path guard rejects inputs absolute
+    under **either** `PurePosixPath` or `PureWindowsPath` (host-independent).
+  - FR-RC2-4 `features/import_/service.py`: old workspace-root matched by `as_posix()`, new path
+    rebuilt host-native via `workspace_root / rel` (separator-robust import rewrite).
+  - **Windows process-liveness** (`core/platform.py` + `infrastructure/process_probe_adapter.py`):
+    new `has_os_kill_liveness` capability; Windows uses a non-destructive
+    `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` existence check instead of `os.kill(pid,0)`
+    — CPython implements `os.kill` on Windows as `OpenProcess(PROCESS_ALL_ACCESS)` +
+    `TerminateProcess`, which would have *killed* the probed process and reported a dead PID as
+    alive (ERROR_INVALID_PARAMETER ≠ ESRCH). ctypes `restype`/`argtypes` declared (no HANDLE
+    truncation/leak on Win64).
+- **T-018-28** — test-only POSIX assumptions corrected (production already right): auth url-safe
+  test injects a `FilePermissionSetter` + POSIX-gate the 0o600/atomic test; markdown-store +
+  agents-reader unreadable-file tests force `OSError` via monkeypatched `read_text` (chmod 0o000
+  is a no-op on Windows) so the branch runs on every OS; scripts-chmod test POSIX-gated; container
+  POSIX-adapter-selection test `importorskip("fcntl")` + Windows-selection test branches on fcntl
+  availability; host-native assertions in import/launcher/platform tests; NEW
+  `tests/contract/test_install_skip_idempotent.py` pins the LF-exact + skip-idempotence invariant;
+  deleted the redundant `tests/unit/core/test_process_probe.py` (the infra adapter test is a strict
+  superset — completes the deferred T-018-03 migration); +6 mock-based tests covering all four
+  branches of the Windows OpenProcess probe (fake kernel32 + `_FORCE_WINDOWS` seam, runs on every OS).
+- **T-018-29** — iterated CI to green over 3 fix rounds. The spurious pytest "KeyboardInterrupt"
+  artifact on Windows was a side-effect of the real failures and vanished once they cleared.
+- **T-018-30** — graduation: deleted the `GRADUATION-GATE` `continue-on-error` from
+  `unit-fast-cross` + `contract-coverage-cross` (+ `importability-smoke`); renamed the jobs to drop
+  "allow-fail" — now hard gates. Broadened `pyproject.toml` classifier from `POSIX :: Linux` only
+  to `POSIX :: Linux` + `MacOS` + `Microsoft :: Windows` (CI-verified; NOT the over-broad
+  `OS Independent` — a deliberate revision of the rc-1 follow-up plan). Updated
+  `tests/contract/test_platform_classifier.py`. The real msvcrt-lock (`test_file_lock_windows.py`)
+  and icacls (`test_file_permission_windows.py::test_restrict_dir_real_icacls_applies_dacl_or_raises`,
+  `skipif != win32`) behavior tests run and pass on the windows-latest runner.
+- **T-018-31** — reviews + audit + CLOSURE + PR (this section).
+
+### Graduation evidence (machine-verifiable, ADR-3)
+
+- CI run **27211204722** on `feature/0.1.8`: all six cross-leg matrix jobs (`Unit fast`,
+  `Contract coverage`, `Importability smoke` × `{windows-latest, macos-latest}`) green as hard
+  gates (first run after deleting the GRADUATION-GATE lines).
+- CI run **27212134310** on `feature/0.1.8` (after the code-reviewer finding-fixes): all six
+  cross-leg jobs green again — final verification.
+- Branch protection on `main` now **requires** those six contexts (added via the GitHub API), so
+  the Windows + macOS unit/contract/importability legs block merges, not just colour the run.
+- Local Linux gate at finalization: 2085 unit+contract passed / 6 Windows-runner-only skips /
+  1 xpass; `ruff format --check` + `ruff check` + `mypy --strict` (213 files) + `lint-imports`
+  (2 contracts kept) all clean.
+
+### rc-2 reviews
+
+- **code-reviewer — APPROVE** (2 MEDIUM + 2 LOW findings, all fixed: ctypes restype/argtypes,
+  `_FORCE_POSIX` on the missed probe test, stale docstring, +6 Windows-branch tests).
+- **security-reviewer — APPROVE** (no findings: OpenProcess probe non-destructive + handle closed
+  in finally; reports_retention + import guards strengthened, not weakened).
+- **qa-engineer — APPROVE** (test-only fixes preserve intent; no coverage lost by the dedupe
+  deletion; new contract + Windows-branch tests are genuine).
+- **project-auditor — PASS 9.2/10** (findings all LOW/INFO, satisfied by this CLOSURE update).
+
+### Dependabot (operator-flagged during rc-2)
+
+No security alerts. The 4 open Dependabot PRs were folded into 0.1.8 and closed as superseded:
+typer 0.26.6→0.26.7, ruff 0.15.15→0.15.16 (`poetry.lock`), actions/setup-node 6.0.0→6.4.0
+(`ci.yml` + `release.yml`), actions/download-artifact 4.1.9→8.0.1 (`release.yml`).
+
+---
+
 ## Archive decision
 
 **MOVE** — release directory will be moved to `specs/_archive/releases/0.1.8/` via
 `git mv`. ACTIVE.md will be updated to `release: none` once the move is complete.
+PyPI publish remains **operator-gated** at the `release-gate` environment.

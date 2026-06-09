@@ -1,9 +1,9 @@
-"""Contract test: pyproject.toml declares the correct OS classifier (T-018-08).
+"""Contract test: pyproject.toml declares the correct OS classifiers (T-018-08 / T-018-30).
 
-Verifies that the ``Operating System`` classifier in ``pyproject.toml`` is set to
-``Operating System :: POSIX :: Linux`` — the honest classifier after the cross-platform
-work in release 0.1.8 (Phase 1).  This is an honest statement of the currently
-supported platform while the Windows/macOS porting work is in progress.
+After the 0.1.8 rc-2 Windows graduation (the cross-platform unit + contract CI legs
+are green and hard-gated on Linux, macOS, and Windows), pyproject.toml advertises all
+three supported operating systems via explicit per-OS classifiers — NOT the over-broad
+``OS Independent`` (which would dishonestly imply every OS works without evidence).
 
 The test reads ``pyproject.toml`` via ``tomllib`` (stdlib since Python 3.11) so it
 does NOT require Poetry or any external tool to be installed.
@@ -18,6 +18,13 @@ import pytest
 
 pytestmark = pytest.mark.contract
 
+# The three OSes whose unit + contract CI legs are hard-gated green (T-018-30).
+_REQUIRED_OS_CLASSIFIERS = (
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+)
+
 
 def _pyproject_path() -> Path:
     """Return the absolute path to ``pyproject.toml`` in the repo root."""
@@ -26,34 +33,40 @@ def _pyproject_path() -> Path:
     return Path(__file__).resolve().parents[2] / "pyproject.toml"
 
 
-def test_os_classifier_is_posix_linux() -> None:
-    """pyproject.toml must declare ``Operating System :: POSIX :: Linux``.
-
-    This is the authoritative classifier for Phase 1 of the cross-platform
-    porting work (0.1.8 alpha-1).  The test fails if the classifier is absent
-    or if an over-broad ``OS Independent`` classifier is still present.
-    """
+def _classifiers() -> list[str]:
     pyproject_path = _pyproject_path()
     assert pyproject_path.exists(), (
         f"pyproject.toml not found at {pyproject_path}. Run this test from the repository root."
     )
-
     with pyproject_path.open("rb") as fh:
         data = tomllib.load(fh)
+    result: list[str] = data.get("tool", {}).get("poetry", {}).get("classifiers", [])
+    return result
 
-    classifiers: list[str] = data.get("tool", {}).get("poetry", {}).get("classifiers", [])
 
-    target = "Operating System :: POSIX :: Linux"
-    assert target in classifiers, (
-        f"Missing classifier '{target}' in pyproject.toml. "
-        f"Found classifiers: {classifiers!r}. "
-        "The pyproject.toml must honestly declare the supported OS after the "
-        "cross-platform porting work in release 0.1.8."
-    )
+def test_os_classifiers_cover_linux_macos_windows() -> None:
+    """pyproject.toml must declare the three supported OS classifiers.
 
-    # Also assert the over-broad classifier is absent.
+    These match the hard-gated CI matrix (Linux + macOS + Windows) after the
+    0.1.8 rc-2 graduation. The test fails if any is absent.
+    """
+    classifiers = _classifiers()
+    for target in _REQUIRED_OS_CLASSIFIERS:
+        assert target in classifiers, (
+            f"Missing classifier '{target}' in pyproject.toml. Found: {classifiers!r}. "
+            "pyproject.toml must declare every OS whose CI legs are hard-gated green."
+        )
+
+
+def test_os_independent_classifier_is_absent() -> None:
+    """The over-broad ``OS Independent`` classifier must NOT be present.
+
+    We advertise the three specific, CI-verified OSes instead of claiming the
+    package runs everywhere unconditionally.
+    """
+    classifiers = _classifiers()
     over_broad = "Operating System :: OS Independent"
     assert over_broad not in classifiers, (
         f"Found over-broad classifier '{over_broad}' in pyproject.toml. "
-        "Remove it — the package requires POSIX (Phase 1 honest classification)."
+        "Declare the specific supported OSes (Linux/macOS/Windows) instead."
     )

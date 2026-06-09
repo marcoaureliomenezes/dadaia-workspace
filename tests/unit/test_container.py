@@ -178,6 +178,10 @@ def test_select_lock_adapter_returns_posix_when_has_fcntl(monkeypatch: pytest.Mo
     """
     from dadaia_workspace.core.platform import Capabilities
 
+    # The POSIX adapter module imports fcntl at module load; on Windows it cannot
+    # be imported at all, so selecting it is meaningless there — skip.
+    pytest.importorskip("fcntl")
+
     posix_caps = Capabilities.detect("linux")
     assert posix_caps.has_fcntl is True  # pre-condition
 
@@ -203,29 +207,39 @@ def test_select_lock_adapter_returns_windows_when_not_has_fcntl(
     'dadaia_workspace.infrastructure.file_lock_windows' module into sys.modules to
     prevent the module-level Windows platform guard from raising on Linux.
     """
+    import importlib.util
+
     from dadaia_workspace.core.platform import Capabilities
 
     win_caps = Capabilities.detect("win32")
     assert win_caps.has_fcntl is False  # pre-condition
-
-    # Inject a stub module so the import inside _select_lock_adapter does not hit
-    # the PlatformCapabilityError guard (which fires on non-Windows at import time).
-    _fake_windows_mod = types.ModuleType("dadaia_workspace.infrastructure.file_lock_windows")
-    _fake_windows_mod.__spec__ = None  # type: ignore[attr-defined]
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", win_caps)
 
     module_key = "dadaia_workspace.infrastructure.file_lock_windows"
-    original = sys.modules.pop(module_key, None)
-    sys.modules[module_key] = _fake_windows_mod
-    try:
-        monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", win_caps)
 
+    if importlib.util.find_spec("fcntl") is None:
+        # Real Windows runner: the Windows adapter imports cleanly (no module-level
+        # guard fires), so assert the genuinely-selected module by name. Avoids the
+        # fake-vs-real identity fragility of sys.modules injection on Windows.
         adapter = container._select_lock_adapter()
-        assert adapter is _fake_windows_mod, (
-            f"Expected file_lock_windows adapter, got {adapter!r}. "
-            "Container must route to Windows adapter when PLATFORM.has_fcntl is False."
+        assert adapter.__name__ == module_key, (
+            f"Expected {module_key} adapter, got {adapter!r}. "
+            "Container must route to the Windows adapter when has_fcntl is False."
         )
-    finally:
-        # Restore sys.modules to its pre-test state.
-        sys.modules.pop(module_key, None)
-        if original is not None:
-            sys.modules[module_key] = original
+    else:
+        # Linux/macOS: the real module raises PlatformCapabilityError at import time
+        # (it is Windows-only), so inject a stub to exercise the selection branch.
+        _fake_windows_mod = types.ModuleType(module_key)
+        _fake_windows_mod.__spec__ = None  # type: ignore[attr-defined]
+        original = sys.modules.pop(module_key, None)
+        sys.modules[module_key] = _fake_windows_mod
+        try:
+            adapter = container._select_lock_adapter()
+            assert adapter is _fake_windows_mod, (
+                f"Expected file_lock_windows adapter, got {adapter!r}. "
+                "Container must route to Windows adapter when PLATFORM.has_fcntl is False."
+            )
+        finally:
+            sys.modules.pop(module_key, None)
+            if original is not None:
+                sys.modules[module_key] = original

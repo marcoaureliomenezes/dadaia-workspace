@@ -449,3 +449,58 @@ Ship-trio review of the 0.1.8 implementation (feature/0.1.8 HEAD 9a0462c) — **
   importability-smoke green on windows-latest + macos-latest; Phase-2 matrix present; ubuntu hard-gate intact.
 
 rc-1 is **ship-ready** pending the operator-requested audit + CLOSURE.
+
+---
+
+## rc-2 Addendum — Windows Graduation (operator-requested, same release)
+
+rc-1 shipped the cross-platform foundation with the Windows unit/contract CI legs on
+`continue-on-error` (the GRADUATION-GATE) because the Windows runner still went red. rc-2
+finishes the job **inside 0.1.8** (no new version): it root-causes every Windows-runner
+failure, makes the Windows `unit-fast-cross` + `contract-coverage-cross` legs genuinely
+green, hard-gates them, exercises the `msvcrt`/`icacls` adapters on a real Windows runner,
+and restores a broader OS classifier.
+
+### Root-caused Windows-runner failures (run 27193494074)
+
+**Real cross-platform product bugs (fixed in production):**
+
+- **FR-RC2-1 (catalog separators).** `features/specs/catalog.py` emitted OS-native `\`
+  separators in memory-atom `path` slugs (`specs\memory\product\...`). These are stable
+  identifiers consumed by the panel and handoffs and MUST be POSIX `/` on every OS.
+  Fix: `Path.relative_to(...).as_posix()`.
+- **FR-RC2-2 (install skip churn).** `write_generated` hashes `content.encode("utf-8")`
+  (LF) against a binary read of the destination, but `_atomic_write_text` wrote in text
+  mode, so Windows newline translation (`\n`→`\r\n`) made the hashes never match → the
+  "skip when content matches" contract never fired and every `install` rewrote every
+  generated file. Fix: write generated text with `newline=""` (no translation), so on-disk
+  bytes equal the hashed LF content on all platforms.
+- **FR-RC2-3 (absolute-path guard).** `reports_retention` rejected absolute artifact paths
+  via `Path.is_absolute()`, which is host-dependent (`/tmp/x` is not absolute on Windows).
+  A POSIX-absolute input slipped past the guard and tripped a later, weaker check. Fix:
+  reject if absolute under **either** `PurePosixPath` or `PureWindowsPath`.
+- **FR-RC2-4 (import path rewrite).** `import_/service.py` matched the old workspace root
+  via `str(old_root)`, which is `\`-separated on Windows and never matched the `/`-separated
+  paths stored in imported config/state → rewrite silently no-op'd. Fix: match the old root
+  by `as_posix()` and rebuild the new path with `workspace_root / rel` (host-native output).
+
+**Test-only POSIX assumptions (production already correct, tests corrected):**
+
+- `test_auth.py::test_ensure_token_generates_url_safe` now injects a `FilePermissionSetter`
+  (it asserts token *format*, not perms); `..._atomic_create_mode_0o600_no_widen_window` is
+  POSIX-gated (it asserts on-disk `0o600`, meaningless on Windows).
+- `test_markdown_agent_store.py` (`..._oserror_returns_none`, `..._skips_unreadable_file`)
+  now force the OSError via a monkeypatched `read_text` rather than `chmod(0o000)` (a no-op
+  on Windows), so the OSError-handling path is exercised on every OS.
+- `test_public_assets.py::test_scripts_chmod_applied` is POSIX-gated (the `0o755` bit is a
+  no-op on Windows; `.sh` scripts are POSIX-only and unused by the Windows Python hooks).
+
+### rc-2 acceptance
+
+- `unit-fast-cross` and `contract-coverage-cross` are **green on windows-latest and
+  macos-latest** on a named `feature/0.1.8` run.
+- The two `GRADUATION-GATE` `continue-on-error` lines are **deleted** → both legs hard-gate.
+- A Windows-runner step exercises `WindowsContextLock`/`WindowsWorkspaceLock` (msvcrt) and
+  `WindowsFilePermissionSetter` (icacls) for real (no skip).
+- `pyproject.toml` classifier broadened beyond `POSIX :: Linux` to advertise macOS + Windows.
+- Version stays **0.1.8**.

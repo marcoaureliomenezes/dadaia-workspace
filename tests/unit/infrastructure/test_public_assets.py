@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import tomllib
 from pathlib import Path
 from unittest.mock import patch
@@ -753,7 +754,10 @@ class TestInstallWorkspaceRootGuardrailPair:
     def test_force_false_claude_md_skips_when_already_stub(self, tmp_path: Path) -> None:
         """force=False: CLAUDE.md already containing stub is a no-op."""
         src = _make_source_file(tmp_path)
-        (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
+        # newline="" so the pre-existing stub is LF-exact, matching how production
+        # writes it (_atomic_write_text). A plain write_text would emit CRLF on
+        # Windows, so the byte-hash skip-compare would (correctly) not match.
+        (tmp_path / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8", newline="")
         installed: list[str] = []
         _install_workspace_root_guardrail_pair(src, tmp_path, force=False, installed=installed)
         assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
@@ -1823,6 +1827,11 @@ class TestInstallCodexRules:
 
 
 class TestInstallScripts:
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="the 0o755 executable bit is a no-op on Windows; .sh scripts are "
+        "POSIX-only and unused by the Windows Python governance hooks",
+    )
     def test_scripts_chmod_applied(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         scripts_src = agentic_dir / "scripts"

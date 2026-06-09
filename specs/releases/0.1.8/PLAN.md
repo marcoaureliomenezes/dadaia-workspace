@@ -278,3 +278,23 @@ branch. All must approve before push + PR. After merge: CLOSURE.md, memory updat
 - rc-1 gate: full ship trio + `dadaia public doctor` + `dadaia specs doctor` both exit 0.
 - `tests/contract/test_platform_classifier.py` asserts correct classifier throughout.
 - import-linter `setup.cfg` contract passes in every CI `lint` run from Step 4 onward.
+
+---
+
+## rc-2 Plan — Windows Graduation (same 0.1.8 release)
+
+Foundation-first, CI-verified each push:
+
+1. Product fixes (T-018-27): catalog `.as_posix()`; `_atomic_write_text(newline="")`;
+   reports_retention dual-`Pure*Path` absolute guard; import rewrite `as_posix()`; Windows
+   process-liveness via non-destructive `OpenProcess` (not `os.kill`).
+2. Test fixes (T-018-28): POSIX-gate / setter-inject / monkeypatch-OSError the chmod-dependent
+   tests; `+ test_install_skip_idempotent.py`; `+` Windows OpenProcess branch tests.
+3. Push feature/0.1.8 (T-018-29): iterate `unit-fast-cross` + `contract-coverage-cross` to green.
+4. Graduate (T-018-30): delete the GRADUATION-GATE `continue-on-error`; broaden the classifier;
+   real msvcrt/icacls behavior tests run on the windows runner.
+5. Reviews + audit + CLOSURE + PR (T-018-31). PyPI publish stays operator-gated.
+
+### rc-2 validation gate
+- `unit-fast-cross` + `contract-coverage-cross` GREEN + hard-gated on windows + macOS.
+- `dadaia public doctor` + `dadaia specs doctor` 0 ERROR; full local suite green.

@@ -471,3 +471,61 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
 - **Done criterion:** CLOSURE.md authored with tasks/validations/memory-updates; all memory
   atoms updated to reflect post-0.1.8 product state (no changelog sections); `dadaia specs
   doctor` 0 ERROR; ACTIVE.md phase updated to ARCHIVED; release dir ready for `git mv`.
+
+---
+
+## rc-2 — Windows Graduation (operator-requested; same 0.1.8 release, no new version)
+
+**Segment Status:** Aprovado
+CI YAML editing (`.github/workflows/ci.yml`) remains authorized for `software-engineer`
+as the recorded operator exception (see header). Disjoint write sets: T-018-27 (production)
+and T-018-28 (tests) may both be `[-]` concurrently.
+
+### [x] T-018-27 — Fix 4 cross-platform product bugs
+- **Owner:** software-engineer
+- **Write set:**
+  - `dadaia_workspace/features/specs/catalog.py`
+  - `dadaia_workspace/infrastructure/public_assets_common.py`
+  - `dadaia_workspace/features/reports_retention/service.py`
+  - `dadaia_workspace/features/import_/service.py`
+- **Done criterion:** catalog `path` is POSIX on all OSes; `write_generated` skip fires on
+  Windows (no rewrite churn); absolute-path guard rejects POSIX- and Windows-absolute inputs
+  on any host; import rewrite matches old root regardless of separator. Full Linux suite green.
+
+### [x] T-018-28 — Correct test-only POSIX assumptions
+- **Owner:** software-engineer
+- **Write set:**
+  - `tests/unit/features/panel/test_auth.py`
+  - `tests/unit/infrastructure/test_markdown_agent_store.py`
+  - `tests/unit/infrastructure/test_public_assets.py`
+  - `tests/contract/` (new round-trip-skip regression test)
+- **Done criterion:** auth url-safe test injects a setter; 0o600/atomic + scripts-chmod tests
+  POSIX-gated; markdown-store OSError tests force OSError via monkeypatch (run on every OS);
+  new contract test proves `write_generated` is idempotent (skip) across newline conventions.
+
+### [x] T-018-29 — Push feature/0.1.8; iterate Windows CI to green
+- **Owner:** software-engineer
+- **Write set:** none (CI observation + fix loop feeding T-018-27/28)
+- **Done criterion:** `unit-fast-cross` + `contract-coverage-cross` report **0 failed / exit 0**
+  on windows-latest AND macos-latest on a named feature/0.1.8 run (recorded in CLOSURE).
+
+### [x] T-018-30 — Graduate CI, real-Windows adapters, broaden classifier [SEC]
+- **Owner:** software-engineer
+- **Write set:**
+  - `.github/workflows/ci.yml`
+  - `pyproject.toml`
+  - `tests/contract/test_platform_classifier.py`
+  - `tests/unit/infrastructure/` (Windows-runner adapter exercise, if needed)
+- **Done criterion:** both `GRADUATION-GATE` `continue-on-error` lines deleted (legs hard-gate);
+  a Windows-runner path exercises `msvcrt` locks + `icacls` permission setter for real;
+  classifier advertises macOS + Windows; classifier contract test updated and green.
+
+### [x] T-018-31 — rc-2 reviews + audit + CLOSURE + PR
+- **Owner:** product-engineer (coordinated by project-manager)
+- **Write set:**
+  - `specs/releases/0.1.8/CLOSURE.md`
+  - `specs/releases/ACTIVE.md`
+  - review reports under `.dadaia/reports/dadaia-workspace/`
+- **Done criterion:** ship-trio APPROVE rc-2 delta; audit PASS; CLOSURE updated with the
+  green Windows run id + graduation evidence; PR feature/0.1.8 → main opened. PyPI publish
+  stays gated at the `release-gate` environment (operator approval).

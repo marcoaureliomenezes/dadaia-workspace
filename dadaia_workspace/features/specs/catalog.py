@@ -167,11 +167,14 @@ def generate_catalog(specs_dir: Path) -> dict[str, Any]:
         slug: str = str(fm.get("slug", md_path.stem))
         depends_on = _extract_depends_on(body)
 
-        # Compute path relative to repo root (specs/memory/product/<slug>.md)
+        # Compute path relative to repo root (specs/memory/product/<slug>.md).
+        # Always emit POSIX "/" separators: this path is a stable identifier the
+        # panel and handoffs consume, so it must not vary by host OS (Windows
+        # Path.__str__ would otherwise yield "\"-separated slugs). See FR-RC2-1.
         try:
-            rel_path = str(md_path.relative_to(product_dir.parent.parent.parent))
+            rel_path = md_path.relative_to(product_dir.parent.parent.parent).as_posix()
         except ValueError:
-            rel_path = str(md_path)
+            rel_path = md_path.as_posix()
 
         features.append(
             {

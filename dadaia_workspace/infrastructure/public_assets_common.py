@@ -88,7 +88,12 @@ def _atomic_write_text(dst: Path, content: str) -> None:
     unchanged — prevents readers from observing a partially-written file.
     """
     tmp = dst.with_suffix(dst.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8")
+    # newline="" disables universal-newline translation so the bytes on disk are
+    # exactly content.encode("utf-8"). Without it, Windows text mode rewrites "\n"
+    # to "\r\n", which breaks write_generated's hash-compare skip (it hashes the
+    # LF content against a binary read of the file) — every install would rewrite
+    # every generated file. Keeps projected files LF on all platforms. See FR-RC2-2.
+    tmp.write_text(content, encoding="utf-8", newline="")
     os.replace(tmp, dst)
 
 
