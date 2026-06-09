@@ -247,7 +247,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   deferred delete of `test_process_probe.py` noted (file-delete task executes only after
   `test_process_probe_adapter.py` is confirmed green in CI); pytest green.
 
-### [-] T-018-12 — Step 7: UPDATE `python_env.py` venv paths + runtime_env.py docstrings
+### [x] T-018-12 — Step 7: UPDATE `python_env.py` venv paths + runtime_env.py docstrings
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/infrastructure/python_env.py`
