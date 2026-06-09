@@ -229,7 +229,9 @@ def test_rewrite_paths_in_value_string_exact(tmp_path: Path) -> None:
 def test_rewrite_paths_in_value_string_prefix(tmp_path: Path) -> None:
     svc = ImportService(workspace_root=tmp_path)
     result, count = svc._rewrite_paths_in_value("/old/ws/scripts/run.sh", "/old/ws", "/new/ws")
-    assert result == "/new/ws/scripts/run.sh"
+    # Output is rebuilt host-native (str(Path(new) / rel)) so the rewrite works on
+    # Windows where the stored "/"-paths would never match a "\"-separated str(root).
+    assert result == str(Path("/new/ws") / "scripts" / "run.sh")
     assert count == 1
 
 
@@ -245,9 +247,9 @@ def test_rewrite_paths_in_value_nested(tmp_path: Path) -> None:
     value = {"a": ["/old/ws/x", "/other/path"], "b": {"c": "/old/ws/y"}}
     result, count = svc._rewrite_paths_in_value(value, "/old/ws", "/new/ws")
     assert count == 2
-    assert result["a"][0] == "/new/ws/x"  # type: ignore[index]
+    assert result["a"][0] == str(Path("/new/ws") / "x")  # type: ignore[index]
     assert result["a"][1] == "/other/path"  # type: ignore[index]
-    assert result["b"]["c"] == "/new/ws/y"  # type: ignore[index]
+    assert result["b"]["c"] == str(Path("/new/ws") / "y")  # type: ignore[index]
 
 
 def test_restore_contexts_skip_true_returns_empty(tmp_path: Path) -> None:

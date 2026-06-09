@@ -11,7 +11,7 @@ import datetime as dt
 import json
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 _DEFAULT_TTL = dt.timedelta(hours=48)
 _TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)")
@@ -338,7 +338,13 @@ class ReportRetentionService:
 
     def _normalize_to_artifact_ref(self, path: str | Path) -> str:
         raw = Path(path)
-        if raw.is_absolute():
+        # Reject absolute inputs regardless of host OS. Path.is_absolute() is
+        # host-dependent ("/tmp/x" is NOT absolute on Windows; "C:\x" is NOT
+        # absolute on POSIX), so a foreign-style absolute path could slip past a
+        # single-flavour check and trip a weaker downstream guard. Test both
+        # flavours. See FR-RC2-3.
+        text = str(path)
+        if PurePosixPath(text).is_absolute() or PureWindowsPath(text).is_absolute():
             raise ValueError("absolute paths are not accepted")
         if any(part == ".." for part in raw.parts):
             raise ValueError("parent traversal is not accepted")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import tomllib
 from pathlib import Path
 from unittest.mock import patch
@@ -1823,6 +1824,11 @@ class TestInstallCodexRules:
 
 
 class TestInstallScripts:
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="the 0o755 executable bit is a no-op on Windows; .sh scripts are "
+        "POSIX-only and unused by the Windows Python governance hooks",
+    )
     def test_scripts_chmod_applied(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         scripts_src = agentic_dir / "scripts"

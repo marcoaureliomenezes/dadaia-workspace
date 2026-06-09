@@ -84,8 +84,10 @@ class ImportService:
             return
 
         data: dict[str, object] = json.loads(contexts_file.read_text(encoding="utf-8"))
-        old_prefix = str(old_root)
-        new_prefix = str(workspace_root)
+        # Match the old root by its POSIX form: exported configs store "/"-separated
+        # paths, but str(old_root) is "\"-separated on Windows and would never match.
+        # Rebuild via workspace_root / rel so output is host-native. See FR-RC2-4.
+        old_posix = old_root.as_posix()
 
         raw_contexts = data.get("contexts", [])
         if not isinstance(raw_contexts, list):
@@ -94,8 +96,11 @@ class ImportService:
             if not isinstance(ctx, dict):
                 continue
             specs_dir = ctx.get("specs_dir")
-            if isinstance(specs_dir, str) and specs_dir.startswith(old_prefix):
-                ctx["specs_dir"] = specs_dir.replace(old_prefix, new_prefix, 1)
+            if isinstance(specs_dir, str) and (
+                specs_dir == old_posix or specs_dir.startswith(old_posix + "/")
+            ):
+                rel = specs_dir[len(old_posix) :].lstrip("/")
+                ctx["specs_dir"] = str(workspace_root / rel) if rel else str(workspace_root)
             ctx["state"] = "dead"
             ctx.pop("is_primary", None)
             ctx.pop("activated_at", None)
@@ -129,9 +134,9 @@ class ImportService:
 
     def patch_json_paths(self, workspace_root: Path, old_root: Path) -> None:
         """Rewrite absolute paths in JSON config files from old_root to workspace_root."""
-        old_prefix = str(old_root)
-        new_prefix = str(workspace_root)
-        if old_prefix == new_prefix:
+        # Match by POSIX form (configs store "/"-separated paths); rebuild host-native.
+        old_posix = old_root.as_posix()
+        if old_posix == workspace_root.as_posix():
             return
         for rel in self._PATH_REWRITE_TARGETS:
             target = workspace_root / rel
@@ -139,7 +144,7 @@ class ImportService:
                 continue
             try:
                 data = json.loads(target.read_text(encoding="utf-8"))
-                patched, count = self._rewrite_paths_in_value(data, old_prefix, new_prefix)
+                patched, count = self._rewrite_paths_in_value(data, old_posix, workspace_root)
                 if count:
                     tmp = target.with_suffix(".tmp")
                     tmp.write_text(json.dumps(patched, indent=2), encoding="utf-8")
@@ -147,12 +152,22 @@ class ImportService:
             except (json.JSONDecodeError, OSError):
                 print(f"WARNING: Could not patch paths in {target}", file=sys.stderr)
 
-    def _rewrite_paths_in_value(self, value: object, old: str, new: str) -> tuple[object, int]:
-        """Recursively rewrite string values. Returns (patched_value, rewrite_count)."""
+    def _rewrite_paths_in_value(
+        self, value: object, old: str, new: str | Path
+    ) -> tuple[object, int]:
+        """Recursively rewrite string values. Returns (patched_value, rewrite_count).
+
+        ``old`` is the old workspace root in POSIX form (matches the "/"-separated
+        paths stored in exported configs on any host); ``new`` is the new workspace
+        root. Matched values are rebuilt as ``new / rel`` so the output uses the
+        host-native separator. See FR-RC2-4.
+        """
+        new_root = Path(new)
         count = 0
         if isinstance(value, str):
             if value == old or value.startswith(old + "/"):
-                return value.replace(old, new, 1), 1
+                rel = value[len(old) :].lstrip("/")
+                return (str(new_root / rel) if rel else str(new_root)), 1
             return value, 0
         if isinstance(value, dict):
             result: dict[str, object] = {}

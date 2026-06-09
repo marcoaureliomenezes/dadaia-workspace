@@ -1,3 +1,3 @@
 release: 0.1.8
-segment: rc-1
-phase: CLOSURE
+segment: rc-2
+phase: IMPLEMENTATION
