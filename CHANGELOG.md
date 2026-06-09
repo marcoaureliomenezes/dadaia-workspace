@@ -11,6 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scaffolder renders templates with a Jinja2 `SandboxedEnvironment`, blocking template access to Python internals. (F-03)
 - `GitSubprocessClient.clone` refuses unsafe URLs (`ext::` transport and option-injection via a leading `-`) before invoking git. (F-05)
 
+## [0.1.8] — 2026-06-09
+
+### Added
+- **Cross-platform support (Linux / macOS / Windows).** `core/platform.py` platform-detection seam
+  (sole `sys.platform` call site) + a port/adapter boundary for OS-sensitive domains: file locks
+  (fcntl / msvcrt), telemetry refresh lock, file permissions (chmod / `icacls`), process probe, and
+  signals/shutdown. New `dadaia_workspace/hooks/` Python governance package replaces the bash hooks
+  so SDD governance is enforced on stock Windows (no Git Bash required). 3-tier resilience contract
+  (fail-loud security / degrade-with-log / unsupported-at-construction). `import-linter` contracts
+  enforce the layering law in CI.
+- Phased 3-OS CI matrix: an importability-smoke job (Windows + macOS) plus Windows/macOS unit and
+  contract legs (allow-fail during graduation; Ubuntu remains the hard gate).
+
+### Changed
+- `Operating System :: OS Independent` classifier corrected to `Operating System :: POSIX :: Linux`
+  until the 3-OS CI matrix graduates to a hard gate.
+- All text I/O now specifies `encoding="utf-8"` (Windows cp1252 corruption fix); the JSON stores
+  route through a single `_atomic_write_text` chokepoint using `os.replace`.
+- venv executable paths resolved via the platform seam (`Scripts/python.exe` on Windows).
+
+### Fixed
+- The CLI is now importable on Windows: the unconditional top-level `import fcntl` in the locking and
+  telemetry modules (which crashed every `dadaia` invocation at import) is removed and delegated to
+  platform adapters.
+- Windows security no-ops closed: the panel auth token is owner-only via `icacls` or the panel
+  refuses to start (Tier-1, CWE-732); `/proc` scans and `os.getuid` degrade safely off-Linux.
+
 ## [0.1.4] — 2026-06-03
 
 ### Added
