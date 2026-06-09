@@ -1,7 +1,6 @@
 """dadaia CLI entry point."""
 
 import sys
-from pathlib import Path
 
 import typer
 
@@ -31,6 +30,7 @@ from dadaia_workspace.cli.commands.newartifacts import (
     release_app,
 )
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.infrastructure.bug_reporter import report_exception as _report_exc
 
@@ -71,7 +71,8 @@ def _safe_app() -> None:
 
     Bug reports are written to the real workspace .dadaia/bugs/ — resolved dynamically
     via resolve_workspace_root() so they never land inside a sub-repo (T-017-02).
-    Falls back to /tmp on WorkspaceNotInitializedError.
+    Falls back to the platform temp dir on WorkspaceNotInitializedError (T-018-09:
+    PLATFORM.tmp_dir, never a hardcoded /tmp — portable to Windows/macOS).
     """
     try:
         app()
@@ -82,7 +83,7 @@ def _safe_app() -> None:
         try:
             workspace_root = resolve_workspace_root()
         except WorkspaceNotInitializedError:
-            workspace_root = Path("/tmp/dadaia-bugs")
+            workspace_root = PLATFORM.tmp_dir / "dadaia-bugs"
         _report_exc(workspace_root, command, exc)
         raise  # re-raise so Typer still exits with error
 

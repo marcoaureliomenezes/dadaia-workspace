@@ -235,7 +235,8 @@ jobs:
       - name: dadaia --help
         run: dadaia --help
       - name: dadaia init in tmpdir
+        # Use the runner temp dir (portable; no hardcoded /tmp — T-018-09).
         run: |
-          mkdir -p /tmp/smoke-ws
-          dadaia init --workspace /tmp/smoke-ws
-          test -f /tmp/smoke-ws/.dadaia/states/spec_contexts.json
+          mkdir -p "$RUNNER_TEMP/smoke-ws"
+          dadaia init --workspace "$RUNNER_TEMP/smoke-ws"
+          test -f "$RUNNER_TEMP/smoke-ws/.dadaia/states/spec_contexts.json"

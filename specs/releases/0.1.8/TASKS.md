@@ -157,7 +157,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   (assert the platform abstraction, not a function name); pytest suite green on Linux with no
   collection errors.
 
-### [ ] T-018-09 — Step 4c: UPDATE `cli/main.py` (PLATFORM.tmp_dir + runtime warning); UPDATE CI workflows (importability-smoke Phase 1 + tool-cache env vars + release.yml RUNNER_TEMP)
+### [x] T-018-09 — Step 4c: UPDATE `cli/main.py` (PLATFORM.tmp_dir + runtime warning); UPDATE CI workflows (importability-smoke Phase 1 + tool-cache env vars + release.yml RUNNER_TEMP)
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/cli/main.py`
