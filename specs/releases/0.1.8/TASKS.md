@@ -259,7 +259,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   `PLATFORM.venv_exe_suffix`; docstrings in `runtime_env.py` contain no POSIX-specific
   path references; mypy --strict passes.
 
-### [ ] T-018-13 — Step 8: UPDATE `scan.py` platform guards + ADD platform guard tests
+### [-] T-018-13 — Step 8: UPDATE `scan.py` platform guards + ADD platform guard tests
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/features/server_registry/scan.py`
