@@ -57,7 +57,7 @@ class CliAgentDispatcher:
     def dispatch(self, invocation: StageInvocation) -> StageResult:
         path = Path(invocation.invocation_path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(_render(invocation, self._runtime_label, None))
+        path.write_text(_render(invocation, self._runtime_label, None), encoding="utf-8")
         return StageResult(
             run_id=invocation.run_id,
             stage_id=invocation.stage_id,
@@ -94,7 +94,7 @@ class OpenCodeAgentDispatcher(CliAgentDispatcher):
                 "OpenCode does not support true parallel agent dispatch. "
                 "This stage will be executed sequentially within the parallel_group."
             )
-        path.write_text(_render(invocation, self._runtime_label, note))
+        path.write_text(_render(invocation, self._runtime_label, note), encoding="utf-8")
         return StageResult(
             run_id=invocation.run_id,
             stage_id=invocation.stage_id,

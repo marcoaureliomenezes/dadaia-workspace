@@ -19,7 +19,10 @@ from unittest.mock import patch
 
 import pytest
 
-from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
+# Migration note (T-018-03): OsProcessProbe moved to infrastructure.process_probe_adapter.
+# This import path is updated here; the full FILE DELETE of test_process_probe.py is
+# deferred until tests/unit/infrastructure/test_process_probe_adapter.py is green in CI.
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 
 
 def test_own_pid_is_alive() -> None:
@@ -34,7 +37,10 @@ def test_missing_pid_is_dead() -> None:
     assert probe.is_pid_alive(99_999_999) is False
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="Test is meaningful only as non-root user")
+@pytest.mark.skipif(
+    not hasattr(os, "geteuid") or os.geteuid() == 0,
+    reason="Test is meaningful only as non-root user on POSIX",
+)
 def test_root_owned_pid_is_alive_via_permission_error() -> None:
     """PID 1 (init/systemd) is root-owned. As a non-root user, os.kill(1, 0)
     raises PermissionError. The probe MUST treat that as alive — this is the

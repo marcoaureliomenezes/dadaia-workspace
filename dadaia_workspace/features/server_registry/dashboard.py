@@ -11,7 +11,7 @@ def render_html(states_dir: Path) -> str:
     entries: list[dict] = []  # type: ignore[type-arg]
     if registry_path.exists():
         try:
-            data = json.loads(registry_path.read_text())
+            data = json.loads(registry_path.read_text(encoding="utf-8"))
             entries = data.get("entries", [])
         except (json.JSONDecodeError, OSError):
             entries = []

@@ -1,9 +1,17 @@
 """Bearer token auth for the panel.
 
 Token is generated once at startup, persisted to ~/.dadaia/state/panel.token
-with chmod 0o600. Validated on every request via constant-time compare.
+with owner-only permissions. Validated on every request via constant-time compare.
 
-Per SPEC § Auth model (D-AM-06).
+Per SPEC § Auth model (D-AM-06) and SPEC §5 Tier-1 (fail-loud security).
+
+Platform security (FR-05 / CWE-732):
+  On POSIX, ``os.open(..., 0o600)`` creates the file at the correct mode atomically
+  (TOCTOU fix — no widen window).  The parent directory is restricted to 0o700.
+  On Windows, ``FilePermissionSetter.restrict_dir_to_owner()`` MUST be called on the
+  parent directory BEFORE the token file is created so the file inherits the
+  restrictive ACL (TOCTOU option a).  Any failure raises ``PlatformSecurityError`` —
+  the panel MUST NOT start with an unprotected token.
 """
 
 from __future__ import annotations
@@ -12,34 +20,81 @@ import hmac
 import os
 import pathlib
 import secrets
+import sys
+
+from dadaia_workspace.core.exceptions import PlatformSecurityError
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
 
 DEFAULT_TOKEN_PATH = pathlib.Path("~/.dadaia/state/panel.token").expanduser()
 _BEARER_PREFIX = "Bearer "
 
 
-def ensure_token(path: pathlib.Path = DEFAULT_TOKEN_PATH) -> str:
+def ensure_token(
+    path: pathlib.Path = DEFAULT_TOKEN_PATH,
+    permission_setter: FilePermissionSetter | None = None,
+) -> str:
     """Read token from path; generate + persist if missing.
 
-    Creates parent dir with 0o700 if missing. File chmod 0o600.
+    Creates parent dir with restricted permissions. Token file is created
+    with owner-only access.
+
+    Platform security (Tier-1 / SPEC §5):
+      If *permission_setter* is provided it is used to restrict the parent
+      directory BEFORE the token file is created (TOCTOU option a on Windows).
+      On POSIX the atomic ``O_EXCL | 0o600`` open provides the same guarantee.
+      If the permission setter raises ``PlatformSecurityError``, the token is
+      NOT created and the error propagates — the panel MUST NOT start with an
+      unprotected token.
 
     Parameters
     ----------
     path:
         Filesystem path for the token file.  Defaults to
         ``~/.dadaia/state/panel.token``.
+    permission_setter:
+        Optional ``FilePermissionSetter`` implementation.  When provided it
+        is used to restrict the parent directory before token creation.
 
     Returns
     -------
     str
         The token value (read from file or freshly generated).
+
+    Raises
+    ------
+    PlatformSecurityError
+        If *permission_setter* is provided and cannot restrict the parent
+        directory.  Propagated without suppression (Tier-1 fail-loud).
     """
     if path.exists():
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
 
-    # Create parent directory with restricted permissions.
+    # Create parent directory.
     parent = path.parent
     parent.mkdir(parents=True, exist_ok=True)
-    os.chmod(parent, 0o700)
+
+    # Apply permission restriction to parent directory BEFORE token creation.
+    # On Windows this is the TOCTOU mitigation option (a): the token file
+    # inherits the restrictive ACL from the parent.
+    # On POSIX the O_EXCL|0o600 open below is the canonical TOCTOU fix, but
+    # restricting the parent directory too is defense-in-depth.
+    # PlatformSecurityError is intentionally NOT caught here (Tier-1 fail-loud).
+    if permission_setter is not None:
+        permission_setter.restrict_dir_to_owner(parent)
+    elif PLATFORM.has_posix_chmod:
+        os.chmod(parent, 0o700)
+    else:
+        # No setter injected AND chmod is a no-op on this platform (Windows):
+        # refuse rather than silently leave the token dir unprotected (CWE-732,
+        # Tier-1 fail-loud). The production panel path always injects a setter
+        # (container._build_permission_setter), so this guards a misuse/fallback only.
+        raise PlatformSecurityError(
+            "cannot restrict panel token directory on this platform without a "
+            "FilePermissionSetter (refusing to create an unprotected token)",
+            feature_name="panel-auth",
+            platform=sys.platform,
+        )
 
     token = secrets.token_urlsafe(32)
 
@@ -51,7 +106,7 @@ def ensure_token(path: pathlib.Path = DEFAULT_TOKEN_PATH) -> str:
         fd = os.open(str(path), os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
     except FileExistsError:
         # Another process beat us to creation; read their token.
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
 
     try:
         os.write(fd, token.encode())

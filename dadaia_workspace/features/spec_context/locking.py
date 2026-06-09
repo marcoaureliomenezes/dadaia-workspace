@@ -1,10 +1,10 @@
 """Two-layer locking for Spec Context Projects (v0.1.6: Lock-3 removed).
 
-Lock 1 — workspace-wide fcntl lock (.dadaia/states/.ws_lock)
+Lock 1 — workspace-wide lock (.dadaia/states/.ws_lock)
     Wraps ALL load→mutate→dump operations on spec_contexts.json.
     Timeout: 5 seconds.  On timeout: WorkspaceLockTimeoutError.
 
-Lock 2 — per-context fcntl lock (.dadaia/states/ctx_locks/<slug>.lock)
+Lock 2 — per-context lock (.dadaia/states/ctx_locks/<slug>.lock)
     Wraps git clone, shutil.rmtree, git push for a single context slug.
     Two different slugs lock independently (parallel OK).
     Same slug: exclusive (clone+rmtree cannot race).
@@ -13,32 +13,34 @@ Lock 3 (removed in v0.1.6) — replaced by single-record TTL-lease in lease.py.
 
 Audit log — .dadaia/logs/lock-events.jsonl
     ONE JSON object per line, written with O_APPEND (atomic under PIPE_BUF).
+
+Platform note (v0.1.8):
+    The ``fcntl`` dependency has been moved to
+    ``dadaia_workspace.infrastructure.file_lock_posix`` (LV-1 in SPEC §4.2).
+    ``workspace_lock`` and ``context_lock`` delegate to the injected adapter
+    via a lazy in-body default (ADR-1 transitional pattern).
+    ``_acquire_flock`` is NOT re-exported from this module; tests that need it
+    import it from ``dadaia_workspace.infrastructure.file_lock_posix`` directly.
 """
 
 from __future__ import annotations
 
-import contextlib
-import fcntl
 import json
 import os
-import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.exceptions import (
-    WorkspaceLockTimeoutError,
+    WorkspaceLockTimeoutError as WorkspaceLockTimeoutError,  # noqa: F401 — re-exported for callers
 )
 
+if TYPE_CHECKING:
+    from dadaia_workspace.core.protocols.file_lock import ContextLock, WorkspaceLock
+
 logger = __import__("logging").getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-_LOCK_TIMEOUT_SECONDS = 5.0
-_LOCK_POLL_INTERVAL = 0.05  # 50 ms between retries
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -58,83 +60,104 @@ def _audit_log_path(workspace_root: Path) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Lock 1 — workspace-wide fcntl
+# Lazy adapter factory (ADR-1 transitional pattern)
 # ---------------------------------------------------------------------------
 
 
-def _acquire_flock(fd: int, path: str, timeout: float = _LOCK_TIMEOUT_SECONDS) -> None:
-    """Attempt to acquire LOCK_EX|LOCK_NB in a retry loop with *timeout* seconds.
+def _default_workspace_lock() -> WorkspaceLock:
+    """Return the platform-appropriate WorkspaceLock adapter.
 
-    We poll every _LOCK_POLL_INTERVAL seconds rather than calling time.sleep for
-    long intervals so the total wait stays bounded and the code stays testable.
+    Uses an in-body sys.platform check (module-level read is forbidden per SPEC §4.1).
+
+    TODO: Replace with PLATFORM.has_fcntl once PLATFORM is stable in T-018-05 callers.
     """
-    deadline = time.monotonic() + timeout
-    while True:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return
-        except BlockingIOError:
-            pass
-        if time.monotonic() >= deadline:
-            # Try to read the PID from the lock file content (best-effort)
-            holder_pid: int | None = None
-            with contextlib.suppress(Exception), open(path) as fh:
-                holder_pid = int(fh.read().strip())
-            raise WorkspaceLockTimeoutError(
-                f"Could not acquire workspace lock '{path}' within {timeout}s. "
-                + (f"Holder PID: {holder_pid}." if holder_pid else "Holder PID unknown.")
-            )
-        time.sleep(_LOCK_POLL_INTERVAL)
+    import sys  # noqa: PLC0415 — intentional lazy import per ADR-1
+
+    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_fcntl once stable
+        from dadaia_workspace.infrastructure.file_lock_windows import WindowsWorkspaceLock
+
+        return WindowsWorkspaceLock()
+    from dadaia_workspace.infrastructure.file_lock_posix import PosixWorkspaceLock
+
+    return PosixWorkspaceLock()
+
+
+def _default_context_lock() -> ContextLock:
+    """Return the platform-appropriate ContextLock adapter.
+
+    Uses an in-body sys.platform check (module-level read is forbidden per SPEC §4.1).
+
+    TODO: Replace with PLATFORM.has_fcntl once PLATFORM is stable in T-018-05 callers.
+    """
+    import sys  # noqa: PLC0415 — intentional lazy import per ADR-1
+
+    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_fcntl once stable
+        from dadaia_workspace.infrastructure.file_lock_windows import WindowsContextLock
+
+        return WindowsContextLock()
+    from dadaia_workspace.infrastructure.file_lock_posix import PosixContextLock
+
+    return PosixContextLock()
+
+
+# ---------------------------------------------------------------------------
+# Lock 1 — workspace-wide lock (delegates to adapter)
+# ---------------------------------------------------------------------------
 
 
 @contextmanager
-def workspace_lock(workspace_root: Path) -> Generator[None, None, None]:
-    """Context manager: acquires the workspace-wide fcntl exclusive lock.
+def workspace_lock(
+    workspace_root: Path,
+    *,
+    _lock: WorkspaceLock | None = None,
+) -> Generator[None, None, None]:
+    """Context manager: acquires the workspace-wide exclusive lock.
 
     File: .dadaia/states/.ws_lock
     Holds for the duration of the ``with`` block; releases on exit.
 
+    Args:
+        workspace_root: Root directory of the initialized dadaia workspace.
+        _lock: Optional injected lock adapter (for testing).  When ``None``
+               the platform-appropriate adapter is selected automatically.
+
     Raises:
         WorkspaceLockTimeoutError: Lock not acquired within 5 seconds.
     """
-    lock_path = _ws_lock_path(workspace_root)
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT, 0o600)
-    try:
-        # Write current PID so other waiters can report holder PID in errors.
-        os.write(fd, str(os.getpid()).encode())
-        _acquire_flock(fd, str(lock_path))
+    adapter = _lock if _lock is not None else _default_workspace_lock()
+    with adapter.acquire(workspace_root):
         yield
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
 
 
 # ---------------------------------------------------------------------------
-# Lock 2 — per-context fcntl
+# Lock 2 — per-context lock (delegates to adapter)
 # ---------------------------------------------------------------------------
 
 
 @contextmanager
-def context_lock(workspace_root: Path, repo_slug: str) -> Generator[None, None, None]:
-    """Context manager: acquires the per-context fcntl exclusive lock.
+def context_lock(
+    workspace_root: Path,
+    repo_slug: str,
+    *,
+    _lock: ContextLock | None = None,
+) -> Generator[None, None, None]:
+    """Context manager: acquires the per-context exclusive lock.
 
     File: .dadaia/states/ctx_locks/<repo_slug>.lock
     Two different slugs lock independently; same slug is exclusive.
 
+    Args:
+        workspace_root: Root directory of the initialized dadaia workspace.
+        repo_slug:      Context identifier (repo slug).
+        _lock: Optional injected lock adapter (for testing).  When ``None``
+               the platform-appropriate adapter is selected automatically.
+
     Raises:
         WorkspaceLockTimeoutError: Lock not acquired within 5 seconds.
     """
-    lock_path = _ctx_lock_path(workspace_root, repo_slug)
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT, 0o600)
-    try:
-        os.write(fd, str(os.getpid()).encode())
-        _acquire_flock(fd, str(lock_path))
+    adapter = _lock if _lock is not None else _default_context_lock()
+    with adapter.acquire(workspace_root, repo_slug):
         yield
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
 
 
 # ---------------------------------------------------------------------------

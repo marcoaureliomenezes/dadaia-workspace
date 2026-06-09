@@ -11,11 +11,11 @@ The invariant is "one bad entry must not blank the entire registry."
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.models.server_registry import PortEntry
+from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def _load(path: Path) -> dict[str, Any]:
     if not path.exists():
         return _empty_registry()
     try:
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             raw = json.load(f)
     except json.JSONDecodeError as exc:
         logger.warning(
@@ -72,12 +72,6 @@ def _load(path: Path) -> dict[str, Any]:
     raw.setdefault("version", _VERSION)
     raw.setdefault("range", _DEFAULT_RANGE)
     return raw
-
-
-def _dump(path: Path, data: dict[str, Any]) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
-    os.replace(tmp, path)
 
 
 def _to_dict(entry: PortEntry) -> dict[str, Any]:
@@ -161,14 +155,14 @@ class JsonServerRegistryStore:
     def save(self, entry: PortEntry) -> None:
         data = _load(self._path)
         data["entries"].append(_to_dict(entry))
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))
 
     def update(self, entry: PortEntry) -> None:
         data = _load(self._path)
         data["entries"] = [
             _to_dict(entry) if e.get("port") == entry.port else e for e in data["entries"]
         ]
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))
 
     def get(self, port: int) -> PortEntry | None:
         data = _load(self._path)
@@ -190,4 +184,4 @@ class JsonServerRegistryStore:
         data["entries"] = [
             e for e in data["entries"] if not (isinstance(e, dict) and e.get("port") == port)
         ]
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))

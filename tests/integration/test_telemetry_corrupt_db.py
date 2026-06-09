@@ -28,7 +28,9 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.service import TelemetryService
+pytest.importorskip("fcntl")
+
+from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 
 # ---------------------------------------------------------------------------

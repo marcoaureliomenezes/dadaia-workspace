@@ -2,16 +2,18 @@
 slug: workspace-init
 title: workspace-init
 category: product
-tldr: porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente.
-summary: porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente.
+tldr: porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente.
+summary: porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura
+  idempotente; hooks registrados como comandos Python (python -m dadaia_workspace.hooks.*),
+  não bash; ctx-inject.sh retido apenas como fallback não-instalado.
 tags:
 - workspace
 - init
 - setup
 - idempotent
 agent_tier: self-pull
-token_estimate: 413
-last_updated: '2026-06-01'
+token_estimate: 450
+last_updated: '2026-06-09'
 release_origin: memory-markdown-source-v1
 ---
 
@@ -19,7 +21,11 @@ CLI surface: `dadaia init [--workspace PATH] [--skip-assets]` · Closure: sdd-re
 
 ## Propósito
 
-Porta de entrada do produto. Bootstrapa um workspace novo criando a estrutura idempotente em `.dadaia/` (academy, agentic, reports, scripts, states, src), o virtualenv Python (`.venv`), os diretórios de runtime dos quatro tools agentic (`.claude/`, `.agents/`, `.codex/`, `.opencode/`), faz stage+install dos assets canônicos públicos (agentes, skills, workflows, commands, rules, templates, scripts) e configura o hook `UserPromptSubmit` em `.claude/settings.json` para injeção automática de contexto.
+Porta de entrada do produto. Bootstrapa um workspace novo criando a estrutura idempotente em `.dadaia/` (academy, agentic, reports, scripts, states, src), o virtualenv Python (`.venv`), os diretórios de runtime dos quatro tools agentic (`.claude/`, `.agents/`, `.codex/`, `.opencode/`), faz stage+install dos assets canônicos públicos (agentes, skills, workflows, commands, rules, templates, scripts) e configura os hooks de governança em `.claude/settings.json` e `.codex/hooks.json`.
+
+Os hooks de governança são registrados como **comandos Python** (`python -m dadaia_workspace.hooks.<name>`) via `infrastructure/runtime_config.py`. Não há dependência de bash para os hooks de SDD — o pacote `dadaia_workspace/hooks/` (6 módulos: `__init__`, `_common`, `sdd_gate`, `root_whitelist`, `ctx_inject`, `sdd_post_gate`) provê os hooks em Python puro, funcionando em Windows, macOS e Linux sem Git Bash ou WSL.
+
+`workspace/service.py` reconhece tanto o caminho antigo (`.sh`) quanto o novo comando Python para evitar dupla-registro durante workspaces migrados. O script bash `ctx-inject.sh` existe em `.dadaia/scripts/` como artefato legado, mas não é mais o mecanismo de hook registrado.
 
 É a única feature que pode ser executada em um workspace zero — sem ela, nenhuma outra feature tem onde escrever estado.
 
@@ -27,10 +33,10 @@ Porta de entrada do produto. Bootstrapa um workspace novo criando a estrutura id
 
   1. Operador executa `dadaia init` (auto-detecta workspace root procurando `.claude/` ou `.dadaia/` em ancestrais).
   2. CLI cria a árvore idempotente sob `.dadaia/` e tools runtime dirs.
-  3. `PythonEnvironmentManager` provisiona o `.venv` Python.
+  3. `PythonEnvironmentManager` provisiona o `.venv` Python usando `PLATFORM.venv_scripts_dir` e `PLATFORM.venv_exe_suffix` para paths cross-platform.
   4. Faz `public stage` e `public install` automáticos (a menos que `--skip-assets`).
-  5. Instala `repos.xlsx` catalog em `.dadaia/src/` e o script `.dadaia/scripts/ctx-inject.sh`.
-  6. Registra a entrada do hook em `.claude/settings.json`.
+  5. Instala `repos.xlsx` catalog em `.dadaia/src/`.
+  6. Registra as entradas de hook em `.claude/settings.json` e `.codex/hooks.json` com comando Python (`python -m dadaia_workspace.hooks.<name>`), não bash.
 
 
 
@@ -47,9 +53,10 @@ Torna o workspace reproduzível desde o primeiro comando — agentes e operador 
   * `.dadaia/states/spec_contexts.json` — contexts list (vazia até primeira criação)
   * `.dadaia/academy/academy.json` — courses list (vazia)
   * `.dadaia/src/repos.xlsx` — catálogo estático de repos conhecidos
-  * `.dadaia/scripts/ctx-inject.sh` — hook bash de injeção de contexto
-  * `.venv/` — virtualenv Python
-  * `.claude/settings.json` — entrada do `UserPromptSubmit` hook
+  * `.dadaia/scripts/ctx-inject.sh` — script bash legado (ainda presente; não é mais o hook registrado)
+  * `.venv/` — virtualenv Python (caminho do executor resolvido por `PLATFORM.venv_scripts_dir`/`PLATFORM.venv_exe_suffix`)
+  * `.claude/settings.json` — entradas de hook: `UserPromptSubmit` → `python -m dadaia_workspace.hooks.ctx_inject`; `PreToolUse` → `python -m dadaia_workspace.hooks.sdd_gate` e `python -m dadaia_workspace.hooks.root_whitelist`; `PostToolUse` → `python -m dadaia_workspace.hooks.sdd_post_gate`
+  * `.codex/hooks.json` — mesmas entradas de hook em formato Codex
 
 
 

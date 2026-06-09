@@ -83,7 +83,7 @@ class ImportService:
         if not contexts_file.exists():
             return
 
-        data: dict[str, object] = json.loads(contexts_file.read_text())
+        data: dict[str, object] = json.loads(contexts_file.read_text(encoding="utf-8"))
         old_prefix = str(old_root)
         new_prefix = str(workspace_root)
 
@@ -109,7 +109,7 @@ class ImportService:
         data.pop("version", None)
 
         tmp = contexts_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, indent=2))
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
         tmp.replace(contexts_file)
 
         primary_file = workspace_root / ".dadaia" / "states" / "primary_context.json"
@@ -138,11 +138,11 @@ class ImportService:
             if not target.exists():
                 continue
             try:
-                data = json.loads(target.read_text())
+                data = json.loads(target.read_text(encoding="utf-8"))
                 patched, count = self._rewrite_paths_in_value(data, old_prefix, new_prefix)
                 if count:
                     tmp = target.with_suffix(".tmp")
-                    tmp.write_text(json.dumps(patched, indent=2))
+                    tmp.write_text(json.dumps(patched, indent=2), encoding="utf-8")
                     tmp.replace(target)
             except (json.JSONDecodeError, OSError):
                 print(f"WARNING: Could not patch paths in {target}", file=sys.stderr)

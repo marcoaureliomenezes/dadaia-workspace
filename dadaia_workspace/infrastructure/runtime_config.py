@@ -3,16 +3,48 @@
 Extracted from ``FileSystemPublicAssetManager`` in ``public_assets.py`` to keep
 that module under 600 lines.  Each function takes explicit arguments instead of
 ``self``, so there are no circular imports.
+
+T-018-17: hook commands are emitted as ``<python> -m dadaia_workspace.hooks.<name>``
+using the venv-aware ``_python_bin()`` helper (Windows-safe fallbacks: Scripts/python.exe
+→ sys.executable → bare python). The ``.sh`` scripts are superseded, not appended.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _render_agents_config_file_blocks,
 )
+
+
+def _python_bin(workspace_root: Path) -> str:
+    """Resolve the workspace venv Python binary, Windows-safe.
+
+    Priority: ``.dadaia/.venv/bin/python`` (POSIX) or
+    ``.dadaia/.venv/Scripts/python.exe`` (Windows) → ``sys.executable`` → bare ``python``.
+    """
+    from dadaia_workspace.core.platform import PLATFORM
+
+    venv_python = (
+        workspace_root
+        / ".dadaia"
+        / ".venv"
+        / PLATFORM.venv_scripts_dir
+        / f"python{PLATFORM.venv_exe_suffix}"
+    )
+    if venv_python.is_file():
+        return str(venv_python)
+    if sys.executable:
+        return sys.executable
+    return "python"
+
+
+def _hook_cmd(workspace_root: Path, module: str) -> str:
+    """Return ``<python_bin> -m <module>`` for *workspace_root*."""
+    return f"{_python_bin(workspace_root)} -m {module}"
 
 
 def claude_settings(workspace_root: Path) -> dict[str, object]:
@@ -23,9 +55,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": str(
-                                workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"
-                            ),
+                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.sdd_gate"),
                             "type": "command",
                         }
                     ],
@@ -34,8 +64,8 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": str(
-                                workspace_root / ".dadaia" / "scripts" / "root-whitelist-gate.sh"
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.root_whitelist"
                             ),
                             "type": "command",
                         }
@@ -47,8 +77,8 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": str(
-                                workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.sdd_post_gate"
                             ),
                             "type": "command",
                         }
@@ -60,8 +90,8 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                 {
                     "hooks": [
                         {
-                            "command": str(
-                                workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
                             ),
                             "type": "command",
                         }
@@ -106,6 +136,8 @@ def codex_config(agentic_dir: Path) -> str:
 def codex_hooks(workspace_root: Path) -> dict[str, object]:
     """Return the .codex/hooks.json dict for *workspace_root*."""
     write_matcher = "^(apply_patch|Edit|Write)$"
+    python_bin = _python_bin(workspace_root)
+    ctx_inject_module = "dadaia_workspace.hooks.ctx_inject"
     return {
         "hooks": {
             "PreToolUse": [
@@ -114,9 +146,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": str(
-                                workspace_root / ".dadaia" / "scripts" / "sdd-spec-gate.sh"
-                            ),
+                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.sdd_gate"),
                             "statusMessage": "Checking SDD gate",
                         }
                     ],
@@ -126,8 +156,8 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": str(
-                                workspace_root / ".dadaia" / "scripts" / "root-whitelist-gate.sh"
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.root_whitelist"
                             ),
                             "statusMessage": "Checking root whitelist",
                         }
@@ -140,8 +170,8 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": str(
-                                workspace_root / ".dadaia" / "scripts" / "sdd-post-gate.sh"
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.sdd_post_gate"
                             ),
                             "statusMessage": "Refreshing SDD session heartbeat",
                         }
@@ -158,9 +188,11 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "DADAIA_HOOK_OUTPUT=codex-json "
-                            + "DADAIA_HOOK_EVENT=SessionStart "
-                            + str(workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"),
+                            "command": (
+                                "DADAIA_HOOK_OUTPUT=codex-json "
+                                "DADAIA_HOOK_EVENT=SessionStart "
+                                f"{python_bin} -m {ctx_inject_module}"
+                            ),
                             "statusMessage": "Loading dadaia context",
                         }
                     ],
@@ -171,8 +203,9 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "DADAIA_HOOK_OUTPUT=codex-json "
-                            + str(workspace_root / ".dadaia" / "scripts" / "ctx-inject.sh"),
+                            "command": (
+                                f"DADAIA_HOOK_OUTPUT=codex-json {python_bin} -m {ctx_inject_module}"
+                            ),
                             "statusMessage": "Loading dadaia context",
                         }
                     ],

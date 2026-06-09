@@ -23,6 +23,16 @@ def _patch_imports_ok(monkeypatch: pytest.MonkeyPatch, raise_exc: Exception) -> 
     )
 
 
+def _make_platform_security_error() -> Exception:
+    from dadaia_workspace.core.exceptions import PlatformSecurityError
+
+    return PlatformSecurityError(
+        "simulated icacls failure",
+        feature_name="test-feature",
+        platform="test",
+    )
+
+
 @pytest.mark.parametrize(
     "exc,fragment",
     [
@@ -30,6 +40,7 @@ def _patch_imports_ok(monkeypatch: pytest.MonkeyPatch, raise_exc: Exception) -> 
         (PermissionError("access denied"), "permission denied"),
         (OSError("disk error"), "OS error"),
         (sqlite3.OperationalError("db locked"), "SQLite"),
+        (_make_platform_security_error(), "platform security"),
     ],
 )
 def test_try_build_telemetry_returns_none_on_expected_exceptions(

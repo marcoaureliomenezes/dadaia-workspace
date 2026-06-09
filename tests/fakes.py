@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.exceptions import (
     OrchestrationUnsupportedError,
@@ -241,7 +242,44 @@ class FakeAgentDispatcher:
         return tuple(self.dispatch(inv) for inv in invocations)
 
 
+class FakeFilePermissionSetter:
+    """In-memory FilePermissionSetter — records calls, never performs I/O.
+
+    Optionally raises ``PlatformSecurityError`` on the next call when
+    ``_raise_on_next`` is set to ``True`` (for testing Tier-1 error paths).
+    """
+
+    def __init__(self, raise_on_next: bool = False) -> None:
+        self.restricted_files: list[tuple[Any, int]] = []
+        self.restricted_dirs: list[tuple[Any, int]] = []
+        self._raise_on_next = raise_on_next
+
+    def _maybe_raise(self) -> None:
+        if self._raise_on_next:
+            from dadaia_workspace.core.exceptions import PlatformSecurityError
+
+            raise PlatformSecurityError(
+                "FakeFilePermissionSetter: simulated failure",
+                feature_name="fake-permission-setter",
+                platform="test",
+            )
+
+    def restrict_to_owner(self, path: object, mode: int = 0o600) -> None:
+        self._maybe_raise()
+        self.restricted_files.append((path, mode))
+
+    def restrict_dir_to_owner(self, path: object, mode: int = 0o700) -> None:
+        self._maybe_raise()
+        self.restricted_dirs.append((path, mode))
+
+
 class FakePythonEnvironmentManager:
+    """In-memory PythonEnvironmentManager — builds venv paths using PLATFORM flags.
+
+    Uses ``PLATFORM.venv_scripts_dir`` and ``PLATFORM.venv_exe_suffix`` so that
+    tests validating venv path construction work correctly on all platforms.
+    """
+
     def __init__(self) -> None:
         self.ensured: list[str] = []
 
@@ -250,10 +288,20 @@ class FakePythonEnvironmentManager:
         return f"{workspace_root}/.dadaia/.venv"
 
     def python_executable(self, workspace_root: str) -> str:
-        return f"{workspace_root}/.dadaia/.venv/bin/python"
+        from dadaia_workspace.core.platform import PLATFORM
+
+        return (
+            f"{workspace_root}/.dadaia/.venv"
+            f"/{PLATFORM.venv_scripts_dir}/python{PLATFORM.venv_exe_suffix}"
+        )
 
     def pip_executable(self, workspace_root: str) -> str:
-        return f"{workspace_root}/.dadaia/.venv/bin/pip"
+        from dadaia_workspace.core.platform import PLATFORM
+
+        return (
+            f"{workspace_root}/.dadaia/.venv"
+            f"/{PLATFORM.venv_scripts_dir}/pip{PLATFORM.venv_exe_suffix}"
+        )
 
 
 class FakeServerRegistryStore:

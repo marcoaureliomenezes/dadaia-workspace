@@ -99,21 +99,25 @@ def test_configure_hook_writes_canonical_nested_schema(
     assert entry["matcher"] == ""
     assert isinstance(entry["hooks"], list) and entry["hooks"]
     assert entry["hooks"][0]["type"] == "command"
-    assert entry["hooks"][0]["command"].endswith("ctx-inject.sh")
+    # T-018-17: command is now Python module invocation, not .sh path.
+    assert "dadaia_workspace.hooks.ctx_inject" in entry["hooks"][0]["command"]
+    assert "ctx-inject.sh" not in entry["hooks"][0]["command"]
     # Legacy flat schema must not leak to the top level.
     assert "command" not in entry
 
 
-def test_configure_hook_no_duplicate_against_existing_nested_entry(
+def test_configure_hook_supersedes_stale_sh_with_python_command(
     service: WorkspaceService, workspace_root: Path
 ) -> None:
-    """Given the nested entry public_assets.py already wrote, _configure_hook must
-    detect it via the nested command and NOT append a duplicate (the bug that broke
-    Claude Code settings validation: hooks.UserPromptSubmit.1.hooks Expected array)."""
+    """T-018-17: given a stale ctx-inject.sh entry, _configure_hook must REPLACE it
+    with the Python module command — not append a duplicate entry.
+    (Original bug: hooks.UserPromptSubmit.1.hooks Expected array)."""
     from dadaia_workspace.core.models.workspace import Workspace
 
     ws = Workspace.from_root(workspace_root)
-    hook_command = str(ws.dadaia_dir / "scripts" / "ctx-inject.sh")
+    # Pre-populate with the stale .sh command (simulates a workspace that was
+    # initialized before T-018-17).
+    stale_sh_command = str(ws.dadaia_dir / "scripts" / "ctx-inject.sh")
     ws.claude_dir.mkdir(parents=True, exist_ok=True)
     settings_path = ws.claude_dir / "settings.json"
     settings_path.write_text(
@@ -123,7 +127,7 @@ def test_configure_hook_no_duplicate_against_existing_nested_entry(
                     "UserPromptSubmit": [
                         {
                             "matcher": "",
-                            "hooks": [{"type": "command", "command": hook_command}],
+                            "hooks": [{"type": "command", "command": stale_sh_command}],
                         }
                     ]
                 }
@@ -135,10 +139,14 @@ def test_configure_hook_no_duplicate_against_existing_nested_entry(
     service._configure_hook(ws)
 
     entries = _user_prompt_submit(settings_path)
-    assert len(entries) == 1, "must not append a duplicate UserPromptSubmit entry"
-    # Every entry is schema-valid: carries a nested hooks array.
-    for entry in entries:
-        assert isinstance(entry.get("hooks"), list)
+    # SUPERSEDE: exactly one entry — the .sh was replaced, not duplicated.
+    assert len(entries) == 1, "must not append a duplicate; stale .sh must be superseded"
+    entry = entries[0]
+    # The replacement entry uses the Python module command.
+    assert isinstance(entry.get("hooks"), list)
+    cmd = entry["hooks"][0]["command"]
+    assert "dadaia_workspace.hooks.ctx_inject" in cmd
+    assert "ctx-inject.sh" not in cmd
 
 
 def test_init_creates_server_registry_json(tmp_path: Path) -> None:

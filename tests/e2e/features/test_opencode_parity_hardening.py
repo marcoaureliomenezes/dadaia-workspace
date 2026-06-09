@@ -123,7 +123,10 @@ class TestPluginProjection:
         assert plugin.is_file()
         text = plugin.read_text("utf-8")
         assert "tool.execute.before" in text
-        assert "sdd-spec-gate.sh" in text
+        # T-018-19 / ADR-7: the plugin invokes the Python governance hook directly
+        # (no bash, no .sh dependency — required for stock-Windows governance).
+        assert "dadaia_workspace.hooks.sdd_gate" in text
+        assert "sdd-spec-gate.sh" not in text
 
     def test_ctx_inject_uses_migrated_signature(self, tmp_path: Path) -> None:
         _install(tmp_path)

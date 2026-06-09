@@ -2,16 +2,16 @@
 slug: context-management
 title: context-management
 category: product
-tldr: multi-context ALIVE/DEAD lifecycle; bind exports DADAIA_SESSION_ID; one
-  TTL-lease per context (O_EXCL CAS, TTL 120s) + fcntl Lock-1/Lock-2 for git ops.
+tldr: multi-context ALIVE/DEAD; bind exports DADAIA_SESSION_ID; one cross-platform TTL-lease per context (O_EXCL CAS, 120s) via WorkspaceLock/ContextLock ports.
 summary: multi-context lifecycle ALIVE/DEAD (no global primary); session binding via
-  eval $(dadaia context bind --mode) exports DADAIA_SESSION_ID; locking (v0.1.6) =
+  eval $(dadaia context bind --mode) exports DADAIA_SESSION_ID; locking (v0.1.8) =
   ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`,
   O_EXCL CAS acquire, TTL 120s, stable-session-identity via .ptr file) plus retained
-  fcntl Lock-1 (workspace) and Lock-2 (per-context git ops); the old 4-store model
-  (sessions, Lock-3, semaphore) is retired; dadaia migrate [--dry-run|--yes] (v1→v2);
-  scaffold canonical tree v2; CLIs dadaia release new, dadaia backlog new, dadaia bug
-  new, dadaia memory product add.
+  port/adapter Lock-1 (workspace via WorkspaceLock protocol) and Lock-2 (per-context
+  git ops via ContextLock protocol) — both backed by `infrastructure/file_lock_posix.py`
+  on POSIX; the old 4-store model (sessions, Lock-3, semaphore) is retired; dadaia
+  migrate [--dry-run|--yes] (v1→v2); scaffold canonical tree v2; CLIs dadaia release
+  new, dadaia backlog new, dadaia bug new, dadaia memory product add.
 tags:
 - context
 - lifecycle
@@ -19,7 +19,7 @@ tags:
 - locking
 agent_tier: self-pull
 token_estimate: 1500
-last_updated: '2026-06-06'
+last_updated: '2026-06-09'
 release_origin: v0.2.0
 ---
 
@@ -54,9 +54,14 @@ Três camadas de lock garantem operações concorrentes seguras:
 
 | Lock | Caminho | Impl | Escopo |
 |------|---------|------|--------|
-| Lock 1 (workspace) | `.dadaia/states/.ws_lock` | fcntl LOCK_EX, 5s timeout | Toda mutação em `spec_contexts.json` (`alive()`, `dead()`, `create()`, `delete()`, `DoctorService.fix()`, `context bind`, `context release`) |
-| Lock 2 (per-context) | `.dadaia/states/ctx_locks/<slug>.lock` | fcntl LOCK_EX, 5s timeout | `git clone` e `shutil.rmtree` por context (fora do Lock 1; L1>L2 é a única direção safe) |
+| Lock 1 (workspace) | `.dadaia/states/.ws_lock` | `WorkspaceLock` protocol; POSIX adapter (`infrastructure/file_lock_posix.py`) uses `fcntl LOCK_EX`, 5s timeout | Toda mutação em `spec_contexts.json` (`alive()`, `dead()`, `create()`, `delete()`, `DoctorService.fix()`, `context bind`, `context release`) |
+| Lock 2 (per-context) | `.dadaia/states/ctx_locks/<slug>.lock` | `ContextLock` protocol; POSIX adapter uses `fcntl LOCK_EX`, 5s timeout | `git clone` e `shutil.rmtree` por context (fora do Lock 1; L1>L2 é a única direção safe) |
 | TTL-lease (per-context) | `.dadaia/states/ctx_locks/<ctx>.lock.json` | JSON O_EXCL CAS (v0.1.6) | Mutex de MUTATING release para o context; TTL 120s; heartbeat a cada PreToolUse |
+
+Lock-1 e Lock-2 operam através dos protocolos `WorkspaceLock` e `ContextLock`
+(`core/protocols/file_lock.py`), com o adapter POSIX em `infrastructure/file_lock_posix.py`.
+A implementação concreta (`fcntl`) nunca importa diretamente em `features/` — apenas o
+protocol é injetado via `container.py`.
 
 **O TTL-lease** é o único mecanismo que serializa writers MUTATING. Ele foi introduzido em v0.1.6 substituindo o modelo 4-store anterior (sessions, Lock-3, semaphore).
 

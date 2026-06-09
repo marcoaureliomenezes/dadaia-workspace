@@ -1,16 +1,16 @@
 """JsonContextStore — atomic CRUD over spec_contexts.json (schema v2).
 
-NOTE: _load and _dump must NOT be called outside SpecContextService methods.
-Calling them directly bypasses the fcntl lock (introduced in T-11) and re-opens
+NOTE: _load must NOT be called outside SpecContextService methods.
+Calling it directly bypasses the fcntl lock (introduced in T-11) and re-opens
 the concurrent-write race R-1.
 """
 
 import json
-import os
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 _VERSION = "2"
 
@@ -25,7 +25,7 @@ def _load(path: Path) -> dict:  # type: ignore[type-arg]
     """
     if not path.exists():
         return {"schema_version": _VERSION, "contexts": []}
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         data = json.load(f)
 
     # Detect v1 by explicit schema_version field
@@ -55,16 +55,6 @@ def _load(path: Path) -> dict:  # type: ignore[type-arg]
         )
 
     return data  # type: ignore[no-any-return]
-
-
-def _dump(path: Path, data: dict) -> None:  # type: ignore[type-arg]
-    """Write spec_contexts.json atomically (tmp → os.replace()).
-
-    Must NOT be called outside SpecContextService methods — see module docstring.
-    """
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
-    os.replace(tmp, path)
 
 
 def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
@@ -100,12 +90,12 @@ class JsonContextStore:
     def save(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"].append(_to_dict(ctx))
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))
 
     def update(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"] = [_to_dict(ctx) if c["name"] == ctx.name else c for c in data["contexts"]]
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))
 
     def get(self, name: str) -> SpecContextProject | None:
         data = _load(self._path)
@@ -121,4 +111,4 @@ class JsonContextStore:
     def delete(self, name: str) -> None:
         data = _load(self._path)
         data["contexts"] = [c for c in data["contexts"] if c["name"] != name]
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))

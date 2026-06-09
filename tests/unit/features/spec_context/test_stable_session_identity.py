@@ -12,16 +12,21 @@ All tests use FakeClock; tmp_path workspace; no real time.sleep in test bodies.
 
 from __future__ import annotations
 
-import inspect
-import json
-from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import pytest
 
-from dadaia_workspace.features.spec_context import lease
-from dadaia_workspace.features.spec_context.doctor import DoctorService
-from dadaia_workspace.features.spec_context.lease import LEASE_TTL_SECONDS
-from tests.fakes import FakeContextStore, FakeGitClient
+pytest.importorskip("fcntl")
+
+import inspect  # noqa: E402
+import json  # noqa: E402
+from collections.abc import Callable  # noqa: E402
+from datetime import UTC, datetime, timedelta  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from dadaia_workspace.features.spec_context import lease  # noqa: E402
+from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from dadaia_workspace.features.spec_context.lease import LEASE_TTL_SECONDS  # noqa: E402
+from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 BASE = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 CTX = "myctx"

@@ -10,6 +10,12 @@ qa-engineer (T-016-08) verifies the bash gate mirrors it exactly.
 For the MUTATING class the gate is the single acquisition point: it delegates to
 :func:`lease.acquire` (O_EXCL CAS). This module does the same, so the Python tests
 exercise the real lease code path, not a stand-in.
+
+The PROTECTED class (SEC-01, F-07) is the sole fail-CLOSED path: writes to
+``.dadaia/sessions/`` (the CLI-owned lease-identity store) are blocked unconditionally
+and evaluated BEFORE any fail-open branch, protecting the ``.ptr`` from forgery
+(confused-deputy / CWE-284). The Python hook ``dadaia_workspace.hooks.sdd_gate``
+delegates here — PROTECTED flows through without reimplementation in the hook.
 """
 
 from __future__ import annotations
@@ -38,6 +44,21 @@ _ADDITIVE_PREFIXES: tuple[str, ...] = (
 )
 _MEMORY_PREFIX = "specs/memory/"
 _FROZEN_PREFIX = "specs/_archive/"
+#: SEC-01 (CWE-284): .dadaia/sessions/ holds CLI-owned runtime session state, incl. the
+#: single-session lease identity pointer (.dadaia/sessions/runtime/<ctx>.ptr). Agents must
+#: NOT write these via Write/Edit — only the dadaia CLI/bootstrap may (it writes via Python,
+#: outside the tool gate). This is the SOLE fail-CLOSED class: it blocks unconditionally,
+#: evaluated BEFORE the fail-open branches below.
+_PROTECTED_PREFIX = ".dadaia/sessions/"
+#: SEC-01 block reason — byte-identical to ``sdd-spec-gate.sh`` so both enforcement paths
+#: emit the same message (parity contract, T-018-15/T-018-16).
+_PROTECTED_MESSAGE = (
+    "[GATE] .dadaia/sessions/ is CLI-owned runtime state, incl. the single-session lease "
+    "identity pointer .dadaia/sessions/runtime/<ctx>.ptr. Agents must not write here via "
+    "Write/Edit — only the dadaia CLI/bootstrap may. Blocked to protect lease-identity "
+    "integrity (the sole deterministic lock); forging the .ptr would let a second session "
+    "steal a Spec Context binding (SEC-01 / CWE-284)."
+)
 #: Phases in which product-engineer may write memory atoms (FR-P1-13).
 _MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
 
@@ -47,6 +68,7 @@ class PathClass(Enum):
     MEMORY = "MEMORY"
     FROZEN = "FROZEN"
     MUTATING = "MUTATING"
+    PROTECTED = "PROTECTED"
     UNGATED = "UNGATED"
 
 
@@ -71,6 +93,8 @@ def classify_path(rel_path: str) -> PathClass:
         return PathClass.FROZEN
     if p.startswith("specs/releases/") or p.startswith("repos/"):
         return PathClass.MUTATING
+    if p.startswith(_PROTECTED_PREFIX):
+        return PathClass.PROTECTED
     return PathClass.UNGATED
 
 
@@ -97,6 +121,12 @@ def evaluate(
     concurrent foreign live session — and even then, additive writes are unblocked.
     """
     cls = classify_path(rel_path)
+
+    # PROTECTED is the SOLE fail-CLOSED class (SEC-01). It is evaluated FIRST — before any
+    # fail-open branch — so an agent write to .dadaia/sessions/ is blocked unconditionally,
+    # protecting the lease-identity .ptr from forgery (confused-deputy / CWE-284).
+    if cls == PathClass.PROTECTED:
+        return Decision.BLOCK, _PROTECTED_MESSAGE
 
     if cls in (PathClass.ADDITIVE, PathClass.UNGATED):
         return Decision.ALLOW, ""

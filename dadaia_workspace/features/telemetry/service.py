@@ -4,10 +4,10 @@ Design decisions implemented:
     D-AM-11  — Lazy on-request + cache 30 s (no daemon, no cron, no watcher).
     D-AM-15  — SQLite WAL in ~/.dadaia/state/telemetry/telemetry.sqlite.
     T6       — Guard os.getuid() != 0 in constructor.
-    Architect D6 — Process lock via fcntl.flock on telemetry.lock.
+    Architect D6 — Process lock via TelemetryRefreshLock protocol (T-018-06).
 
 Refresh logic:
-    1. Acquire LOCK_EX | LOCK_NB on state_dir/telemetry.lock.
+    1. Acquire LOCK_EX | LOCK_NB on state_dir/telemetry.lock via TelemetryRefreshLock.
        If another process holds it, skip refresh and return.
     2. If now - last_refresh < CACHE_TTL_SECONDS, return immediately (cache hit).
     3. Open DAO + apply schema migrations.
@@ -22,15 +22,18 @@ Refresh logic:
 from __future__ import annotations
 
 import datetime
-import fcntl
 import logging
 import os
 import pathlib
 import sqlite3
+import sys
 import time
 from collections.abc import Callable
 from typing import Any, cast
 
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
+from dadaia_workspace.core.protocols.telemetry_lock import TelemetryRefreshLock
 from dadaia_workspace.features.telemetry import budget as _budget
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
@@ -46,6 +49,23 @@ _DEFAULT_STATE_DIR = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
 _DEFAULT_SQLITE_FILENAME = "telemetry.sqlite"
 _DEFAULT_CODEX_PATH = pathlib.Path("~/.codex/state_5.sqlite").expanduser()
 _CLAUDE_PROJECTS_DIR = pathlib.Path("~/.claude/projects").expanduser()
+
+
+def _default_refresh_lock() -> TelemetryRefreshLock:
+    """Return the platform-appropriate TelemetryRefreshLock implementation.
+
+    Interim sys.platform guard.
+    # TODO: Replace with PLATFORM.has_fcntl once WS-1 lands
+    """
+    if sys.platform == "win32":  # TODO: Replace with PLATFORM.has_fcntl once WS-1 lands
+        from dadaia_workspace.infrastructure.telemetry_lock_windows import (
+            WindowsTelemetryRefreshLock,
+        )
+
+        return WindowsTelemetryRefreshLock()
+    from dadaia_workspace.infrastructure.telemetry_lock_posix import PosixTelemetryRefreshLock
+
+    return PosixTelemetryRefreshLock()
 
 
 class TelemetryService:
@@ -77,6 +97,15 @@ class TelemetryService:
         Defaults to ~/.dadaia/state/telemetry/.
     spec_context_service:
         Forwarded to the aggregator (not used directly by the service).
+    refresh_lock:
+        TelemetryRefreshLock implementation for serializing concurrent refreshes.
+        Defaults to a platform-appropriate adapter (POSIX or Windows).
+    permission_setter:
+        Optional ``FilePermissionSetter`` for restricting the telemetry state
+        directory permissions.  When ``None`` (default), falls back to the
+        direct ``os.chmod`` call (Tier-2: if a setter is provided and raises
+        ``PlatformSecurityError``, telemetry degrades to ``None``; the panel
+        starts but telemetry endpoints return 503).
     _now_fn:
         Injectable for tests: returns float (monotonic seconds).
     _getuid_fn:
@@ -92,11 +121,18 @@ class TelemetryService:
         workspace_root: pathlib.Path,
         state_dir: pathlib.Path = _DEFAULT_STATE_DIR,
         spec_context_service: Any = None,
+        refresh_lock: TelemetryRefreshLock | None = None,
+        permission_setter: FilePermissionSetter | None = None,
         _now_fn: Callable[[], float] | None = None,
         _getuid_fn: Callable[[], int] | None = None,
     ) -> None:
         # T6: refuse uid=0
-        getuid = _getuid_fn or os.getuid
+        # Use getattr guard for non-POSIX platforms where os.getuid is absent (FR-08).
+        def _fallback_uid() -> int:
+            return 1000
+
+        _raw_getuid: Any = _getuid_fn or getattr(os, "getuid", _fallback_uid)
+        getuid: Callable[[], int] = _raw_getuid
         if getuid() == 0:
             raise PermissionError(
                 "TelemetryService must not run as root (uid=0). "
@@ -111,27 +147,50 @@ class TelemetryService:
         self._state_dir = state_dir
         self._scs = spec_context_service
         self._now_fn: Callable[[], float] = _now_fn or time.monotonic
+        self._refresh_lock: TelemetryRefreshLock = refresh_lock or _default_refresh_lock()
+        self._permission_setter: FilePermissionSetter | None = permission_setter
 
         # Ensure state directory exists with strict permissions (T-AM-20 / devops T2).
-        # We create parents first, then chmod the leaf dir to 0o700 so that the
+        # We create parents first, then restrict the leaf dir to 0o700 so that the
         # telemetry state is only readable by the owning user.
+        # Tier-2: if the permission setter raises PlatformSecurityError, log INFO and
+        # continue — the panel starts but telemetry degraded (unlike panel auth token
+        # which is Tier-1 fail-loud).
         self._state_dir.mkdir(parents=True, exist_ok=True)
-        os.chmod(self._state_dir, 0o700)
+        if self._permission_setter is not None:
+            try:
+                self._permission_setter.restrict_dir_to_owner(self._state_dir)
+            except Exception as _perm_exc:  # noqa: BLE001
+                from dadaia_workspace.core.exceptions import PlatformSecurityError
+
+                if isinstance(_perm_exc, PlatformSecurityError):
+                    logger.info(
+                        "TelemetryService: cannot restrict state_dir permissions "
+                        "(%s) — telemetry continues in degraded mode.",
+                        _perm_exc,
+                    )
+                else:
+                    raise
+        else:
+            os.chmod(self._state_dir, 0o700)
 
         # Verify the panel auth token file (written by auth.py) has 0o600 perms.
         # If permissions have drifted (e.g. umask misconfiguration), log a warning
         # but do not abort — the operator can remediate without restarting.
-        _token_path = self._state_dir.parent / "panel.token"
-        if _token_path.exists():
-            actual_mode = _token_path.stat().st_mode & 0o777
-            if actual_mode != 0o600:
-                logger.warning(
-                    "TelemetryService: auth token file %s has mode 0o%o "
-                    "(expected 0o600). Run: chmod 600 %s",
-                    _token_path,
-                    actual_mode,
-                    _token_path,
-                )
+        # Guard with PLATFORM.has_posix_chmod: on Windows chmod is a no-op (CWE-732),
+        # so this drift check would always fire a false alarm (SPEC §5 DEAD-PATTERN REMOVAL).
+        if PLATFORM.has_posix_chmod:
+            _token_path = self._state_dir.parent / "panel.token"
+            if _token_path.exists():
+                actual_mode = _token_path.stat().st_mode & 0o777
+                if actual_mode != 0o600:
+                    logger.warning(
+                        "TelemetryService: auth token file %s has mode 0o%o "
+                        "(expected 0o600). Run: chmod 600 %s",
+                        _token_path,
+                        actual_mode,
+                        _token_path,
+                    )
 
         self._degraded = False
 
@@ -158,21 +217,12 @@ class TelemetryService:
 
     def refresh(self) -> None:
         """Ingest new telemetry data. Idempotent; cached for CACHE_TTL_SECONDS."""
-        lock_path = self._state_dir / "telemetry.lock"
+        lock_path = str(self._state_dir / "telemetry.lock")
 
-        # Acquire exclusive non-blocking lock.
-        try:
-            lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
-        except OSError as exc:
-            logger.warning("TelemetryService: cannot open lock file: %s", exc)
-            return
-
-        try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+        # Acquire exclusive non-blocking lock via the injected TelemetryRefreshLock.
+        if not self._refresh_lock.try_acquire(lock_path):
             # Another process is refreshing — skip silently (D-AM-11).
             logger.debug("TelemetryService: another process is refreshing; skipping.")
-            os.close(lock_fd)
             return
 
         try:
@@ -186,8 +236,7 @@ class TelemetryService:
             self._last_refresh = self._now_fn()
 
         finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            os.close(lock_fd)
+            self._refresh_lock.release()
 
     # ------------------------------------------------------------------
     # Integrity check (T-AM-21)
@@ -216,7 +265,7 @@ class TelemetryService:
         ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
         quarantine_path = self._state_dir / f"telemetry.sqlite.corrupt.{ts}"
         try:
-            os.rename(db_path, quarantine_path)
+            os.replace(db_path, quarantine_path)
             logger.warning(
                 "TelemetryService: corrupt database quarantined as %s. "
                 "Service is now in degraded mode. "

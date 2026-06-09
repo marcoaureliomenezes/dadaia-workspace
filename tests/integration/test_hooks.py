@@ -1,13 +1,25 @@
-"""Subprocess tests for shell hooks: ctx-inject.sh + sdd-spec-gate.sh."""
+"""Subprocess tests for shell hooks: ctx-inject.sh + sdd-spec-gate.sh.
+
+These tests invoke bash scripts (the shell governance hooks) and are therefore
+Linux-only. On macOS or Windows the bash hooks may not be available; use the
+Python hooks package (dadaia_workspace.hooks) for cross-platform coverage.
+"""
 
 import json
 import os
 import shutil
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+
+# T-018-20: shell-hook subprocess tests require bash and are Linux-only.
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="Shell governance hooks require bash (Linux only); use dadaia_workspace.hooks for Windows/macOS",
+)
 
 _PKG_SCRIPTS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "scripts"
 CTX_INJECT = _PKG_SCRIPTS / "ctx-inject.sh"
@@ -37,7 +49,7 @@ def test_ctx_inject_silent_and_never_nags_when_no_context(workspace: Path) -> No
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
         text=True,
-        cwd="/tmp",
+        cwd=str(workspace.parent),
         env={k: v for k, v in os.environ.items() if k != "DADAIA_CONTEXT"},
         timeout=5,
     )
@@ -57,7 +69,7 @@ def test_ctx_inject_reports_active_context(workspace: Path) -> None:
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
         text=True,
-        cwd="/tmp",
+        cwd=str(workspace.parent),
         timeout=5,
         env=env,
     )
@@ -79,7 +91,7 @@ def test_ctx_inject_emits_dispatcher_preflight(workspace: Path) -> None:
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
         text=True,
-        cwd="/tmp",
+        cwd=str(workspace.parent),
         timeout=5,
         env=env,
     )
@@ -102,7 +114,7 @@ def test_ctx_inject_no_preflight_without_context(workspace: Path) -> None:
         ["bash", str(scripts / "ctx-inject.sh")],
         capture_output=True,
         text=True,
-        cwd="/tmp",
+        cwd=str(workspace.parent),
         env={k: v for k, v in os.environ.items() if k != "DADAIA_CONTEXT"},
         timeout=5,
     )

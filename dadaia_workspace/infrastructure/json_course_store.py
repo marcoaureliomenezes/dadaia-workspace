@@ -1,10 +1,10 @@
 """JsonCourseStore — atomic CRUD over academy.json."""
 
 import json
-import os
 from pathlib import Path
 
 from dadaia_workspace.core.models.course import Course
+from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 _VERSION = "1"
 
@@ -12,14 +12,8 @@ _VERSION = "1"
 def _load(path: Path) -> dict:  # type: ignore[type-arg]
     if not path.exists():
         return {"version": _VERSION, "courses": []}
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         return json.load(f)  # type: ignore[no-any-return]
-
-
-def _dump(path: Path, data: dict) -> None:  # type: ignore[type-arg]
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
-    os.replace(tmp, path)
 
 
 def _to_dict(course: Course) -> dict:  # type: ignore[type-arg]
@@ -51,14 +45,14 @@ class JsonCourseStore:
     def save(self, course: Course) -> None:
         data = _load(self._path)
         data["courses"].append(_to_dict(course))
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))
 
     def update(self, course: Course) -> None:
         data = _load(self._path)
         data["courses"] = [
             _to_dict(course) if c["slug"] == course.slug else c for c in data["courses"]
         ]
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))
 
     def get(self, slug: str) -> Course | None:
         data = _load(self._path)
@@ -74,4 +68,4 @@ class JsonCourseStore:
     def delete(self, slug: str) -> None:
         data = _load(self._path)
         data["courses"] = [c for c in data["courses"] if c["slug"] != slug]
-        _dump(self._path, data)
+        _atomic_write_text(self._path, json.dumps(data, indent=2))

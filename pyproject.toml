@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
 ]
 
 [tool.poetry.scripts]
@@ -43,6 +43,7 @@ ruff = ">=0.15"
 mypy = ">=1.10,<3.0"
 types-PyYAML = ">=6"
 pytest-randomly = "^4.1.0"
+import-linter = ">=2.11"
 
 [build-system]
 requires = ["poetry-core"]
@@ -51,10 +52,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# Redirect ruff's lint cache to an OS-temp path so no .ruff_cache/ or .dadaia/
-# is ever created inside the repo tree.  .dadaia/ is workspace-level only and
-# must never appear inside a sub-repo (the pytest pollution guard enforces this).
-cache-dir = "/tmp/dadaia-ws-toolcache/ruff"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -63,18 +60,21 @@ ignore = ["E501", "B008"]
 [tool.ruff.lint.per-file-ignores]
 "dadaia_workspace/cli/commands/*.py" = ["B904"]
 "dadaia_workspace/cli/commands/repos.py" = ["SIM118"]
+# Test files that place pytestmark before platform-gated imports (E402 is intentional).
+"tests/unit/infrastructure/test_file_lock_posix.py" = ["E402", "I001"]
+"tests/unit/infrastructure/test_file_lock_windows.py" = ["E402", "I001"]
+"tests/unit/infrastructure/test_telemetry_lock_posix.py" = ["E402", "I001"]
+"tests/unit/infrastructure/test_telemetry_lock_windows.py" = ["E402", "I001"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 incremental = false
-# Redirect the mypy cache to /dev/null so no .mypy_cache is ever created in
-# the repo tree.  On Linux/macOS writes to /dev/null are silently discarded.
-# CI runners and Windows users who need caching can override via the
-# MYPY_CACHE_DIR environment variable (mypy reads that variable and it takes
-# precedence over cache_dir in config).
-cache_dir = "/dev/null"
+# No cache_dir: `incremental = false` already disables the mypy cache, so no
+# .mypy_cache/ is created in the repo tree, and there is no non-portable
+# hardcoded path (the previous "/dev/null" was Unix-only). CI redirects any
+# tool caches via env vars (MYPY_CACHE_DIR -> $RUNNER_TEMP); see ci.yml.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -107,10 +107,6 @@ tmp_path_retention_policy = "failed"
 [tool.coverage.run]
 source = ["dadaia_workspace"]
 parallel = false
-# Redirect coverage data file to an OS-temp path so no .coverage or .dadaia/
-# is ever created inside the repo tree.  .dadaia/ is workspace-level only and
-# must never appear inside a sub-repo (the pytest pollution guard enforces this).
-data_file = "/tmp/dadaia-ws-toolcache/coverage/.coverage"
 
 [tool.coverage.report]
 exclude_lines = [

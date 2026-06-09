@@ -5,7 +5,10 @@ from __future__ import annotations
 import inspect
 import os
 import pathlib
+import sys
 import unittest.mock
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -24,6 +27,7 @@ def _import_auth():
 
 
 class TestEnsureToken:
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
     def test_ensure_token_creates_file_with_0o600(self, tmp_path: pathlib.Path) -> None:
         """Token file created with mode 0o600; parent dir created with mode 0o700."""
         auth = _import_auth()
@@ -133,6 +137,114 @@ class TestEnsureToken:
         result = auth.ensure_token(token_path)
 
         assert result == "existing-token"
+
+
+# ---------------------------------------------------------------------------
+# Permission setter injection tests
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureTokenPermissionSetter:
+    def test_ensure_token_calls_restrict_dir_before_creation(self, tmp_path: pathlib.Path) -> None:
+        """When permission_setter is provided, restrict_dir_to_owner is called before token creation."""
+        from tests.fakes import FakeFilePermissionSetter
+
+        auth = _import_auth()
+        setter = FakeFilePermissionSetter()
+        token_path = tmp_path / "state" / "panel.token"
+
+        auth.ensure_token(token_path, permission_setter=setter)
+
+        assert token_path.exists(), "Token file should be created"
+        assert len(setter.restricted_dirs) == 1, (
+            "restrict_dir_to_owner must be called exactly once on the parent dir"
+        )
+        assert setter.restricted_dirs[0][0] == token_path.parent
+
+    def test_ensure_token_permission_error_propagates(self, tmp_path: pathlib.Path) -> None:
+        """PlatformSecurityError from permission_setter propagates without suppression (Tier-1)."""
+        from dadaia_workspace.core.exceptions import PlatformSecurityError
+        from tests.fakes import FakeFilePermissionSetter
+
+        auth = _import_auth()
+        setter = FakeFilePermissionSetter(raise_on_next=True)
+        token_path = tmp_path / "state" / "panel.token"
+
+        with pytest.raises(PlatformSecurityError):
+            auth.ensure_token(token_path, permission_setter=setter)
+
+        # Token must NOT have been created after the security error
+        assert not token_path.exists(), (
+            "Token file MUST NOT be created after PlatformSecurityError "
+            "(panel must not start with unprotected token)"
+        )
+
+    def test_ensure_token_existing_file_skips_setter(self, tmp_path: pathlib.Path) -> None:
+        """If token already exists, permission_setter is not called."""
+        from tests.fakes import FakeFilePermissionSetter
+
+        auth = _import_auth()
+        token_path = tmp_path / "panel.token"
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text("abc123")
+        if sys.platform != "win32":
+            os.chmod(token_path, 0o600)
+
+        setter = FakeFilePermissionSetter()
+        result = auth.ensure_token(token_path, permission_setter=setter)
+
+        assert result == "abc123"
+        assert len(setter.restricted_dirs) == 0, (
+            "restrict_dir_to_owner must not be called when token file already exists"
+        )
+
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Panel startup with unprotected token test requires POSIX mode bits",
+    )
+    def test_panel_does_not_start_with_unprotected_token_on_mocked_windows(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Panel startup with a mocked Windows environment raises PlatformSecurityError.
+
+        Simulates the Windows path by using a FakeFilePermissionSetter that raises
+        PlatformSecurityError on restrict_dir_to_owner — ensure_token propagates it.
+        """
+        from dadaia_workspace.core.exceptions import PlatformSecurityError
+        from tests.fakes import FakeFilePermissionSetter
+
+        auth = _import_auth()
+        token_path = tmp_path / "state" / "panel.token"
+        failing_setter = FakeFilePermissionSetter(raise_on_next=True)
+
+        with pytest.raises(PlatformSecurityError):
+            auth.ensure_token(token_path, permission_setter=failing_setter)
+
+    def test_no_setter_fallback_fails_loud_when_chmod_is_noop(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No setter + chmod no-op platform (Windows) must raise, not silently no-op (CWE-732).
+
+        Guards the fallback branch: the production panel always injects a setter, but a
+        misuse calling ensure_token() without one on a non-chmod platform must refuse
+        rather than create an unprotected token.
+        """
+        import dataclasses
+
+        from dadaia_workspace.core.exceptions import PlatformSecurityError
+
+        auth = _import_auth()
+        # Simulate a no-effective-chmod platform (Windows) via the PLATFORM seam.
+        fake_platform = dataclasses.replace(auth.PLATFORM, has_posix_chmod=False)
+        monkeypatch.setattr(auth, "PLATFORM", fake_platform)
+        token_path = tmp_path / "state" / "panel.token"
+
+        with pytest.raises(PlatformSecurityError):
+            auth.ensure_token(token_path)  # no permission_setter
+
+        assert not token_path.exists(), (
+            "Token MUST NOT be created when chmod is a no-op and no setter is provided"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -63,7 +63,7 @@ class ClaudeAgentDispatcher:
     def dispatch(self, invocation: StageInvocation) -> StageResult:
         path = Path(invocation.invocation_path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(_render_invocation(invocation, self._runtime_label))
+        path.write_text(_render_invocation(invocation, self._runtime_label), encoding="utf-8")
         return StageResult(
             run_id=invocation.run_id,
             stage_id=invocation.stage_id,

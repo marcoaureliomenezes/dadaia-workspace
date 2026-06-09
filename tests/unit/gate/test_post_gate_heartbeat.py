@@ -10,14 +10,21 @@ when there is nothing else to touch.
 
 from __future__ import annotations
 
-import json
-import os
-import shutil
-import subprocess
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+import sys
 
 import pytest
+
+# Guard: skip this entire module on Windows — shell scripts require POSIX.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32", reason="POSIX shell scripts not available on Windows"
+)
+
+import json  # noqa: E402
+import os  # noqa: E402
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+from datetime import UTC, datetime, timedelta  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 _PKG_SCRIPTS = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public" / "scripts"
 POST_GATE = _PKG_SCRIPTS / "sdd-post-gate.sh"

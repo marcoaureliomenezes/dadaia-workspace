@@ -1,6 +1,8 @@
 """Unit tests for container.py builder functions."""
 
 import json
+import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -161,3 +163,69 @@ def test_build_panel_service_succeeds_when_initialized(tmp_path: Path) -> None:
 
     svc = container.build_panel_service(tmp_path)
     assert isinstance(svc, PanelService)
+
+
+# ---------------------------------------------------------------------------
+# Platform adapter selection — T-018-08
+# ---------------------------------------------------------------------------
+
+
+def test_select_lock_adapter_returns_posix_when_has_fcntl(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With has_fcntl=True, _select_lock_adapter() returns the POSIX adapter module.
+
+    Monkeypatches PLATFORM so the test is platform-neutral (runs on Linux).
+    Does NOT use importorskip — this test exercises the selection logic directly.
+    """
+    from dadaia_workspace.core.platform import Capabilities
+
+    posix_caps = Capabilities.detect("linux")
+    assert posix_caps.has_fcntl is True  # pre-condition
+
+    monkeypatch.setattr("dadaia_workspace.container.PLATFORM", posix_caps, raising=False)
+    # Ensure the PLATFORM import inside _select_lock_adapter sees the patch.
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", posix_caps)
+
+    import dadaia_workspace.infrastructure.file_lock_posix as _posix_mod
+
+    adapter = container._select_lock_adapter()
+    assert adapter is _posix_mod, (
+        f"Expected file_lock_posix adapter, got {adapter!r}. "
+        "Container must route to POSIX adapter when PLATFORM.has_fcntl is True."
+    )
+
+
+def test_select_lock_adapter_returns_windows_when_not_has_fcntl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With has_fcntl=False, _select_lock_adapter() returns the Windows adapter module.
+
+    Monkeypatches PLATFORM to simulate Windows capabilities, and injects a fake
+    'dadaia_workspace.infrastructure.file_lock_windows' module into sys.modules to
+    prevent the module-level Windows platform guard from raising on Linux.
+    """
+    from dadaia_workspace.core.platform import Capabilities
+
+    win_caps = Capabilities.detect("win32")
+    assert win_caps.has_fcntl is False  # pre-condition
+
+    # Inject a stub module so the import inside _select_lock_adapter does not hit
+    # the PlatformCapabilityError guard (which fires on non-Windows at import time).
+    _fake_windows_mod = types.ModuleType("dadaia_workspace.infrastructure.file_lock_windows")
+    _fake_windows_mod.__spec__ = None  # type: ignore[attr-defined]
+
+    module_key = "dadaia_workspace.infrastructure.file_lock_windows"
+    original = sys.modules.pop(module_key, None)
+    sys.modules[module_key] = _fake_windows_mod
+    try:
+        monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", win_caps)
+
+        adapter = container._select_lock_adapter()
+        assert adapter is _fake_windows_mod, (
+            f"Expected file_lock_windows adapter, got {adapter!r}. "
+            "Container must route to Windows adapter when PLATFORM.has_fcntl is False."
+        )
+    finally:
+        # Restore sys.modules to its pre-test state.
+        sys.modules.pop(module_key, None)
+        if original is not None:
+            sys.modules[module_key] = original

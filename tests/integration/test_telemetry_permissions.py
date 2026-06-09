@@ -7,17 +7,27 @@ Verifies that:
 Uses tmp_path to avoid touching the real ~/.dadaia/state/telemetry/ directory.
 All readers and the aggregator are replaced with in-process stubs so no real
 operator data is read and no network calls are made.
+
+Mode-bit assertions (T-018-08 / SE MINOR-1): mode-bit checks use
+``skipif sys.platform == 'win32'`` because ``os.chmod`` is a no-op on Windows.
 """
 
 from __future__ import annotations
 
-import pathlib
-import sqlite3
-from datetime import date
-from typing import Any
+import sys
 
-from dadaia_workspace.features.telemetry.service import TelemetryService
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
+# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import pytest
+
+pytest.importorskip("fcntl")
+
+import pathlib  # noqa: E402
+import sqlite3  # noqa: E402
+from datetime import date  # noqa: E402
+from typing import Any  # noqa: E402
+
+from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
+from dadaia_workspace.features.telemetry.store.dao import TelemetryDao  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Stubs — same pattern as tests/unit/features/telemetry/test_service.py
@@ -99,6 +109,7 @@ def _make_service_on_disk(
 
 
 class TestTelemetryDirectoryPermissions:
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
     def test_state_dir_created_with_0o700(self, tmp_path: pathlib.Path) -> None:
         """After construction, state_dir mode must be 0o700 (owner rwx only)."""
         state_dir = tmp_path / "telemetry"
@@ -113,6 +124,7 @@ class TestTelemetryDirectoryPermissions:
             "Directory must be restricted to owning user only."
         )
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
     def test_state_dir_mode_after_existing_dir(self, tmp_path: pathlib.Path) -> None:
         """If state_dir already exists with wrong perms, constructor fixes them to 0o700."""
         state_dir = tmp_path / "telemetry"
@@ -129,6 +141,7 @@ class TestTelemetryDirectoryPermissions:
 
 
 class TestTelemetrySQLitePermissions:
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
     def test_sqlite_file_created_with_0o600(self, tmp_path: pathlib.Path) -> None:
         """After refresh(), the SQLite DB file must have mode 0o600 (owner rw only)."""
         state_dir = tmp_path / "telemetry"
@@ -144,6 +157,7 @@ class TestTelemetrySQLitePermissions:
             "Database file must be restricted to owning user only."
         )
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
     def test_sqlite_mode_idempotent_on_second_refresh(self, tmp_path: pathlib.Path) -> None:
         """Calling refresh() twice keeps the SQLite file at 0o600."""
         import os

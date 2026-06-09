@@ -77,7 +77,7 @@ def _load_session(sessions_dir: Path, session_id: str) -> dict[str, Any] | None:
     if not session_file.exists():
         return None
     try:
-        data: dict[str, Any] = json.loads(session_file.read_text())
+        data: dict[str, Any] = json.loads(session_file.read_text(encoding="utf-8"))
         return data
     except (json.JSONDecodeError, OSError):
         return None
@@ -332,7 +332,7 @@ def bind(
     try:
         with workspace_lock(workspace_root):
             session_file = sessions_dir / f"{session_id}.json"
-            session_file.write_text(json.dumps(session_data, indent=2))
+            session_file.write_text(json.dumps(session_data, indent=2), encoding="utf-8")
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

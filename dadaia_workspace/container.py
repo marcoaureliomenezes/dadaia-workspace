@@ -1,14 +1,15 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
-from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
@@ -63,10 +64,84 @@ from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateSto
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
+
+
+def _build_permission_setter() -> Any:
+    """Return the appropriate FilePermissionSetter for the current platform.
+
+    Reads ``PLATFORM.has_posix_chmod`` (the sole authorized platform capability
+    flag) and returns the POSIX adapter on platforms with effective chmod, or the
+    Windows ``icacls`` adapter otherwise.  The import is lazy so that importing
+    ``container`` never triggers the Windows module's guard on Linux/macOS.
+
+    Returns:
+        ``PosixFilePermissionSetter`` when ``PLATFORM.has_posix_chmod`` is ``True``,
+        or ``WindowsFilePermissionSetter`` when ``False``.
+    """
+    from dadaia_workspace.core.platform import PLATFORM
+
+    if PLATFORM.has_posix_chmod:
+        from dadaia_workspace.infrastructure.file_permission_posix import (
+            PosixFilePermissionSetter,
+        )
+
+        return PosixFilePermissionSetter()
+    from dadaia_workspace.infrastructure.file_permission_windows import (
+        WindowsFilePermissionSetter,
+    )
+
+    return WindowsFilePermissionSetter()
+
+
+def _select_lock_adapter() -> Any:
+    """Return the appropriate file-lock adapter module for the current platform.
+
+    Reads ``PLATFORM.has_fcntl`` (the sole authorized platform capability flag)
+    and returns the POSIX adapter on platforms that provide ``fcntl``, or the
+    Windows adapter otherwise.  The import is lazy so that importing
+    ``container`` never triggers the Windows module's guard on Linux/macOS.
+
+    Returns:
+        The adapter module: ``infrastructure.file_lock_posix`` when
+        ``PLATFORM.has_fcntl`` is ``True``, or
+        ``infrastructure.file_lock_windows`` when ``False``.
+    """
+    from dadaia_workspace.core.platform import PLATFORM
+
+    if PLATFORM.has_fcntl:
+        import dadaia_workspace.infrastructure.file_lock_posix as _adapter
+    else:
+        import dadaia_workspace.infrastructure.file_lock_windows as _adapter  # type: ignore[no-redef]
+    return _adapter
+
+
+def build_shutdown_handler() -> Any:
+    """Return the appropriate ShutdownHandler for the current platform.
+
+    Interim ``sys.platform`` guard inside the function body (not at module
+    level).  Post-TODO, replace the branch condition with
+    ``PLATFORM.has_sigterm`` once the PLATFORM flag is wired.
+
+    Returns:
+        ``PosixSignalShutdownHandler`` on Linux / macOS (SIGTERM + SIGINT),
+        or ``WindowsSignalShutdownHandler`` on Windows (SIGINT only).
+    """
+    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_sigterm once PLATFORM flag added
+        from dadaia_workspace.infrastructure.signal_shutdown_windows import (
+            WindowsSignalShutdownHandler,
+        )
+
+        return WindowsSignalShutdownHandler()
+    from dadaia_workspace.infrastructure.signal_shutdown_posix import (
+        PosixSignalShutdownHandler,
+    )
+
+    return PosixSignalShutdownHandler()
 
 
 def _states_dir(workspace_root: Path) -> Path:

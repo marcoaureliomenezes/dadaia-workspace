@@ -1628,6 +1628,7 @@ class TestClassifyWorkflows:
 
 class TestConfigGenerators:
     def test_codex_hooks_structure(self, tmp_path: Path) -> None:
+        # T-018-17: hook commands are now Python module invocations, not .sh paths.
         manager = FileSystemPublicAssetManager()
         config = manager._codex_hooks(tmp_path)
         assert "hooks" in config
@@ -1639,15 +1640,19 @@ class TestConfigGenerators:
         assert len(matchers) > 0
         assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
         assert matchers[0]["hooks"][0]["type"] == "command"
-        assert str(matchers[0]["hooks"][0]["command"]).endswith("sdd-spec-gate.sh")
-        # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
+        sdd_gate_cmd = str(matchers[0]["hooks"][0]["command"])
+        assert "dadaia_workspace.hooks.sdd_gate" in sdd_gate_cmd
+        assert "sdd-spec-gate.sh" not in sdd_gate_cmd
+        # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module
         assert "PostToolUse" in hooks
         post_matchers = hooks["PostToolUse"]
         assert isinstance(post_matchers, list)
         assert len(post_matchers) > 0
         assert post_matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
         assert post_matchers[0]["hooks"][0]["type"] == "command"
-        assert str(post_matchers[0]["hooks"][0]["command"]).endswith("sdd-post-gate.sh")
+        post_cmd = str(post_matchers[0]["hooks"][0]["command"])
+        assert "dadaia_workspace.hooks.sdd_post_gate" in post_cmd
+        assert "sdd-post-gate.sh" not in post_cmd
         assert "UserPromptSubmit" in hooks
         prompt_matchers = hooks["UserPromptSubmit"]
         assert isinstance(prompt_matchers, list)
@@ -1655,11 +1660,13 @@ class TestConfigGenerators:
         assert prompt_matchers[0]["hooks"][0]["type"] == "command"
         prompt_command = str(prompt_matchers[0]["hooks"][0]["command"])
         assert prompt_command.startswith("DADAIA_HOOK_OUTPUT=codex-json ")
-        assert prompt_command.endswith("ctx-inject.sh")
+        assert "dadaia_workspace.hooks.ctx_inject" in prompt_command
+        assert "ctx-inject.sh" not in prompt_command
 
     def test_codex_hooks_wire_sessionstart(self, tmp_path: Path) -> None:
         """T-016-C01: Codex SessionStart carries context once per session
-        (matcher startup|resume), routed through ctx-inject in SessionStart mode."""
+        (matcher startup|resume), routed through ctx-inject in SessionStart mode.
+        T-018-17: command is now Python module invocation, not .sh path."""
         manager = FileSystemPublicAssetManager()
         hooks = manager._codex_hooks(tmp_path)["hooks"]
         assert "SessionStart" in hooks
@@ -1669,24 +1676,28 @@ class TestConfigGenerators:
         cmd = str(ss[0]["hooks"][0]["command"])
         assert "DADAIA_HOOK_EVENT=SessionStart" in cmd
         assert "DADAIA_HOOK_OUTPUT=codex-json" in cmd
-        assert cmd.endswith("ctx-inject.sh")
+        assert "dadaia_workspace.hooks.ctx_inject" in cmd
+        assert "ctx-inject.sh" not in cmd
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
+        # T-018-17: hook commands are now Python module invocations, not .sh paths.
         manager = FileSystemPublicAssetManager()
         settings = manager._claude_settings(tmp_path)
         assert "hooks" in settings
         assert "PreToolUse" in settings["hooks"]
         assert "UserPromptSubmit" in settings["hooks"]
-        # AC-T13-10: PostToolUse must be present and point to sdd-post-gate.sh
+        # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module
         assert "PostToolUse" in settings["hooks"]
         post_hooks = settings["hooks"]["PostToolUse"]
         assert isinstance(post_hooks, list)
         assert len(post_hooks) > 0
         commands = [h["command"] for h in post_hooks[0]["hooks"]]
-        assert any(str(c).endswith("sdd-post-gate.sh") for c in commands)
+        assert any("dadaia_workspace.hooks.sdd_post_gate" in str(c) for c in commands)
+        assert not any("sdd-post-gate.sh" in str(c) for c in commands)
 
     def test_claude_settings_root_whitelist_gate_present(self, tmp_path: Path) -> None:
-        """T-SANI-01: root-whitelist-gate.sh must be registered as a PreToolUse hook."""
+        """T-SANI-01: root-whitelist hook must be registered as a PreToolUse hook.
+        T-018-17: command is now Python module invocation, not .sh path."""
         manager = FileSystemPublicAssetManager()
         settings = manager._claude_settings(tmp_path)
         pre_tool_use = settings["hooks"]["PreToolUse"]
@@ -1694,12 +1705,16 @@ class TestConfigGenerators:
         all_commands = [
             str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
-        assert any(cmd.endswith("root-whitelist-gate.sh") for cmd in all_commands), (
-            "root-whitelist-gate.sh not found in claude settings PreToolUse hooks"
+        assert any("dadaia_workspace.hooks.root_whitelist" in cmd for cmd in all_commands), (
+            "dadaia_workspace.hooks.root_whitelist not found in claude settings PreToolUse hooks"
+        )
+        assert not any("root-whitelist-gate.sh" in cmd for cmd in all_commands), (
+            "stale root-whitelist-gate.sh still present in claude settings PreToolUse hooks"
         )
 
     def test_codex_hooks_root_whitelist_gate_present(self, tmp_path: Path) -> None:
-        """T-SANI-01: root-whitelist-gate.sh must be registered as a Codex PreToolUse hook."""
+        """T-SANI-01: root-whitelist hook must be registered as a Codex PreToolUse hook.
+        T-018-17: command is now Python module invocation, not .sh path."""
         manager = FileSystemPublicAssetManager()
         config = manager._codex_hooks(tmp_path)
         pre_tool_use = config["hooks"]["PreToolUse"]
@@ -1707,8 +1722,11 @@ class TestConfigGenerators:
         all_commands = [
             str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
-        assert any(cmd.endswith("root-whitelist-gate.sh") for cmd in all_commands), (
-            "root-whitelist-gate.sh not found in codex hooks PreToolUse hooks"
+        assert any("dadaia_workspace.hooks.root_whitelist" in cmd for cmd in all_commands), (
+            "dadaia_workspace.hooks.root_whitelist not found in codex hooks PreToolUse hooks"
+        )
+        assert not any("root-whitelist-gate.sh" in cmd for cmd in all_commands), (
+            "stale root-whitelist-gate.sh still present in codex hooks PreToolUse hooks"
         )
 
     def test_codex_force_install_removes_stale_agents_and_workflows(self, tmp_path: Path) -> None:

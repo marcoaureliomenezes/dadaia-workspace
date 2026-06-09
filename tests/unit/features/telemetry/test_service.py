@@ -14,9 +14,11 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.service import TelemetryService
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+pytest.importorskip("fcntl")
+
+from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
+from dadaia_workspace.features.telemetry.store.dao import TelemetryDao  # noqa: E402
+from dadaia_workspace.features.telemetry.store.schema import apply_migrations  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -80,6 +82,22 @@ class _FakeAggregator:
         return []
 
 
+class _FakeRefreshLock:
+    """Fake TelemetryRefreshLock that always acquires successfully."""
+
+    def __init__(self, *, always_fail: bool = False) -> None:
+        self.acquire_call_count = 0
+        self.release_call_count = 0
+        self._always_fail = always_fail
+
+    def try_acquire(self, lock_path: str) -> bool:
+        self.acquire_call_count += 1
+        return not self._always_fail
+
+    def release(self) -> None:
+        self.release_call_count += 1
+
+
 # ---------------------------------------------------------------------------
 # Helper to build a service with injectable parts
 # ---------------------------------------------------------------------------
@@ -93,6 +111,7 @@ def _make_service(
     aggregator: Any | None = None,
     claude_reader: _FakeClaudeReader | None = None,
     codex_reader: _FakeCodexReader | None = None,
+    refresh_lock: Any | None = None,
     now_fn: Any = None,
     getuid_fn: Any = None,
 ) -> tuple[TelemetryService, _FakeClaudeReader, _FakeCodexReader]:
@@ -122,6 +141,7 @@ def _make_service(
         workspace_root=workspace_root,
         state_dir=state_dir,
         spec_context_service=_FakeSCS(),
+        refresh_lock=refresh_lock,
         _now_fn=now_fn,
         _getuid_fn=getuid_fn,
     )
@@ -284,3 +304,40 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
     row = conn.execute("SELECT cost_micro_usd FROM events WHERE event_id = 'ev-abc'").fetchone()
     assert row[0] is not None
     assert row[0] > 0
+
+
+def test_refresh_lock_di_injected_is_used(tmp_path: pathlib.Path) -> None:
+    """Injected refresh_lock is called on refresh() — not the default platform adapter."""
+    fake_lock = _FakeRefreshLock()
+
+    svc, cr, _ = _make_service(
+        state_dir=tmp_path / "state",
+        workspace_root=tmp_path,
+        refresh_lock=fake_lock,
+    )
+
+    svc.refresh()
+
+    assert fake_lock.acquire_call_count == 1, (
+        "refresh_lock.try_acquire must be called exactly once per refresh()"
+    )
+    assert fake_lock.release_call_count == 1, (
+        "refresh_lock.release must be called once (in finally block)"
+    )
+
+
+def test_refresh_lock_di_fail_skips_readers(tmp_path: pathlib.Path) -> None:
+    """When injected refresh_lock returns False, readers are not called."""
+    fake_lock = _FakeRefreshLock(always_fail=True)
+
+    svc, cr, cdx = _make_service(
+        state_dir=tmp_path / "state",
+        workspace_root=tmp_path,
+        refresh_lock=fake_lock,
+    )
+
+    svc.refresh()
+
+    assert cr.call_count == 0, "readers must NOT run when lock acquire fails"
+    assert cdx.call_count == 0, "readers must NOT run when lock acquire fails"
+    assert fake_lock.release_call_count == 0, "release must NOT be called when acquire fails"

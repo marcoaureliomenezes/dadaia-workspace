@@ -17,6 +17,7 @@ Tests cover:
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -265,6 +266,7 @@ def test_state_store_file_is_valid_json(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.kill semantics differ on Windows")
 def test_subprocess_launcher_is_alive_false_for_dead_pid() -> None:
     """is_alive() must return False for a PID that definitely doesn't exist."""
     launcher = SubprocessWorkflowLauncher()
@@ -278,6 +280,7 @@ def test_subprocess_launcher_is_alive_false_for_dead_pid() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.kill semantics differ on Windows")
 def test_subprocess_launcher_is_alive_true_for_self() -> None:
     """is_alive() must return True for the current process's PID."""
     import os
