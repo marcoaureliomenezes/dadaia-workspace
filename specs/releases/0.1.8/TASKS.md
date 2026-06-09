@@ -92,7 +92,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   test file; `_acquire_flock` tested via `infrastructure/file_lock_posix` import or via
   public `workspace_lock`/`context_lock` API only; pytest green on Linux.
 
-### [-] T-018-06 — Step 3c: UPDATE `telemetry/service.py` — remove `import fcntl`, fix getuid, chmod guard, DI refresh_lock wiring
+### [x] T-018-06 — Step 3c: UPDATE `telemetry/service.py` — remove `import fcntl`, fix getuid, chmod guard, DI refresh_lock wiring
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/features/telemetry/service.py`
