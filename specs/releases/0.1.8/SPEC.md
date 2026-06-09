@@ -429,3 +429,23 @@ Windows-matrix jobs.
    adapter's docstring.
 5. **macOS green runs** — `continue-on-error` for macOS throughout alpha. If macOS
    reveals unexpected gaps, a follow-up hotfix before Phase-3 graduation is the path.
+
+## rc-1 review record (2026-06-09)
+
+Ship-trio review of the 0.1.8 implementation (feature/0.1.8 HEAD 9a0462c) — **unanimous APPROVE**:
+- **security-reviewer — APPROVE.** All 6 mandatory invariants verified with test evidence: CWE-732
+  (panel token Tier-1 fail-loud, TOCTOU closed), CWE-78 (icacls shell=False + getpass.getuser),
+  SEC-01 PROTECTED (`.dadaia/sessions/**` fail-closed before fail-open, atomic same-commit 73bbb96),
+  Windows lock raises (never silent no-op), rc-4 lock-correctness preserved (PATH-first context +
+  once-per-session sentinel), no secret/PII leakage (`[ok] public-privacy`). 0 production CVEs.
+  Cleared T-018-15, T-018-16, T-018-10 to `[x]`. (Open: devtool CVEs LOW; ctx_inject `.ptr` best-effort INFO.)
+- **code-reviewer — APPROVE.** Layering fidelity (import-linter 2 kept/0 broken; core/platform.py sole
+  sys.platform site); dead-code kill list confirmed removed (panel server.py dead funcs, _dump
+  duplicates, OsProcessProbe moved). One finding (panel auth no-setter `os.chmod` fallback silent
+  no-op on Windows, latent CWE-732) FIXED in 9a0462c (raises PlatformSecurityError; +regression test);
+  remaining os.chmod sites are Tier-2 (ADR-4) or executability bits — acceptable.
+- **qa-engineer — APPROVE.** Full suite 2506 passed / 8 skipped (Windows-runner-only) / 2 xpassed;
+  ruff + mypy --strict (213 files) + lint-imports clean; new tests genuine (no slop); CI
+  importability-smoke green on windows-latest + macos-latest; Phase-2 matrix present; ubuntu hard-gate intact.
+
+rc-1 is **ship-ready** pending the operator-requested audit + CLOSURE.

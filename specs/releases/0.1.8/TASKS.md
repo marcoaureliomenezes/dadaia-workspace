@@ -308,7 +308,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
 
 ## Segment alpha-3 — Step 10 (Python hooks + CI Phase 2/3 graduation)
 
-### [-] T-018-15 — Step 10a: UPDATE `gate_policy.py` PROTECTED class [SEC] (atomic with T-018-16)
+### [x] T-018-15 — Step 10a: UPDATE `gate_policy.py` PROTECTED class [SEC] (atomic with T-018-16)
 - **Owner:** software-engineer
 - **Security sign-off required:** security-reviewer must approve T-018-15 + T-018-16 together before either is `[x]`
 - **Write set:**
@@ -324,7 +324,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   for PROTECTED; SEC-01 message matches `sdd-spec-gate.sh:122` verbatim; committed atomically
   with `hooks/sdd_gate.py` (neither file alone is a valid commit); security sign-off recorded.
 
-### [-] T-018-16 — Step 10b: ADD `dadaia_workspace/hooks/` Python package (6 modules) + unit tests [SEC]
+### [x] T-018-16 — Step 10b: ADD `dadaia_workspace/hooks/` Python package (6 modules) + unit tests [SEC]
 - **Owner:** ai-engineer
 - **Security sign-off required:** (shared with T-018-15 — same security-reviewer sign-off gate)
 - **Note:** `pre_push_ci.py` is NOT included in this package (descoped per orchestrator decision; `.sh` pre-push hook retained). 6 modules: `__init__`, `_common`, `sdd_gate`, `root_whitelist`, `ctx_inject`, `sdd_post_gate`.
@@ -436,14 +436,14 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   `dadaia public doctor` exit 0; `dadaia specs doctor` 0 ERROR; full pytest suite green
   locally on Linux (≥ 2291 tests).
 
-### [ ] T-018-23 — qa-engineer alpha segment review + commit
+### [x] T-018-23 — qa-engineer alpha segment review + commit
 - **Owner:** qa-engineer
 - **Write set:** review report in `.dadaia/reports/dadaia-workspace/qa-engineer/`
 - **Precondition:** T-018-22 `[x]`
 - **Done criterion:** qa-engineer reviews full `feature/0.1.8` diff; emits handoff JSON;
   commits review on feature branch (no push, no PR — alpha cadence).
 
-### [ ] T-018-24 — security-reviewer rc-1 review [SEC]
+### [x] T-018-24 — security-reviewer rc-1 review [SEC]
 - **Owner:** security-reviewer
 - **Write set:** review report in `.dadaia/reports/dadaia-workspace/security-reviewer/`
 - **Precondition:** T-018-23 `[x]`; operator elects to ship rc-1
@@ -451,7 +451,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   PROTECTED patch, `hooks/sdd_gate.py`, `WindowsFilePermissionSetter` icacls;
   verdict=APPROVED in handoff JSON.
 
-### [ ] T-018-25 — code-reviewer rc-1 review
+### [x] T-018-25 — code-reviewer rc-1 review
 - **Owner:** code-reviewer
 - **Write set:** review report in `.dadaia/reports/dadaia-workspace/code-reviewer/`
 - **Precondition:** T-018-23 `[x]`; operator elects to ship rc-1
