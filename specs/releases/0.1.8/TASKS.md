@@ -20,7 +20,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
 
 ## Segment alpha-1 — Steps 0–4 (platform seam, exceptions, layer corrections, fcntl crash, CI smoke)
 
-### [-] T-018-01 — Step 0: ADD typed platform exceptions to `core/exceptions.py`
+### [x] T-018-01 — Step 0: ADD typed platform exceptions to `core/exceptions.py`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/exceptions.py`
 - **Precondition:** none — this is the unconditional first task

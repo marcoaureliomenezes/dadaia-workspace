@@ -168,3 +168,46 @@ class LockActiveError(DadaiaError):
     AC-T12-3 (T-12): reclaim() on a fresh HELD lock raises this.
     Also used in T-11 reclaim path.
     """
+
+
+class PlatformSecurityError(DadaiaError):
+    """Raised when a security control cannot be enforced on the current platform.
+
+    Tier 1 — FAIL LOUD. This error signals a hard security violation: the
+    platform cannot satisfy the requested security guarantee (e.g. restricting
+    a file to owner-only). Silent no-ops or warnings are forbidden for Tier 1
+    controls. Callers must propagate this error without suppression.
+
+    Attributes:
+        feature_name: Logical name of the security feature that failed
+                      (e.g. ``"token_file_protection"``).
+        platform:     The ``sys.platform`` value at the point of failure
+                      (e.g. ``"win32"``).
+    """
+
+    def __init__(self, message: str, *, feature_name: str, platform: str) -> None:
+        self.feature_name = feature_name
+        self.platform = platform
+        super().__init__(message)
+
+
+class PlatformCapabilityError(DadaiaError):
+    """Raised when an OS capability required by a feature is absent on the current platform.
+
+    Tier 2/3 — DEGRADE WITH LOG or UNSUPPORTED PLATFORM at construction.
+    This error signals that the platform lacks the OS primitive needed
+    (e.g. ``fcntl`` on Windows, ``msvcrt`` on non-Windows). Consumers should
+    either degrade gracefully (Tier 2: log INFO and return a safe default)
+    or propagate (Tier 3: unsupported-platform at construction time).
+
+    Attributes:
+        feature_name: Logical name of the capability that is absent
+                      (e.g. ``"fcntl_file_lock"``).
+        platform:     The ``sys.platform`` value at the point of failure
+                      (e.g. ``"win32"``).
+    """
+
+    def __init__(self, message: str, *, feature_name: str, platform: str) -> None:
+        self.feature_name = feature_name
+        self.platform = platform
+        super().__init__(message)
