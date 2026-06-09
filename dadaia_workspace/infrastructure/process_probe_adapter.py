@@ -26,10 +26,12 @@ The previous implementation (v0.1.0) collapsed PermissionError and
 ProcessLookupError into "dead", which meant docker-proxy and other
 root-owned PIDs got swept the next time any project called ``register()``.
 
-Windows note: ``os.kill(pid, 0)`` is available on Windows (Python 3.8+),
-but PermissionError semantics differ.  The conservative "assume alive on
-PermissionError" rule is still correct: we cannot confirm death, so we
-retain the entry.
+Windows note (0.1.8 rc-2): ``os.kill(pid, 0)`` is NOT used on Windows. CPython
+implements ``os.kill`` there as ``OpenProcess(PROCESS_ALL_ACCESS)`` +
+``TerminateProcess(handle, sig)``, so calling it as a liveness probe would *kill*
+the target, and a missing PID raises ERROR_INVALID_PARAMETER rather than ESRCH.
+Windows therefore probes liveness with a read-only ``OpenProcess`` existence check
+(``_is_pid_alive_windows``), selected via the ``PLATFORM.has_os_kill_liveness`` seam.
 """
 
 import logging
@@ -98,6 +100,16 @@ class OsProcessProbe:
         error_access_denied = 5
         still_active = 259
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+        # Declare restype/argtypes explicitly: a Windows HANDLE is pointer-sized
+        # (64-bit on Win64), but ctypes defaults the return type to c_int (32-bit
+        # signed), which would truncate the handle and make CloseHandle close the
+        # wrong/invalid handle (handle leak). c_void_p is pointer-sized.
+        kernel32.OpenProcess.restype = ctypes.c_void_p
+        kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+        kernel32.GetExitCodeProcess.restype = ctypes.c_int
+        kernel32.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+        kernel32.CloseHandle.restype = ctypes.c_int
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
         handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
         if not handle:
             last_error = ctypes.get_last_error()  # type: ignore[attr-defined]

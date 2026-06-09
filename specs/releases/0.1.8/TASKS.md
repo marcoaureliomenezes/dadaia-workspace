@@ -503,13 +503,13 @@ and T-018-28 (tests) may both be `[-]` concurrently.
   POSIX-gated; markdown-store OSError tests force OSError via monkeypatch (run on every OS);
   new contract test proves `write_generated` is idempotent (skip) across newline conventions.
 
-### [ ] T-018-29 — Push feature/0.1.8; iterate Windows CI to green
+### [x] T-018-29 — Push feature/0.1.8; iterate Windows CI to green
 - **Owner:** software-engineer
 - **Write set:** none (CI observation + fix loop feeding T-018-27/28)
 - **Done criterion:** `unit-fast-cross` + `contract-coverage-cross` report **0 failed / exit 0**
   on windows-latest AND macos-latest on a named feature/0.1.8 run (recorded in CLOSURE).
 
-### [ ] T-018-30 — Graduate CI, real-Windows adapters, broaden classifier [SEC]
+### [x] T-018-30 — Graduate CI, real-Windows adapters, broaden classifier [SEC]
 - **Owner:** software-engineer
 - **Write set:**
   - `.github/workflows/ci.yml`
@@ -520,7 +520,7 @@ and T-018-28 (tests) may both be `[-]` concurrently.
   a Windows-runner path exercises `msvcrt` locks + `icacls` permission setter for real;
   classifier advertises macOS + Windows; classifier contract test updated and green.
 
-### [ ] T-018-31 — rc-2 reviews + audit + CLOSURE + PR
+### [-] T-018-31 — rc-2 reviews + audit + CLOSURE + PR
 - **Owner:** product-engineer (coordinated by project-manager)
 - **Write set:**
   - `specs/releases/0.1.8/CLOSURE.md`
