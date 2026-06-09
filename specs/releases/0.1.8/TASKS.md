@@ -28,7 +28,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   added with `feature_name: str` and `platform: str` attributes + docstrings stating their tier;
   mypy --strict passes; pytest green.
 
-### [-] T-018-02 — Step 1: ADD `core/platform.py` platform seam + unit tests
+### [x] T-018-02 — Step 1: ADD `core/platform.py` platform seam + unit tests
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/platform.py` (NEW),
   `tests/unit/core/test_platform.py` (NEW)
