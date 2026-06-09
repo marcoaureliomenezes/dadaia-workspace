@@ -36,6 +36,13 @@ _EMPTY_SERVER_REGISTRY = {
     "entries": [],
 }
 
+# Legacy ctx-inject.sh basename — used to detect stale registrations that must
+# be superseded (replaced) by the new Python hook command (T-018-17).
+_CTX_INJECT_SH_BASENAME = "ctx-inject.sh"
+
+# Canonical Python module for the ctx-inject hook (T-018-17).
+_CTX_INJECT_MODULE = "dadaia_workspace.hooks.ctx_inject"
+
 
 class WorkspaceService:
     def __init__(
@@ -105,7 +112,9 @@ class WorkspaceService:
             dest.chmod(0o755)
 
     def _configure_hook(self, workspace: Workspace) -> None:
-        hook_command = str(workspace.dadaia_dir / "scripts" / "ctx-inject.sh")
+        # T-018-17: emit the Python hook command instead of the .sh path.
+        hook_command = self._canonical_hook_command(workspace)
+
         # Canonical Claude Code hook schema: a matcher entry carrying a nested
         # `hooks` array. This is the same schema `public_assets.py` writes, so
         # the two paths agree and never produce a malformed duplicate entry.
@@ -127,17 +136,84 @@ class WorkspaceService:
 
         hooks = settings.setdefault("hooks", {})
         existing = hooks.get(_HOOK_KEY, [])
+
+        # T-018-17: SUPERSEDE — replace stale .sh entries with the canonical Python command.
+        # If the Python command is already registered, skip. If a stale .sh entry exists,
+        # replace it. Otherwise append.
         if self._hook_command_present(existing, hook_command):
+            # Already up-to-date — nothing to do.
             return
-        hooks[_HOOK_KEY] = existing + [hook_entry]
+
+        updated = self._supersede_stale_sh(existing, hook_entry)
+        hooks[_HOOK_KEY] = updated
         settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
     @staticmethod
+    def _canonical_hook_command(workspace: Workspace) -> str:
+        """Return the canonical ctx-inject hook command for *workspace* (Python module form)."""
+        import sys
+
+        from dadaia_workspace.core.platform import PLATFORM
+
+        venv_python = (
+            workspace.dadaia_dir
+            / ".venv"
+            / PLATFORM.venv_scripts_dir
+            / f"python{PLATFORM.venv_exe_suffix}"
+        )
+        if venv_python.is_file():
+            python_bin = str(venv_python)
+        elif sys.executable:
+            python_bin = sys.executable
+        else:
+            python_bin = "python"
+        return f"{python_bin} -m {_CTX_INJECT_MODULE}"
+
+    @staticmethod
+    def _supersede_stale_sh(
+        existing: object,
+        new_entry: dict,  # type: ignore[type-arg]
+    ) -> list:  # type: ignore[type-arg]
+        """Replace any stale ctx-inject.sh entry in *existing* with *new_entry*.
+
+        If no stale `.sh` entry is found, appends *new_entry*. This ensures the
+        projection SUPERSEDES (replaces) a stale `.sh` registration rather than
+        appending a second hook (T-018-17 done-criterion: not appends).
+        """
+        if not isinstance(existing, list):
+            return [new_entry]
+
+        result = []
+        replaced = False
+        for entry in existing:
+            if not isinstance(entry, dict):
+                result.append(entry)
+                continue
+            if _is_stale_sh_entry(entry):
+                if not replaced:
+                    result.append(new_entry)
+                    replaced = True
+                # Drop the stale entry (or extra duplicates of the new one already added)
+                continue
+            result.append(entry)
+        if not replaced:
+            result.append(new_entry)
+        return result
+
+    @staticmethod
     def _hook_command_present(existing: object, hook_command: str) -> bool:
-        """True if ``hook_command`` is already registered, in either the nested
-        canonical schema (``entry["hooks"][i]["command"]``) or the legacy flat
-        schema (``entry["command"]``). Detecting both prevents the duplicate
-        malformed entry that broke Claude Code settings validation."""
+        """True if ``hook_command`` is already registered.
+
+        Detects the command in either the nested canonical schema
+        (``entry["hooks"][i]["command"]``) or the legacy flat schema
+        (``entry["command"]``). Also recognizes the stale ``.sh`` path as
+        "present" to avoid double-appending — use ``_supersede_stale_sh`` to
+        replace it with the Python command.
+
+        T-018-17: also checks whether *hook_command* is the Python ctx-inject
+        command and if so, recognizes the old `.sh` path as "already handled"
+        so callers that only need a presence check (not supersede) work correctly.
+        """
         if not isinstance(existing, list):
             return False
         for entry in existing:
@@ -151,3 +227,18 @@ class WorkspaceService:
             ):
                 return True
         return False
+
+
+def _is_stale_sh_entry(entry: dict) -> bool:  # type: ignore[type-arg]
+    """Return True if *entry* references the legacy ctx-inject.sh command."""
+    # Check nested schema (canonical)
+    nested = entry.get("hooks")
+    if isinstance(nested, list):
+        for h in nested:
+            if isinstance(h, dict):
+                cmd = str(h.get("command", ""))
+                if cmd.endswith(_CTX_INJECT_SH_BASENAME) or _CTX_INJECT_SH_BASENAME in cmd:
+                    return True
+    # Check legacy flat schema
+    cmd = str(entry.get("command", ""))
+    return cmd.endswith(_CTX_INJECT_SH_BASENAME) or _CTX_INJECT_SH_BASENAME in cmd
