@@ -1,5 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -117,6 +118,30 @@ def _select_lock_adapter() -> Any:
     else:
         import dadaia_workspace.infrastructure.file_lock_windows as _adapter  # type: ignore[no-redef]
     return _adapter
+
+
+def build_shutdown_handler() -> Any:
+    """Return the appropriate ShutdownHandler for the current platform.
+
+    Interim ``sys.platform`` guard inside the function body (not at module
+    level).  Post-TODO, replace the branch condition with
+    ``PLATFORM.has_sigterm`` once the PLATFORM flag is wired.
+
+    Returns:
+        ``PosixSignalShutdownHandler`` on Linux / macOS (SIGTERM + SIGINT),
+        or ``WindowsSignalShutdownHandler`` on Windows (SIGINT only).
+    """
+    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_sigterm once PLATFORM flag added
+        from dadaia_workspace.infrastructure.signal_shutdown_windows import (
+            WindowsSignalShutdownHandler,
+        )
+
+        return WindowsSignalShutdownHandler()
+    from dadaia_workspace.infrastructure.signal_shutdown_posix import (
+        PosixSignalShutdownHandler,
+    )
+
+    return PosixSignalShutdownHandler()
 
 
 def _states_dir(workspace_root: Path) -> Path:

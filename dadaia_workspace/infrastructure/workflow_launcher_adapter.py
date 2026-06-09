@@ -1,30 +1,32 @@
-"""WorkflowLauncher infrastructure adapter — subprocess + os.kill implementation.
+"""WorkflowLauncher infrastructure adapter — subprocess + OsProcessProbe.
 
-Design (T-016-P06):
+Design (T-016-P06 / T-018-11):
   Production implementation of the WorkflowLauncher protocol.
-  subprocess.Popen and os.kill belong here — never in the features layer
+  subprocess.Popen belongs here — never in the features layer
   (constitution §6 / no-subprocess-outside-infrastructure guardrail).
 
-  Liveness semantics mirror OsProcessProbe (core/protocols/process_probe.py):
-    - ProcessLookupError → False (definitely dead)
-    - PermissionError    → True  (alive but unprobable)
-    - other OSError      → True  (conservative; log warning)
+  Liveness is now delegated to OsProcessProbe.is_pid_alive() rather than
+  inlining a duplicate os.kill probe (T-018-11 done criterion).
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
+
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 
 logger = logging.getLogger(__name__)
 
+_probe = OsProcessProbe()
+
 
 class SubprocessWorkflowLauncher:
-    """Production WorkflowLauncher using subprocess.Popen + os.kill.
+    """Production WorkflowLauncher using subprocess.Popen + OsProcessProbe.
 
-    Only this class (and test fakes) may call subprocess.Popen or os.kill
-    for workflow management.
+    Only this class (and test fakes) may call subprocess.Popen for workflow
+    management.  Process liveness is delegated to OsProcessProbe so there is
+    a single implementation of os.kill(pid, 0) semantics in the codebase.
     """
 
     def launch(
@@ -58,26 +60,8 @@ class SubprocessWorkflowLauncher:
     def is_alive(self, pid: int) -> bool:
         """Return True if process *pid* is still running.
 
-        Uses os.kill(pid, 0) — a zero-signal probe that does NOT kill the process.
-
-        Error handling mirrors OsProcessProbe:
-          - ProcessLookupError → False (process is gone)
-          - PermissionError    → True  (process exists but is owned by another user)
-          - other OSError      → True  (conservative; log warning)
+        Delegates to ``OsProcessProbe.is_pid_alive()``.  See
+        ``process_probe_adapter.py`` for the full semantics (PermissionError →
+        True, ProcessLookupError → False, other OSError → True + warning).
         """
-        try:
-            os.kill(pid, 0)
-            return True
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            # PID exists but is owned by another user — treat as alive.
-            return True
-        except OSError as exc:
-            logger.warning(
-                "WorkflowLauncher.is_alive: unexpected OSError on os.kill(%d, 0): %s"
-                " — assuming alive (conservative)",
-                pid,
-                exc,
-            )
-            return True
+        return _probe.is_pid_alive(pid)

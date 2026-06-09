@@ -216,7 +216,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   or `PlatformSecurityError` on non-zero exit); security-reviewer handoff approves before `[x]`;
   pytest green on Linux.
 
-### [-] T-018-11 — Step 6: ADD `ShutdownHandler` protocol + adapters; UPDATE `panel/server.py`; UPDATE `container.py` `build_shutdown_handler()`
+### [x] T-018-11 — Step 6: ADD `ShutdownHandler` protocol + adapters; UPDATE `panel/server.py`; UPDATE `container.py` `build_shutdown_handler()`
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/core/protocols/shutdown_handler.py` (NEW)

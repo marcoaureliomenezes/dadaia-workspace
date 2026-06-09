@@ -37,7 +37,10 @@ def test_missing_pid_is_dead() -> None:
     assert probe.is_pid_alive(99_999_999) is False
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="Test is meaningful only as non-root user")
+@pytest.mark.skipif(
+    not hasattr(os, "geteuid") or os.geteuid() == 0,
+    reason="Test is meaningful only as non-root user on POSIX",
+)
 def test_root_owned_pid_is_alive_via_permission_error() -> None:
     """PID 1 (init/systemd) is root-owned. As a non-root user, os.kill(1, 0)
     raises PermissionError. The probe MUST treat that as alive — this is the
