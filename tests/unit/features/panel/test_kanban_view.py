@@ -173,7 +173,7 @@ def _make_handler(
 
 
 def test_kanban_schema_all_four_columns_present(tmp_path: Path) -> None:
-    """Response has swimlanes, generated_at, and all four column lists."""
+    """Response has swimlanes, generated_at, and all four canonical §7 column lists."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_001", mode="READ")
 
@@ -188,13 +188,17 @@ def test_kanban_schema_all_four_columns_present(tmp_path: Path) -> None:
     # At least one swimlane for the context.
     assert len(data["swimlanes"]) == 1
     columns = data["swimlanes"][0]["columns"]
-    for key in ("research", "spec", "implementation", "review"):
+    for key in ("backlog", "release_def", "impl_review", "closure"):
         assert key in columns, f"Column key {key!r} missing"
         assert isinstance(columns[key], list), f"Column {key!r} is not a list"
 
 
 def test_kanban_modes_land_in_expected_columns(tmp_path: Path) -> None:
-    """Supported session modes land in their expected kanban columns."""
+    """Supported session modes land in their canonical §7 kanban columns.
+
+    READ → backlog; SPEC → release_def;
+    BOUND_IMPLEMENTATION → impl_review; BOUND_REVIEW → impl_review (combined).
+    """
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_read", mode="READ")
     _write_session(sessions_dir, session_id="sess_spec", mode="SPEC")
@@ -207,11 +211,23 @@ def test_kanban_modes_land_in_expected_columns(tmp_path: Path) -> None:
     assert status == 200
     data = json.loads(body)
     columns = data["swimlanes"][0]["columns"]
-    assert columns["research"][0]["session_id"] == "sess_read"
-    assert columns["research"][0]["mode"] == "READ"
-    assert columns["spec"][0]["session_id"] == "sess_spec"
-    assert columns["implementation"][0]["session_id"] == "sess_impl"
-    assert columns["review"][0]["session_id"] == "sess_rev"
+
+    # READ → backlog
+    assert columns["backlog"][0]["session_id"] == "sess_read"
+    assert columns["backlog"][0]["mode"] == "READ"
+
+    # SPEC → release_def
+    assert columns["release_def"][0]["session_id"] == "sess_spec"
+    assert columns["release_def"][0]["mode"] == "SPEC"
+
+    # BOUND_IMPLEMENTATION and BOUND_REVIEW → impl_review (combined column)
+    impl_review_ids = {c["session_id"] for c in columns["impl_review"]}
+    assert "sess_impl" in impl_review_ids
+    assert "sess_rev" in impl_review_ids
+    assert len(columns["impl_review"]) == 2
+
+    # closure column is always present but empty (no session mode maps to it yet)
+    assert columns["closure"] == []
 
 
 def test_kanban_empty_or_missing_sessions_dir_returns_empty_swimlanes(tmp_path: Path) -> None:
@@ -264,13 +280,14 @@ def test_kanban_stale_and_fresh_sessions_are_flagged(tmp_path: Path) -> None:
 
     assert status == 200
     data = json.loads(body)
-    cards = {c["session_id"]: c for c in data["swimlanes"][0]["columns"]["research"]}
+    # READ sessions land in "backlog" column
+    cards = {c["session_id"]: c for c in data["swimlanes"][0]["columns"]["backlog"]}
     assert cards["sess_stale"]["is_stale"] is True
     assert cards["sess_fresh"]["is_stale"] is False
 
 
 def test_kanban_unknown_mode_excluded_or_surfaced(tmp_path: Path) -> None:
-    """Unknown mode is handled gracefully and appears in the fail-safe research column."""
+    """Unknown mode is handled gracefully and appears in the fail-safe backlog column."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_unknown", mode="SOMETHING_WEIRD")
 
@@ -279,12 +296,12 @@ def test_kanban_unknown_mode_excluded_or_surfaced(tmp_path: Path) -> None:
 
     assert status == 200
     data = json.loads(body)
-    # The card must appear somewhere — spec allows research or excluded; we map to research.
+    # The card must appear somewhere — unknown modes fall back to backlog.
     columns = data["swimlanes"][0]["columns"]
     total_cards = sum(len(v) for v in columns.values())
     assert total_cards == 1, "Unknown-mode card must not be silently dropped"
-    assert len(columns["research"]) == 1
-    assert columns["research"][0]["mode"] == "SOMETHING_WEIRD"
+    assert len(columns["backlog"]) == 1
+    assert columns["backlog"][0]["mode"] == "SOMETHING_WEIRD"
 
 
 def test_kanban_post_not_allowed(tmp_path: Path) -> None:
@@ -313,8 +330,9 @@ def test_kanban_invalid_session_files_skipped(tmp_path: Path) -> None:
     data = json.loads(body)
     assert len(data["swimlanes"]) == 1
     columns = data["swimlanes"][0]["columns"]
-    assert len(columns["research"]) == 1
-    assert columns["research"][0]["session_id"] == "sess_valid"
+    # READ → backlog
+    assert len(columns["backlog"]) == 1
+    assert columns["backlog"][0]["session_id"] == "sess_valid"
 
 
 def test_kanban_auth_enforced_unless_loopback_bypass(tmp_path: Path) -> None:
@@ -337,7 +355,10 @@ def test_kanban_auth_enforced_unless_loopback_bypass(tmp_path: Path) -> None:
 
 
 def test_kanban_session_card_shape(tmp_path: Path) -> None:
-    """SessionCard must have all required fields with correct types."""
+    """SessionCard must have all required fields with correct types.
+
+    BOUND_IMPLEMENTATION lands in the combined impl_review column.
+    """
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(
         sessions_dir,
@@ -355,7 +376,8 @@ def test_kanban_session_card_shape(tmp_path: Path) -> None:
     _status, _ct, body = view()
 
     data = json.loads(body)
-    card = data["swimlanes"][0]["columns"]["implementation"][0]
+    # BOUND_IMPLEMENTATION → impl_review (combined column)
+    card = data["swimlanes"][0]["columns"]["impl_review"][0]
 
     assert card["session_id"] == "sess_shape"
     assert card["mode"] == "BOUND_IMPLEMENTATION"
@@ -367,7 +389,10 @@ def test_kanban_session_card_shape(tmp_path: Path) -> None:
 
 
 def test_kanban_multiple_contexts_sorted(tmp_path: Path) -> None:
-    """Multiple contexts produce multiple swimlanes sorted alphabetically."""
+    """Multiple contexts produce multiple swimlanes sorted alphabetically.
+
+    Also verifies correct column placement per the new §7 lifecycle mapping.
+    """
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_z", context="z-project", mode="READ")
     _write_session(sessions_dir, session_id="sess_a", context="a-project", mode="SPEC")
@@ -382,6 +407,12 @@ def test_kanban_multiple_contexts_sorted(tmp_path: Path) -> None:
     assert contexts[0] == "a-project"
     assert contexts[-1] == "z-project"
 
+    # Verify column placement for each swimlane
+    lanes_by_ctx = {s["context"]: s["columns"] for s in data["swimlanes"]}
+    assert len(lanes_by_ctx["z-project"]["backlog"]) == 1  # READ → backlog
+    assert len(lanes_by_ctx["a-project"]["release_def"]) == 1  # SPEC → release_def
+    assert len(lanes_by_ctx["m-project"]["impl_review"]) == 1  # BOUND_REVIEW → impl_review
+
 
 def test_kanban_cards_sorted_by_session_id(tmp_path: Path) -> None:
     """Cards within a column are sorted by session_id for deterministic output."""
@@ -393,6 +424,57 @@ def test_kanban_cards_sorted_by_session_id(tmp_path: Path) -> None:
     _status, _ct, body = view()
 
     data = json.loads(body)
-    cards = data["swimlanes"][0]["columns"]["research"]
+    # READ → backlog
+    cards = data["swimlanes"][0]["columns"]["backlog"]
     ids = [c["session_id"] for c in cards]
     assert ids == sorted(ids), "Cards must be sorted by session_id"
+
+
+def test_kanban_closure_column_always_present_and_empty(tmp_path: Path) -> None:
+    """Closure column is always present in all swimlanes but always empty.
+
+    No session mode currently maps to the closure phase, so the column is
+    present-but-empty (correct design: the column is available, ready for future
+    closure-phase session modes).
+    """
+    sessions_dir = tmp_path / ".dadaia" / "sessions"
+    # Write sessions for all known modes.
+    _write_session(sessions_dir, session_id="sess_r", mode="READ")
+    _write_session(sessions_dir, session_id="sess_s", mode="SPEC")
+    _write_session(sessions_dir, session_id="sess_i", mode="BOUND_IMPLEMENTATION")
+    _write_session(sessions_dir, session_id="sess_v", mode="BOUND_REVIEW")
+
+    view = render_api_kanban(tmp_path)
+    _status, _ct, body = view()
+
+    data = json.loads(body)
+    columns = data["swimlanes"][0]["columns"]
+
+    assert "closure" in columns, "Closure column must always be present"
+    assert columns["closure"] == [], "Closure column must always be empty (no mode maps to it)"
+
+
+def test_kanban_impl_and_review_share_combined_column(tmp_path: Path) -> None:
+    """BOUND_IMPLEMENTATION and BOUND_REVIEW both appear in the impl_review column.
+
+    The XOR-lock dimming logic is retired; both modes share one combined column.
+    """
+    sessions_dir = tmp_path / ".dadaia" / "sessions"
+    _write_session(sessions_dir, session_id="sess_impl", mode="BOUND_IMPLEMENTATION")
+    _write_session(sessions_dir, session_id="sess_rev", mode="BOUND_REVIEW")
+
+    view = render_api_kanban(tmp_path)
+    _status, _ct, body = view()
+
+    data = json.loads(body)
+    columns = data["swimlanes"][0]["columns"]
+
+    # Both in impl_review
+    impl_review_ids = {c["session_id"] for c in columns["impl_review"]}
+    assert "sess_impl" in impl_review_ids
+    assert "sess_rev" in impl_review_ids
+
+    # All other columns empty
+    assert columns["backlog"] == []
+    assert columns["release_def"] == []
+    assert columns["closure"] == []

@@ -134,6 +134,8 @@ Lógica de acquire (FR-P1-15):
 
 **fcntl Lock-1/Lock-2 retidos** em `locking.py` — serializam curtas git ops no mesmo processo (workspace-level e per-context). Não são usados para mutex de release.
 
+**Staleness predicate — `core/lock_liveness.py`:** `is_stale_session(last_seen_at, ttl_seconds)` é a única fonte de verdade para decidir se uma sessão/lease está stale (TTL excedido a partir do último heartbeat). Consumido pelo reclaim-iff-stale do lease, pelo painel Kanban (`features/panel/views/kanban.py`) e por `features/spec_context/locking.py` — antes da extração (v0.1.7 / T-017-10) cada um tinha sua própria cópia do predicado `_is_stale`.
+
 ## Os 3 canais de reporte/comunicação (constitution §11)
 
 dadaia-workspace tem exatamente três canais, cada um com um único destino canônico:
@@ -265,7 +267,9 @@ Locais canônicos de estado em disco e seu propósito:
   * `specs/memory/product/catalog.json` — gerado por `generate-memory-catalog.py` a partir do frontmatter dos `.md`; committed; índice machine-readable.
   * `specs/_archive/releases/<id>/` — releases concluídas com CLOSURE.
 
-**Removido em v0.1.6:** os stores `.dadaia/sessions/<sess_*>.json`, `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (Lock 4 / semaphore), e `.dadaia/logs/semaphore-reclaims.jsonl`. O modelo 4-store foi substituído pelo single-record JSON TTL-lease. `semaphore.py` foi deletado. RULE E do gate foi removido. O antigo marcador global de contexto foi eliminado na migração v1→v2.
+**Removido em v0.1.6:** os stores `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (Lock 4 / semaphore), e `.dadaia/logs/semaphore-reclaims.jsonl`. O modelo 4-store foi substituído pelo single-record JSON TTL-lease. `semaphore.py` foi deletado. RULE E do gate foi removido. O antigo marcador global de contexto foi eliminado na migração v1→v2.
+
+**Retido em v0.1.6:** `.dadaia/sessions/<sess_*>.json` — session binding files gravados por `cli/commands/context.py:bind` (linha 334-335) e lidos por `panel/views/kanban.py` para exibir o estado de sessões ativas na aba Kanban. Estes arquivos não são o mecanismo de locking (Lock-3 foi removido); servem exclusivamente para display de sessão (Kanban view e context bind/release). O mecanismo de locking é agora exclusivamente o TTL-lease em `.dadaia/states/ctx_locks/<ctx>.lock.json`.
 
 ## Memory injection subsystem
 
@@ -275,13 +279,13 @@ O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto.
 
 O bootstrap injetado é **tech-stack + catalog apenas** (~2.400 tokens). `architecture.md` é intencionalmente não injetado — é large e é self-pulled pelos agentes antes de qualquer trabalho arquitetural ou cross-layer, exatamente como feature atoms são pulled on demand.
 
-### ctx-inject.sh (Claude Code + OpenCode)
+### ctx-inject.sh (Claude Code + Codex + OpenCode)
 
-`dadaia_workspace/public/scripts/ctx-inject.sh` — lib-originated, projetado para `.dadaia/scripts/ctx-inject.sh`. Fires em cada `UserPromptSubmit` em Claude Code e em cada `chat.message` em OpenCode.
+`dadaia_workspace/public/scripts/ctx-inject.sh` — lib-originated, projetado para `.dadaia/scripts/ctx-inject.sh`. Em Codex roda no `SessionStart` (matcher `startup|resume`) carregando o contexto completo **uma vez por sessão**; em Claude Code roda no `UserPromptSubmit` e em OpenCode no `chat.message`. Os hooks podem disparar a cada prompt, mas a injeção completa ocorre só uma vez por sessão lógica.
 
 O script:
 1. Resolve `$SPECS_DIR` de `$DADAIA_CONTEXT`, session file ligado, ou flags explícitos.
-2. Verifica sentinel de first-message em `.dadaia/tmp/ctx-inject-fired-<SESSION_ID>`. Se existir, emite apenas a linha de context-name e sai — sem re-injeção em turns subsequentes da mesma sessão.
+2. Resolve um `SESSION_ID` **estável** (env `CLAUDE_CODE_SESSION_ID`/`CODEX_SESSION_ID`/`OPENCODE_SESSION_ID`, depois o `session_id` que o Codex passa no stdin; sem fallback de PID `$$`) e sanitiza-o antes de usá-lo como nome de arquivo. Verifica o sentinel de first-message em `.dadaia/tmp/ctx-inject-fired-<SESSION_ID>`. Se existir, **não emite nada** e sai — nem o breadcrumb de context-name (a injeção completa já ocorreu no SessionStart).
 3. Cria o sentinel e emite o payload completo dentro de bounded markers:
 
 ```

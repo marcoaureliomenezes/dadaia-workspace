@@ -211,6 +211,20 @@ class _FakeWorkflowsService:
         return [_FakeWorkflowSummary(n) for n in self._names]
 
 
+class _FakeWorkflowLauncher:
+    """Test double for the WorkflowLauncher protocol (T-016-P06)."""
+
+    def __init__(self, launch_pid: int = 99999, alive: bool = False) -> None:
+        self._pid = launch_pid
+        self._alive = alive
+
+    def launch(self, workflow_name: str, workspace_root: str, *, python_executable: str) -> int:
+        return self._pid
+
+    def is_alive(self, pid: int) -> bool:
+        return self._alive
+
+
 def _build_service_with_workflows(
     workflow_names: list[str],
     workspace_root: Path = Path("/workspace"),
@@ -225,16 +239,11 @@ def _build_service_with_workflows(
 
 
 def test_run_workflow_starts_subprocess(tmp_path: Path) -> None:
-    """run_workflow returns a dict with pid and workflow name."""
-    from unittest.mock import MagicMock, patch
-
-    mock_proc = MagicMock()
-    mock_proc.pid = 99999
-
+    """run_workflow returns a dict with pid and workflow name via the launcher."""
     service = _build_service_with_workflows(["my-workflow"])
+    service._workflow_launcher = _FakeWorkflowLauncher(launch_pid=99999)  # type: ignore[attr-defined]
 
-    with patch("dadaia_workspace.features.panel.service.subprocess.Popen", return_value=mock_proc):
-        result = service.run_workflow("my-workflow")
+    result = service.run_workflow("my-workflow")
 
     assert result["workflow"] == "my-workflow"
     assert result["pid"] == 99999
@@ -252,20 +261,16 @@ def test_run_workflow_unknown_returns_error(tmp_path: Path) -> None:
 
 def test_run_workflow_already_running_409(tmp_path: Path) -> None:
     """run_workflow raises RuntimeError with 'already running' when PID is alive."""
-    from unittest.mock import MagicMock, patch
-
-    mock_proc = MagicMock()
-    mock_proc.pid = 12345
-
-    service = _build_service_with_workflows(["my-workflow"])
-
-    with patch("dadaia_workspace.features.panel.service.subprocess.Popen", return_value=mock_proc):
-        service.run_workflow("my-workflow")
-
     import pytest
 
-    with (
-        patch("dadaia_workspace.features.panel.service.os.kill", return_value=None),
-        pytest.raises(RuntimeError, match="already running"),
-    ):
+    service = _build_service_with_workflows(["my-workflow"])
+    service._workflow_launcher = _FakeWorkflowLauncher(  # type: ignore[attr-defined]
+        launch_pid=12345, alive=True
+    )
+
+    # First launch registers PID 12345.
+    service.run_workflow("my-workflow")
+
+    # Second launch: the tracked PID is still alive → 409 already-running.
+    with pytest.raises(RuntimeError, match="already running"):
         service.run_workflow("my-workflow")

@@ -317,7 +317,7 @@ lands, plus a topology guard for the self-edit case.
 ### Detection rule 1 — write_allowlist agreement (frontmatter vs body)
 
 Every persona declares its writable paths in **two** places: the frontmatter
-`paths.write_allowlist` (machine-enforced by the SDD gate) and the body "Write
+`paths.write_allowlist` (an agent-instruction convention — NOT gate-enforced as of 0.1.7 rc-3) and the body "Write
 permissions" table (human-readable). They must agree.
 
 ```
@@ -325,11 +325,11 @@ DETECT:
   - Extract the frontmatter allowlist globs.
   - Extract the body Write-permissions table rows.
   - Diff. Any path the body grants but the frontmatter omits is a FALSE-PROMISE
-    drift (the agent believes it can write where the gate will block it). Any
+    drift (the agent believes it can write outside its declared scope). Any
     path the frontmatter grants but the body omits is a SILENT-PRIVILEGE drift
     (a capability with no documented rationale).
 RESOLVE:
-  - The frontmatter is authoritative; the gate enforces it. Fix BOTH so they
+  - The frontmatter is authoritative by convention (the gate does NOT enforce write_allowlist). Fix BOTH so they
     match, and confirm the intersection is exactly what the SPEC authorizes —
     never wider. Widening an allowlist requires an operator-approved release
     task that justifies the widening (privilege-escalation control).

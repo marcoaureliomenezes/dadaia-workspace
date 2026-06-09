@@ -94,4 +94,4 @@ plain text; resolve them by reading `specs/memory/<slug>.md` if needed.
 - `architecture.md` is large. Self-pull it only when needed (Step 2 criteria
   above), not for every task.
 - Never edit memory atoms. They are write-locked for all agents except
-  `product-engineer` during the CLOSURE phase.
+  `product-engineer` during the DEFINITION and CLOSURE phases (constitution §13).

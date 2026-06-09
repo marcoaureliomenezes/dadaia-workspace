@@ -20,7 +20,7 @@ def init(
     ),
 ) -> None:
     """Bootstrap a dadaia workspace: creates .dadaia/ and installs agent assets into .claude/."""
-    root = resolve_workspace_root_for_init(workspace)
+    root = resolve_workspace_root_for_init(workspace, explicit=workspace is not None)
     console.print(f"[bold]Initializing workspace:[/bold] {root}")
 
     svc = container.build_workspace_service(root)

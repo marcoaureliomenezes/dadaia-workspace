@@ -1,3 +1,7 @@
+---
+specs_pattern_version: 1
+---
+
 # Constitution — dadaia-workspace
 
 This document is the permanent product law for `dadaia-workspace`. Agents and
@@ -393,7 +397,9 @@ Three hard rules that apply to every artifact shipped in this workspace:
 
 1. No agent, skill, rule, or workflow ships without a phase in the §7 matrix that
    it owns or gates. An artifact with no phase ownership is slop and must be
-   removed.
+   removed. (Exception: the three plugin-agent stubs are exempt per the §14
+   plugin-stub exemption — they intentionally own no phase until their plugin is
+   installed.)
 2. No store is created without a GC mechanism. Every state file, lock, session
    record, or cache must have a defined expiry and a cleanup path.
 3. No fact is recorded in two sources, and no fact in two channels. The
@@ -451,9 +457,14 @@ Plugins (not in core roster): frontend-engineer, design-specialist, devops-engin
 Plugin agents may be dispatched within a release but do not appear in the roster
 table above.
 
-Persona-existence rule: every surviving persona in `dadaia_workspace/public/agents/`
-must reference a phase from the §7 matrix that it owns or gates. Personas for
-removed agents must not exist in the public agents directory.
+Persona-existence rule: every surviving **core** persona in
+`dadaia_workspace/public/agents/` must reference a phase from the §7 matrix that it
+owns or gates. Personas for removed agents must not exist in the public agents
+directory. **Plugin-stub exemption:** the three plugin agents (frontend-engineer,
+design-specialist, devops-engineer) ship as thin behavior-less stubs in the core
+install and are exempt from the phase-ownership requirement of this rule and of
+§12.1 — they own no §7 phase by design and carry behavior only when their plugin is
+installed.
 
 Agent philosophy: every agent in this roster is a generic AI implementation
 specialized only in its dadaia-workspace SDD role, carrying no project-domain

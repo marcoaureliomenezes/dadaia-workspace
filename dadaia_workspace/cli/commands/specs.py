@@ -141,9 +141,110 @@ def doctor(
                 marker = "ERR " if issue.severity == Severity.ERROR else "WARN"
                 location = f" ({issue.path})" if issue.path else ""
                 typer.echo(f"  [{marker}] {issue.code}: {issue.description}{location}")
+            # Authoritative final verdict line (bug: specs-doctor-dual-error-counter).
+            # A memory-lint issue may embed its own "Summary: … 0 ERROR" text; this final
+            # line is the single source of truth so the last output line never contradicts
+            # the real result.
+            typer.echo(
+                f"[{'fail' if errors else 'ok'}] overall: {len(errors)} error(s), "
+                f"{len(warnings)} warning(s) — {target}"
+            )
 
     has_errors = any(i.severity == Severity.ERROR for i in issues)
     sys.exit(1 if has_errors else 0)
+
+
+@app.command("upgrade")
+def upgrade(
+    specs_dir: str | None = typer.Option(
+        None, "--specs-dir", help="Path to specs/ directory. Default: bound context."
+    ),
+    target: int | None = typer.Option(
+        None, "--target", help="Target pattern version. Default: the canonical version."
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Plan only — no backup, no writes."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the interactive confirmation."),
+) -> None:
+    """Upgrade a specs/ tree to the canonical pattern version.
+
+    Backup-first (``specs_bkp/<from>→<to>-<UTC>/``) → apply the migration chain →
+    re-stamp the constitution → re-run ``dadaia specs doctor``. Idempotent: already
+    at target ⇒ no-op. On a non-clean doctor after upgrade, the backup is the
+    recovery point.
+    """
+    from dadaia_workspace.core import specs_version as _ver
+    from dadaia_workspace.features.migrate import upgrade as _upgrade_feat
+
+    resolved = _resolve_specs_dir(specs_dir)
+    current = _ver.read_pattern_version(resolved)
+    goal = _ver.CANONICAL_SPECS_VERSION if target is None else target
+
+    if current >= goal:
+        typer.echo(f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op.")
+        sys.exit(0)
+
+    if dry_run:
+        result = _upgrade_feat.upgrade(resolved, target=target, dry_run=True)
+        typer.echo(f"[dry-run] {current} → {result.to_version}")
+        typer.echo(f"  backup would be: {result.backup_path}")
+        for key, step_result in result.steps:
+            typer.echo(f"  step {key}: {len(step_result.moved)} move(s) planned")
+        sys.exit(0)
+
+    if not yes:
+        confirm = typer.confirm(
+            f"Upgrade {resolved} from pattern version {current} → {goal}? (a backup is taken first)"
+        )
+        if not confirm:
+            typer.echo("[abort] upgrade cancelled.")
+            sys.exit(1)
+
+    # Snapshot pre-existing doctor errors BEFORE the migration so we only fail on errors
+    # the migration NEWLY introduces — not on pre-existing, unrelated ones (bug:
+    # specs-upgrade-fails-on-preexisting-doctor-error). Restoring the backup for a
+    # pre-existing error is actively harmful: it discards a good version bump while
+    # leaving the very same error in place.
+    pre_doctor = SpecsDoctor(
+        resolved, public_dir=_resolve_public_dir(resolved), templates_dir=_TEMPLATES_DIR
+    )
+    pre_errors = {
+        (i.code, i.description) for i in pre_doctor.check() if i.severity == Severity.ERROR
+    }
+
+    result = _upgrade_feat.upgrade(resolved, target=target)
+    typer.echo(f"[upgrade] {result.from_version} → {result.to_version}")
+    typer.echo(f"  backup: {result.backup_path}")
+    for key, step_result in result.steps:
+        for src, dst in step_result.moved:
+            typer.echo(f"  [{key}] moved {src} → {dst}")
+
+    # Verify with doctor; only the migration's OWN regressions justify a restore.
+    doctor_svc = SpecsDoctor(
+        resolved, public_dir=_resolve_public_dir(resolved), templates_dir=_TEMPLATES_DIR
+    )
+    post_errors = [i for i in doctor_svc.check() if i.severity == Severity.ERROR]
+    new_errors = [i for i in post_errors if (i.code, i.description) not in pre_errors]
+    pre_existing = [i for i in post_errors if (i.code, i.description) in pre_errors]
+    if new_errors:
+        typer.echo(
+            f"[fail] upgrade introduced {len(new_errors)} new doctor error(s). "
+            f"Restore from: {result.backup_path}",
+            err=True,
+        )
+        for issue in new_errors:
+            typer.echo(f"  {issue.code}: {issue.description}", err=True)
+        sys.exit(1)
+    if pre_existing:
+        typer.echo(
+            f"[warn] {resolved} upgraded to pattern version {result.to_version}; the migration "
+            f"is clean, but {len(pre_existing)} pre-existing doctor error(s) remain (not caused "
+            f"by the upgrade) — fix separately, do NOT restore:"
+        )
+        for issue in pre_existing:
+            typer.echo(f"  {issue.code}: {issue.description}")
+        sys.exit(0)
+    typer.echo(f"[ok] {resolved} upgraded to pattern version {result.to_version}; doctor clean.")
+    sys.exit(0)
 
 
 # Canonical templates directory — inside the installed package

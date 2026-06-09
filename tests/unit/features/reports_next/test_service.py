@@ -110,13 +110,13 @@ def test_all_completed_returns_none(tmp_path: Path) -> None:
 def test_first_pending_agent_identified(tmp_path: Path) -> None:
     svc = _build(
         tmp_path,
-        plan="**Owner:** qa-engineer\n**Owner:** devops-engineer\n**Owner:** backend-engineer\n",
+        plan="**Owner:** qa-engineer\n**Owner:** devops-engineer\n**Owner:** software-engineer\n",
         handoffs={"qa-engineer": _RELEASE},
     )
     result = svc.resolve_next()
     assert result.next_agent == "devops-engineer"
     assert result.completed_agents == ["qa-engineer"]
-    assert result.pending_agents == ["devops-engineer", "backend-engineer"]
+    assert result.pending_agents == ["devops-engineer", "software-engineer"]
 
 
 def test_handoff_for_other_release_does_not_count(tmp_path: Path) -> None:
@@ -133,8 +133,8 @@ def test_handoff_for_other_release_does_not_count(tmp_path: Path) -> None:
 
 
 def test_owner_pattern_parens(tmp_path: Path) -> None:
-    svc = _build(tmp_path, plan="- Track A (owner: software-engineer-python)\n")
-    assert svc.resolve_next().next_agent == "software-engineer-python"
+    svc = _build(tmp_path, plan="- Track A (owner: software-engineer)\n")
+    assert svc.resolve_next().next_agent == "software-engineer"
 
 
 def test_owner_pattern_bold(tmp_path: Path) -> None:
@@ -152,12 +152,34 @@ def test_sequence_order_and_dedup(tmp_path: Path) -> None:
         "**Owner:** qa-engineer\n"
         "(owner: devops-engineer)\n"
         "**Owner:** qa-engineer\n"  # duplicate — must not reappear
-        "owner: backend-engineer\n"
+        "owner: software-engineer\n"
     )
     svc = _build(tmp_path, plan=plan)
     result = svc.resolve_next()
-    assert result.pending_agents == ["qa-engineer", "devops-engineer", "backend-engineer"]
+    assert result.pending_agents == ["qa-engineer", "devops-engineer", "software-engineer"]
 
 
 def test_canonical_agents_count() -> None:
-    assert len(CANONICAL_AGENTS) == 15
+    """CANONICAL_AGENTS must match the 12-name registry (9 core + 3 plugins)."""
+    assert len(CANONICAL_AGENTS) == 12
+
+
+def test_canonical_agents_exact_set() -> None:
+    """CANONICAL_AGENTS must equal the registry-derived set exactly."""
+    expected = frozenset(
+        {
+            "ai-engineer",
+            "code-reviewer",
+            "design-specialist",
+            "devops-engineer",
+            "frontend-engineer",
+            "product-engineer",
+            "project-auditor",
+            "project-manager",
+            "qa-engineer",
+            "security-reviewer",
+            "software-architect",
+            "software-engineer",
+        }
+    )
+    assert expected == CANONICAL_AGENTS

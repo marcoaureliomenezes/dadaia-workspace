@@ -560,8 +560,8 @@
   document.addEventListener('dadaia:runtime-change', function () {
     promptCache.clear();
     loaded = false;
-    // Only refetch if the Agents section is currently active (avoid background load)
-    var section = document.getElementById('section-agents');
+    // Only refetch if the Ops section (parent) is currently active (avoid background load)
+    var section = document.getElementById('section-ops');
     if (section && section.classList.contains('active')) {
       load();
     }

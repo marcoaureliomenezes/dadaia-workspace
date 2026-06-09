@@ -24,6 +24,8 @@ import html
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.features.panel.views._md_render import memory_raw_url
+
 
 def render_memory_wrapper(
     workspace_root: Path,  # noqa: ARG001  # reserved for future use
@@ -33,7 +35,7 @@ def render_memory_wrapper(
     def _view(slug: str = "", path: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
         safe_slug = html.escape(slug)
         safe_path = html.escape(path)
-        iframe_src = f"/memory/{safe_slug}/{safe_path}"
+        iframe_src = memory_raw_url(safe_slug, safe_path)
         title = f"Memory — {safe_slug} · {safe_path}"
 
         body = f"""<!DOCTYPE html>

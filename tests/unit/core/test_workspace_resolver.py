@@ -220,3 +220,70 @@ def test_resolve_workspace_root_for_init_fallback_to_cwd(tmp_path: Path) -> None
     result = resolve_workspace_root_for_init(orphan)
 
     assert result == orphan
+
+
+# ---------------------------------------------------------------------------
+# T-016-Z01: explicit --workspace flag is authoritative (bug: init-ignores-workspace-flag)
+# ---------------------------------------------------------------------------
+
+
+def test_explicit_workspace_is_authoritative_when_inside_existing_workspace(
+    tmp_path: Path,
+) -> None:
+    """T-016-Z01: init --workspace <dir> from inside an existing workspace must target <dir>.
+
+    Bug: resolve_workspace_root_for_init used to walk UP to the ancestor
+    workspace when cwd was inside one, ignoring the explicit --workspace path.
+    Fix: an explicit path is returned directly — no ancestor-walk.
+    """
+    # Set up an existing workspace at tmp_path/existing_ws
+    existing_ws = _make_full_workspace(tmp_path / "existing_ws")
+
+    # Simulate CWD inside the existing workspace (e.g. its .dadaia/tmp subdirectory)
+    cwd_inside_ws = existing_ws / ".dadaia" / "tmp" / "agent-session"
+    cwd_inside_ws.mkdir(parents=True)
+
+    # The explicit --workspace target (a fresh, uninitialized dir)
+    fresh_target = tmp_path / "freshws"
+    fresh_target.mkdir(parents=True)
+
+    # When called with an explicit workspace path, it must return that path —
+    # not walk up and find the ancestor workspace.
+    result = resolve_workspace_root_for_init(fresh_target, explicit=True)
+
+    assert result == fresh_target.resolve()
+    # Sanity: the ancestor workspace is NOT what we got back
+    assert result != existing_ws
+
+
+def test_explicit_workspace_with_nonexistent_dir(tmp_path: Path) -> None:
+    """T-016-Z01: explicit workspace path that does not yet exist is returned as-is.
+
+    dadaia init must be allowed to initialize a directory that doesn't exist yet.
+    """
+    nonexistent = tmp_path / "brand_new_workspace"
+    # Do NOT create it — init is allowed to receive a path that will be created
+
+    result = resolve_workspace_root_for_init(nonexistent, explicit=True)
+
+    assert result == nonexistent.resolve()
+
+
+def test_non_explicit_workspace_still_walks_ancestor(tmp_path: Path) -> None:
+    """T-016-Z01 backward compat: without explicit=True, ancestor-walk is preserved.
+
+    When init is invoked with no --workspace flag (cwd defaults to Path.cwd()),
+    the resolver still walks up to find an initialized workspace root.
+    """
+    # Existing workspace at tmp_path/workspace
+    workspace_root = _make_full_workspace(tmp_path / "workspace")
+
+    # Nested sub-repo (partial .dadaia, no sentinel)
+    sub_repo = _make_partial_dadaia(workspace_root / "repos", "my-service")
+    deep = sub_repo / "src"
+    deep.mkdir(parents=True)
+
+    # Without explicit=True, still walks up to find the proper workspace
+    result = resolve_workspace_root_for_init(deep, explicit=False)
+
+    assert result == workspace_root

@@ -19,11 +19,32 @@ import logging
 import os
 import re
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.models.agent import (
+    AgentDTO,
+    AgentNotFoundError,
+    AgentPromptResult,
+    InvalidAgentIdError,
+)
+from dadaia_workspace.core.protocols.agents_provider import AgentsProvider
 from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
+
+# AgentDTO / AgentPromptResult / the error types now live in core/models/agent.py
+# (NEW-02 boundary). Re-exported here so existing
+# `from dadaia_workspace.features.agents.reader import AgentDTO` callers keep working.
+__all__ = [
+    "AgentDTO",
+    "AgentNotFoundError",
+    "AgentPromptResult",
+    "AgentsProvider",
+    "FileSystemAgentsProvider",
+    "InvalidAgentIdError",
+    "MissingTierError",
+    "get_prompt",
+    "read_canonical_agents",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -54,26 +75,6 @@ class MissingTierError(ValueError):
     This error is only raised when 'tier' is present but invalid (non-integer or not in
     {1, 2, 3}), so that typos produce loud failures while stale staged files are tolerated.
     """
-
-
-@dataclass
-class AgentDTO:
-    """Data-transfer object for a canonical agent definition.
-
-    Fields correspond to the §5.1 shape from the R3 SPEC.
-    """
-
-    id: str
-    name: str
-    description: str
-    tier: int = 0  # 1 = orchestrator, 2 = curator, 3 = leaf specialist
-    skills: list[str] = field(default_factory=list)
-    tools: list[str] = field(default_factory=list)
-    model: str | None = None
-    opencode_model: str | None = None
-    max_turns: int | None = None
-    input_contract: dict[str, Any] | None = None
-    paths: dict[str, list[str]] | None = None
 
 
 def _resolve_agents_dir(workspace_root: Path) -> Path | None:
@@ -224,14 +225,6 @@ def _strip_frontmatter(text: str) -> str:
     return text.strip()
 
 
-class InvalidAgentIdError(ValueError):
-    """Raised when the agent ID fails the regex validation or path traversal check."""
-
-
-class AgentNotFoundError(LookupError):
-    """Raised when the agent ID is valid but no corresponding file exists."""
-
-
 def get_prompt(agent_id: str, workspace_root: Path) -> tuple[str, Path]:
     """Resolve an agent ID to its system prompt and source path.
 
@@ -339,3 +332,20 @@ def read_canonical_agents(workspace_root: Path) -> list[AgentDTO]:
 
     logger.debug("agent_reader: loaded %d agents from %s", len(result), agents_dir)
     return result
+
+
+class FileSystemAgentsProvider(AgentsProvider):
+    """Filesystem-backed `AgentsProvider` — the production implementation.
+
+    Thin adapter over the module-level reader functions so the panel can depend
+    on the `core/protocols/agents_provider.AgentsProvider` protocol instead of
+    importing these functions concretely (NEW-02 boundary). Wired in
+    `container.build_panel_service`.
+    """
+
+    def read_canonical_agents(self, workspace_root: Path) -> list[AgentDTO]:
+        return read_canonical_agents(workspace_root)
+
+    def get_prompt(self, agent_id: str, workspace_root: Path) -> AgentPromptResult:
+        body, source_path = get_prompt(agent_id, workspace_root)
+        return AgentPromptResult(body=body, source_path=source_path)

@@ -22,6 +22,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import (
@@ -159,6 +160,7 @@ def _build_agents_server(
         spec_context=_StubSpecContextService(),  # type: ignore[arg-type]
         workspace_root=workspace_root,
         telemetry=stub_telemetry,
+        agents_provider=FileSystemAgentsProvider(),
     )
 
     def _stub_html(**kw: Any) -> tuple[int, str, bytes]:

@@ -42,9 +42,21 @@ def ensure_token(path: pathlib.Path = DEFAULT_TOKEN_PATH) -> str:
     os.chmod(parent, 0o700)
 
     token = secrets.token_urlsafe(32)
-    # Write atomically: create with restricted mode before writing content.
-    path.write_text(token)
-    os.chmod(path, 0o600)
+
+    # Atomic restricted-mode create: O_CREAT|O_WRONLY|O_EXCL|0o600 so the
+    # file is born at 0o600 — there is no window where it exists at a wider
+    # mode (OWASP A02, TOCTOU fix).  O_EXCL also prevents a race where two
+    # processes both try to create the token simultaneously.
+    try:
+        fd = os.open(str(path), os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
+    except FileExistsError:
+        # Another process beat us to creation; read their token.
+        return path.read_text().strip()
+
+    try:
+        os.write(fd, token.encode())
+    finally:
+        os.close(fd)
 
     return token
 

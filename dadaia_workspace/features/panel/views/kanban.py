@@ -3,15 +3,25 @@
 Reads `.dadaia/sessions/*.json` (R2 session files) and groups them into a
 Kanban board response: one swimlane per Spec Context Project, four phase columns.
 
-Session mode → column mapping:
-    READ                  → research
-    SPEC                  → spec
-    BOUND_IMPLEMENTATION  → implementation
-    BOUND_REVIEW          → review
-    Unknown / unrecognised → research  (fail-safe — never drop)
+Session mode → column mapping (canonical §7 lifecycle):
+
+    Column key      Label                    Session modes
+    -----------     -----------------------  ---------------------------------
+    backlog         Backlog                  READ
+    release_def     Release Definition       SPEC
+    impl_review     Implementation + Review  BOUND_IMPLEMENTATION, BOUND_REVIEW
+    closure         Closure                  (present-but-empty — no session
+                                             mode maps to closure phase yet)
+
+    Unknown / unrecognised mode → backlog  (fail-safe — never drop)
+
+The XOR-lock dimming between implementation and review columns is retired: both
+modes now share the single ``impl_review`` column, so the mutual-exclusion visual
+no longer applies.
 
 Staleness is computed at read time from ``last_seen_at`` and ``ttl_seconds``
-(mirrors ``dadaia_workspace.features.spec_context.locking._session_is_stale``).
+using ``dadaia_workspace.core.lock_liveness.is_stale_session`` (single source
+of truth — v0.1.7 T-017-10).
 
 Security (OWASP A03, A06):
 - JSON files are parsed defensively; malformed/missing-field files are skipped.
@@ -28,44 +38,30 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.lock_liveness import is_stale_session
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-_COLUMN_KEYS = ("research", "spec", "implementation", "review")
+_COLUMN_KEYS = ("backlog", "release_def", "impl_review", "closure")
 
 _MODE_TO_COLUMN: dict[str, str] = {
-    "READ": "research",
-    "SPEC": "spec",
-    "BOUND_IMPLEMENTATION": "implementation",
-    "BOUND_REVIEW": "review",
+    "READ": "backlog",
+    "SPEC": "release_def",
+    "BOUND_IMPLEMENTATION": "impl_review",
+    "BOUND_REVIEW": "impl_review",
 }
+
+# No session mode currently maps to the "closure" column.
+# It is always present but empty until a closure-phase session mode is introduced.
+_FALLBACK_COLUMN = "backlog"
 
 _REQUIRED_FIELDS: frozenset[str] = frozenset({"session_id", "mode", "context"})
 
 _DEFAULT_TTL_SECONDS = 300
-
-
-# ---------------------------------------------------------------------------
-# Staleness helper (mirrors locking._session_is_stale)
-# ---------------------------------------------------------------------------
-
-
-def _is_stale(last_seen_at: str, ttl_seconds: int) -> bool:
-    """Return True if the session's last_seen_at is beyond its TTL.
-
-    Handles ``Z`` suffix, missing value (→ not stale), and bad values (→ not stale).
-    """
-    if not last_seen_at:
-        return False
-    try:
-        last_seen_dt = datetime.datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
-        elapsed = (datetime.datetime.now(tz=datetime.UTC) - last_seen_dt).total_seconds()
-        return elapsed > ttl_seconds
-    except Exception:  # noqa: BLE001
-        return False
 
 
 # ---------------------------------------------------------------------------
@@ -128,8 +124,8 @@ def render_api_kanban(
             with contextlib.suppress(TypeError, ValueError):
                 ttl_seconds = int(data.get("ttl_seconds", _DEFAULT_TTL_SECONDS))
 
-            stale = _is_stale(last_seen_at, ttl_seconds)
-            column = _MODE_TO_COLUMN.get(mode, "research")
+            stale = is_stale_session(last_seen_at, ttl_seconds)
+            column = _MODE_TO_COLUMN.get(mode, _FALLBACK_COLUMN)
 
             card: dict[str, object] = {
                 "session_id": session_id,

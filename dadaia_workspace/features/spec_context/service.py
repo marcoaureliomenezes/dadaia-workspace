@@ -7,6 +7,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import specs_backup as _backup
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextLockedError,
@@ -192,7 +193,10 @@ class SpecContextService:
             except Exception:
                 actual_branch = None
 
-            # Scaffold specs/ — safe-preserve any pre-existing tree.
+            # Scaffold specs/. A fresh tree is copied whole; a pre-existing tree is
+            # SAFE-PRESERVED — snapshot it to specs_bkp/preserve-<UTC>/ before merging
+            # in any missing canonical files (never overwriting operator content). The
+            # backup is retained only when the merge actually adds files (FR-S06 path a).
             specs_dir = self._specs_dir(repo_slug)
             if not specs_dir.exists():
                 # Fresh scaffold: copy the whole scaffold source tree.
@@ -202,17 +206,22 @@ class SpecContextService:
                     for subdir in ("", "memory", "features"):
                         (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
             else:
-                # specs/ already exists — merge missing canonical files without
-                # overwriting operator content (never silently skip).
+                # specs/ already exists — back up first, then merge missing canonical
+                # files without overwriting operator content (never silently skip).
                 if _SCAFFOLD_SRC.exists():
+                    preserved = _backup.preserve_specs(specs_dir)
                     added = _merge_scaffold_into(_SCAFFOLD_SRC, specs_dir)
                     if added:
                         _log.info(
-                            "scaffold merge into pre-existing specs/: %d file(s) added: %s",
+                            "scaffold merge into pre-existing specs/: %d file(s) added: %s "
+                            "(pre-existing tree preserved at %s)",
                             len(added),
                             added,
+                            preserved,
                         )
                     else:
+                        # No change — the snapshot is unnecessary; do not litter specs_bkp/.
+                        shutil.rmtree(preserved, ignore_errors=True)
                         _log.info("scaffold merge into pre-existing specs/: no missing files found")
 
             # Copy repo-AGENTS.md template if not already present

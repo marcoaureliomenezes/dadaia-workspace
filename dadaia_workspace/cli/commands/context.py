@@ -218,6 +218,20 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
         with contextlib.suppress(Exception):
             container.build_public_service().install(ws, target="opencode", force=True)
+        # FR-S05/S06: a pre-existing specs/ tree below the canonical pattern version is
+        # only safe-preserved + add-missing-merged — never silently upgraded. Offer the
+        # backup-protected upgrade explicitly so structural drift is the operator's choice.
+        with contextlib.suppress(Exception):
+            from dadaia_workspace.core import specs_version as _ver
+
+            specs_dir = ws / "repos" / ctx.repo_slug / "specs"
+            current = _ver.read_pattern_version(specs_dir)
+            if current < _ver.CANONICAL_SPECS_VERSION:
+                console.print(
+                    f"[yellow]![/yellow] specs pattern version {current} is below the "
+                    f"canonical {_ver.CANONICAL_SPECS_VERSION}. Run "
+                    f"[bold]dadaia specs upgrade[/bold] (backup-protected) to migrate."
+                )
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
@@ -406,46 +420,4 @@ def delete(name: str = typer.Argument(..., help="Context name to delete")) -> No
         raise typer.Exit(1) from None
 
 
-# ---------------------------------------------------------------------------
-# Deprecated verbs — exit non-zero with pointer to new verbs (AC-T10d-7)
-# ---------------------------------------------------------------------------
-
-
-@app.command(hidden=True)
-def activate(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'activate' was removed in v2."""
-    print(
-        "Error: 'activate' was removed in v2. Use: dadaia context alive <name>",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
-
-
-@app.command(hidden=True)
-def deactivate(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'deactivate' was removed in v2."""
-    print(
-        "Error: 'deactivate' was removed in v2. Use: dadaia context dead <name>",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
-
-
-@app.command(hidden=True)
-def promote(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'promote' was removed in v2."""
-    print(
-        "Error: 'promote' was removed in v2. Use: dadaia context bind <name> --mode spec",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
-
-
-@app.command(hidden=True)
-def use(name: str = typer.Argument(..., help="[DEPRECATED]")) -> None:
-    """[REMOVED] 'use' was removed in v2."""
-    print(
-        "Error: 'use' was removed in v2. Use: dadaia context bind <name> --mode read",
-        file=sys.stderr,
-    )
-    raise typer.Exit(1)
+# v2 removals: activate/deactivate/promote/use removed in v0.1.7

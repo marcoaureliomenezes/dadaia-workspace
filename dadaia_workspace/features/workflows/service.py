@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.models.workflow import (
+    WorkflowSummaryDTO as WorkflowSummaryDTO,  # re-export
+)
 from dadaia_workspace.features.workflows.dag import render_dag_svg
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 
@@ -64,20 +67,6 @@ class StageDTO:
     expected_output_path: str | None
     must_include: list[str] | None
     on_failure: str
-
-
-@dataclass
-class WorkflowSummaryDTO:
-    name: str
-    display_name: str
-    description: str
-    version: str
-    schema_version: str
-    stage_count: int
-    agent_ids: list[str]
-    has_parallel: bool
-    has_gates: bool
-    source_path: str
 
 
 @dataclass

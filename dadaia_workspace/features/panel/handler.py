@@ -9,15 +9,24 @@ Design (architect D3):
   ``make_handler_class(views)``, so this module carries zero rendering logic
   and can be unit-tested with stub views without spinning a real server.
 
-Auth (T-AM-13, T-AM-15):
-  API routes (``/api/*``) require ``Authorization: Bearer <token>``.
-  Without a valid token: 401 Unauthorized.
+Auth (T-AM-13, T-AM-15, T-016-P05):
+  Every registered route carries an explicit ``auth_class`` in the declarative
+  ``_ROUTE_TABLE`` constant.  ``auth_class`` is one of:
 
-  The HTML root (``/``) remains unauthenticated in v1.  The SPEC § Auth model
-  documents that the `dadaia panel start` command prints the URL with
-  ``?token=<value>`` for browser first-load; the token then migrates to a
-  session cookie via JS after the first fetch.  Cookie-based auth enforcement
-  on ``/`` is deferred to a future hotfix once the cookie flow is implemented.
+      PUBLIC             — no auth required.
+      BEARER             — Bearer token required; no telemetry dependency.
+      BEARER_SECOND_LOOP — Bearer required when NOT on loopback; data is workspace-
+                           sensitive but not gated by telemetry.
+      BEARER_TELEMETRY   — Bearer required; returns 503 when telemetry is None.
+
+  A route omitted from ``_ROUTE_TABLE`` cannot exist — there is no silent-public
+  fallback.  Adding a route without assigning an ``auth_class`` is a
+  ``ValueError`` at import time.
+
+  For DELETE, the dedicated ``_DELETE_ROUTE_TABLE`` defines its own ordered
+  patterns so that ``/important$`` is matched before the catch-all ``^/api/reports/
+  (?P<path>.+)$``.  The ordering is structural (list position) and is tested by
+  ``test_handler_route_classification.py``.
 
 Security headers (T-AM-14, T8):
   _security_headers(content_type) — CSP for HTML, nosniff for JSON.
@@ -33,6 +42,7 @@ Security headers (T-AM-14, T8):
 from __future__ import annotations
 
 import dataclasses
+import enum
 import json
 import re
 import urllib.parse
@@ -81,90 +91,126 @@ _FORBIDDEN_JSON_KEYS: frozenset[str] = frozenset(
     ["content", "text", "messages", "snapshot", "thinking", "prompt", "response"]
 )
 
+
 # ---------------------------------------------------------------------------
-# Route categories — declare category before adding a new route.
-#
-# PUBLIC (no auth required):
-#   /                              index (full panel HTML)
-#   /memory/<slug>/<path>          memory atom HTML
-#   /memory-view/<slug>/<path>     memory atom wrapper HTML
-#   /static/<name>                 static assets (CSS, JS, SVG)
-#
-# BEARER-ONLY (Bearer token required; no telemetry dependency; always 200):
-#   /api/academy                   academy course list
-#   /api/agents/<id>/prompt        agent prompt text
-#   /api/reports                   report sidecar list (sorted by date)
-#   /api/reports/<path>            delete a report file + its sidecar
-#   /api/workflows                 workflow list
-#   /api/workflows/<name>          workflow detail + DAG SVG
-#
-# BEARER + TELEMETRY (Bearer token required; returns 503 when telemetry is None):
-#   /api/agents                    canonical agent catalog with telemetry overlay
-#   /api/agents/<id>/sessions      per-agent session list
-#   /api/contexts                  active Spec Context Projects
-#   /api/panel-status              server registry grouped by context
-#   /api/sessions                  active sessions across all runtimes
-#   /api/sessions/<runtime>/<id>   single session detail
-#   /health                        health probe (no auth, agent-friendly)
+# Auth class enum (T-016-P05 unified classification)
 # ---------------------------------------------------------------------------
 
-# Route patterns: order matters — more-specific patterns first.
-_RAW_ROUTES: list[tuple[str, str]] = [
-    (r"^/$", "index"),
-    (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt"),
-    (r"^/api/agents/(?P<agent_id>[^/]+)/sessions$", "api_agent_sessions"),
-    (r"^/api/agents$", "api_agents"),
-    # /api/workflows/<name>/run and /api/workflows/<name> before /api/workflows (more specific first).
-    (r"^/api/workflows/(?P<workflow_name>[^/]+)/run$", "api_workflow_run"),
-    (r"^/api/workflows/(?P<workflow_name>[^/]+)$", "api_workflow_detail"),
-    (r"^/api/workflows$", "api_workflows"),
-    # /api/sessions/<runtime>/<session_id> must come before /api/sessions (more specific first).
-    (r"^/api/sessions/(?P<runtime>[^/]+)/(?P<session_id>[^/]+)$", "api_session_detail"),
-    (r"^/api/sessions$", "api_sessions"),
-    (r"^/api/panel-status$", "api_panel_status"),
-    (r"^/health$", "health"),
-    (r"^/api/academy$", "api_academy"),
-    # /api/reports/<path> must come before /api/reports$ (more specific first).
-    (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important"),
-    (r"^/api/reports/(?P<path>.+)$", "api_report_delete"),
-    (r"^/api/reports$", "api_reports"),
-    (r"^/api/contexts$", "api_contexts"),
-    (r"^/api/kanban$", "api_kanban"),
-    (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory"),
-    (r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$", "memory_view"),
-    # /reports/<path>: public route — serves HTML report files directly.
-    (r"^/reports/(?P<path>.+)$", "reports_serve"),
-    (r"^/static/(?P<name>[^/]+)$", "static"),
+
+class AuthClass(enum.Enum):
+    """Auth classification for every registered panel route.
+
+    PUBLIC:
+        No auth required (e.g. index, static assets, health).
+    BEARER:
+        Bearer token required; no telemetry dependency (bearer-only routes).
+    BEARER_SECOND_LOOP:
+        Bearer required when NOT loopback-bound; returns workspace-sensitive data
+        (e.g. server registry, context paths, report/memory content).
+    BEARER_TELEMETRY:
+        Bearer required; returns 503 when telemetry is None or degraded
+        (e.g. agent sessions, agent list with telemetry overlay).
+    """
+
+    PUBLIC = "PUBLIC"
+    BEARER = "BEARER"
+    BEARER_SECOND_LOOP = "BEARER_SECOND_LOOP"
+    BEARER_TELEMETRY = "BEARER_TELEMETRY"
+
+
+# ---------------------------------------------------------------------------
+# Declarative route table (T-016-P05).
+#
+# Each entry is (pattern_str, route_name, auth_class).
+# Order matters — more-specific patterns first; the first match wins.
+#
+# Invariant: every route_name in this table MUST have an explicit AuthClass.
+# The make_handler_class factory enforces this at class-creation time.
+# ---------------------------------------------------------------------------
+
+_ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
+    # PUBLIC routes
+    (r"^/$", "index", AuthClass.PUBLIC),
+    (r"^/health$", "health", AuthClass.PUBLIC),
+    (r"^/static/(?P<name>[^/]+)$", "static", AuthClass.PUBLIC),
+    # BEARER_SECOND_LOOP routes (sensitive data, auth on non-loopback)
+    (r"^/api/panel-status$", "api_panel_status", AuthClass.BEARER_SECOND_LOOP),
+    (r"^/api/contexts$", "api_contexts", AuthClass.BEARER_SECOND_LOOP),
+    (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory", AuthClass.BEARER_SECOND_LOOP),
+    (r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$", "memory_view", AuthClass.BEARER_SECOND_LOOP),
+    (r"^/reports/(?P<path>.+)$", "reports_serve", AuthClass.BEARER_SECOND_LOOP),
+    # BEARER-only routes (auth required; no telemetry dependency)
+    (r"^/api/academy$", "api_academy", AuthClass.BEARER),
+    (r"^/api/kanban$", "api_kanban", AuthClass.BEARER),
+    (r"^/api/reports$", "api_reports", AuthClass.BEARER),
+    # /api/reports/<path>/important must come before /api/reports/<path> (more specific first)
+    (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important", AuthClass.BEARER),
+    (r"^/api/reports/(?P<path>.+)$", "api_report_delete", AuthClass.BEARER),
+    (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt", AuthClass.BEARER),
+    # /api/workflows/<name>/run and /api/workflows/<name> before /api/workflows
+    (r"^/api/workflows/(?P<workflow_name>[^/]+)/run$", "api_workflow_run", AuthClass.BEARER),
+    (
+        r"^/api/workflows/(?P<workflow_name>[^/]+)$",
+        "api_workflow_detail",
+        AuthClass.BEARER,
+    ),
+    (r"^/api/workflows$", "api_workflows", AuthClass.BEARER),
+    # BEARER_TELEMETRY routes (require active telemetry service)
+    (
+        r"^/api/agents/(?P<agent_id>[^/]+)/sessions$",
+        "api_agent_sessions",
+        AuthClass.BEARER_TELEMETRY,
+    ),
+    (r"^/api/agents$", "api_agents", AuthClass.BEARER_TELEMETRY),
+    # /api/sessions/<runtime>/<session_id> before /api/sessions
+    (
+        r"^/api/sessions/(?P<runtime>[^/]+)/(?P<session_id>[^/]+)$",
+        "api_session_detail",
+        AuthClass.BEARER_TELEMETRY,
+    ),
+    (r"^/api/sessions$", "api_sessions", AuthClass.BEARER_TELEMETRY),
 ]
 
-# Routes that require Bearer token auth (all /api/* routes).
-_AUTH_REQUIRED_PREFIX = "/api/"
+# ---------------------------------------------------------------------------
+# DELETE route table — ordered separately so that the /important suffix is
+# matched before the catch-all path pattern.  Structural ordering (list
+# position) is the enforcement mechanism; no runtime sorting is applied.
+# ---------------------------------------------------------------------------
 
-# Routes that require Bearer auth but do NOT need the telemetry service.
-# These are dispatched after auth check, bypassing the telemetry-not-configured 503.
-_BEARER_ONLY_ROUTES: frozenset[str] = frozenset(
-    {
-        "api_academy",
-        "api_agent_prompt",
-        "api_kanban",
-        "api_report_delete",
-        "api_report_mark_important",
-        "api_report_unmark_important",
-        "api_reports",
-        "api_workflows",
-        "api_workflow_detail",
-        "api_workflow_run",
-    }
+_DELETE_ROUTE_TABLE: list[tuple[str, str]] = [
+    # MUST come first: DELETE /api/reports/<path>/important → unmark action
+    (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important"),
+    # catch-all: DELETE /api/reports/<path> → delete report file
+    (r"^/api/reports/(?P<path>.+)$", "api_report_delete"),
+]
+
+# Compile _ROUTE_TABLE patterns once at module load time.
+_COMPILED_ROUTE_TABLE: list[tuple[re.Pattern[str], str, AuthClass]] = [
+    (re.compile(pat), name, auth) for pat, name, auth in _ROUTE_TABLE
+]
+
+# Compile _DELETE_ROUTE_TABLE patterns once at module load time.
+_COMPILED_DELETE_ROUTE_TABLE: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(pat), name) for pat, name in _DELETE_ROUTE_TABLE
+]
+
+# Convenience sets derived from the single source of truth (_ROUTE_TABLE).
+_BEARER_ONLY_ROUTE_NAMES: frozenset[str] = frozenset(
+    name for _, name, auth in _ROUTE_TABLE if auth == AuthClass.BEARER
+)
+_SECOND_LOOP_AUTH_ROUTE_NAMES: frozenset[str] = frozenset(
+    name for _, name, auth in _ROUTE_TABLE if auth == AuthClass.BEARER_SECOND_LOOP
+)
+_TELEMETRY_ROUTE_NAMES: frozenset[str] = frozenset(
+    name for _, name, auth in _ROUTE_TABLE if auth == AuthClass.BEARER_TELEMETRY
 )
 
-# Routes served by the non-telemetry dispatch loop that nonetheless expose
-# workspace-sensitive data — server registry/ports (api_panel_status), repo
-# filesystem paths (api_contexts), and report/memory file contents. They require
-# Bearer auth whenever the panel is NOT loopback-bound (defense in depth; under
-# loopback the bypass waives auth for the local dev experience).
-_SECOND_LOOP_AUTH_ROUTES: frozenset[str] = frozenset(
-    {"api_panel_status", "api_contexts", "reports_serve", "memory", "memory_view"}
-)
+# Legacy aliases preserved for backward compatibility (external tests may import these).
+_BEARER_ONLY_ROUTES = _BEARER_ONLY_ROUTE_NAMES
+_SECOND_LOOP_AUTH_ROUTES = _SECOND_LOOP_AUTH_ROUTE_NAMES
+
+# Backward-compatible flat raw routes list (pattern, name) — consumed by some tests.
+_RAW_ROUTES: list[tuple[str, str]] = [(pat, name) for pat, name, _ in _ROUTE_TABLE]
 
 _POST_WORKFLOW_RUN_RE = re.compile(r"^/api/workflows/(?P<workflow_name>[^/]+)/run$")
 
@@ -264,15 +310,33 @@ def make_handler_class(
         when this flag is active — a deliberate dev-local trade-off for a
         read-only GET surface.
     """
-    compiled: list[tuple[re.Pattern[str], str, Callable[..., tuple[int, str, bytes]]]] = [
-        (re.compile(pat), name, views[name]) for pat, name in _RAW_ROUTES if name in views
-    ]
-    # Telemetry routes are handled inline (not via views dict) because they
-    # depend on the injected telemetry service and auth token — not a pure
-    # view callable that can be passed in from outside.
-    # Exception: "api_agents" may be provided in views (PR3-08 canonical overlay)
-    # in which case it is dispatched from views with active_window_days kwarg.
-    # Routes that require Bearer auth: telemetry routes + bearer-only (no telemetry needed).
+    # Build compiled route list, filtering only routes whose names are in views
+    # OR that are telemetry-dispatched (handled inline, not via views).
+    compiled: list[
+        tuple[re.Pattern[str], str, AuthClass, Callable[..., tuple[int, str, bytes]] | None]
+    ] = []
+    for pat, name, auth in _ROUTE_TABLE:
+        if name in views:
+            compiled.append((re.compile(pat), name, auth, views[name]))
+        elif auth in (AuthClass.BEARER_TELEMETRY, AuthClass.BEARER):
+            # Telemetry-dispatched routes or bearer routes not in views dict
+            # are registered without a view callable — dispatch handles them inline.
+            compiled.append((re.compile(pat), name, auth, None))
+
+    _token = token
+    _telemetry = telemetry
+    _loopback_bypass = loopback_bypass
+
+    if _loopback_bypass:
+        import logging as _logging
+
+        _logging.getLogger(__name__).warning(
+            "[PANEL] Auth disabled for loopback (127.0.0.1) connections."
+        )
+
+    _UNAUTHORIZED_BODY = b'{"error": "unauthorized"}'
+
+    # Keep the legacy tel_patterns for _dispatch_telemetry (used for BEARER_TELEMETRY routes).
     _BEARER_AUTH_ROUTE_NAMES = (
         "api_academy",
         "api_agents",
@@ -292,21 +356,8 @@ def make_handler_class(
         (re.compile(pat), name) for pat, name in _RAW_ROUTES if name in _BEARER_AUTH_ROUTE_NAMES
     ]
 
-    _token = token
-    _telemetry = telemetry
-    _loopback_bypass = loopback_bypass
-
-    if _loopback_bypass:
-        import logging as _logging
-
-        _logging.getLogger(__name__).warning(
-            "[PANEL] Auth disabled for loopback (127.0.0.1) connections."
-        )
-
-    _UNAUTHORIZED_BODY = b'{"error": "unauthorized"}'
-
     class PanelHandler(BaseHTTPRequestHandler):
-        _routes = compiled
+        _compiled_routes = compiled
         _tel_patterns = telemetry_patterns
 
         def do_GET(self) -> None:  # noqa: N802
@@ -314,34 +365,39 @@ def make_handler_class(
             path = parsed.path
             qs = urllib.parse.parse_qs(parsed.query)
 
-            # ------------------------------------------------------------------
-            # Check telemetry routes first (they require Bearer auth).
-            # ------------------------------------------------------------------
-            for pattern, route_name in self._tel_patterns:
+            for pattern, route_name, auth_class, view in self._compiled_routes:
                 m = pattern.match(path)
-                if m is not None:
-                    # Enforce Bearer auth on all /api/* routes unless the server
-                    # is bound to loopback (127.0.0.1) with bypass active.
-                    auth_header = self.headers.get("Authorization")
+                if m is None:
+                    continue
+
+                # Auth enforcement based on auth_class.
+                if auth_class == AuthClass.PUBLIC:
+                    # No auth required.
+                    pass
+                elif auth_class == AuthClass.BEARER:
+                    # Bearer required; no telemetry dependency.
                     if not _loopback_bypass and (
-                        _token is None or not _validate_bearer(auth_header, _token)
+                        _token is None
+                        or not _validate_bearer(self.headers.get("Authorization"), _token)
                     ):
-                        self._respond(
-                            401,
-                            "application/json",
-                            _UNAUTHORIZED_BODY,
-                        )
+                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
                         return
-
-                    # Bearer-only routes (e.g. api_agent_prompt) do not require
-                    # the telemetry service — dispatch them directly from views.
-                    if route_name in _BEARER_ONLY_ROUTES:
-                        if route_name in views:
-                            self._dispatch_telemetry(route_name, m.groupdict(), qs)
-                        else:
-                            self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+                elif auth_class == AuthClass.BEARER_SECOND_LOOP:
+                    # Bearer required on non-loopback connections.
+                    if not _loopback_bypass and (
+                        _token is None
+                        or not _validate_bearer(self.headers.get("Authorization"), _token)
+                    ):
+                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
                         return
-
+                elif auth_class == AuthClass.BEARER_TELEMETRY:
+                    # Bearer required; telemetry must be available.
+                    if not _loopback_bypass and (
+                        _token is None
+                        or not _validate_bearer(self.headers.get("Authorization"), _token)
+                    ):
+                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
+                        return
                     if _telemetry is None:
                         self._respond(
                             503,
@@ -349,9 +405,7 @@ def make_handler_class(
                             b'{"error": "telemetry not configured"}',
                         )
                         return
-
-                    # T-AM-21: degraded mode — SQLite was corrupt and quarantined.
-                    # Auth is checked first (401 precedes 503 per ordering requirement).
+                    # T-AM-21: degraded mode.
                     if getattr(_telemetry, "is_degraded", False):
                         self._respond(
                             503,
@@ -360,32 +414,29 @@ def make_handler_class(
                         )
                         return
 
+                # Dispatch.
+                if view is not None:
+                    # BEARER-only or PUBLIC routes dispatched directly from views.
+                    if auth_class in (
+                        AuthClass.PUBLIC,
+                        AuthClass.BEARER,
+                        AuthClass.BEARER_SECOND_LOOP,
+                    ):
+                        status, content_type, body = view(**m.groupdict())
+                        is_static = path.startswith("/static/")
+                        self._respond(
+                            status,
+                            content_type,
+                            body,
+                            cache_control="no-cache" if is_static else None,
+                        )
+                        return
+                    # BEARER_TELEMETRY with view in views dict (e.g. api_agents canonical overlay).
                     self._dispatch_telemetry(route_name, m.groupdict(), qs)
                     return
-
-            # ------------------------------------------------------------------
-            # Existing routes (no auth required in v1 for non-/api/* paths).
-            # /api/panel-status and /api/contexts are in views dict — they do NOT
-            # require Bearer in v1 to preserve backward compatibility.
-            # ------------------------------------------------------------------
-            for pattern, route_name, view in self._routes:
-                m = pattern.match(path)
-                if m is not None:
-                    if (
-                        route_name in _SECOND_LOOP_AUTH_ROUTES
-                        and not _loopback_bypass
-                        and (
-                            _token is None
-                            or not _validate_bearer(self.headers.get("Authorization"), _token)
-                        )
-                    ):
-                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
-                        return
-                    status, content_type, body = view(**m.groupdict())
-                    is_static = path.startswith("/static/")
-                    self._respond(
-                        status, content_type, body, cache_control="no-cache" if is_static else None
-                    )
+                else:
+                    # Route registered without a view: delegate to telemetry dispatch.
+                    self._dispatch_telemetry(route_name, m.groupdict(), qs)
                     return
 
             # 404 fall-through (T-2.3)
@@ -394,7 +445,8 @@ def make_handler_class(
         def do_DELETE(self) -> None:  # noqa: N802
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
-            for pattern, route_name in self._tel_patterns:
+            # Use the dedicated DELETE route table (ordering is structural).
+            for pattern, route_name in _COMPILED_DELETE_ROUTE_TABLE:
                 m = pattern.match(path)
                 if m is not None:
                     auth_header = self.headers.get("Authorization")
@@ -402,6 +454,7 @@ def make_handler_class(
                         self._respond(401, "application/json", _UNAUTHORIZED_BODY)
                         return
                     if route_name == "api_report_mark_important":
+                        # DELETE /important → unmark action.
                         if "api_report_unmark_important" in views:
                             status, content_type, body = views["api_report_unmark_important"](
                                 path=m.groupdict().get("path", "")

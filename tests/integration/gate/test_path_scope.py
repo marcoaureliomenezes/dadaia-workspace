@@ -1,21 +1,19 @@
-"""Integration tests for the v0.1.6 gate RULE D (write-allowlist via agents.index.json).
+"""Integration tests for gate path classification + precedence in sdd-spec-gate.sh.
 
-Black-box tests that invoke ``sdd-spec-gate.sh`` as a subprocess with controlled
-stdin/env and assert on stdout (the block JSON) and exit code.
+0.1.7 rc-3 removed RULE D (the per-persona write-allowlist via agents.index.json). It
+was fail-open and never fired for an agent (persona is never set in the hook process
+environment), so it was a dormant latent lock. With it gone, a MUTATING write
+(``specs/releases/**``, ``repos/<ctx>/**``) is governed only by the single-session
+lease — the one deterministic lock the product keeps. ADDITIVE paths always flow;
+MEMORY and FROZEN still decide before the lease.
 
-NEW contract (v0.1.6):
-- RULE D runs ONLY on MUTATING paths (``specs/releases/**``, ``repos/<ctx>/**``).
-  ADDITIVE paths (``.dadaia/reports``, ``.dadaia/handoff``, ``specs/backlog`` …) are
-  never path-scope checked.
-- RULE D reads ``.dadaia/agentic/agents.index.json`` ({agent: [globs]}), substitutes
-  ``<ctx>`` with the bound context, and BLOCKs only when a persona is set, is present
-  in the index, and none of its globs match. No persona / persona-absent-from-index /
-  a matching glob → RULE D passes (fail-open on unknown writer).
-- Precedence: MEMORY (RULE A) and FROZEN (RULE B) decide before RULE D.
+These black-box tests invoke ``sdd-spec-gate.sh`` as a subprocess with controlled
+stdin/env and assert on stdout (block JSON) and exit code.
 """
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import subprocess
@@ -36,16 +34,11 @@ _GATE = (
 
 def _build_workspace(
     tmp_path: Path,
-    index: dict[str, list[str]] | None = None,
     active_phase: str = "TASKS",
     active_release: str = "test-release-v1",
     context_name: str = "dadaia-workspace",
 ) -> Path:
-    """Minimal workspace: agents.index.json + spec_contexts.json + ACTIVE.md."""
-    agentic = tmp_path / ".dadaia" / "agentic"
-    agentic.mkdir(parents=True)
-    (agentic / "agents.index.json").write_text(json.dumps(index or {}), encoding="utf-8")
-
+    """Minimal workspace: spec_contexts.json + bound-context ACTIVE.md."""
     # Bound-context ACTIVE.md lives under repos/<ctx>/specs (gate reads it there).
     rel_dir = tmp_path / "repos" / context_name / "specs" / "releases" / active_release
     rel_dir.mkdir(parents=True)
@@ -105,12 +98,12 @@ def _blocked(stdout: str) -> bool:
     return '"decision": "block"' in stdout or '"decision":"block"' in stdout
 
 
-# --- RULE D only applies to MUTATING paths ---------------------------------
+# --- ADDITIVE paths always flow --------------------------------------------
 
 
-def test_additive_report_path_never_path_scoped(tmp_path: Path) -> None:
-    """An agent writing to ANY .dadaia/reports path is ALLOWED (ADDITIVE, no RULE D)."""
-    ws = _build_workspace(tmp_path, index={"code-reviewer": ["specs/**"]})
+def test_additive_report_path_allowed(tmp_path: Path) -> None:
+    """An agent writing to ANY .dadaia/reports path is ALLOWED (ADDITIVE)."""
+    ws = _build_workspace(tmp_path)
     out, _ = _run_gate(
         ws,
         ".dadaia/reports/other-agent/x.html",
@@ -119,48 +112,31 @@ def test_additive_report_path_never_path_scoped(tmp_path: Path) -> None:
     assert not _blocked(out)
 
 
-def test_mutating_in_allowlist_allowed(tmp_path: Path) -> None:
-    ws = _build_workspace(tmp_path, index={"product-engineer": ["specs/**"]})
-    out, _ = _run_gate(
-        ws,
-        "specs/releases/test-release-v1/SPEC.md",
-        env_overrides={"DADAIA_AGENT_PERSONA": "product-engineer"},
-    )
-    assert not _blocked(out)
+# --- MUTATING is governed only by the lease (RULE D removed) ----------------
 
 
-def test_mutating_outside_allowlist_blocked(tmp_path: Path) -> None:
-    ws = _build_workspace(
-        tmp_path, index={"code-reviewer": [".dadaia/reports/<ctx>/code-reviewer/**"]}
-    )
+def test_mutating_with_persona_allowed_no_allowlist(tmp_path: Path) -> None:
+    """A MUTATING write with any persona is allowed — no per-persona allowlist deny."""
+    ws = _build_workspace(tmp_path)
     out, _ = _run_gate(
         ws,
-        "specs/releases/test-release-v1/SPEC.md",
+        "repos/dadaia-workspace/specs/releases/test-release-v1/SPEC.md",
         env_overrides={"DADAIA_AGENT_PERSONA": "code-reviewer"},
     )
-    assert _blocked(out)
-    assert "write_allowlist does not permit" in out
+    assert not _blocked(out)
+    assert "write_allowlist" not in out
 
 
-def test_mutating_no_persona_fail_open(tmp_path: Path) -> None:
-    """No persona env → RULE D is skipped (fail-open), lease then allows."""
-    ws = _build_workspace(tmp_path, index={"code-reviewer": ["nope/**"]})
-    out, _ = _run_gate(ws, "specs/releases/test-release-v1/SPEC.md")
+def test_mutating_no_persona_allowed(tmp_path: Path) -> None:
+    """No persona env → lease allows (fresh session)."""
+    ws = _build_workspace(tmp_path)
+    out, _ = _run_gate(ws, "repos/dadaia-workspace/specs/releases/test-release-v1/SPEC.md")
     assert not _blocked(out)
 
 
-def test_mutating_persona_absent_from_index_fail_open(tmp_path: Path) -> None:
-    ws = _build_workspace(tmp_path, index={"code-reviewer": ["nope/**"]})
-    out, _ = _run_gate(
-        ws,
-        "specs/releases/test-release-v1/SPEC.md",
-        env_overrides={"DADAIA_AGENT_PERSONA": "ghost-agent"},
-    )
-    assert not _blocked(out)
-
-
-def test_double_star_glob_matches_nested(tmp_path: Path) -> None:
-    ws = _build_workspace(tmp_path, index={"software-engineer": ["repos/<ctx>/**"]})
+def test_mutating_repos_path_allowed(tmp_path: Path) -> None:
+    """A write under repos/<ctx>/** is MUTATING and lease-allowed for a fresh session."""
+    ws = _build_workspace(tmp_path)
     out, _ = _run_gate(
         ws,
         "repos/dadaia-workspace/dadaia_workspace/features/x.py",
@@ -169,55 +145,12 @@ def test_double_star_glob_matches_nested(tmp_path: Path) -> None:
     assert not _blocked(out)
 
 
-def test_ctx_substitution_matches_bound_context(tmp_path: Path) -> None:
-    ws = _build_workspace(
-        tmp_path,
-        index={"software-engineer": ["repos/<ctx>/tests/**"]},
-        context_name="dadaia-workspace",
-    )
-    out, _ = _run_gate(
-        ws,
-        "repos/dadaia-workspace/tests/unit/x.py",
-        env_overrides={"DADAIA_AGENT_PERSONA": "software-engineer"},
-    )
-    assert not _blocked(out)
+# --- precedence: MEMORY / FROZEN decide before the lease -------------------
 
 
-# --- persona env resolution ------------------------------------------------
-
-
-def test_harness_specific_persona_env_resolves(tmp_path: Path) -> None:
-    ws = _build_workspace(tmp_path, index={"code-reviewer": ["nope/**"]})
-    out, _ = _run_gate(
-        ws,
-        "specs/releases/test-release-v1/SPEC.md",
-        env_overrides={"CLAUDE_AGENT_PERSONA": "code-reviewer"},
-    )
-    assert _blocked(out)
-
-
-def test_dadaia_persona_takes_priority(tmp_path: Path) -> None:
-    """DADAIA_AGENT_PERSONA (matching) wins over CLAUDE_AGENT_PERSONA (non-matching)."""
-    ws = _build_workspace(
-        tmp_path,
-        index={"product-engineer": ["specs/**"], "code-reviewer": ["nope/**"]},
-    )
-    out, _ = _run_gate(
-        ws,
-        "specs/releases/test-release-v1/SPEC.md",
-        env_overrides={
-            "DADAIA_AGENT_PERSONA": "product-engineer",
-            "CLAUDE_AGENT_PERSONA": "code-reviewer",
-        },
-    )
-    assert not _blocked(out)
-
-
-# --- precedence: MEMORY / FROZEN decide before RULE D ----------------------
-
-
-def test_memory_atomicity_wins_over_path_scope(tmp_path: Path) -> None:
-    ws = _build_workspace(tmp_path, index={"code-reviewer": ["specs/**"]}, active_phase="TASKS")
+def test_memory_atomicity_blocks(tmp_path: Path) -> None:
+    """A memory write outside DEFINITION/CLOSURE is blocked regardless of persona."""
+    ws = _build_workspace(tmp_path, active_phase="TASKS")
     out, _ = _run_gate(
         ws,
         "repos/dadaia-workspace/specs/memory/architecture.md",
@@ -227,8 +160,9 @@ def test_memory_atomicity_wins_over_path_scope(tmp_path: Path) -> None:
     assert "memory/ is atomic" in out
 
 
-def test_archive_path_blocked_before_path_scope(tmp_path: Path) -> None:
-    ws = _build_workspace(tmp_path, index={"software-engineer": ["specs/**"]})
+def test_archive_path_blocked(tmp_path: Path) -> None:
+    """A write under specs/_archive/ is FROZEN regardless of persona."""
+    ws = _build_workspace(tmp_path)
     out, _ = _run_gate(
         ws,
         "repos/dadaia-workspace/specs/_archive/old.md",
@@ -236,3 +170,113 @@ def test_archive_path_blocked_before_path_scope(tmp_path: Path) -> None:
     )
     assert _blocked(out)
     assert "_archive/ is read-only" in out
+
+
+# --- the KEPT lock: single-session lease still BLOCKs a live foreign writer -----
+
+
+def test_mutating_blocked_by_live_foreign_lease(tmp_path: Path) -> None:
+    """rc-3 keeps exactly ONE deterministic lock: the single-session lease. Prove it
+    end-to-end at the gate (black-box): a live FOREIGN session holding the context
+    lease must BLOCK a second session's MUTATING write (yield-iff-live-foreign).
+
+    Closes the coverage gap flagged in 0.1.7 rc-3 review (qa + code-reviewer): the
+    surviving lock's block path had only unit-level coverage in test_lease_*.py.
+    """
+    ws = _build_workspace(tmp_path)
+    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    now = datetime.datetime.now(datetime.UTC).isoformat()
+    (lock_dir / "dadaia-workspace.lock.json").write_text(
+        json.dumps(
+            {
+                "context": "dadaia-workspace",
+                "release": "test-release-v1",
+                "session_id": "foreign-holder-9999",
+                "mode": "IMPLEMENTATION",
+                "acquired_at": now,
+                "heartbeat": now,  # fresh → live within TTL
+                "ttl": 120,
+            }
+        ),
+        encoding="utf-8",
+    )
+    # A DIFFERENT session attempts a MUTATING write → blocked by the live foreign lease.
+    out, _ = _run_gate(
+        ws,
+        "repos/dadaia-workspace/specs/releases/test-release-v1/SPEC.md",
+        env_overrides={"CLAUDE_CODE_SESSION_ID": "my-other-session-0001"},
+    )
+    assert _blocked(out), f"expected MUTATING block by live foreign lease, got: {out!r}"
+
+
+def test_mutating_renews_for_lease_holder(tmp_path: Path) -> None:
+    """The lease holder is never self-blocked: same session id RENEWs (ALLOW)."""
+    ws = _build_workspace(tmp_path)
+    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    runtime = ws / ".dadaia" / "sessions" / "runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    now = datetime.datetime.now(datetime.UTC).isoformat()
+    holder = "incumbent-session-0001"
+    (lock_dir / "dadaia-workspace.lock.json").write_text(
+        json.dumps(
+            {
+                "context": "dadaia-workspace",
+                "release": "test-release-v1",
+                "session_id": holder,
+                "mode": "IMPLEMENTATION",
+                "acquired_at": now,
+                "heartbeat": now,
+                "ttl": 120,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (runtime / "dadaia-workspace.ptr").write_text(holder, encoding="utf-8")
+    out, _ = _run_gate(
+        ws,
+        "repos/dadaia-workspace/specs/releases/test-release-v1/SPEC.md",
+        env_overrides={"CLAUDE_CODE_SESSION_ID": holder},
+    )
+    assert not _blocked(out), f"holder must RENEW, not block; got: {out!r}"
+
+
+# --- rc-4: context resolved from the write PATH → no cross-context contamination -----
+
+
+def test_no_cross_context_lease_contamination(tmp_path: Path) -> None:
+    """rc-4 / T-017-29 (fixes gate-cross-context-lock-contamination): a live lease held for
+    context A must NOT block a MUTATING write to a DIFFERENT context B. The gate resolves the
+    lease context from the write-target path (repos/<slug>/...), not from first-ALIVE.
+    """
+    ws = _build_workspace(tmp_path)  # bound/first-ALIVE context = dadaia-workspace
+    # Seed a live foreign lease for a DIFFERENT context (the contaminator in the real bug).
+    (ws / "repos" / "other-ctx" / "specs" / "releases" / "r1").mkdir(parents=True)
+    (ws / "repos" / "other-ctx" / "specs" / "releases" / "ACTIVE.md").write_text(
+        "release: r1\nphase: TASKS\n", encoding="utf-8"
+    )
+    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    now = datetime.datetime.now(datetime.UTC).isoformat()
+    (lock_dir / "other-ctx.lock.json").write_text(
+        json.dumps(
+            {
+                "context": "other-ctx",
+                "release": "r1",
+                "session_id": "holder-of-other-ctx",
+                "mode": "IMPLEMENTATION",
+                "acquired_at": now,
+                "heartbeat": now,
+                "ttl": 120,
+            }
+        ),
+        encoding="utf-8",
+    )
+    # Write to dadaia-workspace's repo while other-ctx is locked → must ALLOW (no cross-block).
+    out, _ = _run_gate(
+        ws,
+        "repos/dadaia-workspace/specs/releases/test-release-v1/SPEC.md",
+        env_overrides={"CLAUDE_CODE_SESSION_ID": "ws-session"},
+    )
+    assert not _blocked(out), f"cross-context write must NOT be blocked; got: {out!r}"

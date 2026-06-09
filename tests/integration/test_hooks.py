@@ -65,6 +65,101 @@ def test_ctx_inject_reports_active_context(workspace: Path) -> None:
     assert "[active-ctx]" in result.stdout
 
 
+def test_ctx_inject_emits_dispatcher_preflight(workspace: Path) -> None:
+    """T-017-20: when a context is bound, ctx-inject injects the dispatcher
+    preflight so SDD role-routing is a deterministic instruction (not advisory).
+
+    Covers the deployable/deterministic part of bug
+    codex-workflow-dispatch-not-deterministically-enforced.
+    """
+    scripts = _install_scripts(workspace)
+    (workspace / "repos" / "active-ctx" / "specs").mkdir(parents=True)
+    env = {**os.environ, "DADAIA_CONTEXT": "active-ctx", "WORKSPACE_ROOT": str(workspace)}
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    out = result.stdout
+    assert "dispatcher preflight" in out
+    # owning-role routing is named
+    assert "project-manager" in out
+    assert "ai-engineer" in out
+    # subagent-tool discovery before proceeding (the bug's core complaint)
+    assert "tool_search" in out
+    # truthful auto-spawn limitation (backlog acceptance #6)
+    assert "does NOT auto-spawn" in out
+
+
+def test_ctx_inject_no_preflight_without_context(workspace: Path) -> None:
+    """No ALIVE context → no dispatcher preflight (and no nag)."""
+    scripts = _install_scripts(workspace)
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        env={k: v for k, v in os.environ.items() if k != "DADAIA_CONTEXT"},
+        timeout=5,
+    )
+    assert result.returncode == 0
+    assert "dispatcher preflight" not in result.stdout
+
+
+def test_ctx_inject_no_preflight_when_specs_dir_absent(workspace: Path) -> None:
+    """Context bound but its specs/ dir is absent → no preflight (and no context header).
+
+    Guards the `else` branch of the specs-dir check: the preflight is only written
+    when SPECS_DIR exists, so a context with no specs tree must emit neither.
+    """
+    scripts = _install_scripts(workspace)
+    # DADAIA_CONTEXT is set but repos/<ctx>/specs is intentionally NOT created.
+    env = {**os.environ, "DADAIA_CONTEXT": "ghost-ctx", "WORKSPACE_ROOT": str(workspace)}
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    assert "dispatcher preflight" not in result.stdout
+    assert "[ghost-ctx]" not in result.stdout
+
+
+def test_ctx_inject_preflight_in_valid_codex_json(workspace: Path) -> None:
+    """T-017-20: under codex-json output the preflight rides inside a valid
+    JSON envelope's additionalContext (Codex SessionStart contract)."""
+    scripts = _install_scripts(workspace)
+    (workspace / "repos" / "active-ctx" / "specs").mkdir(parents=True)
+    env = {
+        **os.environ,
+        "DADAIA_CONTEXT": "active-ctx",
+        "WORKSPACE_ROOT": str(workspace),
+        "DADAIA_HOOK_OUTPUT": "codex-json",
+        "DADAIA_HOOK_EVENT": "SessionStart",
+    }
+    result = subprocess.run(
+        ["bash", str(scripts / "ctx-inject.sh")],
+        capture_output=True,
+        text=True,
+        cwd="/tmp",
+        timeout=5,
+        env=env,
+    )
+    assert result.returncode == 0
+    envelope = json.loads(result.stdout)
+    hso = envelope["hookSpecificOutput"]
+    assert hso["hookEventName"] == "SessionStart"
+    assert "dispatcher preflight" in hso["additionalContext"]
+    assert "tool_search" in hso["additionalContext"]
+
+
 def test_ctx_inject_honors_dadaia_context_env(workspace: Path) -> None:
     scripts = _install_scripts(workspace)
     (workspace / "repos" / "envctx" / "specs").mkdir(parents=True)
@@ -400,6 +495,99 @@ def test_ctx_inject_codex_json_output_is_parseable(workspace: Path) -> None:
     assert "json-mode" in hook_output["additionalContext"]
 
 
+def test_ctx_inject_codex_stdin_session_id_idempotent(workspace: Path) -> None:
+    """T-016-C01: ctx-inject keys idempotence on the session_id Codex passes on stdin.
+
+    Two consecutive invocations in the same logical session inject exactly once; the
+    second produces NO output (not even a breadcrumb). The sentinel is keyed on the
+    stable session_id, never the volatile shell PID ($$)."""
+    scripts, memory_dir, _ = _make_full_context(workspace, "myctx")
+    (memory_dir / "tech-stack.md").write_text("# tech\n\nbootstrap marker\n")
+    env = {
+        **os.environ,
+        "WORKSPACE_ROOT": str(workspace),
+        "DADAIA_CONTEXT": "myctx",
+        "DADAIA_HOOK_OUTPUT": "codex-json",
+    }
+    # Strip harness session env vars so the stdin-session_id path is exercised
+    # (env vars correctly take precedence over stdin when present).
+    for _var in (
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "OPENCODE_SESSION_ID",
+        "DADAIA_SESSION_ID",
+    ):
+        env.pop(_var, None)
+    stdin_json = json.dumps({"session_id": "codex-sess-abc", "event": "startup"})
+    sentinel_dir = workspace / ".dadaia" / "tmp"
+    for f in sentinel_dir.glob("ctx-inject-fired-*"):
+        f.unlink(missing_ok=True)
+
+    def _run() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(scripts / "ctx-inject.sh")],
+            input=stdin_json,
+            capture_output=True,
+            text=True,
+            cwd="/tmp",
+            timeout=10,
+            env=env,
+        )
+
+    first = _run()
+    assert first.returncode == 0, first.stderr
+    assert "bootstrap marker" in first.stdout, "first invocation must inject full context"
+    # Sentinel keyed on the stdin session_id (not the PID).
+    assert (sentinel_dir / "ctx-inject-fired-codex-sess-abc").exists()
+    assert not list(sentinel_dir.glob("ctx-inject-fired-[0-9]*")), "no PID-keyed sentinel"
+
+    second = _run()
+    assert second.returncode == 0, second.stderr
+    assert second.stdout.strip() == "", "second prompt must produce no output (no breadcrumb)"
+
+
+def test_ctx_inject_opencode_session_guard(workspace: Path) -> None:
+    """T-016-C02: OpenCode first message injects bootstrap; second appends nothing.
+    Idempotence is keyed on OPENCODE_SESSION_ID."""
+    scripts, memory_dir, _ = _make_full_context(workspace, "myctx")
+    (memory_dir / "tech-stack.md").write_text("# tech\n\noc bootstrap\n")
+    env = {
+        **os.environ,
+        "WORKSPACE_ROOT": str(workspace),
+        "DADAIA_CONTEXT": "myctx",
+        "OPENCODE_SESSION_ID": "oc-sess-1",
+    }
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    env.pop("CODEX_SESSION_ID", None)
+    for f in (workspace / ".dadaia" / "tmp").glob("ctx-inject-fired-*"):
+        f.unlink(missing_ok=True)
+
+    def _run() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(scripts / "ctx-inject.sh")],
+            capture_output=True,
+            text=True,
+            cwd="/tmp",
+            timeout=10,
+            env=env,
+        )
+
+    first = _run()
+    assert first.returncode == 0, first.stderr
+    assert "oc bootstrap" in first.stdout
+    assert (workspace / ".dadaia" / "tmp" / "ctx-inject-fired-oc-sess-1").exists()
+    second = _run()
+    assert second.returncode == 0, second.stderr
+    assert second.stdout.strip() == ""
+
+
+def test_ctx_inject_no_pid_fallback(workspace: Path) -> None:
+    """T-016-C01: the $$ shell-PID fallback is removed from ctx-inject.sh."""
+    src = CTX_INJECT.read_text()
+    assert 'SESSION_ID="$$"' not in src
+    assert "CODEX_SESSION_ID" in src, "session id must be resolvable from the Codex env var"
+
+
 def test_ctx_inject_does_not_call_strip_script(workspace: Path) -> None:
     """T-MMS-07: ctx-inject.sh must not reference or invoke strip-memory-html.py."""
     ctx_inject_src = CTX_INJECT.read_text()
@@ -648,3 +836,40 @@ def test_sdd_gate_one_minus_warn_suppressed_with_parallel_declaration(workspace:
     assert "WARN one-active-task" not in log_content and "WARN: multiple [-]" not in log_content, (
         f"WARN should be suppressed with parallel_tasks declaration. Log:\n{log_content!r}"
     )
+
+
+def test_ctx_inject_injects_once_then_silent_same_session(workspace: Path) -> None:
+    """rc-4 / T-017-30 (fixes repeated-visible-userpromptsubmit-memory-injection):
+    the full bootstrap injects ONCE per session; a second prompt in the SAME session
+    emits nothing — no context line, no dispatcher preflight, no memory."""
+    scripts = _install_scripts(workspace)
+    mem = workspace / "repos" / "ctx1" / "specs" / "memory"
+    mem.mkdir(parents=True)
+    (mem / "tech-stack.md").write_text("# tech stack\n", encoding="utf-8")
+    env = {
+        **os.environ,
+        "DADAIA_CONTEXT": "ctx1",
+        "WORKSPACE_ROOT": str(workspace),
+        "CLAUDE_CODE_SESSION_ID": "sess-abc",
+    }
+    env.pop("DADAIA_SESSION_ID", None)
+
+    def _run() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(scripts / "ctx-inject.sh")],
+            capture_output=True,
+            text=True,
+            cwd="/tmp",
+            timeout=5,
+            env=env,
+        )
+
+    first = _run()
+    assert first.returncode == 0
+    assert "[ctx1]" in first.stdout
+    assert "dispatcher preflight" in first.stdout
+    assert "workspace memory" in first.stdout
+
+    second = _run()
+    assert second.returncode == 0
+    assert second.stdout.strip() == "", f"second prompt must be SILENT, got: {second.stdout!r}"

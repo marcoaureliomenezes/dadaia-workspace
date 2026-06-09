@@ -80,22 +80,47 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     )
 
 
-def resolve_workspace_root_for_init(cwd: Path | None = None) -> Path:
-    """Walk up from *cwd* to find workspace root via sentinel.
+def resolve_workspace_root_for_init(
+    cwd: Path | None = None,
+    *,
+    explicit: bool = False,
+) -> Path:
+    """Resolve the workspace root for ``dadaia init``.
 
-    Falls back to *cwd* when no sentinel is found — safe for first-time init.
+    When *explicit* is ``True`` the supplied *cwd* is treated as the
+    authoritative target: it is returned directly (resolved to an absolute
+    path) without any ancestor-walk.  This is the correct behavior for
+    ``dadaia init --workspace <dir>`` — the caller has told us exactly where
+    to initialize, so we must not silently write into an ancestor workspace.
+
+    When *explicit* is ``False`` (the default) the old semantics are
+    preserved: walk up from *cwd* looking for ``.dadaia/states/
+    spec_contexts.json``, and fall back to *cwd* when nothing is found.
+    This supports the no-argument invocation (``dadaia init`` with no
+    ``--workspace`` flag).
 
     Parameters
     ----------
     cwd:
-        Starting directory. Defaults to ``Path.cwd()`` when *None*.
+        Starting directory (or explicit target when *explicit=True*).
+        Defaults to ``Path.cwd()`` when *None*.
+    explicit:
+        When ``True``, treat *cwd* as the authoritative workspace root and
+        return it immediately.  When ``False``, perform the ancestor-walk
+        with sentinel detection.
 
     Returns
     -------
     Path
-        Workspace root when the sentinel is found, otherwise *cwd* (or
-        ``Path.cwd()`` when *cwd* is *None*).  Never raises.
+        Absolute path to the intended workspace root.  Never raises.
     """
+    if explicit:
+        # Authoritative path: resolve to absolute but do NOT walk up.
+        # The directory may not exist yet (init is allowed to create it).
+        target = cwd if cwd is not None else Path.cwd()
+        return target.resolve()
+
+    # Legacy / default behavior: ancestor-walk with safe fallback.
     try:
         return resolve_workspace_root(cwd)
     except WorkspaceNotInitializedError:

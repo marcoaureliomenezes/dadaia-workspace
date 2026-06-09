@@ -11,6 +11,7 @@ from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
 from dadaia_workspace.core.protocols.process_probe import OsProcessProbe
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
+from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
@@ -45,6 +46,8 @@ from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
+from dadaia_workspace.features.workflows.service import WorkflowsService
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
 from dadaia_workspace.infrastructure.cli_agent_dispatcher import (
@@ -58,10 +61,12 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
+from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
+from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
 
 def _states_dir(workspace_root: Path) -> Path:
@@ -175,17 +180,29 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
     )
 
 
+def build_workflow_catalog_service(workspace_root: Path) -> WorkflowsService:
+    """Compose a ``WorkflowsService`` for the given workspace root."""
+    return WorkflowsService(workspace_root)
+
+
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
     academy: object | None = None,
 ) -> PanelService:
+    states = _states_dir(workspace_root)
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
         telemetry=telemetry,
         academy=academy,
+        workflow_launcher=SubprocessWorkflowLauncher(),
+        workflow_state_store=JsonWorkflowStateStore(states),
+        workflows_service=build_workflow_catalog_service(workspace_root),
+        report_retention=ReportRetentionService(workspace_root),
+        adapter_registry=dict(ADAPTER_REGISTRY),
+        agents_provider=FileSystemAgentsProvider(),
     )
 
 
@@ -263,9 +280,8 @@ def build_panel_views(
         telemetry data on the canonical agent catalog (PR3-08).
     """
     academy = build_academy_service(workspace_root)
+    workflows_service = build_workflow_catalog_service(workspace_root)
     service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
-    # WorkflowsService is exposed via PanelService._workflows_service for the
-    # detail endpoint (get_detail needs name resolution against the filesystem).
     return {
         "index": render_index(service),
         "api_panel_status": render_api_servers(service),
@@ -281,7 +297,7 @@ def build_panel_views(
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
-        "api_workflow_detail": render_api_workflow_detail(service._workflows_service),
+        "api_workflow_detail": render_api_workflow_detail(workflows_service),
         "api_workflow_run": render_api_workflow_run(service),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),

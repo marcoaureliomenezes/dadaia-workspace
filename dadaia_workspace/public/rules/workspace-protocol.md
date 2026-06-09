@@ -44,5 +44,5 @@ operator there is nothing to work on.
 ## 5. Memory atomicity
 `specs/memory/**/*.md` files are write-locked for all agents EXCEPT `product-engineer`, who may write in the DEFINITION and CLOSURE phases per `constitution.md §13`. No other agent edits memory atoms in any phase.
 
-## 6. Write-allowlist enforcement
-Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. The SDD gate enforces this at runtime.
+## 6. Write-allowlist convention
+Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. This is an **agent-instruction convention**, not gate-enforced — the RULE-D allowlist check was removed from the SDD gate in 0.1.7 rc-3 (it was fail-open and never fired for an agent). The only deterministic lock is the single-session lease.

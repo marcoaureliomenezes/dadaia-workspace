@@ -2,7 +2,7 @@
 
 Covers:
   - render_agents_section() returns a non-empty string
-  - Section carries role="tabpanel" and aria-labelledby="tab-agents"
+  - T-016-P09: agents are now a sub-section inside the Ops tab (no longer a tabpanel).
   - Grid container id="agents-grid" is present
   - Empty-state id="agents-empty" element is present and hidden by default
   - Staleness banner id="agents-staleness-banner" is present, hidden, role="status"
@@ -23,10 +23,17 @@ def test_render_agents_section_returns_string() -> None:
 
 
 def test_section_has_role_tabpanel() -> None:
-    """Section must carry role="tabpanel" and aria-labelledby="tab-agents"."""
+    """After T-016-P09 agents are a sub-section (ops-subsection) inside the Ops tab.
+
+    The subsection no longer carries role="tabpanel" / aria-labelledby="tab-agents"
+    because it is not a top-level tab target. Instead, verify the sub-section
+    container ID is present.
+    """
     html = render_agents_section()
-    assert 'role="tabpanel"' in html
-    assert 'aria-labelledby="tab-agents"' in html
+    # Sub-section container must be present (not a tabpanel any more)
+    assert 'id="ops-subsection-agents"' in html
+    # agents-grid must still be present for JS to target
+    assert 'id="agents-grid"' in html
 
 
 def test_section_has_grid_container() -> None:

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T18:28:07.660304+00:00",
+  "generated_at": "2026-06-09T03:08:08.492975+00:00",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -435,8 +435,8 @@
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
-      "tldr": "Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, mandatory grill; alpha-N/rc-N; PM-only backlog writes (hard gate).",
-      "summary": "Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill), alpha-N/rc-N maturity model (ADR-1..5), review cadence (alpha=qa-commit / rc=ship-trio), pre-push CI gate, and backlog-ownership enforcement (PM only writes specs/backlog/**; hard PreToolUse gate, D5).",
+      "tldr": "Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, mandatory grill; alpha-N/rc-N; PM curates backlog (convention).",
+      "summary": "Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill), alpha-N/rc-N maturity model (ADR-1..5), review cadence (alpha=qa-commit / rc=ship-trio), pre-push CI gate, and backlog-ownership as a PM coordination convention (NOT gate-enforced since 0.1.7 rc-3; backlog is ADDITIVE-allow).",
       "tags": [
         "sdd",
         "governance",
@@ -463,7 +463,7 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "tldr": "PreToolUse SDD gate (v0.1.6): path-classifier ADDITIVE/MEMORY/FROZEN/MUTATING/UNGATED; MUTATING acquires one TTL-lease via O_EXCL CAS; fail-safe, <=175 lines.",
-      "summary": "PreToolUse gate (v0.1.6 rewrite, ~168 lines): a path-classifier routes each write to ADDITIVE (allow), MEMORY (phase gate), FROZEN (block), MUTATING (single TTL-lease acquire via O_EXCL CAS — only a live conflict blocks), or UNGATED (allow). Fail-safe: inconclusive states allow. RULE A2 backlog-ownership + RULE D allowlist on MUTATING.",
+      "summary": "PreToolUse gate (v0.1.6 rewrite, ~168 lines): a path-classifier routes each write to ADDITIVE (allow), MEMORY (phase gate), FROZEN (block), MUTATING (single TTL-lease acquire via O_EXCL CAS — only a live conflict blocks), or UNGATED (allow). Fail-safe: inconclusive states allow. Backlog is ADDITIVE-allow; RULE A2/RULE D removed in rc-3.",
       "tags": [
         "sdd",
         "gate",

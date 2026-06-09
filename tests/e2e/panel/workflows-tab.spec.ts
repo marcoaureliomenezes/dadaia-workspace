@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
 
+// Workflows are now inside the Ops tab (T-016-P09 consolidation).
 async function openWorkflowsTab(page: any) {
   await gotoPanel(page);
-  await activateTab(page, 'workflows');
+  await activateTab(page, 'ops');
   await page.waitForSelector(
     '#workflows-grid .workflow-card:not(.workflow-card--skeleton), #workflows-empty:not([hidden])',
     { timeout: 15000 }
@@ -99,7 +100,7 @@ test('Workflows tab has no critical or serious axe violations', async ({ page })
 
   const { AxeBuilder } = await import('@axe-core/playwright');
   const results = await new AxeBuilder({ page })
-    .include('#section-workflows')
+    .include('#section-ops')
     .withTags(['wcag2a', 'wcag2aa'])
     .disableRules(['color-contrast'])
     .analyze();

@@ -274,6 +274,216 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   }
 }
 
+/* ── Theme switcher — swatch popover (T-016-P08 visual redesign) ─────────────
+   Operator design: compact icon-button in topbar (top-right) that opens a clean
+   popover showing 3 themes as labelled colour-dot rows. Active theme is
+   highlighted. Polished spacing, subtle shadow, hover/active states.
+   IDs and data-theme-value attributes are unchanged (e2e selectors preserved).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Button — compact icon-pill in topbar */
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem 0.22rem 0.45rem;
+  background: transparent;
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 20px;            /* pill shape — compact and tidy */
+  color: var(--color-muted, #666666);
+  font-family: var(--font-stack);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.13s, border-color 0.13s, color 0.13s;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.theme-btn:hover {
+  background: var(--color-primary-bg, #f0fbf7);
+  border-color: var(--color-accent, #9cddc8);
+  color: var(--color-text, #222222);
+}
+.theme-btn:active {
+  background: var(--color-accent, #9cddc8);
+  border-color: var(--color-accent, #9cddc8);
+  color: var(--color-heading, #111111);
+}
+.theme-btn:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
+}
+
+/* Half-circle icon (◑) + caret */
+.theme-btn-icon {
+  font-size: 1em;
+  line-height: 1;
+  color: var(--color-accent-dark, #2d7d9a);
+}
+.theme-btn-label {
+  font-size: 0.82rem;
+  color: inherit;
+}
+.theme-btn-caret {
+  font-size: 0.6em;
+  line-height: 1;
+  opacity: 0.7;
+  transition: transform 0.15s var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+}
+/* Rotate caret when open */
+.theme-btn[aria-expanded="true"] .theme-btn-caret {
+  transform: rotate(180deg);
+}
+
+/* Popover panel */
+#theme-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius-card, 6px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 1px 4px rgba(0,0,0,.08);
+  min-width: 130px;
+  animation: theme-popover-in var(--duration-fast, 120ms) var(--easing-decelerate, cubic-bezier(0,0,0.2,1));
+}
+@keyframes theme-popover-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #theme-menu { animation: none; }
+}
+/* The [hidden] attribute hides the menu; JS toggles it. */
+#theme-menu[hidden] { display: none; }
+
+/* Row: colour dot + label */
+#theme-menu [role="menuitemradio"] {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.87rem;
+  color: var(--color-text, #222222);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+  border-radius: 0;
+}
+#theme-menu [role="menuitemradio"]:first-child { border-radius: var(--radius-card, 6px) var(--radius-card, 6px) 0 0; }
+#theme-menu [role="menuitemradio"]:last-child  { border-radius: 0 0 var(--radius-card, 6px) var(--radius-card, 6px); }
+#theme-menu [role="menuitemradio"]:only-child  { border-radius: var(--radius-card, 6px); }
+#theme-menu [role="menuitemradio"]:hover {
+  background: var(--color-primary-bg, #f0fbf7);
+}
+#theme-menu [role="menuitemradio"]:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: -2px;
+  border-radius: var(--radius, 4px);
+}
+
+/* Active row: subtle highlight */
+#theme-menu [role="menuitemradio"][aria-checked="true"] {
+  background: var(--color-primary-bg, #f0fbf7);
+  font-weight: 600;
+  color: var(--color-heading, #111111);
+}
+
+/* Colour dot swatch — filled circle in the theme's accent colour */
+.theme-swatch-dot {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,.15);
+}
+.theme-swatch-dot--mint { background: #9cddc8; }
+.theme-swatch-dot--sage { background: #bfd8ad; }
+.theme-swatch-dot--warm { background: #f7af63; }
+
+/* Theme label — wraps just the text so textContent returns the theme name cleanly */
+.theme-label {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Check mark: CSS ::after on the active row — no DOM node needed */
+#theme-menu [role="menuitemradio"]::after {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  flex-shrink: 0;
+}
+#theme-menu [role="menuitemradio"][aria-checked="true"]::after {
+  content: "✓";
+  color: var(--color-accent-dark, #2d7d9a);
+  font-size: 0.82em;
+  line-height: 1;
+}
+
+/* ── Ops consolidated tab — stacked sub-sections ─────────────────────────────
+   T-016-P09: Agents + Workflows + Kanban merged into one "Ops" nav tab.
+   Each sub-section is stacked vertically inside #section-ops with a labelled
+   header and compact cards.
+   ─────────────────────────────────────────────────────────────────────────── */
+.ops-subsection {
+  margin-bottom: var(--space-xl, 2rem);
+  padding-bottom: var(--space-lg, 1.25rem);
+  border-bottom: 1px solid var(--color-border, #dddddd);
+}
+.ops-subsection:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ops-subsection-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: var(--space-md, 1rem);
+  padding-bottom: var(--space-xs, 0.35rem);
+  border-bottom: 1px solid var(--color-border, #dddddd);
+}
+.ops-subsection-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-heading, #111111);
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Compact agent cards inside ops — smaller min-width so more fit per row */
+.agents-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+@media (max-width: 767px) {
+  .agents-grid--compact {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Compact workflow cards inside ops — 3 columns at >=1024px */
+.workflows-grid--compact {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 900px) {
+  .workflows-grid--compact {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .workflows-grid--compact {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Warm theme focus-visible override (E2E-THM-07) ─────────────────────────
    Amber alone fails the WCAG 3:1 UI-component contrast threshold on white.
    In the Warm theme the focus ring uses --color-accent-dark (brown) as the

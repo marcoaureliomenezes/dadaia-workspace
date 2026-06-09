@@ -1,0 +1,626 @@
+# Tasks: Release 0.1.7 — Implementation Rot Remediation
+
+**Status:** Aprovado
+**Release ID:** 0.1.7
+**Owner:** product-engineer
+
+Parallelism note: T-017-01 through T-017-05 and T-017-14 have disjoint write sets
+and may run in parallel (Wave 1). All other waves are sequential per PLAN.md.
+
+---
+
+## Wave 1 — Trivial / Safe (parallel-safe; disjoint write sets)
+
+### [x] T-017-01
+**Finding:** D-01 / AR-05
+**Title:** Fix stale `CANONICAL_AGENTS` in `reports_next/service.py`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/reports_next/service.py`, `tests/unit/features/reports_next/`
+**Precondition:** none
+**Work:** Replace the `CANONICAL_AGENTS` frozenset at lines 23-41 with the 12-name
+public set (9 core + 3 plugins): `ai-engineer`, `code-reviewer`, `design-specialist`,
+`devops-engineer`, `frontend-engineer`, `product-engineer`, `project-auditor`,
+`project-manager`, `qa-engineer`, `security-reviewer`, `software-architect`,
+`software-engineer`. Update any unit tests that assert on the old 15-name set.
+**Done criterion:** `grep -A30 'CANONICAL_AGENTS' dadaia_workspace/features/reports_next/service.py`
+shows exactly 12 names. `pytest tests/unit/features/reports_next/` exits 0.
+
+---
+
+### [x] T-017-02
+**Finding:** D-02 / AR-06
+**Title:** Replace `_WORKSPACE_ROOT` static derivation with `resolve_workspace_root()`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/cli/main.py`, `repos/.dadaia/` (delete)
+**Precondition:** none
+**Work:** Delete `_WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent.parent`
+(line 68). Inside `_safe_app()`, replace its usage with a call to
+`resolve_workspace_root()` wrapped in `try/except WorkspaceNotInitializedError`
+(fall back to a path under `/tmp` on error). Delete the stray `repos/.dadaia/` directory
+and its contents. Add a one-line comment explaining the fix.
+**Done criterion:** `grep '_WORKSPACE_ROOT' dadaia_workspace/cli/main.py` returns empty.
+`[ ! -d repos/.dadaia ]` exits 0. `pytest tests/unit/cli/` exits 0 (if tests exist).
+
+---
+
+### [x] T-017-03
+**Finding:** D-04 / AR-07
+**Title:** Delete dead HTML-era classes in `specs/doctor.py`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/specs/doctor.py`
+**Precondition:** none
+**Work:** Delete `_MemoryHtmlSummary`, `_MemoryParser`, and `_parse_memory_html` at
+lines 266-350. Replace the "retained for any callers" comment with
+"HTML-era parser deleted in v0.1.7 post-memory-markdown-source-v1 cleanup."
+**Done criterion:** `grep -r '_MemoryHtmlSummary\|_MemoryParser\|_parse_memory_html' dadaia_workspace/`
+returns empty. `pytest tests/unit/features/specs/` exits 0.
+
+---
+
+### [x] T-017-04
+**Finding:** D-10
+**Title:** Remove 4 hidden deprecated `context` stubs
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/cli/commands/context.py`, `tests/` (any tests covering these stubs)
+**Precondition:** none
+**Work:** Delete the four `@app.command(hidden=True)` functions `activate`, `deactivate`,
+`promote`, `use` at lines 428-469. Add a one-line comment at the top of the removed section:
+"# v2 removals: activate/deactivate/promote/use removed in v0.1.7". Delete any test that
+exclusively tests these stub commands.
+**Done criterion:** `grep -n 'def activate\|def deactivate\|def promote\|def use'
+dadaia_workspace/cli/commands/context.py` returns empty. `pytest` exits 0.
+
+---
+
+### [x] T-017-05
+**Finding:** D-08 / D-09
+**Title:** Test slop cleanup — duplicate contrast tests, dead dashboard test, misplaced test
+**Owner:** software-engineer
+**Write set:** `tests/unit/features/panel/`, `tests/unit/test_dashboard.py`, `tests/test_orchestration_registry.py`, `tests/unit/features/specs/`
+**Precondition:** none
+**Work:**
+1. Compare `tests/unit/features/panel/test_contrast.py` and `test_panel_css_contrast.py`.
+   Keep the more complete file, delete the other. Update any imports.
+2. Delete `tests/unit/test_dashboard.py` (tests dead `dashboard.render_html()`).
+3. Move `tests/test_orchestration_registry.py` to
+   `tests/unit/features/specs/test_orchestration_registry.py`. Do not change test content.
+**Done criterion:** Only one contrast test file exists in `tests/unit/features/panel/`.
+`[ ! -f tests/unit/test_dashboard.py ]` exits 0.
+`[ ! -f tests/test_orchestration_registry.py ]` exits 0.
+`[ -f tests/unit/features/specs/test_orchestration_registry.py ]` exits 0.
+`pytest` exits 0.
+
+---
+
+### [x] T-017-14
+**Finding:** W-5
+**Title:** Bump `pyproject.toml` version 0.1.5 → 0.1.7
+**Owner:** software-engineer
+**Write set:** `pyproject.toml`
+**Precondition:** none
+**Work:** Change `version = "0.1.5"` to `version = "0.1.7"`. No other changes.
+**Done criterion:** `grep 'version = ' pyproject.toml` shows `"0.1.7"`.
+
+---
+
+## Wave 2 — DI / Structural (sequential; architect-designed)
+
+Read `repos/dadaia-workspace/specs/audits/20260608T035551Z-da1a1b2c/architect-review.md`
+AR-01..AR-03 before starting any task in this wave.
+
+### [x] T-017-10
+**Finding:** AR-08
+**Title:** Extract session-staleness predicate to `core/lock_liveness.py`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/core/lock_liveness.py`, `dadaia_workspace/features/panel/views/kanban.py`, `dadaia_workspace/features/spec_context/locking.py`
+**Precondition:** Wave 1 green (`pytest` exit 0)
+**Work:** Add `is_stale_session(last_seen_at: str, ttl_seconds: int) -> bool` to
+`core/lock_liveness.py`. Remove the inline `_is_stale` function from `kanban.py` (lines 69-81)
+and replace all call sites with the imported `is_stale_session`. Remove the duplicated
+predicate from `locking.py` and replace with the same import.
+**Done criterion:** `grep 'def _is_stale' dadaia_workspace/features/panel/views/kanban.py`
+returns empty. `grep 'is_stale_session' dadaia_workspace/features/panel/views/kanban.py`
+shows import. `pytest` exits 0.
+
+---
+
+### [x] T-017-06
+**Finding:** AR-02
+**Title:** Panel DI — inject `WorkflowsService`; fix `container.py` private-attr read
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/panel/service.py`, `dadaia_workspace/container.py`
+**Precondition:** T-017-10 done
+**Work:** Remove `self._workflows_service = WorkflowsService(workspace_root)` from
+`PanelService.__init__` (line 157). Add `workflows_service` as a constructor parameter
+(type annotation: `WorkflowsService` or the `IWorkflowSummaryProvider` protocol if T-017-07
+is being done concurrently; if sequential, use concrete type now and update type annotation
+in T-017-07). Update `container.py:289` to inject `WorkflowsService` directly into
+`build_panel_service()` and `build_panel_views()` instead of accessing
+`service._workflows_service`.
+**Done criterion:** `grep 'WorkflowsService(workspace_root)' dadaia_workspace/features/panel/service.py`
+returns empty. `grep '_workflows_service' dadaia_workspace/container.py` returns empty.
+`pytest` exits 0.
+
+---
+
+### [x] T-017-07
+**Finding:** D-03 / AR-01
+**Title:** Panel protocols — declare 3 `core/protocols/` interfaces; update `panel/service.py` imports
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/core/protocols/` (new files), `dadaia_workspace/features/panel/service.py`, `dadaia_workspace/container.py`
+**Precondition:** T-017-06 done
+**Work:**
+1. Create `dadaia_workspace/core/protocols/context_project_provider.py` with
+   `ContextProjectProvider` Protocol.
+2. Create `dadaia_workspace/core/protocols/server_registry_provider.py` with
+   `ServerRegistryProvider` Protocol.
+3. Create `dadaia_workspace/core/protocols/workflow_provider.py` with
+   `WorkflowProvider` Protocol.
+4. Update `panel/service.py:45-48` to import from `core/protocols/` not from sibling features.
+5. Update `container.py` to wire concrete implementations against the protocols.
+Derive the protocol surface from the methods actually called by `PanelService` on each
+dependency (minimum surface principle).
+**Done criterion:**
+`grep -E 'from dadaia_workspace.features.(server_registry|spec_context|workflows)'
+dadaia_workspace/features/panel/service.py` returns empty.
+`ls dadaia_workspace/core/protocols/*.py` shows at least the 3 new files.
+`mypy --strict dadaia_workspace` exits 0. `pytest` exits 0.
+
+---
+
+### [x] T-017-08
+**Finding:** AR-03
+**Title:** Panel views — move `ReportRetentionService` into `PanelService`; inject `ADAPTER_REGISTRY`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/panel/views/api.py`, `dadaia_workspace/features/panel/service.py`, `dadaia_workspace/container.py`
+**Precondition:** T-017-07 done
+**Work:**
+1. Move `ReportRetentionService` concern into `PanelService` (the service already has
+   `workspace_root`). Remove the per-request `retention = ReportRetentionService(service._workspace_root)` inside `render_api_reports` closure.
+2. Remove `ADAPTER_REGISTRY` direct import from `panel/views/api.py`. Pass it as an
+   injected mapping through `PanelService` or the container.
+3. View functions should receive only `PanelService` and DTOs (no concrete feature imports).
+**Done criterion:** `grep 'ReportRetentionService(' dadaia_workspace/features/panel/views/api.py`
+returns empty. `grep 'ADAPTER_REGISTRY' dadaia_workspace/features/panel/views/api.py`
+returns empty (import removed). `pytest` exits 0; panel integration tests pass.
+
+---
+
+## Wave 3 — Refactors (public_assets.py)
+
+### [x] T-017-09
+**Finding:** D-06 / AR-04
+**Title:** Collapse triplicated guardrail-pair install functions + merge duplicate consumer-repo discovery
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/infrastructure/public_assets.py`
+**Precondition:** Wave 2 green
+**Work:**
+1. Collapse `_install_workspace_guardrail_pair`, `_install_workspace_root_guardrail_pair`,
+   and `_install_consumer_repos_guardrail_pair` into a single function with a
+   `targets: set[Literal["workspace", "repos"]]` parameter. Approximately 330 → 60 lines.
+2. Merge `_consumer_repos_for_root` (free function) and
+   `FileSystemPublicAssetManager._consumer_repos` (instance method) into a single
+   module-level function.
+**Done criterion:** `grep 'def _install_workspace_guardrail_pair\|def _install_workspace_root_guardrail_pair\|def _install_consumer_repos_guardrail_pair'
+dadaia_workspace/infrastructure/public_assets.py` returns ≤1 result.
+`dadaia public doctor` exits 0. `pytest` exits 0.
+
+---
+
+### [x] T-017-11 — DEFERRED TO 0.1.8 (explicit rc-gate decision)
+**Finding:** D-06 (W-8b)
+**Title:** `public_assets.py` module split (staged; finish or explicit rc-gate defer decision)
+
+**DEFER DECISION (2026-06-08, orchestrated rc-gate call):** Deferred to release 0.1.8.
+Reason: the concrete AR-04 *correctness* harm — triplicated guardrail-pair logic and
+duplicated consumer-repo discovery — was fully eliminated in **T-017-09** (3 funcs → 1
+`_install_guardrail_pair`; method delegates to single `_consumer_repos_for_root`).
+What remains (T-017-11) is a pure SRP/organization refactor (splitting the residual
+~2350-line module into `runtime_transforms/codex_assets.py` / `workspace_guardrail.py` /
+`privacy_check.py`). The software-architect classified this as a 2+ release, HIGH-blast-radius
+change; executing it immediately before the review/ship gate would risk a broken tree for
+no correctness gain. This is a **documented defer, not a silent drop** — it carries to 0.1.8
+with the concrete extraction plan already written below. No partial changes committed
+(public_assets.py stays in the consistent post-T-09 state).
+
+**0.1.8 plan (carry-over):** extract one cohesive submodule per commit, each maintaining
+re-exports in `infrastructure/__init__.py`, with `mypy --strict` + `pytest` + `dadaia public
+doctor` green after each: (1) `privacy_check.py` (lowest coupling), (2) `runtime_transforms/
+codex_assets.py`, (3) `workspace_guardrail.py`; residual `public_assets.py` < 600 lines.
+
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/infrastructure/` (new sub-modules)
+**Precondition:** T-017-09 done
+**Work:** Attempt the module split as proposed in W-8:
+- Extract Codex rendering to `infrastructure/runtime_transforms/codex_assets.py`
+- Extract guardrail-pair logic to `infrastructure/workspace_guardrail.py`
+- Extract privacy scanning to `infrastructure/privacy_check.py`
+- Keep staging/install/doctor as residual in `public_assets.py` (<600 lines)
+Each extraction: maintain re-exports at `infrastructure/__init__.py`, run `mypy --strict`,
+run `pytest`, run `dadaia public doctor`.
+**If the split cannot safely complete in this release:** record an explicit defer decision
+in this task's done note before marking `[x]`: "Deferred to 0.1.8: [reason]."
+**Done criterion (either):**
+- Split complete: `wc -l dadaia_workspace/infrastructure/public_assets.py` shows <600 lines.
+  `dadaia public doctor` exits 0. `pytest` exits 0.
+- Explicit defer: Task marked `[x]` with note "Deferred to 0.1.8: [reason]" added here.
+  No partial changes committed.
+
+---
+
+## Wave 4 — Gate Fix
+
+### [x] T-017-15
+**Finding:** NEW (gate bug — blocked PM backlog writes this session)
+**Title:** Fix backlog-ownership gate persona session-pointer fallback in `sdd-spec-gate.sh`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`
+**Precondition:** Wave 3 green (or concurrent with Wave 2/3 if isolated)
+**Work:** In the backlog branch of the gate (RULE A2), add a persona session-pointer
+fallback so that `project-manager` is resolvable even when the context variable is
+resolved via `.ptr` file (the same fallback that exists in the context-resolution branch).
+The current gate blocks legitimate PM backlog writes when persona resolution fails to
+match `project-manager`. After the fix, run `dadaia public stage && dadaia public install --target all`.
+**Done criterion:** `dadaia public doctor` exits 0 after re-projection. Manual smoke test:
+PM agent write to `specs/backlog/` does not trigger gate error. `pytest` exits 0.
+
+---
+
+## Wave 5 — Memory (product-engineer; DEFINITION phase — applied now)
+
+### [x] T-017-12
+**Finding:** D-05
+**Title:** Correct `specs/memory/architecture.md:268` session-file claim
+**Owner:** product-engineer
+**Write set:** `specs/memory/architecture.md`
+**Precondition:** DEFINITION phase active (now)
+**Work:** Applied in DEFINITION phase. The claim "Removido em v0.1.6: os stores
+`.dadaia/sessions/<sess_*>.json`" is inaccurate. Session files are retained for the
+Kanban view and session display. The locking mechanism (Lock-3) was removed, but the
+session files themselves were not. Correction applied inline.
+**Done criterion:** `grep 'sess_\*' specs/memory/architecture.md` shows retention
+claim, not removal claim. `dadaia specs doctor` exits 0.
+
+---
+
+### [x] T-017-13
+**Finding:** D-07
+**Title:** Fix `specs/memory/quality-assurance.md` broken test path reference
+**Owner:** product-engineer
+**Write set:** `specs/memory/quality-assurance.md`
+**Precondition:** DEFINITION phase active (now)
+**Work:** Applied in DEFINITION phase. The Dependências section references
+`tests/integration/test_gate_session_locks.py` which does not exist. The real
+gate tests live at `tests/unit/gate/` and `tests/integration/gate/`. Reference corrected.
+**Done criterion:** `grep 'test_gate_session_locks' specs/memory/quality-assurance.md`
+shows corrected paths. `dadaia specs doctor` exits 0.
+
+---
+
+## Wave 6 — rc-2 (iterate: clear ALL carry-over; no deferrals)
+
+Operator decision 2026-06-08 (rc-1 ship/iterate gate): **iterate**. Fix every
+remaining point from the re-audit `20260608T134914Z-ve4r8ifs` (NEW-01, NEW-02,
+T-017-11 un-deferred, audits-gitignored drift, NEW-03 CLOSURE memory) plus the
+operator-mandated **codex residual** fold-in, so 0.1.7 is deploy-ready with codex
+intact. Each task keeps `mypy --strict` + `pytest` + `dadaia public doctor` green.
+
+### [x] T-017-16
+**Finding:** audits-gitignored-vs-committed drift (re-audit note; [[project_canonical_lifecycle_model]])
+**Title:** Track `specs/audits/**/*.md` (canonical: auditor MD is committed)
+**Owner:** software-engineer
+**Write set:** `.gitignore`
+**Work:** The `/specs/*` privacy backstop ignores `specs/audits/`. The canonical
+lifecycle model commits auditor markdown to `specs/audits/<ts>/`. Add opt-in
+carve-outs (mirroring the releases pattern) that track ONLY `*.md` under
+`specs/audits/*/` — keeping the privacy backstop for any non-markdown artifact.
+`git add` the existing audit + re-audit reports.
+**Done criterion:** `git check-ignore specs/audits/<id>/index.md` returns empty
+(tracked). `git ls-files specs/audits/` lists the audit + re-audit `.md` files.
+
+### [x] T-017-17
+**Finding:** NEW-02
+**Title:** `AgentsProvider` protocol — panel/service.py off concrete `agents.reader`
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/core/protocols/agents_provider.py` (new), `dadaia_workspace/core/models/` (AgentDTO move), `dadaia_workspace/features/panel/service.py`, `dadaia_workspace/features/agents/reader.py`, `dadaia_workspace/container.py`, tests
+**Precondition:** none
+**Work:** Introduce `AgentsProvider` Protocol in `core/protocols/` with the minimum
+surface PanelService uses (`list_canonical_agents`/`read_canonical_agents` + prompt
+read if shared). Move `AgentDTO` to `core/models/` (re-export from `agents.reader`
+for back-compat). PanelService imports the protocol + core DTO, not the concrete
+sibling feature. Wire the concrete impl in `container.py`.
+**Done criterion:** `grep 'from dadaia_workspace.features.agents.reader' dadaia_workspace/features/panel/service.py`
+returns empty. `mypy --strict` + `pytest` green.
+
+### [x] T-017-18
+**Finding:** NEW-01
+**Title:** panel/views/api.py — remove residual `agents.reader` + telemetry imports
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/panel/views/api.py`, `dadaia_workspace/features/panel/service.py`, `dadaia_workspace/core/models/`, tests
+**Precondition:** T-017-17 done
+**Work:** Move `get_prompt` access behind `PanelService.get_agent_prompt(agent_id)`
+returning an `AgentPromptResult` DTO (body + source_path; raises core-typed errors).
+Expose telemetry `AgentSummary` to the view via a `core`-typed DTO (or via
+`PanelService`), removing the direct `telemetry.aggregator.models` import from the
+view. View imports only `PanelService` + core DTOs.
+**Done criterion:** `grep -E 'from dadaia_workspace.features.(agents|telemetry)' dadaia_workspace/features/panel/views/api.py`
+returns empty. `mypy --strict` + `pytest` green; panel integration tests pass.
+
+### [x] T-017-11 (RE-OPENED for rc-2 — execute the split) — DONE: public_assets.py 2350→596 lines
+**Finding:** D-06 (W-8b)
+**Title:** `public_assets.py` module split to < 600 lines
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/infrastructure/` (new sub-modules), `dadaia_workspace/infrastructure/runtime_transforms/`, tests
+**Precondition:** Wave 6 panel tasks green
+**Work:** Extract cohesive units into submodules with behavior-preserving re-exports,
+`mypy --strict` + `pytest` + `dadaia public doctor` green after each commit:
+1. `infrastructure/privacy_check.py` — privacy denylist + scan helpers.
+2. `infrastructure/runtime_transforms/codex_assets.py` — codex/opencode frontmatter
+   parsing + TOML/rules rendering free functions.
+3. `infrastructure/workspace_guardrail.py` — consumer-repo discovery + guardrail-pair
+   install/doctor.
+4. Extract the codex-drift doctor family (`_dcx*`) and/or install family as needed
+   to bring residual `public_assets.py` < 600 lines.
+**Done criterion:** `wc -l dadaia_workspace/infrastructure/public_assets.py` < 600.
+`dadaia public doctor` exits 0. `mypy --strict` + `pytest` green.
+
+### [x] T-017-19
+**Finding:** NEW-03 (re-audit) + CLOSURE-memory carry-over
+**Title:** Record `core/lock_liveness.py` (`is_stale_session`) in architecture memory
+**Owner:** product-engineer
+**Write set:** `specs/memory/architecture.md`
+**Precondition:** CLOSURE phase (applied at rc-2 close)
+**Work:** Add the `lock_liveness` module entry documenting `is_stale_session` as the
+single source of truth for session-staleness (consumed by kanban + spec_context).
+**Done criterion:** `grep 'lock_liveness' specs/memory/architecture.md` non-empty.
+`dadaia specs doctor` exits 0.
+
+### [x] T-017-20
+**Finding:** `codex-workflow-dispatch-not-deterministically-enforced` (High, open) + FEAT-CODEX-COMPAT-100 residual
+**Title:** Codex residual — dispatcher-preflight injection + route tests + truthful docs + status reconcile
+**Owner:** software-engineer (projector/tests); product-engineer (memory/status)
+**Write set:** `dadaia_workspace/public/scripts/ctx-inject.sh`, `tests/` (codex route/contract tests), `specs/memory/**` (codex orchestration truth), `specs/bugs/codex-workflow-dispatch-not-deterministically-enforced.md`, `specs/bugs/codex-agent-orchestration-mismatch.md` (already closed — leave), `specs/backlog/full-codex-compatibility.md`, `specs/backlog/codex-context-hook-and-workflow-enforcement-hotfix.md`
+**Precondition:** none
+**Work:** Codex bulk (custom agents, hooks, Starlark rules, D-CX-1..10 doctor, golden
+tests) was delivered in 0.1.6 and is verified green on this branch. rc-2 closes the
+residual to the maximum DETERMINISTIC extent:
+1. `ctx-inject.sh`: inject a dispatcher-preflight directive into the bound-context
+   block — resolve active context + owning role for the requested artifact class, and
+   when multi-agent / AI-surface work is requested, discover the subagent tool
+   (`tool_search`) BEFORE proceeding. Harness-neutral wording (applies to Codex +
+   Claude). Must stay valid JSON and not fail when no context is bound.
+2. Add a contract/route test asserting the injected context carries the
+   dispatcher-preflight + that a non-PM `specs/backlog/**` write is gate-blocked under
+   the codex hook path.
+3. Document the INHERENT limitation truthfully (acceptance #6 of the backlog): Codex
+   does not auto-spawn subagents from static workflow files; explicit dispatcher/
+   operator fan-out is required. Record in codex orchestration memory.
+4. Reconcile stale statuses: close the open bug with evidence; mark
+   FEAT-CODEX-COMPAT-100 + the hotfix backlog as delivered (0.1.6 bulk + 0.1.7
+   residual), file retained.
+**Done criterion:** new codex route/contract test passes; `ctx-inject.sh` re-projected
+(`dadaia public stage && dadaia public install --target all`); `dadaia public doctor`
+exit 0; bug status flipped to Closed with evidence; `pytest` green.
+
+---
+
+## rc-3 — Unlock the Workflow (ownership is coordination, not a gate lock)
+
+Folded from the drafted 0.1.8 per operator directive (2026-06-09). Wave A is the keystone
+(reprojected gate unblocks Wave C). See SPEC "rc-3 scope addition" + PLAN "rc-3 plan".
+
+### [x] T-017-21
+**Requirement:** FR-rc3-1, FR-rc3-2, FR-rc3-4 (supersedes GA-02 / T-017-15)
+**Title:** Delete the backlog-ownership persona block from the gate; backlog → plain ADDITIVE
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`
+**Work:** In the `ADDITIVE` branch, remove the entire `*/specs/backlog/*` persona sub-check
+(the `PERSONA=...` resolution, the `.persona`/session-JSON fallback added in T-017-15, and
+both `[BACKLOG OWNERSHIP ERROR]` `_block` calls). `specs/backlog/**` then falls through to the
+existing `exit 0` like every other ADDITIVE path. Update the `PROTECTED` block message + the
+file header comment so the `.dadaia/sessions/**` rationale is **lease `.ptr` identity
+integrity**, not persona. Do NOT touch the MUTATING lease, MEMORY, FROZEN branches.
+**Done criterion:** `grep -c 'BACKLOG OWNERSHIP' sdd-spec-gate.sh` → 0; REPRO 1 → exit 0,
+no `decision":"block"`.
+
+### [x] T-017-22
+**Requirement:** FR-rc3-5 (simplification)
+**Title:** Delete the dormant RULE-D write-allowlist deny path
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`
+**Work:** Remove the RULE-D block (persona-keyed `agents.index.json` allowlist + its `deny`
+`_block`). It is fail-open and never fires for an agent (persona never in the hook env), so
+removal is behavior-preserving for agents and removes a latent lock. Leave a one-line comment:
+path-scope is now an agent-instruction convention, not a gate.
+**Done criterion:** `grep -c 'write_allowlist' sdd-spec-gate.sh` → 0; gate still exits 0 on a
+normal MUTATING write (lease path intact).
+
+### [x] T-017-23
+**Requirement:** FR-rc3-5
+**Title:** Re-word `backlog-ownership` rule: convention, not gate
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/rules/backlog-ownership.md`
+**Work:** Replace "A non-`project-manager` Write/Edit ... is a hard gate violation and is
+blocked, naming the offending agent." with: PM is the curating owner/coordinator of the
+backlog by convention; the flow is never gate-blocked; other agents should route backlog
+changes through PM but are not mechanically prevented. Keep the read-vs-write ownership intent.
+**Done criterion:** no "hard gate"/"blocked" claim remains; rule reads as a convention.
+
+### [x] T-017-24
+**Requirement:** FR-rc3-5
+**Title:** Update root law + gate-model memory to describe exactly one lock
+**Owner:** product-engineer (memory) / software-engineer (AGENTS.md)
+**Write set:** `dadaia_workspace/public/data/AGENTS.md`, `specs/memory/product/**` (gate/lock atom)
+**Work:** In `AGENTS.md` (SDD Gate + Bug-Registration/backlog wording) remove the backlog
+"hard gate" claim; state the single tolerated lock (single-session lease for release-def /
+impl+review). Update the memory product atom documenting the gate/lock model (product-engineer,
+phase=IMPLEMENTATION is NOT allowed for memory — do this memory edit in CLOSURE per gate, or
+keep ACTIVE phase=DEFINITION window; coordinate so the MEMORY phase gate permits it).
+**Done criterion:** grep "backlog" + "gate"/"block" in these surfaces shows only convention
+language; memory atom passes `dadaia specs doctor` lint.
+
+### [x] T-017-25
+**Requirement:** FR-rc3-1, FR-rc3-3, FR-rc3-4
+**Title:** Rewrite gate tests for the new contract
+**Owner:** software-engineer
+**Write set:** `tests/integration/gate/test_backlog_ownership.py`,
+`tests/integration/gate/test_path_scope.py`, plus the rc-2 codex-path backlog-block assertion
+added by T-017-20 (locate via `grep -rn 'backlog' tests/`)
+**Work:** Flip `test_backlog_ownership.py` to assert a backlog Write with no persona is
+ALLOWED (exit 0); delete "non-PM blocked"/"unresolved blocked" assertions; ensure a lease
+negative test exists (foreign live session blocked on MUTATING). Adjust `test_path_scope.py`
+for the RULE-D removal. Update/replace the T-017-20 assertion that a non-PM codex-path backlog
+write is blocked → now ALLOWED. Leave `test_protected_sessions.py` asserting sessions blocked.
+**Done criterion:** `pytest tests/integration/gate/` green.
+
+### [x] T-017-26
+**Requirement:** all rc-3
+**Title:** Reproject + full preflight
+**Owner:** software-engineer
+**Write set:** projected runtime files (via CLI; not hand-edited)
+**Work:** `dadaia public stage && dadaia public install --target all && dadaia public doctor`
+(exit 0, `[ok] public-privacy`); `dadaia ci preflight` (ruff format/check, mypy --strict,
+pytest) green.
+**Done criterion:** doctor exit 0; preflight green.
+
+### [x] T-017-27
+**Requirement:** FR-rc3-6
+**Title:** Register the previously-blocked backlog epic via the unlocked flow
+**Owner:** project-manager
+**Write set:** `specs/backlog/harness-agentic-entities-and-determinism-parity.md`,
+`specs/backlog/candidates.md`
+**Work:** With the gate reprojected, author the backlog epic for cross-harness agentic-entity
+architecture + deterministic enforcement (the item the persona lock blocked), and add its
+`candidates.md` entry — using only the Write tool, no env var, no `.persona` pointer. Success
+is the end-to-end proof of FR-rc3-1/2 on the live instance.
+**Done criterion:** both files written by the Write tool with no gate block.
+
+### [x] T-017-28
+**Requirement:** FR-rc3-6
+**Title:** Close persona bugs + flag stale pick
+**Owner:** product-engineer / project-manager
+**Write set:** `specs/bugs/codex-dispatched-agent-persona-not-propagated-to-sdd-gate.md`,
+`specs/bugs/backlog-ownership-gate-persona-unreachable-claude-code.md`,
+`specs/backlog/candidates.md`
+**Work:** Flip both bugs to closed `resolved_in: 0.1.7` (rc-3) with a one-line resolution
+note. Add a one-line note at the top of `candidates.md` flagging that the 2026-06-06 "v0.2.0
+single active pick" index is stale (v0.2.0/0.2.1/0.2.2 archived; current line is 0.1.x) and
+needs a PM re-baseline pass (out of scope here).
+**Done criterion:** both bugs `status` closed; candidates note present.
+
+---
+
+## rc-4 — Bug root-cause sweep (T-017-29..36)
+
+Solves the root cause of all 8 genuinely-open bugs (post-sanitization). See SPEC "rc-4 scope
+addition" + PLAN "rc-4 plan". Grill report:
+`.dadaia/reports/dadaia-workspace/product-engineer/2026-06-09T033120Z-refine-specs.html`.
+
+### [x] T-017-29
+**Requirement:** FR-rc4-1 (ADR-1) — fixes gate-cross-context-lock-contamination (+ superseded dup)
+**Title:** Resolve lease context from the write-target path
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`,
+`tests/integration/gate/test_path_scope.py`
+**Work:** Before/within `CONTEXT_SLUG` resolution (~lines 69-90), if `$FPATH` is under
+`$WS/repos/<slug>/…`, set `CONTEXT_SLUG=<slug>` (match against ALIVE slugs in
+spec_contexts.json, longest-prefix). This overrides the first-ALIVE/env fallback for any
+repo-scoped write. If `$FPATH` is under no repo → leave context empty → MUTATING path with no
+context resolves UNGATED (ADR-1: no lease). Lease acquire + REL read then use the path-derived
+slug. Do NOT change the lease algorithm itself.
+**Done criterion:** new test: two sessions, two different `repos/<slug>/specs/releases/` targets,
+simultaneous → BOTH allow; same repo + live foreign session → BLOCK. Existing gate tests green.
+
+### [x] T-017-30
+**Requirement:** FR-rc4-2 (ADR-2) — fixes repeated-visible-userpromptsubmit-memory-injection
+**Title:** ctx-inject session identity from harness-native id; silent already-fired path
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/ctx-inject.sh`,
+`tests/integration/test_hooks.py`
+**Work:** (1) Derive the once-per-session sentinel/`.ptr` from the harness-native id
+(`CLAUDE_CODE_SESSION_ID`, else Codex stdin-JSON `session_id`, else a stable per-workspace key) —
+no dependency on `DADAIA_SESSION_ID` (keep it as optional override). Write the `.ptr` so the
+lease (T-017-29) and gate see a stable identity. (2) Move the `[<ctx>]` context-line emission
+INSIDE the sentinel guard so the already-fired path emits nothing (no leaked bootstrap each
+prompt). Keep valid codex-json output.
+**Done criterion:** hook test: first prompt injects full bootstrap once; subsequent prompts in
+the same session inject nothing (no context line, no memory). Existing hook tests green.
+
+### [x] T-017-31
+**Requirement:** FR-rc4-3 (ADR-4) — fixes constitution-persona-single-source-drift
+**Title:** Align memory-write-phase single source + add doctor lint
+**Owner:** product-engineer (memory/constitution) + software-engineer (doctor lint)
+**Write set:** `dadaia_workspace/public/skills/dadaia-step0-memory-bootstrap/SKILL.md`,
+`specs/constitution.md`, affected `dadaia_workspace/public/agents/*.md`,
+`dadaia_workspace/features/specs/doctor.py`, `tests/unit/features/specs/test_doctor.py`
+**Work:** Set DEFINITION+CLOSURE everywhere (fix the CLOSURE-only claim in the step0 skill; fix
+the stale `quality-assurance.md` path ref in constitution; align project-auditor/PM/PE persona
+contradictions). Add a `specs doctor` lint that flags divergent governance facts (memory-write
+phase at minimum) across constitution/personas/skills/rules.
+**Done criterion:** grep shows one consistent phase statement; new doctor lint catches a seeded
+drift and passes the corrected tree; memory edit done in DEFINITION/CLOSURE phase.
+
+### [x] T-017-32
+**Requirement:** FR-rc4-4 — fixes install-does-not-prune-orphan-projections + agent-skill-surface-slop (projection side)
+**Title:** Install/doctor orphan-prune completeness + stage ref-check
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/public_install/install_helpers.py` (or equivalent),
+`dadaia_workspace/features/public*/` doctor, `tests/unit/features/public/`
+**Work:** Add the reverse prune sweep to `copy_agents_for_opencode`; remove the `if force:` guard
+on `install_codex_agents` stale-`.toml` removal; add an orphan scan to `public doctor`
+(enumerate projected dirs, flag files absent from staging). Call `check_agent_skill_refs` inside
+`stage()` and fail staging on broken refs.
+**Done criterion:** deleting a source asset + reinstall removes its projection across all
+runtimes; doctor reports a seeded orphan; stage fails on a seeded broken skill ref.
+
+### [x] T-017-33
+**Requirement:** FR-rc4-5 — fixes specs-doctor-dual-error-counter + specs-upgrade-fails-on-preexisting
+**Title:** Doctor unified verdict + upgrade pre/post error diff
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/cli/commands/specs.py`,
+`dadaia_workspace/features/specs/doctor.py`, the memory-lint summary embedding,
+`tests/integration/cli/` + `tests/unit/features/specs/test_doctor.py`
+**Work:** (doctor) Either strip the embedded `Summary:` line from the LINT-1 issue or add a final
+authoritative overall verdict line so the last line never says `0 ERROR` on a failed run.
+(upgrade) Snapshot doctor errors pre-migration; after migration only `[fail]`+advise-restore on
+NEWLY introduced errors; for pre-existing-only, succeed with a `[warn]`.
+**Done criterion:** upgrade on a tree with a pre-existing unrelated error exits 0 with a warn (no
+restore advice); doctor output has a single authoritative verdict.
+
+### [x] T-017-34
+**Requirement:** FR-rc4-6 — fixes ci-preflight-raw-traceback-when-poetry-absent
+**Title:** CI preflight graceful when poetry absent
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/ci_preflight/service.py`,
+`tests/unit/features/ci_preflight/`
+**Work:** Catch `FileNotFoundError` in the subprocess runner → return a clean
+`(127, "command not found: poetry")` and a `[fail]` line, no traceback. Optionally fall back to
+`sys.executable -m ruff/mypy/pytest` when `shutil.which("poetry")` is None.
+**Done criterion:** preflight with poetry absent prints a clean failure (no stack trace),
+non-zero exit; unit test covers the FileNotFoundError path.
+
+### [x] T-017-35
+**Requirement:** FR-rc4-7 — panel verification follow-ups (from rc-3 panel root-cause review)
+**Title:** Panel DI/slug/auth-tuple cleanup
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/panel/container.py`,
+`dadaia_workspace/features/panel/service.py`, `dadaia_workspace/features/panel/views/memory.py`,
+`dadaia_workspace/features/panel/handler.py`, `tests/unit/features/panel/`
+**Work:** Ensure `container.py` always injects `JsonWorkflowStateStore` (no in-memory fallback in
+prod); ensure `views/memory.py` always passes the per-request slug to `build_renderer()`; remove
+the residual `_BEARER_AUTH_ROUTE_NAMES` tuple at `handler.py:~340-354` (derive from `_ROUTE_TABLE`).
+**Done criterion:** unit tests assert store always injected + renderer slug per request; grep
+shows no residual parallel auth tuple.
+
+### [x] T-017-36
+**Requirement:** FR-rc4-7 + ADR-3 deferral; closes the bug sweep
+**Title:** Persona dangling skill-ref cleanup + ADR-3 backlog + bug closure
+**Owner:** ai-engineer (persona refs) / project-manager (backlog) / product-engineer (bug status)
+**Write set:** `dadaia_workspace/public/agents/software-architect.md`,
+`dadaia_workspace/public/agents/devops-engineer.md`, `specs/backlog/`, `specs/bugs/`
+**Work:** Remove/repoint dangling skill references in software-architect.md / devops-engineer.md
+(library side of agent-skill-surface-slop). File backlog item `lease-shell-write-coverage-gap`
+(ADR-3: lease mediates only agent Write/Edit, not shell — documented deferral). Flip all 8
+targeted bugs to Closed `resolved_in: 0.1.7` (rc-4) once their fix tasks are done + verified.
+**Done criterion:** no dangling skill refs (doctor `[ok]`); backlog item registered; all targeted
+bugs Closed.

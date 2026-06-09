@@ -10,7 +10,7 @@ applyTo: "specs/releases/*/CLOSURE.md"
 
 After every task in `specs/releases/<release-id>/TASKS.md` is marked `[x] DONE` and
 implementation is verified. Set `specs/releases/ACTIVE.md` phase to `CLOSURE` **before**
-writing CLOSURE.md or memory Markdown — gate v3 only allows memory writes in this phase.
+writing CLOSURE.md or memory Markdown — gate v3 allows memory writes in the DEFINITION and CLOSURE phases (this skill operates in CLOSURE).
 
 ## CLOSURE.md template
 
@@ -93,8 +93,9 @@ by the operator. Should be rare.)
 
 ## Memory Markdown update protocol
 
-1. **Verify gate phase.** Confirm `specs/releases/ACTIVE.md` phase = `CLOSURE`. Otherwise
-   the gate will block writes to `specs/memory/*.md`.
+1. **Verify gate phase.** Confirm `specs/releases/ACTIVE.md` phase = `CLOSURE` (memory
+   writes are also allowed in `DEFINITION`). Otherwise the gate will block writes to
+   `specs/memory/*.md`.
 
 2. **Do not author legacy HTML memory.** If legacy HTML memory exists, treat it as
    read-only migration input. New memory writes are Markdown atoms.

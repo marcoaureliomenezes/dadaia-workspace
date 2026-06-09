@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
 
+// Agents are now inside the Ops tab (T-016-P09 consolidation).
 async function openAgentsTab(page: any) {
   await gotoPanel(page);
-  await activateTab(page, 'agents');
+  await activateTab(page, 'ops');
   await page.waitForSelector('#agents-grid[aria-busy="false"]', { timeout: 15000 });
 }
 
@@ -79,7 +80,8 @@ test('Agents tab has no critical or serious axe violations', async ({ page }) =>
 
   const { AxeBuilder } = await import('@axe-core/playwright');
   const results = await new AxeBuilder({ page })
-    .include('#section-agents')
+    // Agents are now a subsection of #section-ops (T-016-P09 consolidation).
+    .include('#ops-subsection-agents')
     .withTags(['wcag2a', 'wcag2aa'])
     .disableRules(['color-contrast'])
     .analyze();

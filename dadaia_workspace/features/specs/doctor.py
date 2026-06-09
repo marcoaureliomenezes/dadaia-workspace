@@ -56,7 +56,6 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from html.parser import HTMLParser
 from pathlib import Path
 
 import yaml
@@ -260,98 +259,7 @@ def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
     return out
 
 
-# _MemoryHtmlSummary and _MemoryParser are retained for any callers that still
-# parse HTML assets (e.g. non-atom HTML files served by the panel).
-@dataclass
-class _MemoryHtmlSummary:
-    has_h1: bool
-    h1_text: str
-    forbidden_h2: list[str]
-    img_srcs: list[str]
-    anchor_hrefs: list[str]
-    has_mermaid_blocks: bool
-    has_mermaid_script: bool
-
-
-class _MemoryParser(HTMLParser):
-    """Lightweight extractor for the few HTML facts the doctor needs."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._tag_stack: list[tuple[str, dict[str, str]]] = []
-        self._current_text: list[str] = []
-        self.h1_text = ""
-        self.has_h1 = False
-        self.forbidden_h2: list[str] = []
-        self.img_srcs: list[str] = []
-        self.anchor_hrefs: list[str] = []
-        self.has_mermaid_blocks = False
-        self.has_mermaid_script = False
-        self._in_h1 = False
-        self._in_h2 = False
-        self._h2_text: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        attr_map = {k: (v or "") for k, v in attrs}
-        self._tag_stack.append((tag, attr_map))
-        if tag == "h1":
-            self._in_h1 = True
-            self._current_text = []
-        elif tag == "h2":
-            self._in_h2 = True
-            self._h2_text = []
-        elif tag == "img":
-            src = attr_map.get("src", "")
-            if src:
-                self.img_srcs.append(src)
-        elif tag == "a":
-            href = attr_map.get("href", "")
-            if href:
-                self.anchor_hrefs.append(href)
-        elif tag == "pre":
-            if "mermaid" in attr_map.get("class", "").split():
-                self.has_mermaid_blocks = True
-        elif tag == "section":
-            klass = attr_map.get("class", "")
-            if "changelog" in klass.split():
-                self.forbidden_h2.append(f"section class={klass!r}")
-        elif tag == "script":
-            src = attr_map.get("src", "")
-            if "mermaid" in src.lower():
-                self.has_mermaid_script = True
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag == "h1" and self._in_h1:
-            self._in_h1 = False
-            self.h1_text = "".join(self._current_text).strip()
-            self.has_h1 = bool(self.h1_text)
-        elif tag == "h2" and self._in_h2:
-            self._in_h2 = False
-            text = "".join(self._h2_text).strip()
-            if text and FORBIDDEN_MEMORY_H2_RE.search(text):
-                self.forbidden_h2.append(text)
-        if self._tag_stack and self._tag_stack[-1][0] == tag:
-            self._tag_stack.pop()
-
-    def handle_data(self, data: str) -> None:
-        if self._in_h1:
-            self._current_text.append(data)
-        elif self._in_h2:
-            self._h2_text.append(data)
-
-
-def _parse_memory_html(path: Path) -> _MemoryHtmlSummary:
-    parser = _MemoryParser()
-    parser.feed(path.read_text(encoding="utf-8"))
-    return _MemoryHtmlSummary(
-        has_h1=parser.has_h1,
-        h1_text=parser.h1_text,
-        forbidden_h2=parser.forbidden_h2,
-        img_srcs=parser.img_srcs,
-        anchor_hrefs=parser.anchor_hrefs,
-        has_mermaid_blocks=parser.has_mermaid_blocks,
-        has_mermaid_script=parser.has_mermaid_script,
-    )
+# HTML-era parser deleted in v0.1.7 post-memory-markdown-source-v1 cleanup.
 
 
 def _read_active_md(
@@ -513,7 +421,29 @@ class SpecsDoctor:
         issues.extend(self._check_cat1_catalog_sync())
         # LINT-1 (memory-markdown-source-v1) — invoke lint-memory-atoms.py
         issues.extend(self._check_lint1_memory_atoms())
+        # SPECS-VERSION (specs-evolution / FR-S05) — pattern-version staleness
+        issues.extend(self._check_specs_pattern_version())
         return issues
+
+    def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
+        """WARN-only: the tree's ``specs_pattern_version`` is below the canonical
+        version the library ships. Recommends ``dadaia specs upgrade`` (FR-S05)."""
+        from dadaia_workspace.core import specs_version as _ver
+
+        current = _ver.read_pattern_version(self.specs_dir)
+        if current >= _ver.CANONICAL_SPECS_VERSION:
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="SPECS-VERSION",
+                severity=Severity.WARNING,
+                description=(
+                    f"specs_pattern_version is {current}, below the canonical "
+                    f"{_ver.CANONICAL_SPECS_VERSION}. Run: dadaia specs upgrade"
+                ),
+                path=str(self.specs_dir / "constitution.md"),
+            )
+        ]
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
         """Apply auto-fixes for all fixable issues.
@@ -1583,6 +1513,13 @@ class SpecsDoctor:
 
         # Exit codes: 0 = clean, 1 = at least one ERROR, 2 = warnings only
         output = (result.stdout + result.stderr).strip()
+        # Drop the lint script's own "Summary: N OK, M WARN, K ERROR" line — it is scoped to
+        # memory atoms only and, embedded in this issue's text, was mistaken for the doctor's
+        # OVERALL verdict (bug: specs-doctor-dual-error-counter-confusing-output). The doctor
+        # CLI now prints one authoritative overall verdict line instead.
+        output = "\n".join(
+            ln for ln in output.splitlines() if not ln.strip().startswith("Summary:")
+        ).strip()
         issues: list[SpecsDoctorIssue] = []
 
         if result.returncode == 0:

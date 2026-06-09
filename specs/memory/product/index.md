@@ -31,7 +31,7 @@
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional (v0.1.6 lock model). |
 | `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente. |
 | `workspace-portability` | workspace-portability | export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas. |
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, mandatory grill; alpha-N/rc-N; PM-only backlog writes (hard gate). |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, mandatory grill; alpha-N/rc-N; PM curates backlog (convention). |
 | `sdd-gate-v3` | sdd-gate-v3 | PreToolUse SDD gate (v0.1.6): path-classifier ADDITIVE/MEMORY/FROZEN/MUTATING/UNGATED; MUTATING acquires one TTL-lease via O_EXCL CAS; fail-safe, <=175 lines. |
 | `sdd-hotfix-track` | sdd-hotfix-track | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
 | `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD de specs/: SPEC-DOC + TREE-1..7 + LINT-1 (atomicidade .md); --fix auto-repara TREE-3/4. |

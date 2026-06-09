@@ -1,14 +1,22 @@
 /**
  * kanban-tab.spec.ts — PW-KAN-01 through PW-KAN-05 (panel-kanban-v1 K-2)
+ * Updated for T-016-P13: canonical §7 lifecycle columns.
+ *
+ * New column layout: Backlog | Release Definition | Implementation + Review | Closure
+ *   backlog      → "Backlog"                (READ sessions)
+ *   release_def  → "Release Definition"     (SPEC sessions)
+ *   impl_review  → "Implementation + Review" (BOUND_IMPLEMENTATION + BOUND_REVIEW, combined)
+ *   closure      → "Closure"               (present-but-empty; no session mode maps here yet)
  *
  * Tests: 5 Playwright board scenarios (AC-2.1 through AC-2.5)
  * Surface:
  *   AC-2.1 (PW-KAN-01): 2 BOUND_IMPLEMENTATION sessions from distinct contexts →
- *     4 columns visible; implementation column has 2 cards with 2 distinct data-context.
- *   AC-2.2 (PW-KAN-02): 4 sessions, one per mode → each column exactly 1 card;
+ *     4 columns visible; impl_review column has 2 cards with 2 distinct data-context.
+ *   AC-2.2 (PW-KAN-02): 4 sessions, one per mode → correct column placement;
+ *     BOUND_REVIEW and BOUND_IMPLEMENTATION share the impl_review column;
  *     session IDs match fixture.
- *   AC-2.3 (PW-KAN-03): Context with BOUND_IMPLEMENTATION session → review column
- *     has data-locked="true" + CSS class kanban-column--locked; 0 review cards.
+ *   AC-2.3 (PW-KAN-03): XOR-lock dimming retired; impl_review column has card from
+ *     BOUND_IMPLEMENTATION; no data-locked="true" present anywhere.
  *   AC-2.4 (PW-KAN-04): No session files → 4 columns visible; each shows
  *     data-testid="kanban-empty-placeholder".
  *   AC-2.5 (PW-KAN-05): One stale session → card has data-stale="true".
@@ -204,7 +212,7 @@ async function loadKanbanTab(page: Page, payload: object): Promise<void> {
 // PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct contexts
 // ---------------------------------------------------------------------------
 
-test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct contexts show 2 cards in implementation column', async ({
+test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct contexts show 2 cards in impl_review column', async ({
   page,
 }) => {
   const payload = {
@@ -213,19 +221,19 @@ test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct conte
       {
         context: 'ctx-alpha',
         columns: {
-          research: [],
-          spec: [],
-          implementation: [makeCard('sess_alpha_impl', 'BOUND_IMPLEMENTATION', { runtime: 'claude-code' })],
-          review: [],
+          backlog:     [],
+          release_def: [],
+          impl_review: [makeCard('sess_alpha_impl', 'BOUND_IMPLEMENTATION', { runtime: 'claude-code' })],
+          closure:     [],
         },
       },
       {
         context: 'ctx-beta',
         columns: {
-          research: [],
-          spec: [],
-          implementation: [makeCard('sess_beta_impl', 'BOUND_IMPLEMENTATION', { runtime: 'codex' })],
-          review: [],
+          backlog:     [],
+          release_def: [],
+          impl_review: [makeCard('sess_beta_impl', 'BOUND_IMPLEMENTATION', { runtime: 'codex' })],
+          closure:     [],
         },
       },
     ],
@@ -241,14 +249,14 @@ test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct conte
   const colCount = await page.$$eval('.kanban-column', (els) => els.length);
   expect(colCount).toBe(8);
 
-  // Implementation column cards: 2 cards total, from 2 distinct data-context values.
-  // All cards in implementation columns (not locked ones) with non-empty data-context.
-  const implCards = await page.$$eval(
-    '.kanban-column:not(.kanban-column--locked) .kanban-card[data-context]',
+  // impl_review column cards: 2 cards total, from 2 distinct data-context values.
+  // No XOR-lock dimming — all kanban-card elements are equally accessible.
+  const allCards = await page.$$eval(
+    '.kanban-card[data-context]',
     (cards) => cards.map((c) => c.getAttribute('data-context') ?? '')
   );
-  // Filter to the 2 implementation cards: context values should be alpha and beta.
-  const implContexts = implCards.filter((c) => c === 'ctx-alpha' || c === 'ctx-beta');
+  // Filter to the 2 impl cards: context values should be alpha and beta.
+  const implContexts = allCards.filter((c) => c === 'ctx-alpha' || c === 'ctx-beta');
   expect(new Set(implContexts).size).toBe(2);
 
   await page.screenshot({
@@ -258,22 +266,27 @@ test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct conte
 });
 
 // ---------------------------------------------------------------------------
-// PW-KAN-02 (AC-2.2) — 4 sessions, one per mode, each column exactly 1 card
+// PW-KAN-02 (AC-2.2) — 4 sessions across §7 lifecycle columns
 // ---------------------------------------------------------------------------
 
-test('PW-KAN-02 (AC-2.2) — 4 sessions one-per-mode → each column exactly 1 card; session IDs match fixture', async ({
+test('PW-KAN-02 (AC-2.2) — 4 sessions across §7 lifecycle columns; BOUND_REVIEW and BOUND_IMPLEMENTATION share impl_review; session IDs match fixture', async ({
   page,
 }) => {
+  // Note: BOUND_IMPLEMENTATION and BOUND_REVIEW both map to impl_review (combined column).
+  // The payload here reflects the server-side grouping (both in impl_review).
   const payload = {
     generated_at: '2026-05-31T10:00:00Z',
     swimlanes: [
       {
         context: 'ctx-main',
         columns: {
-          research:       [makeCard('sess_read',   'READ')],
-          spec:           [makeCard('sess_spec',   'SPEC')],
-          implementation: [makeCard('sess_impl',   'BOUND_IMPLEMENTATION')],
-          review:         [makeCard('sess_review', 'BOUND_REVIEW')],
+          backlog:     [makeCard('sess_read',   'READ')],
+          release_def: [makeCard('sess_spec',   'SPEC')],
+          impl_review: [
+            makeCard('sess_impl',   'BOUND_IMPLEMENTATION'),
+            makeCard('sess_review', 'BOUND_REVIEW'),
+          ],
+          closure:     [],
         },
       },
     ],
@@ -285,14 +298,14 @@ test('PW-KAN-02 (AC-2.2) — 4 sessions one-per-mode → each column exactly 1 c
   const laneCount = await page.$$eval('.kanban-lane', (els) => els.length);
   expect(laneCount).toBe(1);
 
-  // Each column has exactly 1 card (no empty placeholders).
+  // closure column has 1 empty placeholder (3 other columns have cards).
   const placeholders = await page.$$eval(
     '[data-testid="kanban-empty-placeholder"]',
     (els) => els.length
   );
-  expect(placeholders).toBe(0);
+  expect(placeholders).toBe(1);
 
-  // Total 4 cards.
+  // Total 4 cards (backlog: 1, release_def: 1, impl_review: 2, closure: 0).
   const totalCards = await page.$$eval('.kanban-card', (els) => els.length);
   expect(totalCards).toBe(4);
 
@@ -310,22 +323,22 @@ test('PW-KAN-02 (AC-2.2) — 4 sessions one-per-mode → each column exactly 1 c
 });
 
 // ---------------------------------------------------------------------------
-// PW-KAN-03 (AC-2.3) — BOUND_IMPLEMENTATION → review column locked
+// PW-KAN-03 (AC-2.3) — XOR-lock dimming retired; impl_review column has card
 // ---------------------------------------------------------------------------
 
-test('PW-KAN-03 (AC-2.3) — BOUND_IMPLEMENTATION session causes review column to have data-locked="true" and kanban-column--locked', async ({
+test('PW-KAN-03 (AC-2.3) — XOR-lock dimming retired; BOUND_IMPLEMENTATION card in impl_review column; no data-locked attribute anywhere', async ({
   page,
 }) => {
   const payload = {
     generated_at: '2026-05-31T10:00:00Z',
     swimlanes: [
       {
-        context: 'ctx-locked',
+        context: 'ctx-combined',
         columns: {
-          research:       [],
-          spec:           [],
-          implementation: [makeCard('sess_impl_lock', 'BOUND_IMPLEMENTATION')],
-          review:         [],
+          backlog:     [],
+          release_def: [],
+          impl_review: [makeCard('sess_impl_combined', 'BOUND_IMPLEMENTATION')],
+          closure:     [],
         },
       },
     ],
@@ -333,29 +346,24 @@ test('PW-KAN-03 (AC-2.3) — BOUND_IMPLEMENTATION session causes review column t
 
   await loadKanbanTab(page, payload);
 
-  // Review column must have data-locked="true".
-  const reviewLockedAttr = await page.getAttribute(
-    '[data-locked="true"]',
-    'data-locked'
-  );
-  expect(reviewLockedAttr).toBe('true');
+  // XOR-lock dimming is retired: no column should have data-locked="true".
+  const lockedCount = await page.$$eval('[data-locked="true"]', (els) => els.length);
+  expect(lockedCount).toBe(0);
 
-  // Review column must have class kanban-column--locked.
-  const reviewHasLockedClass = await page.evaluate(() => {
-    const cols = document.querySelectorAll('[data-locked="true"]');
-    return Array.from(cols).some((col) => col.classList.contains('kanban-column--locked'));
-  });
-  expect(reviewHasLockedClass).toBe(true);
+  // No locked CSS class anywhere.
+  const lockedClassCount = await page.$$eval('.kanban-column--locked', (els) => els.length);
+  expect(lockedClassCount).toBe(0);
 
-  // No review cards (review column is empty but has locked state).
-  const reviewCards = await page.$$eval(
-    '[data-locked="true"] .kanban-card',
-    (cards) => cards.length
-  );
-  expect(reviewCards).toBe(0);
+  // The impl_review card must be present.
+  const allCards = await page.$$eval('.kanban-card', (els) => els.length);
+  expect(allCards).toBe(1);
+
+  // Session ID appears in the board.
+  const boardText = await page.textContent('#kanban-board');
+  expect(boardText).toContain('sess_impl_combined');
 
   await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'pw-kan-03-review-locked.png'),
+    path: path.join(SCREENSHOTS_DIR, 'pw-kan-03-no-xor-lock.png'),
     fullPage: false,
   });
 });
@@ -364,7 +372,7 @@ test('PW-KAN-03 (AC-2.3) — BOUND_IMPLEMENTATION session causes review column t
 // PW-KAN-04 (AC-2.4) — No session files → 4 columns visible, each empty
 // ---------------------------------------------------------------------------
 
-test('PW-KAN-04 (AC-2.4) — No session files (empty swimlane) → 4 empty-placeholder elements visible', async ({
+test('PW-KAN-04 (AC-2.4) — No session files (empty swimlane) → 4 empty-placeholder elements visible (§7 lifecycle columns)', async ({
   page,
 }) => {
   // Simulate a context with no sessions: all columns empty.
@@ -374,10 +382,10 @@ test('PW-KAN-04 (AC-2.4) — No session files (empty swimlane) → 4 empty-place
       {
         context: 'ctx-empty',
         columns: {
-          research:       [],
-          spec:           [],
-          implementation: [],
-          review:         [],
+          backlog:     [],
+          release_def: [],
+          impl_review: [],
+          closure:     [],
         },
       },
     ],
@@ -449,10 +457,10 @@ test('PW-KAN-05 (AC-2.5) — Stale session → card has data-stale="true"', asyn
       {
         context: 'ctx-stale',
         columns: {
-          research:       [staleCard],
-          spec:           [],
-          implementation: [],
-          review:         [],
+          backlog:     [staleCard],
+          release_def: [],
+          impl_review: [],
+          closure:     [],
         },
       },
     ],

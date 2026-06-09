@@ -37,7 +37,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.features.panel.views._md_render import (
-    Markdown,
     build_renderer,
     render_md_to_html,
 )
@@ -82,19 +81,16 @@ def render_memory(
         Absolute path to the dadaia workspace root directory.
         Memory files are resolved under ``<workspace_root>/repos/<slug>/specs/memory/``.
     """
-    _renderer: Markdown | None = None
-
-    def _get_renderer() -> Markdown:
-        nonlocal _renderer
-        if _renderer is None:
-            _renderer = build_renderer()
-        return _renderer
 
     def _view(slug: str = "", path: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
         """Serve a memory atom.
 
         ``.md`` files are rendered to HTML in-memory (D-4).
         All other files are served verbatim (byte-identical).
+
+        The Markdown renderer is fetched from the per-slug cache (T-016-P04),
+        so wikilinks resolve to the correct context slug, not the hardcoded
+        ``"dadaia-workspace"`` default.
         """
         memory_root = (workspace_root / "repos" / slug / "specs" / "memory").resolve()
         target = (memory_root / path).resolve()
@@ -111,9 +107,11 @@ def render_memory(
 
         if suffix == ".md":
             # D-4: render Markdown to HTML in-memory; never write HTML to disk.
+            # Use the per-slug renderer so wikilinks resolve to the active context.
             try:
                 source = target.read_text(encoding="utf-8")
-                html_str = render_md_to_html(source, renderer=_get_renderer())
+                renderer = build_renderer(slug)
+                html_str = render_md_to_html(source, renderer=renderer)
                 return (200, "text/html; charset=utf-8", html_str.encode("utf-8"))
             except Exception:
                 _log.exception("Failed to render memory atom: %s", target)

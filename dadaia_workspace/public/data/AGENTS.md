@@ -108,6 +108,21 @@ instructions.
 
 See `workspace-protocol` rule for the full context-resolution and spec-loading procedure.
 
+## Bug Registration (all runtimes)
+
+Any time you hit a **bug** while operating dadaia-workspace tooling — projection,
+`specs doctor`/`upgrade`, scaffolding/onboarding, hooks, the SDD gate, locks,
+context bind/alive/dead, panel, reports, the `dadaia` CLI, or any production
+behavior that breaks its own contract — you MUST register a bug file before the
+turn ends. In this self-hosting source workspace, bugs go to
+`repos/dadaia-workspace/specs/bugs/`; in a consumer workspace, to the active
+context's `specs/bugs/` plus an upstream report. Bug files are ADDITIVE (never
+gate-blocked) — there is no excuse to defer. Do NOT file a bug for an error in
+your own throwaway script or for a validation the tool is *designed* to emit
+(e.g. doctor correctly flagging a non-compliant tree, or the gate correctly
+blocking an unauthorized write). See the `bug-registration-guardrail` rule for
+the full record format and redaction requirement.
+
 ## SDD Gate
 
 Production edits require an active approved release:
