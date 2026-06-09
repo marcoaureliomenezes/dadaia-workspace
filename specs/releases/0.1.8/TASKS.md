@@ -367,7 +367,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   `dadaia_workspace.hooks.<name>`) AND does NOT contain the `.sh` path (ensuring supersede, not
   append); `test_workspace_service.py` updated; pytest green.
 
-### [-] T-018-18 — Step 10d: UPDATE `cli/commands/ci.py` pre-push hook; UPDATE `test_cli_ci.py`
+### [x] T-018-18 — Step 10d: UPDATE `cli/commands/ci.py` pre-push hook; UPDATE `test_cli_ci.py`
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/cli/commands/ci.py`
