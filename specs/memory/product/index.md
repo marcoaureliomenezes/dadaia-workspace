@@ -25,11 +25,12 @@
 | `product-vision` | product-vision | Identity, pillars, lifecycle, concurrency model, agent roster, and anti-slop stance — the normative shape of dadaia-workspace from docs/01_medium_codex.md. |
 | `repos-catalog` | repos-catalog | lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL. |
 | `spec-context-project` | spec-context-project | The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0). |
-| `context-management` | context-management | multi-context ALIVE/DEAD lifecycle; bind exports DADAIA_SESSION_ID; one TTL-lease per context (O_EXCL CAS, TTL 120s) + fcntl Lock-1/Lock-2 for git ops. |
+| `context-management` | context-management | multi-context ALIVE/DEAD; bind exports DADAIA_SESSION_ID; one cross-platform TTL-lease per context (O_EXCL CAS, 120s) via WorkspaceLock/ContextLock ports. |
+| `cross-platform-portability` | cross-platform-portability | dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash). |
 | `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 17 skills / 2 workflows / Codex .rules). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional (v0.1.6 lock model). |
-| `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente. |
+| `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente. |
 | `workspace-portability` | workspace-portability | export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, mandatory grill; alpha-N/rc-N; PM curates backlog (convention). |
 | `sdd-gate-v3` | sdd-gate-v3 | PreToolUse SDD gate (v0.1.6): path-classifier ADDITIVE/MEMORY/FROZEN/MUTATING/UNGATED; MUTATING acquires one TTL-lease via O_EXCL CAS; fail-safe, <=175 lines. |

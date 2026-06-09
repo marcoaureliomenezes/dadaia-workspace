@@ -15,8 +15,8 @@ tags:
 - agents
 agent_tier: self-pull
 token_estimate: 3795
-last_updated: '2026-06-06'
-release_origin: v0.2.0
+last_updated: '2026-06-09'
+release_origin: 0.1.8
 ---
 
 ## Visão geral
@@ -55,11 +55,17 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
   * **`window.Panel` registry pattern** em `core.js`: objeto `{ register(name, mod), activate(name, opts) }`. Lazy tab module loading. Módulos registrados: `agents`, `workflows`, `sessions`, `academy`, `reports`.
   * **Workspace resolver** : `_resolve_workspace()` em `panel.py` caminha de baixo para cima do cwd até encontrar o diretório contendo `.dadaia/` — `dadaia panel` funciona de qualquer subdiretório do workspace.
 
-**core/** — `models/` (dataclasses puras), `protocols/` (ABCs / Protocols para DI), `exceptions.py`. Zero I/O. Pode importar stdlib apenas.
+**core/** — `models/` (dataclasses puras), `protocols/` (ABCs / Protocols para DI), `exceptions.py`, `platform.py`. Zero I/O — a única exceção autorizada é `core/platform.py`, que lê `sys.platform` (o único site autorizado para essa chamada em todo o codebase). Pode importar stdlib apenas.
 
-**infrastructure/** — implementações concretas dos protocols: `git_subprocess`, `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `claude_agent_dispatcher`, `cli_agent_dispatcher`, `excel_reader`, `python_env`. Toda I/O fica aqui.
+- `core/platform.py` — plataforma seam: `Capabilities` frozen dataclass com `detect()` classmethod e singleton `PLATFORM` em module-level. Flags: `has_fcntl`, `has_proc_fs`, `has_posix_chmod`, `has_sigterm`, `venv_scripts_dir`, `venv_exe_suffix`, `tmp_dir`. Nenhum outro arquivo pode ler `sys.platform` diretamente.
+- `core/exceptions.py` — `PlatformSecurityError(DadaiaError)` e `PlatformCapabilityError(DadaiaError)` com atributos `feature_name: str` e `platform: str`.
+- `core/protocols/{file_lock,telemetry_lock,platform_services,shutdown_handler}.py` — 4 ports para domínios OS-sensíveis.
 
-**container.py** — wires features ↔ infrastructure via `build_*_service(workspace_root)` factories. CLI commands chamam o container para obter serviços.
+**infrastructure/** — implementações concretas dos protocols: `git_subprocess`, `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `claude_agent_dispatcher`, `cli_agent_dispatcher`, `excel_reader`, `python_env`. Toda I/O fica aqui. Adaptadores de plataforma: `file_lock_posix`, `file_lock_windows`, `telemetry_lock_posix`, `telemetry_lock_windows`, `file_permission_posix`, `file_permission_windows`, `process_probe_adapter`, `signal_shutdown_posix`, `signal_shutdown_windows`.
+
+**container.py** — sole composition root. Lê `PLATFORM`, seleciona adapters (POSIX vs Windows) e injeta via `build_*_service(workspace_root)` factories. CLI commands chamam o container para obter serviços. `container.py` é o único local onde `PLATFORM` determina qual adapter concreto é instanciado.
+
+**hooks/** — `dadaia_workspace/hooks/` Python package (6 módulos: `__init__`, `_common`, `sdd_gate`, `root_whitelist`, `ctx_inject`, `sdd_post_gate`). Substitui os hooks bash de governança. Cada módulo tem entrypoint `__main__`. `runtime_config.py` emite comandos Python (`python -m dadaia_workspace.hooks.<name>`) para `.claude/settings.json` e `.codex/hooks.json`. `workspace/service.py` reconhece tanto o caminho `.sh` antigo quanto o novo comando Python para evitar dupla-registro. `sdd_gate.py` delega a `gate_policy.evaluate()` — não re-deriva política. `pre_push_ci.py` NÃO está no pacote — o hook `.sh` pre-push é retido.
 
 **public/** — assets canônicos versionados: `agents/`, `skills/`, `rules/`, `commands/`, `scripts/`, `templates/`, `workflows/`, `plugins/`, `data/`, `scaffold/`. `public_assets.py` stage/install/doctor. A função `_install_workspace_guardrail_pair` faz fan-out byte-identical de uma única fonte `data/AGENTS.md` para o par `AGENTS.md` + `CLAUDE.md` no workspace-root e em cada consumer-repo.
 
@@ -155,14 +161,26 @@ flowchart TB
     cli --> features
     cli --> container
     features --> core
-    features --> infrastructure
     infrastructure --> core
     container --> features
     container --> infrastructure
     container --> core
+    hooks --> core
 ```
 
-**Proibido:** core nunca importa de features/infrastructure/cli; features não importam de cli; features não importam outras features (passar pelo container).
+**Proibido:** core nunca importa de features/infrastructure/cli; features não importam de cli; features não importam outras features (passar pelo container); **features não importam `infrastructure/` diretamente** — toda dependência OS-sensível é injetada via Protocol por `container.py`.
+
+**Layering invariant (v0.1.8):**
+- `core/` — zero I/O, zero `sys.platform` (exceto `core/platform.py`). Zero `import fcntl / signal / subprocess / msvcrt`.
+- `infrastructure/` — todos os adapters OS. Todo `fcntl`, `os.kill`, `os.chmod`, `signal.signal`, `subprocess`, `/proc`, `msvcrt` vive aqui atrás de Protocol interfaces.
+- `features/` — business logic only. Zero `import fcntl / import signal / os.chmod / os.kill` direto. Recebe capability OS via Protocol injetado.
+- `container.py` — sole composition root. Lê `PLATFORM`, seleciona adapters, injeta.
+
+**Enforcement (dois layers):**
+- `import-linter` (`setup.cfg`): contrato `features → infrastructure` import ban + `core → OS-primitive modules` ban. `core.platform` whitelisted para `sys`. Roda no CI `lint` job.
+- `dadaia doctor` grep check: falha com `[ERROR]` em qualquer `import fcntl` / `os.chmod` / `os.kill` / `os.open` em `features/**/*.py`.
+
+**Transitional debt (ADR-1):** Guards `sys.platform` em function bodies de `locking.py` e `telemetry/service.py` são permitidos durante a janela transitional, cada um anotado `# TODO: Replace with PLATFORM.has_<flag>`. `import-linter` tem 7 `ignore_imports` para o backlog item `features-import-infrastructure-direct-debt`. A remoção completa dessas dependências diretas é escopo de release futura.
 
 ## Fluxo de dados — pipeline asset chain
 
@@ -182,16 +200,16 @@ flowchart LR
     J -.audit.-> H
 ```
 
-## Fluxo de dados — gate v3 SDD (v0.1.6 rewrite, ~168 lines)
+## Fluxo de dados — gate v3 SDD (v0.1.8: Python hooks)
 
-O gate usa um path-classifier de 5 classes: ADDITIVE / MEMORY / FROZEN / MUTATING / UNGATED. RULE E e o 4-store / semaphore model estão removidos.
+O gate usa um path-classifier de 5 classes: ADDITIVE / MEMORY / FROZEN / MUTATING / UNGATED. RULE E e o 4-store / semaphore model estão removidos. O hook é agora `python -m dadaia_workspace.hooks.sdd_gate` (Python puro, sem bash, funciona em Windows/macOS/Linux). `sdd_gate.py` delega a `gate_policy.evaluate()` — não re-deriva política. `.dadaia/sessions/**` é PROTECTED (fail-closed, SEC-01).
 
 ```mermaid
 sequenceDiagram
     participant Tool as Agent Tool
     participant PreHook as PreToolUse Hook
-    participant Gate as sdd-spec-gate.sh
-    participant Classifier as Path Classifier
+    participant Gate as hooks/sdd_gate.py (Python)
+    participant Classifier as gate_policy.py Path Classifier
     participant Active as releases/ACTIVE.md
     participant Lease as lease.py (O_EXCL CAS)
     participant TASKS as releases/<id>/TASKS.md
@@ -238,7 +256,7 @@ cli/commands/*| container.build_*_service| Factory call| Cada command resolve wo
 features/*| core/protocols/*| Protocol / ABC| Injetado via constructor — features não conhecem implementação
 features/specs/doctor| specs/ filesystem| Path-based, read-only| Recebe specs_dir absoluto; nunca escreve. Inclui invariante D-OC-1 (bidirectional router/workflow wikilink validation).
 infrastructure/public_assets| public/ ↔ .dadaia/agentic/ ↔ projeções| Manifest + file copy| Manifest.json é o cache do que foi propagado
-PreToolUse hook| sdd-spec-gate.sh + lease.py| JSON stdin / stdout + O_EXCL CAS| Fail-open: erros internos de hook → allow; live-foreign lease → block
+PreToolUse hook| `python -m dadaia_workspace.hooks.sdd_gate` (+ `root_whitelist`) + `lease.py`| JSON stdin / stdout + O_EXCL CAS| Fail-open: erros não-PROTECTED → allow; `.dadaia/sessions/**` PROTECTED → fail-closed (SEC-01); live-foreign lease → block; context-slug derivado PATH-first do write target
 features/spec_context/lease.py| `.dadaia/states/ctx_locks/<ctx>.lock.json`| Single-record JSON TTL-lease; O_EXCL CAS acquire| `LEASE_TTL_SECONDS = 120`; sem PID; stable-session-identity via `.ptr` file
 features/telemetry/aggregator/queries.py| features/telemetry/aggregator/runtimes.py| RuntimeAdapter protocol + registry| `TelemetryAggregator` mantém registry `{runtime: RuntimeAdapter}` e delega enrichment per row + liveness per runtime.
 
@@ -255,8 +273,9 @@ Locais canônicos de estado em disco e seu propósito:
   * `.dadaia/logs/lock-events.jsonl` — audit log append-only (O_APPEND; eventos: acquire, release, steal, HEARTBEAT).
   * `.dadaia/agentic/<type>/` — staging de assets (snapshot imutável).
   * `.dadaia/agentic/manifest.json` — registro do que foi propagado para cada tool.
-  * `.dadaia/scripts/sdd-spec-gate.sh` — projeção do gate PreToolUse (instalada por `dadaia public install`).
-  * `.dadaia/scripts/sdd-post-gate.sh` — projeção do gate PostToolUse / heartbeat renewal.
+  * `.dadaia/scripts/sdd-spec-gate.sh` — script bash legado (ainda presente como fallback; superseded por `python -m dadaia_workspace.hooks.sdd_gate`).
+  * `.dadaia/scripts/sdd-post-gate.sh` — script bash legado (ainda presente; superseded por `python -m dadaia_workspace.hooks.sdd_post_gate`).
+  * `dadaia_workspace/hooks/` — Python package de governança (6 módulos); registrado em `.claude/settings.json` e `.codex/hooks.json` por `infrastructure/runtime_config.py`.
   * `.dadaia/reports/<context>/<agent>/*.html` — reports HTML produzidos por especialistas; consumidos por `project-manager` no Discovery e por `project-auditor` nas auditorias.
   * `.dadaia/handoff/<context>/*.handoff.json` — agent↔agent JSON handoffs (canal 2 dos 3 canais).
   * `.dadaia/states/report_retention.json` — important-mark set para report retention; keys são caminhos workspace-relativos.
@@ -334,9 +353,9 @@ Invocado por doctor check `LINT-1`. Exit 0 = all valid; exit 1 = ao menos um ERR
 
 | Runtime | Hook enforcement | Notes |
 |---------|-----------------|-------|
-| Claude Code | Real PreToolUse block (`sdd-spec-gate.sh`) | Strongest enforcement |
-| Codex | Guardrail in trusted-workspace mode | Advisory on untrusted Codex |
-| OpenCode | Advisory only | `dadaia public doctor` reporta `[unsupported]` para PostToolUse target opencode — esperado |
+| Claude Code | Real PreToolUse block (`python -m dadaia_workspace.hooks.sdd_gate`) | Strongest enforcement; Python, no bash dependency |
+| Codex | Guardrail in trusted-workspace mode | `python -m dadaia_workspace.hooks.sdd_gate` registered in `.codex/hooks.json`; advisory on untrusted Codex |
+| OpenCode | `.ts` plugins call Python subprocess | `sdd-gate.ts` + `ctx-inject.ts` call Python hooks via venv-path resolution (`.dadaia/.venv/bin/python` → `.dadaia/.venv/Scripts/python.exe` → bare `python`); Bun cross-platform `.env()` API used for env-passing — governed on Windows; `dadaia public doctor` reporta `[unsupported]` para PostToolUse target opencode — esperado |
 
 Codex-specific behavior é expresso em termos Codex-nativos: `AGENTS.md` context, `.codex/config.toml`, `.codex/skills`, hooks onde suportados, e deferred tool discovery para multi-agent capability.
 

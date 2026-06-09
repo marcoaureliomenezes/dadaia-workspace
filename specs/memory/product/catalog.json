@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-09T03:08:08.492975+00:00",
+  "generated_at": "2026-06-09T08:05:34.641789+00:00",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -311,8 +311,8 @@
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
-      "tldr": "multi-context ALIVE/DEAD lifecycle; bind exports DADAIA_SESSION_ID; one TTL-lease per context (O_EXCL CAS, TTL 120s) + fcntl Lock-1/Lock-2 for git ops.",
-      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); session binding via eval $(dadaia context bind --mode) exports DADAIA_SESSION_ID; locking (v0.1.6) = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS acquire, TTL 120s, stable-session-identity via .ptr file) plus retained fcntl Lock-1 (workspace) and Lock-2 (per-context git ops); the old 4-store model (sessions, Lock-3, semaphore) is retired; dadaia migrate [--dry-run|--yes] (v1→v2); scaffold canonical tree v2; CLIs dadaia release new, dadaia backlog new, dadaia bug new, dadaia memory product add.",
+      "tldr": "multi-context ALIVE/DEAD; bind exports DADAIA_SESSION_ID; one cross-platform TTL-lease per context (O_EXCL CAS, 120s) via WorkspaceLock/ContextLock ports.",
+      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); session binding via eval $(dadaia context bind --mode) exports DADAIA_SESSION_ID; locking (v0.1.8) = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS acquire, TTL 120s, stable-session-identity via .ptr file) plus retained port/adapter Lock-1 (workspace via WorkspaceLock protocol) and Lock-2 (per-context git ops via ContextLock protocol) — both backed by `infrastructure/file_lock_posix.py` on POSIX; the old 4-store model (sessions, Lock-3, semaphore) is retired; dadaia migrate [--dry-run|--yes] (v1→v2); scaffold canonical tree v2; CLIs dadaia release new, dadaia backlog new, dadaia bug new, dadaia memory product add.",
       "tags": [
         "context",
         "lifecycle",
@@ -331,6 +331,33 @@
     },
     {
       "rank": 17,
+      "slug": "cross-platform-portability",
+      "title": "cross-platform-portability",
+      "category": "product",
+      "tldr": "dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash).",
+      "summary": "Establishes the cross-platform foundation for dadaia-workspace v0.1.8 — a PLATFORM singleton (sole sys.platform call site), typed platform exceptions, 4 protocol ports, 9 infrastructure adapters, a Python governance hooks package, and a phased 3-OS CI matrix. Defines the 3-tier resilience contract (fail-loud for security, degrade-with-log for non-security, unsupported-platform at construction). Current classifier is POSIX::Linux pending Phase-3 CI graduation (ADR-3).",
+      "tags": [
+        "platform",
+        "cross-platform",
+        "portability",
+        "windows",
+        "macos",
+        "linux",
+        "hooks",
+        "security"
+      ],
+      "token_estimate": 900,
+      "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/cross-platform-portability.md",
+      "depends_on": [
+        "workspace-init",
+        "context-management",
+        "sdd-gate-v3",
+        "architecture"
+      ]
+    },
+    {
+      "rank": 18,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -349,7 +376,7 @@
       "depends_on": []
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -370,7 +397,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -392,25 +419,25 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
-      "tldr": "porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente.",
-      "summary": "porta de entrada; cria .dadaia/, .venv, hooks e estrutura idempotente.",
+      "tldr": "porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente.",
+      "summary": "porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente; hooks registrados como comandos Python (python -m dadaia_workspace.hooks.*), não bash; ctx-inject.sh retido apenas como fallback não-instalado.",
       "tags": [
         "workspace",
         "init",
         "setup",
         "idempotent"
       ],
-      "token_estimate": 413,
+      "token_estimate": 450,
       "agent_tier": "self-pull",
       "path": "specs/memory/product/platform/workspace-init.md",
       "depends_on": []
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -431,7 +458,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -458,7 +485,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -480,7 +507,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "sdd-hotfix-track",
       "title": "sdd-hotfix-track",
       "category": "product",
@@ -503,7 +530,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",

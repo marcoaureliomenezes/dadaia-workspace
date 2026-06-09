@@ -12,8 +12,8 @@ tags:
 - constraints
 agent_tier: inject
 token_estimate: 1100
-last_updated: '2026-06-04'
-release_origin: v0.1.4.6
+last_updated: '2026-06-09'
+release_origin: 0.1.8
 ---
 
 ## Linguagens
@@ -21,7 +21,7 @@ release_origin: v0.1.4.6
 Linguagem| Versão| Uso
 ---|---|---
 Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest.
-Bash| 4+ POSIX-compatível| Hooks (`sdd-spec-gate.sh`, `ctx-inject.sh`), entry scripts. `ctx-inject.sh` injeta lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
+Bash| 4+ POSIX-compatível| Legacy hook scripts (`sdd-spec-gate.sh`, `ctx-inject.sh`) superseded by the `dadaia_workspace/hooks/` Python package (v0.1.8); `pre-push-ci-gate.sh` retained (git-for-Windows ships bash). Entry scripts. Python hooks inject lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
 HTML5 + Mermaid| Mermaid via CDN| Reports em `.dadaia/reports/<ctx>/<agent>/*.html`; memory atoms são `.md` renderizados in-memory (D-4)
 Markdown| CommonMark| Memory atoms atômicos em `specs/memory/*.md` (frontmatter `memory-frontmatter-v1` + corpo Markdown); SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions
 YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows e memory atoms (`memory-frontmatter-v1`: `additionalProperties: false`)
@@ -94,6 +94,7 @@ pyyaml| ^6.0| infrastructure/ + features/| YAML frontmatter parsing (memory atom
 jsonschema| ^4| features/specs/| JSON Schema validation; now used for `memory-frontmatter-v1.schema.json` validation in `lint-memory-atoms.py`. The per-atom YAML schemas (memory-structured-source-v1) were deleted; `jsonschema` remains for frontmatter validation.
 mistune| ~=3.0| features/panel/views/| Markdown → HTML render in-memory for the memory viewer (D-1, memory-markdown-source-v1). Pure-Python, zero transitive deps. Custom hooks: mermaid fence, `wikilink`, sanitiser.
 types-PyYAML| >=6| dev| Type stubs para mypy
+import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` declares `features → infrastructure` import ban and `core → OS-primitive modules` ban; runs in CI `lint` job via `lint-imports`. Zero runtime impact.
 
 **Jinja2** (transitive dependency) is no longer used for memory atom rendering. The `memory-*.html.j2` templates and `dadaia memory render` CLI were deleted in memory-markdown-source-v1. Jinja2 may remain as a transitive dep of other packages.
 

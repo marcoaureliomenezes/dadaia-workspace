@@ -457,7 +457,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
 - **Precondition:** T-018-23 `[x]`; operator elects to ship rc-1
 - **Done criterion:** code-reviewer APPROVES; verdict=APPROVED in handoff JSON.
 
-### [ ] T-018-26 — CLOSURE + memory updates
+### [x] T-018-26 — CLOSURE + memory updates
 - **Owner:** product-engineer
 - **Write set:**
   - `specs/releases/0.1.8/CLOSURE.md`
