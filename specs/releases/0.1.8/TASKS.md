@@ -274,7 +274,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   equivalent) and asserts empty list + INFO log; existing `test_scan.py` has pytestmark
   Linux-only; pytest green.
 
-### [ ] T-018-14 — Step 9: I/O encoding + `_dump()` elimination + `_atomic_write_text` consolidation + `os.rename→os.replace` [SEC-review encoding only, no sign-off gate]
+### [-] T-018-14 — Step 9: I/O encoding + `_dump()` elimination + `_atomic_write_text` consolidation + `os.rename→os.replace` [SEC-review encoding only, no sign-off gate]
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/infrastructure/json_context_store.py` (DELETE _dump, +encoding, route to _atomic_write_text)
