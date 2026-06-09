@@ -109,7 +109,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   `getattr(os, 'getuid', lambda: 1000)`; chmod drift check guarded by
   `if PLATFORM.has_posix_chmod:`; all test importorskip added; pytest green on Linux.
 
-### [ ] T-018-07 — Step 4a: UPDATE `pyproject.toml` classifier + remove hardcoded cache paths; ADD import-linter `setup.cfg`
+### [-] T-018-07 — Step 4a: UPDATE `pyproject.toml` classifier + remove hardcoded cache paths; ADD import-linter `setup.cfg`
 - **Owner:** software-engineer
 - **Write set:**
   - `pyproject.toml`
