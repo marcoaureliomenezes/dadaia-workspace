@@ -520,7 +520,7 @@ and T-018-28 (tests) may both be `[-]` concurrently.
   a Windows-runner path exercises `msvcrt` locks + `icacls` permission setter for real;
   classifier advertises macOS + Windows; classifier contract test updated and green.
 
-### [-] T-018-31 — rc-2 reviews + audit + CLOSURE + PR
+### [x] T-018-31 — rc-2 reviews + audit + CLOSURE + PR
 - **Owner:** product-engineer (coordinated by project-manager)
 - **Write set:**
   - `specs/releases/0.1.8/CLOSURE.md`

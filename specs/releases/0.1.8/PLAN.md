@@ -283,25 +283,18 @@ branch. All must approve before push + PR. After merge: CLOSURE.md, memory updat
 
 ## rc-2 Plan — Windows Graduation (same 0.1.8 release)
 
-Step order (foundation-first, CI-verified each push):
+Foundation-first, CI-verified each push:
 
-1. **Product fixes** (T-018-27): catalog `.as_posix()`, `_atomic_write_text(newline="")`,
-   reports_retention dual-`Pure*Path` absolute guard, import rewrite `as_posix()` matching.
-2. **Test fixes** (T-018-28): auth setter-injection + POSIX-gate, markdown-store monkeypatch
-   OSError, scripts-chmod POSIX-gate. Add a focused contract test asserting `write_generated`
-   round-trips with no rewrite churn (skip fires) regardless of host newline behavior.
-3. **Push feature/0.1.8** (T-018-29): CI runs `unit-fast-cross` + `contract-coverage-cross`
-   on windows-latest/macos-latest (still allow-fail at this point). Read the matrix; iterate
-   until both Windows legs are green (0 failed, exit 0 — the spurious KeyboardInterrupt
-   artifact disappears once the real failures clear).
-4. **Graduate + classifier + real-Windows adapters** (T-018-30): delete both GRADUATION-GATE
-   `continue-on-error` lines; add a Windows-only CI step (or un-skip) that runs the
-   `msvcrt`/`icacls` adapter tests on the windows runner; broaden the pyproject classifier;
-   update `tests/contract/test_platform_classifier.py` to match.
-5. **Reviews + audit + CLOSURE + PR** (T-018-31): ship-trio on the rc-2 delta, audit, update
-   CLOSURE, PR feature/0.1.8 → main. PyPI publish remains operator-gated (release-gate env).
+1. Product fixes (T-018-27): catalog `.as_posix()`; `_atomic_write_text(newline="")`;
+   reports_retention dual-`Pure*Path` absolute guard; import rewrite `as_posix()`; Windows
+   process-liveness via non-destructive `OpenProcess` (not `os.kill`).
+2. Test fixes (T-018-28): POSIX-gate / setter-inject / monkeypatch-OSError the chmod-dependent
+   tests; `+ test_install_skip_idempotent.py`; `+` Windows OpenProcess branch tests.
+3. Push feature/0.1.8 (T-018-29): iterate `unit-fast-cross` + `contract-coverage-cross` to green.
+4. Graduate (T-018-30): delete the GRADUATION-GATE `continue-on-error`; broaden the classifier;
+   real msvcrt/icacls behavior tests run on the windows runner.
+5. Reviews + audit + CLOSURE + PR (T-018-31). PyPI publish stays operator-gated.
 
 ### rc-2 validation gate
-- `unit-fast-cross` + `contract-coverage-cross` GREEN on windows-latest + macos-latest with
-  no `continue-on-error`.
-- `dadaia public doctor` exit 0; `dadaia specs doctor` 0 ERROR; full local suite green.
+- `unit-fast-cross` + `contract-coverage-cross` GREEN + hard-gated on windows + macOS.
+- `dadaia public doctor` + `dadaia specs doctor` 0 ERROR; full local suite green.
