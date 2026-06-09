@@ -233,7 +233,7 @@ class OrchestrationService:
                     if not output_file.exists():
                         validation_error = f"output file not found: {s.output_path}"
                     else:
-                        content = output_file.read_text()
+                        content = output_file.read_text(encoding="utf-8")
                         missing = [item for item in must_include if item not in content]
                         if missing:
                             validation_error = f"output missing required content: {missing!r}"

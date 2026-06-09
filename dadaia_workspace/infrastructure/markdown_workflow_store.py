@@ -243,7 +243,7 @@ class MarkdownWorkflowStore:
     def list(self) -> tuple[WorkflowDefinition, ...]:
         seen: dict[str, WorkflowDefinition] = {}
         for path in self._files():
-            wf = _parse(path.read_text(), path.name, self._agent_catalog)
+            wf = _parse(path.read_text(encoding="utf-8"), path.name, self._agent_catalog)
             if wf.name in seen:
                 raise WorkflowSchemaError(f"duplicate workflow name '{wf.name}'")
             seen[wf.name] = wf

@@ -1,7 +1,6 @@
 """JsonRunStateStore — atomic manifest.json + append-only events.jsonl per run."""
 
 import json
-import os
 from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
@@ -15,6 +14,7 @@ from dadaia_workspace.core.models.run_state import (
     StageState,
     StageStatus,
 )
+from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 _MANIFEST = "manifest.json"
 _EVENTS = "events.jsonl"
@@ -119,7 +119,7 @@ class JsonRunStateStore:
         mpath = self._manifest_path(run_id)
         if not mpath.exists():
             raise RunNotFoundError(f"run '{run_id}' not found under {self._dir}")
-        with mpath.open() as f:
+        with mpath.open(encoding="utf-8") as f:
             return _manifest_from_dict(json.load(f))
 
     def update_manifest(self, manifest: RunManifest) -> None:
@@ -128,7 +128,7 @@ class JsonRunStateStore:
     def append_event(self, event: RunEvent) -> None:
         path = self._events_path(event.run_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a") as f:
+        with path.open("a", encoding="utf-8") as f:
             f.write(_event_to_line(event) + "\n")
 
     def list_runs(self) -> tuple[RunManifest, ...]:
@@ -144,7 +144,7 @@ class JsonRunStateStore:
         path = self._events_path(run_id)
         if not path.exists():
             return
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -157,6 +157,4 @@ class JsonRunStateStore:
     def _write_manifest_atomic(self, manifest: RunManifest) -> None:
         mpath = self._manifest_path(manifest.run_id)
         mpath.parent.mkdir(parents=True, exist_ok=True)
-        tmp = mpath.with_suffix(".tmp")
-        tmp.write_text(json.dumps(_manifest_to_dict(manifest), indent=2))
-        os.replace(tmp, mpath)
+        _atomic_write_text(mpath, json.dumps(_manifest_to_dict(manifest), indent=2))

@@ -135,7 +135,7 @@ class DoctorService:
     @staticmethod
     def _read_lock(path: Path) -> dict[str, object] | None:
         try:
-            result: dict[str, object] = json.loads(path.read_text())
+            result: dict[str, object] = json.loads(path.read_text(encoding="utf-8"))
             return result
         except Exception:
             return None
@@ -396,7 +396,9 @@ class DoctorService:
         audit_path = _audit_log_path(self._workspace_root)
         if audit_path.exists():
             try:
-                lines = [ln for ln in audit_path.read_text().splitlines() if ln.strip()]
+                lines = [
+                    ln for ln in audit_path.read_text(encoding="utf-8").splitlines() if ln.strip()
+                ]
                 for i, line in enumerate(lines, start=1):
                     try:
                         record = json.loads(line)
@@ -422,7 +424,9 @@ class DoctorService:
         # LOCK-5: BLOCKED_ATTEMPT event in audit log — surface as signal (NO AUTO-FIX)
         if audit_path.exists():
             try:
-                lines = [ln for ln in audit_path.read_text().splitlines() if ln.strip()]
+                lines = [
+                    ln for ln in audit_path.read_text(encoding="utf-8").splitlines() if ln.strip()
+                ]
                 for i, line in enumerate(lines, start=1):
                     try:
                         record = json.loads(line)

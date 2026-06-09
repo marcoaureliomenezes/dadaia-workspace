@@ -86,7 +86,7 @@ class WorkspaceService:
 
     def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]
         if not path.exists():
-            path.write_text(json.dumps(empty, indent=2))
+            path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
 
     def _install_repos_catalog(self, workspace: Workspace) -> None:
         dest = workspace.dadaia_dir / "src" / "repos.xlsx"

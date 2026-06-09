@@ -99,8 +99,7 @@ def test_windows_handler_logs_sigterm_skipped(caplog: pytest.LogCaptureFixture) 
         WindowsSignalShutdownHandler().install(_mock_server())
 
     assert any(
-        "SIGTERM" in rec.message and "skipped" in rec.message.lower()
-        for rec in caplog.records
+        "SIGTERM" in rec.message and "skipped" in rec.message.lower() for rec in caplog.records
     ), "Expected INFO log mentioning SIGTERM and skipped"
 
 
@@ -239,11 +238,7 @@ def test_server_module_has_no_install_shutdown_handlers() -> None:
     from pathlib import Path
 
     src = (
-        Path(__file__).parents[3]
-        / "dadaia_workspace"
-        / "features"
-        / "panel"
-        / "server.py"
+        Path(__file__).parents[3] / "dadaia_workspace" / "features" / "panel" / "server.py"
     ).read_text(encoding="utf-8")
     tree = ast.parse(src)
     func_names = [

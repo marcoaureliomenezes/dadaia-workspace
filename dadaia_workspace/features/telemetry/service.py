@@ -265,7 +265,7 @@ class TelemetryService:
         ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
         quarantine_path = self._state_dir / f"telemetry.sqlite.corrupt.{ts}"
         try:
-            os.rename(db_path, quarantine_path)
+            os.replace(db_path, quarantine_path)
             logger.warning(
                 "TelemetryService: corrupt database quarantined as %s. "
                 "Service is now in degraded mode. "

@@ -65,7 +65,7 @@ def ensure_token(
         directory.  Propagated without suppression (Tier-1 fail-loud).
     """
     if path.exists():
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
 
     # Create parent directory.
     parent = path.parent
@@ -92,7 +92,7 @@ def ensure_token(
         fd = os.open(str(path), os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
     except FileExistsError:
         # Another process beat us to creation; read their token.
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
 
     try:
         os.write(fd, token.encode())
