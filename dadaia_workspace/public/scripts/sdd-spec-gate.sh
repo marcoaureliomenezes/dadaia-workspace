@@ -64,27 +64,25 @@ PYEOF
 if [ -z "$FPATH" ]; then _log "ALLOW: unparseable target for tool=$TOOL"; exit 0; fi
 [[ "$FPATH" != /* ]] && FPATH="$WS/$FPATH"
 _log "tool=$TOOL path=$FPATH"
-# Resolve bound context slug: DADAIA_CONTEXT -> first ALIVE in spec_contexts.json.
-# Sanitized to [A-Za-z0-9_-] (CWE-22).
-CONTEXT_SLUG=$("$PYTHON_BIN" - "$WS" "${DADAIA_CONTEXT:-}" "${DADAIA_SESSION_ID:-}" 2>/dev/null <<'PYEOF'
-import json, os, re, sys
-ws, env_ctx, sess = sys.argv[1], sys.argv[2], sys.argv[3]
-slug = env_ctx
+# Resolve context slug from the WRITE-TARGET PATH first (rc-4 / ADR-1 — fixes
+# gate-cross-context-lock-contamination): a write under $WS/repos/<slug>/... belongs to
+# context <slug>, regardless of which context is first-ALIVE in spec_contexts.json. The old
+# first-ALIVE fallback conflated contexts — a session editing repo B acquired repo A's lease.
+# Only an explicit DADAIA_CONTEXT overrides when the path is under no repo; otherwise the slug
+# is empty -> the MUTATING branch fails open (UNGATED, no lease). Sanitized [A-Za-z0-9_-] (CWE-22).
+CONTEXT_SLUG=$("$PYTHON_BIN" - "$WS" "$FPATH" "${DADAIA_CONTEXT:-}" 2>/dev/null <<'PYEOF'
+import os, re, sys
+ws, fpath, env_ctx = sys.argv[1], sys.argv[2], sys.argv[3]
+slug = ""
+prefix = os.path.join(ws, "repos") + os.sep
+cand = fpath if fpath.startswith(prefix) else os.path.realpath(fpath)
+rp = os.path.realpath(os.path.join(ws, "repos")) + os.sep
+if cand.startswith(prefix):
+    slug = cand[len(prefix):].split(os.sep, 1)[0]
+elif cand.startswith(rp):
+    slug = cand[len(rp):].split(os.sep, 1)[0]
 if not slug:
-    try:
-        d = json.load(open(os.path.join(ws, ".dadaia/states/spec_contexts.json")))
-        for c in d.get("contexts", []):
-            if c.get("state", "").lower() == "alive":
-                slug = c.get("repo_slug", "") or ""
-                break
-    except Exception:
-        pass
-if not slug and sess:
-    try:
-        p = os.path.join(ws, ".dadaia/sessions", sess + ".json")
-        slug = json.load(open(p)).get("context", "") or ""
-    except Exception:
-        pass
+    slug = env_ctx  # explicit operator override only; else empty -> UNGATED (no lease)
 print(re.sub(r"[^A-Za-z0-9_-]", "", slug or ""))
 PYEOF
 )
@@ -105,12 +103,12 @@ case "$FPATH" in
     */specs/memory/*) CLASS=MEMORY ;;
     */specs/_archive/*) CLASS=FROZEN ;;
     */specs/releases/*) CLASS=MUTATING ;;
-    # T-017-15 / SEC-01 (CWE-284): .dadaia/sessions/ holds CLI-owned runtime
-    # session state, incl. the persona pointers the backlog-ownership fallback
-    # trusts. Agents must NOT be able to write these via Write/Edit, else a
-    # confused-deputy agent could forge a project-manager persona pointer and
-    # bypass the owner-only backlog gate. The dadaia CLI/bootstrap writes these
-    # via Python (outside the tool gate), so it is unaffected by this block.
+    # SEC-01 (CWE-284): .dadaia/sessions/ holds CLI-owned runtime session state,
+    # incl. the single-session lease identity pointer (.dadaia/sessions/runtime/
+    # <ctx>.ptr). Agents must NOT write these via Write/Edit, else a confused-deputy
+    # agent could forge the lease .ptr and steal a Spec Context binding from the
+    # holding session — defeating the one deterministic lock the product keeps. The
+    # dadaia CLI/bootstrap writes these via Python (outside the tool gate), unaffected.
     */.dadaia/sessions/*) CLASS=PROTECTED ;;
     *) CLASS=UNGATED ;;
 esac
@@ -119,46 +117,19 @@ if [ "$CLASS" = "UNGATED" ] && [ -n "$CONTEXT_SLUG" ]; then
 fi
 _log "class=$CLASS ctx=${CONTEXT_SLUG:-<none>} session=$SESSION_ID"
 if [ "$CLASS" = "PROTECTED" ]; then
-    _block "[GATE] .dadaia/sessions/ is CLI-owned runtime state (incl. persona pointers the backlog-ownership gate trusts). Agents must not write here via Write/Edit — only the dadaia CLI/bootstrap may. Blocked to prevent persona-pointer forgery (SEC-01 / CWE-284, rule: backlog-ownership)."
+    _block "[GATE] .dadaia/sessions/ is CLI-owned runtime state, incl. the single-session lease identity pointer .dadaia/sessions/runtime/<ctx>.ptr. Agents must not write here via Write/Edit — only the dadaia CLI/bootstrap may. Blocked to protect lease-identity integrity (the sole deterministic lock); forging the .ptr would let a second session steal a Spec Context binding (SEC-01 / CWE-284)."
 fi
 [ "$CLASS" = "UNGATED" ] && exit 0
 if [ "$CLASS" = "ADDITIVE" ]; then
-    case "$FPATH" in
-        */specs/backlog/*)
-            # T-016-C03 (FORK-4): backlog is owner-only — fail-safe-BLOCK, never
-            # silently allow. An unresolved/empty persona is blocked too (the prior
-            # fail-open was reclassified a bug in the 0.1.6 grill). This is the narrow
-            # owner-only exception to the gate's fail-open default; it does not touch
-            # the lease/production path, so it cannot reintroduce the lease deadlock.
-            PERSONA="${DADAIA_AGENT_PERSONA:-${CLAUDE_AGENT_PERSONA:-${CODEX_AGENT_PERSONA:-${OPENCODE_AGENT_PERSONA:-}}}}"
-            # T-017-15: persona session-pointer fallback. When no persona env var is
-            # exported (e.g. a runtime that dispatches agents without setting it), resolve
-            # the owning role the SAME way context already falls back to a session pointer
-            # (.dadaia/sessions/runtime/<ctx>.ptr). This is fail-CLOSED: it only ADDS a
-            # resolution source; if it yields nothing or a non-owner the blocks below still
-            # fire. It never silently allows. Sources, in order: a one-line .persona pointer,
-            # then the `persona` field of the session JSON the gate already reads for context.
-            if [ -z "$PERSONA" ] && [ -n "$SESSION_ID" ]; then
-                _PFILE="$WS/.dadaia/sessions/runtime/$SESSION_ID.persona"
-                [ -f "$_PFILE" ] && PERSONA=$(tr -cd 'a-zA-Z0-9_-' <"$_PFILE" 2>/dev/null)
-                if [ -z "$PERSONA" ]; then
-                    PERSONA=$("$PYTHON_BIN" - "$WS/.dadaia/sessions/$SESSION_ID.json" 2>/dev/null <<'PYEOF'
-import json, re, sys
-try:
-    p = json.load(open(sys.argv[1])).get("persona", "") or ""
-except Exception:
-    p = ""
-print(re.sub(r"[^A-Za-z0-9_-]", "", p))
-PYEOF
-)
-                fi
-            fi
-            if [ -z "$PERSONA" ]; then
-                _block "[BACKLOG OWNERSHIP ERROR] writer persona unresolved — only project-manager may write specs/backlog/. Set DADAIA_AGENT_PERSONA=project-manager (the owning role), or record it in the session pointer .dadaia/sessions/runtime/<session>.persona, and retry (rule: backlog-ownership)."
-            elif [ "$PERSONA" != "project-manager" ]; then
-                _block "[BACKLOG OWNERSHIP ERROR] agent ${PERSONA} cannot write to specs/backlog/ — only project-manager creates or edits backlog entries (rule: backlog-ownership)."
-            fi ;;
-    esac
+    # ADDITIVE = backlog / bugs / audits / .dadaia reports,handoff,tmp. All ALLOW.
+    # rc-3 (0.1.7): the backlog-ownership persona block was REMOVED. It was a lock
+    # with no key — no harness sets *_AGENT_PERSONA in the hook process environment,
+    # and no `dadaia` CLI verb writes the .persona pointer, so the legitimate owner
+    # (project-manager) was blocked in EVERY harness (Codex + Claude, both reproduced).
+    # Backlog ownership is a coordination convention (rule: backlog-ownership), not a
+    # gate. The only deterministic lock the product keeps is the single-session
+    # MUTATING lease below. ADDITIVE writes never block a workflow.
+    _log "ALLOW: ADDITIVE $FPATH"
     exit 0
 fi
 if [ "$CLASS" = "MEMORY" ]; then
@@ -170,25 +141,11 @@ if [ "$CLASS" = "MEMORY" ]; then
     esac
 fi
 [ "$CLASS" = "FROZEN" ] && _block "[SDD GATE] specs/_archive/ is read-only. Use 'git mv' to archive a finished release; never edit archived files."
-# RULE D — write-allowlist via pre-compiled agents.index.json. Fail-open when no
-# persona / no index entry (the gate never hard-blocks on an unknown writer).
-PERSONA="${DADAIA_AGENT_PERSONA:-${CLAUDE_AGENT_PERSONA:-${CODEX_AGENT_PERSONA:-${OPENCODE_AGENT_PERSONA:-}}}}"
-if [ -n "$PERSONA" ]; then
-    RD=$("$PYTHON_BIN" - "$WS/.dadaia/agentic/agents.index.json" "$PERSONA" "${FPATH#"$WS"/}" "$CONTEXT_SLUG" 2>/dev/null <<'PYEOF'
-import fnmatch, json, sys
-idx_path, persona, rel, ctx = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-try:
-    idx = json.load(open(idx_path))
-except Exception:
-    print("skip"); sys.exit(0)
-if persona not in idx:
-    print("skip"); sys.exit(0)
-globs = [g.replace("<ctx>", ctx) for g in idx[persona]]
-print("ok" if any(fnmatch.fnmatch(rel, g) for g in globs) else "deny")
-PYEOF
-)
-    [ "$RD" = "deny" ] && _block "[SDD GATE] agent ${PERSONA} write_allowlist does not permit '${FPATH#"$WS"/}' (rule: agent path-scope)."
-fi
+# rc-3 (0.1.7): RULE D (per-persona write-allowlist deny via agents.index.json) was
+# REMOVED. It was fail-open and never fired for an agent — persona is never set in the
+# hook process environment — so it was a dormant latent lock. Path-scope is now an
+# agent-instruction convention, not a gate. Only the single-session lease below can
+# block a MUTATING write.
 if [ -z "$CONTEXT_SLUG" ]; then _log "ALLOW: MUTATING path but no context resolved (fail-open)"; exit 0; fi
 REL="$(grep -E '^release:' "$WS/repos/$CONTEXT_SLUG/specs/releases/ACTIVE.md" 2>/dev/null | head -1 | sed -E 's/^release:[[:space:]]*//; s/[[:space:]]*$//')"
 MODE="${DADAIA_MODE:-IMPLEMENTATION}"

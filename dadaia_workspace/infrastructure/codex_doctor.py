@@ -343,6 +343,51 @@ def check_agent_skill_refs(public_dir: Path) -> list[str]:
     return out
 
 
+# Phrases that assert the memory-write PHASE permission (as opposed to incidental mentions
+# of "release closure" + "memory" in the same line). A governance-bearing line matches one
+# of these AND cites CLOSURE without DEFINITION → single-source drift.
+_MEMORY_PHASE_CLAIM_MARKERS = (
+    "write-locked",
+    "only allows memory",
+    "block writes to",
+    "writes in this phase",
+    "during the closure phase",
+    "may edit memory",
+    "may write memory",
+)
+
+
+def check_memory_phase_single_source(public_dir: Path) -> list[str]:
+    """SINGLE-SRC-1: the memory-write phase is DEFINITION+CLOSURE (constitution §13).
+
+    Flags any public agent/skill line that asserts the memory-write *phase* permission but
+    cites only CLOSURE (omitting DEFINITION) — the single-source drift behind
+    `constitution-persona-single-source-drift`. Incidental "release closure"/"memory update"
+    mentions are NOT flagged (they carry no phase-permission marker).
+    """
+    out: list[str] = []
+    for sub in ("agents", "skills"):
+        base = public_dir / sub
+        if not base.exists():
+            continue
+        for md_file in sorted(base.rglob("*.md")):
+            try:
+                text = md_file.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            for n, raw in enumerate(text.splitlines(), start=1):
+                line = raw.lower()
+                if "closure" not in line or "definition" in line:
+                    continue
+                if any(marker in line for marker in _MEMORY_PHASE_CLAIM_MARKERS):
+                    rel = md_file.relative_to(public_dir)
+                    out.append(
+                        f"[drift] {rel}:{n}: memory-write phase cites CLOSURE only — the "
+                        f"canonical rule is DEFINITION+CLOSURE (constitution §13). (SINGLE-SRC-1)"
+                    )
+    return out
+
+
 def lint_legacy_software_engineer(public_dir: Path, iter_files_fn: object) -> list[str]:
     """T-35: reject the legacy `software-engineer` subagent alias in public/."""
     out: list[str] = []

@@ -1,6 +1,7 @@
 """dadaia public subcommands."""
 
 import json
+from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
@@ -38,6 +39,18 @@ _ONLY_CHOICES = (
 def stage() -> None:
     """Stage packaged public assets into .dadaia/agentic/."""
     workspace_root = resolve_workspace_root()
+    # Defence-in-depth (rc-4 / T-017-36, bug agent-skill-surface-slop): fail staging on broken
+    # agent→skill references so a stage with dangling skills never silently succeeds (doctor
+    # also catches these post-hoc; this blocks them at the source).
+    from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
+
+    public_dir = Path(__file__).resolve().parent.parent.parent / "public"
+    ref_drift = [r for r in check_agent_skill_refs(public_dir) if r.startswith("[drift]")]
+    if ref_drift:
+        console.print("[red]✗ staging blocked — broken agent→skill references:[/red]")
+        for issue in ref_drift:
+            console.print(f"  {issue}", markup=False)
+        raise typer.Exit(1)
     staged = container.build_public_service().stage(workspace_root)
     if staged:
         console.print(f"[green]✓[/green] {len(staged)} asset group(s) staged:")

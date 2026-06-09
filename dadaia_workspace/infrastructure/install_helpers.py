@@ -370,11 +370,12 @@ def install_codex_agents(
     agents_dst = workspace_root / ".codex" / "agents"
     agents_dst.mkdir(parents=True, exist_ok=True)
     expected_tomls = {md_file.with_suffix(".toml").name for md_file in agents_src.glob("*.md")}
-    if force:
-        for stale in sorted(agents_dst.glob("*.toml")):
-            if stale.name not in expected_tomls:
-                stale.unlink()
-                installed.append(f"[rm]   {stale}")
+    # Prune stale .toml unconditionally (rc-4 / T-017-32 — fixes orphan projections): an
+    # agent removed from source must not leave an orphan projection, regardless of --force.
+    for stale in sorted(agents_dst.glob("*.toml")):
+        if stale.name not in expected_tomls:
+            stale.unlink()
+            installed.append(f"[rm]   {stale}")
 
     for md_file in sorted(agents_src.glob("*.md")):
         text = md_file.read_text(encoding="utf-8")
@@ -447,8 +448,11 @@ def copy_agents_for_opencode(
     """Copy agent .md files stripping the ``tools`` array from frontmatter."""
     if not src_dir.exists():
         return
+    managed: set[Path] = set()
     for src in iter_files_fn(src_dir):
-        dst = dst_dir / src.relative_to(src_dir)
+        rel = src.relative_to(src_dir)
+        managed.add(rel)
+        dst = dst_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         content = _prepare_agent_for_opencode(src.read_text(encoding="utf-8"))
         if dst.exists() and not force:
@@ -459,3 +463,10 @@ def copy_agents_for_opencode(
                 continue
         dst.write_text(content, encoding="utf-8")
         installed.append(f"[ok]   {dst}")
+    # Prune orphan projections (rc-4 / T-017-32 — fixes install-does-not-prune-orphan-
+    # projections): an agent .md removed from source must not linger in .opencode/agents/.
+    if dst_dir.exists():
+        for dst in iter_files_fn(dst_dir):
+            if dst.relative_to(dst_dir) not in managed:
+                dst.unlink(missing_ok=True)
+                installed.append(f"[prune] {dst}")

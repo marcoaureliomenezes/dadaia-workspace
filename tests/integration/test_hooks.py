@@ -836,3 +836,40 @@ def test_sdd_gate_one_minus_warn_suppressed_with_parallel_declaration(workspace:
     assert "WARN one-active-task" not in log_content and "WARN: multiple [-]" not in log_content, (
         f"WARN should be suppressed with parallel_tasks declaration. Log:\n{log_content!r}"
     )
+
+
+def test_ctx_inject_injects_once_then_silent_same_session(workspace: Path) -> None:
+    """rc-4 / T-017-30 (fixes repeated-visible-userpromptsubmit-memory-injection):
+    the full bootstrap injects ONCE per session; a second prompt in the SAME session
+    emits nothing — no context line, no dispatcher preflight, no memory."""
+    scripts = _install_scripts(workspace)
+    mem = workspace / "repos" / "ctx1" / "specs" / "memory"
+    mem.mkdir(parents=True)
+    (mem / "tech-stack.md").write_text("# tech stack\n", encoding="utf-8")
+    env = {
+        **os.environ,
+        "DADAIA_CONTEXT": "ctx1",
+        "WORKSPACE_ROOT": str(workspace),
+        "CLAUDE_CODE_SESSION_ID": "sess-abc",
+    }
+    env.pop("DADAIA_SESSION_ID", None)
+
+    def _run() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(scripts / "ctx-inject.sh")],
+            capture_output=True,
+            text=True,
+            cwd="/tmp",
+            timeout=5,
+            env=env,
+        )
+
+    first = _run()
+    assert first.returncode == 0
+    assert "[ctx1]" in first.stdout
+    assert "dispatcher preflight" in first.stdout
+    assert "workspace memory" in first.stdout
+
+    second = _run()
+    assert second.returncode == 0
+    assert second.stdout.strip() == "", f"second prompt must be SILENT, got: {second.stdout!r}"

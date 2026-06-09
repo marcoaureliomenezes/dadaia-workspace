@@ -4,12 +4,12 @@ title: sdd-bug-backlog-governance
 category: product
 tldr: >-
   Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless
-  subsumed, mandatory grill; alpha-N/rc-N; PM-only backlog writes (hard gate).
+  subsumed, mandatory grill; alpha-N/rc-N; PM curates backlog (convention).
 summary: >-
   Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill),
   alpha-N/rc-N maturity model (ADR-1..5), review cadence (alpha=qa-commit /
-  rc=ship-trio), pre-push CI gate, and backlog-ownership enforcement (PM only
-  writes specs/backlog/**; hard PreToolUse gate, D5).
+  rc=ship-trio), pre-push CI gate, and backlog-ownership as a PM coordination
+  convention (NOT gate-enforced since 0.1.7 rc-3; backlog is ADDITIVE-allow).
 tags:
   - sdd
   - governance
@@ -20,7 +20,7 @@ tags:
   - backlog-ownership
 agent_tier: self-pull
 token_estimate: 1350
-last_updated: '2026-06-05'
+last_updated: '2026-06-09'
 release_origin: v0.1.5
 ---
 
@@ -40,12 +40,20 @@ A governança tem três pilares:
 2. **Modelo de maturação** — o modelo `alpha-N → rc-N` que substitui o anti-padrão de
    4-segmentos (`v0.1.4.1`, `v0.1.4.2`, …) por uma estrutura onde cada release cresce
    dentro de um folder `v<M>.<m>.<p>/` com segmentos ordenados.
-3. **Backlog-ownership enforcement (D5, v0.1.5-rc-1)** — somente `project-manager` cria
-   entradas em `specs/backlog/**`; todos os outros agentes são readers; `product-engineer`
-   consome backlog criado pelo PM para criar release specs. Enforcement mecânico via:
-   - Regra always-on `backlog-ownership.md` que declara a ownership.
-   - Hard PreToolUse gate que bloqueia qualquer Write/Edit em `specs/backlog/**` por
-     agentes não-PM, com erro explicitando o agente violador.
+3. **Backlog-ownership como convenção de coordenação (D5; gate removido em 0.1.7 rc-3)** —
+   `project-manager` é o **curador/coordenador** do `specs/backlog/**`; os demais agentes
+   leem livremente e roteiam mudanças via PM por disciplina; `product-engineer` consome
+   backlog para criar release specs. **Não há gate** sobre backlog: `specs/backlog/**` é um
+   caminho ADDITIVE que sempre flui (como `bugs/` e `audits/`). O hard PreToolUse gate
+   original (v0.1.5-rc-1) foi **removido em 0.1.7 rc-3**: era uma trava sem chave — nenhum
+   harness consegue afirmar a persona de um agente ao hook (env só do processo-harness; o
+   ponteiro `.persona` nunca era escrito por CLI; o agente escrevê-lo é forgery, bloqueado
+   por PROTECTED). A trava bloqueava o próprio dono legítimo em todos os harnesses (Codex +
+   Claude). Enforcement agora é por convenção:
+   - Regra always-on `backlog-ownership.md` que declara a curadoria do PM (não-gate).
+   - **Única trava determinística do produto:** o lease single-session por Spec Context
+     (release-definition / implementation+review). Nenhum workflow é jamais lock-blocked por
+     ownership.
 
 ## Fluxo de uso
 

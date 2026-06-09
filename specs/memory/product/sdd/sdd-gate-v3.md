@@ -7,7 +7,7 @@ summary: >-
   PreToolUse gate (v0.1.6 rewrite, ~168 lines): a path-classifier routes each write
   to ADDITIVE (allow), MEMORY (phase gate), FROZEN (block), MUTATING (single TTL-lease
   acquire via O_EXCL CAS — only a live conflict blocks), or UNGATED (allow). Fail-safe:
-  inconclusive states allow. RULE A2 backlog-ownership + RULE D allowlist on MUTATING.
+  inconclusive states allow. Backlog is ADDITIVE-allow; RULE A2/RULE D removed in rc-3.
 tags:
 - sdd
 - gate
@@ -15,7 +15,7 @@ tags:
 - enforcement
 agent_tier: self-pull
 token_estimate: 1300
-last_updated: '2026-06-06'
+last_updated: '2026-06-09'
 release_origin: v0.2.0
 ---
 
@@ -40,10 +40,10 @@ O gate usa um **path-classifier de 5 classes**, aplicado sequencialmente:
 **Regras adicionais:**
 - **RULE A (memory atomicity):** `specs/memory/**/*.md` fora de CLOSURE/DEFINITION → block. Formatos legados `.html`, `.yaml`, `.yml` → block sempre.
 - **RULE B (archive read-only):** `specs/_archive/**` → block sempre.
-- **RULE D (path-scope):** valida `file_path` contra `paths.write_allowlist` do frontmatter do agente ativo em writes MUTATING.
+- **RULE D (path-scope) — REMOVIDO em 0.1.7 rc-3:** era fail-open e nunca disparava para um agente (persona nunca no env do hook). Path-scope agora é convenção de instrução do agente, não gate.
 - **RULE C (task marker):** exige pelo menos uma task `[-]` em `specs/releases/<active-release-id>/TASKS.md` para writes MUTATING.
 - **RULE F (temporary paths):** permite imediatamente writes sob `.dadaia/tmp/` antes das checagens de produção.
-- **RULE A2 (backlog-ownership):** `specs/backlog/**` só é escrito por `project-manager` (gate valida agente ativo).
+- **RULE A2 (backlog-ownership) — REMOVIDO em 0.1.7 rc-3:** `specs/backlog/**` é ADDITIVE-allow (flui sempre, como bugs/audits). Ownership do PM é convenção de coordenação, não gate. A trava era sem chave (bloqueava o dono em todos os harnesses).
 
 Fail-open permanece apenas para crashes internos do hook. Writes sem target path parseável falham fechados.
 

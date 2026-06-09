@@ -132,3 +132,75 @@ architecture state section, noting `core/protocols/` additions) are deferred to 
 3. After T-017-07: `mypy --strict dadaia_workspace`, exit 0 (protocols must type-check).
 4. Before CLOSURE: full suite `pytest`; `dadaia specs doctor`; `dadaia public doctor`.
 5. CLOSURE evidence: commit SHAs + one `pytest` stdout snippet showing pass count.
+
+---
+
+## rc-3 plan — Unlock the Workflow
+
+Three waves on `feature/0.1.7`. Deletion-dominant; the lease (sole concurrency control) is
+untouched. Reproject + doctor after the gate edit; `pytest` green per wave; no push.
+
+**Wave A — remove the lock (keystone):** T-017-21 (delete backlog persona block; re-justify
+PROTECTED on lease `.ptr`) + T-017-22 (delete dormant RULE-D deny path). Both edit
+`sdd-spec-gate.sh` — one cohesive rewrite, one review unit. After: reproject + replay REPRO 1
+(expect ALLOW).
+
+**Wave B — align law/docs/tests (parallel, disjoint write sets):** T-017-23 (reword
+`backlog-ownership` rule), T-017-24 (AGENTS.md + gate-model memory: one lock), T-017-25
+(rewrite gate tests — flip backlog to ALLOW incl. the rc-2 codex-path assertion added in
+T-017-20; keep lease negative + protected-sessions tests).
+
+**Wave C — use the unlocked flow + close (sequential; depends on Wave A reprojected):**
+T-017-26 (reproject + full preflight), T-017-27 (register the previously-blocked backlog epic
+via the unlocked flow — end-to-end proof), T-017-28 (close both persona bugs `resolved_in:
+0.1.7`; flag stale v0.2.0 pick in candidates.md for a separate PM re-baseline).
+
+**Sequencing rationale:** T-017-27 is itself gate-blocked until Wave A is reprojected into the
+live instance — so its success without env var or pointer is the live acceptance proof of
+FR-rc3-1/2. **Rollback:** each change is a `public/` source edit + reproject; `git revert` +
+reproject restores the prior gate exactly.
+
+## rc-3 validation additions
+
+6. After T-017-21: replay REPRO 1 (`echo '{"tool_name":"Write",...backlog...}' | bash
+   sdd-spec-gate.sh`) → exit 0, no `decision":"block"`.
+7. After Wave B: `pytest tests/integration/gate/` green under the new contract.
+8. CLOSURE: re-run full `dadaia ci preflight`; record the T-017-27 backlog write as proof.
+
+---
+
+## rc-4 plan — Bug root-cause sweep
+
+Eight tasks, three waves. Architectural fixes (Wave A) implement the grill ADRs; local-logic
+fixes (Wave B) are independent; Wave C is verification/cleanup + bug closure. Reproject after any
+`public/` edit; `pytest` green per wave; ship-trio re-review before ship. No push.
+
+**Wave A — architectural root cause (grill ADRs 1,2,4):**
+- T-017-29 gate context-from-path (ADR-1) — fixes `gate-cross-context-lock-contamination` (+dup).
+- T-017-30 ctx-inject harness-native session id + silent already-fired (ADR-2) — fixes
+  `repeated-visible-userpromptsubmit-memory-injection`.
+- T-017-31 single-source alignment + `specs doctor` lint (ADR-4) — fixes
+  `constitution-persona-single-source-drift`.
+
+**Wave B — local-logic fixes (no grill; parallel, disjoint write sets):**
+- T-017-32 install/doctor prune completeness — fixes `install-does-not-prune-orphan-projections`
+  + `agent-skill-surface-slop` (projection side).
+- T-017-33 doctor/upgrade output reconciliation — fixes `specs-doctor-dual-error-counter` +
+  `specs-upgrade-fails-on-preexisting-doctor-error`.
+- T-017-34 ci-preflight robustness — fixes `ci-preflight-raw-traceback-when-poetry-absent`.
+
+**Wave C — verify, cleanup, close:**
+- T-017-35 panel verification follow-ups (container store injection; per-request slug; remove
+  residual `_BEARER_AUTH_ROUTE_NAMES` tuple).
+- T-017-36 persona dangling skill-ref cleanup (library side of `agent-skill-surface-slop`,
+  ai-engineer scope) + file backlog item `lease-shell-write-coverage-gap` (ADR-3 deferral) +
+  flip all targeted bugs to Closed `resolved_in: 0.1.7`.
+
+**Sequencing:** T-017-29 is the keystone — it fixes the lock that is actively contaminating this
+very release's writes. Land + reproject it first so the rest of rc-4 (and any concurrent
+context) stops false-blocking. Reproject + full preflight before review.
+
+## rc-4 validation additions
+9. Two-session/two-repo no-cross-block integration test green; same-repo foreign-live still blocks.
+10. ctx-inject hook test: single bootstrap injection + silent already-fired path.
+11. `specs doctor` single-source lint catches a seeded drift; `public doctor` reports a seeded orphan.

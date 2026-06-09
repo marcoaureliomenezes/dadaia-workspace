@@ -1513,6 +1513,13 @@ class SpecsDoctor:
 
         # Exit codes: 0 = clean, 1 = at least one ERROR, 2 = warnings only
         output = (result.stdout + result.stderr).strip()
+        # Drop the lint script's own "Summary: N OK, M WARN, K ERROR" line — it is scoped to
+        # memory atoms only and, embedded in this issue's text, was mistaken for the doctor's
+        # OVERALL verdict (bug: specs-doctor-dual-error-counter-confusing-output). The doctor
+        # CLI now prints one authoritative overall verdict line instead.
+        output = "\n".join(
+            ln for ln in output.splitlines() if not ln.strip().startswith("Summary:")
+        ).strip()
         issues: list[SpecsDoctorIssue] = []
 
         if result.returncode == 0:

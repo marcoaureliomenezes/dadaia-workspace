@@ -236,3 +236,31 @@ def test_dcx10_missing_agent_boundary_detected(installed_workspace: Path) -> Non
     reports = FileSystemPublicAssetManager().doctor(installed_workspace)
 
     assert any("D-CX-10" in r and "qa-engineer.toml" in r and "sandbox_mode" in r for r in reports)
+
+
+def test_check_memory_phase_single_source(tmp_path) -> None:
+    """SINGLE-SRC-1 lint (rc-4 / T-017-31): flags a CLOSURE-only memory-write phase claim,
+    accepts DEFINITION+CLOSURE, ignores incidental 'release closure' + memory mentions."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_memory_phase_single_source
+
+    pub = tmp_path / "public"
+    (pub / "agents").mkdir(parents=True)
+    (pub / "skills" / "s1").mkdir(parents=True)
+    (pub / "agents" / "bad.md").write_text(
+        "---\nname: bad\n---\nMemory atoms are write-locked except product-engineer "
+        "during the CLOSURE phase.\n",
+        encoding="utf-8",
+    )
+    (pub / "agents" / "good.md").write_text(
+        "---\nname: good\n---\nMemory is write-locked except product-engineer in the "
+        "DEFINITION and CLOSURE phases.\n",
+        encoding="utf-8",
+    )
+    (pub / "skills" / "s1" / "SKILL.md").write_text(
+        "---\nname: s1\n---\nAt release closure, update memory and write CLOSURE.md.\n",
+        encoding="utf-8",
+    )
+    out = check_memory_phase_single_source(pub)
+    assert any("bad.md" in line and "SINGLE-SRC-1" in line for line in out), out
+    assert not any("good.md" in line for line in out), out
+    assert not any("SKILL.md" in line for line in out), out

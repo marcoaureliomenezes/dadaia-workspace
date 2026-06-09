@@ -1,16 +1,18 @@
-"""Integration tests for the PROTECTED classifier + persona session-pointer fallback
-in sdd-spec-gate.sh (T-017-15 + SEC-01).
+"""Integration tests for the PROTECTED classifier in sdd-spec-gate.sh (SEC-01).
 
-T-017-15 added a persona session-pointer fallback to the backlog-ownership branch:
-when no persona env var is set, the gate resolves the owning role from
-``.dadaia/sessions/runtime/<session>.persona`` then the session JSON ``persona`` field
-(mirroring the context ``.ptr`` fallback). It stays fail-closed.
+``.dadaia/sessions/**`` is CLI-owned runtime state. Most importantly it holds the
+single-session lease identity pointer (``.dadaia/sessions/runtime/<ctx>.ptr``) — the
+key to the ONE deterministic lock the product keeps. Agent Write/Edit to
+``.dadaia/sessions/**`` must be BLOCKED (CLASS=PROTECTED, CWE-284) so a confused-deputy
+agent cannot forge the lease ``.ptr`` and steal a Spec Context binding from the holding
+session. The dadaia CLI writes session state via Python (outside the Write/Edit tool
+gate), so it is unaffected by this block.
 
-SEC-01 (CWE-284): because the fallback trusts those pointer files, agent Write/Edit to
-``.dadaia/sessions/**`` must be BLOCKED (CLASS=PROTECTED) so a confused-deputy agent
-cannot forge a project-manager pointer and bypass the owner-only backlog gate. The
-dadaia CLI writes session state via Python (outside the Write/Edit tool gate), so it is
-unaffected by this block.
+History: 0.1.7 rc-3 removed the backlog-ownership persona gate (a lock with no key), so
+``.dadaia/sessions/**`` is no longer protected to guard a *persona* pointer — it is
+protected to guard *lease identity*. The PROTECTED behavior itself is unchanged; only
+its rationale moved. The obsolete persona-pointer→backlog-resolution tests were removed
+with the persona gate; backlog ADDITIVE-allow is covered in test_backlog_ownership.py.
 
 These tests invoke the gate source as a black-box subprocess, reusing the harness
 conventions of test_backlog_ownership.py.
@@ -93,14 +95,14 @@ def _run_gate(
 
 
 # ---------------------------------------------------------------------------
-# SEC-01 — agent writes to .dadaia/sessions/** are BLOCKED (no pointer forgery)
+# SEC-01 — agent writes to .dadaia/sessions/** are BLOCKED (no lease .ptr forgery)
 # ---------------------------------------------------------------------------
 
 
-def test_persona_pointer_write_blocked(tmp_path: Path) -> None:
-    """Forging a .persona pointer via Write is blocked (CLASS=PROTECTED)."""
+def test_lease_pointer_write_blocked(tmp_path: Path) -> None:
+    """Forging a lease .ptr via Write is blocked (CLASS=PROTECTED)."""
     ws = _build_workspace(tmp_path)
-    target = str(ws / ".dadaia" / "sessions" / "runtime" / "evil.persona")
+    target = str(ws / ".dadaia" / "sessions" / "runtime" / "dadaia-workspace.ptr")
     stdout, rc = _run_gate(ws, tool="Write", file_path=target)
     assert rc == 0
     data = json.loads(stdout.strip())
@@ -110,7 +112,7 @@ def test_persona_pointer_write_blocked(tmp_path: Path) -> None:
 
 
 def test_session_json_write_blocked(tmp_path: Path) -> None:
-    """Forging the session JSON (persona field) via Write is blocked."""
+    """Forging the session JSON via Write is blocked."""
     ws = _build_workspace(tmp_path)
     target = str(ws / ".dadaia" / "sessions" / "evil.json")
     stdout, rc = _run_gate(ws, tool="Write", file_path=target)
@@ -122,7 +124,7 @@ def test_session_json_write_blocked(tmp_path: Path) -> None:
 def test_nested_session_edit_blocked(tmp_path: Path) -> None:
     """Edit to any nested path under .dadaia/sessions/ is blocked too."""
     ws = _build_workspace(tmp_path)
-    target = str(ws / ".dadaia" / "sessions" / "runtime" / "deep" / "x.persona")
+    target = str(ws / ".dadaia" / "sessions" / "runtime" / "deep" / "x.ptr")
     stdout, rc = _run_gate(ws, tool="Edit", file_path=target)
     assert rc == 0
     data = json.loads(stdout.strip())
@@ -132,7 +134,7 @@ def test_nested_session_edit_blocked(tmp_path: Path) -> None:
 def test_read_session_pointer_not_gated(tmp_path: Path) -> None:
     """Read (non-write tool) on a session pointer is never gated."""
     ws = _build_workspace(tmp_path)
-    target = str(ws / ".dadaia" / "sessions" / "runtime" / "s.persona")
+    target = str(ws / ".dadaia" / "sessions" / "runtime" / "s.ptr")
     stdout, rc = _run_gate(ws, tool="Read", file_path=target)
     assert rc == 0
     assert "block" not in stdout
@@ -148,67 +150,17 @@ def test_other_dadaia_path_not_protected(tmp_path: Path) -> None:
     assert "CLI-owned runtime state" not in stdout
 
 
-# ---------------------------------------------------------------------------
-# T-017-15 — persona session-pointer fallback resolves the owner, fail-closed
-# ---------------------------------------------------------------------------
+def test_backlog_allowed_even_with_session_pointer_present(tmp_path: Path) -> None:
+    """A .ptr present in the session dir does not change backlog ADDITIVE-allow.
 
-
-def test_pointer_fallback_resolves_pm_allows_backlog(tmp_path: Path) -> None:
-    """A CLI-written .persona pointer = project-manager resolves the owner → backlog allowed."""
+    Regression guard: the removed persona gate used to read a .persona pointer here to
+    decide backlog ownership. That coupling is gone — backlog flows regardless.
+    """
     ws = _build_workspace(tmp_path)
-    # Simulate the CLI/bootstrap writing the pointer (tests bypass the tool gate).
-    (ws / ".dadaia" / "sessions" / "runtime" / "sess1.persona").write_text(
-        "project-manager\n", encoding="utf-8"
-    )
+    (ws / ".dadaia" / "sessions" / "runtime" / "sess1.ptr").write_text("sess1\n", encoding="utf-8")
     target = str(ws / "specs" / "backlog" / "item.md")
     stdout, rc = _run_gate(
         ws, tool="Write", file_path=target, env_overrides={"DADAIA_SESSION_ID": "sess1"}
     )
     assert rc == 0
-    assert stdout.strip() == "" or "block" not in stdout
-
-
-def test_pointer_fallback_non_owner_blocks_backlog(tmp_path: Path) -> None:
-    """A .persona pointer naming a non-owner still blocks backlog (fail-closed)."""
-    ws = _build_workspace(tmp_path)
-    (ws / ".dadaia" / "sessions" / "runtime" / "sess2.persona").write_text(
-        "software-engineer\n", encoding="utf-8"
-    )
-    target = str(ws / "specs" / "backlog" / "item.md")
-    stdout, rc = _run_gate(
-        ws, tool="Write", file_path=target, env_overrides={"DADAIA_SESSION_ID": "sess2"}
-    )
-    assert rc == 0
-    data = json.loads(stdout.strip())
-    assert data["decision"] == "block"
-    assert "software-engineer" in data["reason"]
-
-
-def test_no_pointer_no_env_blocks_backlog(tmp_path: Path) -> None:
-    """No env persona and no pointer → backlog write blocked (fail-closed)."""
-    ws = _build_workspace(tmp_path)
-    target = str(ws / "specs" / "backlog" / "item.md")
-    stdout, rc = _run_gate(
-        ws, tool="Write", file_path=target, env_overrides={"DADAIA_SESSION_ID": "ghost"}
-    )
-    assert rc == 0
-    data = json.loads(stdout.strip())
-    assert data["decision"] == "block"
-    assert "unresolved" in data["reason"]
-
-
-def test_env_persona_takes_precedence_over_pointer(tmp_path: Path) -> None:
-    """Env var wins over the pointer: env=project-manager allows even if pointer says otherwise."""
-    ws = _build_workspace(tmp_path)
-    (ws / ".dadaia" / "sessions" / "runtime" / "sess3.persona").write_text(
-        "software-engineer\n", encoding="utf-8"
-    )
-    target = str(ws / "specs" / "backlog" / "item.md")
-    stdout, rc = _run_gate(
-        ws,
-        tool="Write",
-        file_path=target,
-        env_overrides={"DADAIA_SESSION_ID": "sess3", "DADAIA_AGENT_PERSONA": "project-manager"},
-    )
-    assert rc == 0
-    assert stdout.strip() == "" or "block" not in stdout
+    assert "block" not in stdout

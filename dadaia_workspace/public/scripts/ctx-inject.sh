@@ -16,29 +16,6 @@ mkdir -p "$TMP_DIR"
 PAYLOAD_FILE="$(mktemp "$TMP_DIR/ctx-inject-payload.XXXXXX")"
 trap 'rm -f "$PAYLOAD_FILE"' EXIT
 
-# ---------------------------------------------------------------------------
-# T-R1-01: Write runtime→session pointer file (runs before any early exit).
-# When DADAIA_SESSION_ID is set (from eval $(dadaia context bind ...)), write
-# a pointer file at .dadaia/sessions/runtime/<session_id>.ptr so that the SDD
-# gate can resolve the session without requiring DADAIA_SESSION_ID to be
-# manually exported into the agent runtime environment.
-# This runs unconditionally early — before the context/specs guard — so the
-# ptr file is always registered even if specs are missing.
-# Cleanup: `dadaia context release` is the authoritative cleanup path; the
-# EXIT trap here handles per-invocation cleanup only.
-# ---------------------------------------------------------------------------
-if [ -n "${DADAIA_SESSION_ID:-}" ]; then
-    _RUNTIME_PTR_DIR="$WORKSPACE_ROOT/.dadaia/sessions/runtime"
-    mkdir -p "$_RUNTIME_PTR_DIR" 2>/dev/null || true
-    # Sanitize before using as a filename component — never let a session id with
-    # path separators escape the runtime dir (CWE-22; mirrors sdd-spec-gate.sh).
-    _SAFE_PTR_ID="$(printf '%s' "$DADAIA_SESSION_ID" | tr -cd 'a-zA-Z0-9_-')"
-    if [ -n "$_SAFE_PTR_ID" ]; then
-        _PTR_FILE="$_RUNTIME_PTR_DIR/${_SAFE_PTR_ID}.ptr"
-        printf '%s' "$DADAIA_SESSION_ID" > "$_PTR_FILE" 2>/dev/null || true
-    fi
-fi
-
 # Hook event name carried in the JSON envelope. SessionStart (Codex/Claude once-per-
 # session) and UserPromptSubmit both inject via additionalContext; default keeps the
 # historical UserPromptSubmit value for callers that do not set it.
@@ -66,12 +43,52 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Resolve context name and SPECS_DIR (preserve existing logic).
+# Stable session id (rc-4 / ADR-2 — fixes repeated-visible-userpromptsubmit-memory-
+# injection). Derive the once-per-session identity from the HARNESS-NATIVE id, with no
+# dependency on DADAIA_SESSION_ID (no harness exports it). Resolution order:
+#   1. DADAIA_SESSION_ID (explicit operator override), then harness env vars.
+#   2. Codex passes session_id as a JSON field on stdin; subagents inherit the parent's.
+#   3. Degenerate fallback: a single stable per-workspace key so context still injects at
+#      most ONCE (never per-shell / never the volatile PID).
+# This MUST be resolved before any emission so the sentinel guards the ENTIRE injection
+# (context line + dispatcher preflight + memory) — already-fired prompts emit nothing.
 # ---------------------------------------------------------------------------
-# Context resolution never depends on a manual `context bind`. If DADAIA_CONTEXT
-# is not exported, auto-resolve the first ALIVE context from the registry —
-# exactly as the SDD gate does. Binding is optional convenience; the flow must
-# never stop or nag the operator to rebind.
+SESSION_ID="${DADAIA_SESSION_ID:-${CLAUDE_CODE_SESSION_ID:-${CODEX_SESSION_ID:-${OPENCODE_SESSION_ID:-}}}}"
+if [ -z "$SESSION_ID" ] && [ ! -t 0 ]; then
+    # stdin is not a tty — it may carry the harness hook JSON with a session_id field.
+    # Bounded read so a hook invoked without stdin never blocks.
+    _STDIN_JSON="$(timeout 0.2 cat 2>/dev/null || true)"
+    if [ -n "$_STDIN_JSON" ]; then
+        SESSION_ID="$(printf '%s' "$_STDIN_JSON" | "$PYTHON_BIN" -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("session_id", "") or "")
+except Exception:
+    pass' 2>/dev/null)"
+    fi
+fi
+SESSION_ID="${SESSION_ID:-workspace}"
+# Sanitize before using as a filename component — a session id containing '/' or '..'
+# must never escape $TMP_DIR (CWE-22; mirrors sdd-spec-gate.sh's strip).
+SESSION_ID="$(printf '%s' "$SESSION_ID" | tr -cd 'a-zA-Z0-9_-')"
+SESSION_ID="${SESSION_ID:-workspace}"
+
+# ---------------------------------------------------------------------------
+# Runtime session pointer (.ptr). Written from the resolved harness-native session id so
+# downstream tooling can resolve the session without DADAIA_SESSION_ID being exported.
+# (The single-session lease maintains its own <ctx>.ptr on acquire; this is the
+# session-keyed pointer.) Best-effort; never fail the hook.
+# ---------------------------------------------------------------------------
+if [ "$SESSION_ID" != "workspace" ]; then
+    _RUNTIME_PTR_DIR="$WORKSPACE_ROOT/.dadaia/sessions/runtime"
+    mkdir -p "$_RUNTIME_PTR_DIR" 2>/dev/null || true
+    printf '%s' "$SESSION_ID" > "$_RUNTIME_PTR_DIR/${SESSION_ID}.ptr" 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------------------
+# Resolve context name. Never depends on a manual `context bind`: if DADAIA_CONTEXT is
+# not exported, auto-resolve the first ALIVE context from the registry. Binding is
+# optional convenience; the flow must never stop or nag.
+# ---------------------------------------------------------------------------
 if [ -z "$DADAIA_CONTEXT" ]; then
     DADAIA_CONTEXT="$("$PYTHON_BIN" - "$WORKSPACE_ROOT" 2>/dev/null <<'PY'
 import json
@@ -91,123 +108,84 @@ PY
 )"
 fi
 
-if [ -n "$DADAIA_CONTEXT" ]; then
-    CONTEXT_NAME="$DADAIA_CONTEXT"
-    SPECS_DIR="$WORKSPACE_ROOT/repos/$DADAIA_CONTEXT/specs"
-    if [ -d "$SPECS_DIR" ]; then
-        printf '[%s]\n' "$DADAIA_CONTEXT" >> "$PAYLOAD_FILE"
-        # ---------------------------------------------------------------------
-        # Dispatcher preflight (harness-neutral; applies to Codex + Claude +
-        # OpenCode). Makes SDD role-routing a deterministic instruction instead
-        # of relying on the lead agent's memory of specs/AGENTS.md. Closes the
-        # deterministic-routing gap in bug
-        # codex-workflow-dispatch-not-deterministically-enforced.
-        # ---------------------------------------------------------------------
-        {
-            echo "=== dispatcher preflight (SDD routing) ==="
-            echo "Before acting on a request in this workspace:"
-            echo "1. Resolve the active context (above) and the OWNING role for the"
-            echo "   artifact class you are about to touch: backlog → project-manager;"
-            echo "   SPEC/PLAN/TASKS → product-engineer; hooks/agents/skills/rules/"
-            echo "   workflows (the AI surface) → ai-engineer audit; production code →"
-            echo "   software-engineer; reviews → code/security/qa reviewers."
-            echo "2. Owner-only artifacts are GATE-ENFORCED (sdd-spec-gate.sh runs on"
-            echo "   PreToolUse for every harness): a non-owner write to specs/backlog/**"
-            echo "   is blocked, not advisory. Route through the owning role instead."
-            echo "3. If the operator asks for multi-agent / deep / AI-surface work and a"
-            echo "   subagent or dispatch tool is not in your active tool set, DISCOVER it"
-            echo "   first (e.g. tool_search for the agent/dispatch tool) BEFORE starting"
-            echo "   the main task — do not silently proceed as a generic single agent."
-            echo "4. Limitation (truthful): this harness does NOT auto-spawn subagents"
-            echo "   from static .codex/.claude workflow files. Workflow files are"
-            echo "   reference docs; explicit dispatcher/operator fan-out is required."
-            echo "=== end dispatcher preflight ==="
-        } >> "$PAYLOAD_FILE"
-    else
-        # Context known but specs dir absent — inject nothing further, silently.
-        emit_payload
-        exit 0
-    fi
-else
-    # No ALIVE context in the workspace at all — nothing to inject. Stay silent:
-    # no nag, no halt. (The SDD gate still fail-opens on every write.)
+# No ALIVE context at all, or its specs dir is absent → inject nothing, silently.
+# (No nag, no halt. The SDD gate still fail-opens on every write.)
+if [ -z "$DADAIA_CONTEXT" ]; then
+    emit_payload
+    exit 0
+fi
+CONTEXT_NAME="$DADAIA_CONTEXT"
+SPECS_DIR="$WORKSPACE_ROOT/repos/$DADAIA_CONTEXT/specs"
+if [ ! -d "$SPECS_DIR" ]; then
     emit_payload
     exit 0
 fi
 
 # ---------------------------------------------------------------------------
-# Graceful skip: if specs/memory/ does not exist, emit nothing further.
+# Once-per-session sentinel — guards the ENTIRE injection. If context was already
+# injected this session, emit NOTHING (no context line, no preflight, no memory) so
+# the bootstrap never repeats on subsequent prompts (rc-4 / ADR-2).
 # ---------------------------------------------------------------------------
-MEMORY_DIR="$SPECS_DIR/memory"
-if [ ! -d "$MEMORY_DIR" ]; then
-    emit_payload
-    exit 0
-fi
-
-# ---------------------------------------------------------------------------
-# First-message sentinel guard — idempotence keyed on a STABLE session id.
-# Resolution order (no PID fallback — $$ changes per shell and breaks idempotence):
-#   1. Harness session env vars (Claude Code / Codex / OpenCode).
-#   2. Codex passes session_id as a JSON field on stdin at SessionStart; subagents
-#      inherit the parent session_id. Parse it when present.
-#   3. Degenerate fallback: a single stable per-workspace key so context still
-#      injects at most ONCE (never per-shell), never the volatile PID.
-# ---------------------------------------------------------------------------
-SESSION_ID="${CLAUDE_CODE_SESSION_ID:-${CODEX_SESSION_ID:-${OPENCODE_SESSION_ID:-}}}"
-if [ -z "$SESSION_ID" ] && [ ! -t 0 ]; then
-    # stdin is not a tty — it may carry the harness hook JSON with a session_id field.
-    # Bounded read so a hook invoked without stdin never blocks.
-    _STDIN_JSON="$(timeout 0.2 cat 2>/dev/null || true)"
-    if [ -n "$_STDIN_JSON" ]; then
-        SESSION_ID="$(printf '%s' "$_STDIN_JSON" | "$PYTHON_BIN" -c 'import json,sys
-try:
-    print(json.load(sys.stdin).get("session_id", "") or "")
-except Exception:
-    pass' 2>/dev/null)"
-    fi
-fi
-SESSION_ID="${SESSION_ID:-workspace}"
-# Sanitize before using as a filename component — a session id containing '/' or
-# '..' must never escape $TMP_DIR (CWE-22; mirrors sdd-spec-gate.sh's strip).
-SESSION_ID="$(printf '%s' "$SESSION_ID" | tr -cd 'a-zA-Z0-9_-')"
-SESSION_ID="${SESSION_ID:-workspace}"
-
 SENTINEL="$TMP_DIR/ctx-inject-fired-${SESSION_ID}"
-
 if [ -f "$SENTINEL" ]; then
-    # Context already injected this session. Per-prompt path is SILENT — no memory,
-    # no breadcrumb (SessionStart carries context once). Emit nothing, exit 0.
     exit 0
 fi
-
-# Create sentinel before emitting to avoid double-injection on concurrent calls.
+# Create the sentinel before emitting to avoid double-injection on concurrent calls.
 touch "$SENTINEL"
 
-# ---------------------------------------------------------------------------
-# Emit bounded memory bootstrap block.
-# tech-stack.md and product/index.md are read verbatim — no strip pass needed.
-# ---------------------------------------------------------------------------
-
+# --- First injection this session: context line + dispatcher preflight ---
+printf '[%s]\n' "$DADAIA_CONTEXT" >> "$PAYLOAD_FILE"
 {
-    echo ""
-    echo "=== workspace memory (tech + catalog) ==="
+    echo "=== dispatcher preflight (SDD routing) ==="
+    echo "Before acting on a request in this workspace:"
+    echo "1. Resolve the active context (above) and the OWNING role for the"
+    echo "   artifact class you are about to touch: backlog → project-manager;"
+    echo "   SPEC/PLAN/TASKS → product-engineer; hooks/agents/skills/rules/"
+    echo "   workflows (the AI surface) → ai-engineer audit; production code →"
+    echo "   software-engineer; reviews → code/security/qa reviewers."
+    echo "2. Ownership is a COORDINATION CONVENTION, not a gate. No workflow"
+    echo "   (research, backlog/release definition, implementation+review,"
+    echo "   audits) is ever lock-blocked, and project-manager always spawns"
+    echo "   and writes freely. Route changes through the owning role by"
+    echo "   discipline. The ONLY deterministic lock is the single-session"
+    echo "   lease (one bound session per Spec Context for release-definition"
+    echo "   / implementation+review)."
+    echo "3. If the operator asks for multi-agent / deep / AI-surface work and a"
+    echo "   subagent or dispatch tool is not in your active tool set, DISCOVER it"
+    echo "   first (e.g. tool_search for the agent/dispatch tool) BEFORE starting"
+    echo "   the main task — do not silently proceed as a generic single agent."
+    echo "4. Limitation (truthful): this harness does NOT auto-spawn subagents"
+    echo "   from static .codex/.claude workflow files. Workflow files are"
+    echo "   reference docs; explicit dispatcher/operator fan-out is required."
+    echo "=== end dispatcher preflight ==="
 } >> "$PAYLOAD_FILE"
 
-# Tech stack — read .md verbatim (T-MMS-07: no strip pass needed for markdown)
-TECH_FILE="$MEMORY_DIR/tech-stack.md"
-if [ -f "$TECH_FILE" ]; then
-    cat "$TECH_FILE" >> "$PAYLOAD_FILE"
+# --- Memory bootstrap (once per session, only when memory/ exists) ---
+# tech-stack.md and product/index.md are read verbatim — no strip pass needed.
+MEMORY_DIR="$SPECS_DIR/memory"
+if [ -d "$MEMORY_DIR" ]; then
+    {
+        echo ""
+        echo "=== workspace memory (tech + catalog) ==="
+    } >> "$PAYLOAD_FILE"
+
+    TECH_FILE="$MEMORY_DIR/tech-stack.md"
+    if [ -f "$TECH_FILE" ]; then
+        cat "$TECH_FILE" >> "$PAYLOAD_FILE"
+    fi
+
+    # Catalog: prefer catalog.json (machine-readable, generated from frontmatter);
+    # fall back to product/index.md verbatim when catalog.json is absent.
+    CATALOG_JSON="$MEMORY_DIR/product/catalog.json"
+    PRODUCT_INDEX_MD="$MEMORY_DIR/product/index.md"
+    if [ -f "$CATALOG_JSON" ]; then
+        cat "$CATALOG_JSON" >> "$PAYLOAD_FILE"
+    elif [ -f "$PRODUCT_INDEX_MD" ]; then
+        cat "$PRODUCT_INDEX_MD" >> "$PAYLOAD_FILE"
+    fi
+
+    echo "=== end memory bootstrap ===" >> "$PAYLOAD_FILE"
 fi
 
-# Catalog: prefer catalog.json (machine-readable, generated from frontmatter);
-# fall back to product/index.md verbatim when catalog.json is absent (T-MMS-07).
-CATALOG_JSON="$MEMORY_DIR/product/catalog.json"
-PRODUCT_INDEX_MD="$MEMORY_DIR/product/index.md"
-if [ -f "$CATALOG_JSON" ]; then
-    cat "$CATALOG_JSON" >> "$PAYLOAD_FILE"
-elif [ -f "$PRODUCT_INDEX_MD" ]; then
-    cat "$PRODUCT_INDEX_MD" >> "$PAYLOAD_FILE"
-fi
-
-echo "=== end memory bootstrap ===" >> "$PAYLOAD_FILE"
 emit_payload
+exit 0

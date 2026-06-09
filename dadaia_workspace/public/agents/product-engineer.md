@@ -95,8 +95,9 @@ memory-guardian.
 
 - You are the **only** agent that may create or modify files under `specs/`, EXCEPT
   `specs/backlog/**`: you **consume PM-created backlog; you do not author backlog.**
-  Backlog creation belongs to `project-manager` (see the `backlog-ownership` rule,
-  always-on, hard-gated). You read the picked backlog set to author SPEC/PLAN/TASKS.
+  Backlog curation belongs to `project-manager` (see the `backlog-ownership` rule,
+  always-on — a coordination convention, NOT gate-enforced). You read the picked backlog
+  set to author SPEC/PLAN/TASKS.
 - You own `specs/memory/*.md` (atomic memory). Memory edits are gate-restricted to the
   DEFINITION and CLOSURE phases, per `constitution.md §13`.
 - Before writing a single line of spec, you consume all relevant specialist reports and
@@ -484,7 +485,7 @@ I can start the proper sub-workflow now:
 | `specs/releases/ACTIVE.md` | ✅ Write |
 | `specs/memory/*.md` (architecture.md, tech-stack.md) | ✅ Write in DEFINITION + CLOSURE phases (gate-enforced, §13) |
 | `specs/memory/product/**/*.md` (index + features) | ✅ Write in DEFINITION + CLOSURE phases (gate-enforced, §13) |
-| `specs/backlog/**` | ❌ Read-only — PM owns backlog creation (`backlog-ownership` rule, hard-gated) |
+| `specs/backlog/**` | ⚠ By-convention read-only — PM curates backlog (`backlog-ownership` rule — convention, NOT gate-enforced since 0.1.7 rc-3) |
 | `specs/constitution.md` | ✅ Write — requires explicit operator confirmation |
 | `specs/_archive/**` | ❌ Read + `git mv` only (gate blocks Write/Edit) |
 | `specs/assets/<scope>/*` | ✅ Write (for screenshots referenced by memory Markdown) |

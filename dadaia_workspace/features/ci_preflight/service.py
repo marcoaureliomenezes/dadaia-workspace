@@ -62,12 +62,19 @@ def subprocess_runner(cwd: Path) -> Runner:
     """Build a runner that executes each check as a subprocess under ``cwd``."""
 
     def _run(argv: Sequence[str]) -> tuple[int, str]:
-        proc = subprocess.run(  # noqa: S603 — argv is a fixed, trusted check list
-            list(argv),
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            proc = subprocess.run(  # noqa: S603 — argv is a fixed, trusted check list
+                list(argv),
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError as exc:
+            # The check binary (e.g. 'poetry') is not on PATH. Fail this check
+            # gracefully instead of letting a raw FileNotFoundError traceback escape to
+            # the CLI (bug: ci-preflight-raw-traceback-when-poetry-absent).
+            missing = exc.filename or (argv[0] if argv else "command")
+            return 127, f"command not found: {missing} — install it or run the checks directly."
         return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
     return _run

@@ -63,3 +63,17 @@ def test_no_fail_fast_runs_every_check() -> None:
 
 def test_all_passed_is_false_for_empty() -> None:
     assert all_passed([]) is False
+
+
+def test_subprocess_runner_missing_binary_returns_127_not_traceback(tmp_path) -> None:
+    """A check whose binary is absent fails gracefully (127 + clean message), no traceback.
+
+    Regression for ci-preflight-raw-traceback-when-poetry-absent (rc-4 / T-017-34).
+    """
+    from dadaia_workspace.features.ci_preflight.service import subprocess_runner
+
+    run = subprocess_runner(tmp_path)
+    code, out = run(("definitely-not-a-real-binary-xyz123", "run", "ruff"))
+    assert code == 127
+    assert "command not found" in out
+    assert "definitely-not-a-real-binary-xyz123" in out

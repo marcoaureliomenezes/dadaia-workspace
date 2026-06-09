@@ -401,3 +401,226 @@ residual to the maximum DETERMINISTIC extent:
 **Done criterion:** new codex route/contract test passes; `ctx-inject.sh` re-projected
 (`dadaia public stage && dadaia public install --target all`); `dadaia public doctor`
 exit 0; bug status flipped to Closed with evidence; `pytest` green.
+
+---
+
+## rc-3 — Unlock the Workflow (ownership is coordination, not a gate lock)
+
+Folded from the drafted 0.1.8 per operator directive (2026-06-09). Wave A is the keystone
+(reprojected gate unblocks Wave C). See SPEC "rc-3 scope addition" + PLAN "rc-3 plan".
+
+### [x] T-017-21
+**Requirement:** FR-rc3-1, FR-rc3-2, FR-rc3-4 (supersedes GA-02 / T-017-15)
+**Title:** Delete the backlog-ownership persona block from the gate; backlog → plain ADDITIVE
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`
+**Work:** In the `ADDITIVE` branch, remove the entire `*/specs/backlog/*` persona sub-check
+(the `PERSONA=...` resolution, the `.persona`/session-JSON fallback added in T-017-15, and
+both `[BACKLOG OWNERSHIP ERROR]` `_block` calls). `specs/backlog/**` then falls through to the
+existing `exit 0` like every other ADDITIVE path. Update the `PROTECTED` block message + the
+file header comment so the `.dadaia/sessions/**` rationale is **lease `.ptr` identity
+integrity**, not persona. Do NOT touch the MUTATING lease, MEMORY, FROZEN branches.
+**Done criterion:** `grep -c 'BACKLOG OWNERSHIP' sdd-spec-gate.sh` → 0; REPRO 1 → exit 0,
+no `decision":"block"`.
+
+### [x] T-017-22
+**Requirement:** FR-rc3-5 (simplification)
+**Title:** Delete the dormant RULE-D write-allowlist deny path
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`
+**Work:** Remove the RULE-D block (persona-keyed `agents.index.json` allowlist + its `deny`
+`_block`). It is fail-open and never fires for an agent (persona never in the hook env), so
+removal is behavior-preserving for agents and removes a latent lock. Leave a one-line comment:
+path-scope is now an agent-instruction convention, not a gate.
+**Done criterion:** `grep -c 'write_allowlist' sdd-spec-gate.sh` → 0; gate still exits 0 on a
+normal MUTATING write (lease path intact).
+
+### [x] T-017-23
+**Requirement:** FR-rc3-5
+**Title:** Re-word `backlog-ownership` rule: convention, not gate
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/rules/backlog-ownership.md`
+**Work:** Replace "A non-`project-manager` Write/Edit ... is a hard gate violation and is
+blocked, naming the offending agent." with: PM is the curating owner/coordinator of the
+backlog by convention; the flow is never gate-blocked; other agents should route backlog
+changes through PM but are not mechanically prevented. Keep the read-vs-write ownership intent.
+**Done criterion:** no "hard gate"/"blocked" claim remains; rule reads as a convention.
+
+### [x] T-017-24
+**Requirement:** FR-rc3-5
+**Title:** Update root law + gate-model memory to describe exactly one lock
+**Owner:** product-engineer (memory) / software-engineer (AGENTS.md)
+**Write set:** `dadaia_workspace/public/data/AGENTS.md`, `specs/memory/product/**` (gate/lock atom)
+**Work:** In `AGENTS.md` (SDD Gate + Bug-Registration/backlog wording) remove the backlog
+"hard gate" claim; state the single tolerated lock (single-session lease for release-def /
+impl+review). Update the memory product atom documenting the gate/lock model (product-engineer,
+phase=IMPLEMENTATION is NOT allowed for memory — do this memory edit in CLOSURE per gate, or
+keep ACTIVE phase=DEFINITION window; coordinate so the MEMORY phase gate permits it).
+**Done criterion:** grep "backlog" + "gate"/"block" in these surfaces shows only convention
+language; memory atom passes `dadaia specs doctor` lint.
+
+### [x] T-017-25
+**Requirement:** FR-rc3-1, FR-rc3-3, FR-rc3-4
+**Title:** Rewrite gate tests for the new contract
+**Owner:** software-engineer
+**Write set:** `tests/integration/gate/test_backlog_ownership.py`,
+`tests/integration/gate/test_path_scope.py`, plus the rc-2 codex-path backlog-block assertion
+added by T-017-20 (locate via `grep -rn 'backlog' tests/`)
+**Work:** Flip `test_backlog_ownership.py` to assert a backlog Write with no persona is
+ALLOWED (exit 0); delete "non-PM blocked"/"unresolved blocked" assertions; ensure a lease
+negative test exists (foreign live session blocked on MUTATING). Adjust `test_path_scope.py`
+for the RULE-D removal. Update/replace the T-017-20 assertion that a non-PM codex-path backlog
+write is blocked → now ALLOWED. Leave `test_protected_sessions.py` asserting sessions blocked.
+**Done criterion:** `pytest tests/integration/gate/` green.
+
+### [x] T-017-26
+**Requirement:** all rc-3
+**Title:** Reproject + full preflight
+**Owner:** software-engineer
+**Write set:** projected runtime files (via CLI; not hand-edited)
+**Work:** `dadaia public stage && dadaia public install --target all && dadaia public doctor`
+(exit 0, `[ok] public-privacy`); `dadaia ci preflight` (ruff format/check, mypy --strict,
+pytest) green.
+**Done criterion:** doctor exit 0; preflight green.
+
+### [x] T-017-27
+**Requirement:** FR-rc3-6
+**Title:** Register the previously-blocked backlog epic via the unlocked flow
+**Owner:** project-manager
+**Write set:** `specs/backlog/harness-agentic-entities-and-determinism-parity.md`,
+`specs/backlog/candidates.md`
+**Work:** With the gate reprojected, author the backlog epic for cross-harness agentic-entity
+architecture + deterministic enforcement (the item the persona lock blocked), and add its
+`candidates.md` entry — using only the Write tool, no env var, no `.persona` pointer. Success
+is the end-to-end proof of FR-rc3-1/2 on the live instance.
+**Done criterion:** both files written by the Write tool with no gate block.
+
+### [x] T-017-28
+**Requirement:** FR-rc3-6
+**Title:** Close persona bugs + flag stale pick
+**Owner:** product-engineer / project-manager
+**Write set:** `specs/bugs/codex-dispatched-agent-persona-not-propagated-to-sdd-gate.md`,
+`specs/bugs/backlog-ownership-gate-persona-unreachable-claude-code.md`,
+`specs/backlog/candidates.md`
+**Work:** Flip both bugs to closed `resolved_in: 0.1.7` (rc-3) with a one-line resolution
+note. Add a one-line note at the top of `candidates.md` flagging that the 2026-06-06 "v0.2.0
+single active pick" index is stale (v0.2.0/0.2.1/0.2.2 archived; current line is 0.1.x) and
+needs a PM re-baseline pass (out of scope here).
+**Done criterion:** both bugs `status` closed; candidates note present.
+
+---
+
+## rc-4 — Bug root-cause sweep (T-017-29..36)
+
+Solves the root cause of all 8 genuinely-open bugs (post-sanitization). See SPEC "rc-4 scope
+addition" + PLAN "rc-4 plan". Grill report:
+`.dadaia/reports/dadaia-workspace/product-engineer/2026-06-09T033120Z-refine-specs.html`.
+
+### [x] T-017-29
+**Requirement:** FR-rc4-1 (ADR-1) — fixes gate-cross-context-lock-contamination (+ superseded dup)
+**Title:** Resolve lease context from the write-target path
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`,
+`tests/integration/gate/test_path_scope.py`
+**Work:** Before/within `CONTEXT_SLUG` resolution (~lines 69-90), if `$FPATH` is under
+`$WS/repos/<slug>/…`, set `CONTEXT_SLUG=<slug>` (match against ALIVE slugs in
+spec_contexts.json, longest-prefix). This overrides the first-ALIVE/env fallback for any
+repo-scoped write. If `$FPATH` is under no repo → leave context empty → MUTATING path with no
+context resolves UNGATED (ADR-1: no lease). Lease acquire + REL read then use the path-derived
+slug. Do NOT change the lease algorithm itself.
+**Done criterion:** new test: two sessions, two different `repos/<slug>/specs/releases/` targets,
+simultaneous → BOTH allow; same repo + live foreign session → BLOCK. Existing gate tests green.
+
+### [x] T-017-30
+**Requirement:** FR-rc4-2 (ADR-2) — fixes repeated-visible-userpromptsubmit-memory-injection
+**Title:** ctx-inject session identity from harness-native id; silent already-fired path
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/public/scripts/ctx-inject.sh`,
+`tests/integration/test_hooks.py`
+**Work:** (1) Derive the once-per-session sentinel/`.ptr` from the harness-native id
+(`CLAUDE_CODE_SESSION_ID`, else Codex stdin-JSON `session_id`, else a stable per-workspace key) —
+no dependency on `DADAIA_SESSION_ID` (keep it as optional override). Write the `.ptr` so the
+lease (T-017-29) and gate see a stable identity. (2) Move the `[<ctx>]` context-line emission
+INSIDE the sentinel guard so the already-fired path emits nothing (no leaked bootstrap each
+prompt). Keep valid codex-json output.
+**Done criterion:** hook test: first prompt injects full bootstrap once; subsequent prompts in
+the same session inject nothing (no context line, no memory). Existing hook tests green.
+
+### [x] T-017-31
+**Requirement:** FR-rc4-3 (ADR-4) — fixes constitution-persona-single-source-drift
+**Title:** Align memory-write-phase single source + add doctor lint
+**Owner:** product-engineer (memory/constitution) + software-engineer (doctor lint)
+**Write set:** `dadaia_workspace/public/skills/dadaia-step0-memory-bootstrap/SKILL.md`,
+`specs/constitution.md`, affected `dadaia_workspace/public/agents/*.md`,
+`dadaia_workspace/features/specs/doctor.py`, `tests/unit/features/specs/test_doctor.py`
+**Work:** Set DEFINITION+CLOSURE everywhere (fix the CLOSURE-only claim in the step0 skill; fix
+the stale `quality-assurance.md` path ref in constitution; align project-auditor/PM/PE persona
+contradictions). Add a `specs doctor` lint that flags divergent governance facts (memory-write
+phase at minimum) across constitution/personas/skills/rules.
+**Done criterion:** grep shows one consistent phase statement; new doctor lint catches a seeded
+drift and passes the corrected tree; memory edit done in DEFINITION/CLOSURE phase.
+
+### [x] T-017-32
+**Requirement:** FR-rc4-4 — fixes install-does-not-prune-orphan-projections + agent-skill-surface-slop (projection side)
+**Title:** Install/doctor orphan-prune completeness + stage ref-check
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/public_install/install_helpers.py` (or equivalent),
+`dadaia_workspace/features/public*/` doctor, `tests/unit/features/public/`
+**Work:** Add the reverse prune sweep to `copy_agents_for_opencode`; remove the `if force:` guard
+on `install_codex_agents` stale-`.toml` removal; add an orphan scan to `public doctor`
+(enumerate projected dirs, flag files absent from staging). Call `check_agent_skill_refs` inside
+`stage()` and fail staging on broken refs.
+**Done criterion:** deleting a source asset + reinstall removes its projection across all
+runtimes; doctor reports a seeded orphan; stage fails on a seeded broken skill ref.
+
+### [x] T-017-33
+**Requirement:** FR-rc4-5 — fixes specs-doctor-dual-error-counter + specs-upgrade-fails-on-preexisting
+**Title:** Doctor unified verdict + upgrade pre/post error diff
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/cli/commands/specs.py`,
+`dadaia_workspace/features/specs/doctor.py`, the memory-lint summary embedding,
+`tests/integration/cli/` + `tests/unit/features/specs/test_doctor.py`
+**Work:** (doctor) Either strip the embedded `Summary:` line from the LINT-1 issue or add a final
+authoritative overall verdict line so the last line never says `0 ERROR` on a failed run.
+(upgrade) Snapshot doctor errors pre-migration; after migration only `[fail]`+advise-restore on
+NEWLY introduced errors; for pre-existing-only, succeed with a `[warn]`.
+**Done criterion:** upgrade on a tree with a pre-existing unrelated error exits 0 with a warn (no
+restore advice); doctor output has a single authoritative verdict.
+
+### [x] T-017-34
+**Requirement:** FR-rc4-6 — fixes ci-preflight-raw-traceback-when-poetry-absent
+**Title:** CI preflight graceful when poetry absent
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/ci_preflight/service.py`,
+`tests/unit/features/ci_preflight/`
+**Work:** Catch `FileNotFoundError` in the subprocess runner → return a clean
+`(127, "command not found: poetry")` and a `[fail]` line, no traceback. Optionally fall back to
+`sys.executable -m ruff/mypy/pytest` when `shutil.which("poetry")` is None.
+**Done criterion:** preflight with poetry absent prints a clean failure (no stack trace),
+non-zero exit; unit test covers the FileNotFoundError path.
+
+### [x] T-017-35
+**Requirement:** FR-rc4-7 — panel verification follow-ups (from rc-3 panel root-cause review)
+**Title:** Panel DI/slug/auth-tuple cleanup
+**Owner:** software-engineer
+**Write set:** `dadaia_workspace/features/panel/container.py`,
+`dadaia_workspace/features/panel/service.py`, `dadaia_workspace/features/panel/views/memory.py`,
+`dadaia_workspace/features/panel/handler.py`, `tests/unit/features/panel/`
+**Work:** Ensure `container.py` always injects `JsonWorkflowStateStore` (no in-memory fallback in
+prod); ensure `views/memory.py` always passes the per-request slug to `build_renderer()`; remove
+the residual `_BEARER_AUTH_ROUTE_NAMES` tuple at `handler.py:~340-354` (derive from `_ROUTE_TABLE`).
+**Done criterion:** unit tests assert store always injected + renderer slug per request; grep
+shows no residual parallel auth tuple.
+
+### [x] T-017-36
+**Requirement:** FR-rc4-7 + ADR-3 deferral; closes the bug sweep
+**Title:** Persona dangling skill-ref cleanup + ADR-3 backlog + bug closure
+**Owner:** ai-engineer (persona refs) / project-manager (backlog) / product-engineer (bug status)
+**Write set:** `dadaia_workspace/public/agents/software-architect.md`,
+`dadaia_workspace/public/agents/devops-engineer.md`, `specs/backlog/`, `specs/bugs/`
+**Work:** Remove/repoint dangling skill references in software-architect.md / devops-engineer.md
+(library side of agent-skill-surface-slop). File backlog item `lease-shell-write-coverage-gap`
+(ADR-3: lease mediates only agent Write/Edit, not shell — documented deferral). Flip all 8
+targeted bugs to Closed `resolved_in: 0.1.7` (rc-4) once their fix tasks are done + verified.
+**Done criterion:** no dangling skill refs (doctor `[ok]`); backlog item registered; all targeted
+bugs Closed.

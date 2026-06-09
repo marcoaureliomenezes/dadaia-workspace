@@ -15,6 +15,7 @@ from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
+    check_memory_phase_single_source,
     classify_workflows,
     dcx1_missing_toml,
     dcx2_config_toml_entries,
@@ -401,6 +402,7 @@ class FileSystemPublicAssetManager:
         reports.extend(lint_legacy_software_engineer(self._public_dir, self._iter_files))
         reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
         reports.extend(check_agent_skill_refs(self._public_dir))
+        reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(self._check_public_privacy())
 
         try:

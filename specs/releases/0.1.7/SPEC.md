@@ -189,3 +189,136 @@ The following assumptions were made inline (no blocking operator Q&A; operator m
 - **GA-05:** Memory fixes T-017-12 and T-017-13 are applied in the DEFINITION phase (not
   deferred to CLOSURE) because they correct current-truth inaccuracies that active agents are
   reading, per constitution §13 DEFINITION-phase authorization.
+
+---
+
+## rc-3 scope addition — Unlock the Workflow (2026-06-09)
+
+**Status:** Aprovado (operator directive 2026-06-09; folded from the drafted 0.1.8).
+
+**Why rc-3 reopens IMPLEMENTATION.** rc-1/rc-2 tried to *satisfy* the backlog-ownership
+persona gate (GA-02 / T-017-15: a `.dadaia/sessions/runtime/<session>.persona` fallback). That
+approach is unfixable: there is **no key**. Persona can only reach the `PreToolUse` hook from
+the hook-process env (harness-only — no harness sets it for agents) or from a `.persona`
+pointer that **no `dadaia` CLI verb ever writes**; an agent writing it itself is correctly
+blocked as forgery (`.dadaia/sessions/**` PROTECTED, SEC-01). Reproduced live under **Claude
+Code** (not just Codex) — see
+`specs/bugs/codex-dispatched-agent-persona-not-propagated-to-sdd-gate.md` (REPRO 1–3). The
+"owner-only" backlog gate therefore locks out the legitimate owner in **every** harness.
+
+**Operator ruling.** This kind of lock is not tolerated. No workflow (research,
+backlog-definition, release-definition, implementation+review, audits) may ever be
+lock-blocked, and `project-manager` must always spawn and write freely. The **only** tolerated
+deterministic lock is the single-session-per-Spec-Context **lease** (release-definition /
+implementation+review), keyed by `.dadaia/sessions/runtime/<ctx>.ptr` — which is the real
+reason `.dadaia/sessions/**` stays PROTECTED (lease-identity integrity, not persona).
+
+**rc-3 supersedes GA-02 / T-017-15.** The persona session-pointer fallback is removed together
+with the whole backlog-ownership block. Backlog becomes a plain ADDITIVE-allow path; ownership
+is re-expressed as a PM coordination convention (rule reworded, no gate). The dormant RULE-D
+write-allowlist deny path (fail-open, never fires for an agent) is also removed as pure
+simplification. The lease, MEMORY phase gate, FROZEN archive rule, and root-whitelist gate are
+untouched.
+
+**Lock inventory after rc-3:** exactly one deterministic lock — the single-session lease.
+`.dadaia/sessions/**` PROTECTED and `specs/_archive/**` FROZEN remain as **integrity**
+boundaries (not workflow locks); the MEMORY phase gate remains a content-integrity rule that
+does not block any enumerated workflow.
+
+**Trade-off (operator-requested).** Removing the backlog lock lets any (trusted, operator-
+spawned) agent write `specs/backlog/**`. Accepted: ownership is a convention, not a defence
+against an adversary; the genuine integrity boundaries are preserved; two no-key/fail-open
+branches are deleted, reducing race surface rather than adding it.
+
+**rc-3 functional requirements:**
+- FR-rc3-1 — `specs/backlog/**` writes are ALLOWED from any session regardless of persona.
+- FR-rc3-2 — `project-manager`/dispatched agents author backlog with Write/Edit, no env var,
+  no pointer, no operator intervention.
+- FR-rc3-3 — the single-session lease is unchanged (foreign live session still blocked on
+  MUTATING; holder always RENEWs).
+- FR-rc3-4 — `.dadaia/sessions/**` stays agent-write-protected, re-justified on lease integrity.
+- FR-rc3-5 — `backlog-ownership` rule + root `AGENTS.md` + gate-model memory describe exactly
+  one lock (the lease); no "backlog hard gate" claim remains.
+- FR-rc3-6 — the previously-blocked `harness-agentic-entities-and-determinism-parity` backlog
+  item is registered through the now-unblocked flow; both persona bugs close `resolved_in:
+  0.1.7` (rc-3).
+
+**rc-3 acceptance:** REPRO 1 returns ALLOW; gate test asserts backlog ALLOW (was block,
+including the rc-2 codex-path assertion from T-017-20); lease negative test still blocks a
+foreign live session; `test_protected_sessions.py` green; `dadaia public doctor` exit 0
+`[ok] public-privacy`; full `dadaia ci preflight` green.
+
+---
+
+## rc-4 scope addition — Bug root-cause sweep (2026-06-09)
+
+**Status:** Aprovado (operator goal 2026-06-09: solve the root cause of ALL reported bugs in the
+active release; mandatory `dadaia-grill-me` run — report
+`.dadaia/reports/dadaia-workspace/product-engineer/2026-06-09T033120Z-refine-specs.html`).
+
+After sanitizing the bug backlog (26 files → 8 genuinely-open; 7 panel bugs + `init-ignores-
+workspace-flag` verified already-fixed and Closed; `lease-cross-context-false-positive-block`
+superseded as a duplicate), three specialists investigated root causes. One **single
+architectural root cause** unites the CRITICAL bugs:
+
+> **Runtime identity & context are never reliably propagated to the deterministic hooks.** The
+> SDD gate, the lease, and `ctx-inject` each independently re-derive "which context / which
+> session" from unreliable ambient signals — env vars no harness exports into the hook
+> subprocess, a first-ALIVE fallback, a per-hook PID. Each mangles identity differently →
+> cross-context false locks, per-prompt memory-bootstrap spam, and governance doc drift.
+
+**Grill ADRs (operator decisions, 2026-06-09):**
+1. **Context = write-target path.** Resolve `CONTEXT_SLUG` from `repos/<slug>/…`; if the path is
+   under no repo → UNGATED (no lease). The resource's repo is deterministic; the session's
+   declared context is not.
+2. **Session id = harness-native.** Populate `.dadaia/sessions/runtime/<ctx>.ptr` from the
+   harness-native id (`CLAUDE_CODE_SESSION_ID`; Codex stdin-JSON `session_id`) directly;
+   `DADAIA_SESSION_ID` becomes an optional override. The env-export channel is unreachable.
+3. **Shell-bypass of the lease = DEFERRED** to a separate backlog item
+   (`lease-shell-write-coverage-gap`). The lease mediates only agent Write/Edit tools; closing
+   the Bash/CLI gap needs an fs-level/policy mechanism that would also catch legitimate git use.
+4. **Memory writes = DEFINITION+CLOSURE** (gate already correct); fix the one drifted skill that
+   says CLOSURE-only and add a `specs doctor` single-source lint so governance facts can't drift.
+
+**rc-4 functional requirements:**
+- FR-rc4-1 — A MUTATING write resolves its lease context from the target path (`repos/<slug>/`).
+  Two sessions on different repos NEVER lease-block each other; same repo + live foreign → BLOCK.
+  (Fixes `gate-cross-context-lock-contamination` + superseded dup.)
+- FR-rc4-2 — `ctx-inject` derives session identity from the harness-native id and writes the
+  `.ptr`; the full memory bootstrap injects at most once per logical session; the already-fired
+  path emits nothing (no leaked context line). (Fixes `repeated-visible-userpromptsubmit-memory-injection`.)
+- FR-rc4-3 — Canonical memory-write phase is DEFINITION+CLOSURE across constitution, personas,
+  skills, rules; a `specs doctor` lint flags divergence. (Fixes `constitution-persona-single-source-drift`.)
+- FR-rc4-4 — `dadaia public install` prunes orphan projections across ALL copy strategies; `public
+  doctor` reports orphans; `public stage` fails on broken agent→skill refs. (Fixes
+  `install-does-not-prune-orphan-projections` + `agent-skill-surface-slop` projection side.)
+- FR-rc4-5 — `dadaia specs doctor` prints one authoritative overall verdict; `dadaia specs
+  upgrade` only fails/advises-restore on errors the migration NEWLY introduced. (Fixes
+  `specs-doctor-dual-error-counter` + `specs-upgrade-fails-on-preexisting`.)
+- FR-rc4-6 — `dadaia ci preflight` fails gracefully when `poetry` is absent (no raw traceback).
+  (Fixes `ci-preflight-raw-traceback-when-poetry-absent`.)
+- FR-rc4-7 — Panel verification follow-ups closed (store injection always wired; per-request slug;
+  residual auth tuple removed). Persona dangling skill-refs cleaned (library side of
+  `agent-skill-surface-slop`).
+
+**rc-4 acceptance:** every targeted bug flipped to Closed with `resolved_in: 0.1.7` (rc-4);
+new integration test proves two-repo no-cross-block + same-repo foreign-live block; ctx-inject
+hook test proves single-injection + silent already-fired; `dadaia public/specs doctor` exit 0;
+full `pytest` green; ship-trio re-review APPROVE before ship.
+
+## rc-4 review record (2026-06-09)
+
+Ship-trio re-review of the rc-4 changeset (8 bug fixes) — **unanimous APPROVE**:
+- **security-reviewer — APPROVE.** No CRITICAL/HIGH. Retained boundaries intact (PROTECTED
+  `.ptr`, FROZEN, MEMORY phase); the path-derived context fix verified to stop cross-context
+  contamination; slug `[^A-Za-z0-9_-]`-stripped (CWE-22); no secrets in public assets. One
+  MEDIUM hardening (FPATH realpath, no current bypass) + one LOW dev-only pip CVE.
+- **code-reviewer — APPROVE.** bash -n clean both scripts; gate path-derivation + ctx-inject
+  sentinel correct and complete; RULE-D/persona-gate/backlog-block fully excised; new tests
+  genuine. Corroborated the same MEDIUM FPATH-realpath hardening (pre-existing).
+- **qa-engineer — APPROVE.** Full suite 2298 passed; all 8 regression tests genuine (not slop).
+
+The single MEDIUM (FPATH not canonicalized before the bash classifier) is **pre-existing and
+non-blocking** (no current bypass) — registered as `specs/bugs/gate-fpath-not-canonicalized-
+before-classifier.md` for a dedicated fix rather than a late rc-4 change. rc-4 is **ship-ready**
+pending operator ship/iterate + commit.
