@@ -1,3 +1,3 @@
-release: 0.1.7
-segment: rc-4
-phase: CLOSURE
+release: 0.1.8
+segment: alpha-1
+phase: IMPLEMENTATION
