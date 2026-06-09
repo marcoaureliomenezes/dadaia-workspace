@@ -1,0 +1,156 @@
+"""Shared primitives for the Python governance hooks (Windows-safe).
+
+Every concern that the shell hooks implemented with ad-hoc inline Python (stdin-JSON
+parsing, the ``{"decision":"block",...}`` / allow envelope, python-bin resolution,
+UTF-8 encoding, session-id sanitization, atomic file renewal) lives here once so the five
+hook entrypoints stay thin and the behavior is identical across all of them.
+
+Cross-platform notes:
+- All file reads/writes use ``encoding="utf-8"`` explicitly (Windows defaults to the
+  locale code page otherwise, corrupting non-ASCII payloads).
+- Session ids are stripped to ``[A-Za-z0-9_-]`` before use as a filename component so a
+  ``/`` or ``..`` can never escape the temp dir (CWE-22; mirrors the shell strip).
+- Atomic renewal uses ``os.replace`` (atomic on POSIX *and* Windows), never ``os.rename``
+  (which is not atomic-over-existing on Windows).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import uuid
+from pathlib import Path
+from typing import Any
+
+from dadaia_workspace.core.platform import PLATFORM
+
+#: Write-like tool names intercepted by the PreToolUse gates (Claude / Codex / OpenCode).
+WRITE_TOOLS: frozenset[str] = frozenset(
+    {
+        "Write",
+        "write_file",
+        "Edit",
+        "edit_file",
+        "MultiEdit",
+        "NotebookEdit",
+        "apply_patch",
+    }
+)
+
+#: Codex ``apply_patch`` file-header prefixes (the touched file follows the prefix).
+_PATCH_PREFIXES: tuple[str, ...] = (
+    "*** Update File: ",
+    "*** Add File: ",
+    "*** Delete File: ",
+)
+
+_SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def read_stdin_json() -> dict[str, Any]:
+    """Parse the hook JSON envelope from stdin. Returns ``{}`` on any failure (fail-open)."""
+    try:
+        raw = sys.stdin.read()
+    except Exception:  # noqa: BLE001 — fail-open: a stdin read error must never crash a hook
+        return {}
+    if not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def tool_name(payload: dict[str, Any]) -> str:
+    """Extract the tool name from a hook payload (handles both Claude and Codex keys)."""
+    return str(payload.get("tool_name") or payload.get("tool") or "")
+
+
+def is_write_tool(name: str) -> bool:
+    return name in WRITE_TOOLS
+
+
+def target_path(payload: dict[str, Any]) -> str:
+    """Extract the write-target path from a hook payload.
+
+    Handles direct keys (``file_path``/``path``/``notebook_path``) and Codex
+    ``apply_patch`` commands (first ``*** Add/Update/Delete File:`` header). Returns
+    ``""`` when no path can be parsed (caller fails open).
+    """
+    inp = payload.get("tool_input")
+    src: dict[str, Any] = inp if isinstance(inp, dict) else payload
+    direct = src.get("file_path") or src.get("path") or src.get("notebook_path") or ""
+    if direct:
+        return str(direct)
+    command = src.get("command") or ""
+    if isinstance(command, str):
+        for line in command.splitlines():
+            for prefix in _PATCH_PREFIXES:
+                if line.startswith(prefix):
+                    return line[len(prefix) :].strip()
+    return ""
+
+
+def sanitize_session_id(raw: str | None) -> str:
+    """Strip a session id to ``[A-Za-z0-9_-]`` (CWE-22 path-traversal defense)."""
+    return _SESSION_ID_STRIP.sub("", raw or "")
+
+
+def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
+    """Resolve the harness-native session id, sanitized.
+
+    Order (matches the shell hooks): explicit ``DADAIA_SESSION_ID`` override, then the
+    per-harness env vars, then the stdin ``session_id`` field, then ``default``.
+    """
+    candidate = (
+        os.environ.get("DADAIA_SESSION_ID")
+        or os.environ.get("CLAUDE_CODE_SESSION_ID")
+        or os.environ.get("CODEX_SESSION_ID")
+        or os.environ.get("OPENCODE_SESSION_ID")
+        or str(payload.get("session_id") or "")
+    )
+    sanitized = sanitize_session_id(candidate)
+    return sanitized or default
+
+
+def emit_block(reason: str) -> None:
+    """Print the ``{"decision":"block",...}`` envelope (the harness then blocks the tool)."""
+    print(json.dumps({"decision": "block", "reason": reason}))
+
+
+def emit_allow() -> None:
+    """Allow a tool call: the hooks signal allow by emitting nothing and exiting 0."""
+    return None
+
+
+def default_python_bin(workspace: Path) -> str:
+    """Resolve the workspace venv Python, Windows-safe, with portable fallbacks.
+
+    ``.dadaia/.venv/<scripts>/python<suffix>`` (``Scripts/python.exe`` on Windows,
+    ``bin/python`` on POSIX) → ``sys.executable`` → bare ``python``. No bash dependency.
+    """
+    venv_python = (
+        workspace
+        / ".dadaia"
+        / ".venv"
+        / PLATFORM.venv_scripts_dir
+        / f"python{PLATFORM.venv_exe_suffix}"
+    )
+    if venv_python.is_file():
+        return str(venv_python)
+    if sys.executable:
+        return sys.executable
+    return "python"
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` atomically via a temp file + ``os.replace`` (UTF-8).
+
+    ``os.replace`` is atomic-over-existing on both POSIX and Windows, unlike ``os.rename``.
+    """
+    tmp = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
