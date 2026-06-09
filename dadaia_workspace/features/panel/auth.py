@@ -20,7 +20,10 @@ import hmac
 import os
 import pathlib
 import secrets
+import sys
 
+from dadaia_workspace.core.exceptions import PlatformSecurityError
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
 
 DEFAULT_TOKEN_PATH = pathlib.Path("~/.dadaia/state/panel.token").expanduser()
@@ -79,8 +82,19 @@ def ensure_token(
     # PlatformSecurityError is intentionally NOT caught here (Tier-1 fail-loud).
     if permission_setter is not None:
         permission_setter.restrict_dir_to_owner(parent)
-    else:
+    elif PLATFORM.has_posix_chmod:
         os.chmod(parent, 0o700)
+    else:
+        # No setter injected AND chmod is a no-op on this platform (Windows):
+        # refuse rather than silently leave the token dir unprotected (CWE-732,
+        # Tier-1 fail-loud). The production panel path always injects a setter
+        # (container._build_permission_setter), so this guards a misuse/fallback only.
+        raise PlatformSecurityError(
+            "cannot restrict panel token directory on this platform without a "
+            "FilePermissionSetter (refusing to create an unprotected token)",
+            feature_name="panel-auth",
+            platform=sys.platform,
+        )
 
     token = secrets.token_urlsafe(32)
 

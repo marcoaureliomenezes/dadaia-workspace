@@ -220,6 +220,32 @@ class TestEnsureTokenPermissionSetter:
         with pytest.raises(PlatformSecurityError):
             auth.ensure_token(token_path, permission_setter=failing_setter)
 
+    def test_no_setter_fallback_fails_loud_when_chmod_is_noop(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No setter + chmod no-op platform (Windows) must raise, not silently no-op (CWE-732).
+
+        Guards the fallback branch: the production panel always injects a setter, but a
+        misuse calling ensure_token() without one on a non-chmod platform must refuse
+        rather than create an unprotected token.
+        """
+        import dataclasses
+
+        from dadaia_workspace.core.exceptions import PlatformSecurityError
+
+        auth = _import_auth()
+        # Simulate a no-effective-chmod platform (Windows) via the PLATFORM seam.
+        fake_platform = dataclasses.replace(auth.PLATFORM, has_posix_chmod=False)
+        monkeypatch.setattr(auth, "PLATFORM", fake_platform)
+        token_path = tmp_path / "state" / "panel.token"
+
+        with pytest.raises(PlatformSecurityError):
+            auth.ensure_token(token_path)  # no permission_setter
+
+        assert not token_path.exists(), (
+            "Token MUST NOT be created when chmod is a no-op and no setter is provided"
+        )
+
 
 # ---------------------------------------------------------------------------
 # validate tests
