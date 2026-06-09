@@ -401,7 +401,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   - `dadaia public stage` is run after editing the `.ts` plugins so T-018-22's install sees
     matching SHA256.
 
-### [ ] T-018-20 — Step 10f: UPDATE `tests/integration/test_hooks.py` Linux-only + portable tmp_path
+### [-] T-018-20 — Step 10f: UPDATE `tests/integration/test_hooks.py` Linux-only + portable tmp_path
 - **Owner:** software-engineer
 - **Write set:**
   - `tests/integration/test_hooks.py`
