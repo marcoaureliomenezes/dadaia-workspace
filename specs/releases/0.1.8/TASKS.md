@@ -57,7 +57,7 @@ as a recorded operator exception to the `plugin-scope` rule for this release.
   adapter tests are green"); `python -m pytest tests/unit/core/test_process_probe.py` green;
   package imports cleanly.
 
-### [-] T-018-04 — Step 3a: ADD file-lock protocols and POSIX/Windows adapters
+### [x] T-018-04 — Step 3a: ADD file-lock protocols and POSIX/Windows adapters
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/core/protocols/file_lock.py` (NEW)

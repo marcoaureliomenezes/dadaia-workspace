@@ -63,6 +63,11 @@ ignore = ["E501", "B008"]
 [tool.ruff.lint.per-file-ignores]
 "dadaia_workspace/cli/commands/*.py" = ["B904"]
 "dadaia_workspace/cli/commands/repos.py" = ["SIM118"]
+# Test files that place pytestmark before platform-gated imports (E402 is intentional).
+"tests/unit/infrastructure/test_file_lock_posix.py" = ["E402", "I001"]
+"tests/unit/infrastructure/test_file_lock_windows.py" = ["E402", "I001"]
+"tests/unit/infrastructure/test_telemetry_lock_posix.py" = ["E402", "I001"]
+"tests/unit/infrastructure/test_telemetry_lock_windows.py" = ["E402", "I001"]
 
 [tool.mypy]
 python_version = "3.12"
