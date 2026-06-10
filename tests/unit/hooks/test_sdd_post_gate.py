@@ -8,8 +8,7 @@ hook — invoked as a subprocess with a ``claude_hook_env()`` and no hand-plante
 ``DADAIA_*`` — is proven in ``tests/unit/hooks/test_sdd_post_gate_behavior.py``.
 
 ``DADAIA_SESSION_ID`` appears here only as the *operator override* leg of the resolution
-chain (``resolve_session_id`` honors it first); the harness never sets it. These setenvs
-are the recorded ``_ENV_BASELINE`` for this file and are burned down by T-010-11.
+chain (``resolve_session_id`` honors it first); the harness never sets it.
 
 Mandatory parity preserved from rc-4:
   (a) session-record renewal via os.replace (atomic on Windows too);

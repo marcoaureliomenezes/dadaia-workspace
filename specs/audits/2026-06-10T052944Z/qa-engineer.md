@@ -237,5 +237,105 @@ Sampled in depth: `test_two_actor_lease.py`, `test_harness_env_contract.py`,
 
 ---
 
-*Audit artifacts: this file. No production, test, or spec files were modified. Evidence:
-read-only inspection + pytest runs recorded in §5.*
+## rc-2 delta (re-score after commit `fc388d7`, 2026-06-10)
+
+Delta re-score of the two blockers (§6 items 1–2) plus the net-new rc-2 tests. Mode:
+verify-by-running, not by reading the commit message.
+
+### Blocker 1 — Ratchet burn-down → **RESOLVED (baselines at zero, hard-fail)**
+
+- `tests/contract/test_harness_env_contract.py` rewritten: the baseline dicts, allow-file
+  lists, and both anti-rot meta-tests are **gone**; both contracts now assert
+  `current == {}` — first violation fails, no residual cap.
+- The only remaining carve-out is `ALLOWLISTED_DADAIA_ENV` (6 vars in
+  `tests/fixtures/harness_env.py:108`), and it is the *right kind* of allowlist: each entry
+  names its production env-reader (`DADAIA_CONTEXT` → ctx_inject/sdd_gate resolution,
+  `DADAIA_AGENTS_DIR` → agents/reader, `DADAIA_WORKFLOWS_DIR` → workflows/service,
+  `DADAIA_AGENT_RUNTIME` → container, `DADAIA_SESSION_ID`/`DADAIA_MODE` → the operator
+  *override* legs of `resolve_session_id`/`_resolve_mode`). Setting these in a unit test
+  exercises a real production env-read path — not harness-fiction. Both override vars stay
+  in `_FORBIDDEN_HOOK_ENV` (scrubbed from every hook subprocess), so the fiction channel
+  stays closed at the behavior tier.
+- The hook-import baseline was replaced by a **precise behavior definition**: violation =
+  hook-module import AND in-process `sys.stdin` simulation. Sampled rewrites confirm it is
+  real, not relabeling: `test_ctx_inject.py` fully rewritten to
+  `run_hook_subprocess` + `claude_hook_env` (3 subprocess call sites, module docstring
+  names the old banned pattern); `test_sdd_post_gate.py` is now honest white-box (pure
+  helpers + `monkeypatch.setattr(_common, "read_stdin_json", …)` fault-injection, zero
+  `sys.stdin` patching) with a **subprocess companion** `test_sdd_post_gate_behavior.py`
+  (7 `run_hook_subprocess` sites) carrying the harness-real behavior; `test_reader.py`'s
+  setenvs are all `DADAIA_AGENTS_DIR` — the by-design env-read, correctly allowlisted.
+- Residuals (INFO, not score-capping): (a) `test_sdd_post_gate.py:12` docstring still
+  references the deleted `_ENV_BASELINE` — stale doc, one line; (b) the
+  `read_stdin_json` monkeypatch is a documented in-process payload channel the AST contract
+  does not flag — acceptable because it is fault-injection on a production symbol, the
+  contract docstring sanctions it explicitly, and the behavior companion covers the
+  subprocess path.
+
+**Env fidelity → 2/2.**
+
+### Blocker 2 — Lifecycle-asymmetry retroactive map → **DELIVERED AND GROUNDED; enforcement half still open**
+
+- `tests/contract/README.md §"Lifecycle-asymmetry coverage map (retroactive)"`: 8 features
+  × 3 asymmetric legs, every cell a named test. The map claims **zero GAP rows** — I
+  expected ~4, so I spot-grepped 12 names across 4 rows (lease, spec_context, ci_preflight,
+  telemetry, memory-catalog): **12/12 resolve to real test functions** (e.g.
+  `test_lock_steal.py:77`, `test_spec_context_service.py:255`,
+  `ci_preflight/test_service.py:68` — the missing-binary→127 leg,
+  `test_reader_claude.py:161`). The no-GAP claim is earned by rc-2 closing the gaps with
+  real tests (pem-suffix, 127-not-traceback), not papered over.
+- Still absent: the mechanical check (doctor/contract test) that future features add their
+  row — the map's decay guard is prose ("add its row here with an explicit GAP marker").
+  This was the second half of §6 blocker 2 and remains open.
+
+**Adversarial coverage → 1.75/2** (map half resolved; enforcement half open).
+
+### Net-new rc-2 tests — **no fiction found**
+
+- `test_two_actor_lease.py::test_hook_acquired_holder_no_steal_while_driver_alive_then_takeover`
+  (NF-1): a long-lived real driver process acquires via the **real hook**; core assertion
+  `rec0["pid"] == driver_pid` proves the lease records the driver pid, not the ephemeral
+  hook child (pre-fix this is the dead hook pid — genuine falsification). TTL accelerant is
+  honestly documented as a clock compression on a record the hook really wrote; journal
+  history asserts `[A, A, A, B]` with B vetoed while the driver lived.
+- `test_sdd_gate.py::test_resolve_mode_*` (NF-2, 7 tests): incumbent fallback, self-record
+  precedence, **anti-downgrade** (stale read-bind incumbent ignored when a different live
+  session holds the implementation lease — asserted against a real `lease.acquire`), and
+  incumbent-honored-when-no-holder. Pure-helper white-box, correctly in-process.
+- `test_read_mode_non_acquiring.py::test_cross_sid_read_bind_{blocks_mutating,allows_additive}_via_incumbent`:
+  the cross-sid READ path through the incumbent pointer at the gate-subprocess tier.
+- `test_public_assets.py::test_codex_posttooluse_heartbeat_fires_on_all_tools` (N-2): pins
+  omitted-matcher (= Codex canonical match-all) on the PostToolUse heartbeat AND that the
+  PreToolUse write gates stay scoped to `^(apply_patch|Edit|Write)$` — kills the Codex
+  flavor of lease starvation; the old test's wrong pin was flipped, not duplicated.
+- `test_spec_context_service.py::test_dead_with_commit_blocks_on_untracked_pem_key_file` +
+  `test_scan_flags_key_suffixes_and_skips_other_binary` (R-2): suffix-only detection proven
+  with non-PEM bytes (`\x00\x01\x02…`), block + no-push + state-preserved asserted; the
+  unrelated-binary negative control prevents over-blocking.
+
+### Run evidence (rc-2)
+
+Full suite at `fc388d7`: `pytest -p no:cacheprovider -q` → **2,792 passed, 8 skipped,
+1 xpassed, 0 failures, exit 0** (126.4s). Skips are Windows/LAN platform guards; the xpass
+is the documented platform-defined PID-0 probe. Meets the 2,792+ bar.
+
+### Re-score: **9.25/10** (was 8.5)
+
+| Axis | rc-1 | rc-2 | Delta justification |
+|------|------|------|---------------------|
+| Mechanical craft | 2/2 | **2/2** | Held; the hook-driver e2e and the precise behavior-definition contract raise the bar again |
+| Contract fidelity | 2/2 | **2/2** | Held; baseline-free contracts are stronger than the ratchet they replace |
+| Environment fidelity | 1.5/2 | **2/2** | Baselines burned to zero, hard-fail; allowlist auditable with named production readers; unit/behavior split principled with subprocess companions |
+| Adversarial coverage | 1.5/2 | **1.75/2** | Retroactive map delivered, grounded (12/12 spot-grepped names real), honest no-GAP claim earned; mechanical enforcement of the map still prose-only |
+| Escape record | 1.5/2 | **1.5/2** | Unchanged by design — earned only by a future cycle with no escapes past green tests; not purchasable in the release that wrote the tests |
+
+### What blocks 9.5+ (updated)
+
+1. **Map enforcement** (adversarial → 2/2): a contract test or doctor check that every
+   feature surface has a map row (or an explicit GAP cell) — the same mechanization the
+   harness-env contract got in rc-2.
+2. **Escape record** (→ 2/2): time-earned; let the v0.1.11 cycle run.
+3. INFO cleanup: stale `_ENV_BASELINE` docstring reference in `test_sdd_post_gate.py:12`.
+
+*rc-2 delta evidence: read-only inspection of `fc388d7` + the full-suite run above. Only
+this lane file was modified.*

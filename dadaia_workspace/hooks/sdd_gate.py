@@ -25,6 +25,7 @@ import re
 import sys
 from pathlib import Path
 
+from dadaia_workspace.core import lock_liveness
 from dadaia_workspace.features.spec_context import gate_policy, lease, session_identity
 from dadaia_workspace.hooks import _common
 
@@ -179,18 +180,29 @@ def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
 
 
 def _incumbent_is_stale(workspace: Path, ctx: str, incumbent_sid: str) -> bool:
-    """True if a live lease record names a session OTHER than the incumbent pointer.
+    """True if a **live** lease record names a session OTHER than the incumbent pointer.
 
     A read-bind sets the incumbent pointer but takes no lease. If a *different* session then
-    legitimately acquires the implementation lease, the lease record holder diverges from the
-    incumbent pointer — the read-bind is stale and must not downgrade the live holder's mode.
-    Absence of a lease record (no holder yet) is NOT stale: the read-bind still governs.
+    legitimately acquires the implementation lease and is still **live**, the live holder must
+    not be downgraded to the read-bind's mode — the incumbent is stale and ignored
+    (anti-downgrade, NF-2).
+
+    Liveness uses the canonical kernel predicate ``core.lock_liveness.is_stale`` — the same
+    TTL + pid-probe definition the MUTATING gate path uses (NF-4 fix). A *dead* leftover record
+    (TTL-stale heartbeat and dead/absent pid) — the normal residue after an implementation
+    session ends, which nothing deletes until takeover or doctor GC — does NOT defeat the
+    incumbent: a fresh ``bind --mode read`` is honored. Absence of a record (no holder yet) is
+    likewise not stale: the read-bind still governs.
     """
     holder = lease.read_record(workspace, ctx)
     if holder is None:
         return False
     holder_sid = holder.get("session_id")
-    return bool(holder_sid) and str(holder_sid) != incumbent_sid
+    if not holder_sid or str(holder_sid) == incumbent_sid:
+        return False
+    # A divergent holder defeats the incumbent only when it is genuinely LIVE (TTL-fresh, or
+    # TTL-stale but its pid is still alive). A dead/TTL-stale leftover does not.
+    return not lock_liveness.is_stale(holder, pid_probe=_build_pid_probe())
 
 
 def _active_field(specs_dir: Path, field: str) -> str:

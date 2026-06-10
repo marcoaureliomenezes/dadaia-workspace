@@ -115,3 +115,49 @@ harness sid in `bind`). Bugs filed: `lease-pid-veto-records-ephemeral-hook-pid.m
 `bind-mode-session-record-keyed-by-cli-sid.md` (specs/bugs/).
 
 — end of report —
+
+---
+
+## rc-2 delta (re-score after fc388d7, branch feature/v0.1.10)
+
+Adversarial re-verification of the three blockers, at commit `fc388d7`.
+
+### Blocker verdicts
+
+| # | Verdict | Evidence |
+|---|---|---|
+| N-1 | **FIXED.** | Code: `hooks/sdd_gate.py::_resolve_holder_pid` (payload `harness_pid`/`parent_pid`/`ppid` → `os.getppid()` fallback) threaded as `holder_pid` through `gate_policy.evaluate(…, holder_pid=…)` → `lease.acquire(pid=…)`. The ephemeral-hook-pid default survives only for in-process callers. Test: `tests/e2e/test_two_actor_lease.py::test_hook_acquired_holder_no_steal_while_driver_alive_then_takeover` proves the **correct topology** — a real driver process spawns the real `python -m …sdd_gate` subprocess, asserts `rec["pid"] == driver_pid` (not the hook child), foreign MUTATING acquire YIELDED past TTL while the driver lives, TAKEOVER only after the driver is reaped. Suite re-run: 6 passed. Text: all 4 flagged sites relabeled accurately — `workspace-protocol.md:18-20`, `data/AGENTS.md:148-149` ("hook payload pid when present, else the hook's parent process"), `dadaia-workspace-manager:93-100,110-113,206`, `dadaia-task-manager:117`; `lease.py:16-27` docstring now describes the injected-probe veto truthfully. |
+| N-2 | **FIXED.** | `runtime_config.codex_hooks` PostToolUse block carries **no matcher** (Codex's canonical match-all; comment cites N-2 explicitly); the write-matcher remains only on PreToolUse. Live `.codex/hooks.json` confirmed: PostToolUse entry has no `matcher` key. `ai-harness-codex/SKILL.md:321` rewritten to "matcher **omitted** — Codex's canonical match-all form". No leftover `apply_patch\|Edit\|Write`-on-heartbeat claims anywhere in `public/`. |
+| N-3 | **FIXED.** | `sdd_gate._resolve_mode` is now env → session record (harness sid; wins) → **context incumbent pointer** (`sessions/runtime/<ctx>.ptr`) with an anti-downgrade guard (`_incumbent_is_stale`: a live lease naming a different sid voids a stale read-bind) → IMPLEMENTATION default. `context.py` bind refreshes the incumbent pointer (`session_identity.set_incumbent`), so the bind binds the CONTEXT, not a throwaway sid. READ is reachable in the default flow with **no env var and a different harness sid**: `tests/integration/gate/test_read_mode_non_acquiring.py::test_cross_sid_read_bind_blocks_mutating_via_incumbent` (+ ADDITIVE-allows twin) drives the real hook subprocess via `claude_hook_env`; `tests/contract/cli/test_cli_context.py::test_context_bind_refreshes_context_incumbent_pointer` covers the CLI half. 38 passed. Manager-skill text (`dadaia-workspace-manager:43-47,85`) describes the incumbent mechanism and demotes `--print-env` to legacy. |
+
+### Projection / memory consistency
+
+- Source↔projection spot-check (3 touched files): `workspace-protocol.md`, `data/AGENTS.md`→root `AGENTS.md`, `ai-harness-codex/SKILL.md` — `diff` exit 0. `dadaia public doctor` clean incl. `[ok] public-privacy`.
+- `specs/memory/product/sdd/sdd-gate-v3.md` and `specs/memory/architecture.md` both carry the rc-2 mechanisms verbatim-correctly: `_resolve_holder_pid` payload→getppid, Codex omitted-matcher = match-all, 4-step mode resolution incl. incumbent + anti-downgrade.
+- Stale-wording grep (`ephemeral`/`inert`/old precedence): only benign unrelated hits (tmp-file "ephemeral files"). No new contradictions introduced.
+- All three filed bugs closed/resolved with regression pointers.
+
+### Residuals (none blocking)
+
+- **LOW (new, noted):** `getppid()` = harness holds when the harness execs the hook command as a simple command (bash/dash `-c` exec-optimize; the emitted command is pipe-free). If a harness ever wraps hooks in a non-exec shell, the recorded pid is the dead wrapper → graceful degradation to TTL-only (pre-fix behavior, fail-open toward takeover, never freeze). The forward-compatible payload-pid path is the escape hatch. Worth one sentence in the sdd-gate atom someday; not an overclaim today since the text says "the hook's parent process".
+- **LOW carry-overs (N-5, unaddressed as expected):** `public/scripts/__pycache__/*.pyc` still shipped; `public/data/repos.xlsx` opaque binary; ctx-inject raw 25.6 KB catalog bootstrap; sentinel GC.
+
+### Final determinism table (claim → verdict)
+
+| Gate | Verdict |
+|---|---|
+| Path-class × lease × phase × mode (D-1, D-3..D-5) | **Deterministic**, truthfully documented |
+| Lease no-steal (pid veto) (D-2/N-1) | **Deterministic** — long-lived pid recorded, real-topology e2e proof |
+| Heartbeat renewal (D-12/N-2) | **Deterministic on both harnesses** (Claude `*`, Codex omitted-matcher) |
+| READ-mode via bind (D-10/N-3) | **Deterministic** in the default flow (incumbent ptr + anti-downgrade) |
+| PROTECTED / root whitelist (D-6/D-7) | Deterministic-narrow, honestly labeled (Bash envelope = documented D-2 decision, doctor SPEC-DOC-029 backstop) |
+| Markers / allowlists / tmp guardrail (D-8, D-11) | Discipline — **labeled as discipline** everywhere |
+| ctx-inject (D-9), pre-push gate (D-13) | Deterministic (bloat/installation-dependence noted) |
+
+**Remaining theater: none.** Every mechanism the surface claims is now the shipped mechanism; every discipline-only surface self-identifies as discipline. What remains is labeled residual (hygiene LOWs + the shell-exec caveat), not theater.
+
+### NEW SCORE: 9 / 10
+
+All three blockers closed code+text+projection with falsifying tests in the correct process topology. Withheld from 10 by the LOW residuals: ctx-inject bootstrap bloat, shipped `__pycache__`/opaque binary in canonical source, and the untested-in-live-harness getppid shell-exec assumption.
+
+— end of rc-2 delta —

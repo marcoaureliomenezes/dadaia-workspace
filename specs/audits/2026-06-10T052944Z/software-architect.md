@@ -199,3 +199,173 @@ Nothing else in the original lane remains open.
 *software-architect · evidence-only · no production files modified. This report's own Write
 into `repos/dadaia-workspace/specs/audits/…` classified ADDITIVE under the re-rooted gate —
 the baseline's self-demonstrating defect is now a self-demonstrating fix.*
+
+---
+
+## rc-2 delta (commit fc388d7, re-verified 2026-06-10)
+
+> Adversarial re-verification of the rc-2 amendment. Same rubric. Execution caveat: this
+> session has no shell; the named pytest selectors were verified by adversarial reading of
+> the test code (all are real-subprocess, falsifying designs), not re-executed here —
+> demand a green run of `tests/e2e/test_two_actor_lease.py`,
+> `tests/integration/gate/test_read_mode_non_acquiring.py`, and
+> `tests/unit/hooks/test_sdd_gate.py` in the ship evidence.
+
+### NF-1 — RESOLVED at root cause (CRITICAL → closed)
+
+- `hooks/sdd_gate.py:64-95` `_resolve_holder_pid`: payload `harness_pid`/`parent_pid`/`ppid`
+  (int or string, >0 validated, `:84-94`) else `os.getppid()` (`:95`). Threaded at `:281`
+  into `gate_policy.evaluate(holder_pid=…)` (`gate_policy.py:207`), which passes
+  `pid=holder_pid` into `lease.acquire` (`gate_policy.py:279`); stamped into the record at
+  `lease.py:328,360-361,368,381,390` (`acquire` signature gained `pid:` at `lease.py:296`,
+  `steal` at `:496`).
+- **Renew preserves the holder pid** — checked: `lease.renew_heartbeat` rewrites only
+  `heartbeat` (`lease.py:453`) inside the same sentinel CAS; `sdd_post_gate` renews solely
+  via `renew_heartbeat` (`sdd_post_gate.py:100`), so the PostToolUse hook can never clobber
+  the harness pid with its own ephemeral pid. The acquire-RENEW branches re-stamp
+  `pid=holder_pid` (`lease.py:360,381`) — same harness pid on the harness path; harmless.
+- **E2E is genuinely adversarial**: scenario (v)
+  (`test_two_actor_lease.py:480-532`) spawns a long-lived DRIVER that invokes the **real**
+  `python -m dadaia_workspace.hooks.sdd_gate` as its child (`:432-435`), asserts the lock
+  record's `pid` equals the **driver's** pid (`:497` — fails on the rc-1 code by
+  construction), ages the record past TTL while the driver lives, proves foreign MUTATING
+  is YIELDED with the real `OsProcessProbe` (`:506-511`), then kills the driver, waits for
+  OS reap, and proves TAKEOVER (`:516-527`) with the full lock-history invariant (`:530`).
+  The `_set_short_ttl_on_record` accelerant (`:466-477`) rewrites only `ttl` on a record
+  the real hook wrote — pid/sid/heartbeat untouched; acceptable.
+- Residue (LOW, documented in the code itself): `getppid()` names the harness only when the
+  harness spawns hooks as direct children; a non-exec'ing shell wrapper would record a
+  short-lived shell pid and the veto degrades to TTL-only — i.e. the **pre-fix posture,
+  never worse**, and the payload-pid key (`:73-76`) is the forward-compatible cure.
+  PID-reuse false-live is inherent to pid-probe designs; bounded by record GC. Neither
+  blocks closure.
+
+**Verdict: the exact correction §8.1 demanded (long-lived pid + hook-acquired-holder e2e)
+shipped, and the e2e is the falsification I asked for.**
+
+### NF-2 — SUBSTANTIALLY RESOLVED; precedence guard has one liveness defect (see NF-4)
+
+- Resolution chain implemented as specified: env → self-keyed record → context-incumbent
+  via `session_identity.resolve_identity` → IMPLEMENTATION default
+  (`sdd_gate.py:160-178`, ctx passed at `:261`); bind now refreshes the context incumbent
+  pointer inside the workspace lock (`cli/commands/context.py:396-399`), consuming the
+  exact unconsumed seam the original lane named (`session_identity.py:238-252`).
+- The demanded **cross-sid harness-real test exists**:
+  `test_read_mode_non_acquiring.py:125-148` binds via a CLI-style sid the harness never
+  reports, drives the real hook subprocess with a *different* payload sid, asserts BLOCK
+  and **no lease file created** (`:148`); ADDITIVE companion `:151-162`. Unit precedence
+  matrix: self-record-wins (`test_sdd_gate.py:405-417`), live-divergent-holder ignores
+  incumbent (`:420-434`), no-holder honors read-bind (`:437-448`).
+- **Precedence soundness — adversarial answers:**
+  - *Can a stale read-bind downgrade a live implementation holder?* No, in both live cases:
+    a self-bound session's record wins (`sdd_gate.py:163-167`), and a live divergent lease
+    holder voids the incumbent (`:181-193` + test `:420-434`). A busy >TTL holder is also
+    safe today (any divergent record voids the incumbent), but see NF-4 for why that
+    over-breadth is itself the defect.
+  - *Can a foreign record downgrade?* No: self records are keyed by own sid; the incumbent
+    is per-context (`<ctx>.ptr`), and `lease.acquire` rewrites the ptr to the real holder
+    on first MUTATING write (`lease.py:393`), so a bind ptr self-corrects.
+  - *Can a stale incumbent READ-bind block a legitimate implementation harness?* By design
+    yes until the operator binds implementation — that IS the bind contract (D-3), not a
+    defect.
+
+### [HIGH] NF-4 (new, rc-2) — Anti-downgrade guard tests record *presence*, not *liveness*: a dead leftover lock record silently defeats a fresh READ bind
+Location: `hooks/sdd_gate.py:189-193` — `_incumbent_is_stale` calls `lease.read_record`
+(pure read, `lease.py:187-196`) and returns stale on **any** divergent `session_id`; it
+never consults `core/lock_liveness.is_stale` (no TTL check, no pid probe).
+Issue: lock records are not deleted when a session ends (nothing calls `lease.release` at
+session end; only takeover overwrites or doctor GC removes them). So in the **canonical
+flow** — implementation session finishes, operator runs `dadaia context bind <ctx> --mode
+read` to review — the leftover TTL-stale record's sid differs from the bind sid, the guard
+declares the *incumbent* stale, mode falls to IMPLEMENTATION, and the next harness write
+TAKEOVERs the dead record and mutates. The fresh READ bind is silently inert exactly when
+it is most used. The code contradicts its own docstring ("a **live** lease record",
+`sdd_gate.py:182`) and `specs/memory/architecture.md:218` ("não contradiz um lease holder
+**vivo**") — and it introduces a second, divergent liveness definition ("record present")
+beside the kernel's canonical one (`is_stale` = TTL + pid veto). None of the rc-2 tests
+cover this: every incumbent test has either no lock record or a live one.
+Why it matters: READ enforcement (the D3 family) regains a common-path hole — narrower
+than the old NF-2 (it fails toward the default-permissive D-3 posture; lease serialization
+and no-steal are intact; no live session is ever harmed), but the operator's read-bind
+promise is broken in the most ordinary sequence.
+Trade-off if fixed: one-line predicate change — guard returns stale **only when the
+divergent holder is live**: `holder is None or is_stale(holder, pid_probe=…) ⇒ False`.
+Reusing the canonical predicate (with the probe threaded into `_resolve_mode`) also keeps
+a busy >TTL live holder protected from mid-flight downgrade; TTL-only would downgrade it.
+Cost: threading `pid_probe` into `_resolve_mode` + one regression test (stale divergent
+record + fresh read-bind ⇒ READ honored).
+Recommendation: make `_incumbent_is_stale` consume `lock_liveness.is_stale` with the same
+injected probe the MUTATING path uses — one liveness definition, used everywhere — and add
+the missing falsifying test. Until then, the arch.md:218 sentence overstates the guard.
+
+### NF-3 — RESOLVED as scoped (LOW → closed; ownership residue noted)
+
+- `sdd_post_gate._refresh_session_record` now routes read+write through
+  `session_identity.read_session/write_session` (`sdd_post_gate.py:119-127`); the hook no
+  longer constructs the session-record path.
+- Residue (LOW, pre-existing, not an rc-2 regression): `core/specs_resolver.py:34`
+  still builds `.dadaia/sessions/<id>.json` directly (core cannot import features — the
+  duplication is acknowledged at `:23` but remains a schema copy), and read-side
+  constructors persist in `cli/commands/context.py:76`, `spec_context/doctor.py:124`,
+  `panel/views/kanban.py:85`. The grep contract test I recommended ("no module outside
+  session_identity constructs sessions paths") was not added. Carry forward, LOW.
+
+### Doc-overstatement sentences — FIXED (one new narrower one created by NF-4)
+
+- `specs/memory/architecture.md:174-178` now states the long->TTL single call "é coberto
+  pelo PID veto" — **true post NF-1** (e2e v proves it); `:147-158` documents the
+  `_resolve_holder_pid` chain precisely, including the "nunca o pid do subprocesso efêmero"
+  law. Constitution §8 (`specs/constitution.md:272-284`) matches the implemented record
+  schema and TTL+veto semantics. The "session record is the harness-real mode path" claim
+  was rewritten to the incumbent-pointer truth (`architecture.md:202-224`).
+- New residual: `architecture.md:218-219` says the incumbent yields only to a **live**
+  holder — that is the *intended* design; the code checks any record (NF-4). The doc is
+  right and the code is wrong; fix the code, not the doc.
+
+### rc-2 diff sweep — nothing else broken
+
+- `gate_policy.evaluate` gained `holder_pid` (default `None` ⇒ `os.getpid()` —
+  backward-compatible for long-lived direct-API callers; sole caller is the hook).
+- `lease.acquire/steal` gained `pid:`; renew path untouched; CAS discipline intact.
+- Bind's `set_incumbent` cannot corrupt lease identity: acquire's ptr-match branch only
+  fires on `ptr == session_id` and the real holder re-stamps the ptr on its next write.
+- Probe-less side doors persist (pre-existing): `cli/commands/lock.py:51` (`lock steal`)
+  and `lease._main` CLI acquire (`lease.py:576`) run TTL-only with no pid probe — the
+  no-steal veto can be bypassed by invoking the CLI directly via Bash. MEDIUM note for the
+  backlog: thread the probe (or delete `lock steal`, which the forbidden-law already bans
+  from every message).
+- Bind session records (`ttl_seconds: 300`, `context.py:384`) are never renewed by
+  anything; the doctor graveyard GC (`spec_context/doctor.py:465,536`) can therefore
+  delete a still-wanted READ bind record ~5 min after bind, silently decaying READ → 
+  IMPLEMENTATION on the next resolution. LOW note (GC is operator-run), fold with NF-4.
+
+### Review-gate verdicts (rc-2)
+
+- **Root-cause gate: APPROVED.** NF-1 fixed at the identity layer with the demanded
+  falsifying e2e; NF-2 fixed by consuming the existing `resolve_identity` seam with the
+  demanded cross-sid harness-real test; NF-3 routed. NF-4 is a new, narrower defect in the
+  guard's liveness predicate — it does not reopen the family (no theft, no live-session
+  harm) but must be fixed before the read-bind promise is advertised as closed.
+- **Architecture-fidelity gate: APPROVED.** Constitution §8 + architecture.md now match
+  the implemented mechanism; the single remaining overstated sentence
+  (architecture.md:218 "holder vivo") describes the correct design that NF-4's fix will
+  make true.
+
+### Score (rc-2, same rubric)
+
+| Axis | rc-1 | rc-2 | Basis |
+|---|---|---|---|
+| Layering & cohesion | 9 | **9** | probe/pid threading respects every contract (hook owns wiring, features import no adapter); NF-4 is a logic defect, not a layer breach — though "second liveness definition" is mild cohesion debt |
+| Abstraction honesty | 7 | **8** | both overstated narratives corrected; one residual sentence (arch.md:218) now overstates only the guard predicate |
+| Concurrency/locking foundation | 6 | **8** | the >TTL busy-holder window is closed with the production process topology proven end-to-end; READ channel harness-real; residual: NF-4 common-path READ inertness + probe-less CLI steal/acquire side doors |
+| Spec/code/memory fidelity | 8 | **8.5** | docs rewritten to verified behavior incl. the pid chain; one sentence ahead of the code (NF-4) |
+| Process ledger integrity | 9 | **9** | unchanged |
+| Testability & regression discipline | 7 | **9** | rc-2 tests attack exactly the two hand-constructed blind spots (real-hook-child pid assertion `:497`; cross-sid incumbent at the real hook boundary); remaining blind spot (stale divergent record + fresh read-bind) is newly found here |
+| **Overall** | **7.5** | **8.5** | both blockers closed at root cause with falsifying tests; NF-4 (HIGH, one-line fix + one test) + side-door notes are what hold back 9+ |
+
+**What blocks 9+ now:** (1) NF-4 — `_incumbent_is_stale` must use the canonical
+`lock_liveness.is_stale` (probe-threaded) + falsifying test; (2) probe-less `lock steal` /
+lease-CLI acquire; (3) bind-record GC decay note + the NF-3 ownership contract test.
+All small; none reopens the lease-theft family.
+
+*software-architect · rc-2 delta · evidence-only · no production files modified.*

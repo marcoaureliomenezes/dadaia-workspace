@@ -446,3 +446,89 @@ def test_resolve_mode_incumbent_honored_when_no_lease_holder(
     session_identity.set_incumbent(ws, "a", bind_sid)
     assert not (ws / ".dadaia" / "states" / "ctx_locks" / "a.lock.json").exists()
     assert sdd_gate._resolve_mode(ws, "another-harness-sid", "a") == "READ"
+
+
+# --------------------------------------------------------------------------- #
+# White-box: NF-4 (rc-2) — anti-downgrade guard must test record LIVENESS, not
+# mere presence. A dead leftover lock record (the normal residue after an
+# implementation session ends) must NOT defeat a fresh `bind --mode read`.
+# --------------------------------------------------------------------------- #
+
+
+def _write_lease_record(ws: Path, ctx: str, record: dict[str, object]) -> None:
+    """Plant a raw lease record on disk (bypasses acquire so heartbeat/pid are controllable)."""
+    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record), encoding="utf-8")
+
+
+def test_resolve_mode_dead_leftover_record_does_not_defeat_read_bind(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # NF-4: the canonical review flow — an implementation session finished, leaving a
+    # TTL-stale lock record with a dead pid (nothing deletes it until takeover/GC), then the
+    # operator runs `bind --mode read`. The dead leftover's sid differs from the read-bind sid,
+    # but it is NOT live, so the incumbent READ must be honored (not silently downgraded).
+    from datetime import UTC, datetime, timedelta
+
+    ws = _mk_workspace(tmp_path, "a")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    stale_hb = (datetime.now(tz=UTC) - timedelta(seconds=10_000)).isoformat()
+    _write_lease_record(
+        ws,
+        "a",
+        {"session_id": "old-impl", "heartbeat": stale_hb, "ttl": 120, "pid": 0},
+    )
+    bind_sid = "sess_freshread"
+    _write_session_record(ws, bind_sid, "READ")
+    session_identity.set_incumbent(ws, "a", bind_sid)
+    assert sdd_gate._resolve_mode(ws, "harness-reviewer", "a") == "READ"
+
+
+def test_resolve_mode_dead_leftover_record_blocks_mutating_write(tmp_path: Path) -> None:
+    # End-to-end: with a dead leftover record + fresh READ incumbent, a MUTATING write is
+    # blocked (READ enforced), and no lease is written by the blocked attempt.
+    from datetime import UTC, datetime, timedelta
+
+    ws = _mk_workspace(tmp_path, "a")
+    stale_hb = (datetime.now(tz=UTC) - timedelta(seconds=10_000)).isoformat()
+    _write_lease_record(
+        ws,
+        "a",
+        {"session_id": "old-impl", "heartbeat": stale_hb, "ttl": 120, "pid": 0},
+    )
+    bind_sid = "sess_freshread2"
+    _write_session_record(ws, bind_sid, "READ")
+    session_identity.set_incumbent(ws, "a", bind_sid)
+    target = ws / "repos" / "a" / "src" / "mod.py"
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(target), "content": "x = 1\n"},
+    }
+    env = claude_hook_env(ws, session_id="harness-reviewer2")
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    env.pop("DADAIA_CONTEXT", None)
+    result = run_hook_subprocess("sdd_gate", {**payload, "session_id": "harness-reviewer2"}, env)
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is not None  # READ enforced ⇒ MUTATING blocked
+
+
+def test_resolve_mode_live_divergent_record_overrides_read_incumbent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Anti-downgrade preserved: a TTL-fresh divergent holder (live) defeats the read-bind
+    # incumbent — the live implementation session is not downgraded to READ.
+    from datetime import UTC, datetime
+
+    ws = _mk_workspace(tmp_path, "a")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    fresh_hb = datetime.now(tz=UTC).isoformat()
+    _write_lease_record(
+        ws,
+        "a",
+        {"session_id": "live-impl", "heartbeat": fresh_hb, "ttl": 120, "pid": 0},
+    )
+    read_sid = "sess_staleread"
+    _write_session_record(ws, read_sid, "READ")
+    session_identity.set_incumbent(ws, "a", read_sid)
+    assert sdd_gate._resolve_mode(ws, "harness-other", "a") == "IMPLEMENTATION"
