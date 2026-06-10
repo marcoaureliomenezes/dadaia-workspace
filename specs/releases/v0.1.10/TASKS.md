@@ -105,7 +105,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ## Track T — Test kernel completion
 
-### [ ] T-010-11 — R5: fixture matrix + kill drift-ratifying tests
+### [x] T-010-11 — R5: fixture matrix + kill drift-ratifying tests
 - **Owner:** software-engineer · **Maps:** CONF-6, qa defects 1+3 (named tests)
 - **Write set:** `tests/unit/features/spec_context/test_lease_property.py`, `test_lease_activity_exemption.py`, `tests/unit/gate/test_post_gate_heartbeat.py`, gate/lease suites (parametrization)
 - **Preconditions:** T-010-03..09 merged.
@@ -206,14 +206,14 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R6-05):** generated PreToolUse write-gate matcher scoped to `Edit|Write|MultiEdit|NotebookEdit`; PostToolUse matcher fires on all tools (heartbeat); UserPromptSubmit unchanged; regenerated `.claude/settings.json` validated by unit test; live instance reprojected.
 - **Parallelism:** after T-010-04.
 
-### [ ] T-010-15 — R6d: v0.1.9 retro-CLOSURE + archive repair (ledger truth)
+### [x] T-010-15 — R6d: v0.1.9 retro-CLOSURE + archive repair (ledger truth)
 - **Owner:** product-engineer · **Maps:** CONF-5, DRIFT-5, arch F6; Decisions D-4/D-5
 - **Write set:** `specs/releases/v0.1.9/**` (CLOSURE.md), `specs/_archive/releases/` (renames via git mv — request devops/operator), mapping README
 - **Preconditions:** T-010-14 (invariants define the target state). ACTIVE.md → v0.1.10 already done at T-010-00 (release-start split, arch A5) — not part of this task.
 - **Acceptance (AC-R6-03):** v0.1.9 CLOSURE.md authored from implemented evidence (19 tasks, SHAs); v0.1.9 archived; `_archive/releases/v0.2.0/v0.1.{6..9}` renamed non-colliding + mapping README; `dadaia specs doctor` exit 0 with the new invariants active.
 - **Parallelism:** PE-track; does not block code tracks.
 
-### [ ] T-010-17 — R6e: AI-surface honesty rewrite (C-1..C-14)
+### [x] T-010-17 — R6e: AI-surface honesty rewrite (C-1..C-14)
 - **Owner:** ai-engineer · **Maps:** CONF-4, ai C-1..C-14, D-1/D-8 honesty, Decision D-2/D-6
 - **Write set:** `dadaia_workspace/public/{data/AGENTS.md, rules/*, skills/*, agents/*, schemas/handoff-v1.schema.json}` (canonical sources only; then stage/install/doctor)
 - **Preconditions:** Track K merged; T-010-13 done (surface must describe the fixed product).

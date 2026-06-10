@@ -259,14 +259,21 @@ The **dominant** task drives the tier — not the easiest or the rarest.
 
 ### Step 2 — Apply the decision table
 
-| Workload character | Tier | Current model id |
-|---|---|---|
-| Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning | Opus | `claude-opus-4-8` |
-| Standard implementation: TDD code, tests, dashboards, pipelines, routine reviews | Sonnet | `claude-sonnet-4-6` |
-| High-volume mechanical reformatting, bulk renames, deterministic transforms | Haiku | `claude-haiku-4-5` |
+Tier names and model ids are **derived from `core/model_registry.py`** (the single
+source of truth for model identity, pricing, and tier — never hand-maintain a copy
+that can drift):
 
-Default to **Sonnet**. Move **up** to Opus only when depth/breadth/error-cost are all
-high. Move **down** to Haiku only when the task is genuinely mechanical and high-volume.
+| Registry tier | Workload character | Current model id |
+|---|---|---|
+| `deep` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning | `claude-fable-5` |
+| `dispatch` | Orchestration, dispatch authority, review verdicts, standard implementation with broad context | `claude-opus-4-8` |
+| `plugin` | Plugin-domain implementation (frontend/design/devops surfaces) | `claude-sonnet-4-6` |
+| `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms | `claude-haiku-4-5-20251001` |
+
+When recommending a tier move, quote the registry entry (id + latest pricing row) so
+the cost delta comes from live data, not a stale table. Move **up** a tier only when
+depth/breadth/error-cost are all high. Move **down** only when the task is genuinely
+mechanical and high-volume.
 
 ### Step 3 — Justify a tier BUMP (down → up)
 
@@ -280,7 +287,7 @@ A bump must be backed by **measured-cost evidence**, not intuition:
 3. State the cost delta: bump price × invocation frequency. Bump only if the
    rework/quality cost of the lower tier exceeds the per-dispatch price delta.
 4. Record the justification one-liner in the release task (e.g. "ai-engineer →
-   Opus: heavy synthesis + fleet-wide authoring; per-dispatch not per-session").
+   deep tier: heavy synthesis + fleet-wide authoring; per-dispatch not per-session").
 ```
 
 Tier bumps in personas require an **operator-approved release task** — never a silent

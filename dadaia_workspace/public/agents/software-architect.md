@@ -46,7 +46,7 @@ paths:
 
 # Software Architect
 
-> Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
+> Reports follow the `workspace-protocol` rule §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
@@ -304,8 +304,10 @@ Severity levels:
 
 ## Report Templates
 
-Reports are HTML files. The template and required sections live in `.dadaia/reports/AGENTS.md`
-(the same canonical reference noted at the top of this persona).
+Emission is handoff-first (`workspace-protocol` rule §4): JSON handoff by default. When
+an HTML report is warranted (operator request or human-facing handoff), its template and
+required sections live in `.dadaia/reports/AGENTS.md` (the same canonical reference
+noted at the top of this persona).
 
 
 ## Rules

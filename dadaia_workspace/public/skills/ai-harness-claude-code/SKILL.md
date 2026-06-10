@@ -227,11 +227,14 @@ Restrict-vs-trust protocol:
   set means almost no friction on writes. If hooks are the enforcement boundary, keep them
   scoped; prune dead/stale permission entries.
 
-> **F8 encoded — Claude Code does not enforce the write-allowlist.** Native frontmatter
+> **F8 encoded — NOTHING enforces the per-persona write-allowlist.** Native frontmatter
 > fields (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) are honored; dadaia
 > extras (`tier`, `input_contract`, `paths.write_allowlist`) are silently ignored by the
-> runtime. The write-allowlist is enforced by dadaia's PreToolUse gate, not by Claude Code.
-> Never assume the runtime polices write scope.
+> runtime — and dadaia's PreToolUse gate does NOT read them either (no hook can resolve
+> persona identity; the RULE-D allowlist check was removed in 0.1.7 rc-3). The gate
+> enforces path-class × lease × phase × mode, persona-blind. `paths.write_allowlist` is
+> an agent-instruction convention checked by tooling/tests and reviewers, nothing else.
+> Never assume any runtime or hook polices a persona's write scope.
 
 ---
 

@@ -38,11 +38,16 @@ Agent-generated temp files go to `.dadaia/tmp/<agent>/<YYYYMMDD>/` (see the
 `tmp-file-guardrail` rule). Tool caches go under `.dadaia/` (ruff `cache-dir`, coverage
 `data_file`, etc.). MCP server working dirs go under `.dadaia/mcps/<server>/`.
 
-This law is enforced deterministically by the `root-whitelist-gate.sh` PreToolUse hook.
-Any write that would create a new top-level root entry not in the whitelist above is
-**blocked**. The hook reads an optional operator exception list from
-`.dadaia/states/root_exceptions.txt` (one glob per line) for documented, deliberate
-exceptions (e.g. tool configs that a specific tool hard-requires at root).
+This law is enforced deterministically **for file-write tools** by the
+`dadaia_workspace.hooks.root_whitelist` PreToolUse hook (Python; matcher
+`Edit|Write|MultiEdit|NotebookEdit` on Claude, `apply_patch|Edit|Write` on Codex). Any
+such write that would create a new top-level root entry not in the whitelist above is
+**blocked**. Writes performed through the `Bash` tool are outside this determinism
+envelope (Decision D-2, v0.1.10) — they are governed by this rule as discipline, with
+`dadaia doctor` as the after-the-fact backstop. The hook reads an optional operator
+exception list from `.dadaia/states/root_exceptions.txt` (one glob per line) for
+documented, deliberate exceptions (e.g. tool configs that a specific tool hard-requires
+at root).
 
 ## Repository Hygiene
 
@@ -116,8 +121,10 @@ context bind/alive/dead, panel, reports, the `dadaia` CLI, or any production
 behavior that breaks its own contract — you MUST register a bug file before the
 turn ends. In this self-hosting source workspace, bugs go to
 `repos/dadaia-workspace/specs/bugs/`; in a consumer workspace, to the active
-context's `specs/bugs/` plus an upstream report. Bug files are ADDITIVE (never
-gate-blocked) — there is no excuse to defer. Do NOT file a bug for an error in
+context's `specs/bugs/` plus an upstream report. Bug files are ADDITIVE — the gate's
+path classifier resolves `specs/bugs/` (at the workspace root **and** inside any
+`repos/<slug>/`) to the ADDITIVE class, which is never blocked and never takes a
+lease — there is no excuse to defer. Do NOT file a bug for an error in
 your own throwaway script or for a validation the tool is *designed* to emit
 (e.g. doctor correctly flagging a non-compliant tree, or the gate correctly
 blocking an unauthorized write). See the `bug-registration-guardrail` rule for
@@ -125,7 +132,30 @@ the full record format and redaction requirement.
 
 ## SDD Gate
 
-Production edits require an active approved release:
+The gate has two layers. Know which one you are relying on.
+
+**Deterministic enforcement** — the `dadaia_workspace.hooks.sdd_gate` PreToolUse hook
+(Python) evaluates every file-write tool call (`Edit|Write|MultiEdit|NotebookEdit` on
+Claude, `apply_patch|Edit|Write` on Codex) as **path-class × lease × phase × mode**:
+
+- **Path class** (context-relative — the same `specs/` taxonomy applies at the workspace
+  root and inside every `repos/<slug>/`): ADDITIVE (`specs/bugs/`, `specs/backlog/`,
+  `specs/audits/`, `.dadaia/reports|handoff|tmp/`) always allows; MEMORY
+  (`specs/memory/`) allows only in `DEFINITION`/`CLOSURE` phase; FROZEN
+  (`specs/_archive/`) always blocks; PROTECTED (`.dadaia/sessions/`) always blocks
+  (fail-closed, lease-identity integrity); everything else in-repo is MUTATING.
+- **Lease**: a MUTATING write acquires the single per-context TTL lease (O_EXCL CAS,
+  `pid`-recorded). A live foreign holder — heartbeat fresh **or** pid demonstrably
+  alive — is never stolen; the gate yields with an actionable message.
+- **Mode**: a session bound `--mode read` is non-acquiring — MUTATING writes are blocked
+  before any lease call; ADDITIVE paths stay writable.
+
+Writes performed through the `Bash` tool are **outside this determinism envelope**
+(Decision D-2): the gate does not classify shell command strings. Doctor coherence
+checks (lease-record ↔ session-record) are the after-the-fact backstop.
+
+**Agent discipline (not hook-enforced)** — the hook reads no SDD artifacts. The
+following are protocol you must uphold yourself:
 
 - `ACTIVE.md` points at the release.
 - `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
@@ -133,11 +163,11 @@ Production edits require an active approved release:
 - The task is reserved in `TASKS.md` with `[-]`.
 - The edit stays inside the task's declared write set.
 
-If the gate is missing, stop with:
+If any discipline precondition is missing, stop with:
 
 ```text
 [SDD HARD STOP]
-Cannot proceed without an approved gate.
+Cannot proceed without an approved release context.
 Missing:
 - [ ] SPEC.md/PLAN.md/TASKS.md with **Status:** Aprovado
 - [ ] a [-] reservation by the calling agent
@@ -154,22 +184,27 @@ Do not edit specs to justify code already written.
 Memory is current product truth, not history.
 
 - Read memory before changing production behavior.
-- Do not write `specs/memory/**` during implementation.
-- Only `product-engineer` writes memory, in the `DEFINITION` or `CLOSURE` phase (constitution §13).
+- Do not write `specs/memory/**` during implementation. The gate enforces the phase
+  half deterministically: `specs/memory/` (root or in-repo) is the MEMORY class,
+  writable via file tools only when `ACTIVE.md` phase is `DEFINITION` or `CLOSURE`.
+- Only `product-engineer` writes memory, in the `DEFINITION` or `CLOSURE` phase
+  (constitution §13). The who half is discipline — the hook cannot see persona identity.
 - Changelog/history belongs in `CLOSURE.md` and `_archive/`.
 
 ## Reports and Panel
 
-Every agent report goes under:
-
-```text
-.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html
-```
-
-Every HTML report that feeds another agent must have a handoff JSON file under:
+Emission is **handoff-first** (`workspace-protocol` rule §4): the default output of any
+agent task is a handoff JSON under:
 
 ```text
 .dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json
+```
+
+An HTML report is written **only** when the operator explicitly requests one or the
+next handoff target is human, under:
+
+```text
+.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html
 ```
 
 Validate it:

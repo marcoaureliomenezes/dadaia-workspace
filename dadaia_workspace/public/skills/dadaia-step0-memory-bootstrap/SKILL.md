@@ -3,7 +3,7 @@ name: dadaia-step0-memory-bootstrap
 description: >
   Mandatory memory bootstrap protocol for every agent, executed before any
   implementation, review, or report. Loads the tech-stack + feature catalog
-  (injected by ctx-inject.sh or self-pulled) and ensures the agent reads the
+  (injected by the ctx-inject hook or self-pulled) and ensures the agent reads the
   1-3 most relevant feature atoms and the architecture atom before starting work.
   Updated for the markdown source world: atoms are .md files read directly
   (no strip pass needed); catalog.json is generated from frontmatter; [[slug]]
@@ -28,12 +28,12 @@ any source file or writing any output.
 
 ### Precondition — Is the bootstrap already injected?
 
-A lean bootstrap (tech-stack + catalog) is injected at session start via
-`ctx-inject.sh` when running inside the dadaia workspace shell. If it is present
-in your context, skip the self-pull step below and go directly to Step 1.
+A lean bootstrap (tech-stack + catalog) is injected once per session by the
+ctx-inject hook (`dadaia_workspace.hooks.ctx_inject`, wired on all harnesses). If it is
+present in your context, skip the self-pull step below and go directly to Step 1.
 
-If you are running in Codex, a standalone invocation, or any environment where
-`ctx-inject.sh` has not run, self-pull manually:
+If you are running standalone, or in any environment where the ctx-inject hook has
+not run, self-pull manually:
 
 ```
 Read: specs/memory/tech-stack.md          # verbatim; no strip pass needed
@@ -54,7 +54,7 @@ If `catalog.json` is absent (e.g. during migration), fall back to reading
 
 ### Step 2 — Self-pull architecture before any architectural decision
 
-`architecture.md` is NOT injected by `ctx-inject.sh` (it is large). You MUST
+`architecture.md` is NOT injected by the ctx-inject hook (it is large). You MUST
 read it before any decision that touches:
 
 - Layer boundaries or cross-layer dependency rules

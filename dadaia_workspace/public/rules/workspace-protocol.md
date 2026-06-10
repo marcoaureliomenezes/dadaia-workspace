@@ -9,10 +9,25 @@ always_on: true
 All dadaia-workspace agents follow this shared protocol. Do not duplicate these rules inline.
 
 ## 1. SDD gate
-Before editing any production file:
+**What the hook enforces (deterministic, file-write tools only).** The
+`dadaia_workspace.hooks.sdd_gate` PreToolUse hook evaluates each `Edit`/`Write`-family
+tool call as path-class × lease × phase × mode: ADDITIVE paths (`specs/bugs|backlog|audits/`,
+`.dadaia/reports|handoff|tmp/` — root or in-repo) always pass; MEMORY (`specs/memory/`)
+passes only in DEFINITION/CLOSURE phase; FROZEN (`specs/_archive/`) and PROTECTED
+(`.dadaia/sessions/`) block; MUTATING acquires the single per-context lease. Liveness is
+TTL + pid veto: a holder whose pid is still running is never stolen, and the heartbeat
+renews on every PostToolUse (harness-native session id from the hook stdin payload). A
+session bound `--mode read` is non-acquiring — MUTATING writes block before any lease
+call. `Bash`-tool writes are outside this envelope (Decision D-2); doctor coherence
+checks are the backstop.
+
+**What you uphold as discipline (the hook reads no SDD artifacts).** Before editing any
+production file:
 1. Confirm a `[-]` task marker is active in the release's TASKS.md for your task.
 2. Flip `[ ]` → `[-]` BEFORE writing. Flip `[-]` → `[x]` AFTER completing.
 3. At most one `[-]` per owner at a time (unless disjoint write sets are declared in TASKS.md).
+4. SPEC/PLAN/TASKS carry `**Status:** Aprovado` (see §3) and the edit stays inside the
+   task's declared write set.
 
 ## 2. Context discovery
 Resolve specs_dir in priority order:
@@ -42,7 +57,7 @@ operator there is nothing to work on.
 - Reports > 30 KB: split into multi-HTML with `index.html` entry point.
 
 ## 5. Memory atomicity
-`specs/memory/**/*.md` files are write-locked for all agents EXCEPT `product-engineer`, who may write in the DEFINITION and CLOSURE phases per `constitution.md §13`. No other agent edits memory atoms in any phase.
+`specs/memory/**/*.md` files are write-locked for all agents EXCEPT `product-engineer`, who may write in the DEFINITION and CLOSURE phases per `constitution.md §13`. No other agent edits memory atoms in any phase. The gate enforces the phase half deterministically (MEMORY path class, root and in-repo); the who half is agent discipline.
 
 ## 6. Write-allowlist convention
-Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. This is an **agent-instruction convention**, not gate-enforced — the RULE-D allowlist check was removed from the SDD gate in 0.1.7 rc-3 (it was fail-open and never fired for an agent). The only deterministic lock is the single-session lease.
+Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. This is an **agent-instruction convention**, not gate-enforced — no hook reads persona frontmatter, and no harness can assert persona identity to a hook (the RULE-D allowlist check was removed from the SDD gate in 0.1.7 rc-3 for exactly that reason). The only deterministic lock is the single-session lease (§1).

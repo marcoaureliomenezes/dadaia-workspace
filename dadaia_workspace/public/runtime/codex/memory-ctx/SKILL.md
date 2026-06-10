@@ -17,8 +17,9 @@ the universal product foundation that all roles require.
 
 ## Purpose
 
-The equivalent of `ctx-inject.sh`'s memory bootstrap payload for Claude Code and
-OpenCode sessions — delivered here for Codex sessions where the hook does not fire.
+The equivalent of the ctx-inject hook's (`dadaia_workspace.hooks.ctx_inject`) memory
+bootstrap payload for Claude Code and OpenCode sessions — delivered here for Codex
+sessions where the hook does not fire.
 Every Codex session receives:
 
 1. Approved toolchain and constraints (`tech-stack.md`)

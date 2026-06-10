@@ -43,7 +43,7 @@ paths:
 
 # Security Reviewer
 
-> Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
+> Reports follow the `workspace-protocol` rule §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 

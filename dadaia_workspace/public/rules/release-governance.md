@@ -40,5 +40,9 @@ releases, and how releases mature and are reviewed. Full detail: the
 ## Never push red
 
 A push must never carry code that fails locally-runnable CI checks. The pre-push
-CI gate (`dadaia ci preflight`) runs `ruff format --check`, `ruff check`,
-`mypy --strict`, and `pytest` and blocks the push on any failure.
+CI gate (`dadaia ci preflight`, installed as a git pre-push hook —
+`public/scripts/pre-push-ci-gate.sh`) runs `ruff format --check`, `ruff check`,
+`mypy --strict`, and `pytest` and blocks the push on any failure. The hook resolves its
+runner in order: `$DADAIA_BIN` override → walk up from the repo root to the workspace
+venv (`<ws>/.dadaia/.venv/bin/dadaia`) → PATH → repo-local `.venv`; it fails closed
+when none is found (`--probe-only` prints the resolved runner).

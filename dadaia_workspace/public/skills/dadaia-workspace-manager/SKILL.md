@@ -17,7 +17,7 @@ NEVER do these things for workspace management because they corrupt state:
 | What you might reach for | Use this instead |
 |---|---|
 | Edit `.dadaia/states/spec_contexts.json` directly | `dadaia context` subcommands |
-| Manually choose a working context for an agent | `eval $(dadaia context bind <name> --mode read)` |
+| Manually choose a working context for an agent | `dadaia context bind <name>` (persists context + mode in the session record; default mode `read`) |
 | `git clone <url> repos/<slug>/` | `dadaia context alive <name>` |
 | `tar xzf <archive>` to import a workspace | `dadaia import <archive>` |
 | `rm -rf repos/<slug>/` | `dadaia context dead <name>` |
@@ -40,10 +40,12 @@ auto-resolve it by searching cwd and parent directories. You never need to pass
 | `current_branch` | Branch stored when the context is made dead and checked out on the next alive |
 
 **Bound context** - the context selected for the current agent session by
-`eval $(dadaia context bind <name> --mode <read|implementation|review> ...)`.
-The command exports `DADAIA_CONTEXT` and `DADAIA_SESSION_ID` and writes a session
-file. Spec navigation, gates, and workflow commands use this session-bound state
-or explicit `--context` flags.
+`dadaia context bind <name> [--mode <read|implementation|review>] [--release <id>]`.
+The command **persists** the bound context, mode, and session id in the session record
+(consumed directly by the SDD gate — no shell `eval` needed). Pass `--print-env` to
+additionally emit `export DADAIA_CONTEXT=… DADAIA_SESSION_ID=…` lines for legacy
+`eval $(…)` callers. Spec navigation, gates, and workflow commands use this
+session-bound state or explicit `--context` flags.
 
 **Repos on disk** - `repos/<slug>/` exists only when a context is `alive`.
 Making a context dead git-syncs and removes it. Making it alive clones it back
@@ -75,18 +77,22 @@ dadaia context create <name> --repo <slug>   # register new context (state: dead
 dadaia context alive <name>                  # clone repo, checkout stored branch; transition to alive
 dadaia context dead <name>                   # git sync + push + remove repo; transition to dead
 dadaia context delete <name>                 # delete context record (must be dead first)
-eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode read)
-eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode implementation --release <release-id>)
-eval $(.dadaia/.venv/bin/dadaia context bind <name> --mode review --release <release-id>)
+.dadaia/.venv/bin/dadaia context bind <name>                                          # default: read (observe)
+.dadaia/.venv/bin/dadaia context bind <name> --mode implementation --release <release-id>
+.dadaia/.venv/bin/dadaia context bind <name> --mode review --release <release-id>
+# add --print-env only for legacy `eval $(…)` shells — bind persists the mode itself
 ```
 
-Implementation binds acquire the single per-context release **lease** (v0.1.6 model:
-one MUTATING lease per context, coordinated by project-manager — see constitution §8/§9).
-`read` and `spec` binds never block. The lease record is
-`{context, release, session_id, mode, acquired_at, heartbeat, ttl}` (no PID); liveness is
-`now − heartbeat ≤ LEASE_TTL_SECONDS` where `LEASE_TTL_SECONDS = 120` (short heartbeat,
-OQ-1 operator decision 2026-06-06). The holder renews its heartbeat on every tool call;
-a fully-idle holder becomes reclaimable after ~120s.
+Implementation/review binds acquire the single per-context release **lease** (v0.1.6
+model: one MUTATING lease per context, coordinated by project-manager — see constitution
+§8/§9). `read` (and its legacy alias `spec`) binds are **non-acquiring**: they never
+block, never take a lease, and the gate blocks MUTATING file-tool writes from a
+READ-bound session before any lease call (additive paths stay writable). The lease
+record is `{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`;
+liveness is **TTL + pid veto**: stale means `now − heartbeat > LEASE_TTL_SECONDS`
+(`= 120`, OQ-1 operator decision 2026-06-06) **and** the recorded holder pid is not
+demonstrably alive. The heartbeat renews on every PostToolUse hook firing (harness-native
+session id from the hook stdin payload), so a holder running long reads/tests stays live.
 
 ### Liveness & recovery (reclaim-iff-stale / yield-iff-live-foreign)
 
@@ -96,8 +102,10 @@ relaunch, or steal a lock. Behaviour on acquire:
 - **Your own session (even relaunched)** → RENEW. Stable identity via
   `.dadaia/sessions/runtime/<ctx>.ptr` means a relaunched/continuing session resolves to
   the same identity, so you never block yourself.
-- **Stale or absent lease** (no heartbeat within ~120s) → reclaimed automatically on the
-  next write (fail-open). A finished or dead holder frees the lease by itself.
+- **Stale or absent lease** (no heartbeat within ~120s **and** holder pid not alive) →
+  reclaimed automatically on the next write (fail-open). A finished or dead holder frees
+  the lease by itself. A holder whose pid is still running is **never** stolen, however
+  old its heartbeat.
 - **Live foreign lease** (a genuinely different concurrent session) → the gate **yields**:
   this session does not mutate (informative `LockHeldError`, additive writes still allowed),
   and acquires automatically once the other session goes idle / expires. This is the
@@ -176,7 +184,7 @@ create (dead)
 
 ```bash
 dadaia context alive <other-name>       # clone if needed
-eval $(dadaia context bind <other-name> --mode read)
+dadaia context bind <other-name>        # persists the binding; default mode read
 ```
 
 Never run `dadaia context dead` during a switch unless you intentionally want to
@@ -190,4 +198,4 @@ remove that repo from disk.
 |---|---|---|
 | INV-4 | `alive` context has repo on disk at `repos/<slug>/` | No (run `dadaia context alive <name>`) |
 | INV-5 | `dead` context does not have repo on disk | Yes |
-| LEASE | The per-context release lease record is consistent with context state; a stale lease auto-reclaims after the heartbeat window (~120s, no manual action). `dadaia lock steal` exists only as an admin/observability escape — never a routine unblock step | Auto (reclaim-iff-stale) |
+| LEASE | The per-context release lease record is consistent with context state; a stale lease (heartbeat aged past ~120s AND holder pid not alive — a running pid vetoes reclaim) auto-reclaims, no manual action. `dadaia lock steal` exists only as an admin/observability escape — never a routine unblock step | Auto (reclaim-iff-stale) |
