@@ -117,11 +117,3 @@ def test_no_alive_context_emits_empty(tmp_path: Path) -> None:
     )
     out = _run(tmp_path, "s")
     assert out == ""
-
-
-def test_runtime_ptr_written(tmp_path: Path) -> None:
-    _ws(tmp_path)
-    _run(tmp_path, "ptrsess")
-    ptr = tmp_path / ".dadaia" / "sessions" / "runtime" / "ptrsess.ptr"
-    assert ptr.exists()
-    assert ptr.read_text(encoding="utf-8") == "ptrsess"

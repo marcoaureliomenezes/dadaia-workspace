@@ -96,20 +96,34 @@ def test_keyset_desync_modelmap_vs_pricing_errors(
     assert "[ok] model-resolution" not in reports
 
 
-def test_keyset_desync_pricing_vs_registry_errors(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_pricing_keyset_is_registry_derived_not_cross_feature_import(
+    tmp_path: Path,
 ) -> None:
+    """PRICING_TABLE is no longer imported into model_resolution (audit A3 fix).
+
+    The cross-feature ``features.public -> features.telemetry.pricing`` import was
+    removed: ``PRICING_TABLE`` is a derived view over ``core.model_registry`` so the
+    registry claude-id set IS the pricing key-set by construction, and the doctor
+    check now computes it from ``REGISTRY`` directly. This test pins that the symbol
+    is gone from the module namespace (so the old monkeypatch vector cannot silently
+    reappear) and that the live tree still resolves clean. The genuine
+    PRICING_TABLE↔registry coherence guard lives in
+    ``tests/unit/features/telemetry/test_pricing.py`` (key-set equality assertions).
+    """
     import dadaia_workspace.features.public.model_resolution as mod
 
-    monkeypatch.setattr(mod, "PRICING_TABLE", {"claude-fable-5": []})
+    assert not hasattr(mod, "PRICING_TABLE"), (
+        "model_resolution must not import PRICING_TABLE — that was the cross-feature "
+        "edge removed in audit A3; the pricing key-set is registry-derived."
+    )
 
     public_dir = tmp_path / "public"
     public_dir.mkdir()
 
     reports = check_model_resolution(public_dir)
 
-    assert _has_error(reports)
-    assert "[ok] model-resolution" not in reports
+    assert not _has_error(reports)
+    assert "[ok] model-resolution" in reports
 
 
 # ---------------------------------------------------------------------------

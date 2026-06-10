@@ -34,7 +34,6 @@ def test_path_schemas_are_under_protected_dadaia_sessions(tmp_path: Path) -> Non
     ws = _ws(tmp_path)
     for path in (
         si.ptr_path(ws, CTX),
-        si.session_ptr_path(ws, SID),
         si.session_record_path(ws, SID),
     ):
         rel = path.relative_to(ws).as_posix()
@@ -58,7 +57,6 @@ def test_write_and_read_incumbent_ptr_roundtrip(tmp_path: Path) -> None:
     assert si.read_incumbent_ptr(ws, CTX) is None
     si.write_incumbent_ptr(ws, CTX, SID)
     assert si.read_incumbent_ptr(ws, CTX) == SID
-    assert si.incumbent(ws, CTX) == SID  # alias
 
 
 def test_write_incumbent_ptr_is_atomic_replace(tmp_path: Path) -> None:
@@ -77,28 +75,6 @@ def test_set_incumbent_alias_writes(tmp_path: Path) -> None:
     assert si.read_incumbent_ptr(ws, CTX) == SID
 
 
-# --------------------------------------------------------------------------- session ptr
-
-
-def test_session_ptr_roundtrip(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_session_ptr(ws, SID)
-    assert si.read_session_ptr(ws, SID) == SID
-    assert (ws / ".dadaia" / "sessions" / "runtime" / f"{SID}.ptr").read_text() == SID
-
-
-def test_session_ptr_skips_workspace_sentinel(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_session_ptr(ws, "workspace")
-    assert not (ws / ".dadaia" / "sessions" / "runtime" / "workspace.ptr").exists()
-
-
-def test_session_ptr_write_fail_soft_on_bad_id(tmp_path: Path) -> None:
-    """An invalid id must not raise (write_session_ptr is best-effort)."""
-    ws = _ws(tmp_path)
-    si.write_session_ptr(ws, "../bad")  # must not raise
-
-
 # --------------------------------------------------------------------------- session record
 
 
@@ -109,7 +85,6 @@ def test_session_record_roundtrip(tmp_path: Path) -> None:
     si.write_session(ws, SID, record)
     got = si.read_session(ws, SID)
     assert got == record
-    assert si.record_for(ws, SID) == record
 
 
 def test_session_record_fail_soft_on_corrupt_json(tmp_path: Path) -> None:
@@ -187,12 +162,11 @@ def test_coherence_holder_vs_incumbent_disagree(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- legacy / GC
 
 
-def test_iter_ptr_files_collects_both_namespaces(tmp_path: Path) -> None:
+def test_iter_ptr_files_collects_incumbent_namespace(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     si.write_incumbent_ptr(ws, CTX, SID)
-    si.write_session_ptr(ws, SID)
     names = {p.name for p in si.iter_ptr_files(ws)}
-    assert names == {f"{CTX}.ptr", f"{SID}.ptr"}
+    assert names == {f"{CTX}.ptr"}
 
 
 def test_iter_ptr_files_empty_when_dir_absent(tmp_path: Path) -> None:
@@ -206,23 +180,9 @@ def test_legacy_junk_ptr_is_ignored_not_fatal(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     runtime = ws / ".dadaia" / "sessions" / "runtime"
     (runtime / "legacy.ptr").write_text("", encoding="utf-8")  # empty → None
-    assert si.read_session_ptr(ws, "legacy") is None
+    assert si.read_incumbent_ptr(ws, "legacy") is None
     # planted pre-existing session json from an older layout: ignored-and-superseded.
     (ws / ".dadaia" / "sessions" / "old-layout.json").write_text(
         json.dumps({"legacy": True}), encoding="utf-8"
     )
     assert si.resolve_identity(ws, CTX) == {"incumbent": None, "mode": None}
-
-
-def test_gc_orphan_session_ptr_removes_and_reports(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_session_ptr(ws, SID)
-    assert si.gc_orphan_session_ptr(ws, SID) is True
-    assert not (ws / ".dadaia" / "sessions" / "runtime" / f"{SID}.ptr").exists()
-    # idempotent: second call is a no-op
-    assert si.gc_orphan_session_ptr(ws, SID) is False
-
-
-def test_gc_orphan_session_ptr_bad_id_is_false(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    assert si.gc_orphan_session_ptr(ws, "../bad") is False

@@ -1,11 +1,14 @@
 """Unit tests for dadaia_workspace.hooks.sdd_post_gate (R2a, FR-R2-01/02).
 
 These are *in-process* unit tests of the hook's internals and the resolution-chain /
-fail-open contract. They import the module directly (the hook-import contract baselines
-this file at ``tests/contract/test_harness_env_contract.py`` precisely because in-process
-internal unit tests of small helpers are legitimate). The harness-real *behavior* of the
-hook — invoked as a subprocess with a ``claude_hook_env()`` and no hand-planted
-``DADAIA_*`` — is proven in ``tests/unit/hooks/test_sdd_post_gate_behavior.py``.
+fail-open contract. They import the module directly, which is legitimate under the
+zero-baseline harness-env contract (``tests/contract/test_harness_env_contract.py``):
+the rc-2 amendment burned the per-file baselines to zero, so this file carries NO
+baseline entry. The contract now flags only the precise harness-fiction pattern —
+importing a hook behavior module **and** patching ``sys.stdin`` in-process to drive
+its ``main()`` — which these helper-level unit tests do not do. The harness-real
+*behavior* of the hook — invoked as a subprocess with a ``claude_hook_env()`` and no
+hand-planted ``DADAIA_*`` — is proven in ``tests/unit/hooks/test_sdd_post_gate_behavior.py``.
 
 ``DADAIA_SESSION_ID`` appears here only as the *operator override* leg of the resolution
 chain (``resolve_session_id`` honors it first); the harness never sets it.

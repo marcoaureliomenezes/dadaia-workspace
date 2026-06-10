@@ -6,14 +6,19 @@ no single owner (arch F7):
 
 - ``.dadaia/states/ctx_locks/<ctx>.lock.json``    (the lease record — owned by ``lease.py``)
 - ``.dadaia/sessions/runtime/<ctx>.ptr``          (lease incumbent pointer)
-- ``.dadaia/sessions/runtime/<session_id>.ptr``   (ctx_inject session pointer)
 - ``.dadaia/sessions/<id>.json``                  (session record: id, mode, pid, …)
 
-This module is the **sole reader/writer** of the two pointer namespaces and the session
-record. ``lease.py`` keeps ownership of the *lease record itself* (its acquire/CAS/liveness
-logic), but routes every pointer read/write through here. ``hooks/ctx_inject.py``,
-``hooks/sdd_post_gate.py`` (next wave), the bind CLI (next wave), and the workspace doctor
-GC all consume this module instead of constructing those paths directly.
+This module is the **sole reader/writer** of the incumbent-pointer namespace and the
+session record. ``lease.py`` keeps ownership of the *lease record itself* (its
+acquire/CAS/liveness logic), but routes every pointer read/write through here.
+``hooks/sdd_post_gate.py``, the bind CLI, and the workspace doctor GC all consume this
+module instead of constructing those paths directly.
+
+The session-keyed ``<session_id>.ptr`` namespace (an old ctx_inject write hint) was
+removed in v0.1.10 rc-3: it had no production reader (``read_session_ptr`` had zero
+callers and the doctor PTR-GC swept it blind), so the write-only pointer and its
+``read_session_ptr``/``write_session_ptr``/``session_ptr_path``/``gc_orphan_session_ptr``
+surface were deleted (audit A2).
 
 Storage law (FR-R3-03): every artifact lives under PROTECTED ``.dadaia/sessions/`` or
 ``.dadaia/states/ctx_locks/``. No new gate classes are introduced — the existing PROTECTED
@@ -42,20 +47,15 @@ from pathlib import Path
 
 __all__ = [
     "coherence",
-    "gc_orphan_session_ptr",
-    "incumbent",
     "iter_ptr_files",
     "ptr_path",
     "read_incumbent_ptr",
     "read_session",
-    "read_session_ptr",
     "resolve_identity",
-    "session_ptr_path",
     "session_record_path",
     "set_incumbent",
     "write_incumbent_ptr",
     "write_session",
-    "write_session_ptr",
 ]
 
 #: Path-traversal allowlist (CWE-22/CWE-59) shared with ``lease._validate``. Context names
@@ -99,12 +99,6 @@ def ptr_path(workspace: Path, ctx: str, *, create: bool = False) -> Path:
     return _runtime_dir(workspace, create=create) / f"{ctx}.ptr"
 
 
-def session_ptr_path(workspace: Path, session_id: str, *, create: bool = False) -> Path:
-    """Path of the session pointer ``sessions/runtime/<session_id>.ptr`` (ctx_inject hint)."""
-    _validate(session_id, field="session_id")
-    return _runtime_dir(workspace, create=create) / f"{session_id}.ptr"
-
-
 def session_record_path(workspace: Path, session_id: str, *, create: bool = False) -> Path:
     """Path of the session record ``sessions/<id>.json``."""
     _validate(session_id, field="session_id")
@@ -112,7 +106,11 @@ def session_record_path(workspace: Path, session_id: str, *, create: bool = Fals
 
 
 def iter_ptr_files(workspace: Path) -> list[Path]:
-    """Return all ``*.ptr`` files under the runtime dir (sorted, empty if absent)."""
+    """Return all ``<ctx>.ptr`` files under the runtime dir (sorted, empty if absent).
+
+    Only the incumbent-pointer namespace remains after rc-3; the session-keyed
+    ``<sid>.ptr`` hint was removed. The doctor PTR-GC consumes this to sweep orphans.
+    """
     runtime = _runtime_dir(workspace)
     if not runtime.exists():
         return []
@@ -155,38 +153,8 @@ def write_incumbent_ptr(workspace: Path, ctx: str, session_id: str) -> None:
     _atomic_write_text(ptr_path(workspace, ctx, create=True), session_id)
 
 
-#: Aliases expressing the "incumbent of a context" concept (PLAN §R3 vocabulary).
-incumbent = read_incumbent_ptr
+#: Alias expressing the "set incumbent of a context" concept (PLAN §R3 vocabulary).
 set_incumbent = write_incumbent_ptr
-
-
-# ---------------------------------------------------------------------------
-# Session pointer (ctx_inject hint) — <session_id>.ptr
-# ---------------------------------------------------------------------------
-
-
-def read_session_ptr(workspace: Path, session_id: str) -> str | None:
-    """Read the ctx_inject session pointer; returns its content or ``None`` (fail-soft)."""
-    try:
-        content = session_ptr_path(workspace, session_id).read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    return content or None
-
-
-def write_session_ptr(workspace: Path, session_id: str) -> None:
-    """Best-effort session-keyed pointer write (mirrors the old ctx_inject ``.ptr``).
-
-    Fail-soft: a write failure (e.g. read-only ``.dadaia``) is swallowed — the pointer is
-    a hint, never a correctness dependency. The sentinel ``"workspace"`` id is skipped, as
-    it is the no-session fallback and must not create a graveyard entry.
-    """
-    if session_id == "workspace":
-        return
-    try:
-        _atomic_write_text(session_ptr_path(workspace, session_id, create=True), session_id)
-    except (OSError, ValueError):
-        return
 
 
 # ---------------------------------------------------------------------------
@@ -223,11 +191,6 @@ def write_session(
     _validate(session_id, field="session_id")
     path = session_record_path(workspace, session_id, create=True)
     _atomic_write_text(path, json.dumps(record, indent=2))
-
-
-def record_for(workspace: Path, session_id: str) -> dict[str, object] | None:
-    """Alias for :func:`read_session` (PLAN §R3 ``record_for(sid)`` vocabulary)."""
-    return read_session(workspace, session_id)
 
 
 # ---------------------------------------------------------------------------
@@ -300,21 +263,3 @@ def coherence(
 
     detail = ", ".join(f"{label}={value!r}" for label, value in present)
     return f"session-identity incoherence for context {ctx!r}: {detail}"
-
-
-# ---------------------------------------------------------------------------
-# Doctor GC helpers (routed through this module so the doctor never opens the
-# pointer namespace directly — FR-R3-01).
-# ---------------------------------------------------------------------------
-
-
-def gc_orphan_session_ptr(workspace: Path, session_id: str) -> bool:
-    """Delete the session pointer ``<session_id>.ptr`` if present. Returns True if removed."""
-    try:
-        path = session_ptr_path(workspace, session_id)
-    except ValueError:
-        return False
-    if path.exists():
-        path.unlink(missing_ok=True)
-        return True
-    return False

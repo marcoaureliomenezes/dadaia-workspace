@@ -60,6 +60,18 @@ from pathlib import Path
 import yaml
 
 from dadaia_workspace.core.protocols.process_runner import ProcessResult, ProcessRunner
+from dadaia_workspace.features.spec_context import lease, session_identity
+
+#: SPEC-DOC-029: a ``<ctx>.lock.json`` filename component must be a real context name
+#: (same path-traversal allowlist lease/session_identity enforce — CWE-22/CWE-59).
+_CTX_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def _validate_ctx_name(ctx: str) -> str:
+    if not _CTX_NAME_RE.fullmatch(ctx):
+        raise ValueError(f"invalid context name {ctx!r}")
+    return ctx
+
 
 CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
 CANONICAL_PHASES = {
@@ -122,6 +134,24 @@ RELEASE_VINTAGE_CUTOFF = date(2026, 5, 17)  # releases on/before this are exclud
 
 # SPEC-DOC-023: hotfix bullets older than 72 hours in ## Hotfixes pendentes get WARNING
 _HOTFIX_STALE_HOURS = 72
+
+# SPEC-DOC-030 (constitution §8 collision-safe naming): every new specs/audits/ directory
+# must be named ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` so two concurrent additive
+# sessions never collide. Compact timestamp (no colons/dashes inside it) + an 8-char
+# session discriminator.
+AUDIT_DIR_NAME_RE = re.compile(r"^\d{8}T\d{6}Z-[A-Za-z0-9]{8}$")
+
+# Four audit dirs from the v0.1.9/v0.1.10 audit cycles predate the doctor WARN and are
+# grandfathered in place by the constitution §8 amendment (2026-06-10) — their session ids
+# are unrecoverable and their timestamps are cross-referenced in immutable ledger reports.
+_AUDIT_DIR_GRANDFATHER: frozenset[str] = frozenset(
+    {
+        "2026-06-09T075056Z",
+        "2026-06-10T010550Z",
+        "2026-06-10T052944Z",
+        "2026-06-10T140553Z",
+    }
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TREE invariant constants (spec-context-tree-v2)
@@ -449,6 +479,7 @@ class SpecsDoctor:
         issues.extend(self._check_release_naming_canon())  # SPEC-DOC-027
         issues.extend(self._check_constitution_file_refs())  # SPEC-DOC-028
         issues.extend(self._check_lease_session_coherence())  # SPEC-DOC-029
+        issues.extend(self._check_audits_naming_canon())  # SPEC-DOC-030
         return issues
 
     def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
@@ -1165,49 +1196,95 @@ class SpecsDoctor:
         return issues
 
     def _check_lease_session_coherence(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-029 (D-2 backstop): every active lease/lock that names a holder
-        session must have a corresponding session record on disk.
+        """SPEC-DOC-029 (D-2 backstop): the lease-record holder, the incumbent pointer,
+        and the session record may never name three different sessions for one context.
 
-        The doctor is a pure module scoped to specs_dir/public_dir; the lock and
-        session stores live at the *workspace* root (``.dadaia/states/ctx_locks/*.lock``
-        + ``.dadaia/sessions/*.json``), outside the specs tree. This backstop therefore
-        only runs when a caller injects ``workspace_state_dir``; with the default
-        (``None``) it is a documented no-op (see ``__init__``). This detects out-of-band
-        ``.ptr``/lock forgery after the fact (SPEC §WS-R6 / Decision D-2).
+        The doctor is a pure module scoped to specs_dir/public_dir; the lock and session
+        stores live at the *workspace* root (``.dadaia/states/ctx_locks/<ctx>.lock.json``
+        + ``.dadaia/sessions/<id>.json`` + ``.dadaia/sessions/runtime/<ctx>.ptr``),
+        outside the specs tree. This backstop therefore only runs when a caller injects
+        ``workspace_state_dir``; with the default (``None``) it is a documented no-op (see
+        ``__init__``). This detects out-of-band ``.ptr``/lock forgery after the fact
+        (SPEC §WS-R6 / Decision D-2).
+
+        Implementation: the genuine lease records production writes are
+        ``<ctx>.lock.json`` (``lease._record_path``); their holder session_id is read via
+        :func:`lease.read_record`, and the three-source divergence verdict is delegated to
+        :func:`session_identity.coherence` — the single designed coherence API
+        (FR-R3-02), so there is no duplicate (and previously broken) copy of the logic
+        here.
         """
-        import json as _json
-
         state_dir = self.workspace_state_dir
         if state_dir is None:
             return []  # no-op: lease/session stores are unreachable from a pure specs_dir
         locks_dir = state_dir / "states" / "ctx_locks"
-        sessions_dir = state_dir / "sessions"
         if not locks_dir.is_dir():
             return []
+        # session_identity / lease take the WORKSPACE root and append ``.dadaia/...``
+        # internally; workspace_state_dir is that ``.dadaia`` directory, so its parent is
+        # the workspace root.
+        workspace_root = state_dir.parent
         issues: list[SpecsDoctorIssue] = []
-        for lock in sorted(locks_dir.glob("*.lock")):
+        for record_file in sorted(locks_dir.glob("*.lock.json")):
+            ctx = record_file.name[: -len(".lock.json")]
             try:
-                rec = _json.loads(lock.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue  # unreadable/garbage lock — not this invariant's concern
-            session_id = rec.get("session_id") if isinstance(rec, dict) else None
-            if not session_id:
-                continue
-            session_record = sessions_dir / f"{session_id}.json"
-            if not session_record.exists():
+                _validate_ctx_name(ctx)
+            except ValueError:
+                continue  # not a real context-keyed record name
+            record = lease.read_record(workspace_root, ctx)
+            holder = record.get("session_id") if isinstance(record, dict) else None
+            lock_holder = str(holder) if holder else None
+            message = session_identity.coherence(workspace_root, ctx, lock_holder=lock_holder)
+            if message is not None:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-029",
                         severity=Severity.ERROR,
                         description=(
-                            f"Lock '{lock.name}' names holder session '{session_id}' but "
-                            f"no session record exists at sessions/{session_id}.json — "
-                            "lease↔session incoherence (possible out-of-band lock forgery; "
-                            "D-2 backstop, SPEC-DOC-029)."
+                            f"{message} — lease↔session incoherence (possible out-of-band "
+                            "lock/ptr forgery; D-2 backstop, SPEC-DOC-029)."
                         ),
-                        path=str(lock),
+                        path=str(record_file),
                     )
                 )
+        return issues
+
+    def _check_audits_naming_canon(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-030 (constitution §8): WARN on any non-conforming ``specs/audits/`` dir.
+
+        Forward enforcement of the collision-safe naming law: every audit directory must
+        be named ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` (:data:`AUDIT_DIR_NAME_RE`) so
+        two concurrent additive sessions never collide on a path. WARN-only (legacy names
+        are preserved, never auto-renamed), mirroring the SPEC-DOC-027 legacy policy.
+
+        Exempt: the four grandfathered dirs from the §8 amendment
+        (:data:`_AUDIT_DIR_GRANDFATHER`) and ``specs/audits/_archive/``. Silent when the
+        ``audits/`` dir is absent.
+        """
+        audits_dir = self.specs_dir / "audits"
+        if not audits_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for child in sorted(audits_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            name = child.name
+            if name == "_archive" or name in _AUDIT_DIR_GRANDFATHER:
+                continue
+            if AUDIT_DIR_NAME_RE.match(name):
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-030",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"Audit dir 'audits/{name}' does not follow the collision-safe "
+                        "naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) "
+                        "— rename it (SPEC-DOC-030, WARNING)."
+                    ),
+                    path=str(child),
+                )
+            )
         return issues
 
     # 7

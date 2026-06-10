@@ -41,6 +41,15 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 #
 # Breakdown at the recorded count (v0.1.10, after T-010-24's documented model-resolution
 # edge): features-no-infrastructure = 12, features-no-subprocess = 5, total = 17.
+#
+# SHRINK NOTE (arch A4 + T-010-33): the cap stays at 17 — none of the 17 suppressed edges
+# is yet retired. The container-DI cleanup that retires them is tracked in backlog
+# `features-import-infrastructure-direct-debt`; when it lands, drop the corresponding
+# `ignore_imports` edges from setup.cfg AND lower this cap in the same commit (the
+# `test_recorded_cap_is_not_stale_above_reality` test re-pins it). T-010-33's
+# reverse-direction `forbidden` contracts (core-no-upper-layers,
+# infrastructure-no-upper-layers) add ZERO ignore edges — they freeze layers verified
+# clean — so they do not move this number.
 _RECORDED_IGNORE_EDGE_CAP = 17
 
 

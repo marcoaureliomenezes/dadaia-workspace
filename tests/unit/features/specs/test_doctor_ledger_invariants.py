@@ -11,7 +11,9 @@ convention:
 - SPEC-DOC-027 — naming canon ``^v\\d+\\.\\d+\\.\\d+$`` for release dirs, legacy WARN.
 - SPEC-DOC-028 — constitution file-ref resolution (WARN on a missing repo file).
 - SPEC-DOC-029 — lease↔session coherence backstop (no-op unless a workspace state
-  dir is injected; otherwise validates the holder session record exists).
+  dir is injected; otherwise delegates to ``session_identity.coherence`` over the
+  genuine ``<ctx>.lock.json`` records production writes, reporting any three-source
+  divergence between the lease holder, the incumbent pointer, and the session record).
 
 Each invariant has one failing fixture (the violation fires the code) and one passing
 fixture (a clean tree does NOT fire the code).
@@ -23,6 +25,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.features.spec_context import lease, session_identity
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
@@ -367,34 +370,57 @@ def test_constitution_ref_resolution_noop_without_repo_root(tmp_path: Path) -> N
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _seed_lock(state_dir: Path, ctx: str, session_id: str) -> Path:
-    import json
+def test_incoherent_lease_session_via_production_writers_reports_doc_029(
+    tmp_path: Path,
+) -> None:
+    """A deliberately incoherent lease↔session pair, created on disk via the PRODUCTION
+    writers (``lease.acquire`` + ``session_identity`` writers), makes the doctor flag
+    SPEC-DOC-029.
 
-    locks = state_dir / "states" / "ctx_locks"
-    locks.mkdir(parents=True)
-    lock = locks / f"{ctx}.lock"
-    lock.write_text(json.dumps({"session_id": session_id, "context": ctx}), encoding="utf-8")
-    return lock
+    Production sequence reproduced:
 
+    1. ``lease.acquire`` writes the genuine ``<ctx>.lock.json`` record (holder = ``S1``)
+       and the incumbent ``<ctx>.ptr`` (= ``S1``).
+    2. The incumbent pointer is then drifted to ``S2`` (``set_incumbent``) and a session
+       record is written for ``S2`` (``write_session``) — the out-of-band drift the
+       D-2 backstop exists to catch.
 
-def test_lease_without_session_record_reports_doc_029(tmp_path: Path) -> None:
-    """A lock naming a holder session whose session record is absent → SPEC-DOC-029."""
+    Result: lock-holder = ``S1`` while incumbent-ptr/session-record = ``S2`` — three-source
+    divergence → SPEC-DOC-029 fires on the real ``<ctx>.lock.json`` artifact.
+    """
     specs = _make_clean_specs_tree(tmp_path)
     state_dir = tmp_path / ".dadaia"
-    _seed_lock(state_dir, "ctx-a", "sess_ghost1")
-    (state_dir / "sessions").mkdir(parents=True)  # no sess_ghost1.json
+    ctx = "ctx-a"
+
+    # Production writer #1: the real lease record + incumbent ptr, both naming S1.
+    lease.acquire(tmp_path, ctx, "sessS1", "rel-1", "implementation")
+    # Production writer #2: drift the incumbent ptr to S2 and persist S2's session record.
+    session_identity.set_incumbent(tmp_path, ctx, "sessS2")
+    session_identity.write_session(tmp_path, "sessS2", {"session_id": "sessS2"})
+
     issues = SpecsDoctor(specs, workspace_state_dir=state_dir).check()
-    assert "SPEC-DOC-029" in _codes(issues)
+    doc_029 = [i for i in issues if i.code == "SPEC-DOC-029"]
+    assert doc_029, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.ERROR for i in doc_029)
+    # The reported artifact is the REAL record name production writes, not a fabrication.
+    assert all(i.path.endswith(f"{ctx}.lock.json") for i in doc_029)
 
 
-def test_lease_with_session_record_does_not_report_doc_029(tmp_path: Path) -> None:
-    """A lock whose holder session record exists → no SPEC-DOC-029."""
+def test_coherent_lease_session_via_production_writers_does_not_report_doc_029(
+    tmp_path: Path,
+) -> None:
+    """A coherent lease↔session state created via the production writers → no SPEC-DOC-029.
+
+    ``lease.acquire`` writes the lock record + incumbent ptr (both = ``S1``); the matching
+    session record for ``S1`` is then persisted. All three sources name ``S1`` → coherent.
+    """
     specs = _make_clean_specs_tree(tmp_path)
     state_dir = tmp_path / ".dadaia"
-    _seed_lock(state_dir, "ctx-a", "sess_real01")
-    sessions = state_dir / "sessions"
-    sessions.mkdir(parents=True)
-    (sessions / "sess_real01.json").write_text('{"session_id": "sess_real01"}', encoding="utf-8")
+    ctx = "ctx-a"
+
+    lease.acquire(tmp_path, ctx, "sessS1", "rel-1", "implementation")
+    session_identity.write_session(tmp_path, "sessS1", {"session_id": "sessS1"})
+
     issues = SpecsDoctor(specs, workspace_state_dir=state_dir).check()
     assert "SPEC-DOC-029" not in _codes(issues)
 
@@ -404,6 +430,53 @@ def test_lease_coherence_is_noop_without_workspace_state_dir(tmp_path: Path) -> 
     specs = _make_clean_specs_tree(tmp_path)
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-029" not in _codes(issues)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SPEC-DOC-030 — specs/audits/ naming canon (constitution §8 collision-safe naming)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_non_conforming_new_audit_dir_reports_doc_030_warning(tmp_path: Path) -> None:
+    """A new audit dir not matching <YYYYMMDDTHHMMSSZ>-<sid8> → SPEC-DOC-030 WARNING."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "audits" / "2026-07-01T000000Z").mkdir(parents=True)
+    issues = SpecsDoctor(specs).check()
+    doc_030 = _by_code(issues, "SPEC-DOC-030")
+    assert doc_030, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.WARNING for i in doc_030)
+    assert all(i.path.endswith("2026-07-01T000000Z") for i in doc_030)
+
+
+def test_conforming_audit_dir_does_not_report_doc_030(tmp_path: Path) -> None:
+    """A canonical <YYYYMMDDTHHMMSSZ>-<sid8> dir → silent."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "audits" / "20260701T000000Z-abcd1234").mkdir(parents=True)
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-030" not in _codes(issues)
+
+
+def test_grandfathered_audit_dir_does_not_report_doc_030(tmp_path: Path) -> None:
+    """The four §8-amendment grandfathered dirs + _archive → silent."""
+    specs = _make_clean_specs_tree(tmp_path)
+    for name in (
+        "2026-06-09T075056Z",
+        "2026-06-10T010550Z",
+        "2026-06-10T052944Z",
+        "2026-06-10T140553Z",
+        "_archive",
+    ):
+        (specs / "audits" / name).mkdir(parents=True)
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-030" not in _codes(issues)
+
+
+def test_audit_naming_check_silent_when_audits_dir_absent(tmp_path: Path) -> None:
+    """No audits/ dir → the check is a safe no-op."""
+    specs = _make_clean_specs_tree(tmp_path)
+    assert not (specs / "audits").exists()
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-030" not in _codes(issues)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

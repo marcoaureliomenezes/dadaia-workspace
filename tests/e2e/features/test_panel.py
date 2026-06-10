@@ -9,7 +9,7 @@ All tests:
 Coverage map:
   T-5.1  → AC-1, AC-2 (sections render; JSON APIs respond)
   T-5.2  → AC-3 (loopback-only bind)
-  T-5.3  → AC-10, NFR-2 (byte-identical memory serving end-to-end)
+  T-5.3  → AC-10, NFR-2 (memory .md atom rendered + served end-to-end; D-4)
   T-5.4  → AC-6 (dashboard deprecation warning on stderr)
   T-5.5  → AC-9, NFR-4 (clean shutdown within 2 s; port freed)
 """
@@ -43,14 +43,6 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).parents[3]  # repos/dadaia-workspace/
-# The dadaia workspace root is the parent that contains the real .dadaia/states/ directory.
-# _REPO_ROOT has a .dadaia/ dir too, but only with agentic/reports/scripts — no states/.
-# Walking: repos/dadaia-workspace/ → repos/ → dadaia/  (which has .dadaia/states/)
-_DADAIA_WORKSPACE_ROOT = _REPO_ROOT.parents[1]  # workspace root
-# The real memory file is served from repos/<slug>/specs/memory/ relative to the workspace.
-_REAL_MEMORY_HTML = (
-    _DADAIA_WORKSPACE_ROOT / "repos" / "dadaia-workspace" / "specs" / "memory" / "architecture.html"
-)
 
 
 def _find_free_port() -> int:
@@ -368,57 +360,77 @@ def test_panel_bind_loopback_only(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_memory_view_iframe_loads() -> None:
-    """Memory wrapper contains the correct iframe; /memory/ route serves bytes identical to disk.
+def test_memory_view_iframe_loads(tmp_path: Path) -> None:
+    """Memory wrapper contains the correct iframe; /memory/ route renders the .md atom.
 
-    Acceptance: AC-10 (raw bytes unchanged), NFR-2 (memory atomicity preserved end-to-end).
+    Acceptance: AC-10, NFR-2 — the memory viewer chain works end-to-end for the
+    markdown-memory reality (memory-markdown-source-v1, D-4): the ``.md`` source is
+    the canonical artefact and the ``/memory/`` route renders it to HTML in-memory.
+    The byte-identity SPEC-DOC-008 invariant on committed ``.html`` is retired; the
+    behaviour asserted here is "the rendered HTML carries the source's semantics".
 
-    This test uses the REAL workspace root (cwd=_WORKSPACE_ROOT) so that the panel can
-    resolve repos/dadaia-workspace/specs/memory/architecture.html from disk.
-    The active context slug is 'dadaia-workspace' (primary_context.json).
+    Runs against a tmp workspace fixture (cwd=tmp_path) with a hand-built memory atom
+    under ``repos/<slug>/specs/memory/architecture.md`` — never the real workspace
+    root (the previous incarnation pointed at ``cwd=_DADAIA_WORKSPACE_ROOT`` and
+    guarded on a retired ``architecture.html``, so it was dead-by-skip since the
+    markdown migration). Memory routes are Bearer-gated (sec F-3), so every request
+    carries the token.
     """
-    if not _REAL_MEMORY_HTML.exists():
-        pytest.skip(
-            f"Memory fixture not found at {_REAL_MEMORY_HTML} — skipping real-content check"
-        )
+    _init_workspace(tmp_path)
 
-    slug = "dadaia-workspace"
+    slug = "memory-fixture"
+    atom_dir = tmp_path / "repos" / slug / "specs" / "memory"
+    atom_dir.mkdir(parents=True)
+    # A real .md atom whose rendered HTML semantics we assert on. The heading and the
+    # body sentence are distinct, non-injected strings: if the renderer regresses
+    # (stops emitting <h1>, drops body text, or serves raw Markdown), the asserts fail.
+    (atom_dir / "architecture.md").write_text(
+        "# Architecture Atom\n\nThe container wires every feature dependency.\n",
+        encoding="utf-8",
+    )
+
     port = _find_free_port()
-    # Spawn from the dadaia workspace root (which has .dadaia/states/) so the panel
-    # can resolve the workspace and serve memory files from repos/dadaia-workspace/.
-    proc = _spawn_panel(port, cwd=_DADAIA_WORKSPACE_ROOT)
+    proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        _wait_for_ready(proc, port)
+        token = _wait_for_ready_and_token(proc, port)
 
-        # --- /memory-view/<slug>/architecture.html → wrapper with iframe ---
-        wrapper_url = f"http://127.0.0.1:{port}/memory-view/{slug}/architecture.html"
-        with urllib.request.urlopen(wrapper_url, timeout=5) as resp:
+        # --- /memory-view/<slug>/architecture.md → wrapper with iframe ---
+        wrapper_url = f"http://127.0.0.1:{port}/memory-view/{slug}/architecture.md"
+        with _auth_get(wrapper_url, token) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "text/html" in ct, f"Unexpected content-type for memory-view: {ct}"
             wrapper_body = resp.read().decode("utf-8", errors="replace")
 
-        expected_iframe_src = f'src="/memory/{slug}/architecture.html"'
+        expected_iframe_src = f'src="/memory/{slug}/architecture.md"'
         assert expected_iframe_src in wrapper_body, (
             f"Wrapper page missing expected iframe src.\n"
             f"Expected to find: {expected_iframe_src!r}\n"
             f"In: {wrapper_body[:400]!r}"
         )
 
-        # --- /memory/<slug>/architecture.html → byte-identical to disk (NFR-2 / AC-10) ---
-        memory_url = f"http://127.0.0.1:{port}/memory/{slug}/architecture.html"
-        with urllib.request.urlopen(memory_url, timeout=5) as resp:
+        # --- /memory/<slug>/architecture.md → Markdown rendered to HTML (D-4) ---
+        memory_url = f"http://127.0.0.1:{port}/memory/{slug}/architecture.md"
+        with _auth_get(memory_url, token) as resp:
             assert resp.status == 200
-            served_bytes = resp.read()
+            ct = resp.headers.get("Content-Type", "")
+            assert "text/html" in ct, f"Unexpected content-type for memory render: {ct}"
+            served = resp.read().decode("utf-8", errors="replace")
 
-        disk_bytes = _REAL_MEMORY_HTML.read_bytes()
-
-        assert served_bytes == disk_bytes, (
-            f"NFR-2 VIOLATED: served bytes differ from disk bytes for "
-            f"repos/{slug}/specs/memory/architecture.html. "
-            f"Served {len(served_bytes)} bytes, disk has {len(disk_bytes)} bytes. "
-            "The panel must serve memory HTML verbatim (SPEC-DOC-008)."
+        # The renderer must turn the .md heading into an <h1> and preserve the body
+        # sentence — i.e. it served rendered HTML, not the raw Markdown source.
+        assert "<h1" in served, (
+            "Memory render did not emit an <h1> for the '# Architecture Atom' heading — "
+            f"the .md atom was not rendered to HTML. Got: {served[:400]!r}"
+        )
+        assert "Architecture Atom" in served, "Rendered HTML dropped the heading text"
+        assert "The container wires every feature dependency." in served, (
+            "Rendered HTML dropped the body sentence"
+        )
+        assert "# Architecture Atom" not in served, (
+            "Served body still contains the raw Markdown '# ' heading marker — "
+            "the route served source bytes instead of rendered HTML (D-4 violated)."
         )
 
         proc.send_signal(signal.SIGINT)

@@ -10,6 +10,7 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor import _read_active_md
 from dadaia_workspace.features.specs.scaffolder import (
@@ -46,6 +47,22 @@ def _write_active(specs_dir: Path, release: str, segment: str | None, phase: str
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     return _shared_resolve_specs_dir(specs_dir)
+
+
+def _resolve_workspace_state_dir() -> Path | None:
+    """Best-effort resolution of the workspace ``.dadaia/`` directory.
+
+    Returns the workspace-root ``.dadaia/`` (holding ``states/ctx_locks/`` +
+    ``sessions/``) so the doctor's SPEC-DOC-029 lease↔session coherence backstop can run.
+    Returns ``None`` when no workspace root resolves from the cwd (the backstop then stays
+    the documented no-op).
+    """
+    from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+
+    try:
+        return resolve_workspace_root() / ".dadaia"
+    except WorkspaceNotInitializedError:
+        return None
 
 
 def _resolve_public_dir(specs_dir: Path) -> Path | None:
@@ -99,7 +116,17 @@ def doctor(
         resolved_public: Path | None = Path(public_dir).resolve()
     else:
         resolved_public = _resolve_public_dir(target)
-    doctor_svc = SpecsDoctor(target, public_dir=resolved_public, templates_dir=_TEMPLATES_DIR)
+    # Wire the workspace ``.dadaia/`` so the SPEC-DOC-029 lease↔session coherence backstop
+    # actually runs from the CLI (lease/session stores live at the WORKSPACE root, outside
+    # the specs tree). Best-effort: if no workspace root resolves (e.g. a bare --specs-dir
+    # in CI), the backstop stays a documented no-op.
+    workspace_state_dir = _resolve_workspace_state_dir()
+    doctor_svc = SpecsDoctor(
+        target,
+        public_dir=resolved_public,
+        templates_dir=_TEMPLATES_DIR,
+        workspace_state_dir=workspace_state_dir,
+    )
     issues = doctor_svc.check()
 
     # Always surface TREE-1/TREE-2 migration hints (even under --fix).

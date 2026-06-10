@@ -26,7 +26,6 @@ import os
 import sys
 from pathlib import Path
 
-from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.hooks import _common
 
 _DISPATCHER_PREFLIGHT = """=== dispatcher preflight (SDD routing) ===
@@ -97,16 +96,6 @@ def _emit(payload: str) -> None:
         sys.stdout.write(payload)
 
 
-def _write_runtime_ptr(workspace: Path, session_id: str) -> None:
-    """Best-effort session-keyed runtime pointer.
-
-    Routed through ``session_identity`` (WS-R3, FR-R3-01) — the single owner of the
-    ``sessions/runtime/*.ptr`` namespace. Behavior is preserved verbatim: the
-    ``"workspace"`` sentinel is skipped and write failures are swallowed.
-    """
-    session_identity.write_session_ptr(workspace, session_id)
-
-
 def _build_memory(specs_dir: Path) -> str:
     """Build the once-per-session memory bootstrap (tech-stack + catalog/index)."""
     memory_dir = specs_dir / "memory"
@@ -137,7 +126,6 @@ def main() -> int:
         return 0
 
     session_id = _common.resolve_session_id(payload, default="workspace")
-    _write_runtime_ptr(workspace, session_id)
 
     context = _resolve_context(workspace)
     if not context:

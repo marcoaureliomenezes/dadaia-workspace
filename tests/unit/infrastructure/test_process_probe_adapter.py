@@ -174,11 +174,18 @@ def test_unexpected_oserror_is_treated_as_alive_with_warning(
     assert any("unexpected OSError" in rec.message for rec in caplog.records)
 
 
-@pytest.mark.xfail(reason="PID 0 behaviour is platform-defined; we do not assert.")
-def test_pid_zero_documented_as_xfail() -> None:
+def test_pid_zero_returns_a_bool_without_raising() -> None:
+    """PID 0 behaviour is platform-defined, so we do not pin True vs False — but the
+    probe MUST normalise it to a ``bool`` and never let a platform-specific exception
+    (e.g. ``os.kill(0, 0)`` signalling the whole process group) escape its handlers.
+
+    This replaces a non-strict xfail that always XPASSed (it had no assertion, so it
+    could never fail and only added XPASS noise to the summary). As a plain contract
+    test it now fails on a real regression: an unhandled exception or a non-bool return.
+    """
     probe = OsProcessProbe()
-    # Either True or False is acceptable for PID 0. We just exercise the path.
-    probe.is_pid_alive(0)
+    result = probe.is_pid_alive(0)
+    assert isinstance(result, bool)
 
 
 # ---------------------------------------------------------------------------

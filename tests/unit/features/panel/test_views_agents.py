@@ -1,80 +1,55 @@
 """Unit tests for views/agents.py.
 
-Covers:
-  - render_agents_section() returns a non-empty string
-  - T-016-P09: agents are now a sub-section inside the Ops tab (no longer a tabpanel).
-  - Grid container id="agents-grid" is present
-  - Empty-state id="agents-empty" element is present and hidden by default
-  - Staleness banner id="agents-staleness-banner" is present, hidden, role="status"
-  - No inline agent data serialized into HTML (data is JS-fetched)
+Covers the static HTML skeleton contract (T-016-P09): agents are a sub-section
+inside the Ops tab (no longer a top-level tabpanel). Agent cards are populated
+client-side via JS fetch, so the server must NOT serialise agent data into the HTML.
 
-render_agents_section() is a static HTML skeleton; agent cards are populated
-client-side via JS fetch. The no-inline-data test guards that invariant.
+The skeleton is exercised by asserting on its rendered structure (distinct ids,
+roles, hidden-by-default states) rather than smoke-asserting it is a non-empty
+string — each assertion below fails on a real regression that drops a DOM hook the
+client JS depends on.
 """
 
 from dadaia_workspace.features.panel.views.agents import render_agents_section
 
 
-def test_render_agents_section_returns_string() -> None:
-    """render_agents_section() must return a non-empty string."""
-    result = render_agents_section()
-    assert isinstance(result, str)
-    assert len(result) > 0
+def test_agents_subsection_structure() -> None:
+    """The Ops agents sub-section exposes every DOM hook the client JS targets.
 
-
-def test_section_has_role_tabpanel() -> None:
-    """After T-016-P09 agents are a sub-section (ops-subsection) inside the Ops tab.
-
-    The subsection no longer carries role="tabpanel" / aria-labelledby="tab-agents"
-    because it is not a top-level tab target. Instead, verify the sub-section
-    container ID is present.
+    After T-016-P09 the container is a sub-section (``ops-subsection-agents``), NOT a
+    ``role="tabpanel"`` target. The grid, empty-state, and staleness banner ids must
+    all be present so the fetch-driven UI can populate and toggle them.
     """
     html = render_agents_section()
-    # Sub-section container must be present (not a tabpanel any more)
+
+    # Sub-section container (replaces the former top-level tabpanel).
     assert 'id="ops-subsection-agents"' in html
-    # agents-grid must still be present for JS to target
+    # Grid the client JS injects cards into.
     assert 'id="agents-grid"' in html
-
-
-def test_section_has_grid_container() -> None:
-    """Section must include a grid container with id="agents-grid"."""
-    html = render_agents_section()
-    assert 'id="agents-grid"' in html
-
-
-def test_section_has_empty_state() -> None:
-    """Section must include empty-state element with id="agents-empty", hidden by default."""
-    html = render_agents_section()
+    # Empty-state + staleness banner, both present.
     assert 'id="agents-empty"' in html
-    # The empty state must be hidden by default (hidden attribute present)
-    assert "agents-empty" in html
-    # Find the element and confirm hidden attribute
-    idx = html.find('id="agents-empty"')
-    # Get surrounding context (the element opening tag)
-    chunk = html[max(0, idx - 20) : idx + 100]
-    assert "hidden" in chunk
-
-
-def test_section_has_staleness_banner() -> None:
-    """Section must include staleness banner with id="agents-staleness-banner",
-    hidden by default, and role="status"."""
-    html = render_agents_section()
     assert 'id="agents-staleness-banner"' in html
     assert 'role="status"' in html
-    # Must be hidden by default
-    idx = html.find('id="agents-staleness-banner"')
-    chunk = html[max(0, idx - 20) : idx + 120]
-    assert "hidden" in chunk
 
 
-def test_no_inline_data() -> None:
-    """Server must NOT serialize agent data into HTML; JS fetches dynamically.
+def test_agents_empty_state_and_staleness_banner_hidden_by_default() -> None:
+    """Both the empty-state and the staleness banner ship hidden; JS reveals them."""
+    html = render_agents_section()
 
-    Checks that no agent-specific data patterns appear that would suggest
-    server-side rendering of agent records.
+    empty_idx = html.find('id="agents-empty"')
+    assert "hidden" in html[max(0, empty_idx - 20) : empty_idx + 100]
+
+    banner_idx = html.find('id="agents-staleness-banner"')
+    assert "hidden" in html[max(0, banner_idx - 20) : banner_idx + 120]
+
+
+def test_no_inline_agent_data_serialized() -> None:
+    """Server must NOT serialise agent records into HTML; JS fetches them dynamically.
+
+    A regression that starts server-side-rendering agent data would re-introduce one
+    of these JSON keys into the skeleton.
     """
     html = render_agents_section()
-    # Should not contain JSON-like agent data patterns
     assert '"agent_id"' not in html
     assert '"total_cost_usd"' not in html
     assert '"dominant_model"' not in html

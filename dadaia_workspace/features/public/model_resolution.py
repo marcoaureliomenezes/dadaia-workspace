@@ -18,9 +18,14 @@ the fleet honest against future hand-edits:
    refactor) that reintroduces the original silent desync.
 
 Layering: this lives in ``features/public/`` and imports ``core.model_registry``
-(``MODEL_MAP``/``PRICING_TABLE`` are re-exported from their owning modules). No
-import-linter contract forbids ``features -> core``; ``core`` is the bottom layer.
-The check does not import ``infrastructure``.
+(the single source of truth) plus the ``MODEL_MAP`` derived view from
+``infrastructure`` (a documented ignore-edge — the infra view is a separate
+module that must be guarded against a hand-edit). The ``PRICING_TABLE`` key-set
+is no longer imported from the sibling ``features.telemetry`` module (that was a
+cross-feature import, audit A3): the registry is the single source from which
+``PRICING_TABLE`` is itself derived, so the registry claude-id set IS the
+pricing key-set by construction. ``features -> core`` is permitted (``core`` is
+the bottom layer); the ``features.telemetry`` cross-feature edge is gone.
 
 ERROR lines use the ``[drift]`` prefix — the same prefix ``check_agent_skill_refs``
 and ``check_memory_phase_single_source`` use for hard failures — because the
@@ -35,7 +40,6 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.model_registry import REGISTRY
-from dadaia_workspace.features.telemetry.pricing import PRICING_TABLE
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP
 
 # Matches a frontmatter ``model:`` line (first match wins; ``opencode_model:`` is a
@@ -83,8 +87,15 @@ def check_model_resolution(public_dir: Path) -> list[str]:
                 )
 
     # 2. Key-set coherence: MODEL_MAP keys == PRICING_TABLE keys == REGISTRY ids.
+    # PRICING_TABLE and MODEL_MAP are both DERIVED views over REGISTRY (one in
+    # features/telemetry, one in infrastructure). The registry claude-id set IS
+    # the canonical pricing key-set by construction, so we compute the pricing
+    # key-set from REGISTRY directly rather than importing across the
+    # features→features boundary into the sibling telemetry module (audit A3).
+    # The MODEL_MAP infra view lives in a SEPARATE module and is still imported
+    # so a hand-edit that desyncs it from the registry is caught here.
     model_map_keys = set(MODEL_MAP)
-    pricing_keys = set(PRICING_TABLE)
+    pricing_keys = registry_ids  # PRICING_TABLE is derived from REGISTRY (== registry_ids).
     if not (model_map_keys == pricing_keys == registry_ids):
         out.append(
             "[drift] model-resolution ERROR: key-set desync — "
