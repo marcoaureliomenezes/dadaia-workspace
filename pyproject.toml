@@ -59,6 +59,7 @@ import-linter = ">=2.11"
 # Upgrading the live tool venv (.dadaia/.venv) is an operator/devops action; declaring
 # `poetry` as a dev dep here is rejected as unjustified dependency drift (it would pull
 # poetry's entire heavy tree, incl. dulwich, into every contributor install and the lock).
+hypothesis = ">=6.100"
 
 [build-system]
 requires = ["poetry-core"]

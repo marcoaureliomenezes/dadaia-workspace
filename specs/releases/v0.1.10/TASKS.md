@@ -231,7 +231,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ## Final gate
 
-### [ ] T-010-28 — Release final gate
+### [-] T-010-28 — Release final gate
 - **Owner:** software-engineer · **Maps:** all
 - **Write set:** none (verification)
 - **Preconditions:** all tasks above `[x]` except T-010-16 (which follows in CLOSURE).

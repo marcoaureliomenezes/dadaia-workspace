@@ -42,12 +42,18 @@ GATE_SCRIPT = Path(dadaia_workspace.__file__).parent / "public" / "scripts" / "p
 _BASH = shutil.which("bash") or "/usr/bin/bash"
 
 # System bin dirs appended AFTER the stub dir, so real `dirname`/coreutils
-# resolve while the stub `git`/`poetry`/`dadaia` keep precedence. The host has
-# no real poetry/dadaia on PATH (asserted at module import below), so appending
-# these cannot leak a real runner into the probe.
+# resolve while the stub `git`/`poetry`/`dadaia` keep precedence. The probe
+# subprocess PATH is built from scratch (stub dir + these), so a host poetry
+# or dadaia elsewhere (workspace venv, ~/.local/bin, poetry env) cannot leak
+# in. Only a real runner inside the system bin dirs themselves could — guard
+# exactly that, not the host PATH (asserting on the host PATH broke collection
+# under the canonical `poetry run dadaia ci preflight` invocation).
 _SYS_BINS = [Path("/usr/bin"), Path("/bin")]
-assert shutil.which("poetry") is None, "host poetry would leak into probe tests"
-assert shutil.which("dadaia") is None, "host dadaia would leak into probe tests"
+for _tool in ("poetry", "dadaia"):
+    for _bin in _SYS_BINS:
+        assert not (_bin / _tool).exists(), (
+            f"{_bin / _tool} exists: a system-bin runner would leak into probe tests"
+        )
 
 
 def _write_executable(path: Path, body: str = "#!/usr/bin/env bash\nexit 0\n") -> None:
