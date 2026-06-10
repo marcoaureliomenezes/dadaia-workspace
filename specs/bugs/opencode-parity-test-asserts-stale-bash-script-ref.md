@@ -3,11 +3,17 @@ title: opencode-parity-test-asserts-stale-bash-script-ref
 severity: Medium
 opened: 2026-06-09
 session_id: null
-status: Open
+status: Closed
+superseded_by: v0.1.8
 surface: tests/e2e/features/test_opencode_parity_hardening.py
 related_release: 0.1.8
 related_task: T-018-19
 ---
+
+**Resolution (T-010-01, 2026-06-09):** Already fixed by v0.1.8 — line 129 now reads
+`assert "sdd-spec-gate.sh" not in text` and `test_sdd_gate_plugin_projected` passes
+(`pytest -p no:cacheprovider -q ...::test_sdd_gate_plugin_projected` → `1 passed in 0.39s`).
+
 
 **Symptom:** After T-018-19 migrated `public/plugins/sdd-gate.ts` to call the Python
 governance hook (`python -m dadaia_workspace.hooks.sdd_gate`) and removed the `bash

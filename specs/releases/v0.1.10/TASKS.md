@@ -29,13 +29,13 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
   archive repair remain in T-010-15 (unchanged).
 - **Parallelism:** runs first, before all tracks.
 
-### [ ] T-010-01 — VERIFY: opencode-parity bug superseded by v0.1.8
+### [x] T-010-01 — VERIFY: opencode-parity bug superseded by v0.1.8
 - **Owner:** software-engineer · **Maps:** bug `opencode-parity-test-asserts-stale-bash-script-ref`, DRIFT-7
 - **Write set:** `specs/bugs/opencode-parity-test-asserts-stale-bash-script-ref.md` (frontmatter only)
 - **Acceptance:** `pytest -p no:cacheprovider -q tests/e2e/features/test_opencode_parity_hardening.py::TestPluginProjection::test_sdd_gate_plugin_projected` passes at HEAD; line 129 reads `assert "sdd-spec-gate.sh" not in text`. Bug set `status: Closed`, `superseded_by: v0.1.8`; pytest output captured for CLOSURE.
 - **Parallelism:** independent; run first.
 
-### [ ] T-010-02 — VERIFY: claude-fable-5 registry precondition
+### [x] T-010-02 — VERIFY: claude-fable-5 registry precondition
 - **Owner:** software-engineer · **Maps:** bug `model-catalog-modelmap-pricing-drift-no-registry` (precondition)
 - **Write set:** none (read-only)
 - **Acceptance:** `claude-fable-5` present in `MODEL_MAP` and `PRICING_TABLE` (python -c asserts); 5 agent `.md` files carry `model: claude-fable-5`. Evidence recorded.
@@ -45,7 +45,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ## Track K — Concurrency kernel
 
-### [ ] T-010-10 — R5: harness-env fixture contract (FIRST in track)
+### [x] T-010-10 — R5: harness-env fixture contract (FIRST in track)
 - **Owner:** software-engineer · **Maps:** CONF-6, qa defect 2, qa §6.1; bug `lease-stolen…` D3 (test side)
 - **Write set:** `tests/fixtures/harness_env.py` (new — NOT `tests/conftest.py`, avoids colliding with T-010-25), `tests/contract/test_harness_env_contract.py` (new)
 - **Preconditions:** T-010-00.
@@ -136,14 +136,14 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Preconditions:** T-010-23; `features/public/ → core` linter edge verified/added.
 - **Acceptance:** doctor errors on unknown `model:` frontmatter and on key-set desync; exits 0 with current fleet; pytest green.
 
-### [ ] T-010-25 — R8c: ci-preflight self-pollution fix
+### [x] T-010-25 — R8c: ci-preflight self-pollution fix
 - **Owner:** software-engineer · **Maps:** bug `ci-preflight-self-pollution-gate-never-passes` (HIGH)
 - **Write set:** `dadaia_workspace/features/ci_preflight/service.py`, `tests/conftest.py` (pollution-guard rescope), their tests
 - **Preconditions:** SPEC+PLAN Aprovado.
 - **Acceptance (AC-R8-02):** ruff invoked with `--no-cache`; mypy cache redirected under `.dadaia/tmp/`; conftest session-pollution guard does pre/post snapshot diff (fails only on session-created artifacts); unit fixtures per case; end-to-end `dadaia ci preflight` exit 0 on a clean tree, no cache dirs at repo root afterwards.
 - **Parallelism:** independent.
 
-### [ ] T-010-26 — R8d: pre-push gate workspace venv probe
+### [x] T-010-26 — R8d: pre-push gate workspace venv probe
 - **Owner:** software-engineer · **Maps:** arch F9; bug `pre-push-gate-cannot-locate-workspace-venv`
 - **Write set:** `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`, `tests/unit/public/test_pre_push_gate_venv_probe.py` (new)
 - **Preconditions:** SPEC+PLAN Aprovado.
@@ -192,7 +192,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R6-01):** quartet absent from canonical assets, staging manifest, and all projections; `pre-push-ci-gate.sh` retained; docstring names the Python hooks; residue grep contract green; `dadaia public stage && install --target all && public doctor` exit 0; bug closed referencing T-010-03's symlink regression + this retirement.
 - **Parallelism:** after T-010-03; otherwise independent.
 
-### [ ] T-010-14 — R6b: specs-doctor ledger invariants + coherence backstop
+### [x] T-010-14 — R6b: specs-doctor ledger invariants + coherence backstop
 - **Owner:** software-engineer · **Maps:** CONF-5, arch F6, index §4; Decision D-2 backstop
 - **Write set:** `dadaia_workspace/features/specs/doctor.py`, `tests/unit/features/specs/test_doctor_ledger_invariants.py` (new)
 - **Preconditions:** SPEC+PLAN Aprovado.

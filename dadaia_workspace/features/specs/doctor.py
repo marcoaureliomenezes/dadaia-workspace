@@ -374,9 +374,23 @@ class SpecsDoctor:
         public_dir: Path | None = None,
         templates_dir: Path | None = None,
         process_runner: ProcessRunner | None = None,
+        repo_root: Path | None = None,
+        workspace_state_dir: Path | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
+        # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
+        # resolves path-like references against it. None → that check is a no-op.
+        self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
+        # workspace_state_dir: the workspace-level ``.dadaia/`` directory holding
+        # ``states/ctx_locks/*.lock`` + ``sessions/*.json``. The doctor is otherwise a
+        # pure module scoped to specs_dir/public_dir (both under the repo); lease/session
+        # records live at the WORKSPACE root, outside the specs tree, so the lease↔session
+        # coherence backstop (SPEC-DOC-029) can only run when a caller injects this path.
+        # None (the default) → the backstop is a documented no-op.
+        self.workspace_state_dir: Path | None = (
+            Path(workspace_state_dir) if workspace_state_dir is not None else None
+        )
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)
@@ -429,6 +443,12 @@ class SpecsDoctor:
         issues.extend(self._check_lint1_memory_atoms())
         # SPECS-VERSION (specs-evolution / FR-S05) — pattern-version staleness
         issues.extend(self._check_specs_pattern_version())
+        # v0.1.10 / T-010-14 (R6b) — ledger invariants + identity-coherence backstop
+        issues.extend(self._check_phase_markers_coherence())  # SPEC-DOC-024
+        issues.extend(self._check_unique_release_ids())  # SPEC-DOC-026
+        issues.extend(self._check_release_naming_canon())  # SPEC-DOC-027
+        issues.extend(self._check_constitution_file_refs())  # SPEC-DOC-028
+        issues.extend(self._check_lease_session_coherence())  # SPEC-DOC-029
         return issues
 
     def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
@@ -763,20 +783,41 @@ class SpecsDoctor:
 
     # 6
     def _check_archive_closures(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-006: every archived release dir must have a complete CLOSURE.md.
+
+        v0.1.10 (T-010-14): recurse into nested archive layouts so legacy milestone
+        dirs (e.g. ``_archive/releases/v0.2.0/v0.1.9``) that carry SDD release
+        artifacts (SPEC/PLAN/TASKS) but no CLOSURE.md are also caught — the original
+        check only inspected the top level of ``_archive/releases/``.
+        """
         issues: list[SpecsDoctorIssue] = []
         arch = self.specs_dir / "_archive" / "releases"
         if not arch.exists():
             return issues
-        for release_dir in arch.iterdir():
-            if not release_dir.is_dir():
-                continue
+        for release_dir in self._iter_archive_release_dirs(arch):
+            # Documented-legacy nested milestone dirs (e.g. v0.2.0/v0.1.9) are slated
+            # for rename + retro-CLOSURE in T-010-15. Until then they are surfaced at
+            # WARNING — not ERROR — so doctor stays exit-0 on the un-repaired tree
+            # (matching the SPEC-DOC-026 legacy carve-out). Top-level archive dirs keep
+            # the original ERROR contract.
+            is_legacy_nested = self._is_legacy_nested_release(release_dir, arch)
             closure = release_dir / "CLOSURE.md"
             if not closure.exists():
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-006",
-                        severity=Severity.ERROR,
-                        description=f"Archived release {release_dir.name} has no CLOSURE.md",
+                        severity=(Severity.WARNING if is_legacy_nested else Severity.ERROR),
+                        description=(
+                            "Archived release "
+                            f"{release_dir.relative_to(self.specs_dir).as_posix()} "
+                            "has no CLOSURE.md"
+                            + (
+                                " (documented-legacy nested dir — slated for "
+                                "rename + retro-CLOSURE in T-010-15)"
+                                if is_legacy_nested
+                                else ""
+                            )
+                        ),
                         path=str(closure),
                     )
                 )
@@ -817,6 +858,356 @@ class SpecsDoctor:
                             path=str(closure),
                         )
                     )
+        return issues
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Release-dir discovery helpers (shared by SPEC-DOC-006/026/027)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
+    _RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md", "CLOSURE.md")
+    # Segment dirs (ADR-1/ADR-5) live *inside* a release dir and are not themselves
+    # releases: alpha-N, rc-N, plus the historical `integration` segment container.
+    _SEGMENT_NAME_RE = re.compile(r"^(?:alpha|rc)-\d+$|^integration$")
+
+    def _is_release_dir(self, d: Path) -> bool:
+        if not d.is_dir() or not any((d / a).exists() for a in self._RELEASE_ARTIFACTS):
+            return False
+        # Segment dirs (alpha-N/rc-N/integration) are an orthogonal lifecycle concept,
+        # not releases — they carry artifacts but their *release id* is the parent dir.
+        # Exclude them from release-id-uniqueness and naming-canon invariants.
+        return self._SEGMENT_NAME_RE.match(d.name) is None
+
+    def _iter_archive_release_dirs(self, arch: Path) -> list[Path]:
+        """All release dirs under ``_archive/releases/`` (recursive).
+
+        Recurses so nested legacy milestone layouts (``v0.2.0/v0.1.9``) are
+        discovered. A dir qualifies only when it carries an SDD release artifact;
+        plain segment containers without artifacts are skipped (their artifact-bearing
+        children are still found by the recursion).
+        """
+        out: list[Path] = []
+        for d in sorted(p for p in arch.rglob("*") if p.is_dir()):
+            if self._is_release_dir(d):
+                out.append(d)
+        return out
+
+    def _is_legacy_nested_release(self, d: Path, releases_root: Path) -> bool:
+        """True when ``d`` is a release dir nested *below* the top level of a
+        releases root — i.e. its parent is itself a release dir, not the root.
+
+        These are the documented-legacy milestone dirs (audit §4 collision:
+        ``_archive/releases/v0.2.0/v0.1.{6..9}``). Per T-010-14 they earn a WARNING,
+        never an ERROR, until T-010-15 renames them.
+        """
+        try:
+            d.relative_to(releases_root)
+        except ValueError:
+            return False
+        parent = d.parent
+        return parent != releases_root and self._is_release_dir(parent)
+
+    def _iter_all_release_dirs(self) -> list[tuple[Path, Path, bool]]:
+        """Enumerate every release dir across ``releases/`` and ``_archive/releases/``.
+
+        Returns a list of ``(dir, releases_root, is_legacy_nested)`` triples. The
+        active ``releases/`` root is enumerated at its top level only (a release in
+        progress has no nested release dirs); the archive root is enumerated
+        recursively to surface the nested-collision legacy layout.
+        """
+        out: list[tuple[Path, Path, bool]] = []
+        live_root = self.specs_dir / "releases"
+        if live_root.is_dir():
+            for d in sorted(p for p in live_root.iterdir() if p.is_dir()):
+                if self._is_release_dir(d):
+                    out.append((d, live_root, False))
+        arch_root = self.specs_dir / "_archive" / "releases"
+        if arch_root.is_dir():
+            for d in self._iter_archive_release_dirs(arch_root):
+                out.append((d, arch_root, self._is_legacy_nested_release(d, arch_root)))
+        return out
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # T-010-14 (R6b) — ledger invariants
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # SPEC-DOC-024: phase ↔ markers coherence.
+    _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
+
+    def _active_tasks_markers(self, release: str, segment: str | None) -> list[str] | None:
+        """Return the list of task marker chars (' ', '-', 'x') for the active release's
+        TASKS.md, or None when TASKS.md is absent/unreadable."""
+        rdir = self.specs_dir / "releases" / release
+        if segment:
+            rdir = rdir / segment
+        tasks = rdir / "TASKS.md"
+        if not tasks.exists():
+            return None
+        text = tasks.read_text(encoding="utf-8")
+        return [m.group(1).lower() for m in self._TASK_MARKER_RE.finditer(text)]
+
+    def _check_phase_markers_coherence(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-024: ACTIVE.md ``phase`` must be coherent with the active release's
+        TASKS.md markers (constitution §7 lifecycle).
+
+        Mechanical rules (minimal):
+        - phase ∈ {SPEC, DEFINITION}: the active TASKS must NOT already be an
+          ``[x]``-majority (work claimed complete before implementation began —
+          the live audit incident where phase=SPEC but 19/19 tasks were ``[x]``).
+        - phase == IMPLEMENTATION: TASKS.md must exist and carry ``**Status:** Aprovado``.
+        - phase == CLOSURE: every non-CLOSURE task must be ``[x]`` (no ``[ ]``/``[-]``).
+        Other phases are not constrained here.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        active_path = self.specs_dir / "releases" / "ACTIVE.md"
+        release, segment, phase, err = _read_active_md(active_path)
+        if err or not release or release == "none" or phase is None:
+            return issues
+        rdir = self.specs_dir / "releases" / release
+        if segment:
+            rdir = rdir / segment
+        if not rdir.exists():
+            return issues  # release dir issues already reported by SPEC-DOC-009/004
+
+        markers = self._active_tasks_markers(release, segment)
+
+        if phase in ("SPEC", "DEFINITION"):
+            if markers:
+                done = sum(1 for m in markers if m == "x")
+                if done * 2 > len(markers):  # strict [x]-majority
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-024",
+                            severity=Severity.ERROR,
+                            description=(
+                                f"ACTIVE.md phase='{phase}' but the active release "
+                                f"'{release}' has an [x]-majority TASKS.md "
+                                f"({done}/{len(markers)} done). The phase field was "
+                                "never advanced through IMPLEMENTATION — advance ACTIVE.md "
+                                "or correct the markers (constitution §7)."
+                            ),
+                            path=str(active_path),
+                        )
+                    )
+        elif phase == "IMPLEMENTATION":
+            tasks = rdir / "TASKS.md"
+            if not tasks.exists():
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-024",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"ACTIVE.md phase='IMPLEMENTATION' but active release "
+                            f"'{release}' has no TASKS.md."
+                        ),
+                        path=str(tasks),
+                    )
+                )
+            elif _extract_status(tasks) != "Aprovado":
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-024",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"ACTIVE.md phase='IMPLEMENTATION' but TASKS.md of release "
+                            f"'{release}' is not '**Status:** Aprovado' "
+                            f"(found '{_extract_status(tasks)}'). Implementation phase "
+                            "requires an approved TASKS.md (constitution §7)."
+                        ),
+                        path=str(tasks),
+                    )
+                )
+        elif phase == "CLOSURE" and markers is not None:
+            unfinished = sum(1 for m in markers if m != "x")
+            if unfinished:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-024",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"ACTIVE.md phase='CLOSURE' but active release '{release}' "
+                            f"has {unfinished} unfinished task marker(s) "
+                            "(expected every task '[x]' before closure; "
+                            "constitution §7)."
+                        ),
+                        path=str(active_path),
+                    )
+                )
+        return issues
+
+    def _check_unique_release_ids(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-026: release ids (dir basenames) must be unique across
+        ``releases/`` ∪ ``_archive/releases/`` (recursive).
+
+        A collision among two real (non-legacy) dirs is an ERROR. A collision that
+        involves a documented-legacy nested dir (``v0.2.0/v0.1.9`` milestone layout)
+        is a WARNING — these are slated for rename in T-010-15 and must not break
+        doctor exit-0 in the meantime.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        by_name: dict[str, list[tuple[Path, bool]]] = {}
+        for d, _root, is_legacy in self._iter_all_release_dirs():
+            by_name.setdefault(d.name, []).append((d, is_legacy))
+
+        for name, entries in sorted(by_name.items()):
+            if len(entries) < 2:
+                continue
+            any_legacy = any(is_legacy for _d, is_legacy in entries)
+            severity = Severity.WARNING if any_legacy else Severity.ERROR
+            paths = ", ".join(d.relative_to(self.specs_dir).as_posix() for d, _ in sorted(entries))
+            note = (
+                " (documented-legacy nested dir — slated for rename in T-010-15)"
+                if any_legacy
+                else ""
+            )
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-026",
+                    severity=severity,
+                    description=(
+                        f"Release id '{name}' is not unique across releases/ + "
+                        f"_archive/releases/: {paths}{note}."
+                    ),
+                    path=str(self.specs_dir / "_archive" / "releases"),
+                )
+            )
+        return issues
+
+    def _check_release_naming_canon(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-027: release dir names should match ``^v\\d+\\.\\d+\\.\\d+$``.
+
+        Severity follows the same legacy policy as SPEC-DOC-016 so the two checks
+        never disagree:
+        - A non-conforming dir in the live ``releases/`` tree whose SPEC.md
+          ``Created:`` date is on/after the canon cutoff (``RELEASE_SEMVER_CUTOFF``)
+          is an ERROR — a release born after the canon must be SemVer-clean.
+        - Every other non-conforming dir (archive, vintage ``Created:`` ≤
+          ``RELEASE_VINTAGE_CUTOFF``, pre-cutoff, or undeterminable date) is a
+          WARNING — legacy names predate the canon and are preserved until renamed.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        for d, root, _is_legacy in self._iter_all_release_dirs():
+            if RELEASE_SEMVER_RE.match(d.name):
+                continue
+            is_live = root == self.specs_dir / "releases"
+            spec_path = d / "SPEC.md"
+            created = _extract_created_date(spec_path) if spec_path.exists() else None
+            born_after_canon = created is not None and created >= RELEASE_SEMVER_CUTOFF
+            severity = Severity.ERROR if (is_live and born_after_canon) else Severity.WARNING
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-027",
+                    severity=severity,
+                    description=(
+                        f"Release dir '{d.relative_to(self.specs_dir).as_posix()}' does "
+                        "not follow the naming canon ^v<MAJOR>.<MINOR>.<PATCH>$ "
+                        + (
+                            "— rename it (SPEC-DOC-027)."
+                            if severity == Severity.ERROR
+                            else "— legacy name (WARNING, preserved until renamed)."
+                        )
+                    ),
+                    path=str(d),
+                )
+            )
+        return issues
+
+    # SPEC-DOC-028: path-like backtick references in constitution.md.
+    _CONSTITUTION_REF_RE = re.compile(
+        r"`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|md|sh|json|toml|txt|cfg|yml|yaml))`"
+    )
+
+    def _check_constitution_file_refs(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-028: every path-like backtick reference in constitution.md to a
+        repo file should resolve.
+
+        Resolution is relative to ``repo_root``; without it the check is a no-op
+        (the doctor is otherwise a pure specs_dir-scoped module). References that
+        are clearly not repo paths (bare filenames, glob-only, or generic tokens
+        like ``<id>``) are skipped — only refs containing a ``/`` separator OR a
+        recognised root-level filename are resolved, to avoid false positives on
+        illustrative inline names.
+        """
+        if self.repo_root is None:
+            return []
+        constitution = self.specs_dir / "constitution.md"
+        if not constitution.exists():
+            return []
+        text = constitution.read_text(encoding="utf-8")
+        issues: list[SpecsDoctorIssue] = []
+        seen: set[str] = set()
+        for m in self._CONSTITUTION_REF_RE.finditer(text):
+            ref = m.group(1)
+            if ref in seen:
+                continue
+            seen.add(ref)
+            # Only resolve refs that look like a real repo path: they must contain a
+            # directory separator (e.g. ``docs/01_medium_codex.md``,
+            # ``specs/memory/architecture.md``). Bare filenames (``AGENTS.md``,
+            # ``CLAUDE.md``, ``SPEC.md``) are contract tokens that appear in many
+            # locations and are intentionally not resolved here.
+            if "/" not in ref:
+                continue
+            if (self.repo_root / ref).exists():
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-028",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"constitution.md references '{ref}' but it does not resolve "
+                        f"against the repo root ({self.repo_root}). Fix the path or "
+                        "remove the stale reference (SPEC-DOC-028)."
+                    ),
+                    path=str(constitution),
+                )
+            )
+        return issues
+
+    def _check_lease_session_coherence(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-029 (D-2 backstop): every active lease/lock that names a holder
+        session must have a corresponding session record on disk.
+
+        The doctor is a pure module scoped to specs_dir/public_dir; the lock and
+        session stores live at the *workspace* root (``.dadaia/states/ctx_locks/*.lock``
+        + ``.dadaia/sessions/*.json``), outside the specs tree. This backstop therefore
+        only runs when a caller injects ``workspace_state_dir``; with the default
+        (``None``) it is a documented no-op (see ``__init__``). This detects out-of-band
+        ``.ptr``/lock forgery after the fact (SPEC §WS-R6 / Decision D-2).
+        """
+        import json as _json
+
+        state_dir = self.workspace_state_dir
+        if state_dir is None:
+            return []  # no-op: lease/session stores are unreachable from a pure specs_dir
+        locks_dir = state_dir / "states" / "ctx_locks"
+        sessions_dir = state_dir / "sessions"
+        if not locks_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for lock in sorted(locks_dir.glob("*.lock")):
+            try:
+                rec = _json.loads(lock.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue  # unreadable/garbage lock — not this invariant's concern
+            session_id = rec.get("session_id") if isinstance(rec, dict) else None
+            if not session_id:
+                continue
+            session_record = sessions_dir / f"{session_id}.json"
+            if not session_record.exists():
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-029",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"Lock '{lock.name}' names holder session '{session_id}' but "
+                            f"no session record exists at sessions/{session_id}.json — "
+                            "lease↔session incoherence (possible out-of-band lock forgery; "
+                            "D-2 backstop, SPEC-DOC-029)."
+                        ),
+                        path=str(lock),
+                    )
+                )
         return issues
 
     # 7

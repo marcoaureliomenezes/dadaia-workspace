@@ -11,6 +11,7 @@ is re-exported here for backwards compatibility.
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,12 +42,50 @@ class CheckResult:
 _RUFF_PATHS: tuple[str, ...] = ("dadaia_workspace/", "tests/")
 _MYPY_PATHS: tuple[str, ...] = ("dadaia_workspace/",)
 
-# Ordered cheapest → most expensive so fail-fast surfaces quick problems first.
-_LINT_TYPE_CHECKS: tuple[Check, ...] = (
-    Check("ruff format --check", ("poetry", "run", "ruff", "format", "--check", *_RUFF_PATHS)),
-    Check("ruff check", ("poetry", "run", "ruff", "check", *_RUFF_PATHS)),
-    Check("mypy --strict", ("poetry", "run", "mypy", "--strict", *_MYPY_PATHS)),
-)
+
+def resolve_mypy_cache_dir(start: Path | None = None) -> Path:
+    """Resolve a writable mypy cache dir OUTSIDE any repo working tree.
+
+    Self-pollution fix (T-010-25 / bug ``ci-preflight-self-pollution-…``): mypy
+    creates ``.mypy_cache/`` even with ``incremental = false``. Redirecting it
+    away from the repo root stops the preflight gate from creating the pollution
+    that its own final pytest check rejects.
+
+    Resolution walks up from ``start`` (default: this module's location) looking
+    for a workspace root — a directory containing a ``.dadaia/`` folder — and
+    targets ``<ws>/.dadaia/tmp/ci-preflight/mypy-cache``. When no workspace is
+    found (e.g. the package is installed standalone), it falls back to a path
+    under the system temp dir, which is always outside any repo.
+    """
+    here = (start or Path(__file__)).resolve()
+    for parent in (here, *here.parents):
+        candidate = parent / ".dadaia"
+        if candidate.is_dir():
+            return candidate / "tmp" / "ci-preflight" / "mypy-cache"
+    # No workspace above ``start`` — fall back to a stable system-tmp location.
+    return Path(tempfile.gettempdir()) / "dadaia-ci-preflight" / "mypy-cache"
+
+
+def _lint_type_checks() -> tuple[Check, ...]:
+    """Build the lint/type checks with cache redirection baked into the argv.
+
+    Ruff runs with ``--no-cache`` (no ``.ruff_cache/`` at root); mypy gets an
+    explicit ``--cache-dir`` outside the repo (no ``.mypy_cache/`` at root).
+    Ordered cheapest → most expensive so fail-fast surfaces quick problems first.
+    """
+    mypy_cache = resolve_mypy_cache_dir()
+    return (
+        Check(
+            "ruff format --check",
+            ("poetry", "run", "ruff", "format", "--check", "--no-cache", *_RUFF_PATHS),
+        ),
+        Check("ruff check", ("poetry", "run", "ruff", "check", "--no-cache", *_RUFF_PATHS)),
+        Check(
+            "mypy --strict",
+            ("poetry", "run", "mypy", "--strict", "--cache-dir", str(mypy_cache), *_MYPY_PATHS),
+        ),
+    )
+
 
 _PYTEST_FULL: Check = Check("pytest", ("poetry", "run", "pytest", "-q", "-p", "no:cacheprovider"))
 _PYTEST_QUICK: Check = Check(
@@ -58,7 +97,7 @@ _PYTEST_QUICK: Check = Check(
 def checks_for(quick: bool = False) -> tuple[Check, ...]:
     """Return the ordered check list. ``quick`` drops the slow e2e suite."""
     pytest_check = _PYTEST_QUICK if quick else _PYTEST_FULL
-    return (*_LINT_TYPE_CHECKS, pytest_check)
+    return (*_lint_type_checks(), pytest_check)
 
 
 def subprocess_runner(cwd: Path) -> Runner:

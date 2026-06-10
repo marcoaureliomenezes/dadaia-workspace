@@ -198,19 +198,44 @@ def _repo_root_write_guard() -> object:
         )
 
 
+# Snapshot of pollution dirs that already existed when the session started.
+# The pollution guard is a pre/post DIFF: it fails only on dirs CREATED during
+# the session, never on ones that were already present at session start.
+#
+# Why a diff and not an existence check (bug
+# ``ci-preflight-self-pollution-gate-never-passes``, T-010-25): the
+# ``dadaia ci preflight`` gate runs ruff + mypy BEFORE the pytest check.  When
+# those earlier checks created cache dirs at the repo root, the existence-based
+# guard tripped on the gate's OWN artifacts and the gate could never pass on a
+# clean tree.  Detecting whether those dirs should exist *at all* is the job of
+# ``tests/contract/test_source_repo_hygiene.py`` and CI repo-hygiene — not this
+# session guard, whose only job is to catch tests that pollute the root.
+_PREEXISTING_POLLUTION: set[str] = set()
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Record which pollution dirs already existed before any test ran."""
+    _PREEXISTING_POLLUTION.clear()
+    _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists())
+
+
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    """Session-level pollution guard.
+    """Session-level pollution guard (pre/post snapshot diff).
 
     Fails the session (exit code 1) if any tool-generated cache or state
-    directory was created at the repo root during the test run.  This catches
-    misconfigured tool invocations (wrong CWD, missing --no-cache flags, etc.)
-    that the per-test _repo_root_write_guard cannot catch (e.g. directories
-    created by pytest plugins that run outside fixture scope).
+    directory was *created during the test run* at the repo root.  Dirs that
+    already existed at session start are ignored — flagging their existence at
+    all is the job of ``tests/contract/test_source_repo_hygiene.py`` and CI, not
+    this guard.  This catches misconfigured tool invocations (wrong CWD, missing
+    --no-cache flags, etc.) that the per-test _repo_root_write_guard cannot catch
+    (e.g. directories created by pytest plugins that run outside fixture scope).
 
     Offending directories:
       .dadaia  .venv  .pytest_cache  .mypy_cache  .hypothesis  .ruff_cache  test-results
     """
-    offenders = [d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists()]
+    offenders = [
+        d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists() and d not in _PREEXISTING_POLLUTION
+    ]
     if offenders:
         msg = (
             "\n\n[SESSION POLLUTION] The following cache/state directories were found at "
