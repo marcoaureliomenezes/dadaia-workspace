@@ -220,7 +220,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R6-04):** contradiction table C-1..C-14 → commit/file:line complete; SDD-gate sections state real enforcement (path-class×lease×phase) with Aprovado/`[-]` as discipline (C-5); F8 allowlist claim corrected (C-2); handoff-first emitter executable (C-7, D-6); memory phases unified DEFINITION+CLOSURE (C-4); workflow inventory (C-3); report-header blockquotes (C-6/S-7); tier tables from registry (C-8); dispatch column reworded + PM-top-level precondition (C-10); hook ownership corrected (C-11); task-manager in English (C-13); determinism language scoped to write-tools, Bash bypass documented out of scope (D-2); `dadaia public doctor` exit 0 after reprojection.
 - **Parallelism:** after K + 13; parallel with T/R/S tails.
 
-### [ ] T-010-16 — R6f: memory + constitution truth rewrite (CLOSURE phase)
+### [x] T-010-16 — R6f: memory + constitution truth rewrite (CLOSURE phase)
 - **Owner:** product-engineer · **Maps:** DRIFT-1/2/3, arch F4 (closure REJECT gate)
 - **Write set:** `specs/memory/architecture.md`, `specs/memory/product/<gate atom>.md`, `specs/memory/tech-stack.md`, `specs/constitution.md` (operator confirmation required)
 - **Preconditions:** ALL code tasks merged and reviewed; ACTIVE.md phase CLOSURE.

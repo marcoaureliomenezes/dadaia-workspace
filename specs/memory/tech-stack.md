@@ -11,9 +11,9 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 1100
-last_updated: '2026-06-09'
-release_origin: v0.1.9
+token_estimate: 1200
+last_updated: '2026-06-10'
+release_origin: v0.1.10
 ---
 
 ## Linguagens
@@ -21,7 +21,7 @@ release_origin: v0.1.9
 Linguagem| Versão| Uso
 ---|---|---
 Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest.
-Bash| 4+ POSIX-compatível| Legacy hook scripts (`sdd-spec-gate.sh`, `ctx-inject.sh`) superseded by the `dadaia_workspace/hooks/` Python package (v0.1.8); `pre-push-ci-gate.sh` retained (git-for-Windows ships bash). Entry scripts. Python hooks inject lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
+Bash| 4+ POSIX-compatível| Um único shell asset no produto: `pre-push-ci-gate.sh` (git hook, deliberadamente shell; git-for-Windows ships bash) — todos os hooks de governança são o pacote Python `dadaia_workspace/hooks/`. Python hooks inject lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
 HTML5 + Mermaid| Mermaid via CDN| Reports em `.dadaia/reports/<ctx>/<agent>/*.html`; memory atoms são `.md` renderizados in-memory (D-4)
 Markdown| CommonMark| Memory atoms atômicos em `specs/memory/*.md` (frontmatter `memory-frontmatter-v1` + corpo Markdown); SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions
 YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows e memory atoms (`memory-frontmatter-v1`: `additionalProperties: false`)
@@ -54,6 +54,12 @@ Atribuição em dois tiers: `claude-fable-5` para os leaves de raciocínio profu
 dispatchers e gate leaves. Override per-dispatch via `DADAIA_MODEL_OVERRIDE`
 quando a política do dispatcher justificar. Optional packs podem definir agentes
 e modelos próprios fora do default público.
+
+**Single source:** `dadaia_workspace/core/model_registry.py` é a única fonte de
+ids/pricing/tier de modelo (`ModelEntry{claude_id, codex_id, pricing dated
+append-only, tier}`); `MODEL_MAP` (runtime transforms) e `PRICING_TABLE`
+(telemetry) são views derivadas, com contract test de key-equality. `dadaia
+public doctor` falha em `model:` frontmatter que não resolve no registry.
 
 Agente| Modelo| Nota
 ---|---|---
@@ -98,6 +104,10 @@ types-PyYAML| >=6| dev| Type stubs para mypy
 import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` declares `features → infrastructure` import ban and `core → OS-primitive modules` ban; runs in CI `lint` job via `lint-imports`. Zero runtime impact.
 
 **Jinja2** (transitive dependency) is no longer used for memory atom rendering. The `memory-*.html.j2` templates and `dadaia memory render` CLI were deleted in memory-markdown-source-v1. Jinja2 may remain as a transitive dep of other packages.
+
+**Pins de tooling do workspace (não são deps do projeto):** `poetry` ≥ 2.3.4 e
+`dulwich` ≥ 1.2.5 nos ambientes de operação (CVEs nomeados em comentário no
+`pyproject.toml`); não entram em `poetry.lock` — o build-backend é `poetry-core`.
 
 ## Restrições e proibições
 

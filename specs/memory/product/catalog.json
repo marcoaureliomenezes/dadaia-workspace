@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-10T01:37:41Z",
+  "generated_at": "2026-06-10T05:29:19Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -311,8 +311,8 @@
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
-      "tldr": "multi-context ALIVE/DEAD; bind exports DADAIA_SESSION_ID; one cross-platform TTL-lease per context (O_EXCL CAS, 120s) via WorkspaceLock/ContextLock ports.",
-      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); session binding via eval $(dadaia context bind --mode) exports DADAIA_SESSION_ID; locking (v0.1.8) = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS acquire, TTL 120s, stable-session-identity via .ptr file) plus retained port/adapter Lock-1 (workspace via WorkspaceLock protocol) and Lock-2 (per-context git ops via ContextLock protocol) — both backed by `infrastructure/file_lock_posix.py` on POSIX; the old 4-store model (sessions, Lock-3, semaphore) is retired; dadaia migrate [--dry-run|--yes] (v1→v2); scaffold canonical tree v2; CLIs dadaia release new, dadaia backlog new, dadaia bug new, dadaia memory product add.",
+      "tldr": "multi-context ALIVE/DEAD; bind (--mode opcional) persiste modo no session record; TTL+PID-veto lease por contexto; dead() exige tree limpa ou --commit.",
+      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind` (--mode opcional, default read) persiste contexto/modo/pid no session record CLI-owned via session_identity — sem eval-export por default (--print-env é o escape back-compat); sessões READ são non-acquiring no gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS em acquire e renew, TTL 120s piso + PID veto, stable-session-identity via .ptr) plus port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); dead() refuses untracked files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog/bug new, dadaia memory product add.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -320,7 +320,7 @@
         "session",
         "locking"
       ],
-      "token_estimate": 1500,
+      "token_estimate": 1600,
       "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
@@ -489,8 +489,8 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
-      "tldr": "PreToolUse SDD gate (v0.1.6): path-classifier ADDITIVE/MEMORY/FROZEN/MUTATING/UNGATED; MUTATING acquires one TTL-lease via O_EXCL CAS; fail-safe, <=175 lines.",
-      "summary": "PreToolUse gate (v0.1.6 rewrite, ~168 lines): a path-classifier routes each write to ADDITIVE (allow), MEMORY (phase gate), FROZEN (block), MUTATING (single TTL-lease acquire via O_EXCL CAS — only a live conflict blocks), or UNGATED (allow). Fail-safe: inconclusive states allow. Backlog is ADDITIVE-allow; RULE A2/RULE D removed in rc-3.",
+      "tldr": "SDD gate v0.1.10: classificador context-relative; lease O_EXCL CAS com pid veto; heartbeat PostToolUse harness-native; READ non-acquiring.",
+      "summary": "Par de hooks Python: o PreToolUse gate classifica cada write pelo caminho context-relative (prefixo repos/<slug>/ removido) — ADDITIVE allow sem lease, MEMORY gated por fase, FROZEN block, PROTECTED fail-closed, MUTATING adquire o TTL-lease via O_EXCL CAS com PID veto (TTL-stale + holder vivo = block, não takeover); sessões READ-bound são non-acquiring. O PostToolUse renova o heartbeat de todo lease do sid resolvido do stdin, em todo tool call. Markers/Aprovado/ allowlists são disciplina, não mecanismo do gate.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -498,12 +498,11 @@
         "hooks",
         "enforcement"
       ],
-      "token_estimate": 1300,
+      "token_estimate": 1700,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
-        "agent-orchestration",
-        "public-asset-distribution"
+        "agent-orchestration"
       ]
     },
     {
@@ -534,8 +533,8 @@
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
-      "tldr": "Valida invariantes estruturais SDD de specs/: SPEC-DOC (001,002,002L,003..009,012,016) + TREE-1..7+5M + LINT-1; --fix auto-repara TREE-3/4.",
-      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + TREE-1..7 e TREE-5M (canonical tree v2 shape; sem TREE-8 — o check de specs/memory/AGENTS.md é TREE-5M). STRUCT-1..4/SYNC-1/YAML-absent removidos; SPEC-DOC-008 retirado; check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
+      "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-029, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4.",
+      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$), 028 (file refs da constitution resolvem), 029 (coerência lease↔session, backstop D-2); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
@@ -543,7 +542,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 1073,
+      "token_estimate": 1350,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
