@@ -66,21 +66,21 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R3-01):** FR-R3-01..03 — single owner module; residue grep contract proves no other module opens `sessions/runtime/*.ptr` / `sessions/<id>.json`; coherence contract (lock holder vs incumbent vs session record); workspace-doctor PTR-GC/SENTINEL-GC consumers of `sessions/runtime/*.ptr` updated/verified against the collapsed store; legacy artifacts ignored-and-superseded; pytest green.
 - **Parallelism:** spine; before T-010-04/05/08.
 
-### [ ] T-010-04 — R2a: PostToolUse heartbeat, harness-native session id
+### [x] T-010-04 — R2a: PostToolUse heartbeat, harness-native session id
 - **Owner:** software-engineer · **Maps:** CONF-2, arch F2, ai D-12; bug `lease-stolen…` (D2/D3)
 - **Write set:** `dadaia_workspace/hooks/sdd_post_gate.py`, `tests/unit/hooks/test_sdd_post_gate.py`
 - **Preconditions:** T-010-07, T-010-10.
 - **Acceptance (AC-R2-01):** FR-R2-01/02 — session id from stdin payload (`resolve_session_id`), env as override only; renewal context resolved from the session_identity record / leases held by this sid (NOT `DADAIA_CONTEXT`→first-ALIVE; first-ALIVE documented last resort only); renew called outside any session-file guard; subprocess test under `claude_hook_env()` (no hand-planted env) observes fresher lease heartbeat after a simulated Bash PostToolUse; fail-open exit 0 on all errors; no-session-file variant passes; green on Windows/macOS CI legs.
 - **Parallelism:** parallel with T-010-05/08 (disjoint files).
 
-### [ ] T-010-05 — R2b: pid-liveness probe before TAKEOVER + holder-safe renew
+### [x] T-010-05 — R2b: pid-liveness probe before TAKEOVER + holder-safe renew
 - **Owner:** software-engineer · **Maps:** CONF-2, arch F2 (PID lesson restored), C-14
 - **Write set:** `dadaia_workspace/features/spec_context/lease.py`, `dadaia_workspace/features/spec_context/gate_policy.py` (`pid_probe` must thread through `gate_policy.evaluate` — `gate_policy.py:147` is the sole caller of `lease.acquire`), `dadaia_workspace/hooks/sdd_gate.py` (sources `OsProcessProbe` from `container.py`), `dadaia_workspace/core/lock_liveness.py` (explicit EDIT target, not "(consume)": activate the never-called `pid_probe` param; rewrite the stale docstring at `:11-13,54-56`), `tests/unit/features/spec_context/test_lease_*.py`
 - **Preconditions:** T-010-07.
 - **Acceptance (AC-R2-02/03):** FR-R2-03/04 — lease record gains `pid`; TTL-stale+alive-probe ⇒ block (no TAKEOVER), TTL-stale+dead/absent-pid ⇒ TAKEOVER; probe injected via the existing `pid_probe` callable param of `core/lock_liveness.is_stale` (or a core protocol port) wired from hooks/container — `features/lease.py` does NOT import `infrastructure/process_probe_adapter`, no new import-linter ignores; `has_os_kill_liveness` seam with TTL fallback; confirmed holder renews past TTL; renew atomic vs foreign acquire (stress/property test on lock-file history — the `lease.py:379-394` race is fixed); docstring `lease.py:16-19` rewritten truthful; liveness tests green on Windows/macOS CI legs; pytest green.
 - **Parallelism:** parallel with T-010-04/08.
 
-### [ ] T-010-08 — R4a: bind `--mode` optional; mode persisted in session record
+### [x] T-010-08 — R4a: bind `--mode` optional; mode persisted in session record
 - **Owner:** software-engineer · **Maps:** CONF-3, arch F3; bug `context-bind-forces-mode-choice-on-operator`
 - **Write set:** `dadaia_workspace/cli/commands/context.py` (bind, `--mode` at `:260`), `tests/` CLI integration
 - **Preconditions:** T-010-07.
@@ -130,7 +130,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R8-01 part):** `ModelEntry{claude_id,codex_id,pricing:list[ModelPricing] dated append-only,tier}`; `MODEL_MAP`/`PRICING_TABLE` derived views (most-recent row); haiku `claude-haiku-4-5-20251001` in both; `claude-fable-5` row (10.00/50.00/12.50/1.00, 2026-06-01); contradictory pins in `test_pricing.py:47,212` vs `test_model_mapping.py:25` replaced by cross-table key-equality contract test; mypy --strict + import-linter + pytest green.
 - **Parallelism:** independent of K.
 
-### [ ] T-010-24 — R8b: public doctor model-resolution check
+### [x] T-010-24 — R8b: public doctor model-resolution check
 - **Owner:** software-engineer · **Maps:** CONF-9, ai C-8 (mechanical half)
 - **Write set:** `features/public/` doctor module, `tests/unit/features/public/test_model_registry_doctor.py` (new)
 - **Preconditions:** T-010-23; `features/public/ → core` linter edge verified/added.

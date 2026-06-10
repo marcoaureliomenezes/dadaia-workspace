@@ -1,11 +1,37 @@
 ---
 name: model-catalog-modelmap-pricing-drift-no-registry
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-09
+resolved: 2026-06-10
+resolved_in: v0.1.10
 surface: infrastructure/runtime_transforms/model_mapping.py (MODEL_MAP) + features/telemetry/pricing.py (PRICING_TABLE)
 session_id: null
 ---
+
+> **Resolution (2026-06-10, release v0.1.10).** Closed by the two-task R8
+> fix:
+> - **T-010-23 (R8a)** introduced `core/model_registry.py` as the single
+>   source of truth (`REGISTRY` of `ModelEntry{claude_id, codex_id, pricing
+>   (dated append-only), tier}`); `MODEL_MAP` and `PRICING_TABLE` became
+>   *derived views* over it, so both share an identical key-set by
+>   construction. The haiku drift was reconciled to the canonical
+>   `claude-haiku-4-5-20251001`, and the `claude-fable-5` row
+>   (10.00/50.00/12.50/1.00, effective 2026-06-01) was added.
+> - **T-010-24 (R8b)** added the standing `dadaia public doctor`
+>   model-resolution check (`features/public/model_resolution.py`,
+>   `check_model_resolution`): every `model:` frontmatter value across the
+>   canonical `public/agents/*.md` must resolve in `REGISTRY`, and the
+>   MODEL_MAP / PRICING_TABLE / REGISTRY key-sets must be identical — any
+>   unknown id or desync emits a `[drift]` ERROR line and exits the doctor
+>   nonzero. The clean fleet emits `[ok] model-resolution`.
+>
+> **Regression tests** (`tests/unit/features/public/test_model_registry_doctor.py`):
+> `test_unknown_model_in_agent_frontmatter_errors`,
+> `test_keyset_desync_modelmap_vs_pricing_errors`,
+> `test_keyset_desync_pricing_vs_registry_errors`,
+> `test_current_tree_resolves_clean` (plus the T-010-23 cross-table
+> key-equality contract test).
 
 > **Provenance note (corrected 2026-06-10).** This bug was originally filed by
 > a concurrent operator session as `model-catalog-missing-claude-fable-5`. The

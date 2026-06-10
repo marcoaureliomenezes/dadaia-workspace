@@ -25,10 +25,36 @@ import re
 import sys
 from pathlib import Path
 
-from dadaia_workspace.features.spec_context import gate_policy
+from dadaia_workspace.features.spec_context import gate_policy, lease
 from dadaia_workspace.hooks import _common
 
 _SLUG_STRIP = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _build_pid_probe() -> lease.PidProbe | None:
+    """Build the PID-liveness probe injected into the lease (WS-R2 FR-R2-03).
+
+    Sources the container's ``OsProcessProbe`` and adapts it to the lease's
+    ``(pid) -> alive?`` callable. The hook layer owns this wiring so ``features/lease.py``
+    never imports ``infrastructure/process_probe_adapter`` (no new import-linter ignore).
+
+    Returns ``None`` if the probe cannot be constructed — the lease then degrades to
+    TTL-only (Windows-safe). Any construction error fails open (probe absent ⇒ TTL
+    fallback), never blocks the gate. ``OsProcessProbe`` is itself platform-seamed
+    (``PLATFORM.has_os_kill_liveness`` selects ``os.kill`` vs the Windows ``OpenProcess``
+    existence check), so a single probe instance is correct on every host.
+
+    The container (``dadaia_workspace.container``) is the canonical composition root that
+    binds ``OsProcessProbe`` for the app; the hook imports the same adapter here so the
+    feature layer (``features/lease.py``) never imports infrastructure (import-linter law).
+    """
+    try:
+        from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
+
+        probe = OsProcessProbe()
+        return lambda pid: probe.is_pid_alive(pid)
+    except Exception:  # noqa: BLE001 — never let probe wiring break the gate; TTL fallback.
+        return None
 
 
 def _resolve_workspace() -> Path:
@@ -138,6 +164,7 @@ def main() -> int:
         session_id=session_id,
         release=release,
         mode=mode,
+        pid_probe=_build_pid_probe(),
     )
     if decision == gate_policy.Decision.BLOCK:
         _common.emit_block(reason)

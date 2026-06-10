@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.protocols.storage import PublicAssetManager
+from dadaia_workspace.features.public.model_resolution import check_model_resolution
 
 
 class PublicAssetService:
@@ -29,4 +30,11 @@ class PublicAssetService:
         return self._public_assets.list_all()
 
     def doctor(self, workspace_root: Path) -> list[str]:
-        return self._public_assets.doctor(workspace_root)
+        reports = self._public_assets.doctor(workspace_root)
+        # R8b (T-010-24): model-resolution guard against
+        # model-catalog-modelmap-pricing-drift-no-registry. Runs against the
+        # canonical packaged public/ source (same dir the asset manager stages from),
+        # not the workspace projection, so it validates the source of truth.
+        public_dir = Path(__file__).resolve().parent.parent.parent / "public"
+        reports.extend(check_model_resolution(public_dir))
+        return reports

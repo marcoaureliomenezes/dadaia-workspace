@@ -13,10 +13,18 @@ Acquisition is an **O_EXCL compare-and-swap** via a sentinel file (``open(path, 
 this closes the read→stale-check→write TOCTOU gap that caused the double-acquire
 race. No read-then-write acquire path exists anywhere — this is a security red line.
 
-Liveness is TTL-only (``core.lock_liveness.is_stale``): no PID, no ``os.kill``, no
-``/proc`` — Windows-safe (OQ-1). A dead holder expires after ``LEASE_TTL_SECONDS``
-seconds (OQ-1 operator decision 2026-06-06); an idle-but-alive holder renews its
-heartbeat on every PreToolUse.
+Liveness is **TTL with a PID veto** (``core.lock_liveness.is_stale``; WS-R2 FR-R2-03).
+The record carries the holder's ``pid``. A holder whose heartbeat has aged past
+``LEASE_TTL_SECONDS`` is reclaimable **unless** an injected ``pid_probe`` reports that
+pid is still alive — in which case ``acquire`` BLOCKs rather than taking over a
+genuinely-running foreign session (the no-steal half that killed live-session lease
+theft). The probe is **injected** from the hook layer (``hooks/sdd_gate.py`` sources the
+container's ``OsProcessProbe``); this feature module never imports
+``infrastructure/process_probe_adapter`` — no new import-linter ignore. When no probe is
+wired (platforms without ``PLATFORM.has_os_kill_liveness``, or legacy records lacking a
+``pid``), liveness degrades cleanly to TTL-only and remains Windows-safe. An idle-but-alive
+holder still renews its heartbeat on every PreToolUse / PostToolUse, and a **confirmed
+holder renews even past TTL** (same session_id or ``.ptr`` match ⇒ no self-loss).
 
 **Stable session identity (D1 soul-fold):**  On first acquire for a (context,
 session_id) pair, a pointer file is written::
@@ -57,8 +65,15 @@ from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
 from dadaia_workspace.features.spec_context import session_identity
 
+#: Injected PID-liveness probe (WS-R2 FR-R2-03): ``(pid) -> alive?``. Threaded into
+#: ``core.lock_liveness.is_stale`` so a TTL-expired-but-still-running foreign holder is
+#: NOT taken over. ``None`` ⇒ TTL-only fallback. The concrete ``OsProcessProbe`` is
+#: supplied by the hook layer via the container — this module never imports the adapter.
+PidProbe = Callable[[int], bool]
+
 __all__ = [
     "LEASE_TTL_SECONDS",
+    "PidProbe",
     "acquire",
     "is_held",
     "read_record",
@@ -222,6 +237,7 @@ def _new_record(
     *,
     clock: Callable[[], datetime],
     ttl: int,
+    pid: int,
 ) -> dict[str, object]:
     now = clock().isoformat()
     return {
@@ -229,6 +245,7 @@ def _new_record(
         "release": release,
         "session_id": session_id,
         "mode": mode,
+        "pid": pid,
         "acquired_at": now,
         "heartbeat": now,
         "ttl": ttl,
@@ -275,20 +292,28 @@ def acquire(
     clock: Callable[[], datetime] = _utcnow,
     ttl: int = LEASE_TTL_SECONDS,
     permission_setter: FilePermissionSetter | None = None,
+    pid_probe: PidProbe | None = None,
+    pid: int | None = None,
 ) -> tuple[str, dict[str, object]]:
     """Acquire (or renew) the lease via O_EXCL CAS.
 
-    Decision tree (FR-P1-15):
+    Decision tree (FR-P1-15 + WS-R2 FR-R2-03/04):
 
     1. ``.ptr`` file matches ``session_id`` → **RENEW** unconditionally (stable identity:
        this is the incumbent session, even if the lock record shows a different session_id
-       due to a relaunch). Updates the lock record to ``session_id``.
-    2. Record absent or stale → **ACQUIRED** (fresh write).
-    3. Record live, ``session_id`` matches lock record → **RENEWED** (heartbeat updated).
-    4. Record live, foreign ``session_id``, no ``.ptr`` match → raises
+       due to a relaunch). Updates the lock record to ``session_id`` (holder-safe past TTL).
+    2. Record present and ``session_id`` matches → **RENEWED**, *even past TTL* — a
+       confirmed holder never loses its own lease to its own staleness (FR-R2-04).
+    3. Record absent, or TTL-stale **and** the holder pid is dead/absent (per the injected
+       ``pid_probe``) → **ACQUIRED** / **TAKEOVER** (fresh write).
+    4. Record TTL-stale **but** the holder pid is still alive (``pid_probe`` veto), or
+       record TTL-fresh, with a foreign ``session_id`` and no ``.ptr`` match → raises
        :class:`~dadaia_workspace.core.exceptions.LockHeldError` with the informative
-       yield-iff-live-foreign message (FR-P1-15). The caller must not proceed with the
-       MUTATING write.
+       yield-iff-live-foreign message (FR-P1-15/FR-R2-03). The caller must not proceed.
+
+    ``pid_probe`` (``(pid) -> alive?``) is injected from the hook layer (container's
+    ``OsProcessProbe``); ``None`` ⇒ TTL-only fallback (Windows-safe, legacy-record-safe).
+    ``pid`` defaults to this process's pid and is written into the record at acquire/takeover.
 
     The only other :class:`LockHeldError` raised is transient sentinel-contention
     (a genuinely simultaneous CAS that loses all retries); the SDD gate treats that
@@ -300,6 +325,7 @@ def acquire(
     _validate(session_id, field="session_id")
     record_path = _record_path(workspace, ctx, permission_setter)
     sentinel = _sentinel_path(workspace, ctx, permission_setter)
+    holder_pid = os.getpid() if pid is None else pid
 
     backoff = _INITIAL_BACKOFF
     for attempt in range(_MAX_RETRIES + 1):
@@ -331,36 +357,46 @@ def acquire(
                 rec = read_record(workspace, ctx)
                 if rec is not None:
                     rec["session_id"] = session_id
+                    rec["pid"] = holder_pid
                     rec["heartbeat"] = clock().isoformat()
                     _write_record(record_path, rec)
                     _write_ptr(workspace, ctx, session_id)
                     return "RENEWED", rec
                 else:
                     # No record (e.g. GC'd) → create fresh.
-                    new = _new_record(ctx, release, session_id, mode, clock=clock, ttl=ttl)
+                    new = _new_record(
+                        ctx, release, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
+                    )
                     _write_record(record_path, new)
                     _write_ptr(workspace, ctx, session_id)
                     _audit(workspace, "acquire", ctx, session_id, clock=clock)
                     return "ACQUIRED", new
 
-            # --- Normal stale/live/foreign check ---
             rec = read_record(workspace, ctx)
-            if rec is None or is_stale(rec, clock=clock):
-                new = _new_record(ctx, release, session_id, mode, clock=clock, ttl=ttl)
-                _write_record(record_path, new)
-                _write_ptr(workspace, ctx, session_id)
-                _audit(workspace, "acquire", ctx, session_id, clock=clock)
-                return "ACQUIRED", new
 
-            if rec.get("session_id") == session_id:
+            # --- Holder-safe renew (FR-R2-04): a confirmed holder renews even past TTL.
+            # Checked BEFORE the staleness branch so a holder never loses its own lease
+            # to its own heartbeat ageing.
+            if rec is not None and rec.get("session_id") == session_id:
+                rec["pid"] = holder_pid
                 rec["heartbeat"] = clock().isoformat()
                 _write_record(record_path, rec)
                 _write_ptr(workspace, ctx, session_id)
                 return "RENEWED", rec
 
-            # Foreign live lease — yield-iff-live-foreign (FR-P1-15).
+            # --- Foreign / absent: stale ⇒ takeover, live (TTL or pid-veto) ⇒ yield ---
+            if rec is None or is_stale(rec, clock=clock, pid_probe=pid_probe):
+                new = _new_record(
+                    ctx, release, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
+                )
+                _write_record(record_path, new)
+                _write_ptr(workspace, ctx, session_id)
+                _audit(workspace, "acquire", ctx, session_id, clock=clock)
+                return "ACQUIRED", new
+
+            # Foreign lease that is still live — either TTL-fresh, or TTL-stale but the
+            # holder pid is demonstrably alive (WS-R2 FR-R2-03 no-steal veto).
             # NEVER take over a live foreign lease: that violates exactly-one-mutating.
-            # Raise LockHeldError so the gate BLOCKs this write.
             holder_id = str(rec.get("session_id", "<unknown>"))
             heartbeat = str(rec.get("heartbeat", "unknown"))
             raise LockHeldError(_yield_message(ctx, holder_id, heartbeat))
@@ -378,16 +414,48 @@ def renew_heartbeat(
     session_id: str,
     *,
     clock: Callable[[], datetime] = _utcnow,
+    permission_setter: FilePermissionSetter | None = None,
 ) -> bool:
-    """Renew heartbeat iff held by ``session_id`` and not stale. No-op otherwise."""
-    rec = read_record(workspace, ctx)
-    if rec is None or rec.get("session_id") != session_id:
-        return False
-    if is_stale(rec, clock=clock):
-        return False
-    rec["heartbeat"] = clock().isoformat()
-    _write_record(_record_path(workspace, ctx), rec)
-    return True
+    """Renew heartbeat iff held by ``session_id``. No-op otherwise.
+
+    Atomic w.r.t. a foreign ``acquire`` (FR-R2-04): the read→verify→write runs **inside
+    the same O_EXCL sentinel CAS** that ``acquire``/``steal`` use, so a concurrent
+    takeover can never interleave between this renewal's read and write. Without the CAS
+    (the historical race at this site), a foreign acquirer could take over a stale record
+    *after* this read but *before* this write, and the write would then stamp the foreign
+    record back to ``session_id`` — producing a lock-file history in which two different
+    holders each believe they hold the lease. The CAS serializes them: whoever wins the
+    sentinel runs to completion; the loser observes the committed record.
+
+    Holder-safe past TTL: a confirmed holder renews even if its own heartbeat aged out —
+    it never loses its own lease to its own staleness (mirrors ``acquire``'s holder branch).
+    A non-holder is a guarded no-op (returns ``False``); it never overwrites a foreign
+    record.
+    """
+    sentinel = _sentinel_path(workspace, ctx, permission_setter)
+    record_path = _record_path(workspace, ctx, permission_setter)
+    backoff = _INITIAL_BACKOFF
+    for attempt in range(_MAX_RETRIES + 1):
+        _gc_orphan_sentinel(sentinel)
+        try:
+            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
+                pass
+        except FileExistsError:
+            if attempt >= _MAX_RETRIES:
+                return False  # contended renewal is a safe no-op (gate fail-open).
+            time.sleep(backoff)
+            backoff *= 2
+            continue
+        try:
+            rec = read_record(workspace, ctx)
+            if rec is None or rec.get("session_id") != session_id:
+                return False
+            rec["heartbeat"] = clock().isoformat()
+            _write_record(record_path, rec)
+            return True
+        finally:
+            sentinel.unlink(missing_ok=True)
+    return False
 
 
 def release(workspace: Path, ctx: str, session_id: str) -> bool:
@@ -400,10 +468,20 @@ def release(workspace: Path, ctx: str, session_id: str) -> bool:
     return True
 
 
-def is_held(workspace: Path, ctx: str, *, clock: Callable[[], datetime] = _utcnow) -> bool:
-    """True if a live (non-stale) record exists. Pure read."""
+def is_held(
+    workspace: Path,
+    ctx: str,
+    *,
+    clock: Callable[[], datetime] = _utcnow,
+    pid_probe: PidProbe | None = None,
+) -> bool:
+    """True if a live (non-stale) record exists. Pure read.
+
+    ``pid_probe`` (when wired) keeps a TTL-expired-but-still-running holder reported
+    as held (WS-R2 FR-R2-03); ``None`` ⇒ TTL-only.
+    """
     rec = read_record(workspace, ctx)
-    return rec is not None and not is_stale(rec, clock=clock)
+    return rec is not None and not is_stale(rec, clock=clock, pid_probe=pid_probe)
 
 
 def steal(
@@ -414,16 +492,21 @@ def steal(
     clock: Callable[[], datetime] = _utcnow,
     ttl: int = LEASE_TTL_SECONDS,
     permission_setter: FilePermissionSetter | None = None,
+    pid_probe: PidProbe | None = None,
+    pid: int | None = None,
 ) -> tuple[bool, dict[str, object] | None]:
     """Reclaim a *stale* lease for ``session_id`` via the same O_EXCL CAS as acquire.
 
-    Refuses (returns ``(False, record)``) if the lease is live. Returns
-    ``(True, new_record)`` on success. The CAS prevents a double-steal race.
+    Refuses (returns ``(False, record)``) if the lease is live — including a
+    TTL-expired-but-pid-alive holder when ``pid_probe`` is wired (WS-R2 FR-R2-03: no
+    stealing a genuinely-running session). Returns ``(True, new_record)`` on success.
+    The CAS prevents a double-steal race.
     """
     _validate(ctx, field="context")
     _validate(session_id, field="session_id")
+    holder_pid = os.getpid() if pid is None else pid
     rec = read_record(workspace, ctx)
-    if rec is not None and not is_stale(rec, clock=clock):
+    if rec is not None and not is_stale(rec, clock=clock, pid_probe=pid_probe):
         return False, rec
 
     sentinel = _sentinel_path(workspace, ctx, permission_setter)
@@ -442,11 +525,13 @@ def steal(
             continue
         try:
             rec2 = read_record(workspace, ctx)
-            if rec2 is not None and not is_stale(rec2, clock=clock):
+            if rec2 is not None and not is_stale(rec2, clock=clock, pid_probe=pid_probe):
                 return False, rec2  # became live during the race
             release_id = str(rec2.get("release", "")) if rec2 else ""
             mode = str(rec2.get("mode", "")) if rec2 else ""
-            new = _new_record(ctx, release_id, session_id, mode, clock=clock, ttl=ttl)
+            new = _new_record(
+                ctx, release_id, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
+            )
             _write_record(record_path, new)
             _write_ptr(workspace, ctx, session_id)
             _audit(workspace, "steal", ctx, session_id, clock=clock)

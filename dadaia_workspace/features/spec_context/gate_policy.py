@@ -173,6 +173,7 @@ def evaluate(
     release: str,
     mode: str,
     clock: Callable[[], datetime] = _utcnow,
+    pid_probe: lease.PidProbe | None = None,
 ) -> tuple[Decision, str]:
     """Return the gate decision for one write target — the fail-safe contract.
 
@@ -184,6 +185,11 @@ def evaluate(
     never "relaunch"). A relaunched session with a matching ``.ptr`` is recognised
     as the incumbent and RENEWs (never blocks). The flow only stops on a genuinely
     concurrent foreign live session — and even then, additive writes are unblocked.
+
+    ``pid_probe`` (WS-R2 FR-R2-03) is threaded straight into :func:`lease.acquire` so a
+    TTL-expired-but-still-running foreign holder is BLOCKed (not taken over). It is
+    injected by the hook layer (``hooks/sdd_gate.py`` sources the container's
+    ``OsProcessProbe``); ``None`` ⇒ TTL-only fallback. This module imports no adapter.
     """
     cls = classify_path(rel_path)
 
@@ -209,7 +215,7 @@ def evaluate(
 
     # MUTATING — the gate is the single acquisition point (O_EXCL CAS in lease).
     try:
-        lease.acquire(workspace, ctx, session_id, release, mode, clock=clock)
+        lease.acquire(workspace, ctx, session_id, release, mode, clock=clock, pid_probe=pid_probe)
     except LockHeldError as exc:
         # Genuine live-foreign conflict — BLOCK with the informative yield message.
         return Decision.BLOCK, str(exc)

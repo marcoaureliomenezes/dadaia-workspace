@@ -26,6 +26,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.spec_context.locking import (
     workspace_lock,
 )
@@ -275,39 +276,67 @@ def dead(
         raise typer.Exit(1) from None
 
 
+# Bind mode resolution (FR-R4-01/02). The operator-facing aliases map onto two
+# canonical, non-acquiring modes (READ) and two lease-taking modes (IMPLEMENTATION,
+# REVIEW). `spec` is a legacy alias of `read`; both persist as READ. Lease-taking modes
+# persist with the BOUND_ prefix the gate/lease layer expects.
+_BIND_MODE_ALIASES: dict[str, str] = {
+    "READ": "READ",
+    "SPEC": "READ",  # legacy alias → READ (no lease)
+    "IMPLEMENTATION": "IMPLEMENTATION",
+    "REVIEW": "REVIEW",
+}
+_LEASE_TAKING_MODES = ("IMPLEMENTATION", "REVIEW")
+
+
 @app.command()
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
     mode: str = typer.Option(
-        ...,
+        "read",
         "--mode",
-        help=("Binding mode: read | spec | implementation | review. read/spec are never blocked."),
+        help=(
+            "Binding mode (optional; default 'read'): read | implementation | review. "
+            "Legacy alias: 'spec' maps to read. read never takes a lease."
+        ),
     ),
     release: str | None = typer.Option(
         None, "--release", help="Release ID (required for implementation and review modes)"
+    ),
+    print_env: bool = typer.Option(
+        False,
+        "--print-env",
+        help=(
+            "Back-compat: also emit eval-compatible 'export DADAIA_*' lines for operators "
+            "who still run 'eval $(dadaia context bind ...)'. Default off — bind persists "
+            "the mode in the session record instead."
+        ),
     ),
     force: bool = typer.Option(False, "--force", help="Accepted but no-op (lock-steal replaces)"),
     reason: str = typer.Option("", "--reason", help="Reason note (informational only)"),
 ) -> None:
     """Bind this shell session to a context.
 
-    Run: eval $(dadaia context bind <name> --mode <mode> [--release <id>])
+    Run: dadaia context bind <name> [--mode <mode>] [--release <id>]
 
-    Outputs eval-compatible export lines to set DADAIA_CONTEXT, DADAIA_SESSION_ID,
-    and DADAIA_MODE in the current shell.
+    With no --mode, binds normally in 'read' (observe) mode — never lock-blocked. The
+    bound context, mode, and session id are persisted in the session record (consumed by
+    the SDD gate); a human confirmation line is printed. Pass --print-env to additionally
+    emit the legacy 'export DADAIA_*' lines for `eval $(...)` workflows.
     """
     mode_upper = mode.upper()
-    if mode_upper not in ("READ", "SPEC", "IMPLEMENTATION", "REVIEW"):
+    if mode_upper not in _BIND_MODE_ALIASES:
         err_console.print(
-            f"[red]Error:[/red] Invalid mode '{mode}'. Must be one of: read, spec, implementation, review"
+            f"[red]Error:[/red] Invalid mode '{mode}'. Must be one of: "
+            "read, spec, implementation, review"
         )
         raise typer.Exit(1) from None
 
-    # --release is required for implementation and review
-    if mode_upper in ("IMPLEMENTATION", "REVIEW") and not release:
-        err_console.print(
-            f"[red]Error:[/red] --release <id> is required for --mode {mode_upper.lower()}"
-        )
+    resolved_mode = _BIND_MODE_ALIASES[mode_upper]
+
+    # --release is required for the lease-taking modes (implementation, review).
+    if resolved_mode in _LEASE_TAKING_MODES and not release:
+        err_console.print(f"[red]Error:[/red] --release <id> is required for --mode {mode.lower()}")
         raise typer.Exit(1) from None
 
     workspace_root = resolve_workspace_root()
@@ -324,8 +353,8 @@ def bind(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # ALIVE guard: IMPLEMENTATION and REVIEW modes require an ALIVE context (AC-T11-5)
-    if mode_upper in ("IMPLEMENTATION", "REVIEW") and ctx.state != ContextState.ALIVE:
+    # ALIVE guard: lease-taking modes require an ALIVE context (AC-T11-5)
+    if resolved_mode in _LEASE_TAKING_MODES and ctx.state != ContextState.ALIVE:
         err_console.print(
             f"[red]Error:[/red] Context '{name}' is not ALIVE (state={ctx.state.value}). "
             "Run 'dadaia context alive <name>' first."
@@ -337,10 +366,16 @@ def bind(
     runtime = os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
     pid = os.getpid()
 
+    # The persisted mode the gate reads: lease-taking modes carry the BOUND_ prefix; READ
+    # persists bare. (spec → READ, review → BOUND_REVIEW per FR-R4-02 mapping table.)
+    persisted_mode = (
+        f"BOUND_{resolved_mode}" if resolved_mode in _LEASE_TAKING_MODES else resolved_mode
+    )
+
     session_data: dict = {  # type: ignore[type-arg]
         "session_id": session_id,
         "context": name,
-        "mode": f"BOUND_{mode_upper}" if mode_upper in ("IMPLEMENTATION", "REVIEW") else mode_upper,
+        "mode": persisted_mode,
         "release": release,
         "runtime": runtime,
         "pid": pid,
@@ -350,19 +385,27 @@ def bind(
         "is_stale": False,
     }
 
+    # Persist the session record via the single session-identity owner (FR-R4-02 / R3).
     try:
         with workspace_lock(workspace_root):
-            session_file = sessions_dir / f"{session_id}.json"
-            session_file.write_text(json.dumps(session_data, indent=2), encoding="utf-8")
+            session_identity.write_session(workspace_root, session_id, session_data)
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # Output eval-compatible export lines
-    dadaia_mode = mode_upper
-    print(f"export DADAIA_CONTEXT={name}")
-    print(f"export DADAIA_SESSION_ID={session_id}")
-    print(f"export DADAIA_MODE={dadaia_mode}")
+    # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
+    # stays eval-safe for operators still running `eval $(dadaia context bind ... --print-env)`.
+    if print_env:
+        print(f"export DADAIA_CONTEXT={name}")
+        print(f"export DADAIA_SESSION_ID={session_id}")
+        print(f"export DADAIA_MODE={resolved_mode}")
+        return
+
+    # Human confirmation (NOT shell-export syntax): context, mode, session id.
+    console.print(
+        f"[green]✓[/green] Bound to '[bold]{name}[/bold]' "
+        f"(mode: {resolved_mode.lower()}, session id: {session_id})"
+    )
 
 
 @app.command(name="release")
