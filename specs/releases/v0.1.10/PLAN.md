@@ -1,6 +1,6 @@
 # PLAN: v0.1.10 — Concurrency Kernel + Workspace Truth
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** v0.1.10
 **Owner:** product-engineer
 **Created:** 2026-06-10 (revised same day for the R1–R8 extension)
@@ -24,8 +24,8 @@ records remain readable (new `pid` field optional on read, written on acquire).
 | WS | Files | Layer |
 |---|---|---|
 | R1 | `features/spec_context/gate_policy.py` | features |
-| R2 | `features/spec_context/lease.py`, `hooks/sdd_post_gate.py`, `core/lock_liveness.py` (consume) | features + hooks |
-| R3 | `features/spec_context/session_identity.py` (new), `hooks/ctx_inject.py`, lease/gate consumers | features + hooks |
+| R2 | `features/spec_context/lease.py`, `hooks/sdd_post_gate.py`, `features/spec_context/gate_policy.py` (`pid_probe` threading via `evaluate`), `hooks/sdd_gate.py` (`OsProcessProbe` from container), `core/lock_liveness.py` (EDIT: activate `pid_probe`, fix docstring) | features + hooks + core |
+| R3 | `features/spec_context/session_identity.py` (new), `hooks/ctx_inject.py`, `features/spec_context/doctor.py` (PTR-GC), `core/specs_resolver.py`, lease/gate consumers | features + hooks + core |
 | R4 | bind CLI (`cli/…context…`), `hooks/sdd_gate.py` | cli + hooks |
 | R5 | `tests/` (fixtures, matrix, contract tier, two-actor helper) | tests |
 | R6 | `public/scripts/` (delete quartet), `features/specs/doctor.py`, `infrastructure/runtime_config.py`, public agents/skills/rules/schemas, `specs/` ledger+memory+constitution | public + features + infra + specs |
@@ -190,6 +190,7 @@ fail-closed message when none. Linter cap: contract test pins the ignore-edge co
 | Risk | L | Mitigation |
 |------|---|-----------|
 | R1 changes fail-open/fail-closed boundary | M | full gate integration matrix re-run; PROTECTED-first re-asserted |
+| R1 re-root flips expected class in existing gate/lease tests (~30-60 assertions, HIGH blast radius) | H | explicit re-baseline pass in T-010-03: each flipped expectation re-derived from the new taxonomy, never mechanically inverted; matrix tests are the source of truth |
 | Holder-pid not stably knowable per harness | M | acceptance is behavioral (alive⇒no-steal, absent⇒TTL); TTL fallback documented |
 | renew/acquire atomicity rework introduces deadlock | M | property/stress test on lock history; fail-open posture preserved |
 | R3 refactor breaks live self-hosting state | M | ignored-and-superseded legacy artifacts; doctor coherence backstop |

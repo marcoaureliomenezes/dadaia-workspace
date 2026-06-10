@@ -1,6 +1,6 @@
 # TASKS: v0.1.10 — Concurrency Kernel + Workspace Truth
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** v0.1.10
 **Owner:** product-engineer
 **Created:** 2026-06-10 (revised same day for the R1–R8 extension)
@@ -19,7 +19,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ## Pre-work
 
-### [ ] T-010-00 — Release start: ACTIVE.md → v0.1.10
+### [x] T-010-00 — Release start: ACTIVE.md → v0.1.10 — DONE: executed by product-engineer at approval (2026-06-10); ACTIVE.md phase set to IMPLEMENTATION per arch A5 release-start split.
 - **Owner:** product-engineer · **Maps:** arch A5 (SPEC review), CONF-5; Decisions D-4/D-5 prelude
 - **Write set:** `specs/releases/ACTIVE.md`
 - **Preconditions:** SPEC+PLAN+TASKS Aprovado.
@@ -56,12 +56,12 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Owner:** software-engineer · **Maps:** CONF-1, arch F1, sec F-1, ai D-3/D-4/D-5/C-1; bugs `lease-stolen…` (D1), `gate-fpath-not-canonicalized-before-classifier` (Python surface)
 - **Write set:** `dadaia_workspace/features/spec_context/gate_policy.py`, `tests/unit/features/spec_context/test_gate_policy.py`, `tests/integration/gate/` (matrix + symlink + incident regression)
 - **Preconditions:** T-010-10.
-- **Acceptance (AC-R1-01/02/03):** FR-R1-01..08 — matrix tests class×{root,in-repo}×{default,non-default slug}; in-repo MEMORY phase-rule and FROZEN block exercised (`gate_policy.py:90-93,137-143` no longer dead); symlink→MEMORY regression test named; full-pipeline incident regression (dual-session, injected clock, ALLOW + holder unchanged in lock record); full gate integration matrix green.
+- **Acceptance (AC-R1-01/02/03):** FR-R1-01..08 — matrix tests class×{root,in-repo}×{default,non-default slug}; in-repo MEMORY phase-rule and FROZEN block exercised (`gate_policy.py:90-93,137-143` no longer dead); symlink→MEMORY regression test named; full-pipeline incident regression (dual-session, injected clock, ALLOW + holder unchanged in lock record); full gate integration matrix green; **explicit re-baseline** of existing gate/lease tests whose expected class changes under the re-root (~30-60 assertions; HIGH blast radius — acknowledged in PLAN risk note) — each flipped expectation re-derived from the new taxonomy, not mechanically inverted.
 - **Parallelism:** spine; before T-010-07.
 
 ### [ ] T-010-07 — R3: session_identity consolidation module
 - **Owner:** software-engineer · **Maps:** arch F7, CONF-1/2 substrate
-- **Write set:** `dadaia_workspace/features/spec_context/session_identity.py` (new), `dadaia_workspace/features/spec_context/lease.py` (pointer reads), `dadaia_workspace/hooks/ctx_inject.py`, `tests/unit/features/spec_context/test_session_identity.py` (new), `tests/contract/test_session_store_ownership.py` (new)
+- **Write set:** `dadaia_workspace/features/spec_context/session_identity.py` (new), `dadaia_workspace/features/spec_context/lease.py` (pointer reads), `dadaia_workspace/hooks/ctx_inject.py`, `dadaia_workspace/features/spec_context/doctor.py` (PTR-GC, `:126,572-581`), `dadaia_workspace/core/specs_resolver.py` (`:19`) — both consume the session stores R3 consolidates and would fail FR-R3-01's residue grep if left unmigrated — `tests/unit/features/spec_context/test_session_identity.py` (new), `tests/contract/test_session_store_ownership.py` (new)
 - **Preconditions:** T-010-03.
 - **Acceptance (AC-R3-01):** FR-R3-01..03 — single owner module; residue grep contract proves no other module opens `sessions/runtime/*.ptr` / `sessions/<id>.json`; coherence contract (lock holder vs incumbent vs session record); workspace-doctor PTR-GC/SENTINEL-GC consumers of `sessions/runtime/*.ptr` updated/verified against the collapsed store; legacy artifacts ignored-and-superseded; pytest green.
 - **Parallelism:** spine; before T-010-04/05/08.
@@ -75,16 +75,16 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ### [ ] T-010-05 — R2b: pid-liveness probe before TAKEOVER + holder-safe renew
 - **Owner:** software-engineer · **Maps:** CONF-2, arch F2 (PID lesson restored), C-14
-- **Write set:** `dadaia_workspace/features/spec_context/lease.py`, `tests/unit/features/spec_context/test_lease_*.py`
+- **Write set:** `dadaia_workspace/features/spec_context/lease.py`, `dadaia_workspace/features/spec_context/gate_policy.py` (`pid_probe` must thread through `gate_policy.evaluate` — `gate_policy.py:147` is the sole caller of `lease.acquire`), `dadaia_workspace/hooks/sdd_gate.py` (sources `OsProcessProbe` from `container.py`), `dadaia_workspace/core/lock_liveness.py` (explicit EDIT target, not "(consume)": activate the never-called `pid_probe` param; rewrite the stale docstring at `:11-13,54-56`), `tests/unit/features/spec_context/test_lease_*.py`
 - **Preconditions:** T-010-07.
 - **Acceptance (AC-R2-02/03):** FR-R2-03/04 — lease record gains `pid`; TTL-stale+alive-probe ⇒ block (no TAKEOVER), TTL-stale+dead/absent-pid ⇒ TAKEOVER; probe injected via the existing `pid_probe` callable param of `core/lock_liveness.is_stale` (or a core protocol port) wired from hooks/container — `features/lease.py` does NOT import `infrastructure/process_probe_adapter`, no new import-linter ignores; `has_os_kill_liveness` seam with TTL fallback; confirmed holder renews past TTL; renew atomic vs foreign acquire (stress/property test on lock-file history — the `lease.py:379-394` race is fixed); docstring `lease.py:16-19` rewritten truthful; liveness tests green on Windows/macOS CI legs; pytest green.
 - **Parallelism:** parallel with T-010-04/08.
 
 ### [ ] T-010-08 — R4a: bind `--mode` optional; mode persisted in session record
 - **Owner:** software-engineer · **Maps:** CONF-3, arch F3; bug `context-bind-forces-mode-choice-on-operator`
-- **Write set:** bind CLI module (locate via grep `context bind` under `dadaia_workspace/cli/`), `tests/` CLI integration
+- **Write set:** `dadaia_workspace/cli/commands/context.py` (bind, `--mode` at `:260`), `tests/` CLI integration
 - **Preconditions:** T-010-07.
-- **Acceptance:** FR-R4-01/02 — `dadaia context bind <ctx>` (no `--mode`) exits 0, default `read`; explicit modes still work; bind writes `mode` into the session record via session_identity; pytest green.
+- **Acceptance:** FR-R4-01/02 — `dadaia context bind <ctx>` (no `--mode`) exits 0, default `read`; explicit modes still work; bind **stops emitting the eval-export theater** (`context.py:273`) and persists the session record (via session_identity) instead; legacy modes map explicitly: `spec` → `READ`, `review` → `IMPLEMENTATION/REVIEW` (accepted as aliases, persisted as the mapped mode); pytest green.
 - **Parallelism:** parallel with T-010-04/05; before T-010-09.
 
 ### [ ] T-010-09 — R4b: gate mode resolution; READ non-acquiring

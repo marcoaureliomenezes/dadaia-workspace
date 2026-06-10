@@ -1,10 +1,11 @@
 # SPEC: v0.1.10 — Concurrency Kernel + Workspace Truth (audit remediation R1–R8)
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** v0.1.10
 **Owner:** product-engineer
 **Created:** 2026-06-10
 **Revised:** 2026-06-10 (extended per audit `specs/audits/2026-06-10T010550Z/` — coverage verdict PARTIAL → full R1–R8)
+**Review trail:** software-architect (2026-06-10, 7 findings folded) · qa-engineer (2026-06-10, 9 findings folded) · software-engineer implementability (2026-06-10, 5 findings S1–S5 folded) — all APPROVE-WITH-CHANGES, all changes applied before approval.
 
 ---
 
