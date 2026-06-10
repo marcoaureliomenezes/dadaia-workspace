@@ -47,7 +47,7 @@ mesma que governa paths workspace-root. Um restante in-repo sem classe é MUTATI
 | UNGATED | Demais paths workspace-root (ex. fora de specs/.dadaia) | Allow |
 
 **Regras (o que o gate realmente enforça):**
-- **RULE A (memory atomicity):** `specs/memory/**` fora de DEFINITION/CLOSURE → block. O gate classifica apenas por **path**, nunca por formato/extensão — a proibição de formatos legados `.html`/`.yaml`/`.yml` em memory é lei de formato committed (constitution §3, verificada post-hoc pelo `dadaia specs doctor`), não mecanismo do gate.
+- **RULE A (memory atomicity):** `specs/memory/**` fora de DEFINITION/CLOSURE → block. O gate classifica apenas por **path**, nunca por formato/extensão — a proibição de formatos legados `.html`/`.yaml`/`.yml` em memory é lei de formato committed (constitution §3), não mecanismo do gate. Post-hoc, o `dadaia specs doctor` verifica apenas stray `.html` (SPEC-DOC-002L); não existe check de doctor para `.yaml`/`.yml` — esses são lei sem verificador automático.
 - **RULE B (archive read-only):** `specs/_archive/**` → block sempre — inclusive in-repo.
 - **RULE READ (mode channel):** sessão com modo resolvido READ/BOUND_READ é non-acquiring — write MUTATING bloqueado **antes** de qualquer chamada ao lease; ADDITIVE flui. Resolução de modo: `DADAIA_MODE` env (escape de operador) → `mode` do session record keyed pelo sid harness-native (vence o incumbent) → modo do **incumbent do contexto** (`sessions/runtime/<ctx>.ptr`, atualizado pelo `bind` — o caminho harness-real do fluxo default; ignorado se um lease vivo nomeia outro sid, anti-downgrade guard) → default `IMPLEMENTATION`.
 - **PROTECTED (SEC-01):** `.dadaia/sessions/**` é CLI-owned; block incondicional protege o `.ptr` de forgery.

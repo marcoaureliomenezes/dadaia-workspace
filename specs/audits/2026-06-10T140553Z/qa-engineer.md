@@ -238,3 +238,102 @@ have seen at this scale), isolation (two-layer guard with exit-status enforcemen
    baseline exists anymore).
 6. Consider tightening the env-contract visitor to also catch `os.putenv` — currently the
    only un-scanned setenv spelling (deliberate-evasion-only, low priority).
+
+## rc-3 delta re-audit (2026-06-10, HEAD 762b4b6)
+
+Adversarial verification of the rc-3 iteration (`d04894a..762b4b6`) against the residual
+actions of the 9.1 audit above, plus the NEW production code that commit carries. One full
+suite run + targeted file run; full diff reads of every touched test file and the three
+production modules.
+
+### V1 — Revived e2e `test_memory_view_iframe_loads`: FIXED, REAL (not a tautology)
+
+- **Runs:** `pytest -rs tests/e2e/features/test_panel.py` → 5 passed, 1 skipped; the only
+  remaining skip is the genuinely environmental LAN-IPv4 one (:337). The dead-by-skip
+  guard on the retired `architecture.html` is gone.
+- **Behavioral quality:** the rewrite spawns the real panel subprocess against a **tmp
+  workspace fixture** (`cwd=tmp_path` — the latent real-workspace-root isolation breach
+  is also dead), writes a real `.md` atom via the production layout
+  (`repos/<slug>/specs/memory/architecture.md`), and asserts the **render contract**:
+  wrapper iframe `src="/memory/<slug>/architecture.md"`, served body contains `<h1` +
+  heading text + body sentence, AND **does not** contain the raw `# ` Markdown marker
+  (raw-source-vs-rendered falsifier, D-4). Every request carries the Bearer token; the
+  401-without-token leg is covered by the adjacent
+  `test_tokenless_loopback_request_to_sensitive_api_is_401`. Verdict: falsifying on
+  renderer regression, raw-bytes passthrough, and auth-route wiring. Slop item 1 closed.
+
+### V2 — `test_views_*` consolidation 33→8: ZERO COVERAGE LOSS
+
+Read all four diffs (`academy` 9→2, `agents` 6→3, `reports` 11→2, `workflows` 7→1).
+Deleted material is exclusively: (a) `isinstance(str)` / `len>0` smoke tests, (b)
+duplicate id asserts (the `test_section_has_role_tabpanel` copy-paste residue, slop
+item 3). **Every behavior-bearing assertion survived** — section/ARIA/tabindex wiring,
+grid/empty-state/staleness-banner ids, hidden-by-default chunks (positional `find()`
+checks preserved verbatim), `aria-live="polite"`, and the no-inline-data JSON-key
+falsifiers. Each surviving test fails on a real dropped DOM hook. Slop items 2+3 closed.
+
+### V3 — XPASS + docstring: BOTH FIXED
+
+- `test_pid_zero_documented_as_xfail` → `test_pid_zero_returns_a_bool_without_raising`:
+  the non-strict xfail (which had NO assertion and could never fail) is now a plain
+  contract test asserting `isinstance(result, bool)` + no-raise. Suite shows **0 xpassed**.
+- `test_sdd_post_gate.py` module docstring rewritten to state the zero-baseline reality
+  accurately (no baseline entry; contract flags only import+`sys.stdin`-patch). Items 5+6 closed.
+
+### V4 — NEW production code test adequacy: ADEQUATE, one documented residual
+
+- **SPEC-DOC-029 coherence backstop** (real fix: old code globbed `*.lock` while
+  production writes `<ctx>.lock.json` — the invariant could never fire). Tests now build
+  state **exclusively via production writers** (`lease.acquire` +
+  `session_identity.set_incumbent/write_session`) at three levels: unit
+  (`test_doctor_ledger_invariants.py`, red+green, pins the real `.lock.json` path in the
+  issue), integration (`test_specs_doctor_coherence_backstop.py`, against a
+  `WorkspaceService.init` workspace, red+green), and **CLI**
+  (`test_cli_specs_doctor_coherence.py` — proves the CLI actually wires
+  `workspace_state_dir`, the exact no-op gap the old code had; red+green). Falsifying:
+  reverting the glob or the CLI wiring fails the red legs immediately.
+- **SPEC-DOC-030 audits naming WARN**: all four cases covered — non-conforming dir fires
+  WARNING with path pinned, conforming `<ts>-<sid8>` silent, the four grandfathered dirs
+  + `_archive` silent, absent `audits/` no-op. Complete.
+- **session_identity prune**: deleted tests covered ONLY deleted surface
+  (`session_ptr` family, `gc_orphan_session_ptr`, `incumbent`/`record_for` aliases).
+  Grep confirms zero production references to pruned symbols remain. Every surviving
+  `__all__` symbol still has tests (roundtrips, atomic-replace, coherence matrix,
+  `iter_ptr_files` now pinned to the single remaining namespace, fail-soft legs). No
+  coverage taken with the dead code.
+- **model_resolution keyset rewire** (audit A3: cross-feature
+  `features.public → features.telemetry` import removed): the replacement test
+  `test_pricing_keyset_is_registry_derived_not_cross_feature_import` pins
+  `not hasattr(mod, "PRICING_TABLE")` + a clean live-tree resolve. Meaningful in its
+  narrow purpose (the old monkeypatch vector cannot silently return). **Residual,
+  documented in the test itself:** the doctor check's pricing leg is now tautological
+  within the check (`pricing_keys = registry_ids` by definition); the load-bearing
+  PRICING_TABLE↔REGISTRY guard delegates to
+  `test_pricing.py::test_pricing_table_keys_equal_registry_claude_ids` — verified it
+  exists and PRICING_TABLE is literally built from REGISTRY in `pricing.py`. Acceptable;
+  the seam is honest and guarded, just one module away.
+
+### V5 — Suite health: GREEN
+
+`pytest -p no:cacheprovider -q` → **2774 passed, 7 skipped, 0 xpassed, exit 0, 85.65s**.
+Skip inventory: 8→7 as expected — the dead memory-fixture skip is gone; the 7 remaining
+are 1 environmental (LAN IPv4) + 6 Windows-runner-only (run on the hard-gated Windows CI
+leg). No xfail noise. No cache dirs created in the repo; working tree clean.
+
+### Not addressed in rc-3 (carried, minor)
+
+- Prose-pinning contract minority (codex wording / gate terms) — unchanged (−0.2 stands).
+- Codex "omitted matcher = match-all" residual not yet promoted to a contract README row;
+  two-actor e2e TTL compression seam unchanged (small fraction of the prior −0.2).
+
+### FINAL RE-SCORE: 9.5 / 10 — PASS
+
+Recovered: +0.3 (dead e2e revived as a genuinely falsifying render+auth test, isolation
+breach removed), +0.2 (views family swept with zero coverage loss), +0.1 (XPASS +
+docstring hygiene, portion of the residual-seams deduction). Held back: −0.2
+prose-pinning contracts (untouched), −0.2 residual seams (Codex matcher pin, TTL
+compression) + the new-but-documented model_resolution intra-check tautology, −0.1
+margin for the grandfather list in `doctor.py` being a hardcoded frozenset that future
+audit dirs must not grow (WARN-only, so low risk). The new production code (coherence
+backstop, SPEC-DOC-030, prune, rewire) arrives **better tested than the suite average**
+— production-writer state construction, red+green at unit/integration/CLI levels.

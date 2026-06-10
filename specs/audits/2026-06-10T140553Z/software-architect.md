@@ -301,3 +301,50 @@ this codebase is a defensible 9.
 modified. This report's own Write into `repos/dadaia-workspace/specs/audits/…` classified
 ADDITIVE under the re-rooted taxonomy (`gate_policy.py:50-54,177-180`) — the original
 audit's self-demonstrating F1 footnote now demonstrates the fix.*
+
+---
+
+## rc-3 delta re-audit (2026-06-10, HEAD 762b4b6)
+
+> Adversarial verification of the rc-3 iteration (commits e93a7d8 + 762b4b6) against the
+> morning findings above. Method: read-only code trace (no Bash in this lane — red path
+> traced end-to-end through `lease.acquire` → `SpecsDoctor._check_lease_session_coherence`
+> → `session_identity.coherence`); all greps repo-wide.
+
+### Finding → verdict table
+
+| Finding | rc-3 claim | Verdict | Evidence |
+|---|---|---|---|
+| **A1 (HIGH)** dead SPEC-DOC-029 backstop | reads production records, delegates to `coherence()`, wired from CLI, production-writer tests | **FIXED** | `features/specs/doctor.py:1228` globs `*.lock.json` (the real record name, `lease.py:151`; cannot match the fcntl `<slug>.lock` or `.lock.sentinel` — the A6 trap is defused at this consumer); holder read via `lease.read_record` (`:1234-1236`); verdict delegated to `session_identity.coherence` (`:1237`) — the divergent duplicate is **deleted**, one implementation remains. `coherence()` now has a real production caller. CLI wiring confirmed: `cli/commands/specs.py:52-65` (`_resolve_workspace_state_dir` via `resolve_workspace_root()/.dadaia`, fail-soft `None`) injected at `:123-128` — the backstop fires from `dadaia specs doctor`, not just the service layer. |
+| **A1 tests** | built via production writers | **VERIFIED** | Three layers, all state created exclusively through `lease.acquire` + `session_identity.set_incumbent`/`write_session` — zero fabricated fixtures: unit `tests/unit/features/specs/test_doctor_ledger_invariants.py:373-432` (red fires on the real `<ctx>.lock.json` path, green clears, no-op without `workspace_state_dir`); service-level integration `tests/integration/test_specs_doctor_coherence_backstop.py`; **CLI-level** integration `tests/integration/cli/test_cli_specs_doctor_coherence.py` (invokes `specs doctor` via CliRunner from a tmp workspace cwd — covers the coordinator-caught wiring gap both red and green). Red path traced by hand: acquire ⇒ record holder S1 + incumbent ptr S1; drift ptr→S2 + S2 session record ⇒ `coherence` returns three-source divergence ⇒ SPEC-DOC-029 ERROR on `ctx-a.lock.json`. Fires. |
+| **A2 (MED)** dead identity exports | corpses deleted; remaining API all called; ctx_inject change sound | **FIXED** | Repo-wide grep: `read_session_ptr`/`write_session_ptr`/`session_ptr_path`/`gc_orphan_session_ptr`/`record_for`/`incumbent`-alias — **zero hits** in production *and* tests (only docstring/audit/spec prose remains). Every remaining `__all__` name has a production caller: `coherence`→`specs/doctor.py:1237`; `iter_ptr_files`→`spec_context/doctor.py:576`; `ptr_path`→`lease.py:172`; `read_incumbent_ptr`→`lease.py:178`; `read_session`→`sdd_gate.py:164`/`sdd_post_gate.py:119`/`doctor.py:546`; `resolve_identity`→`sdd_gate.py:170`; `set_incumbent`→`cli/context.py:399`; `write_incumbent_ptr`→`lease.py:184`; `write_session`→`sdd_post_gate.py:125`/`cli/context.py:398`. (`session_record_path` is exported with only internal-production callers — canonical path constructor of the path-owner module; LOW residue, not a corpse.) ctx_inject: the write-only `<sid>.ptr` write is **gone entirely** (`ctx_inject.py` no longer touches `session_identity` at all); legacy `<sid>.ptr` orphans are still swept by PTR-GC (`spec_context/doctor.py:576-588` — no matching `<sid>.lock.json` ⇒ orphan ⇒ deleted). Sound migration path. |
+| **A3 (MED)** one-directional contracts | 2 reverse contracts, zero ignores; cross-feature edge removed via core registry | **FIXED** | `setup.cfg:98-117` adds `core-no-upper-layers` + `infrastructure-no-upper-layers`, both with **zero** `ignore_imports`. Independently verified by grep: zero imports of features/infrastructure/cli/hooks in `core/`, zero of features/cli/hooks in `infrastructure/` — both contracts pass on the actual import graph. `model_resolution.py` no longer imports `features.telemetry.pricing`: pricing key-set computed from `core.model_registry.REGISTRY` (`:98`), and the "by construction" claim is **true, not asserted** — `PRICING_TABLE` is a genuine comprehension over `REGISTRY` (`telemetry/pricing.py:42-44`), so its key-set cannot hand-drift from the registry without a code change. The `MODEL_MAP` infra import remains the documented ignore edge (`setup.cfg:57`). |
+| **A3/A4 cap** | unchanged ≤17 with shrink note | **VERIFIED** | `setup.cfg` edges counted by hand: 12 + 5 = 17. Exact-equality ratchet intact (`test_import_linter_ignore_cap.py:96-108`); explicit SHRINK NOTE (`:45-52`) names the backlog item and states the reverse contracts add zero edges. Parser handles ignore-less contracts (`:71-78` defaults to `""`). |
+| **NEW edge** `features/specs/doctor.py:63 → features.spec_context.{lease,session_identity}` | flagged out-of-scope by implementers | **ACCEPTABLE DEBT — not a regression** | Judgment: (a) it is delegation to the **single designed identity owner** — the alternative (a local copy of coherence logic) is literally the A1 defect being fixed; (b) net cross-feature edge count is **flat at 1** (the telemetry data edge was removed in the same iteration — repo-wide grep confirms this is now the *only* features→features import in the tree); (c) caveat recorded: no contract governs features→features, so this edge is held by discipline alone — when the A3 follow-on `layers`/independence contract lands, this edge must be explicitly declared (or `session_identity`, which is pure stdlib, promoted to `core/`). |
+| **New corpses from rc-3 edits** | — | **NONE FOUND** | The old fabricated-fixture test is replaced (no `*.lock` fabrication remains in `test_doctor_ledger_invariants.py`); no dangling test references to the deleted API; all imports in the touched files (`doctor.py`: `lease`, `session_identity`, `_CTX_NAME_RE`; `ctx_inject.py`; `model_resolution.py`; `cli/specs.py`: `_resolve_workspace_state_dir`) are used. `specs upgrade`'s internal pre/post doctors intentionally omit `workspace_state_dir` (migration-scoped; documented no-op) — not dead code. |
+
+### Unchanged residuals (out of rc-3 scope, all LOW/MED, pre-acknowledged)
+
+A4 debt pile itself (cap honest, shrink scheduled via backlog), A5 dashboard corpse,
+A6 namespace adjacency (mitigated at the new consumer by the precise `*.lock.json` glob),
+A7 ppid assumption, A8 temporal naming.
+
+### FINAL RE-SCORE: 9.2/10 — PASS (≥9)
+
+Justification: the two findings that scoped the 8.5 FAIL are fixed **at their root cause**
+— the D-2 backstop now reads the genuine production artifact through the single designed
+API, is wired all the way to the CLI surface, and is proven by tests that create state
+exclusively through production writers at three layers (unit, service, CLI), eliminating
+the fabricated-evidence defect class this lane refused to certify. The A2 corpses are
+deleted with zero dangling references, and the surviving API is 100% production-consumed.
+rc-3 additionally went beyond the minimum bar: the reverse-direction layering contracts
+freeze `core`/`infrastructure` purity with zero suppressions, and the only cross-feature
+import was re-routed through the core registry on a derivation that is verifiably true by
+construction. Per-axis deltas: spec/code fidelity 8.5→9.5 (backstop real, CLI-wired,
+three-layer proven), ledger integrity 8.5→9.5 (all six invariants now live),
+dead/stale/slop hygiene 7→8.5 (A1/A2 cleared; A5/A8 LOW remain), abstraction honesty
+8→9 (reverse contracts; minus the one discipline-held features→features edge). Held below
+9.5 overall by the undeclared-by-contract `specs→spec_context` seam, the unshrunk 17-edge
+debt pile (A4), and the unchanged LOW residuals.
+
+*software-architect · rc-3 delta re-audit · read-only except this appendix.*

@@ -32,10 +32,16 @@ residue greps, consistency-contract-at-introduction policy) now hold the line.
 Score journey: **5/10 → 9.0/10** (spec/ledger 4→9, memory 3→9, architecture 6→9.0,
 test quality 5→9.25, AI-surface honesty 5→9.0, security 7→9.0).
 
+A subsequent operator-mandated pre-deploy verification audit
+(`specs/audits/2026-06-10T140553Z/`) initially failed two lanes and drove an in-release
+**rc-3** iteration (tasks T-010-30..34); its delta re-audit closed the release at
+**all lanes ≥ 9** (arch 9.2, qa 9.5, spec/ledger 9.5, memory 9.5) — see §rc-3 amendment.
+
 ## Tasks completed
 
 All **29 tasks (T-010-00..28) `[x]`**, zero `[ ]`/`[-]` (grep-verified by the final
-audit). Implementation landed as coordinated **wave commits** on `feature/v0.1.10`
+audit); the rc-3 amendment later appended **T-010-30..34** (all `[x]` at `762b4b6` —
+ledger in §rc-3, bringing the release total to 34 tasks). Implementation landed as coordinated **wave commits** on `feature/v0.1.10`
 rather than one commit per task; per-task evidence is the task's handoff JSON under
 `.dadaia/handoff/dadaia-workspace/` (filenames carry the task id, e.g.
 `2026-06-10T024848Z-software-engineer-t-010-03-classifier-reroot.handoff.json`).
@@ -53,7 +59,9 @@ Commit ledger:
 | `c7391a0` | Wave 7 — closes the 7-wave implementation of T-010-00..27 |
 | `5374495` | Final gate T-010-28 (10/10 checks green) |
 | `fc388d7` | rc-2 amendment — NF-1, NF-2, N-2 + security R-2 suffix gap (see §rc-2) |
-| `9ca2d2a` | rc-2 final — NF-4 anti-downgrade liveness predicate (HEAD at audit SHIP) |
+| `9ca2d2a` | rc-2 final — NF-4 anti-downgrade liveness predicate (HEAD at rc-2 audit SHIP) |
+| `e93a7d8` | rc-3 definition — TASKS T-010-30..34 + PE-direct fixes M-1/M-2/M-3, S-1/S-2/S-3 (see §rc-3) |
+| `762b4b6` | rc-3 implementation — T-010-30..34 (HEAD at verification-audit PASS) |
 
 Task → workstream map (owners per TASKS.md):
 
@@ -86,6 +94,70 @@ this section is its ledger of record.
 rc-2 text amendments (ai-engineer) and the rc-2 lane re-scores (qa 9.25, ai 9.0,
 architect 9.0 final at HEAD) are in the handoffs listed under §Review trail. Test count
 chain: 2,779 (`f77e96c`) → 2,792 (`fc388d7`) → 2,795 (`9ca2d2a`).
+
+## rc-3 amendment (2026-06-10, verification-audit-driven)
+
+**Why.** After the rc-2 SHIP verdict, the operator mandated an independent pre-deploy
+verification audit (`specs/audits/2026-06-10T140553Z/`, lanes: software-architect,
+qa-engineer, project-auditor on specs/memory/constitution). At the initial HEAD
+(`429ed03`) it **failed two lanes at the ≥9 bar**: architecture **8.5** (A1 HIGH — the
+SPEC-DOC-029 lease↔session backstop was dead on arrival: doctor globbed `*.lock` while
+lease records are `<ctx>.lock.json`, and `session_identity.coherence()` had zero
+callers; plus A2/A3/A4) and memory **8.5** (M-1/M-2/M-3 atom-theater findings). The
+release was un-archived from `specs/_archive/` back to `specs/releases/v0.1.10/`, five
+tasks T-010-30..34 were appended to TASKS.md under the §rc-3 amendment note (same SPEC
+scope — remediation of already-claimed deliverables, no scope change), and PR #53 was
+held unmerged pending all lanes ≥ 9.
+
+**Definition commit `e93a7d8`** carried the TASKS amendment plus the PE-direct
+(non-task) fixes: M-1/M-2 (`specs/memory/product/sdd/sdd-gate-v3.md` — false
+`.html/.yaml/.yml` gate-enforcement claim re-attributed to constitution §3 law; Codex
+PostToolUse row corrected to matcher-less match-all), M-3
+(`specs/memory/product/index.md` regenerated, generator-verified), S-1/S-2
+(constitution §8 — 4-step mode chain; audit-dir naming law grandfather amendment),
+S-3 (this CLOSURE's R6 dead "mapping README" reference corrected + drift
+`archive-mapping-readme-not-shipped` recorded).
+
+**Implementation commit `762b4b6`** — the five tasks, each with its evidence triple:
+
+| Task | Fix | Evidence (commit + file + named test) |
+|------|-----|----------------------------------------|
+| T-010-30 | SPEC-DOC-029 backstop made real: doctor reads the real `<ctx>.lock.json` records and delegates to `session_identity.coherence()` (one implementation); CLI wires `workspace_state_dir` | `762b4b6`; `dadaia_workspace/features/specs/doctor.py` + `dadaia_workspace/cli/commands/specs.py:52,123-128`; `tests/unit/features/specs/test_doctor_ledger_invariants.py::test_incoherent_lease_session_via_production_writers_reports_doc_029` (+ coherent negative) and CLI-level `tests/integration/cli/test_cli_specs_doctor_coherence.py::test_cli_doctor_reaches_coherence_check_on_incoherent_state` — incoherence created via the **production writers**, not fabricated fixtures |
+| T-010-31 | `session_identity` dead exports pruned; write-only session-keyed `<sid>.ptr` no longer written by `ctx_inject` (GC sweep removed); every surviving public name has a production caller | `762b4b6`; `dadaia_workspace/features/spec_context/session_identity.py` + `dadaia_workspace/hooks/ctx_inject.py`; `tests/unit/features/spec_context/test_session_identity.py::test_coherence_three_disagreeing_sessions_is_reported` (+3 coherence tests) and `tests/contract/test_session_store_ownership.py` |
+| T-010-32 | qa-lane test debt: dead-by-skip panel e2e revived against a tmp markdown-memory workspace; always-XPASS xfail made falsifiable; `test_views_*` tautology family consolidated 33→8 behavior-bearing tests, zero coverage loss | `762b4b6`; `tests/e2e/features/test_panel.py::test_memory_view_iframe_loads` (runs, no skip); `tests/unit/infrastructure/test_process_probe_adapter.py::test_pid_zero_returns_a_bool_without_raising`; `tests/unit/features/panel/test_views_*.py` |
+| T-010-33 | Layering frozen bidirectionally: 2 reverse-direction import-linter contracts ("core must not import features/infrastructure/cli/hooks", "infrastructure must not import features/cli/hooks", zero ignores); cross-feature `model_resolution → telemetry.pricing` edge removed via `core/model_registry`; ignore cap flat at 17 | `762b4b6`; `setup.cfg:99,110` + `dadaia_workspace/features/public/model_resolution.py`; `tests/unit/features/telemetry/test_pricing.py::test_model_map_and_pricing_table_key_sets_identical` and `tests/contract/test_import_linter_ignore_cap.py` |
+| T-010-34 | New doctor WARN **SPEC-DOC-030**: any new `specs/audits/` dir not matching `<YYYYMMDDTHHMMSSZ>-<sid8>` (the four §8-grandfathered dirs and `_archive/` excepted) | `762b4b6`; `dadaia_workspace/features/specs/doctor.py`; `tests/unit/features/specs/test_doctor_ledger_invariants.py::test_non_conforming_new_audit_dir_reports_doc_030_warning` (+ conforming and grandfathered negatives) |
+
+**Delta re-audit outcome (at `762b4b6`,** `specs/audits/2026-06-10T140553Z/index.md`**):**
+
+| Lane | Initial (`429ed03`) | rc-3 delta (`762b4b6`) |
+|------|--------------------|------------------------|
+| Software architecture | 8.5 FAIL | **9.2 PASS** |
+| Test architecture & quality | 9.1 PASS | **9.5 PASS** |
+| Spec/ledger fidelity | 9.0 PASS | **9.5 PASS** |
+| Memory fidelity | 8.5 FAIL | **9.5 PASS** |
+
+Verdict: **PASS — all dimensions ≥ 9, clear to ship** (operator holds the PR #53 merge
+click). Integrated validation at `762b4b6`: full suite **2774 passed / 7 skipped, exit
+0** (count down from rc-2's 2,795 by design — T-010-32's 33→8 tautology consolidation
+outweighs the rc-3 additions; zero xpassed remains), `dadaia specs doctor` and
+`dadaia doctor` both **0 errors**.
+
+**Ledger-honesty notes (auditor INFO, recorded for archaeology):**
+
+1. **The DEFINITION window existed but is invisible in git.** ACTIVE.md was set to
+   `phase: DEFINITION` before the rc-3 memory edits (M-1/M-2/M-3 — gate-legal per
+   constitution §13), then to `IMPLEMENTATION` for T-010-30..34. The phase flips were
+   not committed individually, so the committed history shows the pointer jumping
+   none→IMPLEMENTATION; the intermediate DEFINITION state was real on disk and
+   gate-enforced, just not a separate commit.
+2. **Two files landed outside declared TASKS write sets:**
+   `dadaia_workspace/cli/commands/specs.py` (coordinator-authorized CLI wiring so the
+   T-010-30 backstop actually runs from `dadaia specs doctor` — the task's write set
+   named the feature module but not the CLI entry) and
+   `tests/unit/hooks/test_ctx_inject.py` (mechanical consequence of the T-010-31
+   ptr-writer removal decoupling `ctx_inject` from the session ptr). Both are
+   in-scope-of-intent; recorded here since no write-set line in TASKS.md names them.
 
 ## Validations
 
@@ -230,6 +302,18 @@ the closure nit fixes above):
   reality (explicit operator confirmation obtained before commit).
 - `specs/memory/product/index.md` / `catalog.json` — no change: no feature added or
   removed; catalog order unchanged.
+
+rc-3 additions (DEFINITION window for M-1/M-2/M-3 at `e93a7d8`; CLOSURE polish after
+the delta re-audit):
+
+- `specs/memory/product/sdd/sdd-gate-v3.md` — M-1/M-2 (format-law claim re-attributed
+  to constitution §3; Codex PostToolUse row → matcher-less match-all); closure polish:
+  doctor format check stated to exact truth (`.html` only via SPEC-DOC-002L; no
+  `.yaml/.yml` check exists — audit INFO residual).
+- `specs/memory/product/index.md` — M-3: regenerated to frontmatter/catalog truth
+  (generator-verified byte-identical thereafter).
+- `specs/memory/product/sdd/specs-doctor.md` — SPEC-DOC-030 audits-naming WARN added
+  to the ledger-invariant inventory (T-010-34).
 
 ## Backlog returns
 

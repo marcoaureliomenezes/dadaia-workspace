@@ -35,4 +35,4 @@
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, mandatory grill; alpha-N/rc-N; PM curates backlog (convention). |
 | `sdd-gate-v3` | sdd-gate-v3 | SDD gate v0.1.10: classificador context-relative; lease O_EXCL CAS com pid veto; heartbeat PostToolUse harness-native; READ non-acquiring. |
 | `sdd-hotfix-track` | sdd-hotfix-track | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
-| `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-029, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4. |
+| `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-030, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4. |
