@@ -244,3 +244,126 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 T-010-13/17/26 modify `dadaia_workspace/public/**`. After each:
 `dadaia public stage && dadaia public install --target all && dadaia public doctor`
 (exit 0 required before the final gate).
+
+---
+
+## rc-3 (in-release iteration amendment — 2026-06-10)
+
+> **Amendment note:** rc-3 added 2026-06-10 after the verification audit
+> `specs/audits/2026-06-10T140553Z/` FAILED two lanes at the ≥9 bar (architecture
+> 8.5 — finding A1 dead SPEC-DOC-029 backstop + A2/A3/A4 residuals; memory 8.5 —
+> findings M-1/M-2/M-3). Same SPEC scope; **Status stays Aprovado** (no scope
+> change — this section remediates defects in already-claimed v0.1.10 deliverables).
+> The release was un-archived from `specs/_archive/` back to `specs/releases/v0.1.10/`;
+> PR #53 remains unmerged pending all lanes ≥9.
+>
+> PE-exclusive findings were fixed directly in this amendment commit, not as tasks:
+> M-1/M-2 (`specs/memory/product/sdd/sdd-gate-v3.md` — false `.html/.yaml/.yml`
+> gate-enforcement claim re-attributed to constitution §3 law; Codex PostToolUse
+> table row corrected to matcher-less match-all per `runtime_config.py:187-190`),
+> M-3 (`specs/memory/product/index.md` regenerated to frontmatter/catalog truth),
+> S-1 (constitution §8 mode chain amended to the 4-step env → self record →
+> live-checked context incumbent → IMPLEMENTATION), S-2 (constitution §8 naming-law
+> amendment: law unchanged, four audit dirs grandfathered with rationale — forward
+> enforcement is T-010-34), S-3 (CLOSURE R6 dead "mapping README" reference corrected
+> + drift `archive-mapping-readme-not-shipped` recorded).
+
+### [x] T-010-30 — Make the SPEC-DOC-029 lease↔session coherence backstop real
+- **Owner:** software-engineer · **Maps:** audit A1 (HIGH) — dead D-2 backstop
+- **Write set:** `dadaia_workspace/features/specs/doctor.py`,
+  `dadaia_workspace/features/spec_context/session_identity.py` (wiring only),
+  `tests/unit/features/specs/test_doctor_ledger_invariants.py`,
+  `tests/integration/` (new coherence integration test)
+- **Preconditions:** none (first rc-3 task; T-010-31 sequenced after it).
+- **Problem:** `doctor.py:1188` globs `*.lock`, but lease records are written as
+  `<ctx>.lock.json` (`lease.py:151`) — the invariant can never fire on any artifact
+  production writes; its unit test passes only via a fabricated `<ctx>.lock` fixture
+  no production path creates. `session_identity.coherence()` (the designed API,
+  docstring says "the doctor consumes it as a backstop") has zero production callers.
+- **Acceptance:** SPEC-DOC-029 reads the real `<ctx>.lock.json` records (via
+  `lease.read_record` and/or `session_identity.coherence` — ONE implementation, no
+  duplicate logic); a deliberately incoherent lease↔session pair **created on disk
+  via the production writers** (`lease.acquire` + the session-record CLI writer)
+  makes `dadaia specs doctor` flag SPEC-DOC-029; the fabricated-fixture test is
+  replaced by one exercising the production-written files; suite green, `mypy
+  --strict` clean.
+- **Parallelism:** blocks T-010-31; disjoint from T-010-32/33/34.
+
+### [x] T-010-31 — Prune session_identity dead exports + write-only session ptr
+- **Owner:** software-engineer · **Maps:** audit A2 (MEDIUM)
+- **Write set:** `dadaia_workspace/features/spec_context/session_identity.py`,
+  `dadaia_workspace/hooks/ctx_inject.py`,
+  `dadaia_workspace/features/spec_context/doctor.py` (GC sweep, if the ptr is removed),
+  `tests/unit/features/spec_context/test_session_identity.py`,
+  `tests/contract/test_session_store_ownership.py`
+- **Preconditions:** T-010-30 `[x]` (it decides whether `coherence` gains a caller).
+- **Acceptance:** every public name in `session_identity.py` has a production caller
+  or is deleted — specifically resolve `read_session_ptr`, `record_for`, the
+  `incumbent` read-alias, `gc_orphan_session_ptr`, and whatever remains uncalled
+  after T-010-30 wires `coherence`. The session-keyed `<sid>.ptr` written by
+  `ctx_inject.py:100-107` is read by nothing: either give it a real reader (justify
+  in the commit) or stop writing it and remove its GC sweep. Suite green.
+- **Parallelism:** after T-010-30; disjoint from T-010-32/33/34.
+
+### [x] T-010-32 — Revive dead-by-skip e2e + kill XPASS/tautology test debt (qa lane)
+- **Owner:** software-engineer · **Maps:** qa lane findings (audit 140553Z)
+- **Write set:** `tests/e2e/features/test_panel.py`,
+  `tests/unit/hooks/test_sdd_post_gate.py` (docstring),
+  `tests/unit/infrastructure/test_process_probe_adapter.py` (xfail),
+  `tests/unit/features/panel/test_views_*.py` (consolidation)
+- **Preconditions:** none.
+- **Acceptance:** (1) the `test_panel.py:381` e2e (`test_memory_view_iframe_loads`) —
+  dead-by-skip behind a guard on retired `specs/memory/architecture.html` and a
+  docstring referencing retired `primary_context.json`, and latently targeting the
+  REAL workspace root (`cwd=_DADAIA_WORKSPACE_ROOT`) — is rewritten for
+  markdown-memory reality against a tmp workspace fixture so it **RUNS** (no skip)
+  and passes, OR is deleted with an explicit superseded-by note pointing at
+  `test_memory_byte_identity.py` (qa residual #1 allows either); (2)
+  `test_pid_zero_documented_as_xfail` becomes a plain documented test or
+  `strict=True` with a platform guard — zero XPASS in the suite run; (3) the stale
+  "baselines this file" docstring in `test_sdd_post_gate.py:4-6` is corrected to the
+  post-rc-2 zero-baseline contract; (4) the panel `test_views_*` near-tautology
+  family (`*_returns_string` smokes + duplicated id asserts, ~15–20 tests) is
+  consolidated into behavior-bearing tests with zero coverage loss; suite green.
+- **Parallelism:** independent; disjoint write set from all other rc-3 tasks.
+
+### [x] T-010-33 — Freeze the verified layering graph (reverse-direction contracts)
+- **Owner:** software-engineer · **Maps:** audit A3 (MEDIUM) + A4 (cap note)
+- **Write set:** `setup.cfg`,
+  `dadaia_workspace/features/public/model_resolution.py`,
+  `tests/contract/test_import_linter_ignore_cap.py`,
+  unit tests touched by the model_resolution change
+- **Preconditions:** none.
+- **Acceptance:** (1) import-linter gains reverse-direction coverage for the layers
+  the architect found clean-by-discipline-only — core ↛ {features, infrastructure,
+  cli, hooks}; infrastructure ↛ {features, cli, hooks} — via a `layers`-type (or
+  equivalent forbidden) contract; (2) the one live cross-feature import
+  (`features/public/model_resolution.py:38` → `features.telemetry.pricing.PRICING_TABLE`)
+  is removed by consuming `core/model_registry` (the single source both views derive
+  from) instead of reaching into a sibling feature; (3) `lint-imports` green; (4) the
+  `ignore_imports` cap is **not increased** (≤17) and the cap test carries a shrink
+  note pointing at backlog `features-import-infrastructure-direct-debt`; suite +
+  `mypy --strict` green.
+- **Parallelism:** independent; disjoint from T-010-30/31/32/34.
+
+### [x] T-010-34 — Doctor WARN for non-conforming new specs/audits/ dirs (S-2 enforcement)
+- **Owner:** software-engineer · **Maps:** spec/ledger S-2 + residual #5; constitution
+  §8 naming-law amendment (2026-06-10)
+- **Write set:** `dadaia_workspace/features/specs/doctor.py`,
+  `tests/unit/features/specs/test_doctor_ledger_invariants.py`
+- **Preconditions:** none (constitution amendment already landed in this rc-3 commit).
+- **Acceptance:** `dadaia specs doctor` emits a WARNING for any `specs/audits/`
+  directory not matching `<YYYYMMDDTHHMMSSZ>-<session_id_8chars>` EXCEPT the four
+  grandfathered dirs named in the §8 amendment (`2026-06-09T075056Z`,
+  `2026-06-10T010550Z`, `2026-06-10T052944Z`, `2026-06-10T140553Z`) and
+  `specs/audits/_archive/`; a synthetic new dir (e.g. `2026-07-01T000000Z/`)
+  triggers the WARN in tests; the current tree stays 0 errors; suite green.
+- **Parallelism:** shares `doctor.py` with T-010-30 — sequence after T-010-30 or
+  coordinate the merge; otherwise independent.
+
+### rc-3 closure note
+
+When all rc-3 tasks are `[x]`: re-run the final-gate checklist (T-010-28 items 1–10),
+re-dispatch the verification audit lanes, and amend `CLOSURE.md` with an `## rc-3
+amendment` section (tasks, SHAs, re-audit scores) before re-archiving and merging
+PR #53.

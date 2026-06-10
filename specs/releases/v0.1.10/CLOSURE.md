@@ -96,7 +96,7 @@ chain: 2,779 (`f77e96c`) → 2,792 (`fc388d7`) → 2,795 (`9ca2d2a`).
 | R3 session identity: single-owner residue grep + coherence contract | `pytest -p no:cacheprovider -q tests/contract/test_session_store_ownership.py tests/unit/features/spec_context/test_session_identity.py` | green at `9ca2d2a` (in full-suite run below) |
 | R4 mode channel: bind no-mode exits 0; READ non-acquiring via incumbent, no env vars | `dadaia context bind dadaia-workspace` + `pytest tests/integration/gate/test_read_mode_non_acquiring.py` | audit AC-R4-01 sampled **PASS** (`cli/commands/context.py:355-399`, `gate_policy.py:84-112`); final-gate check 9 |
 | R5 test kernel: full suite green at HEAD | `pytest -p no:cacheprovider -q` | **2795 passed, 8 skipped, 1 xpassed, exit 0** at `9ca2d2a` (coordinator green run, recorded in audit §6) |
-| R6 ledger: doctor invariants live on the repaired ledger | `dadaia specs doctor` | **0 errors / 19 warnings** with SPEC-DOC-024..029 active (audit §3a); v0.1.9 retro-CLOSURE at `specs/_archive/releases/v0.1.9/CLOSURE.md`; archive renames + mapping README |
+| R6 ledger: doctor invariants live on the repaired ledger | `dadaia specs doctor` | **0 errors / 19 warnings** with SPEC-DOC-024..029 active (audit §3a); v0.1.9 retro-CLOSURE at `specs/_archive/releases/v0.1.9/CLOSURE.md`; archive renames — alpha-N↔milestone mapping preserved in each `specs/_archive/releases/v0.2.0/alpha-N/SPEC.md` header (original milestone id + "Milestone within: v0.2.0"); the SPEC-promised standalone mapping README was never created (see drift `archive-mapping-readme-not-shipped`) |
 | R6 surface honesty: contradiction table C-1..C-14 → commit/file:line | (review) | T-010-17 handoff `2026-06-10T044640Z-ai-engineer-t-010-17-honesty-rewrite-continuation.handoff.json`; ai lane re-audit "remaining theater: none" |
 | R6 projections clean after quartet retirement + matcher scoping | `dadaia public stage && dadaia public install --target all && dadaia public doctor` | exit 0, `[ok] public-privacy` (final gate checks 5; T-010-13/17/18 handoffs) |
 | R7 security tail: loopback 401, dead() review gate + secret scan, privacy baseline, token tighten | `pytest` (panel/auth, spec_context service, privacy_check suites) | AC-R7-01/02/03 green; final-gate check 10 (tokenless loopback → 401); security lane 9.0 at `f77e96c` + architect adversarial probe of the rc-2 diff (audit §2.3) |
@@ -191,6 +191,21 @@ filed (LOW) against the in-flight working tree (T-010-04/05/08 partially integra
 
 **Resolution:** Verified not reproducible on the integrated tree (isolation supplied by
 T-010-07/10/11); bug closed with the repro commands green. No plan change.
+
+**Memory updates:** none.
+
+### archive-mapping-readme-not-shipped
+
+**Description:** SPEC D-4/D-5 and T-010-15 promised a standalone "mapping README" for
+the `_archive/releases/v0.2.0/` alpha-N renames; the rc-3 verification audit
+(2026-06-10T140553Z, finding S-3) confirmed no such README exists anywhere under
+`specs/_archive/` — the original R6 evidence row cited a non-existent artifact.
+
+**Resolution:** Claim corrected at rc-3 (this amendment). The mapping is in fact
+preserved — each renamed `alpha-N/SPEC.md` header retains its original milestone id
+plus a "Milestone within: v0.2.0" line, so archaeology is fully recoverable without a
+separate README. The standalone README is dropped as redundant rather than
+retro-created inside the FROZEN archive.
 
 **Memory updates:** none.
 

@@ -47,7 +47,7 @@ mesma que governa paths workspace-root. Um restante in-repo sem classe é MUTATI
 | UNGATED | Demais paths workspace-root (ex. fora de specs/.dadaia) | Allow |
 
 **Regras (o que o gate realmente enforça):**
-- **RULE A (memory atomicity):** `specs/memory/**` fora de DEFINITION/CLOSURE → block. Formatos legados `.html`, `.yaml`, `.yml` → block sempre.
+- **RULE A (memory atomicity):** `specs/memory/**` fora de DEFINITION/CLOSURE → block. O gate classifica apenas por **path**, nunca por formato/extensão — a proibição de formatos legados `.html`/`.yaml`/`.yml` em memory é lei de formato committed (constitution §3, verificada post-hoc pelo `dadaia specs doctor`), não mecanismo do gate.
 - **RULE B (archive read-only):** `specs/_archive/**` → block sempre — inclusive in-repo.
 - **RULE READ (mode channel):** sessão com modo resolvido READ/BOUND_READ é non-acquiring — write MUTATING bloqueado **antes** de qualquer chamada ao lease; ADDITIVE flui. Resolução de modo: `DADAIA_MODE` env (escape de operador) → `mode` do session record keyed pelo sid harness-native (vence o incumbent) → modo do **incumbent do contexto** (`sessions/runtime/<ctx>.ptr`, atualizado pelo `bind` — o caminho harness-real do fluxo default; ignorado se um lease vivo nomeia outro sid, anti-downgrade guard) → default `IMPLEMENTATION`.
 - **PROTECTED (SEC-01):** `.dadaia/sessions/**` é CLI-owned; block incondicional protege o `.ptr` de forgery.
@@ -178,5 +178,5 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 Runtime| PreToolUse| PostToolUse| Observação
 ---|---|---|---
 Claude Code| `.claude/settings.json` `hooks.PreToolUse[*]` matcher `Edit\|Write\|MultiEdit\|NotebookEdit`| `hooks.PostToolUse[*]` matcher `*` (todos os tools)| `python -m dadaia_workspace.hooks.sdd_gate`; Python puro (Windows/macOS/Linux); instalado via `dadaia public install --target claude`
-Codex| `.codex/hooks.json` `PreToolUse` matcher `^(apply_patch\|Edit\|Write)$`| `PostToolUse` mesmo write matcher| `SessionStart` (matcher `startup\|resume`) injeta o contexto uma vez por sessão via ctx_inject
+Codex| `.codex/hooks.json` `PreToolUse` matcher `^(apply_patch\|Edit\|Write)$`| `PostToolUse` **sem matcher** (forma canônica match-all do Codex — heartbeat em todos os tools, incl. Bash)| `SessionStart` (matcher `startup\|resume`) injeta o contexto uma vez por sessão via ctx_inject
 OpenCode| Plugin TS `sdd-gate.ts` (`tool.execute.before`) chama os hooks Python via subprocess| sem post-hook separado (doctor reporta `[unsupported]` — esperado)| venv-path resolution `.dadaia/.venv/bin/python` → `Scripts/python.exe` → `python`

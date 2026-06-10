@@ -263,6 +263,19 @@ discriminator so two concurrent sessions never collide on a path:
 (`specs/backlog/**` is exempt because `project-manager` is its sole writer; the rule
 binds wherever multiple sessions may write the same tree.)
 
+> **Amendment (2026-06-10, v0.1.10 rc-3 — audit finding S-2):** the naming law above
+> stands **unchanged** for all new audit output — seven existing audit directories
+> comply with it and the collision rationale holds. Four directories created during
+> the v0.1.9/v0.1.10 audit cycles violate it (`2026-06-09T075056Z/`,
+> `2026-06-10T010550Z/`, `2026-06-10T052944Z/`, `2026-06-10T140553Z/`: non-compact
+> timestamp, no session discriminator). They are **grandfathered in place, not
+> renamed**: the creating sessions' ids are unrecoverable (fabricating a
+> discriminator would falsify the ledger), and their timestamps are cross-referenced
+> inside committed audit lane reports, which are immutable — renaming would break
+> the audit ledger to satisfy form. Forward enforcement moves from pure discipline
+> to a `dadaia specs doctor` WARNING on any new non-conforming `specs/audits/`
+> directory, with exactly these four as the grandfather list (rc-3 task T-010-34).
+
 **MUTATING phases (5/6/8):** write targets are `specs/releases/<id>/**`, the
 active context's production tree (`repos/<ctx>/` for a consumer repo, or
 `dadaia_workspace/**` when dadaia-workspace is the bound context), and
@@ -288,13 +301,27 @@ gets EEXIST), so a renewal can never interleave with a foreign acquire.
 
 **Session mode channel:** `dadaia context bind <ctx>` (`--mode` optional, default
 `read`) persists the bound mode in the CLI-owned session record — the store the gate
-actually reads. The gate resolves a session's mode as: `DADAIA_MODE` env override
-(operator-shell escape) → session-record `mode` → default `IMPLEMENTATION`. A
-READ-bound session is **non-acquiring**: MUTATING writes are blocked before any
+actually reads — **and refreshes the context's incumbent pointer**
+(`.dadaia/sessions/runtime/<ctx>.ptr`) at bind time. The gate resolves a session's
+mode as a four-step chain, first hit wins:
+
+1. `DADAIA_MODE` env override (operator-shell escape; no harness sets it);
+2. the session record keyed by the **harness-native session id** — a session that
+   bound itself wins over the incumbent pointer, so a live implementation session
+   is never downgraded by another session's stale read-bind;
+3. the **context incumbent**: the mode of the session named by the context's
+   incumbent pointer, refreshed by `bind`. This is the harness-real path for the
+   default bind flow (the bind CLI mints a sid the running harness never reports,
+   but the pointer binds the *context*). An **anti-downgrade guard** ignores the
+   incumbent when a **live** lease holder (canonical TTL + pid-probe liveness)
+   names a different session — a dead leftover record does not defeat a fresh bind;
+4. default `IMPLEMENTATION`.
+
+A READ-resolved session is **non-acquiring**: MUTATING writes are blocked before any
 lease call (a read session never takes, renews, or steals a lease) while ADDITIVE
-writes flow. A session with no bind and no env (every plain harness session)
-defaults to IMPLEMENTATION and may acquire a **free** lease, but may never take
-over a live-probed holder.
+writes flow. A session with no bind, no env, and no incumbent binding (every plain
+harness session) defaults to IMPLEMENTATION and may acquire a **free** lease, but
+may never take over a live-probed holder.
 
 Lock resolution is **reclaim-iff-stale, yield-iff-live-foreign**: the gate reclaims
 and heals on an absent lease or an expired lease whose holder is dead (it never
