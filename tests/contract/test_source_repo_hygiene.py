@@ -29,6 +29,10 @@ def test_sdd_release_gate_artifacts_are_not_gitignored() -> None:
         "specs/_archive/releases/v9.9.8/PLAN.md",
         "specs/_archive/releases/v9.9.8/TASKS.md",
         "specs/_archive/releases/v9.9.8/CLOSURE.md",
+        # Bug records are repository truth (bug-registration-guardrail); the
+        # /specs/* privacy backstop must not hide them from review/CI.
+        "specs/bugs/some-bug.md",
+        "specs/audits/20991231T235959Z/index.md",
     ]
 
     ignored = [path for path in visible_paths if _is_ignored(path)]
@@ -40,7 +44,7 @@ def test_noncanonical_specs_content_stays_gitignored() -> None:
     """Only canonical lifecycle artifacts are opted back into version control."""
     ignored_paths = [
         "specs/backlog/candidates.md",
-        "specs/bugs/some-local-bug.md",
+        "specs/bugs/non-markdown-attachment.png",
         "specs/releases/v9.9.9/local-notes.md",
         "specs/releases/v9.9.9/tmp/debug.json",
         "specs/_archive/releases/v9.9.8/local-notes.md",

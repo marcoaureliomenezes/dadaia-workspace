@@ -109,6 +109,7 @@ pip-wheel-metadata/
 # Bug records are repository truth (bug-registration-guardrail mandates
 # registration in specs/bugs/ with redacted content): opt in ONLY *.md.
 !/specs/bugs/
+/specs/bugs/*
 !/specs/bugs/*.md
 !/specs/releases/
 !/specs/releases/ACTIVE.md
