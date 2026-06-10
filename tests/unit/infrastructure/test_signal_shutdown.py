@@ -19,7 +19,6 @@ Scenarios:
 from __future__ import annotations
 
 import signal
-import sys
 from http.server import ThreadingHTTPServer
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -184,12 +183,12 @@ def test_posix_handler_calls_shutdown_in_thread_on_sigint() -> None:
 
 def test_container_returns_posix_handler_on_linux() -> None:
     """build_shutdown_handler() must return PosixSignalShutdownHandler on linux."""
-    with patch.object(sys, "platform", "linux"):
-        import importlib
+    from dadaia_workspace.core.platform import Capabilities
 
+    linux_caps = Capabilities.detect("linux")
+    with patch("dadaia_workspace.core.platform.PLATFORM", linux_caps):
         import dadaia_workspace.container as _c
 
-        importlib.reload(_c)
         handler = _c.build_shutdown_handler()
 
     assert isinstance(handler, PosixSignalShutdownHandler), (
@@ -199,12 +198,12 @@ def test_container_returns_posix_handler_on_linux() -> None:
 
 def test_container_returns_posix_handler_on_darwin() -> None:
     """build_shutdown_handler() must return PosixSignalShutdownHandler on darwin."""
-    with patch.object(sys, "platform", "darwin"):
-        import importlib
+    from dadaia_workspace.core.platform import Capabilities
 
+    darwin_caps = Capabilities.detect("darwin")
+    with patch("dadaia_workspace.core.platform.PLATFORM", darwin_caps):
         import dadaia_workspace.container as _c
 
-        importlib.reload(_c)
         handler = _c.build_shutdown_handler()
 
     assert isinstance(handler, PosixSignalShutdownHandler), (
@@ -214,12 +213,12 @@ def test_container_returns_posix_handler_on_darwin() -> None:
 
 def test_container_returns_windows_handler_on_win32() -> None:
     """build_shutdown_handler() must return WindowsSignalShutdownHandler on win32."""
-    with patch.object(sys, "platform", "win32"):
-        import importlib
+    from dadaia_workspace.core.platform import Capabilities
 
+    win32_caps = Capabilities.detect("win32")
+    with patch("dadaia_workspace.core.platform.PLATFORM", win32_caps):
         import dadaia_workspace.container as _c
 
-        importlib.reload(_c)
         handler = _c.build_shutdown_handler()
 
     assert isinstance(handler, WindowsSignalShutdownHandler), (

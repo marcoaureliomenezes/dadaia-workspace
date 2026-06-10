@@ -3,11 +3,14 @@
 Pure orchestration: the check list lives here (single source of truth), and the
 runner is injectable so tests can exercise pass/fail aggregation without spawning
 real subprocesses.
+
+The ``subprocess_runner`` factory — which contains the only subprocess call for
+this feature — lives in ``dadaia_workspace.infrastructure.subprocess_runner`` and
+is re-exported here for backwards compatibility.
 """
 
 from __future__ import annotations
 
-import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,25 +62,14 @@ def checks_for(quick: bool = False) -> tuple[Check, ...]:
 
 
 def subprocess_runner(cwd: Path) -> Runner:
-    """Build a runner that executes each check as a subprocess under ``cwd``."""
+    """Build a runner that executes each check as a subprocess under ``cwd``.
 
-    def _run(argv: Sequence[str]) -> tuple[int, str]:
-        try:
-            proc = subprocess.run(  # noqa: S603 — argv is a fixed, trusted check list
-                list(argv),
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError as exc:
-            # The check binary (e.g. 'poetry') is not on PATH. Fail this check
-            # gracefully instead of letting a raw FileNotFoundError traceback escape to
-            # the CLI (bug: ci-preflight-raw-traceback-when-poetry-absent).
-            missing = exc.filename or (argv[0] if argv else "command")
-            return 127, f"command not found: {missing} — install it or run the checks directly."
-        return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+    Delegates to ``dadaia_workspace.infrastructure.subprocess_runner.subprocess_runner_for_ci``
+    so that this module never imports ``subprocess`` directly.
+    """
+    from dadaia_workspace.infrastructure.subprocess_runner import subprocess_runner_for_ci
 
-    return _run
+    return subprocess_runner_for_ci(cwd)
 
 
 def run_preflight(

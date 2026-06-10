@@ -27,7 +27,7 @@
 | `spec-context-project` | spec-context-project | The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0). |
 | `context-management` | context-management | multi-context ALIVE/DEAD; bind exports DADAIA_SESSION_ID; one cross-platform TTL-lease per context (O_EXCL CAS, 120s) via WorkspaceLock/ContextLock ports. |
 | `cross-platform-portability` | cross-platform-portability | dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash). |
-| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 17 skills / 2 workflows / Codex .rules). |
+| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional (v0.1.6 lock model). |
 | `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente. |

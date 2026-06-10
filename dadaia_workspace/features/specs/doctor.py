@@ -51,7 +51,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -59,6 +58,8 @@ from enum import StrEnum
 from pathlib import Path
 
 import yaml
+
+from dadaia_workspace.core.protocols.process_runner import ProcessResult, ProcessRunner
 
 CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
 CANONICAL_PHASES = {
@@ -372,6 +373,7 @@ class SpecsDoctor:
         specs_dir: Path,
         public_dir: Path | None = None,
         templates_dir: Path | None = None,
+        process_runner: ProcessRunner | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
@@ -392,6 +394,10 @@ class SpecsDoctor:
             )
         else:
             self._scaffold_dir = None
+
+        # ProcessRunner: injected for tests/DI; lazily resolved to the infra adapter in
+        # production when not provided.
+        self._process_runner: ProcessRunner | None = process_runner
 
     def check(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
@@ -1485,14 +1491,18 @@ class SpecsDoctor:
                 )
             ]
 
+        runner = self._process_runner
+        if runner is None:
+            from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
+
+            runner = SubprocessProcessRunner()
+
         try:
-            result = subprocess.run(
+            proc_result: ProcessResult = runner.run(
                 [sys.executable, str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
-                capture_output=True,
-                text=True,
                 timeout=30,
             )
-        except subprocess.TimeoutExpired:
+        except TimeoutError:
             return [
                 SpecsDoctorIssue(
                     code="LINT-1",
@@ -1510,9 +1520,8 @@ class SpecsDoctor:
                     path=str(mem_dir),
                 )
             ]
-
         # Exit codes: 0 = clean, 1 = at least one ERROR, 2 = warnings only
-        output = (result.stdout + result.stderr).strip()
+        output = (proc_result.stdout + proc_result.stderr).strip()
         # Drop the lint script's own "Summary: N OK, M WARN, K ERROR" line — it is scoped to
         # memory atoms only and, embedded in this issue's text, was mistaken for the doctor's
         # OVERALL verdict (bug: specs-doctor-dual-error-counter-confusing-output). The doctor
@@ -1522,9 +1531,9 @@ class SpecsDoctor:
         ).strip()
         issues: list[SpecsDoctorIssue] = []
 
-        if result.returncode == 0:
+        if proc_result.returncode == 0:
             return []
-        if result.returncode == 1:
+        if proc_result.returncode == 1:
             # ERRORs present
             issues.append(
                 SpecsDoctorIssue(
@@ -1537,7 +1546,7 @@ class SpecsDoctor:
                     path=str(mem_dir),
                 )
             )
-        elif result.returncode == 2:
+        elif proc_result.returncode == 2:
             # Warnings only (e.g. token_estimate drift)
             issues.append(
                 SpecsDoctorIssue(
@@ -1557,7 +1566,7 @@ class SpecsDoctor:
                     severity=Severity.WARNING,
                     description=(
                         f"LINT-1: lint-memory-atoms.py exited with unexpected code "
-                        f"{result.returncode}:\n{output}"
+                        f"{proc_result.returncode}:\n{output}"
                     ),
                     path=str(mem_dir),
                 )

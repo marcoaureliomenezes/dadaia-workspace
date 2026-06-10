@@ -56,7 +56,7 @@ modelos próprios fora do default público.
 
 Agente| Modelo| Nota
 ---|---|---
-project-manager| `claude-sonnet-4-6`| Dispatcher / lease coordinator
+project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator
 project-auditor| `claude-sonnet-4-6`| Dispatcher / audit fan-out
 product-engineer| `claude-sonnet-4-6`| Curator / memory guardian
 software-engineer| `claude-sonnet-4-6`| Implementation leaf (absorbs python/node/backend)

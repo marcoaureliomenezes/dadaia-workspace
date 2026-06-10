@@ -3,12 +3,30 @@
 import io
 import json
 import tarfile
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core.models.import_ import ImportOptions
+from dadaia_workspace.core.protocols.process_runner import ProcessResult
 from dadaia_workspace.features.import_.service import ImportService
+
+
+class _FakeProcessRunner:
+    """Fake ProcessRunner for injection into ImportService."""
+
+    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
+        self._result = ProcessResult(returncode=returncode, stdout=stdout, stderr=stderr)
+
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path | None = None,
+        timeout: float | None = None,
+    ) -> ProcessResult:
+        return self._result
 
 
 def _make_archive(
@@ -329,11 +347,9 @@ def test_run_full_path_without_activate(tmp_path: Path) -> None:
 
 
 def test_restore_contexts_activate_succeeds(tmp_path: Path) -> None:
-    from unittest.mock import MagicMock, patch
-
     from dadaia_workspace.core.models.import_ import ImportManifest
 
-    svc = ImportService(workspace_root=tmp_path)
+    svc = ImportService(workspace_root=tmp_path, process_runner=_FakeProcessRunner(returncode=0))
     manifest = ImportManifest(
         version="1",
         exported_at="2026-01-01T00:00:00Z",
@@ -344,21 +360,17 @@ def test_restore_contexts_activate_succeeds(tmp_path: Path) -> None:
         mnt_included=False,
         reports_included=False,
     )
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    with patch(
-        "dadaia_workspace.features.import_.service.subprocess.run", return_value=mock_result
-    ):
-        errors = svc.restore_contexts(manifest, tmp_path, skip=False)
+    errors = svc.restore_contexts(manifest, tmp_path, skip=False)
     assert errors == ()
 
 
 def test_restore_contexts_activate_fails(tmp_path: Path) -> None:
-    from unittest.mock import MagicMock, patch
-
     from dadaia_workspace.core.models.import_ import ImportManifest
 
-    svc = ImportService(workspace_root=tmp_path)
+    svc = ImportService(
+        workspace_root=tmp_path,
+        process_runner=_FakeProcessRunner(returncode=1, stderr="git clone failed"),
+    )
     manifest = ImportManifest(
         version="1",
         exported_at="2026-01-01T00:00:00Z",
@@ -369,15 +381,22 @@ def test_restore_contexts_activate_fails(tmp_path: Path) -> None:
         mnt_included=False,
         reports_included=False,
     )
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stderr = "git clone failed"
-    with patch(
-        "dadaia_workspace.features.import_.service.subprocess.run", return_value=mock_result
-    ):
-        errors = svc.restore_contexts(manifest, tmp_path, skip=False)
+    errors = svc.restore_contexts(manifest, tmp_path, skip=False)
     assert len(errors) == 1
     assert "ctx1" in errors[0]
+
+
+def test_bootstrap_raises_runtime_error_on_nonzero_exit(tmp_path: Path) -> None:
+    """bootstrap() must raise RuntimeError when `dadaia init` exits non-zero, so the
+    CLI's (ValueError, RuntimeError) handler surfaces a clean message instead of an
+    uncaught traceback (T-CODE-01 regression guard: the old subprocess.run(check=True)
+    raised CalledProcessError; the adapter path now maps non-zero to RuntimeError)."""
+    svc = ImportService(
+        workspace_root=tmp_path,
+        process_runner=_FakeProcessRunner(returncode=2, stderr="init failed"),
+    )
+    with pytest.raises(RuntimeError, match="dadaia init failed"):
+        svc.bootstrap(tmp_path)
 
 
 # test_restore_contexts_with_primary_promote_fails was removed in v2:

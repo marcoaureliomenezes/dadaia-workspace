@@ -1,17 +1,31 @@
 """Workspace import feature — restores a workspace from a dadaia export archive."""
 
 import json
-import subprocess
 import sys
 import tarfile
 from pathlib import Path
 
 from dadaia_workspace.core.models.import_ import ImportManifest, ImportOptions, ImportResult
+from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 
 
 class ImportService:
-    def __init__(self, workspace_root: Path) -> None:
+    def __init__(
+        self,
+        workspace_root: Path,
+        process_runner: ProcessRunner | None = None,
+    ) -> None:
         self._workspace_root = workspace_root
+        # ProcessRunner: injected for tests/DI; lazily resolved to the infra adapter in
+        # production when not provided.
+        self._process_runner: ProcessRunner | None = process_runner
+
+    def _get_runner(self) -> ProcessRunner:
+        if self._process_runner is None:
+            from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
+
+            self._process_runner = SubprocessProcessRunner()
+        return self._process_runner
 
     # ── Phase 1 ─────────────────────────────────────────────────────────────
 
@@ -189,7 +203,11 @@ class ImportService:
 
     def bootstrap(self, workspace_root: Path) -> None:
         dadaia_bin = str(Path(sys.executable).parent / "dadaia")
-        subprocess.run([dadaia_bin, "init"], cwd=workspace_root, check=True)
+        result = self._get_runner().run([dadaia_bin, "init"], cwd=workspace_root)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"dadaia init failed (exit {result.returncode}): {result.stderr.strip()}"
+            )
 
     # ── Phase 5 ─────────────────────────────────────────────────────────────
 
@@ -207,12 +225,11 @@ class ImportService:
         alive = [c for c in manifest.contexts if c.get("state") in ("alive", "ativo")]
 
         dadaia_bin = str(Path(sys.executable).parent / "dadaia")
+        runner = self._get_runner()
         for ctx in alive:
-            result = subprocess.run(
+            result = runner.run(
                 [dadaia_bin, "context", "alive", str(ctx["name"])],
                 cwd=workspace_root,
-                capture_output=True,
-                text=True,
             )
             if result.returncode != 0:
                 errors.append(f"{ctx['name']}: {result.stderr.strip()}")

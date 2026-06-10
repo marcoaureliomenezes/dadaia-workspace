@@ -214,7 +214,7 @@ normative source once committed. The consolidated roadmap §1 is supporting cont
 |---|-------|-------|-----------|----------------|----------------|
 | 1 | Backlog definition | project-manager | `specs/backlog/**` | ADDITIVE | no lease — parallel |
 | 2 | Bug filing | any agent / auto | `specs/bugs/**` | ADDITIVE | no lease — parallel |
-| 3 | Research | researcher / PM-dispatched | `.dadaia/reports/**` | ADDITIVE | no lease — parallel |
+| 3 | Research | PM-dispatched | `.dadaia/reports/**` | ADDITIVE | no lease — parallel |
 | 4 | Audit | project-auditor | `specs/audits/<ts>-<session_id_8chars>/` | ADDITIVE | no lease — parallel |
 | 5 | Release definition (SPEC/PLAN/TASKS) | product-engineer | `specs/releases/<id>/**` | MUTATING | acquires the release lease |
 | 6 | Implementation | software-engineer | `repos/<ctx>/` prod + tests (or `dadaia_workspace/**` when dadaia-workspace is the bound context) | MUTATING | holds the release lease |

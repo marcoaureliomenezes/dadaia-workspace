@@ -20,7 +20,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 1500
 last_updated: '2026-06-09'
-release_origin: v0.2.0
+release_origin: 0.1.8
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2`

@@ -41,8 +41,7 @@ an expiry note.
 
 This atom is the design-of-record for implementers and qa-engineer. It is the
 canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the
-normative vision §6. The former location `specs/memory/product/sdd/quality-assurance.md`
-is non-conformant and staged for deletion at v0.2.1 CLOSURE.
+normative vision §6.
 
 ## Fluxo de uso
 

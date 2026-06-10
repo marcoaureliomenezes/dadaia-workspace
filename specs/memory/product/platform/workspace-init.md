@@ -14,7 +14,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 450
 last_updated: '2026-06-09'
-release_origin: memory-markdown-source-v1
+release_origin: 0.1.8
 ---
 
 CLI surface: `dadaia init [--workspace PATH] [--skip-assets]` · Closure: sdd-release-lifecycle-v1

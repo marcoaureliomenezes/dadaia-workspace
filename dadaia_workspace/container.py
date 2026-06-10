@@ -1,6 +1,5 @@
 """Composition root — builds services with concrete infrastructure."""
 
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -123,15 +122,19 @@ def _select_lock_adapter() -> Any:
 def build_shutdown_handler() -> Any:
     """Return the appropriate ShutdownHandler for the current platform.
 
-    Interim ``sys.platform`` guard inside the function body (not at module
-    level).  Post-TODO, replace the branch condition with
-    ``PLATFORM.has_sigterm`` once the PLATFORM flag is wired.
+    Reads ``PLATFORM.has_sigterm`` (the sole authorized platform capability flag)
+    and returns the POSIX adapter on platforms with effective SIGTERM support
+    (Linux, macOS), or the Windows adapter on platforms without it.  The import
+    is lazy so that importing ``container`` never triggers the Windows module's
+    guard on Linux/macOS.
 
     Returns:
         ``PosixSignalShutdownHandler`` on Linux / macOS (SIGTERM + SIGINT),
         or ``WindowsSignalShutdownHandler`` on Windows (SIGINT only).
     """
-    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_sigterm once PLATFORM flag added
+    from dadaia_workspace.core.platform import PLATFORM
+
+    if not PLATFORM.has_sigterm:
         from dadaia_workspace.infrastructure.signal_shutdown_windows import (
             WindowsSignalShutdownHandler,
         )

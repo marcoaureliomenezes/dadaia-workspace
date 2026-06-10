@@ -21,7 +21,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 3983
 last_updated: '2026-06-06'
-release_origin: v0.1.5
+release_origin: 0.1.6
 ---
 
 CLI surface: `dadaia panel [--port 4999] [--no-open] [--bind 127.0.0.1]` · Closure: panel-kanban-v1 · 2026-05-31

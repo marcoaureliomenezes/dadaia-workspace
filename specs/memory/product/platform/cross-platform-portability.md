@@ -5,11 +5,11 @@ category: product
 tldr: dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash).
 summary: Establishes the cross-platform foundation for dadaia-workspace v0.1.8 — a
   PLATFORM singleton (sole sys.platform call site), typed platform exceptions, 4 protocol
-  ports, 9 infrastructure adapters, a Python governance hooks package, and a phased 3-OS
-  CI matrix. Defines the 3-tier resilience contract (fail-loud for security, degrade-with-log
-  for non-security, unsupported-platform at construction). As of 0.1.8 rc-2 the Windows +
-  macOS unit/contract/importability CI legs are GREEN and HARD-GATED (branch-protection
-  required), and the classifier advertises POSIX::Linux + MacOS + Microsoft::Windows.
+  ports, 9 infrastructure adapters, a Python governance hooks package, and a hard-gated
+  3-OS CI matrix. Defines the 3-tier resilience contract (fail-loud for security,
+  degrade-with-log for non-security, unsupported-platform at construction). As of 0.1.8
+  rc-2 the Windows + macOS CI legs are GREEN and HARD-GATED (no continue-on-error;
+  branch-protection required); classifier is POSIX::Linux + MacOS + Microsoft::Windows.
 tags:
 - platform
 - cross-platform
@@ -132,18 +132,20 @@ Propagação de env (`DADAIA_HOOK_OUTPUT`/`DADAIA_HOOK_EVENT`) via Bun cross-pla
 
 `pre_push_ci.py` NÃO está no pacote. O hook `.sh` pre-push é retido (git-for-Windows ships bash).
 
-## CI matrix 3-OS (phased)
+## CI matrix 3-OS (graduated — hard-gated)
 
-**Phase 1 (atual):** `importability-smoke` job — `matrix.os: [windows-latest, macos-latest]`
-com `continue-on-error: true`. Confirma `python -c "import dadaia_workspace"` + `dadaia --help`.
+A matrix 3-OS está **HARD-GATED** desde rc-2 (0.1.8). Todos os `continue-on-error` foram
+removidos e o comentário `# GRADUATION-GATE:` foi eliminado. As legs Windows e macOS são
+agora required checks na branch-protection (6 contextos adicionados via API).
 
-**Phase 2 (atual):** `unit-fast` + `contract-coverage` jobs têm legs Windows/macOS com
-`continue-on-error: true` + `timeout-minutes: 8`. Comentário `# GRADUATION-GATE:` nas linhas
-`continue-on-error` — graduation ocorre quando um humano remove esse comentário após confirmar
-ambas as legs verdes em um CI run nomeado de `feature/0.1.8`.
+O classificador PyPI foi ampliado de `POSIX :: Linux` para
+`POSIX :: Linux + MacOS + Microsoft :: Windows` (não mais "OS Independent" provisório).
 
-**Phase 3 (pendente, ADR-3):** `continue-on-error` removido → hard-gate em todos os 3 OS.
-Após Phase 3 confirmada, o classificador PyPI volta de `POSIX :: Linux` para `OS Independent`.
+**Jobs com cobertura 3-OS (Linux/macOS/Windows):** `importability-smoke`, `unit-fast`,
+`contract-coverage` — todos hard-gated. Qualquer falha em Windows ou macOS bloqueia o merge.
+
+**Linux-only by design (nunca adicionar Win/macOS):** `integration`, `e2e-python`, `e2e-panel`.
+Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.
 
 **Linux-only by design (nunca adicionar Win/macOS):** integration, e2e-python, e2e-panel.
 Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.

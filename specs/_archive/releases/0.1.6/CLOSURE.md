@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Summary
+## Summary
 
 0.1.6 compiled the entire open backlog + all open bugs into one patch release over the
 published 0.1.5. It split into a **net-new** half (panel rework, specs-evolution migration
@@ -21,7 +21,7 @@ All 46 alpha tasks + the rc-1 ship trio are `[x]`. Full CI-equivalent suite gree
 **2358 passed, 2 skipped** (env-benign), `ruff format --check` + `ruff check` + `mypy --strict`
 clean.
 
-## 2. What shipped (by workstream)
+## What shipped (by workstream)
 
 | WS | Tasks | Outcome |
 |---|---|---|
@@ -33,27 +33,32 @@ clean.
 | WS-AGENTS | A01–A08 | A01 roster-reduction strategy record; A02 prune+orphan verified; A03 dangling refs verified-clean; A04/A06 bug `adopted:` → 0.1.6; A05 constitution plugin-stub exemption (§14+§12.1); A07 9-core+3-stub verified. **A08** (operator focus): software-architect specialized as anti-slop/anti-spaghetti reviewer + root-cause & architecture-fidelity review gates + new `architect-core-workflow` skill + WebSearch grant. |
 | rc-1 | R01–R04 | qa full-suite (R01), security-reviewer (R02), code-reviewer (R03), software-architect root-cause + architecture-fidelity gates — **all APPROVE**. This CLOSURE (R04). |
 
-## 3. Review evidence (rc-1)
+## Validations
 
-- **qa-engineer (R01):** full suite 2358 passed; ruff + mypy --strict clean. APPROVE.
-- **security-reviewer (R02):** APPROVE. One LOW (CWE-22) — `SESSION_ID`/`DADAIA_SESSION_ID`
-  unsanitized before filename use in `ctx-inject.sh` — **fixed** (`tr -cd 'a-zA-Z0-9_-'` +
-  non-empty guard, mirroring `sdd-spec-gate.sh`).
-- **code-reviewer (R03):** APPROVE (after re-verification — its two initial findings did not
-  survive contact with the actual code).
-- **software-architect (gates):** Root-cause gate **PASS** — Z04/C01/C03 are genuine
-  root-cause fixes, no workarounds. Architecture-fidelity gate **PASS** — the `core/`
-  placement of the migration primitives is the correct call (avoids the prohibited
-  feature→feature import, architecture.md:163). Two LOW doc findings — **fixed** (SPEC §5 +
-  PLAN write-set now list the `core/` modules with rationale).
+| Description | Command | Evidence |
+|-------------|---------|----------|
+| Full pytest suite green (2358 passed, 2 skipped) | `pytest` | 2358 passed, 2 skipped — qa-engineer R01 APPROVE |
+| Ruff format check clean | `ruff format --check .` | ruff format: clean — qa-engineer R01 APPROVE |
+| Ruff lint check clean | `ruff check .` | ruff check: no issues — qa-engineer R01 APPROVE |
+| Mypy strict type-check clean | `mypy --strict dadaia_workspace` | mypy --strict: clean — qa-engineer R01 APPROVE |
+| Security review: ctx-inject.sh SESSION_ID sanitization | manual + code review | CWE-22 LOW fixed: `tr -cd 'a-zA-Z0-9_-'` + non-empty guard — security-reviewer R02 APPROVE |
+| Architecture-fidelity gate: core/ placement of migration primitives | manual review | PASS — avoids prohibited feature→feature import (architecture.md:163) — software-architect APPROVE |
 
-## 4. Memory updated (CLOSURE phase, §13)
+## Drifts
 
-- `specs/memory/architecture.md` — ctx-inject.sh section: Codex `SessionStart` once-per-session
-  injection, stable `SESSION_ID` resolution (env + stdin, no `$$`), per-prompt silence.
-- `specs/memory/tech-stack.md` — Bash row: once-per-session injection + stable session-id keying.
+No significant implementation drifts from PLAN.md. The verify-and-reconcile workstreams
+(L01–L03, C04–C10, A02–A03, A07) confirmed pre-existing implementations rather than
+rebuilding — this was anticipated in the PLAN.
 
-## 5. Bug dispositions (root cause only — no workarounds)
+## Memory updates
+
+- `specs/memory/architecture.md` — ctx-inject.sh section updated: Codex `SessionStart`
+  once-per-session injection, stable `SESSION_ID` resolution (env + stdin, no `$$`),
+  per-prompt silence.
+- `specs/memory/tech-stack.md` — Bash row updated: once-per-session injection + stable
+  session-id keying.
+
+## Bug dispositions (root cause only — no workarounds)
 
 - `configure-hook-writes-malformed-duplicate-userpromptsubmit` → Fixed (Z04, root cause).
 - Codex session-key instability → Fixed (C01, root cause; `$$` removed).
@@ -62,12 +67,12 @@ clean.
 - `software-architect-workspace-specialization` (FEAT-SA-WORKSPACE-SPEC-01) → superseded by
   `software-architect-anti-slop-specialization` (FEAT-SA-ANTISLOP-01), implemented under A08.
 
-## 6. Remaining backlog (deferred, not dropped)
+## Remaining backlog (deferred, not dropped)
 
 - The 6 pre-existing memory-atom heading/token-estimate WARNs (curated-allowlist) — cosmetic.
 - 8 pre-existing SPEC-DOC-016 SemVer-folder WARNs on legacy release dirs.
 
-## 7. Operator-gated next steps (NOT performed)
+## Operator-gated next steps (NOT performed)
 
 1. `git mv specs/releases/0.1.6 specs/_archive/releases/0.1.6` after merge.
 2. Merge `feature/0.1.6` → `main`; tag `v0.1.6`.

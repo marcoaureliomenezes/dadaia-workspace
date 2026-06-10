@@ -16,16 +16,16 @@ tags:
 agent_tier: self-pull
 token_estimate: 1300
 last_updated: '2026-06-09'
-release_origin: v0.2.0
+release_origin: 0.1.8
 ---
 
-Assets: `.dadaia/scripts/sdd-spec-gate.sh` (PreToolUse) · `.dadaia/scripts/sdd-post-gate.sh` (PostToolUse) · Codex projeta `UserPromptSubmit` onde suportado.
+Assets: `python -m dadaia_workspace.hooks.sdd_gate` (PreToolUse) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse) · Codex projeta `UserPromptSubmit` onde suportado. Scripts bash legados `.dadaia/scripts/sdd-spec-gate.sh` e `.dadaia/scripts/sdd-post-gate.sh` retidos apenas como fallback; superseded desde 0.1.8.
 
 ## Propósito
 
-Par de hooks bash que intercepta invocações de ferramentas em Claude Code,
-Codex e equivalentes. `sdd-spec-gate.sh` decide **allow** ou **block** antes de
-writes; `sdd-post-gate.sh` renova o heartbeat do lease após cada tool call.
+Par de hooks Python que intercepta invocações de ferramentas em Claude Code,
+Codex e equivalentes. `dadaia_workspace.hooks.sdd_gate` decide **allow** ou **block** antes de
+writes; `dadaia_workspace.hooks.sdd_post_gate` renova o heartbeat do lease após cada tool call.
 
 O gate usa um **path-classifier de 5 classes**, aplicado sequencialmente:
 
@@ -63,25 +63,25 @@ O gate invoca `lease.py acquire <ctx> <session_id> <release> <mode>` para writes
 ## Fluxo de uso
 
 1. Agente invoca uma tool de escrita (ex. `Write` em `dadaia_workspace/foo.py`).
-2. Claude Code (ou Codex/OpenCode) executa o hook `sdd-spec-gate.sh` passando JSON em stdin com tool_name + file_path.
+2. Claude Code (ou Codex/OpenCode) executa o hook `python -m dadaia_workspace.hooks.sdd_gate` passando JSON em stdin com tool_name + file_path.
 3. O gate resolve `WORKSPACE_ROOT`, context/specs path, `releases/ACTIVE.md` para phase, e `DADAIA_SESSION_ID` do env.
 4. O path-classifier determina a classe do path.
 5. Para MUTATING: invoca `lease.py acquire`; verifica task `[-]`.
 6. Allow → exit 0 (silencioso); Block → STDOUT JSON `{"decision":"block","reason":"..."}`.
-7. Após o allow (PostToolUse), `sdd-post-gate.sh` renova o heartbeat do lease atomicamente.
+7. Após o allow (PostToolUse), o hook `python -m dadaia_workspace.hooks.sdd_post_gate` renova o heartbeat do lease atomicamente.
 
 ```mermaid
 sequenceDiagram
     participant T as Tool Write/Edit
     participant PreH as PreToolUse Hook
-    participant G as sdd-spec-gate.sh
+    participant G as hooks/sdd_gate.py (Python)
     participant C as Path Classifier
     participant A as releases/ACTIVE.md
     participant L as lease.py (O_EXCL CAS)
     participant K as releases/<id>/TASKS.md
     participant PostH as PostToolUse Hook
     T->>PreH: file_path
-    PreH->>G: stdin JSON
+    PreH->>G: stdin JSON (tool_name + file_path)
     G->>C: classify path
     alt ADDITIVE
         C-->>G: allow
@@ -111,7 +111,7 @@ sequenceDiagram
     end
     PreH-->>T: allow/block
     T->>PostH: tool completed
-    PostH->>G: renew heartbeat (atomic)
+    PostH->>G: renew heartbeat via sdd_post_gate.py (atomic)
 ```
 
 ## Trigger típico
@@ -127,7 +127,7 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
   * Read-only pelo PreToolUse gate: `releases/ACTIVE.md`, `releases/<active-id>/TASKS.md`.
   * Invoca (via subprocess): `lease.py acquire/steal/release/status` — acessa `.dadaia/states/ctx_locks/<ctx>.lock.json` e `.dadaia/sessions/runtime/<ctx>.ptr`.
   * Write pelo PostToolUse gate: renew heartbeat via `lease.py`.
-  * Logs: `/tmp/sdd-gate.log` (append-only audit log do gate).
+  * Logs: `.dadaia/logs/lock-events.jsonl` (append-only audit log do gate; eventos acquire, release, steal, HEARTBEAT).
   * Saída: STDOUT JSON quando bloqueia; exit 0 (silencioso) quando permite.
 
 ## Dependências
@@ -141,6 +141,6 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 
 Runtime| PreToolUse| PostToolUse| Observação
 ---|---|---|---
-Claude Code| `.claude/settings.json hooks.PreToolUse[*]`| `hooks.PostToolUse[*]`| Shell script direto; ambos instalados via `dadaia public install --target claude`
-Codex| `.codex/hooks.json` `PreToolUse` matcher for `apply_patch`/`Edit`/`Write`| `PostToolUse` same write matcher| Shell script direto; `UserPromptSubmit` injects JSON additional context
-OpenCode| Plugin TS `sdd-gate.ts` (`tool.execute.before`)| Inline no path allow do pre-gate (fallback)| OpenCode não suporta shell post-hook separado; doctor reporta `[unsupported]` para PostToolUse target opencode — esperado.
+Claude Code| `.claude/settings.json hooks.PreToolUse[*]`| `hooks.PostToolUse[*]`| `python -m dadaia_workspace.hooks.sdd_gate`; Python puro (Windows/macOS/Linux); instalado via `dadaia public install --target claude`
+Codex| `.codex/hooks.json` `PreToolUse` matcher for `apply_patch`/`Edit`/`Write`| `PostToolUse` same write matcher| `python -m dadaia_workspace.hooks.sdd_gate`; `UserPromptSubmit` injects JSON additional context
+OpenCode| Plugin TS `sdd-gate.ts` (`tool.execute.before`)| Inline no path allow do pre-gate (fallback)| `sdd-gate.ts` chama Python hooks via subprocess; OpenCode não suporta shell post-hook separado; doctor reporta `[unsupported]` para PostToolUse target opencode — esperado.

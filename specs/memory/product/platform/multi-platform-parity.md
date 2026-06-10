@@ -2,10 +2,10 @@
 slug: multi-platform-parity
 title: multi-platform-parity
 category: product
-tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 17 skills / 2 workflows / Codex .rules)."
+tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules)."
 summary: Codex uses native config, shared and Codex-specific skills, hook parity,
   native Starlark .rules command policy, workflow docs that do not auto-execute,
-  and Codex custom-agent wording. Public surface is 9 core agents, 17 skills, 2 workflows. Plugin stubs (frontend-engineer,
+  and Codex custom-agent wording. Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer,
   design-specialist, devops-engineer) project as thin stubs with no behavior until
   the plugin is installed.
 tags:
@@ -33,7 +33,7 @@ hooks, config loading, workflow support, and skill discovery.
 |-----------|-------|-------|
 | Core agents | 9 | project-manager, project-auditor, product-engineer, software-engineer, qa-engineer, security-reviewer, code-reviewer, ai-engineer, software-architect |
 | Plugin stubs | 3 | frontend-engineer, design-specialist (plugin: frontend-design); devops-engineer (plugin: devops) |
-| Skills | 17 | Reduced from 22 in v0.1.9 (5 frontend/design skills → plugin) |
+| Skills | 18 | Reduced from 22 in v0.1.9 (5 frontend/design skills → plugin) |
 | Workflows | 2 | release-ship, audit-fanout (7 stale workflows deleted in v0.1.9) |
 | Rules | 5 | workspace-protocol, tmp-file-guardrail, plugin-scope, dadaia-workspace-dev-guardrail, harness-skill-scope |
 
@@ -84,7 +84,7 @@ same shell scripts used by the other runtimes.
 - `.codex/agents/`: TOML agent files with no fake model-derived skill names.
 - `.codex/rules/`: native `.rules` command policy and no Markdown protocol masquerading
   as executable rules.
-- `.claude/skills/`, `.agents/skills/`: 17 skill directories.
+- `.claude/skills/`, `.agents/skills/`: 18 skill directories.
 - Codex workflows as reference-only, not missing runtime behavior.
 - OpenCode workflow limitations separately.
 - All staged SHA256 hashes match projected files (`[ok]` for every asset; `[drift]` on mismatch).
