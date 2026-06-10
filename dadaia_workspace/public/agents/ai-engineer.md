@@ -2,7 +2,7 @@
 name: ai-engineer
 description: AI-entity engineer. Exclusive owner of agents/skills/rules/workflows/commands/hooks. Context engineering, prompt design, model tiering. No code, specs, tests, frontend, CI.
 tier: 3
-model: claude-opus-4-8
+model: claude-fable-5
 activity_class: MUTATING
 lease_relationship: "PM sub-agent during releases; own short session for ad-hoc surface fixes"
 gate_role: "AI-entity implementer"
@@ -364,19 +364,7 @@ Operator-facing rationale.
 After finalizing any HTML report under `.dadaia/reports/`, invoke the
 `dadaia-handoff-emitter` skill to emit handoff JSON under `.dadaia/handoff/<context>/`.
 
----
-
-## Report emission (handoff-first)
-
-**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
-
-**HTML report:** emit ONLY when:
-- The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the handoff JSON.
-
-**Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
-
-**Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.1).
 
 ---
 ## Implementation review gate

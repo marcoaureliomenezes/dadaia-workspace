@@ -1,9 +1,9 @@
 """Unit tests for dadaia_workspace.infrastructure.runtime_transforms.model_mapping.
 
 Covers:
-- All four canonical Claude → Codex mappings (ADR-5 table).
+- All five canonical Claude → Codex mappings (ADR-5 table).
 - ValueError on an unknown Claude identifier.
-- Guard that MODEL_MAP has exactly 4 entries (prevents accidental expansion without
+- Guard that MODEL_MAP has exactly 5 entries (prevents accidental expansion without
   a corresponding test update and ADR amendment).
 """
 
@@ -33,6 +33,10 @@ def test_opus_4_8_maps_to_gpt55() -> None:
     assert map_model("claude-opus-4-8") == "gpt-5.5"
 
 
+def test_fable_5_maps_to_gpt55() -> None:
+    assert map_model("claude-fable-5") == "gpt-5.5"
+
+
 def test_unknown_identifier_raises_value_error() -> None:
     unknown = "claude-unknown-9-9"
     with pytest.raises(ValueError) as exc_info:
@@ -41,10 +45,10 @@ def test_unknown_identifier_raises_value_error() -> None:
 
 
 def test_model_map_is_complete() -> None:
-    """Guard: MODEL_MAP must have exactly 4 entries.
+    """Guard: MODEL_MAP must have exactly 5 entries.
 
     If a new Claude model is added to agent frontmatter, the install pipeline
     will raise ValueError (by design). This test ensures no entry is silently
     added or removed from MODEL_MAP without a deliberate update to ADR-5.
     """
-    assert len(MODEL_MAP) == 4
+    assert len(MODEL_MAP) == 5

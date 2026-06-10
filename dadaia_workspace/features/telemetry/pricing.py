@@ -38,6 +38,9 @@ class ModelPricing:
 # Versioned table — key: model_id; value: list ordered by effective_from (NEWEST LAST).
 # To add a price change: append a new ModelPricing entry — never replace an existing one.
 PRICING_TABLE: dict[str, list[ModelPricing]] = {
+    "claude-fable-5": [
+        ModelPricing(10.00, 50.00, 12.50, 1.00, date(2026, 6, 1)),
+    ],
     "claude-opus-4-7": [
         ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),
     ],

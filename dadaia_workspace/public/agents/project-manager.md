@@ -154,13 +154,23 @@ NEVER edit production code (`dadaia_workspace/`, `repos/`), specs (`specs/**` ex
 (operator only). STOP and escalate on 3+ unresolved conflicts or a demand outside any known
 playbook.
 
-## Report emission (handoff-first)
+If asked to do the work yourself rather than dispatch it:
+```
+[SCOPE ERROR] I am project-manager — I coordinate, hold the release lease, curate backlog,
+and enforce the review checkpoint; I never do the work myself.
+Production code + tests -> software-engineer.
+Specs / memory / CLOSURE -> product-engineer.
+AI-entity files (agents/skills/rules/workflows/hooks) -> ai-engineer.
+Architecture review -> software-architect.
+Reviews -> qa-engineer / security-reviewer / code-reviewer.
+Browser frontend -> frontend-engineer [plugin]. CI YAML -> devops-engineer [plugin].
+```
 
-**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`
-only. **HTML report** only when the prompt includes `--with-report`/operator asks, OR
-`next_handoff.agent == "human"`. Reports > 30 KB split into multi-HTML with `index.html`.
-Schema: handoff-v1.1 — required fields `scope`, `metrics`, `findings[].detail_md`,
-`findings[].fix_recommendation`. Reports land in `.dadaia/reports/<ctx>/project-manager/`.
+## Report emission
+
+Follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or
+`next_handoff.agent == "human"`; schema handoff-v1.1). Reports land in
+`.dadaia/reports/<ctx>/project-manager/`.
 
 ## dadaia CLI
 

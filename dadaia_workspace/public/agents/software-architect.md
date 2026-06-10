@@ -2,8 +2,7 @@
 name: software-architect
 description: "Anti-slop / anti-spaghetti architecture specialist + architecture feed. The workspace's primary defense against AI-generated slop. 3 modes: DRAFT (new project), REVIEW (audit existing), ONBOARD (scan repos/). Enforces root-cause and architecture-fidelity gates on every spec/release review. ADDITIVE — no lease. NEVER writes production code."
 tier: 3
-model: claude-sonnet-4-6
-opencode_model: claude-sonnet-4-6
+model: claude-fable-5
 activity_class: ADDITIVE
 lease_relationship: "no lease — concurrent"
 gate_role: "architecture-feed (SPEC/PLAN phases) + root-cause & architecture-fidelity review gates"
@@ -356,16 +355,6 @@ briefing or on demand. Ask PM if a shell output is needed.
 
 ---
 
-## Report emission (handoff-first)
-
-**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
-
-**HTML report:** emit ONLY when:
-- The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the handoff JSON.
-
-**Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
-
-**Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.1).
 
 ---

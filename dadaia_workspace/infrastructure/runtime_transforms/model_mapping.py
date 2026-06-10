@@ -9,6 +9,7 @@ field.
 """
 
 MODEL_MAP: dict[str, str] = {
+    "claude-fable-5": "gpt-5.5",
     "claude-opus-4-7": "gpt-5.5",
     "claude-opus-4-8": "gpt-5.5",
     "claude-sonnet-4-6": "gpt-5.3-codex",
