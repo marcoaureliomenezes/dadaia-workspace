@@ -29,7 +29,11 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.locking import (
     workspace_lock,
 )
-from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.spec_context.service import (
+    DeadReviewRequiredError,
+    DeadSecretFoundError,
+    SpecContextService,
+)
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 console = Console()
@@ -241,11 +245,28 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
 
 
 @app.command()
-def dead(name: str = typer.Argument(..., help="Context name to make DEAD")) -> None:
+def dead(
+    name: str = typer.Argument(..., help="Context name to make DEAD"),
+    commit: bool = typer.Option(
+        False,
+        "--commit",
+        help=(
+            "Explicit consent to commit+push untracked files. Without it, dead() "
+            "refuses if untracked files are present and pushes nothing. With it, a "
+            "secret scan runs over the files before push and blocks on any finding."
+        ),
+    ),
+) -> None:
     """Transition a context to DEAD; git sync + remove repo from disk."""
     try:
-        ctx = _ctx_service().dead(name)
+        ctx = _ctx_service().dead(name, commit=commit)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
+    except DeadReviewRequiredError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except DeadSecretFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
     except ContextLockedError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

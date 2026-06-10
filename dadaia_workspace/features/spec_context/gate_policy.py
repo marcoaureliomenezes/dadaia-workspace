@@ -34,16 +34,28 @@ __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 #: specs/audits/ is ADDITIVE (FR-P1-14/D2): parallel audit sessions write here
 #: without a MUTATING lease. Audit dirs use collision-safe naming per FR-P1-16:
 #:   specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
-_ADDITIVE_PREFIXES: tuple[str, ...] = (
+#:
+#: WS-R1 split (FR-R1-01/05): the ``specs/`` ADDITIVE classes apply both at the
+#: workspace root *and* relative to a context root (``repos/<slug>/``). The ``.dadaia/``
+#: classes are workspace-root-only — ``.dadaia/`` is forbidden inside any repo working
+#: tree (root AGENTS.md repo-cleanliness law), so there is no in-repo ``.dadaia/``
+#: ADDITIVE class to honor.
+_SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/backlog/",
     "specs/bugs/",
     "specs/audits/",
+)
+_DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = (
     ".dadaia/reports/",
     ".dadaia/handoff/",
     ".dadaia/tmp/",
 )
 _MEMORY_PREFIX = "specs/memory/"
 _FROZEN_PREFIX = "specs/_archive/"
+#: A path under ``repos/<slug>/`` whose context-relative remainder matches one of these
+#: ``specs/`` class prefixes is classified by that class. Every other in-repo remainder —
+#: production source AND unlisted ``specs/<other>`` files (e.g. ``specs/constitution.md``)
+#: — is MUTATING (FR-R1-04): a ``ctx_rel`` matching no class NEVER falls through to UNGATED.
 #: SEC-01 (CWE-284): .dadaia/sessions/ holds CLI-owned runtime session state, incl. the
 #: single-session lease identity pointer (.dadaia/sessions/runtime/<ctx>.ptr). Agents must
 #: NOT write these via Write/Edit — only the dadaia CLI/bootstrap may (it writes via Python,
@@ -81,17 +93,63 @@ def _utcnow() -> datetime:
     return datetime.now(tz=UTC)
 
 
+def _classify_specs_relative(spec_rel: str) -> PathClass | None:
+    """Apply the ordered ``specs/`` class taxonomy to a root- or context-relative path.
+
+    Returns the matched ``PathClass`` (ADDITIVE/MEMORY/FROZEN), or ``None`` when no
+    ``specs/`` class prefix matched — the caller decides the no-match verdict (MUTATING
+    for in-repo, the release/protected/ungated tail for workspace-root paths).
+    """
+    for prefix in _SPECS_ADDITIVE_PREFIXES:
+        if spec_rel.startswith(prefix):
+            return PathClass.ADDITIVE
+    if spec_rel.startswith(_MEMORY_PREFIX):
+        return PathClass.MEMORY
+    if spec_rel.startswith(_FROZEN_PREFIX):
+        return PathClass.FROZEN
+    return None
+
+
+def _context_relative(p: str) -> str | None:
+    """Return the remainder of ``p`` after a ``repos/<slug>/`` prefix, else ``None``.
+
+    ``repos/`` alone or ``repos/<slug>`` with no trailing remainder yields ``""`` (still
+    in-repo, so the caller classifies it MUTATING). A non-``repos/`` path yields ``None``.
+    """
+    if not p.startswith("repos/"):
+        return None
+    rest = p[len("repos/") :]
+    slash = rest.find("/")
+    if slash == -1:
+        return ""  # 'repos/<slug>' with no remainder — in-repo, no class match
+    return rest[slash + 1 :]
+
+
 def classify_path(rel_path: str) -> PathClass:
-    """Classify a workspace-relative path. Ordered; first match wins (FR-P1-05)."""
+    """Classify a workspace-relative path. Ordered; first match wins (FR-P1-05).
+
+    WS-R1 re-root (FR-R1-01..05): a path under ``repos/<slug>/`` is classified by its
+    **context-relative** remainder using the same ordered ``specs/`` class rules that
+    govern workspace-root paths. An in-repo remainder matching no class is MUTATING
+    (FR-R1-04) — it NEVER falls through to UNGATED. Workspace-root paths keep their
+    pre-change behavior exactly (FR-R1-05): root ``.dadaia/`` ADDITIVE prefixes, the
+    fail-closed PROTECTED class, and the UNGATED fall-through are all preserved.
+    """
     p = rel_path.lstrip("/")
-    for prefix in _ADDITIVE_PREFIXES:
+
+    ctx_rel = _context_relative(p)
+    if ctx_rel is not None:
+        # In-repo: re-root the taxonomy at the context. Unmatched ⇒ MUTATING (never UNGATED).
+        return _classify_specs_relative(ctx_rel) or PathClass.MUTATING
+
+    # Workspace-root path: specs class set + .dadaia/ additive + PROTECTED + UNGATED tail.
+    specs_class = _classify_specs_relative(p)
+    if specs_class is not None:
+        return specs_class
+    for prefix in _DADAIA_ADDITIVE_PREFIXES:
         if p.startswith(prefix):
             return PathClass.ADDITIVE
-    if p.startswith(_MEMORY_PREFIX):
-        return PathClass.MEMORY
-    if p.startswith(_FROZEN_PREFIX):
-        return PathClass.FROZEN
-    if p.startswith("specs/releases/") or p.startswith("repos/"):
+    if p.startswith("specs/releases/"):
         return PathClass.MUTATING
     if p.startswith(_PROTECTED_PREFIX):
         return PathClass.PROTECTED

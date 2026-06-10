@@ -140,3 +140,17 @@ class GitSubprocessClient:
         if result.returncode != 0:
             return False
         return Path(result.stdout.strip()).resolve() == path.resolve()
+
+    def list_untracked(self, path: Path) -> list[str]:
+        """Return repo-relative paths of untracked, non-gitignored files.
+
+        Uses ``git ls-files --others --exclude-standard`` so that ``.gitignore``
+        is honoured (gitignored files are NOT returned). The result drives the
+        ``dead()`` review gate: an untracked file here is content that would be
+        newly committed and pushed, so it must be reviewed/scanned first.
+        """
+        result = _run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=path,
+        )
+        return [line.strip() for line in result.stdout.splitlines() if line.strip()]

@@ -1,4 +1,4 @@
-"""Claude-to-Codex model identifier mapping (ADR-5).
+"""Claude-to-Codex model identifier mapping (ADR-5) — derived view.
 
 The canonical agent frontmatter uses Claude model identifiers (e.g.
 ``claude-sonnet-4-6``).  Codex TOML files must not contain any ``claude-*``
@@ -6,15 +6,21 @@ strings (AC3).  This module provides the authoritative translation table and a
 helper that raises explicitly on unknown identifiers so that ``dadaia public
 install --target codex`` fails loudly rather than silently emitting a bad model
 field.
+
+``MODEL_MAP`` is no longer hand-maintained: it is **derived** from the single
+source of truth in :mod:`dadaia_workspace.core.model_registry` (claude_id →
+codex_id). This guarantees its key-set is identical to ``PRICING_TABLE``'s
+(also derived from the same registry) — closing the drift documented in bug
+``model-catalog-modelmap-pricing-drift-no-registry``. (infrastructure → core
+imports are permitted by the layering contracts.)
 """
 
-MODEL_MAP: dict[str, str] = {
-    "claude-fable-5": "gpt-5.5",
-    "claude-opus-4-7": "gpt-5.5",
-    "claude-opus-4-8": "gpt-5.5",
-    "claude-sonnet-4-6": "gpt-5.3-codex",
-    "claude-haiku-4-5-20251001": "gpt-5.4-mini",
-}
+from __future__ import annotations
+
+from dadaia_workspace.core.model_registry import REGISTRY
+
+# Derived view: claude_id -> codex_id, in registry order.
+MODEL_MAP: dict[str, str] = {entry.claude_id: entry.codex_id for entry in REGISTRY}
 
 
 def map_model(claude_id: str) -> str:

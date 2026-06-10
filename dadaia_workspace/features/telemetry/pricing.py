@@ -1,8 +1,18 @@
-"""Pricing table for AI models. Versioned via effective_from date — historical
-events use the price vigent at their occurrence date, preserving reproducibility.
+"""Pricing table for AI models — derived view. Versioned via effective_from
+date: historical events use the price vigent at their occurrence date,
+preserving reproducibility.
 
-Per SPEC § "Tabela de preços" (D-AM-07). Update via PR adding new effective_from
-entry, NEVER replacing existing entries.
+Per SPEC § "Tabela de preços" (D-AM-07). ``PRICING_TABLE`` is no longer
+hand-maintained here: it is **derived** from the single source of truth in
+:mod:`dadaia_workspace.core.model_registry` (claude_id → dated pricing rows).
+This guarantees its key-set is identical to ``MODEL_MAP``'s (also derived from
+the same registry) — closing bug ``model-catalog-modelmap-pricing-drift-no-registry``.
+To change a price, append a new dated row to the registry — NEVER replace an
+existing row. (features → core imports are permitted by the layering contracts.)
+
+``ModelPricing`` is re-exported from the registry for backward compatibility:
+existing consumers (``from ...telemetry.pricing import ModelPricing``) and the
+unit tests keep working unchanged.
 
 Cost arithmetic:
     total_usd = (
@@ -19,42 +29,20 @@ For the micro-USD precision required here, float arithmetic is adequate.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from dadaia_workspace.core.model_registry import REGISTRY, ModelPricing
 
-@dataclass(frozen=True)
-class ModelPricing:
-    """Prices per million tokens (USD/MTok)."""
-
-    input_per_mtok: float
-    output_per_mtok: float
-    cache_creation_per_mtok: float
-    cache_read_per_mtok: float
-    effective_from: date
+__all__ = ["ModelPricing", "PRICING_TABLE", "compute_cost", "pricing_age_days"]
 
 
-# Versioned table — key: model_id; value: list ordered by effective_from (NEWEST LAST).
-# To add a price change: append a new ModelPricing entry — never replace an existing one.
+# Derived view — key: model_id; value: dated rows ascending by effective_from
+# (NEWEST LAST), matching the historical contract consumers rely on.
 PRICING_TABLE: dict[str, list[ModelPricing]] = {
-    "claude-fable-5": [
-        ModelPricing(10.00, 50.00, 12.50, 1.00, date(2026, 6, 1)),
-    ],
-    "claude-opus-4-7": [
-        ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),
-    ],
-    "claude-opus-4-8": [
-        ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),
-    ],
-    "claude-sonnet-4-6": [
-        ModelPricing(3.00, 15.00, 3.75, 0.30, date(2025, 1, 1)),
-    ],
-    "claude-haiku-3-5": [
-        ModelPricing(0.80, 4.00, 1.00, 0.08, date(2025, 1, 1)),
-    ],
-    # Unknown models: compute_cost returns None → cost_micro_usd NULL.
+    entry.claude_id: sorted(entry.pricing, key=lambda r: r.effective_from) for entry in REGISTRY
 }
+# Unknown models: compute_cost returns None → cost_micro_usd NULL.
 
 
 def compute_cost(usage: dict[str, Any], model: str, when: date) -> int | None:

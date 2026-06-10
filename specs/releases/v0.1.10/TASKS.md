@@ -52,7 +52,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R5-01):** `claude_hook_env()` / `codex_hook_env()` fixtures with pinned-minimal env + subprocess hook-runner helper exist; env contract test covers the **whole `DADAIA_*` namespace** with an explicit allowlist (e.g. `DADAIA_CONTEXT` operator-shell var) and fails any hook/gate/lease test that setenvs a non-allowlisted `DADAIA_*` outside the fixtures; second contract test flags direct hook-module import+call in `tests/**/hooks|gate/**` (behavior tests must use the subprocess runner — closes the `os.environ.update` evasion); new tests green on Windows/macOS CI legs; existing suites still green.
 - **Parallelism:** independent of all other tracks; blocks T-010-03/04/05/09 acceptance.
 
-### [ ] T-010-03 — R1: classifier re-root — full class×location taxonomy
+### [x] T-010-03 — R1: classifier re-root — full class×location taxonomy
 - **Owner:** software-engineer · **Maps:** CONF-1, arch F1, sec F-1, ai D-3/D-4/D-5/C-1; bugs `lease-stolen…` (D1), `gate-fpath-not-canonicalized-before-classifier` (Python surface)
 - **Write set:** `dadaia_workspace/features/spec_context/gate_policy.py`, `tests/unit/features/spec_context/test_gate_policy.py`, `tests/integration/gate/` (matrix + symlink + incident regression)
 - **Preconditions:** T-010-10.
@@ -123,7 +123,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ## Track R — Registries + push gates
 
-### [ ] T-010-23 — R8a: core/model_registry.py single source
+### [x] T-010-23 — R8a: core/model_registry.py single source
 - **Owner:** software-engineer · **Maps:** CONF-9, arch cluster F; bug `model-catalog-modelmap-pricing-drift-no-registry`
 - **Write set:** `dadaia_workspace/core/model_registry.py` (new), `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py`, `dadaia_workspace/features/telemetry/pricing.py`, their unit tests
 - **Preconditions:** T-010-02.
@@ -161,12 +161,12 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ## Track S — Security tail
 
-### [ ] T-010-19 — R7a: `dead()` review gate + secret scan
+### [x] T-010-19 — R7a: `dead()` review gate + secret scan
 - **Owner:** software-engineer · **Maps:** CONF-8, sec F-5
 - **Write set:** `dadaia_workspace/features/spec_context/service.py`, related CLI, tests
 - **Acceptance (AC-R7-01):** untracked files + no `--commit` ⇒ refuse, push nothing; `--commit` ⇒ privacy-engine scan of staged content blocks on a planted secret; clean-tree `dead()` unchanged; pytest green.
 
-### [ ] T-010-20 — R7b: privacy gate fail-closed baseline denylist
+### [x] T-010-20 — R7b: privacy gate fail-closed baseline denylist
 - **Owner:** software-engineer · **Maps:** sec F-2
 - **Write set:** `dadaia_workspace/infrastructure/privacy_check.py`, packaged baseline data, tests
 - **Acceptance (AC-R7-02):** absent operator denylist ⇒ baseline structural scan still runs and flags planted IP/hostname; `[ok] public-privacy` emitted only after a real scan; pytest green.

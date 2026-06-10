@@ -201,6 +201,123 @@ def test_dead_pushes_when_remote_present(
     assert repo in git.pushed
 
 
+# ------------------------------------------------------ dead() review gate (F-5 / AC-R7-01)
+
+
+def test_dead_refuses_on_untracked_files_without_commit(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    """AC-R7-01: untracked files + no --commit ⇒ refuse, push nothing, repo untouched."""
+    from dadaia_workspace.features.spec_context.service import DeadReviewRequiredError
+
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    # Plant an untracked file on disk + tell the fake git it is untracked.
+    (repo / "leftover.txt").write_text("operator forgot to gitignore this")
+    git._untracked[repo] = ["leftover.txt"]
+
+    with pytest.raises(DeadReviewRequiredError) as exc:
+        service.dead("proj")
+
+    # Files are listed in the message.
+    assert "leftover.txt" in str(exc.value)
+    # NOTHING pushed, NOTHING committed, repo left on disk untouched.
+    assert repo not in git.pushed
+    assert repo not in git.committed
+    assert repo.exists()
+    assert (repo / "leftover.txt").exists()
+    # Context is still ALIVE (state not mutated).
+    assert service.show("proj").state == ContextState.ALIVE
+
+
+def test_dead_with_commit_and_clean_untracked_passes(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    """AC-R7-01: --commit + clean (secret-free) untracked files ⇒ proceeds + pushes."""
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    git._dirty.add(repo)
+    (repo / "notes.md").write_text("# just some harmless notes\nnothing secret here\n")
+    git._untracked[repo] = ["notes.md"]
+
+    ctx = service.dead("proj", commit=True)
+
+    assert ctx.state == ContextState.DEAD
+    assert repo in git.committed
+    assert repo in git.pushed
+    assert not repo.exists()
+
+
+def test_dead_with_commit_blocks_on_planted_secret(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    """AC-R7-01: --commit + a planted secret in an untracked file ⇒ block the push."""
+    from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
+
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    secret_value = "AKIAIOSFODNN7EXAMPLE"
+    (repo / "config.env").write_text(f"AWS_ACCESS_KEY_ID={secret_value}\n")
+    git._untracked[repo] = ["config.env"]
+
+    with pytest.raises(DeadSecretFoundError) as exc:
+        service.dead("proj", commit=True)
+
+    # File named, secret value redacted (never echoed back).
+    assert "config.env" in str(exc.value)
+    assert secret_value not in str(exc.value)
+    # Nothing pushed/committed; repo untouched.
+    assert repo not in git.pushed
+    assert repo not in git.committed
+    assert repo.exists()
+    assert service.show("proj").state == ContextState.ALIVE
+
+
+def test_dead_with_commit_blocks_on_planted_private_ip(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    """AC-R7-01: a planted private IP / internal hostname also blocks --commit push."""
+    from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
+
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    (repo / "hosts.txt").write_text("db host: 10.4.2.17 (db-primary.internal)\n")
+    git._untracked[repo] = ["hosts.txt"]
+
+    with pytest.raises(DeadSecretFoundError):
+        service.dead("proj", commit=True)
+
+    assert repo not in git.pushed
+    assert repo.exists()
+
+
+def test_dead_clean_tree_unchanged_no_untracked(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    """AC-R7-01 regression: a clean tree (no untracked) ⇒ dead() behaves as before."""
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    git._dirty.add(repo)
+    # No untracked files registered → gate is a no-op.
+
+    ctx = service.dead("proj")  # no --commit needed
+
+    assert ctx.state == ContextState.DEAD
+    assert repo in git.committed  # tracked-dirty still auto-synced (FR-R7)
+    assert repo in git.pushed
+    assert not repo.exists()
+
+
 # ------------------------------------------------------------------ delete
 
 

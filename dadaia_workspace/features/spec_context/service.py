@@ -2,6 +2,7 @@
 
 import contextlib
 import logging
+import re
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from dadaia_workspace.core.exceptions import (
     ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
+    DadaiaError,
     GitSyncError,
 )
 from dadaia_workspace.core.lock_liveness import is_stale
@@ -32,8 +34,106 @@ _SCAFFOLD_SRC = _PUBLIC_DIR / "scaffold"
 _log = logging.getLogger(__name__)
 
 
+class DeadReviewRequiredError(DadaiaError):
+    """Raised when dead() finds untracked files but no explicit --commit consent.
+
+    F-5 (sec audit): dead() must NOT auto-stage and push untracked non-gitignored
+    files without review. When such files exist and the caller did not pass
+    ``commit=True``, dead() refuses, pushes nothing, and leaves the repo on disk
+    untouched. The message lists the offending files so the operator can review,
+    gitignore, or delete them and then re-run with ``--commit`` to consent.
+    """
+
+
+class DeadSecretFoundError(DadaiaError):
+    """Raised when --commit was given but a planted secret/IP/hostname is found.
+
+    The privacy/secret scan runs over the content of the untracked files that
+    ``--commit`` would newly commit. Any match blocks the push (repo left on disk,
+    nothing committed or pushed). The message is redacted: it names the file and
+    the rule that fired, never the secret value itself.
+    """
+
+
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+# --------------------------------------------------------------------- secret scan
+#
+# Structural secret/identifier patterns reused as the privacy/secret engine for the
+# dead() --commit review gate (F-5 / AC-R7-01). These are content-shape rules — no
+# operator-specific terms are hardcoded here (dev-guardrail #4). The operator denylist
+# baseline (R7b / T-010-20) lives in infrastructure/privacy_check.py and is orthogonal;
+# this scan is the structural layer that blocks pushing newly-committed files that look
+# like they carry a secret, private IP, or internal hostname.
+_SECRET_SCAN_TEXT_SUFFIXES = {
+    ".cfg",
+    ".conf",
+    ".css",
+    ".env",
+    ".html",
+    ".ini",
+    ".j2",
+    ".js",
+    ".json",
+    ".md",
+    ".py",
+    ".sh",
+    ".toml",
+    ".ts",
+    ".txt",
+    ".yaml",
+    ".yml",
+    "",
+}
+
+# (rule-name, compiled-pattern). Names are surfaced in the error; values never are.
+_SECRET_SCAN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("private-key-block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("aws-access-key-id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
+    ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    (
+        "generic-secret-assignment",
+        re.compile(
+            r"(?i)(?:password|passwd|secret|api[_-]?key|access[_-]?token|"
+            r"private[_-]?key)\s*[:=]\s*['\"]?[A-Za-z0-9/+_\-]{8,}",
+        ),
+    ),
+    (
+        "private-ipv4",
+        re.compile(
+            r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+            r"|192\.168\.\d{1,3}\.\d{1,3}"
+            r"|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b",
+        ),
+    ),
+    (
+        "internal-hostname",
+        re.compile(r"(?i)\b[a-z0-9][a-z0-9-]*\.(?:internal|local|lan|corp|intranet)\b"),
+    ),
+)
+
+
+def _scan_file_for_secrets(path: Path) -> list[str]:
+    """Return rule names that match *path*'s content (empty list ⇒ clean).
+
+    Binary / unreadable / unsupported-suffix files are skipped (returns ``[]``).
+    Never returns the matched secret value — only the rule name, so callers can
+    build a redacted report.
+    """
+    if path.suffix.lower() not in _SECRET_SCAN_TEXT_SUFFIXES:
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return []
+    hits: list[str] = []
+    for rule_name, pattern in _SECRET_SCAN_RULES:
+        if pattern.search(text):
+            hits.append(rule_name)
+    return hits
 
 
 def _merge_scaffold_into(
@@ -256,10 +356,77 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 
-    def dead(self, name: str) -> SpecContextProject:
+    def _enforce_dead_review_gate(self, name: str, repo_path: Path, *, commit: bool) -> None:
+        """Gate dead() on untracked content (F-5 / AC-R7-01).
+
+        No untracked files ⇒ no-op (clean-tree / tracked-only path unchanged).
+        Untracked files + not *commit* ⇒ raise DeadReviewRequiredError (refuse).
+        Untracked files + *commit* ⇒ secret-scan their content; any match raises
+        DeadSecretFoundError. This runs before any commit/push/rmtree so a refusal
+        leaves the repo untouched.
+        """
+        try:
+            untracked = self._git.list_untracked(repo_path)
+        except Exception:
+            # Fail-closed for the gate: if we cannot enumerate untracked files we
+            # cannot prove the tree is clean. Without consent, refuse.
+            if commit:
+                return
+            raise DeadReviewRequiredError(
+                f"Context '{name}': could not verify the working tree of '{repo_path}'. "
+                "Re-run with --commit to consent to committing+pushing any changes, "
+                "or clean the tree first."
+            ) from None
+
+        if not untracked:
+            return  # clean tree (no untracked files) — behave exactly as before
+
+        if not commit:
+            shown = untracked[:20]
+            more = "" if len(untracked) <= 20 else f"\n  ... and {len(untracked) - 20} more"
+            listing = "\n".join(f"  {f}" for f in shown)
+            raise DeadReviewRequiredError(
+                f"Context '{name}' has {len(untracked)} untracked file(s) that dead() "
+                f"would otherwise commit and push WITHOUT review:\n"
+                f"{listing}{more}\n"
+                "Review them, then either delete/gitignore them, or re-run with "
+                "'dadaia context dead "
+                f"{name} --commit' to explicitly consent to committing and pushing them."
+            )
+
+        # commit=True: scan the content of the files we are about to newly commit.
+        flagged: list[str] = []
+        for rel in untracked:
+            file_path = repo_path / rel
+            if not file_path.is_file():
+                continue
+            hits = _scan_file_for_secrets(file_path)
+            if hits:
+                flagged.append(f"  {rel}: {', '.join(sorted(set(hits)))}")
+        if flagged:
+            report = "\n".join(flagged)
+            raise DeadSecretFoundError(
+                f"Context '{name}': secret scan blocked dead() --commit. "
+                f"{len(flagged)} untracked file(s) match a secret/identifier rule "
+                "(values redacted):\n"
+                f"{report}\n"
+                "Remove or redact the flagged content, then re-run. Nothing was pushed."
+            )
+
+    def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
         """Transition a context from ALIVE to DEAD; sets dead_since, removes repo.
 
         Raises ContextLockedError if a live lease record exists for this context.
+
+        Review gate (F-5 / AC-R7-01): if the repo has untracked non-gitignored
+        files and *commit* is False, dead() REFUSES — it raises
+        ``DeadReviewRequiredError`` listing the files, pushes nothing, and leaves
+        the repo on disk untouched. Passing ``commit=True`` is explicit operator
+        consent to commit+push those files; before pushing, their content is run
+        through the structural secret scan and any match raises
+        ``DeadSecretFoundError`` (push blocked, repo untouched). Tracked-but-dirty
+        modifications keep the existing auto-sync behaviour (FR-R7: only untracked
+        content is gated). A clean tree behaves exactly as before.
 
         Lock 1 wraps the JSON write (spec_contexts.json update).
         Lock 2 wraps git push and shutil.rmtree (OUTSIDE Lock 1).
@@ -279,6 +446,11 @@ class SpecContextService:
 
         repo_path = self._repo_path(ctx.repo_slug)
         branch_before_sync: str | None = None
+
+        # Review gate (F-5): evaluate untracked content BEFORE any lock, commit,
+        # push, or rmtree, so a refusal leaves the repo entirely untouched on disk.
+        if repo_path.exists() and self._git.is_git_root(repo_path):
+            self._enforce_dead_review_gate(name, repo_path, commit=commit)
 
         # Git sync + rmtree under Lock 2 (OUTSIDE Lock 1)
         if repo_path.exists():
