@@ -59,7 +59,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R1-01/02/03):** FR-R1-01..08 — matrix tests class×{root,in-repo}×{default,non-default slug}; in-repo MEMORY phase-rule and FROZEN block exercised (`gate_policy.py:90-93,137-143` no longer dead); symlink→MEMORY regression test named; full-pipeline incident regression (dual-session, injected clock, ALLOW + holder unchanged in lock record); full gate integration matrix green; **explicit re-baseline** of existing gate/lease tests whose expected class changes under the re-root (~30-60 assertions; HIGH blast radius — acknowledged in PLAN risk note) — each flipped expectation re-derived from the new taxonomy, not mechanically inverted.
 - **Parallelism:** spine; before T-010-07.
 
-### [ ] T-010-07 — R3: session_identity consolidation module
+### [x] T-010-07 — R3: session_identity consolidation module
 - **Owner:** software-engineer · **Maps:** arch F7, CONF-1/2 substrate
 - **Write set:** `dadaia_workspace/features/spec_context/session_identity.py` (new), `dadaia_workspace/features/spec_context/lease.py` (pointer reads), `dadaia_workspace/hooks/ctx_inject.py`, `dadaia_workspace/features/spec_context/doctor.py` (PTR-GC, `:126,572-581`), `dadaia_workspace/core/specs_resolver.py` (`:19`) — both consume the session stores R3 consolidates and would fail FR-R3-01's residue grep if left unmigrated — `tests/unit/features/spec_context/test_session_identity.py` (new), `tests/contract/test_session_store_ownership.py` (new)
 - **Preconditions:** T-010-03.
@@ -171,12 +171,12 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Write set:** `dadaia_workspace/infrastructure/privacy_check.py`, packaged baseline data, tests
 - **Acceptance (AC-R7-02):** absent operator denylist ⇒ baseline structural scan still runs and flags planted IP/hostname; `[ok] public-privacy` emitted only after a real scan; pytest green.
 
-### [ ] T-010-21 — R7c: panel loopback auth + token-mode recheck
+### [x] T-010-21 — R7c: panel loopback auth + token-mode recheck
 - **Owner:** software-engineer · **Maps:** sec F-3, F-7
 - **Write set:** `dadaia_workspace/features/panel/handler.py`, `dadaia_workspace/features/panel/auth.py`, unit + e2e tests
 - **Acceptance (AC-R7-03):** tokenless loopback request to a sensitive API ⇒ 401 (contract pinned by test); `ensure_token` tightens a pre-existing 0o644 token to 0o600 (platform-seam aware); panel e2e green.
 
-### [ ] T-010-22 — R7d: dev dependency pins
+### [x] T-010-22 — R7d: dev dependency pins
 - **Owner:** software-engineer · **Maps:** sec F-6
 - **Write set:** `pyproject.toml`, `poetry.lock` (dev/build group)
 - **Acceptance:** `poetry` ≥ 2.3.4, `dulwich` ≥ 1.2.5; `pip-audit` clean of the 4 named CVEs; suite green.
@@ -185,7 +185,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ## Track D — Truth pass
 
-### [ ] T-010-13 — R6a: retire the bash hook quartet (Decision D-1)
+### [x] T-010-13 — R6a: retire the bash hook quartet (Decision D-1)
 - **Owner:** software-engineer · **Maps:** ai S-1/S-2/C-9, DRIFT-6, sec F-4; bug `gate-fpath-not-canonicalized-before-classifier` (bash surface)
 - **Write set:** `dadaia_workspace/public/scripts/{sdd-spec-gate,sdd-post-gate,root-whitelist-gate,ctx-inject}.sh` (delete), `public/scripts/__pycache__/` (delete), manifest/staging/projection code+tests, `features/spec_context/gate_policy.py:1-8` docstring, `tests/contract/test_bash_hook_residue.py` (new)
 - **Preconditions:** T-010-03 merged (shares `gate_policy.py` — the docstring fix lands after the re-root; declared exception to cross-track file-disjointness).

@@ -56,6 +56,72 @@ class TestEnsureToken:
 
         assert result == "abc123"
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
+    def test_ensure_token_tightens_preexisting_world_readable_token(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """F-7: a pre-existing 0o644 token file is tightened to 0o600 on read.
+
+        The atomic O_EXCL|0o600 create only protects newly minted tokens; a token
+        left behind by an older (pre-fix) panel at a group/other-readable mode is
+        silently world-readable.  ``ensure_token`` must re-check the mode of an
+        existing token and tighten it to owner-only before returning the value.
+        """
+        auth = _import_auth()
+        token_path = tmp_path / "state" / "panel.token"
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text("legacy-wide-token")
+        os.chmod(token_path, 0o644)  # world/group readable — the leak
+
+        result = auth.ensure_token(token_path)
+
+        assert result == "legacy-wide-token", "Existing token value must be preserved"
+        stat = os.stat(token_path)
+        assert stat.st_mode & 0o777 == 0o600, (
+            f"Pre-existing token must be tightened to 0o600, got {oct(stat.st_mode & 0o777)}"
+        )
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
+    def test_ensure_token_leaves_already_tight_token_untouched(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A pre-existing 0o600 token already at the secure mode stays 0o600."""
+        auth = _import_auth()
+        token_path = tmp_path / "panel.token"
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text("already-tight")
+        os.chmod(token_path, 0o600)
+
+        result = auth.ensure_token(token_path)
+
+        assert result == "already-tight"
+        assert os.stat(token_path).st_mode & 0o777 == 0o600
+
+    def test_ensure_token_tightens_preexisting_via_setter_seam(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """F-7 platform seam: when a setter is injected the existing-token tighten
+        path routes through ``restrict_to_owner`` (icacls on Windows / chmod on POSIX).
+
+        Runs on every OS because it asserts on the seam call, not on-disk mode bits.
+        """
+        from tests.fakes import FakeFilePermissionSetter
+
+        auth = _import_auth()
+        token_path = tmp_path / "state" / "panel.token"
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text("legacy-token")
+        if sys.platform != "win32":
+            os.chmod(token_path, 0o644)
+
+        setter = FakeFilePermissionSetter()
+        result = auth.ensure_token(token_path, permission_setter=setter)
+
+        assert result == "legacy-token"
+        assert any(p == token_path for p, _ in setter.restricted_files), (
+            "restrict_to_owner must be called on the pre-existing token file via the seam"
+        )
+
     def test_ensure_token_generates_url_safe(self, tmp_path: pathlib.Path) -> None:
         """Fresh path generates a URL-safe token of length >= 32 with no whitespace."""
         from tests.fakes import FakeFilePermissionSetter

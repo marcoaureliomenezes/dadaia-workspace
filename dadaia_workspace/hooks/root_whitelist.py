@@ -1,4 +1,4 @@
-"""PreToolUse workspace-root whitelist gate (Windows-safe port of ``root-whitelist-gate.sh``).
+"""PreToolUse workspace-root whitelist gate (the canonical, cross-platform gate surface).
 
 The Law: the workspace root may contain ONLY these entries::
 

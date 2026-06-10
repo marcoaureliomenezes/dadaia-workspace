@@ -11,6 +11,7 @@ from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
+from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     _audit_log_path,
     context_lock,
@@ -121,9 +122,6 @@ class DoctorService:
 
     def _sessions_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "sessions"
-
-    def _sessions_runtime_dir(self) -> Path:
-        return self._workspace_root / ".dadaia" / "sessions" / "runtime"
 
     def _ctx_locks_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
@@ -543,7 +541,9 @@ class DoctorService:
                     continue
                 if sess_file.parent.name == "runtime":
                     continue
-                sess_data = self._read_lock(sess_file)
+                # Read the session record through its single owner (FR-R3-01).
+                sess_id = sess_file.name[: -len(".json")]
+                sess_data = session_identity.read_session(self._workspace_root, sess_id)
                 if sess_data is None:
                     continue
                 # Build a TTL-check-compatible dict using session fields
@@ -572,24 +572,20 @@ class DoctorService:
         # Stable-identity .ptr GC (D1 soul-fold): delete orphan .ptr files where
         # the corresponding .lock.json does not exist or is expired (is_stale).
         # .ptr is a hint, not a lock; orphans must not persist after the lease expires.
-        runtime_dir = self._sessions_runtime_dir()
-        if runtime_dir.exists():
-            ctx_locks_dir = self._ctx_locks_dir()
-            for ptr_file in sorted(runtime_dir.iterdir()):
-                if not ptr_file.name.endswith(".ptr"):
-                    continue
-                ctx_name = ptr_file.name[: -len(".ptr")]
-                lock_file = ctx_locks_dir / f"{ctx_name}.lock.json"
-                is_orphan = False
-                if not lock_file.exists():
+        # Iterate the pointer namespace through its single owner (FR-R3-01).
+        for ptr_file in session_identity.iter_ptr_files(self._workspace_root):
+            ctx_name = ptr_file.name[: -len(".ptr")]
+            lock_file = ctx_locks_dir / f"{ctx_name}.lock.json"
+            is_orphan = False
+            if not lock_file.exists():
+                is_orphan = True
+            else:
+                lock_data = self._read_lock(lock_file)
+                if lock_data is None or is_stale(lock_data):
                     is_orphan = True
-                else:
-                    lock_data = self._read_lock(lock_file)
-                    if lock_data is None or is_stale(lock_data):
-                        is_orphan = True
-                if is_orphan:
-                    ptr_file.unlink(missing_ok=True)
-                    actions.append(f"PTR-GC: deleted orphan session pointer '{ptr_file.name}'")
+            if is_orphan:
+                ptr_file.unlink(missing_ok=True)
+                actions.append(f"PTR-GC: deleted orphan session pointer '{ptr_file.name}'")
 
         # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
         for cache_name in sorted(_ROOT_FORBIDDEN_CACHES):

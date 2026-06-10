@@ -1,11 +1,18 @@
-"""Pure reference implementation of the SDD gate's path-classifier + decision (v0.1.6).
+"""Path-classifier + decision policy for the SDD gate (single source of truth).
 
-The enforced gate is ``public/scripts/sdd-spec-gate.sh`` (bash, ≤175 lines) which
-classifies paths inline for performance — most PreToolUse calls touch ADDITIVE or
-UNGATED paths and must not pay a Python-startup cost. This module is the
-**executable specification** of that policy: the fail-safe property table (AC-04)
-and the activity-class exemption matrix (AC-05) are unit-tested against it, and
-qa-engineer (T-016-08) verifies the bash gate mirrors it exactly.
+The enforced gate is the Python hook package ``dadaia_workspace.hooks`` —
+``sdd_gate`` (PreToolUse write gate), ``root_whitelist`` (workspace-root
+whitelist), ``sdd_post_gate`` (PostToolUse heartbeat), and ``ctx_inject``
+(session bootstrap). All four are wired as ``<python> -m
+dadaia_workspace.hooks.<name>`` commands across every harness (Claude
+``settings.json``, Codex ``hooks.json``) since v0.1.8. The legacy bash hook
+quartet was retired in v0.1.10 (Decision D-1); the only remaining shell asset is
+``public/scripts/pre-push-ci-gate.sh`` (a real git hook, deliberately shell).
+
+This module is the gate's path-classifier and decision policy: the fail-safe
+property table (AC-04) and the activity-class exemption matrix (AC-05) are
+unit-tested against it, and ``hooks.sdd_gate`` delegates here so there is no
+second classifier implementation to keep in byte-parity.
 
 For the MUTATING class the gate is the single acquisition point: it delegates to
 :func:`lease.acquire` (O_EXCL CAS). This module does the same, so the Python tests
@@ -62,8 +69,8 @@ _FROZEN_PREFIX = "specs/_archive/"
 #: outside the tool gate). This is the SOLE fail-CLOSED class: it blocks unconditionally,
 #: evaluated BEFORE the fail-open branches below.
 _PROTECTED_PREFIX = ".dadaia/sessions/"
-#: SEC-01 block reason — byte-identical to ``sdd-spec-gate.sh`` so both enforcement paths
-#: emit the same message (parity contract, T-018-15/T-018-16).
+#: SEC-01 block reason emitted by the Python hook ``dadaia_workspace.hooks.sdd_gate``,
+#: which delegates here so PROTECTED has a single message source.
 _PROTECTED_MESSAGE = (
     "[GATE] .dadaia/sessions/ is CLI-owned runtime state, incl. the single-session lease "
     "identity pointer .dadaia/sessions/runtime/<ctx>.ptr. Agents must not write here via "

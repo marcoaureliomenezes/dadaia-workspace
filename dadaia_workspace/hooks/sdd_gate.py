@@ -1,4 +1,4 @@
-"""PreToolUse SDD gate (Windows-safe Python port of ``sdd-spec-gate.sh``).
+"""PreToolUse SDD gate (the canonical, cross-platform gate surface).
 
 This hook is the enforcement entrypoint the harness invokes as
 ``python -m dadaia_workspace.hooks.sdd_gate``. It does NOT re-derive the gate policy:

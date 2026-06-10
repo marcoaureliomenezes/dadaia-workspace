@@ -55,6 +55,7 @@ from pathlib import Path
 from dadaia_workspace.core.exceptions import LockHeldError, PlatformSecurityError
 from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
+from dadaia_workspace.features.spec_context import session_identity
 
 __all__ = [
     "LEASE_TTL_SECONDS",
@@ -144,33 +145,28 @@ def _sentinel_path(
     return _lock_dir(workspace, permission_setter) / f"{ctx}.lock.sentinel"
 
 
+# Stable-identity pointer reads/writes are owned by ``session_identity`` (WS-R3,
+# FR-R3-01). ``lease.py`` keeps these thin wrappers so its acquire/CAS logic and the
+# existing test seams read naturally, but it no longer constructs the
+# ``sessions/runtime/*.ptr`` path itself — the single owner does.
+
+
 def _ptr_path(workspace: Path, ctx: str) -> Path:
-    """Path for the stable-identity pointer file (not a lock; a hint)."""
+    """Path for the stable-identity pointer file (delegated to ``session_identity``)."""
     _validate(ctx, field="context")
-    runtime_dir = workspace / ".dadaia" / "sessions" / "runtime"
-    runtime_dir.mkdir(parents=True, exist_ok=True)
-    return runtime_dir / f"{ctx}.ptr"
+    return session_identity.ptr_path(workspace, ctx, create=True)
 
 
 def _read_ptr(workspace: Path, ctx: str) -> str | None:
     """Read the stable-identity pointer; returns session_id string or None."""
-    try:
-        content = _ptr_path(workspace, ctx).read_text(encoding="utf-8").strip()
-        return content if content else None
-    except OSError:
-        return None
+    _validate(ctx, field="context")
+    return session_identity.read_incumbent_ptr(workspace, ctx)
 
 
 def _write_ptr(workspace: Path, ctx: str, session_id: str) -> None:
-    """Write session_id to the pointer file atomically (via os.replace)."""
-    ptr = _ptr_path(workspace, ctx)
-    tmp = ptr.parent / f"{ptr.name}.{uuid.uuid4().hex}.tmp"
-    tmp.write_text(session_id, encoding="utf-8")
-    try:
-        os.replace(tmp, ptr)
-    except OSError:
-        tmp.unlink(missing_ok=True)
-        raise
+    """Write session_id to the incumbent pointer atomically (via ``session_identity``)."""
+    _validate(ctx, field="context")
+    session_identity.write_incumbent_ptr(workspace, ctx, session_id)
 
 
 def read_record(workspace: Path, ctx: str) -> dict[str, object] | None:

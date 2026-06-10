@@ -133,7 +133,6 @@ def panel(
         views,
         token=token,
         telemetry=telemetry,
-        loopback_bypass=(bind in _LOOPBACK_ONLY),
     )
 
     try:
@@ -158,6 +157,13 @@ def panel(
     # The token is printed to stdout (terminal only); never logged.
     typer.echo(f"Panel running at http://{bind}:{port}/")
     typer.echo(f"First-load URL:  http://{bind}:{port}/?token={token}")
+    # Flush the readiness banner before entering the blocking serve loop. stdout
+    # is block-buffered when piped (e.g. a supervising launcher or the e2e
+    # harness); without this flush the token line can sit in the buffer until the
+    # process exits — which never happens under serve_forever — so any
+    # readiness/token handoff over stdout would hang. Flush makes the handoff
+    # deterministic.
+    sys.stdout.flush()
 
     if not no_open:
         webbrowser.open(f"http://{bind}:{port}/?token={token}")

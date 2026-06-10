@@ -82,8 +82,8 @@ class WorkspaceService:
         # Install repos.xlsx catalog (idempotent — never overwrite)
         self._install_repos_catalog(workspace)
 
-        # Install ctx-inject.sh and configure the hook
-        self._install_hook_script(workspace)
+        # Configure the ctx-inject hook (Python module command; the legacy
+        # ctx-inject.sh script was retired in v0.1.10, Decision D-1).
         self._configure_hook(workspace)
 
         return workspace, installed
@@ -101,15 +101,6 @@ class WorkspaceService:
             src = Path(__file__).parent.parent.parent / "public" / "data" / "repos.xlsx"
             if src.exists():
                 shutil.copy2(src, dest)
-
-    def _install_hook_script(self, workspace: Workspace) -> None:
-        scripts_dir = workspace.dadaia_dir / "scripts"
-        scripts_dir.mkdir(parents=True, exist_ok=True)
-        dest = scripts_dir / "ctx-inject.sh"
-        src = Path(__file__).parent.parent.parent / "public" / "scripts" / "ctx-inject.sh"
-        if src.exists():
-            shutil.copy2(src, dest)
-            dest.chmod(0o755)
 
     def _configure_hook(self, workspace: Workspace) -> None:
         # T-018-17: emit the Python hook command instead of the .sh path.

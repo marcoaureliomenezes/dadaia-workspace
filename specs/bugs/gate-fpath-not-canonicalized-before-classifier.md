@@ -1,10 +1,18 @@
 ---
 name: gate-fpath-not-canonicalized-before-classifier
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-09
 surface: sdd-spec-gate.sh (FPATH classification)
 session_id: null
+resolution: >
+  Python surface fixed in T-010-03 — hooks/sdd_gate.py resolves the path
+  (fpath.resolve()) BEFORE relativizing/classifying, with the named symlink→MEMORY
+  regression test tests/integration/gate/test_classifier_symlink_canonicalization.py.
+  Bash surface retired in T-010-13 (Decision D-1): sdd-spec-gate.sh and the rest of
+  the bash hook quartet were deleted from public/scripts/, staging, manifest, and all
+  projections, so no un-canonicalized bash classifier surface remains. Residue pinned
+  by tests/contract/test_bash_hook_residue.py.
 ---
 
 **Symptom:** `sdd-spec-gate.sh` makes `FPATH` absolute (`[[ "$FPATH" != /* ]] && FPATH="$WS/$FPATH"`)

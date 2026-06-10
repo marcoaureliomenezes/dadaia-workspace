@@ -20,6 +20,7 @@ import hmac
 import os
 import pathlib
 import secrets
+import stat as _stat
 import sys
 
 from dadaia_workspace.core.exceptions import PlatformSecurityError
@@ -29,6 +30,43 @@ from dadaia_workspace.core.protocols.platform_services import FilePermissionSett
 DEFAULT_TOKEN_PATH = pathlib.Path("~/.dadaia/state/panel.token").expanduser()
 _BEARER_PREFIX = "Bearer "
 
+# Mode bits that make the token readable by group or other. A token carrying
+# these bits is effectively world-readable and must be tightened to 0o600.
+_GROUP_OTHER_READABLE = _stat.S_IRWXG | _stat.S_IRWXO
+
+
+def _tighten_existing_token(
+    path: pathlib.Path,
+    permission_setter: FilePermissionSetter | None,
+) -> None:
+    """Re-check the mode of a pre-existing token file and tighten to 0o600.
+
+    F-7 (CWE-732): the atomic ``O_EXCL | 0o600`` create only protects newly
+    minted tokens.  A token left behind by an older (pre-fix) panel may sit at a
+    group/other-readable mode (e.g. ``0o644``) and stays world-readable forever.
+    On every read we verify the mode and, if it is too wide, restrict it back to
+    owner-only — preferring the injected ``FilePermissionSetter`` (icacls on
+    Windows / chmod on POSIX) and falling back to ``os.chmod`` on POSIX.
+
+    On platforms with no effective ``os.chmod`` (Windows) and no setter injected,
+    the mode cannot be read/changed meaningfully via POSIX bits; the ACL-based
+    setter is the only honest tightening path, so this is a no-op without one.
+    """
+    if permission_setter is not None:
+        # The seam owns the platform-correct tightening (icacls/chmod). Always
+        # route through it so Windows ACLs get re-applied too.
+        permission_setter.restrict_to_owner(path, 0o600)
+        return
+
+    if not PLATFORM.has_posix_chmod:
+        # No setter and chmod is a no-op (Windows): cannot tighten via POSIX bits.
+        # The production panel always injects a setter; this guards a misuse only.
+        return
+
+    current_mode = _stat.S_IMODE(os.stat(path).st_mode)
+    if current_mode & _GROUP_OTHER_READABLE:
+        os.chmod(path, 0o600)
+
 
 def ensure_token(
     path: pathlib.Path = DEFAULT_TOKEN_PATH,
@@ -37,7 +75,9 @@ def ensure_token(
     """Read token from path; generate + persist if missing.
 
     Creates parent dir with restricted permissions. Token file is created
-    with owner-only access.
+    with owner-only access.  A pre-existing token file has its mode re-checked
+    on every read and tightened to 0o600 if an older panel left it
+    group/other-readable (F-7 / CWE-732, platform-seam aware).
 
     Platform security (Tier-1 / SPEC §5):
       If *permission_setter* is provided it is used to restrict the parent
@@ -68,6 +108,9 @@ def ensure_token(
         directory.  Propagated without suppression (Tier-1 fail-loud).
     """
     if path.exists():
+        # F-7: re-check the mode of a pre-existing token and tighten it if an
+        # older panel left it group/other-readable (CWE-732, platform-seam aware).
+        _tighten_existing_token(path, permission_setter)
         return path.read_text(encoding="utf-8").strip()
 
     # Create parent directory.

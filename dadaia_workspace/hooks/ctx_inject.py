@@ -1,4 +1,4 @@
-"""Context-injection hook (Windows-safe port of ``ctx-inject.sh``).
+"""Context-injection hook (the canonical, cross-platform gate surface).
 
 Invoked on SessionStart and UserPromptSubmit. It injects, ONCE per logical session, the
 lean workspace bootstrap (context line + dispatcher preflight + tech-stack.md + catalog).
@@ -26,6 +26,7 @@ import os
 import sys
 from pathlib import Path
 
+from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.hooks import _common
 
 _DISPATCHER_PREFLIGHT = """=== dispatcher preflight (SDD routing) ===
@@ -97,15 +98,13 @@ def _emit(payload: str) -> None:
 
 
 def _write_runtime_ptr(workspace: Path, session_id: str) -> None:
-    """Best-effort session-keyed runtime pointer (mirrors the shell ``.ptr`` write)."""
-    if session_id == "workspace":
-        return
-    ptr_dir = workspace / ".dadaia" / "sessions" / "runtime"
-    try:
-        ptr_dir.mkdir(parents=True, exist_ok=True)
-        (ptr_dir / f"{session_id}.ptr").write_text(session_id, encoding="utf-8")
-    except OSError:
-        return
+    """Best-effort session-keyed runtime pointer.
+
+    Routed through ``session_identity`` (WS-R3, FR-R3-01) — the single owner of the
+    ``sessions/runtime/*.ptr`` namespace. Behavior is preserved verbatim: the
+    ``"workspace"`` sentinel is skipped and write failures are swallowed.
+    """
+    session_identity.write_session_ptr(workspace, session_id)
 
 
 def _build_memory(specs_dir: Path) -> str:

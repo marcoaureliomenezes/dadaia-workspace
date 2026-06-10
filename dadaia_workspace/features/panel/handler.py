@@ -13,10 +13,12 @@ Auth (T-AM-13, T-AM-15, T-016-P05):
   Every registered route carries an explicit ``auth_class`` in the declarative
   ``_ROUTE_TABLE`` constant.  ``auth_class`` is one of:
 
-      PUBLIC             — no auth required.
+      PUBLIC             — no auth required (index, /health, /static).
       BEARER             — Bearer token required; no telemetry dependency.
-      BEARER_SECOND_LOOP — Bearer required when NOT on loopback; data is workspace-
-                           sensitive but not gated by telemetry.
+      BEARER_SECOND_LOOP — Bearer required; data is workspace-sensitive but not
+                           gated by telemetry.  (Historical name: the loopback
+                           exemption was removed in T-010-21 / sec F-3 — these
+                           routes now require auth unconditionally.)
       BEARER_TELEMETRY   — Bearer required; returns 503 when telemetry is None.
 
   A route omitted from ``_ROUTE_TABLE`` cannot exist — there is no silent-public
@@ -105,8 +107,9 @@ class AuthClass(enum.Enum):
     BEARER:
         Bearer token required; no telemetry dependency (bearer-only routes).
     BEARER_SECOND_LOOP:
-        Bearer required when NOT loopback-bound; returns workspace-sensitive data
-        (e.g. server registry, context paths, report/memory content).
+        Bearer required unconditionally (no loopback exemption — sec F-3);
+        returns workspace-sensitive data (e.g. server registry, context paths,
+        report/memory content).
     BEARER_TELEMETRY:
         Bearer required; returns 503 when telemetry is None or degraded
         (e.g. agent sessions, agent list with telemetry overlay).
@@ -276,7 +279,6 @@ def make_handler_class(
     *,
     token: str | None = None,
     telemetry: Any = None,
-    loopback_bypass: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a PanelHandler subclass with *views* and auth/telemetry injected.
 
@@ -291,24 +293,24 @@ def make_handler_class(
         ``"api_academy"``, ``"memory"``, ``"memory_view"``, ``"static"``.
 
     token:
-        The expected Bearer token.  When provided, all ``/api/*`` routes
-        enforce ``Authorization: Bearer <token>``.  If None, telemetry
-        routes return 503 Service Unavailable (auth not configured).
+        The expected Bearer token.  When provided, all sensitive routes enforce
+        ``Authorization: Bearer <token>``.  If None, telemetry routes return 503
+        Service Unavailable (auth not configured) and bearer routes return 401.
 
     telemetry:
         A TelemetryService (or compatible stub) instance.  When None,
         telemetry routes return 503 Service Unavailable.
 
-    loopback_bypass:
-        When True (set by panel.py when ``bind == "127.0.0.1"``), the Bearer
-        token requirement on ``/api/*`` routes is waived.  This allows local
-        human and AI-agent clients to call the panel API without supplying an
-        Authorization header.  Detection is at the server bind level — NOT
-        derived from the client TCP peer address.
-
-        Security note: any local process can read panel data without a token
-        when this flag is active — a deliberate dev-local trade-off for a
-        read-only GET surface.
+    Security note (sec F-3 / T-010-21 R7c):
+        There is **no loopback bypass**.  A tokenless request to a sensitive
+        API returns 401 even when the panel is bound to 127.0.0.1.  Previously a
+        ``loopback_bypass`` flag waived Bearer auth on loopback binds; this
+        exposed every sensitive panel API to any co-located local process and to
+        DNS-rebinding / CSRF-style attacks from a malicious local web page
+        (CWE-200 / CWE-668).  PUBLIC routes (index, ``/health``, ``/static``)
+        remain tokenless; only sensitive routes require auth.  The browser UI
+        obtains the token from the ``?token=`` launch URL and sends it on every
+        API call (``core.js`` token bootstrap + ``authedFetch``).
     """
     # Build compiled route list, filtering only routes whose names are in views
     # OR that are telemetry-dispatched (handled inline, not via views).
@@ -325,14 +327,6 @@ def make_handler_class(
 
     _token = token
     _telemetry = telemetry
-    _loopback_bypass = loopback_bypass
-
-    if _loopback_bypass:
-        import logging as _logging
-
-        _logging.getLogger(__name__).warning(
-            "[PANEL] Auth disabled for loopback (127.0.0.1) connections."
-        )
 
     _UNAUTHORIZED_BODY = b'{"error": "unauthorized"}'
 
@@ -375,26 +369,24 @@ def make_handler_class(
                     # No auth required.
                     pass
                 elif auth_class == AuthClass.BEARER:
-                    # Bearer required; no telemetry dependency.
-                    if not _loopback_bypass and (
-                        _token is None
-                        or not _validate_bearer(self.headers.get("Authorization"), _token)
+                    # Bearer required; no telemetry dependency. No loopback bypass.
+                    if _token is None or not _validate_bearer(
+                        self.headers.get("Authorization"), _token
                     ):
                         self._respond(401, "application/json", _UNAUTHORIZED_BODY)
                         return
                 elif auth_class == AuthClass.BEARER_SECOND_LOOP:
-                    # Bearer required on non-loopback connections.
-                    if not _loopback_bypass and (
-                        _token is None
-                        or not _validate_bearer(self.headers.get("Authorization"), _token)
+                    # Sensitive workspace data; Bearer required unconditionally
+                    # (sec F-3: no loopback exemption).
+                    if _token is None or not _validate_bearer(
+                        self.headers.get("Authorization"), _token
                     ):
                         self._respond(401, "application/json", _UNAUTHORIZED_BODY)
                         return
                 elif auth_class == AuthClass.BEARER_TELEMETRY:
-                    # Bearer required; telemetry must be available.
-                    if not _loopback_bypass and (
-                        _token is None
-                        or not _validate_bearer(self.headers.get("Authorization"), _token)
+                    # Bearer required; telemetry must be available. No loopback bypass.
+                    if _token is None or not _validate_bearer(
+                        self.headers.get("Authorization"), _token
                     ):
                         self._respond(401, "application/json", _UNAUTHORIZED_BODY)
                         return

@@ -149,7 +149,6 @@ _TEST_TOKEN = "test-kanban-token"
 def _make_handler(
     tmp_path: Path,
     *,
-    loopback_bypass: bool = False,
     token: str | None = _TEST_TOKEN,
 ) -> type[BaseHTTPRequestHandler]:
     """Build a handler class with a real api_kanban view and minimal stubs."""
@@ -168,7 +167,6 @@ def _make_handler(
         views,  # type: ignore[arg-type]
         token=token,
         telemetry=None,
-        loopback_bypass=loopback_bypass,
     )
 
 
@@ -306,7 +304,7 @@ def test_kanban_unknown_mode_excluded_or_surfaced(tmp_path: Path) -> None:
 
 def test_kanban_post_not_allowed(tmp_path: Path) -> None:
     """POST /api/kanban returns 405 Method Not Allowed."""
-    handler_class = _make_handler(tmp_path, loopback_bypass=True)
+    handler_class = _make_handler(tmp_path)
     status, _body = _dispatch_post(handler_class, "/api/kanban")
     assert status == 405
 
@@ -335,20 +333,20 @@ def test_kanban_invalid_session_files_skipped(tmp_path: Path) -> None:
     assert columns["backlog"][0]["session_id"] == "sess_valid"
 
 
-def test_kanban_auth_enforced_unless_loopback_bypass(tmp_path: Path) -> None:
-    """Auth is required without loopback bypass and skipped with loopback bypass."""
+def test_kanban_auth_enforced(tmp_path: Path) -> None:
+    """Auth is required: tokenless ⇒ 401, valid Bearer ⇒ 200 (no loopback bypass)."""
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_auth", mode="READ")
 
-    handler_class = _make_handler(tmp_path, loopback_bypass=False, token=_TEST_TOKEN)
-    status, body = _dispatch_get(handler_class, "/api/kanban")
+    handler_class = _make_handler(tmp_path, token=_TEST_TOKEN)
 
+    # Tokenless request → 401 even on loopback (sec F-3).
+    status, body = _dispatch_get(handler_class, "/api/kanban")
     assert status == 401
     assert b"unauthorized" in body
 
-    handler_class = _make_handler(tmp_path, loopback_bypass=True, token=_TEST_TOKEN)
-    status, body = _dispatch_get(handler_class, "/api/kanban")
-
+    # Valid Bearer token → 200.
+    status, body = _dispatch_get(handler_class, "/api/kanban", token=_TEST_TOKEN)
     assert status == 200
     data = json.loads(body)
     assert "swimlanes" in data

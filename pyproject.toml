@@ -47,6 +47,19 @@ types-PyYAML = ">=6"
 pytest-randomly = "^4.1.0"
 import-linter = ">=2.11"
 
+# Dev/build tooling CVE floors (security audit F-6, sec-reviewer 2026-06-10).
+# `poetry` and `dulwich` are NOT declared dependencies of this project and do not
+# appear in `poetry.lock` (build-system uses `poetry-core`, which has no dulwich in
+# its closure). The flagged CVEs live only in the workspace tool environment where
+# `poetry` is installed to operate the workspace (pip-installed into the venv, not
+# locked here). They are therefore outside this repo's lockfile control. The required
+# safe floors — enforced on the *tool* environment, not this project's deps — are:
+#   poetry  >= 2.3.4  (CVE-2026-34591, CVE-2026-41140)
+#   dulwich >= 1.2.5  (CVE-2026-42305, CVE-2026-47734  — poetry transitive)
+# Upgrading the live tool venv (.dadaia/.venv) is an operator/devops action; declaring
+# `poetry` as a dev dep here is rejected as unjustified dependency drift (it would pull
+# poetry's entire heavy tree, incl. dulwich, into every contributor install and the lock).
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

@@ -1,4 +1,4 @@
-"""PostToolUse session-heartbeat hook (Windows-safe port of ``sdd-post-gate.sh``).
+"""PostToolUse session-heartbeat hook (the canonical, cross-platform gate surface).
 
 Runs after every tool call. Its sole purpose: keep the active session alive by renewing
 ``last_seen_at`` in the session file and appending a HEARTBEAT event to

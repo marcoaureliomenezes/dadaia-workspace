@@ -16,13 +16,19 @@ Coverage map:
 
 from __future__ import annotations
 
+import fcntl
+import http.client
 import json
+import os
+import queue
 import select
 import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -51,7 +57,8 @@ def _find_free_port() -> int:
     """Return an OS-assigned free TCP port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+        port: int = s.getsockname()[1]
+        return port
 
 
 def _spawn_panel(
@@ -80,22 +87,101 @@ def _spawn_panel(
 
 def _wait_for_ready(proc: subprocess.Popen[str], port: int, timeout: float = 10.0) -> None:
     """Block until the 'Panel running at' line appears on stdout or timeout."""
+    _wait_for_ready_and_token(proc, port, timeout)
+
+
+def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) -> str:
+    """Best-effort, NON-blocking read of whatever is currently on stderr.
+
+    The panel runs ``serve_forever`` and never closes its pipes, so a plain
+    ``proc.stderr.read()`` on a live process blocks forever.  We mark the fd
+    non-blocking and read what is buffered so diagnostics never hang the suite.
+    """
+    if proc.stderr is None:
+        return ""
+    time.sleep(wait)
+    fd = proc.stderr.fileno()
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+    try:
+        return proc.stderr.read() or ""
+    except (BlockingIOError, OSError):
+        return ""
+
+
+def _wait_for_ready_and_token(proc: subprocess.Popen[str], port: int, timeout: float = 10.0) -> str:
+    """Block until the panel is ready and return the Bearer token.
+
+    The panel prints two lines on startup (flushed before ``serve_forever``)::
+
+        Panel running at http://127.0.0.1:<port>/
+        First-load URL:  http://127.0.0.1:<port>/?token=<token>
+
+    A reader thread drains stdout line-by-line; mixing ``select`` on the raw fd
+    with a buffered ``TextIOWrapper.readline`` is unsound (the second line can be
+    sitting in the wrapper's buffer while ``select`` reports the fd as empty,
+    which is exactly the hang this replaces).  The token is required because
+    there is no loopback auth bypass (sec F-3 / T-010-21): every sensitive API
+    call must carry ``Authorization: Bearer <token>``.
+
+    Fails fast with a bounded timeout — never an unbounded poll, and never a
+    blocking ``stderr.read()`` on the still-running process.
+    """
     expected = f"Panel running at http://127.0.0.1:{port}/"
-    deadline = time.monotonic() + timeout
+    token_marker = "/?token="
     assert proc.stdout is not None
+
+    lines: queue.Queue[str | None] = queue.Queue()
+
+    def _reader() -> None:
+        try:
+            assert proc.stdout is not None
+            for raw in proc.stdout:
+                lines.put(raw)
+        finally:
+            lines.put(None)  # EOF sentinel
+
+    reader = threading.Thread(target=_reader, daemon=True)
+    reader.start()
+
+    deadline = time.monotonic() + timeout
+    ready = False
+    token: str | None = None
     while time.monotonic() < deadline:
-        rlist, _, _ = select.select([proc.stdout], [], [], 0.2)
-        if rlist:
-            line = proc.stdout.readline()
-            if expected in line:
-                return
-        if proc.poll() is not None:
-            stderr = proc.stderr.read() if proc.stderr else ""
+        remaining = max(0.0, deadline - time.monotonic())
+        try:
+            line = lines.get(timeout=min(0.2, remaining) or 0.05)
+        except queue.Empty:
+            if proc.poll() is not None:
+                stderr = _drain_stderr_nonblocking(proc)
+                raise RuntimeError(
+                    f"Panel process exited early (rc={proc.returncode}). stderr:\n{stderr}"
+                ) from None
+            continue
+        if line is None:  # EOF — process closed stdout
+            stderr = _drain_stderr_nonblocking(proc)
             raise RuntimeError(
-                f"Panel process exited early (rc={proc.returncode}). stderr:\n{stderr}"
+                f"Panel closed stdout before becoming ready (rc={proc.poll()}). stderr:\n{stderr}"
             )
-    stderr = proc.stderr.read() if proc.stderr else ""
-    raise TimeoutError(f"Panel did not print ready-line within {timeout}s. stderr:\n{stderr}")
+        if expected in line:
+            ready = True
+        if token_marker in line:
+            token = line.split(token_marker, 1)[1].strip()
+        if ready and token is not None:
+            return token
+
+    stderr = _drain_stderr_nonblocking(proc)
+    raise TimeoutError(
+        f"Panel did not print ready-line + token within {timeout}s. stderr:\n{stderr}"
+    )
+
+
+def _auth_get(url: str, token: str, timeout: float = 5.0) -> http.client.HTTPResponse:
+    """GET *url* with an Authorization: Bearer header. Returns the response."""
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {token}")
+    resp: http.client.HTTPResponse = urllib.request.urlopen(req, timeout=timeout)
+    return resp
 
 
 def _kill_proc(proc: subprocess.Popen[str]) -> None:
@@ -130,9 +216,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        _wait_for_ready(proc, port)
+        token = _wait_for_ready_and_token(proc, port)
 
-        # --- index page ---
+        # --- index page (PUBLIC — no token required) ---
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=5) as resp:
             assert resp.status == 200
             body = resp.read().decode("utf-8", errors="replace")
@@ -148,9 +234,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             "Index page missing Agents/Workflows section marker"
         )
 
-        # --- /api/panel-status ---
+        # --- /api/panel-status (sensitive — Bearer token required) ---
         # Response shape: {"groups": [...]}  (see views/api.py contract docstring)
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/panel-status", timeout=5) as resp:
+        with _auth_get(f"http://127.0.0.1:{port}/api/panel-status", token) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/panel-status: {ct}"
@@ -159,9 +245,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             assert "groups" in servers_data, "/api/panel-status response missing 'groups' key"
             assert isinstance(servers_data["groups"], list), "'groups' must be a list"
 
-        # --- /api/contexts ---
+        # --- /api/contexts (sensitive — Bearer token required) ---
         # Response shape: {"contexts": [...]}  (see views/api.py contract docstring)
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/contexts", timeout=5) as resp:
+        with _auth_get(f"http://127.0.0.1:{port}/api/contexts", token) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/contexts: {ct}"
@@ -171,6 +257,50 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             assert isinstance(contexts_data["contexts"], list), "'contexts' must be a list"
 
         # --- SIGINT teardown ---
+        proc.send_signal(signal.SIGINT)
+        rc = proc.wait(timeout=5)
+        assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
+    finally:
+        _kill_proc(proc)
+
+
+# ---------------------------------------------------------------------------
+# T-010-21 R7c — panel loopback auth (sec F-3, AC-R7-03)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
+def test_tokenless_loopback_request_to_sensitive_api_is_401(tmp_path: Path) -> None:
+    """AC-R7-03 contract pin: a tokenless 127.0.0.1 request to a sensitive panel
+    API returns 401; the same request with the Bearer token returns 200.
+
+    There is no loopback auth bypass — a co-located local process or a malicious
+    local web page (DNS-rebinding / CSRF-style) cannot reach workspace state
+    without the token.
+    """
+    _init_workspace(tmp_path)
+    port = _find_free_port()
+    proc = _spawn_panel(port, cwd=tmp_path)
+
+    try:
+        token = _wait_for_ready_and_token(proc, port)
+
+        # Tokenless request to a sensitive API → 401.
+        sensitive_url = f"http://127.0.0.1:{port}/api/panel-status"
+        try:
+            with urllib.request.urlopen(sensitive_url, timeout=5):
+                raise AssertionError("Tokenless request to sensitive API must NOT return 2xx")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 401, f"Expected 401 for tokenless sensitive API, got {exc.code}"
+
+        # Same request WITH the Bearer token → 200.
+        with _auth_get(sensitive_url, token) as resp:
+            assert resp.status == 200
+
+        # PUBLIC /health stays reachable without a token.
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=5) as resp:
+            assert resp.status == 200
+
         proc.send_signal(signal.SIGINT)
         rc = proc.wait(timeout=5)
         assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
