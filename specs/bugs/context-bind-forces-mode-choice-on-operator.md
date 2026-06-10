@@ -1,11 +1,20 @@
 ---
 name: context-bind-forces-mode-choice-on-operator
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-09
+resolved_in: v0.1.10
 surface: dadaia context bind — mandatory --mode option / bind ergonomics
 session_id: sess_61345db3
 ---
+
+**Resolution (v0.1.10):** Fixed by T-010-08 — `--mode` is now optional and
+defaults to `read` (mode-agnostic bind), so `dadaia context bind <name>` exits 0
+and prints a human confirmation without forcing the operator to pick a lifecycle
+mode. Regression tests (green):
+`tests/contract/cli/test_cli_context.py::test_context_bind_no_mode_exits_zero_default_read`
+and `::test_context_bind_no_mode_prints_human_confirmation`.
+
 
 **Symptom:** `dadaia context bind <name>` fails closed when `--mode` is omitted:
 

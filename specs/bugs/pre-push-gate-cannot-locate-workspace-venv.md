@@ -1,11 +1,23 @@
 ---
 name: pre-push-gate-cannot-locate-workspace-venv
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-09
+resolved_in: v0.1.10
 surface: pre-push-ci-gate.sh (.git/hooks/pre-push runner detection)
 session_id: null
 ---
+
+**Resolution (v0.1.10):** Fixed by T-010-26 — `pre-push-ci-gate.sh` now probes
+the runner in order `DADAIA_BIN` → walk-up `<ws>/.dadaia/.venv/bin/dadaia` →
+`poetry` → repo-local `.venv`, with a fail-closed clear error when none is found.
+This lets the gate actually run in the self-hosting workspace layout instead of
+forcing a `--no-verify` bypass. Regression tests (all 7 green):
+`tests/unit/public/test_pre_push_gate_venv_probe.py` — including
+`::test_branch2_walk_up_to_workspace_venv`,
+`::test_none_found_fails_closed`, and the precedence tests
+`::test_dadaia_bin_precedes_workspace_venv` / `::test_workspace_venv_precedes_poetry`.
+
 
 **Symptom:** The mandatory pre-push CI gate (`pre-push-ci-gate.sh`) fails-closed and never runs
 its checks in the self-hosting / dadaia-workspace layout. On `git push` it prints:

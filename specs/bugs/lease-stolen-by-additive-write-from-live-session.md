@@ -1,11 +1,24 @@
 ---
 name: lease-stolen-by-additive-write-from-live-session
-status: Open
+status: Closed
 severity: CRITICAL
 reported: 2026-06-10
+resolved_in: v0.1.10
 surface: hooks/sdd_gate.py + spec_context/gate_policy.py + spec_context/lease.py heartbeat model
 session_id: null
 ---
+
+**Resolution (v0.1.10):** Fixed by T-010-03 (classifier re-root — full
+class×location taxonomy: in-repo `specs/bugs|audits|backlog` writes classify
+ADDITIVE and acquire/steal no lease) together with T-010-04/05 (PostToolUse
+heartbeat = real liveness signal, not write-recency; a live holder is never
+taken over). Regression tests (all green):
+`tests/e2e/test_two_actor_lease.py::test_holder_busy_foreign_additive_allowed_and_never_named`,
+`tests/integration/gate/test_classifier_reroot_matrix.py::test_lease_theft_incident_in_repo_additive_does_not_steal`,
+and `::test_lease_theft_dual_session_foreign_mutating_still_blocks_live_holder`
+(the last proves a foreign MUTATING write is still blocked while the live
+holder's pid is alive — the lease is never stolen, only ADDITIVE passes through).
+
 
 **Symptom:** A second session that only wrote a **bug file** (an ADDITIVE
 artifact the product law says is "never gate-blocked, never locked") **took

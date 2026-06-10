@@ -112,7 +112,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R5-02):** root-only ADDITIVE assertions (`test_lease_property.py:74`, `test_lease_activity_exemption.py:27`) replaced by the R1 matrix; `test_post_gate_heartbeat.py:79` migrated to harness-env fixture; gate/lease suites parametrized {1,2 contexts}×{default,non-default slug}×{seeded,empty}; evidence = the named file:lines removed, recorded for CLOSURE + AC-R1-01 matrix carries an in-repo variant per class (replaces the unmechanical residue grep; bash-pinning residue stays covered by T-010-13's contract).
 - **Parallelism:** after Track K.
 
-### [ ] T-010-12 — R5: escape-matrix regression coverage (7/7 bugs)
+### [x] T-010-12 — R5: escape-matrix regression coverage (7/7 bugs)
 - **Owner:** software-engineer · **Maps:** CONF-6, qa escape matrix; all 7 open bugs
 - **Write set:** `tests/` (named regression per bug where not already created in K/R tracks), bug frontmatter (`status: Closed` + regression-test name)
 - **Preconditions:** T-010-06, T-010-11, T-010-23..26.

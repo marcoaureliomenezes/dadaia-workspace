@@ -1,11 +1,23 @@
 ---
 name: ci-preflight-self-pollution-gate-never-passes
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-10
+resolved_in: v0.1.10
 session_id: sess_d7f127f8
 surface: dadaia ci preflight / pre-push hook / tests/conftest.py session-pollution guard
 ---
+
+**Resolution (v0.1.10):** Fixed by T-010-25 — `ci_preflight/service.py` now
+invokes `ruff` with `--no-cache`, redirects the mypy cache under `.dadaia/tmp/`,
+and the conftest session-pollution guard does a pre/post snapshot diff (failing
+only on session-created artifacts, not pre-existing cache dirs). `dadaia ci
+preflight` now exits 0 on a clean tree with no cache dirs left at the repo root.
+Regression tests (all green):
+`tests/unit/features/ci_preflight/test_no_pollution.py`,
+`tests/unit/features/ci_preflight/test_pollution_guard_diff.py`, and
+`tests/unit/features/ci_preflight/test_service.py`.
+
 
 **Symptom:** `dadaia ci preflight` (and therefore the pre-push hook) can never
 pass on a clean tree. The pytest check always fails with `[SESSION POLLUTION]`
