@@ -204,6 +204,7 @@ def evaluate(
     mode: str,
     clock: Callable[[], datetime] = _utcnow,
     pid_probe: lease.PidProbe | None = None,
+    holder_pid: int | None = None,
 ) -> tuple[Decision, str]:
     """Return the gate decision for one write target — the fail-safe contract.
 
@@ -227,6 +228,14 @@ def evaluate(
     TTL-expired-but-still-running foreign holder is BLOCKed (not taken over). It is
     injected by the hook layer (``hooks/sdd_gate.py`` sources the container's
     ``OsProcessProbe``); ``None`` ⇒ TTL-only fallback. This module imports no adapter.
+
+    ``holder_pid`` (WS-R2 FR-R2-03, NF-1 fix) is the pid stamped into the lease record so a
+    *foreign* probe can later confirm this holder is alive. It MUST be a **long-lived**
+    process id, not the ephemeral gate subprocess's own: the hook layer passes
+    ``os.getppid()`` (the harness process that spawned the hook) — the hook child dies
+    milliseconds after acquire, so recording its pid would make the no-steal veto probe a
+    dead pid and inert. ``None`` ⇒ :func:`lease.acquire` defaults to ``os.getpid()`` (correct
+    for a long-lived direct-API caller).
     """
     cls = classify_path(rel_path)
 
@@ -259,7 +268,16 @@ def evaluate(
 
     # MUTATING — the gate is the single acquisition point (O_EXCL CAS in lease).
     try:
-        lease.acquire(workspace, ctx, session_id, release, mode, clock=clock, pid_probe=pid_probe)
+        lease.acquire(
+            workspace,
+            ctx,
+            session_id,
+            release,
+            mode,
+            clock=clock,
+            pid_probe=pid_probe,
+            pid=holder_pid,
+        )
     except LockHeldError as exc:
         # Genuine live-foreign conflict — BLOCK with the informative yield message.
         return Decision.BLOCK, str(exc)

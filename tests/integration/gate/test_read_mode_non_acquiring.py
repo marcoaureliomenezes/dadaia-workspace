@@ -106,3 +106,57 @@ def test_unbound_session_is_implementation_capable(tmp_path: Path) -> None:
     assert result.block_envelope() is None, f"unbound write must ALLOW; stdout={result.stdout!r}"
     # Free-lease acquire proceeded: the lease record now exists, held by this session.
     assert _lock_path(ws).exists()
+
+
+# --------------------------------------------------------------------------------------
+# NF-2 (rc-2): the default `dadaia context bind --mode read` flow — a sid the harness never
+# reports — is honored at the REAL hook boundary via the CONTEXT incumbent pointer, with a
+# DIFFERENT harness sid (no self record, no env var).
+# --------------------------------------------------------------------------------------
+
+
+def _bind_read_incumbent(ws: Path, bind_sid: str) -> None:
+    """Emulate `dadaia context bind --mode read`: persist a READ record AND refresh the
+    context incumbent pointer to ``bind_sid`` — exactly what the bind CLI now does (NF-2)."""
+    session_identity.write_session(ws, bind_sid, {"session_id": bind_sid, "mode": "READ"})
+    session_identity.set_incumbent(ws, _SLUG, bind_sid)
+
+
+def test_cross_sid_read_bind_blocks_mutating_via_incumbent(tmp_path: Path) -> None:
+    # The operator's `bind --mode read` minted a sid the running harness never reports. A
+    # DIFFERENT harness sid performs a MUTATING write under the real hook: it must resolve
+    # READ through the context incumbent pointer ⇒ BLOCK, no lease written. This is the
+    # NF-2 falsification: the mode channel works with NO env var and a cross-sid record.
+    ws = _make_workspace(tmp_path)
+    _bind_read_incumbent(ws, "sess_operatorbind")
+    assert not _lock_path(ws).exists()
+
+    target = ws / "repos" / _SLUG / "specs" / "releases" / "v0.1.10" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # The harness session id is DIFFERENT from the bind sid and has no record of its own.
+    env = claude_hook_env(ws, session_id="claude-harness-other")
+    result = run_hook_subprocess("sdd_gate", _write_payload(target), env)
+
+    assert result.returncode == 0
+    envelope = result.block_envelope()
+    assert envelope is not None, (
+        f"cross-sid read-bind must BLOCK MUTATING; stdout={result.stdout!r}"
+    )
+    assert "read" in envelope["reason"].lower()
+    assert "--mode implementation" in envelope["reason"]
+    # Non-acquiring: no lease record created by the blocked write.
+    assert not _lock_path(ws).exists()
+
+
+def test_cross_sid_read_bind_allows_additive_via_incumbent(tmp_path: Path) -> None:
+    # Same cross-sid read-bind, but an ADDITIVE write ⇒ ALLOW (FR-R4-03), still no lease.
+    ws = _make_workspace(tmp_path)
+    _bind_read_incumbent(ws, "sess_operatorbind")
+
+    target = ws / "repos" / _SLUG / "specs" / "bugs" / "planted-by-other.md"
+    env = claude_hook_env(ws, session_id="claude-harness-other")
+    result = run_hook_subprocess("sdd_gate", _write_payload(target), env)
+
+    assert result.returncode == 0
+    assert result.block_envelope() is None, f"ADDITIVE must ALLOW; stdout={result.stdout!r}"
+    assert not _lock_path(ws).exists()

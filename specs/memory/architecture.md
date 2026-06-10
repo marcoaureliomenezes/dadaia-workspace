@@ -147,7 +147,11 @@ live-lease conflict.
 - **Liveness = TTL com PID veto** (`core/lock_liveness.is_stale`): `LEASE_TTL_SECONDS =
   120` é o piso de reclaimability, mas quando o record carrega `pid` e o probe injetado
   reporta o processo holder **vivo**, um record TTL-expirado é tratado como live —
-  `acquire` estrangeiro **bloqueia** em vez de TAKEOVER (no-steal). Pid morto/ausente,
+  `acquire` estrangeiro **bloqueia** em vez de TAKEOVER (no-steal). O `pid` gravado é o
+  do **processo harness de vida longa**, resolvido pelo hook
+  (`hooks/sdd_gate._resolve_holder_pid`: `harness_pid`/`parent_pid`/`ppid` do payload
+  stdin, senão `os.getppid()`) e threaded até `lease.acquire` — nunca o pid do
+  subprocesso efêmero do hook. Pid morto/ausente,
   ou probe indisponível na plataforma (`PLATFORM.has_os_kill_liveness`) ⇒ fallback
   TTL-only (TAKEOVER). O probe (`infrastructure/process_probe_adapter.OsProcessProbe`,
   platform-seamed) é injetado pelo hook layer (`hooks/sdd_gate.py`) — `features/lease.py`
@@ -167,17 +171,19 @@ heartbeat de **todo lease cujo record nomeia o sid desta sessão**:
 - O alvo da renovação são os lock records que este sid efetivamente segura — **nunca**
   `DADAIA_CONTEXT` → first-ALIVE (a rota da contaminação cross-context).
 - A renovação roda fora de qualquer guard de session-file; fail-open exit 0 sempre.
-- No Claude Code o matcher PostToolUse é match-all `*`: o heartbeat dispara inclusive
-  após Bash — um holder dentro de um pytest longo mantém o lease fresco. No Codex o
-  PostToolUse dispara nos write tools; um holder ocupado em comando longo é coberto
-  pelo PID veto (TTL-stale + processo vivo ⇒ block, não steal).
+- No Claude Code o matcher PostToolUse é match-all `*`; no Codex o bloco PostToolUse
+  vem **sem** matcher — a forma canônica match-all do Codex. Em ambos os harnesses o
+  heartbeat dispara após todo tool (inclusive Bash) — um holder dentro de um pytest
+  longo renova entre as calls, e uma única call que ultrapasse o TTL é coberta pelo
+  PID veto (TTL-stale + pid harness vivo ⇒ block, não steal).
 
 ### Identidade de sessão — `session_identity.py` (single owner)
 
 `features/spec_context/session_identity.py` é o **único** reader/writer dos pointer
 namespaces e do session record:
 
-- `.dadaia/sessions/runtime/<ctx>.ptr` — pointer do holder incumbente do lease.
+- `.dadaia/sessions/runtime/<ctx>.ptr` — pointer do incumbente do contexto (lease
+  holder ou último bind; o `bind` o atualiza e o gate o lê na resolução de modo).
 - `.dadaia/sessions/runtime/<session_id>.ptr` — pointer de sessão do ctx-inject.
 - `.dadaia/sessions/<id>.json` — session record (`session_id`, `context`, `mode`,
   `release`, `pid`, `bound_at`, `last_seen_at`, `ttl_seconds`).
@@ -196,15 +202,22 @@ Lógica de acquire (FR-P1-15 + pid veto):
 ### Canal de modo — bind → session record → gate
 
 `dadaia context bind <ctx>` (`--mode` opcional, default `read`) **persiste** o modo no
-session record via `session_identity` — o store que os hooks realmente leem. O bind não
-emite eval-exports por default; `--print-env` é o escape back-compat para operadores que
-ainda rodam `eval $(dadaia context bind ...)`. Mapeamento de modos: `read`/`spec`
-(legacy) → `READ`; `implementation` → `BOUND_IMPLEMENTATION`; `review` → `BOUND_REVIEW`
-(modos lease-taking exigem `--release`).
+session record via `session_identity` **e atualiza o incumbent pointer do contexto**
+(`sessions/runtime/<ctx>.ptr`) — o bind vincula o CONTEXTO: o sid que o CLI cunha não é
+o sid que o harness reporta, então é via incumbent que o gate resolve o modo bound no
+fluxo default. O bind não emite eval-exports por default; `--print-env` é o escape
+back-compat para operadores que ainda rodam `eval $(dadaia context bind ...)`.
+Mapeamento de modos: `read`/`spec` (legacy) → `READ`; `implementation` →
+`BOUND_IMPLEMENTATION`; `review` → `BOUND_REVIEW` (modos lease-taking exigem
+`--release`).
 
 O gate resolve o modo da sessão na ordem: (1) `DADAIA_MODE` env (escape de shell do
-operador — harness nunca o seta), (2) `mode` do session record, (3) default
-`IMPLEMENTATION`. Sessão READ-resolved é **non-acquiring**: write MUTATING é bloqueado
+operador — harness nunca o seta), (2) `mode` do session record keyed pelo sid
+harness-native (sessão que se auto-bindou; vence o incumbent — um holder vivo nunca é
+downgraded), (3) modo do **incumbent do contexto** via `<ctx>.ptr` — o caminho
+harness-real do bind default; honrado só se não contradiz um lease holder vivo
+(anti-downgrade guard: lease record nomeando outro sid ⇒ incumbent stale, ignorado),
+(4) default `IMPLEMENTATION`. Sessão READ-resolved é **non-acquiring**: write MUTATING é bloqueado
 **antes** de qualquer chamada ao lease (sessão read nunca cria, renova ou rouba lease);
 ADDITIVE flui normalmente. Sessão sem modo (nenhum bind, nenhum env — toda sessão
 harness comum) permanece IMPLEMENTATION-capable: pode adquirir um lease **livre**, mas
@@ -300,7 +313,7 @@ O gate usa um path-classifier de 6 classes — ADDITIVE / MEMORY / FROZEN / MUTA
 PROTECTED / UNGATED — computado **context-relative** (prefixo `repos/<slug>/` removido
 antes da taxonomia `specs/`). O hook é `python -m dadaia_workspace.hooks.sdd_gate`
 (Python puro; Windows/macOS/Linux); ele resolve o slug PATH-first do write target,
-resolve o modo (env → session record → IMPLEMENTATION) e delega a
+resolve o modo (env → session record → incumbent do contexto → IMPLEMENTATION) e delega a
 `gate_policy.evaluate()` — não re-deriva política. `.dadaia/sessions/**` é PROTECTED
 (o único caminho fail-closed, SEC-01). O gate não lê TASKS.md nem status de specs —
 markers e aprovações são disciplina, não mecanismo.
@@ -332,7 +345,7 @@ sequenceDiagram
     else FROZEN (specs/_archive/** root+in-repo)
         Gate-->>PreHook: block
     else MUTATING (production + in-repo sem classe)
-        Gate->>Sess: resolve mode (env -> record -> IMPLEMENTATION)
+        Gate->>Sess: resolve mode (env -> record -> incumbent -> IMPLEMENTATION)
         alt mode == READ
             Gate-->>PreHook: block (non-acquiring, sem lease I/O)
         else lease-taking

@@ -53,11 +53,10 @@ from __future__ import annotations
 import json
 import os
 import sys
-import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.features.spec_context import lease
+from dadaia_workspace.features.spec_context import lease, session_identity
 from dadaia_workspace.hooks import _common
 
 
@@ -108,29 +107,23 @@ def _renew_held_leases(workspace: Path, sess_id: str) -> int:
 
 
 def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] | None:
-    """Best-effort refresh of ``sessions/<id>.json`` ``last_seen_at``. Returns the record.
+    """Best-effort refresh of the session record's ``last_seen_at``. Returns the record.
 
-    Returns ``None`` (no-op) when the session file is absent or unreadable — unlike the
-    lease renewal above, this *is* gated on the session file existing, because there is
-    nothing to refresh otherwise. Renewal of the session record is atomic (tmp +
-    ``os.replace``).
+    Routed through ``session_identity`` (NF-3 fix, WS-R3 FR-R3-01): the single owner of the
+    ``sessions/<id>.json`` namespace constructs the path, reads the record, and writes it
+    atomically. This hook no longer builds the session-record path itself, so it drops off
+    the session-store ownership allowlist. Returns ``None`` (no-op) when the record is absent
+    or unreadable — unlike the lease renewal above, this is gated on the record existing,
+    because there is nothing to refresh otherwise.
     """
-    sess_file = workspace / ".dadaia" / "sessions" / f"{sess_id}.json"
-    if not sess_file.is_file():
-        return None
-    try:
-        data = json.loads(sess_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, ValueError):
-        return None
-    if not isinstance(data, dict):
+    data = session_identity.read_session(workspace, sess_id)
+    if data is None:
         return None
 
     data["last_seen_at"] = datetime.now(tz=UTC).isoformat()
     try:
-        tmp = sess_file.with_suffix(f".{uuid.uuid4().hex}.tmp")
-        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        os.replace(tmp, sess_file)
-    except OSError:
+        session_identity.write_session(workspace, sess_id, data)
+    except (OSError, ValueError):
         return None
     return data
 

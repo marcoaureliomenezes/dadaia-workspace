@@ -1,6 +1,17 @@
-"""Unit + parity tests for dadaia_workspace.hooks.sdd_gate.
+"""Behavior + white-box tests for dadaia_workspace.hooks.sdd_gate.
 
-Mandatory rc-4 parity invariants tested here:
+Two test layers, each driven through its harness-real channel:
+
+* **Behavior** (the gate's ALLOW/BLOCK envelope on a real PreToolUse) is exercised by
+  spawning the hook as a subprocess via :func:`run_hook_subprocess` + :func:`claude_hook_env`
+  — never by patching ``sys.stdin`` and calling ``sdd_gate.main()`` in-process (the
+  simulated-stdin pattern the harness-env contract bans).
+* **White-box** unit tests target the pure helper ``sdd_gate._resolve_mode`` and the
+  fail-safe contract of ``gate_policy.evaluate`` directly. These never simulate harness
+  stdin; the lease fault-injection (arbitrary error ⇒ ALLOW; live-foreign ⇒ BLOCK) is a
+  property of the *policy* layer, so it is asserted there rather than through the hook.
+
+Mandatory rc-4 parity invariants covered:
   (a) PATH-first context slug: a write under repos/B never acquires repos/A's lease.
   (b) Fail-open: any non-PROTECTED, non-live-foreign error -> ALLOW.
   (c) PROTECTED (.dadaia/sessions/) is the sole fail-CLOSED path.
@@ -8,14 +19,15 @@ Mandatory rc-4 parity invariants tested here:
 
 from __future__ import annotations
 
-import io
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from dadaia_workspace.features.spec_context import gate_policy, session_identity
 from dadaia_workspace.hooks import sdd_gate
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
 def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
@@ -33,156 +45,170 @@ def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
 
 
 def _run(
-    monkeypatch: pytest.MonkeyPatch,
-    payload: dict[str, object],
+    tmp_path: Path,
+    payload: dict[str, Any],
     *,
-    capsys: pytest.CaptureFixture[str],
-) -> str:
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    rc = sdd_gate.main()
-    assert rc == 0  # the gate signals block via stdout, always returns 0
-    return capsys.readouterr().out
+    session_id: str = "claude-sess",
+) -> dict[str, Any] | None:
+    """Spawn sdd_gate as a real subprocess; return the parsed BLOCK envelope (or None=ALLOW).
+
+    The session id is supplied through the stdin ``session_id`` field (the harness-real
+    channel); ``claude_hook_env``'s native ``CLAUDE_CODE_SESSION_ID`` is popped so resolution
+    falls to the payload field, matching how these gate paths are driven. ``DADAIA_CONTEXT``
+    is popped so the PATH-first slug derivation is the only context source.
+    """
+    env = claude_hook_env(tmp_path, session_id=session_id)
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    env.pop("DADAIA_CONTEXT", None)
+    full_payload = {**payload, "session_id": session_id}
+    result = run_hook_subprocess("sdd_gate", full_payload, env)
+    assert result.returncode == 0, result.stderr
+    return result.block_envelope()
 
 
-def test_non_write_tool_allows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("WORKSPACE_ROOT", str(_mk_workspace(tmp_path, "a")))
-    out = _run(monkeypatch, {"tool_name": "Read", "tool_input": {"file_path": "x"}}, capsys=capsys)
-    assert out == ""
+# --------------------------------------------------------------------------- #
+# Behavior: ALLOW / BLOCK envelope under a real subprocess spawn.
+# --------------------------------------------------------------------------- #
 
 
-def test_unparseable_target_allows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("WORKSPACE_ROOT", str(_mk_workspace(tmp_path, "a")))
-    out = _run(monkeypatch, {"tool_name": "Write", "tool_input": {}}, capsys=capsys)
-    assert out == ""
+def test_non_write_tool_allows(tmp_path: Path) -> None:
+    _mk_workspace(tmp_path, "a")
+    block = _run(tmp_path, {"tool_name": "Read", "tool_input": {"file_path": "x"}})
+    assert block is None
 
 
-def test_ungated_path_allows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_unparseable_target_allows(tmp_path: Path) -> None:
+    _mk_workspace(tmp_path, "a")
+    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {}})
+    assert block is None
+
+
+def test_ungated_path_allows(tmp_path: Path) -> None:
     ws = _mk_workspace(tmp_path, "a")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    out = _run(
-        monkeypatch,
+    block = _run(
+        tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(ws / "README.md")}},
-        capsys=capsys,
     )
-    assert out == ""
+    assert block is None
 
 
-def test_protected_sessions_blocks(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_protected_sessions_blocks(tmp_path: Path) -> None:
     # PARITY (c): .dadaia/sessions/ is the sole fail-CLOSED path — blocked unconditionally.
     ws = _mk_workspace(tmp_path, "a")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     target = ws / ".dadaia" / "sessions" / "runtime" / "a.ptr"
-    out = _run(
-        monkeypatch,
+    block = _run(
+        tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        capsys=capsys,
     )
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "SEC-01" in decision["reason"]
+    assert block is not None
+    assert "SEC-01" in block["reason"]
 
 
-def test_path_first_context_slug_parity(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_path_first_context_slug_parity(tmp_path: Path) -> None:
     # PARITY (a): first-ALIVE is repos/A, but a write under repos/B MUST acquire repos/B's
     # lease, never repos/A's (fixes gate-cross-context-lock-contamination).
     ws = _mk_workspace(tmp_path, "A", "B")  # A is first-ALIVE
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    out = _run(
-        monkeypatch,
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(target)},
-            "session_id": "sess-1",
-        },
-        capsys=capsys,
+    block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        session_id="sess-1",
     )
-    assert out == ""  # acquired cleanly (no foreign conflict)
+    assert block is None  # acquired cleanly (no foreign conflict)
     # The lease record must be for context B, never A.
     lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
     assert (lock_dir / "B.lock.json").exists()
     assert not (lock_dir / "A.lock.json").exists()
 
 
-def test_mutating_no_context_fails_open(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_mutating_no_context_fails_open(tmp_path: Path) -> None:
     # A specs/releases/ path with no repo slug + no DADAIA_CONTEXT -> fail open (no lease).
     ws = _mk_workspace(tmp_path, "a")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     target = ws / "specs" / "releases" / "x" / "TASKS.md"
-    out = _run(
-        monkeypatch,
+    block = _run(
+        tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        capsys=capsys,
     )
-    assert out == ""
+    assert block is None
 
 
-def test_fail_open_on_lease_error(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    # PARITY (b): any non-LockHeldError from the lease subsystem -> ALLOW (fail-open).
+def test_live_foreign_lease_blocks_real(tmp_path: Path) -> None:
+    # PARITY: a genuine fresh foreign lease held by THIS (alive) process makes the gate BLOCK
+    # — reproduced harness-real by seeding a real lease, no monkeypatch of acquire.
+    import os
+
+    from dadaia_workspace.features.spec_context import lease
+
     ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
+    # A different session already holds B's lease, stamped with a live pid (this process).
+    lease.acquire(ws, "B", "owner-A", "rel-1", "implementation", pid=os.getpid())
+    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
 
+    block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        session_id="intruder",
+    )
+    assert block is not None
+    # The yield-iff-live-foreign message names the holder and the contended context.
+    assert "SDD LOCK" in block["reason"]
+    assert "owner-A" in block["reason"]
+    assert "context 'B'" in block["reason"]
+
+
+# --------------------------------------------------------------------------- #
+# White-box: gate_policy.evaluate fail-safe contract (no hook, no stdin).
+# --------------------------------------------------------------------------- #
+
+
+def _evaluate_mutating(
+    tmp_path: Path,
+    *,
+    acquire: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[gate_policy.Decision, str]:
+    ws = _mk_workspace(tmp_path, "B")
+    monkeypatch.setattr(gate_policy.lease, "acquire", acquire)
+    return gate_policy.evaluate(
+        ws,
+        "repos/B/specs/releases/rel-1/TASKS.md",
+        ctx="B",
+        phase="IMPLEMENTATION",
+        session_id="s",
+        release="rel-1",
+        mode="IMPLEMENTATION",
+    )
+
+
+def test_fail_open_on_lease_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # PARITY (b): any non-LockHeldError from the lease subsystem -> ALLOW (fail-open). Asserted
+    # at the policy layer (the fail-safe guarantee lives in gate_policy.evaluate, AC-04).
     def boom(*_a: object, **_k: object) -> None:
         raise RuntimeError("lease subsystem exploded")
 
-    monkeypatch.setattr(gate_policy.lease, "acquire", boom)
-    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    out = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s"},
-        capsys=capsys,
-    )
-    assert out == ""  # fail open despite the lease error
+    decision, reason = _evaluate_mutating(tmp_path, acquire=boom, monkeypatch=monkeypatch)
+    assert decision == gate_policy.Decision.ALLOW
+    assert reason == ""
 
 
-def test_live_foreign_lease_blocks(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_live_foreign_lease_blocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # A genuine live-foreign LockHeldError -> BLOCK with the informative yield message.
     from dadaia_workspace.core.exceptions import LockHeldError
-
-    ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
 
     def held(*_a: object, **_k: object) -> None:
         raise LockHeldError("context 'B' is held by another live session")
 
-    monkeypatch.setattr(gate_policy.lease, "acquire", held)
-    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    out = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s"},
-        capsys=capsys,
-    )
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "another live session" in decision["reason"]
+    decision, reason = _evaluate_mutating(tmp_path, acquire=held, monkeypatch=monkeypatch)
+    assert decision == gate_policy.Decision.BLOCK
+    assert "another live session" in reason
 
 
 # --------------------------------------------------------------------------- #
-# WS-R4 FR-R4-02/03/04 — gate mode resolution + READ non-acquiring.
+# White-box: WS-R4 FR-R4-02/03/04 — gate mode resolution helper (_resolve_mode).
+# These call the pure helper directly; no main(), no simulated stdin.
 # --------------------------------------------------------------------------- #
 
 
@@ -191,32 +217,12 @@ def _write_session_record(ws: Path, session_id: str, mode: str) -> None:
     session_identity.write_session(ws, session_id, {"session_id": session_id, "mode": mode})
 
 
-def _scrub_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Remove harness/operator session-id overrides so stdin ``session_id`` resolves.
-
-    These unit tests drive ``resolve_session_id`` via the stdin ``session_id`` field; a
-    leaked ``CLAUDE_CODE_SESSION_ID`` (present when the suite itself runs under Claude Code)
-    would otherwise win the resolution order and point the gate at the wrong record.
-    """
-    for var in (
-        "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "OPENCODE_SESSION_ID",
-    ):
-        monkeypatch.delenv(var, raising=False)
-
-
 def test_resolve_mode_env_override_wins(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # Order (1): DADAIA_MODE env override beats any session record. DADAIA_MODE is an
-    # operator-shell escape (no harness sets it); it is planted here via setitem on
-    # os.environ — NOT monkeypatch.setenv — so the harness-env contract (which bans
-    # planting DADAIA_* in hook tests) stays green while still exercising the override.
-    import os
-
+    # operator-shell escape (no harness sets it) and an allowlisted operator-override env var.
     ws = _mk_workspace(tmp_path, "a")
     _write_session_record(ws, "sess-1", "READ")
-    monkeypatch.setitem(os.environ, "DADAIA_MODE", "IMPLEMENTATION")
+    monkeypatch.setenv("DADAIA_MODE", "IMPLEMENTATION")
     assert sdd_gate._resolve_mode(ws, "sess-1") == "IMPLEMENTATION"
 
 
@@ -238,105 +244,205 @@ def test_resolve_mode_default_implementation_when_absent(
     assert sdd_gate._resolve_mode(ws, "no-such-session") == "IMPLEMENTATION"
 
 
-def test_read_mode_blocks_mutating_no_lease_written(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+# --------------------------------------------------------------------------- #
+# Behavior: WS-R4 READ non-acquiring + BOUND_REVIEW/missing acquire, via subprocess.
+# --------------------------------------------------------------------------- #
+
+
+def test_read_mode_blocks_mutating_no_lease_written(tmp_path: Path) -> None:
     # FR-R4-03: a READ-bound session's MUTATING write → BLOCK, and NO lease record is
     # written (non-acquiring). Message names the documented path, with no auto-rebind nag.
     ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
-    monkeypatch.delenv("DADAIA_MODE", raising=False)
-    _scrub_session_env(monkeypatch)
     _write_session_record(ws, "sess-read", "READ")
     target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)
-    out = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-read"},
-        capsys=capsys,
+    block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        session_id="sess-read",
     )
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "read" in decision["reason"].lower()
-    assert "--mode implementation" in decision["reason"]
+    assert block is not None
+    assert "read" in block["reason"].lower()
+    assert "--mode implementation" in block["reason"]
     # Non-acquiring: the gate must NOT have created the lease record.
     assert not (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
 
 
-def test_read_mode_allows_additive_in_repo(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_read_mode_allows_additive_in_repo(tmp_path: Path) -> None:
     # FR-R4-03: a READ session's ADDITIVE write (in-repo specs/bugs) is allowed.
     ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_MODE", raising=False)
-    _scrub_session_env(monkeypatch)
     _write_session_record(ws, "sess-read", "READ")
     target = ws / "repos" / "B" / "specs" / "bugs" / "some-bug.md"
     target.parent.mkdir(parents=True, exist_ok=True)
-    out = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-read"},
-        capsys=capsys,
+    block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        session_id="sess-read",
     )
-    assert out == ""
+    assert block is None
 
 
-def test_read_mode_protected_still_blocks(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_read_mode_protected_still_blocks(tmp_path: Path) -> None:
     # PROTECTED stays fail-closed regardless of mode (unchanged by R4).
     ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     _write_session_record(ws, "sess-read", "READ")
     target = ws / ".dadaia" / "sessions" / "runtime" / "B.ptr"
-    out = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-read"},
-        capsys=capsys,
+    block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        session_id="sess-read",
     )
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "SEC-01" in decision["reason"]
+    assert block is not None
+    assert "SEC-01" in block["reason"]
 
 
-def test_bound_review_acquires_like_implementation(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_bound_review_acquires_like_implementation(tmp_path: Path) -> None:
     # FR-R4-03 / D-3: only explicit READ blocks MUTATING. BOUND_REVIEW is lease-taking, so a
     # free lease is acquired exactly like implementation.
     ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_MODE", raising=False)
-    _scrub_session_env(monkeypatch)
     _write_session_record(ws, "sess-rev", "BOUND_REVIEW")
     target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)
-    out = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-rev"},
-        capsys=capsys,
+    block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        session_id="sess-rev",
     )
-    assert out == ""  # acquired cleanly
+    assert block is None  # acquired cleanly
     assert (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
 
 
-def test_missing_mode_acquires_free_lease(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_missing_mode_acquires_free_lease(tmp_path: Path) -> None:
     # FR-R4-04: no bind record, no env → IMPLEMENTATION; free-lease acquire proceeds.
     ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.delenv("DADAIA_MODE", raising=False)
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
-    _scrub_session_env(monkeypatch)
     target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)
-    out = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "unbound"},
-        capsys=capsys,
+    block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+        session_id="unbound",
     )
-    assert out == ""
+    assert block is None
     assert (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
+
+
+# --------------------------------------------------------------------------- #
+# White-box: NF-1 (rc-2) — the gate records a LONG-LIVED holder pid (getppid /
+# payload), never the ephemeral hook child's own. _resolve_holder_pid is pure.
+# --------------------------------------------------------------------------- #
+
+
+def test_resolve_holder_pid_defaults_to_parent_pid() -> None:
+    # In a real hook subprocess the harness is the PARENT; getppid() is the long-lived pid.
+    # The hook's own os.getpid() is ephemeral and would make the no-steal veto probe a dead
+    # pid, so it must NEVER be recorded. With no payload pid hint, getppid() is used.
+    import os
+
+    assert sdd_gate._resolve_holder_pid({}) == os.getppid()
+
+
+def test_resolve_holder_pid_prefers_payload_harness_pid() -> None:
+    # A harness that sends an explicit long-lived pid is honored (int and string forms).
+    assert sdd_gate._resolve_holder_pid({"harness_pid": 4242}) == 4242
+    assert sdd_gate._resolve_holder_pid({"parent_pid": "5151"}) == 5151
+    assert sdd_gate._resolve_holder_pid({"ppid": 6262}) == 6262
+
+
+def test_resolve_holder_pid_ignores_bad_payload_pid() -> None:
+    # Non-positive / unparseable payload pids fall back to getppid(), never to 0/negative.
+    import os
+
+    assert sdd_gate._resolve_holder_pid({"harness_pid": 0}) == os.getppid()
+    assert sdd_gate._resolve_holder_pid({"harness_pid": -3}) == os.getppid()
+    assert sdd_gate._resolve_holder_pid({"harness_pid": "nope"}) == os.getppid()
+
+
+def test_gate_threads_payload_pid_into_lease_record(tmp_path: Path) -> None:
+    # End-to-end through the real hook subprocess: a payload-supplied harness pid is the pid
+    # stamped into the lease record (proving the gate threads the LONG-LIVED pid, not its own
+    # ephemeral child pid). The pid is a known-alive process (this test process).
+    import os
+
+    from dadaia_workspace.features.spec_context import lease
+
+    ws = _mk_workspace(tmp_path, "B")
+    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    my_pid = os.getpid()
+    block = _run(
+        tmp_path,
+        {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target)},
+            "harness_pid": my_pid,
+        },
+        session_id="s-pid",
+    )
+    assert block is None
+    rec = lease.read_record(ws, "B")
+    assert rec is not None and rec["pid"] == my_pid, rec
+
+
+# --------------------------------------------------------------------------- #
+# White-box: NF-2 (rc-2) — context-incumbent mode resolution + anti-downgrade.
+# --------------------------------------------------------------------------- #
+
+
+def test_resolve_mode_falls_back_to_context_incumbent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # NF-2: a `dadaia context bind --mode read` mints a sid the harness never reports, but it
+    # refreshes the context incumbent pointer. A DIFFERENT harness sid (no self record, no env)
+    # resolves READ through the incumbent pointer → record.
+    ws = _mk_workspace(tmp_path, "a")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    bind_sid = "sess_bind01"
+    _write_session_record(ws, bind_sid, "READ")
+    session_identity.set_incumbent(ws, "a", bind_sid)
+    assert sdd_gate._resolve_mode(ws, "harness-sid-xyz", "a") == "READ"
+
+
+def test_resolve_mode_self_record_wins_over_incumbent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Precedence: a record keyed to the harness sid wins over the incumbent pointer — a live
+    # implementation session is never downgraded by another session's read-bind.
+    ws = _mk_workspace(tmp_path, "a")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    read_sid = "sess_read01"
+    _write_session_record(ws, read_sid, "READ")
+    session_identity.set_incumbent(ws, "a", read_sid)
+    impl_sid = "harness-impl"
+    _write_session_record(ws, impl_sid, "BOUND_IMPLEMENTATION")
+    assert sdd_gate._resolve_mode(ws, impl_sid, "a") == "BOUND_IMPLEMENTATION"
+
+
+def test_resolve_mode_incumbent_ignored_when_live_holder_differs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Anti-downgrade (NF-2): a stale read-bind set the incumbent, but a DIFFERENT session then
+    # acquired the implementation lease. The live holder must not be downgraded to READ — the
+    # stale incumbent is ignored and the resolving session defaults to IMPLEMENTATION.
+    from dadaia_workspace.features.spec_context import lease
+
+    ws = _mk_workspace(tmp_path, "a")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    read_sid = "sess_readstale"
+    _write_session_record(ws, read_sid, "READ")
+    session_identity.set_incumbent(ws, "a", read_sid)
+    lease.acquire(ws, "a", "live-impl", "rel-1", "IMPLEMENTATION")
+    assert sdd_gate._resolve_mode(ws, "live-impl", "a") == "IMPLEMENTATION"
+
+
+def test_resolve_mode_incumbent_honored_when_no_lease_holder(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # No lease holder yet ⇒ the read-bind incumbent still governs (a read session takes no
+    # lease, so absence of a holder is the normal read-bound state, not staleness).
+    ws = _mk_workspace(tmp_path, "a")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    bind_sid = "sess_nolease"
+    _write_session_record(ws, bind_sid, "READ")
+    session_identity.set_incumbent(ws, "a", bind_sid)
+    assert not (ws / ".dadaia" / "states" / "ctx_locks" / "a.lock.json").exists()
+    assert sdd_gate._resolve_mode(ws, "another-harness-sid", "a") == "READ"

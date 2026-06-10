@@ -144,11 +144,14 @@ Claude, `apply_patch|Edit|Write` on Codex) as **path-class × lease × phase × 
   (`specs/memory/`) allows only in `DEFINITION`/`CLOSURE` phase; FROZEN
   (`specs/_archive/`) always blocks; PROTECTED (`.dadaia/sessions/`) always blocks
   (fail-closed, lease-identity integrity); everything else in-repo is MUTATING.
-- **Lease**: a MUTATING write acquires the single per-context TTL lease (O_EXCL CAS,
-  `pid`-recorded). A live foreign holder — heartbeat fresh **or** pid demonstrably
-  alive — is never stolen; the gate yields with an actionable message.
-- **Mode**: a session bound `--mode read` is non-acquiring — MUTATING writes are blocked
-  before any lease call; ADDITIVE paths stay writable.
+- **Lease**: a MUTATING write acquires the single per-context TTL lease (O_EXCL CAS).
+  The record carries the long-lived harness pid (hook payload pid when present, else the
+  hook's parent process). A live foreign holder — heartbeat fresh **or** recorded pid
+  demonstrably alive — is never stolen; the gate yields with an actionable message.
+- **Mode**: resolved env → session record → the context's incumbent pointer (refreshed
+  by `dadaia context bind`) → IMPLEMENTATION default. A session resolving READ is
+  non-acquiring — MUTATING writes are blocked before any lease call; ADDITIVE paths
+  stay writable.
 
 Writes performed through the `Bash` tool are **outside this determinism envelope**
 (Decision D-2): the gate does not classify shell command strings. Doctor coherence

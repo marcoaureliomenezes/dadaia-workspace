@@ -47,9 +47,12 @@ Usage
     assert result.returncode == 0
 
 The behavior of every hook/gate/lease test must flow through these helpers: a contract
-test (``tests/contract/test_harness_env_contract.py``) fails any test that ``setenv``s a
-non-allowlisted ``DADAIA_*`` outside this module, or imports+calls a hook module directly
-in ``tests/**/hooks|gate/**`` instead of using :func:`run_hook_subprocess`.
+test (``tests/contract/test_harness_env_contract.py``) HARD-FAILS (no baseline) any test
+that ``setenv``s a non-allowlisted ``DADAIA_*`` outside this module, or imports a hook
+behavior module AND patches ``sys.stdin`` in-process to drive its ``main()`` instead of
+using :func:`run_hook_subprocess`. Pure-helper unit tests (e.g. ``sdd_gate._resolve_mode``)
+and fault-injection tests that monkeypatch a production internal without simulating
+``sys.stdin`` are legitimately in-process and are not flagged.
 """
 
 from __future__ import annotations
@@ -66,6 +69,7 @@ __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
     "CLAUDE_SESSION_ENV_VAR",
     "CODEX_SESSION_ENV_VAR",
+    "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
     "HookResult",
     "claude_hook_env",
@@ -79,12 +83,50 @@ CLAUDE_SESSION_ENV_VAR: Final[str] = "CLAUDE_CODE_SESSION_ID"
 #: The native session-id env var Codex provides to a hook subprocess.
 CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 
-#: ``DADAIA_*`` env vars that MAY legitimately reach a hook subprocess because the
-#: *operator's shell* (not the harness) exports them. The env-contract test allows these
-#: to be set by tests; every other ``DADAIA_*`` setenv outside this module is a violation.
-#: ``DADAIA_CONTEXT`` is the documented operator-shell context override
-#: (``hooks/ctx_inject._resolve_context``, ``hooks/sdd_gate._context_slug``).
-ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset({"DADAIA_CONTEXT"})
+#: ``DADAIA_*`` env vars a test MAY ``setenv`` in-process without tripping the env-contract
+#: ratchet, because each is a documented **operator-shell input or operator override that
+#: production code reads from the environment BY DESIGN**. Setting one in a unit test
+#: exercises a real production env-read path — it is not harness-fiction. Every other
+#: ``DADAIA_*`` setenv outside this module is a violation. Per-var justification (the
+#: production reader is named so the allowlist stays auditable):
+#:
+#:   - ``DADAIA_CONTEXT`` — operator-shell context override; read by
+#:     ``hooks/ctx_inject._resolve_context`` and ``hooks/sdd_gate`` context resolution.
+#:   - ``DADAIA_AGENTS_DIR`` — agents-dir override (resolution branch 1); read by
+#:     ``features/agents/reader`` (``os.environ.get("DADAIA_AGENTS_DIR")``).
+#:   - ``DADAIA_WORKFLOWS_DIR`` — workflows-dir override (resolution branch 1); read by
+#:     ``features/workflows/service`` (``os.environ.get("DADAIA_WORKFLOWS_DIR")``).
+#:   - ``DADAIA_AGENT_RUNTIME`` — runtime selector; read by ``container._select_dispatcher``
+#:     and the ``context``/``orchestrate`` CLI commands.
+#:   - ``DADAIA_SESSION_ID`` — the operator **override** leg of ``resolve_session_id``
+#:     (``hooks/_common`` reads it first, ahead of the harness-native id vars). The harness
+#:     never sets it (so it stays in :data:`_FORBIDDEN_HOOK_ENV`, scrubbed from a real hook
+#:     *subprocess*), but a unit test of the override leg legitimately ``setenv``s it.
+#:   - ``DADAIA_MODE`` — the operator-shell mode escape, order (1) of
+#:     ``hooks/sdd_gate._resolve_mode``. Harness-never-set (scrubbed from subprocess env)
+#:     but read from the environment by design when an operator exports it.
+ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
+    {
+        "DADAIA_CONTEXT",
+        "DADAIA_AGENTS_DIR",
+        "DADAIA_WORKFLOWS_DIR",
+        "DADAIA_AGENT_RUNTIME",
+        "DADAIA_SESSION_ID",
+        "DADAIA_MODE",
+    }
+)
+
+#: ``DADAIA_*`` vars the **harness wiring itself** sets on the hook command line (not the
+#: operator shell): the output contract that selects the codex-json / json envelope. The
+#: Codex hook command in ``infrastructure/runtime_config`` and the OpenCode Bun plugin
+#: (``public/plugins/ctx-inject.ts``) export these when they spawn the hook; ``ctx_inject``
+#: reads them in ``_emit``. They are NOT operator-shell vars and must never be planted via
+#: an in-process ``setenv`` — a behavior test passes them through the *subprocess* env
+#: (:func:`run_hook_subprocess`), which is the harness-real channel. :func:`claude_hook_env`
+#: / :func:`codex_hook_env` accept them in ``extra`` for exactly that purpose.
+HARNESS_CONTROL_DADAIA_ENV: Final[frozenset[str]] = frozenset(
+    {"DADAIA_HOOK_OUTPUT", "DADAIA_HOOK_EVENT"}
+)
 
 #: ``DADAIA_*`` / persona / mode vars that the harness NEVER provides to a hook and that
 #: therefore must be scrubbed from any inherited environment before a hook runs. Tests
@@ -136,10 +178,16 @@ def _harness_env(
     env[session_env_var] = session_id
     if extra:
         for key, value in extra.items():
-            if key.startswith("DADAIA_") and key not in ALLOWLISTED_DADAIA_ENV:
+            if (
+                key.startswith("DADAIA_")
+                and key not in ALLOWLISTED_DADAIA_ENV
+                and key not in HARNESS_CONTROL_DADAIA_ENV
+            ):
                 raise ValueError(
                     f"{key!r} is not a harness-provided var; do not inject it into a "
-                    "hook env (see tests/fixtures/harness_env.py for the contract)."
+                    "hook env (see tests/fixtures/harness_env.py for the contract). "
+                    "Operator-shell vars go in ALLOWLISTED_DADAIA_ENV; the hook output "
+                    "contract vars go in HARNESS_CONTROL_DADAIA_ENV."
                 )
             env[key] = value
     return env

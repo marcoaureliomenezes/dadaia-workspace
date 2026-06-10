@@ -388,6 +388,150 @@ def test_dead_holder_takeover(tmp_path: Path) -> None:
     assert isinstance(final.get("pid"), int) and final["pid"] != holder_pid
 
 
+# --------------------------------------------------------------------------------------
+# (v) HOOK-ACQUIRED HOLDER NO-STEAL (NF-1, rc-2) — the production process model.
+#
+# Production never acquires in-process: the holder is the harness, and the lease is acquired
+# by the EPHEMERAL ``sdd_gate`` hook child the harness spawns. The hook child dies in
+# milliseconds; the no-steal pid-veto can only work if the recorded pid is the LONG-LIVED
+# harness (``getppid()``), not the dead hook child. This scenario reproduces exactly that:
+#
+#   * a long-lived DRIVER process (the stand-in harness) spawns the REAL ``sdd_gate`` hook as
+#     a child, which acquires the lease recording the driver's pid (``getppid()``);
+#   * the driver then stays alive (no renewal) until told to stop, so the record ages past the
+#     short TTL while the driver pid is demonstrably alive;
+#   * a foreign MUTATING acquire (real pid probe) ⇒ BLOCKED while the driver lives;
+#   * killing the driver ⇒ a later foreign MUTATING acquire ⇒ TAKEOVER.
+#
+# This is the falsification the rc-1 e2e lacked (it only had in-process direct-API holders).
+# --------------------------------------------------------------------------------------
+
+#: Long-lived DRIVER (stand-in harness): invoke the REAL sdd_gate hook as a child so the hook
+#: records the driver's pid via getppid(), confirm the lease names the driver, then idle until
+#: stopped. Bounded so a leaked child self-terminates. Writes its own pid for the test.
+_HOOK_DRIVER = textwrap.dedent(
+    """
+    import json, os, subprocess, sys, time
+    from pathlib import Path
+
+    ws, ctx, sid = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+    ready, stop, pidfile = Path(sys.argv[4]), Path(sys.argv[5]), Path(sys.argv[6])
+
+    target = ws / "repos" / ctx / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": sid}
+
+    env = dict(os.environ)
+    env["WORKSPACE_ROOT"] = str(ws)
+    env["CLAUDE_CODE_SESSION_ID"] = sid
+    for bad in ("DADAIA_SESSION_ID", "DADAIA_MODE", "CODEX_SESSION_ID", "OPENCODE_SESSION_ID"):
+        env.pop(bad, None)
+
+    # Spawn the REAL gate hook as a CHILD of this driver. The hook records getppid() == this
+    # driver's pid, then exits. This is the production topology (harness spawns ephemeral hook).
+    proc = subprocess.run(
+        [sys.executable, "-m", "dadaia_workspace.hooks.sdd_gate"],
+        input=json.dumps(payload), capture_output=True, text=True, env=env, timeout=30,
+    )
+    pidfile.write_text(str(os.getpid()))
+    ready.write_text("OK" if not proc.stdout.strip() else "BLOCKED:" + proc.stdout)
+
+    # Stay alive (pid probe must see THIS driver alive) until told to stop. No renewal happens,
+    # so the record ages past the short TTL while this driver is demonstrably alive.
+    deadline = time.monotonic() + 120.0
+    while not stop.exists() and time.monotonic() < deadline:
+        time.sleep(0.02)
+    """
+)
+
+
+def _start_hook_driver(
+    ws: Path, ctx: str, sid: str, paths: dict[str, Path]
+) -> subprocess.Popen[str]:
+    """Spawn the long-lived hook-driver and block until it has acquired via the real hook."""
+    proc = _spawn(
+        str(ws),
+        ctx,
+        sid,
+        str(paths["ready"]),
+        str(paths["stop"]),
+        str(paths["pid"]),
+        code=_HOOK_DRIVER,
+    )
+    wait_for_file(paths["ready"], deadline_s=_READY_DEADLINE, what=f"hook-driver {sid} to acquire")
+    assert paths["ready"].read_text().strip() == "OK", paths["ready"].read_text()
+    return proc
+
+
+def _set_short_ttl_on_record(ws: Path, ctx: str, ttl: int) -> None:
+    """Shrink the live record's TTL in place so it can age out fast (no 120 s real sleep).
+
+    The hook always acquires with the default 120 s TTL (the gate has no short-TTL seam), so
+    we rewrite ``ttl`` on the on-disk record post-acquire. This is a test-only accelerant on a
+    record the real hook genuinely wrote — the holder pid, session id, and heartbeat are the
+    hook's real values; only the staleness clock is compressed.
+    """
+    rec = read_lock_record(ws, ctx)
+    assert rec is not None
+    rec["ttl"] = ttl
+    lease._record_path(ws, ctx).write_text(json.dumps(rec), encoding="utf-8")
+
+
+def test_hook_acquired_holder_no_steal_while_driver_alive_then_takeover(tmp_path: Path) -> None:
+    ws = _make_workspace(tmp_path, _SLUG)
+    holder, foreign = "driver-A-holder", "session-B-foreign"
+    journal = LockJournal(ws, _SLUG)
+    paths = {
+        "ready": tmp_path / "A.ready",
+        "stop": tmp_path / "A.stop",
+        "pid": tmp_path / "A.pid",
+    }
+
+    proc_a = _start_hook_driver(ws, _SLUG, holder, paths)
+    driver_pid = int(paths["pid"].read_text().strip())
+    try:
+        rec0 = journal.capture()  # version 0: A holds, acquired via the real hook
+        assert rec0 is not None
+        # NF-1 core assertion: the lease records the LONG-LIVED driver pid (getppid in the
+        # hook), NOT the ephemeral hook child's pid. Without the fix this is the dead hook pid.
+        assert rec0["pid"] == driver_pid, rec0
+        assert rec0["session_id"] == holder
+
+        _set_short_ttl_on_record(ws, _SLUG, SHORT_TTL_SECONDS)
+        _wait_ttl_stale(ws, _SLUG)  # TTL-stale, but the DRIVER pid is alive ⇒ no-steal veto
+        journal.capture()  # version 1: still A
+
+        # Foreign B attempts a MUTATING acquire wired with the REAL pid probe. The probe sees
+        # the driver pid alive ⇒ B must be vetoed (this is what was inert before NF-1).
+        proc_b = _python(str(ws), _SLUG, foreign, timeout=_EXIT_DEADLINE, code=_FOREIGN_MUTATING)
+        journal.capture()  # version 2: A must STILL hold — B vetoed by the live driver pid
+        out_b = proc_b.stdout + proc_b.stderr
+        assert proc_b.returncode == 0, out_b
+        assert "YIELDED" in proc_b.stdout, out_b
+        assert "ACQUIRED" not in proc_b.stdout and "TAKEOVER" not in proc_b.stdout, out_b
+    finally:
+        _stop_holder(proc_a, paths["stop"])
+
+    # Driver A is now dead. Confirm the OS reaped it, then a foreign MUTATING acquire TAKEOVERs.
+    from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
+
+    wait_until(
+        lambda: not OsProcessProbe().is_pid_alive(driver_pid),
+        deadline_s=_EXIT_DEADLINE,
+        what="driver pid to be reaped",
+    )
+    proc_c = _python(str(ws), _SLUG, foreign, timeout=_EXIT_DEADLINE, code=_FOREIGN_MUTATING)
+    journal.capture()  # version 3: now B took over the dead driver's stale lease
+    out_c = proc_c.stdout + proc_c.stderr
+    assert proc_c.returncode == 0, out_c
+    assert "ACQUIRED" in proc_c.stdout or "TAKEOVER" in proc_c.stdout, out_c
+
+    # HISTORY: A (hook-acquired), A (stale-but-alive), A (B vetoed), B (takeover after death).
+    assert journal.holders() == [holder, holder, holder, foreign], journal.holders()
+    # No-steal held while the driver lived: B never appears until A is dead.
+    assert journal.versions[2] is not None and journal.versions[2]["session_id"] == holder
+
+
 def test_journal_records_raw_lock_versions(tmp_path: Path) -> None:
     """The journal captures the literal on-disk record, independent of the lease module.
 

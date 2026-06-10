@@ -49,7 +49,7 @@ mesma que governa paths workspace-root. Um restante in-repo sem classe é MUTATI
 **Regras (o que o gate realmente enforça):**
 - **RULE A (memory atomicity):** `specs/memory/**` fora de DEFINITION/CLOSURE → block. Formatos legados `.html`, `.yaml`, `.yml` → block sempre.
 - **RULE B (archive read-only):** `specs/_archive/**` → block sempre — inclusive in-repo.
-- **RULE READ (mode channel):** sessão com modo resolvido READ/BOUND_READ é non-acquiring — write MUTATING bloqueado **antes** de qualquer chamada ao lease; ADDITIVE flui. Resolução de modo: `DADAIA_MODE` env (escape de operador) → `mode` do session record (caminho harness-real) → default `IMPLEMENTATION`.
+- **RULE READ (mode channel):** sessão com modo resolvido READ/BOUND_READ é non-acquiring — write MUTATING bloqueado **antes** de qualquer chamada ao lease; ADDITIVE flui. Resolução de modo: `DADAIA_MODE` env (escape de operador) → `mode` do session record keyed pelo sid harness-native (vence o incumbent) → modo do **incumbent do contexto** (`sessions/runtime/<ctx>.ptr`, atualizado pelo `bind` — o caminho harness-real do fluxo default; ignorado se um lease vivo nomeia outro sid, anti-downgrade guard) → default `IMPLEMENTATION`.
 - **PROTECTED (SEC-01):** `.dadaia/sessions/**` é CLI-owned; block incondicional protege o `.ptr` de forgery.
 
 **O que NÃO é mecanismo do gate (disciplina de agente/PM):** o gate não lê `TASKS.md`,
@@ -70,7 +70,10 @@ Para writes MUTATING lease-taking, o gate chama `lease.acquire(ctx, session_id,
 release, mode, pid_probe)` (in-process; o pid-probe `OsProcessProbe` é injetado pelo
 hook — `features/lease.py` nunca importa o adapter). O acquire usa O_EXCL sentinel file
 (único caminho — sem read-then-write TOCTOU); o `renew_heartbeat` roda dentro do mesmo
-CAS. O record carrega `pid`. Decision tree:
+CAS. O record carrega `pid` — o do **processo harness de vida longa**, resolvido por
+`sdd_gate._resolve_holder_pid` (`harness_pid`/`parent_pid`/`ppid` do payload stdin,
+senão `os.getppid()`) e threaded até `lease.acquire`; nunca o pid do subprocesso
+efêmero do hook. Decision tree:
 
 1. `.ptr` match → **RENEW** incondicional (incumbente, mesmo após relaunch).
 2. Record com mesmo `session_id` → **RENEWED**, mesmo past-TTL (holder-safe: um holder nunca perde o próprio lease pela própria staleness).
@@ -81,8 +84,10 @@ CAS. O record carrega `pid`. Decision tree:
 (harness-native; `DADAIA_SESSION_ID` é só override de operador) e renova o heartbeat de
 todo lease cujo record nomeia esse sid — nunca via `DADAIA_CONTEXT`→first-ALIVE. Roda
 fora de qualquer guard de session-file; fail-open exit 0. No Claude Code o matcher é
-match-all `*` (heartbeat após **todo** tool, incl. Bash — um holder em pytest longo não
-expira); no Codex dispara nos write tools e o PID veto cobre holders ocupados.
+match-all `*`; no Codex o bloco PostToolUse vem **sem** matcher (a forma canônica
+match-all do Codex) — em ambos, heartbeat após **todo** tool, incl. Bash: um holder em
+pytest longo renova entre as calls, e uma única call acima do TTL é coberta pelo PID
+veto (pid harness vivo ⇒ block, não steal).
 
 **Canonical unblock:** se o gate bloqueia com live-foreign lease, a sessão aguarda o
 holder terminar ou morrer — um holder morto é liberado por TTL+probe no próximo acquire.
@@ -92,7 +97,7 @@ Nenhuma ação manual é necessária; writes ADDITIVE seguem fluindo.
 
 1. Agente invoca uma tool de escrita (ex. `Write` em `repos/<slug>/src/foo.py`).
 2. O harness executa `python -m dadaia_workspace.hooks.sdd_gate` passando JSON em stdin com `tool_name`, `file_path` e `session_id`.
-3. O gate resolve workspace root, deriva o context slug **PATH-first** do write target (env `DADAIA_CONTEXT` só como override sem repo no path), lê `releases/ACTIVE.md` do contexto para a fase, resolve o session id do stdin e o modo (env → session record → IMPLEMENTATION).
+3. O gate resolve workspace root, deriva o context slug **PATH-first** do write target (env `DADAIA_CONTEXT` só como override sem repo no path), lê `releases/ACTIVE.md` do contexto para a fase, resolve o session id do stdin e o modo (env → session record → incumbent do contexto → IMPLEMENTATION).
 4. O classificador context-relative determina a classe do path.
 5. Para MUTATING: READ-mode bloqueia non-acquiring; senão `lease.acquire` com pid-probe.
 6. Allow → exit 0 (silencioso); Block → STDOUT JSON `{"decision":"block","reason":"..."}`.
@@ -125,7 +130,7 @@ sequenceDiagram
     else FROZEN
         G-->>PreH: block
     else MUTATING
-        G->>S: resolve mode (env -> record -> IMPLEMENTATION)
+        G->>S: resolve mode (env -> record -> incumbent -> IMPLEMENTATION)
         alt READ
             G-->>PreH: block (non-acquiring)
         else lease-taking

@@ -42,7 +42,9 @@ auto-resolve it by searching cwd and parent directories. You never need to pass
 **Bound context** - the context selected for the current agent session by
 `dadaia context bind <name> [--mode <read|implementation|review>] [--release <id>]`.
 The command **persists** the bound context, mode, and session id in the session record
-(consumed directly by the SDD gate — no shell `eval` needed). Pass `--print-env` to
+**and refreshes the context's incumbent pointer** (`sessions/runtime/<ctx>.ptr`) — the
+bind binds the CONTEXT, so the SDD gate resolves the bound mode for the running harness
+session through the incumbent pointer, no shell `eval` needed. Pass `--print-env` to
 additionally emit `export DADAIA_CONTEXT=… DADAIA_SESSION_ID=…` lines for legacy
 `eval $(…)` callers. Spec navigation, gates, and workflow commands use this
 session-bound state or explicit `--context` flags.
@@ -88,11 +90,14 @@ model: one MUTATING lease per context, coordinated by project-manager — see co
 §8/§9). `read` (and its legacy alias `spec`) binds are **non-acquiring**: they never
 block, never take a lease, and the gate blocks MUTATING file-tool writes from a
 READ-bound session before any lease call (additive paths stay writable). The lease
-record is `{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`;
-liveness is **TTL + pid veto**: stale means `now − heartbeat > LEASE_TTL_SECONDS`
-(`= 120`, OQ-1 operator decision 2026-06-06) **and** the recorded holder pid is not
-demonstrably alive. The heartbeat renews on every PostToolUse hook firing (harness-native
-session id from the hook stdin payload), so a holder running long reads/tests stays live.
+record is `{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`,
+where `pid` is the **long-lived harness pid** (hook payload pid when present, else the
+hook's parent process); liveness is **TTL + pid veto**: stale means
+`now − heartbeat > LEASE_TTL_SECONDS` (`= 120`, OQ-1 operator decision 2026-06-06)
+**and** the recorded holder pid is not demonstrably alive. The heartbeat renews on every
+PostToolUse hook firing (match-all on both harnesses; harness-native session id from the
+hook stdin payload), so a holder running long reads/tests stays live — and a single tool
+call outliving the TTL is still protected by the pid veto.
 
 ### Liveness & recovery (reclaim-iff-stale / yield-iff-live-foreign)
 

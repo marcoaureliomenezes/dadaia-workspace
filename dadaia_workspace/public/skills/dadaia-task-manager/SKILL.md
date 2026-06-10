@@ -114,12 +114,13 @@ The gate hook blocks for **kernel** reasons, never for marker reasons. The block
 message tells you which rule fired:
 
 - **Live foreign lease** — another session genuinely holds this context's lease
-  (heartbeat fresh, or its pid is still running — a live holder is never stolen).
-  Additive paths (`specs/bugs/`, `specs/backlog/`, `specs/audits/`,
+  (heartbeat fresh, or its recorded harness pid is still running — a live holder is
+  never stolen). Additive paths (`specs/bugs/`, `specs/backlog/`, `specs/audits/`,
   `.dadaia/reports|handoff|tmp/`) remain writable; the lease frees itself when the
   holder finishes or dies. Never ask the operator to rebind or steal.
-- **READ-mode session** — this session was bound `--mode read` (non-acquiring). Write
-  rights require the operator binding once:
+- **READ-mode session** — this session's mode resolved READ (the context was bound
+  `--mode read`; bind refreshes the context's incumbent pointer, which the gate reads).
+  Write rights require the operator binding once:
   `dadaia context bind <ctx> --mode implementation`.
 - **MEMORY phase** — `specs/memory/` is writable only in DEFINITION/CLOSURE phase.
 - **FROZEN / PROTECTED** — `specs/_archive/` is read-only; `.dadaia/sessions/` is

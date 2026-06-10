@@ -149,6 +149,8 @@ def codex_config(agentic_dir: Path) -> str:
 
 def codex_hooks(workspace_root: Path) -> dict[str, object]:
     """Return the .codex/hooks.json dict for *workspace_root*."""
+    # PreToolUse write gates are scoped to the write tools only — they police
+    # filesystem writes and must never fire on Bash / read-only tools.
     write_matcher = "^(apply_patch|Edit|Write)$"
     python_bin = _python_bin(workspace_root)
     ctx_inject_module = "dadaia_workspace.hooks.ctx_inject"
@@ -178,9 +180,15 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     ],
                 },
             ],
+            # N-2 (v0.1.10 rc-2): the lease heartbeat MUST fire after *every* tool,
+            # including Bash and read-only tools — otherwise a long non-write Codex
+            # call (e.g. a multi-minute pytest run) starves the heartbeat and the
+            # lease goes TTL-stale, the original lease-starvation incident's Codex
+            # flavor. Codex's canonical match-all is an *omitted* matcher (same form
+            # used by UserPromptSubmit), so the heartbeat block carries no matcher and
+            # thus runs on all tools, mirroring Claude's explicit "*".
             "PostToolUse": [
                 {
-                    "matcher": write_matcher,
                     "hooks": [
                         {
                             "type": "command",

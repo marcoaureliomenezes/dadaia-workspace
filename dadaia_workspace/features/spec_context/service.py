@@ -88,6 +88,24 @@ _SECRET_SCAN_TEXT_SUFFIXES = {
     "",
 }
 
+# R-2 (v0.1.10 rc-2 sec audit LOW): cryptographic key / certificate material is
+# commonly stored in binary-suffix files (.pem can be text, .key/.p12/.pfx are
+# typically binary) that the text-suffix scan above skips. A private-key file in
+# an untracked dead()-push set is a finding *by its suffix alone* — regardless of
+# whether the bytes happen to be UTF-8 decodable. PEM files are also content-scanned
+# (they overlap with the text path) so a real key block is caught both ways.
+_SECRET_SCAN_KEY_SUFFIXES = {
+    ".pem",
+    ".key",
+    ".p12",
+    ".pfx",
+    ".crt",
+    ".cer",
+    ".der",
+    ".keystore",
+    ".jks",
+}
+
 # (rule-name, compiled-pattern). Names are surfaced in the error; values never are.
 _SECRET_SCAN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("private-key-block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
@@ -117,19 +135,39 @@ _SECRET_SCAN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 
 def _scan_file_for_secrets(path: Path) -> list[str]:
-    """Return rule names that match *path*'s content (empty list ⇒ clean).
+    """Return rule names that match *path* (empty list ⇒ clean).
 
-    Binary / unreadable / unsupported-suffix files are skipped (returns ``[]``).
-    Never returns the matched secret value — only the rule name, so callers can
-    build a redacted report.
+    Two layers (R-2):
+
+    1. **Suffix presence** — a cryptographic key / certificate suffix
+       (``.pem``/``.key``/``.p12``/``.pfx``/...) is itself a finding
+       (``cert-key-file-suffix``), because such a file does not belong in an
+       untracked dead()-push set regardless of its byte content. This catches
+       binary key material the text scan below skips.
+    2. **Content rules** — for text-decodable files (the text-suffix allowlist,
+       plus PEM/key files that happen to be ASCII), the structural secret rules
+       run over the decoded content.
+
+    Binary / unreadable / unsupported-suffix files that are not key material are
+    skipped. Never returns the matched secret value — only the rule name, so
+    callers can build a redacted report.
     """
-    if path.suffix.lower() not in _SECRET_SCAN_TEXT_SUFFIXES:
-        return []
+    suffix = path.suffix.lower()
+    hits: list[str] = []
+
+    is_key_file = suffix in _SECRET_SCAN_KEY_SUFFIXES
+    if is_key_file:
+        # Presence of cert/key material is a finding by itself.
+        hits.append("cert-key-file-suffix")
+
+    # Content-scan only files we can decode: the text allowlist, plus key files
+    # (PEM is frequently ASCII — a decodable .pem also triggers private-key-block).
+    if suffix not in _SECRET_SCAN_TEXT_SUFFIXES and not is_key_file:
+        return hits
     try:
         text = path.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
-        return []
-    hits: list[str] = []
+        return hits
     for rule_name, pattern in _SECRET_SCAN_RULES:
         if pattern.search(text):
             hits.append(rule_name)

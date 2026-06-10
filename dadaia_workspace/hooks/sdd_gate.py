@@ -61,6 +61,40 @@ def _build_pid_probe() -> lease.PidProbe | None:
         return None
 
 
+def _resolve_holder_pid(payload: dict[str, object]) -> int:
+    """Resolve the LONG-LIVED holder pid to stamp into the lease record (WS-R2, NF-1 fix).
+
+    The gate runs as a short-lived ``python -m dadaia_workspace.hooks.sdd_gate`` child that
+    exits milliseconds after acquiring the lease. Recording ``os.getpid()`` (this child's
+    own pid) makes the no-steal pid-veto inert: a foreign session later probes a pid that is
+    already dead, so it always reclaims — the exact lease-theft incident. We therefore record
+    a pid that **outlives the hook**:
+
+    1. If the harness stdin payload carries an explicit harness pid (``harness_pid`` /
+       ``parent_pid`` / ``ppid``), prefer it — it names the long-lived harness process most
+       precisely. (No current harness sends one; this is forward-compatible and lets tests
+       pin a known-alive pid.)
+    2. Otherwise ``os.getppid()`` — the parent that spawned this hook child, i.e. the harness
+       process. It stays alive for the whole session, so a foreign probe sees the holder as
+       genuinely running and the no-steal veto fires while the harness is busy (even across a
+       single >120 s tool call), and only releases once the harness process truly dies.
+
+    A non-positive or unparseable payload pid falls back to ``os.getppid()``.
+    """
+    for key in ("harness_pid", "parent_pid", "ppid"):
+        raw = payload.get(key)
+        if isinstance(raw, int) and raw > 0:
+            return raw
+        if isinstance(raw, str):
+            try:
+                value = int(raw.strip())
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                return value
+    return os.getppid()
+
+
 def _resolve_workspace() -> Path:
     """Resolve the workspace root: ``WORKSPACE_ROOT`` env wins, else walk up from cwd."""
     env = os.environ.get("WORKSPACE_ROOT")
@@ -93,21 +127,35 @@ def _context_slug(workspace: Path, fpath: Path) -> str:
     return _SLUG_STRIP.sub("", slug or "")
 
 
-def _resolve_mode(workspace: Path, session_id: str) -> str:
-    """Resolve the session's bind mode (WS-R4 FR-R4-02/03/04). Ordered, first hit wins:
+def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
+    """Resolve the session's bind mode (WS-R4 FR-R4-02/03/04 + NF-2 fix). First hit wins:
 
     1. ``DADAIA_MODE`` env fast-path override — an operator-shell escape (the harness never
        sets this; it is honored only when the operator deliberately exports it).
-    2. The CLI-owned session record's ``mode`` field, keyed by the resolved session id
-       (``session_identity.read_session``). **This is the harness-real path**: a real hook
-       subprocess has no ``DADAIA_MODE`` env, so production READ enforcement flows entirely
-       through the on-disk record the bind CLI persisted.
-    3. Default ``IMPLEMENTATION`` (FR-R4-04 / D-3): a plain harness session with no bind
-       record and no env stays lease-capable and may acquire a *free* lease.
+    2. The CLI-owned session record keyed by the **resolved harness session id**
+       (``session_identity.read_session``). A session that bound *itself* (its own harness sid
+       reached the bind CLI) is found here; this record **wins over the incumbent pointer**
+       so a live implementation session is never downgraded by another session's stale
+       read-bind on the same context.
+    3. **CONTEXT-INCUMBENT record** (NF-2 fix): the mode of the session named by the
+       context's incumbent pointer ``sessions/runtime/<ctx>.ptr`` via
+       ``session_identity.resolve_identity(ctx)``. This is the harness-real path for the
+       default ``dadaia context bind`` flow: the bind CLI mints a fresh sid the running
+       harness never reports, but it also refreshes the context incumbent pointer at bind
+       time, so the operator's bind binds the **CONTEXT**. A different harness sid in the
+       same context then resolves the bound mode through the incumbent pointer — even with no
+       env var and no self-keyed record. Empty ``ctx`` skips this step (no context to key on).
 
-    Fail-soft: a missing/malformed record or empty mode field falls through to the default
-    (``read_session`` already returns ``None`` on any read error), so mode resolution never
-    raises and never blocks the gate by accident.
+       **Anti-downgrade guard:** the incumbent is honored only when it does NOT contradict a
+       live lease holder. If a lease record exists and its ``session_id`` differs from the
+       incumbent pointer (a different session legitimately took implementation after a stale
+       read-bind), the incumbent is treated as stale and ignored — a live implementation
+       holder is never downgraded to READ by another session's leftover read-bind.
+    4. Default ``IMPLEMENTATION`` (FR-R4-04 / D-3): no env, no self record, no incumbent
+       binding ⇒ lease-capable; may acquire a *free* lease.
+
+    Fail-soft: every lookup returns ``None`` on missing/malformed input, so mode resolution
+    never raises and never blocks the gate by accident.
     """
     env_mode = os.environ.get("DADAIA_MODE")
     if env_mode:
@@ -117,7 +165,32 @@ def _resolve_mode(workspace: Path, session_id: str) -> str:
         raw = rec.get("mode")
         if raw:
             return str(raw)
+    if ctx:
+        incumbent = session_identity.resolve_identity(workspace, ctx)
+        incumbent_sid = incumbent.get("incumbent")
+        incumbent_mode = incumbent.get("mode")
+        if (
+            incumbent_sid
+            and incumbent_mode
+            and not _incumbent_is_stale(workspace, ctx, str(incumbent_sid))
+        ):
+            return str(incumbent_mode)
     return _DEFAULT_MODE
+
+
+def _incumbent_is_stale(workspace: Path, ctx: str, incumbent_sid: str) -> bool:
+    """True if a live lease record names a session OTHER than the incumbent pointer.
+
+    A read-bind sets the incumbent pointer but takes no lease. If a *different* session then
+    legitimately acquires the implementation lease, the lease record holder diverges from the
+    incumbent pointer — the read-bind is stale and must not downgrade the live holder's mode.
+    Absence of a lease record (no holder yet) is NOT stale: the read-bind still governs.
+    """
+    holder = lease.read_record(workspace, ctx)
+    if holder is None:
+        return False
+    holder_sid = holder.get("session_id")
+    return bool(holder_sid) and str(holder_sid) != incumbent_sid
 
 
 def _active_field(specs_dir: Path, field: str) -> str:
@@ -181,10 +254,11 @@ def main() -> int:
     phase = _active_field(specs_dir, "phase")
     release = _active_field(specs_dir, "release") or "none"
     session_id = _common.resolve_session_id(payload, default="anon-session")
-    # Mode resolution order (WS-R4): DADAIA_MODE env override → session record → default.
-    # Resolved here (not inline) so READ-mode enforcement uses the harness-real on-disk
-    # record path, with the env var as the operator-shell escape only.
-    mode = _resolve_mode(workspace, session_id)
+    # Mode resolution order (WS-R4 + NF-2): DADAIA_MODE env override → self-keyed session
+    # record → context-incumbent record → default. Passing ``ctx`` enables the incumbent
+    # fallback so a default `dadaia context bind --mode read` (which mints a sid the harness
+    # never reports) still binds the CONTEXT and is honored without any env var.
+    mode = _resolve_mode(workspace, session_id, ctx)
 
     # MUTATING with no resolvable context → fail open (UNGATED, no lease), matching shell.
     # NOTE: a READ-bound session that *does* resolve a context is still blocked below by
@@ -202,6 +276,9 @@ def main() -> int:
         release=release,
         mode=mode,
         pid_probe=_build_pid_probe(),
+        # NF-1: record a LONG-LIVED pid (the harness, via getppid / payload), never this
+        # ephemeral hook child's own — otherwise the no-steal veto probes a dead pid.
+        holder_pid=_resolve_holder_pid(payload),
     )
     if decision == gate_policy.Decision.BLOCK:
         _common.emit_block(reason)

@@ -1,29 +1,39 @@
 """Harness-env contract tests (WS-R5 / FR-R5-01 / AC-R5-01, release v0.1.10).
 
-Two ratcheting contracts protect the harness-env fixture discipline introduced in
-``tests/fixtures/harness_env.py``:
+Two HARD-FAIL contracts protect the harness-env fixture discipline introduced in
+``tests/fixtures/harness_env.py``. Both formerly carried per-file *baselines* of pre-existing
+violations and failed only on growth; the rc-2 amendment burned those baselines to **zero**,
+so each contract now fails on the *first* violation — there is no residual cap.
 
 1. :class:`TestDadaiaEnvSetenvContract` — scans the whole ``tests/`` tree for any write of
    a ``DADAIA_*`` environment variable (``monkeypatch.setenv``, ``os.environ[...] = ...``,
-   ``os.environ.setdefault``/``update``, ``setenv(...)``) outside the fixture module, with
-   an explicit allowlist (``DADAIA_CONTEXT`` — the operator-shell context var). The audit
-   (``specs/audits/2026-06-10T010550Z/qa-engineer.md`` §6.1, defect 2) showed tests planting
-   ``DADAIA_SESSION_ID`` / persona vars that no harness delivers, certifying dead
-   mechanisms. The ideal end state is **zero** out-of-fixture session/mode/persona setenvs;
-   T-010-11 burns the existing ones down. To keep the suite green *now* while ratcheting,
-   this contract records a per-file baseline of pre-existing violations and fails only on
-   **growth** (a new violating file, or more violations in a baselined file).
+   ``os.environ.setdefault``/``update``, ``setenv(...)``) outside the fixture module. The
+   only permitted ``DADAIA_*`` writes are the allowlist in
+   ``tests/fixtures/harness_env.ALLOWLISTED_DADAIA_ENV`` — each entry an operator-shell input
+   or operator override that production code reads from the environment *by design* (so
+   setting it in a unit test exercises a real production env-read path, not harness-fiction).
+   Every other ``DADAIA_*`` setenv (``DADAIA_SESSION_ID`` planted as if the harness supplied
+   it, persona/mode fiction, the harness-control output-contract vars) is a violation: it
+   certifies a mechanism no harness delivers, exactly the audit defect
+   (``specs/audits/2026-06-10T010550Z/qa-engineer.md`` §6.1) this contract closes. The
+   burn-down (T-010-11 + the rc-2 amendment) rewrote the genuine-fiction sites to the
+   subprocess fixture and allowlisted only the by-design env-reads, driving the count to 0.
 
-2. :class:`TestHookImportContract` — flags direct import+call of a hook *behavior* module
-   (``sdd_gate``/``sdd_post_gate``/``ctx_inject``/``root_whitelist``) inside
-   ``tests/**/hooks|gate/**``. Behavior tests must drive hooks through
-   ``run_hook_subprocess`` (the harness-real path), not by importing ``main()`` in-process
-   — the in-process path re-opens the ``os.environ.update`` evasion. Same growth-only
-   ratchet: a per-file baseline is recorded and only new offending files fail.
+2. :class:`TestHookBehaviorChannelContract` — flags the harness-**stdin-simulation** pattern:
+   a test module that imports a hook *behavior* module (``sdd_gate``/``sdd_post_gate``/
+   ``ctx_inject``/``root_whitelist``) **and** patches ``sys.stdin`` in-process to drive its
+   ``main()``. Feeding a hook a hand-built stdin payload in-process re-opens the simulated-env
+   evasion this fixture exists to kill; harness-real behavior must flow through
+   ``run_hook_subprocess`` (which spawns ``python -m dadaia_workspace.hooks.<name>`` with a
+   real stdin pipe and a pinned :func:`claude_hook_env`). White-box unit tests that import a
+   hook module to call a *pure helper* (``sdd_gate._resolve_mode``) or to fault-inject a
+   production internal (``monkeypatch.setattr`` on a module symbol) — and never simulate
+   ``sys.stdin`` — are legitimately in-process and are NOT flagged. This replaces the former
+   blanket file-level baseline (every importing file) with a precise behavior definition, so
+   the contract carries NO file baseline.
 
-Both ratchets are intentionally *recorded baselines* of CURRENT reality, not aspirational
-zeros, so this task ships green and the named follow-up tasks (T-010-11 for the setenvs,
-the hook-subprocess migrations for the imports) drive the counts to zero.
+Both ratchets are now zero-tolerance: the baseline data structures and over-count guards are
+gone, and any new violation fails immediately.
 """
 
 from __future__ import annotations
@@ -95,13 +105,21 @@ class _EnvVarWriteVisitor(ast.NodeVisitor):
         func = node.func
         if isinstance(func, ast.Attribute) and node.args:
             arg0 = _string_arg(node.args[0])
-            # monkeypatch.setenv("DADAIA_X", ...)
+            # monkeypatch.setenv("DADAIA_X", ...) / monkeypatch.setitem(os.environ, "DADAIA_X")
             sets_via_first_arg = func.attr in _SETENV_CALLS or (
                 # os.environ.setdefault("DADAIA_X", ...)
                 func.attr in _ENVIRON_METHOD_CALLS and _is_environ_subscript(func.value)
             )
             if sets_via_first_arg:
                 self._record(arg0)
+            elif (
+                func.attr == "setitem"
+                and len(node.args) >= 2
+                and _is_environ_subscript(node.args[0])
+            ):
+                # monkeypatch.setitem(os.environ, "DADAIA_X", ...) — the os.environ escape
+                # hatch that bypasses setenv; treated identically to a setenv.
+                self._record(_string_arg(node.args[1]))
             # os.environ.update({"DADAIA_X": ...})
             elif func.attr == "update" and _is_environ_subscript(func.value):
                 self._record_update(node)
@@ -130,20 +148,7 @@ def _scan_env_violations() -> dict[str, int]:
     return violations
 
 
-# Recorded baseline of pre-existing out-of-fixture DADAIA_* env writes (2026-06-10, HEAD
-# of feature/v0.1.10). Burned down by T-010-11; this contract fails only on GROWTH.
-_ENV_BASELINE: dict[str, int] = {
-    "unit/features/agents/test_reader.py": 15,
-    "unit/features/panel/test_api_agent_prompt.py": 6,
-    "unit/features/workflows/test_service.py": 1,
-    "unit/hooks/test_common.py": 1,
-    "unit/hooks/test_ctx_inject.py": 3,
-    "unit/hooks/test_sdd_post_gate.py": 5,
-    "unit/test_container.py": 1,
-}
-
-
-def _import_offending_hook_modules(tree: ast.Module) -> set[str]:
+def _imports_hook_module(tree: ast.Module) -> set[str]:
     """Return hook *behavior* modules imported in a parsed test module.
 
     Matches ``from dadaia_workspace.hooks import sdd_gate`` and
@@ -167,95 +172,86 @@ def _import_offending_hook_modules(tree: ast.Module) -> set[str]:
     return found
 
 
-def _scan_hook_import_violations() -> dict[str, set[str]]:
-    """Map ``tests/**/hooks|gate/**`` file → set of directly-imported hook modules."""
+def _patches_sys_stdin(tree: ast.Module) -> bool:
+    """True if the module patches ``sys.stdin`` in-process (the harness-stdin simulation).
+
+    Detects ``monkeypatch.setattr("sys.stdin", ...)`` and
+    ``monkeypatch.setattr(sys, "stdin", ...)`` — the only sanctioned way to feed a hook a
+    hand-built stdin payload in-process. That pattern, combined with a hook-module import,
+    *is* the in-process behavior-simulation the subprocess runner replaces.
+    """
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        if node.func.attr != "setattr" or not node.args:
+            continue
+        # Form 1: setattr("sys.stdin", ...)
+        first = _string_arg(node.args[0])
+        if first == "sys.stdin":
+            return True
+        # Form 2: setattr(sys, "stdin", ...)
+        if (
+            isinstance(node.args[0], ast.Name)
+            and node.args[0].id == "sys"
+            and len(node.args) >= 2
+            and _string_arg(node.args[1]) == "stdin"
+        ):
+            return True
+    return False
+
+
+def _scan_hook_behavior_violations() -> dict[str, set[str]]:
+    """Map test file → imported hook modules, for files that ALSO simulate ``sys.stdin``.
+
+    Scope is the whole ``tests/`` tree (not just hooks/gate dirs): the simulated-stdin
+    evasion is the same wherever it lives. A file is a violation iff it imports a hook
+    behavior module AND patches ``sys.stdin`` in-process — i.e. it drives ``main()`` through
+    a hand-built stdin rather than ``run_hook_subprocess``.
+    """
     violations: dict[str, set[str]] = {}
     for path in _iter_test_files():
-        parts = set(path.relative_to(_TESTS_ROOT).parts)
-        if not ({"hooks", "gate"} & parts):
-            continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (OSError, SyntaxError):  # pragma: no cover - defensive
             continue
-        mods = _import_offending_hook_modules(tree)
-        if mods:
+        mods = _imports_hook_module(tree)
+        if mods and _patches_sys_stdin(tree):
             violations[path.relative_to(_TESTS_ROOT).as_posix()] = mods
     return violations
 
 
-# Recorded baseline of test files in tests/**/hooks|gate/** that import a hook behavior
-# module directly (instead of going through run_hook_subprocess). Migrated by the
-# hook-subprocess tasks; this contract fails only on GROWTH (a new offending file).
-_HOOK_IMPORT_BASELINE: frozenset[str] = frozenset(
-    {
-        "unit/hooks/test_ctx_inject.py",
-        "unit/hooks/test_root_whitelist.py",
-        "unit/hooks/test_sdd_gate.py",
-        "unit/hooks/test_sdd_post_gate.py",
-    }
-)
-
-
 class TestDadaiaEnvSetenvContract:
-    """No new out-of-fixture DADAIA_* env writes (growth-only ratchet)."""
+    """Zero out-of-fixture, non-allowlisted DADAIA_* env writes (hard-fail, no baseline)."""
 
-    def test_no_new_files_write_dadaia_env(self) -> None:
+    def test_no_file_writes_non_allowlisted_dadaia_env(self) -> None:
         current = _scan_env_violations()
-        new_files = sorted(set(current) - set(_ENV_BASELINE))
-        assert not new_files, (
-            "New test file(s) write a non-allowlisted DADAIA_* env var outside "
-            "tests/fixtures/harness_env.py. Hook/gate/lease tests must build env via "
-            "claude_hook_env()/codex_hook_env(); other DADAIA_* config must be set in "
-            f"the fixture or allowlisted. Offending: {new_files}"
-        )
-
-    def test_no_baselined_file_grows(self) -> None:
-        current = _scan_env_violations()
-        grown = {
-            f: (current[f], _ENV_BASELINE[f])
-            for f in _ENV_BASELINE
-            if current.get(f, 0) > _ENV_BASELINE[f]
-        }
-        assert not grown, (
-            "A baselined file added MORE non-allowlisted DADAIA_* env writes. The ratchet "
-            f"only goes down (T-010-11 burns these to zero). file -> (now, baseline): {grown}"
-        )
-
-    def test_baseline_does_not_overcount(self) -> None:
-        """Baseline must not exceed reality — keeps the recorded numbers honest."""
-        current = _scan_env_violations()
-        stale = {
-            f: (current.get(f, 0), _ENV_BASELINE[f])
-            for f in _ENV_BASELINE
-            if _ENV_BASELINE[f] > current.get(f, 0)
-        }
-        assert not stale, (
-            "Baseline over-counts (a file dropped below its recorded count). Lower the "
-            f"baseline so the ratchet keeps biting. file -> (now, baseline): {stale}"
+        assert current == {}, (
+            "Test file(s) write a non-allowlisted DADAIA_* env var outside "
+            "tests/fixtures/harness_env.py. Either the var is read from the environment by "
+            "production BY DESIGN (add it to ALLOWLISTED_DADAIA_ENV with a one-line "
+            "justification naming the production reader), or it is harness-fiction "
+            "(DADAIA_SESSION_ID planted as harness-supplied, persona/mode vars, the "
+            "DADAIA_HOOK_OUTPUT/EVENT output contract): rewrite the test to "
+            "claude_hook_env()/codex_hook_env() + run_hook_subprocess(), or to explicit "
+            f"function params / a monkeypatched reader. Offending file -> count: {current}"
         )
 
     def test_context_var_is_allowlisted(self) -> None:
         assert "DADAIA_CONTEXT" in ALLOWLISTED_DADAIA_ENV
 
 
-class TestHookImportContract:
-    """No new direct hook-behavior imports in tests/**/hooks|gate/** (growth-only)."""
+class TestHookBehaviorChannelContract:
+    """No in-process harness-stdin simulation of a hook (hard-fail, no baseline)."""
 
-    def test_no_new_direct_hook_imports(self) -> None:
-        current = set(_scan_hook_import_violations())
-        new_files = sorted(current - _HOOK_IMPORT_BASELINE)
-        assert not new_files, (
-            "New behavior test in tests/**/hooks|gate/** imports a hook module directly. "
-            "Invoke the hook via run_hook_subprocess() with claude_hook_env()/"
-            f"codex_hook_env() instead. Offending: {new_files}"
-        )
-
-    def test_baseline_files_still_exist(self) -> None:
-        """Baseline stays honest — a migrated/removed file must leave the baseline."""
-        current = set(_scan_hook_import_violations())
-        stale = sorted(_HOOK_IMPORT_BASELINE - current)
-        assert not stale, (
-            "Baselined file no longer imports a hook module directly (migrated/removed). "
-            f"Drop it from _HOOK_IMPORT_BASELINE so the ratchet keeps biting: {stale}"
+    def test_no_file_simulates_hook_stdin_in_process(self) -> None:
+        current = _scan_hook_behavior_violations()
+        assert current == {}, (
+            "Test file(s) import a hook behavior module AND patch sys.stdin in-process to "
+            "drive its main() — the simulated-env evasion run_hook_subprocess() exists to "
+            "kill. Invoke the hook via run_hook_subprocess() with claude_hook_env()/"
+            "codex_hook_env() instead. (Pure-helper unit tests like sdd_gate._resolve_mode, "
+            "and fault-injection tests that monkeypatch a production internal without "
+            "simulating sys.stdin, are legitimately in-process and are not flagged.) "
+            f"Offending file -> imported hook modules: "
+            f"{ {k: sorted(v) for k, v in current.items()} }"
         )

@@ -314,12 +314,13 @@ Codex hooks can fire on: `SessionStart`, `UserPromptSubmit`, `PreToolUse`,
 | Validate SDD gate before write | Decide product scope |
 | Block forbidden repo artifacts | Rewrite SPEC to justify code |
 | Validate handoff/report format | Hide human approval |
-| Update session heartbeat after write | Depend on fragile state with no timeout or clear message |
+| Update session heartbeat after every tool call | Depend on fragile state with no timeout or clear message |
 
 dadaia reference wiring (live shape, v0.1.10): `PreToolUse apply_patch|Edit|Write →
 python -m dadaia_workspace.hooks.sdd_gate` and `→ …hooks.root_whitelist`;
-`PostToolUse * → …hooks.sdd_post_gate` (lease heartbeat — must fire on every tool, so
-its matcher stays broad); `SessionStart → …hooks.ctx_inject`. The legacy bash hook
+`PostToolUse → …hooks.sdd_post_gate` with the matcher **omitted** — Codex's canonical
+match-all form — so the lease heartbeat fires after every tool;
+`SessionStart → …hooks.ctx_inject`. The legacy bash hook
 quartet was retired in v0.1.10 (Decision D-1) — the hooks are production Python owned
 by software-engineer. Risk to guard against: absolute paths and local projections
 leaking into public packages.

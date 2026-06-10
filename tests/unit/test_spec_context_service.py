@@ -299,6 +299,54 @@ def test_dead_with_commit_blocks_on_planted_private_ip(
     assert repo.exists()
 
 
+def test_dead_with_commit_blocks_on_untracked_pem_key_file(
+    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+) -> None:
+    """R-2 (v0.1.10 rc-2 sec LOW): a private-key file (.pem) in the untracked push
+    set is a finding by its *suffix alone* — the binary-suffix family was skipped by
+    the old text-only scan. dead() --commit must block regardless of byte content."""
+    from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
+
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    service.alive("proj")
+    repo = workspace_root / "repos" / "my-repo"
+    git._has_remote.add(repo)
+    # Non-PEM-formatted bytes: caught purely by the .pem suffix, not by content.
+    (repo / "server.pem").write_bytes(b"\x00\x01\x02opaque-key-bytes\xff\xfe")
+    git._untracked[repo] = ["server.pem"]
+
+    with pytest.raises(DeadSecretFoundError) as exc:
+        service.dead("proj", commit=True)
+
+    assert "server.pem" in str(exc.value)
+    assert repo not in git.pushed
+    assert repo not in git.committed
+    assert repo.exists()
+    assert service.show("proj").state == ContextState.ALIVE
+
+
+def test_scan_flags_key_suffixes_and_skips_other_binary(tmp_path: Path) -> None:
+    """R-2: cert/key suffixes flag on presence; an unrelated binary suffix stays clean."""
+    from dadaia_workspace.features.spec_context.service import _scan_file_for_secrets
+
+    for suffix in (".pem", ".key", ".p12", ".pfx"):
+        f = tmp_path / f"material{suffix}"
+        f.write_bytes(b"\x00binary\xff")
+        assert _scan_file_for_secrets(f) == ["cert-key-file-suffix"], suffix
+
+    # A decodable PEM block triggers BOTH the suffix rule and the content rule.
+    pem = tmp_path / "real.pem"
+    pem.write_text("-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n")
+    hits = _scan_file_for_secrets(pem)
+    assert "cert-key-file-suffix" in hits
+    assert "private-key-block" in hits
+
+    # An unrelated binary suffix (not key material, not text-decodable) stays clean.
+    blob = tmp_path / "image.png"
+    blob.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x01")
+    assert _scan_file_for_secrets(blob) == []
+
+
 def test_dead_clean_tree_unchanged_no_untracked(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:

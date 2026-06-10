@@ -1,14 +1,21 @@
-"""Unit tests for dadaia_workspace.hooks.root_whitelist."""
+"""Harness-real behavior tests for dadaia_workspace.hooks.root_whitelist.
+
+These drive ``root_whitelist`` as a real Claude Code harness does: a subprocess spawned with
+:func:`claude_hook_env` and a ``PreToolUse`` payload piped to stdin. The gate signals ALLOW
+with empty stdout and BLOCK with a ``{"decision":"block",...}`` envelope; both are asserted
+on the subprocess result, never by importing ``main()`` in-process.
+
+Rewritten from the old in-process ``root_whitelist.main()`` + ``sys.stdin`` simulation (the
+pattern the harness-env contract bans). The workspace root the gate consults is delivered
+through ``WORKSPACE_ROOT`` — a real harness-provided var — set by ``claude_hook_env``.
+"""
 
 from __future__ import annotations
 
-import io
-import json
 from pathlib import Path
+from typing import Any
 
-import pytest
-
-from dadaia_workspace.hooks import root_whitelist
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -16,86 +23,68 @@ def _ws(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _run(
-    monkeypatch: pytest.MonkeyPatch,
-    payload: dict[str, object],
-    *,
-    capsys: pytest.CaptureFixture[str],
-) -> str:
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    assert root_whitelist.main() == 0
-    return capsys.readouterr().out
+def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    """Invoke root_whitelist as a subprocess; return (stdout, parsed block envelope)."""
+    env = claude_hook_env(tmp_path)
+    result = run_hook_subprocess("root_whitelist", payload, env)
+    assert result.returncode == 0, result.stderr
+    return result.stdout, result.block_envelope()
 
 
-def test_non_write_tool_allows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("WORKSPACE_ROOT", str(_ws(tmp_path)))
-    out = _run(monkeypatch, {"tool_name": "Read", "tool_input": {"path": "x"}}, capsys=capsys)
+def test_non_write_tool_allows(tmp_path: Path) -> None:
+    _ws(tmp_path)
+    out, block = _run(tmp_path, {"tool_name": "Read", "tool_input": {"path": "x"}})
     assert out == ""
+    assert block is None
 
 
-def test_whitelisted_root_entry_allows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_whitelisted_root_entry_allows(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    out = _run(
-        monkeypatch,
+    out, block = _run(
+        tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(ws / "AGENTS.md")}},
-        capsys=capsys,
     )
     assert out == ""
+    assert block is None
 
 
-def test_subdir_write_allows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_subdir_write_allows(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     target = ws / "repos" / "x" / "file.py"
-    out = _run(
-        monkeypatch,
+    out, block = _run(
+        tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        capsys=capsys,
     )
     assert out == ""
+    assert block is None
 
 
-def test_forbidden_root_entry_blocks(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_forbidden_root_entry_blocks(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    out = _run(
-        monkeypatch,
+    _out, block = _run(
+        tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(ws / "junk.txt")}},
-        capsys=capsys,
     )
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "ROOT WHITELIST GATE" in decision["reason"]
+    assert block is not None
+    assert block["decision"] == "block"
+    assert "ROOT WHITELIST GATE" in block["reason"]
 
 
-def test_operator_exception_allows(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_operator_exception_allows(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     (ws / ".dadaia" / "states" / "root_exceptions.txt").write_text(
         "# operator exceptions\n*.png\n", encoding="utf-8"
     )
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    out = _run(
-        monkeypatch,
+    out, block = _run(
+        tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(ws / "screenshot.png")}},
-        capsys=capsys,
     )
     assert out == ""
+    assert block is None
 
 
-def test_unparseable_path_fails_open(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("WORKSPACE_ROOT", str(_ws(tmp_path)))
-    out = _run(monkeypatch, {"tool_name": "Write", "tool_input": {}}, capsys=capsys)
+def test_unparseable_path_fails_open(tmp_path: Path) -> None:
+    _ws(tmp_path)
+    out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {}})
     assert out == ""
+    assert block is None

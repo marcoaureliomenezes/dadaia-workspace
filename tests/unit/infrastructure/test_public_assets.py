@@ -1647,12 +1647,15 @@ class TestConfigGenerators:
         sdd_gate_cmd = str(matchers[0]["hooks"][0]["command"])
         assert "dadaia_workspace.hooks.sdd_gate" in sdd_gate_cmd
         assert "sdd-spec-gate.sh" not in sdd_gate_cmd
-        # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module
+        # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module.
+        # N-2 (v0.1.10 rc-2): the heartbeat now fires on ALL tools — Codex's
+        # canonical match-all is an *omitted* matcher (see
+        # test_codex_posttooluse_heartbeat_fires_on_all_tools).
         assert "PostToolUse" in hooks
         post_matchers = hooks["PostToolUse"]
         assert isinstance(post_matchers, list)
         assert len(post_matchers) > 0
-        assert post_matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
+        assert "matcher" not in post_matchers[0]
         assert post_matchers[0]["hooks"][0]["type"] == "command"
         post_cmd = str(post_matchers[0]["hooks"][0]["command"])
         assert "dadaia_workspace.hooks.sdd_post_gate" in post_cmd
@@ -1682,6 +1685,38 @@ class TestConfigGenerators:
         assert "DADAIA_HOOK_OUTPUT=codex-json" in cmd
         assert "dadaia_workspace.hooks.ctx_inject" in cmd
         assert "ctx-inject.sh" not in cmd
+
+    def test_codex_posttooluse_heartbeat_fires_on_all_tools(self, tmp_path: Path) -> None:
+        """N-2 (v0.1.10 rc-2 re-audit HIGH): the Codex lease-heartbeat PostToolUse
+        block must fire on ALL tools (omitted matcher = Codex canonical match-all),
+        NOT only on the write tools. Pinning it to ``^(apply_patch|Edit|Write)$``
+        starved the heartbeat during long Bash / read-only Codex calls, letting the
+        lease go TTL-stale (the original lease-starvation incident's Codex flavor).
+
+        The PreToolUse write gates stay scoped to the write tools only.
+        Regression guard for runtime_config.codex_hooks.
+        """
+        manager = FileSystemPublicAssetManager()
+        hooks = manager._codex_hooks(tmp_path)["hooks"]
+
+        # PostToolUse heartbeat: omitted matcher => fires on every tool.
+        post = hooks["PostToolUse"]
+        assert isinstance(post, list) and len(post) == 1
+        assert "matcher" not in post[0], (
+            "Codex heartbeat must NOT be pinned to the write tools — an omitted "
+            "matcher is Codex's canonical match-all (N-2)."
+        )
+        post_cmds = [str(h["command"]) for h in post[0]["hooks"]]
+        assert any("dadaia_workspace.hooks.sdd_post_gate" in c for c in post_cmds)
+
+        # PreToolUse write gates remain scoped to the write tools only.
+        pre = hooks["PreToolUse"]
+        assert isinstance(pre, list) and len(pre) == 2
+        for entry in pre:
+            assert entry["matcher"] == "^(apply_patch|Edit|Write)$"
+        pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
+        assert any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
+        assert any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         # T-018-17: hook commands are now Python module invocations, not .sh paths.

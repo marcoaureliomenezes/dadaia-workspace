@@ -15,10 +15,13 @@ tool call as path-class × lease × phase × mode: ADDITIVE paths (`specs/bugs|b
 `.dadaia/reports|handoff|tmp/` — root or in-repo) always pass; MEMORY (`specs/memory/`)
 passes only in DEFINITION/CLOSURE phase; FROZEN (`specs/_archive/`) and PROTECTED
 (`.dadaia/sessions/`) block; MUTATING acquires the single per-context lease. Liveness is
-TTL + pid veto: a holder whose pid is still running is never stolen, and the heartbeat
-renews on every PostToolUse (harness-native session id from the hook stdin payload). A
-session bound `--mode read` is non-acquiring — MUTATING writes block before any lease
-call. `Bash`-tool writes are outside this envelope (Decision D-2); doctor coherence
+TTL + pid veto: the lease records the long-lived harness pid (hook payload pid when
+present, else the hook's parent process) — a holder whose recorded pid is still running
+is never stolen — and the heartbeat renews on every PostToolUse (match-all on both
+harnesses; harness-native session id from the hook stdin payload). A session whose mode
+resolves READ (env → session record → the context's incumbent pointer, which `bind`
+refreshes → IMPLEMENTATION default) is non-acquiring — MUTATING writes block before any
+lease call. `Bash`-tool writes are outside this envelope (Decision D-2); doctor coherence
 checks are the backstop.
 
 **What you uphold as discipline (the hook reads no SDD artifacts).** Before editing any

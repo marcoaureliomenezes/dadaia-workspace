@@ -385,10 +385,18 @@ def bind(
         "is_stale": False,
     }
 
-    # Persist the session record via the single session-identity owner (FR-R4-02 / R3).
+    # Persist the session record via the single session-identity owner (FR-R4-02 / R3),
+    # and refresh the CONTEXT incumbent pointer to this bind's session id (NF-2 fix). The
+    # incumbent pointer makes the bind bind the CONTEXT, not just a throwaway sid: the SDD
+    # gate resolves a harness session's mode through ``resolve_identity(ctx)`` →
+    # ``<ctx>.ptr`` → this record, so a default in-session `dadaia context bind --mode read`
+    # (whose minted sid no harness reports) is honored with no env var. For lease-taking
+    # binds the pointer is harmless — ``lease.acquire`` rewrites ``<ctx>.ptr`` to the real
+    # acquiring harness sid on first MUTATING write, so the incumbent self-corrects.
     try:
         with workspace_lock(workspace_root):
             session_identity.write_session(workspace_root, session_id, session_data)
+            session_identity.set_incumbent(workspace_root, name, session_id)
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

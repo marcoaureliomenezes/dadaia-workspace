@@ -271,6 +271,29 @@ def test_context_bind_read_persists_read(workspace: Path) -> None:
     assert record["mode"] == "READ"
 
 
+def test_context_bind_refreshes_context_incumbent_pointer(workspace: Path) -> None:
+    """NF-2 (rc-2): bind writes the CONTEXT incumbent pointer to the bind's session id.
+
+    The incumbent pointer is what makes a default in-session bind bind the CONTEXT (not just
+    a throwaway sid): the SDD gate resolves a harness session's mode through
+    ``resolve_identity(ctx)`` → ``<ctx>.ptr`` → the persisted record.
+    """
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    assert result.exit_code == 0, result.output
+    record = _session_record_for(workspace, result.output)
+    incumbent = session_identity.read_incumbent_ptr(workspace, "myctx")
+    assert incumbent == record["session_id"], (
+        "bind must refresh the context incumbent pointer to its session id"
+    )
+    # And the gate resolves the bound mode through the incumbent for a DIFFERENT harness sid.
+    identity = session_identity.resolve_identity(workspace, "myctx")
+    assert identity["incumbent"] == record["session_id"]
+    assert identity["mode"] == "READ"
+
+
 def test_context_bind_implementation_persists_bound_implementation(workspace: Path) -> None:
     """FR-R4-02: --mode implementation persists BOUND_IMPLEMENTATION + creates session."""
     _register_alive_ctx(workspace)
