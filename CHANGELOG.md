@@ -11,6 +11,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scaffolder renders templates with a Jinja2 `SandboxedEnvironment`, blocking template access to Python internals. (F-03)
 - `GitSubprocessClient.clone` refuses unsafe URLs (`ext::` transport and option-injection via a leading `-`) before invoking git. (F-05)
 
+## [0.1.10] — 2026-06-10
+
+Full-remediation release: one release closing every finding of the 5-agent
+workspace audit (overall score 5/10 → 9.0/10 on all six dimensions).
+
+### Fixed
+- SDD gate classifier re-rooted context-relatively: ADDITIVE/MEMORY/FROZEN classes
+  now live inside `repos/<slug>/` (unmatched in-repo ⇒ MUTATING, never UNGATED);
+  symlinks canonicalized before classification. Kills the lease-theft-by-additive-write
+  CRITICAL.
+- Lease liveness = TTL + PID veto: holder records a long-lived harness pid
+  (payload/getppid); TTL-stale + alive ⇒ yield (no takeover), dead ⇒ takeover;
+  renew runs inside the same O_EXCL CAS (race fixed); heartbeat renews on every
+  PostToolUse from the harness-native session id (Claude `*` matcher, Codex match-all).
+- Session identity consolidated into a single owner module (`session_identity`);
+  bind `--mode` optional (default read), persisted in the session record + context
+  incumbent pointer (eval-export theater removed, `--print-env` legacy escape);
+  gate mode resolution env → record → live-incumbent → IMPLEMENTATION; READ binds
+  are non-acquiring.
+- `dadaia ci preflight` no longer self-pollutes (ruff `--no-cache`, mypy cache
+  redirected, pollution guard = session snapshot diff) — the pre-push gate passes
+  end-to-end for the first time; pre-push hook probes the workspace venv
+  (`$DADAIA_BIN` → walk-up → poetry → repo venv, fail-closed).
+- specs doctor ledger invariants (SPEC-DOC-024..029): phase↔markers, CLOSURE-before-
+  archive, unique release ids, naming canon, constitution ref resolution, lease↔session
+  coherence; archive id collisions repaired (`v0.2.0/alpha-N`, mapping README).
+- Model registry single source (`core/model_registry`): MODEL_MAP/PRICING_TABLE are
+  derived views; public doctor validates agent `model:` frontmatter + key-set sync.
+
+### Security
+- Panel loopback auth bypass removed (tokenless sensitive API ⇒ 401 even on
+  127.0.0.1; tokenized-URL handoff, token file modes re-tightened to 0o600).
+- `context dead` refuses untracked files without `--commit`; `--commit` runs a
+  structural secret scan (incl. cert/key file suffixes) before any push.
+- public-privacy gate fails closed: packaged baseline structural denylist scans
+  even without an operator denylist.
+
+### Changed
+- Bash hook quartet retired; Python hooks are the sole gate surface (PreToolUse
+  scoped to write tools; Bash-tool writes documented out of the determinism
+  envelope with doctor backstops).
+- AI surface (AGENTS.md, rules, skills, personas) rewritten to describe real
+  enforcement vs discipline (14 contradictions fixed); memory + constitution §8
+  rewritten to the merged kernel.
+- Test architecture: harness-env fixture contract (hook behavior tests run as real
+  subprocesses; `DADAIA_*` setenv + hook-import ratchets at zero baseline), two-actor
+  concurrency e2e asserting on lock-file history, drift-ratifying tests killed,
+  consistency-contract + lifecycle-asymmetry policies; 2795 tests.
+
 ## [0.1.9] — 2026-06-09
 
 ### Changed
