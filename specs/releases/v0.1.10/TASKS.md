@@ -8,14 +8,26 @@
 Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 Tracks K (kernel), T (tests), R (registries/push-gates), S (security), D (truth) are
-file-disjoint and safe to run in parallel **across** tracks. Within a track, respect
-the listed preconditions. Hard spine: T-010-10 → 03 → 07 → {04,05,08} → {09,06} →
-11 → 12; T-010-16 runs last (CLOSURE phase). Maximum one `[-]` per owner unless tasks
-are in different tracks (disjoint write sets declared here).
+safe to run in parallel **across** tracks with one declared exception: T-010-13
+(Track D) shares `gate_policy.py` with T-010-03 (Track K) and is sequenced after it —
+the file-disjoint claim does not hold for that pair. Within a track, respect the
+listed preconditions. Hard spine: T-010-00 → 10 → 03 → 07 → {04,05,08} → {09,06} →
+11 → 12 (plus 03 → 13); T-010-16 runs last (CLOSURE phase). Maximum one `[-]` per
+owner unless tasks are in different tracks (disjoint write sets declared here).
 
 ---
 
 ## Pre-work
+
+### [ ] T-010-00 — Release start: ACTIVE.md → v0.1.10
+- **Owner:** product-engineer · **Maps:** arch A5 (SPEC review), CONF-5; Decisions D-4/D-5 prelude
+- **Write set:** `specs/releases/ACTIVE.md`
+- **Preconditions:** SPEC+PLAN+TASKS Aprovado.
+- **Acceptance:** `ACTIVE.md` reads `release: v0.1.10` / `phase: IMPLEMENTATION`
+  **before any Track K work begins**, so gate legality and the new phase↔markers
+  doctor invariant (T-010-14) hold for the whole release. The v0.1.9 retro-CLOSURE +
+  archive repair remain in T-010-15 (unchanged).
+- **Parallelism:** runs first, before all tracks.
 
 ### [ ] T-010-01 — VERIFY: opencode-parity bug superseded by v0.1.8
 - **Owner:** software-engineer · **Maps:** bug `opencode-parity-test-asserts-stale-bash-script-ref`, DRIFT-7
@@ -35,9 +47,9 @@ are in different tracks (disjoint write sets declared here).
 
 ### [ ] T-010-10 — R5: harness-env fixture contract (FIRST in track)
 - **Owner:** software-engineer · **Maps:** CONF-6, qa defect 2, qa §6.1; bug `lease-stolen…` D3 (test side)
-- **Write set:** `tests/fixtures/harness_env.py` (new) or `tests/conftest.py`, `tests/contract/test_harness_env_contract.py` (new)
-- **Preconditions:** SPEC+PLAN Aprovado.
-- **Acceptance (AC-R5-01):** `claude_hook_env()` / `codex_hook_env()` fixtures with pinned-minimal env + subprocess hook-runner helper exist; contract test fails any hook/gate/lease test that setenvs `DADAIA_SESSION_ID|DADAIA_PERSONA|DADAIA_MODE` outside the fixtures; existing suites still green.
+- **Write set:** `tests/fixtures/harness_env.py` (new — NOT `tests/conftest.py`, avoids colliding with T-010-25), `tests/contract/test_harness_env_contract.py` (new)
+- **Preconditions:** T-010-00.
+- **Acceptance (AC-R5-01):** `claude_hook_env()` / `codex_hook_env()` fixtures with pinned-minimal env + subprocess hook-runner helper exist; env contract test covers the **whole `DADAIA_*` namespace** with an explicit allowlist (e.g. `DADAIA_CONTEXT` operator-shell var) and fails any hook/gate/lease test that setenvs a non-allowlisted `DADAIA_*` outside the fixtures; second contract test flags direct hook-module import+call in `tests/**/hooks|gate/**` (behavior tests must use the subprocess runner — closes the `os.environ.update` evasion); new tests green on Windows/macOS CI legs; existing suites still green.
 - **Parallelism:** independent of all other tracks; blocks T-010-03/04/05/09 acceptance.
 
 ### [ ] T-010-03 — R1: classifier re-root — full class×location taxonomy
@@ -51,21 +63,21 @@ are in different tracks (disjoint write sets declared here).
 - **Owner:** software-engineer · **Maps:** arch F7, CONF-1/2 substrate
 - **Write set:** `dadaia_workspace/features/spec_context/session_identity.py` (new), `dadaia_workspace/features/spec_context/lease.py` (pointer reads), `dadaia_workspace/hooks/ctx_inject.py`, `tests/unit/features/spec_context/test_session_identity.py` (new), `tests/contract/test_session_store_ownership.py` (new)
 - **Preconditions:** T-010-03.
-- **Acceptance (AC-R3-01):** FR-R3-01..03 — single owner module; residue grep contract proves no other module opens `sessions/runtime/*.ptr` / `sessions/<id>.json`; coherence contract (lock holder vs incumbent vs session record); legacy artifacts ignored-and-superseded; pytest green.
+- **Acceptance (AC-R3-01):** FR-R3-01..03 — single owner module; residue grep contract proves no other module opens `sessions/runtime/*.ptr` / `sessions/<id>.json`; coherence contract (lock holder vs incumbent vs session record); workspace-doctor PTR-GC/SENTINEL-GC consumers of `sessions/runtime/*.ptr` updated/verified against the collapsed store; legacy artifacts ignored-and-superseded; pytest green.
 - **Parallelism:** spine; before T-010-04/05/08.
 
 ### [ ] T-010-04 — R2a: PostToolUse heartbeat, harness-native session id
 - **Owner:** software-engineer · **Maps:** CONF-2, arch F2, ai D-12; bug `lease-stolen…` (D2/D3)
 - **Write set:** `dadaia_workspace/hooks/sdd_post_gate.py`, `tests/unit/hooks/test_sdd_post_gate.py`
 - **Preconditions:** T-010-07, T-010-10.
-- **Acceptance (AC-R2-01):** FR-R2-01/02 — session id from stdin payload (`resolve_session_id`), env as override only; renew called outside any session-file guard; subprocess test under `claude_hook_env()` (no hand-planted env) observes fresher lease heartbeat after a simulated Bash PostToolUse; fail-open exit 0 on all errors; no-session-file variant passes.
+- **Acceptance (AC-R2-01):** FR-R2-01/02 — session id from stdin payload (`resolve_session_id`), env as override only; renewal context resolved from the session_identity record / leases held by this sid (NOT `DADAIA_CONTEXT`→first-ALIVE; first-ALIVE documented last resort only); renew called outside any session-file guard; subprocess test under `claude_hook_env()` (no hand-planted env) observes fresher lease heartbeat after a simulated Bash PostToolUse; fail-open exit 0 on all errors; no-session-file variant passes; green on Windows/macOS CI legs.
 - **Parallelism:** parallel with T-010-05/08 (disjoint files).
 
 ### [ ] T-010-05 — R2b: pid-liveness probe before TAKEOVER + holder-safe renew
 - **Owner:** software-engineer · **Maps:** CONF-2, arch F2 (PID lesson restored), C-14
 - **Write set:** `dadaia_workspace/features/spec_context/lease.py`, `tests/unit/features/spec_context/test_lease_*.py`
 - **Preconditions:** T-010-07.
-- **Acceptance (AC-R2-02/03):** FR-R2-03/04 — lease record gains `pid`; TTL-stale+alive-probe ⇒ block (no TAKEOVER), TTL-stale+dead/absent-pid ⇒ TAKEOVER; probe via `core/lock_liveness.py` + `has_os_kill_liveness` seam with TTL fallback; confirmed holder renews past TTL; renew atomic vs foreign acquire (stress/property test on lock-file history — the `lease.py:379-394` race is fixed); docstring `lease.py:16-19` rewritten truthful; pytest green.
+- **Acceptance (AC-R2-02/03):** FR-R2-03/04 — lease record gains `pid`; TTL-stale+alive-probe ⇒ block (no TAKEOVER), TTL-stale+dead/absent-pid ⇒ TAKEOVER; probe injected via the existing `pid_probe` callable param of `core/lock_liveness.is_stale` (or a core protocol port) wired from hooks/container — `features/lease.py` does NOT import `infrastructure/process_probe_adapter`, no new import-linter ignores; `has_os_kill_liveness` seam with TTL fallback; confirmed holder renews past TTL; renew atomic vs foreign acquire (stress/property test on lock-file history — the `lease.py:379-394` race is fixed); docstring `lease.py:16-19` rewritten truthful; liveness tests green on Windows/macOS CI legs; pytest green.
 - **Parallelism:** parallel with T-010-04/08.
 
 ### [ ] T-010-08 — R4a: bind `--mode` optional; mode persisted in session record
@@ -79,14 +91,14 @@ are in different tracks (disjoint write sets declared here).
 - **Owner:** software-engineer · **Maps:** CONF-3, ai D-10; bugs `context-bind-…`, `lease-stolen…` (read-session steal family)
 - **Write set:** `dadaia_workspace/hooks/sdd_gate.py`, `tests/unit/hooks/test_sdd_gate.py`
 - **Preconditions:** T-010-08, T-010-10.
-- **Acceptance (AC-R4-01/02):** FR-R4-03/04 — resolution order env→session-record→IMPLEMENTATION; READ ⇒ MUTATING blocked (no lease write, message without rebind instruction) and ADDITIVE allowed — verified under `claude_hook_env()` with **no** env vars (session-record path); both-absent ⇒ IMPLEMENTATION, free-lease acquire proceeds; PROTECTED unchanged; pytest green.
+- **Acceptance (AC-R4-01/02):** FR-R4-03/04 — resolution order env→session-record→IMPLEMENTATION; READ ⇒ MUTATING blocked (no lease write; message has no auto-rebind nag but MAY name `bind --mode implementation` as the documented path to write rights) and ADDITIVE allowed — verified under `claude_hook_env()` with **no** env vars (session-record path); both-absent ⇒ IMPLEMENTATION, free-lease acquire proceeds; PROTECTED unchanged; pytest green.
 - **Parallelism:** after T-010-08.
 
 ### [ ] T-010-06 — R2c: two-actor concurrency e2e (no-steal invariant)
 - **Owner:** software-engineer · **Maps:** CONF-2/CONF-6, qa §6.2; bug `lease-stolen…` (incident e2e)
 - **Write set:** `tests/e2e/test_two_actor_lease.py` (new) + shared rendezvous helper
 - **Preconditions:** T-010-04, T-010-05.
-- **Acceptance (AC-R2-04):** real OS processes + file rendezvous; holder busy >TTL: (i) foreign ADDITIVE write → ALLOW, lock-file history never names the foreign session; (ii) foreign MUTATING attempt → blocked while holder pid alive; invariant asserted on lock-file history, not return values.
+- **Acceptance (AC-R2-04):** real OS processes + file rendezvous; holder busy >TTL: (i) foreign ADDITIVE write → ALLOW, lock-file history never names the foreign session; (ii) foreign MUTATING attempt → blocked while holder pid alive; (iii) two contexts mutating disjoint repos concurrently → no cross-block; (iv) dead-holder real-process takeover e2e — holder process exits, foreign acquire TAKEOVERs; invariants asserted on lock-file history, not return values; green on Windows/macOS CI legs (platform-seamed pid probe).
 - **Parallelism:** after 04+05; final task of Track K.
 
 ---
@@ -97,7 +109,7 @@ are in different tracks (disjoint write sets declared here).
 - **Owner:** software-engineer · **Maps:** CONF-6, qa defects 1+3 (named tests)
 - **Write set:** `tests/unit/features/spec_context/test_lease_property.py`, `test_lease_activity_exemption.py`, `tests/unit/gate/test_post_gate_heartbeat.py`, gate/lease suites (parametrization)
 - **Preconditions:** T-010-03..09 merged.
-- **Acceptance (AC-R5-02):** root-only ADDITIVE assertions (`test_lease_property.py:74`, `test_lease_activity_exemption.py:27`) replaced by the R1 matrix; `test_post_gate_heartbeat.py:79` migrated to harness-env fixture; gate/lease suites parametrized {1,2 contexts}×{default,non-default slug}×{seeded,empty}; residue grep proves no remaining root-only/bash-pinning assertions.
+- **Acceptance (AC-R5-02):** root-only ADDITIVE assertions (`test_lease_property.py:74`, `test_lease_activity_exemption.py:27`) replaced by the R1 matrix; `test_post_gate_heartbeat.py:79` migrated to harness-env fixture; gate/lease suites parametrized {1,2 contexts}×{default,non-default slug}×{seeded,empty}; evidence = the named file:lines removed, recorded for CLOSURE + AC-R1-01 matrix carries an in-repo variant per class (replaces the unmechanical residue grep; bash-pinning residue stays covered by T-010-13's contract).
 - **Parallelism:** after Track K.
 
 ### [ ] T-010-12 — R5: escape-matrix regression coverage (7/7 bugs)
@@ -142,7 +154,7 @@ are in different tracks (disjoint write sets declared here).
 - **Owner:** software-engineer · **Maps:** CONF-9, arch F10, qa §6.4
 - **Write set:** `tests/contract/` (cap test, residue greps), `setup.cfg` (comment-pin), `specs/AGENTS.md` (policy paragraph)
 - **Preconditions:** T-010-23, T-010-13.
-- **Acceptance (AC-R8-04):** linter ignore-edge cap test fails on growth beyond recorded count; residue greps active (retired bash hooks, retired models); consistency-contract-at-introduction policy documented in `specs/AGENTS.md` + `tests/contract/` README.
+- **Acceptance (AC-R8-04):** linter ignore-edge cap test fails on growth beyond recorded count; residue greps active (retired bash hooks, retired models); consistency-contract-at-introduction policy documented in `specs/AGENTS.md` + `tests/contract/` README, including the **lifecycle-asymmetry policy** (audit §6.5): every feature documents per-feature delete/orphan + dirty-input + missing-dependency coverage or a justified absence.
 - **Parallelism:** after 23 and 13.
 
 ---
@@ -176,9 +188,9 @@ are in different tracks (disjoint write sets declared here).
 ### [ ] T-010-13 — R6a: retire the bash hook quartet (Decision D-1)
 - **Owner:** software-engineer · **Maps:** ai S-1/S-2/C-9, DRIFT-6, sec F-4; bug `gate-fpath-not-canonicalized-before-classifier` (bash surface)
 - **Write set:** `dadaia_workspace/public/scripts/{sdd-spec-gate,sdd-post-gate,root-whitelist-gate,ctx-inject}.sh` (delete), `public/scripts/__pycache__/` (delete), manifest/staging/projection code+tests, `features/spec_context/gate_policy.py:1-8` docstring, `tests/contract/test_bash_hook_residue.py` (new)
-- **Preconditions:** SPEC+PLAN Aprovado.
+- **Preconditions:** T-010-03 merged (shares `gate_policy.py` — the docstring fix lands after the re-root; declared exception to cross-track file-disjointness).
 - **Acceptance (AC-R6-01):** quartet absent from canonical assets, staging manifest, and all projections; `pre-push-ci-gate.sh` retained; docstring names the Python hooks; residue grep contract green; `dadaia public stage && install --target all && public doctor` exit 0; bug closed referencing T-010-03's symlink regression + this retirement.
-- **Parallelism:** independent.
+- **Parallelism:** after T-010-03; otherwise independent.
 
 ### [ ] T-010-14 — R6b: specs-doctor ledger invariants + coherence backstop
 - **Owner:** software-engineer · **Maps:** CONF-5, arch F6, index §4; Decision D-2 backstop
@@ -196,8 +208,8 @@ are in different tracks (disjoint write sets declared here).
 
 ### [ ] T-010-15 — R6d: v0.1.9 retro-CLOSURE + archive repair (ledger truth)
 - **Owner:** product-engineer · **Maps:** CONF-5, DRIFT-5, arch F6; Decisions D-4/D-5
-- **Write set:** `specs/releases/v0.1.9/**` (CLOSURE.md), `specs/_archive/releases/` (renames via git mv — request devops/operator), mapping README, `specs/releases/ACTIVE.md`
-- **Preconditions:** T-010-14 (invariants define the target state).
+- **Write set:** `specs/releases/v0.1.9/**` (CLOSURE.md), `specs/_archive/releases/` (renames via git mv — request devops/operator), mapping README
+- **Preconditions:** T-010-14 (invariants define the target state). ACTIVE.md → v0.1.10 already done at T-010-00 (release-start split, arch A5) — not part of this task.
 - **Acceptance (AC-R6-03):** v0.1.9 CLOSURE.md authored from implemented evidence (19 tasks, SHAs); v0.1.9 archived; `_archive/releases/v0.2.0/v0.1.{6..9}` renamed non-colliding + mapping README; `dadaia specs doctor` exit 0 with the new invariants active.
 - **Parallelism:** PE-track; does not block code tracks.
 

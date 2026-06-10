@@ -80,7 +80,10 @@ therefore execute for in-repo paths — they are no longer dead code.
   per ACTIVE.md) is evaluated and blocks outside those phases.
 - FR-R1-03: `repos/<slug>/specs/_archive/**` → FROZEN; Write/Edit blocked.
 - FR-R1-04: `repos/<slug>/specs/releases/**` and all other in-repo paths → MUTATING
-  (lease-acquiring), unchanged.
+  (lease-acquiring), unchanged. A `ctx_rel` matching no class NEVER falls through to
+  UNGATED: no class match ⇒ MUTATING. In-repo production source
+  (`repos/<slug>/src/**`, `repos/dadaia-workspace/dadaia_workspace/**`) and in-repo
+  `specs/<other>` (e.g. `repos/<slug>/specs/constitution.md`) are MUTATING.
 - FR-R1-05: workspace-root paths (`specs/bugs/`, `.dadaia/reports/`, etc.) classify
   identically to pre-change behavior (no regression).
 - FR-R1-06: **matrix tests** — every class × {workspace-root, in-repo} × {default slug,
@@ -137,7 +140,9 @@ is alive. `lease.py:16-19` docstring claims renewal "on every PreToolUse" — fa
 - FR-R2-05: **two-actor concurrency test** (real OS processes, file rendezvous,
   generalizing `tests/e2e/test_two_process_denial.py`): holder busy past TTL while a
   second actor (i) writes ADDITIVE — lock-file history shows the holder never changed;
-  (ii) attempts MUTATING — blocked while the holder process is alive.
+  (ii) attempts MUTATING — blocked while the holder process is alive; (iii) two
+  contexts mutating disjoint repos concurrently — no cross-block; (iv) dead-holder
+  takeover e2e — the holder process really exits, foreign acquire TAKEOVERs.
 
 ### WS-R3 — Session-identity consolidation (one module, four stores collapsed)
 
@@ -180,7 +185,9 @@ the CLI forces the operator to choose a mode that has no effect.
 - Part B (gate): mode resolution order: (1) `DADAIA_MODE` env fast-path override;
   (2) session record `mode` via session_identity; (3) default IMPLEMENTATION.
   When mode resolves to READ/BOUND_READ: the session is **non-acquiring** — MUTATING
-  writes are blocked with a message that never instructs rebinding; ADDITIVE/UNGATED
+  writes are blocked with a message that never auto-instructs rebinding mid-flow; it
+  MAY name `dadaia context bind <ctx> --mode implementation` as the documented path to
+  write rights (distinct from the banned auto-rebind nag); ADDITIVE/UNGATED
   follow their normal policies; PROTECTED stays fail-closed.
 - Missing-mode sessions (no bind, no env — every plain harness session) default to
   IMPLEMENTATION and may acquire a **free** lease, but may never TAKEOVER from a
@@ -203,9 +210,12 @@ the CLI forces the operator to choose a mode that has no effect.
 1. **Harness-env fixture contract.** New fixtures `claude_hook_env()` / `codex_hook_env()`
    contain ONLY what each harness actually provides to hook subprocesses (pinned once,
    documented in the fixture docstring with the verification source). All hook/gate/
-   lease tests run hooks through these fixtures. A contract test (residue grep) fails
-   any test under `tests/**/gate|hooks|spec_context/**` that `setenv`s
-   `DADAIA_SESSION_ID`/`DADAIA_PERSONA`/`DADAIA_MODE` outside the fixtures' allowlist.
+   lease tests run hooks through these fixtures. Hook BEHAVIOR tests in
+   `tests/**/hooks|gate/**` MUST invoke hooks via the subprocess runner helper; a
+   contract test flags direct hook-module import+call in those suites (closes the
+   `os.environ.update` evasion). The env-contract grep covers the whole `DADAIA_*`
+   namespace with an explicit allowlist (e.g. `DADAIA_CONTEXT`, an operator-shell var),
+   failing any test that `setenv`s a non-allowlisted `DADAIA_*` outside the fixtures.
 2. **Two-actor / multi-context tier + fixture matrix.** The two-actor pattern of
    FR-R2-05 becomes a reusable helper; gate/lease/renderer tests parametrize over
    {1, 2 contexts} × {default, non-default slug} × {seeded, empty}.
@@ -219,7 +229,10 @@ the CLI forces the operator to choose a mode that has no effect.
 
 **Functional requirements:**
 - FR-R5-01: `claude_hook_env()`/`codex_hook_env()` exist and are the only env source
-  for hook subprocess tests; enforcement contract test present.
+  for hook subprocess tests; hook behavior tests in `tests/**/hooks|gate/**` invoke
+  hooks via the subprocess runner helper; contract tests present for (a) out-of-fixture
+  `DADAIA_*` setenv (full namespace, explicit allowlist) and (b) direct hook-module
+  import+call in those suites.
 - FR-R5-02: fixture-matrix parametrization applied to the gate/lease suites.
 - FR-R5-03: zero remaining assertions pinning the retired bash-hook behavior or the
   root-only ADDITIVE assumption (residue grep test).
@@ -331,10 +344,14 @@ constitution is REJECTED (F4).
   consistency contract at introduction time. Concrete contracts shipped: MODEL_MAP↔
   PRICING_TABLE key equality; retired-bash-hook residue grep; import-linter ignore-list
   **cap** (CI fails if `setup.cfg` ignore edges grow beyond the current count, F10).
+- **Lifecycle-asymmetry policy (audit §6.5):** every feature carries per-feature
+  delete/orphan + dirty-input + missing-dependency coverage, or a justified absence,
+  documented in the same policy home (`specs/AGENTS.md` + `tests/contract/` README;
+  folded into T-010-27).
 
 ---
 
-## Decisions (stated, per audit evidence)
+## Decisions (D-1..D-6 ALL ratified by the architect at SPEC review, 2026-06-10)
 
 - **D-1 Bash gate retired, not canonicalized.** The shell hook quartet is an unexecuted
   dual implementation requiring hand byte-parity, already drifted (S-2, C-9, DRIFT-6);
@@ -352,8 +369,8 @@ constitution is REJECTED (F4).
   "missing ⇒ non-acquiring" would block every plain harness session (none has a bind
   record) and violate the flow-never-stops law. Adopted composition: missing mode may
   acquire a **free** lease; the no-steal property for held leases comes from the R2
-  liveness probe; only explicit READ blocks MUTATING. Flagged for operator/architect
-  confirmation at SPEC review.
+  liveness probe; only explicit READ blocks MUTATING. Ratified by the architect at
+  SPEC review.
 - **D-4 v0.1.9 closed retroactively inside v0.1.10** (R6 ledger repair), not reopened.
 - **D-5 Archive id collisions fixed by renaming** the `v0.2.0` internal milestone dirs
   (with a mapping README), not by history rewrite.
@@ -413,31 +430,45 @@ Each AC is reviewer-verifiable (file:line / named test / command + expected outp
 
 - **AC-R1-01** Matrix test `tests/unit/features/spec_context/test_gate_policy.py`
   covers {ADDITIVE, MEMORY, FROZEN, MUTATING, PROTECTED} × {root, in-repo} ×
-  {default, non-default slug}; all pass (FR-R1-01..06).
+  {default, non-default slug}, with an in-repo variant per class, including rows for
+  in-repo production source (`repos/<slug>/src/**`, `dadaia_workspace/**`) and in-repo
+  `specs/<other>` (e.g. `repos/<slug>/specs/constitution.md`) → MUTATING, never
+  UNGATED; all pass (FR-R1-01..06).
 - **AC-R1-02** Full-pipeline incident regression (FR-R1-08) passes in a dual-session
   fixture; lock record asserted on file content, not return value.
 - **AC-R1-03** Symlink regression (FR-R1-07) passes; named test referenced in the
   `gate-fpath-…` bug closure.
 - **AC-R2-01** PostToolUse heartbeat test runs the hook as a subprocess under
   `claude_hook_env()` (no hand-planted `DADAIA_SESSION_ID`) and observes a fresher
-  lease heartbeat (FR-R2-01/02).
+  lease heartbeat (FR-R2-01/02); green on the Windows/macOS CI legs too.
 - **AC-R2-02** TTL-stale + alive holder ⇒ foreign `lease.acquire` blocked; TTL-stale +
-  dead pid ⇒ TAKEOVER (FR-R2-03), with injected clock + fake/real pid.
+  dead pid ⇒ TAKEOVER (FR-R2-03), with injected clock + fake/real pid; liveness tests
+  green on the Windows/macOS CI legs (platform-seamed pid probe; no Linux-only
+  acceptance).
 - **AC-R2-03** Holder renews past TTL; concurrent foreign acquire cannot interleave a
   stale overwrite (FR-R2-04, property/stress test on the lock file history).
 - **AC-R2-04** Two-actor e2e (FR-R2-05): "a live holder never loses the lease; an
-  ADDITIVE write never appears in the lock record" asserted on lock-file history.
+  ADDITIVE write never appears in the lock record" asserted on lock-file history;
+  plus disjoint-repos no-cross-block and dead-holder real-process takeover scenarios;
+  green on the Windows/macOS CI legs.
 - **AC-R3-01** `session_identity.py` is the only module touching session stores
   (residue grep contract test); coherence contract test passes (FR-R3-02).
 - **AC-R4-01** `dadaia context bind <ctx>` (no `--mode`) exits 0; session record has
   `mode: read`; gate blocks a MUTATING write from that session **with no env vars set**
-  (harness-real path); block message contains no rebind instruction (FR-R4-01..03).
+  (harness-real path); block message contains no auto-rebind nag — it MAY name
+  `bind --mode implementation` as the documented path to write rights (FR-R4-01..03).
 - **AC-R4-02** No-bind/no-env session: MUTATING write on a free lease proceeds
   (FR-R4-04).
-- **AC-R5-01** `claude_hook_env()`/`codex_hook_env()` fixtures exist; enforcement
-  contract test fails on out-of-fixture `DADAIA_*` setenv in hook suites.
-- **AC-R5-02** The four qa-named drift-ratifying tests are removed/replaced; residue
-  grep proves no root-only-ADDITIVE or bash-hook pinning assertions remain.
+- **AC-R5-01** `claude_hook_env()`/`codex_hook_env()` fixtures exist; contract tests
+  fail on (a) out-of-fixture `DADAIA_*` setenv (full namespace, explicit allowlist) and
+  (b) direct hook-module import+call in `tests/**/hooks|gate/**`; new hook-subprocess
+  tests green on the Windows/macOS CI legs.
+- **AC-R5-02** The four qa-named drift-ratifying tests are removed/replaced, evidenced
+  by the named file:lines removed (`test_lease_property.py:74`,
+  `test_lease_activity_exemption.py:27`, `test_post_gate_heartbeat.py:79`,
+  `test_pricing.py:47,212`/`test_model_mapping.py:25`) recorded in CLOSURE; AC-R1-01's
+  matrix includes an in-repo variant per class (mechanical replacement for the
+  unmechanical residue grep); bash-hook pinning covered by T-010-13's residue contract.
 - **AC-R5-03** 7/7 open bugs each have a named regression test (table in CLOSURE).
 - **AC-R6-01** Bash quartet absent from `public/scripts/`, manifest, and projections;
   `dadaia public doctor` exit 0; `pre-push-ci-gate.sh` present.
