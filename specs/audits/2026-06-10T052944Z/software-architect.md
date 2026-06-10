@@ -369,3 +369,87 @@ lease-CLI acquire; (3) bind-record GC decay note + the NF-3 ownership contract t
 All small; none reopens the lease-theft family.
 
 *software-architect · rc-2 delta · evidence-only · no production files modified.*
+
+---
+
+## rc-2 final (commit 9ca2d2a, verified 2026-06-10)
+
+> Final delta over the rc-2 lane (8.5, blocking on NF-4). Same rubric. No shell in this
+> session: code/test verification by inspection. The full-suite green run is
+> coordinator-supplied evidence — `pytest -p no:cacheprovider -q` → 2795 passed, 8
+> skipped, 1 xpassed, 0 failures, exit 0 (includes the two-actor e2e and the
+> hook-acquired-holder scenario); ruff format/check + mypy --strict clean; doctors 0 —
+> accepted as the green run the rc-2 appendix demanded.
+
+### NF-4 — RESOLVED at root cause (HIGH → closed)
+
+- `hooks/sdd_gate.py:182-205` — `_incumbent_is_stale` now consumes the canonical kernel
+  predicate: a divergent holder defeats the incumbent only when
+  `not lock_liveness.is_stale(holder, pid_probe=_build_pid_probe())` (`:205`). One
+  liveness definition (TTL floor + pid veto, `core/lock_liveness.py:47-134`) used by both
+  the MUTATING path and the mode guard — the "second divergent liveness definition"
+  cohesion debt is gone, and the guard's docstring and `architecture.md:218` ("holder
+  **vivo**") are now TRUE in code. This is the exact one-predicate fix the rc-2 lane
+  prescribed, not a workaround.
+- **Soundness (adversarial):** (a) dead/TTL-stale leftover → `is_stale` True → guard
+  False → fresh READ bind honored — the canonical review flow is fixed. (b) TTL-fresh
+  divergent holder → live → incumbent voided → no downgrade; the live holder is further
+  protected by the lease itself. (c) busy >TTL live holder → pid veto keeps it live →
+  still safe from mid-flight downgrade (why the canonical predicate, not TTL-only, was
+  required). (d) corrupt record → stale → READ honored — fails toward operator intent.
+  (e) probe construction failure or probe error → TTL verdict — identical degradation
+  posture to the MUTATING path (`lock_liveness.py:119-128`, `sdd_gate.py:61-62`).
+- **No recursion / perf trap:** `_build_pid_probe` only imports and constructs
+  `OsProcessProbe` (no I/O, no lease or gate re-entry); the guard executes only on the
+  env-miss → self-record-miss → incumbent-present resolution path, costing one record
+  read plus at most one pid syscall on the TTL-stale branch. Cosmetic nit: the probe is
+  constructed twice per hook run (`sdd_gate.py:205` and `:290`) — a single shared
+  instance would do; zero behavioral impact, fold into NF-3 cleanup.
+- **Falsifying tests shipped** (`tests/unit/hooks/test_sdd_gate.py`): dead-leftover →
+  READ honored at unit level (`:465-485`), the same scenario through the REAL hook
+  subprocess proving the MUTATING write emits a block envelope and READ is enforced
+  end-to-end (`:488-513`), and live-divergent override preserved (`:516-534`). Nit: the
+  "dead" record uses `pid: 0` (the no-veto legacy branch, `lock_liveness.py:122-123`)
+  rather than a real reaped pid (probe-False branch); both yield the TTL verdict and e2e
+  scenario (v) already exercises probe-alive/probe-dead with the real `OsProcessProbe`,
+  so coverage is acceptable.
+
+### Residuals — confirmed non-blocking backlog (not release blockers)
+
+- **MEDIUM — probe-less lock-steal CLI side door** (`cli/commands/lock.py:51`,
+  `lease._main` acquire `lease.py:576`): correctly characterized as backlog. Pre-existing
+  (not an rc regression), reachable only by a deliberate operator-level CLI invocation
+  outside the gated harness write path, and `lock steal` is already banned from agent
+  messaging by the forbidden-law. It does not weaken the harness-flow no-steal guarantee
+  this release ships. Backlog: thread the probe or delete `lock steal`.
+- **LOW — bind-record GC decay** (`context.py:384` ttl 300 s; doctor GC
+  `spec_context/doctor.py:465,536`): correctly LOW. GC is operator-run, decay fails
+  toward the default-permissive D-3 posture, no live session is harmed, and the
+  incumbent pointer narrows the practical window. Backlog: exempt or renew bind records.
+- Carried LOWs unchanged: NF-3 ownership contract test, pid-reuse false-live (inherent
+  to pid-probe designs, GC-bounded), `getppid` shell-wrapper degradation (TTL-only =
+  pre-fix posture, never worse).
+
+### Review-gate verdicts (final)
+
+- **Root-cause gate: APPROVED.** NF-4 fixed inside the liveness predicate consumption
+  itself — the single canonical `is_stale` with the same injected probe — with falsifying
+  tests on both sides of the boundary (dead-leftover honored; live-divergent overrides).
+  No workaround anywhere in the rc-2/rc-3 chain; the lease-theft family (D1/D2/D3) is
+  closed at root cause end-to-end.
+- **Architecture-fidelity gate: APPROVED.** No remaining sentence ahead of the code:
+  `architecture.md:218` and the guard docstring now describe the implemented behavior.
+
+### FINAL SCORE (architecture lane, v0.1.10)
+
+| Axis | rc-2 | FINAL | Basis |
+|---|---|---|---|
+| Layering & cohesion | 9 | **9** | single liveness definition restored; probe wiring stays hook-owned; only the duplicate-probe-construction nit remains |
+| Abstraction honesty | 8 | **9** | the last overstated sentence (arch.md:218) is now true in code; docs, docstrings, and behavior converge |
+| Concurrency/locking foundation | 8 | **9** | READ common-path hole closed with the canonical predicate; busy-live-holder protection preserved; residuals are deliberate-CLI side doors only |
+| Spec/code/memory fidelity | 8.5 | **9** | code caught up to the doc; nothing overstated in either direction |
+| Process ledger integrity | 9 | **9** | unchanged |
+| Testability & regression discipline | 9 | **9** | the newly found blind spot got unit + real-subprocess falsifying tests; green run supplied (2795 pass, exit 0) |
+| **Overall** | **8.5** | **9.0 — APPROVED** | every blocker in this lane's history fixed at root cause with falsification; residual MEDIUM/LOW items are honest backlog and none reopens the lease-theft family |
+
+*software-architect · rc-2 final · evidence-only · no production files modified.*

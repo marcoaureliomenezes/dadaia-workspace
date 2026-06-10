@@ -95,15 +95,14 @@ O contrato de sidecar JSON entre agentes é versionado em `dadaia_workspace/publ
 Dependência| Versão| Camada| Justificativa
 ---|---|---|---
 typer| >=0.25 (extras=[all])| cli/| CLI framework com auto-completion e rich formatting
-rich| ^13| cli/| Pretty terminal output
+rich| >=13,<16| cli/| Pretty terminal output
 openpyxl| ^3.1| infrastructure/| Leitura de planilhas Excel (academy)
 pyyaml| ^6.0| infrastructure/ + features/| YAML frontmatter parsing (memory atoms, agents/skills/workflows); `yaml.safe_load` used by lint and catalog scripts
 jsonschema| ^4| features/specs/| JSON Schema validation; now used for `memory-frontmatter-v1.schema.json` validation in `lint-memory-atoms.py`. The per-atom YAML schemas (memory-structured-source-v1) were deleted; `jsonschema` remains for frontmatter validation.
 mistune| ~=3.0| features/panel/views/| Markdown → HTML render in-memory for the memory viewer (D-1, memory-markdown-source-v1). Pure-Python, zero transitive deps. Custom hooks: mermaid fence, `wikilink`, sanitiser.
 types-PyYAML| >=6| dev| Type stubs para mypy
+jinja2| ^3.1| features/specs/| Dependência **direta** de runtime: `features/specs/scaffolder.py` renderiza os templates de scaffold SDD via `SandboxedEnvironment`. NÃO é usada para memory rendering (memory atoms são `.md` renderizados por mistune).
 import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` declares `features → infrastructure` import ban and `core → OS-primitive modules` ban; runs in CI `lint` job via `lint-imports`. Zero runtime impact.
-
-**Jinja2** (transitive dependency) is no longer used for memory atom rendering. The `memory-*.html.j2` templates and `dadaia memory render` CLI were deleted in memory-markdown-source-v1. Jinja2 may remain as a transitive dep of other packages.
 
 **Pins de tooling do workspace (não são deps do projeto):** `poetry` ≥ 2.3.4 e
 `dulwich` ≥ 1.2.5 nos ambientes de operação (CVEs nomeados em comentário no
