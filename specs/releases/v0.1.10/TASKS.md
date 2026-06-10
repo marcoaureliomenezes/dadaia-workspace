@@ -1,291 +1,234 @@
-# TASKS: v0.1.10 — Lock Correctness + Model Registry
+# TASKS: v0.1.10 — Concurrency Kernel + Workspace Truth
 
 **Status:** Em revisão
 **Release ID:** v0.1.10
 **Owner:** product-engineer
-**Created:** 2026-06-10
+**Created:** 2026-06-10 (revised same day for the R1–R8 extension)
 
-Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
+Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
-Parallel execution is safe across tracks (Track A / Track B / Track C) because each
-track touches disjoint file sets. Within Track A, WS-3B depends on WS-3A (coordinate
-edits in `sdd_gate.py` and `context_cmd.py`). Track B is sequential (WS-4B depends on
-WS-4A). Track C tasks are independent of all others.
-
----
-
-## Pre-work — verification
-
-### T-0110-VERIFY-01 — Confirm opencode-parity bug superseded by v0.1.8
-
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:** none (read-only verification)
-- **Preconditions:** none
-- **Acceptance:** Run
-  `pytest -p no:cacheprovider -q tests/e2e/features/test_opencode_parity_hardening.py::TestPluginProjection::test_sdd_gate_plugin_projected`
-  at HEAD. Test passes. Confirm line 129 reads `assert "sdd-spec-gate.sh" not in text`.
-  Record the passing pytest output as evidence in CLOSURE. Close bug
-  `opencode-parity-test-asserts-stale-bash-script-ref` as superseded-by-v0.1.8.
-- **Parallelism:** Independent; can run immediately.
-- **Done criterion:** Evidence (pytest pass) captured; bug record updated with
-  `status: Closed` and `superseded_by: v0.1.8`.
+Tracks K (kernel), T (tests), R (registries/push-gates), S (security), D (truth) are
+file-disjoint and safe to run in parallel **across** tracks. Within a track, respect
+the listed preconditions. Hard spine: T-010-10 → 03 → 07 → {04,05,08} → {09,06} →
+11 → 12; T-010-16 runs last (CLOSURE phase). Maximum one `[-]` per owner unless tasks
+are in different tracks (disjoint write sets declared here).
 
 ---
 
-### T-0110-VERIFY-02 — Confirm claude-fable-5 workaround applied (operator gate)
+## Pre-work
 
-- **Status:** [ ]
-- **Owner:** software-engineer (verification only)
-- **Write set:** none (read-only verification)
-- **Preconditions:** SATISFIED — operator applied the workaround 2026-06-10: `MODEL_MAP`
-  has `"claude-fable-5": "gpt-5.5"`, `PRICING_TABLE` has `ModelPricing(10.00, 50.00,
-  12.50, 1.00, date(2026,6,1))`, `test_model_mapping.py` updated to 5 entries, all targets
-  reprojected, doctor exit 0. Five agents (product-engineer, software-engineer, qa-engineer,
-  ai-engineer, project-auditor) run `claude-fable-5`. 27 catalog tests green.
-- **Acceptance:**
-  ```
-  python -c "from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP; assert 'claude-fable-5' in MODEL_MAP"
-  python -c "from dadaia_workspace.features.telemetry.pricing import PRICING_TABLE; assert 'claude-fable-5' in PRICING_TABLE"
-  ```
-  Both pass. Grep confirms 5 agent `.md` files have `model: claude-fable-5`.
-- **Parallelism:** Precondition satisfied; T-0110-05 may proceed once this task is verified.
-- **Done criterion:** Both assertions pass; grep evidence recorded.
+### [ ] T-010-01 — VERIFY: opencode-parity bug superseded by v0.1.8
+- **Owner:** software-engineer · **Maps:** bug `opencode-parity-test-asserts-stale-bash-script-ref`, DRIFT-7
+- **Write set:** `specs/bugs/opencode-parity-test-asserts-stale-bash-script-ref.md` (frontmatter only)
+- **Acceptance:** `pytest -p no:cacheprovider -q tests/e2e/features/test_opencode_parity_hardening.py::TestPluginProjection::test_sdd_gate_plugin_projected` passes at HEAD; line 129 reads `assert "sdd-spec-gate.sh" not in text`. Bug set `status: Closed`, `superseded_by: v0.1.8`; pytest output captured for CLOSURE.
+- **Parallelism:** independent; run first.
+
+### [ ] T-010-02 — VERIFY: claude-fable-5 registry precondition
+- **Owner:** software-engineer · **Maps:** bug `model-catalog-modelmap-pricing-drift-no-registry` (precondition)
+- **Write set:** none (read-only)
+- **Acceptance:** `claude-fable-5` present in `MODEL_MAP` and `PRICING_TABLE` (python -c asserts); 5 agent `.md` files carry `model: claude-fable-5`. Evidence recorded.
+- **Parallelism:** independent; gates T-010-23.
 
 ---
 
-## Track A — Lock correctness (software-engineer)
+## Track K — Concurrency kernel
 
-### T-0110-01 — WS-1: Context-relative ADDITIVE classifier (gate_policy.py)
+### [ ] T-010-10 — R5: harness-env fixture contract (FIRST in track)
+- **Owner:** software-engineer · **Maps:** CONF-6, qa defect 2, qa §6.1; bug `lease-stolen…` D3 (test side)
+- **Write set:** `tests/fixtures/harness_env.py` (new) or `tests/conftest.py`, `tests/contract/test_harness_env_contract.py` (new)
+- **Preconditions:** SPEC+PLAN Aprovado.
+- **Acceptance (AC-R5-01):** `claude_hook_env()` / `codex_hook_env()` fixtures with pinned-minimal env + subprocess hook-runner helper exist; contract test fails any hook/gate/lease test that setenvs `DADAIA_SESSION_ID|DADAIA_PERSONA|DADAIA_MODE` outside the fixtures; existing suites still green.
+- **Parallelism:** independent of all other tracks; blocks T-010-03/04/05/09 acceptance.
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/features/spec_context/gate_policy.py`,
-  `tests/unit/features/spec_context/test_gate_policy.py` (new sibling in existing
-  `spec_context/` test directory; use the dual-session clock-injection fixture pattern
-  from `tests/unit/features/spec_context/test_lease_activity_exemption.py`)
-- **Preconditions:** SPEC + PLAN Aprovado.
-- **Acceptance:** AC-LOCK-01 and AC-LOCK-02.
-  - Unit: `classify_path("repos/dadaia-workspace/specs/bugs/foo.md")` returns `PathClass.ADDITIVE`.
-  - Unit: `classify_path("repos/dadaia-workspace/specs/backlog/bar.md")` returns `PathClass.ADDITIVE`.
-  - Unit: `classify_path("repos/dadaia-workspace/specs/audits/20260610T000000Z-abc1234/foo.md")` returns `PathClass.ADDITIVE`.
-  - Unit: `classify_path("repos/dadaia-workspace/specs/releases/v0.1.10/SPEC.md")` returns `PathClass.MUTATING` (context-relative short-circuit does not match; falls through to workspace-relative classifier).
-  - Unit: `classify_path("repos/dadaia-workspace/specs/memory/architecture.md")` returns `PathClass.MEMORY` (same fall-through).
-  - Unit: `classify_path("specs/bugs/foo.md")` returns `PathClass.ADDITIVE` (workspace-root ADDITIVE unaffected).
-  - **Full-pipeline regression (AC-LOCK-02):** session A acquires lease; clock injected
-    to advance 130 s with no Write/Edit; session B calls `gate_policy.evaluate` end-to-end
-    on `repos/dadaia-workspace/specs/bugs/<slug>.md`; assert ALLOW returned AND
-    `lease.read_record()` still shows session A as holder. Dual-session fixture required.
-  - **Bash-vs-Python parity:** For in-repo ADDITIVE paths, the bash gate (`sdd-spec-gate.sh`)
-    must not acquire a lease (returns ALLOW without lease modification). Add a parity
-    assertion verifying bash gate behavior matches Python gate for this path class.
-  - `pytest` passes (0 regressions).
-- **Parallelism:** Independent of T-0110-02; file-disjoint. May run concurrently.
+### [ ] T-010-03 — R1: classifier re-root — full class×location taxonomy
+- **Owner:** software-engineer · **Maps:** CONF-1, arch F1, sec F-1, ai D-3/D-4/D-5/C-1; bugs `lease-stolen…` (D1), `gate-fpath-not-canonicalized-before-classifier` (Python surface)
+- **Write set:** `dadaia_workspace/features/spec_context/gate_policy.py`, `tests/unit/features/spec_context/test_gate_policy.py`, `tests/integration/gate/` (matrix + symlink + incident regression)
+- **Preconditions:** T-010-10.
+- **Acceptance (AC-R1-01/02/03):** FR-R1-01..08 — matrix tests class×{root,in-repo}×{default,non-default slug}; in-repo MEMORY phase-rule and FROZEN block exercised (`gate_policy.py:90-93,137-143` no longer dead); symlink→MEMORY regression test named; full-pipeline incident regression (dual-session, injected clock, ALLOW + holder unchanged in lock record); full gate integration matrix green.
+- **Parallelism:** spine; before T-010-07.
 
----
+### [ ] T-010-07 — R3: session_identity consolidation module
+- **Owner:** software-engineer · **Maps:** arch F7, CONF-1/2 substrate
+- **Write set:** `dadaia_workspace/features/spec_context/session_identity.py` (new), `dadaia_workspace/features/spec_context/lease.py` (pointer reads), `dadaia_workspace/hooks/ctx_inject.py`, `tests/unit/features/spec_context/test_session_identity.py` (new), `tests/contract/test_session_store_ownership.py` (new)
+- **Preconditions:** T-010-03.
+- **Acceptance (AC-R3-01):** FR-R3-01..03 — single owner module; residue grep contract proves no other module opens `sessions/runtime/*.ptr` / `sessions/<id>.json`; coherence contract (lock holder vs incumbent vs session record); legacy artifacts ignored-and-superseded; pytest green.
+- **Parallelism:** spine; before T-010-04/05/08.
 
-### T-0110-02 — WS-2: PostToolUse lease heartbeat renewal (sdd_post_gate.py)
+### [ ] T-010-04 — R2a: PostToolUse heartbeat, harness-native session id
+- **Owner:** software-engineer · **Maps:** CONF-2, arch F2, ai D-12; bug `lease-stolen…` (D2/D3)
+- **Write set:** `dadaia_workspace/hooks/sdd_post_gate.py`, `tests/unit/hooks/test_sdd_post_gate.py`
+- **Preconditions:** T-010-07, T-010-10.
+- **Acceptance (AC-R2-01):** FR-R2-01/02 — session id from stdin payload (`resolve_session_id`), env as override only; renew called outside any session-file guard; subprocess test under `claude_hook_env()` (no hand-planted env) observes fresher lease heartbeat after a simulated Bash PostToolUse; fail-open exit 0 on all errors; no-session-file variant passes.
+- **Parallelism:** parallel with T-010-05/08 (disjoint files).
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/hooks/sdd_post_gate.py`,
-  `tests/unit/hooks/test_sdd_post_gate.py`
-- **Preconditions:** SPEC + PLAN Aprovado.
-- **Acceptance:** AC-LOCK-03 and AC-LOCK-04.
-  - The `renew_heartbeat` call is placed OUTSIDE the session-file existence guard in
-    `sdd_post_gate.py` (no early return that skips renewal when `DADAIA_SESSION_ID` is
-    set and session file is absent).
-  - PostToolUse with `DADAIA_SESSION_ID=<holder>` updates `lease.read_record().heartbeat`.
-  - **No-session-file variant (AC-LOCK-03):** renewal occurs even when the session file
-    is absent — the holder's lease heartbeat is updated without a session file present.
-  - With injected clock advanced 130 s, the lease is not stale after PostToolUse fires
-    (holder can renew past TTL — the is_stale gate in `renew_heartbeat` must not block the
-    confirmed holder).
-  - A foreign write attempt after PostToolUse renewal gets `LockHeldError`.
-  - PostToolUse with unset `DADAIA_SESSION_ID` is a no-op (no error, returns 0).
-  - `pytest` passes.
-- **Parallelism:** Independent of T-0110-01 and T-0110-03. File-disjoint.
+### [ ] T-010-05 — R2b: pid-liveness probe before TAKEOVER + holder-safe renew
+- **Owner:** software-engineer · **Maps:** CONF-2, arch F2 (PID lesson restored), C-14
+- **Write set:** `dadaia_workspace/features/spec_context/lease.py`, `tests/unit/features/spec_context/test_lease_*.py`
+- **Preconditions:** T-010-07.
+- **Acceptance (AC-R2-02/03):** FR-R2-03/04 — lease record gains `pid`; TTL-stale+alive-probe ⇒ block (no TAKEOVER), TTL-stale+dead/absent-pid ⇒ TAKEOVER; probe via `core/lock_liveness.py` + `has_os_kill_liveness` seam with TTL fallback; confirmed holder renews past TTL; renew atomic vs foreign acquire (stress/property test on lock-file history — the `lease.py:379-394` race is fixed); docstring `lease.py:16-19` rewritten truthful; pytest green.
+- **Parallelism:** parallel with T-010-04/08.
 
----
+### [ ] T-010-08 — R4a: bind `--mode` optional; mode persisted in session record
+- **Owner:** software-engineer · **Maps:** CONF-3, arch F3; bug `context-bind-forces-mode-choice-on-operator`
+- **Write set:** bind CLI module (locate via grep `context bind` under `dadaia_workspace/cli/`), `tests/` CLI integration
+- **Preconditions:** T-010-07.
+- **Acceptance:** FR-R4-01/02 — `dadaia context bind <ctx>` (no `--mode`) exits 0, default `read`; explicit modes still work; bind writes `mode` into the session record via session_identity; pytest green.
+- **Parallelism:** parallel with T-010-04/05; before T-010-09.
 
-### T-0110-03 — WS-3A: `dadaia context bind` --mode optional (CLI)
+### [ ] T-010-09 — R4b: gate mode resolution; READ non-acquiring
+- **Owner:** software-engineer · **Maps:** CONF-3, ai D-10; bugs `context-bind-…`, `lease-stolen…` (read-session steal family)
+- **Write set:** `dadaia_workspace/hooks/sdd_gate.py`, `tests/unit/hooks/test_sdd_gate.py`
+- **Preconditions:** T-010-08, T-010-10.
+- **Acceptance (AC-R4-01/02):** FR-R4-03/04 — resolution order env→session-record→IMPLEMENTATION; READ ⇒ MUTATING blocked (no lease write, message without rebind instruction) and ADDITIVE allowed — verified under `claude_hook_env()` with **no** env vars (session-record path); both-absent ⇒ IMPLEMENTATION, free-lease acquire proceeds; PROTECTED unchanged; pytest green.
+- **Parallelism:** after T-010-08.
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/cli/context_cmd.py` (or whichever file implements `context bind`),
-  `tests/` (integration test for bind CLI)
-- **Preconditions:** SPEC + PLAN Aprovado. Locate the bind subcommand: grep `context bind`
-  in `dadaia_workspace/cli/` before editing.
-- **Acceptance:** AC-LOCK-05.
-  - `dadaia context bind dadaia-workspace` (no --mode) exits 0.
-  - Emitted env export includes `DADAIA_MODE=read` or equivalent safe default.
-  - `dadaia context bind dadaia-workspace --mode implementation` still works.
-  - `dadaia context bind dadaia-workspace --mode read` still works.
-  - `pytest` passes.
-- **Parallelism:** Should coordinate with T-0110-04 (same CLI area); recommend sequential.
+### [ ] T-010-06 — R2c: two-actor concurrency e2e (no-steal invariant)
+- **Owner:** software-engineer · **Maps:** CONF-2/CONF-6, qa §6.2; bug `lease-stolen…` (incident e2e)
+- **Write set:** `tests/e2e/test_two_actor_lease.py` (new) + shared rendezvous helper
+- **Preconditions:** T-010-04, T-010-05.
+- **Acceptance (AC-R2-04):** real OS processes + file rendezvous; holder busy >TTL: (i) foreign ADDITIVE write → ALLOW, lock-file history never names the foreign session; (ii) foreign MUTATING attempt → blocked while holder pid alive; invariant asserted on lock-file history, not return values.
+- **Parallelism:** after 04+05; final task of Track K.
 
 ---
 
-### T-0110-04 — WS-3B: Session-file READ-mode gate block (sdd_gate.py)
+## Track T — Test kernel completion
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/hooks/sdd_gate.py`,
-  `tests/unit/hooks/test_sdd_gate.py`
-- **Preconditions:** T-0110-03 complete (same context area).
-- **Acceptance:** AC-LOCK-06 and AC-LOCK-07.
-  - Mode resolution order verified: (1) `DADAIA_MODE` env var fast-path; (2) session-file
-    `mode` field lookup; (3) default `IMPLEMENTATION` when both absent.
-  - With `DADAIA_MODE=READ` in env (fast-path): Write to `specs/releases/v0.1.10/SPEC.md`
-    returns BLOCK with read-mode message.
-  - With session file recording `mode: READ` (no env var): Write to a MUTATING path
-    returns BLOCK.
-  - With `DADAIA_MODE` absent AND no session file: gate defaults to IMPLEMENTATION;
-    holder session's MUTATING writes proceed as today (AC-LOCK-06 default-path test).
-  - With mode READ: Write to `specs/bugs/foo.md` returns ALLOW (AC-LOCK-07).
-  - PROTECTED paths remain BLOCK regardless of `DADAIA_MODE`.
-  - `pytest` passes.
-- **Parallelism:** After T-0110-03.
+### [ ] T-010-11 — R5: fixture matrix + kill drift-ratifying tests
+- **Owner:** software-engineer · **Maps:** CONF-6, qa defects 1+3 (named tests)
+- **Write set:** `tests/unit/features/spec_context/test_lease_property.py`, `test_lease_activity_exemption.py`, `tests/unit/gate/test_post_gate_heartbeat.py`, gate/lease suites (parametrization)
+- **Preconditions:** T-010-03..09 merged.
+- **Acceptance (AC-R5-02):** root-only ADDITIVE assertions (`test_lease_property.py:74`, `test_lease_activity_exemption.py:27`) replaced by the R1 matrix; `test_post_gate_heartbeat.py:79` migrated to harness-env fixture; gate/lease suites parametrized {1,2 contexts}×{default,non-default slug}×{seeded,empty}; residue grep proves no remaining root-only/bash-pinning assertions.
+- **Parallelism:** after Track K.
+
+### [ ] T-010-12 — R5: escape-matrix regression coverage (7/7 bugs)
+- **Owner:** software-engineer · **Maps:** CONF-6, qa escape matrix; all 7 open bugs
+- **Write set:** `tests/` (named regression per bug where not already created in K/R tracks), bug frontmatter (`status: Closed` + regression-test name)
+- **Preconditions:** T-010-06, T-010-11, T-010-23..26.
+- **Acceptance (AC-R5-03):** table bug → named regression test, 7/7, recorded for CLOSURE; each bug file closed with the test reference (opencode bug already closed superseded in T-010-01).
+- **Parallelism:** late; after K+R tracks.
 
 ---
 
-## Track B — Model registry (software-engineer)
+## Track R — Registries + push gates
 
-### T-0110-05 — WS-4A: core/model_registry.py + refactor MODEL_MAP + PRICING_TABLE
+### [ ] T-010-23 — R8a: core/model_registry.py single source
+- **Owner:** software-engineer · **Maps:** CONF-9, arch cluster F; bug `model-catalog-modelmap-pricing-drift-no-registry`
+- **Write set:** `dadaia_workspace/core/model_registry.py` (new), `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py`, `dadaia_workspace/features/telemetry/pricing.py`, their unit tests
+- **Preconditions:** T-010-02.
+- **Acceptance (AC-R8-01 part):** `ModelEntry{claude_id,codex_id,pricing:list[ModelPricing] dated append-only,tier}`; `MODEL_MAP`/`PRICING_TABLE` derived views (most-recent row); haiku `claude-haiku-4-5-20251001` in both; `claude-fable-5` row (10.00/50.00/12.50/1.00, 2026-06-01); contradictory pins in `test_pricing.py:47,212` vs `test_model_mapping.py:25` replaced by cross-table key-equality contract test; mypy --strict + import-linter + pytest green.
+- **Parallelism:** independent of K.
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/core/model_registry.py` (new),
-  `dadaia_workspace/infrastructure/runtime_transforms/model_mapping.py`,
-  `dadaia_workspace/features/telemetry/pricing.py`
-- **Preconditions:** T-0110-VERIFY-02 verified (precondition satisfied). SPEC + PLAN Aprovado.
-- **Acceptance:** AC-MODEL-01, AC-MODEL-02.
-  - `core/model_registry.py` exists and defines `ModelEntry` (with `pricing: list[ModelPricing]`)
-    and `_REGISTRY`.
-  - `ModelPricing` moved to `core/` (or re-exported from `core/`); `pricing.py` imports
-    from `core/`.
-  - `MODEL_MAP` and `PRICING_TABLE` key sets are identical (both derived from registry).
-  - `PRICING_TABLE` uses the most-recent `ModelPricing` row per model.
-  - `PRICING_TABLE` contains `claude-haiku-4-5-20251001` (not `claude-haiku-3-5`).
-  - `PRICING_TABLE` contains `claude-fable-5` with correct pricing row.
-  - `pytest` passes. `mypy --strict` passes. `import-linter` passes.
-- **Parallelism:** After T-0110-VERIFY-02. Independent of Track A.
+### [ ] T-010-24 — R8b: public doctor model-resolution check
+- **Owner:** software-engineer · **Maps:** CONF-9, ai C-8 (mechanical half)
+- **Write set:** `features/public/` doctor module, `tests/unit/features/public/test_model_registry_doctor.py` (new)
+- **Preconditions:** T-010-23; `features/public/ → core` linter edge verified/added.
+- **Acceptance:** doctor errors on unknown `model:` frontmatter and on key-set desync; exits 0 with current fleet; pytest green.
 
----
+### [ ] T-010-25 — R8c: ci-preflight self-pollution fix
+- **Owner:** software-engineer · **Maps:** bug `ci-preflight-self-pollution-gate-never-passes` (HIGH)
+- **Write set:** `dadaia_workspace/features/ci_preflight/service.py`, `tests/conftest.py` (pollution-guard rescope), their tests
+- **Preconditions:** SPEC+PLAN Aprovado.
+- **Acceptance (AC-R8-02):** ruff invoked with `--no-cache`; mypy cache redirected under `.dadaia/tmp/`; conftest session-pollution guard does pre/post snapshot diff (fails only on session-created artifacts); unit fixtures per case; end-to-end `dadaia ci preflight` exit 0 on a clean tree, no cache dirs at repo root afterwards.
+- **Parallelism:** independent.
 
-### T-0110-06 — WS-4B: features/public/ doctor check for model frontmatter resolution
+### [ ] T-010-26 — R8d: pre-push gate workspace venv probe
+- **Owner:** software-engineer · **Maps:** arch F9; bug `pre-push-gate-cannot-locate-workspace-venv`
+- **Write set:** `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`, `tests/unit/public/test_pre_push_gate_venv_probe.py` (new)
+- **Preconditions:** SPEC+PLAN Aprovado.
+- **Acceptance (AC-R8-03):** probe order `DADAIA_BIN` → walk-up `<ws>/.dadaia/.venv/bin/dadaia` → poetry → repo `.venv`; fail-closed clear error when none; fake-tree unit tests for all four branches; stage/install/doctor after edit; manual smoke `git push` from `repos/dadaia-workspace/` recorded for CLOSURE.
+- **Parallelism:** independent.
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/features/public/doctor.py` (or the appropriate `features/public/`
-  doctor module — locate before editing),
-  `tests/unit/features/public/test_model_registry_doctor.py` (new; includes the
-  key-set parity assertion: `assert MODEL_MAP.keys() == set(PRICING_TABLE.keys())`)
-- **Preconditions:** T-0110-05 complete. Import-linter contract for
-  `features/public/ → core/model_registry` verified (add exception if needed before editing).
-- **Acceptance:** AC-MODEL-03, AC-MODEL-04.
-  - `dadaia public doctor` emits error for an agent frontmatter with `model: claude-nonexistent-99`.
-  - With all current agent frontmatter models in the registry (including `claude-fable-5`),
-    doctor exits 0 for the model-consistency check.
-  - `MODEL_MAP.keys() != set(PRICING_TABLE.keys())` triggers a doctor error (key-set
-    parity check in the doctor module, also asserted in `test_model_registry_doctor.py`).
-  - `pytest` passes.
-- **Parallelism:** After T-0110-05.
+### [ ] T-010-27 — R8e: consistency-contract policy + import-linter cap
+- **Owner:** software-engineer · **Maps:** CONF-9, arch F10, qa §6.4
+- **Write set:** `tests/contract/` (cap test, residue greps), `setup.cfg` (comment-pin), `specs/AGENTS.md` (policy paragraph)
+- **Preconditions:** T-010-23, T-010-13.
+- **Acceptance (AC-R8-04):** linter ignore-edge cap test fails on growth beyond recorded count; residue greps active (retired bash hooks, retired models); consistency-contract-at-introduction policy documented in `specs/AGENTS.md` + `tests/contract/` README.
+- **Parallelism:** after 23 and 13.
 
 ---
 
-## Track C — Shell gates (software-engineer)
+## Track S — Security tail
 
-### T-0110-07 — WS-5: sdd-spec-gate.sh FPATH realpath canonicalization
+### [ ] T-010-19 — R7a: `dead()` review gate + secret scan
+- **Owner:** software-engineer · **Maps:** CONF-8, sec F-5
+- **Write set:** `dadaia_workspace/features/spec_context/service.py`, related CLI, tests
+- **Acceptance (AC-R7-01):** untracked files + no `--commit` ⇒ refuse, push nothing; `--commit` ⇒ privacy-engine scan of staged content blocks on a planted secret; clean-tree `dead()` unchanged; pytest green.
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/public/scripts/sdd-spec-gate.sh`,
-  `tests/integration/test_sdd_gate_symlink.py` (new; pytest fixture creates symlink in
-  `tmp_path`, invokes shell gate via subprocess, asserts MEMORY classification — manual
-  smoke alone is insufficient per AC-GATE-01),
-  bash-vs-python gate parity check (can be part of `test_sdd_gate_symlink.py` or a
-  sibling test file) verifying that for in-repo ADDITIVE paths, the bash gate returns
-  ALLOW without lease modification.
-- **Preconditions:** SPEC + PLAN Aprovado.
-- **Acceptance:** AC-GATE-01.
-  - Automated integration test: symlink in `tmp_path` pointing to MEMORY path → shell gate
-    returns MEMORY (blocked), not UNGATED.
-  - Bash-vs-python parity test: `repos/<ctx>/specs/bugs/<slug>.md` → bash gate returns
-    ALLOW (no lease acquired).
-  - Canonicalization fallback order: `realpath --canonicalize-missing` → `readlink -f` →
-    Python one-liner (no silent `echo "$FPATH"` last resort).
-  - Existing gate integration tests pass (no regression on normal paths).
-  - After change: `dadaia public stage && dadaia public install --target all`.
-    `dadaia public doctor` exits 0.
-- **Parallelism:** Independent of all other tracks.
+### [ ] T-010-20 — R7b: privacy gate fail-closed baseline denylist
+- **Owner:** software-engineer · **Maps:** sec F-2
+- **Write set:** `dadaia_workspace/infrastructure/privacy_check.py`, packaged baseline data, tests
+- **Acceptance (AC-R7-02):** absent operator denylist ⇒ baseline structural scan still runs and flags planted IP/hostname; `[ok] public-privacy` emitted only after a real scan; pytest green.
+
+### [ ] T-010-21 — R7c: panel loopback auth + token-mode recheck
+- **Owner:** software-engineer · **Maps:** sec F-3, F-7
+- **Write set:** `dadaia_workspace/features/panel/handler.py`, `dadaia_workspace/features/panel/auth.py`, unit + e2e tests
+- **Acceptance (AC-R7-03):** tokenless loopback request to a sensitive API ⇒ 401 (contract pinned by test); `ensure_token` tightens a pre-existing 0o644 token to 0o600 (platform-seam aware); panel e2e green.
+
+### [ ] T-010-22 — R7d: dev dependency pins
+- **Owner:** software-engineer · **Maps:** sec F-6
+- **Write set:** `pyproject.toml`, `poetry.lock` (dev/build group)
+- **Acceptance:** `poetry` ≥ 2.3.4, `dulwich` ≥ 1.2.5; `pip-audit` clean of the 4 named CVEs; suite green.
 
 ---
 
-### T-0110-08 — WS-6: pre-push-ci-gate.sh workspace venv probe
+## Track D — Truth pass
 
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:**
-  `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`,
-  `tests/unit/public/test_pre_push_gate_venv_probe.py` (new; fake filesystem tree fixture
-  verifies: DADAIA_BIN override honored first; workspace-walk finds `.dadaia/.venv/bin/dadaia`
-  when DADAIA_BIN absent; error raised when no runner found — manual smoke alone is
-  insufficient per AC-PRE-PUSH-01)
-- **Preconditions:** SPEC + PLAN Aprovado.
-- **Acceptance:** AC-PRE-PUSH-01.
-  - Unit test (fake filesystem): DADAIA_BIN override is honored (highest priority).
-  - Unit test: workspace-walk probe finds `.dadaia/.venv/bin/dadaia`.
-  - Unit test: gate fails with clear error when no runner is found.
-  - Priority order in script: DADAIA_BIN → workspace-level venv → poetry → repo-relative
-    .venv.
-  - Manual smoke: in the self-hosting layout (workspace venv at
-    `<ws>/.dadaia/.venv/bin/dadaia`, no poetry on PATH), `git push` from
-    `repos/dadaia-workspace/` runs the CI suite without `--no-verify`.
-  - After change: `dadaia public stage && dadaia public install --target all`.
-    `dadaia public doctor` exits 0.
-- **Parallelism:** Independent of all other tracks.
+### [ ] T-010-13 — R6a: retire the bash hook quartet (Decision D-1)
+- **Owner:** software-engineer · **Maps:** ai S-1/S-2/C-9, DRIFT-6, sec F-4; bug `gate-fpath-not-canonicalized-before-classifier` (bash surface)
+- **Write set:** `dadaia_workspace/public/scripts/{sdd-spec-gate,sdd-post-gate,root-whitelist-gate,ctx-inject}.sh` (delete), `public/scripts/__pycache__/` (delete), manifest/staging/projection code+tests, `features/spec_context/gate_policy.py:1-8` docstring, `tests/contract/test_bash_hook_residue.py` (new)
+- **Preconditions:** SPEC+PLAN Aprovado.
+- **Acceptance (AC-R6-01):** quartet absent from canonical assets, staging manifest, and all projections; `pre-push-ci-gate.sh` retained; docstring names the Python hooks; residue grep contract green; `dadaia public stage && install --target all && public doctor` exit 0; bug closed referencing T-010-03's symlink regression + this retirement.
+- **Parallelism:** independent.
+
+### [ ] T-010-14 — R6b: specs-doctor ledger invariants + coherence backstop
+- **Owner:** software-engineer · **Maps:** CONF-5, arch F6, index §4; Decision D-2 backstop
+- **Write set:** `dadaia_workspace/features/specs/doctor.py`, `tests/unit/features/specs/test_doctor_ledger_invariants.py` (new)
+- **Preconditions:** SPEC+PLAN Aprovado.
+- **Acceptance (AC-R6-02):** five invariants (phase↔markers; CLOSURE-before-archive; unique release ids across releases+_archive; `^v\d+\.\d+\.\d+$` naming with legacy WARN; constitution file-ref resolution) + lease↔session coherence backstop; one failing fixture per invariant; pytest green.
+- **Parallelism:** independent; before T-010-15.
+
+### [ ] T-010-18 — R6c: Claude PreToolUse matcher scoping
+- **Owner:** software-engineer · **Maps:** ai C-12
+- **Write set:** `dadaia_workspace/infrastructure/runtime_config.py`, its tests
+- **Preconditions:** T-010-04 merged (PostToolUse breadth requirement known).
+- **Acceptance (AC-R6-05):** generated PreToolUse write-gate matcher scoped to `Edit|Write|MultiEdit|NotebookEdit`; PostToolUse matcher fires on all tools (heartbeat); UserPromptSubmit unchanged; regenerated `.claude/settings.json` validated by unit test; live instance reprojected.
+- **Parallelism:** after T-010-04.
+
+### [ ] T-010-15 — R6d: v0.1.9 retro-CLOSURE + archive repair (ledger truth)
+- **Owner:** product-engineer · **Maps:** CONF-5, DRIFT-5, arch F6; Decisions D-4/D-5
+- **Write set:** `specs/releases/v0.1.9/**` (CLOSURE.md), `specs/_archive/releases/` (renames via git mv — request devops/operator), mapping README, `specs/releases/ACTIVE.md`
+- **Preconditions:** T-010-14 (invariants define the target state).
+- **Acceptance (AC-R6-03):** v0.1.9 CLOSURE.md authored from implemented evidence (19 tasks, SHAs); v0.1.9 archived; `_archive/releases/v0.2.0/v0.1.{6..9}` renamed non-colliding + mapping README; `dadaia specs doctor` exit 0 with the new invariants active.
+- **Parallelism:** PE-track; does not block code tracks.
+
+### [ ] T-010-17 — R6e: AI-surface honesty rewrite (C-1..C-14)
+- **Owner:** ai-engineer · **Maps:** CONF-4, ai C-1..C-14, D-1/D-8 honesty, Decision D-2/D-6
+- **Write set:** `dadaia_workspace/public/{data/AGENTS.md, rules/*, skills/*, agents/*, schemas/handoff-v1.schema.json}` (canonical sources only; then stage/install/doctor)
+- **Preconditions:** Track K merged; T-010-13 done (surface must describe the fixed product).
+- **Acceptance (AC-R6-04):** contradiction table C-1..C-14 → commit/file:line complete; SDD-gate sections state real enforcement (path-class×lease×phase) with Aprovado/`[-]` as discipline (C-5); F8 allowlist claim corrected (C-2); handoff-first emitter executable (C-7, D-6); memory phases unified DEFINITION+CLOSURE (C-4); workflow inventory (C-3); report-header blockquotes (C-6/S-7); tier tables from registry (C-8); dispatch column reworded + PM-top-level precondition (C-10); hook ownership corrected (C-11); task-manager in English (C-13); determinism language scoped to write-tools, Bash bypass documented out of scope (D-2); `dadaia public doctor` exit 0 after reprojection.
+- **Parallelism:** after K + 13; parallel with T/R/S tails.
+
+### [ ] T-010-16 — R6f: memory + constitution truth rewrite (CLOSURE phase)
+- **Owner:** product-engineer · **Maps:** DRIFT-1/2/3, arch F4 (closure REJECT gate)
+- **Write set:** `specs/memory/architecture.md`, `specs/memory/product/<gate atom>.md`, `specs/memory/tech-stack.md`, `specs/constitution.md` (operator confirmation required)
+- **Preconditions:** ALL code tasks merged and reviewed; ACTIVE.md phase CLOSURE.
+- **Acceptance (AC-R6-04 memory half):** architecture.md concurrency section and constitution §0/§8 match the merged R1–R4 contract (reviewer cross-check vs code); no changelog sections; `dadaia specs doctor` exit 0; constitution diff explicitly confirmed by operator before commit.
+- **Parallelism:** LAST before release CLOSURE.md.
 
 ---
 
-## Final gate (all tracks)
+## Final gate
 
-### T-0110-09 — Release final gate
-
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Write set:** none (gate verification only)
-- **Preconditions:** All T-0110-01 through T-0110-08 complete.
-- **Acceptance:**
-  1. `pytest -p no:cacheprovider` — 0 failures.
-  2. `ruff format --check && ruff check` — clean.
-  3. `mypy --strict` — 0 errors, 0 unignored warnings.
-  4. `import-linter` — 0 violations.
-  5. `dadaia public doctor` — exit 0 (model-registry doctor check included).
-  6. `dadaia specs doctor` — exit 0.
-  7. **Registry key-set parity assertion** (pytest, in `tests/unit/features/public/test_model_registry_doctor.py`):
-     `assert MODEL_MAP.keys() == set(PRICING_TABLE.keys())` — replaces the grep check.
-  8. `pytest` on `test_model_registry_doctor.py` confirms `claude-haiku-3-5` is NOT a
-     key in `PRICING_TABLE` (haiku desync corrected).
-  9. `dadaia context bind dadaia-workspace` (no --mode) — exits 0.
+### [ ] T-010-28 — Release final gate
+- **Owner:** software-engineer · **Maps:** all
+- **Write set:** none (verification)
+- **Preconditions:** all tasks above `[x]` except T-010-16 (which follows in CLOSURE).
+- **Acceptance:** (1) `pytest -p no:cacheprovider` 0 failures; (2) `ruff format --check && ruff check --no-cache` clean; (3) `mypy --strict` clean; (4) import-linter 0 violations + cap respected; (5) `dadaia public doctor` exit 0; (6) `dadaia specs doctor` exit 0; (7) `dadaia ci preflight` exit 0 end-to-end on a clean tree; (8) two-actor e2e green; (9) `dadaia context bind dadaia-workspace` (no `--mode`) exit 0; (10) tokenless loopback panel request → 401.
 
 ---
 
 ## Public-asset propagation note
 
-Tasks T-0110-07 and T-0110-08 modify files under `dadaia_workspace/public/scripts/`.
-After either task, the implementer must run:
-
-```
-dadaia public stage && dadaia public install --target all
-dadaia public doctor
-```
-
-This is a required step before the final gate.
+T-010-13/17/26 modify `dadaia_workspace/public/**`. After each:
+`dadaia public stage && dadaia public install --target all && dadaia public doctor`
+(exit 0 required before the final gate).

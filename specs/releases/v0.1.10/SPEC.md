@@ -1,551 +1,501 @@
-# SPEC: v0.1.10 — Lock Correctness + Model Registry
+# SPEC: v0.1.10 — Concurrency Kernel + Workspace Truth (audit remediation R1–R8)
 
 **Status:** Em revisão
 **Release ID:** v0.1.10
 **Owner:** product-engineer
 **Created:** 2026-06-10
+**Revised:** 2026-06-10 (extended per audit `specs/audits/2026-06-10T010550Z/` — coverage verdict PARTIAL → full R1–R8)
 
 ---
 
 ## Objective
 
-Fix five open bugs covering two failure domains:
+One release that remediates the full 2026-06-10 audit so the next full audit scores
+≥9/10 on all six dimensions (spec fidelity 4→9, memory fidelity 4→9, architecture 6→9,
+test quality 5→9, AI-surface honesty 5→9, security 7→9). The prior v0.1.10 draft
+(lock correctness + model registry) is **extended, not replaced**: its WS-1/2/3/4/6
+content is preserved where the audit confirmed it correct, and broadened per the audit's
+remediation order R1–R8 (`index.md §6`).
 
-1. **Lock-correctness domain** — three compounding defects that allow a live lease to be
-   stolen by a non-owning session (CRITICAL bug `lease-stolen-by-additive-write-from-live-session`)
-   and two related ergonomic defects (`context-bind-forces-mode-choice-on-operator`,
-   `gate-fpath-not-canonicalized-before-classifier`).
+Scope: the concurrency/identity kernel (classifier, lease liveness, session identity,
+mode channel), the test-architecture kernel, the ledger/memory/constitution truth pass,
+the security tail, and anti-drift consistency contracts. All 7 open bugs are solved or
+explicitly superseded.
 
-2. **Model-registry domain** — two independent defects: the FPATH canonicalization gap in
-   the bash gate (included in lock-correctness workstream) and the dual-table haiku
-   desync + absent single registry (`model-catalog-modelmap-pricing-drift-no-registry`).
-
-One additional bug (`opencode-parity-test-asserts-stale-bash-script-ref`) is verified
-superseded by prior work and is closed here with that justification.
-
-One infrastructure bug (`pre-push-gate-cannot-locate-workspace-venv`) rounds out the
-release by making the pre-push CI gate actually executable in the self-hosting layout.
-
-No new features, no new CLI commands. Every change is correctness or infrastructure
-hardening.
+**Grill-me:** satisfied by the operator's explicit written directive + the audit corpus
+(4 lane reports + synthesis), per release-governance.
 
 ---
 
-## Bug inventory and resolution map
+## Bug inventory and resolution map (7/7)
 
-| Bug | Severity | Resolution |
-|-----|----------|-----------|
-| `lease-stolen-by-additive-write-from-live-session` | CRITICAL | Fixed by WS-1 (D1), WS-2 (D2), WS-3 (D3) |
-| `model-catalog-modelmap-pricing-drift-no-registry` | MEDIUM | Fixed by WS-4 |
-| `context-bind-forces-mode-choice-on-operator` | MEDIUM | Fixed by WS-3 |
-| `gate-fpath-not-canonicalized-before-classifier` | MEDIUM | Fixed by WS-5 |
-| `pre-push-gate-cannot-locate-workspace-venv` | MEDIUM | Fixed by WS-6 |
-| `opencode-parity-test-asserts-stale-bash-script-ref` | MEDIUM | Superseded by v0.1.8 (T-018-19); see §Bug supersession |
+| Bug | Sev | Resolution |
+|-----|-----|-----------|
+| `lease-stolen-by-additive-write-from-live-session` | CRITICAL | R1 (T-010-03), R2 (T-010-04/05/06), R3 (T-010-07), R4 (T-010-09) |
+| `ci-preflight-self-pollution-gate-never-passes` | HIGH | R8 (T-010-25) |
+| `gate-fpath-not-canonicalized-before-classifier` | MEDIUM | R1 symlink regression (T-010-03) + bash-gate retirement (T-010-13) |
+| `context-bind-forces-mode-choice-on-operator` | MEDIUM | R4 (T-010-08/09) |
+| `model-catalog-modelmap-pricing-drift-no-registry` | MEDIUM | R8 (T-010-23/24/27) |
+| `pre-push-gate-cannot-locate-workspace-venv` | MEDIUM | R8 (T-010-26) |
+| `opencode-parity-test-asserts-stale-bash-script-ref` | MEDIUM | Superseded by v0.1.8 — verified at HEAD (T-010-01); see §Bug supersession |
 
-### Bug-always-solved justification
+No bug is silently dropped (bug-always-solved law).
 
-Every picked bug is either fixed by a named workstream or explicitly superseded with
-verifiable evidence. No bug is silently dropped.
+### Bug supersession
 
----
-
-## Bug supersession
-
-### `opencode-parity-test-asserts-stale-bash-script-ref`
-
-**Status in codebase at v0.1.10 definition time:** Already corrected.
-
-Inspection of
-`tests/e2e/features/test_opencode_parity_hardening.py::TestPluginProjection::test_sdd_gate_plugin_projected`
-at HEAD shows line 129 reads:
-
-```python
-assert "sdd-spec-gate.sh" not in text
-```
-
-This is the correct post-ADR-7 assertion. The bug described a `not in` being written as
-`in`. The fix was delivered as part of the v0.1.8 implementation work (T-018-19 scope
-expansion or a follow-up edit). Task T-0110-VERIFY-01 verifies this is indeed the current
-HEAD state and formally closes the bug as superseded-by-v0.1.8.
-
-`superseded_by: v0.1.8`
+`opencode-parity-test-asserts-stale-bash-script-ref`: verified on disk at definition
+time — `tests/e2e/features/test_opencode_parity_hardening.py:129` reads
+`assert "sdd-spec-gate.sh" not in text` (the correct post-ADR-7 assertion). The fix
+shipped with v0.1.8. T-010-01 captures pytest evidence and closes the bug with
+`superseded_by: v0.1.8`. (The audit lane's "still asserts `in`" entry predates this
+verification and is refuted by HEAD.)
 
 ---
 
 ## Workstreams
 
-### WS-1 — Context-relative ADDITIVE classifier (D1 fix)
+### WS-R1 — Classifier re-root: context-relative class × location taxonomy
 
-**Root cause:** `gate_policy.classify_path` checks workspace-root relative paths.
-A bug file at `repos/dadaia-workspace/specs/bugs/<slug>.md` has workspace-relative path
-`repos/dadaia-workspace/specs/bugs/<slug>.md`, which starts with `repos/` and matches
-`MUTATING` before any ADDITIVE prefix is checked. The ADDITIVE prefixes (`specs/bugs/`,
-`specs/backlog/`, etc.) are never reached for in-repo paths.
+**Audit:** CONF-1 (CRITICAL, 4/4 lanes), arch F1, sec F-1, ai D-3/D-4/D-5/C-1, qa 17-D1.
 
-**Fix:** After the workspace-relative path is computed (and before the `case` classifier
-runs), strip the `repos/<slug>/` prefix to get the context-relative path, then check
-ADDITIVE against the context-relative path. This check is a **short-circuit only**: if
-the context-relative path matches an ADDITIVE prefix, classify `ADDITIVE` immediately —
-bypassing `lease.acquire` entirely. If the context-relative path does NOT match an
-ADDITIVE prefix, fall through to the unchanged workspace-relative classifier. This
-guarantees that all non-ADDITIVE in-repo paths (`repos/<ctx>/specs/releases/...`,
-`repos/<ctx>/specs/memory/...`, etc.) continue to be classified by the workspace-relative
-classifier as MUTATING, MEMORY, FROZEN, or PROTECTED — never as UNGATED.
+**Root cause:** `gate_policy.classify_path` (`gate_policy.py:37-46,84-98`) matches
+ADDITIVE/MEMORY/FROZEN prefixes against workspace-root-relative paths only; `repos/`
+matches MUTATING first (`:94`). The root-whitelist law forbids a root `specs/`, so the
+three classes are **unreachable in any compliant workspace**: in-repo bugs/backlog/audits
+acquire/steal the lease, in-repo memory bypasses the PE phase-lock, in-repo `_archive`
+is writable.
 
-**Affected:** `features/spec_context/gate_policy.py` (classifier + evaluate), unit tests.
-
-**Functional requirements:**
-
-- FR-WS1-01: A Write to `repos/<slug>/specs/bugs/<any>.md` must classify ADDITIVE and
-  return `Decision.ALLOW` without touching the lease.
-- FR-WS1-02: A Write to `repos/<slug>/specs/backlog/<any>.md` must classify ADDITIVE.
-- FR-WS1-03: A Write to `repos/<slug>/specs/audits/<any>/<any>.md` must classify ADDITIVE.
-- FR-WS1-04: A Write to `repos/<slug>/specs/releases/<id>/SPEC.md` must still classify
-  MUTATING (releases are not ADDITIVE even in-repo; the context-relative short-circuit
-  does not match, falls through to the workspace-relative classifier which correctly
-  returns MUTATING).
-- FR-WS1-05: A Write to `repos/<slug>/specs/memory/<any>.md` must still classify MEMORY
-  (same fall-through logic; workspace-relative classifier handles this).
-- FR-WS1-06: The PROTECTED class (`repos/<slug>/...` that resolves to `.dadaia/sessions/`)
-  must remain PROTECTED (workspace-relative classifier handles this).
-- FR-WS1-07: Workspace-root ADDITIVE paths (`specs/bugs/`, `.dadaia/reports/`, etc.) must
-  continue to classify ADDITIVE with no regression.
-
-### WS-2 — Lease heartbeat from PostToolUse (D2 fix)
-
-**Root cause:** The PostToolUse hook (`hooks/sdd_post_gate.py`) renews
-`.dadaia/sessions/<id>.json:last_seen_at` keyed by `DADAIA_SESSION_ID`. The lease record
-heartbeat in `.dadaia/states/ctx_locks/<ctx>.lock.json` is only renewed when
-`lease.acquire` is called — which only happens on a gate-visible Write/Edit tool call.
-Long-running Bash calls (pytest, git push) emit no Write/Edit tool calls, so the lease
-heartbeat starves. After 120 s the lease appears stale and any concurrent write performs
-an auto-TAKEOVER.
-
-**Fix:** Extend `sdd_post_gate.py` to also call `lease.renew_heartbeat` for the active
-context when `DADAIA_SESSION_ID` is the lease holder. This decouples lease liveness from
-write frequency. The `renew_heartbeat` function already exists in `lease.py` and is
-a pure heartbeat bump with no lock state change — it is safe to call on every PostToolUse.
-
-**Critical implementation constraint:** The current `sdd_post_gate.py` returns early (at
-approximately line 47–49) if no session file is found. The `renew_heartbeat` call MUST be
-placed OUTSIDE this session-file guard — it must run whenever `DADAIA_SESSION_ID` is set
-and non-empty, regardless of whether a session file exists. The incident session had no
-session file; gating the renewal on file presence defeats the fix.
-
-Implementation notes:
-- PostToolUse runs after EVERY tool call (Read, Bash, Write, etc.), so the heartbeat fires
-  on Bash tool calls during pytest runs.
-- The context must be derived from the same PATH-first logic as the gate; fallback:
-  read `DADAIA_CONTEXT` env var, then first-ALIVE registry entry. If context is
-  unresolvable, fail-open (no renewal attempted, no error surfaced).
-- `renew_heartbeat` is a no-op if the session does not hold the lease — safe for
-  read-mode sessions.
-- `DADAIA_SESSION_ID` env propagation to subprocess hooks: the harness passes env to
-  hook subprocesses. No change needed to the env contract — the PostToolUse already uses
-  this env var; extending it to also renew the lease record uses the same channel.
-
-**Acknowledged race — `renew_heartbeat` check-then-act (lease.py:379–394):**
-`renew_heartbeat` reads the lock record, checks that `session_id` matches the holder, then
-writes an updated heartbeat timestamp. A concurrent `lease.acquire` by a foreign session
-can replace the lock record between the read and the write, causing the write to overwrite
-with stale holder data. The `is_same_holder` guard at line 388 is the current boundary but
-is NOT sufficient: the read-compare-write is unprotected by the sentinel CAS. This release
-does not fix the race (doing so requires sentinel-guarded renew, which is a separate
-change); it acknowledges it here and adds an acceptance criterion (AC-LOCK-04B) to verify
-the guard still catches the most common scenario. A follow-on bug is recorded for the
-unsupported case.
-
-**Affected:** `hooks/sdd_post_gate.py`, unit tests.
+**Fix (extends the prior draft's ADDITIVE-only short-circuit to the full taxonomy):**
+classification is computed on the **context-relative path** — strip a leading
+`repos/<slug>/` segment, then run the full class taxonomy (ADDITIVE, MEMORY, FROZEN,
+releases-MUTATING) against the context-relative string. Workspace-root paths classify
+exactly as today. PROTECTED (`.dadaia/sessions/`) remains workspace-root and is
+evaluated first, unchanged. RULE A (memory phase-lock) and RULE B (frozen archive) must
+therefore execute for in-repo paths — they are no longer dead code.
 
 **Functional requirements:**
+- FR-R1-01: `repos/<slug>/specs/bugs|backlog|audits/**` → ADDITIVE; `Decision.ALLOW`
+  with **no lease read or write**.
+- FR-R1-02: `repos/<slug>/specs/memory/**` → MEMORY; PE-phase rule (DEFINITION/CLOSURE
+  per ACTIVE.md) is evaluated and blocks outside those phases.
+- FR-R1-03: `repos/<slug>/specs/_archive/**` → FROZEN; Write/Edit blocked.
+- FR-R1-04: `repos/<slug>/specs/releases/**` and all other in-repo paths → MUTATING
+  (lease-acquiring), unchanged.
+- FR-R1-05: workspace-root paths (`specs/bugs/`, `.dadaia/reports/`, etc.) classify
+  identically to pre-change behavior (no regression).
+- FR-R1-06: **matrix tests** — every class × {workspace-root, in-repo} × {default slug,
+  non-default slug} asserted in `tests/unit/features/spec_context/test_gate_policy.py`.
+- FR-R1-07: symlink regression — the Python gate resolves (`hooks/sdd_gate.py` uses
+  `.resolve()`) before classifying; an automated test creates a symlink from an ungated
+  location into `specs/memory/` and asserts MEMORY classification, not UNGATED
+  (closes the Python-surface acceptance of `gate-fpath-not-canonicalized-before-classifier`).
+- FR-R1-08: full-pipeline regression of the incident: session A holds the lease; clock
+  advanced 130 s with no Write/Edit from A; session B `gate_policy.evaluate` end-to-end
+  on `repos/dadaia-workspace/specs/bugs/<slug>.md` → ALLOW **and** `lease.read_record()`
+  still names session A (lease untouched).
 
-- FR-WS2-01: PostToolUse must call `lease.renew_heartbeat(workspace, ctx, session_id)`
-  whenever `DADAIA_SESSION_ID` is set and non-empty, outside any session-file guard.
-- FR-WS2-02: If the holder runs a Bash call lasting > 120 s with no Write/Edit, the lease
-  heartbeat must remain fresh (< 120 s old) via PostToolUse renewal.
-- FR-WS2-03: A session that does not hold the lease must not acquire or modify it via
-  PostToolUse (renew_heartbeat is a guarded no-op when session_id does not match holder).
-- FR-WS2-04: PostToolUse failure (OSError, unresolvable workspace, unresolvable context)
-  must never block any tool call; hook must always return 0.
-- FR-WS2-05: PostToolUse must call `renew_heartbeat` even when the session file is absent
-  (no early return that skips the call when `DADAIA_SESSION_ID` is present).
+### WS-R2 — Lease liveness: harness-native heartbeat + process probe; no TAKEOVER from a live session
 
-### WS-3 — Read-mode bind honoured by gate; bind --mode optional (D3 fix)
+**Audit:** CONF-2 (CRITICAL), arch F2, ai D-2/D-12/C-14, qa 17-D2/D3. Restores the
+PID-liveness lesson learned in v0.1.5 rc-2 and discarded in the v0.1.6 lease rewrite.
 
-**Root cause (two parts):**
-
-Part A: `dadaia context bind` requires `--mode` as a mandatory option, forcing the
-operator to make a lifecycle decision at bind time. The mode is a lifecycle concern that
-should be derived from the dispatched role and phase, not chosen by the human at bind.
-
-Part B: The gate resolves mode as `os.environ.get("DADAIA_MODE", "IMPLEMENTATION")`.
-Harness Bash calls run in fresh shells — exported env from a preceding
-`eval $(dadaia context bind --mode read)` does not reach the hook subprocess. So
-`--mode read` binds are theater for harness invocations: the gate always sees
-`IMPLEMENTATION`.
+**Root cause (three parts):** (a) lease heartbeat renews only inside
+`gate_policy.evaluate` for MUTATING Edit/Write — a holder inside any >120 s Bash call
+(pytest) starves; (b) the PostToolUse heartbeat (`hooks/sdd_post_gate.py:38`) is keyed
+on `DADAIA_SESSION_ID`, an env var no harness sets — permanent no-op; (c) staleness is
+TTL-only — `lease.acquire` auto-TAKEOVERs a "stale" record even when the holder process
+is alive. `lease.py:16-19` docstring claims renewal "on every PreToolUse" — false.
 
 **Fix:**
-
-Part A: Make `--mode` optional in `dadaia context bind`. Default: `read` (observe-only
-bind; no lease implications). Document that lease-escalating modes (`implementation`,
-`review`) are taken by the dispatched role when it reaches the gate, not by the human.
-The `workspace-protocol §2` statement "a bind is optional convenience, never a
-precondition" is preserved; now the CLI contract matches the documented model.
-
-Part B (WS-3B — mode resolution): The gate must resolve mode from the **session file as
-the primary source**. OQ-1 is resolved: `context.py:319–330` already records the mode in
-the session file when the session is created. The gate resolves `session_id` from the hook
-payload, reads `.dadaia/sessions/<session_id>.json`, and extracts the `mode` field. If the
-session file records `mode: READ` (or `BOUND_READ`), the gate blocks MUTATING writes for
-that session. `DADAIA_MODE` env var is retained as a **fast-path override** only (checked
-first; if present, used directly; if absent, session-file lookup is the authoritative
-source). When DADAIA_MODE is absent from the hook env AND no session file exists (or the
-session file has no `mode` field), the gate defaults to `IMPLEMENTATION` — preserving
-today's behavior for sessions created before this release.
-
-**Affected:** `cli/context_cmd.py` (or equivalent bind CLI), `hooks/sdd_gate.py`, tests.
+1. `sdd_post_gate` resolves the session id **harness-natively**: stdin `session_id`
+   payload first (same `_common.resolve_session_id` channel `sdd_gate` uses), env var
+   as override only. It calls `lease.renew_heartbeat` on **every** PostToolUse (all
+   tools, incl. Bash), placed **outside** any session-file existence guard.
+2. `renew_heartbeat` must allow the **confirmed holder** to renew past TTL (relax the
+   is_stale no-op for same session_id), and the renew path must be holder-safe (atomic
+   compare-on-holder write; a concurrent foreign replace must never be overwritten with
+   stale holder data — the `lease.py:379-394` check-then-act race is **fixed**, not
+   acknowledged, because AC-R2-04's lock-history invariant cannot hold otherwise).
+3. `lease.acquire` consults a **process-liveness probe** before TAKEOVER: the lease
+   record gains a `pid` field at acquire; when a record is TTL-stale, acquire probes the
+   holder pid via the existing platform seam (`core/lock_liveness.py` +
+   `has_os_kill_liveness` non-destructive probe, v0.1.8). If the holder process is
+   alive → **no TAKEOVER**: the foreign MUTATING write is blocked with a clear,
+   no-rebind-instruction message. If dead or unprobeable on the platform → TTL fallback
+   (today's behavior).
+4. `lease.py` docstring rewritten to the implemented liveness model (fixes C-14).
 
 **Functional requirements:**
+- FR-R2-01: PostToolUse renews the lease heartbeat with session id resolved from the
+  stdin payload (no env var required), outside any session-file guard; fail-open
+  (exit 0) on any error; non-holder renewal is a guarded no-op.
+- FR-R2-02: a holder running a >120 s Bash call with no Write/Edit keeps a fresh
+  heartbeat via PostToolUse renewal.
+- FR-R2-03: lease record carries `pid`; TTL-stale + alive-probe ⇒ acquire raises/blocks
+  (no TAKEOVER); TTL-stale + dead-probe ⇒ TAKEOVER as today.
+- FR-R2-04: confirmed holder can renew past TTL; renew is atomic w.r.t. foreign acquire.
+- FR-R2-05: **two-actor concurrency test** (real OS processes, file rendezvous,
+  generalizing `tests/e2e/test_two_process_denial.py`): holder busy past TTL while a
+  second actor (i) writes ADDITIVE — lock-file history shows the holder never changed;
+  (ii) attempts MUTATING — blocked while the holder process is alive.
 
-- FR-WS3-01: `dadaia context bind <name>` with no `--mode` flag must succeed (not error).
-  Default mode is `read`.
-- FR-WS3-02: `dadaia context bind <name> --mode implementation` and `--mode read` must
-  continue to work as before.
-- FR-WS3-03: The gate resolves mode from the session file as the primary source:
-  `session_id` from hook payload → read `.dadaia/sessions/<session_id>.json` → extract
-  `mode`. If `DADAIA_MODE` env var is present, it is used as a fast-path override instead.
-  When a session file records `mode: READ` or `BOUND_READ`, the gate BLOCKS MUTATING
-  writes with a message explaining the session is read-bound.
-- FR-WS3-04: When mode resolves to READ, the gate must still ALLOW ADDITIVE, UNGATED, and
-  PROTECTED writes per their respective policies (PROTECTED is the only fail-CLOSED path).
-- FR-WS3-05: The BLOCK message for a READ-mode MUTATING attempt must NOT instruct the
-  operator to rebind or relaunch.
-- FR-WS3-06: When DADAIA_MODE is absent from hook env AND no session file is found (or
-  session file has no mode field), gate defaults to IMPLEMENTATION (backward compatible).
+### WS-R3 — Session-identity consolidation (one module, four stores collapsed)
 
-### WS-4 — Single model registry (model-catalog fix)
+**Audit:** arch F7, CONF-1/CONF-2 substrate.
 
-**Context:** The operator workaround is already applied as of 2026-06-10: `MODEL_MAP` has
-`"claude-fable-5": "gpt-5.5"`, `PRICING_TABLE` has
-`ModelPricing(10.00, 50.00, 12.50, 1.00, date(2026,6,1))` (input $10.00/MTok, output
-$50.00/MTok, cache-write-5m $12.50/MTok, cache-read $1.00/MTok), `test_model_mapping.py`
-updated to 5 entries, all targets reprojected, doctor exit 0. Five agents (product-engineer,
-software-engineer, qa-engineer, ai-engineer, project-auditor) run `claude-fable-5`. VERIFY-02
-and AC-MODEL-04 preconditions are satisfied (evidence: workaround applied 2026-06-10, 27
-catalog tests green).
+**Root cause:** four fragmented identity/liveness artifacts with two key schemes —
+`.dadaia/states/ctx_locks/<ctx>.lock.json`, `.dadaia/sessions/runtime/<ctx>.ptr`,
+`.dadaia/sessions/runtime/<session_id>.ptr` (written by `ctx_inject.py:99-106`),
+`.dadaia/sessions/<id>.json` — no module owns "who is this session".
 
-**Root cause:** `MODEL_MAP` in `infrastructure/runtime_transforms/model_mapping.py` and
-`PRICING_TABLE` in `features/telemetry/pricing.py` are independently maintained hardcoded
-tables. Currently `MODEL_MAP` has `claude-haiku-4-5-20251001` but `PRICING_TABLE` has
-`claude-haiku-3-5`. No automated check detects the desync. Every new model requires
-editing both tables manually.
-
-**Fix:** Create a single model-registry module (`dadaia_workspace/core/model_registry.py`)
-that defines a unified `ModelEntry` with: `claude_id`, `codex_id`,
-`pricing: list[ModelPricing]` (append-only dated rows — preserves `PRICING_TABLE`'s
-point-in-time historical-cost semantics; a new pricing tier is appended, never replacing
-an existing row), and `tier`. Both `model_mapping.MODEL_MAP` and `pricing.PRICING_TABLE`
-become thin views over the registry. `PRICING_TABLE` is derived by taking the most-recent
-`ModelPricing` row per model (ordered by `effective_from`); the full dated list is
-available from the registry for historical cost computation.
-
-**Doctor check:** A new check in the `features/public/` doctor module (the surface that
-runs as part of `dadaia public doctor`) verifies:
-1. Every `model:` value in `public/agents/*.md` frontmatter resolves in the registry.
-2. `MODEL_MAP` and `PRICING_TABLE` key sets are identical.
-Import-linter contracts must allow `features/public/ → core/model_registry` (verify this
-dependency is permitted or add the exception before implementation).
-
-Additionally: fix the `codex.py` body-text leak for unknown `claude-*` model ids (the
-map_model fail-loud behavior is correct and intentional; the issue is whether the unknown
-model id leaks into the Codex TOML body text verbatim when projection runs with an unset
-id — verify whether this path exists and close it if it does).
-
-**Affected:** `core/model_registry.py` (new), `infrastructure/runtime_transforms/model_mapping.py`,
-`features/telemetry/pricing.py`, `dadaia_workspace/public/` codex projection code (if
-leak confirmed), `features/public/` doctor check.
+**Fix:** one CLI-owned module `features/spec_context/session_identity.py` is the sole
+reader/writer of session-identity state: session record (id, mode, pid, created_at,
+last_seen_at) and the lease-incumbent pointer. `lease.py`, `hooks/ctx_inject.py`,
+`hooks/sdd_post_gate.py`, `hooks/sdd_gate.py`, and the bind CLI consume it. Redundant
+artifacts are eliminated or derived (target: ≤2 on-disk artifacts — lease record +
+session record; the dual `.ptr` namespace collapses). Migration: stale legacy artifacts
+are ignored-and-superseded, not migrated.
 
 **Functional requirements:**
+- FR-R3-01: a single module owns all reads/writes of session identity; grep shows no
+  other module opens `sessions/runtime/*.ptr` or `sessions/<id>.json` directly.
+- FR-R3-02: lease record holder, incumbent pointer, and session record can never name
+  three different sessions for one context (consistency asserted by contract test).
+- FR-R3-03: all artifacts live under PROTECTED `.dadaia/sessions/` or
+  `.dadaia/states/ctx_locks/`; no new gate classes.
 
-- FR-WS4-01: A single `core/model_registry.py` module defines `ModelEntry` with
-  `claude_id`, `codex_id`, `pricing: list[ModelPricing]` (dated, append-only), and `tier`.
-  `MODEL_MAP` and `PRICING_TABLE` are computed from it; `PRICING_TABLE` uses the
-  most-recent row per model.
-- FR-WS4-02: Every claude model id that appears in `public/agents/*.md` frontmatter
-  `model:` field resolves in the registry. Doctor (in `features/public/` surface) emits
-  an error if any frontmatter model id is absent.
-- FR-WS4-03: `MODEL_MAP` and `PRICING_TABLE` key sets are always identical (both derived
-  from the same registry). Doctor emits an error if they desync.
-- FR-WS4-04: `pytest` full suite passes. Import-linter passes (including the new
-  `features/public/ → core/model_registry` dependency). No regressions in telemetry
-  cost computation.
-- FR-WS4-05: The haiku desync is corrected: both tables use `claude-haiku-4-5-20251001`
-  (or whatever the registry declares as the canonical haiku entry).
-- FR-WS4-06 (conditional): If the codex body-text leak for unknown model ids is confirmed,
-  it is fixed. If not present, this FR is closed as N/A.
+### WS-R4 — Bind-mode channel: mode persisted where hooks read it; READ binds non-acquiring
 
-### WS-5 — FPATH canonicalization in gate (hardening)
+**Audit:** CONF-3 (HIGH), arch F3, ai D-10/D-11; bug `context-bind-forces-mode-choice-on-operator`.
 
-**Root cause:** `sdd-spec-gate.sh` makes `FPATH` absolute but does not canonicalize it
-(no `realpath`) before the `case` classifier. A symlink from an ungated location into
-`specs/memory/` could be classified UNGATED instead of MEMORY.
+**Root cause:** `bind --mode` only prints `export` lines; hooks run in harness env that
+never inherits them; `sdd_gate.py:127` defaults `DADAIA_MODE` to IMPLEMENTATION; the
+`mode` stored in the lease record is never read by any decision. Mode is theater, and
+the CLI forces the operator to choose a mode that has no effect.
 
-Note: The Python gate (`hooks/sdd_gate.py`) already uses `fpath.resolve()` before
-`relative_to`, so it does canonicalize. The shell gate (`public/scripts/sdd-spec-gate.sh`)
-does not. This release adds `realpath` canonicalization to the shell gate.
-
-Care: normalize `$WS` consistently (realpath both) so the `repos/$CONTEXT_SLUG/`
-reclassification still matches. Verify the gate integration suite stays green (some CI
-sandboxes symlink `/tmp`).
-
-**Affected:** `dadaia_workspace/public/scripts/sdd-spec-gate.sh`.
+**Fix:**
+- Part A (CLI): `--mode` becomes optional, default `read`. Bind persists the mode in the
+  CLI-owned session record (WS-R3) — the store hooks actually read — keyed by the
+  harness-native session id when resolvable, else by the bind-created session id.
+- Part B (gate): mode resolution order: (1) `DADAIA_MODE` env fast-path override;
+  (2) session record `mode` via session_identity; (3) default IMPLEMENTATION.
+  When mode resolves to READ/BOUND_READ: the session is **non-acquiring** — MUTATING
+  writes are blocked with a message that never instructs rebinding; ADDITIVE/UNGATED
+  follow their normal policies; PROTECTED stays fail-closed.
+- Missing-mode sessions (no bind, no env — every plain harness session) default to
+  IMPLEMENTATION and may acquire a **free** lease, but may never TAKEOVER from a
+  live-probed holder (WS-R2 FR-R2-03 supplies the no-steal half). See Decision D-3.
 
 **Functional requirements:**
+- FR-R4-01: `dadaia context bind <name>` with no `--mode` exits 0; default mode `read`;
+  explicit `--mode implementation|read` still works.
+- FR-R4-02: bind writes `mode` into the session record; the gate reads it without any
+  env var present (the harness-real path).
+- FR-R4-03: READ-resolved session: MUTATING → BLOCK (no lease write); ADDITIVE → ALLOW.
+- FR-R4-04: both-sources-absent → IMPLEMENTATION (backward compatible; existing
+  sessions unaffected).
 
-- FR-WS5-01: `FPATH` is canonicalized via `realpath --canonicalize-missing` (or
-  equivalent) immediately after being made absolute, before the `case` classifier runs.
-- FR-WS5-02: `$WS` is also canonicalized consistently so relative-to comparisons remain
-  correct.
-- FR-WS5-03: The gate integration test suite passes on Linux CI (including sandboxes that
-  symlink `/tmp`).
-- FR-WS5-04: A symlink from an ungated location targeting `specs/memory/` is classified
-  MEMORY (or FROZEN/PROTECTED for other gated subtrees), not UNGATED.
-- FR-WS5-05: The portability fallback order is: `realpath --canonicalize-missing` (GNU
-  coreutils, Linux) → `readlink -f` (macOS/BSD) → `python3 -c "import os,sys;
-  print(os.path.realpath(sys.argv[1]))" "$FPATH"` (universal fallback). The final
-  fallback must be the Python one-liner — a silent `echo "$FPATH"` is not acceptable as
-  a last resort because it would silently preserve unresolved symlinks.
+### WS-R5 — Test-architecture kernel (acceptance substrate for R1–R4)
 
-### WS-6 — Pre-push gate workspace venv resolution
+**Audit:** CONF-6 (HIGH), qa defects 1–3 + strategy §6; covers 11 of 16 blind escapes.
 
-**Root cause:** `pre-push-ci-gate.sh` probes `command -v poetry` (PATH) and
-`.venv/bin/dadaia` (repo-relative). In the self-hosting layout, the dadaia CLI lives at
-`<ws>/.dadaia/.venv/bin/dadaia` (workspace-level venv), not inside the sub-repo. The gate
-fails-closed with an error and the operator is forced to use `git push --no-verify`,
-defeating the gate's purpose.
-
-**Fix:** Walk up from the git repo root to find the workspace root (presence of `.dadaia/`
-directory), then probe `<ws>/.dadaia/.venv/bin/dadaia`. Also accept a `DADAIA_BIN` env
-var override.
-
-**Priority order (highest to lowest):**
-1. `DADAIA_BIN` env var override — if set and binary exists, use it directly.
-2. Workspace-level venv — walk up from `$GIT_DIR` to find `.dadaia/.venv/bin/dadaia`.
-3. `poetry` on PATH — existing probe, retained as fallback.
-4. Repo-relative `.venv/bin/dadaia` — existing probe, retained as last resort.
-
-**Note on `ci-preflight-raw-traceback-when-poetry-absent`:** This bug is already
-`status: Closed` as of the workspace state at definition time. It is moot — WS-6 stands
-alone on the `pre-push-gate-cannot-locate-workspace-venv` bug.
-
-**Affected:** `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`.
+**Fix (three pillars):**
+1. **Harness-env fixture contract.** New fixtures `claude_hook_env()` / `codex_hook_env()`
+   contain ONLY what each harness actually provides to hook subprocesses (pinned once,
+   documented in the fixture docstring with the verification source). All hook/gate/
+   lease tests run hooks through these fixtures. A contract test (residue grep) fails
+   any test under `tests/**/gate|hooks|spec_context/**` that `setenv`s
+   `DADAIA_SESSION_ID`/`DADAIA_PERSONA`/`DADAIA_MODE` outside the fixtures' allowlist.
+2. **Two-actor / multi-context tier + fixture matrix.** The two-actor pattern of
+   FR-R2-05 becomes a reusable helper; gate/lease/renderer tests parametrize over
+   {1, 2 contexts} × {default, non-default slug} × {seeded, empty}.
+3. **Kill drift-ratifying tests** (qa-named): `test_lease_property.py:74` and
+   `test_lease_activity_exemption.py:27` (root-only ADDITIVE paths → replaced by the
+   R1 matrix); `test_post_gate_heartbeat.py:79` (hand-planted `DADAIA_SESSION_ID` →
+   migrated to harness-env fixture); the contradictory haiku pins
+   `test_pricing.py:47,212` vs `test_model_mapping.py:25` (replaced by the registry
+   cross-table contract, WS-R8). Each named regression test for the 7 open bugs ships
+   in this release (escape-matrix-driven coverage).
 
 **Functional requirements:**
+- FR-R5-01: `claude_hook_env()`/`codex_hook_env()` exist and are the only env source
+  for hook subprocess tests; enforcement contract test present.
+- FR-R5-02: fixture-matrix parametrization applied to the gate/lease suites.
+- FR-R5-03: zero remaining assertions pinning the retired bash-hook behavior or the
+  root-only ADDITIVE assumption (residue grep test).
+- FR-R5-04: every one of the 7 open bugs has a named regression test listed in CLOSURE.
 
-- FR-WS6-01: `DADAIA_BIN` env var is checked first; if set and binary exists, use it
-  directly (highest priority).
-- FR-WS6-02: If `DADAIA_BIN` is unset, walk up from `$GIT_DIR` to find a parent containing
-  `.dadaia/.venv/bin/dadaia` and use it.
-- FR-WS6-03: `poetry` on PATH is the third fallback; repo-relative `.venv/bin/dadaia` is
-  the fourth.
-- FR-WS6-04: In the self-hosting dadaia-workspace layout, `git push` from
-  `repos/dadaia-workspace/` successfully runs the CI-equivalent suite via the workspace
-  venv rather than erroring.
-- FR-WS6-05: If no runner is found after all probe paths, the gate must still fail-closed
-  with a clear error message (preserve the "never push red silently" contract).
-- FR-WS6-06: `pytest` on the hook integration suite passes.
+### WS-R6 — Ledger / memory / constitution truth pass + AI-surface honesty
+
+**Audit:** CONF-4, CONF-5 (HIGH), DRIFT-1..7, arch F4/F6/F8, ai C-1..C-14, S-1/S-2.
+Arch review gate: any v0.1.10 closure that fixes code without rewriting memory/
+constitution is REJECTED (F4).
+
+**Fix (six parts):**
+1. **Retire the dead bash hook quartet** (`public/scripts/{sdd-spec-gate,sdd-post-gate,
+   root-whitelist-gate,ctx-inject}.sh`): removed from canonical assets, staging manifest,
+   and projections. `pre-push-ci-gate.sh` is kept (a real git hook, deliberately shell —
+   ai D-13 DETERMINISTIC). Delete `public/scripts/__pycache__/` (S-1). Fix the
+   `gate_policy.py:3-8` docstring to name the Python hooks as the enforced gate
+   (C-9/DRIFT-6). This retirement is the resolution of sec F-4 — see Decision D-1.
+2. **Doctor invariants (SDD machine validates its own state):** `dadaia specs doctor`
+   errors on (a) ACTIVE.md phase inconsistent with TASKS markers (e.g. phase SPEC/TASKS
+   while all tasks `[x]`, or phase IMPLEMENTATION with no `[-]`/`[x]`); (b) a fully-`[x]`
+   archived release without CLOSURE.md; (c) duplicate release ids across
+   `specs/releases/` + `specs/_archive/releases/` (any depth); (d) release dir names
+   not matching `^v\d+\.\d+\.\d+$` (new releases; pre-canon archive ids reported as
+   WARN with the documented mapping); (e) constitution file references that do not
+   resolve on disk.
+3. **Ledger repair (PE):** author the missing v0.1.9 retro-CLOSURE from the implemented
+   evidence, archive v0.1.9, and resolve the archive release-id collision
+   (`_archive/releases/v0.2.0/{v0.1.6..v0.1.9}` renamed to non-colliding milestone
+   names with a mapping README) — Decision D-4/D-5.
+4. **Memory + constitution rewrite (PE, CLOSURE phase):** `specs/memory/architecture.md`
+   §"Modelo de concorrência" (ADDITIVE-unconditional and heartbeat-per-PreToolUse claims)
+   and constitution §0/§8 lifecycle claims rewritten to the **post-fix verified**
+   contract (R1–R4). Constitution edits require explicit operator confirmation.
+5. **AI-surface honesty rewrite (ai-engineer):** all 14 contradictions C-1..C-14
+   resolved — each claim either becomes true in code (covered by R1–R8 tasks) or is
+   reworded as discipline. Key items: the SDD Gate section of root AGENTS.md +
+   `dadaia-task-manager` skill state what the gate **actually** enforces (path-class ×
+   lease × memory-phase) and that Aprovado/`[-]` markers are agent discipline (C-5/D-1,
+   CONF-4); the harness skill F8 allowlist claim corrected (C-2); handoff-emitter skill +
+   schema made executable for the handoff-first default (C-7); memory-phase wording
+   unified to DEFINITION+CLOSURE (C-4); PM workflow inventory corrected (C-3); persona
+   HTML-report header blockquotes reconciled with handoff-first (C-6/S-7); model-tier
+   tables regenerated from the registry (C-8); dispatch column reworded as
+   handoff-routing intent + PM-top-level precondition stated (C-10); hook ownership
+   table corrected — `dadaia_workspace/hooks/*.py` is software-engineer production
+   Python (C-11); `dadaia-task-manager` translated to English (C-13); lease docstring
+   (C-14, done in R2); tmp-file-guardrail "Enforcement" relabeled discipline (D-8).
+6. **Bash-bypass honesty (Decision D-2):** enforcement-scope language ("deterministically",
+   "blocked unconditionally") rewritten to scope all PreToolUse determinism claims to
+   `Edit|Write|apply_patch`-family tools; Bash-side writes are explicitly documented as
+   outside the determinism envelope. A doctor backstop check validates lease-record ↔
+   session-record coherence (detects out-of-band `.ptr`/lock forgery after the fact).
+
+**Functional requirements:**
+- FR-R6-01: no `.sh` hook of the quartet remains in canonical assets, manifest, or
+  projections; residue grep contract test passes; `pre-push-ci-gate.sh` retained.
+- FR-R6-02: the five doctor invariants implemented with unit tests (one fixture per
+  violation class) and `dadaia specs doctor` exit 0 on the repaired ledger.
+- FR-R6-03: v0.1.9 CLOSURE.md exists with evidence; archive contains no duplicate
+  release ids; mapping README present.
+- FR-R6-04: memory/constitution concurrency sections match the implemented contract
+  (reviewer cross-checks against R1/R2 code).
+- FR-R6-05: a contradiction-resolution table in CLOSURE maps each of C-1..C-14 to a
+  commit or a reworded file:line.
+
+### WS-R7 — Security tail
+
+**Audit:** sec F-2/F-3/F-5/F-6/F-7 (F-1 = R1; F-4 = R6 retirement; F-8 INFO = D-2).
+
+- **F-5 `dead()` push review gate:** `context dead()` refuses to auto-commit untracked
+  files unless `--commit` is passed explicitly; with `--commit`, a secret/pattern scan
+  (reusing the privacy-check engine) runs before push and blocks on findings.
+- **F-2 privacy gate fail-closed:** `infrastructure/privacy_check.py:95-97` ships an
+  in-package baseline structural denylist (IP/hostname/path regexes) so the check is
+  never a no-op when the operator denylist is absent; operator terms stay additive.
+- **F-3 panel loopback bypass:** Bearer auth required even on 127.0.0.1 binds (or
+  same-origin/Host allowlist check — implementer chooses, test pins the contract:
+  tokenless request to a sensitive API on loopback → 401).
+- **F-7 token-mode recheck:** `panel/auth.py:34-35` `ensure_token` verifies the mode of
+  a pre-existing token file and tightens to 0o600 (platform-seam aware).
+- **F-6 dev pins:** bump dev/build `poetry`/`dulwich` past the named CVEs.
+
+### WS-R8 — Anti-drift consistency contracts + push-gate repair
+
+**Audit:** CONF-9, arch cluster F + F9/F10, qa defect 4; bugs `model-catalog-…`,
+`ci-preflight-self-pollution…`, `pre-push-gate-…`.
+
+- **Single model registry (preserved from prior draft WS-4):**
+  `core/model_registry.py` defines `ModelEntry{claude_id, codex_id,
+  pricing: list[ModelPricing] (dated, append-only), tier}`; `MODEL_MAP` and
+  `PRICING_TABLE` become derived views (PRICING_TABLE = most-recent row per model);
+  haiku desync corrected (`claude-haiku-4-5-20251001`); `claude-fable-5` entry
+  (input $10.00 / output $50.00 / cache-write-5m $12.50 / cache-read $1.00 per MTok,
+  effective 2026-06-01) — workaround already applied, precondition satisfied.
+  `dadaia public doctor` check: every `model:` in `public/agents/*.md` resolves in the
+  registry; `MODEL_MAP`/`PRICING_TABLE` key sets identical.
+- **ci-preflight self-pollution fix:** `features/ci_preflight/service.py:46-47` invokes
+  ruff with `--no-cache`; mypy with an explicit cache redirect (`MYPY_CACHE_DIR` /
+  `--cache-dir` under `.dadaia/tmp/`); the conftest session-pollution guard scoped to
+  artifacts **created during the pytest session** (snapshot-diff), so the gate's own
+  earlier checks can never fail its final check. Acceptance: `dadaia ci preflight`
+  exits 0 on a clean tree end-to-end.
+- **Pre-push gate venv probe (preserved WS-6):** runner resolution priority
+  `DADAIA_BIN` env → walk-up workspace venv (`<ws>/.dadaia/.venv/bin/dadaia`) →
+  `poetry` on PATH → repo-local `.venv`; fail-closed with a clear error when none found.
+- **Consistency-contract-at-introduction policy:** documented in `tests/contract/`
+  scope notes + `specs/AGENTS.md`: any pair of modules sharing an identifier set gets a
+  consistency contract at introduction time. Concrete contracts shipped: MODEL_MAP↔
+  PRICING_TABLE key equality; retired-bash-hook residue grep; import-linter ignore-list
+  **cap** (CI fails if `setup.cfg` ignore edges grow beyond the current count, F10).
+
+---
+
+## Decisions (stated, per audit evidence)
+
+- **D-1 Bash gate retired, not canonicalized.** The shell hook quartet is an unexecuted
+  dual implementation requiring hand byte-parity, already drifted (S-2, C-9, DRIFT-6);
+  live wiring has invoked the Python hooks on all harnesses since v0.1.8. Retiring it
+  resolves sec F-4 (no bash classifier surface remains), C-9, and the bash half of
+  `gate-fpath-not-canonicalized-before-classifier`. `pre-push-ci-gate.sh` (git hook,
+  D-13 deterministic) is explicitly kept.
+- **D-2 Bash tool bypass: documented out of determinism scope, not closed.** Per sec
+  F-8 (INFO — fail-open is non-destructive and the intended posture) and the harness
+  skill's own "guardrail, not a hard boundary": classifying Bash command strings is
+  brittle theater. Instead, all "deterministic/unconditional" enforcement language is
+  scoped to file-write tools, and a doctor coherence backstop detects out-of-band
+  session/lock forgery.
+- **D-3 Missing-mode sessions remain IMPLEMENTATION-capable.** Strict
+  "missing ⇒ non-acquiring" would block every plain harness session (none has a bind
+  record) and violate the flow-never-stops law. Adopted composition: missing mode may
+  acquire a **free** lease; the no-steal property for held leases comes from the R2
+  liveness probe; only explicit READ blocks MUTATING. Flagged for operator/architect
+  confirmation at SPEC review.
+- **D-4 v0.1.9 closed retroactively inside v0.1.10** (R6 ledger repair), not reopened.
+- **D-5 Archive id collisions fixed by renaming** the `v0.2.0` internal milestone dirs
+  (with a mapping README), not by history rewrite.
+- **D-6 Handoff-emitter executability (C-7):** the skill/schema are aligned so the
+  handoff-first default (no HTML) is executable; exact mechanism (conditional
+  `content_hash` or subject-artifact hash) is the ai-engineer task's acceptance.
 
 ---
 
 ## Architecture deltas
 
-- **`dadaia_workspace/core/model_registry.py`** (new): single source of truth for
-  `claude_id → {codex_id, pricing: list[ModelPricing], tier}`. Zero I/O. Layer: `core/`
-  (no OS calls, no subprocess). Consumed by `infrastructure/runtime_transforms/model_mapping.py`
-  and `features/telemetry/pricing.py`.
-- **`features/spec_context/gate_policy.py`**: `classify_path` gains a context-relative
-  short-circuit for in-repo ADDITIVE paths (non-ADDITIVE falls through unchanged).
-  `evaluate` gains READ-mode BLOCK logic driven by session-file mode lookup.
-- **`hooks/sdd_post_gate.py`**: adds `lease.renew_heartbeat` call on every PostToolUse
-  when session id is set, outside the session-file guard.
-- **`hooks/sdd_gate.py`**: resolves mode from session file (primary); `DADAIA_MODE` env
-  var as fast-path override; BLOCKS MUTATING paths when mode resolves to READ; defaults
-  to IMPLEMENTATION when both sources absent.
-- **`cli/context_cmd.py`** (or bind entrypoint): `--mode` becomes optional with default
-  `read`.
-- **`dadaia_workspace/public/scripts/sdd-spec-gate.sh`**: FPATH `realpath`
-  canonicalization with Python one-liner as final fallback.
-- **`dadaia_workspace/public/scripts/pre-push-ci-gate.sh`**: workspace venv probe with
-  priority DADAIA_BIN > workspace venv > poetry > repo-local .venv.
-- No new CLI commands.
-- No new agent personas.
-- No changes to the lease record schema.
-- No changes to the `.ptr` file semantics.
-
----
+- `features/spec_context/gate_policy.py` — full context-relative classification
+  (ADDITIVE/MEMORY/FROZEN reachable in-repo); READ-mode non-acquiring evaluation.
+- `features/spec_context/lease.py` — `pid` in the lease record; liveness probe before
+  TAKEOVER via `core/lock_liveness.py` + platform seam; holder-safe renew; truthful
+  docstring.
+- `features/spec_context/session_identity.py` (new) — sole owner of session records and
+  incumbent pointers; consumed by lease, hooks, bind CLI.
+- `hooks/sdd_post_gate.py` — heartbeat on every PostToolUse, stdin-resolved session id.
+- `hooks/sdd_gate.py` — mode resolution (env fast-path → session record → default).
+- `cli` bind — `--mode` optional (default read), persists mode in the session record.
+- `core/model_registry.py` (new, zero-I/O) — single source for model id/pricing/tier;
+  `model_mapping.MODEL_MAP` and `telemetry/pricing.PRICING_TABLE` become views.
+- `infrastructure/runtime_config.py` — Claude PreToolUse write-gate matchers scoped to
+  `Edit|Write|MultiEdit|NotebookEdit` (C-12); PostToolUse stays broad (heartbeat needs
+  every tool); ctx-inject UserPromptSubmit unchanged.
+- `features/specs/doctor.py` — five ledger invariants + identity-coherence backstop.
+- `features/ci_preflight/service.py` — no-cache/redirected check invocations.
+- Public assets: bash hook quartet removed; `pre-push-ci-gate.sh` venv probe.
+- No new CLI commands; no new agent personas; lease record schema gains `pid` only.
 
 ## Tech-stack deltas
 
-None. No new dependencies.
-
----
+None at runtime. Dev/build pins: `poetry` ≥ 2.3.4, `dulwich` ≥ 1.2.5 (F-6).
 
 ## Security/operations deltas
 
-- WS-3 (session-file READ-mode gate block) closes a confused-deputy hole: a read-bound
-  session could accidentally acquire a MUTATING lease. The fix is now effective for
-  harness sessions (session-file lookup) as well as direct-shell use (DADAIA_MODE env).
-  Severity: MEDIUM.
-- WS-5 (FPATH canonicalization) closes a theoretical symlink traversal misclassification
-  (CWE-59). No known exploit path; hardening only.
-- WS-1 (context-relative ADDITIVE short-circuit) is primarily a correctness fix but also
-  prevents the ADDITIVE bypass being used as a lease-steal vector.
-
----
+- R1+R2+R4 close the confused-deputy lease-theft family (sec F-1 HIGH).
+- R7: `dead()` no longer pushes unreviewed untracked files (F-5); privacy gate never
+  no-ops (F-2); panel loopback requires auth (F-3); legacy token modes tightened (F-7).
+- D-2: enforcement posture documented honestly; no destructive failure modes added.
 
 ## Memory files affected at closure
 
-- `specs/memory/architecture.md` — lease model and gate-policy section updated (WS-1/WS-2/WS-3)
-- `specs/memory/product/sdd/sdd-gate-v3.md` — ADDITIVE classifier contract, READ-mode
-  gate behavior (session-file primary source)
-- `specs/memory/tech-stack.md` — model-registry module noted; model assignments already
-  current (workaround applied 2026-06-10)
+- `specs/memory/architecture.md` — concurrency model, gate taxonomy, session identity,
+  hook wiring (bash quartet removed), doctor invariants.
+- `specs/memory/product/sdd/sdd-gate-v3.md` (or current gate atom) — class×location
+  taxonomy, mode channel, liveness contract.
+- `specs/memory/tech-stack.md` — model registry module; dev pins.
+- `specs/constitution.md` — §0/§8 concurrency claims (operator confirmation required).
 
 ---
 
 ## Acceptance criteria
 
-### AC-LOCK-01 — In-repo ADDITIVE writes bypass lease (WS-1)
-A Write to `repos/<any-ctx>/specs/bugs/<slug>.md` by a session that does not hold the
-lease is classified ADDITIVE and returns `Decision.ALLOW` without modifying the lease
-record. Verified by unit test in
-`tests/unit/features/spec_context/test_gate_policy.py`.
+Each AC is reviewer-verifiable (file:line / named test / command + expected output).
 
-### AC-LOCK-02 — Full-pipeline regression: in-repo ADDITIVE does not steal live lease (WS-1)
-Full-pipeline regression test of the incident scenario: session A acquires the lease on
-context `dadaia-workspace`; clock is injected to advance 130 s with no Write/Edit from
-session A; session B calls `gate_policy.evaluate` end-to-end on
-`repos/dadaia-workspace/specs/bugs/<slug>.md`; assert Write is ALLOWED AND
-`lease.read_record()` still shows session A as holder (lease was not stolen). A unit test
-of `classify_path` alone is insufficient — the full `evaluate` pipeline must be exercised
-in the dual-session fixture.
-
-### AC-LOCK-03 — PostToolUse renews lease heartbeat on non-write tools (WS-2)
-After a simulated `Bash` tool call (non-write) with `DADAIA_SESSION_ID` set to the lease
-holder's id, `lease.read_record().heartbeat` is fresher than it was before the call.
-Unit test in `tests/unit/hooks/test_sdd_post_gate.py`. A no-session-file variant must
-also pass: the renewal occurs even when the session file is absent (no early return that
-skips the renewal when `DADAIA_SESSION_ID` is set).
-
-### AC-LOCK-04 — Lease survives a 120 s+ gap; renewal works for live holder past TTL (WS-2)
-Two-clock scenario:
-1. Acquire lease at T=0 (clock injected).
-2. Call `renew_heartbeat` with clock at T+130. Must return True (renewal succeeds for the
-   live holder, even though the lease would appear stale to an external observer). Note:
-   the current `renew_heartbeat` is_stale-gate would no-op if is_stale is True — the spec
-   requires this guard be relaxed for the confirmed holder (same session_id): a live holder
-   must be able to renew past TTL to prevent self-steal.
-3. After renewal, `is_stale(record)` at T+130 is False (heartbeat was updated).
-4. Separately: a foreign `lease.acquire` at T+130 (before renewal) raises `LockHeldError`
-   (the holder's heartbeat was refreshed by PostToolUse, so the lease is not stale to the
-   foreign session).
-Unit test with injected clock.
-
-### AC-LOCK-05 — `dadaia context bind` without --mode succeeds (WS-3)
-`dadaia context bind dadaia-workspace` (no `--mode`) exits 0. The exported shell env
-contains `DADAIA_MODE=read` (or equivalent default). Verified by CLI integration test.
-
-### AC-LOCK-06 — READ-mode session cannot acquire MUTATING lease; default path unchanged (WS-3)
-When mode resolves to READ (via session-file lookup or DADAIA_MODE=READ env), a Write to
-a MUTATING path is BLOCKed by the gate with a clear message. No lease record is written.
-When DADAIA_MODE is absent from hook env AND no session file exists (or session file has
-no mode field), gate defaults to IMPLEMENTATION and a holder session's MUTATING writes
-proceed as today. Both paths verified by unit test.
-
-### AC-LOCK-07 — READ-mode session can write ADDITIVE paths (WS-3)
-With mode resolved to READ, a Write to `specs/bugs/<slug>.md` returns `Decision.ALLOW`.
-Unit test.
-
-### AC-MODEL-01 — Single registry is the source of both tables (WS-4)
-`core/model_registry.py` exists. `MODEL_MAP` and `PRICING_TABLE` key sets are identical.
-`ModelEntry.pricing` is `list[ModelPricing]` with at least one dated row per model.
-`pytest` passes. Import-linter passes (including `features/public/ → core/model_registry`).
-
-### AC-MODEL-02 — Haiku desync corrected (WS-4)
-`PRICING_TABLE` contains key `claude-haiku-4-5-20251001` (not `claude-haiku-3-5`).
-`MODEL_MAP` and `PRICING_TABLE` both map the same haiku claude id. Doctor emits no error.
-
-### AC-MODEL-03 — Doctor validates agent frontmatter model resolution (WS-4)
-`dadaia public doctor` (surface: `features/public/` doctor module) emits an error for any
-`model:` value in `public/agents/*.md` that is absent from the registry. When all
-frontmatter models resolve, doctor exits 0 for the model-consistency check.
-
-### AC-MODEL-04 — Workaround validation: claude-fable-5 pre-registered (WS-4)
-**Precondition: SATISFIED** (evidence: workaround applied 2026-06-10, 27 catalog tests
-green). The doctor check finds `claude-fable-5` resolves for all 5 retiered agent
-frontmatter files. No error emitted.
-
-### AC-GATE-01 — Shell gate canonicalizes FPATH; automated integration test required (WS-5)
-An automated integration test (pytest fixture) creates a symlink in `tmp_path` pointing
-into a path that would classify as MEMORY, invokes the shell gate via subprocess, and
-asserts the gate returns a MEMORY (blocked) classification — not UNGATED. Manual smoke
-alone is insufficient. Additionally, a bash-vs-python gate parity check verifies that
-for in-repo ADDITIVE paths (e.g. `repos/<ctx>/specs/bugs/<slug>.md`), the bash gate does
-NOT acquire a lease (returns ALLOW without lease modification), matching Python gate
-behavior.
-
-### AC-PRE-PUSH-01 — Pre-push gate finds workspace venv; unit test required (WS-6)
-A unit test using a fake filesystem tree fixture verifies: DADAIA_BIN env var override
-is honored (highest priority); workspace-walk probe finds `.dadaia/.venv/bin/dadaia` when
-DADAIA_BIN is unset; error is raised when no runner is found. Manual smoke (git push from
-self-hosting layout) provides additional CLOSURE evidence but is not the primary
-verification.
-
-### AC-OPENCODE-01 — Stale parity test verified closed (opencode-parity supersession)
-`tests/e2e/features/test_opencode_parity_hardening.py::TestPluginProjection::test_sdd_gate_plugin_projected`
-passes at HEAD without any modification. The assertion reads
-`assert "sdd-spec-gate.sh" not in text`. Bug is formally closed as superseded-by-v0.1.8.
+- **AC-R1-01** Matrix test `tests/unit/features/spec_context/test_gate_policy.py`
+  covers {ADDITIVE, MEMORY, FROZEN, MUTATING, PROTECTED} × {root, in-repo} ×
+  {default, non-default slug}; all pass (FR-R1-01..06).
+- **AC-R1-02** Full-pipeline incident regression (FR-R1-08) passes in a dual-session
+  fixture; lock record asserted on file content, not return value.
+- **AC-R1-03** Symlink regression (FR-R1-07) passes; named test referenced in the
+  `gate-fpath-…` bug closure.
+- **AC-R2-01** PostToolUse heartbeat test runs the hook as a subprocess under
+  `claude_hook_env()` (no hand-planted `DADAIA_SESSION_ID`) and observes a fresher
+  lease heartbeat (FR-R2-01/02).
+- **AC-R2-02** TTL-stale + alive holder ⇒ foreign `lease.acquire` blocked; TTL-stale +
+  dead pid ⇒ TAKEOVER (FR-R2-03), with injected clock + fake/real pid.
+- **AC-R2-03** Holder renews past TTL; concurrent foreign acquire cannot interleave a
+  stale overwrite (FR-R2-04, property/stress test on the lock file history).
+- **AC-R2-04** Two-actor e2e (FR-R2-05): "a live holder never loses the lease; an
+  ADDITIVE write never appears in the lock record" asserted on lock-file history.
+- **AC-R3-01** `session_identity.py` is the only module touching session stores
+  (residue grep contract test); coherence contract test passes (FR-R3-02).
+- **AC-R4-01** `dadaia context bind <ctx>` (no `--mode`) exits 0; session record has
+  `mode: read`; gate blocks a MUTATING write from that session **with no env vars set**
+  (harness-real path); block message contains no rebind instruction (FR-R4-01..03).
+- **AC-R4-02** No-bind/no-env session: MUTATING write on a free lease proceeds
+  (FR-R4-04).
+- **AC-R5-01** `claude_hook_env()`/`codex_hook_env()` fixtures exist; enforcement
+  contract test fails on out-of-fixture `DADAIA_*` setenv in hook suites.
+- **AC-R5-02** The four qa-named drift-ratifying tests are removed/replaced; residue
+  grep proves no root-only-ADDITIVE or bash-hook pinning assertions remain.
+- **AC-R5-03** 7/7 open bugs each have a named regression test (table in CLOSURE).
+- **AC-R6-01** Bash quartet absent from `public/scripts/`, manifest, and projections;
+  `dadaia public doctor` exit 0; `pre-push-ci-gate.sh` present.
+- **AC-R6-02** Five doctor invariants: one failing fixture each (unit-tested) and
+  `dadaia specs doctor` exit 0 on the repaired workspace ledger.
+- **AC-R6-03** v0.1.9 CLOSURE.md exists; no duplicate release ids under releases +
+  archive; mapping README present.
+- **AC-R6-04** Contradiction table C-1..C-14 → commit/file:line, complete in CLOSURE;
+  reviewer spot-checks C-2, C-5, C-7, C-12 minimum.
+- **AC-R6-05** Generated `.claude/settings.json` PreToolUse write-gate matcher is
+  scoped (not empty); PostToolUse fires on all tools (unit test on runtime_config).
+- **AC-R7-01** `dead()` on a tree with untracked files and no `--commit` refuses and
+  pushes nothing; with `--commit`, a planted fake secret blocks the push (tests).
+- **AC-R7-02** Privacy check with operator denylist absent still scans the baseline
+  list and flags a planted IP/hostname (test); `[ok] public-privacy` only after a real
+  scan.
+- **AC-R7-03** Tokenless loopback request to a sensitive panel API → 401 (e2e/unit);
+  pre-existing 0o644 token tightened to 0o600 on `ensure_token`.
+- **AC-R8-01** `core/model_registry.py` single source; key-set equality contract test;
+  haiku id `claude-haiku-4-5-20251001` in both views; `claude-fable-5` resolves for the
+  5 retiered agents; `dadaia public doctor` model check green; mypy --strict +
+  import-linter pass.
+- **AC-R8-02** `dadaia ci preflight` exits 0 on a clean tree (full run, no
+  `--no-verify`); no `.ruff_cache`/`.mypy_cache` at repo root afterwards.
+- **AC-R8-03** Pre-push gate unit tests (fake tree): DADAIA_BIN honored; workspace-venv
+  walk-up found; fail-closed error when none. Manual smoke: `git push` from
+  `repos/dadaia-workspace/` runs the suite.
+- **AC-R8-04** Import-linter ignore-list cap test fails when an edge is added beyond
+  the recorded count.
 
 ---
 
 ## Out of scope
 
-- Full harness env propagation of `DADAIA_MODE` to hook subprocesses via harness config
-  changes (WS-3B uses session-file lookup as the primary fix; no harness config changes
-  are needed or in scope for this release).
-- PID-based or process-liveness-based lease renewal (current TTL-only model is retained;
-  WS-2 extends the heartbeat source without adding process probes).
-- Sentinel-CAS protection for `renew_heartbeat` (the check-then-act race in
-  `lease.py:379–394` is acknowledged; the guard at line 388 is the boundary but is not
-  sentinel-protected — a follow-on bug is registered, fix is deferred to v0.1.11).
-- Any new feature, CLI command, or agent persona.
-- Bulk model-catalog updates beyond haiku desync and claude-fable-5 workaround validation.
-- `sdd-spec-gate.sh` → Python full replacement (retained per architecture.md; only
-  FPATH canonicalization added in this release).
-
----
+- Classifying Bash command strings in PreToolUse (Decision D-2 — documented honestly
+  instead).
+- Harness config changes to propagate `DADAIA_*` env into hook subprocesses (session
+  record + stdin payload are the channels).
+- Multi-holder/queued leases; lease schema beyond the `pid` field.
+- Bulk model-catalog expansion beyond registry consolidation.
+- ctx-inject payload slimming (ai §4 bloat finding) and rules-tree scoping (S-5/S-6) —
+  backlog returns, not release scope.
+- Reopening archived releases; PyPI publish (operator-gated as always).
 
 ## Dependencies and risks
 
-- **Risk (WS-2):** PostToolUse fires on every tool call — adding `lease.renew_heartbeat`
-  increases PostToolUse latency. `renew_heartbeat` is a JSON read + atomic write; measured
-  overhead should be < 5 ms. Accept if under 10 ms; otherwise gate the call behind a
-  sampling flag.
-- **Risk (WS-2, acknowledged race):** `renew_heartbeat` has a check-then-act race
-  (read holder → concurrent foreign acquire replaces record → write overwrites with stale
-  data). The line-388 same-holder guard is the current boundary and is not sufficient.
-  Registered as follow-on bug; this release does not fix it.
-- **Risk (WS-4):** Making `PRICING_TABLE` a computed view over the registry changes the
-  module structure that is imported by telemetry. Verify mypy --strict passes after
-  refactor. Run full pytest suite before merge.
-- **Risk (WS-4):** `ModelEntry.pricing: list[ModelPricing]` changes the type relative to
-  the current single-`ModelPricing` field. All call sites that access pricing must be
-  updated to use the most-recent row (or the full list for historical computation).
-- **Risk (WS-1):** The context-relative ADDITIVE check introduces a path-parsing step in
-  the classifier hot path. Profile on pathological paths (very long paths, no-repo writes).
-- **Risk (WS-5):** `realpath --canonicalize-missing` availability varies across POSIX
-  systems. The Python one-liner final fallback ensures the canonicalization is universal.
-- **Dependency (WS-4):** `claude-fable-5` workaround already applied (see §WS-4 Context).
-  AC-MODEL-04 precondition is satisfied.
-- **Dependency (WS-4):** Import-linter contracts must allow `features/public/ → core/`.
-  Verify before implementing the doctor check.
+- **R1 touches the fail-open/fail-closed boundary** — full gate integration matrix must
+  re-run; PROTECTED ordering unchanged and re-asserted.
+- **R2 PID probe platform-sensitivity** — mitigated by the existing v0.1.8 seam
+  (`has_os_kill_liveness`, non-destructive OpenProcess on Windows); TTL fallback where
+  unprobeable. PID-reuse false-alive accepted (worst case = today's block-not-steal,
+  never theft).
+- **R3 is a refactor under live state** — legacy artifacts ignored-and-superseded;
+  doctor coherence check catches residue.
+- **PostToolUse latency** — renew is one JSON read + atomic write; accept < 10 ms,
+  else sample.
+- **R6 constitution edits** require explicit operator confirmation before commit.
+- **Sequencing risk** — memory/constitution rewrite (R6.4) must land AFTER R1–R4 code
+  is merged, in CLOSURE, so it documents the fixed contract (arch F4 gate).
+- **WS-R8 registry refactor** changes telemetry import surface — mypy --strict + full
+  pytest before merge; `features/public/ → core/` import-linter edge verified first.
