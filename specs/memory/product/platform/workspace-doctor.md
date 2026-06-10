@@ -16,8 +16,8 @@ tags:
 - repair
 agent_tier: self-pull
 token_estimate: 700
-last_updated: '2026-06-06'
-release_origin: v0.2.0
+last_updated: '2026-06-09'
+release_origin: v0.1.9
 ---
 
 CLI surface: `dadaia doctor [--fix]`

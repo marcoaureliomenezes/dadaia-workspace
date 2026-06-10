@@ -13,7 +13,7 @@ tags:
 agent_tier: inject
 token_estimate: 1100
 last_updated: '2026-06-09'
-release_origin: 0.1.8
+release_origin: v0.1.9
 ---
 
 ## Linguagens
@@ -49,22 +49,23 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 
 ## Model assignments (9 core agents + 3 plugin stubs)
 
-Modelo padrão da topologia pública: `claude-sonnet-4-6` para os agentes default,
-com override per-dispatch via `DADAIA_MODEL_OVERRIDE=opus` quando a política do
-dispatcher justificar escalonamento. Optional packs podem definir agentes e
-modelos próprios fora do default público.
+Atribuição em dois tiers: `claude-fable-5` para os leaves de raciocínio profundo
+(spec authoring, QA, harness, arquitetura, auditoria) e `claude-opus-4-8` para
+dispatchers e gate leaves. Override per-dispatch via `DADAIA_MODEL_OVERRIDE`
+quando a política do dispatcher justificar. Optional packs podem definir agentes
+e modelos próprios fora do default público.
 
 Agente| Modelo| Nota
 ---|---|---
 project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator
-project-auditor| `claude-sonnet-4-6`| Dispatcher / audit fan-out
-product-engineer| `claude-sonnet-4-6`| Curator / memory guardian
-software-engineer| `claude-sonnet-4-6`| Implementation leaf (absorbs python/node/backend)
-ai-engineer| `claude-opus-4-8`| AI-entity surface owner (harness-mastery synthesis workload)
-software-architect| `claude-sonnet-4-6`| Architectural review leaf (ADDITIVE)
-qa-engineer| `claude-sonnet-4-6`| Review → commit gate leaf
-security-reviewer| `claude-sonnet-4-6`| Review → push gate leaf
-code-reviewer| `claude-sonnet-4-6`| Review → PR gate leaf
+project-auditor| `claude-fable-5`| Dispatcher / audit fan-out
+product-engineer| `claude-fable-5`| Curator / memory guardian
+software-engineer| `claude-opus-4-8`| Implementation leaf (absorbs python/node/backend)
+ai-engineer| `claude-fable-5`| AI-entity surface owner (harness-mastery synthesis workload)
+software-architect| `claude-fable-5`| Architectural review leaf (ADDITIVE)
+qa-engineer| `claude-fable-5`| Review → commit gate leaf
+security-reviewer| `claude-opus-4-8`| Review → push gate leaf
+code-reviewer| `claude-opus-4-8`| Review → PR gate leaf
 frontend-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
 design-specialist (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
 devops-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (devops); no behavior without plugin

@@ -16,8 +16,8 @@ tags:
 - sdd
 agent_tier: self-pull
 token_estimate: 1073
-last_updated: '2026-06-07'
-release_origin: v0.2.1
+last_updated: '2026-06-09'
+release_origin: v0.1.9
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1

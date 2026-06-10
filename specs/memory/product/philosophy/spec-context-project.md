@@ -15,8 +15,8 @@ tags:
 - concurrency
 agent_tier: self-pull
 token_estimate: 700
-last_updated: '2026-06-06'
-release_origin: v0.2.0
+last_updated: '2026-06-09'
+release_origin: v0.1.9
 ---
 
 ## Propósito
@@ -33,7 +33,7 @@ O binding de um Spec Context Project a uma terminal session dispara a cadeia de 
 
 2. **Inject** — o binding injeta a `constitution.md` do contexto e sua `memory/` na sessão por **lazy product-feature consumption**: `tech-stack.md` e `catalog.json` carregam up front (~2.400 tokens); feature atoms individuais são pulled on demand pelo agente conforme relevantes à tarefa. Nenhuma sessão paga pelo catálogo inteiro antecipadamente.
 
-3. **Enforce** — o SDD lifecycle (constitution §7) é enforced para cada production write sob aquele contexto: nenhuma mudança de produção sem release aprovado e task reservada. O gate `sdd-spec-gate.sh` verifica ativo-context + lease + task marker `[-]` antes de cada write.
+3. **Enforce** — o SDD lifecycle (constitution §7) é enforced para cada production write sob aquele contexto: nenhuma mudança de produção sem release aprovado e task reservada. O gate SDD (`python -m dadaia_workspace.hooks.sdd_gate`, PreToolUse) verifica ativo-context + lease + task marker `[-]` antes de cada write.
 
 4. **Parallel multi-project** — porque cada contexto carrega exatamente um MUTATING lease (§8), múltiplos Spec Context Projects podem ser trabalhados concorrentemente em sessões diferentes. Trabalho ADDITIVE (backlog, bugs, research, audit, review) dentro de qualquer contexto roda em paralelo — sem colisão, porque o lock contract torna structuralmente impossível ter mais de um MUTATING writer por contexto ao mesmo tempo.
 

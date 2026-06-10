@@ -20,7 +20,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 1500
 last_updated: '2026-06-09'
-release_origin: 0.1.8
+release_origin: v0.1.9
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2`
@@ -29,7 +29,7 @@ CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|heartbeat
 
 Gerencia múltiplos **Spec Context Projects** — cada um mapeia `nome → repo_slug → repo_url` e tem state machine binária: **ALIVE** (repo clonado em `repos/<repo_slug>/`, disponível para implementação) ou **DEAD** (repo removido do disco, fora de uso). Não existe "global primary": o context ativo por sessão é estabelecido via _session binding_ (`eval $(dadaia context bind ...)`), exportando `DADAIA_CONTEXT`, `DADAIA_SESSION_ID` e `DADAIA_MODE` no shell da sessão.
 
-O modelo v2 (semver 2.0.0) elimina o contexto global implícito. Cada sessão de agente declara seu contexto explicitamente. O gate `sdd-spec-gate.sh` valida a identidade da sessão e o lease antes de permitir qualquer write em produção.
+O modelo v2 (semver 2.0.0) elimina o contexto global implícito. Cada sessão de agente declara seu contexto explicitamente. O gate SDD (`python -m dadaia_workspace.hooks.sdd_gate`, PreToolUse) valida a identidade da sessão e o lease antes de permitir qualquer write em produção.
 
 ### State machine ALIVE/DEAD
 
