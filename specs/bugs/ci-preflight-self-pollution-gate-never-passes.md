@@ -3,6 +3,7 @@ name: ci-preflight-self-pollution-gate-never-passes
 status: Open
 severity: HIGH
 reported: 2026-06-10
+session_id: sess_d7f127f8
 surface: dadaia ci preflight / pre-push hook / tests/conftest.py session-pollution guard
 ---
 
