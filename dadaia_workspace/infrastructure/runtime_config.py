@@ -47,6 +47,18 @@ def _hook_cmd(workspace_root: Path, module: str) -> str:
     return f"{_python_bin(workspace_root)} -m {module}"
 
 
+# T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse write-gate matcher.
+# The SDD gate and root-whitelist gate only police filesystem writes, so they fire
+# exactly on the write tools — never on read-only / Bash tools. This scopes them
+# instead of using the forbidden empty (match-all) matcher the ai audit flagged.
+_CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit"
+# Claude Code's canonical explicit match-all for tool-matching events. Used on
+# PostToolUse so the lease heartbeat (T-010-04) fires after *every* tool, including
+# Bash, not just write tools. Deliberately the explicit "*" form, NOT the empty
+# string the ai audit forbids.
+_CLAUDE_MATCH_ALL = "*"
+
+
 def claude_settings(workspace_root: Path) -> dict[str, object]:
     """Return the Claude Code settings.json dict for *workspace_root*."""
     return {
@@ -59,7 +71,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                             "type": "command",
                         }
                     ],
-                    "matcher": "",
+                    "matcher": _CLAUDE_WRITE_TOOLS,
                 },
                 {
                     "hooks": [
@@ -70,7 +82,7 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                             "type": "command",
                         }
                     ],
-                    "matcher": "",
+                    "matcher": _CLAUDE_WRITE_TOOLS,
                 },
             ],
             "PostToolUse": [
@@ -83,9 +95,11 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                             "type": "command",
                         }
                     ],
-                    "matcher": "",
+                    # Heartbeat must fire on ALL tools (T-010-04) — explicit match-all.
+                    "matcher": _CLAUDE_MATCH_ALL,
                 }
             ],
+            # UserPromptSubmit has no tool to match; matcher unchanged (empty).
             "UserPromptSubmit": [
                 {
                     "hooks": [

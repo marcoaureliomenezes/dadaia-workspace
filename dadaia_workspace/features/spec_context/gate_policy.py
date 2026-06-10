@@ -81,6 +81,36 @@ _PROTECTED_MESSAGE = (
 #: Phases in which product-engineer may write memory atoms (FR-P1-13).
 _MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
 
+#: Non-acquiring (READ-resolved) mode tokens (WS-R4 FR-R4-03 / Decision D-3). A session
+#: whose resolved mode is one of these is **non-acquiring**: a MUTATING write is BLOCKed
+#: WITHOUT touching the lease (no acquire, no lease-record write). The bind CLI persists
+#: ``READ`` (operator aliases ``read``/``spec`` both map here); ``BOUND_READ`` is accepted
+#: as a defensive synonym. Comparison is case-insensitive against the upper-cased token.
+#:
+#: Only explicit READ blocks MUTATING (Decision D-3): every other mode — missing,
+#: ``IMPLEMENTATION``, ``BOUND_IMPLEMENTATION``, ``BOUND_REVIEW`` — is lease-taking and may
+#: acquire a *free* lease. ``BOUND_REVIEW`` is treated exactly like implementation at the
+#: gate: the spec grants review no gate rights distinct from implementation (FR-R4-03
+#: scopes READ as the only blocking mode), so review keeps the simple lease-taking path.
+_READ_MODES: frozenset[str] = frozenset({"READ", "BOUND_READ"})
+
+#: BLOCK message for a READ-resolved session attempting a MUTATING write. It names the
+#: documented path to write rights (``bind --mode implementation``) WITHOUT any banned
+#: auto-rebind nag: it states a fact about the session's bound mode and the one-time
+#: operator action that grants write rights, never instructing a mid-flow relaunch.
+_READ_BLOCK_MESSAGE = (
+    "[RULE READ] '{rel_path}' is a MUTATING write, but this session is bound in read "
+    "(observe) mode — read sessions are non-acquiring and never take or modify a lease. "
+    "Additive paths (specs/backlog, specs/bugs, specs/audits, .dadaia/reports, "
+    ".dadaia/handoff, .dadaia/tmp) remain writable. To gain write rights, the operator "
+    "binds implementation mode once: `dadaia context bind {ctx} --mode implementation`."
+)
+
+
+def _is_read_mode(mode: str) -> bool:
+    """True iff ``mode`` resolves to a non-acquiring READ binding (case-insensitive)."""
+    return mode.strip().upper() in _READ_MODES
+
 
 class PathClass(Enum):
     ADDITIVE = "ADDITIVE"
@@ -186,6 +216,13 @@ def evaluate(
     as the incumbent and RENEWs (never blocks). The flow only stops on a genuinely
     concurrent foreign live session — and even then, additive writes are unblocked.
 
+    ``mode`` (WS-R4 FR-R4-03) selects the MUTATING sub-policy. A READ-resolved mode
+    (``READ``/``BOUND_READ``, case-insensitive) is **non-acquiring**: a MUTATING write is
+    BLOCKed with the documented-path message BEFORE any lease call, so a read session never
+    writes a lease record. Every other mode (missing, IMPLEMENTATION, BOUND_IMPLEMENTATION,
+    BOUND_REVIEW) is lease-taking — only explicit READ blocks MUTATING (Decision D-3).
+    ADDITIVE/UNGATED ignore mode entirely; PROTECTED stays fail-closed regardless of mode.
+
     ``pid_probe`` (WS-R2 FR-R2-03) is threaded straight into :func:`lease.acquire` so a
     TTL-expired-but-still-running foreign holder is BLOCKed (not taken over). It is
     injected by the hook layer (``hooks/sdd_gate.py`` sources the container's
@@ -212,6 +249,13 @@ def evaluate(
             f"[RULE A] memory writes are allowed only in DEFINITION or CLOSURE phase "
             f"(current phase={phase})."
         )
+
+    # MUTATING + READ-resolved session (WS-R4 FR-R4-03 / D-3): non-acquiring BLOCK. This
+    # is evaluated BEFORE lease.acquire so NO lease file is written or modified — a read
+    # session can never take, renew, or steal a lease. Only explicit READ reaches here;
+    # missing/IMPLEMENTATION/BOUND_REVIEW fall through to the lease-taking path below.
+    if _is_read_mode(mode):
+        return Decision.BLOCK, _READ_BLOCK_MESSAGE.format(rel_path=rel_path, ctx=ctx or "<ctx>")
 
     # MUTATING — the gate is the single acquisition point (O_EXCL CAS in lease).
     try:

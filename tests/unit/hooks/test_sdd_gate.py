@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import gate_policy
+from dadaia_workspace.features.spec_context import gate_policy, session_identity
 from dadaia_workspace.hooks import sdd_gate
 
 
@@ -179,3 +179,164 @@ def test_live_foreign_lease_blocks(
     decision = json.loads(out)
     assert decision["decision"] == "block"
     assert "another live session" in decision["reason"]
+
+
+# --------------------------------------------------------------------------- #
+# WS-R4 FR-R4-02/03/04 — gate mode resolution + READ non-acquiring.
+# --------------------------------------------------------------------------- #
+
+
+def _write_session_record(ws: Path, session_id: str, mode: str) -> None:
+    """Persist a minimal session record (id + mode) the way the bind CLI does."""
+    session_identity.write_session(ws, session_id, {"session_id": session_id, "mode": mode})
+
+
+def _scrub_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove harness/operator session-id overrides so stdin ``session_id`` resolves.
+
+    These unit tests drive ``resolve_session_id`` via the stdin ``session_id`` field; a
+    leaked ``CLAUDE_CODE_SESSION_ID`` (present when the suite itself runs under Claude Code)
+    would otherwise win the resolution order and point the gate at the wrong record.
+    """
+    for var in (
+        "DADAIA_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "OPENCODE_SESSION_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_resolve_mode_env_override_wins(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Order (1): DADAIA_MODE env override beats any session record. DADAIA_MODE is an
+    # operator-shell escape (no harness sets it); it is planted here via setitem on
+    # os.environ — NOT monkeypatch.setenv — so the harness-env contract (which bans
+    # planting DADAIA_* in hook tests) stays green while still exercising the override.
+    import os
+
+    ws = _mk_workspace(tmp_path, "a")
+    _write_session_record(ws, "sess-1", "READ")
+    monkeypatch.setitem(os.environ, "DADAIA_MODE", "IMPLEMENTATION")
+    assert sdd_gate._resolve_mode(ws, "sess-1") == "IMPLEMENTATION"
+
+
+def test_resolve_mode_session_record_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Order (2): with NO env var, the on-disk session record supplies the mode. This is the
+    # harness-real path (a real hook subprocess never carries DADAIA_MODE).
+    ws = _mk_workspace(tmp_path, "a")
+    _write_session_record(ws, "sess-read", "READ")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    assert sdd_gate._resolve_mode(ws, "sess-read") == "READ"
+
+
+def test_resolve_mode_default_implementation_when_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Order (3): no env, no record → IMPLEMENTATION (FR-R4-04 / D-3, lease-capable).
+    ws = _mk_workspace(tmp_path, "a")
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    assert sdd_gate._resolve_mode(ws, "no-such-session") == "IMPLEMENTATION"
+
+
+def test_read_mode_blocks_mutating_no_lease_written(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # FR-R4-03: a READ-bound session's MUTATING write → BLOCK, and NO lease record is
+    # written (non-acquiring). Message names the documented path, with no auto-rebind nag.
+    ws = _mk_workspace(tmp_path, "B")
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    _scrub_session_env(monkeypatch)
+    _write_session_record(ws, "sess-read", "READ")
+    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    out = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-read"},
+        capsys=capsys,
+    )
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "read" in decision["reason"].lower()
+    assert "--mode implementation" in decision["reason"]
+    # Non-acquiring: the gate must NOT have created the lease record.
+    assert not (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
+
+
+def test_read_mode_allows_additive_in_repo(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # FR-R4-03: a READ session's ADDITIVE write (in-repo specs/bugs) is allowed.
+    ws = _mk_workspace(tmp_path, "B")
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    _scrub_session_env(monkeypatch)
+    _write_session_record(ws, "sess-read", "READ")
+    target = ws / "repos" / "B" / "specs" / "bugs" / "some-bug.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    out = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-read"},
+        capsys=capsys,
+    )
+    assert out == ""
+
+
+def test_read_mode_protected_still_blocks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # PROTECTED stays fail-closed regardless of mode (unchanged by R4).
+    ws = _mk_workspace(tmp_path, "B")
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    _write_session_record(ws, "sess-read", "READ")
+    target = ws / ".dadaia" / "sessions" / "runtime" / "B.ptr"
+    out = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-read"},
+        capsys=capsys,
+    )
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "SEC-01" in decision["reason"]
+
+
+def test_bound_review_acquires_like_implementation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # FR-R4-03 / D-3: only explicit READ blocks MUTATING. BOUND_REVIEW is lease-taking, so a
+    # free lease is acquired exactly like implementation.
+    ws = _mk_workspace(tmp_path, "B")
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    _scrub_session_env(monkeypatch)
+    _write_session_record(ws, "sess-rev", "BOUND_REVIEW")
+    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    out = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "sess-rev"},
+        capsys=capsys,
+    )
+    assert out == ""  # acquired cleanly
+    assert (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
+
+
+def test_missing_mode_acquires_free_lease(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # FR-R4-04: no bind record, no env → IMPLEMENTATION; free-lease acquire proceeds.
+    ws = _mk_workspace(tmp_path, "B")
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
+    monkeypatch.delenv("DADAIA_MODE", raising=False)
+    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
+    _scrub_session_env(monkeypatch)
+    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    out = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "unbound"},
+        capsys=capsys,
+    )
+    assert out == ""
+    assert (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()

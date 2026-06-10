@@ -25,10 +25,14 @@ import re
 import sys
 from pathlib import Path
 
-from dadaia_workspace.features.spec_context import gate_policy, lease
+from dadaia_workspace.features.spec_context import gate_policy, lease, session_identity
 from dadaia_workspace.hooks import _common
 
 _SLUG_STRIP = re.compile(r"[^A-Za-z0-9_-]")
+
+#: Default mode when neither the env override nor a session record resolves one. Missing-mode
+#: sessions stay IMPLEMENTATION-capable (free-lease acquire OK) — Decision D-3 / FR-R4-04.
+_DEFAULT_MODE = "IMPLEMENTATION"
 
 
 def _build_pid_probe() -> lease.PidProbe | None:
@@ -87,6 +91,33 @@ def _context_slug(workspace: Path, fpath: Path) -> str:
     if not slug:
         slug = os.environ.get("DADAIA_CONTEXT", "")  # explicit override only
     return _SLUG_STRIP.sub("", slug or "")
+
+
+def _resolve_mode(workspace: Path, session_id: str) -> str:
+    """Resolve the session's bind mode (WS-R4 FR-R4-02/03/04). Ordered, first hit wins:
+
+    1. ``DADAIA_MODE`` env fast-path override — an operator-shell escape (the harness never
+       sets this; it is honored only when the operator deliberately exports it).
+    2. The CLI-owned session record's ``mode`` field, keyed by the resolved session id
+       (``session_identity.read_session``). **This is the harness-real path**: a real hook
+       subprocess has no ``DADAIA_MODE`` env, so production READ enforcement flows entirely
+       through the on-disk record the bind CLI persisted.
+    3. Default ``IMPLEMENTATION`` (FR-R4-04 / D-3): a plain harness session with no bind
+       record and no env stays lease-capable and may acquire a *free* lease.
+
+    Fail-soft: a missing/malformed record or empty mode field falls through to the default
+    (``read_session`` already returns ``None`` on any read error), so mode resolution never
+    raises and never blocks the gate by accident.
+    """
+    env_mode = os.environ.get("DADAIA_MODE")
+    if env_mode:
+        return env_mode
+    rec = session_identity.read_session(workspace, session_id)
+    if rec is not None:
+        raw = rec.get("mode")
+        if raw:
+            return str(raw)
+    return _DEFAULT_MODE
 
 
 def _active_field(specs_dir: Path, field: str) -> str:
@@ -150,9 +181,15 @@ def main() -> int:
     phase = _active_field(specs_dir, "phase")
     release = _active_field(specs_dir, "release") or "none"
     session_id = _common.resolve_session_id(payload, default="anon-session")
-    mode = os.environ.get("DADAIA_MODE", "IMPLEMENTATION")
+    # Mode resolution order (WS-R4): DADAIA_MODE env override → session record → default.
+    # Resolved here (not inline) so READ-mode enforcement uses the harness-real on-disk
+    # record path, with the env var as the operator-shell escape only.
+    mode = _resolve_mode(workspace, session_id)
 
     # MUTATING with no resolvable context → fail open (UNGATED, no lease), matching shell.
+    # NOTE: a READ-bound session that *does* resolve a context is still blocked below by
+    # gate_policy.evaluate (non-acquiring); the no-context fail-open only covers MUTATING
+    # writes the gate cannot attribute to any context (no slug, no DADAIA_CONTEXT).
     if cls == gate_policy.PathClass.MUTATING and not ctx:
         return 0
 

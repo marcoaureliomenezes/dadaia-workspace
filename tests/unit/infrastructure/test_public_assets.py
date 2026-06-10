@@ -1699,6 +1699,39 @@ class TestConfigGenerators:
         assert any("dadaia_workspace.hooks.sdd_post_gate" in str(c) for c in commands)
         assert not any("sdd-post-gate.sh" in str(c) for c in commands)
 
+    def test_claude_settings_matcher_scoping(self, tmp_path: Path) -> None:
+        """T-010-18 (R6c, AC-R6-05, ai C-12): PreToolUse write-gate hooks are scoped
+        to the write tools; PostToolUse heartbeat fires on all tools; UserPromptSubmit
+        is unchanged (no empty match-all on the write gates)."""
+        manager = FileSystemPublicAssetManager()
+        settings = manager._claude_settings(tmp_path)
+        hooks = settings["hooks"]
+        write_matcher = "Edit|Write|MultiEdit|NotebookEdit"
+
+        # PreToolUse: both sdd_gate and root_whitelist scoped to the write tools.
+        pre = hooks["PreToolUse"]
+        assert isinstance(pre, list) and len(pre) == 2
+        for entry in pre:
+            assert entry["matcher"] == write_matcher
+            assert entry["matcher"] != "", "write gate must not use the empty match-all"
+        pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
+        assert any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
+        assert any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
+
+        # PostToolUse: heartbeat must fire on ALL tools via the explicit match-all.
+        post = hooks["PostToolUse"]
+        assert isinstance(post, list) and len(post) == 1
+        assert post[0]["matcher"] == "*"
+        post_cmds = [str(h["command"]) for h in post[0]["hooks"]]
+        assert any("dadaia_workspace.hooks.sdd_post_gate" in c for c in post_cmds)
+
+        # UserPromptSubmit: unchanged (empty matcher, ctx-inject).
+        ups = hooks["UserPromptSubmit"]
+        assert isinstance(ups, list) and len(ups) == 1
+        assert ups[0]["matcher"] == ""
+        ups_cmds = [str(h["command"]) for h in ups[0]["hooks"]]
+        assert any("dadaia_workspace.hooks.ctx_inject" in c for c in ups_cmds)
+
     def test_claude_settings_root_whitelist_gate_present(self, tmp_path: Path) -> None:
         """T-SANI-01: root-whitelist hook must be registered as a PreToolUse hook.
         T-018-17: command is now Python module invocation, not .sh path."""

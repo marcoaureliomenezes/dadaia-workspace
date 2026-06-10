@@ -87,14 +87,14 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance:** FR-R4-01/02 — `dadaia context bind <ctx>` (no `--mode`) exits 0, default `read`; explicit modes still work; bind **stops emitting the eval-export theater** (`context.py:273`) and persists the session record (via session_identity) instead; legacy modes map explicitly: `spec` → `READ`, `review` → `IMPLEMENTATION/REVIEW` (accepted as aliases, persisted as the mapped mode); pytest green.
 - **Parallelism:** parallel with T-010-04/05; before T-010-09.
 
-### [ ] T-010-09 — R4b: gate mode resolution; READ non-acquiring
+### [x] T-010-09 — R4b: gate mode resolution; READ non-acquiring
 - **Owner:** software-engineer · **Maps:** CONF-3, ai D-10; bugs `context-bind-…`, `lease-stolen…` (read-session steal family)
 - **Write set:** `dadaia_workspace/hooks/sdd_gate.py`, `tests/unit/hooks/test_sdd_gate.py`
 - **Preconditions:** T-010-08, T-010-10.
 - **Acceptance (AC-R4-01/02):** FR-R4-03/04 — resolution order env→session-record→IMPLEMENTATION; READ ⇒ MUTATING blocked (no lease write; message has no auto-rebind nag but MAY name `bind --mode implementation` as the documented path to write rights) and ADDITIVE allowed — verified under `claude_hook_env()` with **no** env vars (session-record path); both-absent ⇒ IMPLEMENTATION, free-lease acquire proceeds; PROTECTED unchanged; pytest green.
 - **Parallelism:** after T-010-08.
 
-### [ ] T-010-06 — R2c: two-actor concurrency e2e (no-steal invariant)
+### [x] T-010-06 — R2c: two-actor concurrency e2e (no-steal invariant)
 - **Owner:** software-engineer · **Maps:** CONF-2/CONF-6, qa §6.2; bug `lease-stolen…` (incident e2e)
 - **Write set:** `tests/e2e/test_two_actor_lease.py` (new) + shared rendezvous helper
 - **Preconditions:** T-010-04, T-010-05.
@@ -150,7 +150,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R8-03):** probe order `DADAIA_BIN` → walk-up `<ws>/.dadaia/.venv/bin/dadaia` → poetry → repo `.venv`; fail-closed clear error when none; fake-tree unit tests for all four branches; stage/install/doctor after edit; manual smoke `git push` from `repos/dadaia-workspace/` recorded for CLOSURE.
 - **Parallelism:** independent.
 
-### [ ] T-010-27 — R8e: consistency-contract policy + import-linter cap
+### [x] T-010-27 — R8e: consistency-contract policy + import-linter cap
 - **Owner:** software-engineer · **Maps:** CONF-9, arch F10, qa §6.4
 - **Write set:** `tests/contract/` (cap test, residue greps), `setup.cfg` (comment-pin), `specs/AGENTS.md` (policy paragraph)
 - **Preconditions:** T-010-23, T-010-13.
@@ -199,7 +199,7 @@ owner unless tasks are in different tracks (disjoint write sets declared here).
 - **Acceptance (AC-R6-02):** five invariants (phase↔markers; CLOSURE-before-archive; unique release ids across releases+_archive; `^v\d+\.\d+\.\d+$` naming with legacy WARN; constitution file-ref resolution) + lease↔session coherence backstop; one failing fixture per invariant; pytest green.
 - **Parallelism:** independent; before T-010-15.
 
-### [ ] T-010-18 — R6c: Claude PreToolUse matcher scoping
+### [x] T-010-18 — R6c: Claude PreToolUse matcher scoping
 - **Owner:** software-engineer · **Maps:** ai C-12
 - **Write set:** `dadaia_workspace/infrastructure/runtime_config.py`, its tests
 - **Preconditions:** T-010-04 merged (PostToolUse breadth requirement known).
