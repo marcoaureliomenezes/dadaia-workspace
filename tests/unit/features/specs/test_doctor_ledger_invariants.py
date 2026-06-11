@@ -304,16 +304,79 @@ def test_non_semver_active_release_dir_reports_doc_027(tmp_path: Path) -> None:
     assert any(i.severity == Severity.ERROR for i in doc_027), [i.to_dict() for i in doc_027]
 
 
-def test_legacy_archive_non_semver_dir_reports_doc_027_warning(tmp_path: Path) -> None:
-    """A legacy archived non-SemVer release dir → SPEC-DOC-027 WARNING, never ERROR."""
+def test_unlisted_legacy_archive_non_semver_dir_reports_doc_027_warning(tmp_path: Path) -> None:
+    """A NON-allowlisted legacy archived non-SemVer dir → SPEC-DOC-027 WARNING, never ERROR.
+
+    Uses a synthetic name that is NOT in the SPEC-DOC-027 permanent allowlist
+    (ADR-9), so forward enforcement for new/unrecognised legacy dirs is intact.
+    """
     specs = _make_clean_specs_tree(tmp_path)
-    legacy = specs / "_archive" / "releases" / "ctx-inject-v2-drift-fix-v1"
+    legacy = specs / "_archive" / "releases" / "some-unlisted-legacy-name-v1"
     legacy.mkdir(parents=True)
     (legacy / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
     issues = SpecsDoctor(specs).check()
     doc_027 = _by_code(issues, "SPEC-DOC-027")
-    assert doc_027, "expected SPEC-DOC-027 WARNING for legacy archive dir"
+    assert doc_027, "expected SPEC-DOC-027 WARNING for unlisted legacy archive dir"
     assert all(i.severity == Severity.WARNING for i in doc_027), [i.to_dict() for i in doc_027]
+
+
+@pytest.mark.parametrize(
+    "allowlisted_name",
+    [
+        "ctx-inject-v2-drift-fix-v1",
+        "memory-markdown-source-v1",
+        "v0.1.4.1",
+        "v0.1.4.2",
+        "v0.1.4.3",
+        "v0.1.4.3-report-retention",
+        "v0.1.4.4",
+        "v0.1.4.5",
+        "v0.1.4.6",
+    ],
+)
+def test_allowlisted_legacy_archive_dir_is_silent_doc_027(
+    tmp_path: Path, allowlisted_name: str
+) -> None:
+    """An enumerated permanent-allowlist legacy archive dir → no SPEC-DOC-027 (ADR-9).
+
+    The frozen-history `_archive` names are documented in source and never renamed;
+    the doctor stays silent for exactly these names.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    legacy = specs / "_archive" / "releases" / allowlisted_name
+    legacy.mkdir(parents=True)
+    (legacy / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-027" not in _codes(issues), [
+        i.to_dict() for i in _by_code(issues, "SPEC-DOC-027")
+    ]
+
+
+def test_allowlist_does_not_silence_synthetic_new_bad_dir_doc_027(tmp_path: Path) -> None:
+    """The allowlist is name-exact: a NEW non-canon dir still WARNs even alongside
+    an allowlisted dir (forward enforcement intact, ADR-9)."""
+    specs = _make_clean_specs_tree(tmp_path)
+    allowed = specs / "_archive" / "releases" / "v0.1.4.6"
+    allowed.mkdir(parents=True)
+    (allowed / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    bad = specs / "_archive" / "releases" / "brand-new-non-canon-dir"
+    bad.mkdir(parents=True)
+    (bad / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    doc_027 = _by_code(issues, "SPEC-DOC-027")
+    assert any("brand-new-non-canon-dir" in (i.path or "") for i in doc_027), [
+        i.to_dict() for i in doc_027
+    ]
+    assert not any("v0.1.4.6" in (i.path or "") for i in doc_027), [i.to_dict() for i in doc_027]
+
+
+def test_allowlist_does_not_silence_live_release_tree_doc_027(tmp_path: Path) -> None:
+    """The allowlist only applies to archived dirs: an allowlisted name appearing in the
+    LIVE releases/ tree born after the canon still ERRORs (forward enforcement, ADR-9)."""
+    specs = _make_clean_specs_tree(tmp_path, release_id="v0.1.4.6")
+    issues = SpecsDoctor(specs).check()
+    doc_027 = _by_code(issues, "SPEC-DOC-027")
+    assert any(i.severity == Severity.ERROR for i in doc_027), [i.to_dict() for i in doc_027]
 
 
 def test_semver_release_dirs_do_not_report_doc_027(tmp_path: Path) -> None:

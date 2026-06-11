@@ -311,7 +311,7 @@ its failing test before the fix.
   reason note for CLOSURE; suite green after lock regen.
 - **Parallelism:** independent.
 
-### [ ] T-011-18 — R10: WARN cleanups, non-memory half only (SPEC-DOC-027 legacy allowlist)
+### [x] T-011-18 — R10: WARN cleanups, non-memory half only (SPEC-DOC-027 legacy allowlist)
 - **Owner:** software-engineer · **Maps:** residual R10 (WARN half only); ADR-3/ADR-9;
   qa Q-M2 split
 - **Write set:** `dadaia_workspace/features/specs/doctor.py` (027 allowlist),

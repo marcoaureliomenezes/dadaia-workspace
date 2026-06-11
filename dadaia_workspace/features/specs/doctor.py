@@ -132,6 +132,31 @@ RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
 RELEASE_SEMVER_HARD = date(2026, 7, 1)  # ERROR starts here
 RELEASE_VINTAGE_CUTOFF = date(2026, 5, 17)  # releases on/before this are excluded
 
+# SPEC-DOC-027 (ADR-9, v0.1.11): permanent documented allowlist of legacy ``_archive``
+# release-dir names that predate the SemVer naming canon. These are FROZEN HISTORY:
+# renaming an archived dir would break historical pointers and is pure churn, so the
+# honest permanent record is this enumerated allowlist (rationale: ADR-9). The doctor
+# stays silent for exactly these names *only inside _archive/releases/* — they never
+# silence a non-canon dir in the LIVE releases/ tree, and any name NOT in this set
+# still WARNs, so forward enforcement for new/unrecognised legacy dirs is intact.
+#   - ``ctx-inject-v2-drift-fix-v1`` / ``memory-markdown-source-v1``: pre-canon
+#     descriptive-slug releases (the slug-naming era before SemVer dirs).
+#   - ``v0.1.4.1``..``v0.1.4.6`` + ``v0.1.4.3-report-retention``: the v0.1.4.x hotfix
+#     family, four-segment + suffixed names that predate the three-segment canon.
+RELEASE_NAMING_LEGACY_ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "ctx-inject-v2-drift-fix-v1",
+        "memory-markdown-source-v1",
+        "v0.1.4.1",
+        "v0.1.4.2",
+        "v0.1.4.3",
+        "v0.1.4.3-report-retention",
+        "v0.1.4.4",
+        "v0.1.4.5",
+        "v0.1.4.6",
+    }
+)
+
 # SPEC-DOC-023: hotfix bullets older than 72 hours in ## Hotfixes pendentes get WARNING
 _HOTFIX_STALE_HOURS = 72
 
@@ -1159,12 +1184,22 @@ class SpecsDoctor:
         - Every other non-conforming dir (archive, vintage ``Created:`` ≤
           ``RELEASE_VINTAGE_CUTOFF``, pre-cutoff, or undeterminable date) is a
           WARNING — legacy names predate the canon and are preserved until renamed.
+
+        ADR-9 (v0.1.11): archived dirs whose name is in the permanent documented
+        ``RELEASE_NAMING_LEGACY_ALLOWLIST`` are silenced entirely — they are frozen
+        history that is never renamed. The allowlist is name-exact and ``_archive``-only,
+        so any unrecognised legacy dir still WARNs and forward enforcement holds.
         """
         issues: list[SpecsDoctorIssue] = []
         for d, root, _is_legacy in self._iter_all_release_dirs():
             if RELEASE_SEMVER_RE.match(d.name):
                 continue
             is_live = root == self.specs_dir / "releases"
+            # ADR-9: archived dirs on the permanent legacy allowlist are silent (frozen
+            # history, never renamed). The allowlist applies ONLY to _archive/ — a
+            # non-canon dir in the live releases/ tree is never silenced this way.
+            if not is_live and d.name in RELEASE_NAMING_LEGACY_ALLOWLIST:
+                continue
             spec_path = d / "SPEC.md"
             created = _extract_created_date(spec_path) if spec_path.exists() else None
             born_after_canon = created is not None and created >= RELEASE_SEMVER_CUTOFF
