@@ -186,7 +186,6 @@ class _RaisingTelemetry:
 # ---------------------------------------------------------------------------
 
 
-
 def _build_minimal_handler(telemetry: Any) -> type[BaseHTTPRequestHandler]:
     """Build a minimal PanelHandler with sessions views injected (no credential)."""
     service = _make_service(telemetry_stub=telemetry)

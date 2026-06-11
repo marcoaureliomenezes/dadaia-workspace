@@ -105,6 +105,7 @@ def _dispatch_post(
 # Tests
 # ---------------------------------------------------------------------------
 
+
 def _make_views() -> dict[str, _StubView]:
     names = ["index", "api_servers", "api_contexts", "memory", "memory_view", "static"]
     views: dict[str, _StubView] = {n: _StubView(name=n) for n in names}
