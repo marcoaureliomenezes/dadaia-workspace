@@ -184,6 +184,27 @@ def build_repos_service() -> ReposService:
     return ReposService(excel_reader=OpenpyxlExcelReader())
 
 
+def _build_pid_probe() -> Callable[[int], bool] | None:
+    """Composition-root PID-liveness probe wiring for the DoctorService LOCK-GC sweep.
+
+    The container is the composition root: it may reach into the hook layer's canonical
+    probe builder (``hooks/sdd_gate._build_pid_probe``, which wires the container's
+    ``OsProcessProbe``) and inject the resulting ``(pid) -> alive?`` callable into the
+    ``DoctorService``. Without it, ``dadaia doctor --fix`` runs LOCK-GC TTL-only and would
+    reclaim a TTL-expired lease whose holder pid is STILL ALIVE — violating the no-steal
+    invariant (FR-W1-02: a live-pid holder is NEVER reclaimed). This mirrors the
+    ``SpecsDoctor`` seam in ``cli/commands/specs.py``: ``features/spec_context/doctor.py``
+    never imports the infrastructure adapter. Any failure ⇒ ``None`` ⇒ TTL-only liveness
+    (Windows-safe / legacy-record-safe), exactly as the gate degrades.
+    """
+    try:
+        from dadaia_workspace.hooks.sdd_gate import _build_pid_probe as _hook_build_probe
+
+        return _hook_build_probe()
+    except Exception:  # noqa: BLE001 — probe wiring must never break `dadaia doctor`.
+        return None
+
+
 def build_doctor_service(workspace_root: Path) -> DoctorService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
@@ -191,6 +212,7 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        pid_probe=_build_pid_probe(),
     )
 
 

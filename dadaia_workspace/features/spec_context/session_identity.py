@@ -281,10 +281,12 @@ def liveness_timestamp(record: dict[str, object]) -> str:
 
     Prefers the heartbeat-renewed ``last_seen_at``; when absent (a pre-heartbeat record),
     falls back to the creation timestamp (``bound_at`` then ``created_at``) so GC decays
-    such a record TTL-from-creation. Returns ``""`` when no timestamp is present, which the
-    TTL predicate treats as fresh (fail-safe — a malformed record is never auto-collected
-    on a timestamp it does not carry). The ``pid`` field is never consulted here (ADR-8
-    amended: the bind-CLI pid is dead by construction).
+    such a record TTL-from-creation. Returns ``""`` when no timestamp is present at all.
+    The consumer (``doctor.py`` graveyard-GC) feeds this string into
+    ``core.lock_liveness.is_stale`` as the record's ``heartbeat``, and that predicate
+    treats an empty/non-string heartbeat as **STALE** (fail-open) — so a record that
+    carries no timestamp whatsoever is collected, not preserved. The ``pid`` field is never
+    consulted here (ADR-8 amended: the bind-CLI pid is dead by construction).
     """
     raw = record.get(SESSION_HEARTBEAT_FIELD)
     if isinstance(raw, str) and raw:
