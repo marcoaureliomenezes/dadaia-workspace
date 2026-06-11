@@ -3,7 +3,7 @@ title: configure-hook-writes-malformed-duplicate-userpromptsubmit
 severity: High
 opened: 2026-06-07
 session_id: null
-status: Fixed
+status: Closed
 ---
 
 # Bug: configure-hook-writes-malformed-duplicate-userpromptsubmit

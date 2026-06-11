@@ -1,7 +1,7 @@
 ---
 title: semaphore-no-liveness-reclaim
 severity: Medium
-status: resolved
+status: Closed
 opened: 2026-06-05
 session_id: null
 resolved_in: v0.1.5/rc-2

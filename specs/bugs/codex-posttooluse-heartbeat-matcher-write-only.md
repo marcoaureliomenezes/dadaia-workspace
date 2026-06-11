@@ -1,6 +1,6 @@
 ---
 name: codex-posttooluse-heartbeat-matcher-write-only
-status: Resolved
+status: Closed
 severity: HIGH
 session_id: null
 reported: 2026-06-10

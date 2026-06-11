@@ -3,7 +3,7 @@ title: doctor-blind-to-projected-drift
 severity: High
 opened: 2026-06-05
 session_id: null
-status: resolved
+status: Closed
 resolved_in: v0.1.5/rc-2
 resolution_note: resolved by v0.1.5/rc-2 T-PROP-01 (install hash-compare overwrite) + T-PROP-02 (doctor staging↔projected check) + T-PROP-03 (guardrail rule alignment)
 ---
