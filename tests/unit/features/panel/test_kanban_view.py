@@ -99,10 +99,8 @@ class _FakeSocket:
 def _dispatch_get(
     handler_class: type[BaseHTTPRequestHandler],
     path: str,
-    token: str | None = None,
 ) -> tuple[int, bytes]:
-    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = f"GET {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
+    raw_request = f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
     fake_sock = _FakeSocket(raw_request)
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
     response = fake_sock._wfile.getvalue()
@@ -115,10 +113,8 @@ def _dispatch_get(
 def _dispatch_post(
     handler_class: type[BaseHTTPRequestHandler],
     path: str,
-    token: str | None = None,
 ) -> tuple[int, bytes]:
-    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = f"POST {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
+    raw_request = f"POST {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
     fake_sock = _FakeSocket(raw_request)
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
     response = fake_sock._wfile.getvalue()
@@ -143,13 +139,8 @@ class _StubView:
         return (self.status, self.content_type, self.body)
 
 
-_TEST_TOKEN = "test-kanban-token"
-
-
 def _make_handler(
     tmp_path: Path,
-    *,
-    token: str | None = _TEST_TOKEN,
 ) -> type[BaseHTTPRequestHandler]:
     """Build a handler class with a real api_kanban view and minimal stubs."""
     kanban_view = render_api_kanban(tmp_path)
@@ -165,7 +156,6 @@ def _make_handler(
     }
     return make_handler_class(  # type: ignore[arg-type]
         views,  # type: ignore[arg-type]
-        token=token,
         telemetry=None,
     )
 
@@ -333,20 +323,19 @@ def test_kanban_invalid_session_files_skipped(tmp_path: Path) -> None:
     assert columns["backlog"][0]["session_id"] == "sess_valid"
 
 
-def test_kanban_auth_enforced(tmp_path: Path) -> None:
-    """Auth is required: tokenless ⇒ 401, valid Bearer ⇒ 200 (no loopback bypass)."""
+def test_kanban_serves_without_credential(tmp_path: Path) -> None:
+    """GET /api/kanban serves 200 with NO credential (panel auth removed 2026-06-11).
+
+    The Bearer-required variant of this test was removed when panel auth was
+    deleted; the no-auth + Host-guard contract is pinned in
+    ``test_no_auth_contract.py``.
+    """
     sessions_dir = tmp_path / ".dadaia" / "sessions"
     _write_session(sessions_dir, session_id="sess_auth", mode="READ")
 
-    handler_class = _make_handler(tmp_path, token=_TEST_TOKEN)
+    handler_class = _make_handler(tmp_path)
 
-    # Tokenless request → 401 even on loopback (sec F-3).
     status, body = _dispatch_get(handler_class, "/api/kanban")
-    assert status == 401
-    assert b"unauthorized" in body
-
-    # Valid Bearer token → 200.
-    status, body = _dispatch_get(handler_class, "/api/kanban", token=_TEST_TOKEN)
     assert status == 200
     data = json.loads(body)
     assert "swimlanes" in data

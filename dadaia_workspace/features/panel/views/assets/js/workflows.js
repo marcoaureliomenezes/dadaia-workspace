@@ -567,21 +567,13 @@
     var grid = getGrid();
     if (!grid) { return; }
     grid.setAttribute('aria-busy', 'false');
-    if (status === 401) {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + '<strong>Authentication required.</strong> '
-        + 'Re-authenticate by opening the panel with '
-        + '<code>dadaia panel start</code> and using the token URL provided.'
-        + '</div>';
-    } else {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + 'Failed to load workflows (HTTP ' + escHtml(String(status)) + '). '
-        + '<button type="button" id="workflows-retry-btn" class="retry-link">Retry</button>'
-        + '</div>';
-      var retryBtn = document.getElementById('workflows-retry-btn');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', function () { load(); });
-      }
+    grid.innerHTML = '<div class="error-state" role="alert">'
+      + 'Failed to load workflows (HTTP ' + escHtml(String(status)) + '). '
+      + '<button type="button" id="workflows-retry-btn" class="retry-link">Retry</button>'
+      + '</div>';
+    var retryBtn = document.getElementById('workflows-retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', function () { load(); });
     }
   }
 

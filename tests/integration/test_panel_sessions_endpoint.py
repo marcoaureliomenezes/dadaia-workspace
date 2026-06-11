@@ -211,23 +211,25 @@ def _get(url: str, token: str | None = None) -> tuple[int, bytes]:
 
 
 class TestSessionsAuth:
-    def test_sessions_list_401_without_token(self, sessions_server) -> None:
-        """GET /api/sessions without token → 401."""
+    """Sessions routes serve credential-less — no-auth contract (operator decision 2026-06-11)."""
+
+    def test_sessions_list_200_without_token(self, sessions_server) -> None:
+        """GET /api/sessions without token → 200."""
         base, token, _ = sessions_server
         status, _ = _get(f"{base}/api/sessions")
-        assert status == 401
+        assert status == 200
 
-    def test_sessions_list_401_wrong_token(self, sessions_server) -> None:
-        """GET /api/sessions with wrong token → 401."""
+    def test_sessions_list_stray_auth_header_ignored(self, sessions_server) -> None:
+        """A stray Authorization header is ignored — the route still serves 200."""
         base, _, _ = sessions_server
         status, _ = _get(f"{base}/api/sessions", token="wrong-token")
-        assert status == 401
+        assert status == 200
 
-    def test_sessions_detail_401_without_token(self, sessions_server) -> None:
-        """GET /api/sessions/claude/<id> without token → 401."""
+    def test_sessions_detail_serves_without_token(self, sessions_server) -> None:
+        """GET /api/sessions/claude/<id> without token → not an auth error (404 for unknown id is fine)."""
         base, token, _ = sessions_server
         status, _ = _get(f"{base}/api/sessions/claude/any-id")
-        assert status == 401
+        assert status in (200, 404)
 
 
 # ---------------------------------------------------------------------------

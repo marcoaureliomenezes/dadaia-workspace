@@ -78,8 +78,51 @@ def _spawn_panel(
 
 
 def _wait_for_ready(proc: subprocess.Popen[str], port: int, timeout: float = 10.0) -> None:
-    """Block until the 'Panel running at' line appears on stdout or timeout."""
-    _wait_for_ready_and_token(proc, port, timeout)
+    """Block until the 'Panel running at' line appears on stdout or timeout.
+
+    Panel auth was removed by operator decision (2026-06-11): the panel is a
+    loopback-only local tool — no token, no launch URL, no cookie. Startup
+    prints a single ready line; this helper waits for it with a reader thread
+    (mixing select on the raw fd with buffered readline is unsound).
+    """
+    expected = f"Panel running at http://127.0.0.1:{port}/"
+    assert proc.stdout is not None
+
+    lines: queue.Queue[str | None] = queue.Queue()
+
+    def _reader() -> None:
+        try:
+            assert proc.stdout is not None
+            for raw in proc.stdout:
+                lines.put(raw)
+        finally:
+            lines.put(None)  # EOF sentinel
+
+    reader = threading.Thread(target=_reader, daemon=True)
+    reader.start()
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        remaining = max(0.0, deadline - time.monotonic())
+        try:
+            line = lines.get(timeout=min(0.2, remaining) or 0.05)
+        except queue.Empty:
+            if proc.poll() is not None:
+                stderr = _drain_stderr_nonblocking(proc)
+                raise RuntimeError(
+                    f"Panel process exited early (rc={proc.returncode}). stderr:\n{stderr}"
+                ) from None
+            continue
+        if line is None:  # EOF — process closed stdout
+            stderr = _drain_stderr_nonblocking(proc)
+            raise RuntimeError(
+                f"Panel closed stdout before becoming ready (rc={proc.poll()}). stderr:\n{stderr}"
+            )
+        if expected in line:
+            return
+
+    stderr = _drain_stderr_nonblocking(proc)
+    raise TimeoutError(f"Panel did not print the ready line within {timeout}s. stderr:\n{stderr}")
 
 
 def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) -> str:
@@ -101,110 +144,10 @@ def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) ->
         return ""
 
 
-def _wait_for_ready_and_token(proc: subprocess.Popen[str], port: int, timeout: float = 10.0) -> str:
-    """Block until the panel is ready and return the single-use LAUNCH token.
-
-    The panel prints two lines on startup (flushed before ``serve_forever``)::
-
-        Panel running at http://127.0.0.1:<port>/
-        First-load URL:  http://127.0.0.1:<port>/?launch=<launch-token>
-
-    T-011-13 / ADR-10: the launch URL carries ONLY a single-use, short-TTL launch
-    token — NEVER the long-lived Bearer.  The Bearer is exchanged server-side for
-    a ``SameSite=Strict; HttpOnly`` session cookie on first GET of the shell.
-    Sensitive APIs stay Bearer-only, so the e2e reads the Bearer out of the
-    exchanged cookie (see ``_exchange_launch_token``) for its authed calls.
-
-    A reader thread drains stdout line-by-line; mixing ``select`` on the raw fd
-    with a buffered ``TextIOWrapper.readline`` is unsound (the second line can be
-    sitting in the wrapper's buffer while ``select`` reports the fd as empty,
-    which is exactly the hang this replaces).
-
-    Fails fast with a bounded timeout — never an unbounded poll, and never a
-    blocking ``stderr.read()`` on the still-running process.
-    """
-    expected = f"Panel running at http://127.0.0.1:{port}/"
-    token_marker = "/?launch="
-    assert proc.stdout is not None
-
-    lines: queue.Queue[str | None] = queue.Queue()
-
-    def _reader() -> None:
-        try:
-            assert proc.stdout is not None
-            for raw in proc.stdout:
-                lines.put(raw)
-        finally:
-            lines.put(None)  # EOF sentinel
-
-    reader = threading.Thread(target=_reader, daemon=True)
-    reader.start()
-
-    deadline = time.monotonic() + timeout
-    ready = False
-    token: str | None = None
-    while time.monotonic() < deadline:
-        remaining = max(0.0, deadline - time.monotonic())
-        try:
-            line = lines.get(timeout=min(0.2, remaining) or 0.05)
-        except queue.Empty:
-            if proc.poll() is not None:
-                stderr = _drain_stderr_nonblocking(proc)
-                raise RuntimeError(
-                    f"Panel process exited early (rc={proc.returncode}). stderr:\n{stderr}"
-                ) from None
-            continue
-        if line is None:  # EOF — process closed stdout
-            stderr = _drain_stderr_nonblocking(proc)
-            raise RuntimeError(
-                f"Panel closed stdout before becoming ready (rc={proc.poll()}). stderr:\n{stderr}"
-            )
-        if expected in line:
-            ready = True
-        if token_marker in line:
-            token = line.split(token_marker, 1)[1].strip()
-        if ready and token is not None:
-            return token
-
-    stderr = _drain_stderr_nonblocking(proc)
-    raise TimeoutError(
-        f"Panel did not print ready-line + token within {timeout}s. stderr:\n{stderr}"
-    )
-
-
-def _auth_get(url: str, token: str, timeout: float = 5.0) -> http.client.HTTPResponse:
-    """GET *url* with an Authorization: Bearer header. Returns the response."""
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Bearer {token}")
-    resp: http.client.HTTPResponse = urllib.request.urlopen(req, timeout=timeout)
+def _get(url: str, timeout: float = 5.0) -> http.client.HTTPResponse:
+    """Plain credential-less GET — the no-auth contract (operator decision 2026-06-11)."""
+    resp: http.client.HTTPResponse = urllib.request.urlopen(url, timeout=timeout)
     return resp
-
-
-def _bearer_from_set_cookie(set_cookie: str) -> str:
-    """Extract the Bearer value from a ``panel_session=<bearer>; ...`` Set-Cookie."""
-    first = set_cookie.split(";", 1)[0]
-    name, _, value = first.partition("=")
-    assert name.strip() == "panel_session", f"unexpected session cookie: {set_cookie!r}"
-    return value.strip()
-
-
-def _exchange_launch_token(port: int, launch_token: str, timeout: float = 5.0) -> str:
-    """Exchange a single-use launch token for the Bearer carried in the cookie.
-
-    T-011-13 / ADR-10 binding contract: first GET ``/?launch=<tok>`` returns 200
-    and a ``SameSite=Strict; HttpOnly`` Set-Cookie; the cookie value is the
-    Bearer (the session credential).  Asserts the cookie flags and returns the
-    Bearer so the caller can drive Bearer-only sensitive APIs.
-    """
-    url = f"http://127.0.0.1:{port}/?launch={launch_token}"
-    with urllib.request.urlopen(url, timeout=timeout) as resp:
-        assert resp.status == 200, f"launch exchange must return 200, got {resp.status}"
-        set_cookie = resp.headers.get("Set-Cookie")
-    assert set_cookie, "first launch-token use must emit a Set-Cookie header"
-    low = set_cookie.lower()
-    assert "httponly" in low, f"session cookie must be HttpOnly: {set_cookie!r}"
-    assert "samesite=strict" in low, f"session cookie must be SameSite=Strict: {set_cookie!r}"
-    return _bearer_from_set_cookie(set_cookie)
 
 
 def _kill_proc(proc: subprocess.Popen[str]) -> None:
@@ -239,10 +182,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        launch_token = _wait_for_ready_and_token(proc, port)
-        token = _exchange_launch_token(port, launch_token)
+        _wait_for_ready(proc, port)
 
-        # --- index page (PUBLIC — no token required) ---
+        # --- index page (no credential — the panel is auth-free on loopback) ---
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=5) as resp:
             assert resp.status == 200
             body = resp.read().decode("utf-8", errors="replace")
@@ -258,9 +200,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             "Index page missing Agents/Workflows section marker"
         )
 
-        # --- /api/panel-status (sensitive — Bearer token required) ---
+        # --- /api/panel-status (credential-less — no-auth contract) ---
         # Response shape: {"groups": [...]}  (see views/api.py contract docstring)
-        with _auth_get(f"http://127.0.0.1:{port}/api/panel-status", token) as resp:
+        with _get(f"http://127.0.0.1:{port}/api/panel-status") as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/panel-status: {ct}"
@@ -269,9 +211,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             assert "groups" in servers_data, "/api/panel-status response missing 'groups' key"
             assert isinstance(servers_data["groups"], list), "'groups' must be a list"
 
-        # --- /api/contexts (sensitive — Bearer token required) ---
+        # --- /api/contexts (credential-less — no-auth contract) ---
         # Response shape: {"contexts": [...]}  (see views/api.py contract docstring)
-        with _auth_get(f"http://127.0.0.1:{port}/api/contexts", token) as resp:
+        with _get(f"http://127.0.0.1:{port}/api/contexts") as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/contexts: {ct}"
@@ -289,42 +231,40 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# T-010-21 R7c — panel loopback auth (sec F-3, AC-R7-03)
+# No-auth loopback contract (operator decision 2026-06-11) — supersedes the
+# T-010-21 R7c 401 pin and the T-011-13 launch-token binding contract: the
+# panel is a loopback-only local tool; the loopback bind plus the Host-header
+# allowlist (DNS-rebinding guard) are the entire boundary.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
-def test_tokenless_loopback_request_to_sensitive_api_is_401(tmp_path: Path) -> None:
-    """AC-R7-03 contract pin: a tokenless 127.0.0.1 request to a sensitive panel
-    API returns 401; the same request with the Bearer token returns 200.
+def test_credentialless_loopback_request_to_api_is_200(tmp_path: Path) -> None:
+    """A credential-less 127.0.0.1 request to every panel surface serves 200.
 
-    There is no loopback auth bypass — a co-located local process or a malicious
-    local web page (DNS-rebinding / CSRF-style) cannot reach workspace state
-    without the token.
+    No token, no cookie, no Authorization header — the no-auth contract.
+    A request with a foreign Host header is refused (403) by the
+    DNS-rebinding allowlist.
     """
     _init_workspace(tmp_path)
     port = _find_free_port()
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        launch_token = _wait_for_ready_and_token(proc, port)
-        token = _exchange_launch_token(port, launch_token)
+        _wait_for_ready(proc, port)
 
-        # Tokenless request to a sensitive API → 401.
-        sensitive_url = f"http://127.0.0.1:{port}/api/panel-status"
+        for path in ("/", "/health", "/api/panel-status", "/api/contexts", "/api/kanban"):
+            with _get(f"http://127.0.0.1:{port}{path}") as resp:
+                assert resp.status == 200, f"{path} must serve 200 credential-less"
+
+        # Foreign Host header → 403 (DNS-rebinding allowlist, NOT auth).
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/panel-status")
+        req.add_header("Host", "evil.example.com")
         try:
-            with urllib.request.urlopen(sensitive_url, timeout=5):
-                raise AssertionError("Tokenless request to sensitive API must NOT return 2xx")
+            with urllib.request.urlopen(req, timeout=5):
+                raise AssertionError("Foreign-Host request must NOT return 2xx")
         except urllib.error.HTTPError as exc:
-            assert exc.code == 401, f"Expected 401 for tokenless sensitive API, got {exc.code}"
-
-        # Same request WITH the Bearer token → 200.
-        with _auth_get(sensitive_url, token) as resp:
-            assert resp.status == 200
-
-        # PUBLIC /health stays reachable without a token.
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=5) as resp:
-            assert resp.status == 200
+            assert exc.code == 403, f"Expected 403 for foreign Host, got {exc.code}"
 
         proc.send_signal(signal.SIGINT)
         rc = proc.wait(timeout=5)
@@ -334,50 +274,36 @@ def test_tokenless_loopback_request_to_sensitive_api_is_401(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
-# T-011-13 — panel launch-token binding contract (AC-W4-02 / ADR-10)
+# Startup banner contract (no-auth world)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
-def test_launch_url_has_no_bearer_and_token_is_single_use(tmp_path: Path) -> None:
-    """AC-W4-02 binding contract (URL content + replay 401).
+def test_startup_banner_has_no_token_or_launch_url(tmp_path: Path) -> None:
+    """The startup output is a plain URL — no `?launch=`, no token, no cookie hint.
 
-    The CLI launch URL carries ONLY a single-use launch token (`?launch=<tok>`)
-    and NEVER the long-lived Bearer.  First GET exchanges it for a
-    ``SameSite=Strict; HttpOnly`` session cookie carrying the Bearer; a replay of
-    the consumed launch token returns 401.  Sensitive APIs stay Bearer-only.
+    Replaces the retired launch-token binding contract (panel auth removed by
+    operator decision 2026-06-11).
     """
     _init_workspace(tmp_path)
     port = _find_free_port()
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        launch_token = _wait_for_ready_and_token(proc, port)
-
-        # First use of the launch token → 200 + Set-Cookie carrying the Bearer.
-        bearer = _exchange_launch_token(port, launch_token)
-        assert bearer, "exchanged session cookie must carry a non-empty Bearer"
-
-        # URL content: the launch token is NOT the Bearer (no Bearer in the URL).
-        assert bearer != launch_token, (
-            "the launch URL token must be the single-use launch token, NOT the Bearer"
-        )
-
-        # Replay of the consumed launch token → 401 (single-use; binding contract).
-        replay_url = f"http://127.0.0.1:{port}/?launch={launch_token}"
-        try:
-            with urllib.request.urlopen(replay_url, timeout=5):
-                raise AssertionError("Replay of a consumed launch token must NOT return 2xx")
-        except urllib.error.HTTPError as exc:
-            assert exc.code == 401, f"Expected 401 on launch-token replay, got {exc.code}"
-
-        # The exchanged Bearer still authorizes a sensitive Bearer-only API.
-        with _auth_get(f"http://127.0.0.1:{port}/api/panel-status", bearer) as resp:
+        _wait_for_ready(proc, port)
+        # The banner already arrived; the API serves with zero credentials.
+        with _get(f"http://127.0.0.1:{port}/api/panel-status") as resp:
             assert resp.status == 200
 
         proc.send_signal(signal.SIGINT)
         rc = proc.wait(timeout=5)
         assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
+        # Drain remaining stdout after exit; no token marker may appear anywhere.
+        leftover = proc.stdout.read() if proc.stdout is not None else ""
+        assert "?launch=" not in leftover, (
+            f"startup output still carries a launch token: {leftover!r}"
+        )
+        assert "token" not in leftover.lower(), f"startup output mentions a token: {leftover!r}"
     finally:
         _kill_proc(proc)
 
@@ -455,8 +381,8 @@ def test_memory_view_iframe_loads(tmp_path: Path) -> None:
     under ``repos/<slug>/specs/memory/architecture.md`` — never the real workspace
     root (the previous incarnation pointed at ``cwd=_DADAIA_WORKSPACE_ROOT`` and
     guarded on a retired ``architecture.html``, so it was dead-by-skip since the
-    markdown migration). Memory routes are Bearer-gated (sec F-3), so every request
-    carries the token.
+    markdown migration). The panel is auth-free on loopback (operator decision
+    2026-06-11), so plain GETs exercise the chain.
     """
     _init_workspace(tmp_path)
 
@@ -475,12 +401,11 @@ def test_memory_view_iframe_loads(tmp_path: Path) -> None:
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        launch_token = _wait_for_ready_and_token(proc, port)
-        token = _exchange_launch_token(port, launch_token)
+        _wait_for_ready(proc, port)
 
         # --- /memory-view/<slug>/architecture.md → wrapper with iframe ---
         wrapper_url = f"http://127.0.0.1:{port}/memory-view/{slug}/architecture.md"
-        with _auth_get(wrapper_url, token) as resp:
+        with _get(wrapper_url) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "text/html" in ct, f"Unexpected content-type for memory-view: {ct}"
@@ -495,7 +420,7 @@ def test_memory_view_iframe_loads(tmp_path: Path) -> None:
 
         # --- /memory/<slug>/architecture.md → Markdown rendered to HTML (D-4) ---
         memory_url = f"http://127.0.0.1:{port}/memory/{slug}/architecture.md"
-        with _auth_get(memory_url, token) as resp:
+        with _get(memory_url) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "text/html" in ct, f"Unexpected content-type for memory render: {ct}"

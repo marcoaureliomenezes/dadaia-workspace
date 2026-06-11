@@ -231,11 +231,7 @@
     window.authedFetch('/api/kanban')
       .then(function (r) {
         if (!r.ok) {
-          if (r.status === 401) {
-            renderError('Authentication required. Re-open the panel via dadaia panel start.');
-          } else {
-            renderError('Failed to load Kanban board (HTTP ' + r.status + ').');
-          }
+          renderError('Failed to load Kanban board (HTTP ' + r.status + ').');
           return null;
         }
         return r.json();

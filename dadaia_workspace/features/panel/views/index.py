@@ -244,8 +244,10 @@ def _render_context_card(ctx: PanelContext) -> str:
         f"</div>"
         f"{zone_c}"
         f'<nav class="card-zone-d card-chips" aria-label="Memory links">'
+        f'<a class="memory-chip" href="{memory_view_url(slug, "constitution.md")}">Constitution</a>'
         f'<a class="memory-chip" href="{memory_view_url(slug, "architecture.md")}">Architecture</a>'
         f'<a class="memory-chip" href="{memory_view_url(slug, "tech-stack.md")}">Tech Stack</a>'
+        f'<a class="memory-chip" href="{memory_view_url(slug, "quality-assurance.md")}">Quality</a>'
         f'<a class="memory-chip" href="{memory_view_url(slug, "product/index.md")}">Product</a>'
         f"</nav>"
         f"</article>"

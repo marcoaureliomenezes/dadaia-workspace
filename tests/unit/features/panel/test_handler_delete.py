@@ -1,8 +1,15 @@
 """Unit tests for PanelHandler.do_DELETE — T-P5-31.
 
+Panel auth removed by operator decision 2026-06-11 — see handler.py module
+docstring; the no-auth + Host-guard contract is pinned in
+``test_no_auth_contract.py``.  The Bearer-token DELETE/POST 401 cases that used
+to live here were DELETED with that change; the panel serves every route without
+a credential.  What remains is the still-real DELETE dispatch behaviour:
+
 Covers:
-  - DELETE /api/reports/<path> with valid Bearer token dispatches to api_report_delete view.
-  - DELETE /api/reports/<path> without valid Bearer token returns 401.
+  - DELETE /api/reports/<path> dispatches to api_report_delete view (no credential).
+  - DELETE /api/reports/<path>/important dispatches to api_report_unmark_important.
+  - POST /api/reports/<path>/important dispatches to api_report_mark_important.
   - DELETE /unknown/path returns 404.
 """
 
@@ -64,14 +71,12 @@ class _FakeSocket:
 def _dispatch_delete(
     handler_class: type[BaseHTTPRequestHandler],
     path: str,
-    token: str | None = None,
 ) -> tuple[int, bytes]:
     """Drive a single DELETE request through *handler_class* for *path*.
 
-    Returns ``(status_code, response_body_bytes)``.
+    Sends a loopback Host, NO credential.  Returns ``(status_code, body_bytes)``.
     """
-    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = f"DELETE {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
+    raw_request = f"DELETE {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
     fake_sock = _FakeSocket(raw_request)
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
 
@@ -85,10 +90,8 @@ def _dispatch_delete(
 def _dispatch_post(
     handler_class: type[BaseHTTPRequestHandler],
     path: str,
-    token: str | None = None,
 ) -> tuple[int, bytes]:
-    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = f"POST {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
+    raw_request = f"POST {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
     fake_sock = _FakeSocket(raw_request)
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
     response = fake_sock._wfile.getvalue()
@@ -102,9 +105,6 @@ def _dispatch_post(
 # Tests
 # ---------------------------------------------------------------------------
 
-_TOKEN = "test-token-abc"
-
-
 def _make_views() -> dict[str, _StubView]:
     names = ["index", "api_servers", "api_contexts", "memory", "memory_view", "static"]
     views: dict[str, _StubView] = {n: _StubView(name=n) for n in names}
@@ -115,46 +115,24 @@ def _make_views() -> dict[str, _StubView]:
     return views  # type: ignore[return-value]
 
 
-def test_delete_report_with_valid_token_dispatches_view() -> None:
-    """DELETE /api/reports/foo.html with valid Bearer token calls api_report_delete view."""
+def test_delete_report_dispatches_view() -> None:
+    """DELETE /api/reports/foo.html calls api_report_delete view (no credential)."""
     views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+    handler_class = make_handler_class(views)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_delete(handler_class, "/api/reports/foo.html", token=_TOKEN)
+    status, _ = _dispatch_delete(handler_class, "/api/reports/foo.html")
 
     assert status == 200
     assert views["api_report_delete"].call_count == 1
     assert views["api_report_delete"].last_kwargs == {"path": "foo.html"}
 
 
-def test_delete_report_without_token_returns_401() -> None:
-    """DELETE /api/reports/foo.html without Authorization header returns 401."""
-    views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
-
-    status, _ = _dispatch_delete(handler_class, "/api/reports/foo.html", token=None)
-
-    assert status == 401
-    assert views["api_report_delete"].call_count == 0
-
-
-def test_delete_report_with_wrong_token_returns_401() -> None:
-    """DELETE /api/reports/foo.html with wrong Bearer token returns 401."""
-    views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
-
-    status, _ = _dispatch_delete(handler_class, "/api/reports/foo.html", token="wrong-token")
-
-    assert status == 401
-    assert views["api_report_delete"].call_count == 0
-
-
 def test_delete_unknown_path_returns_404() -> None:
     """DELETE /unknown/path returns 404."""
     views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+    handler_class = make_handler_class(views)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_delete(handler_class, "/unknown/path", token=_TOKEN)
+    status, _ = _dispatch_delete(handler_class, "/unknown/path")
 
     assert status == 404
 
@@ -162,52 +140,33 @@ def test_delete_unknown_path_returns_404() -> None:
 def test_delete_report_nested_path_captures_full_path() -> None:
     """DELETE /api/reports/ctx/agent/file.html captures full path including slashes."""
     views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+    handler_class = make_handler_class(views)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_delete(handler_class, "/api/reports/ctx/agent/file.html", token=_TOKEN)
+    status, _ = _dispatch_delete(handler_class, "/api/reports/ctx/agent/file.html")
 
     assert status == 200
     assert views["api_report_delete"].call_count == 1
     assert views["api_report_delete"].last_kwargs == {"path": "ctx/agent/file.html"}
 
 
-def test_mark_important_post_with_valid_token_dispatches_view() -> None:
+def test_mark_important_post_dispatches_view() -> None:
+    """POST /api/reports/<path>/important dispatches to api_report_mark_important."""
     views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+    handler_class = make_handler_class(views)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_post(
-        handler_class,
-        "/api/reports/ctx/agent/file.html/important",
-        token=_TOKEN,
-    )
+    status, _ = _dispatch_post(handler_class, "/api/reports/ctx/agent/file.html/important")
 
     assert status == 200
     assert views["api_report_mark_important"].call_count == 1
     assert views["api_report_mark_important"].last_kwargs == {"path": "ctx/agent/file.html"}
 
 
-def test_unmark_important_delete_without_token_returns_401() -> None:
+def test_unmark_important_delete_dispatches_view() -> None:
+    """DELETE /api/reports/<path>/important dispatches to api_report_unmark_important."""
     views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
+    handler_class = make_handler_class(views)  # type: ignore[arg-type]
 
-    status, _ = _dispatch_delete(
-        handler_class,
-        "/api/reports/ctx/agent/file.html/important",
-    )
-
-    assert status == 401
-    assert views["api_report_unmark_important"].call_count == 0
-
-
-def test_unmark_important_delete_with_valid_token_dispatches_view() -> None:
-    views = _make_views()
-    handler_class = make_handler_class(views, token=_TOKEN)  # type: ignore[arg-type]
-
-    status, _ = _dispatch_delete(
-        handler_class,
-        "/api/reports/ctx/agent/file.html/important",
-        token=_TOKEN,
-    )
+    status, _ = _dispatch_delete(handler_class, "/api/reports/ctx/agent/file.html/important")
 
     assert status == 200
     assert views["api_report_unmark_important"].call_count == 1

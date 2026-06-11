@@ -316,3 +316,59 @@ def test_fixture_md_renders_correctly(
         assert "/memory-view/" in html
         for slug in expected_slugs:
             assert slug in html, f"{slug_name}: expected [[{slug}]] to appear in rendered HTML"
+
+
+# ---------------------------------------------------------------------------
+# Constitution allowlist (operator demand 2026-06-11): the single literal path
+# `constitution.md` re-roots to repos/<slug>/specs/constitution.md. Nothing
+# else under specs/ is reachable through the memory routes.
+# ---------------------------------------------------------------------------
+
+
+def _mk_ws(tmp_path):
+    slug = "ctx"
+    specs = tmp_path / "repos" / slug / "specs"
+    (specs / "memory").mkdir(parents=True)
+    (specs / "releases").mkdir()
+    (specs / "constitution.md").write_text("# Constitution\n\nThe law of the project.\n")
+    (specs / "releases" / "ACTIVE.md").write_text("release: x\n")
+    (specs / "memory" / "architecture.md").write_text("# Arch\n")
+    return slug
+
+
+def test_constitution_md_served_via_allowlist(tmp_path) -> None:
+    from dadaia_workspace.features.panel.views.memory import render_memory
+
+    slug = _mk_ws(tmp_path)
+    view = render_memory(tmp_path)
+    status, ct, body = view(slug=slug, path="constitution.md")
+    assert status == 200
+    assert "text/html" in ct
+    html = body.decode("utf-8")
+    assert "<h1" in html and "Constitution" in html
+    assert "# Constitution" not in html  # rendered, not raw
+
+
+def test_specs_paths_other_than_constitution_stay_404(tmp_path) -> None:
+    from dadaia_workspace.features.panel.views.memory import render_memory
+
+    slug = _mk_ws(tmp_path)
+    view = render_memory(tmp_path)
+    for escape in (
+        "../constitution.md",
+        "../releases/ACTIVE.md",
+        "releases/ACTIVE.md",
+        "../../specs/constitution.md",
+    ):
+        status, _, _ = view(slug=slug, path=escape)
+        assert status == 404, f"{escape!r} must stay unreachable"
+
+
+def test_constitution_missing_file_is_404(tmp_path) -> None:
+    from dadaia_workspace.features.panel.views.memory import render_memory
+
+    slug = "bare"
+    (tmp_path / "repos" / slug / "specs" / "memory").mkdir(parents=True)
+    view = render_memory(tmp_path)
+    status, _, _ = view(slug=slug, path="constitution.md")
+    assert status == 404

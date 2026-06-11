@@ -93,11 +93,22 @@ def render_memory(
         ``"dadaia-workspace"`` default.
         """
         memory_root = (workspace_root / "repos" / slug / "specs" / "memory").resolve()
-        target = (memory_root / path).resolve()
+        if path == "constitution.md":
+            # Explicit single-file allowlist (operator: the constitution is the
+            # main file of a project): `constitution.md` lives one level ABOVE
+            # the memory root, at repos/<slug>/specs/constitution.md. Only this
+            # literal path is re-rooted — everything else under specs/
+            # (releases/, bugs/, _archive/, ...) stays unreachable.
+            target = (workspace_root / "repos" / slug / "specs" / "constitution.md").resolve()
+            specs_root = (workspace_root / "repos" / slug / "specs").resolve()
+            if target.parent != specs_root:
+                return _NOT_FOUND
+        else:
+            target = (memory_root / path).resolve()
 
-        # Path traversal guard (OWASP A03)
-        if not target.is_relative_to(memory_root):
-            return _NOT_FOUND
+            # Path traversal guard (OWASP A03)
+            if not target.is_relative_to(memory_root):
+                return _NOT_FOUND
 
         if not target.exists() or not target.is_file():
             return _NOT_FOUND

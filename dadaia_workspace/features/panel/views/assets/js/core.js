@@ -29,33 +29,24 @@
     };
   })();
 
-  // ── Token bootstrap ───────────────────────────────────────────────
-  // On first load the panel URL carries ?token=<value>.
-  // Persist it to localStorage so auth survives tab close/reopen,
-  // then strip from the URL bar so it is not accidentally shared.
-  (function bootstrapToken() {
-    var params = new URLSearchParams(location.search);
-    var urlToken = params.get('token');
-    if (urlToken) {
-      localStorage.setItem('panel_token', urlToken);
-      params.delete('token');
-      var newSearch = params.toString();
-      var newUrl = location.pathname + (newSearch ? '?' + newSearch : '') + location.hash;
-      history.replaceState(null, '', newUrl);
+  // ── Stale credential purge ────────────────────────────────────────
+  // The panel has no authentication (operator decision 2026-06-11): it is a
+  // loopback-only local dev tool. Older builds persisted a Bearer token in
+  // localStorage under 'panel_token'; remove it once so no stale credential
+  // lingers in the browser.
+  (function purgeStaleToken() {
+    try {
+      localStorage.removeItem('panel_token');
+    } catch (e) {
+      // localStorage may be unavailable (private mode); nothing to purge.
     }
   })();
 
-  // ── Authenticated fetch wrapper ────────────────────────────────────
-  // All /api/* calls must carry Authorization: Bearer <token>.
-  // If the token is absent the call is still made so callers see the 401.
+  // ── Fetch alias ────────────────────────────────────────────────────
+  // The panel sends no credentials. authedFetch is kept as a thin alias of
+  // fetch so existing call sites do not churn; it adds no Authorization header.
   function authedFetch(url, opts) {
-    opts = opts || {};
-    var token = localStorage.getItem('panel_token') || '';
-    var headers = opts.headers ? Object.assign({}, opts.headers) : {};
-    if (token) {
-      headers['Authorization'] = 'Bearer ' + token;
-    }
-    return fetch(url, Object.assign({}, opts, { headers: headers }));
+    return fetch(url, opts || {});
   }
   window.authedFetch = authedFetch;
 
@@ -199,7 +190,10 @@
   function fetchServers() {
     if (statusDot) { statusDot.classList.add('updating'); }
     fetch('/api/panel-status')
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        if (!r.ok) { throw new Error('HTTP ' + r.status); }
+        return r.json();
+      })
       .then(function (data) {
         var container = document.getElementById('servers-content');
         if (container) { container.innerHTML = buildServersHTML(data); }
@@ -207,16 +201,16 @@
         if (statusDot) { statusDot.classList.remove('updating'); }
         updateStatusLabel();
       })
-      .catch(function () {
+      .catch(function (err) {
         if (statusDot) { statusDot.classList.remove('updating'); }
         lastUpdated = new Date();
         updateStatusLabel();
         var container = document.getElementById('servers-content');
-        if (container && !container.dataset.adblockNotice) {
-          container.dataset.adblockNotice = '1';
+        if (container && !container.dataset.errorNotice) {
+          container.dataset.errorNotice = '1';
           var notice = document.createElement('p');
           notice.style.cssText = 'padding:0.5rem 1rem;color:var(--color-muted,#888);font-size:0.82rem;';
-          notice.textContent = 'Server list unavailable — if using an ad blocker, allow this page and reload.';
+          notice.textContent = 'Server list unavailable: ' + (err && err.message ? err.message : String(err)) + '.';
           container.appendChild(notice);
         }
       });

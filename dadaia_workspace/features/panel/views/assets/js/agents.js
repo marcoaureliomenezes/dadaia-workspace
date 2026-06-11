@@ -316,12 +316,6 @@
 
   // Render error state in the modal body.
   function renderModalError(status) {
-    if (status === 401) {
-      return '<div class="agent-detail agent-detail--error" role="alert">'
-        + '<strong>Authentication required.</strong> '
-        + 'Re-authenticate via <code>dadaia panel start</code>.'
-        + '</div>';
-    }
     return '<div class="agent-detail agent-detail--error" role="alert">'
       + 'Failed to load system prompt (HTTP ' + escHtml(String(status)) + ').'
       + '</div>';
@@ -491,21 +485,13 @@
     var grid = document.getElementById('agents-grid');
     if (!grid) { return; }
     grid.setAttribute('aria-busy', 'false');
-    if (status === 401) {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + '<strong>Authentication required.</strong> '
-        + 'Re-authenticate by opening the panel with '
-        + '<code>dadaia panel start</code> and using the token URL provided.'
-        + '</div>';
-    } else {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + 'Failed to load agents (HTTP ' + escHtml(String(status)) + '). '
-        + '<button type="button" id="agents-retry-btn" class="retry-link">Retry</button>'
-        + '</div>';
-      var retryBtn = document.getElementById('agents-retry-btn');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', function () { load(); });
-      }
+    grid.innerHTML = '<div class="error-state" role="alert">'
+      + 'Failed to load agents (HTTP ' + escHtml(String(status)) + '). '
+      + '<button type="button" id="agents-retry-btn" class="retry-link">Retry</button>'
+      + '</div>';
+    var retryBtn = document.getElementById('agents-retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', function () { load(); });
     }
   }
 
