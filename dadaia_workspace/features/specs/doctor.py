@@ -187,6 +187,37 @@ _LINT_SCRIPT: Path = (
     Path(__file__).resolve().parent.parent.parent / "public" / "scripts" / "lint-memory-atoms.py"
 )
 
+# ──────────────────────────────────────────────────────────────────────────────
+# SPEC-DOC-031 / SPEC-DOC-032 — closure-disposition canon (T-011-10, bug B1, ADR-6/ADR-11)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ADR-11 single-source status-token vocabulary.
+#
+# Backlog (case-insensitive prefix match on the Status line value):
+#   non-terminal = {OPEN, PICKED, CANDIDATE}; terminal = {DELIVERED, SUPERSEDED,
+#   RESOLVED, CONSUMED, DEFERRED, REJECTED} (+ free suffixes like ``— vX.Y.Z``).
+# Only the NON-TERMINAL set drives SPEC-DOC-031: a non-terminal backlog entry whose
+# slug is referenced by an archived release is the consumed-but-unsanitized drift.
+_BACKLOG_NONTERMINAL_PREFIXES: tuple[str, ...] = ("open", "picked", "candidate")
+
+# Bugs (ADR-11): the canon is exactly {Open, Closed} (case-insensitive). SPEC-DOC-032
+# WARNs on anything else (legacy Fixed/resolved/Rejected tokens, etc.).
+_BUG_STATUS_CANON: frozenset[str] = frozenset({"open", "closed"})
+
+# Match a Status line in a backlog entry: ``Status: ...`` or ``**Status:** ...``.
+_BACKLOG_STATUS_RE = re.compile(r"^\s*(?:\*\*)?status\*?\*?\s*:?\*?\*?\s*(.+)$", re.IGNORECASE)
+
+# Match a bug frontmatter ``status:`` line (frontmatter is leading YAML-like lines).
+_BUG_STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
+
+# Aggregate / free-form backlog files that are not per-slug backlog entries.
+_BACKLOG_AGGREGATE_FILES: frozenset[str] = frozenset({"candidates.md", "ideas.md", "README.md"})
+
+# ADR-6: matches inside a ``## Backlog returns`` section of an archived CLOSURE are a
+# legitimate return (the slug is being ADDED for a future release, not consumed) and are
+# the documented false-positive class. SPEC-DOC-031 stays WARN (never ERR) for this reason.
+_BACKLOG_RETURNS_HEADING_RE = re.compile(r"^##\s+Backlog\s+returns\b", re.IGNORECASE)
+
 
 class Severity(StrEnum):
     ERROR = "error"
@@ -490,6 +521,9 @@ class SpecsDoctor:
         issues.extend(self._check_constitution_file_refs())  # SPEC-DOC-028
         issues.extend(self._check_lease_session_coherence())  # SPEC-DOC-029
         issues.extend(self._check_audits_naming_canon())  # SPEC-DOC-030
+        # v0.1.11 / T-011-10 (bug B1) — closure-disposition canon
+        issues.extend(self._check_consumed_backlog_disposition())  # SPEC-DOC-031
+        issues.extend(self._check_bug_status_canon())  # SPEC-DOC-032
         return issues
 
     def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
@@ -1335,6 +1369,137 @@ class SpecsDoctor:
                         "— rename it (SPEC-DOC-030, WARNING)."
                     ),
                     path=str(child),
+                )
+            )
+        return issues
+
+    def _backlog_status_value(self, text: str) -> str | None:
+        """Extract the (first) Status line value from a backlog entry's body.
+
+        Accepts both ``Status: <value>`` and ``**Status:** <value>``. Returns the
+        stripped value, or ``None`` when no Status line is present.
+        """
+        for line in text.splitlines():
+            m = _BACKLOG_STATUS_RE.match(line)
+            if m:
+                return m.group(1).strip()
+        return None
+
+    def _archive_consumption_hits(self, slug: str) -> list[str]:
+        """Release ids of archived CLOSURE/SPEC that reference ``slug`` as consumed.
+
+        Scans every ``specs/_archive/releases/*/CLOSURE.md`` and ``.../SPEC.md`` for a
+        line containing ``slug``. Lines inside a ``## Backlog returns`` section are
+        EXCLUDED (ADR-6: the slug is being ADDED for a future release, not consumed — the
+        documented false-positive class). Returns the sorted, de-duplicated set of
+        archived release ids that reference the slug outside Backlog-returns sections.
+        """
+        arch = self.specs_dir / "_archive" / "releases"
+        if not arch.is_dir():
+            return []
+        hits: set[str] = set()
+        for release_dir in self._iter_archive_release_dirs(arch):
+            release_id = release_dir.name
+            for doc_name in ("CLOSURE.md", "SPEC.md"):
+                doc = release_dir / doc_name
+                if not doc.is_file():
+                    continue
+                in_backlog_returns = False
+                for raw_line in doc.read_text(encoding="utf-8").splitlines():
+                    if raw_line.startswith("## "):
+                        in_backlog_returns = bool(_BACKLOG_RETURNS_HEADING_RE.match(raw_line))
+                    if in_backlog_returns:
+                        continue
+                    if slug in raw_line:
+                        hits.add(release_id)
+                        break
+        return sorted(hits)
+
+    def _check_consumed_backlog_disposition(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-031 (T-011-10, bug B1, ADR-6): WARN on consumed-but-unsanitized backlog.
+
+        A ``specs/backlog/<slug>.md`` entry whose Status line is an ADR-11 NON-TERMINAL
+        token ({OPEN, PICKED, CANDIDATE}, case-insensitive prefix match) AND whose slug is
+        referenced by an archived release CLOSURE/SPEC (outside ``## Backlog returns``
+        sections) ⇒ **WARNING**. The lifecycle contract is that a backlog item consumed
+        into a shipped+archived release must be flipped to a terminal disposition token
+        during CLOSURE; a non-terminal status on a referenced slug is the drift.
+
+        Severity is WARN, never ERR (ADR-6): a slug mention is necessary-but-not-sufficient
+        evidence of consumption — the "Backlog returns" section (excluded here) and
+        defer/supersede mentions in archived CLOSUREs are the known false-positive class.
+        Aggregate files (``candidates.md``/``ideas.md``/``README.md``) are skipped.
+        """
+        backlog_dir = self.specs_dir / "backlog"
+        if not backlog_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for entry in sorted(backlog_dir.glob("*.md")):
+            if entry.name in _BACKLOG_AGGREGATE_FILES:
+                continue
+            slug = entry.stem
+            status = self._backlog_status_value(entry.read_text(encoding="utf-8"))
+            if status is None:
+                continue
+            status_lower = status.lower()
+            if not status_lower.startswith(_BACKLOG_NONTERMINAL_PREFIXES):
+                continue
+            hits = self._archive_consumption_hits(slug)
+            if not hits:
+                continue
+            releases = ", ".join(hits)
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-031",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"backlog/{entry.name} has non-terminal status '{status}' but its "
+                        f"slug is referenced by archived release(s) {releases} (outside "
+                        "'Backlog returns' sections). If it was consumed/shipped, flip the "
+                        "status to an ADR-11 terminal token (DELIVERED/SUPERSEDED/RESOLVED/"
+                        "CONSUMED — vX.Y.Z) with an evidence pointer. WARNING only — a slug "
+                        "mention is not proof of consumption (ADR-6 false-positive class)."
+                    ),
+                    path=str(entry),
+                )
+            )
+        return issues
+
+    def _check_bug_status_canon(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-032 (T-011-10, bug B1, ADR-11): WARN on non-canonical bug status tokens.
+
+        Every ``specs/bugs/<slug>.md`` frontmatter ``status:`` must be in the ADR-11 bug
+        canon {``Open``, ``Closed``} (case-insensitive). Anything else (legacy ``Fixed`` /
+        ``resolved`` / ``Rejected`` etc.) ⇒ **WARNING**. A duplicate/rejected bug should be
+        ``Closed`` with a ``superseded_by:`` frontmatter field, not a ``Rejected`` token.
+        ``README.md`` is skipped; an absent ``bugs/`` dir is a no-op.
+        """
+        bugs_dir = self.specs_dir / "bugs"
+        if not bugs_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for bug_file in sorted(bugs_dir.glob("*.md")):
+            if bug_file.name in ("README.md",):
+                continue
+            m = _BUG_STATUS_RE.search(bug_file.read_text(encoding="utf-8"))
+            if m is None:
+                # Missing status is a separate concern (TREE-7 governs session_id); a bug
+                # with no status line at all is not flagged by this status-canon check.
+                continue
+            status = m.group(1).strip()
+            if status.lower() in _BUG_STATUS_CANON:
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-032",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"bugs/{bug_file.name} has status '{status}' outside the ADR-11 bug "
+                        "canon {Open, Closed}. Normalize it: a fixed bug ⇒ 'Closed'; a "
+                        "duplicate/rejected bug ⇒ 'Closed' with a 'superseded_by: <slug>' "
+                        "frontmatter field (SPEC-DOC-032, WARNING)."
+                    ),
+                    path=str(bug_file),
                 )
             )
         return issues

@@ -74,6 +74,52 @@ def test_inv4_issue_not_fixable(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CTX-URL-1: ALIVE context must not have an empty repo_url (T-011-08 / FR-W2-03 d)
+# ---------------------------------------------------------------------------
+
+
+def _ctx_empty_url(name: str, state: ContextState = ContextState.ALIVE) -> SpecContextProject:
+    return SpecContextProject(
+        name=name,
+        state=state,
+        repo_slug=name,
+        repo_url="",
+        created_at="2026-01-01T00:00:00",
+        alive_since="2026-06-01T00:00:00Z" if state == ContextState.ALIVE else None,
+        dead_since=None,
+        current_branch="main" if state == ContextState.ALIVE else None,
+    )
+
+
+def test_check_detects_ctx_url_1_alive_empty_url(tmp_path: Path) -> None:
+    ctx = _ctx_empty_url("foo", state=ContextState.ALIVE)
+    (tmp_path / "repos" / "foo").mkdir(parents=True)
+    svc, _ = _make_doctor(tmp_path, [ctx])
+    issues = svc.check()
+    codes = {i.code for i in issues}
+    assert "CTX-URL-1" in codes
+    ctx_url = next(i for i in issues if i.code == "CTX-URL-1")
+    assert ctx_url.fixable is False
+    assert "context update" in ctx_url.description
+
+
+def test_ctx_url_1_silent_when_url_present(tmp_path: Path) -> None:
+    ctx = _ctx("foo", state=ContextState.ALIVE)
+    (tmp_path / "repos" / "foo").mkdir(parents=True)
+    svc, _ = _make_doctor(tmp_path, [ctx])
+    codes = {i.code for i in svc.check()}
+    assert "CTX-URL-1" not in codes
+
+
+def test_ctx_url_1_silent_for_dead_empty_url(tmp_path: Path) -> None:
+    # A DEAD context with an empty URL is not flagged (only ALIVE is un-portable now).
+    ctx = _ctx_empty_url("foo", state=ContextState.DEAD)
+    svc, _ = _make_doctor(tmp_path, [ctx])
+    codes = {i.code for i in svc.check()}
+    assert "CTX-URL-1" not in codes
+
+
+# ---------------------------------------------------------------------------
 # INV-5: DEAD context must not have repo on disk
 # ---------------------------------------------------------------------------
 

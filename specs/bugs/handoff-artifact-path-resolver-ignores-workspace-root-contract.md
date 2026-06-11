@@ -1,6 +1,7 @@
 ---
 name: handoff-artifact-path-resolver-ignores-workspace-root-contract
-status: Rejected
+status: Closed
+superseded_by: handoff-artifact-path-cannot-reference-specs-audits
 rejected_reason: duplicate of handoff-artifact-path-cannot-reference-specs-audits (2026-06-10, same root cause and repro)
 session_id: null
 severity: MEDIUM

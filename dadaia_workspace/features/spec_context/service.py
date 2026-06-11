@@ -264,6 +264,57 @@ class SpecContextService:
             self._store.save(ctx)
         return ctx
 
+    # ------------------------------------------------------------------ update_url
+
+    def update_url(self, name: str, repo_url: str) -> SpecContextProject:
+        """Repair a context's ``repo_url`` through the store ``update()`` API.
+
+        FR-W2-03 (c) / T-011-08: the operator repair verb for the VPS-migration
+        scenario where no on-disk repo is present to back-fill from. Preserves the
+        record shape and locking discipline (the store ``update()`` does the JSON
+        write under the workspace lock). Raises ``ContextNotFoundError`` if the
+        context does not exist.
+        """
+        with workspace_lock(self._workspace_root):
+            ctx = self._store.get(name)
+            if ctx is None:
+                raise ContextNotFoundError(f"Context '{name}' not found.")
+            updated = SpecContextProject(
+                name=ctx.name,
+                state=ctx.state,
+                repo_slug=ctx.repo_slug,
+                repo_url=repo_url,
+                created_at=ctx.created_at,
+                alive_since=ctx.alive_since,
+                dead_since=ctx.dead_since,
+                current_branch=ctx.current_branch,
+            )
+            self._store.update(updated)
+        return updated
+
+    # ------------------------------------------------------------------ back-fill
+
+    def _backfill_repo_url(self, repo_slug: str, current_url: str) -> str:
+        """Return the on-disk ``origin`` URL when the record URL is empty.
+
+        FR-W2-03 (b) / T-011-08: ``alive``/``dead`` back-fill ``repo_url`` from
+        ``git remote get-url origin`` when the record's URL is empty and a repo is
+        on disk (the repo knows its own remote). Goes exclusively through the
+        per-context git-ops port — no raw subprocess in features. Returns the
+        existing URL unchanged when it is already set, when no repo is on disk, or
+        when the repo has no ``origin`` remote.
+        """
+        if current_url:
+            return current_url
+        repo_path = self._repo_path(repo_slug)
+        if not repo_path.exists() or not self._git.is_git_root(repo_path):
+            return current_url
+        try:
+            discovered = self._git.remote_url(repo_path)
+        except Exception:
+            return current_url
+        return discovered or current_url
+
     # ------------------------------------------------------------------ list / show
 
     def list_all(self) -> list[SpecContextProject]:
@@ -305,6 +356,7 @@ class SpecContextService:
         # Lock 2: serialize ALL per-repo filesystem ops for this slug.
         # Released before Lock 1 is requested — no simultaneous L1+L2 hold here.
         actual_branch: str | None = None
+        backfilled_url: str = ctx.repo_url
         with context_lock(self._workspace_root, repo_slug):
             # Re-read ctx inside Lock 2 so we use the freshest repo_url / current_branch.
             ctx_l2 = self._store.get(name)
@@ -330,6 +382,11 @@ class SpecContextService:
                 actual_branch = self._git.current_branch(repo_path)
             except Exception:
                 actual_branch = None
+
+            # Back-fill repo_url from the on-disk origin remote when the record's URL
+            # is empty (FR-W2-03 b / T-011-08) — keeps the context portable for a
+            # later export/import + alive clone on another machine.
+            backfilled_url = self._backfill_repo_url(repo_slug, ctx_l2.repo_url)
 
             # Scaffold specs/. A fresh tree is copied whole; a pre-existing tree is
             # SAFE-PRESERVED — snapshot it to specs_bkp/preserve-<UTC>/ before merging
@@ -378,11 +435,14 @@ class SpecContextService:
             if ctx_fresh.state == ContextState.ALIVE:
                 return ctx_fresh  # another thread already transitioned
 
+            # Prefer the back-filled URL only when the freshest record URL is still
+            # empty — never clobber a URL another writer set in the meantime.
+            resolved_url = ctx_fresh.repo_url or backfilled_url
             alive_ctx = SpecContextProject(
                 name=ctx_fresh.name,
                 state=ContextState.ALIVE,
                 repo_slug=ctx_fresh.repo_slug,
-                repo_url=ctx_fresh.repo_url,
+                repo_url=resolved_url,
                 created_at=ctx_fresh.created_at,
                 alive_since=_now(),
                 dead_since=None,
@@ -484,6 +544,10 @@ class SpecContextService:
 
         repo_path = self._repo_path(ctx.repo_slug)
         branch_before_sync: str | None = None
+        # Back-fill repo_url from the on-disk origin remote while the repo still
+        # exists (FR-W2-03 b / T-011-08), BEFORE the rmtree below removes it — a
+        # DEAD record with a known URL stays portable for a future alive clone.
+        backfilled_url: str = self._backfill_repo_url(ctx.repo_slug, ctx.repo_url)
 
         # Review gate (F-5): evaluate untracked content BEFORE any lock, commit,
         # push, or rmtree, so a refusal leaves the repo entirely untouched on disk.
@@ -536,7 +600,7 @@ class SpecContextService:
                 name=ctx.name,
                 state=ContextState.DEAD,
                 repo_slug=ctx.repo_slug,
-                repo_url=ctx.repo_url,
+                repo_url=ctx.repo_url or backfilled_url,
                 created_at=ctx.created_at,
                 alive_since=None,
                 dead_since=_now(),

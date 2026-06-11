@@ -109,20 +109,32 @@ def _session_is_stale(session_data: dict) -> bool:  # type: ignore[type-arg]
 def create(
     name: str = typer.Argument(..., help="Context name"),
     repo: str = typer.Option(..., "--repo", help="Repo slug (directory name under repos/)"),
+    url: str | None = typer.Option(
+        None,
+        "--url",
+        help=(
+            "Repo clone URL. Overrides the repos-catalog lookup when given — use it "
+            "for a repo not in the catalog or to pin an explicit remote."
+        ),
+    ),
 ) -> None:
     """Create a new Spec Context Project in state 'dead'."""
     workspace_root = resolve_workspace_root()
-    # Look up repo_url from whitelist; fall back gracefully if catalog unavailable
+    # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
+    # look up repo_url from the repos catalog, failing gracefully if unavailable.
     repo_url = ""
-    try:
-        repos_svc = container.build_repos_service()
-        rows = repos_svc.list_known(workspace_root)
-        for row in rows:
-            if row.get("Repo Name") == repo:
-                repo_url = row.get("Repo URL", "")
-                break
-    except (RepoCatalogError, Exception):
-        pass
+    if url is not None:
+        repo_url = url
+    else:
+        try:
+            repos_svc = container.build_repos_service()
+            rows = repos_svc.list_known(workspace_root)
+            for row in rows:
+                if row.get("Repo Name") == repo:
+                    repo_url = row.get("Repo URL", "")
+                    break
+        except (RepoCatalogError, Exception):
+            pass
 
     try:
         ctx = _ctx_service().create(name, repo, repo_url)
@@ -481,6 +493,29 @@ def heartbeat() -> None:
         f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
         f"(context={ctx_name}, last_seen_at={now})"
     )
+
+
+@app.command()
+def update(
+    name: str = typer.Argument(..., help="Context name to update"),
+    url: str = typer.Option(..., "--url", help="New repo clone URL to persist"),
+) -> None:
+    """Repair a context's repo URL (FR-W2-03 c / T-011-08).
+
+    Run: dadaia context update <name> --url <url>
+
+    The repair path for the VPS-migration scenario where no on-disk repo is present
+    to back-fill from. Persists through the store update() API, preserving the record
+    shape and locking.
+    """
+    try:
+        ctx = _ctx_service().update_url(name, url)
+        console.print(
+            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' repo URL set to {ctx.repo_url}"
+        )
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
 
 @app.command()

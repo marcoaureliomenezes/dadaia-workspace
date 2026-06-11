@@ -154,7 +154,7 @@ its failing test before the fix.
   regression test.
 - **Parallelism:** independent.
 
-### [ ] T-011-08 — Context repo_url lifecycle: `--url`, back-fill, `update`, doctor flag
+### [x] T-011-08 — Context repo_url lifecycle: `--url`, back-fill, `update`, doctor flag
 - **Owner:** software-engineer · **Maps:** bug
   `context-repo-url-not-settable-or-repairable`; ADR-7
 - **Write set:** `dadaia_workspace/cli/commands/context.py`,
@@ -191,7 +191,7 @@ its failing test before the fix.
   never-delete law restated; wording consistent with release-governance and ADR-11.
 - **Parallelism:** independent; feeds T-011-19 and T-011-21.
 
-### [ ] T-011-10 — specs doctor: SPEC-DOC-031 (consumed backlog) + SPEC-DOC-032 (bug status canon)
+### [x] T-011-10 — specs doctor: SPEC-DOC-031 (consumed backlog) + SPEC-DOC-032 (bug status canon)
 - **Owner:** software-engineer · **Maps:** bug B1 half (b); ADR-6
 - **Write set:** `dadaia_workspace/features/specs/doctor.py`,
   `tests/unit/features/specs/test_doctor_ledger_invariants.py`
@@ -330,7 +330,7 @@ its failing test before the fix.
 
 ## W6 — Projection + final gate + closure
 
-### [ ] T-011-19 — Reprojection of changed public assets
+### [-] T-011-19 — Reprojection of changed public assets
 - **Owner:** software-engineer · **Maps:** lib-guardrail workflow
 - **Write set:** projections via CLI only (`dadaia public stage && dadaia public
   install --target all && dadaia public doctor`)

@@ -154,3 +154,17 @@ class GitSubprocessClient:
             cwd=path,
         )
         return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+    def remote_url(self, path: Path) -> str:
+        """Return the URL of the ``origin`` remote, or ``""`` if none is configured.
+
+        Drives the repo_url back-fill (FR-W2-03 / T-011-08): when a context record
+        has an empty ``repo_url`` but the repo is on disk with an ``origin`` remote,
+        ``alive``/``dead`` read the canonical URL straight from the repo. Returns
+        the empty string on any failure (no remote, not a repo) so callers treat it
+        as "nothing to back-fill" rather than raising.
+        """
+        result = _run(["git", "remote", "get-url", "origin"], cwd=path)
+        if result.returncode != 0:
+            return ""
+        return result.stdout.strip()

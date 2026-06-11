@@ -67,6 +67,7 @@ class FakeGitClient:
         self._has_remote: set[Path] = set()
         self._branches: dict[Path, str] = {}
         self._untracked: dict[Path, list[str]] = {}
+        self._remote_urls: dict[Path, str] = {}
 
     def clone(self, url: str, dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
@@ -96,6 +97,9 @@ class FakeGitClient:
 
     def list_untracked(self, path: Path) -> list[str]:
         return list(self._untracked.get(path, []))
+
+    def remote_url(self, path: Path) -> str:
+        return self._remote_urls.get(path, "")
 
 
 class FakeCourseStore:

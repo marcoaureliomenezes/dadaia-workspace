@@ -666,3 +666,193 @@ def test_clean_ledger_tree_has_no_new_errors(tmp_path: Path) -> None:
     new_codes = {"SPEC-DOC-024", "SPEC-DOC-026", "SPEC-DOC-027", "SPEC-DOC-028", "SPEC-DOC-029"}
     errors = [i for i in issues if i.severity == Severity.ERROR and i.code in new_codes]
     assert errors == [], [i.to_dict() for i in errors]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SPEC-DOC-031 — consumed-backlog disposition drift (T-011-10, bug B1 half (b))
+#
+# A specs/backlog/<slug>.md whose Status line is an ADR-11 NON-TERMINAL token
+# ({OPEN, PICKED, CANDIDATE}, case-insensitive prefix match) AND whose slug/ID
+# appears in an ARCHIVED release CLOSURE.md/SPEC.md (specs/_archive/releases/*/),
+# EXCLUDING matches inside "Backlog returns" sections ⇒ WARN (never ERR; ADR-6 —
+# slug mention ≠ consumption is the false-positive class that keeps it WARN).
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _write_backlog_entry(specs: Path, slug: str, status_line: str) -> None:
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    (specs / "backlog" / f"{slug}.md").write_text(
+        f"# {slug}\n\n**Status:** {status_line}\n\nBody.\n", encoding="utf-8"
+    )
+
+
+def _write_archived_closure(specs: Path, release_id: str, body: str) -> None:
+    rel = specs / "_archive" / "releases" / release_id
+    rel.mkdir(parents=True, exist_ok=True)
+    (rel / "CLOSURE.md").write_text(body, encoding="utf-8")
+
+
+def test_nonterminal_backlog_referenced_in_archived_closure_reports_doc_031_warning(
+    tmp_path: Path,
+) -> None:
+    """Picked/consumed backlog whose status is still non-terminal ⇒ SPEC-DOC-031 WARN."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_backlog_entry(specs, "feat-consumed-thing", "PICKED — blocked on operator grill")
+    _write_archived_closure(
+        specs,
+        "v0.0.9",
+        "# Closure\n\n## Bug dispositions\n\n"
+        "Source: `specs/backlog/feat-consumed-thing.md` — delivered, accepted.\n",
+    )
+    issues = SpecsDoctor(specs).check()
+    doc_031 = _by_code(issues, "SPEC-DOC-031")
+    assert doc_031, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.WARNING for i in doc_031)
+    text = " ".join(i.description for i in doc_031)
+    assert "feat-consumed-thing" in text
+    # The finding text must cite the ADR-6 false-positive reasoning (why it stays WARN).
+    assert "v0.0.9" in text
+    assert all(i.path.endswith("feat-consumed-thing.md") for i in doc_031)
+
+
+def test_open_backlog_referenced_in_archived_spec_reports_doc_031_warning(
+    tmp_path: Path,
+) -> None:
+    """An OPEN backlog slug sourced in an archived SPEC also drifts ⇒ WARN."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_backlog_entry(specs, "open-but-sourced", "OPEN — filed for intake only")
+    rel = specs / "_archive" / "releases" / "v0.0.8"
+    rel.mkdir(parents=True, exist_ok=True)
+    (rel / "SPEC.md").write_text(
+        "# Spec\n\n## 4. Product Deltas\n\nSource: `specs/backlog/open-but-sourced.md`\n",
+        encoding="utf-8",
+    )
+    (rel / "CLOSURE.md").write_text("# Closure\n\nDone.\n", encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    doc_031 = _by_code(issues, "SPEC-DOC-031")
+    assert doc_031, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.WARNING for i in doc_031)
+    assert any("open-but-sourced" in i.description for i in doc_031)
+
+
+def test_backlog_slug_only_in_backlog_returns_section_is_silent(tmp_path: Path) -> None:
+    """Negative fixture (ADR-6): a slug appearing ONLY inside a ``## Backlog returns``
+    section of an archived CLOSURE is a legitimate return (the slug is being ADDED, not
+    consumed) ⇒ SPEC-DOC-031 must stay silent."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_backlog_entry(specs, "newly-returned-item", "CANDIDATE — not picked")
+    _write_archived_closure(
+        specs,
+        "v0.0.7",
+        "# Closure\n\n## Backlog returns\n\n"
+        "- `specs/backlog/newly-returned-item.md` ← registered for a future release.\n",
+    )
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-031" not in _codes(issues)
+
+
+def test_terminal_backlog_referenced_in_archived_closure_is_silent(tmp_path: Path) -> None:
+    """A DELIVERED (terminal) backlog entry referenced in an archived CLOSURE is correctly
+    dispositioned ⇒ no SPEC-DOC-031 WARN."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_backlog_entry(specs, "shipped-thing", "DELIVERED — v0.0.9 (see CLOSURE)")
+    _write_archived_closure(
+        specs,
+        "v0.0.9",
+        "# Closure\n\n## Dispositions\n\nSource: `specs/backlog/shipped-thing.md` delivered.\n",
+    )
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-031" not in _codes(issues)
+
+
+def test_nonterminal_backlog_not_in_any_archive_is_silent(tmp_path: Path) -> None:
+    """A genuinely open backlog item never referenced by an archived release ⇒ silent."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_backlog_entry(specs, "brand-new-idea", "OPEN — never picked")
+    _write_archived_closure(specs, "v0.0.9", "# Closure\n\nUnrelated content.\n")
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-031" not in _codes(issues)
+
+
+def test_doc_031_skips_candidates_and_ideas_aggregate_files(tmp_path: Path) -> None:
+    """The free-form aggregate files (candidates.md / ideas.md / README.md) are not
+    per-slug backlog entries and must never trigger SPEC-DOC-031."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "backlog" / "candidates.md").write_text(
+        "## Candidatas ativas\n\n- thing — x (owner: a, contexto: b)\n", encoding="utf-8"
+    )
+    _write_archived_closure(specs, "v0.0.9", "# Closure\n\nReferences candidates here.\n")
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-031" not in _codes(issues)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SPEC-DOC-032 — bug status-token canon (T-011-10, bug B1 half (b))
+#
+# A specs/bugs/<slug>.md whose frontmatter ``status:`` is outside the ADR-11 bug
+# canon {Open, Closed} ⇒ WARN (guards regressions of the legacy Fixed/resolved drift).
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _write_bug(specs: Path, slug: str, status: str, extra: str = "") -> None:
+    (specs / "bugs").mkdir(parents=True, exist_ok=True)
+    (specs / "bugs" / f"{slug}.md").write_text(
+        f"---\nname: {slug}\nstatus: {status}\nsession_id: null\n{extra}---\n\n**Symptom:** x.\n",
+        encoding="utf-8",
+    )
+
+
+def test_bug_with_noncanonical_status_reports_doc_032_warning(tmp_path: Path) -> None:
+    """A bug carrying a legacy ``Fixed`` token ⇒ SPEC-DOC-032 WARN."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_bug(specs, "some-old-bug", "Fixed")
+    issues = SpecsDoctor(specs).check()
+    doc_032 = _by_code(issues, "SPEC-DOC-032")
+    assert doc_032, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.WARNING for i in doc_032)
+    text = " ".join(i.description for i in doc_032)
+    assert "Fixed" in text
+    assert all(i.path.endswith("some-old-bug.md") for i in doc_032)
+
+
+def test_bug_with_rejected_status_reports_doc_032_warning(tmp_path: Path) -> None:
+    """``Rejected`` is outside the {Open, Closed} canon ⇒ WARN (the duplicate/rejected bug
+    should be ``Closed`` + ``superseded_by:``)."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_bug(specs, "rejected-dup-bug", "Rejected", extra="rejected_reason: duplicate of x\n")
+    issues = SpecsDoctor(specs).check()
+    doc_032 = _by_code(issues, "SPEC-DOC-032")
+    assert doc_032, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.WARNING for i in doc_032)
+
+
+@pytest.mark.parametrize("status", ["Open", "Closed", "open", "closed", "CLOSED"])
+def test_bug_with_canonical_status_is_silent(tmp_path: Path, status: str) -> None:
+    """{Open, Closed} (case-insensitive) ⇒ silent."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_bug(specs, "well-formed-bug", status)
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-032" not in _codes(issues)
+
+
+def test_doc_032_skips_readme_and_silent_when_bugs_dir_absent(tmp_path: Path) -> None:
+    """README.md is skipped; absent bugs/ dir ⇒ no-op."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "bugs").mkdir(parents=True, exist_ok=True)
+    (specs / "bugs" / "README.md").write_text("# Bugs\n\nstatus: whatever\n", encoding="utf-8")
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-032" not in _codes(issues)
+
+
+def test_closed_bug_with_superseded_by_is_silent(tmp_path: Path) -> None:
+    """A duplicate normalized to ``Closed`` + ``superseded_by:`` (the live-tree fix shape)
+    ⇒ silent."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_bug(
+        specs,
+        "duplicate-bug",
+        "Closed",
+        extra="superseded_by: canonical-bug\nrejected_reason: marked duplicate\n",
+    )
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-032" not in _codes(issues)

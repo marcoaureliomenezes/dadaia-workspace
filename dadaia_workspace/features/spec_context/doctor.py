@@ -422,6 +422,27 @@ class DoctorService:
                         )
                     )
 
+        # CTX-URL-1 (T-011-08 / FR-W2-03 d): an ALIVE context with an empty repo_url is
+        # un-portable — an export/import + ``context alive`` on another machine would
+        # ``git clone ""`` and fail. Surface it so the operator can repair via
+        # ``dadaia context update <name> --url <url>`` (or re-run ``alive`` while the
+        # on-disk origin remote is present, which back-fills automatically).
+        for ctx in contexts:
+            if ctx.state == ContextState.ALIVE and not ctx.repo_url:
+                issues.append(
+                    DoctorIssue(
+                        code="CTX-URL-1",
+                        description=(
+                            f"Context '{ctx.name}' is alive but has an empty repo_url "
+                            "(un-portable). Run 'dadaia context update "
+                            f"{ctx.name} --url <url>' to set it, or re-run "
+                            f"'dadaia context alive {ctx.name}' while the repo's origin "
+                            "remote is on disk to back-fill it automatically."
+                        ),
+                        fixable=False,
+                    )
+                )
+
         # INV-5 (v2): DEAD context must not have repo on disk
         for ctx in contexts:
             if ctx.state == ContextState.DEAD:
