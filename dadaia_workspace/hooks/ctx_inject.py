@@ -24,9 +24,26 @@ import contextlib
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from dadaia_workspace.hooks import _common
+
+#: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
+#: the injection (catalog.json on disk is untouched — self-pull depth intact). Keeping
+#: rank/slug/title/tldr/path is enough for the once-per-session first-pass scan; an agent
+#: that needs depth self-pulls the full atom (Step 0 memory bootstrap).
+_DIGEST_FIELDS: tuple[str, ...] = ("rank", "slug", "title", "tldr", "path")
+
+#: Filename prefix of the once-per-session sentinel (``ctx-inject-fired-<sessionId>``).
+_SENTINEL_PREFIX = "ctx-inject-fired-"
+
+#: Age (seconds) after which a once-per-session sentinel is considered stale and GC'd at
+#: inject time. Generous (24 h) so a long-running live session is never disturbed; a
+#: session older than this would at worst re-inject the bootstrap once. The sweep home is
+#: pinned HERE (inject time), not in ``spec_context/doctor.py`` — avoids the doctor
+#: write-set overlap (T-011-14 write set: the doctor leg is conditional and unused).
+_SENTINEL_GC_TTL_SECONDS = 24 * 60 * 60
 
 _DISPATCHER_PREFLIGHT = """=== dispatcher preflight (SDD routing) ===
 Before acting on a request in this workspace:
@@ -96,8 +113,33 @@ def _emit(payload: str) -> None:
         sys.stdout.write(payload)
 
 
+def _digest_catalog(raw: str) -> str:
+    """Return a tldr-digest of ``catalog.json`` text: drop ``summary``, keep lean fields.
+
+    Each feature is reduced to :data:`_DIGEST_FIELDS` (rank/slug/title/tldr/path). The
+    catalog FILE is never modified — this operates on the read-in text and returns the
+    smaller string to INJECT. On any parse failure the raw text is returned verbatim
+    (fail-open: a malformed catalog must not break the bootstrap).
+    """
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return raw
+    if not isinstance(data, dict):
+        return raw
+    features = data.get("features")
+    if not isinstance(features, list):
+        return raw
+    digested = [
+        {k: feat[k] for k in _DIGEST_FIELDS if k in feat}
+        for feat in features
+        if isinstance(feat, dict)
+    ]
+    return json.dumps({"features": digested}, ensure_ascii=False, indent=2)
+
+
 def _build_memory(specs_dir: Path) -> str:
-    """Build the once-per-session memory bootstrap (tech-stack + catalog/index)."""
+    """Build the once-per-session memory bootstrap (tech-stack + catalog-digest/index)."""
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""
@@ -108,12 +150,35 @@ def _build_memory(specs_dir: Path) -> str:
             parts.append(tech.read_text(encoding="utf-8"))
     catalog = memory_dir / "product" / "catalog.json"
     index = memory_dir / "product" / "index.md"
-    chosen = catalog if catalog.is_file() else (index if index.is_file() else None)
-    if chosen is not None:
+    if catalog.is_file():
         with contextlib.suppress(OSError):
-            parts.append(chosen.read_text(encoding="utf-8"))
+            parts.append(_digest_catalog(catalog.read_text(encoding="utf-8")))
+    elif index.is_file():
+        with contextlib.suppress(OSError):
+            parts.append(index.read_text(encoding="utf-8"))
     parts.append("=== end memory bootstrap ===")
     return "\n".join(parts)
+
+
+def _gc_stale_sentinels(tmp_dir: Path, *, now: float | None = None) -> None:
+    """Sweep aged once-per-session sentinel files at inject time (fail-open).
+
+    A sentinel (``ctx-inject-fired-*``) whose mtime is older than
+    :data:`_SENTINEL_GC_TTL_SECONDS` is removed; fresh sentinels (other live sessions) and
+    non-sentinel tmp files are left untouched. Any OS error during the scan is suppressed —
+    GC is best-effort housekeeping and must never break the bootstrap.
+    """
+    cutoff = (now if now is not None else time.time()) - _SENTINEL_GC_TTL_SECONDS
+    try:
+        entries = list(tmp_dir.iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        if not entry.name.startswith(_SENTINEL_PREFIX):
+            continue
+        with contextlib.suppress(OSError):
+            if entry.is_file() and entry.stat().st_mtime < cutoff:
+                entry.unlink()
 
 
 def main() -> int:
@@ -139,7 +204,11 @@ def main() -> int:
     # Once-per-session sentinel — guards the ENTIRE injection. Path is BYTE-IDENTICAL
     # to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<sessionId>.
     tmp_dir = workspace / ".dadaia" / "tmp"
-    sentinel = tmp_dir / f"ctx-inject-fired-{session_id}"
+    sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
+    # Inject-time GC of stale sentinels (dead/aged sessions). Runs before the once-per-
+    # session short-circuit so leftover sentinels are reaped on every fire, not only on
+    # the first prompt of a session.
+    _gc_stale_sentinels(tmp_dir)
     if sentinel.exists():
         return 0
     try:

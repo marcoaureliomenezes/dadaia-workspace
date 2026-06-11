@@ -35,6 +35,24 @@ read fails soft (returns ``None``/``""``) on malformed or absent input.
 Atomic writes use temp-file + ``os.replace`` (atomic over an existing target on both
 POSIX and Windows), matching the convention in ``hooks/_common.atomic_write_text`` and
 ``lease._write_record``. No fcntl/os.kill/``/proc`` — Windows-safe.
+
+Bind-record liveness (T-011-04 / FR-W1-04, ADR-8 amended)
+---------------------------------------------------------
+The session/bind record's ``last_seen_at`` is the GC liveness clock, refreshed by the
+PostToolUse heartbeat (``hooks/sdd_post_gate._refresh_session_record``) on every tool use.
+The workspace doctor's graveyard GC measures TTL against this field, so a still-active
+session renews and never decays (no silent READ→IMPLEMENTATION decay), while a dead
+session's bind expires after its ``ttl_seconds`` window. :func:`touch_last_seen_at` is the
+single accessor the heartbeat uses to stamp+persist the field; :func:`liveness_timestamp`
+is the single accessor the GC uses to read the effective liveness clock.
+
+**TTL-from-creation fallback.** A legacy/pre-heartbeat record that carries NO
+``last_seen_at`` decays from its CREATION time instead — :func:`liveness_timestamp` falls
+back to ``bound_at`` (the bind-CLI creation field) and then ``created_at``. This preserves
+the original TTL-from-creation behavior for records written before this field existed; it
+is never silently kept alive. The session-record ``pid`` is **NOT** consulted for bind GC:
+it is the transient bind-CLI pid (``context.py``'s ``os.getpid()``), dead by construction,
+so a pid-keyed bind GC would collect every legitimate READ bind (ADR-8 amended rationale).
 """
 
 from __future__ import annotations
@@ -46,14 +64,21 @@ import uuid
 from pathlib import Path
 
 __all__ = [
+    "SESSION_CREATION_FIELDS",
+    "SESSION_GC_TTL_FIELD",
+    "SESSION_HEARTBEAT_FIELD",
     "coherence",
     "iter_ptr_files",
+    "iter_session_records",
+    "liveness_timestamp",
     "ptr_path",
     "read_incumbent_ptr",
     "read_session",
     "resolve_identity",
     "session_record_path",
+    "sessions_dir",
     "set_incumbent",
+    "touch_last_seen_at",
     "write_incumbent_ptr",
     "write_session",
 ]
@@ -63,9 +88,14 @@ __all__ = [
 _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 #: Session-record TTL/heartbeat field names. These match the keys the bind CLI and the
-#: PostToolUse heartbeat write, and the keys the doctor graveyard-GC reads.
-_SESSION_HEARTBEAT_FIELD = "last_seen_at"
-_SESSION_GC_TTL_FIELD = "ttl_seconds"
+#: PostToolUse heartbeat write, and the keys the doctor graveyard-GC reads. Public so the
+#: hook and the doctor consume the canonical names from their single owner (no duplication).
+SESSION_HEARTBEAT_FIELD = "last_seen_at"
+SESSION_GC_TTL_FIELD = "ttl_seconds"
+
+#: Creation-timestamp fields, tried in order when ``last_seen_at`` is absent (TTL-from-
+#: creation fallback for pre-heartbeat records). ``bound_at`` is the bind-CLI creation key.
+SESSION_CREATION_FIELDS: tuple[str, ...] = ("bound_at", "created_at")
 
 
 def _validate(name: str, *, field: str) -> str:
@@ -103,6 +133,31 @@ def session_record_path(workspace: Path, session_id: str, *, create: bool = Fals
     """Path of the session record ``sessions/<id>.json``."""
     _validate(session_id, field="session_id")
     return _sessions_dir(workspace, create=create) / f"{session_id}.json"
+
+
+def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
+    """Path of the session-record directory ``.dadaia/sessions/`` (T-011-05 / FR-W1-05).
+
+    The single accessor for the session-store directory. The 3 legal consumers
+    (``cli/commands/context.py``, ``spec_context/doctor.py``, ``panel/views/kanban.py``)
+    call this instead of constructing the ``.dadaia/sessions`` path themselves (ADR-12);
+    ``core/specs_resolver.py`` stays the documented allowlist exception because ``core``
+    cannot import this features-layer owner (constitution §6).
+    """
+    return _sessions_dir(workspace, create=create)
+
+
+def iter_session_records(workspace: Path) -> list[Path]:
+    """Return all top-level ``<id>.json`` session-record files (sorted; empty if absent).
+
+    Excludes the ``runtime/`` incumbent-pointer subdir (it holds ``.ptr`` files, not
+    records). Used by the Kanban view to enumerate sessions without constructing the
+    sessions-dir path itself (T-011-05 / FR-W1-05).
+    """
+    base = _sessions_dir(workspace)
+    if not base.exists():
+        return []
+    return sorted(p for p in base.glob("*.json") if p.is_file())
 
 
 def iter_ptr_files(workspace: Path) -> list[Path]:
@@ -191,6 +246,54 @@ def write_session(
     _validate(session_id, field="session_id")
     path = session_record_path(workspace, session_id, create=True)
     _atomic_write_text(path, json.dumps(record, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Bind-record liveness (T-011-04 / FR-W1-04) — last_seen_at read/write.
+# ---------------------------------------------------------------------------
+
+
+def touch_last_seen_at(
+    workspace: Path,
+    session_id: str,
+    *,
+    now: str,
+) -> dict[str, object] | None:
+    """Refresh the session record's ``last_seen_at`` to ``now`` and persist it atomically.
+
+    This is the single writer the PostToolUse heartbeat uses to renew a bind's liveness
+    clock. Fail-soft: returns ``None`` (no-op) when the record is absent or unwritable —
+    there is nothing to refresh otherwise. Returns the updated record on success.
+    """
+    data = read_session(workspace, session_id)
+    if data is None:
+        return None
+    data[SESSION_HEARTBEAT_FIELD] = now
+    try:
+        write_session(workspace, session_id, data)
+    except (OSError, ValueError):
+        return None
+    return data
+
+
+def liveness_timestamp(record: dict[str, object]) -> str:
+    """Return the effective GC liveness timestamp for a session/bind record.
+
+    Prefers the heartbeat-renewed ``last_seen_at``; when absent (a pre-heartbeat record),
+    falls back to the creation timestamp (``bound_at`` then ``created_at``) so GC decays
+    such a record TTL-from-creation. Returns ``""`` when no timestamp is present, which the
+    TTL predicate treats as fresh (fail-safe — a malformed record is never auto-collected
+    on a timestamp it does not carry). The ``pid`` field is never consulted here (ADR-8
+    amended: the bind-CLI pid is dead by construction).
+    """
+    raw = record.get(SESSION_HEARTBEAT_FIELD)
+    if isinstance(raw, str) and raw:
+        return raw
+    for field in SESSION_CREATION_FIELDS:
+        candidate = record.get(field)
+        if isinstance(candidate, str) and candidate:
+            return candidate
+    return ""
 
 
 # ---------------------------------------------------------------------------

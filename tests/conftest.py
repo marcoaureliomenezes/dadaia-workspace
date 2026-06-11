@@ -35,9 +35,17 @@ Session-level pollution guard (_session_root_pollution_guard):
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
+
+# Repo-cleanliness law: the test run must never materialize bytecode caches inside
+# the working tree. Import-time compilation happens BEFORE any in-script
+# ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
+# ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
+# enforcement point (AC-W5-01).
+sys.dont_write_bytecode = True
 
 # ---------------------------------------------------------------------------
 # Hypothesis: redirect storage dir and disable the on-disk database so

@@ -73,7 +73,9 @@ def _now_iso() -> str:
 
 
 def _sessions_dir(workspace_root: Path) -> Path:
-    return workspace_root / ".dadaia" / "sessions"
+    # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the bind CLI
+    # no longer constructs the ``.dadaia/sessions`` path itself.
+    return session_identity.sessions_dir(workspace_root)
 
 
 def _load_session(sessions_dir: Path, session_id: str) -> dict[str, Any] | None:

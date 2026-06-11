@@ -2,6 +2,7 @@
 name: handoff-artifact-path-resolver-ignores-workspace-root-contract
 status: Rejected
 rejected_reason: duplicate of handoff-artifact-path-cannot-reference-specs-audits (2026-06-10, same root cause and repro)
+session_id: null
 severity: MEDIUM
 reported: 2026-06-11
 surface: dadaia reports validate (features/reports_validation/service.py)

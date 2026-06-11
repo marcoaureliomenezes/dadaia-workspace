@@ -406,6 +406,7 @@ class SpecsDoctor:
         process_runner: ProcessRunner | None = None,
         repo_root: Path | None = None,
         workspace_state_dir: Path | None = None,
+        pid_probe: lease.PidProbe | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
@@ -421,6 +422,15 @@ class SpecsDoctor:
         self.workspace_state_dir: Path | None = (
             Path(workspace_state_dir) if workspace_state_dir is not None else None
         )
+        # pid_probe: the PID-liveness seam for the SPEC-DOC-029 three-state triage
+        # (T-011-03). Composition-root-wired (like ``workspace_state_dir``): the CLI
+        # ``dadaia specs doctor`` builds it from the hook layer's ``OsProcessProbe`` and
+        # injects it here. ``features/specs/doctor.py`` therefore NEVER imports the
+        # infrastructure process-probe adapter — the import-linter layering law holds.
+        # ``None`` (the default / a pure-module construction) ⇒ TTL-only liveness:
+        # a TTL-expired record is treated as a dead holder (no veto), and a legacy
+        # pid-less record likewise degrades to the TTL verdict.
+        self.pid_probe: lease.PidProbe | None = pid_probe
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)
@@ -1196,23 +1206,40 @@ class SpecsDoctor:
         return issues
 
     def _check_lease_session_coherence(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-029 (D-2 backstop): the lease-record holder, the incumbent pointer,
-        and the session record may never name three different sessions for one context.
+        """SPEC-DOC-029 (D-2 backstop) — three-state triage (T-011-03, bug B3).
+
+        The lease-record holder, the incumbent pointer, and the session record may never
+        name three different sessions for one *live* context. But a TTL-expired lock left
+        by a dead session is **not** forgery — it is just a stale lease that was never
+        garbage-collected. Conflating the two produced the
+        ``doctor-stale-lease-misdiagnosed-as-forgery`` bug (a ~36 h-old, ``ttl: 120`` record
+        from a dead session alleged as "possible out-of-band lock/ptr forgery"). The triage
+        distinguishes three states per ``<ctx>.lock.json`` record:
+
+        * **(a) stale lease, holder dead/unprobeable** — the record is TTL-expired and the
+          holder pid is dead (per the injected ``pid_probe``) OR the record predates the
+          ``pid`` field (legacy, unprobeable ⇒ TTL verdict). ⇒ **WARN**: "stale lease from
+          a dead session — safe to reclaim", naming the remediation commands
+          (``dadaia doctor --fix`` / ``dadaia lock steal <ctx>``). No forgery wording; the
+          overall doctor exit stays 0 when no other ERROR exists.
+        * **(b) live holder, genuine incoherence** — the record is live (TTL-fresh, or
+          TTL-expired but its pid is demonstrably alive per ``pid_probe``) AND the three
+          identity sources genuinely diverge. ⇒ **ERROR** with the out-of-band forgery
+          wording. This is the *only* state where forgery language is emitted.
+        * **(c) coherent** — a live, coherent lease ⇒ silent.
 
         The doctor is a pure module scoped to specs_dir/public_dir; the lock and session
         stores live at the *workspace* root (``.dadaia/states/ctx_locks/<ctx>.lock.json``
-        + ``.dadaia/sessions/<id>.json`` + ``.dadaia/sessions/runtime/<ctx>.ptr``),
-        outside the specs tree. This backstop therefore only runs when a caller injects
-        ``workspace_state_dir``; with the default (``None``) it is a documented no-op (see
-        ``__init__``). This detects out-of-band ``.ptr``/lock forgery after the fact
-        (SPEC §WS-R6 / Decision D-2).
+        + ``.dadaia/sessions/<id>.json`` + ``.dadaia/sessions/runtime/<ctx>.ptr``), outside
+        the specs tree. This backstop only runs when a caller injects ``workspace_state_dir``;
+        with the default (``None``) it is a documented no-op (see ``__init__``).
 
-        Implementation: the genuine lease records production writes are
-        ``<ctx>.lock.json`` (``lease._record_path``); their holder session_id is read via
-        :func:`lease.read_record`, and the three-source divergence verdict is delegated to
-        :func:`session_identity.coherence` — the single designed coherence API
-        (FR-R3-02), so there is no duplicate (and previously broken) copy of the logic
-        here.
+        Liveness is the canonical lease verdict (:func:`lease.is_held`, which delegates to
+        ``core.lock_liveness.is_stale``): TTL is the floor, the ``pid_probe`` is the veto. The
+        probe is composition-root-wired via ``self.pid_probe`` (never an infrastructure
+        import inside ``features``). The three-source divergence verdict for live holders is
+        delegated to :func:`session_identity.coherence` — the single designed coherence API
+        (FR-R3-02) — so there is no duplicate copy of that logic here.
         """
         state_dir = self.workspace_state_dir
         if state_dir is None:
@@ -1232,6 +1259,30 @@ class SpecsDoctor:
             except ValueError:
                 continue  # not a real context-keyed record name
             record = lease.read_record(workspace_root, ctx)
+            # State (a): a stale lease whose holder is dead/unprobeable. ``lease.is_held``
+            # is True iff the record is live (TTL-fresh, or TTL-expired with an alive pid
+            # under ``pid_probe``); not-held ⇒ reclaimable dead/legacy record.
+            holder_is_live = lease.is_held(workspace_root, ctx, pid_probe=self.pid_probe)
+            if not holder_is_live:
+                holder = record.get("session_id") if isinstance(record, dict) else None
+                holder_desc = repr(str(holder)) if holder else "an ended session"
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-029",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"Context {ctx!r}: stale lease from a dead session "
+                            f"(holder {holder_desc}, heartbeat past TTL) — safe to reclaim. "
+                            f"Run 'dadaia doctor --fix' to garbage-collect it, or "
+                            f"'dadaia lock steal {ctx}' to take it over (SPEC-DOC-029, "
+                            "WARNING)."
+                        ),
+                        path=str(record_file),
+                    )
+                )
+                continue
+            # State (b)/(c): the holder is LIVE. Only now is a three-source divergence a
+            # genuine incoherence worth flagging as possible forgery.
             holder = record.get("session_id") if isinstance(record, dict) else None
             lock_holder = str(holder) if holder else None
             message = session_identity.coherence(workspace_root, ctx, lock_holder=lock_holder)
@@ -1241,12 +1292,13 @@ class SpecsDoctor:
                         code="SPEC-DOC-029",
                         severity=Severity.ERROR,
                         description=(
-                            f"{message} — lease↔session incoherence (possible out-of-band "
-                            "lock/ptr forgery; D-2 backstop, SPEC-DOC-029)."
+                            f"{message} — live lease↔session incoherence (possible "
+                            "out-of-band lock/ptr forgery; D-2 backstop, SPEC-DOC-029)."
                         ),
                         path=str(record_file),
                     )
                 )
+            # else state (c): live + coherent ⇒ silent.
         return issues
 
     def _check_audits_naming_canon(self) -> list[SpecsDoctorIssue]:

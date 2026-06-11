@@ -38,7 +38,17 @@ POINTER_IDIOMS: tuple[str, ...] = (
 
 #: Idiom for the session-record path ``sessions/<id>.json`` — code that builds a session
 #: record file from the sessions directory. Allowlisted consumers are enumerated below.
-RECORD_IDIOMS: tuple[str, ...] = ('"sessions" / f"{',)
+#:
+#: T-011-05 (FR-W1-05 / ADR-12) extends this to also catch the SESSIONS-DIRECTORY
+#: construction idiom (``"sessions"`` joined onto ``.dadaia``) — the 3 legal sites
+#: (``cli/commands/context.py:76``, ``spec_context/doctor.py:124``,
+#: ``panel/views/kanban.py:85``) previously built the directory and appended ``<id>.json``
+#: themselves, slipping past the ``f"{`` interpolation grep. They are now migrated to the
+#: ``session_identity`` accessors; this guards against the pattern's return.
+RECORD_IDIOMS: tuple[str, ...] = (
+    '"sessions" / f"{',
+    '".dadaia" / "sessions"',
+)
 
 
 @dataclass(frozen=True)

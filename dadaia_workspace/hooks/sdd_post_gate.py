@@ -115,17 +115,14 @@ def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] 
     the session-store ownership allowlist. Returns ``None`` (no-op) when the record is absent
     or unreadable — unlike the lease renewal above, this is gated on the record existing,
     because there is nothing to refresh otherwise.
-    """
-    data = session_identity.read_session(workspace, sess_id)
-    if data is None:
-        return None
 
-    data["last_seen_at"] = datetime.now(tz=UTC).isoformat()
-    try:
-        session_identity.write_session(workspace, sess_id, data)
-    except (OSError, ValueError):
-        return None
-    return data
+    This ``last_seen_at`` refresh is the bind-record liveness renewal (T-011-04 / FR-W1-04,
+    ADR-8 amended): the workspace doctor's graveyard GC measures TTL against ``last_seen_at``,
+    so a still-active session — including a READ-mode bind that takes no lease — renews on
+    every tool use and never silently decays.
+    """
+    now = datetime.now(tz=UTC).isoformat()
+    return session_identity.touch_last_seen_at(workspace, sess_id, now=now)
 
 
 def _append_heartbeat_event(

@@ -186,3 +186,54 @@ def test_legacy_junk_ptr_is_ignored_not_fatal(tmp_path: Path) -> None:
         json.dumps({"legacy": True}), encoding="utf-8"
     )
     assert si.resolve_identity(ws, CTX) == {"incumbent": None, "mode": None}
+
+
+# --------------------------------------------------------------------------- last_seen_at (T-011-04)
+
+
+def test_touch_last_seen_at_refreshes_field_and_returns_record(tmp_path: Path) -> None:
+    """FR-W1-04: touch_last_seen_at stamps last_seen_at and persists the record."""
+    ws = _ws(tmp_path)
+    si.write_session(
+        ws, SID, {"id": SID, "mode": "READ", "last_seen_at": "2020-01-01T00:00:00+00:00"}
+    )
+    updated = si.touch_last_seen_at(ws, SID, now="2030-06-10T12:00:00+00:00")
+    assert updated is not None
+    assert updated["last_seen_at"] == "2030-06-10T12:00:00+00:00"
+    # Persisted, not just returned.
+    reread = si.read_session(ws, SID)
+    assert reread is not None and reread["last_seen_at"] == "2030-06-10T12:00:00+00:00"
+
+
+def test_touch_last_seen_at_noop_when_no_record(tmp_path: Path) -> None:
+    """A missing session record cannot be refreshed — returns None (fail-soft)."""
+    ws = _ws(tmp_path)
+    assert si.touch_last_seen_at(ws, SID, now="2030-06-10T12:00:00+00:00") is None
+
+
+def test_liveness_timestamp_prefers_last_seen_at(tmp_path: Path) -> None:
+    """The GC liveness clock is the renewed last_seen_at when present."""
+    rec: dict[str, object] = {
+        "last_seen_at": "2030-06-10T12:00:00+00:00",
+        "bound_at": "2020-01-01T00:00:00+00:00",
+    }
+    assert si.liveness_timestamp(rec) == "2030-06-10T12:00:00+00:00"
+
+
+def test_liveness_timestamp_falls_back_to_creation_when_no_last_seen_at(tmp_path: Path) -> None:
+    """FR-W1-04: a record WITHOUT last_seen_at decays TTL-from-creation (bound_at/created_at)."""
+    # bound_at (the bind-CLI creation field) is used when last_seen_at is absent.
+    assert (
+        si.liveness_timestamp({"bound_at": "2020-01-01T00:00:00+00:00"})
+        == "2020-01-01T00:00:00+00:00"
+    )
+    # created_at is the secondary creation field.
+    assert (
+        si.liveness_timestamp({"created_at": "2019-01-01T00:00:00+00:00"})
+        == "2019-01-01T00:00:00+00:00"
+    )
+
+
+def test_liveness_timestamp_empty_when_no_timestamp_field(tmp_path: Path) -> None:
+    """No last_seen_at and no creation field ⇒ empty string (is_stale treats as fresh)."""
+    assert si.liveness_timestamp({"mode": "READ"}) == ""

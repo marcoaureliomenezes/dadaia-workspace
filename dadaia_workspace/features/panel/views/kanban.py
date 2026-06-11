@@ -39,6 +39,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.lock_liveness import is_stale_session
+from dadaia_workspace.features.spec_context import session_identity
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +83,12 @@ def render_api_kanban(
     """
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
-        sessions_dir = workspace_root / ".dadaia" / "sessions"
+        # Session-store enumeration via the single owner (T-011-05 / FR-W1-05, ADR-12):
+        # the panel no longer constructs the ``.dadaia/sessions`` path itself.
         generated_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
 
-        if not sessions_dir.exists():
+        session_files = session_identity.iter_session_records(workspace_root)
+        if not session_files:
             payload: dict[str, object] = {
                 "generated_at": generated_at,
                 "swimlanes": [],
@@ -96,7 +99,7 @@ def render_api_kanban(
         # Key: context name → column key → list of SessionCard dicts
         lanes: dict[str, dict[str, list[dict[str, object]]]] = {}
 
-        for json_file in sorted(sessions_dir.glob("*.json")):
+        for json_file in session_files:
             try:
                 data = json.loads(json_file.read_text(encoding="utf-8"))
             except Exception:  # noqa: BLE001

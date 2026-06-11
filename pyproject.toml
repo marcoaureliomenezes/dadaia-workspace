@@ -50,18 +50,32 @@ types-PyYAML = ">=6"
 pytest-randomly = "^4.1.0"
 import-linter = ">=2.11"
 
-# Dev/build tooling CVE floors (security audit F-6, sec-reviewer 2026-06-10).
-# `poetry` and `dulwich` are NOT declared dependencies of this project and do not
-# appear in `poetry.lock` (build-system uses `poetry-core`, which has no dulwich in
-# its closure). The flagged CVEs live only in the workspace tool environment where
-# `poetry` is installed to operate the workspace (pip-installed into the venv, not
-# locked here). They are therefore outside this repo's lockfile control. The required
-# safe floors — enforced on the *tool* environment, not this project's deps — are:
+# Dev/build tooling CVE floors (security audit F-6, sec-reviewer 2026-06-10;
+# re-verified T-011-17 / residual R9, 2026-06-10).
+# `pip`, `poetry`, and `dulwich` are NOT declared dependencies of this project and do
+# not appear in `poetry.lock` (build-system uses `poetry-core`, which has no dulwich in
+# its closure — verified: `grep name=\"(pip|poetry|dulwich)\" poetry.lock` -> 0 hits).
+# The flagged CVEs live only in the workspace *tool* environment (`.dadaia/.venv`),
+# where `poetry` (and its transitive `dulwich`) and `pip` are installed to operate the
+# workspace — pip-installed, not locked here. They are therefore outside this repo's
+# lockfile control. Required safe floors, enforced on the tool environment only:
+#   pip     >= 25.3   (CVE-2025-8869  — sdist symlink traversal; project venv is 26.0.1, OK)
 #   poetry  >= 2.3.4  (CVE-2026-34591, CVE-2026-41140)
 #   dulwich >= 1.2.5  (CVE-2026-42305, CVE-2026-47734  — poetry transitive)
-# Upgrading the live tool venv (.dadaia/.venv) is an operator/devops action; declaring
-# `poetry` as a dev dep here is rejected as unjustified dependency drift (it would pull
-# poetry's entire heavy tree, incl. dulwich, into every contributor install and the lock).
+#
+# R9 disposition (T-011-17): DEFERRED — cannot be remediated from this repo.
+#   * No lockfile bump is possible: these packages are not in poetry.lock, so neither a
+#     pyproject constraint nor `poetry update` would touch them. Declaring `poetry` as a
+#     dev dep is rejected as unjustified dependency drift (it pulls poetry's entire heavy
+#     tree, incl. dulwich, into every contributor install + the lock).
+#   * pip-audit was unavailable in the project venv on the implementing host; audit was
+#     performed via `python -m pip list --format json` against both venvs + these CVE
+#     floors. The live tool venv was found at poetry 1.8.3 / dulwich 0.21.7 / pip 24.0 —
+#     all below floor — but `poetry` is broken (snap-confined, non-executable) on that
+#     host, so the tool venv cannot be regenerated here.
+#   * Operator/devops remediation (rebuild/upgrade the tool venv, NOT a repo lock op):
+#       .dadaia/.venv/bin/pip install --upgrade 'pip>=25.3' 'poetry>=2.3.4' 'dulwich>=1.2.5'
+#     then re-verify: .dadaia/.venv/bin/pip list | grep -Ei '^(pip|poetry|dulwich) '
 hypothesis = ">=6.100"
 
 [build-system]

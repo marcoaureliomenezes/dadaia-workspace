@@ -433,6 +433,182 @@ def test_lease_coherence_is_noop_without_workspace_state_dir(tmp_path: Path) -> 
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# SPEC-DOC-029 three-state triage — T-011-03 (bug B3:
+# doctor-stale-lease-misdiagnosed-as-forgery)
+#
+# (a) TTL-expired + dead/unprobeable holder  ⇒ WARN "stale lease ... safe to reclaim"
+# (b) live holder + genuine incoherence       ⇒ ERR (forgery wording ONLY here)
+# (c) coherent                                ⇒ silent
+# ──────────────────────────────────────────────────────────────────────────────
+
+from datetime import UTC, datetime, timedelta  # noqa: E402
+
+from dadaia_workspace.features.specs import doctor as _doctor_mod  # noqa: E402
+
+_FORGERY_TOKEN = "forgery"
+_STALE_REMEDIATION_TOKENS = ("dadaia doctor --fix", "dadaia lock steal")
+
+
+def _strip_pid_from_lock_record(state_dir: Path, ctx: str) -> None:
+    """Reduce the genuine ``<ctx>.lock.json`` to the legacy pre-``pid`` record shape.
+
+    The record is still produced by the production writer (``lease.acquire``); this only
+    removes the ``pid`` field to reproduce the EXACT pre-pid legacy shape observed in the
+    bug (a record that predates the ``pid`` field), so the pid-veto degrades to TTL-only.
+    """
+    import json
+
+    record_path = state_dir / "states" / "ctx_locks" / f"{ctx}.lock.json"
+    data = json.loads(record_path.read_text(encoding="utf-8"))
+    data.pop("pid", None)
+    record_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def test_stale_dead_holder_lease_reports_doc_029_warning_with_remediation(
+    tmp_path: Path,
+) -> None:
+    """State (a): a TTL-expired lock record whose holder is dead/unprobeable ⇒ WARN.
+
+    The lease is acquired ~36 h ago (heartbeat far past the 120 s TTL); no live pid_probe
+    is wired (default ``None``), so the record degrades to the TTL verdict (stale/dead).
+    The incumbent ptr / session record are coherently re-bound to a *fresh* session — the
+    out-of-band lock holder is just the stale, never-GC'd lease. Doctor must WARN
+    ("stale lease ... safe to reclaim") with a remediation command, never ERR / forgery.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    state_dir = tmp_path / ".dadaia"
+    ctx = "ctx-stale"
+
+    stale_clock = lambda: datetime.now(tz=UTC) - timedelta(hours=36)  # noqa: E731
+    lease.acquire(tmp_path, ctx, "sessOld", "rel-1", "implementation", clock=stale_clock)
+    # Fresh READ bind: incumbent ptr + session record re-point to a new live session.
+    session_identity.set_incumbent(tmp_path, ctx, "sessNew")
+    session_identity.write_session(tmp_path, "sessNew", {"session_id": "sessNew"})
+
+    issues = SpecsDoctor(specs, workspace_state_dir=state_dir).check()
+    doc_029 = _by_code(issues, "SPEC-DOC-029")
+    assert doc_029, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.WARNING for i in doc_029)
+    text = " ".join(i.description for i in doc_029)
+    assert "stale lease" in text.lower()
+    assert "safe to reclaim" in text.lower()
+    assert any(tok in text for tok in _STALE_REMEDIATION_TOKENS)
+    assert _FORGERY_TOKEN not in text.lower()
+    # No ERROR-class SPEC-DOC-029 at all.
+    assert all(i.severity == Severity.WARNING for i in doc_029)
+
+
+def test_stale_pidless_lease_with_fresh_read_bind_warns_not_err(tmp_path: Path) -> None:
+    """Named composed integration test (AC-W1-03 / bug B3 repro steps 1–4, end-to-end).
+
+    Built entirely via the PRODUCTION writers:
+
+    1. A session acquires the lease in IMPLEMENTATION mode (genuine ``<ctx>.lock.json`` +
+       incumbent ptr), ~36 h ago — heartbeat far past TTL. The record is then reduced to
+       the legacy pid-LESS shape (the exact pre-pid record observed in the bug).
+    2. The harness session ended without release; TTL expired; no GC reclaimed the file.
+    3. A new session runs a READ bind: incumbent ptr + session record re-point to the new
+       session (production ``set_incumbent`` + ``write_session``).
+    4. ``specs doctor`` runs over this state.
+
+    Expected (the bug's Expected section): WARN — not ERR — naming the reclaim command,
+    overall exit 0 (no other ERR), and NO forgery wording in the output.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    state_dir = tmp_path / ".dadaia"
+    ctx = "consumer-ctx"
+
+    # Step 1 — genuine lease + ptr, ~36 h old, then reduced to the legacy pid-less shape.
+    stale_clock = lambda: datetime.now(tz=UTC) - timedelta(hours=36)  # noqa: E731
+    lease.acquire(tmp_path, ctx, "sessDead", "rel-1", "implementation", clock=stale_clock)
+    _strip_pid_from_lock_record(state_dir, ctx)
+
+    # Step 3 — fresh READ bind re-points incumbent ptr + session record to the new session.
+    session_identity.set_incumbent(tmp_path, ctx, "sessFreshRead")
+    session_identity.write_session(
+        tmp_path, "sessFreshRead", {"session_id": "sessFreshRead", "mode": "read"}
+    )
+
+    # Step 4 — run doctor (probe seam left at default None ⇒ pid-less ⇒ TTL verdict = dead).
+    issues = SpecsDoctor(specs, workspace_state_dir=state_dir).check()
+
+    doc_029 = _by_code(issues, "SPEC-DOC-029")
+    assert doc_029, [i.to_dict() for i in issues]
+    # WARN, not ERR.
+    assert all(i.severity == Severity.WARNING for i in doc_029)
+    # Remediation command named.
+    text = " ".join(i.description for i in doc_029)
+    assert any(tok in text for tok in _STALE_REMEDIATION_TOKENS), text
+    # No forgery wording anywhere in the doctor output.
+    full_output = " ".join(i.description for i in issues)
+    assert _FORGERY_TOKEN not in full_output.lower(), full_output
+    # Overall exit 0 — no ERROR-class issue introduced by this stale lease.
+    assert all(i.severity != Severity.ERROR for i in doc_029)
+
+
+def test_live_incoherent_lease_reports_doc_029_error_with_forgery_wording(
+    tmp_path: Path,
+) -> None:
+    """State (b): a LIVE lock holder whose identity genuinely diverges from the incumbent
+    ptr / session record ⇒ ERR with forgery wording (the only state where it is permitted).
+
+    ``lease.acquire`` writes a TTL-fresh record stamped with THIS test process's pid (alive),
+    so the holder is live; the incumbent ptr is then drifted to a different session — genuine
+    three-source incoherence on a live holder = the forgery the backstop exists to catch.
+    """
+    specs = _make_clean_specs_tree(tmp_path)
+    state_dir = tmp_path / ".dadaia"
+    ctx = "ctx-live"
+
+    # Live holder: fresh acquire (heartbeat now, pid = this process, alive). Wire a probe
+    # so the live pid is honoured even if TTL math is borderline.
+    lease.acquire(tmp_path, ctx, "sessLive", "rel-1", "implementation")
+    session_identity.set_incumbent(tmp_path, ctx, "sessOther")
+    session_identity.write_session(tmp_path, "sessOther", {"session_id": "sessOther"})
+
+    issues = SpecsDoctor(
+        specs,
+        workspace_state_dir=state_dir,
+        pid_probe=lambda _pid: True,  # the holder is genuinely alive
+    ).check()
+    doc_029 = _by_code(issues, "SPEC-DOC-029")
+    assert doc_029, [i.to_dict() for i in issues]
+    assert all(i.severity == Severity.ERROR for i in doc_029)
+    text = " ".join(i.description for i in doc_029).lower()
+    assert _FORGERY_TOKEN in text, text
+
+
+def test_coherent_live_lease_reports_no_doc_029(tmp_path: Path) -> None:
+    """State (c): a coherent live lease ⇒ silent (no SPEC-DOC-029 at all)."""
+    specs = _make_clean_specs_tree(tmp_path)
+    state_dir = tmp_path / ".dadaia"
+    ctx = "ctx-coherent"
+
+    lease.acquire(tmp_path, ctx, "sessS1", "rel-1", "implementation")
+    session_identity.write_session(tmp_path, "sessS1", {"session_id": "sessS1"})
+
+    issues = SpecsDoctor(specs, workspace_state_dir=state_dir, pid_probe=lambda _pid: True).check()
+    assert "SPEC-DOC-029" not in _codes(issues)
+
+
+def test_doctor_pid_probe_seam_is_composition_root_wired_not_feature_import() -> None:
+    """The doctor pid-probe seam is an injected ``__init__`` parameter (composition-root
+    wired, like ``workspace_state_dir``) — ``features/specs/doctor.py`` must NOT import the
+    infrastructure process-probe adapter directly (import-linter / ADR layering law).
+    """
+    import inspect
+
+    sig = inspect.signature(SpecsDoctor.__init__)
+    assert "pid_probe" in sig.parameters, "SpecsDoctor must accept an injected pid_probe seam"
+
+    src = inspect.getsource(_doctor_mod)
+    assert "process_probe_adapter" not in src, (
+        "features/specs/doctor.py must not import the infrastructure process-probe adapter; "
+        "the probe is composition-root-wired via the pid_probe parameter."
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # SPEC-DOC-030 — specs/audits/ naming canon (constitution §8 collision-safe naming)
 # ──────────────────────────────────────────────────────────────────────────────
 

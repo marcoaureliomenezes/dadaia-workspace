@@ -66,7 +66,7 @@ its failing test before the fix.
   for all three states; suite green.
 - **Parallelism:** after 01; before 03 and 04.
 
-### [ ] T-011-03 — SPEC-DOC-029 triage: stale-dead ≠ forgery
+### [x] T-011-03 — SPEC-DOC-029 triage: stale-dead ≠ forgery
 - **Owner:** software-engineer · **Maps:** bug B3 half (2) —
   `features/specs/doctor.py:1199-1245` conflates staleness with forgery
 - **Write set:** `dadaia_workspace/features/specs/doctor.py`,
@@ -86,7 +86,7 @@ its failing test before the fix.
   ERR. Bug closed with the named regression test.
 - **Parallelism:** after 02; before T-011-10.
 
-### [ ] T-011-04 — Bind-record GC: heartbeat-renewed `last_seen_at` (no READ→IMPLEMENTATION decay)
+### [x] T-011-04 — Bind-record GC: heartbeat-renewed `last_seen_at` (no READ→IMPLEMENTATION decay)
 - **Owner:** software-engineer · **Maps:** residual R3; ADR-8 (amended — architect A1)
 - **Write set:** `dadaia_workspace/hooks/sdd_post_gate.py` (heartbeat also refreshes
   the session/bind record's `last_seen_at`),
@@ -106,7 +106,7 @@ its failing test before the fix.
   transient bind-CLI pid, dead by construction); suite green.
 - **Parallelism:** after 02; before 05.
 
-### [ ] T-011-05 — Session-path ownership: migrate the 3 legal sites (ADR-12)
+### [x] T-011-05 — Session-path ownership: migrate the 3 legal sites (ADR-12)
 - **Owner:** software-engineer · **Maps:** residual R4 (arch NF-3 residue); ADR-12
 - **Write set:** `dadaia_workspace/cli/commands/context.py` (`:76`),
   `dadaia_workspace/features/spec_context/doctor.py` (`:124`),
@@ -258,7 +258,7 @@ its failing test before the fix.
   the binding contract; v0.1.10 tokenless-sensitive-API 401 contract still green.
 - **Parallelism:** independent.
 
-### [ ] T-011-14 — ctx-inject: tldr-digest catalog + sentinel GC
+### [x] T-011-14 — ctx-inject: tldr-digest catalog + sentinel GC
 - **Owner:** software-engineer · **Maps:** residual R6 (ai N-5)
 - **Write set:** `dadaia_workspace/hooks/ctx_inject.py`,
   `tests/unit/hooks/test_ctx_inject*.py`,
@@ -302,7 +302,7 @@ its failing test before the fix.
   file:line evidence recorded for CLOSURE.
 - **Parallelism:** independent.
 
-### [ ] T-011-17 — R9: opportunistic venv tooling bumps (or explicit defer)
+### [x] T-011-17 — R9: opportunistic venv tooling bumps (or explicit defer)
 - **Owner:** software-engineer · **Maps:** residual R9 (security F-6 tail)
 - **Write set:** `pyproject.toml`, `poetry.lock`
 - **Preconditions:** T-011-00.

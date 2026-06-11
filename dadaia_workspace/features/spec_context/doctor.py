@@ -95,9 +95,11 @@ _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
 # Sentinel files older than this are orphans (process SIGKILLed mid-CAS).
 _SENTINEL_ORPHAN_AGE = 30.0
 
-# Sessions expired beyond this age are graveyard entries eligible for GC.
-_SESSION_GC_TTL_FIELD = "ttl_seconds"
-_SESSION_HEARTBEAT_FIELD = "last_seen_at"
+# Sessions expired beyond this age are graveyard entries eligible for GC. The field names
+# are owned by ``session_identity`` (the single owner of the session-record schema); the
+# GC liveness clock is resolved via ``session_identity.liveness_timestamp`` (last_seen_at,
+# with TTL-from-creation fallback for pre-heartbeat records — T-011-04 / FR-W1-04 / ADR-8).
+_SESSION_GC_TTL_FIELD = session_identity.SESSION_GC_TTL_FIELD
 
 
 @dataclass(frozen=True)
@@ -128,7 +130,9 @@ class DoctorService:
         return self._workspace_root / "repos"
 
     def _sessions_dir(self) -> Path:
-        return self._workspace_root / ".dadaia" / "sessions"
+        # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the
+        # doctor no longer constructs ``.dadaia/sessions`` itself.
+        return session_identity.sessions_dir(self._workspace_root)
 
     def _ctx_locks_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
@@ -598,9 +602,13 @@ class DoctorService:
                 sess_data = session_identity.read_session(self._workspace_root, sess_id)
                 if sess_data is None:
                     continue
-                # Build a TTL-check-compatible dict using session fields
+                # Build a TTL-check-compatible dict. The liveness clock is the
+                # heartbeat-renewed ``last_seen_at`` (T-011-04 / FR-W1-04, ADR-8 amended),
+                # with TTL-from-creation fallback for pre-heartbeat records — resolved by
+                # the single owner. The session-record pid is NOT passed (no pid_probe): the
+                # bind-CLI pid is dead by construction, so bind GC is pure last_seen_at TTL.
                 gc_check: dict[str, object] = {
-                    "heartbeat": sess_data.get(_SESSION_HEARTBEAT_FIELD, ""),
+                    "heartbeat": session_identity.liveness_timestamp(sess_data),
                     "ttl": sess_data.get(_SESSION_GC_TTL_FIELD, 300),
                 }
                 if is_stale(gc_check):
