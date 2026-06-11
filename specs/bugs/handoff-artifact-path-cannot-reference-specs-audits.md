@@ -1,6 +1,8 @@
 ---
 name: handoff-artifact-path-cannot-reference-specs-audits
-status: Open
+status: Closed
+closed: 2026-06-11
+fixed_by: v0.1.11
 severity: MEDIUM
 session_id: null
 reported: 2026-06-10
@@ -21,3 +23,17 @@ surface: reports_validation (handoff-v1.1 schema + artifact path resolver)
 **Expected:** The lifecycle contract designates `specs/audits/<ts>/` (committed) as the auditor's report channel, and handoff-v1.1 requires `artifact` with `content_hash` verification. These two contracts must compose: workspace-relative resolution should cover `repos/...` (or any workspace-rooted path), not only `.dadaia/...`.
 
 **Notes:** Workaround used: duplicate the audit MD under `.dadaia/reports/<ctx>/<agent>/` and point `artifact.path` there — which forks the artifact into two copies and defeats `content_hash` as a single-source integrity check. Suggested fix: in `_resolve_artifact_path`, treat any relative path that exists under `workspace_root` as workspace-rooted (keeping the handoff-dir fallback for legacy), or extend the prefix allowlist to `repos/`. Environment: dadaia-workspace v0.1.10 line, self-hosting workspace. No operator-local paths in this record.
+
+**Resolution (v0.1.11, 2026-06-11):** `_resolve_artifact_path` resolves ANY relative
+`artifact.path` that exists under `workspace_root` as workspace-rooted (covers
+`repos/<slug>/specs/audits/<UTC>/…`); legacy handoff-dir fallback kept; workspace-root
+wins when both exist; absolute/`..` still schema-rejected (T-011-07, schema unchanged).
+Named regression tests:
+`tests/unit/features/reports_validation/test_resolve_artifact_path.py` —
+`test_resolve_repos_specs_audits_artifact_validates`,
+`test_resolve_legacy_handoff_dir_relative_still_validates`,
+`test_workspace_root_wins_when_path_resolvable_both_ways`,
+`test_absolute_path_outside_workspace_rejected`, `test_dotdot_escape_path_rejected`.
+Verified at `feature/v0.1.11 @ e1f2de3`. Duplicate record
+`handoff-artifact-path-resolver-ignores-workspace-root-contract` stays Closed,
+superseded by this one.

@@ -2,21 +2,23 @@
 slug: workspace-doctor
 title: workspace-doctor
 category: product
-tldr: diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, INV-4, INV-5, SENTINEL-GC, PTR-GC.
+tldr: diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, LOCK-GC, CTX-URL-1, INV-4, INV-5, SENTINEL-GC, PTR-GC.
 summary: diagnóstico + repair de invariantes do workspace state com --fix opcional.
-  Cobre context ALIVE/DEAD (INV-4, INV-5), TTL-lease stale/inválido (LOCK-NEW),
-  orphan sentinel files (SENTINEL-GC) e orphan .ptr files (PTR-GC). Invariantes
-  SEM-1 e Lock-3 foram removidos em v0.1.6. Os antigos LEASE-1..4 não existem no
-  código — os códigos reais são LOCK-NEW (doctor.py:300), INV-4 (doctor.py:376),
-  INV-5 (doctor.py:389), SENTINEL-GC e PTR-GC (doctor.py:558-593, sem código nomeado no output).
+  Cobre context ALIVE/DEAD (INV-4, INV-5), TTL-lease inválido (LOCK-NEW), reclaim
+  probe-gated de lease stale de holder morto/unprobeable (LOCK-GC — nunca reclama
+  pid vivo), context ALIVE com repo_url vazio (CTX-URL-1, manual via context
+  update --url), orphan sentinel files (SENTINEL-GC) e orphan .ptr files (PTR-GC).
+  Bind/session records decaem por TTL contra last_seen_at heartbeat-renovado.
+  Invariantes SEM-1 e Lock-3 foram removidos em v0.1.6; os antigos LEASE-1..4
+  nunca existiram no código.
 tags:
 - workspace
 - doctor
 - health
 - repair
 agent_tier: self-pull
-token_estimate: 700
-last_updated: '2026-06-09'
+token_estimate: 900
+last_updated: '2026-06-11'
 release_origin: v0.1.9
 ---
 
@@ -41,17 +43,24 @@ O TTL-lease usa um single-record JSON por context em `.dadaia/states/ctx_locks/<
 
 | Código | O que detecta | Auto-fix |
 |--------|---------------|----------|
-| `LOCK-NEW` | `.lock.json` com JSON inválido, campos obrigatórios ausentes, ou `heartbeat` stale (TTL 120s excedido) — `_check_lease_records`, `doctor.py:300` | AUTO-FIX (`--fix`): deleta o `.lock.json` stale ou inválido. |
-| `INV-4` | Context com `state=ALIVE` e repo ausente em `repos/` — `doctor.py:376` | Manual: `dadaia context alive <name>`. |
-| `INV-5` | Context com `state=DEAD` e repo presente em `repos/` — `doctor.py:389` | AUTO-FIX: `dadaia context dead <name>` ou remoção manual. |
-| `SENTINEL-GC` | Orphan `.lock.sentinel` com mtime > 30s (processo morreu entre CAS e unlink) — `doctor.py:558–593`, sem código nomeado no output | AUTO-FIX (`--fix`): deleta o sentinel. |
-| `PTR-GC` | Orphan `.ptr` file em `.dadaia/sessions/runtime/` para um context sem `.lock.json` ou com lease expirado — `doctor.py:572–592` | AUTO-FIX (`--fix`): deleta o `.ptr`. |
+| `LOCK-NEW` | `.lock.json` com JSON inválido ou campos obrigatórios ausentes — `_check_lease_records` | AUTO-FIX (`--fix`): deleta o `.lock.json` inválido. |
+| `LOCK-GC` | Lease TTL-expirado cujo holder está **morto** (pid probe, injetado no composition root via `container`) ou é **unprobeable** (record pré-`pid` ⇒ TTL-only reclaimable) | AUTO-FIX (`--fix`): reclaim (deleta o record). Um holder com pid **vivo** NUNCA é reclaimed, mesmo past-TTL (invariante no-steal). |
+| `CTX-URL-1` | Context com `state=ALIVE` e `repo_url` vazio no record (context não-portável) | Manual: `dadaia context update <name> --url <url>` — ou back-fill automático em `alive`/`dead` quando o repo on-disk tem origin. |
+| `INV-4` | Context com `state=ALIVE` e repo ausente em `repos/` | Manual: `dadaia context alive <name>`. |
+| `INV-5` | Context com `state=DEAD` e repo presente em `repos/` | AUTO-FIX: `dadaia context dead <name>` ou remoção manual. |
+| `SENTINEL-GC` | Orphan `.lock.sentinel` com mtime > 30s (processo morreu entre CAS e unlink) | AUTO-FIX (`--fix`): deleta o sentinel. |
+| `PTR-GC` | Orphan `.ptr` file em `.dadaia/sessions/runtime/` para um context sem `.lock.json` ou com lease expirado | AUTO-FIX (`--fix`): deleta o `.ptr`. |
 
-Mensagens de `LOCK-NEW` incluem: `context`, `session_id` do holder, e `heartbeat` — informação suficiente para diagnóstico sem instrução de reclaim manual.
+Bind/session records (`.dadaia/sessions/<id>.json`) são coletados por TTL medido contra
+`last_seen_at`, que o heartbeat PostToolUse renova a cada tool use — um bind de sessão
+ativa nunca decai; record sem `last_seen_at` mantém TTL-from-creation; o pid do record
+(bind-CLI, morto por construção) não é consultado.
+
+Mensagens de `LOCK-NEW`/`LOCK-GC` incluem: `context`, `session_id` do holder, e `heartbeat` — informação suficiente para diagnóstico sem instrução de reclaim manual.
 
 ## Fluxo de uso
 
-  1. `dadaia doctor` — executa checklist de invariantes (INV-4, INV-5, LOCK-NEW, SENTINEL-GC, PTR-GC) e lista issues com flag `[fixable]` ou `[manual]`.
+  1. `dadaia doctor` — executa checklist de invariantes (INV-4, INV-5, LOCK-NEW, LOCK-GC, CTX-URL-1, SENTINEL-GC, PTR-GC) e lista issues com flag `[fixable]` ou `[manual]`.
   2. Operador inspeciona os issues; se todos forem `[fixable]`, roda `dadaia doctor --fix`.
   3. Doctor aplica os reparos e mostra a lista de ações realizadas.
   4. Re-rodar `dadaia doctor` deve retornar "All invariants OK".
@@ -62,7 +71,7 @@ Após crash de sessão de agente (verificar se leases STALE existem), após upgr
 
 ## Diferencial
 
-Sem este guardrail, leases de implementação abandonados (crash de sessão) bloqueariam futuros writers indefinidamente. O invariante `LOCK-NEW` detecta e deleta esses leases órfãos ou stale; o operador é informado com evidência em vez de ter que editar JSON manualmente. `SENTINEL-GC` garante que orphan sentinels (processo morto entre O_EXCL CAS e unlink) não causem bloqueio permanente.
+Sem este guardrail, leases de implementação abandonados (crash de sessão) bloqueariam futuros writers indefinidamente e ficariam permanentemente irrecuperáveis (records pré-`pid` eram un-reclaimable até v0.1.10). `LOCK-GC` reclama esses leases com segurança — o pid probe garante que um holder vivo nunca é roubado; `LOCK-NEW` deleta records inválidos; o operador é informado com evidência em vez de ter que editar JSON manualmente. `SENTINEL-GC` garante que orphan sentinels (processo morto entre O_EXCL CAS e unlink) não causem bloqueio permanente. `CTX-URL-1` impede contexts ALIVE não-portáveis (URL vazia) de falharem silenciosamente num export/import.
 
 ## Estado runtime tocado
 

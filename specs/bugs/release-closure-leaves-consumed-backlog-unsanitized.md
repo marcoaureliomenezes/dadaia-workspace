@@ -1,6 +1,8 @@
 ---
 name: release-closure-leaves-consumed-backlog-unsanitized
-status: Open
+status: Closed
+closed: 2026-06-11
+fixed_by: v0.1.11
 severity: HIGH
 session_id: sess_8adf5659
 reported: 2026-06-10
@@ -52,3 +54,20 @@ re-pick already-shipped work (e.g. cross-platform-os-compatibility presents a
 the 9 stale entries is being performed by hand (PM curation); this bug tracks the
 missing **mechanism** (closure-protocol step + doctor invariant) so the drift
 cannot recur. No operator-local paths or secrets involved.
+
+**Resolution (v0.1.11, 2026-06-11):** Mechanism shipped on both halves. (a) The
+`dadaia-release-closure` skill carries a mandatory disposition sweep + `## Dispositions`
+CLOSURE template section (T-011-09); first live execution = the v0.1.11 CLOSURE itself
+(`specs/_archive/releases/v0.1.11/CLOSURE.md §Dispositions`). (b) specs doctor invariants
+SPEC-DOC-031 (non-terminal backlog referenced by an archived release ⇒ WARN) and
+SPEC-DOC-032 (bug `status:` outside {Open, Closed} ⇒ WARN) (T-011-10). Named regression
+tests: `tests/unit/features/specs/test_doctor_ledger_invariants.py` —
+`test_nonterminal_backlog_referenced_in_archived_closure_reports_doc_031_warning`,
+`test_open_backlog_referenced_in_archived_spec_reports_doc_031_warning`,
+`test_backlog_slug_only_in_backlog_returns_section_is_silent`,
+`test_terminal_backlog_referenced_in_archived_closure_is_silent`,
+`test_doc_031_skips_candidates_and_ideas_aggregate_files`,
+`test_bug_with_noncanonical_status_reports_doc_032_warning`,
+`test_bug_with_rejected_status_reports_doc_032_warning`,
+`test_doc_032_skips_readme_and_silent_when_bugs_dir_absent`. Verified at
+`feature/v0.1.11 @ e1f2de3` (qa rc-1 APPROVE).

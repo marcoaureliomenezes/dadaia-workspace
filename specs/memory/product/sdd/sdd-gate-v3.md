@@ -18,7 +18,7 @@ tags:
 - enforcement
 agent_tier: self-pull
 token_estimate: 1700
-last_updated: '2026-06-10'
+last_updated: '2026-06-11'
 release_origin: v0.1.10
 ---
 
@@ -73,7 +73,10 @@ hook — `features/lease.py` nunca importa o adapter). O acquire usa O_EXCL sent
 CAS. O record carrega `pid` — o do **processo harness de vida longa**, resolvido por
 `sdd_gate._resolve_holder_pid` (`harness_pid`/`parent_pid`/`ppid` do payload stdin,
 senão `os.getppid()`) e threaded até `lease.acquire`; nunca o pid do subprocesso
-efêmero do hook. Decision tree:
+efêmero do hook. Caveat: quando o harness invoca o hook através de um shell wrapper, o
+fallback `os.getppid()` resolve o pid do wrapper de vida curta em vez do processo
+harness — o record degrada para o regime TTL-only (nunca menos seguro; o caminho preciso
+é o `harness_pid` do payload). Decision tree:
 
 1. `.ptr` match → **RENEW** incondicional (incumbente, mesmo após relaunch).
 2. Record com mesmo `session_id` → **RENEWED**, mesmo past-TTL (holder-safe: um holder nunca perde o próprio lease pela própria staleness).

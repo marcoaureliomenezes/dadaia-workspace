@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-10T15:19:56.146465+00:00",
+  "generated_at": "2026-06-11T03:49:53.689623+00:00",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -8,7 +8,7 @@
       "title": "agent-comms — Handoff Contract v1",
       "category": "product",
       "tldr": "handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/.",
-      "summary": "contrato handoff-v1.1 separa evidência humana de coordenação entre agentes: reports HTML em .dadaia/reports/<context>/<agent>/ e handoffs JSON em .dadaia/handoff/<context>/. O CLI valida schema e hash de artifact.path dentro do workspace; reports next e o gate QA/security consomem a raiz canônica.",
+      "summary": "contrato handoff-v1.1 separa evidência humana de coordenação entre agentes: reports HTML em .dadaia/reports/<context>/<agent>/ e handoffs JSON em .dadaia/handoff/<context>/. O CLI valida schema e hash de artifact.path dentro do workspace — qualquer path relativo existente sob o root resolve workspace-rooted (incl. repos/<slug>/specs/audits), com fallback legacy handoff-dir; reports next e o gate QA/security consomem a raiz canônica.",
       "tags": [
         "agent-comms",
         "handoff",
@@ -312,14 +312,14 @@
       "title": "context-management",
       "category": "product",
       "tldr": "multi-context ALIVE/DEAD; bind (--mode opcional) persiste modo no session record; TTL+PID-veto lease por contexto; dead() exige tree limpa ou --commit.",
-      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind` (--mode opcional, default read) persiste contexto/modo/pid no session record CLI-owned via session_identity — sem eval-export por default (--print-env é o escape back-compat); sessões READ são non-acquiring no gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS em acquire e renew, TTL 120s piso + PID veto, stable-session-identity via .ptr) plus port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); dead() refuses untracked files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog/bug new, dadaia memory product add.",
+      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind` (--mode opcional, default read) persiste contexto/modo/pid no session record CLI-owned via session_identity — sem eval-export por default (--print-env é o escape back-compat); sessões READ são non-acquiring no gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS em acquire e renew, TTL 120s piso + PID veto, stable-session-identity via .ptr) plus port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); lock steal e doctor LOCK-GC probe-gated (holder com pid vivo nunca é reclaimed); bind records renovados por heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog/bug new, dadaia memory product add.",
       "tags": [
         "context",
         "lifecycle",
         "session",
         "locking"
       ],
-      "token_estimate": 1600,
+      "token_estimate": 2400,
       "agent_tier": "self-pull",
       "path": "specs/memory/product/platform/context-management.md",
       "depends_on": [
@@ -346,7 +346,7 @@
         "hooks",
         "security"
       ],
-      "token_estimate": 900,
+      "token_estimate": 1440,
       "agent_tier": "self-pull",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "depends_on": [
@@ -401,15 +401,15 @@
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
-      "tldr": "diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, INV-4, INV-5, SENTINEL-GC, PTR-GC.",
-      "summary": "diagnóstico + repair de invariantes do workspace state com --fix opcional. Cobre context ALIVE/DEAD (INV-4, INV-5), TTL-lease stale/inválido (LOCK-NEW), orphan sentinel files (SENTINEL-GC) e orphan .ptr files (PTR-GC). Invariantes SEM-1 e Lock-3 foram removidos em v0.1.6. Os antigos LEASE-1..4 não existem no código — os códigos reais são LOCK-NEW (doctor.py:300), INV-4 (doctor.py:376), INV-5 (doctor.py:389), SENTINEL-GC e PTR-GC (doctor.py:558-593, sem código nomeado no output).",
+      "tldr": "diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, LOCK-GC, CTX-URL-1, INV-4, INV-5, SENTINEL-GC, PTR-GC.",
+      "summary": "diagnóstico + repair de invariantes do workspace state com --fix opcional. Cobre context ALIVE/DEAD (INV-4, INV-5), TTL-lease inválido (LOCK-NEW), reclaim probe-gated de lease stale de holder morto/unprobeable (LOCK-GC — nunca reclama pid vivo), context ALIVE com repo_url vazio (CTX-URL-1, manual via context update --url), orphan sentinel files (SENTINEL-GC) e orphan .ptr files (PTR-GC). Bind/session records decaem por TTL contra last_seen_at heartbeat-renovado. Invariantes SEM-1 e Lock-3 foram removidos em v0.1.6; os antigos LEASE-1..4 nunca existiram no código.",
       "tags": [
         "workspace",
         "doctor",
         "health",
         "repair"
       ],
-      "token_estimate": 700,
+      "token_estimate": 900,
       "agent_tier": "self-pull",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "depends_on": [
@@ -431,7 +431,7 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 450,
+      "token_estimate": 600,
       "agent_tier": "self-pull",
       "path": "specs/memory/product/platform/workspace-init.md",
       "depends_on": []
@@ -533,21 +533,21 @@
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
-      "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-030, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4.",
-      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$), 028 (file refs da constitution resolvem), 029 (coerência lease↔session, backstop D-2), 030 (naming de dirs novos em specs/audits/, WARN); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
+      "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4.",
+      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$ com allowlist legacy documentada), 028 (file refs da constitution resolvem), 029 (coerência lease↔session com triagem em 3 estados: stale-dead WARN com remediação / live-incoerente ERR / coerente ok), 030 (naming de dirs novos em specs/audits/, WARN), 031 (backlog consumido por release arquivada com status não-terminal, WARN), 032 (status de bug fora do canon {Open, Closed}, WARN); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
       "tags": [
         "specs",
         "doctor",
         "validation",
         "sdd"
       ],
-      "token_estimate": 1350,
+      "token_estimate": 1650,
       "agent_tier": "self-pull",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "depends_on": [
+        "workspace-doctor",
         "context-management",
-        "sdd-gate-v3",
-        "workspace-doctor"
+        "sdd-gate-v3"
       ]
     }
   ]

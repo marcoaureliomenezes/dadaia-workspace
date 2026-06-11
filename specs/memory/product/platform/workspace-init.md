@@ -12,7 +12,7 @@ tags:
 - setup
 - idempotent
 agent_tier: self-pull
-token_estimate: 450
+token_estimate: 600
 last_updated: '2026-06-09'
 release_origin: 0.1.8
 ---

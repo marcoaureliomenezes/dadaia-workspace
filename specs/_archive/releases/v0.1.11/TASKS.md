@@ -353,7 +353,7 @@ its failing test before the fix.
   CLOSURE; (9) v0.1.10 two-actor e2e still green.
 - **Parallelism:** last code-side task; gates rc-1 ship-trio (ADR-2).
 
-### [ ] T-011-21 — Memory truth + token_estimate regeneration + R8 doc nits + CLOSURE (PE, CLOSURE phase)
+### [x] T-011-21 — Memory truth + token_estimate regeneration + R8 doc nits + CLOSURE (PE, CLOSURE phase)
 - **Owner:** product-engineer · **Maps:** FR-W5-03; FR-W5-05 memory half (qa Q-M2,
   arch MINOR-3); SPEC "Memory files affected"; bug B1 dogfood (first disposition
   sweep)

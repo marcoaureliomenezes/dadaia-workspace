@@ -20,7 +20,7 @@ tags:
 - hooks
 - security
 agent_tier: self-pull
-token_estimate: 900
+token_estimate: 1440
 last_updated: '2026-06-09'
 release_origin: 0.1.8
 ---

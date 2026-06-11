@@ -15,8 +15,8 @@ tags:
 - adr
 - agents
 agent_tier: self-pull
-token_estimate: 4100
-last_updated: '2026-06-10'
+token_estimate: 6400
+last_updated: '2026-06-11'
 release_origin: v0.1.10
 ---
 
@@ -183,7 +183,9 @@ heartbeat de **todo lease cujo record nomeia o sid desta sessão**:
 namespaces e do session record:
 
 - `.dadaia/sessions/runtime/<ctx>.ptr` — pointer do incumbente do contexto (lease
-  holder ou último bind; o `bind` o atualiza e o gate o lê na resolução de modo).
+  holder ou último bind; o `bind` o atualiza e o gate o lê na resolução de modo —
+  honrado apenas quando nenhum lease **vivo** nomeia outro sid: liveness do holder
+  vence o pointer, anti-downgrade).
 - `.dadaia/sessions/runtime/<session_id>.ptr` — pointer de sessão do ctx-inject.
 - `.dadaia/sessions/<id>.json` — session record (`session_id`, `context`, `mode`,
   `release`, `pid`, `bound_at`, `last_seen_at`, `ttl_seconds`).
@@ -239,7 +241,15 @@ lease estrangeiro vivo (TTL-fresh ou pid-vivo): yield informativo. A mensagem **
 instrui o operador a rebind, relaunch, ou steal — nenhuma cerimônia manual de
 desbloqueio.
 
-**GC:** `dadaia doctor --fix` deleta `.lock.json` stale, session files órfãos, e sentinel files órfãos.
+**GC:** `dadaia doctor --fix` reclama leases TTL-expirados cujo holder está morto ou é
+unprobeable (`LOCK-GC` — records pré-`pid` são unprobeable ⇒ reclaimable por TTL puro; um
+holder com pid **vivo** nunca é reclaimed, mesmo past-TTL; probe injetado no composition
+root via `container`), além de session files e sentinel files órfãos. `dadaia lock steal
+<ctx>` é probe-gated: recusa quando o pid registrado do holder está vivo. Bind/session
+records decaem por TTL medido contra `last_seen_at`, que o heartbeat PostToolUse renova a
+cada tool use — uma sessão READ ativa nunca decai para IMPLEMENTATION; records sem
+`last_seen_at` mantêm TTL-from-creation. O pid do session record (pid do bind-CLI, morto
+por construção) não participa do bind-GC.
 
 **fcntl Lock-1/Lock-2 retidos** em `locking.py` — serializam curtas git ops no mesmo processo (workspace-level e per-context). Não são usados para mutex de release.
 
