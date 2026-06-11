@@ -330,7 +330,7 @@ its failing test before the fix.
 
 ## W6 — Projection + final gate + closure
 
-### [-] T-011-19 — Reprojection of changed public assets
+### [x] T-011-19 — Reprojection of changed public assets
 - **Owner:** software-engineer · **Maps:** lib-guardrail workflow
 - **Write set:** projections via CLI only (`dadaia public stage && dadaia public
   install --target all && dadaia public doctor`)
@@ -339,7 +339,7 @@ its failing test before the fix.
   staging; `[ok] public-privacy` present.
 - **Parallelism:** after the public/** tasks.
 
-### [ ] T-011-20 — Release final gate
+### [x] T-011-20 — Release final gate
 - **Owner:** software-engineer · **Maps:** all
 - **Write set:** none (verification)
 - **Preconditions:** all code tasks `[x]` except T-011-21.

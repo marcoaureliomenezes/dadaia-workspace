@@ -50,6 +50,23 @@ def test_resolve_tool_prefers_venv_sibling_of_python(tmp_path: Path) -> None:
     assert argv == (str(ruff),)
 
 
+def test_resolve_tool_sibling_of_python_symlink_not_its_target(tmp_path: Path) -> None:
+    """Venv-symlink regression (live-gate defect): ``bin/python`` is a symlink to
+    the base interpreter; resolution must look for siblings next to the SYMLINK,
+    never next to its target (which would escape the venv into the system bin)."""
+    base_bin = tmp_path / "usr" / "bin"
+    base_python = _make_exe(base_bin, "python3.12")  # no ruff here
+
+    venv_bin = tmp_path / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    python_link = venv_bin / "python"
+    python_link.symlink_to(base_python)
+    ruff = _make_exe(venv_bin, "ruff")
+
+    argv = _resolve_tool("ruff", python_executable=str(python_link), dadaia_bin=None)
+    assert argv == (str(ruff),)
+
+
 def test_resolve_tool_falls_back_to_dadaia_bin_when_no_venv_sibling(tmp_path: Path) -> None:
     """No sibling beside python → resolve from the DADAIA_BIN-derived bin dir."""
     venv_bin = tmp_path / "venv" / "bin"

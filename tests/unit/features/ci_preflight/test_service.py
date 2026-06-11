@@ -52,7 +52,9 @@ def test_fail_fast_stops_at_first_failure() -> None:
 
 def test_no_fail_fast_runs_every_check() -> None:
     def runner(argv: Sequence[str]) -> tuple[int, str]:
-        return (1, "boom") if "mypy" in argv else (0, "ok")
+        # argv entries may be absolute tool paths (runner-derived resolution,
+        # T-011-06) — match the tool by substring, not exact element.
+        return (1, "boom") if any("mypy" in part for part in argv) else (0, "ok")
 
     results = run_preflight(checks_for(), runner, fail_fast=False)
 

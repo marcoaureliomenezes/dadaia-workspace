@@ -109,14 +109,19 @@ def _resolve_tool(
     ``python_executable`` / ``dadaia_bin`` are injectable for testing; in
     production they default to ``sys.executable`` and ``os.environ["DADAIA_BIN"]``.
     """
+    # NOTE: the interpreter/dadaia paths must NOT be ``resolve()``d before taking
+    # ``parent`` — a venv's ``bin/python`` is a symlink to the base interpreter
+    # (e.g. ``/usr/bin/python3.12``), and following it would escape the venv and
+    # look for siblings in the system bin dir. Tool siblings live next to the
+    # symlink itself.
     py = python_executable if python_executable is not None else sys.executable
-    venv_sibling = Path(py).resolve().parent / name
+    venv_sibling = Path(os.path.abspath(py)).parent / name
     if _is_executable_file(venv_sibling):
         return (str(venv_sibling),)
 
     bin_ptr = dadaia_bin if dadaia_bin is not None else os.environ.get("DADAIA_BIN")
     if bin_ptr:
-        dadaia_sibling = Path(bin_ptr).resolve().parent / name
+        dadaia_sibling = Path(os.path.abspath(bin_ptr)).parent / name
         if _is_executable_file(dadaia_sibling):
             return (str(dadaia_sibling),)
 

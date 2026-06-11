@@ -28,7 +28,11 @@ def test_preflight_blocks_when_a_check_fails(monkeypatch, tmp_path: Path) -> Non
 
     def factory(root: Path):
         def run(argv: Sequence[str]) -> tuple[int, str]:
-            return (1, "type error on line 1") if "mypy" in argv else (0, "ok")
+            # argv may carry absolute tool paths (runner-derived resolution,
+            # T-011-06) — match by substring, not exact element.
+            if any("mypy" in part for part in argv):
+                return (1, "type error on line 1")
+            return (0, "ok")
 
         return run
 
