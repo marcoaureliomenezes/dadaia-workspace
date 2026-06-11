@@ -52,6 +52,22 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   that workflow files are reference/context unless a runtime dispatcher actually
   spawns agents.
 
+### [-] T-013-07 — Make the panel Academy tab browse knowledge_basis modules and lessons
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/panel/views/academy.py`,
+  `dadaia_workspace/features/panel/views/api.py` (academy view only),
+  `dadaia_workspace/features/panel/views/assets/js/academy.js`,
+  `dadaia_workspace/features/panel/views/assets/css/academy.py`,
+  `dadaia_workspace/features/panel/handler.py` (new academy lesson route rows only),
+  `dadaia_workspace/features/academy/service.py`,
+  `dadaia_workspace/container.py` (academy lesson view wiring only), tests
+- **Acceptance:** `/api/academy` lists ALL knowledge_basis modules with titles and
+  lesson counts; clicking a module expands its lessons; a new read-only
+  path-traversal-guarded `GET /academy/<module>/<lesson>` route renders the lesson
+  Markdown in the panel via `views/_md_render.py`. Covers bug
+  `academy-tab-cannot-browse-knowledge-basis-modules`. Unit + integration tests incl.
+  traversal negatives; ruff + mypy --strict clean.
+
 ### [x] T-013-06 — Project and verify Codex parity
 - **Owner:** software-engineer
 - **Write set:** generated projection files via `dadaia public stage/install`,
