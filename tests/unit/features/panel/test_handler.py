@@ -457,6 +457,166 @@ def test_public_routes_stay_tokenless() -> None:
         assert stubs[route].call_count == 1
 
 
+# ---------------------------------------------------------------------------
+# T-011-13 — panel launch token exchange (ADR-10 / AC-W4-02)
+#
+# The launch URL carries ONLY a single-use launch token (`?launch=<tok>`).  On
+# first GET of the shell the server consumes the token and sets the session
+# cookie (SameSite=Strict; HttpOnly), carrying the Bearer.  The token is then
+# invalidated — replay / expiry ⇒ 401.  Sensitive APIs stay Bearer-only (the
+# cookie gates only the UI shell).
+# ---------------------------------------------------------------------------
+
+_LAUNCH_BEARER = "launch-bearer-token"
+
+
+def _dispatch_get_full(
+    handler_class: type[BaseHTTPRequestHandler],
+    path: str,
+    token: str | None = None,
+) -> tuple[int, dict[str, list[str]], bytes]:
+    """GET *path*; return (status, headers, body). Headers map name→list of values."""
+    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
+    raw_request = f"GET {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
+    fake_sock = _FakeSocket(raw_request)
+    handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
+    response = fake_sock._wfile.getvalue()
+    head, _, body = response.partition(b"\r\n\r\n")
+    head_lines = head.split(b"\r\n")
+    status_code = int(head_lines[0].split(b" ")[1])
+    headers: dict[str, list[str]] = {}
+    for line in head_lines[1:]:
+        if b":" in line:
+            name, _, value = line.partition(b":")
+            headers.setdefault(name.decode().strip().lower(), []).append(value.decode().strip())
+    return status_code, headers, body
+
+
+def _make_launch_store():
+    from dadaia_workspace.features.panel.auth import LaunchTokenStore
+
+    return LaunchTokenStore(ttl_seconds=60)
+
+
+def test_launch_token_first_use_sets_session_cookie() -> None:
+    """First GET /?launch=<tok> sets the SameSite=Strict; HttpOnly session cookie."""
+    store = _make_launch_store()
+    launch_tok = store.mint()
+    stubs = _make_stubs()
+    handler_class = make_handler_class(
+        stubs,  # type: ignore[arg-type]
+        token=_LAUNCH_BEARER,
+        launch_token_store=store,
+    )
+
+    status, headers, _ = _dispatch_get_full(handler_class, f"/?launch={launch_tok}")
+
+    assert status == 200
+    assert stubs["index"].call_count == 1
+    cookies = headers.get("set-cookie", [])
+    assert cookies, "first launch-token use must emit a Set-Cookie header"
+    cookie = cookies[0].lower()
+    assert "httponly" in cookie
+    assert "samesite=strict" in cookie
+    # The cookie carries the Bearer as the session credential.
+    assert _LAUNCH_BEARER in cookies[0]
+
+
+def test_launch_token_replay_is_401() -> None:
+    """A consumed launch token replayed ⇒ 401 (single-use; the binding contract)."""
+    store = _make_launch_store()
+    launch_tok = store.mint()
+    stubs = _make_stubs()
+    handler_class = make_handler_class(
+        stubs,  # type: ignore[arg-type]
+        token=_LAUNCH_BEARER,
+        launch_token_store=store,
+    )
+
+    first, _, _ = _dispatch_get_full(handler_class, f"/?launch={launch_tok}")
+    assert first == 200
+
+    status, headers, _ = _dispatch_get_full(handler_class, f"/?launch={launch_tok}")
+    assert status == 401, "replay of a consumed launch token must be rejected"
+    assert "set-cookie" not in headers, "replay must not mint a session cookie"
+
+
+def test_expired_launch_token_is_401() -> None:
+    """A launch token used after TTL expiry ⇒ 401."""
+    from dadaia_workspace.features.panel.auth import LaunchTokenStore
+
+    now = [1000.0]
+    store = LaunchTokenStore(ttl_seconds=60, clock=lambda: now[0])
+    launch_tok = store.mint()
+    stubs = _make_stubs()
+    handler_class = make_handler_class(
+        stubs,  # type: ignore[arg-type]
+        token=_LAUNCH_BEARER,
+        launch_token_store=store,
+    )
+
+    now[0] = 1061.0  # past the 60s TTL
+    status, _, _ = _dispatch_get_full(handler_class, f"/?launch={launch_tok}")
+    assert status == 401
+
+
+def test_index_without_launch_token_stays_public_no_cookie() -> None:
+    """GET / with no launch token serves the public shell and sets no cookie.
+
+    loopback-tokenless-GET precedence: PUBLIC routes serve without a launch
+    token; the launch token only adds the cookie-mint side effect on first use.
+    """
+    store = _make_launch_store()
+    stubs = _make_stubs()
+    handler_class = make_handler_class(
+        stubs,  # type: ignore[arg-type]
+        token=_LAUNCH_BEARER,
+        launch_token_store=store,
+    )
+
+    status, headers, _ = _dispatch_get_full(handler_class, "/")
+    assert status == 200
+    assert stubs["index"].call_count == 1
+    assert "set-cookie" not in headers
+
+
+def test_launch_token_does_not_relax_sensitive_api_auth() -> None:
+    """ADR-10: the launch token / cookie gates only the UI shell.
+
+    A sensitive API GET still requires the Bearer header — a (bogus) launch
+    query param on an API path must not grant access.
+    """
+    store = _make_launch_store()
+    launch_tok = store.mint()
+    stubs = _make_stubs_with_api_reports()
+    handler_class = make_handler_class(
+        stubs,  # type: ignore[arg-type]
+        token=_LAUNCH_BEARER,
+        launch_token_store=store,
+    )
+
+    status, headers, body = _dispatch_get_full(handler_class, f"/api/reports?launch={launch_tok}")
+    assert status == 401, "launch token must not authorize a sensitive API"
+    assert b"unauthorized" in body
+    assert "set-cookie" not in headers
+    assert stubs["api_reports"].call_count == 0
+
+
+def test_invalid_launch_token_on_index_is_401() -> None:
+    """An unknown launch token on the shell route ⇒ 401 (not a silent public serve)."""
+    store = _make_launch_store()
+    stubs = _make_stubs()
+    handler_class = make_handler_class(
+        stubs,  # type: ignore[arg-type]
+        token=_LAUNCH_BEARER,
+        launch_token_store=store,
+    )
+
+    status, headers, _ = _dispatch_get_full(handler_class, "/?launch=never-minted")
+    assert status == 401
+    assert "set-cookie" not in headers
+
+
 def test_make_handler_class_rejects_loopback_bypass_kwarg() -> None:
     """The loopback_bypass parameter is removed; passing it is a TypeError.
 

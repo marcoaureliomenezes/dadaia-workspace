@@ -102,25 +102,29 @@ def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) ->
 
 
 def _wait_for_ready_and_token(proc: subprocess.Popen[str], port: int, timeout: float = 10.0) -> str:
-    """Block until the panel is ready and return the Bearer token.
+    """Block until the panel is ready and return the single-use LAUNCH token.
 
     The panel prints two lines on startup (flushed before ``serve_forever``)::
 
         Panel running at http://127.0.0.1:<port>/
-        First-load URL:  http://127.0.0.1:<port>/?token=<token>
+        First-load URL:  http://127.0.0.1:<port>/?launch=<launch-token>
+
+    T-011-13 / ADR-10: the launch URL carries ONLY a single-use, short-TTL launch
+    token — NEVER the long-lived Bearer.  The Bearer is exchanged server-side for
+    a ``SameSite=Strict; HttpOnly`` session cookie on first GET of the shell.
+    Sensitive APIs stay Bearer-only, so the e2e reads the Bearer out of the
+    exchanged cookie (see ``_exchange_launch_token``) for its authed calls.
 
     A reader thread drains stdout line-by-line; mixing ``select`` on the raw fd
     with a buffered ``TextIOWrapper.readline`` is unsound (the second line can be
     sitting in the wrapper's buffer while ``select`` reports the fd as empty,
-    which is exactly the hang this replaces).  The token is required because
-    there is no loopback auth bypass (sec F-3 / T-010-21): every sensitive API
-    call must carry ``Authorization: Bearer <token>``.
+    which is exactly the hang this replaces).
 
     Fails fast with a bounded timeout — never an unbounded poll, and never a
     blocking ``stderr.read()`` on the still-running process.
     """
     expected = f"Panel running at http://127.0.0.1:{port}/"
-    token_marker = "/?token="
+    token_marker = "/?launch="
     assert proc.stdout is not None
 
     lines: queue.Queue[str | None] = queue.Queue()
@@ -176,6 +180,33 @@ def _auth_get(url: str, token: str, timeout: float = 5.0) -> http.client.HTTPRes
     return resp
 
 
+def _bearer_from_set_cookie(set_cookie: str) -> str:
+    """Extract the Bearer value from a ``panel_session=<bearer>; ...`` Set-Cookie."""
+    first = set_cookie.split(";", 1)[0]
+    name, _, value = first.partition("=")
+    assert name.strip() == "panel_session", f"unexpected session cookie: {set_cookie!r}"
+    return value.strip()
+
+
+def _exchange_launch_token(port: int, launch_token: str, timeout: float = 5.0) -> str:
+    """Exchange a single-use launch token for the Bearer carried in the cookie.
+
+    T-011-13 / ADR-10 binding contract: first GET ``/?launch=<tok>`` returns 200
+    and a ``SameSite=Strict; HttpOnly`` Set-Cookie; the cookie value is the
+    Bearer (the session credential).  Asserts the cookie flags and returns the
+    Bearer so the caller can drive Bearer-only sensitive APIs.
+    """
+    url = f"http://127.0.0.1:{port}/?launch={launch_token}"
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        assert resp.status == 200, f"launch exchange must return 200, got {resp.status}"
+        set_cookie = resp.headers.get("Set-Cookie")
+    assert set_cookie, "first launch-token use must emit a Set-Cookie header"
+    low = set_cookie.lower()
+    assert "httponly" in low, f"session cookie must be HttpOnly: {set_cookie!r}"
+    assert "samesite=strict" in low, f"session cookie must be SameSite=Strict: {set_cookie!r}"
+    return _bearer_from_set_cookie(set_cookie)
+
+
 def _kill_proc(proc: subprocess.Popen[str]) -> None:
     """Force-kill if still running (emergency teardown)."""
     if proc.poll() is None:
@@ -208,7 +239,8 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        token = _wait_for_ready_and_token(proc, port)
+        launch_token = _wait_for_ready_and_token(proc, port)
+        token = _exchange_launch_token(port, launch_token)
 
         # --- index page (PUBLIC — no token required) ---
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=5) as resp:
@@ -275,7 +307,8 @@ def test_tokenless_loopback_request_to_sensitive_api_is_401(tmp_path: Path) -> N
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        token = _wait_for_ready_and_token(proc, port)
+        launch_token = _wait_for_ready_and_token(proc, port)
+        token = _exchange_launch_token(port, launch_token)
 
         # Tokenless request to a sensitive API → 401.
         sensitive_url = f"http://127.0.0.1:{port}/api/panel-status"
@@ -291,6 +324,55 @@ def test_tokenless_loopback_request_to_sensitive_api_is_401(tmp_path: Path) -> N
 
         # PUBLIC /health stays reachable without a token.
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=5) as resp:
+            assert resp.status == 200
+
+        proc.send_signal(signal.SIGINT)
+        rc = proc.wait(timeout=5)
+        assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
+    finally:
+        _kill_proc(proc)
+
+
+# ---------------------------------------------------------------------------
+# T-011-13 — panel launch-token binding contract (AC-W4-02 / ADR-10)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
+def test_launch_url_has_no_bearer_and_token_is_single_use(tmp_path: Path) -> None:
+    """AC-W4-02 binding contract (URL content + replay 401).
+
+    The CLI launch URL carries ONLY a single-use launch token (`?launch=<tok>`)
+    and NEVER the long-lived Bearer.  First GET exchanges it for a
+    ``SameSite=Strict; HttpOnly`` session cookie carrying the Bearer; a replay of
+    the consumed launch token returns 401.  Sensitive APIs stay Bearer-only.
+    """
+    _init_workspace(tmp_path)
+    port = _find_free_port()
+    proc = _spawn_panel(port, cwd=tmp_path)
+
+    try:
+        launch_token = _wait_for_ready_and_token(proc, port)
+
+        # First use of the launch token → 200 + Set-Cookie carrying the Bearer.
+        bearer = _exchange_launch_token(port, launch_token)
+        assert bearer, "exchanged session cookie must carry a non-empty Bearer"
+
+        # URL content: the launch token is NOT the Bearer (no Bearer in the URL).
+        assert bearer != launch_token, (
+            "the launch URL token must be the single-use launch token, NOT the Bearer"
+        )
+
+        # Replay of the consumed launch token → 401 (single-use; binding contract).
+        replay_url = f"http://127.0.0.1:{port}/?launch={launch_token}"
+        try:
+            with urllib.request.urlopen(replay_url, timeout=5):
+                raise AssertionError("Replay of a consumed launch token must NOT return 2xx")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 401, f"Expected 401 on launch-token replay, got {exc.code}"
+
+        # The exchanged Bearer still authorizes a sensitive Bearer-only API.
+        with _auth_get(f"http://127.0.0.1:{port}/api/panel-status", bearer) as resp:
             assert resp.status == 200
 
         proc.send_signal(signal.SIGINT)
@@ -393,7 +475,8 @@ def test_memory_view_iframe_loads(tmp_path: Path) -> None:
     proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
-        token = _wait_for_ready_and_token(proc, port)
+        launch_token = _wait_for_ready_and_token(proc, port)
+        token = _exchange_launch_token(port, launch_token)
 
         # --- /memory-view/<slug>/architecture.md → wrapper with iframe ---
         wrapper_url = f"http://127.0.0.1:{port}/memory-view/{slug}/architecture.md"

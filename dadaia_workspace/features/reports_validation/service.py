@@ -131,9 +131,11 @@ class ReportsValidationService:
     def check_hash(self, handoff_path: Path) -> str:
         """Compare the artifact's actual sha256 against the handoff's ``content_hash``.
 
-        Workspace-relative artifact paths such as ``.dadaia/reports/...`` are
-        resolved from the workspace root. Other relative paths keep the legacy
-        behavior and resolve from the handoff file directory.
+        Any relative artifact path that exists under the workspace root (e.g.
+        ``.dadaia/reports/...`` or ``repos/<slug>/specs/audits/...``) is resolved
+        workspace-rooted; workspace-root wins when a path is resolvable both ways.
+        Paths that exist only beside the handoff file keep the legacy
+        handoff-dir-relative behavior.
 
         Args:
             handoff_path: Path to the ``.handoff.json`` file.
@@ -164,11 +166,26 @@ class ReportsValidationService:
         return "match" if actual_hash == expected_hash else "mismatch"
 
     def _resolve_artifact_path(self, handoff_path: Path, artifact_ref: str) -> Path | None:
+        """Resolve ``artifact_ref`` to an in-workspace path, or ``None`` if it escapes.
+
+        Resolution order:
+        1. Absolute paths resolve as-is (guarded against escaping the workspace).
+        2. ANY relative path that exists workspace-rooted resolves workspace-rooted —
+           workspace-root wins over the handoff-dir fallback when both exist (covers
+           ``repos/<slug>/specs/audits/<UTC>/audit.md``).
+        3. Otherwise fall back to the legacy handoff-dir-relative location.
+
+        The ``_within_workspace`` guard (``resolve()`` + ``relative_to``, symlink-safe)
+        is applied to every branch so ``..`` traversal and out-of-tree paths are
+        rejected without a schema change.
+        """
         artifact_path = Path(artifact_ref)
         if artifact_path.is_absolute():
             return self._within_workspace(artifact_path)
-        if artifact_ref.startswith(".dadaia/") and self._workspace_root is not None:
-            return self._within_workspace(self._workspace_root / artifact_path)
+        if self._workspace_root is not None:
+            workspace_rooted = self._within_workspace(self._workspace_root / artifact_path)
+            if workspace_rooted is not None and workspace_rooted.exists():
+                return workspace_rooted
         candidate = handoff_path.parent / artifact_path
         return self._within_workspace(candidate) if self._workspace_root is not None else candidate
 

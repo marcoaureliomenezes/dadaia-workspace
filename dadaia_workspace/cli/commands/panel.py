@@ -14,7 +14,7 @@ import typer
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import PlatformSecurityError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.panel.auth import ensure_token
+from dadaia_workspace.features.panel.auth import LaunchTokenStore, ensure_token
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.server import build_panel_http_server
 
@@ -129,10 +129,21 @@ def panel(
         typer.echo(f"Failed to initialise panel: {exc}", err=True)
         raise typer.Exit(1) from None
 
+    # Launch-token exchange (T-011-13 / ADR-10, residual R5): the long-lived
+    # Bearer never enters a URL.  We mint a single-use, short-TTL (<=60s) launch
+    # token and put ONLY that on the launch URL (`?launch=<tok>`).  On first GET
+    # of the shell the handler consumes it and moves the Bearer into a
+    # SameSite=Strict; HttpOnly session cookie (a header, not a URL); replay or
+    # expiry => 401.  Sensitive APIs stay Bearer-only — the cookie gates the UI
+    # shell only.
+    launch_token_store = LaunchTokenStore()
+    launch_token = launch_token_store.mint()
+
     handler_cls = make_handler_class(
         views,
         token=token,
         telemetry=telemetry,
+        launch_token_store=launch_token_store,
     )
 
     try:
@@ -151,22 +162,23 @@ def panel(
     shutdown_handler = container.build_shutdown_handler()
     shutdown_handler.install(server)
 
-    # Print URL with ?token=<value> for browser convenience (SPEC § Auth model).
-    # SECURITY NOTE: the token appears in the URL only for the first browser load;
-    # JS migrates it to a session cookie after the first fetch (P8 implementation).
-    # The token is printed to stdout (terminal only); never logged.
+    # Print the launch URL carrying ONLY the single-use launch token (ADR-10).
+    # SECURITY NOTE: the long-lived Bearer is NEVER placed in a URL.  The launch
+    # token is single-use and short-lived (<=60s); on first GET the server
+    # exchanges it for the session cookie carrying the Bearer.  Printed to stdout
+    # (terminal only); never logged.
     typer.echo(f"Panel running at http://{bind}:{port}/")
-    typer.echo(f"First-load URL:  http://{bind}:{port}/?token={token}")
+    typer.echo(f"First-load URL:  http://{bind}:{port}/?launch={launch_token}")
     # Flush the readiness banner before entering the blocking serve loop. stdout
     # is block-buffered when piped (e.g. a supervising launcher or the e2e
-    # harness); without this flush the token line can sit in the buffer until the
+    # harness); without this flush the launch line can sit in the buffer until the
     # process exits — which never happens under serve_forever — so any
-    # readiness/token handoff over stdout would hang. Flush makes the handoff
+    # readiness/launch handoff over stdout would hang. Flush makes the handoff
     # deterministic.
     sys.stdout.flush()
 
     if not no_open:
-        webbrowser.open(f"http://{bind}:{port}/?token={token}")
+        webbrowser.open(f"http://{bind}:{port}/?launch={launch_token}")
 
     server.serve_forever()
     sys.exit(0)

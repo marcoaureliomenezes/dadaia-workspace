@@ -8,6 +8,7 @@ from rich.console import Console
 
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import lease as _lease
+from dadaia_workspace.hooks.sdd_gate import _build_pid_probe
 
 app = typer.Typer(help="Manage SDD implementation lease records.")
 console = Console()
@@ -41,14 +42,19 @@ def steal(
     """Reclaim a stale lease record for the current caller.
 
     Reads .dadaia/states/ctx_locks/<ctx>.lock.json and calls lease.steal().
-    Refuses if the lease is live (heartbeat < TTL) — the holder may still be active.
+    Refuses if the lease is live — including a TTL-expired record whose recorded
+    holder pid is still alive (the pid-liveness probe veto, T-011-01): a
+    genuinely-running session is never stolen even past TTL. A record with no
+    ``pid`` field (legacy/pre-pid) degrades to the TTL rule.
 
-    Use when a session died mid-work and its lease TTL has not yet expired.
+    Use when a session died mid-work and its lease record is stale (TTL expired and
+    the holder is no longer running).
     """
     workspace = resolve_workspace_root()
     session_id = _caller_session_id()
+    pid_probe = _build_pid_probe()
 
-    ok, rec = _lease.steal(workspace, ctx, session_id)
+    ok, rec = _lease.steal(workspace, ctx, session_id, pid_probe=pid_probe)
     if ok:
         console.print(
             f"[green]✓[/green] Lease for '[bold]{ctx}[/bold]' stolen. "
@@ -57,6 +63,7 @@ def steal(
         raise typer.Exit(0)
     else:
         err_console.print(
-            "Lease is live (heartbeat < TTL); refusing steal. Verify the holder is actually dead."
+            "Lease is live (holder pid alive or heartbeat < TTL); refusing steal. "
+            "Verify the holder is actually dead."
         )
         raise typer.Exit(1)

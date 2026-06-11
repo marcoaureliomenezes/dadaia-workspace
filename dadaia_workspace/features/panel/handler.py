@@ -52,6 +52,10 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from typing import Any
 
+from dadaia_workspace.features.panel.auth import (
+    LaunchTokenStore,
+    build_session_cookie,
+)
 from dadaia_workspace.features.panel.auth import validate as _validate_bearer
 
 # ---------------------------------------------------------------------------
@@ -279,6 +283,7 @@ def make_handler_class(
     *,
     token: str | None = None,
     telemetry: Any = None,
+    launch_token_store: LaunchTokenStore | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a PanelHandler subclass with *views* and auth/telemetry injected.
 
@@ -308,9 +313,19 @@ def make_handler_class(
         exposed every sensitive panel API to any co-located local process and to
         DNS-rebinding / CSRF-style attacks from a malicious local web page
         (CWE-200 / CWE-668).  PUBLIC routes (index, ``/health``, ``/static``)
-        remain tokenless; only sensitive routes require auth.  The browser UI
-        obtains the token from the ``?token=`` launch URL and sends it on every
-        API call (``core.js`` token bootstrap + ``authedFetch``).
+        remain tokenless; only sensitive routes require auth.
+
+    Launch token (T-011-13 / ADR-10 — the Bearer never enters a URL):
+        The launch URL carries only a single-use, short-TTL (<=60s) launch token
+        via ``?launch=<tok>`` (NOT the long-lived Bearer).  On first GET of the
+        shell route the handler consumes the token via *launch_token_store* and,
+        on success, emits the session cookie (``SameSite=Strict; HttpOnly``)
+        carrying the Bearer; the token is then invalidated, so replay/expiry =>
+        401.  Precedence — loopback-tokenless-GET vs launch-token: PUBLIC routes
+        still serve credential-free, but a launch token PRESENT on the shell
+        route MUST be valid (a stale/replayed URL must not look "successful").
+        The cookie gates only the UI shell; sensitive APIs stay Bearer-only and
+        the launch token never relaxes them.
     """
     # Build compiled route list, filtering only routes whose names are in views
     # OR that are telemetry-dispatched (handled inline, not via views).
@@ -327,6 +342,7 @@ def make_handler_class(
 
     _token = token
     _telemetry = telemetry
+    _launch_token_store = launch_token_store
 
     _UNAUTHORIZED_BODY = b'{"error": "unauthorized"}'
 
@@ -363,6 +379,23 @@ def make_handler_class(
                 m = pattern.match(path)
                 if m is None:
                     continue
+
+                # Launch-token exchange (T-011-13 / ADR-10) — shell route only.
+                # The launch URL carries a single-use `?launch=<tok>` instead of
+                # the Bearer.  On first GET of the index shell we consume it and
+                # mint the session cookie carrying the Bearer; replay/expiry =>
+                # 401.  loopback-tokenless-GET precedence: a shell GET WITHOUT a
+                # launch param still serves public (no cookie); a shell GET WITH
+                # a launch param must present a VALID token.
+                _session_cookie: str | None = None
+                if route_name == "index" and _launch_token_store is not None and "launch" in qs:
+                    launch_values = qs.get("launch", [])
+                    launch_tok = launch_values[0] if launch_values else None
+                    if _token is None or not _launch_token_store.consume(launch_tok):
+                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
+                        return
+                    # Bearer goes into a Set-Cookie header — never a URL.
+                    _session_cookie = build_session_cookie(_token)
 
                 # Auth enforcement based on auth_class.
                 if auth_class == AuthClass.PUBLIC:
@@ -416,11 +449,17 @@ def make_handler_class(
                     ):
                         status, content_type, body = view(**m.groupdict())
                         is_static = path.startswith("/static/")
+                        extra_headers = (
+                            [("Set-Cookie", _session_cookie)]
+                            if _session_cookie is not None
+                            else None
+                        )
                         self._respond(
                             status,
                             content_type,
                             body,
                             cache_control="no-cache" if is_static else None,
+                            extra_headers=extra_headers,
                         )
                         return
                     # BEARER_TELEMETRY with view in views dict (e.g. api_agents canonical overlay).
@@ -694,12 +733,16 @@ def make_handler_class(
             content_type: str,
             body: bytes,
             cache_control: str | None = None,
+            extra_headers: list[tuple[str, str]] | None = None,
         ) -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self._security_headers(content_type)
             if cache_control is not None:
                 self.send_header("Cache-Control", cache_control)
+            if extra_headers is not None:
+                for name, value in extra_headers:
+                    self.send_header(name, value)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

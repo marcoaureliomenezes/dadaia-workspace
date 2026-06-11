@@ -128,7 +128,12 @@ def _context_slug(workspace: Path, fpath: Path) -> str:
     return _SLUG_STRIP.sub("", slug or "")
 
 
-def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
+def _resolve_mode(
+    workspace: Path,
+    session_id: str,
+    ctx: str = "",
+    pid_probe: lease.PidProbe | None = None,
+) -> str:
     """Resolve the session's bind mode (WS-R4 FR-R4-02/03/04 + NF-2 fix). First hit wins:
 
     1. ``DADAIA_MODE`` env fast-path override — an operator-shell escape (the harness never
@@ -173,13 +178,15 @@ def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
         if (
             incumbent_sid
             and incumbent_mode
-            and not _incumbent_is_stale(workspace, ctx, str(incumbent_sid))
+            and not _incumbent_is_stale(workspace, ctx, str(incumbent_sid), pid_probe)
         ):
             return str(incumbent_mode)
     return _DEFAULT_MODE
 
 
-def _incumbent_is_stale(workspace: Path, ctx: str, incumbent_sid: str) -> bool:
+def _incumbent_is_stale(
+    workspace: Path, ctx: str, incumbent_sid: str, pid_probe: lease.PidProbe | None
+) -> bool:
     """True if a **live** lease record names a session OTHER than the incumbent pointer.
 
     A read-bind sets the incumbent pointer but takes no lease. If a *different* session then
@@ -202,7 +209,7 @@ def _incumbent_is_stale(workspace: Path, ctx: str, incumbent_sid: str) -> bool:
         return False
     # A divergent holder defeats the incumbent only when it is genuinely LIVE (TTL-fresh, or
     # TTL-stale but its pid is still alive). A dead/TTL-stale leftover does not.
-    return not lock_liveness.is_stale(holder, pid_probe=_build_pid_probe())
+    return not lock_liveness.is_stale(holder, pid_probe=pid_probe)
 
 
 def _active_field(specs_dir: Path, field: str) -> str:
@@ -266,11 +273,15 @@ def main() -> int:
     phase = _active_field(specs_dir, "phase")
     release = _active_field(specs_dir, "release") or "none"
     session_id = _common.resolve_session_id(payload, default="anon-session")
+    # Single probe construction point (R8 dedup): the PID-liveness probe is built once here
+    # and threaded into both the incumbent-staleness check (via ``_resolve_mode``) and the
+    # final ``gate_policy.evaluate`` call below — never re-instantiated per call site.
+    pid_probe = _build_pid_probe()
     # Mode resolution order (WS-R4 + NF-2): DADAIA_MODE env override → self-keyed session
     # record → context-incumbent record → default. Passing ``ctx`` enables the incumbent
     # fallback so a default `dadaia context bind --mode read` (which mints a sid the harness
     # never reports) still binds the CONTEXT and is honored without any env var.
-    mode = _resolve_mode(workspace, session_id, ctx)
+    mode = _resolve_mode(workspace, session_id, ctx, pid_probe)
 
     # MUTATING with no resolvable context → fail open (UNGATED, no lease), matching shell.
     # NOTE: a READ-bound session that *does* resolve a context is still blocked below by
@@ -287,7 +298,7 @@ def main() -> int:
         session_id=session_id,
         release=release,
         mode=mode,
-        pid_probe=_build_pid_probe(),
+        pid_probe=pid_probe,
         # NF-1: record a LONG-LIVED pid (the harness, via getppid / payload), never this
         # ephemeral hook child's own — otherwise the no-steal veto probes a dead pid.
         holder_pid=_resolve_holder_pid(payload),

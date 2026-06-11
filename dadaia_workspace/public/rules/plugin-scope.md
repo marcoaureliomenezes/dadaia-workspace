@@ -9,23 +9,25 @@ always_on: true
 This rule is always active in this workspace.
 
 Three agents are **plugins**, not part of the 9-agent core roster (constitution §14).
-They ship as thin stubs in the core install and carry no behavior until their plugin is
-installed:
+They ship as thin stubs in the core install and carry no behavior until their plugin
+pack is available:
 
-| Plugin agent | Domain | Install command |
+| Plugin agent | Domain | Plugin pack |
 |---|---|---|
-| `frontend-engineer` | Browser HTML/CSS/JS/TS/React surfaces | `dadaia plugin install frontend-design` |
-| `design-specialist` | UX/UI, design specs, visual review | `dadaia plugin install frontend-design` |
-| `devops-engineer` | CI/CD, GitHub Actions, gitflow, deploy | `dadaia plugin install devops` |
+| `frontend-engineer` | Browser HTML/CSS/JS/TS/React surfaces | `frontend-design` (not yet distributed) |
+| `design-specialist` | UX/UI, design specs, visual review | `frontend-design` (not yet distributed) |
+| `devops-engineer` | CI/CD, GitHub Actions, gitflow, deploy | `devops` (not yet distributed) |
 
-Dispatching any of these requires the corresponding plugin to be installed in the
-workspace. When a **core** agent receives a task that falls in a plugin domain, it does
-not attempt the work — it responds:
+**Plugin packs are not yet distributed** and there is no install command — the feature
+is tracked by the backlog entry `plugin-packs-and-install-command`. Until it ships,
+plugin agents cannot be enabled. When a **core** agent receives a task that falls in a
+plugin domain, it does not attempt the work — it responds:
 
 ```
-[PLUGIN REQUIRED] <agent-name> plugin is not installed in this workspace.
-Install with: dadaia plugin install <name>
+[PLUGIN REQUIRED] <agent-name> is a plugin agent and its plugin pack is not yet
+distributed (no install command exists). Route this task to the operator.
+Tracking: backlog entry `plugin-packs-and-install-command`.
 ```
 
-(`<name>` is `frontend-design` for frontend-engineer / design-specialist, `devops` for
-devops-engineer.)
+The operator decides how the work proceeds (e.g. authoring it directly, or deferring
+until the plugin packs ship).

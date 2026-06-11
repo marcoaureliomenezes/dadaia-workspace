@@ -77,6 +77,7 @@ __all__ = [
     "acquire",
     "is_held",
     "read_record",
+    "reclaim",
     "release",
     "renew_heartbeat",
     "steal",
@@ -484,6 +485,34 @@ def is_held(
     return rec is not None and not is_stale(rec, clock=clock, pid_probe=pid_probe)
 
 
+def reclaim(
+    record: dict[str, object] | None,
+    *,
+    clock: Callable[[], datetime] = _utcnow,
+    pid_probe: PidProbe | None = None,
+) -> bool:
+    """Return ``True`` if a lease record is safe to reclaim (GC/delete) — T-011-02.
+
+    Reclaimability is the single liveness verdict (``core.lock_liveness.is_stale``):
+
+    * TTL-expired **and** the holder pid is dead/absent (per ``pid_probe``) ⇒ reclaimable.
+    * TTL-expired **but** the record carries **no** ``pid`` field (legacy/pre-pid record,
+      observed in the ``doctor-stale-lease-misdiagnosed-as-forgery`` bug) ⇒ reclaimable —
+      there is nothing to veto on, so it degrades to the TTL rule and is no longer
+      permanently un-reclaimable.
+    * TTL-expired **but** the holder pid is demonstrably **alive** (``pid_probe`` veto) ⇒
+      **NOT** reclaimable, regardless of how far past TTL the heartbeat is. A
+      genuinely-running session is never garbage-collected.
+    * TTL-fresh ⇒ NOT reclaimable.
+    * absent / corrupt record ⇒ reclaimable (fail-open: a corrupt lock never deadlocks).
+
+    This is the GC counterpart to ``acquire``'s reclaim-iff-stale branch and exposes the
+    same predicate to the workspace doctor's ``LOCK-GC`` sweep, so an idle workspace can
+    garbage-collect a dead session's stale lease without a MUTATING-write acquisition.
+    """
+    return is_stale(record, clock=clock, pid_probe=pid_probe)
+
+
 def steal(
     workspace: Path,
     ctx: str,
@@ -541,6 +570,35 @@ def steal(
     return False, read_record(workspace, ctx)
 
 
+def _main_pid_probe() -> PidProbe | None:
+    """Resolve the PID-liveness probe for the ``_main`` CLI side door (T-011-01).
+
+    ``_main`` is the SDD gate's single acquisition point; its ``acquire``/``steal``
+    paths must consult the SAME probe the MUTATING gate path uses, so a TTL-expired
+    foreign holder whose pid is still alive is never taken over via this side door
+    (residual R1; bug ``doctor-stale-lease-misdiagnosed-as-forgery``).
+
+    The concrete probe is the container's ``OsProcessProbe``. ``features/`` must not
+    import ``infrastructure/`` — not even transitively through the hook layer
+    (import-linter law). The canonical builder lives in the hook layer
+    (``hooks/sdd_gate._build_pid_probe``, which itself wires the adapter); we resolve it
+    here through a **dynamic** ``importlib`` lookup at the composition boundary (this
+    entrypoint is the lease's own composition root, analogous to the doctor's
+    composition-root-wired probe seam — never a static feature→infrastructure import).
+    The dynamic resolution keeps the static import graph clean: ``features/lease.py`` has
+    zero static edge into ``infrastructure`` or ``hooks``. Any failure ⇒ ``None`` ⇒
+    TTL-only fallback (Windows-safe, legacy-record-safe), exactly as the gate degrades.
+    """
+    try:
+        import importlib
+
+        sdd_gate = importlib.import_module("dadaia_workspace.hooks.sdd_gate")
+        builder: Callable[[], PidProbe | None] = sdd_gate._build_pid_probe
+        return builder()
+    except Exception:  # noqa: BLE001 — probe wiring must never deadlock the gate side door.
+        return None
+
+
 def _main(argv: list[str] | None = None) -> int:
     """CLI entrypoint: the SDD gate's SINGLE acquisition point.
 
@@ -551,6 +609,9 @@ def _main(argv: list[str] | None = None) -> int:
     Prints ``ACQUIRED`` / ``RENEWED`` and exits 0 on success; prints the unblock
     message and exits 1 on a live conflict. Any unexpected failure exits 0
     (fail-open) so the gate never deadlocks on a lease-subsystem bug.
+
+    Both the ``acquire`` and ``steal`` paths thread the pid-liveness probe
+    (``_main_pid_probe``) so this side door honours the no-steal veto (T-011-01).
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
@@ -568,12 +629,17 @@ def _main(argv: list[str] | None = None) -> int:
         print(f"WORKSPACE_UNRESOLVED: {exc}", file=sys.stderr)
         return 0
 
+    # Single probe for every side-door path so the no-steal veto holds (T-011-01).
+    pid_probe = _main_pid_probe()
+
     cmd = args[0]
     try:
         if cmd == "acquire":
             ctx, session_id, release_id, mode = args[1], args[2], args[3], args[4]
             try:
-                status, _rec = acquire(workspace, ctx, session_id, release_id, mode)
+                status, _rec = acquire(
+                    workspace, ctx, session_id, release_id, mode, pid_probe=pid_probe
+                )
             except LockHeldError as exc:
                 print(str(exc))
                 return 1
@@ -581,7 +647,7 @@ def _main(argv: list[str] | None = None) -> int:
             return 0
         if cmd == "steal":
             ctx, session_id = args[1], args[2]
-            ok, _srec = steal(workspace, ctx, session_id)
+            ok, _srec = steal(workspace, ctx, session_id, pid_probe=pid_probe)
             print("STOLEN" if ok else "LIVE")
             return 0 if ok else 1
         if cmd == "release":

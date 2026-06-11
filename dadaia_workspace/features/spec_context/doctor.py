@@ -3,6 +3,7 @@
 import fnmatch
 import json
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,7 +12,7 @@ from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.features.spec_context import lease, session_identity
 from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     _audit_log_path,
     context_lock,
@@ -112,10 +113,16 @@ class DoctorService:
         context_store: ContextStore,
         git_client: GitClient,
         workspace_root: Path,
+        pid_probe: Callable[[int], bool] | None = None,
     ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
+        # Injected PID-liveness probe (composition-root seam, like the gate's; T-011-02).
+        # ``None`` ⇒ TTL-only LOCK-GC verdict (Windows-safe / legacy-record-safe). A live
+        # holder is never reclaimed; ``features`` never imports the adapter — the container
+        # (or a caller) supplies the probe built from ``OsProcessProbe``.
+        self._pid_probe = pid_probe
 
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
@@ -295,10 +302,14 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def _check_lease_records(self) -> list[DoctorIssue]:
-        """LOCK-NEW: scan ctx_locks/*.lock.json for invalid or stale records.
+        """LOCK-NEW: scan ctx_locks/*.lock.json for invalid records.
 
-        - Invalid JSON / missing required fields → warn.
-        - Stale (per is_stale) → warn; --fix deletes it.
+        - Invalid JSON / missing required fields → warn; --fix deletes it.
+
+        Staleness/reclaim is no longer reported here — that moved to ``_check_lock_gc``
+        (LOCK-GC, T-011-02), which honours the pid-liveness veto so a TTL-expired but
+        still-running holder is never flagged or reclaimed. LOCK-NEW now covers only the
+        structural-corruption cases (a stale-but-valid record is a LOCK-GC concern).
         """
         issues: list[DoctorIssue] = []
         ctx_locks_dir = self._ctx_locks_dir()
@@ -343,21 +354,51 @@ class DoctorService:
                     )
                 )
                 continue
-            if is_stale(data):
-                ctx_name = str(data.get("context", lock_file.stem.replace(".lock", "")))
-                session_id = str(data.get("session_id", "unknown"))
-                issues.append(
-                    DoctorIssue(
-                        code="LOCK-NEW",
-                        description=(
-                            f"[stale-record] {lock_file}: lease for context '{ctx_name}' "
-                            f"is stale (session={session_id}, "
-                            f"heartbeat={data.get('heartbeat', 'none')}). "
-                            "Run 'dadaia doctor --fix' to delete it."
-                        ),
-                        fixable=True,
-                    )
+        return issues
+
+    # ------------------------------------------------------------------
+    # LOCK-GC: stale-lease garbage collection with the pid-liveness veto
+    # ------------------------------------------------------------------
+
+    def _check_lock_gc(self) -> list[DoctorIssue]:
+        """LOCK-GC: report TTL-expired lease records that are safe to reclaim (T-011-02).
+
+        A record is reclaimable (per ``lease.reclaim`` / the pid-liveness veto) when it is
+        TTL-expired AND its holder is demonstrably dead, OR it predates the ``pid`` field
+        (legacy/pre-pid — the ``doctor-stale-lease-misdiagnosed-as-forgery`` case, which was
+        previously permanently un-reclaimable). A record whose holder pid is still ALIVE is
+        NEVER reported, regardless of how far past TTL it is. ``--fix`` deletes the reported
+        records; an invalid/corrupt record stays under ``LOCK-NEW`` (a separate concern).
+        """
+        issues: list[DoctorIssue] = []
+        ctx_locks_dir = self._ctx_locks_dir()
+        if not ctx_locks_dir.exists():
+            return issues
+        for lock_file in sorted(ctx_locks_dir.iterdir()):
+            if not lock_file.name.endswith(".lock.json"):
+                continue
+            data = self._read_lock(lock_file)
+            if data is None:
+                continue  # corrupt/unreadable — owned by LOCK-NEW, not LOCK-GC.
+            if not lease.reclaim(data, pid_probe=self._pid_probe):
+                continue
+            ctx_name = str(data.get("context", lock_file.stem.replace(".lock", "")))
+            session_id = str(data.get("session_id", "unknown"))
+            pidless = "pid" not in data
+            qualifier = "pre-pid record" if pidless else "holder dead/unprobeable"
+            issues.append(
+                DoctorIssue(
+                    code="LOCK-GC",
+                    description=(
+                        f"[stale-lease] {lock_file}: lease for context '{ctx_name}' is a "
+                        f"stale lease from a dead session ({qualifier}; session={session_id}, "
+                        f"heartbeat={data.get('heartbeat', 'none')}) — safe to reclaim. "
+                        "Run 'dadaia doctor --fix' or 'dadaia lock steal "
+                        f"{ctx_name}' to reclaim it."
+                    ),
+                    fixable=True,
                 )
+            )
         return issues
 
     def check(self) -> list[DoctorIssue]:
@@ -455,6 +496,9 @@ class DoctorService:
         # ---- Single-record lease check ----
         issues.extend(self._check_lease_records())
 
+        # ---- Stale-lease GC (probe-aware reclaim; T-011-02) ----
+        issues.extend(self._check_lock_gc())
+
         return issues
 
     def fix(self) -> list[str]:
@@ -516,21 +560,29 @@ class DoctorService:
                 if not lock_file.name.endswith(".lock.json"):
                     continue
                 data = self._read_lock(lock_file)
-                should_delete = False
+                code_label = "LOCK-NEW"
                 reason_label = ""
+                should_delete = False
                 if data is None:
                     should_delete = True
                     reason_label = "invalid JSON"
                 elif required_fields - set(data.keys()):
                     should_delete = True
                     reason_label = "missing required fields"
-                elif is_stale(data):
+                elif lease.reclaim(data, pid_probe=self._pid_probe):
+                    # Probe-aware reclaim (T-011-02): TTL-expired + dead/pre-pid holder.
+                    # A live-pid holder is NEVER reclaimed regardless of TTL.
                     should_delete = True
-                    reason_label = "stale record"
+                    code_label = "LOCK-GC"
+                    reason_label = (
+                        "stale lease from dead session (pre-pid record)"
+                        if "pid" not in data
+                        else "stale lease from dead session"
+                    )
                 if should_delete:
                     lock_file.unlink(missing_ok=True)
                     actions.append(
-                        f"LOCK-NEW: deleted lease record '{lock_file.name}' ({reason_label})"
+                        f"{code_label}: deleted lease record '{lock_file.name}' ({reason_label})"
                     )
 
         # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/

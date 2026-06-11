@@ -22,6 +22,8 @@ import pathlib
 import secrets
 import stat as _stat
 import sys
+import time
+from collections.abc import Callable
 
 from dadaia_workspace.core.exceptions import PlatformSecurityError
 from dadaia_workspace.core.platform import PLATFORM
@@ -29,6 +31,34 @@ from dadaia_workspace.core.protocols.platform_services import FilePermissionSett
 
 DEFAULT_TOKEN_PATH = pathlib.Path("~/.dadaia/state/panel.token").expanduser()
 _BEARER_PREFIX = "Bearer "
+
+# ---------------------------------------------------------------------------
+# Launch-token exchange (T-011-13 / ADR-10, residual R5 / security R-1).
+#
+# Precedence — loopback-tokenless-GET vs launch-token:
+#   PUBLIC routes (/, /health, /static) are served WITHOUT any credential, even
+#   on loopback (the loopback-tokenless-GET rule; sec F-3 keeps SENSITIVE APIs
+#   Bearer-only regardless of loopback).  The launch token is an ADDITIVE,
+#   shell-only mechanism layered on top of that: when a launch token is present
+#   on the shell route it MUST be valid (single-use, TTL <= 60s) and, on first
+#   use, the server mints the session cookie carrying the Bearer.  A consumed or
+#   expired launch token on the shell route is rejected (401) — it never
+#   silently degrades to a public serve, because that would let a replayed/stale
+#   URL look "successful".  The launch token NEVER relaxes sensitive-API auth:
+#   those stay Bearer-only (the cookie gates only the UI shell, ADR-10).
+#
+# The long-lived Bearer therefore appears in NO URL anywhere — only the
+# single-use launch token rides the `?launch=` query param; the Bearer is moved
+# into a Set-Cookie (a header, not a URL) on first launch-token use.
+# ---------------------------------------------------------------------------
+
+# ADR-10 pins the launch-token TTL at <= 60 seconds; requests above the cap are
+# clamped to it so a misconfigured caller cannot widen the replay window.
+LAUNCH_TOKEN_TTL_CAP_SECONDS = 60
+
+# Name of the HttpOnly; SameSite=Strict session cookie that carries the Bearer
+# after a successful launch-token exchange.  The cookie gates only the UI shell.
+SESSION_COOKIE_NAME = "panel_session"
 
 # Mode bits that make the token readable by group or other. A token carrying
 # these bits is effectively world-readable and must be tightened to 0o600.
@@ -180,3 +210,70 @@ def validate(header_value: str | None, expected_token: str) -> bool:
     if not candidate:
         return False
     return hmac.compare_digest(candidate, expected_token)
+
+
+class LaunchTokenStore:
+    """Single-use, short-TTL launch tokens for the panel shell (ADR-10 / R5).
+
+    The launch token rides the `?launch=<tok>` query parameter of the launch URL
+    **instead of** the long-lived Bearer, so the Bearer never appears in a URL.
+    On first GET of the shell the server calls :meth:`consume`; on success it
+    mints the session cookie (carrying the Bearer) and the token is invalidated.
+    A replayed or expired token returns ``False`` (the handler maps that to 401).
+
+    The store is in-memory and panel-process-local (the panel is a single
+    foreground loopback process — there is no cross-process token sharing).
+    A ``clock`` is injectable for deterministic TTL tests (no ``time.sleep``).
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: int = LAUNCH_TOKEN_TTL_CAP_SECONDS,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        # Clamp to the ADR-10 cap — never honour a wider replay window.
+        self.ttl_seconds = min(int(ttl_seconds), LAUNCH_TOKEN_TTL_CAP_SECONDS)
+        if self.ttl_seconds <= 0:
+            self.ttl_seconds = LAUNCH_TOKEN_TTL_CAP_SECONDS
+        self._clock = clock
+        # token -> issued-at timestamp (from the injected clock).
+        self._issued: dict[str, float] = {}
+
+    def mint(self) -> str:
+        """Mint a fresh single-use, URL-safe launch token and record its issue time."""
+        token = secrets.token_urlsafe(32)
+        self._issued[token] = self._clock()
+        return token
+
+    def consume(self, token: str | None) -> bool:
+        """Validate-and-invalidate a launch token (single-use).
+
+        Returns ``True`` exactly once for a known, unexpired, unconsumed token;
+        ``False`` for an unknown, already-consumed, expired, empty, or ``None``
+        token.  Consuming always removes the token, so replay is impossible.
+        """
+        if not token:
+            return False
+        issued_at = self._issued.pop(token, None)
+        if issued_at is None:
+            return False
+        # Expired tokens were already popped above, so they cannot be retried.
+        return self._clock() - issued_at <= self.ttl_seconds
+
+
+def build_session_cookie(bearer: str) -> str:
+    """Build the ``Set-Cookie`` value carrying the Bearer as the session credential.
+
+    The cookie is ``SameSite=Strict; HttpOnly; Path=/`` (ADR-10): HttpOnly keeps
+    it out of JS, SameSite=Strict pins the CSRF posture, Path=/ scopes the shell.
+    The Bearer lives in a cookie (a response header), never in a URL.
+
+    Header-injection guard (OWASP A03): the value is the Bearer minted by
+    ``ensure_token`` (URL-safe base64), but we still refuse any value containing
+    CR/LF/``;`` so a malformed credential cannot inject extra Set-Cookie
+    attributes or split the response header.
+    """
+    if any(c in bearer for c in ("\r", "\n", ";")):
+        raise ValueError("session cookie value contains an unsafe character")
+    return f"{SESSION_COOKIE_NAME}={bearer}; Path=/; HttpOnly; SameSite=Strict"

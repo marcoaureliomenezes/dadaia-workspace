@@ -1966,8 +1966,10 @@ class SpecsDoctor:
             runner = SubprocessProcessRunner()
 
         try:
+            # `-B` disables bytecode writing so no __pycache__/*.pyc is created under
+            # dadaia_workspace/public/scripts/ when LINT-1 runs (T-011-15 / FR-W5-01).
             proc_result: ProcessResult = runner.run(
-                [sys.executable, str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
+                [sys.executable, "-B", str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
                 timeout=30,
             )
         except TimeoutError:

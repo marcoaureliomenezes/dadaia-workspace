@@ -11,10 +11,18 @@ is re-exported here for backwards compatibility.
 
 from __future__ import annotations
 
+import os
+import shutil
+import sys
 import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+# ``shutil`` is imported so the no-PATH-probing contract is testable (a test
+# monkeypatches ``shutil.which`` and asserts it is never called). Resolution
+# itself MUST NOT consult the ambient PATH — see ``_resolve_tool``.
+_ = shutil
 
 # A runner executes an argv and returns (exit_code, combined_output).
 Runner = Callable[[Sequence[str]], "tuple[int, str]"]
@@ -66,38 +74,113 @@ def resolve_mypy_cache_dir(start: Path | None = None) -> Path:
     return Path(tempfile.gettempdir()) / "dadaia-ci-preflight" / "mypy-cache"
 
 
-def _lint_type_checks() -> tuple[Check, ...]:
+def _is_executable_file(path: Path) -> bool:
+    """True iff ``path`` is an existing regular file with the executable bit.
+
+    A directory whose name matches a tool (e.g. a ``ruff/`` package dir) must
+    never satisfy resolution — only a real executable file does.
+    """
+    try:
+        return path.is_file() and os.access(path, os.X_OK)
+    except OSError:
+        return False
+
+
+def _resolve_tool(
+    name: str,
+    *,
+    python_executable: str | None = None,
+    dadaia_bin: str | None = None,
+) -> tuple[str, ...]:
+    """Resolve the argv prefix that invokes tool ``name`` (bug B2 fix).
+
+    Pinned resolution order — **no** ``shutil.which`` / ambient-PATH probing:
+
+    1. **venv sibling of the interpreter** — ``Path(sys.executable).parent / name``.
+       The runner that imports this module is the resolved venv's python, so its
+       sibling tools are exactly the ones CI would use.
+    2. **DADAIA_BIN-derived bin dir** — ``Path(DADAIA_BIN).parent / name``. The
+       pre-push hook exports ``DADAIA_BIN`` pointing at the resolved ``dadaia``
+       executable; its sibling tools share the same environment.
+    3. **poetry fallback** — ``("poetry", "run", name)``. Used only when the tool
+       is absent from both trees; the runner then fails closed at execution time
+       (127 + "command not found") if poetry too is missing.
+
+    ``python_executable`` / ``dadaia_bin`` are injectable for testing; in
+    production they default to ``sys.executable`` and ``os.environ["DADAIA_BIN"]``.
+    """
+    py = python_executable if python_executable is not None else sys.executable
+    venv_sibling = Path(py).resolve().parent / name
+    if _is_executable_file(venv_sibling):
+        return (str(venv_sibling),)
+
+    bin_ptr = dadaia_bin if dadaia_bin is not None else os.environ.get("DADAIA_BIN")
+    if bin_ptr:
+        dadaia_sibling = Path(bin_ptr).resolve().parent / name
+        if _is_executable_file(dadaia_sibling):
+            return (str(dadaia_sibling),)
+
+    return ("poetry", "run", name)
+
+
+def _lint_type_checks(
+    *,
+    python_executable: str | None = None,
+    dadaia_bin: str | None = None,
+) -> tuple[Check, ...]:
     """Build the lint/type checks with cache redirection baked into the argv.
 
     Ruff runs with ``--no-cache`` (no ``.ruff_cache/`` at root); mypy gets an
     explicit ``--cache-dir`` outside the repo (no ``.mypy_cache/`` at root).
     Ordered cheapest → most expensive so fail-fast surfaces quick problems first.
+    Each tool prefix is resolved via ``_resolve_tool`` (runner-derived, not
+    ``poetry``-hardcoded — bug B2).
     """
     mypy_cache = resolve_mypy_cache_dir()
+    ruff = _resolve_tool("ruff", python_executable=python_executable, dadaia_bin=dadaia_bin)
+    mypy = _resolve_tool("mypy", python_executable=python_executable, dadaia_bin=dadaia_bin)
     return (
         Check(
             "ruff format --check",
-            ("poetry", "run", "ruff", "format", "--check", "--no-cache", *_RUFF_PATHS),
+            (*ruff, "format", "--check", "--no-cache", *_RUFF_PATHS),
         ),
-        Check("ruff check", ("poetry", "run", "ruff", "check", "--no-cache", *_RUFF_PATHS)),
+        Check("ruff check", (*ruff, "check", "--no-cache", *_RUFF_PATHS)),
         Check(
             "mypy --strict",
-            ("poetry", "run", "mypy", "--strict", "--cache-dir", str(mypy_cache), *_MYPY_PATHS),
+            (*mypy, "--strict", "--cache-dir", str(mypy_cache), *_MYPY_PATHS),
         ),
     )
 
 
-_PYTEST_FULL: Check = Check("pytest", ("poetry", "run", "pytest", "-q", "-p", "no:cacheprovider"))
-_PYTEST_QUICK: Check = Check(
-    "pytest (no e2e)",
-    ("poetry", "run", "pytest", "-q", "-p", "no:cacheprovider", "--ignore=tests/e2e"),
-)
+def _pytest_check(
+    quick: bool,
+    *,
+    python_executable: str | None = None,
+    dadaia_bin: str | None = None,
+) -> Check:
+    """Build the pytest check, resolving the pytest executable via ``_resolve_tool``."""
+    pytest = _resolve_tool("pytest", python_executable=python_executable, dadaia_bin=dadaia_bin)
+    base = (*pytest, "-q", "-p", "no:cacheprovider")
+    if quick:
+        return Check("pytest (no e2e)", (*base, "--ignore=tests/e2e"))
+    return Check("pytest", base)
 
 
-def checks_for(quick: bool = False) -> tuple[Check, ...]:
-    """Return the ordered check list. ``quick`` drops the slow e2e suite."""
-    pytest_check = _PYTEST_QUICK if quick else _PYTEST_FULL
-    return (*_lint_type_checks(), pytest_check)
+def checks_for(
+    quick: bool = False,
+    *,
+    python_executable: str | None = None,
+    dadaia_bin: str | None = None,
+) -> tuple[Check, ...]:
+    """Return the ordered check list. ``quick`` drops the slow e2e suite.
+
+    ``python_executable`` / ``dadaia_bin`` are injectable for testing; in
+    production they default to ``sys.executable`` / ``DADAIA_BIN`` via
+    ``_resolve_tool``.
+    """
+    lint = _lint_type_checks(python_executable=python_executable, dadaia_bin=dadaia_bin)
+    pytest_check = _pytest_check(quick, python_executable=python_executable, dadaia_bin=dadaia_bin)
+    return (*lint, pytest_check)
 
 
 def subprocess_runner(cwd: Path) -> Runner:

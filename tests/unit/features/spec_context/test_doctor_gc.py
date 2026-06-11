@@ -88,8 +88,10 @@ def test_stale_lock_json_deleted_after_fix(tmp_path: Path) -> None:
     assert not lock_file.exists(), (
         f"Stale lock file should be deleted after doctor fix, but still exists. Actions: {actions}"
     )
-    assert any("LOCK-NEW" in a and "myctx.lock.json" in a for a in actions), (
-        f"Expected LOCK-NEW action for myctx.lock.json, got: {actions}"
+    # Re-classification (T-011-02): a stale-but-valid record is reclaimed under LOCK-GC
+    # (probe-aware) rather than LOCK-NEW; LOCK-NEW now covers only structural corruption.
+    assert any("LOCK-GC" in a and "myctx.lock.json" in a for a in actions), (
+        f"Expected LOCK-GC action for myctx.lock.json, got: {actions}"
     )
 
 

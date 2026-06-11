@@ -21,7 +21,7 @@ its failing test before the fix.
 
 ## Pre-work
 
-### [ ] T-011-00 — Release start: ACTIVE.md → v0.1.11 IMPLEMENTATION
+### [x] T-011-00 — Release start: ACTIVE.md → v0.1.11 IMPLEMENTATION
 - **Owner:** product-engineer · **Maps:** v0.1.10 release-start precedent (arch A5)
 - **Write set:** `specs/releases/ACTIVE.md`
 - **Preconditions:** SPEC+PLAN+TASKS `**Status:** Aprovado` (coordinator flips after
@@ -35,7 +35,7 @@ its failing test before the fix.
 
 ## W1 — Concurrency-kernel tail (bug B3 + residuals R1/R3/R4)
 
-### [ ] T-011-01 — Probe the CLI side doors: `lock steal` + `lease._main` acquire
+### [x] T-011-01 — Probe the CLI side doors: `lock steal` + `lease._main` acquire
 - **Owner:** software-engineer · **Maps:** residual R1; bug
   `doctor-stale-lease-misdiagnosed-as-forgery` (remediation-path half); ADR-5
 - **Write set:** `dadaia_workspace/cli/commands/lock.py`,
@@ -53,7 +53,7 @@ its failing test before the fix.
   green.
 - **Parallelism:** spine; before T-011-02.
 
-### [ ] T-011-02 — Stale-lease GC/reclaim (`LOCK-GC`, doctor `--fix`)
+### [x] T-011-02 — Stale-lease GC/reclaim (`LOCK-GC`, doctor `--fix`)
 - **Owner:** software-engineer · **Maps:** bug B3 half (1) — no GC path; pre-pid
   records permanently un-reclaimable
 - **Write set:** `dadaia_workspace/features/spec_context/lease.py` (reclaim helper),
@@ -125,7 +125,7 @@ its failing test before the fix.
 
 ## W2 — CLI/validation seams (bugs B2, B4, B6)
 
-### [ ] T-011-06 — ci-preflight: runner-derived tool argv (poetry fallback only)
+### [x] T-011-06 — ci-preflight: runner-derived tool argv (poetry fallback only)
 - **Owner:** software-engineer · **Maps:** bug `ci-preflight-checks-hardcode-poetry-run`
 - **Write set:** `dadaia_workspace/features/ci_preflight/service.py` (`:80-93`),
   `tests/unit/features/ci_preflight/`, e2e preflight test
@@ -138,7 +138,7 @@ its failing test before the fix.
   missing everywhere. Bug closed with named regression test.
 - **Parallelism:** independent.
 
-### [ ] T-011-07 — Handoff resolver: workspace-rooted relative artifact paths
+### [x] T-011-07 — Handoff resolver: workspace-rooted relative artifact paths
 - **Owner:** software-engineer · **Maps:** bug
   `handoff-artifact-path-cannot-reference-specs-audits`
 - **Write set:** `dadaia_workspace/features/reports_validation/service.py`
@@ -177,7 +177,7 @@ its failing test before the fix.
 
 ## W3 — Closure contract (bug B1 + residual R2)
 
-### [ ] T-011-09 — Closure skill: mandatory disposition sweep (source edit)
+### [x] T-011-09 — Closure skill: mandatory disposition sweep (source edit)
 - **Owner:** ai-engineer · **Maps:** bug
   `release-closure-leaves-consumed-backlog-unsanitized` half (a)
 - **Write set:** `dadaia_workspace/public/skills/dadaia-release-closure/SKILL.md`
@@ -210,7 +210,7 @@ its failing test before the fix.
   Bug B1 closed referencing T-011-09 + this test.
 - **Parallelism:** after 03; before 18.
 
-### [ ] T-011-11 — Lifecycle-asymmetry map: mechanical contract test + map completion
+### [x] T-011-11 — Lifecycle-asymmetry map: mechanical contract test + map completion
 - **Owner:** software-engineer · **Maps:** residual R2 (qa §blockers; qa Q-BL1)
 - **Write set:** `tests/contract/test_lifecycle_asymmetry_map.py` (new),
   `tests/contract/README.md` (the map's actual home — author the ~15 missing
@@ -228,7 +228,7 @@ its failing test before the fix.
 
 ## W4 — Plugin honesty + panel + inject (bug B5 + residuals R5/R6)
 
-### [ ] T-011-12 — Plugin honest-relabel (rule + 3 stubs)
+### [x] T-011-12 — Plugin honest-relabel (rule + 3 stubs)
 - **Owner:** ai-engineer · **Maps:** bug `plugin-install-command-missing`; ADR-4
 - **Write set:** `dadaia_workspace/public/rules/plugin-scope.md`,
   `dadaia_workspace/public/agents/{frontend-engineer,design-specialist,devops-engineer}.md`
@@ -243,7 +243,7 @@ its failing test before the fix.
   bug closed referencing the grep evidence + backlog return (registered at CLOSURE).
 - **Parallelism:** independent; feeds T-011-19.
 
-### [ ] T-011-13 — Panel launch token (Bearer never in a URL)
+### [x] T-011-13 — Panel launch token (Bearer never in a URL)
 - **Owner:** software-engineer · **Maps:** residual R5 (security R-1); ADR-10
 - **Write set:** `dadaia_workspace/features/panel/auth.py`,
   `dadaia_workspace/features/panel/handler.py`, panel launch CLI path, unit + e2e
@@ -276,7 +276,7 @@ its failing test before the fix.
 
 ## W5 — Hygiene / docs / tooling (residuals R7/R8/R9/R10)
 
-### [ ] T-011-15 — Public-source hygiene: `__pycache__` prevention + repos.xlsx disposition
+### [x] T-011-15 — Public-source hygiene: `__pycache__` prevention + repos.xlsx disposition
 - **Owner:** software-engineer · **Maps:** residual R7
 - **Write set:** `dadaia_workspace/public/scripts/__pycache__/` (delete),
   script invocation sites (add `-B`/`PYTHONDONTWRITEBYTECODE`), `pyproject.toml`
@@ -291,7 +291,7 @@ its failing test before the fix.
   + evidence recorded for CLOSURE.
 - **Parallelism:** independent; feeds T-011-19.
 
-### [ ] T-011-16 — R8 code nits: docstring + probe dedup
+### [x] T-011-16 — R8 code nits: docstring + probe dedup
 - **Owner:** software-engineer · **Maps:** residual R8 (code half)
 - **Write set:** `tests/unit/hooks/test_sdd_post_gate.py` (`:12` docstring),
   `dadaia_workspace/hooks/sdd_gate.py` (duplicate probe construction)

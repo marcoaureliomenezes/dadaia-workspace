@@ -25,6 +25,12 @@ from typing import Any, cast
 import yaml
 from jsonschema import ValidationError, validate
 
+# Public-source hygiene (T-011-15 / FR-W5-01): never write a __pycache__/*.pyc under
+# dadaia_workspace/public/. This guard fires no matter how the script is invoked
+# (direct `python <script>`, subprocess, or import), complementing the `-B` flag at
+# the subprocess call site in features/specs/doctor.py.
+sys.dont_write_bytecode = True
+
 # ---------------------------------------------------------------------------
 # Heading allowlist (union of Groups A + B + C from W0 decisions report)
 # Exact strings, case-sensitive.  See T-MMS-W0-01 for the enumeration.

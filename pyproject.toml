@@ -5,6 +5,9 @@ description = "AI-native workspace management CLI for multi-agent development wi
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
+# Public-source hygiene (T-011-15 / FR-W5-01): never ship compiled bytecode in the
+# sdist/wheel. poetry-core honours these globs for both artifacts.
+exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
 keywords = [
     "ai-agents", "claude-code", "codex", "opencode",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
