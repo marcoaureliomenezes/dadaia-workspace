@@ -23,6 +23,19 @@ in `CODEX_HOME` first, then the project from repo root down to the current
 directory. Closer files appear later and win on conflict. Almost every decision
 below is an application of "which layer owns this, and does it win where it must."
 
+Current-doc corrections to keep active:
+- Codex subagents are available in current Codex, but Codex spawns them only when
+  explicitly asked for subagents, delegation, or parallel agent work. A custom-agent
+  TOML file makes a role spawnable; it does not route prompts by itself.
+- Codex Rules use documented Starlark `prefix_rule(...)` declarations. Treat any
+  generated `command_allowed(cmd)` policy as compatibility debt unless a local Codex
+  binary proves it still loads.
+- Project `.codex/config.toml`, project hooks, and project rules load only when the
+  project layer is trusted. Provider/auth/telemetry settings remain user/admin
+  concerns and must not be emitted from dadaia public assets.
+- Hook matchers are event-specific. `UserPromptSubmit` and `Stop` ignore matchers;
+  command hooks are the only handler type that runs today.
+
 ---
 
 ## 1. AGENTS.md as scoped constitution — discovery + stacking
@@ -96,7 +109,9 @@ and emit one of three decisions.
 prefix_rule(
     pattern = ["git", "push"],
     decision = "prompt",
-    justification = "...",
+    justification = "Publishing requires operator approval.",
+    match = ["git push origin feature/x"],
+    not_match = ["git status"],
 )
 ```
 
@@ -125,6 +140,11 @@ must follow QA/review), `prompt` on `dadaia context dead` and `dadaia public ins
 destructive sweeps over `repos/` (user projects). If you want the model to *think*
 differently, that is a skill or AGENTS.md, not a Rule.
 
+Projection invariant: generated `.codex/rules/dadaia-command-policy.rules` must
+contain `prefix_rule(` and must not contain `command_allowed(`. Keep a focused test
+for that shape because it separates current documented Codex command policy from
+older compatibility assumptions.
+
 ---
 
 ## 4. Skills in Codex — discovery, frontmatter deltas, cross-harness authoring
@@ -135,6 +155,11 @@ A skill is a folder with `SKILL.md`. Codex first sees only the frontmatter
 (`name`, `description`) and opens the full body **only when it decides to use the
 skill**. The description is the trigger surface — it must be short, verb-first, and
 scenario-named ("Use when…" / "Use for…").
+
+Codex scans repo `.agents/skills` directories from CWD upward to the repository
+root, plus user/admin/system locations. Large skill inventories are listing-
+budgeted, so descriptions must front-load trigger words; a skill omitted from the
+initial list can still be used when explicitly mentioned.
 
 ### Frontmatter deltas vs Claude Code
 
@@ -170,17 +195,25 @@ and `.codex`/`.agents`. Therefore:
 
 ### Mental model (and the key delta vs Claude Code)
 
-Codex does **not** spawn subagents automatically. The operator (or a dispatcher)
-must explicitly request delegation or parallel work. Each subagent does its own
-read/execute/synthesize; the primary consolidates. This is the central audit
-correction: a declarative workflow YAML/topology does **not** equal a running
-subagent — it does not execute parallelism by itself.
+Codex has native subagent workflows and custom-agent TOML, but it does **not**
+spawn subagents automatically. The operator (or a dispatcher running in the main
+thread) must explicitly request delegation or parallel work. Each subagent does
+its own read/execute/synthesize; the primary consolidates. This is the central
+audit correction: a declarative workflow YAML/topology does **not** equal a
+running subagent — it does not execute parallelism by itself.
 
 | Axis | Claude Code dispatch | Codex fan-out |
 |---|---|---|
 | Trigger | dispatcher agent with dispatch authority | explicit operator/dispatcher request for real spawn |
-| Declarative topology | maps toward dispatch | does NOT auto-execute; needs explicit spawn or manual handoff |
+| Declarative topology | maps toward dispatch | does NOT auto-execute; needs explicit spawn, a real executor, or manual handoff |
 | Safest pattern | task tool to a subagent | parallel **read** (explore, review, triage, logs, tests, compare) |
+
+Current Codex custom-agent schema requires `name`, `description`, and
+`developer_instructions`. Optional `model`, `model_reasoning_effort`,
+`sandbox_mode`, `mcp_servers`, and skill config inherit when omitted. Use
+`sandbox_mode` as a real role-boundary signal: evidence-only reviewers should not
+be projected as general workspace writers unless their role explicitly writes
+artifacts.
 
 ### Guard conditions for fan-out correctness
 
@@ -205,8 +238,8 @@ custom agents with scoped tools.
 
 Codex reads config in layers: personal config in `~/.codex/config.toml`; project
 config in `.codex/config.toml` **loaded only when the project is trusted**; closer
-files may override earlier values. Some sensitive keys can never be overridden by
-project-local config.
+files may override earlier values. Some sensitive keys are ignored from project-
+local config and must remain user/admin-global.
 
 ### Trust classification (decision table)
 
@@ -218,6 +251,11 @@ project-local config.
 | SDD-gate / hook wiring | `.codex/hooks.json` | Yes, but must point to **trusted workspace-level scripts** | hooks run host commands |
 | Provider / base URL / auth / telemetry | user or admin config | **NEVER project-local** | a repo must not change credentials or host-owned behavior |
 | Sandbox / approval level | profile or per-command | escalate cautiously | stricter for review; permissive only in a trusted workspace |
+
+Project-local config must not emit `openai_base_url`, `chatgpt_base_url`,
+`model_provider`, `model_providers`, `profile`, `profiles`, `notify`, or `otel`.
+Those keys redirect credentials, host-owned behavior, or telemetry and belong to
+the operator/admin.
 
 ### dadaia audit findings — what must NOT be project-local (apply as constraints)
 
@@ -291,6 +329,9 @@ Authoring consequences:
 
 Codex hooks can fire on: `SessionStart`, `UserPromptSubmit`, `PreToolUse`,
 `PostToolUse`, `PreCompact`, `PostCompact`, `SubagentStart`, `SubagentStop`, `Stop`.
+Only command hook handlers run today; `prompt` and `agent` handlers are parsed but
+skipped. `UserPromptSubmit` and `Stop` do not honor matchers, so never depend on a
+matcher there for selective behavior.
 
 > **Inject full context once per session, not every prompt.** Wire the full static
 > context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the

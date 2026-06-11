@@ -29,6 +29,16 @@ _CODEX_CLAUDE_MODEL_RE: re.Pattern[str] = re.compile(
     re.MULTILINE,
 )
 _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
+_CODEX_EXPECTED_READ_ONLY_AGENTS: frozenset[str] = frozenset(
+    {
+        "code-reviewer",
+        "design-specialist",
+        "project-auditor",
+        "qa-engineer",
+        "security-reviewer",
+        "software-architect",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +250,20 @@ def dcx8_codex_rules_shape(codex_dir: Path) -> list[str]:
         return out
     if not any(rules_dir.glob("*.rules")):
         out.append("[missing] codex:rules/*.rules (D-CX-8)")
+    for rules_file in sorted(rules_dir.glob("*.rules")):
+        try:
+            text = rules_file.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if "command_allowed(" in text:
+            out.append(
+                f"[error] codex:rules/{rules_file.name}: undocumented command_allowed policy "
+                "(D-CX-8)"
+            )
+        if "prefix_rule(" not in text:
+            out.append(
+                f"[error] codex:rules/{rules_file.name}: missing prefix_rule declarations (D-CX-8)"
+            )
     for md_file in sorted(rules_dir.glob("*.md")):
         out.append(f"[extra] codex:rules/{md_file.name}: markdown is not Codex Rules (D-CX-8)")
     return out
@@ -286,6 +310,14 @@ def dcx10_codex_agent_boundaries(codex_dir: Path) -> list[str]:
         for field in ("sandbox_mode", "model_reasoning_effort"):
             if field not in data:
                 out.append(f"[missing] codex:agents/{toml_file.name}:{field} (D-CX-10)")
+        if (
+            toml_file.stem in _CODEX_EXPECTED_READ_ONLY_AGENTS
+            and data.get("sandbox_mode") != "read-only"
+        ):
+            out.append(
+                f"[error] codex:agents/{toml_file.name}:sandbox_mode must be read-only "
+                "for evidence-only role (D-CX-10)"
+            )
         for forbidden in ("provider", "api_key", "telemetry"):
             if forbidden in data:
                 out.append(f"[error] codex:agents/{toml_file.name}:{forbidden} (D-CX-10)")

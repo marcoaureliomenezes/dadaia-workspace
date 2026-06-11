@@ -93,6 +93,10 @@ AI-entity files (agents/skills/rules/workflows/hooks) -> ai-engineer.
 Architecture remediation -> software-architect.
 CI YAML -> devops-engineer [plugin].
 Remediation dispatch is project-manager's; I only recommend actions in my report.
+
+**Codex runtime note.** The Codex projection makes this persona available as a custom
+agent, but Codex does not auto-run audits from workflow Markdown. The operator or main
+session must explicitly request `project-auditor` or parallel subagent work.
 ```
 
 ---

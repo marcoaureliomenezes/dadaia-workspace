@@ -215,6 +215,19 @@ def test_dcx8_markdown_rules_rejected(installed_workspace: Path) -> None:
     assert any("D-CX-8" in r and "workspace-protocol.md" in r for r in reports)
 
 
+def test_dcx8_undocumented_command_allowed_rejected(installed_workspace: Path) -> None:
+    rules_path = installed_workspace / ".codex" / "rules" / "dadaia-command-policy.rules"
+    rules_path.write_text(
+        "def command_allowed(cmd):\n    return True\n",
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-8" in r and "command_allowed" in r for r in reports)
+    assert any("D-CX-8" in r and "missing prefix_rule" in r for r in reports)
+
+
 def test_dcx9_missing_hook_command_detected(installed_workspace: Path) -> None:
     # T-018-17: codex hooks invoke the Python governance hooks
     # (``<python> -m dadaia_workspace.hooks.<name>``), not the bash ``.sh`` scripts.
@@ -244,6 +257,23 @@ def test_dcx10_missing_agent_boundary_detected(installed_workspace: Path) -> Non
     reports = FileSystemPublicAssetManager().doctor(installed_workspace)
 
     assert any("D-CX-10" in r and "qa-engineer.toml" in r and "sandbox_mode" in r for r in reports)
+
+
+def test_dcx10_reviewer_workspace_write_detected(installed_workspace: Path) -> None:
+    toml_path = installed_workspace / ".codex" / "agents" / "security-reviewer.toml"
+    text = toml_path.read_text(encoding="utf-8")
+    assert 'sandbox_mode = "read-only"' in text
+    toml_path.write_text(
+        text.replace('sandbox_mode = "read-only"', 'sandbox_mode = "workspace-write"', 1),
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any(
+        "D-CX-10" in r and "security-reviewer.toml" in r and "must be read-only" in r
+        for r in reports
+    )
 
 
 def test_check_memory_phase_single_source(tmp_path) -> None:

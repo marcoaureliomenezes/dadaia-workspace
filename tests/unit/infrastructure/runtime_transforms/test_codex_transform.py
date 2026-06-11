@@ -91,7 +91,7 @@ def test_project_manager_agent_tool_replaced() -> None:
         "Expected '`Agent`' tool-table entry to be replaced in project-manager output"
     )
     assert "subagent dispatch" not in result
-    assert "Codex custom-agent delegation" in result
+    assert "explicit Codex subagent delegation" in result
 
 
 def test_project_auditor_agent_tool_replaced() -> None:
@@ -106,7 +106,7 @@ def test_project_auditor_agent_tool_replaced() -> None:
         "Expected '`Agent`' tool-table entry to be replaced in project-auditor output"
     )
     assert "subagent dispatch" not in result
-    assert "Codex custom-agent delegation" in result
+    assert "explicit Codex subagent delegation" in result
 
 
 def test_preserves_claude_code_skill_identifier() -> None:

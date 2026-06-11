@@ -2,6 +2,7 @@
 name: sdd-gate-lease-blocks-pm-dispatched-subagent-writes
 status: Closed
 severity: HIGH
+session_id: null
 reported: 2026-06-11
 surface: dadaia_workspace.hooks.sdd_gate (lease identity + heartbeat renewal)
 ---
