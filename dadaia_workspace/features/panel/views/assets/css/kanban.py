@@ -196,9 +196,28 @@ KANBAN_CSS: str = """
   to   { opacity: 1; }
 }
 
-/* ── Card: stale indicator ────────────────────────────────────────────── */
+/* ── Card: stale indicator (session cards only) ─────────────────────────── */
 .kanban-card[data-stale="true"] {
   border-left: 3px solid var(--color-stale-dot, #cc7700);
+}
+
+/* ── Release card (primary lifecycle card from ACTIVE.md) ────────────────── */
+.kanban-card--release {
+  border-left: 3px solid var(--color-primary, #2d7d9a);
+  background: var(--color-primary-bg, #f0fbf7);
+}
+.kanban-release-badge {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-primary, #2d7d9a);
+  color: var(--color-surface, #ffffff);
+  font-size: var(--font-size-xs, 0.68rem);
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  border-radius: var(--radius-pill, 9999px);
+  padding: 0.1em 0.5em;
+  line-height: 1.4;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ── Card title row (session id + status dot) ────────────────────────── */
@@ -262,6 +281,38 @@ KANBAN_CSS: str = """
   border-radius: var(--radius-card, 6px);
   height: var(--kanban-card-min-h, 72px);
   background: transparent;
+}
+
+/* ── Observers strip (live READ sessions; only rendered when non-empty) ─── */
+.kanban-observers {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm, 0.6rem);
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--color-border, #dddddd);
+  background: var(--color-placeholder-bg, #f7f7f7);
+  flex-wrap: wrap;
+}
+.kanban-observers-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted, #666666);
+  font-family: var(--font-stack, -apple-system, sans-serif);
+  white-space: nowrap;
+  padding-top: 0.4rem;
+}
+.kanban-observers-cards {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-sm, 0.6rem);
+  flex-wrap: wrap;
+  flex: 1;
+}
+.kanban-observers-cards .kanban-card {
+  min-width: var(--kanban-col-min-w, 200px);
+  max-width: 280px;
 }
 
 /* ── Empty lane state ─────────────────────────────────────────────────── */

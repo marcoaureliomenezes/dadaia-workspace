@@ -148,6 +148,10 @@ def render_index(
         <p>Agents, Workflows and Kanban &mdash; stacked below.</p>
       </div>
 
+      {agents_subsection}
+
+      {workflows_subsection}
+
       <div class="ops-subsection" id="ops-subsection-kanban">
         <div class="ops-subsection-header">
           <h3 class="ops-subsection-title">Kanban</h3>
@@ -157,10 +161,6 @@ def render_index(
         <div id="kanban-board" class="kanban-board" aria-label="Kanban board" aria-live="polite">
         </div>
       </div>
-
-      {workflows_subsection}
-
-      {agents_subsection}
     </section>
 
     {academy_section}

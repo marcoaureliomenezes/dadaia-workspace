@@ -32,9 +32,14 @@ Arch note (architect D4.A):
 
 from __future__ import annotations
 
+import html as _html
 import logging
+import re
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 from dadaia_workspace.features.panel.views._md_render import (
     build_renderer,
@@ -42,6 +47,9 @@ from dadaia_workspace.features.panel.views._md_render import (
 )
 
 _log = logging.getLogger(__name__)
+
+# YAML frontmatter delimited by leading `---` ... `---`.
+_FRONTMATTER_RE = re.compile(r"\A---\s*\n(?P<fm>.*?)\n---\s*\n?", re.DOTALL)
 
 # Content-type map keyed by file suffix (lower-case, dot included).
 _CONTENT_TYPES: dict[str, str] = {
@@ -64,6 +72,90 @@ _NOT_FOUND: tuple[int, str, bytes] = (
     "text/plain; charset=utf-8",
     b"Not found.",
 )
+
+
+def _split_frontmatter(source: str) -> tuple[dict[str, Any], str]:
+    """Split a leading YAML frontmatter block from Markdown source.
+
+    Returns ``(metadata, body)``.  When no frontmatter is present, returns
+    ``({}, source)``.  A malformed YAML block is treated as no frontmatter and
+    left in the body (never raised) so a bad atom still renders.
+    """
+    match = _FRONTMATTER_RE.match(source)
+    if match is None:
+        return {}, source
+    try:
+        loaded = yaml.safe_load(match.group("fm"))
+    except yaml.YAMLError:
+        return {}, source
+    meta = loaded if isinstance(loaded, dict) else {}
+    body = source[match.end() :]
+    return meta, body
+
+
+def _render_meta_header(meta: dict[str, Any]) -> str:
+    """Render the frontmatter as a compact styled meta header (no raw YAML soup).
+
+    Surfaces ``title``, ``tldr``, ``tags`` (as chips) and ``last_updated``.
+    All values are HTML-escaped (OWASP A03).  Returns ``""`` when there is
+    nothing worth showing.
+    """
+    title = meta.get("title") or meta.get("slug")
+    tldr = meta.get("tldr")
+    tags = meta.get("tags")
+    last_updated = meta.get("last_updated")
+
+    if not any((title, tldr, tags, last_updated)):
+        return ""
+
+    parts: list[str] = ['<header class="memory-meta">']
+    if title:
+        parts.append(f'<h1 class="memory-meta__title">{_html.escape(str(title))}</h1>')
+    if tldr:
+        parts.append(f'<p class="memory-meta__tldr">{_html.escape(str(tldr))}</p>')
+    if isinstance(tags, list) and tags:
+        chips = "".join(
+            f'<li class="memory-meta__chip">{_html.escape(str(tag))}</li>' for tag in tags
+        )
+        parts.append(f'<ul class="memory-meta__tags">{chips}</ul>')
+    if last_updated:
+        parts.append(
+            f'<p class="memory-meta__footer">Last updated: {_html.escape(str(last_updated))}</p>'
+        )
+    parts.append("</header>")
+    return "".join(parts)
+
+
+# Theme pre-paint: apply the stored panel theme before first contentful paint
+# so a memory document opened standalone matches the panel's active theme.
+_THEME_PREPAINT = (
+    "<script>(function(){var t=localStorage.getItem('dadaia-panel-theme');"
+    "if(t&&(t==='mint'||t==='sage'||t==='warm')){document.documentElement.dataset.theme=t;}})();</script>"
+)
+
+
+def _wrap_document(title: str, meta_header: str, body_html: str) -> str:
+    """Wrap rendered memory body in a full HTML document carrying the identity.
+
+    Links ``/static/tokens.css`` (palette + theme) and ``/static/memory-doc.css``
+    (document typography/tables/code) into ``<head>`` so the rendered memory
+    document carries the dadaia visual identity whether viewed standalone or
+    inside the wrapper iframe.
+    """
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n<head>\n'
+        '<meta charset="UTF-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f"<title>{_html.escape(title)}</title>\n"
+        f"{_THEME_PREPAINT}\n"
+        '<link rel="stylesheet" href="/static/tokens.css">\n'
+        '<link rel="stylesheet" href="/static/memory-doc.css">\n'
+        "</head>\n<body>\n"
+        '<main class="memory-doc">\n'
+        f"{meta_header}{body_html}"
+        "\n</main>\n</body>\n</html>\n"
+    )
 
 
 def render_memory(
@@ -121,9 +213,15 @@ def render_memory(
             # Use the per-slug renderer so wikilinks resolve to the active context.
             try:
                 source = target.read_text(encoding="utf-8")
+                # Strip YAML frontmatter so it never renders as raw key:value
+                # soup; surface it as a styled compact meta header instead.
+                meta, md_body = _split_frontmatter(source)
                 renderer = build_renderer(slug)
-                html_str = render_md_to_html(source, renderer=renderer)
-                return (200, "text/html; charset=utf-8", html_str.encode("utf-8"))
+                body_html = render_md_to_html(md_body, renderer=renderer)
+                meta_header = _render_meta_header(meta)
+                doc_title = str(meta.get("title") or meta.get("slug") or target.stem)
+                document = _wrap_document(doc_title, meta_header, body_html)
+                return (200, "text/html; charset=utf-8", document.encode("utf-8"))
             except Exception:
                 _log.exception("Failed to render memory atom: %s", target)
                 return _NOT_FOUND

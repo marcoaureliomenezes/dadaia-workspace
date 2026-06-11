@@ -149,6 +149,64 @@ ACADEMY_CSS: str = """
   margin: 0;
 }
 
+/* ── Lesson list (module → lessons) ──────────────────────────────────── */
+.academy-lesson-list {
+  list-style: none;
+  margin: var(--space-sm, 0.6rem) 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.3rem);
+}
+
+.academy-lesson-item {
+  margin: 0;
+}
+
+.academy-lesson-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--color-border-card, #dddddd);
+  border-radius: var(--radius, 4px);
+  padding: 0.55em 0.8em;
+  color: var(--color-accent-dark, #2d7d9a);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--duration-fast, 120ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+}
+
+.academy-lesson-link:hover,
+.academy-lesson-link:focus-visible {
+  background: var(--color-primary-bg, #f0fbf7);
+}
+
+/* ── Lesson body (rendered Markdown) ─────────────────────────────────── */
+.academy-lesson-body {
+  margin-top: var(--space-md, 1rem);
+  color: var(--color-text, #222222);
+  line-height: 1.6;
+}
+
+.academy-lesson-body h1,
+.academy-lesson-body h2,
+.academy-lesson-body h3 {
+  color: var(--color-heading, #111111);
+}
+
+.academy-lesson-body pre {
+  overflow-x: auto;
+  background: var(--color-code-bg, #f5f5f5);
+  padding: var(--space-sm, 0.6rem);
+  border-radius: var(--radius, 4px);
+}
+
+.academy-lesson-body code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
 /* ── Error state variant ────────────────────────────────────────────── */
 .empty-state.error-state {
   color: var(--color-cost, #633d2e);

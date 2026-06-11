@@ -25,8 +25,13 @@ from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
 from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.kanban import KANBAN_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory import MEMORY_CSS
+from dadaia_workspace.features.panel.views.assets.css.memory_doc import MEMORY_DOC_CSS
 from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.reports import REPORTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.reports_doc import (
+    REPORTS_DOC_BASE_CSS,
+    REPORTS_DOC_OVERRIDE_CSS,
+)
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
@@ -53,6 +58,11 @@ _MIME_BY_EXT: dict[str, str] = {
 _ASSETS: dict[str, tuple[str, bytes]] = {
     "tokens.css": ("text/css; charset=utf-8", TOKENS_CSS.encode("utf-8")),
     "memory.css": ("text/css; charset=utf-8", MEMORY_CSS.encode("utf-8")),
+    "memory-doc.css": ("text/css; charset=utf-8", MEMORY_DOC_CSS.encode("utf-8")),
+    "reports-doc.css": (
+        "text/css; charset=utf-8",
+        (REPORTS_DOC_BASE_CSS + REPORTS_DOC_OVERRIDE_CSS).encode("utf-8"),
+    ),
     "structure.css": ("text/css; charset=utf-8", STRUCTURE_CSS.encode("utf-8")),
     "agents.css": ("text/css; charset=utf-8", AGENTS_CSS.encode("utf-8")),
     "projects.css": ("text/css; charset=utf-8", PROJECTS_CSS.encode("utf-8")),

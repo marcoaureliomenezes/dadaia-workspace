@@ -6,7 +6,7 @@ schema_version: "1"
 trigger: operator-requests-audit-or-closure
 owner: project-manager
 activity_class: ADDITIVE
-lifecycle_phase: Research
+lifecycle_phase: Audits
 inputs:
   context:
     type: string

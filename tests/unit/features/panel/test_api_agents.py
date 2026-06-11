@@ -460,3 +460,116 @@ class TestRuntimeFilterBackwardCompatParity:
         assert set(data_no_qs.keys()) == set(data_claude.keys()), (
             "Top-level envelope keys differ between no-qs and runtime=claude"
         )
+
+
+# ---------------------------------------------------------------------------
+# Agentic-tab redesign: plugin-stub exclusion + phases / workflows / model
+# ---------------------------------------------------------------------------
+
+
+class _FakeWorkflowSummary:
+    def __init__(self, name: str, agent_ids: list[str]) -> None:
+        self.name = name
+        self.display_name = name
+        self.agent_ids = agent_ids
+
+
+class _FakeWorkflowsService:
+    def __init__(self, summaries: list[_FakeWorkflowSummary]) -> None:
+        self._summaries = summaries
+
+    def list_summaries(self) -> list[_FakeWorkflowSummary]:
+        return list(self._summaries)
+
+
+def test_plugin_stubs_excluded_from_roster() -> None:
+    """Agents with plugin=True (design-specialist/devops/frontend) never appear."""
+    agents = [
+        _make_dto(agent_id="software-engineer"),
+        AgentDTO(
+            id="design-specialist",
+            name="design-specialist",
+            description="[PLUGIN] stub.",
+            tier=3,
+            plugin=True,
+        ),
+    ]
+    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+    _, _, data = _api_data(svc)
+    ids = {a["agent_id"] for a in data["agents"]}
+    assert "software-engineer" in ids
+    assert "design-specialist" not in ids
+
+
+def test_agent_phases_derived_from_constitution() -> None:
+    """The §7 lifecycle phase(s) appear on each agent entry."""
+    agents = [_make_dto(agent_id="qa-engineer")]
+    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+    _, _, data = _api_data(svc)
+    card = data["agents"][0]
+    assert card["phases"] == ["Review gate — commit"]
+
+
+def test_unknown_agent_phases_empty_not_faked() -> None:
+    """An agent not in the §7 table gets an empty phases list — never fabricated."""
+    agents = [_make_dto(agent_id="mystery-agent")]
+    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+    _, _, data = _api_data(svc)
+    assert data["agents"][0]["phases"] == []
+
+
+def test_workflow_membership_derived_from_workflow_definitions() -> None:
+    """Workflows the agent takes part in are derived from workflow agent_ids."""
+    agents = [
+        _make_dto(agent_id="project-manager"),
+        _make_dto(agent_id="software-engineer"),
+    ]
+    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+    svc._workflows_service_override = _FakeWorkflowsService(  # type: ignore[attr-defined]
+        [
+            _FakeWorkflowSummary("audit-fanout", ["project-auditor", "project-manager"]),
+            _FakeWorkflowSummary("release-ship", ["project-manager"]),
+        ]
+    )
+    _, _, data = _api_data(svc)
+    by_id = {a["agent_id"]: a for a in data["agents"]}
+    assert by_id["project-manager"]["workflows"] == ["audit-fanout", "release-ship"]
+    assert by_id["software-engineer"]["workflows"] == []
+
+
+def test_workflows_empty_when_provider_unavailable() -> None:
+    """A workflows-read failure yields empty membership, not a 500."""
+    agents = [_make_dto(agent_id="software-engineer")]
+    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+    # No workflows service injected → list_workflow_summaries() raises → caught.
+    status, _, data = _api_data(svc)
+    assert status == 200
+    assert data["agents"][0]["workflows"] == []
+
+
+def test_model_inherited_flag_when_no_model_frontmatter() -> None:
+    """An agent with no model: declares model_inherited=True and model=None."""
+    agents = [
+        AgentDTO(
+            id="no-model-agent",
+            name="no-model-agent",
+            description="No model frontmatter.",
+            tier=3,
+            model=None,
+        )
+    ]
+    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+    _, _, data = _api_data(svc)
+    card = data["agents"][0]
+    assert card["model"] is None
+    assert card["model_inherited"] is True
+
+
+def test_model_inherited_false_when_model_present() -> None:
+    """A configured model id sets model_inherited=False."""
+    agents = [_make_dto(agent_id="software-engineer", model="claude-opus-4-8")]
+    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+    _, _, data = _api_data(svc)
+    card = data["agents"][0]
+    assert card["model"] == "claude-opus-4-8"
+    assert card["model_inherited"] is False

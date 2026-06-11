@@ -119,14 +119,12 @@ _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/panel-status /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
-    b"/api/workflows /api/workflows/<name> /api/workflows/<name>/run "
+    b"/api/workflows /api/workflows/<name> "
     b"/api/sessions /api/sessions/<runtime>/<session_id> "
     b"/api/kanban "
     b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
-
-_WORKFLOW_NAME_RE = re.compile(r"^[a-zA-Z0-9\-]+$")
 
 # ---------------------------------------------------------------------------
 # Forbidden field names for T1 privacy check (belt-and-suspenders; the reader
@@ -188,6 +186,12 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory", AuthClass.BEARER_SECOND_LOOP),
     (r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$", "memory_view", AuthClass.BEARER_SECOND_LOOP),
     (r"^/reports/(?P<path>.+)$", "reports_serve", AuthClass.BEARER_SECOND_LOOP),
+    # Academy lesson render (read-only; path-traversal guard lives in the view/service).
+    (
+        r"^/academy/(?P<module>[^/]+)/(?P<lesson>[^/]+)$",
+        "academy_lesson",
+        AuthClass.BEARER_SECOND_LOOP,
+    ),
     # BEARER-only routes (auth required; no telemetry dependency)
     (r"^/api/academy$", "api_academy", AuthClass.BEARER),
     (r"^/api/kanban$", "api_kanban", AuthClass.BEARER),
@@ -196,8 +200,7 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important", AuthClass.BEARER),
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete", AuthClass.BEARER),
     (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt", AuthClass.BEARER),
-    # /api/workflows/<name>/run and /api/workflows/<name> before /api/workflows
-    (r"^/api/workflows/(?P<workflow_name>[^/]+)/run$", "api_workflow_run", AuthClass.BEARER),
+    # /api/workflows/<name> before /api/workflows
     (
         r"^/api/workflows/(?P<workflow_name>[^/]+)$",
         "api_workflow_detail",
@@ -260,8 +263,6 @@ _SECOND_LOOP_AUTH_ROUTES = _SECOND_LOOP_AUTH_ROUTE_NAMES
 
 # Backward-compatible flat raw routes list (pattern, name) — consumed by some tests.
 _RAW_ROUTES: list[tuple[str, str]] = [(pat, name) for pat, name, _ in _ROUTE_TABLE]
-
-_POST_WORKFLOW_RUN_RE = re.compile(r"^/api/workflows/(?P<workflow_name>[^/]+)/run$")
 
 # Routes that are GET-only and must return 405 Method Not Allowed on POST.
 _GET_ONLY_API_ROUTES_RE = re.compile(r"^/api/kanban$")
@@ -336,7 +337,8 @@ def make_handler_class(
         ``(status_code, content_type, body_bytes)`` triple.
 
         Required keys: ``"index"``, ``"api_panel_status"``, ``"api_contexts"``,
-        ``"api_academy"``, ``"memory"``, ``"memory_view"``, ``"static"``.
+        ``"api_academy"``, ``"academy_lesson"``, ``"memory"``, ``"memory_view"``,
+        ``"static"``.
 
     token:
         Deprecated and ignored (no-auth decision, 2026-06-11).  Accepted for
@@ -515,37 +517,6 @@ def make_handler_class(
                 }:
                     continue
                 self._dispatch_telemetry(route_name, m_api.groupdict(), {})
-                return
-
-            m = _POST_WORKFLOW_RUN_RE.match(path)
-            if m is not None:
-                workflow_name = m.group("workflow_name")
-                if not _WORKFLOW_NAME_RE.match(workflow_name):
-                    self._respond(
-                        400,
-                        "application/json",
-                        b'{"error": "invalid workflow name"}',
-                    )
-                    return
-                if "api_workflow_run" in views:
-                    try:
-                        status, content_type, body = views["api_workflow_run"](
-                            workflow_name=workflow_name,
-                        )
-                        self._respond(status, content_type, body)
-                    except Exception as exc:  # noqa: BLE001
-                        import logging
-
-                        logging.getLogger(__name__).warning(
-                            "PanelHandler: api_workflow_run error: %s", exc
-                        )
-                        self._respond(
-                            500,
-                            "application/json",
-                            b'{"error": "internal server error"}',
-                        )
-                else:
-                    self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
                 return
 
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)

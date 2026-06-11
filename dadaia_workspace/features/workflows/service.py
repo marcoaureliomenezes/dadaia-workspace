@@ -83,6 +83,7 @@ class WorkflowDetailDTO:
     source_path: str
     inputs: list[dict[str, Any]]
     stages: list[StageDTO]
+    lifecycle_phase: str = "Unmapped"
     diagram_svg: str = field(default="")
 
 
@@ -174,6 +175,7 @@ class WorkflowsService:
                     has_parallel=any(s.parallel_group for s in wf.stages),
                     has_gates=any(s.gate is not None for s in wf.stages),
                     source_path=str(source_file),
+                    lifecycle_phase=wf.lifecycle_phase,
                 )
             )
         return summaries
@@ -227,6 +229,7 @@ class WorkflowsService:
             source_path=str(source_file),
             inputs=inputs_list,
             stages=stage_dtos,
+            lifecycle_phase=wf.lifecycle_phase,
             diagram_svg=diagram,  # server-rendered SVG from dag.py (PR3-13)
         )
 

@@ -1,32 +1,32 @@
-// kanban.js — Kanban board tab UI (swimlanes, 4-stage lifecycle columns, auto-refresh)
-// panel-kanban-v1 K-2 (FE) — updated for §7 canonical lifecycle columns (T-016-P13)
+// kanban.js — Kanban board tab UI (lifecycle-truth board, kanban-v2)
 //
 // Depends on: window.authedFetch() and window.escHtml() defined in core.js (loaded before this).
 //
-// API contract (SPEC §3 K-1 response schema — normative):
+// API contract (kanban-v2 — normative; see views/kanban.py docstring):
 //   GET /api/kanban
-//     → { generated_at: "<ISO>", swimlanes: [ SwimLane, ... ] }
-//   SwimLane: { context: "<name>", columns: { backlog: [...], release_def: [...],
-//               impl_review: [...], closure: [...] } }
-//   SessionCard: { session_id, mode, release, runtime, pid, last_seen_at, is_stale }
+//     → { schema: "kanban-v2", generated_at: "<ISO>", swimlanes: [ SwimLane, ... ] }
+//   SwimLane: { context, columns: { release_def, impl_review, closure }, observers: [Card] }
+//   Card (release): { card_kind: "release", release, phase }
+//   Card (session): { card_kind: "session", session_id, mode, release, started_at,
+//                     last_seen_at, age_seconds }
 //
 // Column label map (canonical §7 SDD lifecycle):
-//   backlog      → "Backlog"                (READ sessions)
-//   release_def  → "Release Definition"     (SPEC sessions)
-//   impl_review  → "Implementation + Review" (BOUND_IMPLEMENTATION + BOUND_REVIEW sessions, combined)
-//   closure      → "Closure"               (closure-phase sessions; present-but-empty until supported)
+//   release_def  → "Release Definition"      (release card in DEFINITION/SPEC/PLAN; SPEC sessions)
+//   impl_review  → "Implementation + Review" (release card in TASKS/IMPLEMENTATION/REVIEW;
+//                                              BOUND_IMPLEMENTATION + BOUND_REVIEW sessions)
+//   closure      → "Closure"                 (release card in CLOSURE)
+//   observers    → "Observers" strip         (live READ sessions — NOT backlog work)
 //
-// Behaviour summary:
-//   - On DOMContentLoaded: locate #section-kanban or #ops-subsection-kanban; if absent, exit (no-op).
-//   - fetchKanban() calls GET /api/kanban via authedFetch.
-//   - renderBoard(data): renders lanes and columns into #kanban-board.
-//   - XOR lock dimming is RETIRED (impl and review share one combined column).
-//   - Per-card stale indicator preserved: data-stale="true" on stale cards.
-//   - Empty column → placeholder div with data-testid="kanban-empty-placeholder" + aria-hidden="true".
-//   - Empty lane → visible italic "No active sessions" (announced by screen reader).
-//   - Empty board → centred "No Spec Context Projects available".
-//   - Poll for updates every 10 s (same interval as sessions.js); checks document.hidden.
-//   - window.Kanban public API: isLoaded(), load(), reload().
+// kanban-v2 behaviour:
+//   - The Backlog column is RETIRED. The old board dumped every (often dead) READ bind
+//     into Backlog as `sess_xxxx / unknown / unknown · 9h ago`. v2 shows only LIVE
+//     sessions, routes READ binds to an Observers strip, and makes the primary card per
+//     lane the context's real release + phase from ACTIVE.md.
+//   - Release cards render the release id + phase; session cards render mode, release
+//     (if bound) and relative age — never the literal string "unknown". Absent fields
+//     are omitted, not stubbed.
+//   - Per-card stale indicator preserved on session cards via data-stale.
+//   - Poll every 10 s (checks document.hidden). window.Kanban: isLoaded(), load(), reload().
 
 (function () {
   'use strict';
@@ -35,7 +35,6 @@
   var AUTO_REFRESH_MS = 10000;
 
   var COLUMN_LABELS = {
-    backlog:     'Backlog',
     release_def: 'Release Definition',
     impl_review: 'Implementation + Review',
     closure:     'Closure',
@@ -47,7 +46,7 @@
     impl_review: '×2',  // ×2 (impl + review combined)
   };
 
-  var COLUMN_ORDER = ['backlog', 'release_def', 'impl_review', 'closure'];
+  var COLUMN_ORDER = ['release_def', 'impl_review', 'closure'];
 
   // ── Module state ───────────────────────────────────────────────────────────
   var _loaded = false;
@@ -61,20 +60,16 @@
     });
   }
 
-  // ── Relative age formatter ─────────────────────────────────────────────────
-  function fmtAge(iso) {
-    if (!iso) { return '—'; }
-    var then = new Date(iso);
-    if (isNaN(then.getTime())) { return '—'; }
-    var diffMs = Date.now() - then.getTime();
-    var diffSec = Math.floor(diffMs / 1000);
-    if (diffSec < 60) { return 'just now'; }
-    var diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) { return diffMin + 'm ago'; }
-    var diffH = Math.floor(diffMin / 60);
-    if (diffH < 24) { return diffH + 'h ago'; }
-    var diffD = Math.floor(diffH / 24);
-    return diffD + 'd ago';
+  // ── Relative age formatter (from age_seconds or ISO) ────────────────────────
+  function fmtAgeFromSeconds(sec) {
+    if (sec == null || isNaN(sec)) { return null; }
+    sec = Math.floor(sec);
+    if (sec < 60) { return 'just now'; }
+    var min = Math.floor(sec / 60);
+    if (min < 60) { return min + 'm ago'; }
+    var h = Math.floor(min / 60);
+    if (h < 24) { return h + 'h ago'; }
+    return Math.floor(h / 24) + 'd ago';
   }
 
   // ── Update "last updated" badge ────────────────────────────────────────────
@@ -84,34 +79,81 @@
     el.textContent = 'Updated: ' + new Date().toLocaleTimeString();
   }
 
-  // ── Build a single card's HTML ─────────────────────────────────────────────
-  function buildCardHtml(card) {
-    var id = card.session_id || '';
-    var runtime = card.runtime || '—';
-    var isStale = card.is_stale === true;
-    var staleAttr = isStale ? 'true' : 'false';
-    var context = esc(card._context || '');
-    var age = fmtAge(card.last_seen_at);
-    var statusText = isStale ? 'stale' : 'active';
+  // ── Build a release card's HTML ──────────────────────────────────────────────
+  function buildReleaseCardHtml(card, ctx) {
+    var release = card.release || '';
+    var phase = card.phase || '';
+    var ariaLabel = 'Active release ' + esc(release) + ', phase ' + esc(phase);
 
-    // aria-label: "Session <id>, <runtime>, <age>, <status>"
-    var ariaLabel = 'Session ' + esc(id) + ', ' + esc(runtime) + ', ' + esc(age) + ', ' + esc(statusText);
-
-    return '<div class="kanban-card"'
+    var html = '<div class="kanban-card kanban-card--release"'
       + ' role="article"'
       + ' tabindex="0"'
+      + ' data-card-kind="release"'
       + ' aria-label="' + ariaLabel + '"'
-      + ' data-context="' + context + '"'
+      + ' data-context="' + esc(ctx) + '"'
+      + '>'
+      + '<div class="kanban-card-title-row">'
+        + '<span class="kanban-card-session-id">' + esc(release) + '</span>'
+        + '<span class="kanban-release-badge">release</span>'
+      + '</div>';
+    if (phase) {
+      html += '<div class="kanban-card-meta">' + esc(phase) + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // ── Build a live-session card's HTML ─────────────────────────────────────────
+  // Renders only the fields that are present — never the literal "unknown".
+  function buildSessionCardHtml(card, ctx) {
+    var id = card.session_id || '';
+    var mode = card.mode || '';
+    var isStale = card.is_stale === true; // v2 only emits live sessions; flag retained.
+    var staleAttr = isStale ? 'true' : 'false';
+    var age = fmtAgeFromSeconds(card.age_seconds);
+    var statusText = isStale ? 'stale' : 'active';
+
+    var labelParts = ['Session ' + esc(id)];
+    if (mode) { labelParts.push(esc(mode)); }
+    if (card.release) { labelParts.push(esc(card.release)); }
+    if (age) { labelParts.push(esc(age)); }
+    labelParts.push(esc(statusText));
+
+    var html = '<div class="kanban-card kanban-card--session"'
+      + ' role="article"'
+      + ' tabindex="0"'
+      + ' data-card-kind="session"'
+      + ' aria-label="' + labelParts.join(', ') + '"'
+      + ' data-context="' + esc(ctx) + '"'
       + ' data-stale="' + esc(staleAttr) + '"'
       + '>'
       + '<div class="kanban-card-title-row">'
         + '<span class="kanban-card-session-id">' + esc(id) + '</span>'
         + '<span class="kanban-status-dot" role="img" data-stale="' + esc(staleAttr) + '"'
           + ' aria-label="' + esc(statusText) + '"></span>'
-      + '</div>'
-      + '<div class="kanban-card-meta">' + esc(runtime) + '</div>'
-      + '<div class="kanban-card-meta-detail">' + esc(runtime) + ' · ' + esc(age) + '</div>'
       + '</div>';
+
+    // Meta line 1: mode (always present on a session card).
+    if (mode) {
+      html += '<div class="kanban-card-meta">' + esc(mode) + '</div>';
+    }
+    // Meta line 2: release · age — only the present pieces, joined by " · ".
+    var detail = [];
+    if (card.release) { detail.push(esc(card.release)); }
+    if (age) { detail.push(esc(age)); }
+    if (detail.length) {
+      html += '<div class="kanban-card-meta-detail">' + detail.join(' · ') + '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function buildCardHtml(card, ctx) {
+    if (card && card.card_kind === 'release') {
+      return buildReleaseCardHtml(card, ctx);
+    }
+    return buildSessionCardHtml(card, ctx);
   }
 
   // ── Build a swimlane's HTML ─────────────────────────────────────────────────
@@ -119,38 +161,31 @@
     var ctx = lane.context || '';
     var ctxSlug = ctx.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     var columns = lane.columns || {};
+    var observers = lane.observers || [];
 
-    // XOR lock dimming is retired: impl and review share one combined column (impl_review).
-    // Count total cards in all columns to detect empty lane.
-    var totalCards = 0;
+    // Detect a fully idle lane (no release card, no session cards, no observers).
+    var totalCards = observers.length;
     COLUMN_ORDER.forEach(function (col) {
       totalCards += (columns[col] || []).length;
     });
 
     var html = '<section class="kanban-lane" aria-labelledby="lane-' + esc(ctxSlug) + '-heading">';
 
-    // Lane header
     html += '<div class="kanban-lane-header">'
       + '<h3 class="kanban-lane-title" id="lane-' + esc(ctxSlug) + '-heading">'
         + esc(ctx)
       + '</h3>'
       + '</div>';
 
-    // Always render the 4-column grid (AC-2.4: empty columns show placeholders).
-    // When all columns empty: also render a screen-reader-visible note for a11y.
     if (totalCards === 0) {
-      // Screen-reader announcement for empty lane; sighted users see the placeholders.
-      html += '<div class="kanban-lane-empty" role="status" aria-live="polite">No active sessions</div>';
+      html += '<div class="kanban-lane-empty" role="status" aria-live="polite">No active release or live sessions</div>';
     }
 
     html += '<div class="kanban-lane-columns">';
 
       COLUMN_ORDER.forEach(function (colKey) {
         var label = COLUMN_LABELS[colKey] || colKey;
-        var cards = (columns[colKey] || []).map(function (c) {
-          c._context = ctx;
-          return c;
-        });
+        var cards = columns[colKey] || [];
         var headingId = 'col-' + esc(colKey) + '-' + esc(ctxSlug) + '-heading';
 
         html += '<div class="kanban-column"'
@@ -158,25 +193,20 @@
           + ' aria-labelledby="' + headingId + '"'
           + '>';
 
-        // Column header
         var badge = COLUMN_BADGES[colKey];
         html += '<div class="kanban-col-header">'
           + '<span class="kanban-col-title" id="' + headingId + '">'
             + esc(label)
           + '</span>'
           + '<div class="kanban-col-header-right">';
-
         if (badge) {
           html += '<span class="kanban-concurrency-badge" title="Max concurrency: ' + esc(badge) + '">'
             + esc(badge)
             + '</span>';
         }
-
         html += '</div>';
-
         html += '</div>'; // .kanban-col-header
 
-        // Cards or empty placeholder
         if (cards.length === 0) {
           html += '<div class="kanban-empty-placeholder"'
             + ' data-testid="kanban-empty-placeholder"'
@@ -184,7 +214,7 @@
             + '</div>';
         } else {
           cards.forEach(function (card) {
-            html += buildCardHtml(card);
+            html += buildCardHtml(card, ctx);
           });
         }
 
@@ -192,6 +222,17 @@
       });
 
       html += '</div>'; // .kanban-lane-columns
+
+    // Observers strip — live READ sessions only (never rendered when empty).
+    if (observers.length) {
+      html += '<div class="kanban-observers" role="group" aria-label="Observers — live read-only sessions">'
+        + '<span class="kanban-observers-label">Observers</span>'
+        + '<div class="kanban-observers-cards">';
+      observers.forEach(function (card) {
+        html += buildCardHtml(card, ctx);
+      });
+      html += '</div></div>';
+    }
 
     html += '</section>'; // .kanban-lane
     return html;
@@ -256,21 +297,16 @@
 
   // ── Initialise ─────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
-    // Kanban lives inside the Ops section (#ops-subsection-kanban).
-    // Fall back to #section-kanban for isolated test scaffolds that embed
-    // only the kanban fragment (e.g. kanban-tab.spec.ts live-FE tests).
     var section = document.getElementById('ops-subsection-kanban')
       || document.getElementById('section-kanban');
     if (!section) { return; } // No kanban section in the DOM — no-op
 
-    // Visibility change: resume refresh when tab is foregrounded
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) {
         fetchKanban();
       }
     });
 
-    // Initial fetch + auto-refresh
     fetchKanban();
     startAutoRefresh();
   });

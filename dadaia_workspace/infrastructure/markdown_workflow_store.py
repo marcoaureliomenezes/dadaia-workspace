@@ -26,6 +26,34 @@ _FRONTMATTER_DELIM = "---"
 _SUFFIX = ".workflow.md"
 _AGENT_PLACEHOLDER_RE = re.compile(r"^\{\{\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*\}\}$")
 
+# Canonical development-lifecycle phase labels (single source of truth = the
+# `lifecycle_phase:` frontmatter key in public/workflows/*.md). Any value not in
+# this map (or absent) resolves to "Unmapped" so the panel can group honestly.
+_LIFECYCLE_PHASE_CANON: dict[str, str] = {
+    "backlog definition": "Backlog Definition",
+    "backlog-definition": "Backlog Definition",
+    "research": "Research",
+    "release definition": "Release Definition",
+    "release-definition": "Release Definition",
+    "implementation": "Implementation + Review",
+    "implementation + review": "Implementation + Review",
+    "implementation+review": "Implementation + Review",
+    "review": "Implementation + Review",
+    "audit": "Audits",
+    "audits": "Audits",
+    "closure": "Closure",
+}
+
+
+def _canonical_lifecycle_phase(raw: Any) -> str:  # noqa: ANN401
+    """Map a frontmatter lifecycle_phase value to a canonical group label.
+
+    Returns "Unmapped" when the value is missing or not recognised.
+    """
+    if not isinstance(raw, str):
+        return "Unmapped"
+    return _LIFECYCLE_PHASE_CANON.get(raw.strip().lower(), "Unmapped")
+
 
 def _split_frontmatter(text: str) -> str:
     lines = text.splitlines()
@@ -227,6 +255,7 @@ def _parse(text: str, filename: str, agent_catalog: Iterable[str] | None) -> Wor
         inputs=inputs,
         stages=stages,
         exit_criteria=_coerce_exit_criteria(data.get("exit_criteria")),
+        lifecycle_phase=_canonical_lifecycle_phase(data.get("lifecycle_phase")),
     )
 
 

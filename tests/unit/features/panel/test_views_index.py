@@ -180,6 +180,18 @@ def test_index_renders_panel_sections(section_id: str, visible_text: str) -> Non
     assert visible_text in html
 
 
+def test_agentic_subsection_order_is_agents_workflows_kanban() -> None:
+    """Operator demand: inside the Agentic tab the order must be
+    Agents → Workflows → Kanban (Kanban was previously first)."""
+    html = _render(_build_service())
+    idx_agents = html.index('id="agents-grid"')
+    idx_workflows = html.index('id="workflows-grid"')
+    idx_kanban = html.index('id="kanban-board"')
+    assert idx_agents < idx_workflows < idx_kanban, (
+        "Agentic subsections must render Agents → Workflows → Kanban"
+    )
+
+
 def test_index_tablist_contract() -> None:
     """The nav must expose the current tab order and active default tab.
 

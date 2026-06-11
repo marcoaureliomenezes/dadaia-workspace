@@ -799,3 +799,60 @@ def test_get_prompt_unreadable_file_raises_not_found(
     monkeypatch.setattr(Path, "read_text", boom)
     with pytest.raises(AgentNotFoundError, match="Cannot read"):
         get_prompt("locked-agent", workspace_root=tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# plugin / gate_role frontmatter mapping (Agentic-tab redesign)
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_stub_frontmatter_maps_to_dto(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An agent with ``plugin: true`` maps to AgentDTO.plugin = True."""
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    _write_agent(
+        _agentic_dir(tmp_path),
+        "design-specialist.md",
+        'name: design-specialist\ndescription: "[PLUGIN] stub."\nplugin: true\n',
+        "# stub\n",
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path)
+    dto = next(a for a in agents if a.id == "design-specialist")
+    assert dto.plugin is True
+
+
+def test_non_plugin_agent_defaults_plugin_false(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A normal agent (no plugin key) has plugin = False and gate_role mapped."""
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    _write_agent(
+        _agentic_dir(tmp_path),
+        "software-engineer.md",
+        (
+            "name: software-engineer\ndescription: Implementer.\n"
+            "tier: 3\nmodel: claude-opus-4-8\ngate_role: implementer\n"
+        ),
+        "# se\n",
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path)
+    dto = next(a for a in agents if a.id == "software-engineer")
+    assert dto.plugin is False
+    assert dto.gate_role == "implementer"
+
+
+def test_plugin_stub_missing_tier_does_not_warn(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Plugin stubs omit ``tier`` by design — no missing-tier stderr warning."""
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    _write_agent(
+        _agentic_dir(tmp_path),
+        "frontend-engineer.md",
+        'name: frontend-engineer\ndescription: "[PLUGIN] stub."\nplugin: true\n',
+        "# stub\n",
+    )
+    read_canonical_agents(workspace_root=tmp_path)
+    captured = capsys.readouterr()
+    assert "missing the 'tier'" not in captured.err
