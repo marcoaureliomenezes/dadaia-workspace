@@ -219,17 +219,40 @@ prefix_rule(
     match = ["git push origin feature/x"],
 )
 
+# prefix_rule matches the argv prefix LITERALLY (no PATH lookup, no basename
+# normalization). The workspace mandates the venv-absolute invocation
+# `.dadaia/.venv/bin/dadaia ...` (bare `dadaia` is intentionally off-PATH), so a
+# pattern whose first token is `dadaia` would never fire in a compliant session.
+# We therefore gate BOTH the venv-relative argv0 form actually used in this
+# workspace's docs AND the bare name (for any non-compliant PATH invocation), and
+# prove the real form in `match=`.
+prefix_rule(
+    pattern = [".dadaia/.venv/bin/dadaia", "public", "install"],
+    decision = "prompt",
+    justification = "Public install rewrites generated runtime projections.",
+    match = [".dadaia/.venv/bin/dadaia public install --target codex", ".dadaia/.venv/bin/dadaia public install --target all"],
+    not_match = [".dadaia/.venv/bin/dadaia public doctor"],
+)
+
 prefix_rule(
     pattern = ["dadaia", "public", "install"],
     decision = "prompt",
-    justification = "Public install rewrites generated runtime projections.",
+    justification = "Public install rewrites generated runtime projections (bare-name fallback).",
     match = ["dadaia public install --target codex", "dadaia public install --target all"],
+)
+
+prefix_rule(
+    pattern = [".dadaia/.venv/bin/dadaia", "context", "dead"],
+    decision = "prompt",
+    justification = "Making a context dead syncs and removes a repository from disk.",
+    match = [".dadaia/.venv/bin/dadaia context dead dadaia-workspace"],
+    not_match = [".dadaia/.venv/bin/dadaia context show --json"],
 )
 
 prefix_rule(
     pattern = ["dadaia", "context", "dead"],
     decision = "prompt",
-    justification = "Making a context dead syncs and removes a repository from disk.",
+    justification = "Making a context dead syncs and removes a repository from disk (bare-name fallback).",
     match = ["dadaia context dead dadaia-workspace"],
 )
 

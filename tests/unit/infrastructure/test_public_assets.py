@@ -1888,6 +1888,44 @@ class TestInstallCodexRules:
         assert (workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
         assert len(installed) == 1
 
+    def test_dadaia_rules_gate_venv_invocation_form(self) -> None:
+        """T-013-10: dadaia-gating prefix rules must match the mandated venv form.
+
+        prefix_rule matches the argv prefix literally, so a pattern whose first
+        token is bare `dadaia` never fires against the workspace-mandated
+        `.dadaia/.venv/bin/dadaia ...` invocation. The generated policy must carry
+        a venv-relative pattern for both `public install` and `context dead`, and
+        prove the real form in `match=` (closes
+        codex-rules-dadaia-prefix-never-matches-venv-invocation).
+        """
+        from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+            _render_codex_command_policy_rules,
+        )
+
+        rules = _render_codex_command_policy_rules()
+
+        # The mandated venv invocation is the FIRST argv token in a pattern.
+        assert 'pattern = [".dadaia/.venv/bin/dadaia", "public", "install"]' in rules
+        assert 'pattern = [".dadaia/.venv/bin/dadaia", "context", "dead"]' in rules
+
+        # `match=` examples self-document using the REAL invocation form.
+        assert ".dadaia/.venv/bin/dadaia public install --target codex" in rules
+        assert ".dadaia/.venv/bin/dadaia context dead dadaia-workspace" in rules
+
+        # Shape invariant kept (D-CX-8): prefix_rule, no command_allowed.
+        assert "prefix_rule(" in rules
+        assert "command_allowed(" not in rules
+
+    def test_dadaia_rules_keep_bare_name_fallback(self) -> None:
+        """T-013-10: a bare-name `dadaia` fallback pattern remains for PATH invocations."""
+        from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+            _render_codex_command_policy_rules,
+        )
+
+        rules = _render_codex_command_policy_rules()
+        assert 'pattern = ["dadaia", "public", "install"]' in rules
+        assert 'pattern = ["dadaia", "context", "dead"]' in rules
+
 
 # ---------------------------------------------------------------------------
 # _install_scripts
