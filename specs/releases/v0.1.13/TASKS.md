@@ -130,7 +130,7 @@ qa-engineer only.
   the real invocation form matches and bare-name-only patterns are gone. Closes
   bug `codex-rules-dadaia-prefix-never-matches-venv-invocation`.
 
-### [ ] T-013-11 — Delete/invert the stale T-35 roster lint
+### [-] T-013-11 — Delete/invert the stale T-35 roster lint
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_doctor.py`
   (`lint_legacy_software_engineer`),
