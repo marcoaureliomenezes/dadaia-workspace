@@ -22,10 +22,10 @@ applyTo: "specs/**/TASKS.md"
 **Invariant:** never two simultaneous `[-]` in the same `TASKS.md`. If you find two
 `[-]` when starting a session, **stop** and report to the operator.
 
-**Honesty note — markers are discipline, not a hook check.** The SDD gate hook
-(`dadaia_workspace.hooks.sdd_gate`) never reads `TASKS.md`, `SPEC.md`, or any status
-marker. What it enforces deterministically is path-class × lease × phase × mode on
-file-write tool calls (see the `workspace-protocol` rule §1). Marker discipline exists
+**Honesty note — markers are discipline, not a hook check.** The SDD-gate stage of the
+merged `dadaia_workspace.hooks.pre_gate` PreToolUse hook never reads `TASKS.md`,
+`SPEC.md`, or any status marker. What it enforces deterministically is path-class ×
+lease × phase × mode on file-write tool calls (see the `workspace-protocol` rule §1). Marker discipline exists
 for traceability and coordination between agents and the operator — uphold it even
 though no hook will block you for skipping it.
 
@@ -71,8 +71,11 @@ When the work is done and the task's acceptance criteria are satisfied:
 **Implementation complete is not DONE.** After the implementer finishes code, unit
 tests, and integration tests, the task remains `[-]` until `qa-engineer`,
 `code-reviewer`, and `security-reviewer` return green approval for the same commit
-(per the `release-governance` cadence: alpha-N boundaries are qa-only; the full trio
-runs at rc-N ship). UI tasks also require `design-specialist` approval.
+(per the `release-governance` cadence: alpha-N boundaries are qa-only; reviews mature
+the release, and the push boundary itself is mechanically gated — the pre-push
+security-verdict chokepoint requires an APPROVED `security-reviewer` handoff whose
+`metrics.commit_sha` equals each pushed ref sha, per push-cycle). UI tasks also
+require `design-specialist` approval.
 
 Before those approvals, it is forbidden to mark `[x]`, open a PR, request merge,
 deploy, close the release, write `CLOSURE.md`, or update memory. If any reviewer
@@ -110,8 +113,9 @@ Document the reason in the commit message. Another agent can pick up the task la
 
 ### The SDD gate blocked my write
 
-The gate hook blocks for **kernel** reasons, never for marker reasons. The block
-message tells you which rule fired:
+The merged `pre_gate` hook blocks for **kernel** reasons, never for marker reasons
+(stages: root-whitelist → venv-guard → SDD gate, first-block-wins). The block message
+tells you which rule fired. The SDD-gate stage's reasons:
 
 - **Live foreign lease** — another session genuinely holds this context's lease
   (heartbeat fresh, or its recorded harness pid is still running — a live holder is
