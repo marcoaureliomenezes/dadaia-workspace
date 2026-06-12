@@ -53,66 +53,50 @@ def _refs(*lines: str) -> list:
 
 def test_approved_pushed_sha_passes(tmp_path: Path) -> None:
     _handoff(tmp_path, "sec-approve", commit_sha=_SHA_A)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert d.allowed, d.message
 
 
 def test_stale_sha_approve_blocks(tmp_path: Path) -> None:
     # APPROVE exists but for a different (older) sha than the one being pushed.
     _handoff(tmp_path, "sec-approve", commit_sha=_SHA_B)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not d.allowed
     assert _SHA_A[:12] in d.message
 
 
 def test_no_approve_blocks_and_lists_what_was_found(tmp_path: Path) -> None:
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not d.allowed
     assert "no security-reviewer APPROVE found" in d.message
 
 
 def test_rejected_verdict_does_not_count(tmp_path: Path) -> None:
     _handoff(tmp_path, "sec-reject", verdict="REJECTED", commit_sha=_SHA_A)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not d.allowed
 
 
 def test_non_security_agent_does_not_count(tmp_path: Path) -> None:
     _handoff(tmp_path, "qa-approve", agent="qa-engineer", commit_sha=_SHA_A)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not d.allowed
 
 
 def test_scope_field_is_not_a_fallback(tmp_path: Path) -> None:
     # commit_sha absent from metrics; scope carries the sha — must NOT satisfy the gate.
     _handoff(tmp_path, "sec-scope", commit_sha=None, scope=_SHA_A)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not d.allowed
 
 
 def test_branch_deletion_passes_without_verdict(tmp_path: Path) -> None:
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"))
     assert d.allowed
 
 
 def test_tag_push_passes_without_verdict(tmp_path: Path) -> None:
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"))
     assert d.allowed
 
 
@@ -139,9 +123,7 @@ def test_predicate_never_consults_head(tmp_path: Path) -> None:
     # A handoff approving a sha that is NOT in the stdin refs must not let an unrelated
     # pushed sha through. This asserts the gate keys on stdin lines, not the repo HEAD.
     _handoff(tmp_path, "sec-head", commit_sha="c" * 40)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not d.allowed
 
 
@@ -150,7 +132,5 @@ def test_malformed_handoff_skipped(tmp_path: Path) -> None:
     ctx_dir.mkdir(parents=True)
     (ctx_dir / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
     _handoff(tmp_path, "sec-good", commit_sha=_SHA_A)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert d.allowed
