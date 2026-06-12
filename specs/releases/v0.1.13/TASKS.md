@@ -117,7 +117,7 @@ qa-engineer only.
   description carries no Claude-ism; unit tests cover transform + doctor pattern.
   Closes bug `codex-agent-description-claude-ism-leak`.
 
-### [ ] T-013-10 — Venv-path prefix rules + real-form `match=` proofs
+### [-] T-013-10 — Venv-path prefix rules + real-form `match=` proofs
 - **Owner:** software-engineer
 - **Write set:**
   `dadaia_workspace/infrastructure/runtime_transforms/codex_assets.py`
