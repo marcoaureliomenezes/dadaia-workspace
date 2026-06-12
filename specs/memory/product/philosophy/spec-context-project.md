@@ -15,8 +15,8 @@ tags:
 - concurrency
 agent_tier: self-pull
 token_estimate: 700
-last_updated: '2026-06-09'
-release_origin: v0.1.9
+last_updated: '2026-06-12'
+release_origin: v0.1.14
 ---
 
 ## Propósito
@@ -29,11 +29,11 @@ Um Spec Context Project é **uma canonical specs folder bound to one repository*
 
 O binding de um Spec Context Project a uma terminal session dispara a cadeia de valor:
 
-1. **Bind** — a sessão se anexa a um Spec Context Project. O operador executa `eval $(dadaia context bind <name>)`, que exporta `DADAIA_CONTEXT`, `DADAIA_SESSION_ID`, e `DADAIA_MODE` para o shell da sessão.
+1. **Bind** — a sessão se anexa a um Spec Context Project. O operador executa `dadaia context bind <name>`, que persiste contexto/modo no session record, atualiza o incumbent pointer e escreve o bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — o ÚNICO trigger de injeção de context-memory. `--print-env` é o escape back-compat para o fluxo `eval $(...)` com exports `DADAIA_*`.
 
 2. **Inject** — o binding injeta a `constitution.md` do contexto e sua `memory/` na sessão por **lazy product-feature consumption**: `tech-stack.md` e `catalog.json` carregam up front (~2.400 tokens); feature atoms individuais são pulled on demand pelo agente conforme relevantes à tarefa. Nenhuma sessão paga pelo catálogo inteiro antecipadamente.
 
-3. **Enforce** — o SDD lifecycle (constitution §7) é enforced para cada production write sob aquele contexto: nenhuma mudança de produção sem release aprovado e task reservada. O gate SDD (`python -m dadaia_workspace.hooks.sdd_gate`, PreToolUse) verifica ativo-context + lease + task marker `[-]` antes de cada write.
+3. **Enforce** — o SDD lifecycle (constitution §7) é enforced para cada production write sob aquele contexto: nenhuma mudança de produção sem release aprovado e task reservada. O entrypoint PreToolUse único (`python -m dadaia_workspace.hooks.pre_gate`) enforça deterministicamente path-class × lease × fase × modo a cada write, e os chokepoints git (pre-commit lease gate + pre-push security-verdict gate) gateiam commit/push independentemente de hooks de harness. Markers `[-]` e aprovações de spec são disciplina de agente/PM, não mecanismo do gate.
 
 4. **Parallel multi-project** — porque cada contexto carrega exatamente um MUTATING lease (§8), múltiplos Spec Context Projects podem ser trabalhados concorrentemente em sessões diferentes. Trabalho ADDITIVE (backlog, bugs, research, audit, review) dentro de qualquer contexto roda em paralelo — sem colisão, porque o lock contract torna structuralmente impossível ter mais de um MUTATING writer por contexto ao mesmo tempo.
 

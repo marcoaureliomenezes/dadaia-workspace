@@ -4,10 +4,13 @@ title: multi-platform-parity
 category: product
 tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules)."
 summary: Codex uses native config, shared and Codex-specific skills, interactive-only
-  hook execution (codex exec never fires hooks — automation path is discipline-only),
-  native Starlark .rules command policy with venv-path prefix_rule patterns, workflow
-  docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and
-  registry-derived Codex-native model tiering (model id × model_reasoning_effort).
+  hook execution (codex exec never fires hooks — headless posture is chokepoints-only,
+  per the §8 enforcement matrix), native Starlark .rules command policy with venv-path
+  prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for
+  evidence-only reviewers, and registry-derived Codex-native model tiering (model id ×
+  model_reasoning_effort). All harnesses are protected by the git chokepoints
+  (pre-commit lease gate + pre-push security-verdict gate), which fire independently
+  of harness hooks; OpenCode is canonized "advisory + chokepoint-protected" (ADR-G3).
   Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs
   (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with
   no behavior until the plugin is installed.
@@ -20,7 +23,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 606
 last_updated: '2026-06-12'
-release_origin: v0.2.2
+release_origin: v0.1.14
 ---
 
 ## Propósito
@@ -38,7 +41,7 @@ hooks, config loading, workflow support, and skill discovery.
 | Plugin stubs | 3 | frontend-engineer, design-specialist (plugin: frontend-design); devops-engineer (plugin: devops) |
 | Skills | 18 | Reduced from 22 in v0.1.9 (5 frontend/design skills → plugin) |
 | Workflows | 2 | release-ship, audit-fanout (7 stale workflows deleted in v0.1.9) |
-| Rules | 5 | workspace-protocol, tmp-file-guardrail, plugin-scope, dadaia-workspace-dev-guardrail, harness-skill-scope |
+| Rules | 8 | workspace-protocol, tmp-file-guardrail, plugin-scope, dadaia-workspace-dev-guardrail, harness-skill-scope, bug-registration-guardrail, backlog-ownership, release-governance |
 
 Agent personas for the following names do not exist in `dadaia_workspace/public/agents/`:
 `software-engineer-python`, `software-engineer-node`, `backend-engineer`, `researcher`.
@@ -73,14 +76,16 @@ Codex receives:
   mandated venv-path invocation form (`.dadaia/.venv/bin/dadaia ...`), proven by
   real-form `match=` examples. Markdown files under `public/rules/*.md` remain
   behavioral protocols and are not projected as executable Codex Rules.
-- `.codex/hooks.json` with `PreToolUse` (anchored matcher
-  `^(apply_patch|Edit|Write)$` — valid form), `PostToolUse` (match-all), and
-  `UserPromptSubmit`/`SessionStart` entries. **Honesty boundary (live-verified,
-  codex-cli 0.139.0):** Codex executes command hooks ONLY in interactive (TUI)
-  sessions — `codex exec` (headless) never fires them, so deterministic SDD-gate
-  enforcement on Codex is interactive-only and the Codex automation path is
-  discipline-only. Live contract harness: `tests/integration/codex_live/` (opt-in
-  `DADAIA_CODEX_LIVE=1`).
+- `.codex/hooks.json` with a SINGLE `PreToolUse` command (anchored matcher
+  `^(apply_patch|Edit|Write|Bash)$` → `dadaia_workspace.hooks.pre_gate`),
+  `PostToolUse` (match-all), and `UserPromptSubmit`/`SessionStart` entries.
+  **Honesty boundary (live-verified, codex-cli 0.139.0):** Codex executes command
+  hooks ONLY in interactive (TUI) sessions — `codex exec` (headless) never fires
+  them, so hook enforcement on Codex is interactive-only and the headless
+  automation path is **chokepoints only**: the git pre-commit lease gate and the
+  pre-push CI/security-verdict gate fire regardless of harness hooks (constitution
+  §8 enforcement matrix). Live contract harness: `tests/integration/codex_live/`
+  (opt-in `DADAIA_CODEX_LIVE=1`).
 - workflows installed as reference docs; workflow Markdown does not auto-execute.
 - dispatch wording based on Codex custom agents, never fake tool names or stale
   tool-discovery promises.

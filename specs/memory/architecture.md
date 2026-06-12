@@ -2,11 +2,13 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: Layer rules, 9+3 agent topology, context-relative gate taxonomy, TTL+PID-veto lease, 3-channel comms, and the asset projection chain.
+tldr: Layer rules, 9+3 agent topology, merged pre_gate hook + git chokepoints, context-relative gate taxonomy, TTL+PID-veto lease, 3-channel comms, projection chain.
 summary: Defines the three-ring architecture (cli/features/infrastructure), dependency
   rules, 9-core agent roster with coordinator+sub-agent topology, the concurrency
-  kernel (context-relative path classifier; single-record JSON TTL-lease with pid
-  veto; PostToolUse heartbeat; session_identity store; bind-mode channel), 3
+  kernel (merged pre_gate PreToolUse entrypoint; context-relative path classifier;
+  single-record JSON TTL-lease with pid veto and same-CAS by-session heartbeat index;
+  git pre-commit/pre-push chokepoints; bind-driven context injection;
+  session_identity store; bind-mode channel; kernel_tunables single home), 3
   report/comms channels, panel HTTP internals, ADRs, and state runtime.
 tags:
 - architecture
@@ -15,9 +17,9 @@ tags:
 - adr
 - agents
 agent_tier: self-pull
-token_estimate: 6400
-last_updated: '2026-06-11'
-release_origin: v0.1.10
+token_estimate: 7000
+last_updated: '2026-06-12'
+release_origin: v0.1.14
 ---
 
 ## Visão geral
@@ -60,13 +62,14 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 
 - `core/platform.py` — plataforma seam: `Capabilities` frozen dataclass com `detect()` classmethod e singleton `PLATFORM` em module-level. Flags: `has_fcntl`, `has_proc_fs`, `has_posix_chmod`, `has_sigterm`, `venv_scripts_dir`, `venv_exe_suffix`, `tmp_dir`. Nenhum outro arquivo pode ler `sys.platform` diretamente.
 - `core/exceptions.py` — `PlatformSecurityError(DadaiaError)` e `PlatformCapabilityError(DadaiaError)` com atributos `feature_name: str` e `platform: str`.
-- `core/protocols/` — 21 protocol files total: 4 OS-sensitive ports (`file_lock`, `telemetry_lock`, `platform_services`, `shutdown_handler`) + 17 domain protocols for DI, incluindo `process_runner` (`ProcessRunner`/`ProcessResult` — seam de execução de subprocess para features; nenhuma feature importa `subprocess` diretamente).
+- `core/protocols/` — OS-sensitive ports (`file_lock`, `telemetry_lock`, `platform_services`, `shutdown_handler`, `process_ancestry` — `ProcessAncestry`, probe read-only de ancestralidade de processo com adapters Linux `/proc` walk / macOS `ps -o ppid=` via ProcessRunner / Windows Toolhelp32 read-only, NUNCA `os.kill`; consumido pelo pre-commit lease gate e pelo `context release` default-flow) + domain protocols for DI, incluindo `process_runner` (`ProcessRunner`/`ProcessResult` — seam de execução de subprocess para features; nenhuma feature importa `subprocess` diretamente).
+- `core/kernel_tunables.py` — single home das constantes do kernel de concorrência (lease TTL, GC TTLs, CAS retries, sentinel TTL, throttle do reconciler); constantes puras, zero I/O; leaf no import-linter.
 
 **infrastructure/** — implementações concretas dos protocols: `git_subprocess`, `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `claude_agent_dispatcher`, `cli_agent_dispatcher`, `excel_reader`, `python_env`, `subprocess_runner` (`SubprocessProcessRunner` — implementação production do `ProcessRunner`; consumida por `features/import_`, `features/ci_preflight`, `features/specs/doctor` e `features/server_registry` via Protocol/DI; contrato import-linter `features-no-subprocess` em `setup.cfg` proíbe `features → subprocess`). Toda I/O fica aqui. Adaptadores de plataforma: `file_lock_posix`, `file_lock_windows`, `telemetry_lock_posix`, `telemetry_lock_windows`, `file_permission_posix`, `file_permission_windows`, `process_probe_adapter`, `signal_shutdown_posix`, `signal_shutdown_windows`.
 
 **container.py** — sole composition root. Lê `PLATFORM`, seleciona adapters (POSIX vs Windows) e injeta via `build_*_service(workspace_root)` factories. CLI commands chamam o container para obter serviços. `container.py` é o único local onde `PLATFORM` determina qual adapter concreto é instanciado.
 
-**hooks/** — `dadaia_workspace/hooks/` Python package (6 módulos: `__init__`, `_common`, `sdd_gate`, `root_whitelist`, `ctx_inject`, `sdd_post_gate`) — a única implementação dos hooks de governança (o quarteto bash legado não existe mais no asset chain; o único shell asset remanescente é `public/scripts/pre-push-ci-gate.sh`, um git hook deliberadamente shell). Cada módulo tem entrypoint `__main__`. `runtime_config.py` emite comandos Python (`python -m dadaia_workspace.hooks.<name>`) para `.claude/settings.json` e `.codex/hooks.json`: PreToolUse com matcher de write tools (`Edit|Write|MultiEdit|NotebookEdit` no Claude; `apply_patch|Edit|Write` no Codex), PostToolUse match-all `*` no Claude (heartbeat em todo tool). `workspace/service.py` reconhece tanto o caminho `.sh` legado quanto o comando Python para evitar dupla-registro em settings pré-existentes. `sdd_gate.py` delega a `gate_policy.evaluate()` — não re-deriva política — e injeta o PID-probe no lease.
+**hooks/** — `dadaia_workspace/hooks/` Python package (8 módulos: `__init__`, `_common`, `pre_gate`, `sdd_gate`, `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`) — a única implementação dos hooks de governança. O PreToolUse roda por **um entrypoint merged**, `pre_gate`: lê o stdin uma vez e avalia as policies em ordem fixa root-whitelist → venv-guard (Bash apenas) → SDD gate, first-block-wins; cada policy é fail-open (PROTECTED fail-closed dentro da policy SDD); `sdd_gate` e `root_whitelist` são thin policy modules (`evaluate_payload()`; `main()` legado mantido por uma release). `runtime_config.py` emite UM comando PreToolUse por runtime (`python -m dadaia_workspace.hooks.pre_gate`) para `.claude/settings.json` e `.codex/hooks.json`: matcher `Edit|Write|MultiEdit|NotebookEdit|Bash` no Claude; `^(apply_patch|Edit|Write|Bash)$` no Codex; PostToolUse match-all (heartbeat + reconciler advisory em todo tool). Shell assets git-hook: `public/scripts/pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (chokepoints; instalados por `dadaia ci install-hook`; backends `dadaia ci pre-commit-check`/`push-gate-check`). `workspace/service.py` reconhece tanto o caminho `.sh` legado quanto o comando Python para evitar dupla-registro em settings pré-existentes. A policy SDD delega a `gate_policy.evaluate()` — não re-deriva política — e injeta o PID-probe no lease; `_common.target_paths()` classifica todos os headers de um `apply_patch` multi-file (veredito mais restritivo vence). Cada invocação de `pre_gate` appenda latência `{ts, hook, event, duration_ms}` em `.dadaia/logs/hook-latency.jsonl` (best-effort, fail-open). Constantes do kernel (lease TTL, GC TTLs, CAS retries, sentinel TTL, throttle do reconciler) têm single home em `core/kernel_tunables.py` (leaf; contrato import-linter).
 
 **public/** — assets canônicos versionados: `agents/`, `skills/`, `rules/`, `commands/`, `scripts/`, `templates/`, `workflows/`, `plugins/`, `data/`, `scaffold/`. `public_assets.py` stage/install/doctor. A função `_install_workspace_guardrail_pair` faz fan-out byte-identical de uma única fonte `data/AGENTS.md` para o par `AGENTS.md` + `CLAUDE.md` no workspace-root e em cada consumer-repo.
 
@@ -97,7 +100,7 @@ A topologia pública default é definida na constitution §14. Dois papéis de d
 
 **Sub-agent architecture:** `product-engineer` e `software-engineer` rodam como PM sub-agentes sob o single lease do PM coordinator. Eles nunca adquirem um lease independentemente. O "writer role" move-se entre sub-agentes quando PM despacha o próximo — o lease nunca muda de mãos. Isso torna deadlocks entre sessões em diferentes lifecycle phases estruturalmente impossíveis.
 
-## Modelo de concorrência e lease (v0.1.10)
+## Modelo de concorrência e lease (v0.1.14)
 
 Constitution §8 define as duas activity classes que particionam todas as ações.
 
@@ -159,6 +162,19 @@ live-lease conflict.
 - **Holder-safe past TTL:** um holder confirmado (mesmo `session_id` ou `.ptr` match)
   renova mesmo com heartbeat expirado — nunca perde o próprio lease para a própria
   staleness.
+- **By-session index (mesma transação CAS):** `acquire`/`steal`/`release` escrevem e
+  removem `ctx_locks/by-session/<sid>.json` **dentro do mesmo O_EXCL sentinel CAS**
+  que escreve o lock record — record e index não podem divergir estruturalmente. A
+  renovação PostToolUse é index-driven (sem full scan do lock dir quando a sessão não
+  segura nada; fallback full-scan quando o dir do index está ausente).
+- **Release explícito:** `dadaia context release` solta o(s) lease(s) da sessão antes
+  de remover o session record (eval flow: por sid do env; default flow: contexto bound
+  + holder pid morto ou ancestry do chamador via `ProcessAncestry`; nunca solta holder
+  estrangeiro vivo). `renew_heartbeat` nunca recria record ausente/foreign-sid —
+  ressurreição pós-release é estruturalmente impossível (DP-3: sem guard de renovação
+  baseado em session record; holder unbound continua renovando — FR-R2-01).
+- **Tunables:** TTLs/retries/throttles do kernel vivem em `core/kernel_tunables.py`
+  (constantes puras, zero I/O; `lease.LEASE_TTL_SECONDS` re-exportado por uma release).
 - **Lock directory:** `0700`; lock file: `0600`.
 
 ### Heartbeat — PostToolUse com session id harness-native
@@ -168,14 +184,21 @@ heartbeat de **todo lease cujo record nomeia o sid desta sessão**:
 
 - O session id é resolvido do **payload stdin** do hook (`_common.resolve_session_id` —
   harness-native); `DADAIA_SESSION_ID` é apenas override de operador.
-- O alvo da renovação são os lock records que este sid efetivamente segura — **nunca**
-  `DADAIA_CONTEXT` → first-ALIVE (a rota da contaminação cross-context).
+- O alvo da renovação é resolvido pelo **by-session index**
+  (`ctx_locks/by-session/<sid>.json`) — sem full scan do lock dir quando a sessão não
+  segura nada, e **nunca** via `DADAIA_CONTEXT` → first-ALIVE (a rota da contaminação
+  cross-context).
 - A renovação roda fora de qualquer guard de session-file; fail-open exit 0 sempre.
+  `renew_heartbeat` nunca recria um record ausente ou de sid estrangeiro.
 - No Claude Code o matcher PostToolUse é match-all `*`; no Codex o bloco PostToolUse
   vem **sem** matcher — a forma canônica match-all do Codex. Em ambos os harnesses o
   heartbeat dispara após todo tool (inclusive Bash) — um holder dentro de um pytest
   longo renova entre as calls, e uma única call que ultrapasse o TTL é coberta pelo
   PID veto (TTL-stale + pid harness vivo ⇒ block, não steal).
+- O mesmo PostToolUse roda o **reconciler advisory** (FR-W1-03): flagueia paths
+  MUTATING sujos fora de lease no repo do contexto bound (evento `RECONCILER_FLAG`
+  em `.dadaia/logs/lock-events.jsonl`); nunca bloqueia, exit 0 em todos os branches;
+  throttle por sessão (`.dadaia/tmp/reconciler-last-<sid>`, TTL de `kernel_tunables`).
 
 ### Identidade de sessão — `session_identity.py` (single owner)
 
@@ -225,15 +248,36 @@ ADDITIVE flui normalmente. Sessão sem modo (nenhum bind, nenhum env — toda se
 harness comum) permanece IMPLEMENTATION-capable: pode adquirir um lease **livre**, mas
 nunca TAKEOVER de um holder vivo (Decision D-3 + PID veto).
 
-### Escopo do determinismo (Decision D-2)
+### Escopo do determinismo (D-2 superado pelo envelope de chokepoints)
 
-O envelope determinístico do gate cobre apenas **file-write tools** (Claude PreToolUse
-matcher `Edit|Write|MultiEdit|NotebookEdit`; Codex `apply_patch|Edit|Write`). Writes
-feitos por comandos Bash ficam fora do envelope — postura fail-open documentada; o
-backstop pós-hoc é a coerência lease↔session do doctor (SPEC-DOC-029). O gate **não lê**
-`TASKS.md`, status `Aprovado`, markers `[-]` nem write-allowlists de agente — o que ele
-enforça deterministicamente é path-class × lease × fase × modo; markers, aprovações e
-allowlists são disciplina de agente/PM (workspace-protocol), não mecanismo.
+O envelope file-tool do gate cobre file-write tools (Claude PreToolUse matcher
+`Edit|Write|MultiEdit|NotebookEdit|Bash`; Codex `^(apply_patch|Edit|Write|Bash)$` — o
+evento Bash alimenta apenas o venv-guard de padrão fixo; o gate nunca parseia strings
+de shell). Writes arbitrários via Bash continuam fora desse envelope, mas os desfechos
+de lifecycle que importam são gated deterministicamente nos **chokepoints git**, que
+rodam mesmo sem nenhum hook de harness (constitution §8):
+
+- **pre-commit lease gate** — commit num repo de Spec Context sem segurar o MUTATING
+  lease do contexto é bloqueado. Cadeia DP-4: sem lease/stale-dead ⇒ allow; env-sid
+  igual ao holder ⇒ allow; pid do holder ancestral do processo invocante (port
+  `ProcessAncestry`: Linux `/proc` walk, macOS `ps -o ppid=`, Windows Toolhelp32
+  read-only; nunca `os.kill`) ⇒ allow; ancestralidade indeterminada OU holder pid
+  morto ⇒ **ALLOW + WARN logado** (zero-false-block domina; degradação advisory
+  documentada). Block apenas em lease estrangeiro vivo com non-match positivo;
+  contexto derivado do path do repo, nunca first-ALIVE.
+- **pre-push gate** — o mesmo hook roda `dadaia ci preflight` E o check mecânico de
+  verdict de security: para cada sha non-zero das ref lines do stdin deve existir um
+  handoff `security-reviewer` APPROVED com `metrics.commit_sha` igual àquele sha
+  (campo canônico único; nunca `rev-parse HEAD`); deleções/tag-only passam; APPROVE
+  stale bloqueia; commits nunca são review-blocked.
+- **Escape hatch:** `--no-verify` bypassa git hooks — postura
+  deterministic-at-the-chokepoint, não unbypassable; o backstop pós-hoc segue sendo a
+  coerência lease↔session do doctor (SPEC-DOC-029).
+
+O gate **não lê** `TASKS.md`, status `Aprovado`, markers `[-]` nem write-allowlists de
+agente — o que ele enforça deterministicamente é path-class × lease × fase × modo;
+markers, aprovações e allowlists são disciplina de agente/PM (workspace-protocol), não
+mecanismo.
 
 **Reclaim-iff-stale, yield-iff-live-foreign:** o gate reclaims e heals em lease ausente
 ou expirado-com-holder-morto (nunca bloqueia em lease stale/missing reclaimable); em
@@ -317,30 +361,33 @@ flowchart LR
     J -.audit.-> H
 ```
 
-## Fluxo de dados — gate v3 SDD (v0.1.10: Python hooks)
+## Fluxo de dados — gate v3 SDD (v0.1.14: entrypoint merged pre_gate)
 
-O gate usa um path-classifier de 6 classes — ADDITIVE / MEMORY / FROZEN / MUTATING /
-PROTECTED / UNGATED — computado **context-relative** (prefixo `repos/<slug>/` removido
-antes da taxonomia `specs/`). O hook é `python -m dadaia_workspace.hooks.sdd_gate`
-(Python puro; Windows/macOS/Linux); ele resolve o slug PATH-first do write target,
-resolve o modo (env → session record → incumbent do contexto → IMPLEMENTATION) e delega a
-`gate_policy.evaluate()` — não re-deriva política. `.dadaia/sessions/**` é PROTECTED
-(o único caminho fail-closed, SEC-01). O gate não lê TASKS.md nem status de specs —
-markers e aprovações são disciplina, não mecanismo.
+O PreToolUse roda por UM entrypoint — `python -m dadaia_workspace.hooks.pre_gate`
+(Python puro; Windows/macOS/Linux) — que lê o stdin uma vez e avalia root-whitelist →
+venv-guard (Bash) → SDD gate, first-block-wins, cada policy fail-open. A policy SDD usa
+um path-classifier de 6 classes — ADDITIVE / MEMORY / FROZEN / MUTATING / PROTECTED /
+UNGATED — computado **context-relative** (prefixo `repos/<slug>/` removido antes da
+taxonomia `specs/`); resolve o slug PATH-first do write target, o modo (env → session
+record → incumbent do contexto → IMPLEMENTATION) e delega a `gate_policy.evaluate()` —
+não re-deriva política. Um `apply_patch` multi-file tem todos os headers classificados
+(veredito mais restritivo vence). `.dadaia/sessions/**` é PROTECTED (o único caminho
+fail-closed, SEC-01). O gate não lê TASKS.md nem status de specs — markers e aprovações
+são disciplina, não mecanismo.
 
 ```mermaid
 sequenceDiagram
     participant Tool as Agent Tool
-    participant PreHook as PreToolUse Hook (write tools)
-    participant Gate as hooks/sdd_gate.py (Python)
+    participant PreHook as PreToolUse Hook (write tools + Bash)
+    participant Gate as hooks/pre_gate.py (root-whitelist -> venv-guard -> SDD)
     participant Classifier as gate_policy.py (context-relative)
     participant Active as releases/ACTIVE.md
     participant Sess as session_identity (mode record)
     participant Lease as lease.py (O_EXCL CAS + pid veto)
     participant PostHook as PostToolUse Hook (todos os tools)
     Tool->>PreHook: Write/Edit (file_path)
-    PreHook->>Gate: stdin JSON (tool_name + file_path + session_id)
-    Gate->>Classifier: classify path (strip repos/<slug>/)
+    PreHook->>Gate: stdin JSON (lido uma vez; tool_name + file_path + session_id)
+    Gate->>Classifier: classify path (strip repos/<slug>/; todos os headers)
     alt PROTECTED (.dadaia/sessions/**)
         Gate-->>PreHook: block (fail-closed, SEC-01)
     else ADDITIVE (backlog/bugs/audits root+in-repo; reports/handoff/tmp root)
@@ -369,9 +416,10 @@ sequenceDiagram
     else UNGATED
         Gate-->>PreHook: allow
     end
-    PreHook-->>Tool: allow/block
-    Tool->>PostHook: tool completed (qualquer tool, incl. Bash no Claude)
-    PostHook->>Lease: renew heartbeat dos leases deste sid (CAS atômico)
+    PreHook-->>Tool: allow/block (first-block-wins)
+    Tool->>PostHook: tool completed (qualquer tool, incl. Bash)
+    PostHook->>Lease: renew heartbeat via by-session index (CAS atômico)
+    PostHook->>PostHook: reconciler advisory (nunca bloqueia; throttled)
 ```
 
 ## Contratos entre módulos
@@ -382,10 +430,12 @@ cli/commands/*| container.build_*_service| Factory call| Cada command resolve wo
 features/*| core/protocols/*| Protocol / ABC| Injetado via constructor — features não conhecem implementação
 features/specs/doctor| specs/ filesystem| Path-based, read-only| Recebe specs_dir absoluto; nunca escreve. Inclui D-OC-1 (bidirectional router/workflow wikilink validation) e os ledger invariants SPEC-DOC-024 (fase ↔ markers), 026 (release ids únicos releases+archive), 027 (naming canon `^v\d+\.\d+\.\d+$`), 028 (file refs da constitution resolvem) e 029 (coerência lease↔session, backstop D-2).
 infrastructure/public_assets| public/ ↔ .dadaia/agentic/ ↔ projeções| Manifest + file copy| Manifest.json é o cache do que foi propagado
-PreToolUse hook| `python -m dadaia_workspace.hooks.sdd_gate` (+ `root_whitelist`) + `gate_policy.py` + `lease.py`| JSON stdin / stdout + O_EXCL CAS| Fail-open: erros não-PROTECTED → allow; `.dadaia/sessions/**` PROTECTED → fail-closed (SEC-01); live-foreign lease (TTL-fresh ou pid-vivo) → block; READ-mode → block non-acquiring; context-slug derivado PATH-first do write target; pid-probe injetado pelo hook
-PostToolUse hook| `python -m dadaia_workspace.hooks.sdd_post_gate` + `lease.py`| JSON stdin (session_id harness-native)| Renova heartbeat de todo lease cujo record nomeia este sid; nunca via DADAIA_CONTEXT→first-ALIVE; fail-open exit 0
-features/spec_context/lease.py| `.dadaia/states/ctx_locks/<ctx>.lock.json`| Single-record JSON TTL-lease; O_EXCL CAS em acquire E renew| `LEASE_TTL_SECONDS = 120` piso + PID veto (`core/lock_liveness.is_stale`); holder-safe past TTL; pointer I/O via `session_identity`
+PreToolUse hook| `python -m dadaia_workspace.hooks.pre_gate` (root-whitelist → venv-guard → SDD) + `gate_policy.py` + `lease.py`| JSON stdin (lido uma vez) / stdout + O_EXCL CAS| First-block-wins; cada policy fail-open: erros não-PROTECTED → allow; `.dadaia/sessions/**` PROTECTED → fail-closed (SEC-01); live-foreign lease (TTL-fresh ou pid-vivo) → block; READ-mode → block non-acquiring; context-slug derivado PATH-first do write target; pid-probe injetado pelo hook; latência appendada em hook-latency.jsonl
+PostToolUse hook| `python -m dadaia_workspace.hooks.sdd_post_gate` + `lease.py`| JSON stdin (session_id harness-native)| Renova heartbeat via by-session index (sem full scan; nunca via DADAIA_CONTEXT→first-ALIVE); roda o reconciler advisory (nunca bloqueia); fail-open exit 0
+git chokepoints| `pre-commit-lease-gate.sh` / `pre-push-ci-gate.sh` → `dadaia ci pre-commit-check` / `ci preflight` + `ci push-gate-check`| git hook (stdin ref lines no pre-push)| Pre-commit: cadeia DP-4 (zero-false-block; indeterminado/holder-pid-morto ⇒ ALLOW+WARN advisory); pre-push: APPROVED security handoff com `metrics.commit_sha` por sha pushed; runner resolution fail-closed; independem de hooks de harness
+features/spec_context/lease.py| `.dadaia/states/ctx_locks/<ctx>.lock.json` + `ctx_locks/by-session/<sid>.json`| Single-record JSON TTL-lease; O_EXCL CAS em acquire E renew; index na mesma transação| `LEASE_TTL_SECONDS` (single home `core/kernel_tunables.py`; piso 120) + PID veto (`core/lock_liveness.is_stale`); holder-safe past TTL; pointer I/O via `session_identity`
 features/spec_context/session_identity.py| `.dadaia/sessions/runtime/*.ptr` + `.dadaia/sessions/<id>.json`| Single-owner module| Único reader/writer dos pointers e session records; consumido por lease, hooks, bind CLI e doctor GC; coerência validada por SPEC-DOC-029
+hooks/* + features/spec_context/{lease,gate_policy}.py + ci chokepoint backends| `core/kernel_tunables.py`| Import-linter leaf contract (`setup.cfg`)| Single home das constantes do kernel (lease TTL, GC TTLs, CAS retries, sentinel TTL, throttle do reconciler); constantes puras zero I/O; o contrato garante que `kernel_tunables` é leaf (não importa de nenhuma camada) e que hooks/features importam os valores de lá; `lease.LEASE_TTL_SECONDS` re-exportado por uma release
 features/telemetry/aggregator/queries.py| features/telemetry/aggregator/runtimes.py| RuntimeAdapter protocol + registry| `TelemetryAggregator` mantém registry `{runtime: RuntimeAdapter}` e delega enrichment per row + liveness per runtime.
 
 ## Estado runtime
@@ -396,14 +446,17 @@ Locais canônicos de estado em disco e seu propósito:
   * `.dadaia/states/.ws_lock` — fcntl workspace-wide lock (gitignored; criado em runtime; Lock 1 — serializa mutações em `spec_contexts.json`).
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored; Lock 2 — serializa git clone/rmtree).
   * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease; schema `{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`; acquire e renew via O_EXCL CAS; staleness = TTL piso + PID veto.
+  * `.dadaia/states/ctx_locks/by-session/<sid>.json` — by-session heartbeat index; escrito/removido na mesma transação CAS do lock record; renovação PostToolUse O(1).
+  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `dadaia context bind`; trigger e fonte de descoberta da injeção bind-driven de contexto.
   * `.dadaia/states/ctx_locks/<ctx>.lock.sentinel` — CAS sentinel file (transient; criado e deletado atomicamente durante acquire/renew).
   * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (lease incumbent); contém `session_id` do holder; RENEW incondicionalmente quando match. I/O exclusivo via `session_identity.py`.
   * `.dadaia/sessions/runtime/<session_id>.ptr` — pointer de sessão do ctx-inject (idempotência de injeção). I/O exclusivo via `session_identity.py`.
   * `.dadaia/sessions/<id>.json` — session record CLI-owned (`session_id`, `context`, `mode`, `release`, `pid`, `bound_at`, `last_seen_at`, `ttl_seconds`); escrito por `dadaia context bind` via `session_identity`; lido pelo gate (resolução de modo), pelo `sdd_post_gate` (refresh `last_seen_at`) e pelo Kanban do panel.
-  * `.dadaia/logs/lock-events.jsonl` — audit log append-only (O_APPEND; eventos: acquire, release, steal, HEARTBEAT).
+  * `.dadaia/logs/lock-events.jsonl` — audit log append-only (O_APPEND; eventos: acquire, release, steal, HEARTBEAT, RECONCILER_FLAG).
+  * `.dadaia/logs/hook-latency.jsonl` — telemetria de latência de hook (`{ts, hook, event, duration_ms}` por invocação de `pre_gate`; best-effort, fail-open).
   * `.dadaia/agentic/<type>/` — staging de assets (snapshot imutável).
   * `.dadaia/agentic/manifest.json` — registro do que foi propagado para cada tool.
-  * `dadaia_workspace/hooks/` — Python package de governança (6 módulos); única implementação dos hooks (não existem scripts bash de gate); registrado em `.claude/settings.json` e `.codex/hooks.json` por `infrastructure/runtime_config.py`.
+  * `dadaia_workspace/hooks/` — Python package de governança (8 módulos); única implementação dos hooks de harness; UM comando PreToolUse por runtime (`pre_gate`), registrado em `.claude/settings.json` e `.codex/hooks.json` por `infrastructure/runtime_config.py`; os shell assets são exclusivamente os git chokepoints (`pre-commit-lease-gate.sh`, `pre-push-ci-gate.sh`), instalados em `.git/hooks/` por `dadaia ci install-hook`.
   * `.dadaia/reports/<context>/<agent>/*.html` — reports HTML produzidos por especialistas; consumidos por `project-manager` no Discovery e por `project-auditor` nas auditorias.
   * `.dadaia/handoff/<context>/*.handoff.json` — agent↔agent JSON handoffs (canal 2 dos 3 canais).
   * `.dadaia/states/report_retention.json` — important-mark set para report retention; keys são caminhos workspace-relativos.
@@ -428,10 +481,14 @@ O bootstrap injetado é **tech-stack + catalog apenas** (~2.400 tokens). `archit
 
 `python -m dadaia_workspace.hooks.ctx_inject` — módulo do pacote de hooks Python. Em Codex roda no `SessionStart` (matcher `startup|resume`) carregando o contexto completo **uma vez por sessão**; em Claude Code roda no `UserPromptSubmit` e em OpenCode via plugin TS. Os hooks podem disparar a cada prompt, mas a injeção completa ocorre só uma vez por sessão lógica.
 
-O hook:
-1. Resolve o specs dir de `DADAIA_CONTEXT`, session record ligado, ou first-ALIVE no registry.
-2. Resolve um `SESSION_ID` **estável** (env harness-native `CLAUDE_CODE_SESSION_ID`/`CODEX_SESSION_ID`/`OPENCODE_SESSION_ID`, depois o `session_id` do payload stdin; sem fallback de PID) e o sanitiza antes de usá-lo como componente de filename. Verifica o sentinel de first-message keyed nesse id. Se existir, **não emite nada** e sai — a injeção completa já ocorreu.
-3. Cria o sentinel (pointer de sessão via `session_identity`) e emite o payload completo dentro de bounded markers:
+A injeção é **bind-driven** (DP-2, v0.1.14): `dadaia context bind` escreve o marker
+standalone `.dadaia/states/bind_epoch/<ctx>` e é o ÚNICO trigger de injeção de
+context-memory. O first-ALIVE foi deletado da cadeia de injeção (permanece apenas na
+resolução de lease-context do gate). O hook:
+
+1. Resolve o contexto: `DADAIA_CONTEXT` env → session record self-keyed (contexto bound) → **marker bind-epoch mais novo que o sentinel desta sessão** (o marker carrega o slug; é o caminho harness-real, já que o sid do bind-CLI ≠ sid do harness) → **preflight genérico apenas** (preflight de dispatcher + lista de contexts ALIVE; SEM context memory).
+2. Resolve um `SESSION_ID` **estável** (env harness-native `CLAUDE_CODE_SESSION_ID`/`CODEX_SESSION_ID`/`OPENCODE_SESSION_ID`, depois o `session_id` do payload stdin; sem fallback de PID) e o sanitiza antes de usá-lo como componente de filename. Verifica o sentinel de first-message keyed nesse id. Re-injeta quando (a) não há sentinel para o sid, ou (b) um marker bind-epoch é mais novo que o mtime do sentinel (re-bind para outro contexto re-injeta; o sentinel é estampado com o slug injetado). Marker pré-existente nunca binda sessão fresca — sem sentinel, a cadeia cai no preflight genérico (que estampa o sentinel). Caso contrário, **não emite nada** e sai.
+3. Cria/estampa o sentinel (pointer de sessão via `session_identity`) e emite o payload completo dentro de bounded markers:
 
 ```
 === workspace memory (tech + catalog) ===
@@ -477,11 +534,12 @@ Invocado por doctor check `LINT-1`. Exit 0 = all valid; exit 1 = ao menos um ERR
 
 ## Multi-harness runtime parity (constitution §4)
 
-| Runtime | Hook enforcement | Notes |
-|---------|-----------------|-------|
-| Claude Code | Real PreToolUse block (`python -m dadaia_workspace.hooks.sdd_gate`) | Strongest enforcement; Python, no bash dependency |
-| Codex | Guardrail in trusted-workspace mode | `python -m dadaia_workspace.hooks.sdd_gate` registered in `.codex/hooks.json`; advisory on untrusted Codex |
-| OpenCode | `.ts` plugins call Python subprocess | `sdd-gate.ts` + `ctx-inject.ts` call Python hooks via venv-path resolution (`.dadaia/.venv/bin/python` → `.dadaia/.venv/Scripts/python.exe` → bare `python`); Bun cross-platform `.env()` API used for env-passing — governed on Windows; `dadaia public doctor` reporta `[unsupported]` para PostToolUse target opencode — esperado |
+| Runtime | PreToolUse hooks (`pre_gate`) | Git chokepoints | Postura |
+|---------|-------------------------------|-----------------|---------|
+| Claude Code | sim — `python -m dadaia_workspace.hooks.pre_gate` (matcher `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash`) | sim | determinístico: hooks + chokepoints |
+| Codex interativo (TUI) | sim — `pre_gate` em `.codex/hooks.json` (matcher `^(apply_patch\|Edit\|Write\|Bash)$`) | sim | determinístico: hooks + chokepoints |
+| Codex headless (`codex exec`) | **não — exec não dispara hooks** (defeito upstream codex-cli 0.139.0, live-verificado) | sim | **chokepoints only** |
+| OpenCode | plugins `.ts` chamam hooks Python via subprocess (venv-path resolution `.dadaia/.venv/bin/python` → `Scripts/python.exe` → `python`); `dadaia public doctor` reporta `[unsupported]` para PostToolUse opencode — esperado | sim | advisory + chokepoint-protected (ADR-G3) |
 
 Codex-specific behavior é expresso em termos Codex-nativos: `AGENTS.md` context, `.codex/config.toml`, `.codex/skills`, hooks onde suportados, e deferred tool discovery para multi-agent capability.
 
