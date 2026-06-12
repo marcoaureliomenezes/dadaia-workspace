@@ -388,7 +388,7 @@ Write set (group): generated projections via `dadaia public stage/install`
 (never hand-edited), `.git/hooks/` via `dadaia ci install-hook`, evidence
 artifacts under `.dadaia/reports|handoff/`. Disjoint from all source groups.
 
-### [-] T-014-21 — Projection chain + hook installation
+### [x] T-014-21 — Projection chain + hook installation
 - **Owner:** software-engineer (devops-engineer is a plugin, not distributed)
 - **FR:** PLAN "Migration / projection steps" 1–5
 - **Files:** projections via `dadaia public stage` →

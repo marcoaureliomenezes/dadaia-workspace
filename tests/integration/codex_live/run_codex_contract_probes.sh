@@ -3,7 +3,7 @@
 #
 # Drives the real `codex` binary against trusted throwaway workspaces to resolve the
 # Codex hook/config contract points the runtime fidelity audit left UNVERIFIED:
-#   P1 PreToolUse matcher regex form           (anchored `^(apply_patch|Edit|Write)$`)
+#   P1 PreToolUse matcher regex form           (anchored `^(apply_patch|Edit|Write|Bash)$`)
 #   P2 `{"decision":"block"}` stdout envelope   (vs exit-2 / permissionDecision)
 #   P3 shell-exec of env-prefixed command       (`VAR=val cmd`)
 #   P4 (F-6) `approved_commands` config key      (real vs unknown)
@@ -98,7 +98,7 @@ type = "command"
 command = "/usr/bin/touch $MK/SessionStart"
 
 [[hooks.PreToolUse]]
-matcher = "^(apply_patch|Edit|Write)\$"
+matcher = "^(apply_patch|Edit|Write|Bash)\$"
 [[hooks.PreToolUse.hooks]]
 type = "command"
 command = "/usr/bin/touch $MK/PreToolUse"
@@ -146,7 +146,7 @@ if "specs/_archive" in blob:
     print(json.dumps({"decision": "block", "reason": "FROZEN: specs/_archive is read-only"}))
 PY
   cat > "$FX_FZ/.codex/hooks.json" <<EOF
-{ "hooks": { "PreToolUse": [ { "matcher": "^(apply_patch|Edit|Write)\$",
+{ "hooks": { "PreToolUse": [ { "matcher": "^(apply_patch|Edit|Write|Bash)\$",
   "hooks": [ { "type": "command", "command": "/usr/bin/python3 '$FX_FZ/.codex/hooks/frozen_gate.py'" } ] } ] } }
 EOF
   cat > "$CODEX_HOME/config.toml" <<EOF
