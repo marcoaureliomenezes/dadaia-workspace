@@ -1,6 +1,6 @@
 ---
 name: sdd-gate-apply-patch-multi-file-first-header-only
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-11
 surface: dadaia_workspace/hooks/_common.py target_path() (SDD gate path classification on Codex)
@@ -27,3 +27,5 @@ patch).
 **Notes:** Found during T-013-08 live Codex contract verification (v0.1.13 alpha-2);
 evidence and real payload sample in the WS-CDX-VERIFY FACTS file. Affects the Codex
 runtime only (Claude file tools carry `file_path` directly).
+
+**Resolution (2026-06-12):** Closed by v0.1.14 FR-W4-04 (every `apply_patch` file header is classified; most-restrictive verdict wins) — commit `bd6a1f7` on `feature/v0.1.14`.

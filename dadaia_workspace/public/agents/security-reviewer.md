@@ -57,10 +57,12 @@ a structured finding report that the operator or implementing agent uses to reme
 ## §1 Lifecycle position
 
 ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. You are the
-**pre-push checkpoint**: your `APPROVE` verdict is the precondition for pushing to the feature
-branch. You hold **no lease** and run concurrently — your writes (reports only) are ADDITIVE
-and never contend for the release lease. You vote; you do not hold the lease. A
-`REQUEST_CHANGES` verdict keeps the task `[-]` and blocks the push.
+**pre-push gate**: your `APPROVE` verdict is mechanically enforced — the pre-push
+security-verdict chokepoint (`dadaia ci push-gate-check`) blocks any push whose ref sha
+lacks a matching APPROVED handoff from you. You hold **no lease** and run concurrently —
+your writes (reports only) are ADDITIVE and never contend for the release lease. You
+vote; you do not hold the lease. A `REQUEST_CHANGES` verdict keeps the task `[-]` and
+blocks the push.
 
 ---
 
@@ -268,6 +270,13 @@ additions, generated-file leakage, deploy leakage, or consumer-specific data exp
 Always redact raw secret values. Include file:line evidence, command output references,
 and the commit reviewed. After implementer rework, rerun the review against the new commit
 before changing the recommendation.
+
+**Push-cycle duty — `metrics.commit_sha`.** On a push-cycle `APPROVE` handoff, set
+`metrics.commit_sha` to the exact commit sha being pushed (the ref sha the push will
+publish, full 40-hex — never a branch name or an older sha). The pre-push
+security-verdict chokepoint keys on this field per pushed ref sha; a handoff without it
+(or with a stale sha) does not authorize the push. After rework, emit a new APPROVE
+handoff carrying the new sha.
 
 ---
 ## dadaia CLI

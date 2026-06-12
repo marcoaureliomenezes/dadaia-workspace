@@ -1,6 +1,6 @@
 ---
 name: context-release-leaves-lease-heartbeat-renewing
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-12
 session_id: null
@@ -36,3 +36,5 @@ alone, which the hook itself kept refreshing — a self-sustaining orphan.
 Workaround used: manually remove `ctx_locks/<ctx>.lock.json` and run
 `context dead` in the same shell command (no intervening tool call → no
 renewal). TTL 120s, mode BOUND_IMPLEMENTATION, observed on Claude Code harness.
+
+**Resolution (2026-06-12):** Closed by v0.1.14 FR-W4-03: `context release` now calls `lease.release()` (eval flow releases by session; default flow releases only when the holder is dead or caller ancestry is proven), so the lease record is dropped at release time. `renew_heartbeat` keeps its minimal contract — it no-ops on an absent or foreign record and never re-creates one (FR-R2-01 preserved); no hook-side absence-renewal guard was added (DP-3). Commit `15723f6` on `feature/v0.1.14`.

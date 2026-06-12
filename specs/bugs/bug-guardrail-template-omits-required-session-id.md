@@ -1,6 +1,6 @@
 ---
 name: bug-guardrail-template-omits-required-session-id
-status: Open
+status: Closed
 severity: LOW
 reported: 2026-06-12
 session_id: null
@@ -25,3 +25,5 @@ template in `dadaia_workspace/public/rules/` source (and any scaffold/example bu
 files), so the documented minimum record passes the tree invariants.
 
 **Notes:** Doc-vs-validator contract drift; one-line source fix + reprojection.
+
+**Resolution (2026-06-12):** Closed by v0.1.14 FR-W5-04 (T-014-19): `session_id: null` added to the template in `dadaia_workspace/public/rules/bug-registration-guardrail.md`, with a post-stage contract test asserting the projection carries it — `feature/v0.1.14`.

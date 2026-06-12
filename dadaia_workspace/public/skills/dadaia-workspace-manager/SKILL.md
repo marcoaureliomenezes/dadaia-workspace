@@ -44,7 +44,11 @@ auto-resolve it by searching cwd and parent directories. You never need to pass
 The command **persists** the bound context, mode, and session id in the session record
 **and refreshes the context's incumbent pointer** (`sessions/runtime/<ctx>.ptr`) — the
 bind binds the CONTEXT, so the SDD gate resolves the bound mode for the running harness
-session through the incumbent pointer, no shell `eval` needed. Pass `--print-env` to
+session through the incumbent pointer, no shell `eval` needed. Bind also stamps a
+bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — the SOLE trigger for
+context-memory injection: an unbound session gets generic preflight only (no
+first-ALIVE injection fallback), and bind is never a precondition for ADDITIVE work.
+Pass `--print-env` to
 additionally emit `export DADAIA_CONTEXT=… DADAIA_SESSION_ID=…` lines for legacy
 `eval $(…)` callers. Spec navigation, gates, and workflow commands use this
 session-bound state or explicit `--context` flags.

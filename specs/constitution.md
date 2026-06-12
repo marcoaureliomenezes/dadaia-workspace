@@ -176,8 +176,11 @@ Claude Code, Codex, and OpenCode projections must describe what each runtime
 actually supports. Runtime adapters may differ, but doctor output and AGENTS.md
 instructions must not claim behavior that the runtime does not enforce.
 
-Claude Code = real block (enforced Python PreToolUse hook); Codex = guardrail in
-trusted-workspace mode (advisory on untrusted Codex); opencode = advisory only.
+Enforcement per harness follows §8's per-harness enforcement matrix (normative):
+Claude Code = deterministic (PreToolUse hooks + git chokepoints); Codex
+interactive = deterministic (PreToolUse hooks + git chokepoints); Codex headless
+(`codex exec`) = chokepoints only (exec hooks do not fire — upstream codex-cli
+defect); OpenCode = advisory + chokepoint-protected (ADR-G3).
 
 Codex-specific behavior must be expressed in Codex-native terms: `AGENTS.md`
 context, `.codex/config.toml`, `.codex/skills`, hooks where supported, and
@@ -331,14 +334,55 @@ the operator to rebind, relaunch, or steal a session — that instruction is for
 law. Context resolves automatically from the registry; the flow is never halted to
 ask the operator to bind.
 
-**Enforcement scope (honesty clause):** the gate's deterministic envelope covers
-file-write tool calls only (Edit/Write-family tools; Codex `apply_patch`). Writes
-performed inside Bash commands are outside the determinism envelope — the posture
-is documented fail-open, backstopped post-hoc by the doctor's lease↔session
-coherence invariant. The gate enforces path-class × lease × memory-phase × mode; it
-reads no SPEC/PLAN/TASKS status and no task markers — `Aprovado` gates and `[-]`
-reservations are agent/PM discipline (§1, §11), upheld by coordination and review,
-not by the hook.
+**Enforcement envelope (honesty clause):** deterministic PreToolUse enforcement
+runs through ONE merged entrypoint — `dadaia_workspace.hooks.pre_gate` — which
+reads the hook stdin envelope once and evaluates the registered policies in fixed
+order, first-block-wins: root-whitelist → venv-guard → SDD gate. Allow requires
+every policy to allow; each policy is fail-open (a crashing policy never blocks
+the harness), with PROTECTED (`.dadaia/sessions/`) remaining the sole fail-closed
+path inside the SDD policy. This file-tool envelope covers file-write tool calls
+(Edit/Write-family tools; Codex `apply_patch`); the venv-guard adds one narrow
+fixed-pattern Bash check (`dadaia` / `pip` / `python -m dadaia_workspace`
+invocations not rooted in `.dadaia/.venv/bin/`). The SDD policy enforces
+path-class × lease × memory-phase × mode; it reads no SPEC/PLAN/TASKS status and
+no task markers — `Aprovado` gates and `[-]` reservations are agent/PM discipline
+(§1, §11), upheld by coordination and review, not by the hook.
+
+**Chokepoint envelope (supersedes the old "Bash writes are outside the envelope"
+posture):** arbitrary Bash file writes remain outside the file-tool envelope —
+the gate never parses shell command strings — but the lifecycle outcomes that
+matter are deterministically gated at **git-hook chokepoints**, which run
+regardless of whether any harness hook fired:
+
+- **pre-commit lease gate** — a `git commit` into a Spec Context repo from a
+  session that does not hold the context's MUTATING lease is blocked with an
+  actionable message. Holder-identity probe chain: (1) no lease, or a stale
+  lease whose holder pid is dead ⇒ allow (ADDITIVE work commits freely;
+  zero-false-block); (2) `DADAIA_SESSION_ID` equals the holder sid ⇒ allow;
+  (3) the holder's recorded pid is an ancestor of the invoking process — via
+  the read-only `ProcessAncestry` port, never `os.kill` ⇒ allow; (4) ancestry
+  unavailable or indeterminate ⇒ **ALLOW with a logged WARN** — zero-false-block
+  dominates, and on that platform the chokepoint degrades to advisory. This
+  advisory degradation is documented honestly here, not hidden. Block ONLY on a
+  live foreign lease with a positive non-match at steps 2–3.
+- **pre-push gate** — the same pre-push hook runs the CI preflight and the
+  mechanical security-verdict check; the push-boundary contract is normative in
+  §11.
+- **advisory working-tree reconciler** — a PostToolUse pass flags out-of-lease
+  dirty MUTATING paths in the bound context's repo (logged event); it never
+  blocks and never exits non-zero.
+- **escape-hatch honesty** — chokepoints are git hooks: `--no-verify` bypasses
+  them. The posture is deterministic-at-the-chokepoint, not unbypassable; the
+  doctor's lease↔session coherence checks remain the post-hoc backstop.
+
+**Per-harness enforcement matrix:**
+
+| Harness | PreToolUse hooks (`pre_gate`) | Git chokepoints | Posture |
+|---|---|---|---|
+| Claude Code | yes | yes | deterministic: hooks + chokepoints |
+| Codex interactive | yes | yes | deterministic: hooks + chokepoints |
+| Codex headless (`codex exec`) | **no — exec hooks do not fire** (upstream codex-cli defect) | yes | chokepoints only |
+| OpenCode | no | yes | advisory + chokepoint-protected (ADR-G3) |
 
 ## 9. Coordinator + Sub-Agent Architecture
 
@@ -395,11 +439,12 @@ project-manager is the sole owner of `specs/backlog/**`. The process:
 The reviewer transitions below are **coordinator-enforced checkpoints**, not
 mechanical blocks. They are enforced by `project-manager`'s discipline: PM will not
 advance a transition without the reviewer's APPROVE handoff. The word "gate" is
-reserved in this constitution for the genuinely **mechanical** enforcers — the SDD
-path gate (the `dadaia_workspace.hooks.sdd_gate` PreToolUse block on file-write
-tools, scoped per §8's honesty clause) and the pre-push CI gate
-(`dadaia ci preflight`). A checkpoint is PM-mediated; a gate is a mechanical hook
-block. Do not conflate them.
+reserved in this constitution for the genuinely **mechanical** enforcers — the
+merged PreToolUse gate (`dadaia_workspace.hooks.pre_gate`: root-whitelist →
+venv-guard → SDD gate, scoped per §8's honesty clause) and the git chokepoints
+(the pre-commit lease gate, and the pre-push hook running `dadaia ci preflight`
+plus the security-verdict check below). A checkpoint is PM-mediated; a gate is a
+mechanical block. Do not conflate them.
 
 ### Spec-review sequence (release-definition checkpoints)
 
@@ -416,18 +461,28 @@ ordering distinct from the implementation checkpoints below:
 The ordering is sequential QA → SE (SE never reviews before QA APPROVE); the
 architect review is parallel and optional. PM mediates throughout.
 
-### Implementation checkpoints (rc-N ship segment)
+### Implementation checkpoints & the push gate
 
-1. qa-engineer reviews → APPROVE verdict → commit to feature branch allowed.
-2. security-reviewer reviews → APPROVE verdict → push to feature branch allowed.
-3. code-reviewer reviews → APPROVE verdict → PR merge allowed.
+1. qa-engineer reviews → APPROVE verdict → commit to feature branch allowed
+   (coordinator checkpoint).
+2. **Push boundary — mechanical gate.** A `git push` is blocked by the pre-push
+   hook unless, for every non-zero local sha being pushed, an APPROVED
+   `security-reviewer` handoff exists whose `metrics.commit_sha` equals that
+   sha. Branch deletions (zero local sha) and tag-only pushes are exempt; a
+   stale approval (an older sha) does not pass; commits are never
+   review-blocked. The check runs alongside the CI preflight in the same
+   pre-push hook. The push boundary is no longer a PM-mediated checkpoint and
+   carries no reviewer-roster precondition: the security verdict for the pushed
+   sha is the sole, mechanically-checked requirement at push.
+3. code-reviewer reviews → APPROVE verdict → PR merge allowed (coordinator
+   checkpoint).
 4. product-engineer updates `specs/memory/**` → only after the code-reviewer
    checkpoint.
 
-For alpha-N segments: qa-engineer checkpoint only → commit. No push, no PR, no
-other reviewers.
+The full commit/push/PR gate ladder — mechanizing the qa→commit and
+code-review→PR halves — is law-deferred to v0.1.15 (the governance release).
 
-Each checkpoint requires a handoff JSON with `"verdict": "APPROVED"`. A REJECT
+Each coordinator checkpoint requires a handoff JSON with `"verdict": "APPROVED"`. A REJECT
 verdict blocks the transition and re-opens the relevant implementation task (marker
 flipped back to `[ ]`). The failing task stays `[ ]` until the fix is committed and
 the checkpoint is re-run.

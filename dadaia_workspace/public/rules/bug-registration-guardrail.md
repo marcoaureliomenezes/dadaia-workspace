@@ -55,6 +55,7 @@ status: Open
 severity: LOW | MEDIUM | HIGH | CRITICAL
 reported: <YYYY-MM-DD>
 surface: <component/command that failed>
+session_id: null
 ---
 
 **Symptom:** what happened (the error, the wrong output).

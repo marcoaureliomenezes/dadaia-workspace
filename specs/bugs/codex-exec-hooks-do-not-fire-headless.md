@@ -1,6 +1,6 @@
 ---
 name: codex-exec-hooks-do-not-fire-headless
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-11
 session_id: null
@@ -51,3 +51,5 @@ headless path.
   approved_commands inert, config_file real, `[skills] paths` invalid) recorded in the
   WS-CDX-VERIFY FACTS file for T-013-08.
 - Environment: codex-cli 0.139.0, Linux x86_64. No secrets/operator paths in this record.
+
+**Resolution (2026-06-12):** Closed per the bug's own option (b) in v0.1.14: the git chokepoints (pre-commit lease check + pre-push security gate) cover the headless path, and the per-harness enforcement matrix in constitution §8 honestly documents Codex headless as chokepoint-protected (hooks interactive-only) — commit `2e33b9e` on `feature/v0.1.14` + constitution §8 (T-014-17).

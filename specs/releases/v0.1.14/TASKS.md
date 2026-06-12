@@ -255,7 +255,7 @@ Write set (group): `dadaia_workspace/public/scripts/pre-commit-lease-gate.sh`
 TG-2's `ProcessAncestry` read-only. Sequential after TG-2 on
 `sdd_post_gate.py`.
 
-### [-] T-014-14 — Pre-commit lease gate (script + CLI) + seed-1 e2e (bug fold)
+### [x] T-014-14 — Pre-commit lease gate (script + CLI) + seed-1 e2e (bug fold)
 - **Owner:** software-engineer
 - **FR:** FR-W1-01 (DP-4) — harness-independence regression for
   `codex-exec-hooks-do-not-fire-headless`
@@ -318,7 +318,8 @@ Write set (group): `specs/constitution.md`, `dadaia_workspace/public/rules/*`,
 `dadaia_workspace/public/data/AGENTS.md`, `dadaia_workspace/public/skills/*`,
 `specs/backlog/*`, contract tests. Disjoint from all code groups.
 
-### [ ] T-014-17 — Constitution §8 + §11
+### [x] T-014-17 — Constitution §8 + §11
+> Operator gate: constitution diff approved 2026-06-12 (PM-surfaced).
 - **Owner:** product-engineer (operator confirmation REQUIRED — PM surfaces
   the diff before the edit lands)
 - **FR:** FR-W5-01 + FR-W5-02
@@ -333,7 +334,7 @@ Write set (group): `specs/constitution.md`, `dadaia_workspace/public/rules/*`,
   and the `--no-verify` escape-hatch honesty; §11 makes the pre-push security
   gate a mechanical gate; full gate ladder explicitly deferred to v0.1.15.
 
-### [ ] T-014-18 — Rules, personas, AGENTS.md, skills sweep
+### [x] T-014-18 — Rules, personas, AGENTS.md, skills sweep
 - **Owner:** ai-engineer
 - **FR:** FR-W2-03 + FR-W5-03 + W1 sha-in-verdict convention
 - **Files:** `dadaia_workspace/public/rules/workspace-protocol.md` (§1 merged
@@ -349,7 +350,7 @@ Write set (group): `specs/constitution.md`, `dadaia_workspace/public/rules/*`,
 - **Done:** no law doc describes shell-parsing enforcement, first-ALIVE
   injection, or the abolished trio model at the push boundary.
 
-### [ ] T-014-19 — Bug-guardrail template `session_id` (bug fold)
+### [x] T-014-19 — Bug-guardrail template `session_id` (bug fold)
 - **Owner:** ai-engineer (template line); software-engineer (contract test —
   disjoint write set)
 - **FR:** FR-W5-04 — closes
@@ -362,7 +363,7 @@ Write set (group): `specs/constitution.md`, `dadaia_workspace/public/rules/*`,
   asserted POST-STAGE so the projection carries it too.
 - **Done:** template carries `session_id: null`; contract test green.
 
-### [ ] T-014-20 — Backlog re-status + bug dispositions (CLOSURE input)
+### [x] T-014-20 — Backlog re-status + bug dispositions (CLOSURE input)
 - **Owner:** product-engineer (disposition sweep; ADDITIVE/backlog paths)
 - **FR:** FR-W5-05 + SPEC "Backlog re-status" table
 - **Files:** `specs/backlog/lease-shell-write-coverage-gap.md` (SUPERSEDED —

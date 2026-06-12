@@ -37,8 +37,10 @@ Current-doc corrections to keep active:
   command hooks are the only handler type that runs today.
 - HEADLINE (live-verified, codex-cli 0.139.0): command hooks fire ONLY in the
   interactive `codex` TUI. Under headless `codex exec` they never run, in any
-  configuration form. Deterministic gate enforcement on Codex is interactive-only
-  today; the automation path runs ungoverned (§9).
+  configuration form. Harness-hook gate enforcement on Codex is interactive-only
+  today; on the headless path the git chokepoints (pre-commit lease gate, pre-push
+  security-verdict gate, v0.1.14) provide the deterministic coverage — they fire as
+  git hooks, independent of any harness hook (§9).
 
 ---
 
@@ -361,21 +363,26 @@ matcher there for selective behavior.
 | Hook `command` strings run **through a shell** — env-prefix `VAR=x cmd`, `$(...)`, and `~` all work | live-verified (shell `>>` redirection markers fired) |
 | Real apply_patch PreToolUse payload: `tool_input.command = "*** Begin Patch..."` with **NO `file_path` key** — path classification must parse `*** Add/Update/Delete File:` headers | live-verified (payload captured) |
 
-Known dadaia gate gap from the payload fact: the header parser classifies only the
-FIRST file of a multi-file patch (bug
-`specs/bugs/sdd-gate-apply-patch-multi-file-first-header-only.md`).
+From the payload fact: the gate's header parser classifies EVERY
+`*** Add/Update/Delete File:` header of a multi-file patch; the most restrictive
+verdict wins (fixed in v0.1.14 — bug
+`sdd-gate-apply-patch-multi-file-first-header-only` closed).
 
 ### Enforcement reality — interactive-only (live-verified 0.139.0)
 
 | Path | Hooks fire? | Consequence |
 |---|---|---|
 | Interactive `codex` TUI | **YES** — all four wired events (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse); the block envelope is honored (FROZEN write blocked live) | deterministic gate enforcement EXISTS interactively |
-| Headless `codex exec` | **NO** — across all four config forms (project `.codex/hooks.json`, inline `[hooks]` in trusted project config, user-layer `hooks.json`, match-all), with trusted project + `--dangerously-bypass-hook-trust` + hooks feature flag on | SDD gate, root-whitelist, ctx-inject, and heartbeat DO NOT run; the automation path is ungoverned |
+| Headless `codex exec` | **NO** — across all four config forms (project `.codex/hooks.json`, inline `[hooks]` in trusted project config, user-layer `hooks.json`, match-all), with trusted project + `--dangerously-bypass-hook-trust` + hooks feature flag on | the merged pre_gate, ctx-inject, and heartbeat DO NOT run; harness-hook enforcement is absent on this path |
 
-**Never claim "deterministic enforcement on Codex" unqualified.** Enforcement
-exists only in interactive sessions today; `codex exec` automation runs on agent
-discipline plus after-the-fact doctor checks alone, until the upstream defect
-changes (bug `specs/bugs/codex-exec-hooks-do-not-fire-headless.md`).
+**Never claim "harness-hook enforcement on Codex" unqualified.** Harness hooks fire
+only in interactive sessions today (upstream defect, bug
+`codex-exec-hooks-do-not-fire-headless`, resolved per its option (b)). The headless
+gap is covered by the **git chokepoints** (v0.1.14): the pre-commit lease gate and
+the pre-push security-verdict gate run as git hooks and fire regardless of whether
+any harness hook ran — file-tool-level gating is absent headless, but commits and
+pushes stay deterministically gated. Agent discipline plus doctor checks cover the
+remainder.
 
 > **Inject full context once per session, not every prompt.** Wire the full static
 > context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the
@@ -401,16 +408,20 @@ changes (bug `specs/bugs/codex-exec-hooks-do-not-fire-headless.md`).
 | Validate handoff/report format | Hide human approval |
 | Update session heartbeat after every tool call | Depend on fragile state with no timeout or clear message |
 
-dadaia reference wiring (live shape, v0.1.10): `PreToolUse ^(apply_patch|Edit|Write)$ →
-python -m dadaia_workspace.hooks.sdd_gate` and `→ …hooks.root_whitelist`;
-`PostToolUse → …hooks.sdd_post_gate` with the matcher **omitted** — Codex's canonical
-match-all form — so the lease heartbeat fires after every tool;
-`SessionStart → …hooks.ctx_inject`. The anchored matcher is documented-valid and
-NOT to be changed (live-verified; see the contract table above). The legacy bash hook
-quartet was retired in v0.1.10 (Decision D-1) — the hooks are production Python owned
-by software-engineer. This wiring enforces only in interactive sessions (see
-Enforcement reality above). Risk to guard against: absolute paths and local
-projections leaking into public packages.
+dadaia reference wiring (live shape, v0.1.14): a SINGLE merged PreToolUse entrypoint —
+`PreToolUse ^(apply_patch|Edit|Write|Bash)$ → python -m dadaia_workspace.hooks.pre_gate`
+— evaluates root-whitelist → venv-guard → SDD gate in order, first-block-wins (one
+interpreter spawn per tool call; `Bash` is in the matcher only for the venv-guard's
+fixed-pattern check — no shell parsing); `PostToolUse → …hooks.sdd_post_gate` with the
+matcher **omitted** — Codex's canonical match-all form — so the lease heartbeat fires
+after every tool; `SessionStart → …hooks.ctx_inject` (injection itself is bind-driven:
+re-injection only on a bind-epoch marker newer than the session sentinel; no first-ALIVE
+fallback). The anchored matcher is documented-valid and NOT to be changed
+(live-verified; see the contract table above). The legacy bash hook quartet was retired
+in v0.1.10 (Decision D-1) — the hooks are production Python owned by software-engineer.
+This wiring enforces only in interactive sessions; headless commits/pushes are covered
+by the git chokepoints (see Enforcement reality above). Risk to guard against: absolute
+paths and local projections leaking into public packages.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: ctx-inject-ignores-session-bind-first-alive-proxy
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-11
 surface: hooks/ctx_inject.py context resolution (UserPromptSubmit/SessionStart injection)
@@ -39,3 +39,5 @@ since the beginning" — operator). Fix is scoped as W2 of the backlog epic
 whose "context resolves automatically / bind is optional convenience" wording
 encodes the wrong model for injection). The first-ALIVE fallback remains valid
 only inside the SDD gate's lease-context resolution, which is a different job.
+
+**Resolution (2026-06-12):** Closed by v0.1.14 FR-W2 (strict bind-driven injection: env → session bind record → generic preflight; first-ALIVE fallback deleted from injection; bind invalidates the sentinel) — commit `f94e953` on `feature/v0.1.14`.
