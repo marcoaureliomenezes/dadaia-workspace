@@ -106,7 +106,7 @@ Write set (group): `dadaia_workspace/cli/commands/context.py`,
 `dadaia_workspace/infrastructure/` (adapters), tests. Sequential after TG-1;
 shares `context.py` with TG-3 and `sdd_post_gate.py` with TG-5 (never parallel).
 
-### [ ] T-014-06 — `ProcessAncestry` port + three adapters
+### [x] T-014-06 — `ProcessAncestry` port + three adapters
 - **Owner:** software-engineer
 - **FR:** FR-W1-01 step 3 (DP-4) — created here, reused read-only by TG-5
 - **Files:** `dadaia_workspace/core/` (protocol port),
@@ -122,7 +122,7 @@ shares `context.py` with TG-3 and `sdd_post_gate.py` with TG-5 (never parallel).
 - **Done:** port + 3 adapters wired in the composition root; mypy --strict
   clean; no destructive probe anywhere.
 
-### [ ] T-014-07 — By-session heartbeat index, same-CAS atomic
+### [x] T-014-07 — By-session heartbeat index, same-CAS atomic
 - **Owner:** software-engineer
 - **FR:** FR-W4-02
 - **Files:** `dadaia_workspace/features/spec_context/lease.py`
@@ -140,7 +140,7 @@ shares `context.py` with TG-3 and `sdd_post_gate.py` with TG-5 (never parallel).
 - **Done:** renewal is index-driven, structurally lossless; zero behavior
   change for holders.
 
-### [ ] T-014-08 — `context release` drops held lease(s) (bug fold)
+### [x] T-014-08 — `context release` drops held lease(s) (bug fold)
 - **Owner:** software-engineer
 - **FR:** FR-W4-03 (DP-3: NO hook-side renewal guard) — closes
   `context-release-leaves-lease-heartbeat-renewing`

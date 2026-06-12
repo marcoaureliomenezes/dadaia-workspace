@@ -76,10 +76,13 @@ __all__ = [
     "LEASE_TTL_SECONDS",
     "PidProbe",
     "acquire",
+    "contexts_for_session",
     "is_held",
     "read_record",
     "reclaim",
     "release",
+    "release_context_if_caller_owned",
+    "release_for_session",
     "renew_heartbeat",
     "steal",
 ]
@@ -163,6 +166,163 @@ def _sentinel_path(
 ) -> Path:
     _validate(ctx, field="context")
     return _lock_dir(workspace, permission_setter) / f"{ctx}.lock.sentinel"
+
+
+# --- By-session heartbeat index (FR-W4-02) -------------------------------------
+# ``ctx_locks/by-session/<sid>.json`` maps a session id to the set of contexts that
+# session currently holds. PostToolUse renewal reads this index instead of scanning
+# the whole lock dir, so a session holding nothing does no FS scan at all. The index
+# entry is written/removed INSIDE the SAME O_EXCL sentinel CAS as the lock record in
+# ``acquire``/``steal``/``release`` — record-write and index-write form one atomic
+# unit; a lost index entry must be structurally impossible (a silent miss starves
+# renewal and reopens the lease-theft class). ``_iter_lease_contexts`` falls back to a
+# full lock-dir scan whenever the by-session DIR is absent (migration window).
+
+
+def _by_session_dir(workspace: Path) -> Path:
+    return workspace / ".dadaia" / "states" / "ctx_locks" / "by-session"
+
+
+def _by_session_path(workspace: Path, session_id: str) -> Path:
+    _validate(session_id, field="session_id")
+    return _by_session_dir(workspace) / f"{session_id}.json"
+
+
+def _read_by_session(workspace: Path, session_id: str) -> list[str]:
+    """Read the contexts a session holds per its index entry (empty if absent/corrupt)."""
+    path = _by_session_path(workspace, session_id)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if isinstance(data, dict):
+        ctxs = data.get("contexts")
+        if isinstance(ctxs, list):
+            return [c for c in ctxs if isinstance(c, str)]
+    return []
+
+
+def _index_add(workspace: Path, ctx: str, session_id: str) -> None:
+    """Add ``ctx`` to ``session_id``'s by-session index entry (inside the CAS)."""
+    contexts = sorted({*_read_by_session(workspace, session_id), ctx})
+    path = _by_session_path(workspace, session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_record(path, {"session_id": session_id, "contexts": list(contexts)})
+
+
+def _index_remove(workspace: Path, ctx: str, session_id: str) -> None:
+    """Remove ``ctx`` from ``session_id``'s index entry; unlink the entry when empty."""
+    remaining = [c for c in _read_by_session(workspace, session_id) if c != ctx]
+    path = _by_session_path(workspace, session_id)
+    if remaining:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _write_record(path, {"session_id": session_id, "contexts": sorted(remaining)})
+    else:
+        path.unlink(missing_ok=True)
+
+
+def release_for_session(workspace: Path, session_id: str) -> list[str]:
+    """Eval-flow release (FR-W4-03 a): drop every lease the ``session_id`` holds.
+
+    The env sid is the same key hooks renew on, so releasing every lock record naming
+    it is exact — there is no foreign-holder ambiguity. Returns the contexts released.
+    Falls back to a full lock-dir scan when the by-session index is absent (migration).
+    """
+    released: list[str] = []
+    contexts = contexts_for_session(workspace, session_id)
+    if not contexts:
+        contexts = _scan_contexts_held_by(workspace, session_id)
+    for ctx in contexts:
+        try:
+            if release(workspace, ctx, session_id):
+                released.append(ctx)
+        except (OSError, ValueError):
+            continue
+    return released
+
+
+def _scan_contexts_held_by(workspace: Path, session_id: str) -> list[str]:
+    """Migration fallback: scan lock records for those whose holder == ``session_id``."""
+    lock_dir = _lock_dir(workspace)
+    try:
+        entries = list(lock_dir.iterdir())
+    except OSError:
+        return []
+    suffix = ".lock.json"
+    out: list[str] = []
+    for p in entries:
+        if not p.name.endswith(suffix):
+            continue
+        ctx = p.name[: -len(suffix)]
+        rec = read_record(workspace, ctx)
+        if rec is not None and rec.get("session_id") == session_id:
+            out.append(ctx)
+    return sorted(out)
+
+
+def release_context_if_caller_owned(
+    workspace: Path,
+    ctx: str,
+    *,
+    caller_pid: int,
+    pid_probe: PidProbe | None = None,
+    ancestry: Callable[[int, int], bool] | None = None,
+) -> str | None:
+    """Default-flow release (FR-W4-03 b): drop ``ctx``'s lease only when caller-owned.
+
+    The CLI-minted sid never matches the harness sid recorded in the lock, so we cannot
+    release by sid. Instead, release the bound context's lease ONLY when its holder is:
+
+    * **dead** — the holder ``pid`` is no longer alive (``pid_probe`` reports dead), OR
+    * **the caller's own process** — the holder ``pid`` is an ancestor of ``caller_pid``
+      (the ``ancestry(holder_pid, caller_pid)`` predicate), i.e. the bind belongs to the
+      same harness tree issuing the release.
+
+    A live foreign holder (alive pid, not in the caller's ancestry) is NEVER released by
+    context name alone — that is exactly the cross-session theft the chokepoint forbids.
+    Indeterminate ancestry is treated as NOT-owned (conservative: do not release).
+
+    Returns the holder sid that was released, or ``None`` when nothing was released.
+    """
+    rec = read_record(workspace, ctx)
+    if rec is None:
+        return None
+    holder_sid = str(rec.get("session_id", ""))
+    holder_pid_raw = rec.get("pid")
+    holder_pid = int(holder_pid_raw) if isinstance(holder_pid_raw, int) else None
+
+    owned = False
+    if holder_pid is None:
+        # Legacy record without a pid — nothing to probe; treat as dead/releasable.
+        owned = True
+    else:
+        alive = pid_probe(holder_pid) if pid_probe is not None else False
+        if not alive:
+            owned = True
+        elif ancestry is not None and holder_pid != caller_pid:
+            owned = ancestry(holder_pid, caller_pid)
+        elif holder_pid == caller_pid:
+            owned = True
+
+    if not owned or not holder_sid:
+        return None
+    if release(workspace, ctx, holder_sid):
+        return holder_sid
+    return None
+
+
+def contexts_for_session(workspace: Path, session_id: str) -> list[str]:
+    """Public read of the by-session index: contexts ``session_id`` holds (FR-W4-02).
+
+    Consumed by ``hooks/sdd_post_gate._iter_lease_contexts`` to drive renewal without a
+    full lock-dir scan. Returns ``[]`` when the session holds nothing or its entry is
+    absent/corrupt. An invalid session id returns ``[]`` rather than raising (the hook
+    must never break the harness).
+    """
+    try:
+        return sorted(_read_by_session(workspace, session_id))
+    except ValueError:
+        return []
 
 
 # Stable-identity pointer reads/writes are owned by ``session_identity`` (WS-R3,
@@ -365,6 +525,7 @@ def acquire(
                     rec["pid"] = holder_pid
                     rec["heartbeat"] = clock().isoformat()
                     _write_record(record_path, rec)
+                    _index_add(workspace, ctx, session_id)
                     _write_ptr(workspace, ctx, session_id)
                     return "RENEWED", rec
                 else:
@@ -373,6 +534,7 @@ def acquire(
                         ctx, release, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
                     )
                     _write_record(record_path, new)
+                    _index_add(workspace, ctx, session_id)
                     _write_ptr(workspace, ctx, session_id)
                     _audit(workspace, "acquire", ctx, session_id, clock=clock)
                     return "ACQUIRED", new
@@ -386,15 +548,23 @@ def acquire(
                 rec["pid"] = holder_pid
                 rec["heartbeat"] = clock().isoformat()
                 _write_record(record_path, rec)
+                _index_add(workspace, ctx, session_id)
                 _write_ptr(workspace, ctx, session_id)
                 return "RENEWED", rec
 
             # --- Foreign / absent: stale ⇒ takeover, live (TTL or pid-veto) ⇒ yield ---
             if rec is None or is_stale(rec, clock=clock, pid_probe=pid_probe):
+                # A takeover transfers holder identity: drop the stale holder's index
+                # entry for this ctx, then claim it for the new session — same CAS.
+                stale_holder = str(rec.get("session_id", "")) if rec else ""
+                if stale_holder and stale_holder != session_id:
+                    with contextlib.suppress(OSError, ValueError):
+                        _index_remove(workspace, ctx, stale_holder)
                 new = _new_record(
                     ctx, release, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
                 )
                 _write_record(record_path, new)
+                _index_add(workspace, ctx, session_id)
                 _write_ptr(workspace, ctx, session_id)
                 _audit(workspace, "acquire", ctx, session_id, clock=clock)
                 return "ACQUIRED", new
@@ -463,14 +633,46 @@ def renew_heartbeat(
     return False
 
 
-def release(workspace: Path, ctx: str, session_id: str) -> bool:
-    """Delete the record iff held by ``session_id``. No-op otherwise."""
-    rec = read_record(workspace, ctx)
-    if rec is None or rec.get("session_id") != session_id:
-        return False
-    _record_path(workspace, ctx).unlink(missing_ok=True)
-    _audit(workspace, "release", ctx, session_id, clock=_utcnow)
-    return True
+def release(
+    workspace: Path,
+    ctx: str,
+    session_id: str,
+    *,
+    permission_setter: FilePermissionSetter | None = None,
+) -> bool:
+    """Delete the record iff held by ``session_id``. No-op otherwise.
+
+    Record-unlink and by-session-index removal happen inside the SAME O_EXCL sentinel
+    CAS as ``acquire``/``steal`` (FR-W4-02): the two removals are one atomic unit, so a
+    concurrent ``acquire`` can never interleave between them and observe a dangling index
+    entry whose record is gone (or vice versa). A non-holder is a guarded no-op.
+    """
+    sentinel = _sentinel_path(workspace, ctx, permission_setter)
+    record_path = _record_path(workspace, ctx, permission_setter)
+    backoff = _INITIAL_BACKOFF
+    for attempt in range(_MAX_RETRIES + 1):
+        _gc_orphan_sentinel(sentinel)
+        try:
+            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
+                pass
+        except FileExistsError:
+            if attempt >= _MAX_RETRIES:
+                return False  # contended release is a safe no-op.
+            time.sleep(backoff)
+            backoff *= 2
+            continue
+        try:
+            rec = read_record(workspace, ctx)
+            if rec is None or rec.get("session_id") != session_id:
+                return False
+            record_path.unlink(missing_ok=True)
+            with contextlib.suppress(OSError, ValueError):
+                _index_remove(workspace, ctx, session_id)
+            _audit(workspace, "release", ctx, session_id, clock=_utcnow)
+            return True
+        finally:
+            sentinel.unlink(missing_ok=True)
+    return False
 
 
 def is_held(
@@ -562,10 +764,15 @@ def steal(
                 return False, rec2  # became live during the race
             release_id = str(rec2.get("release", "")) if rec2 else ""
             mode = str(rec2.get("mode", "")) if rec2 else ""
+            stale_holder = str(rec2.get("session_id", "")) if rec2 else ""
+            if stale_holder and stale_holder != session_id:
+                with contextlib.suppress(OSError, ValueError):
+                    _index_remove(workspace, ctx, stale_holder)
             new = _new_record(
                 ctx, release_id, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
             )
             _write_record(record_path, new)
+            _index_add(workspace, ctx, session_id)
             _write_ptr(workspace, ctx, session_id)
             _audit(workspace, "steal", ctx, session_id, clock=clock)
             return True, new

@@ -9,6 +9,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
+from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
@@ -63,6 +64,11 @@ from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateSto
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
+from dadaia_workspace.infrastructure.process_ancestry_adapter import (
+    LinuxProcAncestry,
+    PsProcessAncestry,
+    WindowsToolhelpAncestry,
+)
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -203,6 +209,30 @@ def _build_pid_probe() -> Callable[[int], bool] | None:
         return _hook_build_probe()
     except Exception:  # noqa: BLE001 — probe wiring must never break `dadaia doctor`.
         return None
+
+
+def build_process_ancestry() -> ProcessAncestry:
+    """Composition-root selection of the read-only ``ProcessAncestry`` adapter (T-014-06).
+
+    Platform is decided here via the ``PLATFORM`` seam — never by an in-adapter
+    ``sys.platform`` branch:
+
+    * ``has_proc_fs`` (Linux) → ``LinuxProcAncestry`` (``/proc`` PPID walk).
+    * else ``has_os_kill_liveness`` (other POSIX, incl. macOS) → ``PsProcessAncestry``
+      (``ps -o ppid=`` via the injected ``SubprocessProcessRunner``).
+    * else (Windows) → ``WindowsToolhelpAncestry`` (read-only Toolhelp32 snapshot).
+
+    Every adapter is non-destructive and returns ``Ancestry.UNKNOWN`` for any
+    indeterminate case; the ALLOW+WARN policy decision lives in the chokepoint caller.
+    """
+    from dadaia_workspace.core.platform import PLATFORM
+    from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
+
+    if PLATFORM.has_proc_fs:
+        return LinuxProcAncestry()
+    if PLATFORM.has_os_kill_liveness:
+        return PsProcessAncestry(SubprocessProcessRunner())
+    return WindowsToolhelpAncestry()
 
 
 def _build_alive_contexts_provider(

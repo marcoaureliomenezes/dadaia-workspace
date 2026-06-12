@@ -431,27 +431,95 @@ def bind(
 
 
 @app.command(name="release")
-def release_cmd() -> None:
-    """Release the current session's binding.
+def release_cmd(
+    session: str | None = typer.Option(
+        None,
+        "--session",
+        help=(
+            "CLI session id to release (default flow). When omitted, the eval-flow "
+            "DADAIA_SESSION_ID is used if set."
+        ),
+    ),
+) -> None:
+    """Release the current session's binding AND any lease(s) it holds (FR-W4-03).
 
     Run: dadaia context release
+
+    Two flows (the CLI-sid/harness-sid split):
+
+    * **eval flow** — ``DADAIA_SESSION_ID`` exported (e.g. ``eval $(dadaia context bind
+      ... --print-env)``). Hooks key on the same sid, so every lock record naming it is
+      released exactly, then the session record is unlinked.
+    * **default flow** — a CLI-minted sid (``--session`` or the latest bind record). The
+      lock holder is a harness sid that never matches, so the bound context's lease is
+      released ONLY when its holder pid is dead or in the caller's process ancestry; a
+      live foreign holder's lease is NEVER released by context name alone.
+
+    In BOTH flows the lease is dropped BEFORE the session record is unlinked, so the
+    PostToolUse heartbeat cannot renew a released binding (closes
+    ``context-release-leaves-lease-heartbeat-renewing``). DP-3: there is no absence-based
+    renewal guard — ``release`` deletes the record, and ``renew_heartbeat`` no-ops on an
+    absent/foreign record, so resurrection is structurally impossible.
     """
-    session_id = os.environ.get("DADAIA_SESSION_ID")
-    if not session_id:
-        err_console.print(
-            "[red]Error:[/red] No active session. Set DADAIA_SESSION_ID first "
-            "(e.g. eval $(dadaia context bind ...))."
-        )
-        raise typer.Exit(1) from None
+    from dadaia_workspace import container
+    from dadaia_workspace.features.spec_context import lease as _lease
 
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
-    session_file = sessions_dir / f"{session_id}.json"
+
+    env_sid = os.environ.get("DADAIA_SESSION_ID")
+    cli_sid = session or env_sid
+    if not cli_sid:
+        err_console.print(
+            "[red]Error:[/red] No active session. Pass --session <id> or set "
+            "DADAIA_SESSION_ID (e.g. eval $(dadaia context bind ... --print-env))."
+        )
+        raise typer.Exit(1) from None
+
+    session_file = sessions_dir / f"{cli_sid}.json"
+    session_data = _load_session(sessions_dir, cli_sid)
+    released: list[str] = []
 
     with workspace_lock(workspace_root):
+        if env_sid:
+            # Eval flow: the env sid is the lock holder key — release every lease it holds.
+            released = _lease.release_for_session(workspace_root, env_sid)
+        elif session_data is not None:
+            # Default flow: resolve the bound context from the CLI session record and
+            # release its lease only when the holder is dead or in our ancestry.
+            ctx_name = str(session_data.get("context", ""))
+            if ctx_name:
+                with contextlib.suppress(Exception):
+                    pid_probe = container._build_pid_probe()
+                    ancestry_probe = container.build_process_ancestry()
+
+                    def _is_ancestor(holder_pid: int, caller_pid: int) -> bool:
+                        from dadaia_workspace.core.protocols.process_ancestry import Ancestry
+
+                        return (
+                            ancestry_probe.is_ancestor(holder_pid, caller_pid) is Ancestry.ANCESTOR
+                        )
+
+                    holder = _lease.release_context_if_caller_owned(
+                        workspace_root,
+                        ctx_name,
+                        caller_pid=os.getpid(),
+                        pid_probe=pid_probe,
+                        ancestry=_is_ancestor,
+                    )
+                    if holder is not None:
+                        released.append(ctx_name)
+
+        # Unlink the session record AFTER the lease has been dropped.
         session_file.unlink(missing_ok=True)
 
-    console.print(f"[green]✓[/green] Session '[bold]{session_id}[/bold]' released")
+    if released:
+        console.print(
+            f"[green]✓[/green] Session '[bold]{cli_sid}[/bold]' released "
+            f"(lease(s) dropped: {', '.join(released)})"
+        )
+    else:
+        console.print(f"[green]✓[/green] Session '[bold]{cli_sid}[/bold]' released")
 
 
 @app.command()

@@ -69,13 +69,29 @@ def _resolve_workspace() -> Path:
     return resolve_workspace_root()
 
 
-def _iter_lease_contexts(workspace: Path) -> list[str]:
-    """Context names with a present lock record, derived from the lock dir filenames.
+def _iter_lease_contexts(workspace: Path, sess_id: str) -> list[str]:
+    """Contexts this session holds — index-driven (FR-W4-02), no full lock-dir scan.
 
-    Returns ``[]`` (fail-soft) when the directory is absent or unreadable. Each entry is
-    the ``<ctx>`` of a ``<ctx>.lock.json`` file; the suffix is stripped so the name is fed
-    back through ``lease`` (which re-validates ``[A-Za-z0-9_-]``).
+    Resolution order:
+
+    1. **By-session index present** (``ctx_locks/by-session/`` dir exists): read this
+       session's entry (``by-session/<sid>.json``) and return only the contexts it names.
+       A session holding nothing has no entry → ``[]`` and the lock dir is never scanned.
+       This is the FS-op-counting acceptance: PostToolUse does not iterate the lock dir
+       when the session holds nothing.
+    2. **By-session DIR absent** (migration window — a workspace whose leases predate the
+       index): fall back to the legacy full lock-dir scan so a pre-index holder still
+       renews. ``lease.renew_heartbeat`` is holder-guarded, so scanning every record is a
+       safe (if less efficient) superset.
+
+    Returns ``[]`` (fail-soft) on any read error. Each name is fed back through ``lease``
+    (which re-validates ``[A-Za-z0-9_-]``).
     """
+    by_session_dir = workspace / ".dadaia" / "states" / "ctx_locks" / "by-session"
+    if by_session_dir.is_dir():
+        return sorted(lease.contexts_for_session(workspace, sess_id))
+
+    # Migration fallback: no by-session index yet → full lock-dir scan.
     lock_dir = workspace / ".dadaia" / "states" / "ctx_locks"
     try:
         entries = list(lock_dir.iterdir())
@@ -95,7 +111,7 @@ def _renew_held_leases(workspace: Path, sess_id: str) -> int:
     never aborts the others (fail-open per FR-R2-01).
     """
     renewed = 0
-    for ctx in _iter_lease_contexts(workspace):
+    for ctx in _iter_lease_contexts(workspace, sess_id):
         try:
             if lease.renew_heartbeat(workspace, ctx, sess_id):
                 renewed += 1
