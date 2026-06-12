@@ -35,6 +35,10 @@ Current-doc corrections to keep active:
   concerns and must not be emitted from dadaia public assets.
 - Hook matchers are event-specific. `UserPromptSubmit` and `Stop` ignore matchers;
   command hooks are the only handler type that runs today.
+- HEADLINE (live-verified, codex-cli 0.139.0): command hooks fire ONLY in the
+  interactive `codex` TUI. Under headless `codex exec` they never run, in any
+  configuration form. Deterministic gate enforcement on Codex is interactive-only
+  today; the automation path runs ungoverned (§9).
 
 ---
 
@@ -157,9 +161,18 @@ skill**. The description is the trigger surface — it must be short, verb-first
 scenario-named ("Use when…" / "Use for…").
 
 Codex scans repo `.agents/skills` directories from CWD upward to the repository
-root, plus user/admin/system locations. Large skill inventories are listing-
+root, plus user/admin/system locations. This repo discovery is **native and
+automatic — no config key enables it**. Large skill inventories are listing-
 budgeted, so descriptions must front-load trigger words; a skill omitted from the
 initial list can still be used when explicitly mentioned.
+
+Config-key facts (live-verified 0.139.0 via `--strict-config` + official
+config-reference):
+
+| Claimed key | Reality |
+|---|---|
+| `[skills] paths = [...]` | **INVALID** — unknown field (hard error under `--strict-config`, silently ignored otherwise). Do not emit it. |
+| `skills.config` | The real surface: an array of per-skill `{path, enabled}` override objects — enable/disable only, not a search path. |
 
 ### Frontmatter deltas vs Claude Code
 
@@ -246,8 +259,8 @@ local config and must remain user/admin-global.
 | Concern | Layer | Project-local? | Why |
 |---|---|---|---|
 | Personal model / verbosity preference | `~/.codex/config.toml` | No — user-global | personal, not a product artifact |
-| dadaia projected agents | `.codex/agents/*.toml` | Yes (generated) | runtime projection from `public/` |
-| Skill search paths | `.codex` skills config | Yes (generated) | `[skills] paths = [".agents/skills", ".codex/skills"]` |
+| dadaia projected agents | `.codex/agents/*.toml` registered via `agents.<name>.config_file` | Yes (generated) | `config_file` is a real documented key (live-verified 0.139.0 accepts it under `--strict-config`) |
+| Skill enable/disable overrides | `skills.config` array | Yes (only if per-skill overrides needed) | `[skills] paths` is NOT a key (live-verified 0.139.0); `.agents/skills` repo discovery is native — never emit a paths key |
 | SDD-gate / hook wiring | `.codex/hooks.json` | Yes, but must point to **trusted workspace-level scripts** | hooks run host commands |
 | Provider / base URL / auth / telemetry | user or admin config | **NEVER project-local** | a repo must not change credentials or host-owned behavior |
 | Sandbox / approval level | profile or per-command | escalate cautiously | stricter for review; permissive only in a trusted workspace |
@@ -256,6 +269,11 @@ Project-local config must not emit `openai_base_url`, `chatgpt_base_url`,
 `model_provider`, `model_providers`, `profile`, `profiles`, `notify`, or `otel`.
 Those keys redirect credentials, host-owned behavior, or telemetry and belong to
 the operator/admin.
+
+Non-keys to never emit (live-verified 0.139.0): `approved_commands` is NOT a
+config key — unknown field under `--strict-config`, silently ignored otherwise.
+Command approval is owned by Rules (`.rules`) and the `approval_policy` /
+`[tools]` keys, not a flat allow-list. Same class: `[skills] paths` (see §4).
 
 ### dadaia audit findings — what must NOT be project-local (apply as constraints)
 
@@ -333,6 +351,32 @@ Only command hook handlers run today; `prompt` and `agent` handlers are parsed b
 skipped. `UserPromptSubmit` and `Stop` do not honor matchers, so never depend on a
 matcher there for selective behavior.
 
+### Verified hook contract (codex-cli 0.139.0)
+
+| Fact | Evidence level |
+|---|---|
+| The PreToolUse `matcher` is a **regex string**; the anchored form `^(apply_patch\|Edit\|Write)$` is valid — official examples include `^apply_patch$` | official docs |
+| `Edit`/`Write` are matcher **aliases** for `apply_patch`; hook input still reports `tool_name: "apply_patch"` | official docs |
+| Deny mechanisms: preferred `hookSpecificOutput.permissionDecision = "deny"`; legacy `{"decision":"block","reason":...}` with exit 0 is ACCEPTED; exit 2 + reason on stderr also denies | docs; legacy envelope **live-verified** blocking a FROZEN write interactively |
+| Hook `command` strings run **through a shell** — env-prefix `VAR=x cmd`, `$(...)`, and `~` all work | live-verified (shell `>>` redirection markers fired) |
+| Real apply_patch PreToolUse payload: `tool_input.command = "*** Begin Patch..."` with **NO `file_path` key** — path classification must parse `*** Add/Update/Delete File:` headers | live-verified (payload captured) |
+
+Known dadaia gate gap from the payload fact: the header parser classifies only the
+FIRST file of a multi-file patch (bug
+`specs/bugs/sdd-gate-apply-patch-multi-file-first-header-only.md`).
+
+### Enforcement reality — interactive-only (live-verified 0.139.0)
+
+| Path | Hooks fire? | Consequence |
+|---|---|---|
+| Interactive `codex` TUI | **YES** — all four wired events (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse); the block envelope is honored (FROZEN write blocked live) | deterministic gate enforcement EXISTS interactively |
+| Headless `codex exec` | **NO** — across all four config forms (project `.codex/hooks.json`, inline `[hooks]` in trusted project config, user-layer `hooks.json`, match-all), with trusted project + `--dangerously-bypass-hook-trust` + hooks feature flag on | SDD gate, root-whitelist, ctx-inject, and heartbeat DO NOT run; the automation path is ungoverned |
+
+**Never claim "deterministic enforcement on Codex" unqualified.** Enforcement
+exists only in interactive sessions today; `codex exec` automation runs on agent
+discipline plus after-the-fact doctor checks alone, until the upstream defect
+changes (bug `specs/bugs/codex-exec-hooks-do-not-fire-headless.md`).
+
 > **Inject full context once per session, not every prompt.** Wire the full static
 > context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the
 > `session_id` Codex passes on stdin. `UserPromptSubmit` hooks may fire every prompt,
@@ -357,14 +401,16 @@ matcher there for selective behavior.
 | Validate handoff/report format | Hide human approval |
 | Update session heartbeat after every tool call | Depend on fragile state with no timeout or clear message |
 
-dadaia reference wiring (live shape, v0.1.10): `PreToolUse apply_patch|Edit|Write →
+dadaia reference wiring (live shape, v0.1.10): `PreToolUse ^(apply_patch|Edit|Write)$ →
 python -m dadaia_workspace.hooks.sdd_gate` and `→ …hooks.root_whitelist`;
 `PostToolUse → …hooks.sdd_post_gate` with the matcher **omitted** — Codex's canonical
 match-all form — so the lease heartbeat fires after every tool;
-`SessionStart → …hooks.ctx_inject`. The legacy bash hook
+`SessionStart → …hooks.ctx_inject`. The anchored matcher is documented-valid and
+NOT to be changed (live-verified; see the contract table above). The legacy bash hook
 quartet was retired in v0.1.10 (Decision D-1) — the hooks are production Python owned
-by software-engineer. Risk to guard against: absolute paths and local projections
-leaking into public packages.
+by software-engineer. This wiring enforces only in interactive sessions (see
+Enforcement reality above). Risk to guard against: absolute paths and local
+projections leaking into public packages.
 
 ---
 

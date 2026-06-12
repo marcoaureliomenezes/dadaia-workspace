@@ -105,7 +105,7 @@ qa-engineer only.
   with the documented form if the live run shows the anchored form misbehaves.
   Closes the audit's F-1/F-6/F-8 UNVERIFIED cells.
 
-### [-] T-013-09 — Description-field transform + D-CX-4 tool-name patterns
+### [x] T-013-09 — Description-field transform + D-CX-4 tool-name patterns
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/install_helpers.py`
   (`install_codex_agents`),

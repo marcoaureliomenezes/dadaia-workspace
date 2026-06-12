@@ -302,3 +302,43 @@ def test_check_memory_phase_single_source(tmp_path) -> None:
     assert any("bad.md" in line and "SINGLE-SRC-1" in line for line in out), out
     assert not any("good.md" in line for line in out), out
     assert not any("SKILL.md" in line for line in out), out
+
+
+# ---------------------------------------------------------------------------
+# T-013-09 — description field runs through transform_for_codex; D-CX-4 flags
+# Claude tool names (codex-agent-description-claude-ism-leak)
+# ---------------------------------------------------------------------------
+
+
+def test_description_field_transformed_through_codex_replacements(
+    installed_workspace: Path,
+) -> None:
+    """The agent TOML description must be run through transform_for_codex.
+
+    project-manager's source description says "dispatches sub-agents via Agent tool".
+    After install, the rendered TOML description must carry no Claude tool-name
+    Claude-ism — the "Agent tool" phrase must be replaced.
+    """
+    toml_path = installed_workspace / ".codex" / "agents" / "project-manager.toml"
+    data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    description = data.get("description", "")
+    assert description, "project-manager.toml must carry a description"
+    assert "Agent tool" not in description, (
+        "Description must be transformed; 'Agent tool' Claude-ism leaked: " + description
+    )
+    assert "explicit Codex subagent delegation" in description
+
+
+def test_dcx4_flags_claude_tool_name_in_artifact(installed_workspace: Path) -> None:
+    """D-CX-4 must flag a Codex artifact that contains a Claude tool-name pattern."""
+    toml_path = installed_workspace / ".codex" / "agents" / "ai-engineer.toml"
+    text = toml_path.read_text(encoding="utf-8")
+    # Clean artifact: no tool-name leak reported.
+    clean = FileSystemPublicAssetManager().doctor(installed_workspace)
+    assert not any("D-CX-4" in r and "claude-tool-name" in r for r in clean)
+
+    toml_path.write_text(text + '\ndescription = "delegate via Agent tool"\n', encoding="utf-8")
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+    assert any(
+        "D-CX-4" in r and "claude-tool-name" in r and "ai-engineer.toml" in r for r in reports
+    ), reports

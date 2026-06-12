@@ -110,3 +110,87 @@ release: the desired artifacts, target audience, and pain point are explicit.
 - Evidence-only Codex reviewer custom agents are no longer projected as general
   workspace writers.
 - Final response includes verification commands and outcomes.
+
+---
+
+## Amendment — alpha-2 (2026-06-11): Codex Runtime Fidelity residuals
+
+**Segment:** alpha-2 (release-governance ADR-1 maturity model). End-of-alpha-2
+review gate: qa-engineer only.
+
+### Motivation
+
+The Codex runtime fidelity audit
+(`specs/audits/2026-06-12T001813Z/codex-runtime-fidelity-review.md`) reviewed
+alpha-1's own deliverables and found three residual risk classes:
+
+1. **Enforcement UNVERIFIED (F-1, HIGH/UNVERIFIED; siblings F-6, F-8).** The SDD
+   gate's actual blocking on Codex rests on three contract points never verified
+   against a live Codex binary since the v0.1.10 Python-hook rewrite — failure
+   mode is silent allow while the workspace believes deterministic enforcement
+   exists.
+2. **Four new Open bugs** in the projection tail (description-field Claude-ism
+   leak, never-matching `dadaia` prefix rules, stale T-35 roster lint,
+   Claude-centric model tiering in personas).
+3. **Claude-centric model strategy.** MODEL_MAP id-substitution is the wrong
+   abstraction for persona prose: Anthropic tier names survive as operative
+   instructions and the mapped tier table collapses `deep`/`dispatch` into one id.
+
+The operator approved folding the residual scope into this release as segment
+alpha-2.
+
+### Scope (operator grill decisions — final, do not re-open)
+
+In scope: **WS-CDX-VERIFY + WS-CDX-BUGFIX + WS-CDX-MODEL** only.
+
+The codex CLI IS installed: WS-CDX-VERIFY MUST be a scripted, repeatable harness
+(`codex exec` against a trusted throwaway workspace under `.dadaia/tmp/`), not an
+operator-manual procedure.
+
+### Folded bugs (bugs-always-solved law)
+
+Every picked bug is fixed in this segment; a bug is never silently dropped
+(release-governance). No picked backlog item supersedes any of them.
+
+| Bug | Severity | Closed by |
+|---|---|---|
+| `codex-agent-description-claude-ism-leak` | MEDIUM | T-013-09 |
+| `codex-rules-dadaia-prefix-never-matches-venv-invocation` | MEDIUM | T-013-10 |
+| `stale-legacy-software-engineer-lint-inverts-roster` | LOW | T-013-11 |
+| `codex-personas-claude-model-tiering-leak` | MEDIUM | T-013-12 |
+
+### Acceptance criteria per workstream
+
+**WS-CDX-VERIFY**
+
+- A scripted, repeatable harness drives `codex exec` in a trusted throwaway
+  workspace under `.dadaia/tmp/` and yields marker-file evidence per hook event.
+- A live trusted-Codex session demonstrably BLOCKS an attempted FROZEN
+  `specs/_archive/` write via `apply_patch` — or the gate's Codex story is
+  rewritten honestly as discipline-only.
+- Every UNVERIFIED cell in the audit gap table within this scope (F-1: matcher
+  form, block envelope, shell-exec of env-prefixed commands; F-6:
+  `approved_commands`; F-8: `[agents."<n>"] config_file`) is resolved to a fact
+  recorded in the `ai-harness-codex` skill and academy course 07.
+
+**WS-CDX-BUGFIX**
+
+- All 4 folded bugs fixed, test-backed.
+- The `dadaia public doctor` D-CX suite catches the in-scope Claude-ism classes
+  found by the audit (Claude tool names, Anthropic tier names) — regression-proof.
+- No in-scope Codex-projected artifact (agent TOMLs, command-policy rules, doctor
+  lints) claims behavior Codex does not have by default.
+
+**WS-CDX-MODEL**
+
+- Codex personas express model guidance in Codex-native terms: per-runtime tier
+  rendering instead of MODEL_MAP prose substitution; `model_reasoning_effort` as a
+  first-class tiering axis; loud failure when mapping collapses tiers.
+- No Opus/Sonnet/Haiku prose survives in any Codex-projected persona body.
+
+### Explicitly deferred (NOT in this release)
+
+**WS-CDX-PROTOCOL** (F-2/F-11 — rule-corpus visibility on Codex) and
+**WS-CDX-HYGIENE** (F-3/F-7/F-9/F-12 — trust surfacing, adapter-skill rework,
+`.codex/workflows/` decision, doc cleanup) are deferred by operator decision.
+They remain CANDIDATE in `specs/backlog/codex-runtime-fidelity.md`.

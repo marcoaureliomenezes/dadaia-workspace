@@ -49,7 +49,7 @@ dadaia's desired architecture is:
 | `project-auditor` coordinates drift audits | Must be explicitly invoked for audit work |
 | Worker agents perform bounded tasks | Spawned only when the active session delegates |
 | Workflow markdown describes stage order | Reference/context unless a runtime dispatcher actually executes it |
-| Hooks enforce local mechanics | Can block writes or refresh state when trusted and enabled |
+| Hooks enforce local mechanics | Can block writes or refresh state in interactive sessions; on 0.139.0 hooks never fire under headless `codex exec` |
 
 This is the central Claude-to-Codex drift: Claude Code may feel more naturally
 agentic around the existing workflow conventions, while Codex requires explicit

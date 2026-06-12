@@ -394,11 +394,17 @@ def install_codex_agents(
         claude_model = str(fm.get("model", "claude-sonnet-4-6"))
         codex_model = map_model(claude_model)
         description = fm.get("description")
+        # The description is the Codex spawn-trigger surface; it must pass through
+        # the SAME replacement table as the body so no Claude-ism (e.g. "Agent tool")
+        # ships on it (codex-agent-description-claude-ism-leak, T-013-09).
+        codex_description = (
+            transform_for_codex(str(description), agent_name) if description else None
+        )
         toml_content = _render_codex_agent_toml(
             agent_name,
             codex_model,
             body,
-            description=str(description) if description else None,
+            description=codex_description,
         )
         dst = agents_dst / f"{agent_name}.toml"
         if dst.exists() and not force:

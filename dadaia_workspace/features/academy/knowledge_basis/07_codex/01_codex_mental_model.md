@@ -43,9 +43,11 @@ Codex reads many text surfaces, but only some are mechanical enforcement:
 - Sandbox and approval policy are runtime controls. They are stronger than text.
 
 In dadaia terms, the SDD gate is a hook, so it can mechanically block file-write
-tools. The rule "reserve a TASKS.md marker before implementation" is a discipline
-contract unless a hook checks it. Treat that distinction as a design constraint,
-not a weakness.
+tools — but only in interactive sessions. On codex-cli 0.139.0, command hooks do
+not fire under headless `codex exec`, so on that automation path the gate is
+discipline-only. The rule "reserve a TASKS.md marker before implementation" is a
+discipline contract unless a hook checks it. Treat that distinction as a design
+constraint, not a weakness.
 
 ## The Correct Build Order
 

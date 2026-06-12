@@ -28,6 +28,12 @@ _CODEX_CLAUDE_MODEL_RE: re.Pattern[str] = re.compile(
     r"(?:^|[^a-zA-Z0-9_-])claude-(?:opus|sonnet|haiku)-[\w.-]+",
     re.MULTILINE,
 )
+# Claude-only tool names that have no Codex meaning. Codex uses explicit subagent
+# delegation, not the Claude Code `Agent`/`Task` tools, so these must not leak into
+# any Codex-projected artifact (codex-agent-description-claude-ism-leak, T-013-09).
+_CODEX_CLAUDE_TOOL_RE: re.Pattern[str] = re.compile(
+    r"\b(?:Agent|Task) tool\b",
+)
 _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
 _CODEX_EXPECTED_READ_ONLY_AGENTS: frozenset[str] = frozenset(
     {
@@ -155,6 +161,9 @@ def dcx4_claude_strings(codex_dir: Path) -> list[str]:
         if _CODEX_CLAUDE_MODEL_RE.search(text) or ".claude/rules/" in text:
             rel = path.relative_to(codex_dir).as_posix()
             out.append(f"[error] codex:claude-model-or-path in {rel} (D-CX-4)")
+        elif _CODEX_CLAUDE_TOOL_RE.search(text):
+            rel = path.relative_to(codex_dir).as_posix()
+            out.append(f"[error] codex:claude-tool-name in {rel} (D-CX-4)")
     return out
 
 
