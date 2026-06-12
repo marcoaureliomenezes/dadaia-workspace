@@ -1,11 +1,17 @@
 ---
 name: agents-md-instructs-html-report-validation-unsupported
-status: Open
+status: Closed
 severity: LOW
 reported: 2026-06-12
 session_id: null
 surface: dadaia reports validate / public AGENTS.md (Reports and Panel section)
 ---
+
+> **Disposition (v0.1.14 release definition, 2026-06-12, product-engineer):**
+> Closed as duplicate of `reports-validate-rejects-html-despite-agents-md-contract`
+> (reported 2026-06-11, same defect: AGENTS.md instructs HTML validation via
+> `dadaia reports validate`, which is handoff-JSON-only). The surviving bug file
+> tracks the fix; no information is lost (symptom/repro identical).
 
 **Symptom:** The projected root `AGENTS.md` ("Reports and Panel" section, generated
 from `dadaia_workspace/public/data/AGENTS.md`) instructs, immediately after the HTML

@@ -7,6 +7,11 @@ surface: dadaia reports validate (CLI) vs root AGENTS.md "Reports and Panel" con
 session_id: 82c8408f
 ---
 
+> **Disposition (v0.1.14 release definition, 2026-06-12, product-engineer):**
+> NOT PICKED — valid doc/CLI-UX contract drift, stays Open; outside kernel scope.
+> `agents-md-instructs-html-report-validation-unsupported` was Closed as its
+> duplicate; this file is the surviving tracker.
+
 **Symptom:** `dadaia reports validate <path-to-html-report>` fails with a raw
 JSON-parse error instead of validating (or cleanly rejecting) an HTML report:
 

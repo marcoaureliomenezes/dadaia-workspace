@@ -7,6 +7,11 @@ surface: dadaia_workspace/public/scripts/lint-memory-atoms.py (heading allowlist
 session_id: null
 ---
 
+> **Disposition (v0.1.14 release definition, 2026-06-12, product-engineer):**
+> NOT PICKED — valid consumer-extensibility gap in the memory lint, stays Open;
+> specs-doctor lint surface is outside the v0.1.14 kernel scope. Natural fit for
+> the v0.1.15 governance release (doctor invariants are reworked there).
+
 **Symptom:** `lint-memory-atoms.py` (invoked by `dadaia specs doctor`) warns
 "not in the curated allowlist" on every valid domain-specific H2 heading in consumer
 workspaces. The allowlist (`HEADING_ALLOWLIST`, Groups A+B+C) is hardcoded in the

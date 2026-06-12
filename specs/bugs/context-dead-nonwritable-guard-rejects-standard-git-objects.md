@@ -7,6 +7,11 @@ session_id: null
 surface: dadaia context dead (GitSyncError non-writable guard)
 ---
 
+> **Disposition (v0.1.14 release definition, 2026-06-12, product-engineer):**
+> NOT PICKED — valid bug, stays Open. Surface is `context dead()` repo removal
+> (file-permission guard), outside the v0.1.14 kernel scope
+> (lease/gate/ctx-inject/hooks/venv). Candidate for a context-lifecycle fix release.
+
 **Symptom:** `dadaia context dead <ctx>` fails with
 `GitSyncError: Cannot remove 'repos/<ctx>': N non-writable file(s) found
 (e.g. ['.git/objects/...']). Run: sudo chown -R $USER ...` — but the listed
