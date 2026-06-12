@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
-# Mandatory pre-push CI gate — dadaia-workspace v0.1.5 (T-GATE-01).
+# Mandatory pre-push gate — dadaia-workspace v0.1.5 (CI) + v0.1.14 (security verdict).
 #
-# Runs the CI-equivalent suite locally (ruff format --check, ruff check,
-# mypy --strict, pytest) and BLOCKS the push (exit non-zero) if any check fails.
-# Locally-solvable failures must never reach a push (post-mortem: the v0.1.4
-# family was pushed + closed while CI was red).
+# Two gates run in sequence and BOTH must pass before a push proceeds:
+#   1. CI-equivalent preflight (ruff format --check, ruff check, mypy --strict, pytest).
+#      Locally-solvable failures must never reach a push (post-mortem: the v0.1.4 family
+#      was pushed + closed while CI was red).
+#   2. Security-verdict gate (FR-W1-02, T-014-15): every non-zero, non-tag pushed sha must
+#      be covered by a security-reviewer APPROVE handoff (`metrics.commit_sha` == sha).
+#      The pre-push ref lines git feeds on STDIN are forwarded to `ci push-gate-check`.
 #
 # Installed to .git/hooks/pre-push by `dadaia ci install-hook`.
 # Emergency bypass (discouraged, leaves a trace in reflog): git push --no-verify
 #
 # Runner resolution (v0.1.10, T-010-26, bug pre-push-gate-cannot-locate-workspace-venv):
-#   1. $DADAIA_BIN env override        → "$DADAIA_BIN ci preflight"
+#   1. $DADAIA_BIN env override        → "$DADAIA_BIN ci <verb>"
 #   2. walk UP from repo root to the workspace root, probe
 #      "<dir>/.dadaia/.venv/bin/dadaia"  (canonical self-hosting layout: the repo
 #      lives at <ws>/repos/<slug> and the venv at <ws>/.dadaia/.venv)
-#   3. poetry on PATH                  → "poetry run dadaia ci preflight"
+#   3. poetry on PATH                  → "poetry run dadaia ci <verb>"
 #   4. repo-local ".venv/bin/dadaia"
 #   None found → fail CLOSED with a clear error (never silently skip the gate).
 #
@@ -30,15 +33,22 @@ fi
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
+# git feeds the pre-push ref lines on STDIN exactly once. Capture them now so the
+# security-verdict gate can be fed the same lines after the CI preflight has run.
+PUSH_REFS=""
+if [ "$PROBE_ONLY" -eq 0 ] && [ ! -t 0 ]; then
+    PUSH_REFS="$(cat)"
+fi
+
 # Resolve the dadaia runner. Echoes a human-readable label to stderr and sets
-# RUNNER to an array that, when expanded, runs `<...> ci preflight`.
-RUNNER=()
+# RUNNER_BIN to a parallel array that, when expanded with a verb, runs `<...> ci <verb>`.
+RUNNER_BIN=()
 RUNNER_LABEL=""
 
 resolve_runner() {
     # 1. Explicit override.
     if [ -n "${DADAIA_BIN:-}" ]; then
-        RUNNER=("$DADAIA_BIN" ci preflight)
+        RUNNER_BIN=("$DADAIA_BIN")
         RUNNER_LABEL="DADAIA_BIN=$DADAIA_BIN"
         return 0
     fi
@@ -48,7 +58,7 @@ resolve_runner() {
     while :; do
         local candidate="$dir/.dadaia/.venv/bin/dadaia"
         if [ -x "$candidate" ]; then
-            RUNNER=("$candidate" ci preflight)
+            RUNNER_BIN=("$candidate")
             RUNNER_LABEL="workspace-venv $candidate"
             return 0
         fi
@@ -62,14 +72,14 @@ resolve_runner() {
 
     # 3. poetry on PATH.
     if command -v poetry >/dev/null 2>&1; then
-        RUNNER=(poetry run dadaia ci preflight)
+        RUNNER_BIN=(poetry run dadaia)
         RUNNER_LABEL="poetry run dadaia"
         return 0
     fi
 
     # 4. Repo-local venv.
     if [ -x ".venv/bin/dadaia" ]; then
-        RUNNER=(.venv/bin/dadaia ci preflight)
+        RUNNER_BIN=(.venv/bin/dadaia)
         RUNNER_LABEL="repo-venv .venv/bin/dadaia"
         return 0
     fi
@@ -90,4 +100,7 @@ if [ "$PROBE_ONLY" -eq 1 ]; then
 fi
 
 echo "[pre-push] CI-equivalent preflight via $RUNNER_LABEL (ruff · mypy --strict · pytest)…"
-exec "${RUNNER[@]}"
+"${RUNNER_BIN[@]}" ci preflight
+
+echo "[pre-push] security-verdict gate (every pushed commit needs a security-reviewer APPROVE)…"
+printf '%s' "$PUSH_REFS" | "${RUNNER_BIN[@]}" ci push-gate-check

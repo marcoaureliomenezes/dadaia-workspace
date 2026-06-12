@@ -255,7 +255,7 @@ Write set (group): `dadaia_workspace/public/scripts/pre-commit-lease-gate.sh`
 TG-2's `ProcessAncestry` read-only. Sequential after TG-2 on
 `sdd_post_gate.py`.
 
-### [ ] T-014-14 — Pre-commit lease gate (script + CLI) + seed-1 e2e (bug fold)
+### [-] T-014-14 — Pre-commit lease gate (script + CLI) + seed-1 e2e (bug fold)
 - **Owner:** software-engineer
 - **FR:** FR-W1-01 (DP-4) — harness-independence regression for
   `codex-exec-hooks-do-not-fire-headless`
@@ -277,7 +277,7 @@ TG-2's `ProcessAncestry` read-only. Sequential after TG-2 on
   resolution mirrors `pre-push-ci-gate.sh`; context derived from repo path
   (never first-ALIVE).
 
-### [ ] T-014-15 — Push-gate verdict check + pre-push extension + seed-2 e2e
+### [x] T-014-15 — Push-gate verdict check + pre-push extension + seed-2 e2e
 - **Owner:** software-engineer
 - **FR:** FR-W1-02 (DP-5)
 - **Files:** `dadaia_workspace/cli/commands/ci.py` (`push-gate-check`),
@@ -294,7 +294,7 @@ TG-2's `ProcessAncestry` read-only. Sequential after TG-2 on
 - **Done:** push deterministically gated on a security-reviewer APPROVE
   covering every pushed sha; commits never review-blocked.
 
-### [ ] T-014-16 — Advisory working-tree reconciler
+### [x] T-014-16 — Advisory working-tree reconciler
 - **Owner:** software-engineer
 - **FR:** FR-W1-03
 - **Files:** `dadaia_workspace/hooks/sdd_post_gate.py` (reconciler fn;

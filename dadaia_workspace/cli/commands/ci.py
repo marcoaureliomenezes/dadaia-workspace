@@ -1,9 +1,11 @@
-"""CLI command group: `dadaia ci <verb>` — local CI-equivalent preflight gate."""
+"""CLI command group: `dadaia ci <verb>` — local CI-equivalent preflight gate + chokepoints."""
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import typer
@@ -16,10 +18,12 @@ from dadaia_workspace.features.ci_preflight import (
     subprocess_runner,
 )
 
-app = typer.Typer(help="Local CI-equivalent preflight gate (pre-push).")
+app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
 # .../dadaia_workspace/cli/commands/ci.py -> parents[2] == .../dadaia_workspace
-_HOOK_SOURCE = Path(__file__).resolve().parents[2] / "public" / "scripts" / "pre-push-ci-gate.sh"
+_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "public" / "scripts"
+_HOOK_SOURCE = _SCRIPTS_DIR / "pre-push-ci-gate.sh"
+_PRE_COMMIT_HOOK_SOURCE = _SCRIPTS_DIR / "pre-commit-lease-gate.sh"
 
 
 def _repo_root() -> Path:
@@ -73,22 +77,116 @@ def preflight(
     typer.secho("\nAll preflight checks passed.", fg=typer.colors.GREEN)
 
 
+def _resolve_workspace_root(repo_root: Path) -> Path:
+    """Resolve the workspace root from inside a (possibly sub-) repo. Falls back to the repo."""
+    if env := os.environ.get("WORKSPACE_ROOT"):
+        return Path(env)
+    from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+
+    try:
+        return resolve_workspace_root(repo_root)
+    except WorkspaceNotInitializedError:
+        return repo_root
+
+
+@app.command("pre-commit-check")
+def pre_commit_check() -> None:
+    """Pre-commit lease gate (FR-W1-01): block a commit not from the context's lease holder.
+
+    Consults the per-context MUTATING lease ONLY (never a review handoff). The holder's own
+    commit flows (env-sid match or process-ancestry); a commit while no live lease exists
+    flows (zero-false-block); a live foreign holder blocks. Indeterminate ancestry degrades
+    to ALLOW + a logged WARN (the chokepoint is advisory on that platform).
+    """
+    from dadaia_workspace.container import build_process_ancestry
+    from dadaia_workspace.features.chokepoints import context_slug_for_path, pre_commit_decision
+
+    repo_root = _repo_root()
+    workspace = _resolve_workspace_root(repo_root)
+    ctx = context_slug_for_path(workspace, repo_root)
+
+    # Wire the read-only ancestry adapter and the pid-liveness probe from the composition root.
+    ancestry_adapter = build_process_ancestry()
+    pid_probe = None
+    try:
+        from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
+
+        probe = OsProcessProbe()
+        pid_probe = probe.is_pid_alive
+    except Exception:  # noqa: BLE001 — no liveness seam ⇒ TTL-only (cross-platform safe).
+        pid_probe = None
+
+    decision = pre_commit_decision(
+        workspace,
+        ctx,
+        caller_pid=os.getpid(),
+        env_sid=os.environ.get("DADAIA_SESSION_ID"),
+        pid_probe=pid_probe,
+        ancestry=ancestry_adapter.is_ancestor,
+    )
+    if decision.warn:
+        typer.echo(decision.warn, err=True)
+    if not decision.allowed:
+        typer.secho(decision.message, fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@app.command("push-gate-check")
+def push_gate_check() -> None:
+    """Pre-push security-verdict gate (FR-W1-02): require a security-reviewer APPROVE per sha.
+
+    Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
+    <remote-sha>``). For each non-zero, non-tag local sha a ``security-reviewer`` APPROVE
+    handoff (``metrics.commit_sha`` == sha) must exist under ``.dadaia/handoff/``. Branch
+    deletions and tag-only pushes pass. Commits are never review-blocked here.
+    """
+    from dadaia_workspace.features.chokepoints import push_gate_decision
+    from dadaia_workspace.features.chokepoints.service import parse_push_refs
+
+    repo_root = _repo_root()
+    workspace = _resolve_workspace_root(repo_root)
+    handoff_root = workspace / ".dadaia" / "handoff"
+
+    stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
+    refs = parse_push_refs(stdin_text)
+    decision = push_gate_decision(handoff_root, refs)
+    if not decision.allowed:
+        typer.secho(decision.message, fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+def _install_one(source: Path, target: Path, *, label: str, force: bool) -> None:
+    """Copy a hook script into ``.git/hooks/`` (0755), honoring ``--force``."""
+    if target.exists() and not force:
+        typer.secho(
+            f"{target.name} hook already exists at {target}; use --force to overwrite.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+    shutil.copyfile(source, target)
+    target.chmod(0o755)
+    typer.secho(f"Installed {label} -> {target}", fg=typer.colors.GREEN)
+
+
 @app.command("install-hook")
 def install_hook(
-    force: bool = typer.Option(False, "--force", help="Overwrite an existing pre-push hook."),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
 ) -> None:
-    """Install the pre-push CI gate into .git/hooks/pre-push for this repo."""
+    """Install the pre-commit lease gate AND the pre-push CI+security gate for this repo."""
     root = _repo_root()
     hooks_dir = root / ".git" / "hooks"
     if not hooks_dir.is_dir():
         raise typer.BadParameter(f"{hooks_dir} not found (is this a git repository?)")
-    target = hooks_dir / "pre-push"
-    if target.exists() and not force:
-        typer.secho(
-            f"pre-push hook already exists at {target}; use --force to overwrite.",
-            fg=typer.colors.YELLOW,
-        )
-        raise typer.Exit(1)
-    shutil.copyfile(_HOOK_SOURCE, target)
-    target.chmod(0o755)
-    typer.secho(f"Installed pre-push CI gate -> {target}", fg=typer.colors.GREEN)
+    _install_one(
+        _PRE_COMMIT_HOOK_SOURCE,
+        hooks_dir / "pre-commit",
+        label="pre-commit lease gate",
+        force=force,
+    )
+    _install_one(
+        _HOOK_SOURCE,
+        hooks_dir / "pre-push",
+        label="pre-push CI + security gate",
+        force=force,
+    )
