@@ -402,7 +402,7 @@ artifacts under `.dadaia/reports|handoff/`. Disjoint from all source groups.
 - **Done:** live instance runs the merged entrypoint + chokepoints; consumer
   re-install step documented in the rule text.
 
-### [-] T-014-22 — Final verification: e2e seeds 1–6, doctors, regression canon
+### [x] T-014-22 — Final verification: e2e seeds 1–6, doctors, regression canon
 - **Owner:** qa-engineer (evidence run); software-engineer fixes any red
 - **FR:** all acceptance seeds 1–6 + SPEC zero-false-block binding requirement
 - **Files:** evidence only (reports/handoff paths); NO production writes
