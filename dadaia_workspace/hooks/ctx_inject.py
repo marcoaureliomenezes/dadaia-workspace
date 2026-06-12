@@ -27,6 +27,7 @@ import sys
 import time
 from pathlib import Path
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.hooks import _common
 
 #: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
@@ -43,7 +44,8 @@ _SENTINEL_PREFIX = "ctx-inject-fired-"
 #: session older than this would at worst re-inject the bootstrap once. The sweep home is
 #: pinned HERE (inject time), not in ``spec_context/doctor.py`` — avoids the doctor
 #: write-set overlap (T-011-14 write set: the doctor leg is conditional and unused).
-_SENTINEL_GC_TTL_SECONDS = 24 * 60 * 60
+#: DP-1 (v0.1.14): the value is sourced from ``core.kernel_tunables`` (single tunables home).
+_SENTINEL_GC_TTL_SECONDS = kernel_tunables.SENTINEL_GC_TTL_SECONDS
 
 _DISPATCHER_PREFLIGHT = """=== dispatcher preflight (SDD routing) ===
 Before acting on a request in this workspace:

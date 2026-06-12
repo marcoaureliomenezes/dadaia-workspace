@@ -1674,9 +1674,10 @@ class TestConfigGenerators:
         assert len(matchers) > 0
         assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
         assert matchers[0]["hooks"][0]["type"] == "command"
-        sdd_gate_cmd = str(matchers[0]["hooks"][0]["command"])
-        assert "dadaia_workspace.hooks.sdd_gate" in sdd_gate_cmd
-        assert "sdd-spec-gate.sh" not in sdd_gate_cmd
+        # T-014-05: single merged PreToolUse entrypoint (pre_gate).
+        pre_gate_cmd = str(matchers[0]["hooks"][0]["command"])
+        assert "dadaia_workspace.hooks.pre_gate" in pre_gate_cmd
+        assert "sdd-spec-gate.sh" not in pre_gate_cmd
         # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module.
         # N-2 (v0.1.10 rc-2): the heartbeat now fires on ALL tools — Codex's
         # canonical match-all is an *omitted* matcher (see
@@ -1739,14 +1740,15 @@ class TestConfigGenerators:
         post_cmds = [str(h["command"]) for h in post[0]["hooks"]]
         assert any("dadaia_workspace.hooks.sdd_post_gate" in c for c in post_cmds)
 
-        # PreToolUse write gates remain scoped to the write tools only.
+        # PreToolUse: single merged entrypoint, scoped to the write tools (T-014-05).
         pre = hooks["PreToolUse"]
-        assert isinstance(pre, list) and len(pre) == 2
+        assert isinstance(pre, list) and len(pre) == 1
         for entry in pre:
             assert entry["matcher"] == "^(apply_patch|Edit|Write)$"
         pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
-        assert any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
-        assert any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
+        assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         # T-018-17: hook commands are now Python module invocations, not .sh paths.
@@ -1773,15 +1775,16 @@ class TestConfigGenerators:
         hooks = settings["hooks"]
         write_matcher = "Edit|Write|MultiEdit|NotebookEdit"
 
-        # PreToolUse: both sdd_gate and root_whitelist scoped to the write tools.
+        # PreToolUse: single merged entrypoint scoped to the write tools (T-014-05).
         pre = hooks["PreToolUse"]
-        assert isinstance(pre, list) and len(pre) == 2
+        assert isinstance(pre, list) and len(pre) == 1
         for entry in pre:
             assert entry["matcher"] == write_matcher
             assert entry["matcher"] != "", "write gate must not use the empty match-all"
         pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
-        assert any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
-        assert any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
+        assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
 
         # PostToolUse: heartbeat must fire on ALL tools via the explicit match-all.
         post = hooks["PostToolUse"]
@@ -1797,9 +1800,23 @@ class TestConfigGenerators:
         ups_cmds = [str(h["command"]) for h in ups[0]["hooks"]]
         assert any("dadaia_workspace.hooks.ctx_inject" in c for c in ups_cmds)
 
+    def test_seed5_single_pretooluse_command_per_runtime(self, tmp_path: Path) -> None:
+        """Seed-5 static proof (T-014-05): exactly ONE registered PreToolUse hook command
+        per runtime config (the merged pre_gate), down from the old dual sdd_gate +
+        root_whitelist wiring — one interpreter spawn per write tool call."""
+        manager = FileSystemPublicAssetManager()
+        for hooks in (
+            manager._claude_settings(tmp_path)["hooks"],
+            manager._codex_hooks(tmp_path)["hooks"],
+        ):
+            pre = hooks["PreToolUse"]
+            commands = [str(h["command"]) for entry in pre for h in entry.get("hooks", [])]
+            assert len(commands) == 1, f"expected one PreToolUse command, got {commands}"
+            assert "dadaia_workspace.hooks.pre_gate" in commands[0]
+
     def test_claude_settings_root_whitelist_gate_present(self, tmp_path: Path) -> None:
-        """T-SANI-01: root-whitelist hook must be registered as a PreToolUse hook.
-        T-018-17: command is now Python module invocation, not .sh path."""
+        """T-SANI-01 + T-014-05: the root-whitelist policy is registered as a PreToolUse
+        hook — now via the merged pre_gate entrypoint (which runs root-whitelist first)."""
         manager = FileSystemPublicAssetManager()
         settings = manager._claude_settings(tmp_path)
         pre_tool_use = settings["hooks"]["PreToolUse"]
@@ -1807,16 +1824,17 @@ class TestConfigGenerators:
         all_commands = [
             str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
-        assert any("dadaia_workspace.hooks.root_whitelist" in cmd for cmd in all_commands), (
-            "dadaia_workspace.hooks.root_whitelist not found in claude settings PreToolUse hooks"
+        assert any("dadaia_workspace.hooks.pre_gate" in cmd for cmd in all_commands), (
+            "dadaia_workspace.hooks.pre_gate (carries root-whitelist policy) not found in "
+            "claude settings PreToolUse hooks"
         )
         assert not any("root-whitelist-gate.sh" in cmd for cmd in all_commands), (
             "stale root-whitelist-gate.sh still present in claude settings PreToolUse hooks"
         )
 
     def test_codex_hooks_root_whitelist_gate_present(self, tmp_path: Path) -> None:
-        """T-SANI-01: root-whitelist hook must be registered as a Codex PreToolUse hook.
-        T-018-17: command is now Python module invocation, not .sh path."""
+        """T-SANI-01 + T-014-05: the root-whitelist policy is registered as a Codex
+        PreToolUse hook — now via the merged pre_gate entrypoint."""
         manager = FileSystemPublicAssetManager()
         config = manager._codex_hooks(tmp_path)
         pre_tool_use = config["hooks"]["PreToolUse"]
@@ -1824,8 +1842,9 @@ class TestConfigGenerators:
         all_commands = [
             str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
-        assert any("dadaia_workspace.hooks.root_whitelist" in cmd for cmd in all_commands), (
-            "dadaia_workspace.hooks.root_whitelist not found in codex hooks PreToolUse hooks"
+        assert any("dadaia_workspace.hooks.pre_gate" in cmd for cmd in all_commands), (
+            "dadaia_workspace.hooks.pre_gate (carries root-whitelist policy) not found in "
+            "codex hooks PreToolUse hooks"
         )
         assert not any("root-whitelist-gate.sh" in cmd for cmd in all_commands), (
             "stale root-whitelist-gate.sh still present in codex hooks PreToolUse hooks"

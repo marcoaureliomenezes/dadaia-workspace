@@ -104,6 +104,59 @@ def test_protected_sessions_blocks(tmp_path: Path) -> None:
     assert "SEC-01" in block["reason"]
 
 
+def test_apply_patch_multi_file_frozen_blocks_whole_patch(tmp_path: Path) -> None:
+    """REGRESSION (T-014-02 / FR-W4-04): a multi-file apply_patch whose FIRST file is
+    allowed and whose SECOND file is FROZEN (specs/_archive/) blocks the WHOLE patch.
+
+    Before the fix, target_path() returned only the first header (README.md), so the
+    FROZEN file's block branch never evaluated and the patch was allowed. Now every
+    header is classified and the most restrictive verdict wins.
+    """
+    _mk_workspace(tmp_path, "a")
+    cmd = (
+        "*** Begin Patch\n"
+        "*** Update File: README.md\n"
+        "+ok\n"
+        "*** Update File: specs/_archive/x.md\n"
+        "+frozen\n"
+        "*** End Patch"
+    )
+    block = _run(tmp_path, {"tool_name": "apply_patch", "tool_input": {"command": cmd}})
+    assert block is not None
+    assert "_archive" in block["reason"] or "FROZEN" in block["reason"].upper()
+
+
+def test_apply_patch_multi_file_protected_blocks_whole_patch(tmp_path: Path) -> None:
+    """REGRESSION (T-014-02): a later PROTECTED (.dadaia/sessions/) header blocks the patch."""
+    _mk_workspace(tmp_path, "a")
+    cmd = (
+        "*** Begin Patch\n"
+        "*** Update File: README.md\n"
+        "+ok\n"
+        "*** Update File: .dadaia/sessions/runtime/a.ptr\n"
+        "+forge\n"
+        "*** End Patch"
+    )
+    block = _run(tmp_path, {"tool_name": "apply_patch", "tool_input": {"command": cmd}})
+    assert block is not None
+    assert "SEC-01" in block["reason"]
+
+
+def test_apply_patch_multi_file_all_allowed_passes(tmp_path: Path) -> None:
+    """A multi-file apply_patch where EVERY header is allowed is not blocked (no false block)."""
+    _mk_workspace(tmp_path, "a")
+    cmd = (
+        "*** Begin Patch\n"
+        "*** Update File: README.md\n"
+        "+ok\n"
+        "*** Update File: docs/notes.md\n"
+        "+more\n"
+        "*** End Patch"
+    )
+    block = _run(tmp_path, {"tool_name": "apply_patch", "tool_input": {"command": cmd}})
+    assert block is None
+
+
 def test_path_first_context_slug_parity(tmp_path: Path) -> None:
     # PARITY (a): first-ALIVE is repos/A, but a write under repos/B MUST acquire repos/B's
     # lease, never repos/A's (fixes gate-cross-context-lock-contamination).

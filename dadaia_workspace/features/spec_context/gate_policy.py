@@ -1,12 +1,15 @@
 """Path-classifier + decision policy for the SDD gate (single source of truth).
 
-The enforced gate is the Python hook package ``dadaia_workspace.hooks`` —
-``sdd_gate`` (PreToolUse write gate), ``root_whitelist`` (workspace-root
-whitelist), ``sdd_post_gate`` (PostToolUse heartbeat), and ``ctx_inject``
-(session bootstrap). All four are wired as ``<python> -m
+The enforced gate is the Python hook package ``dadaia_workspace.hooks``. Since
+v0.1.14 (FR-W4-01) a SINGLE merged PreToolUse entrypoint ``pre_gate`` reads stdin
+once and runs the registered policies in order (root-whitelist → venv-guard → SDD
+gate); the standalone ``sdd_gate`` / ``root_whitelist`` entrypoints retain their
+``main()`` one release for back-compat but their pure ``evaluate_payload`` policy
+surfaces are what ``pre_gate`` reuses. ``sdd_post_gate`` (PostToolUse heartbeat) and
+``ctx_inject`` (session bootstrap) stay separate. All are wired as ``<python> -m
 dadaia_workspace.hooks.<name>`` commands across every harness (Claude
-``settings.json``, Codex ``hooks.json``) since v0.1.8. The legacy bash hook
-quartet was retired in v0.1.10 (Decision D-1); the only remaining shell asset is
+``settings.json``, Codex ``hooks.json``). The legacy bash hook quartet was retired in
+v0.1.10 (Decision D-1); the only remaining shell asset is
 ``public/scripts/pre-push-ci-gate.sh`` (a real git hook, deliberately shell).
 
 This module is the gate's path-classifier and decision policy: the fail-safe

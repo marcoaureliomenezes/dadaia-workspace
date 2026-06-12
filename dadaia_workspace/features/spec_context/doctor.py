@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.protocols.context_store import ContextStore
@@ -92,8 +93,10 @@ _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
     }
 )
 
-# Sentinel files older than this are orphans (process SIGKILLed mid-CAS).
-_SENTINEL_ORPHAN_AGE = 30.0
+# Sentinel files older than this are orphans (process SIGKILLed mid-CAS). DP-1 (v0.1.14):
+# value sourced from ``core.kernel_tunables`` so the doctor's SENTINEL-GC and the lease's
+# inline cleanup measure against the identical threshold (no drift).
+_SENTINEL_ORPHAN_AGE = kernel_tunables.SENTINEL_ORPHAN_AGE_SECONDS
 
 # Sessions expired beyond this age are graveyard entries eligible for GC. The field names
 # are owned by ``session_identity`` (the single owner of the session-record schema); the
@@ -630,7 +633,9 @@ class DoctorService:
                 # bind-CLI pid is dead by construction, so bind GC is pure last_seen_at TTL.
                 gc_check: dict[str, object] = {
                     "heartbeat": session_identity.liveness_timestamp(sess_data),
-                    "ttl": sess_data.get(_SESSION_GC_TTL_FIELD, 300),
+                    "ttl": sess_data.get(
+                        _SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS
+                    ),
                 }
                 if is_stale(gc_check):
                     sess_file.unlink(missing_ok=True)

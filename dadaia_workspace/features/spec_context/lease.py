@@ -60,6 +60,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import LockHeldError, PlatformSecurityError
 from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
@@ -85,13 +86,16 @@ __all__ = [
 
 #: Heartbeat TTL in seconds — OQ-1 operator decision 2026-06-06 (short heartbeat).
 #: Every liveness comparison must reference this constant; no inline magic numbers
-#: are permitted anywhere in the liveness path.
-LEASE_TTL_SECONDS = 120
+#: are permitted anywhere in the liveness path. DP-1 (v0.1.14): the canonical home is now
+#: ``core.kernel_tunables.LEASE_TTL_SECONDS``; this name is a re-export kept for one release
+#: (deprecation note) so external importers (``from ...lease import LEASE_TTL_SECONDS``) and
+#: tests keep working. New code should import from ``core.kernel_tunables``.
+LEASE_TTL_SECONDS = kernel_tunables.LEASE_TTL_SECONDS
 
-_MAX_RETRIES = 3
-_INITIAL_BACKOFF = 0.1
+_MAX_RETRIES = kernel_tunables.CAS_MAX_RETRIES
+_INITIAL_BACKOFF = kernel_tunables.CAS_INITIAL_BACKOFF_SECONDS
 #: A sentinel older than this is an orphan (process SIGKILLed between CAS and unlink).
-_SENTINEL_ORPHAN_AGE = 30.0
+_SENTINEL_ORPHAN_AGE = kernel_tunables.SENTINEL_ORPHAN_AGE_SECONDS
 _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 #: Test-only TOCTOU seam. ``acquire`` calls it after the sentinel CAS wins and

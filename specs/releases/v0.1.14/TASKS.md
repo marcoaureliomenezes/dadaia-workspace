@@ -28,7 +28,7 @@ Write set (group): `dadaia_workspace/hooks/pre_gate.py` (NEW),
 `dadaia_workspace/core/kernel_tunables.py` (NEW),
 `dadaia_workspace/infrastructure/runtime_config.py`, tests.
 
-### [ ] T-014-01 — Kernel tunables single home
+### [x] T-014-01 — Kernel tunables single home
 - **Owner:** software-engineer
 - **FR:** FR-W4-05 (DP-1)
 - **Files:** `dadaia_workspace/core/kernel_tunables.py` (NEW),
@@ -44,7 +44,7 @@ Write set (group): `dadaia_workspace/hooks/pre_gate.py` (NEW),
   (pure constants, zero I/O); import-linter contract added (hooks may import
   tunables; no reverse dependency); focused pytest green.
 
-### [ ] T-014-02 — apply_patch multi-file classification (bug fold)
+### [x] T-014-02 — apply_patch multi-file classification (bug fold)
 - **Owner:** software-engineer
 - **FR:** FR-W4-04 — closes `sdd-gate-apply-patch-multi-file-first-header-only`
 - **Files:** `dadaia_workspace/hooks/_common.py` (`target_paths() -> list[str]`),
@@ -56,7 +56,7 @@ Write set (group): `dadaia_workspace/hooks/pre_gate.py` (NEW),
 - **Done:** every apply_patch file header is classified; most restrictive
   verdict wins (one blocked file blocks the whole patch); bug repro passes.
 
-### [ ] T-014-03 — `pre_gate` merged PreToolUse entrypoint
+### [x] T-014-03 — `pre_gate` merged PreToolUse entrypoint
 - **Owner:** software-engineer
 - **FR:** FR-W4-01
 - **Files:** `dadaia_workspace/hooks/pre_gate.py` (NEW),
@@ -71,7 +71,7 @@ Write set (group): `dadaia_workspace/hooks/pre_gate.py` (NEW),
 - **Done:** one entrypoint reads stdin once; order root-whitelist → venv-guard
   slot (wired in TG-4) → SDD gate; first block wins; parity suites green.
 
-### [ ] T-014-04 — Hook-latency telemetry
+### [x] T-014-04 — Hook-latency telemetry
 - **Owner:** software-engineer
 - **FR:** FR-W4-06
 - **Files:** `dadaia_workspace/hooks/pre_gate.py` (timer wrapper), tests
@@ -83,7 +83,7 @@ Write set (group): `dadaia_workspace/hooks/pre_gate.py` (NEW),
 - **Done:** best-effort JSONL telemetry live; no new dependency; Bash-event
   latency capturable as its own percentile (consumed as CLOSURE evidence).
 
-### [ ] T-014-05 — Runtime wiring switch to `pre_gate`
+### [x] T-014-05 — Runtime wiring switch to `pre_gate`
 - **Owner:** software-engineer
 - **FR:** FR-W4-01 (wiring) + seed-5 static proof
 - **Files:** `dadaia_workspace/infrastructure/runtime_config.py` (Claude

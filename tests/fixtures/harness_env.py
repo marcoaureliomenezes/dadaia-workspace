@@ -149,7 +149,7 @@ _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
 #: like ``sanitize_session_id``), not a hook entrypoint, so unit-testing it directly is
 #: legitimate. The behavior-import contract test uses this same list.
 HOOK_MODULES: Final[frozenset[str]] = frozenset(
-    {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist"}
+    {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
 )
 
 

@@ -224,23 +224,16 @@ def _active_field(specs_dir: Path, field: str) -> str:
     return m.group(1) if m else ""
 
 
-def main() -> int:
-    """Run the SDD gate. Returns 0 always (block is signaled via the stdout envelope)."""
-    payload = _common.read_stdin_json()
-    name = _common.tool_name(payload)
-    if not _common.is_write_tool(name):
-        return 0
+def _evaluate_target(
+    payload: dict[str, object], workspace: Path, raw_path: str
+) -> tuple[gate_policy.Decision, str]:
+    """Evaluate ONE write-target path through the gate policy.
 
-    raw_path = _common.target_path(payload)
-    if not raw_path:
-        # Fail-safe: unparseable target → ALLOW (never deadlock on a parse miss).
-        return 0
-
-    try:
-        workspace = _resolve_workspace()
-    except Exception:  # noqa: BLE001 — fail-open: unresolved workspace must not block
-        return 0
-
+    Returns ``(ALLOW, "")`` for any allow path and ``(BLOCK, reason)`` for a blocked one.
+    Fail-open: an unresolvable/unattributable MUTATING write yields ALLOW (matches shell).
+    The caller (``main``) iterates every ``apply_patch`` file header and lets the most
+    restrictive verdict win (FR-W4-04) — the first BLOCK short-circuits the whole patch.
+    """
     fpath = Path(raw_path)
     if not fpath.is_absolute():
         fpath = workspace / fpath
@@ -255,7 +248,7 @@ def main() -> int:
 
     # PROTECTED short-circuit (sole fail-CLOSED path): no context/lease work needed.
     if cls == gate_policy.PathClass.PROTECTED:
-        decision, reason = gate_policy.evaluate(
+        return gate_policy.evaluate(
             workspace,
             rel_path,
             ctx="",
@@ -264,9 +257,6 @@ def main() -> int:
             release="",
             mode="",
         )
-        if decision == gate_policy.Decision.BLOCK:
-            _common.emit_block(reason)
-        return 0
 
     ctx = _context_slug(workspace, fpath)
     specs_dir = workspace / "repos" / ctx / "specs" if ctx else workspace / "specs"
@@ -288,9 +278,9 @@ def main() -> int:
     # gate_policy.evaluate (non-acquiring); the no-context fail-open only covers MUTATING
     # writes the gate cannot attribute to any context (no slug, no DADAIA_CONTEXT).
     if cls == gate_policy.PathClass.MUTATING and not ctx:
-        return 0
+        return gate_policy.Decision.ALLOW, ""
 
-    decision, reason = gate_policy.evaluate(
+    return gate_policy.evaluate(
         workspace,
         rel_path,
         ctx=ctx,
@@ -303,7 +293,45 @@ def main() -> int:
         # ephemeral hook child's own — otherwise the no-steal veto probes a dead pid.
         holder_pid=_resolve_holder_pid(payload),
     )
-    if decision == gate_policy.Decision.BLOCK:
+
+
+def evaluate_payload(payload: dict[str, object]) -> str | None:
+    """Pure SDD-gate policy over an ALREADY-PARSED hook payload.
+
+    Returns a block reason string when the write must be BLOCKed, else ``None`` (ALLOW).
+    This is the reusable policy surface the merged ``pre_gate`` entrypoint drives (it reads
+    stdin once and dispatches). ``main`` is a thin wrapper kept one release for back-compat
+    direct wiring (``python -m dadaia_workspace.hooks.sdd_gate``).
+
+    FR-W4-04: classify EVERY write target. A multi-file apply_patch surfaces every file
+    header; the most restrictive verdict wins — the first BLOCK stops the whole patch.
+    """
+    name = _common.tool_name(payload)
+    if not _common.is_write_tool(name):
+        return None
+
+    raw_paths = _common.target_paths(payload)
+    if not raw_paths:
+        # Fail-safe: unparseable target → ALLOW (never deadlock on a parse miss).
+        return None
+
+    try:
+        workspace = _resolve_workspace()
+    except Exception:  # noqa: BLE001 — fail-open: unresolved workspace must not block
+        return None
+
+    for raw_path in raw_paths:
+        decision, reason = _evaluate_target(payload, workspace, raw_path)
+        if decision == gate_policy.Decision.BLOCK:
+            return reason
+    return None
+
+
+def main() -> int:
+    """Run the SDD gate. Returns 0 always (block is signaled via the stdout envelope)."""
+    payload = _common.read_stdin_json()
+    reason = evaluate_payload(payload)
+    if reason is not None:
         _common.emit_block(reason)
     return 0
 

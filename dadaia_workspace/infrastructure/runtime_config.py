@@ -63,22 +63,14 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
     """Return the Claude Code settings.json dict for *workspace_root*."""
     return {
         "hooks": {
+            # FR-W4-01 (T-014-05): a SINGLE merged PreToolUse entrypoint (pre_gate) reads
+            # stdin once and runs root-whitelist → venv-guard → SDD gate in order. The old
+            # dual sdd_gate + root_whitelist wiring is gone (one interpreter spawn per write).
             "PreToolUse": [
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.sdd_gate"),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": _CLAUDE_WRITE_TOOLS,
-                },
-                {
-                    "hooks": [
-                        {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.root_whitelist"
-                            ),
+                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.pre_gate"),
                             "type": "command",
                         }
                     ],
@@ -156,26 +148,17 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
     ctx_inject_module = "dadaia_workspace.hooks.ctx_inject"
     return {
         "hooks": {
+            # FR-W4-01 (T-014-05): single merged PreToolUse entrypoint (pre_gate) — one
+            # interpreter spawn runs root-whitelist → venv-guard → SDD gate. The old dual
+            # sdd_gate + root_whitelist wiring is removed.
             "PreToolUse": [
                 {
                     "matcher": write_matcher,
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.sdd_gate"),
-                            "statusMessage": "Checking SDD gate",
-                        }
-                    ],
-                },
-                {
-                    "matcher": write_matcher,
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.root_whitelist"
-                            ),
-                            "statusMessage": "Checking root whitelist",
+                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.pre_gate"),
+                            "statusMessage": "Checking dadaia PreToolUse gate",
                         }
                     ],
                 },
