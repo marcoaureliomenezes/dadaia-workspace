@@ -1,9 +1,10 @@
 ---
 name: panel-memory-view-unreachable-and-incomplete
-status: Open
+status: Closed
 severity: HIGH
 session_id: sess_4f3a2384
 reported: 2026-06-11
+resolved_in: v0.1.13
 surface: panel Projects tab memory feed (views/index.py chips, views/memory.py root, handler route classes)
 ---
 

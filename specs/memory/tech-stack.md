@@ -41,7 +41,7 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 ## Agent runtimes
 
   * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`.
-  * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..5. 9 agentes core TOML em `.codex/agents/`. Zero leak `claude-*`. Workflows em `.codex/workflows/`.
+  * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..8 (D-CX-4 lint inclui tool-names Claude e tier-names Anthropic). 9 agentes core TOML em `.codex/agents/` com tiering registry-derived (model id × `model_reasoning_effort` via `core/model_registry.codex_tier_views()`; deep→high, dispatch→medium; collapse guard loud-fail). Zero leak `claude-*`/Opus/Sonnet/Haiku. Command policy `.codex/rules/*.rules` em `prefix_rule(...)` com paths venv-form. **Hooks executam só em sessão interativa** — `codex exec` headless não dispara hooks (codex-cli 0.139.0, live-verified; harness opt-in `tests/integration/codex_live/`, `DADAIA_CODEX_LIVE=1`). Workflows em `.codex/workflows/` (reference-only).
   * **OpenCode** : projeção via strip de frontmatter de tools; workflows e skills projetados em `.opencode/`.
   * **CLI** : agentes invocados via `claude --agent <name>` ou equivalente; modo manual sem paralelização automática.
 

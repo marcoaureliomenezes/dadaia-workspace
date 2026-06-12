@@ -18,7 +18,7 @@ tags:
 - enforcement
 agent_tier: self-pull
 token_estimate: 1700
-last_updated: '2026-06-11'
+last_updated: '2026-06-12'
 release_origin: v0.1.10
 ---
 
@@ -181,5 +181,5 @@ Sem este gate, agentes podem escrever em qualquer lugar a qualquer momento — m
 Runtime| PreToolUse| PostToolUse| Observação
 ---|---|---|---
 Claude Code| `.claude/settings.json` `hooks.PreToolUse[*]` matcher `Edit\|Write\|MultiEdit\|NotebookEdit`| `hooks.PostToolUse[*]` matcher `*` (todos os tools)| `python -m dadaia_workspace.hooks.sdd_gate`; Python puro (Windows/macOS/Linux); instalado via `dadaia public install --target claude`
-Codex| `.codex/hooks.json` `PreToolUse` matcher `^(apply_patch\|Edit\|Write)$`| `PostToolUse` **sem matcher** (forma canônica match-all do Codex — heartbeat em todos os tools, incl. Bash)| `SessionStart` (matcher `startup\|resume`) injeta o contexto uma vez por sessão via ctx_inject
+Codex| `.codex/hooks.json` `PreToolUse` matcher `^(apply_patch\|Edit\|Write)$`| `PostToolUse` **sem matcher** (forma canônica match-all do Codex — heartbeat em todos os tools, incl. Bash)| `SessionStart` (matcher `startup\|resume`) injeta o contexto uma vez por sessão via ctx_inject. **Limite live-verificado (codex-cli 0.139.0):** Codex executa command hooks SOMENTE em sessões interativas (TUI) — `codex exec` (headless) nunca dispara nenhum hook, logo o enforcement determinístico no Codex é interactive-only e o caminho de automação headless é discipline-only (bug upstream `codex-exec-hooks-do-not-fire-headless`, Open). Interativamente, o envelope `{"decision":"block"}` é honrado e um write FROZEN via `apply_patch` é bloqueado de fato. Harness vivo: `tests/integration/codex_live/` (opt-in `DADAIA_CODEX_LIVE=1`)
 OpenCode| Plugin TS `sdd-gate.ts` (`tool.execute.before`) chama os hooks Python via subprocess| sem post-hook separado (doctor reporta `[unsupported]` — esperado)| venv-path resolution `.dadaia/.venv/bin/python` → `Scripts/python.exe` → `python`

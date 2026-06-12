@@ -1,8 +1,9 @@
 ---
 name: codex-personas-claude-model-tiering-leak
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-11
+resolved_in: v0.1.13
 surface: runtime_transforms/codex.transform_for_codex + model_mapping.MODEL_MAP (persona-body model guidance)
 session_id: null
 ---
@@ -37,3 +38,10 @@ distinct root cause: MODEL_MAP id-substitution is the wrong abstraction for pers
 ("Registry tier" table, derived from `core/model_registry.py`, which is
 Anthropic-only). Fidelity audit:
 `specs/audits/2026-06-12T001813Z/codex-runtime-fidelity-review.md`.
+
+**Resolution (v0.1.13, T-013-12):** Codex persona model guidance is now rendered
+per-runtime from `core/model_registry.codex_tier_views()` — tier identity is
+(model id × `model_reasoning_effort`), deep→high / dispatch→medium, with a loud
+failure when a mapping collapses two tiers into one id. No Opus/Sonnet/Haiku prose
+survives in Codex-projected persona bodies; D-CX-4 lints Anthropic tier names.
+Evidence in `specs/_archive/releases/v0.1.13/CLOSURE.md` (Dispositions).

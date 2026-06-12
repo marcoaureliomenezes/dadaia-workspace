@@ -4,6 +4,7 @@ status: Closed
 severity: HIGH
 session_id: null
 reported: 2026-06-11
+resolved_in: v0.1.13
 surface: panel Academy tab (/api/academy + academy.js + lesson serving)
 ---
 

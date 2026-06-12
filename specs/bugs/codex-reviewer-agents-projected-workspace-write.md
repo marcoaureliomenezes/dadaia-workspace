@@ -1,8 +1,9 @@
 ---
 name: codex-reviewer-agents-projected-workspace-write
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-11
+resolved_in: v0.1.13
 surface: dadaia_workspace/infrastructure/runtime_transforms/codex_assets.py / .codex/agents/*.toml
 session_id: sess_efebeec4
 ---
@@ -32,3 +33,8 @@ should be classified consistently with its persona.
 configuration individually and inherit the parent runtime overrides. Dadaia should use
 that field to make role boundaries mechanically visible in Codex, especially where the
 persona says "never edit".
+
+**Resolution (v0.1.13, T-013-04):** evidence-only reviewers (`code-reviewer`,
+`security-reviewer`) project as `sandbox_mode = "read-only"`; the stale
+`security-engineer` allowlist entry was corrected; codex_doctor verifies role
+boundaries. Evidence in `specs/_archive/releases/v0.1.13/CLOSURE.md` (Dispositions).

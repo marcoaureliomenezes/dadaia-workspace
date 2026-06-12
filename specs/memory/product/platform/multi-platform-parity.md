@@ -3,11 +3,14 @@ slug: multi-platform-parity
 title: multi-platform-parity
 category: product
 tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules)."
-summary: Codex uses native config, shared and Codex-specific skills, hook parity,
-  native Starlark .rules command policy, workflow docs that do not auto-execute,
-  and Codex custom-agent wording. Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer,
-  design-specialist, devops-engineer) project as thin stubs with no behavior until
-  the plugin is installed.
+summary: Codex uses native config, shared and Codex-specific skills, interactive-only
+  hook execution (codex exec never fires hooks — automation path is discipline-only),
+  native Starlark .rules command policy with venv-path prefix_rule patterns, workflow
+  docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and
+  registry-derived Codex-native model tiering (model id × model_reasoning_effort).
+  Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs
+  (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with
+  no behavior until the plugin is installed.
 tags:
 - codex
 - opencode
@@ -16,7 +19,7 @@ tags:
 - multi-platform
 agent_tier: self-pull
 token_estimate: 606
-last_updated: '2026-06-07'
+last_updated: '2026-06-12'
 release_origin: v0.2.2
 ---
 
@@ -50,17 +53,34 @@ Codex receives:
 
 - `AGENTS.md` as the automatically loaded workspace rule surface.
 - `.codex/config.toml` containing `[agents."<name>"] config_file = "agents/<name>.toml"`
-  entries for all projected agents.
-- `.codex/agents/*.toml` containing native custom-agent definitions, mapped Codex
-  models, `sandbox_mode`, `model_reasoning_effort`, and developer instructions.
-- `[skills] paths = [".agents/skills", ".codex/skills"]` so shared skills and
-  Codex-only adapters are explicit.
+  entries for all projected agents — `config_file` is a real, live-verified config
+  key. The file still emits `approved_commands` and `[skills] paths`, but both are
+  live-verified INVALID config keys in codex-cli 0.139.0 (inert — no runtime
+  behavior; skill discovery does not flow through `[skills] paths`). Their removal
+  is deferred backlog (`codex-runtime-fidelity` WS-CDX-HYGIENE).
+- `.codex/agents/*.toml` containing native custom-agent definitions, registry-derived
+  Codex models, `sandbox_mode`, `model_reasoning_effort`, and developer instructions.
+  The `description` field runs through the same Claude-ism replacement table as the
+  body. Evidence-only reviewers (`code-reviewer`, `security-reviewer`,
+  `project-auditor`) project as `sandbox_mode = "read-only"`. Model guidance is
+  rendered per-runtime from `core/model_registry.codex_tier_views()` — tier identity
+  is (model id × `model_reasoning_effort`), deep→high / dispatch→medium, with a loud
+  failure when a mapping collapses two tiers into one id. No Opus/Sonnet/Haiku prose
+  survives in Codex-projected persona bodies (doctor D-CX-4 lints Anthropic tier
+  names and Claude tool names like `Agent tool`/`Task tool`).
 - `.codex/rules/dadaia-command-policy.rules` as the executable Starlark command-policy
-  rule. Markdown files under `public/rules/*.md` remain behavioral protocols and are not
-  projected as executable Codex Rules.
-- `.codex/hooks.json` with `PreToolUse`, `PostToolUse`, and `UserPromptSubmit`
-  entries where the runtime supports them.
-- broad hook matchers; shell scripts decide whether a tool call is relevant.
+  rule using documented `prefix_rule(...)` declarations whose patterns match the
+  mandated venv-path invocation form (`.dadaia/.venv/bin/dadaia ...`), proven by
+  real-form `match=` examples. Markdown files under `public/rules/*.md` remain
+  behavioral protocols and are not projected as executable Codex Rules.
+- `.codex/hooks.json` with `PreToolUse` (anchored matcher
+  `^(apply_patch|Edit|Write)$` — valid form), `PostToolUse` (match-all), and
+  `UserPromptSubmit`/`SessionStart` entries. **Honesty boundary (live-verified,
+  codex-cli 0.139.0):** Codex executes command hooks ONLY in interactive (TUI)
+  sessions — `codex exec` (headless) never fires them, so deterministic SDD-gate
+  enforcement on Codex is interactive-only and the Codex automation path is
+  discipline-only. Live contract harness: `tests/integration/codex_live/` (opt-in
+  `DADAIA_CODEX_LIVE=1`).
 - workflows installed as reference docs; workflow Markdown does not auto-execute.
 - dispatch wording based on Codex custom agents, never fake tool names or stale
   tool-discovery promises.

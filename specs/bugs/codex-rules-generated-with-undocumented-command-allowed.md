@@ -1,8 +1,9 @@
 ---
 name: codex-rules-generated-with-undocumented-command-allowed
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-11
+resolved_in: v0.1.13
 surface: dadaia_workspace/infrastructure/runtime_transforms/codex_assets.py / .codex/rules/dadaia-command-policy.rules
 session_id: sess_efebeec4
 ---
@@ -31,3 +32,8 @@ silently ignored or fail to load in current Codex.
 **Notes:** Found while refreshing official Codex documentation for the requested
 Codex entity academy/skill/audit work. Relevant official page:
 https://developers.openai.com/codex/rules
+
+**Resolution (v0.1.13, T-013-03):** generation rewritten to documented
+`prefix_rule(...)` declarations (no `command_allowed`); shape verified by focused
+tests, and the projected file confirms the documented form. Evidence in
+`specs/_archive/releases/v0.1.13/CLOSURE.md` (Dispositions).

@@ -1,8 +1,9 @@
 ---
 name: codex-agent-description-claude-ism-leak
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-11
+resolved_in: v0.1.13
 surface: install_helpers.install_codex_agents + runtime_transforms/codex.transform_for_codex + codex_doctor D-CX-4
 session_id: null
 ---
@@ -27,3 +28,8 @@ artifacts.
 `specs/audits/2026-06-12T001813Z/codex-runtime-fidelity-review.md`. Body transform is
 applied at `install_helpers.py` (`install_codex_agents`); description passthrough is
 the gap.
+
+**Resolution (v0.1.13, T-013-09):** `description` now runs through the same
+replacement table as the body; D-CX-4 flags Claude tool names (`Agent tool`,
+`Task tool`) in Codex artifacts; unit tests cover both. Evidence in
+`specs/_archive/releases/v0.1.13/CLOSURE.md` (Dispositions).

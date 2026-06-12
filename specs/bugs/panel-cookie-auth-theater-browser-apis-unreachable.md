@@ -1,9 +1,10 @@
 ---
 name: panel-cookie-auth-theater-browser-apis-unreachable
-status: Open
+status: Closed
 severity: CRITICAL
 session_id: sess_4f3a2384
 reported: 2026-06-11
+resolved_in: v0.1.13
 surface: panel auth architecture (features/panel/{auth,handler}.py + views/assets/js/core.js)
 ---
 
@@ -53,3 +54,11 @@ simulation of cookie+header behavior).
 **Notes:** found during operator live review of the v0.1.11 panel; v0.1.11 shipped
 the regression half, the plain-fetch and memory-view halves predate it. No
 operator-local data in this record.
+
+**Resolution (v0.1.13 window, live-review commits `9d02f7f`/`ab859c7` — solved
+outside the release's folded bug table):** the operator killed panel auth entirely
+for the loopback boundary — token/cookie machinery removed; the only residual guard
+is a Host-header allowlist (DNS-rebinding protection, not authentication) in
+`features/panel/handler.py`. Browser API calls work with zero credential; the
+incoherent cookie/Bearer/localStorage triangle no longer exists. Verified present in
+the working tree at v0.1.13 closure.
