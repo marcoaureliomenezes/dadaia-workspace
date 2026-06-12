@@ -1,25 +1,30 @@
 /**
  * kanban-tab.spec.ts — PW-KAN-01 through PW-KAN-05 (panel-kanban-v1 K-2)
- * Updated for T-016-P13: canonical §7 lifecycle columns.
+ * Updated for kanban-v2 (lifecycle-truth board, ab859c7 operator live-review
+ * round 2). Backend contract: dadaia_workspace/features/panel/views/kanban.py.
  *
- * New column layout: Backlog | Release Definition | Implementation + Review | Closure
- *   backlog      → "Backlog"                (READ sessions)
- *   release_def  → "Release Definition"     (SPEC sessions)
+ * kanban-v2 column layout (the Backlog column is RETIRED):
+ *   release_def  → "Release Definition"      (SPEC sessions; release card in DEFINITION/SPEC/PLAN)
  *   impl_review  → "Implementation + Review" (BOUND_IMPLEMENTATION + BOUND_REVIEW, combined)
- *   closure      → "Closure"               (present-but-empty; no session mode maps here yet)
+ *   closure      → "Closure"                 (release card in CLOSURE)
+ *   observers    → "Observers" strip         (live READ sessions — NOT a column;
+ *                                             rendered below the columns, only when non-empty)
+ * Stale-and-dead sessions are dropped by the backend and never become cards;
+ * the FE keeps the per-card data-stale indicator pathway for is_stale flags.
  *
  * Tests: 5 Playwright board scenarios (AC-2.1 through AC-2.5)
  * Surface:
  *   AC-2.1 (PW-KAN-01): 2 BOUND_IMPLEMENTATION sessions from distinct contexts →
- *     4 columns visible; impl_review column has 2 cards with 2 distinct data-context.
- *   AC-2.2 (PW-KAN-02): 4 sessions, one per mode → correct column placement;
- *     BOUND_REVIEW and BOUND_IMPLEMENTATION share the impl_review column;
+ *     3 columns per lane (6 total); impl_review has 2 cards with 2 distinct data-context.
+ *   AC-2.2 (PW-KAN-02): 4 sessions, one per mode → correct placement; READ lands in
+ *     the Observers strip; BOUND_REVIEW + BOUND_IMPLEMENTATION share impl_review;
  *     session IDs match fixture.
  *   AC-2.3 (PW-KAN-03): XOR-lock dimming retired; impl_review column has card from
  *     BOUND_IMPLEMENTATION; no data-locked="true" present anywhere.
- *   AC-2.4 (PW-KAN-04): No session files → 4 columns visible; each shows
- *     data-testid="kanban-empty-placeholder".
- *   AC-2.5 (PW-KAN-05): One stale session → card has data-stale="true".
+ *   AC-2.4 (PW-KAN-04): Idle lane → 3 columns visible, each with an
+ *     empty-placeholder, plus the "No active release or live sessions" lane message.
+ *   AC-2.5 (PW-KAN-05): is_stale-flagged card (Observers strip) renders
+ *     data-stale="true" — the FE stale-indicator pathway is preserved.
  *
  * Live FE mode (mirrors test_panel_sessions_tab.spec.ts pattern):
  *   1. Navigate to the panel origin (http://127.0.0.1:4999).
@@ -107,14 +112,18 @@ function buildKanbanPageHtml(): string {
 // Session card fixture factory
 // ---------------------------------------------------------------------------
 
+// kanban-v2 session Card shape (views/kanban.py response schema). is_stale is
+// not emitted by the v2 backend (stale sessions are dropped) but the FE retains
+// the indicator pathway — PW-KAN-05 exercises it explicitly.
 interface SessionCard {
+  card_kind: 'session';
   session_id: string;
   mode: string;
   release: string | null;
-  runtime: string;
-  pid: number;
-  last_seen_at: string;
-  is_stale: boolean;
+  started_at: string | null;
+  last_seen_at: string | null;
+  age_seconds: number | null;
+  is_stale?: boolean;
 }
 
 function makeCard(
@@ -123,12 +132,13 @@ function makeCard(
   opts: Partial<SessionCard> = {}
 ): SessionCard {
   return {
+    card_kind: 'session',
     session_id: sessionId,
     mode,
     release: opts.release ?? 'my-release-v1',
-    runtime: opts.runtime ?? 'claude-code',
-    pid: opts.pid ?? 12345,
+    started_at: opts.started_at ?? '2026-05-31T09:00:00Z',
     last_seen_at: opts.last_seen_at ?? '2026-05-31T10:00:00Z',
+    age_seconds: opts.age_seconds ?? 120,
     is_stale: opts.is_stale ?? false,
   };
 }
@@ -216,25 +226,26 @@ test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct conte
   page,
 }) => {
   const payload = {
+    schema: 'kanban-v2',
     generated_at: '2026-05-31T10:00:00Z',
     swimlanes: [
       {
         context: 'ctx-alpha',
         columns: {
-          backlog:     [],
           release_def: [],
-          impl_review: [makeCard('sess_alpha_impl', 'BOUND_IMPLEMENTATION', { runtime: 'claude-code' })],
+          impl_review: [makeCard('sess_alpha_impl', 'BOUND_IMPLEMENTATION')],
           closure:     [],
         },
+        observers: [],
       },
       {
         context: 'ctx-beta',
         columns: {
-          backlog:     [],
           release_def: [],
-          impl_review: [makeCard('sess_beta_impl', 'BOUND_IMPLEMENTATION', { runtime: 'codex' })],
+          impl_review: [makeCard('sess_beta_impl', 'BOUND_IMPLEMENTATION')],
           closure:     [],
         },
+        observers: [],
       },
     ],
   };
@@ -245,9 +256,9 @@ test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct conte
   const laneCount = await page.$$eval('.kanban-lane', (els) => els.length);
   expect(laneCount).toBe(2);
 
-  // 4 columns must be visible per lane (8 total).
+  // 3 lifecycle columns per lane (6 total) — Backlog is retired in kanban-v2.
   const colCount = await page.$$eval('.kanban-column', (els) => els.length);
-  expect(colCount).toBe(8);
+  expect(colCount).toBe(6);
 
   // impl_review column cards: 2 cards total, from 2 distinct data-context values.
   // No XOR-lock dimming — all kanban-card elements are equally accessible.
@@ -272,15 +283,16 @@ test('PW-KAN-01 (AC-2.1) — 2 BOUND_IMPLEMENTATION sessions from distinct conte
 test('PW-KAN-02 (AC-2.2) — 4 sessions across §7 lifecycle columns; BOUND_REVIEW and BOUND_IMPLEMENTATION share impl_review; session IDs match fixture', async ({
   page,
 }) => {
-  // Note: BOUND_IMPLEMENTATION and BOUND_REVIEW both map to impl_review (combined column).
-  // The payload here reflects the server-side grouping (both in impl_review).
+  // Note: BOUND_IMPLEMENTATION and BOUND_REVIEW both map to impl_review (combined
+  // column). READ sessions are routed to the Observers strip in kanban-v2 (the
+  // Backlog column is retired). The payload reflects the server-side grouping.
   const payload = {
+    schema: 'kanban-v2',
     generated_at: '2026-05-31T10:00:00Z',
     swimlanes: [
       {
         context: 'ctx-main',
         columns: {
-          backlog:     [makeCard('sess_read',   'READ')],
           release_def: [makeCard('sess_spec',   'SPEC')],
           impl_review: [
             makeCard('sess_impl',   'BOUND_IMPLEMENTATION'),
@@ -288,6 +300,7 @@ test('PW-KAN-02 (AC-2.2) — 4 sessions across §7 lifecycle columns; BOUND_REVI
           ],
           closure:     [],
         },
+        observers: [makeCard('sess_read', 'READ')],
       },
     ],
   };
@@ -298,16 +311,24 @@ test('PW-KAN-02 (AC-2.2) — 4 sessions across §7 lifecycle columns; BOUND_REVI
   const laneCount = await page.$$eval('.kanban-lane', (els) => els.length);
   expect(laneCount).toBe(1);
 
-  // closure column has 1 empty placeholder (3 other columns have cards).
+  // closure column has 1 empty placeholder (the 2 other columns have cards).
   const placeholders = await page.$$eval(
     '[data-testid="kanban-empty-placeholder"]',
     (els) => els.length
   );
   expect(placeholders).toBe(1);
 
-  // Total 4 cards (backlog: 1, release_def: 1, impl_review: 2, closure: 0).
+  // Total 4 cards (release_def: 1, impl_review: 2, closure: 0, observers: 1).
   const totalCards = await page.$$eval('.kanban-card', (els) => els.length);
   expect(totalCards).toBe(4);
+
+  // The READ session must render inside the Observers strip, not a column.
+  const observerIds = await page.$$eval(
+    '.kanban-observers .kanban-card',
+    (els) => els.map((el) => el.textContent ?? '')
+  );
+  expect(observerIds.length).toBe(1);
+  expect(observerIds[0]).toContain('sess_read');
 
   // Session IDs must appear somewhere in the board.
   const boardText = await page.textContent('#kanban-board');
@@ -330,16 +351,17 @@ test('PW-KAN-03 (AC-2.3) — XOR-lock dimming retired; BOUND_IMPLEMENTATION card
   page,
 }) => {
   const payload = {
+    schema: 'kanban-v2',
     generated_at: '2026-05-31T10:00:00Z',
     swimlanes: [
       {
         context: 'ctx-combined',
         columns: {
-          backlog:     [],
           release_def: [],
           impl_review: [makeCard('sess_impl_combined', 'BOUND_IMPLEMENTATION')],
           closure:     [],
         },
+        observers: [],
       },
     ],
   };
@@ -372,37 +394,42 @@ test('PW-KAN-03 (AC-2.3) — XOR-lock dimming retired; BOUND_IMPLEMENTATION card
 // PW-KAN-04 (AC-2.4) — No session files → 4 columns visible, each empty
 // ---------------------------------------------------------------------------
 
-test('PW-KAN-04 (AC-2.4) — No session files (empty swimlane) → 4 empty-placeholder elements visible (§7 lifecycle columns)', async ({
+test('PW-KAN-04 (AC-2.4) — No session files (empty swimlane) → 3 empty-placeholder elements visible (§7 lifecycle columns)', async ({
   page,
 }) => {
-  // Simulate a context with no sessions: all columns empty.
+  // Simulate an idle context: no release card, no sessions, no observers.
   const payload = {
+    schema: 'kanban-v2',
     generated_at: '2026-05-31T10:00:00Z',
     swimlanes: [
       {
         context: 'ctx-empty',
         columns: {
-          backlog:     [],
           release_def: [],
           impl_review: [],
           closure:     [],
         },
+        observers: [],
       },
     ],
   };
 
   await loadKanbanTab(page, payload);
 
-  // 4 empty-placeholder elements (one per column).
+  // 3 empty-placeholder elements (one per kanban-v2 lifecycle column).
   const placeholders = await page.$$eval(
     '[data-testid="kanban-empty-placeholder"]',
     (els) => els.length
   );
-  expect(placeholders).toBe(4);
+  expect(placeholders).toBe(3);
 
-  // 4 columns visible.
+  // 3 columns visible (Backlog retired in kanban-v2).
   const colCount = await page.$$eval('.kanban-column', (els) => els.length);
-  expect(colCount).toBe(4);
+  expect(colCount).toBe(3);
+
+  // The idle-lane message must be shown.
+  const emptyMsg = await page.textContent('.kanban-lane-empty');
+  expect(emptyMsg).toContain('No active release or live sessions');
 
   // No cards.
   const cardCount = await page.$$eval('.kanban-card', (els) => els.length);
@@ -440,28 +467,35 @@ test('PW-KAN-04-variant — /api/kanban empty swimlanes → "No Spec Context Pro
 });
 
 // ---------------------------------------------------------------------------
-// PW-KAN-05 (AC-2.5) — Stale session → card has data-stale="true"
+// PW-KAN-05 (AC-2.5) — is_stale-flagged card renders data-stale="true"
+//
+// kanban-v2 backend drops stale-and-dead sessions entirely (they never become
+// cards), but the FE retains the per-card data-stale indicator pathway for an
+// is_stale flag. This test pins that FE contract: a READ card flagged is_stale
+// (Observers strip) must render data-stale="true".
 // ---------------------------------------------------------------------------
 
-test('PW-KAN-05 (AC-2.5) — Stale session → card has data-stale="true"', async ({
+test('PW-KAN-05 (AC-2.5) — Stale-flagged session card renders data-stale="true" (FE indicator pathway)', async ({
   page,
 }) => {
   const staleCard = makeCard('sess_stale', 'READ', {
     is_stale: true,
     last_seen_at: '2026-05-31T08:00:00Z',
+    age_seconds: 7200,
   });
 
   const payload = {
+    schema: 'kanban-v2',
     generated_at: '2026-05-31T10:00:00Z',
     swimlanes: [
       {
         context: 'ctx-stale',
         columns: {
-          backlog:     [staleCard],
           release_def: [],
           impl_review: [],
           closure:     [],
         },
+        observers: [staleCard],
       },
     ],
   };

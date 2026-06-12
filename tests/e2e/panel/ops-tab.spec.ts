@@ -63,14 +63,15 @@ test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, and 
   // Kanban board must be in the DOM
   await expect(page.locator('#kanban-board')).toBeAttached();
 
-  // Subsection order: Kanban (top) → Workflows → Agents (bottom) — T-016-P11
+  // Subsection order: Agents (top) → Workflows → Kanban (bottom) — Agentic tab
+  // restructure (operator live-review round 2, ab859c7) supersedes T-016-P11.
   const subsectionIds = await page.$$eval(
     '#section-ops .ops-subsection',
     (els) => els.map((el) => el.id)
   );
-  expect(subsectionIds[0]).toBe('ops-subsection-kanban');
+  expect(subsectionIds[0]).toBe('ops-subsection-agents');
   expect(subsectionIds[1]).toBe('ops-subsection-workflows');
-  expect(subsectionIds[2]).toBe('ops-subsection-agents');
+  expect(subsectionIds[2]).toBe('ops-subsection-kanban');
 });
 
 // ---------------------------------------------------------------------------
@@ -86,8 +87,13 @@ test('OPS-03 — Agents sub-section loads real agent cards inside the Ops tab', 
   expect(count).toBeGreaterThan(0);
 
   const first = cards.first();
+  // Minimalist card redesign (ab859c7): status badge removed from the collapsed
+  // card; the Model fact (real id or explicit "inherited default") is the
+  // non-empty content contract now.
   await expect(first.locator('.agent-card__name')).toHaveText(/\S+/);
-  await expect(first.locator('.agent-status-badge')).toHaveText(/ACTIVE|INACTIVE/i);
+  await expect(
+    first.locator('.agent-card__model-id, .agent-card__model-inherited')
+  ).toHaveText(/\S+/);
 });
 
 // ---------------------------------------------------------------------------
