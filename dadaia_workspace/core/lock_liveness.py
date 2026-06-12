@@ -4,13 +4,23 @@ This is the *only* place ``(now - heartbeat) >= ttl`` is evaluated. It is a pure
 model-layer function: zero I/O, stdlib-only imports, and every time/process/session
 seam is injected so callers (and tests) stay deterministic.
 
-Design decisions (state-model redesign, OQ-1):
-  * **No PID.** Liveness is TTL-only so the lease is cross-platform (Windows-safe).
-    ``pid_probe`` is accepted for injection-signature compatibility but never used.
+Design decisions (state-model redesign, OQ-1; PID lesson restored WS-R2 FR-R2-03):
+  * **TTL is the floor; PID is the veto (WS-R2).** The TTL rule decides reclaimability
+    on its own, but when a record carries a ``pid`` and an injected ``pid_probe`` reports
+    that pid is **still alive**, a TTL-expired record is treated as *live* (NOT stale) —
+    this is the no-steal half: a foreign session that is genuinely still running keeps its
+    lease past the heartbeat TTL, so ``lease.acquire`` BLOCKs instead of taking over. When
+    ``pid_probe`` is ``None`` (no platform liveness, or the record has no ``pid``), the
+    predicate falls back to TTL-only exactly as before — cross-platform safe, no regression.
+    The probe is **only consulted to keep an otherwise-stale record alive**; it can never
+    make a TTL-fresh record stale, and a dead/absent pid yields the plain TTL verdict
+    (TTL-stale ⇒ reclaimable ⇒ TAKEOVER).
   * **Fail-open on corrupt.** A record that is absent, missing required fields, or
     has an unparseable heartbeat is treated as *stale* (acquirable), never as a
     live lock. This is the operator's overriding mandate: the lease must never
     deadlock a session. A corrupt record is reclaimed inline by ``lease.acquire``.
+    A probe that itself raises is swallowed → fall back to the TTL verdict (never
+    deadlock on a probe bug).
   * **Boundary inclusive.** ``elapsed == ttl`` is stale (``>=``), and ``ttl == 0``
     is always stale.
 """
@@ -52,8 +62,15 @@ def is_stale(
         ``FakeClock`` so the predicate body contains zero direct ``datetime.now``
         calls.
     pid_probe:
-        Accepted for injection-signature compatibility only. **Never used**
-        (OQ-1: liveness is TTL-only, no PID).
+        Optional liveness callable ``(pid: int) -> bool`` (WS-R2 FR-R2-03). When the
+        record carries an integer ``pid`` and this probe reports it **alive**, an
+        otherwise TTL-expired record is treated as *live* (returns ``False``) so a
+        foreign holder that is still running is never taken over. ``None`` (default) ⇒
+        TTL-only behavior, unchanged — the cross-platform fallback for hosts without a
+        liveness seam, and for legacy records that carry no ``pid``. The probe is wired
+        from ``hooks/sdd_gate.py`` via the container's ``OsProcessProbe`` (``features``
+        never imports the adapter). A dead/absent pid, or a probe that raises, yields the
+        plain TTL verdict.
     session_exists:
         Accepted for injection-signature compatibility only. Reserved for a
         future fast-path identity check; not consulted by the TTL rule.
@@ -92,7 +109,29 @@ def is_stale(
         heartbeat_dt = heartbeat_dt.replace(tzinfo=UTC)
 
     elapsed = (clock() - heartbeat_dt).total_seconds()
-    return bool(elapsed >= ttl)
+    ttl_stale = bool(elapsed >= ttl)
+    if not ttl_stale:
+        return False
+
+    # TTL says reclaimable. WS-R2 FR-R2-03: veto the takeover when the holder process is
+    # demonstrably still alive. Only consulted on the TTL-stale branch — a fresh record is
+    # already live above, so the probe can never *create* staleness, only suppress it.
+    if pid_probe is None:
+        return True
+    pid = data.get("pid")
+    if not isinstance(pid, int) or pid <= 0:
+        return True  # legacy/absent pid ⇒ no veto ⇒ TTL verdict (reclaimable).
+    try:
+        alive = pid_probe(pid)
+    except Exception:  # noqa: BLE001 — a probe bug must never deadlock; fall back to TTL.
+        logger.warning("lease pid_probe raised for pid %r; falling back to TTL verdict", pid)
+        return True
+    if alive:
+        logger.info(
+            "lease record TTL-expired but holder pid %d is alive; not stale (no takeover)", pid
+        )
+        return False
+    return True
 
 
 def is_stale_session(last_seen_at: str, ttl_seconds: int) -> bool:

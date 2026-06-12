@@ -3,13 +3,24 @@
 Extracted from ``public_assets.py`` to keep that module under 600 lines.
 All names remain importable from ``dadaia_workspace.infrastructure.public_assets``
 via its re-export block.
+
+Fail-closed posture (R7b / sec F-2): when the operator-private denylist is
+absent (fresh clone, CI, pip install) the check is **never** a no-op. A
+versioned, in-package *baseline structural scan* runs instead, flagging IP
+literals, internal hostnames, ``/home/<user>`` paths, emails, and secret-looking
+tokens in the public/ asset payload. Operator denylist terms, when present, are
+merged additively on top of the baseline.
 """
 
 from __future__ import annotations
 
+import importlib.resources
 import json
 import os
+import re
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
@@ -39,9 +50,73 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
 #   2. <workspace_root>/.dadaia/states/privacy_denylist.json
 #      where workspace_root is resolved by walking up from cwd looking for the
 #      .dadaia/states/spec_contexts.json sentinel (via resolve_workspace_root).
-# Format: [["term", "reason"], ...] or {"term": "reason", ...}. Absent -> no terms.
+# Format: [["term", "reason"], ...] or {"term": "reason", ...}.
+# Absent -> the baseline structural scan (below) runs instead; the check is
+# never a no-op (fail-closed).
 _PRIVACY_DENYLIST_ENV = "DADAIA_PRIVACY_DENYLIST"
 _PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
+
+# Packaged, versioned baseline of STRUCTURAL patterns. Shipped inside the wheel
+# so the check is fail-closed even with no operator denylist. Operator terms are
+# additive on top of these.
+_PRIVACY_BASELINE_PKG = "dadaia_workspace.infrastructure.data"
+_PRIVACY_BASELINE_FILE = "privacy_baseline.json"
+
+_OK_MARKER = "[ok] public-privacy"
+# Distinct ok line so an operator can tell which mode actually ran.
+_BASELINE_OK_MARKER = "[ok] public-privacy (baseline structural scan, no operator denylist)"
+
+
+@dataclass(frozen=True)
+class _BaselinePattern:
+    """A compiled structural pattern from the packaged baseline."""
+
+    id: str
+    regex: re.Pattern[str]
+    reason: str
+    exclude: re.Pattern[str] | None
+
+
+@lru_cache(maxsize=1)
+def _load_privacy_baseline() -> tuple[_BaselinePattern, ...]:
+    """Load and compile the packaged baseline structural patterns.
+
+    The baseline ships inside the wheel under
+    ``dadaia_workspace/infrastructure/data/privacy_baseline.json`` (versioned,
+    documented ``_header``). A malformed or absent file yields an empty tuple —
+    but the file is part of the distribution, so this is a defensive fallback,
+    not the normal absent-operator-denylist path.
+    """
+    try:
+        resource = importlib.resources.files(_PRIVACY_BASELINE_PKG) / _PRIVACY_BASELINE_FILE
+        raw = json.loads(resource.read_text(encoding="utf-8"))
+    except (OSError, ValueError, ModuleNotFoundError):
+        return ()
+    patterns: list[_BaselinePattern] = []
+    for entry in raw.get("patterns", []):
+        if not isinstance(entry, dict):
+            continue
+        pattern_id = str(entry.get("id", ""))
+        regex_src = entry.get("regex")
+        if not isinstance(regex_src, str) or not regex_src:
+            continue
+        exclude_src = entry.get("exclude_regex")
+        try:
+            compiled = re.compile(regex_src)
+            exclude = (
+                re.compile(exclude_src) if isinstance(exclude_src, str) and exclude_src else None
+            )
+        except re.error:
+            continue
+        patterns.append(
+            _BaselinePattern(
+                id=pattern_id,
+                regex=compiled,
+                reason=str(entry.get("reason", "structural privacy match")),
+                exclude=exclude,
+            )
+        )
+    return tuple(patterns)
 
 
 def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
@@ -84,17 +159,47 @@ def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
     return ()
 
 
+def _scan_text_for_baseline(
+    text: str, patterns: Iterable[_BaselinePattern]
+) -> list[tuple[str, str]]:
+    """Return ``(matched_text, reason)`` pairs for baseline structural hits.
+
+    Each match is filtered through the pattern's optional ``exclude`` regex so
+    loopback / documentation IP ranges, example hostnames, and SHA-like tokens
+    do not produce false positives.
+    """
+    hits: list[tuple[str, str]] = []
+    for pattern in patterns:
+        for match in pattern.regex.finditer(text):
+            value = match.group(0)
+            if pattern.exclude is not None and pattern.exclude.search(value):
+                continue
+            hits.append((value, pattern.reason))
+    return hits
+
+
 def check_public_privacy(
     public_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
     is_ignored_fn: Callable[[Path], bool],
 ) -> list[str]:
-    """Fail doctor if public distributed assets contain known private identifiers."""
+    """Fail doctor if public distributed assets contain private identifiers.
+
+    Two complementary layers, always at least one runs (fail-closed):
+
+    * **Operator denylist** (additive, when present): literal-substring terms
+      supplied by the workspace operator outside the package.
+    * **Baseline structural scan** (always available, in-package): regex
+      patterns for IP/hostname/path/email/secret literals.
+
+    The emitted ``[ok]`` line distinguishes the absent-denylist baseline mode
+    explicitly so an operator can confirm a real scan ran.
+    """
     lib_root = public_dir.parent.parent
     roots: list[Path] = [public_dir]
     denylist = _load_privacy_denylist()
-    if not denylist:
-        return ["[ok] public-privacy"]
+    baseline = _load_privacy_baseline()
+    baseline_only = not denylist
     root_agents = lib_root / "AGENTS.md"
     if root_agents.exists():
         roots.append(root_agents)
@@ -111,13 +216,17 @@ def check_public_privacy(
                 text = path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
+            rel = path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
             lowered = text.lower()
             for term, reason in denylist:
                 if term.lower() in lowered:
-                    rel = path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
                     findings.append(
                         f"[error] public-privacy:{rel.as_posix()}: contains '{term}' ({reason})"
                     )
-    if not findings:
-        findings.append("[ok] public-privacy")
-    return findings
+            for value, reason in _scan_text_for_baseline(text, baseline):
+                findings.append(
+                    f"[error] public-privacy:{rel.as_posix()}: baseline match '{value}' ({reason})"
+                )
+    if findings:
+        return findings
+    return [_BASELINE_OK_MARKER if baseline_only else _OK_MARKER]

@@ -4,17 +4,18 @@ title: workspace-init
 category: product
 tldr: porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente.
 summary: porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura
-  idempotente; hooks registrados como comandos Python (python -m dadaia_workspace.hooks.*),
-  não bash; ctx-inject.sh retido apenas como fallback não-instalado.
+  idempotente; PreToolUse registrado como UM comando Python (python -m
+  dadaia_workspace.hooks.pre_gate), não bash; ctx-inject.sh retido apenas como
+  fallback não-instalado.
 tags:
 - workspace
 - init
 - setup
 - idempotent
 agent_tier: self-pull
-token_estimate: 450
-last_updated: '2026-06-09'
-release_origin: memory-markdown-source-v1
+token_estimate: 620
+last_updated: '2026-06-12'
+release_origin: v0.1.14
 ---
 
 CLI surface: `dadaia init [--workspace PATH] [--skip-assets]` · Closure: sdd-release-lifecycle-v1
@@ -23,7 +24,7 @@ CLI surface: `dadaia init [--workspace PATH] [--skip-assets]` · Closure: sdd-re
 
 Porta de entrada do produto. Bootstrapa um workspace novo criando a estrutura idempotente em `.dadaia/` (academy, agentic, reports, scripts, states, src), o virtualenv Python (`.venv`), os diretórios de runtime dos quatro tools agentic (`.claude/`, `.agents/`, `.codex/`, `.opencode/`), faz stage+install dos assets canônicos públicos (agentes, skills, workflows, commands, rules, templates, scripts) e configura os hooks de governança em `.claude/settings.json` e `.codex/hooks.json`.
 
-Os hooks de governança são registrados como **comandos Python** (`python -m dadaia_workspace.hooks.<name>`) via `infrastructure/runtime_config.py`. Não há dependência de bash para os hooks de SDD — o pacote `dadaia_workspace/hooks/` (6 módulos: `__init__`, `_common`, `sdd_gate`, `root_whitelist`, `ctx_inject`, `sdd_post_gate`) provê os hooks em Python puro, funcionando em Windows, macOS e Linux sem Git Bash ou WSL.
+Os hooks de governança são registrados como **comandos Python** (`python -m dadaia_workspace.hooks.<name>`) via `infrastructure/runtime_config.py`. Não há dependência de bash para os hooks de SDD — o pacote `dadaia_workspace/hooks/` (8 módulos: `__init__`, `_common`, `pre_gate`, `sdd_gate`, `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`) provê os hooks em Python puro, funcionando em Windows, macOS e Linux sem Git Bash ou WSL. O PreToolUse é UM único comando (`pre_gate`, que avalia root-whitelist → venv-guard → SDD gate, first-block-wins). Os git chokepoints (pre-commit lease gate + pre-push CI/security gate) são instalados separadamente por `dadaia ci install-hook`.
 
 `workspace/service.py` reconhece tanto o caminho antigo (`.sh`) quanto o novo comando Python para evitar dupla-registro durante workspaces migrados. O script bash `ctx-inject.sh` existe em `.dadaia/scripts/` como artefato legado, mas não é mais o mecanismo de hook registrado.
 
@@ -36,7 +37,7 @@ Os hooks de governança são registrados como **comandos Python** (`python -m da
   3. `PythonEnvironmentManager` provisiona o `.venv` Python usando `PLATFORM.venv_scripts_dir` e `PLATFORM.venv_exe_suffix` para paths cross-platform.
   4. Faz `public stage` e `public install` automáticos (a menos que `--skip-assets`).
   5. Instala `repos.xlsx` catalog em `.dadaia/src/`.
-  6. Registra as entradas de hook em `.claude/settings.json` e `.codex/hooks.json` com comando Python (`python -m dadaia_workspace.hooks.<name>`), não bash.
+  6. Registra as entradas de hook em `.claude/settings.json` e `.codex/hooks.json` com comando Python (`python -m dadaia_workspace.hooks.<name>`), não bash — PreToolUse único via `pre_gate`.
 
 
 
@@ -55,8 +56,8 @@ Torna o workspace reproduzível desde o primeiro comando — agentes e operador 
   * `.dadaia/src/repos.xlsx` — catálogo estático de repos conhecidos
   * `.dadaia/scripts/ctx-inject.sh` — script bash legado (ainda presente; não é mais o hook registrado)
   * `.venv/` — virtualenv Python (caminho do executor resolvido por `PLATFORM.venv_scripts_dir`/`PLATFORM.venv_exe_suffix`)
-  * `.claude/settings.json` — entradas de hook: `UserPromptSubmit` → `python -m dadaia_workspace.hooks.ctx_inject`; `PreToolUse` → `python -m dadaia_workspace.hooks.sdd_gate` e `python -m dadaia_workspace.hooks.root_whitelist`; `PostToolUse` → `python -m dadaia_workspace.hooks.sdd_post_gate`
-  * `.codex/hooks.json` — mesmas entradas de hook em formato Codex
+  * `.claude/settings.json` — entradas de hook: `UserPromptSubmit` → `python -m dadaia_workspace.hooks.ctx_inject`; `PreToolUse` (matcher `Edit|Write|MultiEdit|NotebookEdit|Bash`) → `python -m dadaia_workspace.hooks.pre_gate` (comando único); `PostToolUse` → `python -m dadaia_workspace.hooks.sdd_post_gate`
+  * `.codex/hooks.json` — mesmas entradas em formato Codex (PreToolUse matcher `^(apply_patch|Edit|Write|Bash)$` → `pre_gate`)
 
 
 

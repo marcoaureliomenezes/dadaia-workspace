@@ -6,8 +6,8 @@ Codex runtime.
 
 Transformations applied:
 
-1. Replace references to the Claude Code ``Agent`` tool with Codex custom-agent
-   delegation wording. Codex has native custom agents/subagents; workflow
+1. Replace references to the Claude Code ``Agent`` tool with explicit Codex
+   subagent delegation wording. Codex has native custom agents/subagents; workflow
    Markdown remains documentation and does not auto-execute fan-out.
 
 2. Preserve hook semantics. Claude-authored references to ``PreToolUse``,
@@ -36,10 +36,16 @@ from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MOD
 
 _REPLACEMENTS: tuple[tuple[str, str], ...] = (
     (".claude/rules/workspace-protocol.md", "AGENTS.md and projected workspace protocols"),
-    ("`Agent` tool", "Codex custom-agent delegation"),
-    ("Agent tool", "Codex custom-agent delegation"),
-    ("Agent.dispatch", "Codex custom-agent delegation"),
-    ("`Agent`", "Codex custom-agent delegation"),
+    ("`Agent` tool", "explicit Codex subagent delegation"),
+    ("Agent tool", "explicit Codex subagent delegation"),
+    ("Agent.dispatch", "explicit Codex subagent delegation"),
+    ("`Agent`", "explicit Codex subagent delegation"),
+    # Defense-in-depth (codex-personas-claude-model-tiering-leak, T-013-12): the
+    # ai-engineer prose fix removes the Anthropic tier-recommendation phrase at
+    # source, but if any persona still recommends Anthropic marketing tiers we
+    # rewrite the phrase to the Codex-native registry tier terms so no
+    # "Opus / Sonnet / Haiku" tier prose ships in a Codex persona body.
+    ("Opus / Sonnet / Haiku", "deep / dispatch / fast registry tiers"),
 )
 
 # Pattern matching any ``claude-<identifier>`` token in body prose.

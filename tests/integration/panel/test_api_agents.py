@@ -245,17 +245,19 @@ def agents_server(staged_root: Path):
 
 
 class TestBearerEnforcement:
-    def test_agents_401_without_token(self, agents_server: Any) -> None:
-        """GET /api/agents without Authorization → 401."""
+    """Renamed semantics: routes serve credential-less — no-auth contract (operator decision 2026-06-11)."""
+
+    def test_agents_200_without_token(self, agents_server: Any) -> None:
+        """GET /api/agents without Authorization → 200."""
         base, token, _ = agents_server
         status, _, _ = _get(f"{base}/api/agents")
-        assert status == 401
+        assert status == 200
 
-    def test_agents_401_with_wrong_token(self, agents_server: Any) -> None:
-        """GET /api/agents with wrong Bearer → 401."""
+    def test_agents_200_with_stray_auth_header(self, agents_server: Any) -> None:
+        """A stray Authorization header is ignored — still 200."""
         base, token, _ = agents_server
         status, _, _ = _get(f"{base}/api/agents", token="wrong-token")
-        assert status == 401
+        assert status == 200
 
     def test_agents_200_with_correct_token(self, agents_server: Any) -> None:
         """GET /api/agents with correct Bearer → 200."""
@@ -437,8 +439,8 @@ class TestAgentPromptTraversalDefence:
         status, _, _ = _get(f"{base}/api/agents/does-not-exist/prompt", token=token)
         assert status == 404
 
-    def test_prompt_401_without_token(self, agents_server: Any) -> None:
-        """GET /api/agents/software-engineer/prompt without token → 401."""
+    def test_prompt_200_without_token(self, agents_server: Any) -> None:
+        """GET /api/agents/software-engineer/prompt without token → 200 (no-auth contract (operator decision 2026-06-11))."""
         base, token, _ = agents_server
         status, _, _ = _get(f"{base}/api/agents/software-engineer/prompt")
-        assert status == 401
+        assert status == 200

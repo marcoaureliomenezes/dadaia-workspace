@@ -91,7 +91,7 @@ def test_project_manager_agent_tool_replaced() -> None:
         "Expected '`Agent`' tool-table entry to be replaced in project-manager output"
     )
     assert "subagent dispatch" not in result
-    assert "Codex custom-agent delegation" in result
+    assert "explicit Codex subagent delegation" in result
 
 
 def test_project_auditor_agent_tool_replaced() -> None:
@@ -106,7 +106,7 @@ def test_project_auditor_agent_tool_replaced() -> None:
         "Expected '`Agent`' tool-table entry to be replaced in project-auditor output"
     )
     assert "subagent dispatch" not in result
-    assert "Codex custom-agent delegation" in result
+    assert "explicit Codex subagent delegation" in result
 
 
 def test_preserves_claude_code_skill_identifier() -> None:
@@ -127,6 +127,15 @@ def test_maps_known_claude_model_identifiers_only() -> None:
     assert "gpt-5.3-codex" in result
     assert "claude-sonnet-4-6" not in result
     assert "ai-harness-claude-code" in result
+
+
+def test_anthropic_tier_phrase_replaced() -> None:
+    """T-013-12 defense-in-depth: the 'Opus / Sonnet / Haiku' tier-recommendation
+    phrase is rewritten to Codex-native registry tier terms."""
+    body = "recommend Opus / Sonnet / Haiku based on the workload-character table."
+    result = transform_for_codex(body, "ai-engineer")
+    assert "Opus / Sonnet / Haiku" not in result
+    assert "deep / dispatch / fast registry tiers" in result
 
 
 def test_generic_agent_preserved_verbatim() -> None:

@@ -26,8 +26,10 @@ quirk.)
   active spec-context's `specs/bugs/`, and report it upstream to the
   dadaia-workspace project.
 
-Bug files are **ADDITIVE** — the SDD gate does not block them, and any persona /
-any runtime may write them. There is no excuse to defer registration.
+Bug files are **ADDITIVE** — the SDD gate's path classifier is context-relative
+(v0.1.10), so `specs/bugs/` resolves to the ADDITIVE class both at the workspace root
+and inside any `repos/<slug>/`: never blocked, never lease-gated, writable by any
+persona / any runtime. There is no excuse to defer registration.
 
 ## What NOT to register
 
@@ -53,6 +55,7 @@ status: Open
 severity: LOW | MEDIUM | HIGH | CRITICAL
 reported: <YYYY-MM-DD>
 surface: <component/command that failed>
+session_id: null
 ---
 
 **Symptom:** what happened (the error, the wrong output).

@@ -1,12 +1,12 @@
 """Tests for views/academy.py scaffold — T-P5-26.
 
-Covers:
-  - render_academy_section() returns a non-empty string.
-  - The returned string contains the section element with correct id.
-  - The section contains a heading "Academy".
-  - The section has proper ARIA attributes (role="tabpanel", aria-labelledby="tab-academy").
-  - The section contains the empty-state loading placeholder.
-  - The function is importable from the correct module path.
+Covers the static Academy tabpanel skeleton: it is a focusable ``<section>`` tab
+target carrying the correct id, ARIA wiring, heading, content div, and a loading
+placeholder for client-side population.
+
+The skeleton is exercised by asserting on its rendered structure rather than
+smoke-asserting a non-empty string — each assertion fails on a real regression that
+drops a DOM hook (tab wiring, content div, or the loading placeholder).
 """
 
 from __future__ import annotations
@@ -14,58 +14,29 @@ from __future__ import annotations
 from dadaia_workspace.features.panel.views.academy import render_academy_section
 
 
-def test_render_academy_section_returns_string() -> None:
-    """render_academy_section() must return a non-empty string."""
+def test_academy_section_is_focusable_tabpanel() -> None:
+    """The root is a focusable ``<section>`` tab target with correct id + ARIA wiring."""
     result = render_academy_section()
-    assert isinstance(result, str)
-    assert len(result) > 0
+    stripped = result.strip()
 
-
-def test_render_academy_section_has_correct_id() -> None:
-    """Section must have id='section-academy'."""
-    result = render_academy_section()
+    # Root element is a <section> ... </section>.
+    assert stripped.startswith("<section")
+    assert "</section>" in stripped
+    # Tab identity + ARIA wiring (id, role, labelledby, focusable).
     assert 'id="section-academy"' in result
-
-
-def test_render_academy_section_has_role_tabpanel() -> None:
-    """Section must carry role='tabpanel' for tab navigation."""
-    result = render_academy_section()
     assert 'role="tabpanel"' in result
-
-
-def test_render_academy_section_has_aria_labelledby() -> None:
-    """Section must have aria-labelledby='tab-academy'."""
-    result = render_academy_section()
     assert 'aria-labelledby="tab-academy"' in result
+    assert "tabindex" in result
 
 
-def test_render_academy_section_has_heading() -> None:
-    """Section must contain an <h2>Academy</h2> heading."""
+def test_academy_section_has_heading_content_and_placeholder() -> None:
+    """The section carries its heading, the JS content div, and a loading placeholder."""
     result = render_academy_section()
+
+    # Heading.
     assert "Academy" in result
     assert "<h2>" in result or "<h2 " in result
-
-
-def test_render_academy_section_has_academy_content_div() -> None:
-    """Section must contain id='academy-content' div for JS population."""
-    result = render_academy_section()
+    # Content div the client JS populates.
     assert 'id="academy-content"' in result
-
-
-def test_render_academy_section_has_empty_state() -> None:
-    """Section must contain an empty-state/loading placeholder for client-side use."""
-    result = render_academy_section()
+    # Empty-state / loading placeholder for client-side use.
     assert "empty-state" in result or "Loading" in result
-
-
-def test_render_academy_section_is_section_element() -> None:
-    """The root element must be a <section> tag."""
-    result = render_academy_section().strip()
-    assert result.startswith("<section")
-    assert "</section>" in result
-
-
-def test_render_academy_section_has_tabindex() -> None:
-    """Section must be focusable (tabindex='0') for keyboard navigation."""
-    result = render_academy_section()
-    assert "tabindex" in result

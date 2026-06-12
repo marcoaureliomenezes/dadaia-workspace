@@ -1,6 +1,5 @@
 """Composition root — builds services with concrete infrastructure."""
 
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -10,12 +9,14 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
+from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
+from dadaia_workspace.features.panel.views.academy import render_academy_lesson
 from dadaia_workspace.features.panel.views.api import (
     delete_report_file,
     mark_report_important,
@@ -28,7 +29,6 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_session_detail,
     render_api_sessions,
     render_api_workflow_detail,
-    render_api_workflow_run,
     render_api_workflows_list,
     render_health,
     serve_report_file,
@@ -64,6 +64,11 @@ from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateSto
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
+from dadaia_workspace.infrastructure.process_ancestry_adapter import (
+    LinuxProcAncestry,
+    PsProcessAncestry,
+    WindowsToolhelpAncestry,
+)
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -123,15 +128,19 @@ def _select_lock_adapter() -> Any:
 def build_shutdown_handler() -> Any:
     """Return the appropriate ShutdownHandler for the current platform.
 
-    Interim ``sys.platform`` guard inside the function body (not at module
-    level).  Post-TODO, replace the branch condition with
-    ``PLATFORM.has_sigterm`` once the PLATFORM flag is wired.
+    Reads ``PLATFORM.has_sigterm`` (the sole authorized platform capability flag)
+    and returns the POSIX adapter on platforms with effective SIGTERM support
+    (Linux, macOS), or the Windows adapter on platforms without it.  The import
+    is lazy so that importing ``container`` never triggers the Windows module's
+    guard on Linux/macOS.
 
     Returns:
         ``PosixSignalShutdownHandler`` on Linux / macOS (SIGTERM + SIGINT),
         or ``WindowsSignalShutdownHandler`` on Windows (SIGINT only).
     """
-    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_sigterm once PLATFORM flag added
+    from dadaia_workspace.core.platform import PLATFORM
+
+    if not PLATFORM.has_sigterm:
         from dadaia_workspace.infrastructure.signal_shutdown_windows import (
             WindowsSignalShutdownHandler,
         )
@@ -181,6 +190,79 @@ def build_repos_service() -> ReposService:
     return ReposService(excel_reader=OpenpyxlExcelReader())
 
 
+def _build_pid_probe() -> Callable[[int], bool] | None:
+    """Composition-root PID-liveness probe wiring for the DoctorService LOCK-GC sweep.
+
+    The container is the composition root: it may reach into the hook layer's canonical
+    probe builder (``hooks/sdd_gate._build_pid_probe``, which wires the container's
+    ``OsProcessProbe``) and inject the resulting ``(pid) -> alive?`` callable into the
+    ``DoctorService``. Without it, ``dadaia doctor --fix`` runs LOCK-GC TTL-only and would
+    reclaim a TTL-expired lease whose holder pid is STILL ALIVE — violating the no-steal
+    invariant (FR-W1-02: a live-pid holder is NEVER reclaimed). This mirrors the
+    ``SpecsDoctor`` seam in ``cli/commands/specs.py``: ``features/spec_context/doctor.py``
+    never imports the infrastructure adapter. Any failure ⇒ ``None`` ⇒ TTL-only liveness
+    (Windows-safe / legacy-record-safe), exactly as the gate degrades.
+    """
+    try:
+        from dadaia_workspace.hooks.sdd_gate import _build_pid_probe as _hook_build_probe
+
+        return _hook_build_probe()
+    except Exception:  # noqa: BLE001 — probe wiring must never break `dadaia doctor`.
+        return None
+
+
+def build_process_ancestry() -> ProcessAncestry:
+    """Composition-root selection of the read-only ``ProcessAncestry`` adapter (T-014-06).
+
+    Platform is decided here via the ``PLATFORM`` seam — never by an in-adapter
+    ``sys.platform`` branch:
+
+    * ``has_proc_fs`` (Linux) → ``LinuxProcAncestry`` (``/proc`` PPID walk).
+    * else ``has_os_kill_liveness`` (other POSIX, incl. macOS) → ``PsProcessAncestry``
+      (``ps -o ppid=`` via the injected ``SubprocessProcessRunner``).
+    * else (Windows) → ``WindowsToolhelpAncestry`` (read-only Toolhelp32 snapshot).
+
+    Every adapter is non-destructive and returns ``Ancestry.UNKNOWN`` for any
+    indeterminate case; the ALLOW+WARN policy decision lives in the chokepoint caller.
+    """
+    from dadaia_workspace.core.platform import PLATFORM
+    from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
+
+    if PLATFORM.has_proc_fs:
+        return LinuxProcAncestry()
+    if PLATFORM.has_os_kill_liveness:
+        return PsProcessAncestry(SubprocessProcessRunner())
+    return WindowsToolhelpAncestry()
+
+
+def _build_alive_contexts_provider(
+    workspace_root: Path,
+) -> Callable[[], list[tuple[str, str]]]:
+    """Composition-root provider of ALIVE Spec Contexts for the Kanban view (kanban-v2).
+
+    Returns a callable yielding ``(context_name, repo_slug)`` for every ALIVE context in
+    the registry, so the Kanban board's swimlanes are the live-project set (not "whatever
+    has session files"). ``features/panel/views/kanban.py`` never imports the context
+    store adapter — the container injects this callable, mirroring the ``pid_probe`` seam.
+    Fail-soft: any registry error ⇒ empty list (the view falls back to session-derived
+    lanes only).
+    """
+    from dadaia_workspace.core.models.spec_context import ContextState
+
+    def _provider() -> list[tuple[str, str]]:
+        try:
+            store = JsonContextStore(_states_dir(workspace_root))
+            return [
+                (ctx.name, ctx.repo_slug)
+                for ctx in store.list_all()
+                if ctx.state == ContextState.ALIVE
+            ]
+        except Exception:  # noqa: BLE001 — registry read must never break the panel.
+            return []
+
+    return _provider
+
+
 def build_doctor_service(workspace_root: Path) -> DoctorService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
@@ -188,6 +270,7 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        pid_probe=_build_pid_probe(),
     )
 
 
@@ -362,8 +445,13 @@ def build_panel_views(
         "api_panel_status": render_api_servers(service),
         "health": render_health(),
         "api_contexts": render_api_contexts(service),
-        "api_kanban": render_api_kanban(workspace_root),
+        "api_kanban": render_api_kanban(
+            workspace_root,
+            alive_contexts=_build_alive_contexts_provider(workspace_root),
+            pid_probe=_build_pid_probe(),
+        ),
         "api_academy": render_api_academy(service),
+        "academy_lesson": render_academy_lesson(academy),
         "api_reports": render_api_reports(service),
         "reports_serve": serve_report_file(service),
         "api_report_delete": delete_report_file(service),
@@ -373,7 +461,6 @@ def build_panel_views(
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
         "api_workflow_detail": render_api_workflow_detail(workflows_service),
-        "api_workflow_run": render_api_workflow_run(service),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),

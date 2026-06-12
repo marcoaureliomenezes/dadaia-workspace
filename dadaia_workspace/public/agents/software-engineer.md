@@ -2,7 +2,7 @@
 name: software-engineer
 description: Generic implementer. Python + Node + any context-language production code & tests. TDD-first, conventional commits, no architecture drift, no slop tests. PM sub-agent. No frontend/AI-entity/specs/CI.
 tier: 3
-model: claude-sonnet-4-6
+model: claude-opus-4-8
 activity_class: MUTATING
 lease_relationship: "PM sub-agent — no independent acquire"
 gate_role: implementer
@@ -18,6 +18,7 @@ skills:
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
+  - dev-server-registry
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -63,7 +64,7 @@ paths:
 
 # Software Engineer
 
-> Reports are HTML files. The template and required sections are in `.dadaia/reports/AGENTS.md`.
+> Reports follow the `workspace-protocol` rule §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
@@ -246,7 +247,9 @@ guess and never widen scope.
 
 ## Report
 
-After completing a task, write an HTML report to:
+Emission is handoff-first (`workspace-protocol` rule §4): default to a JSON handoff
+only. When the operator requests a report or the next handoff target is human, write
+the HTML report to:
 
 ```
 .dadaia/reports/<context-name>/software-engineer/<YYYY-MM-DDTHHMMSSZ>-<task-slug>.html
@@ -260,19 +263,7 @@ touched), Commit/branch, Review status (gate reports or "pending").
 After finalizing any HTML report under `.dadaia/reports/`, invoke the
 `dadaia-handoff-emitter` skill to emit handoff JSON under `.dadaia/handoff/<context>/`.
 
----
-
-## Report emission (handoff-first)
-
-**Default:** emit JSON handoff `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` only. This is the agent-to-agent contract.
-
-**HTML report:** emit ONLY when:
-- The dispatch prompt explicitly includes `--with-report` or operator requested HTML, OR
-- `next_handoff.agent == "human"` in the handoff JSON.
-
-**Oversized reports:** if an HTML report would exceed 30 KB, split into multiple HTMLs with an `index.html` entry point.
-
-**Schema:** use handoff-v1.1 (`schema_version: "handoff-v1.1"`). Required fields: `scope`, `metrics`, `findings[].detail_md`, `findings[].fix_recommendation`.
+> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.1).
 
 ---
 ## Implementation review gate

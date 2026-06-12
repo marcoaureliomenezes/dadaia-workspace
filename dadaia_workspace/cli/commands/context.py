@@ -26,10 +26,15 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.spec_context.locking import (
     workspace_lock,
 )
-from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.spec_context.service import (
+    DeadReviewRequiredError,
+    DeadSecretFoundError,
+    SpecContextService,
+)
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 console = Console()
@@ -68,7 +73,9 @@ def _now_iso() -> str:
 
 
 def _sessions_dir(workspace_root: Path) -> Path:
-    return workspace_root / ".dadaia" / "sessions"
+    # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the bind CLI
+    # no longer constructs the ``.dadaia/sessions`` path itself.
+    return session_identity.sessions_dir(workspace_root)
 
 
 def _load_session(sessions_dir: Path, session_id: str) -> dict[str, Any] | None:
@@ -102,20 +109,32 @@ def _session_is_stale(session_data: dict) -> bool:  # type: ignore[type-arg]
 def create(
     name: str = typer.Argument(..., help="Context name"),
     repo: str = typer.Option(..., "--repo", help="Repo slug (directory name under repos/)"),
+    url: str | None = typer.Option(
+        None,
+        "--url",
+        help=(
+            "Repo clone URL. Overrides the repos-catalog lookup when given — use it "
+            "for a repo not in the catalog or to pin an explicit remote."
+        ),
+    ),
 ) -> None:
     """Create a new Spec Context Project in state 'dead'."""
     workspace_root = resolve_workspace_root()
-    # Look up repo_url from whitelist; fall back gracefully if catalog unavailable
+    # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
+    # look up repo_url from the repos catalog, failing gracefully if unavailable.
     repo_url = ""
-    try:
-        repos_svc = container.build_repos_service()
-        rows = repos_svc.list_known(workspace_root)
-        for row in rows:
-            if row.get("Repo Name") == repo:
-                repo_url = row.get("Repo URL", "")
-                break
-    except (RepoCatalogError, Exception):
-        pass
+    if url is not None:
+        repo_url = url
+    else:
+        try:
+            repos_svc = container.build_repos_service()
+            rows = repos_svc.list_known(workspace_root)
+            for row in rows:
+                if row.get("Repo Name") == repo:
+                    repo_url = row.get("Repo URL", "")
+                    break
+        except (RepoCatalogError, Exception):
+            pass
 
     try:
         ctx = _ctx_service().create(name, repo, repo_url)
@@ -241,11 +260,28 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
 
 
 @app.command()
-def dead(name: str = typer.Argument(..., help="Context name to make DEAD")) -> None:
+def dead(
+    name: str = typer.Argument(..., help="Context name to make DEAD"),
+    commit: bool = typer.Option(
+        False,
+        "--commit",
+        help=(
+            "Explicit consent to commit+push untracked files. Without it, dead() "
+            "refuses if untracked files are present and pushes nothing. With it, a "
+            "secret scan runs over the files before push and blocks on any finding."
+        ),
+    ),
+) -> None:
     """Transition a context to DEAD; git sync + remove repo from disk."""
     try:
-        ctx = _ctx_service().dead(name)
+        ctx = _ctx_service().dead(name, commit=commit)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
+    except DeadReviewRequiredError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except DeadSecretFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
     except ContextLockedError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
@@ -254,39 +290,67 @@ def dead(name: str = typer.Argument(..., help="Context name to make DEAD")) -> N
         raise typer.Exit(1) from None
 
 
+# Bind mode resolution (FR-R4-01/02). The operator-facing aliases map onto two
+# canonical, non-acquiring modes (READ) and two lease-taking modes (IMPLEMENTATION,
+# REVIEW). `spec` is a legacy alias of `read`; both persist as READ. Lease-taking modes
+# persist with the BOUND_ prefix the gate/lease layer expects.
+_BIND_MODE_ALIASES: dict[str, str] = {
+    "READ": "READ",
+    "SPEC": "READ",  # legacy alias → READ (no lease)
+    "IMPLEMENTATION": "IMPLEMENTATION",
+    "REVIEW": "REVIEW",
+}
+_LEASE_TAKING_MODES = ("IMPLEMENTATION", "REVIEW")
+
+
 @app.command()
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
     mode: str = typer.Option(
-        ...,
+        "read",
         "--mode",
-        help=("Binding mode: read | spec | implementation | review. read/spec are never blocked."),
+        help=(
+            "Binding mode (optional; default 'read'): read | implementation | review. "
+            "Legacy alias: 'spec' maps to read. read never takes a lease."
+        ),
     ),
     release: str | None = typer.Option(
         None, "--release", help="Release ID (required for implementation and review modes)"
+    ),
+    print_env: bool = typer.Option(
+        False,
+        "--print-env",
+        help=(
+            "Back-compat: also emit eval-compatible 'export DADAIA_*' lines for operators "
+            "who still run 'eval $(dadaia context bind ...)'. Default off — bind persists "
+            "the mode in the session record instead."
+        ),
     ),
     force: bool = typer.Option(False, "--force", help="Accepted but no-op (lock-steal replaces)"),
     reason: str = typer.Option("", "--reason", help="Reason note (informational only)"),
 ) -> None:
     """Bind this shell session to a context.
 
-    Run: eval $(dadaia context bind <name> --mode <mode> [--release <id>])
+    Run: dadaia context bind <name> [--mode <mode>] [--release <id>]
 
-    Outputs eval-compatible export lines to set DADAIA_CONTEXT, DADAIA_SESSION_ID,
-    and DADAIA_MODE in the current shell.
+    With no --mode, binds normally in 'read' (observe) mode — never lock-blocked. The
+    bound context, mode, and session id are persisted in the session record (consumed by
+    the SDD gate); a human confirmation line is printed. Pass --print-env to additionally
+    emit the legacy 'export DADAIA_*' lines for `eval $(...)` workflows.
     """
     mode_upper = mode.upper()
-    if mode_upper not in ("READ", "SPEC", "IMPLEMENTATION", "REVIEW"):
+    if mode_upper not in _BIND_MODE_ALIASES:
         err_console.print(
-            f"[red]Error:[/red] Invalid mode '{mode}'. Must be one of: read, spec, implementation, review"
+            f"[red]Error:[/red] Invalid mode '{mode}'. Must be one of: "
+            "read, spec, implementation, review"
         )
         raise typer.Exit(1) from None
 
-    # --release is required for implementation and review
-    if mode_upper in ("IMPLEMENTATION", "REVIEW") and not release:
-        err_console.print(
-            f"[red]Error:[/red] --release <id> is required for --mode {mode_upper.lower()}"
-        )
+    resolved_mode = _BIND_MODE_ALIASES[mode_upper]
+
+    # --release is required for the lease-taking modes (implementation, review).
+    if resolved_mode in _LEASE_TAKING_MODES and not release:
+        err_console.print(f"[red]Error:[/red] --release <id> is required for --mode {mode.lower()}")
         raise typer.Exit(1) from None
 
     workspace_root = resolve_workspace_root()
@@ -303,8 +367,8 @@ def bind(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # ALIVE guard: IMPLEMENTATION and REVIEW modes require an ALIVE context (AC-T11-5)
-    if mode_upper in ("IMPLEMENTATION", "REVIEW") and ctx.state != ContextState.ALIVE:
+    # ALIVE guard: lease-taking modes require an ALIVE context (AC-T11-5)
+    if resolved_mode in _LEASE_TAKING_MODES and ctx.state != ContextState.ALIVE:
         err_console.print(
             f"[red]Error:[/red] Context '{name}' is not ALIVE (state={ctx.state.value}). "
             "Run 'dadaia context alive <name>' first."
@@ -316,10 +380,16 @@ def bind(
     runtime = os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
     pid = os.getpid()
 
+    # The persisted mode the gate reads: lease-taking modes carry the BOUND_ prefix; READ
+    # persists bare. (spec → READ, review → BOUND_REVIEW per FR-R4-02 mapping table.)
+    persisted_mode = (
+        f"BOUND_{resolved_mode}" if resolved_mode in _LEASE_TAKING_MODES else resolved_mode
+    )
+
     session_data: dict = {  # type: ignore[type-arg]
         "session_id": session_id,
         "context": name,
-        "mode": f"BOUND_{mode_upper}" if mode_upper in ("IMPLEMENTATION", "REVIEW") else mode_upper,
+        "mode": persisted_mode,
         "release": release,
         "runtime": runtime,
         "pid": pid,
@@ -329,43 +399,133 @@ def bind(
         "is_stale": False,
     }
 
+    # Persist the session record via the single session-identity owner (FR-R4-02 / R3),
+    # and refresh the CONTEXT incumbent pointer to this bind's session id (NF-2 fix). The
+    # incumbent pointer makes the bind bind the CONTEXT, not just a throwaway sid: the SDD
+    # gate resolves a harness session's mode through ``resolve_identity(ctx)`` →
+    # ``<ctx>.ptr`` → this record, so a default in-session `dadaia context bind --mode read`
+    # (whose minted sid no harness reports) is honored with no env var. For lease-taking
+    # binds the pointer is harmless — ``lease.acquire`` rewrites ``<ctx>.ptr`` to the real
+    # acquiring harness sid on first MUTATING write, so the incumbent self-corrects.
     try:
         with workspace_lock(workspace_root):
-            session_file = sessions_dir / f"{session_id}.json"
-            session_file.write_text(json.dumps(session_data, indent=2), encoding="utf-8")
+            session_identity.write_session(workspace_root, session_id, session_data)
+            session_identity.set_incumbent(workspace_root, name, session_id)
+            # FR-W2-02 (ADR-G5): stamp the bind-epoch marker. This is the SOLE trigger for
+            # context-memory injection and the ctx-inject hook's harness-real discovery
+            # source — the bind CLI's minted sid is invisible to the harness, so the marker's
+            # mtime+name is what the hook scans to re-inject on the next prompt. Standalone
+            # file, NOT a `.ptr` field (the `.ptr` is lease-incumbency, untouched here).
+            session_identity.write_bind_epoch(workspace_root, name)
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # Output eval-compatible export lines
-    dadaia_mode = mode_upper
-    print(f"export DADAIA_CONTEXT={name}")
-    print(f"export DADAIA_SESSION_ID={session_id}")
-    print(f"export DADAIA_MODE={dadaia_mode}")
+    # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
+    # stays eval-safe for operators still running `eval $(dadaia context bind ... --print-env)`.
+    if print_env:
+        print(f"export DADAIA_CONTEXT={name}")
+        print(f"export DADAIA_SESSION_ID={session_id}")
+        print(f"export DADAIA_MODE={resolved_mode}")
+        return
+
+    # Human confirmation (NOT shell-export syntax): context, mode, session id.
+    console.print(
+        f"[green]✓[/green] Bound to '[bold]{name}[/bold]' "
+        f"(mode: {resolved_mode.lower()}, session id: {session_id})"
+    )
 
 
 @app.command(name="release")
-def release_cmd() -> None:
-    """Release the current session's binding.
+def release_cmd(
+    session: str | None = typer.Option(
+        None,
+        "--session",
+        help=(
+            "CLI session id to release (default flow). When omitted, the eval-flow "
+            "DADAIA_SESSION_ID is used if set."
+        ),
+    ),
+) -> None:
+    """Release the current session's binding AND any lease(s) it holds (FR-W4-03).
 
     Run: dadaia context release
+
+    Two flows (the CLI-sid/harness-sid split):
+
+    * **eval flow** — ``DADAIA_SESSION_ID`` exported (e.g. ``eval $(dadaia context bind
+      ... --print-env)``). Hooks key on the same sid, so every lock record naming it is
+      released exactly, then the session record is unlinked.
+    * **default flow** — a CLI-minted sid (``--session`` or the latest bind record). The
+      lock holder is a harness sid that never matches, so the bound context's lease is
+      released ONLY when its holder pid is dead or in the caller's process ancestry; a
+      live foreign holder's lease is NEVER released by context name alone.
+
+    In BOTH flows the lease is dropped BEFORE the session record is unlinked, so the
+    PostToolUse heartbeat cannot renew a released binding (closes
+    ``context-release-leaves-lease-heartbeat-renewing``). DP-3: there is no absence-based
+    renewal guard — ``release`` deletes the record, and ``renew_heartbeat`` no-ops on an
+    absent/foreign record, so resurrection is structurally impossible.
     """
-    session_id = os.environ.get("DADAIA_SESSION_ID")
-    if not session_id:
-        err_console.print(
-            "[red]Error:[/red] No active session. Set DADAIA_SESSION_ID first "
-            "(e.g. eval $(dadaia context bind ...))."
-        )
-        raise typer.Exit(1) from None
+    from dadaia_workspace import container
+    from dadaia_workspace.features.spec_context import lease as _lease
 
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
-    session_file = sessions_dir / f"{session_id}.json"
+
+    env_sid = os.environ.get("DADAIA_SESSION_ID")
+    cli_sid = session or env_sid
+    if not cli_sid:
+        err_console.print(
+            "[red]Error:[/red] No active session. Pass --session <id> or set "
+            "DADAIA_SESSION_ID (e.g. eval $(dadaia context bind ... --print-env))."
+        )
+        raise typer.Exit(1) from None
+
+    session_file = sessions_dir / f"{cli_sid}.json"
+    session_data = _load_session(sessions_dir, cli_sid)
+    released: list[str] = []
 
     with workspace_lock(workspace_root):
+        if env_sid:
+            # Eval flow: the env sid is the lock holder key — release every lease it holds.
+            released = _lease.release_for_session(workspace_root, env_sid)
+        elif session_data is not None:
+            # Default flow: resolve the bound context from the CLI session record and
+            # release its lease only when the holder is dead or in our ancestry.
+            ctx_name = str(session_data.get("context", ""))
+            if ctx_name:
+                with contextlib.suppress(Exception):
+                    pid_probe = container._build_pid_probe()
+                    ancestry_probe = container.build_process_ancestry()
+
+                    def _is_ancestor(holder_pid: int, caller_pid: int) -> bool:
+                        from dadaia_workspace.core.protocols.process_ancestry import Ancestry
+
+                        return (
+                            ancestry_probe.is_ancestor(holder_pid, caller_pid) is Ancestry.ANCESTOR
+                        )
+
+                    holder = _lease.release_context_if_caller_owned(
+                        workspace_root,
+                        ctx_name,
+                        caller_pid=os.getpid(),
+                        pid_probe=pid_probe,
+                        ancestry=_is_ancestor,
+                    )
+                    if holder is not None:
+                        released.append(ctx_name)
+
+        # Unlink the session record AFTER the lease has been dropped.
         session_file.unlink(missing_ok=True)
 
-    console.print(f"[green]✓[/green] Session '[bold]{session_id}[/bold]' released")
+    if released:
+        console.print(
+            f"[green]✓[/green] Session '[bold]{cli_sid}[/bold]' released "
+            f"(lease(s) dropped: {', '.join(released)})"
+        )
+    else:
+        console.print(f"[green]✓[/green] Session '[bold]{cli_sid}[/bold]' released")
 
 
 @app.command()
@@ -407,6 +567,29 @@ def heartbeat() -> None:
         f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
         f"(context={ctx_name}, last_seen_at={now})"
     )
+
+
+@app.command()
+def update(
+    name: str = typer.Argument(..., help="Context name to update"),
+    url: str = typer.Option(..., "--url", help="New repo clone URL to persist"),
+) -> None:
+    """Repair a context's repo URL (FR-W2-03 c / T-011-08).
+
+    Run: dadaia context update <name> --url <url>
+
+    The repair path for the VPS-migration scenario where no on-disk repo is present
+    to back-fill from. Persists through the store update() API, preserving the record
+    shape and locking.
+    """
+    try:
+        ctx = _ctx_service().update_url(name, url)
+        console.print(
+            f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' repo URL set to {ctx.repo_url}"
+        )
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
 
 @app.command()

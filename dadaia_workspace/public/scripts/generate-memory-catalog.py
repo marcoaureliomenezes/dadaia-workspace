@@ -53,6 +53,12 @@ from typing import Any
 
 import yaml
 
+# Public-source hygiene (T-011-15 / FR-W5-01): never write a __pycache__/*.pyc under
+# dadaia_workspace/public/. This guard fires no matter how the script is invoked
+# (direct `python <script>`, subprocess, or import), complementing the `-B` flag at
+# the subprocess call site in features/specs/doctor.py.
+sys.dont_write_bytecode = True
+
 # ---------------------------------------------------------------------------
 # Regexes
 # ---------------------------------------------------------------------------

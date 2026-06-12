@@ -176,8 +176,11 @@ Claude Code, Codex, and OpenCode projections must describe what each runtime
 actually supports. Runtime adapters may differ, but doctor output and AGENTS.md
 instructions must not claim behavior that the runtime does not enforce.
 
-Claude Code = real block (enforced shell hook); Codex = guardrail in
-trusted-workspace mode (advisory on untrusted Codex); opencode = advisory only.
+Enforcement per harness follows §8's per-harness enforcement matrix (normative):
+Claude Code = deterministic (PreToolUse hooks + git chokepoints); Codex
+interactive = deterministic (PreToolUse hooks + git chokepoints); Codex headless
+(`codex exec`) = chokepoints only (exec hooks do not fire — upstream codex-cli
+defect); OpenCode = advisory + chokepoint-protected (ADR-G3).
 
 Codex-specific behavior must be expressed in Codex-native terms: `AGENTS.md`
 context, `.codex/config.toml`, `.codex/skills`, hooks where supported, and
@@ -214,7 +217,7 @@ normative source once committed. The consolidated roadmap §1 is supporting cont
 |---|-------|-------|-----------|----------------|----------------|
 | 1 | Backlog definition | project-manager | `specs/backlog/**` | ADDITIVE | no lease — parallel |
 | 2 | Bug filing | any agent / auto | `specs/bugs/**` | ADDITIVE | no lease — parallel |
-| 3 | Research | researcher / PM-dispatched | `.dadaia/reports/**` | ADDITIVE | no lease — parallel |
+| 3 | Research | PM-dispatched | `.dadaia/reports/**` | ADDITIVE | no lease — parallel |
 | 4 | Audit | project-auditor | `specs/audits/<ts>-<session_id_8chars>/` | ADDITIVE | no lease — parallel |
 | 5 | Release definition (SPEC/PLAN/TASKS) | product-engineer | `specs/releases/<id>/**` | MUTATING | acquires the release lease |
 | 6 | Implementation | software-engineer | `repos/<ctx>/` prod + tests (or `dadaia_workspace/**` when dadaia-workspace is the bound context) | MUTATING | holds the release lease |
@@ -240,8 +243,17 @@ simultaneously the lock model, the agent-coordination model, and the lifecycle.
 
 **ADDITIVE phases (1/2/3/4/7):** write targets are `specs/backlog/**`,
 `specs/bugs/**`, `specs/audits/**`, `.dadaia/reports/**`, `.dadaia/handoff/**`. No
-lease required. Concurrent sessions allowed. Gate allows unconditionally for these
-paths.
+lease required. Concurrent sessions allowed. The gate allows these paths with zero
+lease reads or writes — an additive write never appears in any lock record.
+
+The gate's path classes are computed **context-relative**: for a write under
+`repos/<slug>/...` the `repos/<slug>/` prefix is stripped and the same ordered
+`specs/` taxonomy (ADDITIVE → MEMORY → FROZEN) is applied to the remainder, exactly
+as for workspace-root paths. The ADDITIVE/MEMORY/FROZEN guarantees therefore hold
+inside every Spec Context's `repos/<slug>/specs/` tree, where real specs live. An
+in-repo path matching no class is MUTATING — it never falls through to ungated.
+(The `.dadaia/` additive paths are workspace-root-only; `.dadaia/` is forbidden
+inside repos.)
 
 **Collision-safe naming for parallel additive output.** Because additive phases
 allow concurrent sessions, any Markdown written into a parallel-writable additive
@@ -254,29 +266,123 @@ discriminator so two concurrent sessions never collide on a path:
 (`specs/backlog/**` is exempt because `project-manager` is its sole writer; the rule
 binds wherever multiple sessions may write the same tree.)
 
+> **Amendment (2026-06-10, v0.1.10 rc-3 — audit finding S-2):** the naming law above
+> stands **unchanged** for all new audit output — seven existing audit directories
+> comply with it and the collision rationale holds. Four directories created during
+> the v0.1.9/v0.1.10 audit cycles violate it (`2026-06-09T075056Z/`,
+> `2026-06-10T010550Z/`, `2026-06-10T052944Z/`, `2026-06-10T140553Z/`: non-compact
+> timestamp, no session discriminator). They are **grandfathered in place, not
+> renamed**: the creating sessions' ids are unrecoverable (fabricating a
+> discriminator would falsify the ledger), and their timestamps are cross-referenced
+> inside committed audit lane reports, which are immutable — renaming would break
+> the audit ledger to satisfy form. Forward enforcement moves from pure discipline
+> to a `dadaia specs doctor` WARNING on any new non-conforming `specs/audits/`
+> directory, with exactly these four as the grandfather list (rc-3 task T-010-34).
+
 **MUTATING phases (5/6/8):** write targets are `specs/releases/<id>/**`, the
 active context's production tree (`repos/<ctx>/` for a consumer repo, or
 `dadaia_workspace/**` when dadaia-workspace is the bound context), and
 `specs/memory/**`. Exactly one active lease per context. Gate blocks on
 live-lease conflict.
 
-The lease record schema (as implemented in v0.1.6):
-`{context, release, session_id, mode, acquired_at, heartbeat, ttl}`. No PID
-field. Liveness = `now − heartbeat ≤ LEASE_TTL_SECONDS` where
-`LEASE_TTL_SECONDS = 120` (short-heartbeat liveness — OQ-1 operator decision
-2026-06-06, superseding the earlier 1800s value). Heartbeat is renewed on every
-PreToolUse event by the actively-working holder; a fully-idle holder is reclaimable
-after ~120s. Stable session identity is carried by
-`.dadaia/sessions/runtime/<id>.ptr`, so a relaunched or continuing session resolves
-to the same identity and RENEWs its own lease rather than self-blocking. Acquire
-mechanism: `O_EXCL` CAS (atomic file creation; the second caller gets EEXIST).
+The lease record schema (as implemented):
+`{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`.
+Liveness is **TTL with a PID veto**: `LEASE_TTL_SECONDS = 120` (short-heartbeat —
+OQ-1 operator decision 2026-06-06) is the reclaimability floor, but a TTL-expired
+record whose holder `pid` probes alive is treated as live — a foreign acquire
+**blocks instead of taking over** a genuinely-running session. A dead or absent
+holder pid (or a platform without a liveness probe) falls back to the plain TTL
+verdict and is reclaimable. The heartbeat is renewed by the PostToolUse hook after
+tool calls, with the session id resolved from the harness stdin payload (no
+environment variable is required), and by the holder's own MUTATING writes; a
+confirmed holder renews even past TTL, so it never loses its own lease to its own
+staleness. Stable session identity is carried by
+`.dadaia/sessions/runtime/<ctx>.ptr`, so a relaunched or continuing session resolves
+to the same identity and RENEWs its own lease rather than self-blocking. Acquire and
+renew both run under the `O_EXCL` CAS (atomic sentinel creation; the second caller
+gets EEXIST), so a renewal can never interleave with a foreign acquire.
+
+**Session mode channel:** `dadaia context bind <ctx>` (`--mode` optional, default
+`read`) persists the bound mode in the CLI-owned session record — the store the gate
+actually reads — **and refreshes the context's incumbent pointer**
+(`.dadaia/sessions/runtime/<ctx>.ptr`) at bind time. The gate resolves a session's
+mode as a four-step chain, first hit wins:
+
+1. `DADAIA_MODE` env override (operator-shell escape; no harness sets it);
+2. the session record keyed by the **harness-native session id** — a session that
+   bound itself wins over the incumbent pointer, so a live implementation session
+   is never downgraded by another session's stale read-bind;
+3. the **context incumbent**: the mode of the session named by the context's
+   incumbent pointer, refreshed by `bind`. This is the harness-real path for the
+   default bind flow (the bind CLI mints a sid the running harness never reports,
+   but the pointer binds the *context*). An **anti-downgrade guard** ignores the
+   incumbent when a **live** lease holder (canonical TTL + pid-probe liveness)
+   names a different session — a dead leftover record does not defeat a fresh bind;
+4. default `IMPLEMENTATION`.
+
+A READ-resolved session is **non-acquiring**: MUTATING writes are blocked before any
+lease call (a read session never takes, renews, or steals a lease) while ADDITIVE
+writes flow. A session with no bind, no env, and no incumbent binding (every plain
+harness session) defaults to IMPLEMENTATION and may acquire a **free** lease, but
+may never take over a live-probed holder.
 
 Lock resolution is **reclaim-iff-stale, yield-iff-live-foreign**: the gate reclaims
-and heals on an absent or expired lease (it never blocks on a stale or missing
-lease); on a live foreign lease it yields informatively. The gate **never** instructs
+and heals on an absent lease or an expired lease whose holder is dead (it never
+blocks on a reclaimable lease); on a live foreign lease — TTL-fresh, or TTL-expired
+with the holder process alive — it yields informatively. The gate **never** instructs
 the operator to rebind, relaunch, or steal a session — that instruction is forbidden
 law. Context resolves automatically from the registry; the flow is never halted to
 ask the operator to bind.
+
+**Enforcement envelope (honesty clause):** deterministic PreToolUse enforcement
+runs through ONE merged entrypoint — `dadaia_workspace.hooks.pre_gate` — which
+reads the hook stdin envelope once and evaluates the registered policies in fixed
+order, first-block-wins: root-whitelist → venv-guard → SDD gate. Allow requires
+every policy to allow; each policy is fail-open (a crashing policy never blocks
+the harness), with PROTECTED (`.dadaia/sessions/`) remaining the sole fail-closed
+path inside the SDD policy. This file-tool envelope covers file-write tool calls
+(Edit/Write-family tools; Codex `apply_patch`); the venv-guard adds one narrow
+fixed-pattern Bash check (`dadaia` / `pip` / `python -m dadaia_workspace`
+invocations not rooted in `.dadaia/.venv/bin/`). The SDD policy enforces
+path-class × lease × memory-phase × mode; it reads no SPEC/PLAN/TASKS status and
+no task markers — `Aprovado` gates and `[-]` reservations are agent/PM discipline
+(§1, §11), upheld by coordination and review, not by the hook.
+
+**Chokepoint envelope (supersedes the old "Bash writes are outside the envelope"
+posture):** arbitrary Bash file writes remain outside the file-tool envelope —
+the gate never parses shell command strings — but the lifecycle outcomes that
+matter are deterministically gated at **git-hook chokepoints**, which run
+regardless of whether any harness hook fired:
+
+- **pre-commit lease gate** — a `git commit` into a Spec Context repo from a
+  session that does not hold the context's MUTATING lease is blocked with an
+  actionable message. Holder-identity probe chain: (1) no lease, or a stale
+  lease whose holder pid is dead ⇒ allow (ADDITIVE work commits freely;
+  zero-false-block); (2) `DADAIA_SESSION_ID` equals the holder sid ⇒ allow;
+  (3) the holder's recorded pid is an ancestor of the invoking process — via
+  the read-only `ProcessAncestry` port, never `os.kill` ⇒ allow; (4) ancestry
+  unavailable or indeterminate ⇒ **ALLOW with a logged WARN** — zero-false-block
+  dominates, and on that platform the chokepoint degrades to advisory. This
+  advisory degradation is documented honestly here, not hidden. Block ONLY on a
+  live foreign lease with a positive non-match at steps 2–3.
+- **pre-push gate** — the same pre-push hook runs the CI preflight and the
+  mechanical security-verdict check; the push-boundary contract is normative in
+  §11.
+- **advisory working-tree reconciler** — a PostToolUse pass flags out-of-lease
+  dirty MUTATING paths in the bound context's repo (logged event); it never
+  blocks and never exits non-zero.
+- **escape-hatch honesty** — chokepoints are git hooks: `--no-verify` bypasses
+  them. The posture is deterministic-at-the-chokepoint, not unbypassable; the
+  doctor's lease↔session coherence checks remain the post-hoc backstop.
+
+**Per-harness enforcement matrix:**
+
+| Harness | PreToolUse hooks (`pre_gate`) | Git chokepoints | Posture |
+|---|---|---|---|
+| Claude Code | yes | yes | deterministic: hooks + chokepoints |
+| Codex interactive | yes | yes | deterministic: hooks + chokepoints |
+| Codex headless (`codex exec`) | **no — exec hooks do not fire** (upstream codex-cli defect) | yes | chokepoints only |
+| OpenCode | no | yes | advisory + chokepoint-protected (ADR-G3) |
 
 ## 9. Coordinator + Sub-Agent Architecture
 
@@ -333,10 +439,12 @@ project-manager is the sole owner of `specs/backlog/**`. The process:
 The reviewer transitions below are **coordinator-enforced checkpoints**, not
 mechanical blocks. They are enforced by `project-manager`'s discipline: PM will not
 advance a transition without the reviewer's APPROVE handoff. The word "gate" is
-reserved in this constitution for the genuinely **mechanical** enforcers — the SDD
-path gate (`sdd-spec-gate.sh` PreToolUse block) and the pre-push CI gate
-(`dadaia ci preflight`). A checkpoint is PM-mediated; a gate is a shell block. Do
-not conflate them.
+reserved in this constitution for the genuinely **mechanical** enforcers — the
+merged PreToolUse gate (`dadaia_workspace.hooks.pre_gate`: root-whitelist →
+venv-guard → SDD gate, scoped per §8's honesty clause) and the git chokepoints
+(the pre-commit lease gate, and the pre-push hook running `dadaia ci preflight`
+plus the security-verdict check below). A checkpoint is PM-mediated; a gate is a
+mechanical block. Do not conflate them.
 
 ### Spec-review sequence (release-definition checkpoints)
 
@@ -353,18 +461,28 @@ ordering distinct from the implementation checkpoints below:
 The ordering is sequential QA → SE (SE never reviews before QA APPROVE); the
 architect review is parallel and optional. PM mediates throughout.
 
-### Implementation checkpoints (rc-N ship segment)
+### Implementation checkpoints & the push gate
 
-1. qa-engineer reviews → APPROVE verdict → commit to feature branch allowed.
-2. security-reviewer reviews → APPROVE verdict → push to feature branch allowed.
-3. code-reviewer reviews → APPROVE verdict → PR merge allowed.
+1. qa-engineer reviews → APPROVE verdict → commit to feature branch allowed
+   (coordinator checkpoint).
+2. **Push boundary — mechanical gate.** A `git push` is blocked by the pre-push
+   hook unless, for every non-zero local sha being pushed, an APPROVED
+   `security-reviewer` handoff exists whose `metrics.commit_sha` equals that
+   sha. Branch deletions (zero local sha) and tag-only pushes are exempt; a
+   stale approval (an older sha) does not pass; commits are never
+   review-blocked. The check runs alongside the CI preflight in the same
+   pre-push hook. The push boundary is no longer a PM-mediated checkpoint and
+   carries no reviewer-roster precondition: the security verdict for the pushed
+   sha is the sole, mechanically-checked requirement at push.
+3. code-reviewer reviews → APPROVE verdict → PR merge allowed (coordinator
+   checkpoint).
 4. product-engineer updates `specs/memory/**` → only after the code-reviewer
    checkpoint.
 
-For alpha-N segments: qa-engineer checkpoint only → commit. No push, no PR, no
-other reviewers.
+The full commit/push/PR gate ladder — mechanizing the qa→commit and
+code-review→PR halves — is law-deferred to v0.1.15 (the governance release).
 
-Each checkpoint requires a handoff JSON with `"verdict": "APPROVED"`. A REJECT
+Each coordinator checkpoint requires a handoff JSON with `"verdict": "APPROVED"`. A REJECT
 verdict blocks the transition and re-opens the relevant implementation task (marker
 flipped back to `[ ]`). The failing task stays `[ ]` until the fix is committed and
 the checkpoint is re-run.

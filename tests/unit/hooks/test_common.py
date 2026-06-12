@@ -59,6 +59,55 @@ def test_target_path_unparseable_returns_empty() -> None:
     assert _common.target_path({"tool_input": {}}) == ""
 
 
+# --------------------------------------------------------------------------- #
+# T-014-02 (FR-W4-04): target_paths() returns ALL apply_patch file headers so the
+# gate can classify every file and let the most restrictive verdict win.
+# Closes sdd-gate-apply-patch-multi-file-first-header-only.
+# --------------------------------------------------------------------------- #
+
+
+def test_target_paths_direct_key_single() -> None:
+    assert _common.target_paths({"tool_input": {"file_path": "/a/b.py"}}) == ["/a/b.py"]
+    assert _common.target_paths({"path": "/c.py"}) == ["/c.py"]
+    assert _common.target_paths({"tool_input": {"notebook_path": "/n.ipynb"}}) == ["/n.ipynb"]
+
+
+def test_target_paths_apply_patch_multi_file_all_headers() -> None:
+    # REGRESSION repro: a multi-file patch whose FIRST file is allowed and whose SECOND
+    # file is FROZEN. target_path() returns only README.md (the bug); target_paths()
+    # must return BOTH headers so the FROZEN file is classified and blocks the patch.
+    cmd = (
+        "*** Begin Patch\n"
+        "*** Update File: README.md\n"
+        "+ok\n"
+        "*** Update File: specs/_archive/x.md\n"
+        "+frozen\n"
+        "*** Delete File: .dadaia/sessions/runtime/y.ptr\n"
+        "*** End Patch"
+    )
+    assert _common.target_paths({"tool_input": {"command": cmd}}) == [
+        "README.md",
+        "specs/_archive/x.md",
+        ".dadaia/sessions/runtime/y.ptr",
+    ]
+
+
+def test_target_paths_unparseable_returns_empty_list() -> None:
+    assert _common.target_paths({"tool_input": {}}) == []
+
+
+def test_target_path_still_returns_first_header_backcompat() -> None:
+    # target_path() keeps its single-value contract (first header) for callers not yet
+    # migrated; the bug fix lives in callers switching to target_paths().
+    cmd = (
+        "*** Begin Patch\n"
+        "*** Update File: README.md\n"
+        "*** Update File: specs/_archive/x.md\n"
+        "*** End Patch"
+    )
+    assert _common.target_path({"tool_input": {"command": cmd}}) == "README.md"
+
+
 def test_sanitize_session_id_strips_traversal() -> None:
     # CWE-22: a session id with '/' or '..' must never survive as a path component.
     assert _common.sanitize_session_id("../../etc/passwd") == "etcpasswd"

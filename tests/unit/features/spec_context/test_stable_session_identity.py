@@ -8,6 +8,14 @@ Acceptance criteria tested:
                is in test_short_heartbeat_triad.py as the AC-19 triad).
 
 All tests use FakeClock; tmp_path workspace; no real time.sleep in test bodies.
+
+Re-classification note (T-011-04 / FR-W1-04, ADR-8 amended): SESSION-record (bind) GC
+TTL semantics changed to measure against the heartbeat-renewed ``last_seen_at`` (with
+TTL-from-creation fallback for pre-heartbeat records), not the bind-CLI pid. The cases
+in THIS module concern the LEASE record (``ctx_locks/<ctx>.lock.json``) and its ``.ptr``
+incumbent pointer — a distinct artifact whose liveness is the lease ``heartbeat`` + the
+pid veto (T-011-01/02). They are unaffected by the bind ``last_seen_at`` change and remain
+asserted as-is here; the bind-record ``last_seen_at`` GC is covered in test_doctor_gc.py.
 """
 
 from __future__ import annotations

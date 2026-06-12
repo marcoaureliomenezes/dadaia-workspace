@@ -149,11 +149,13 @@ def workflows_server(staged_root: Path):
 
 
 class TestWorkflowsBearerEnforcement:
-    def test_workflows_list_401_without_token(self, workflows_server: Any) -> None:
-        """GET /api/workflows without Authorization → 401."""
+    """Renamed semantics: routes serve credential-less — no-auth contract (operator decision 2026-06-11)."""
+
+    def test_workflows_list_200_without_token(self, workflows_server: Any) -> None:
+        """GET /api/workflows without Authorization → 200."""
         base, token = workflows_server
         status, _, _ = _get(f"{base}/api/workflows")
-        assert status == 401
+        assert status == 200
 
     def test_workflows_list_200_with_token(self, workflows_server: Any) -> None:
         """GET /api/workflows with Bearer → 200."""
@@ -161,11 +163,11 @@ class TestWorkflowsBearerEnforcement:
         status, _, _ = _get(f"{base}/api/workflows", token=token)
         assert status == 200
 
-    def test_workflow_detail_401_without_token(self, workflows_server: Any) -> None:
-        """GET /api/workflows/<name> without Authorization → 401."""
+    def test_workflow_detail_200_without_token(self, workflows_server: Any) -> None:
+        """GET /api/workflows/<name> without Authorization → 200."""
         base, token = workflows_server
         status, _, _ = _get(f"{base}/api/workflows/audit-fanout")
-        assert status == 401
+        assert status == 200
 
     def test_workflow_detail_200_with_token(self, workflows_server: Any) -> None:
         """GET /api/workflows/audit-fanout with Bearer → 200."""

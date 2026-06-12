@@ -5,11 +5,11 @@ category: product
 tldr: dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash).
 summary: Establishes the cross-platform foundation for dadaia-workspace v0.1.8 — a
   PLATFORM singleton (sole sys.platform call site), typed platform exceptions, 4 protocol
-  ports, 9 infrastructure adapters, a Python governance hooks package, and a phased 3-OS
-  CI matrix. Defines the 3-tier resilience contract (fail-loud for security, degrade-with-log
-  for non-security, unsupported-platform at construction). As of 0.1.8 rc-2 the Windows +
-  macOS unit/contract/importability CI legs are GREEN and HARD-GATED (branch-protection
-  required), and the classifier advertises POSIX::Linux + MacOS + Microsoft::Windows.
+  ports, 9 infrastructure adapters, a Python governance hooks package, and a hard-gated
+  3-OS CI matrix. Defines the 3-tier resilience contract (fail-loud for security,
+  degrade-with-log for non-security, unsupported-platform at construction). As of 0.1.8
+  rc-2 the Windows + macOS CI legs are GREEN and HARD-GATED (no continue-on-error;
+  branch-protection required); classifier is POSIX::Linux + MacOS + Microsoft::Windows.
 tags:
 - platform
 - cross-platform
@@ -20,9 +20,9 @@ tags:
 - hooks
 - security
 agent_tier: self-pull
-token_estimate: 900
-last_updated: '2026-06-09'
-release_origin: 0.1.8
+token_estimate: 1440
+last_updated: '2026-06-12'
+release_origin: v0.1.14
 ---
 
 ## Propósito
@@ -44,8 +44,10 @@ com `# TODO: Replace with PLATFORM.has_<flag>`).
   2. `features/` recebem os adapters injetados via Protocol — zero `import fcntl` / `import signal`
      / `os.chmod` direto em features.
   3. Em um Windows runner: `python -c "import dadaia_workspace"` exits 0. `dadaia --help` exits 0.
-  4. Governance hooks (`sdd_gate`, `root_whitelist`, `ctx_inject`, `sdd_post_gate`) rodam como
-     `python -m dadaia_workspace.hooks.<name>` — sem bash dependency.
+  4. Governance hooks rodam como `python -m dadaia_workspace.hooks.<name>` — sem bash
+     dependency. O PreToolUse registrado é o entrypoint MERGED `pre_gate` (root-whitelist →
+     venv-guard → SDD gate, first-block-wins); `ctx_inject` e `sdd_post_gate` rodam como
+     entrypoints próprios.
   5. CI importability-smoke job (Windows/macOS) confirma portabilidade a cada push.
 
 ## Trigger típico
@@ -110,9 +112,16 @@ Singleton `PLATFORM` é acessado via `from dadaia_workspace.core.platform import
 
 ## Python governance hooks package
 
-`dadaia_workspace/hooks/` — 6 módulos: `__init__`, `_common`, `sdd_gate`, `root_whitelist`,
-`ctx_inject`, `sdd_post_gate`. Cada módulo (exceto `__init__`) tem entrypoint
-`if __name__ == '__main__': sys.exit(main())`.
+`dadaia_workspace/hooks/` — 8 módulos: `__init__`, `_common`, `pre_gate`, `sdd_gate`,
+`root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`.
+
+Wiring PreToolUse: o harness registra **um único** entrypoint, o MERGED `pre_gate`
+(`python -m dadaia_workspace.hooks.pre_gate`), que executa os estágios root-whitelist →
+venv-guard → SDD gate em sequência, first-block-wins. `sdd_gate.py` e `root_whitelist.py`
+permanecem como módulos de POLÍTICA expondo `evaluate_payload()`, consumido por `pre_gate`
+(o `main()` standalone de cada um é mantido por uma release, depois removido).
+`ctx_inject` e `sdd_post_gate` têm entrypoints próprios
+(`if __name__ == '__main__': sys.exit(main())`).
 
 Invariantes de paridade (parity contract com os hooks bash anteriores):
 - `sdd_gate.py` delega a `gate_policy.evaluate()` / `gate_policy.classify_path()` — não re-deriva política. `.dadaia/sessions/**` é PROTECTED (fail-closed, SEC-01).
@@ -132,18 +141,20 @@ Propagação de env (`DADAIA_HOOK_OUTPUT`/`DADAIA_HOOK_EVENT`) via Bun cross-pla
 
 `pre_push_ci.py` NÃO está no pacote. O hook `.sh` pre-push é retido (git-for-Windows ships bash).
 
-## CI matrix 3-OS (phased)
+## CI matrix 3-OS (graduated — hard-gated)
 
-**Phase 1 (atual):** `importability-smoke` job — `matrix.os: [windows-latest, macos-latest]`
-com `continue-on-error: true`. Confirma `python -c "import dadaia_workspace"` + `dadaia --help`.
+A matrix 3-OS está **HARD-GATED** desde rc-2 (0.1.8). Todos os `continue-on-error` foram
+removidos e o comentário `# GRADUATION-GATE:` foi eliminado. As legs Windows e macOS são
+agora required checks na branch-protection (6 contextos adicionados via API).
 
-**Phase 2 (atual):** `unit-fast` + `contract-coverage` jobs têm legs Windows/macOS com
-`continue-on-error: true` + `timeout-minutes: 8`. Comentário `# GRADUATION-GATE:` nas linhas
-`continue-on-error` — graduation ocorre quando um humano remove esse comentário após confirmar
-ambas as legs verdes em um CI run nomeado de `feature/0.1.8`.
+O classificador PyPI foi ampliado de `POSIX :: Linux` para
+`POSIX :: Linux + MacOS + Microsoft :: Windows` (não mais "OS Independent" provisório).
 
-**Phase 3 (pendente, ADR-3):** `continue-on-error` removido → hard-gate em todos os 3 OS.
-Após Phase 3 confirmada, o classificador PyPI volta de `POSIX :: Linux` para `OS Independent`.
+**Jobs com cobertura 3-OS (Linux/macOS/Windows):** `importability-smoke`, `unit-fast`,
+`contract-coverage` — todos hard-gated. Qualquer falha em Windows ou macOS bloqueia o merge.
+
+**Linux-only by design (nunca adicionar Win/macOS):** `integration`, `e2e-python`, `e2e-panel`.
+Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.
 
 **Linux-only by design (nunca adicionar Win/macOS):** integration, e2e-python, e2e-panel.
 Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.
@@ -160,5 +171,6 @@ Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.
 
 - Depende de [[workspace-init]] (cria `.venv`, registra os hooks, provisiona o pacote Python)
 - [[context-management]] usa os protocolos `WorkspaceLock`/`ContextLock` para Lock-1/Lock-2
-- [[sdd-gate-v3]] descreve o comportamento do gate; a implementação Python é `hooks/sdd_gate.py`
+- [[sdd-gate-v3]] descreve o comportamento do gate; a política Python é `hooks/sdd_gate.py`
+  (`evaluate_payload()`), consumida pelo entrypoint wired `hooks/pre_gate.py`
 - [[architecture]] descreve o layering invariant e os contratos de layer que enforcement depende

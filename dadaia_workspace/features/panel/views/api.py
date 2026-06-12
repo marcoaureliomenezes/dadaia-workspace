@@ -52,9 +52,13 @@ JSON shapes (stable contract — if changed, panel.js must be updated in lockste
         "skills":         list[str],
         "tools":          list[str],
         "model":          str | null,
+        "model_inherited": bool,     # true when no model: frontmatter — show inherited default
         "opencode_model": str | null,
         "max_turns":      int | null,
         "input_contract": dict | null,
+        "gate_role":      str | null,  # §7 review-gate / phase role from frontmatter
+        "phases":         list[str],   # §7 lifecycle phase(s) owned/gated (constitution-derived)
+        "workflows":      list[str],   # workflow display names this agent takes part in
         "telemetry": {
           "session_count":      int,
           "total_cost_usd":     float | null,
@@ -75,6 +79,8 @@ JSON shapes (stable contract — if changed, panel.js must be updated in lockste
 
   Validation: active_window_days must be in range [1, 365]. Returns 400 if
   out of range. Telemetry-only agents (not in canonical catalog) are excluded.
+  Plugin STUBS (frontmatter ``plugin: true`` — design-specialist, devops-engineer,
+  frontend-engineer) are excluded from the roster (constitution §14).
 
 Security (R3-A): json.dumps() handles JSON-string escaping; no HTML escaping needed here.
 Content-Type is always set to application/json; charset=utf-8.
@@ -100,6 +106,67 @@ _ACTIVE_WINDOW_DAYS_MIN = 1
 _ACTIVE_WINDOW_DAYS_MAX = 365
 _ACTIVE_WINDOW_DAYS_DEFAULT = 30
 _TELEMETRY_WINDOW_DAYS = 180  # existing aggregation window — not configurable
+
+# Development-lifecycle phase ownership, derived HONESTLY from the constitution
+# §7 phase table and §14 roster. Keyed by canonical agent id. Each value is the
+# ordered list of phase labels the agent OWNS or GATES. Agents not listed here
+# resolve to an empty list (rendered as a neutral "—" in the panel, never faked).
+#
+# §7 table (normative):
+#   1 Backlog definition  — project-manager
+#   3 Research            — PM-dispatched
+#   4 Audit               — project-auditor
+#   5 Release definition  — product-engineer (SPEC/PLAN/TASKS); software-architect feeds
+#   6 Implementation      — software-engineer; ai-engineer (AI-entity surface)
+#   7 Review gates        — qa-engineer (commit) · security-reviewer (push) · code-reviewer (PR)
+#   8 Closure             — product-engineer
+_AGENT_PHASES: dict[str, list[str]] = {
+    "project-manager": ["Backlog definition", "Coordinator (all phases)"],
+    "product-engineer": ["Release definition", "Closure"],
+    "software-architect": ["Release definition (architecture feed)"],
+    "software-engineer": ["Implementation"],
+    "ai-engineer": ["Implementation (AI-entity surface)"],
+    "qa-engineer": ["Review gate — commit"],
+    "security-reviewer": ["Review gate — push"],
+    "code-reviewer": ["Review gate — PR"],
+    "project-auditor": ["Audit"],
+}
+
+
+def _agent_phases(agent_id: str) -> list[str]:
+    """Return the §7 lifecycle phase(s) an agent owns or gates.
+
+    Derived from the constitution §7 table via ``_AGENT_PHASES``. Returns an
+    empty list for any agent not in the table — the panel renders that as a
+    neutral placeholder, never a fabricated phase.
+    """
+    return list(_AGENT_PHASES.get(agent_id, []))
+
+
+def _workflow_membership(service: PanelService) -> dict[str, list[str]]:
+    """Build an ``agent_id -> [workflow display names]`` map.
+
+    Derived at request time by parsing the canonical workflow definitions via
+    ``PanelService.list_workflow_summaries()`` and reading each workflow's
+    ``agent_ids`` (the distinct agents appearing in its stages). Best-effort:
+    a workflows-read failure yields an empty map rather than failing the
+    /api/agents response.
+    """
+    membership: dict[str, list[str]] = {}
+    try:
+        summaries = service.list_workflow_summaries()
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "_workflow_membership: list_workflow_summaries() failed; "
+            "continuing with empty workflow membership"
+        )
+        return membership
+    for wf in summaries:
+        for agent_id in wf.agent_ids:
+            bucket = membership.setdefault(agent_id, [])
+            if wf.display_name not in bucket:
+                bucket.append(wf.display_name)
+    return membership
 
 
 def render_api_servers(
@@ -247,12 +314,22 @@ def render_api_agents_canonical(
         # override (for tests) or by calling the real reader.
         canonical_agents = service.list_canonical_agents()
 
+        # Workflow membership: agent_id -> [workflow display names], derived once
+        # per request by parsing the canonical workflow definitions.
+        membership = _workflow_membership(service)
+
         # Build output — one entry per canonical agent.
         # Filter by runtime: include agent if its telemetry providers list contains
         # the requested runtime.  When runtime="claude" and the agent has no telemetry
         # entry, it is included (all canonical agents default to claude).
         agent_entries = []
         for dto in canonical_agents:
+            # Exclude plugin STUBS (constitution §14 / plugin-scope rule): they
+            # carry no behavior in the core install and must never appear as
+            # ghost agents in the Agentic tab.
+            if dto.plugin:
+                continue
+
             tel_summary: AgentSummary | None = tel_by_id.get(dto.id)
 
             # Runtime-scoped filter (FR5 / NFR5).
@@ -310,6 +387,9 @@ def render_api_agents_canonical(
                 status = "inactive"
                 telemetry_sub = _empty_telemetry_sub()
 
+            # Model resolution: the configured model from frontmatter. When the
+            # agent declares no ``model:``, ``model`` is null and the panel shows
+            # the inherited harness default with a marker — never a fabricated id.
             agent_entries.append(
                 {
                     "agent_id": dto.id,
@@ -320,9 +400,13 @@ def render_api_agents_canonical(
                     "skills": list(dto.skills),
                     "tools": list(dto.tools),
                     "model": dto.model,
+                    "model_inherited": dto.model is None,
                     "opencode_model": dto.opencode_model,
                     "max_turns": dto.max_turns,
                     "input_contract": dto.input_contract,
+                    "gate_role": dto.gate_role,
+                    "phases": _agent_phases(dto.id),
+                    "workflows": list(membership.get(dto.id, [])),
                     "telemetry": telemetry_sub,
                 }
             )
@@ -449,6 +533,7 @@ def render_api_workflows_list(
                     "agent_ids": list[str],
                     "has_parallel": bool,
                     "has_gates": bool,
+                    "lifecycle_phase": str,    # canonical dev-lifecycle group
                     "source_path": str
                 }
             ]
@@ -489,6 +574,7 @@ def render_api_workflows_list(
                 "agent_ids": list(s.agent_ids),
                 "has_parallel": s.has_parallel,
                 "has_gates": s.has_gates,
+                "lifecycle_phase": s.lifecycle_phase,
                 "source_path": s.source_path,
             }
             for s in summaries
@@ -591,6 +677,7 @@ def render_api_workflow_detail(
             "agent_ids": list(detail.agent_ids),
             "has_parallel": detail.has_parallel,
             "has_gates": detail.has_gates,
+            "lifecycle_phase": detail.lifecycle_phase,
             "inputs": detail.inputs,
             "stages": stages_list,
             "diagram_svg": detail.diagram_svg,
@@ -799,31 +886,31 @@ def render_api_session_detail(
 def render_api_academy(
     service: PanelService,
 ) -> Callable[..., tuple[int, str, bytes]]:
-    """Return ``GET /api/academy`` view — list all academy courses.
+    """Return ``GET /api/academy`` view — list the shipped course catalog.
 
-    Returns 200 with empty list when service.academy is None.
-    Each course: slug, name, module_number, module_name, created_at.
-    course_dir is intentionally omitted (server-side filesystem path).
+    Lists the ``knowledge_basis`` modules that ship with the package (the browse
+    source for the Academy tab), NOT the user-created course copies under
+    ``.dadaia/academy``. Each module carries its title, lesson count, and lessons so
+    the panel can expand a module to its lessons and open each lesson via
+    ``GET /academy/<module>/<lesson>``.
+
+    Returns 200 with an empty list when ``service.academy`` is None.
+
+    Response shape::
+
+        {"modules": [
+            {"module": "07_codex", "module_number": 7, "title": "...",
+             "lesson_count": 9,
+             "lessons": [{"lesson": "01_codex_mental_model.md", "title": "..."}]}
+        ]}
     """
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         if service.academy is None:
-            body = json.dumps({"courses": []}).encode("utf-8")
+            body = json.dumps({"modules": []}).encode("utf-8")
             return (200, "application/json; charset=utf-8", body)
-        courses = service.academy.list_all()
-        payload = {
-            "courses": [
-                {
-                    "slug": c.slug,
-                    "name": c.name,
-                    "module_number": c.module_number,
-                    "module_name": c.module_name,
-                    "created_at": c.created_at,
-                }
-                for c in courses
-            ]
-        }
-        body = json.dumps(payload).encode("utf-8")
+        catalog = service.academy.list_module_catalog()
+        body = json.dumps({"modules": catalog}).encode("utf-8")
         return (200, "application/json; charset=utf-8", body)
 
     return _view
@@ -1011,6 +1098,69 @@ def _report_route_path(artifact_path: str) -> str:
     return artifact_path
 
 
+# ---------------------------------------------------------------------------
+# Report identity injection (operator demand 2026-06-11)
+#
+# Agent-authored reports carry arbitrary inline styles, frequently unreadable.
+# At serve time we inject the dadaia identity stylesheets into the <head> so
+# every report inherits the visual identity regardless of how it was authored.
+# The link tags reference /static/tokens.css (palette + theme) and
+# /static/reports-doc.css (base identity + a readability override that WINS
+# over agent styling for body fg/bg). Only text/html bodies are mutated.
+# ---------------------------------------------------------------------------
+
+_REPORT_IDENTITY_HEAD = (
+    "<script>(function(){var t=localStorage.getItem('dadaia-panel-theme');"
+    "if(t&&(t==='mint'||t==='sage'||t==='warm')){document.documentElement.dataset.theme=t;}})();</script>"
+    '<link rel="stylesheet" href="/static/tokens.css">'
+    '<link rel="stylesheet" href="/static/reports-doc.css">'
+)
+
+_HEAD_OPEN_RE = re.compile(r"<head[^>]*>", re.IGNORECASE)
+_HTML_OPEN_RE = re.compile(r"<html[^>]*>", re.IGNORECASE)
+
+_REPORT_ASSET_MIME: dict[str, str] = {
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".json": "application/json; charset=utf-8",
+}
+
+
+def _report_content_type(suffix: str) -> str:
+    """Content-type for a non-HTML report asset (default text/html for legacy)."""
+    return _REPORT_ASSET_MIME.get(suffix, "text/html; charset=utf-8")
+
+
+def _inject_report_identity(html: str) -> str:
+    """Inject the dadaia identity stylesheets into a report's HTML <head>.
+
+    Insertion makes inheritance win for base readability: the base layer is
+    injected right after ``<head>`` (before any agent ``<style>`` inside head),
+    and the reports-doc.css override layer uses ``!important`` on body fg/bg so
+    it still wins regardless of agent inline styles.
+
+    Falls back to inserting after ``<html>`` or prepending a ``<head>`` block
+    when the report has no ``<head>``. Idempotent: a report already carrying the
+    marker link is left unchanged.
+    """
+    if "/static/reports-doc.css" in html:
+        return html
+    head_match = _HEAD_OPEN_RE.search(html)
+    if head_match is not None:
+        idx = head_match.end()
+        return html[:idx] + _REPORT_IDENTITY_HEAD + html[idx:]
+    html_match = _HTML_OPEN_RE.search(html)
+    if html_match is not None:
+        idx = html_match.end()
+        return html[:idx] + "<head>" + _REPORT_IDENTITY_HEAD + "</head>" + html[idx:]
+    return "<head>" + _REPORT_IDENTITY_HEAD + "</head>" + html
+
+
 def serve_report_file(
     service: PanelService,
 ) -> Callable[..., tuple[int, str, bytes]]:
@@ -1019,6 +1169,10 @@ def serve_report_file(
     Resolves the requested path under ``<workspace_root>/.dadaia/reports/``.
     Returns 403 if the resolved path escapes the boundary.
     Returns 404 if the file does not exist.
+
+    For ``text/html`` reports, the dadaia identity stylesheets are injected into
+    the ``<head>`` at serve time (operator demand 2026-06-11) so every report
+    inherits the visual identity. Non-HTML report assets are served verbatim.
 
     Security (OWASP A01, A03): Path.resolve() is used to canonicalise the
     requested path; relative_to() enforces the boundary without string ops.
@@ -1035,7 +1189,15 @@ def serve_report_file(
         if not requested.exists() or not requested.is_file():
             return (404, "text/plain; charset=utf-8", b"404 Not Found")
         content = requested.read_bytes()
-        return (200, "text/html; charset=utf-8", content)
+        # Only mutate HTML reports; serve every other asset byte-verbatim.
+        if requested.suffix.lower() in (".html", ".htm"):
+            try:
+                injected = _inject_report_identity(content.decode("utf-8"))
+                return (200, "text/html; charset=utf-8", injected.encode("utf-8"))
+            except UnicodeDecodeError:
+                # Non-UTF-8 HTML — serve verbatim rather than corrupt bytes.
+                return (200, "text/html; charset=utf-8", content)
+        return (200, _report_content_type(requested.suffix.lower()), content)
 
     return _view
 
@@ -1097,54 +1259,6 @@ def render_health() -> Callable[..., tuple[int, str, bytes]]:
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         return (200, "application/json", body)
-
-    return _view
-
-
-def render_api_workflow_run(
-    panel_service: object,
-) -> Callable[..., tuple[int, str, bytes]]:
-    """Return a closure that handles POST /api/workflows/<name>/run.
-
-    Status codes:
-        202  — workflow started; body: {"status": "started", "workflow": str, "pid": int}
-        404  — workflow name not found in registry
-        409  — workflow already running
-    """
-
-    def _view(workflow_name: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
-        if not workflow_name or not _WORKFLOW_NAME_RE.match(workflow_name):
-            return (
-                400,
-                "application/json; charset=utf-8",
-                json.dumps({"error": "invalid_workflow_name"}).encode("utf-8"),
-            )
-        try:
-            result = panel_service.run_workflow(workflow_name)  # type: ignore[attr-defined]
-        except Exception as exc:  # noqa: BLE001
-            msg = str(exc).lower()
-            if "not found" in msg:
-                return (
-                    404,
-                    "application/json; charset=utf-8",
-                    json.dumps({"error": "workflow not found"}).encode("utf-8"),
-                )
-            if "already running" in msg:
-                return (
-                    409,
-                    "application/json; charset=utf-8",
-                    json.dumps({"error": "already running"}).encode("utf-8"),
-                )
-            logger.warning("render_api_workflow_run: unexpected error: %s", exc)
-            return (
-                500,
-                "application/json; charset=utf-8",
-                json.dumps({"error": "internal server error"}).encode("utf-8"),
-            )
-        body = json.dumps(
-            {"status": "started", "workflow": result["workflow"], "pid": result["pid"]}
-        ).encode("utf-8")
-        return (202, "application/json; charset=utf-8", body)
 
     return _view
 

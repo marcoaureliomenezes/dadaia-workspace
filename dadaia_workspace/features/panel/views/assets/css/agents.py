@@ -222,6 +222,96 @@ AGENTS_CSS: str = """
   opacity: 1;
 }
 
+/* ── Minimalist agent card (operator-demanded Agentic-tab redesign) ─────────
+   Exactly four data points: name (+ tier label), model, lifecycle phase(s),
+   workflows. No status badge, no review counts, no last-seen, no token/cost. */
+.agent-card--minimal {
+  padding: 0.55rem 0.65rem 0.6rem;
+}
+.agent-card--minimal .agent-card__header {
+  margin-bottom: 0.45rem;
+}
+
+/* Definition-list of agent facts (Model / Lifecycle / Workflows). */
+.agent-card__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 0.55rem;
+  margin: 0;
+}
+.agent-fact {
+  display: contents;
+}
+.agent-fact__label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+  color: var(--color-muted, #666666); /* #666 on #fff = 5.74:1 — WCAG AA */
+  align-self: start;
+  padding-top: 0.1rem;
+}
+.agent-fact__value {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-text, #222222);
+  min-width: 0;
+}
+.agent-fact__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+/* Model value: monospace configured id, or an italic "inherited default" marker. */
+.agent-card__model-id {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-cost, #633d2e);
+  word-break: break-word;
+}
+.agent-card__model-inherited {
+  font-style: italic;
+  color: var(--color-muted, #666666);
+}
+
+/* Lifecycle phase chips (§7-derived). */
+.phase-chip {
+  display: inline-block;
+  padding: 0.1em 0.4em;
+  border-radius: 2px;
+  background: var(--color-accent, #9cddc8);
+  color: var(--color-chip-text, #3a3a3a); /* WCAG AA on accent */
+  font-size: 0.62rem;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Workflow membership chips. */
+.workflow-chip {
+  display: inline-block;
+  padding: 0.1em 0.4em;
+  border-radius: 2px;
+  background: var(--color-accent-secondary, #bfd8ad);
+  color: var(--color-chip-text, #3a3a3a); /* WCAG AA on accent-secondary */
+  font-size: 0.62rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Neutral placeholder when an agent owns no phase / joins no workflow. */
+.agent-meta-none {
+  color: var(--color-muted, #666666);
+  font-style: italic;
+}
+
 /* ── Agent modal ─────────────────────────────────────────────────────────── */
 .agent-modal {
   max-width: var(--modal-max-w, 720px);

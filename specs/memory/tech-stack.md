@@ -11,9 +11,9 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 1100
-last_updated: '2026-06-09'
-release_origin: 0.1.8
+token_estimate: 1200
+last_updated: '2026-06-10'
+release_origin: v0.1.10
 ---
 
 ## Linguagens
@@ -21,7 +21,7 @@ release_origin: 0.1.8
 Linguagem| Versão| Uso
 ---|---|---
 Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest.
-Bash| 4+ POSIX-compatível| Legacy hook scripts (`sdd-spec-gate.sh`, `ctx-inject.sh`) superseded by the `dadaia_workspace/hooks/` Python package (v0.1.8); `pre-push-ci-gate.sh` retained (git-for-Windows ships bash). Entry scripts. Python hooks inject lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
+Bash| 4+ POSIX-compatível| Um único shell asset no produto: `pre-push-ci-gate.sh` (git hook, deliberadamente shell; git-for-Windows ships bash) — todos os hooks de governança são o pacote Python `dadaia_workspace/hooks/`. Python hooks inject lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
 HTML5 + Mermaid| Mermaid via CDN| Reports em `.dadaia/reports/<ctx>/<agent>/*.html`; memory atoms são `.md` renderizados in-memory (D-4)
 Markdown| CommonMark| Memory atoms atômicos em `specs/memory/*.md` (frontmatter `memory-frontmatter-v1` + corpo Markdown); SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions
 YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows e memory atoms (`memory-frontmatter-v1`: `additionalProperties: false`)
@@ -41,7 +41,7 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 ## Agent runtimes
 
   * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`.
-  * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..5. 9 agentes core TOML em `.codex/agents/`. Zero leak `claude-*`. Workflows em `.codex/workflows/`.
+  * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..8 (D-CX-4 lint inclui tool-names Claude e tier-names Anthropic). 9 agentes core TOML em `.codex/agents/` com tiering registry-derived (model id × `model_reasoning_effort` via `core/model_registry.codex_tier_views()`; deep→high, dispatch→medium; collapse guard loud-fail). Zero leak `claude-*`/Opus/Sonnet/Haiku. Command policy `.codex/rules/*.rules` em `prefix_rule(...)` com paths venv-form. **Hooks executam só em sessão interativa** — `codex exec` headless não dispara hooks (codex-cli 0.139.0, live-verified; harness opt-in `tests/integration/codex_live/`, `DADAIA_CODEX_LIVE=1`). Workflows em `.codex/workflows/` (reference-only).
   * **OpenCode** : projeção via strip de frontmatter de tools; workflows e skills projetados em `.opencode/`.
   * **CLI** : agentes invocados via `claude --agent <name>` ou equivalente; modo manual sem paralelização automática.
 
@@ -49,22 +49,29 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 
 ## Model assignments (9 core agents + 3 plugin stubs)
 
-Modelo padrão da topologia pública: `claude-sonnet-4-6` para os agentes default,
-com override per-dispatch via `DADAIA_MODEL_OVERRIDE=opus` quando a política do
-dispatcher justificar escalonamento. Optional packs podem definir agentes e
-modelos próprios fora do default público.
+Atribuição em dois tiers: `claude-fable-5` para os leaves de raciocínio profundo
+(spec authoring, QA, harness, arquitetura, auditoria) e `claude-opus-4-8` para
+dispatchers e gate leaves. Override per-dispatch via `DADAIA_MODEL_OVERRIDE`
+quando a política do dispatcher justificar. Optional packs podem definir agentes
+e modelos próprios fora do default público.
+
+**Single source:** `dadaia_workspace/core/model_registry.py` é a única fonte de
+ids/pricing/tier de modelo (`ModelEntry{claude_id, codex_id, pricing dated
+append-only, tier}`); `MODEL_MAP` (runtime transforms) e `PRICING_TABLE`
+(telemetry) são views derivadas, com contract test de key-equality. `dadaia
+public doctor` falha em `model:` frontmatter que não resolve no registry.
 
 Agente| Modelo| Nota
 ---|---|---
-project-manager| `claude-sonnet-4-6`| Dispatcher / lease coordinator
-project-auditor| `claude-sonnet-4-6`| Dispatcher / audit fan-out
-product-engineer| `claude-sonnet-4-6`| Curator / memory guardian
-software-engineer| `claude-sonnet-4-6`| Implementation leaf (absorbs python/node/backend)
-ai-engineer| `claude-opus-4-8`| AI-entity surface owner (harness-mastery synthesis workload)
-software-architect| `claude-sonnet-4-6`| Architectural review leaf (ADDITIVE)
-qa-engineer| `claude-sonnet-4-6`| Review → commit gate leaf
-security-reviewer| `claude-sonnet-4-6`| Review → push gate leaf
-code-reviewer| `claude-sonnet-4-6`| Review → PR gate leaf
+project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator
+project-auditor| `claude-fable-5`| Dispatcher / audit fan-out
+product-engineer| `claude-fable-5`| Curator / memory guardian
+software-engineer| `claude-opus-4-8`| Implementation leaf (absorbs python/node/backend)
+ai-engineer| `claude-fable-5`| AI-entity surface owner (harness-mastery synthesis workload)
+software-architect| `claude-fable-5`| Architectural review leaf (ADDITIVE)
+qa-engineer| `claude-fable-5`| Review → commit gate leaf
+security-reviewer| `claude-opus-4-8`| Review → push gate leaf
+code-reviewer| `claude-opus-4-8`| Review → PR gate leaf
 frontend-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
 design-specialist (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
 devops-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (devops); no behavior without plugin
@@ -88,15 +95,18 @@ O contrato de sidecar JSON entre agentes é versionado em `dadaia_workspace/publ
 Dependência| Versão| Camada| Justificativa
 ---|---|---|---
 typer| >=0.25 (extras=[all])| cli/| CLI framework com auto-completion e rich formatting
-rich| ^13| cli/| Pretty terminal output
+rich| >=13,<16| cli/| Pretty terminal output
 openpyxl| ^3.1| infrastructure/| Leitura de planilhas Excel (academy)
 pyyaml| ^6.0| infrastructure/ + features/| YAML frontmatter parsing (memory atoms, agents/skills/workflows); `yaml.safe_load` used by lint and catalog scripts
 jsonschema| ^4| features/specs/| JSON Schema validation; now used for `memory-frontmatter-v1.schema.json` validation in `lint-memory-atoms.py`. The per-atom YAML schemas (memory-structured-source-v1) were deleted; `jsonschema` remains for frontmatter validation.
 mistune| ~=3.0| features/panel/views/| Markdown → HTML render in-memory for the memory viewer (D-1, memory-markdown-source-v1). Pure-Python, zero transitive deps. Custom hooks: mermaid fence, `wikilink`, sanitiser.
 types-PyYAML| >=6| dev| Type stubs para mypy
+jinja2| ^3.1| features/specs/| Dependência **direta** de runtime: `features/specs/scaffolder.py` renderiza os templates de scaffold SDD via `SandboxedEnvironment`. NÃO é usada para memory rendering (memory atoms são `.md` renderizados por mistune).
 import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` declares `features → infrastructure` import ban and `core → OS-primitive modules` ban; runs in CI `lint` job via `lint-imports`. Zero runtime impact.
 
-**Jinja2** (transitive dependency) is no longer used for memory atom rendering. The `memory-*.html.j2` templates and `dadaia memory render` CLI were deleted in memory-markdown-source-v1. Jinja2 may remain as a transitive dep of other packages.
+**Pins de tooling do workspace (não são deps do projeto):** `poetry` ≥ 2.3.4 e
+`dulwich` ≥ 1.2.5 nos ambientes de operação (CVEs nomeados em comentário no
+`pyproject.toml`); não entram em `poetry.lock` — o build-backend é `poetry-core`.
 
 ## Restrições e proibições
 

@@ -2,15 +2,20 @@
 
 import fnmatch
 import json
+import os
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
+from dadaia_workspace.features.spec_context import lease, session_identity
 from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     _audit_log_path,
     context_lock,
@@ -90,12 +95,16 @@ _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
     }
 )
 
-# Sentinel files older than this are orphans (process SIGKILLed mid-CAS).
-_SENTINEL_ORPHAN_AGE = 30.0
+# Sentinel files older than this are orphans (process SIGKILLed mid-CAS). DP-1 (v0.1.14):
+# value sourced from ``core.kernel_tunables`` so the doctor's SENTINEL-GC and the lease's
+# inline cleanup measure against the identical threshold (no drift).
+_SENTINEL_ORPHAN_AGE = kernel_tunables.SENTINEL_ORPHAN_AGE_SECONDS
 
-# Sessions expired beyond this age are graveyard entries eligible for GC.
-_SESSION_GC_TTL_FIELD = "ttl_seconds"
-_SESSION_HEARTBEAT_FIELD = "last_seen_at"
+# Sessions expired beyond this age are graveyard entries eligible for GC. The field names
+# are owned by ``session_identity`` (the single owner of the session-record schema); the
+# GC liveness clock is resolved via ``session_identity.liveness_timestamp`` (last_seen_at,
+# with TTL-from-creation fallback for pre-heartbeat records — T-011-04 / FR-W1-04 / ADR-8).
+_SESSION_GC_TTL_FIELD = session_identity.SESSION_GC_TTL_FIELD
 
 
 @dataclass(frozen=True)
@@ -111,19 +120,24 @@ class DoctorService:
         context_store: ContextStore,
         git_client: GitClient,
         workspace_root: Path,
+        pid_probe: Callable[[int], bool] | None = None,
     ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
+        # Injected PID-liveness probe (composition-root seam, like the gate's; T-011-02).
+        # ``None`` ⇒ TTL-only LOCK-GC verdict (Windows-safe / legacy-record-safe). A live
+        # holder is never reclaimed; ``features`` never imports the adapter — the container
+        # (or a caller) supplies the probe built from ``OsProcessProbe``.
+        self._pid_probe = pid_probe
 
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
 
     def _sessions_dir(self) -> Path:
-        return self._workspace_root / ".dadaia" / "sessions"
-
-    def _sessions_runtime_dir(self) -> Path:
-        return self._workspace_root / ".dadaia" / "sessions" / "runtime"
+        # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the
+        # doctor no longer constructs ``.dadaia/sessions`` itself.
+        return session_identity.sessions_dir(self._workspace_root)
 
     def _ctx_locks_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
@@ -297,10 +311,14 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def _check_lease_records(self) -> list[DoctorIssue]:
-        """LOCK-NEW: scan ctx_locks/*.lock.json for invalid or stale records.
+        """LOCK-NEW: scan ctx_locks/*.lock.json for invalid records.
 
-        - Invalid JSON / missing required fields → warn.
-        - Stale (per is_stale) → warn; --fix deletes it.
+        - Invalid JSON / missing required fields → warn; --fix deletes it.
+
+        Staleness/reclaim is no longer reported here — that moved to ``_check_lock_gc``
+        (LOCK-GC, T-011-02), which honours the pid-liveness veto so a TTL-expired but
+        still-running holder is never flagged or reclaimed. LOCK-NEW now covers only the
+        structural-corruption cases (a stale-but-valid record is a LOCK-GC concern).
         """
         issues: list[DoctorIssue] = []
         ctx_locks_dir = self._ctx_locks_dir()
@@ -345,22 +363,103 @@ class DoctorService:
                     )
                 )
                 continue
-            if is_stale(data):
-                ctx_name = str(data.get("context", lock_file.stem.replace(".lock", "")))
-                session_id = str(data.get("session_id", "unknown"))
-                issues.append(
-                    DoctorIssue(
-                        code="LOCK-NEW",
-                        description=(
-                            f"[stale-record] {lock_file}: lease for context '{ctx_name}' "
-                            f"is stale (session={session_id}, "
-                            f"heartbeat={data.get('heartbeat', 'none')}). "
-                            "Run 'dadaia doctor --fix' to delete it."
-                        ),
-                        fixable=True,
-                    )
-                )
         return issues
+
+    # ------------------------------------------------------------------
+    # LOCK-GC: stale-lease garbage collection with the pid-liveness veto
+    # ------------------------------------------------------------------
+
+    def _check_lock_gc(self) -> list[DoctorIssue]:
+        """LOCK-GC: report TTL-expired lease records that are safe to reclaim (T-011-02).
+
+        A record is reclaimable (per ``lease.reclaim`` / the pid-liveness veto) when it is
+        TTL-expired AND its holder is demonstrably dead, OR it predates the ``pid`` field
+        (legacy/pre-pid — the ``doctor-stale-lease-misdiagnosed-as-forgery`` case, which was
+        previously permanently un-reclaimable). A record whose holder pid is still ALIVE is
+        NEVER reported, regardless of how far past TTL it is. ``--fix`` deletes the reported
+        records; an invalid/corrupt record stays under ``LOCK-NEW`` (a separate concern).
+        """
+        issues: list[DoctorIssue] = []
+        ctx_locks_dir = self._ctx_locks_dir()
+        if not ctx_locks_dir.exists():
+            return issues
+        for lock_file in sorted(ctx_locks_dir.iterdir()):
+            if not lock_file.name.endswith(".lock.json"):
+                continue
+            data = self._read_lock(lock_file)
+            if data is None:
+                continue  # corrupt/unreadable — owned by LOCK-NEW, not LOCK-GC.
+            if not lease.reclaim(data, pid_probe=self._pid_probe):
+                continue
+            ctx_name = str(data.get("context", lock_file.stem.replace(".lock", "")))
+            session_id = str(data.get("session_id", "unknown"))
+            pidless = "pid" not in data
+            qualifier = "pre-pid record" if pidless else "holder dead/unprobeable"
+            issues.append(
+                DoctorIssue(
+                    code="LOCK-GC",
+                    description=(
+                        f"[stale-lease] {lock_file}: lease for context '{ctx_name}' is a "
+                        f"stale lease from a dead session ({qualifier}; session={session_id}, "
+                        f"heartbeat={data.get('heartbeat', 'none')}) — safe to reclaim. "
+                        "Run 'dadaia doctor --fix' or 'dadaia lock steal "
+                        f"{ctx_name}' to reclaim it."
+                    ),
+                    fixable=True,
+                )
+            )
+        return issues
+
+    def _check_venv_health(self) -> list[DoctorIssue]:
+        """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
+
+        FR-W3-02 (ADR-G4). The workspace law requires ``dadaia`` / ``pip`` / ``python -m
+        dadaia_workspace`` to run from ``<ws>/.dadaia/.venv/bin/`` (the W3 Bash gate
+        enforces this for agents). This invariant surfaces a broken venv before an agent
+        hits the gate: the venv dir is absent, or its ``dadaia`` entrypoint is missing or
+        non-executable. Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
+        and the exec check uses ``os.access`` (the platform-correct probe). Not fixable:
+        rebuilding a venv is an operator action (``dadaia init`` / re-bootstrap), never an
+        auto-repair.
+        """
+        venv_bin = self._workspace_root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+        if not venv_bin.is_dir():
+            return [
+                DoctorIssue(
+                    code="VENV-1",
+                    description=(
+                        f"Workspace venv missing: '{venv_bin}' does not exist. Workspace "
+                        "tooling (dadaia/pip/python -m dadaia_workspace) must run from this "
+                        "venv. Re-bootstrap it (e.g. 'dadaia init' or the documented "
+                        "venv setup)."
+                    ),
+                    fixable=False,
+                )
+            ]
+        entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
+        if not entry.is_file():
+            return [
+                DoctorIssue(
+                    code="VENV-1",
+                    description=(
+                        f"Workspace venv entrypoint missing: '{entry}' not found. "
+                        "Re-bootstrap the workspace venv."
+                    ),
+                    fixable=False,
+                )
+            ]
+        if not os.access(entry, os.X_OK):
+            return [
+                DoctorIssue(
+                    code="VENV-1",
+                    description=(
+                        f"Workspace venv entrypoint not executable: '{entry}'. "
+                        "Restore the exec bit (chmod +x) or re-bootstrap the venv."
+                    ),
+                    fixable=False,
+                )
+            ]
+        return []
 
     def check(self) -> list[DoctorIssue]:
         issues: list[DoctorIssue] = []
@@ -378,6 +477,27 @@ class DoctorService:
                             fixable=False,
                         )
                     )
+
+        # CTX-URL-1 (T-011-08 / FR-W2-03 d): an ALIVE context with an empty repo_url is
+        # un-portable — an export/import + ``context alive`` on another machine would
+        # ``git clone ""`` and fail. Surface it so the operator can repair via
+        # ``dadaia context update <name> --url <url>`` (or re-run ``alive`` while the
+        # on-disk origin remote is present, which back-fills automatically).
+        for ctx in contexts:
+            if ctx.state == ContextState.ALIVE and not ctx.repo_url:
+                issues.append(
+                    DoctorIssue(
+                        code="CTX-URL-1",
+                        description=(
+                            f"Context '{ctx.name}' is alive but has an empty repo_url "
+                            "(un-portable). Run 'dadaia context update "
+                            f"{ctx.name} --url <url>' to set it, or re-run "
+                            f"'dadaia context alive {ctx.name}' while the repo's origin "
+                            "remote is on disk to back-fill it automatically."
+                        ),
+                        fixable=False,
+                    )
+                )
 
         # INV-5 (v2): DEAD context must not have repo on disk
         for ctx in contexts:
@@ -457,6 +577,12 @@ class DoctorService:
         # ---- Single-record lease check ----
         issues.extend(self._check_lease_records())
 
+        # ---- Stale-lease GC (probe-aware reclaim; T-011-02) ----
+        issues.extend(self._check_lock_gc())
+
+        # ---- Venv health (FR-W3-02, T-014-13) ----
+        issues.extend(self._check_venv_health())
+
         return issues
 
     def fix(self) -> list[str]:
@@ -518,21 +644,29 @@ class DoctorService:
                 if not lock_file.name.endswith(".lock.json"):
                     continue
                 data = self._read_lock(lock_file)
-                should_delete = False
+                code_label = "LOCK-NEW"
                 reason_label = ""
+                should_delete = False
                 if data is None:
                     should_delete = True
                     reason_label = "invalid JSON"
                 elif required_fields - set(data.keys()):
                     should_delete = True
                     reason_label = "missing required fields"
-                elif is_stale(data):
+                elif lease.reclaim(data, pid_probe=self._pid_probe):
+                    # Probe-aware reclaim (T-011-02): TTL-expired + dead/pre-pid holder.
+                    # A live-pid holder is NEVER reclaimed regardless of TTL.
                     should_delete = True
-                    reason_label = "stale record"
+                    code_label = "LOCK-GC"
+                    reason_label = (
+                        "stale lease from dead session (pre-pid record)"
+                        if "pid" not in data
+                        else "stale lease from dead session"
+                    )
                 if should_delete:
                     lock_file.unlink(missing_ok=True)
                     actions.append(
-                        f"LOCK-NEW: deleted lease record '{lock_file.name}' ({reason_label})"
+                        f"{code_label}: deleted lease record '{lock_file.name}' ({reason_label})"
                     )
 
         # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/
@@ -543,13 +677,21 @@ class DoctorService:
                     continue
                 if sess_file.parent.name == "runtime":
                     continue
-                sess_data = self._read_lock(sess_file)
+                # Read the session record through its single owner (FR-R3-01).
+                sess_id = sess_file.name[: -len(".json")]
+                sess_data = session_identity.read_session(self._workspace_root, sess_id)
                 if sess_data is None:
                     continue
-                # Build a TTL-check-compatible dict using session fields
+                # Build a TTL-check-compatible dict. The liveness clock is the
+                # heartbeat-renewed ``last_seen_at`` (T-011-04 / FR-W1-04, ADR-8 amended),
+                # with TTL-from-creation fallback for pre-heartbeat records — resolved by
+                # the single owner. The session-record pid is NOT passed (no pid_probe): the
+                # bind-CLI pid is dead by construction, so bind GC is pure last_seen_at TTL.
                 gc_check: dict[str, object] = {
-                    "heartbeat": sess_data.get(_SESSION_HEARTBEAT_FIELD, ""),
-                    "ttl": sess_data.get(_SESSION_GC_TTL_FIELD, 300),
+                    "heartbeat": session_identity.liveness_timestamp(sess_data),
+                    "ttl": sess_data.get(
+                        _SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS
+                    ),
                 }
                 if is_stale(gc_check):
                     sess_file.unlink(missing_ok=True)
@@ -572,24 +714,20 @@ class DoctorService:
         # Stable-identity .ptr GC (D1 soul-fold): delete orphan .ptr files where
         # the corresponding .lock.json does not exist or is expired (is_stale).
         # .ptr is a hint, not a lock; orphans must not persist after the lease expires.
-        runtime_dir = self._sessions_runtime_dir()
-        if runtime_dir.exists():
-            ctx_locks_dir = self._ctx_locks_dir()
-            for ptr_file in sorted(runtime_dir.iterdir()):
-                if not ptr_file.name.endswith(".ptr"):
-                    continue
-                ctx_name = ptr_file.name[: -len(".ptr")]
-                lock_file = ctx_locks_dir / f"{ctx_name}.lock.json"
-                is_orphan = False
-                if not lock_file.exists():
+        # Iterate the pointer namespace through its single owner (FR-R3-01).
+        for ptr_file in session_identity.iter_ptr_files(self._workspace_root):
+            ctx_name = ptr_file.name[: -len(".ptr")]
+            lock_file = ctx_locks_dir / f"{ctx_name}.lock.json"
+            is_orphan = False
+            if not lock_file.exists():
+                is_orphan = True
+            else:
+                lock_data = self._read_lock(lock_file)
+                if lock_data is None or is_stale(lock_data):
                     is_orphan = True
-                else:
-                    lock_data = self._read_lock(lock_file)
-                    if lock_data is None or is_stale(lock_data):
-                        is_orphan = True
-                if is_orphan:
-                    ptr_file.unlink(missing_ok=True)
-                    actions.append(f"PTR-GC: deleted orphan session pointer '{ptr_file.name}'")
+            if is_orphan:
+                ptr_file.unlink(missing_ok=True)
+                actions.append(f"PTR-GC: deleted orphan session pointer '{ptr_file.name}'")
 
         # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
         for cache_name in sorted(_ROOT_FORBIDDEN_CACHES):

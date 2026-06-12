@@ -185,11 +185,9 @@ class _RaisingTelemetry:
 # Handler-level auth tests (401)
 # ---------------------------------------------------------------------------
 
-_EXPECTED_TOKEN = "panel-unit-test-token-xyz"
 
-
-def _build_minimal_handler(token: str, telemetry: Any) -> type[BaseHTTPRequestHandler]:
-    """Build a minimal PanelHandler with sessions views injected."""
+def _build_minimal_handler(telemetry: Any) -> type[BaseHTTPRequestHandler]:
+    """Build a minimal PanelHandler with sessions views injected (no credential)."""
     service = _make_service(telemetry_stub=telemetry)
     stub_views: dict[str, Any] = {
         "index": lambda **kw: (200, "text/html; charset=utf-8", b"<html>ok</html>"),
@@ -202,7 +200,7 @@ def _build_minimal_handler(token: str, telemetry: Any) -> type[BaseHTTPRequestHa
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
     }
-    return make_handler_class(stub_views, token=token, telemetry=telemetry)
+    return make_handler_class(stub_views, telemetry=telemetry)
 
 
 class _FakeSocket:
@@ -233,11 +231,11 @@ class _FakeSocket:
 def _dispatch(
     handler_class: type[BaseHTTPRequestHandler],
     path: str,
-    token: str | None = None,
+    *,
+    host: str = "localhost",
 ) -> tuple[int, bytes]:
-    """Drive a single GET request through handler_class for path."""
-    auth_header = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = (f"GET {path} HTTP/1.1\r\nHost: localhost\r\n{auth_header}\r\n").encode()
+    """Drive a single GET request through handler_class for path (no credential)."""
+    raw_request = (f"GET {path} HTTP/1.1\r\nHost: {host}\r\n\r\n").encode()
     fake_sock = _FakeSocket(raw_request)
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
     response = fake_sock._wfile.getvalue()
@@ -248,37 +246,43 @@ def _dispatch(
 
 
 # ---------------------------------------------------------------------------
-# Tests — auth (401 via handler)
+# Tests — session routes via handler (no credential; Host guard only)
+#
+# Panel auth removed by operator decision 2026-06-11 — see handler.py module
+# docstring; the no-auth + Host-guard contract is pinned in
+# test_no_auth_contract.py.  The former 401-without-token cases were DELETED;
+# what remains is the credential-free serve plus the Host-header guard.
 # ---------------------------------------------------------------------------
 
 
-class TestAuth:
-    def test_sessions_list_401_without_token(self) -> None:
-        """GET /api/sessions without Authorization header → 401."""
-        handler = _build_minimal_handler(_EXPECTED_TOKEN, _FakeTelemetry())
-        status, body = _dispatch(handler, "/api/sessions")
-        assert status == 401
+class TestSessionRouteAccess:
+    def test_sessions_list_serves_without_credential(self) -> None:
+        """GET /api/sessions serves 200 with NO credential (telemetry present)."""
+        handler = _build_minimal_handler(_FakeTelemetry())
+        status, _ = _dispatch(handler, "/api/sessions?runtime=claude")
+        assert status == 200
 
-    def test_sessions_detail_401_without_token(self) -> None:
-        """GET /api/sessions/<runtime>/<id> without Authorization header → 401."""
-        handler = _build_minimal_handler(_EXPECTED_TOKEN, _FakeTelemetry())
-        status, body = _dispatch(
+    def test_sessions_detail_reaches_view_without_credential(self) -> None:
+        """GET /api/sessions/<runtime>/<id> reaches the view without a credential.
+
+        The fake telemetry has no matching detail, so the view itself answers 404
+        — the point is the handler did NOT reject the credential-free request
+        (no 401/403); the request reached the dispatched view.
+        """
+        handler = _build_minimal_handler(_FakeTelemetry())
+        status, _ = _dispatch(
             handler,
             f"/api/sessions/claude/{_SESSION_ROW_CLAUDE.session_id}",
         )
-        assert status == 401
+        assert status not in (401, 403), "credential-free request must not be rejected"
+        assert status == 404, "fake telemetry has no matching detail → view returns 404"
 
-    def test_sessions_list_401_wrong_token(self) -> None:
-        """GET /api/sessions with wrong token → 401."""
-        handler = _build_minimal_handler(_EXPECTED_TOKEN, _FakeTelemetry())
-        status, body = _dispatch(handler, "/api/sessions", token="wrong-token")
-        assert status == 401
-
-    def test_sessions_list_200_valid_token(self) -> None:
-        """GET /api/sessions with valid token → 200."""
-        handler = _build_minimal_handler(_EXPECTED_TOKEN, _FakeTelemetry())
-        status, body = _dispatch(handler, "/api/sessions?runtime=claude", token=_EXPECTED_TOKEN)
-        assert status == 200
+    def test_sessions_list_foreign_host_is_403(self) -> None:
+        """A foreign Host on /api/sessions ⇒ 403 (DNS-rebinding guard)."""
+        handler = _build_minimal_handler(_FakeTelemetry())
+        status, body = _dispatch(handler, "/api/sessions", host="evil.example.com")
+        assert status == 403
+        assert b"forbidden host" in body
 
 
 # ---------------------------------------------------------------------------

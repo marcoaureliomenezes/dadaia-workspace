@@ -9,20 +9,26 @@ All tests:
 Coverage map:
   T-5.1  → AC-1, AC-2 (sections render; JSON APIs respond)
   T-5.2  → AC-3 (loopback-only bind)
-  T-5.3  → AC-10, NFR-2 (byte-identical memory serving end-to-end)
+  T-5.3  → AC-10, NFR-2 (memory .md atom rendered + served end-to-end; D-4)
   T-5.4  → AC-6 (dashboard deprecation warning on stderr)
   T-5.5  → AC-9, NFR-4 (clean shutdown within 2 s; port freed)
 """
 
 from __future__ import annotations
 
+import fcntl
+import http.client
 import json
+import os
+import queue
 import select
 import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -37,21 +43,14 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).parents[3]  # repos/dadaia-workspace/
-# The dadaia workspace root is the parent that contains the real .dadaia/states/ directory.
-# _REPO_ROOT has a .dadaia/ dir too, but only with agentic/reports/scripts — no states/.
-# Walking: repos/dadaia-workspace/ → repos/ → dadaia/  (which has .dadaia/states/)
-_DADAIA_WORKSPACE_ROOT = _REPO_ROOT.parents[1]  # workspace root
-# The real memory file is served from repos/<slug>/specs/memory/ relative to the workspace.
-_REAL_MEMORY_HTML = (
-    _DADAIA_WORKSPACE_ROOT / "repos" / "dadaia-workspace" / "specs" / "memory" / "architecture.html"
-)
 
 
 def _find_free_port() -> int:
     """Return an OS-assigned free TCP port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+        port: int = s.getsockname()[1]
+        return port
 
 
 def _spawn_panel(
@@ -79,23 +78,76 @@ def _spawn_panel(
 
 
 def _wait_for_ready(proc: subprocess.Popen[str], port: int, timeout: float = 10.0) -> None:
-    """Block until the 'Panel running at' line appears on stdout or timeout."""
+    """Block until the 'Panel running at' line appears on stdout or timeout.
+
+    Panel auth was removed by operator decision (2026-06-11): the panel is a
+    loopback-only local tool — no token, no launch URL, no cookie. Startup
+    prints a single ready line; this helper waits for it with a reader thread
+    (mixing select on the raw fd with buffered readline is unsound).
+    """
     expected = f"Panel running at http://127.0.0.1:{port}/"
-    deadline = time.monotonic() + timeout
     assert proc.stdout is not None
+
+    lines: queue.Queue[str | None] = queue.Queue()
+
+    def _reader() -> None:
+        try:
+            assert proc.stdout is not None
+            for raw in proc.stdout:
+                lines.put(raw)
+        finally:
+            lines.put(None)  # EOF sentinel
+
+    reader = threading.Thread(target=_reader, daemon=True)
+    reader.start()
+
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        rlist, _, _ = select.select([proc.stdout], [], [], 0.2)
-        if rlist:
-            line = proc.stdout.readline()
-            if expected in line:
-                return
-        if proc.poll() is not None:
-            stderr = proc.stderr.read() if proc.stderr else ""
+        remaining = max(0.0, deadline - time.monotonic())
+        try:
+            line = lines.get(timeout=min(0.2, remaining) or 0.05)
+        except queue.Empty:
+            if proc.poll() is not None:
+                stderr = _drain_stderr_nonblocking(proc)
+                raise RuntimeError(
+                    f"Panel process exited early (rc={proc.returncode}). stderr:\n{stderr}"
+                ) from None
+            continue
+        if line is None:  # EOF — process closed stdout
+            stderr = _drain_stderr_nonblocking(proc)
             raise RuntimeError(
-                f"Panel process exited early (rc={proc.returncode}). stderr:\n{stderr}"
+                f"Panel closed stdout before becoming ready (rc={proc.poll()}). stderr:\n{stderr}"
             )
-    stderr = proc.stderr.read() if proc.stderr else ""
-    raise TimeoutError(f"Panel did not print ready-line within {timeout}s. stderr:\n{stderr}")
+        if expected in line:
+            return
+
+    stderr = _drain_stderr_nonblocking(proc)
+    raise TimeoutError(f"Panel did not print the ready line within {timeout}s. stderr:\n{stderr}")
+
+
+def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) -> str:
+    """Best-effort, NON-blocking read of whatever is currently on stderr.
+
+    The panel runs ``serve_forever`` and never closes its pipes, so a plain
+    ``proc.stderr.read()`` on a live process blocks forever.  We mark the fd
+    non-blocking and read what is buffered so diagnostics never hang the suite.
+    """
+    if proc.stderr is None:
+        return ""
+    time.sleep(wait)
+    fd = proc.stderr.fileno()
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+    try:
+        return proc.stderr.read() or ""
+    except (BlockingIOError, OSError):
+        return ""
+
+
+def _get(url: str, timeout: float = 5.0) -> http.client.HTTPResponse:
+    """Plain credential-less GET — the no-auth contract (operator decision 2026-06-11)."""
+    resp: http.client.HTTPResponse = urllib.request.urlopen(url, timeout=timeout)
+    return resp
 
 
 def _kill_proc(proc: subprocess.Popen[str]) -> None:
@@ -132,7 +184,7 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
     try:
         _wait_for_ready(proc, port)
 
-        # --- index page ---
+        # --- index page (no credential — the panel is auth-free on loopback) ---
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=5) as resp:
             assert resp.status == 200
             body = resp.read().decode("utf-8", errors="replace")
@@ -148,9 +200,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             "Index page missing Agents/Workflows section marker"
         )
 
-        # --- /api/panel-status ---
+        # --- /api/panel-status (credential-less — no-auth contract) ---
         # Response shape: {"groups": [...]}  (see views/api.py contract docstring)
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/panel-status", timeout=5) as resp:
+        with _get(f"http://127.0.0.1:{port}/api/panel-status") as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/panel-status: {ct}"
@@ -159,9 +211,9 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             assert "groups" in servers_data, "/api/panel-status response missing 'groups' key"
             assert isinstance(servers_data["groups"], list), "'groups' must be a list"
 
-        # --- /api/contexts ---
+        # --- /api/contexts (credential-less — no-auth contract) ---
         # Response shape: {"contexts": [...]}  (see views/api.py contract docstring)
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/contexts", timeout=5) as resp:
+        with _get(f"http://127.0.0.1:{port}/api/contexts") as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "application/json" in ct, f"Unexpected content-type for /api/contexts: {ct}"
@@ -174,6 +226,84 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
         proc.send_signal(signal.SIGINT)
         rc = proc.wait(timeout=5)
         assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
+    finally:
+        _kill_proc(proc)
+
+
+# ---------------------------------------------------------------------------
+# No-auth loopback contract (operator decision 2026-06-11) — supersedes the
+# T-010-21 R7c 401 pin and the T-011-13 launch-token binding contract: the
+# panel is a loopback-only local tool; the loopback bind plus the Host-header
+# allowlist (DNS-rebinding guard) are the entire boundary.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
+def test_credentialless_loopback_request_to_api_is_200(tmp_path: Path) -> None:
+    """A credential-less 127.0.0.1 request to every panel surface serves 200.
+
+    No token, no cookie, no Authorization header — the no-auth contract.
+    A request with a foreign Host header is refused (403) by the
+    DNS-rebinding allowlist.
+    """
+    _init_workspace(tmp_path)
+    port = _find_free_port()
+    proc = _spawn_panel(port, cwd=tmp_path)
+
+    try:
+        _wait_for_ready(proc, port)
+
+        for path in ("/", "/health", "/api/panel-status", "/api/contexts", "/api/kanban"):
+            with _get(f"http://127.0.0.1:{port}{path}") as resp:
+                assert resp.status == 200, f"{path} must serve 200 credential-less"
+
+        # Foreign Host header → 403 (DNS-rebinding allowlist, NOT auth).
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/panel-status")
+        req.add_header("Host", "evil.example.com")
+        try:
+            with urllib.request.urlopen(req, timeout=5):
+                raise AssertionError("Foreign-Host request must NOT return 2xx")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 403, f"Expected 403 for foreign Host, got {exc.code}"
+
+        proc.send_signal(signal.SIGINT)
+        rc = proc.wait(timeout=5)
+        assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
+    finally:
+        _kill_proc(proc)
+
+
+# ---------------------------------------------------------------------------
+# Startup banner contract (no-auth world)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
+def test_startup_banner_has_no_token_or_launch_url(tmp_path: Path) -> None:
+    """The startup output is a plain URL — no `?launch=`, no token, no cookie hint.
+
+    Replaces the retired launch-token binding contract (panel auth removed by
+    operator decision 2026-06-11).
+    """
+    _init_workspace(tmp_path)
+    port = _find_free_port()
+    proc = _spawn_panel(port, cwd=tmp_path)
+
+    try:
+        _wait_for_ready(proc, port)
+        # The banner already arrived; the API serves with zero credentials.
+        with _get(f"http://127.0.0.1:{port}/api/panel-status") as resp:
+            assert resp.status == 200
+
+        proc.send_signal(signal.SIGINT)
+        rc = proc.wait(timeout=5)
+        assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
+        # Drain remaining stdout after exit; no token marker may appear anywhere.
+        leftover = proc.stdout.read() if proc.stdout is not None else ""
+        assert "?launch=" not in leftover, (
+            f"startup output still carries a launch token: {leftover!r}"
+        )
+        assert "token" not in leftover.lower(), f"startup output mentions a token: {leftover!r}"
     finally:
         _kill_proc(proc)
 
@@ -238,57 +368,77 @@ def test_panel_bind_loopback_only(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_memory_view_iframe_loads() -> None:
-    """Memory wrapper contains the correct iframe; /memory/ route serves bytes identical to disk.
+def test_memory_view_iframe_loads(tmp_path: Path) -> None:
+    """Memory wrapper contains the correct iframe; /memory/ route renders the .md atom.
 
-    Acceptance: AC-10 (raw bytes unchanged), NFR-2 (memory atomicity preserved end-to-end).
+    Acceptance: AC-10, NFR-2 — the memory viewer chain works end-to-end for the
+    markdown-memory reality (memory-markdown-source-v1, D-4): the ``.md`` source is
+    the canonical artefact and the ``/memory/`` route renders it to HTML in-memory.
+    The byte-identity SPEC-DOC-008 invariant on committed ``.html`` is retired; the
+    behaviour asserted here is "the rendered HTML carries the source's semantics".
 
-    This test uses the REAL workspace root (cwd=_WORKSPACE_ROOT) so that the panel can
-    resolve repos/dadaia-workspace/specs/memory/architecture.html from disk.
-    The active context slug is 'dadaia-workspace' (primary_context.json).
+    Runs against a tmp workspace fixture (cwd=tmp_path) with a hand-built memory atom
+    under ``repos/<slug>/specs/memory/architecture.md`` — never the real workspace
+    root (the previous incarnation pointed at ``cwd=_DADAIA_WORKSPACE_ROOT`` and
+    guarded on a retired ``architecture.html``, so it was dead-by-skip since the
+    markdown migration). The panel is auth-free on loopback (operator decision
+    2026-06-11), so plain GETs exercise the chain.
     """
-    if not _REAL_MEMORY_HTML.exists():
-        pytest.skip(
-            f"Memory fixture not found at {_REAL_MEMORY_HTML} — skipping real-content check"
-        )
+    _init_workspace(tmp_path)
 
-    slug = "dadaia-workspace"
+    slug = "memory-fixture"
+    atom_dir = tmp_path / "repos" / slug / "specs" / "memory"
+    atom_dir.mkdir(parents=True)
+    # A real .md atom whose rendered HTML semantics we assert on. The heading and the
+    # body sentence are distinct, non-injected strings: if the renderer regresses
+    # (stops emitting <h1>, drops body text, or serves raw Markdown), the asserts fail.
+    (atom_dir / "architecture.md").write_text(
+        "# Architecture Atom\n\nThe container wires every feature dependency.\n",
+        encoding="utf-8",
+    )
+
     port = _find_free_port()
-    # Spawn from the dadaia workspace root (which has .dadaia/states/) so the panel
-    # can resolve the workspace and serve memory files from repos/dadaia-workspace/.
-    proc = _spawn_panel(port, cwd=_DADAIA_WORKSPACE_ROOT)
+    proc = _spawn_panel(port, cwd=tmp_path)
 
     try:
         _wait_for_ready(proc, port)
 
-        # --- /memory-view/<slug>/architecture.html → wrapper with iframe ---
-        wrapper_url = f"http://127.0.0.1:{port}/memory-view/{slug}/architecture.html"
-        with urllib.request.urlopen(wrapper_url, timeout=5) as resp:
+        # --- /memory-view/<slug>/architecture.md → wrapper with iframe ---
+        wrapper_url = f"http://127.0.0.1:{port}/memory-view/{slug}/architecture.md"
+        with _get(wrapper_url) as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
             assert "text/html" in ct, f"Unexpected content-type for memory-view: {ct}"
             wrapper_body = resp.read().decode("utf-8", errors="replace")
 
-        expected_iframe_src = f'src="/memory/{slug}/architecture.html"'
+        expected_iframe_src = f'src="/memory/{slug}/architecture.md"'
         assert expected_iframe_src in wrapper_body, (
             f"Wrapper page missing expected iframe src.\n"
             f"Expected to find: {expected_iframe_src!r}\n"
             f"In: {wrapper_body[:400]!r}"
         )
 
-        # --- /memory/<slug>/architecture.html → byte-identical to disk (NFR-2 / AC-10) ---
-        memory_url = f"http://127.0.0.1:{port}/memory/{slug}/architecture.html"
-        with urllib.request.urlopen(memory_url, timeout=5) as resp:
+        # --- /memory/<slug>/architecture.md → Markdown rendered to HTML (D-4) ---
+        memory_url = f"http://127.0.0.1:{port}/memory/{slug}/architecture.md"
+        with _get(memory_url) as resp:
             assert resp.status == 200
-            served_bytes = resp.read()
+            ct = resp.headers.get("Content-Type", "")
+            assert "text/html" in ct, f"Unexpected content-type for memory render: {ct}"
+            served = resp.read().decode("utf-8", errors="replace")
 
-        disk_bytes = _REAL_MEMORY_HTML.read_bytes()
-
-        assert served_bytes == disk_bytes, (
-            f"NFR-2 VIOLATED: served bytes differ from disk bytes for "
-            f"repos/{slug}/specs/memory/architecture.html. "
-            f"Served {len(served_bytes)} bytes, disk has {len(disk_bytes)} bytes. "
-            "The panel must serve memory HTML verbatim (SPEC-DOC-008)."
+        # The renderer must turn the .md heading into an <h1> and preserve the body
+        # sentence — i.e. it served rendered HTML, not the raw Markdown source.
+        assert "<h1" in served, (
+            "Memory render did not emit an <h1> for the '# Architecture Atom' heading — "
+            f"the .md atom was not rendered to HTML. Got: {served[:400]!r}"
+        )
+        assert "Architecture Atom" in served, "Rendered HTML dropped the heading text"
+        assert "The container wires every feature dependency." in served, (
+            "Rendered HTML dropped the body sentence"
+        )
+        assert "# Architecture Atom" not in served, (
+            "Served body still contains the raw Markdown '# ' heading marker — "
+            "the route served source bytes instead of rendered HTML (D-4 violated)."
         )
 
         proc.send_signal(signal.SIGINT)

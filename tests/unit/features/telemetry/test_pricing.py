@@ -1,4 +1,11 @@
-"""Unit tests for features/telemetry/pricing.py (T-AM-10)."""
+"""Unit tests for features/telemetry/pricing.py (T-AM-10).
+
+``PRICING_TABLE`` is now a DERIVED view over ``core.model_registry``. The two
+contradictory haiku pins (``claude-haiku-3-5`` at the old lines 47/212, which
+disagreed with the mapping table's ``claude-haiku-4-5-20251001``) are resolved
+here to the single canonical id, and a cross-table key-equality contract test
+replaces the implicit per-table assumptions.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +13,15 @@ from datetime import date
 
 import pytest
 
+from dadaia_workspace.core.model_registry import REGISTRY
 from dadaia_workspace.features.telemetry import pricing
 from dadaia_workspace.features.telemetry.pricing import (
+    PRICING_TABLE,
     ModelPricing,
     compute_cost,
     pricing_age_days,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP
 
 # ---------------------------------------------------------------------------
 # compute_cost
@@ -41,10 +51,11 @@ class TestComputeCost:
                 date(2026, 1, 1),
                 18_000_000,
             ),
-            # claude-haiku-3-5: 1M input only at 2026-01-01
-            # = 0.80 USD = 800_000 micro-USD
+            # claude-haiku-4-5-20251001 (drift resolved): 1M input only at
+            # 2026-01-01 = 0.80 USD = 800_000 micro-USD (haiku-tier pricing
+            # preserved under the canonical 4-5 id).
             (
-                "claude-haiku-3-5",
+                "claude-haiku-4-5-20251001",
                 {"input_tokens": 1_000_000},
                 date(2026, 1, 1),
                 800_000,
@@ -209,7 +220,40 @@ class TestPricingAgeDays:
     def test_pricing_age_days_all_models_same_effective_from(self) -> None:
         """All three baseline models have 2025-01-01; from 2026-01-01 = 365 days."""
         result = pricing_age_days(
-            ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-3-5"],
+            ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
             when=date(2026, 1, 1),
         )
         assert result == 365
+
+
+# ---------------------------------------------------------------------------
+# Cross-table contract + derived-view correctness (registry single source).
+# ---------------------------------------------------------------------------
+
+
+class TestRegistryDerivedView:
+    def test_pricing_table_keys_equal_registry_claude_ids(self) -> None:
+        assert set(PRICING_TABLE) == {entry.claude_id for entry in REGISTRY}
+
+    def test_model_map_and_pricing_table_key_sets_identical(self) -> None:
+        """The contract that closes the drift bug: both derived views share an
+        identical key-set (== the registry claude_ids)."""
+        assert set(MODEL_MAP) == set(PRICING_TABLE)
+        assert set(PRICING_TABLE) == {entry.claude_id for entry in REGISTRY}
+
+    def test_pricing_rows_are_ascending_by_effective_from(self) -> None:
+        """Derived view preserves dated rows ascending (newest last) so the
+        most-recent row wins in compute_cost."""
+        for rows in PRICING_TABLE.values():
+            dates = [r.effective_from for r in rows]
+            assert dates == sorted(dates)
+
+    def test_derived_rows_match_registry_pricing(self) -> None:
+        index = {e.claude_id: e for e in REGISTRY}
+        for claude_id, rows in PRICING_TABLE.items():
+            assert set(rows) == set(index[claude_id].pricing)
+
+    def test_fable_5_priced_via_derived_view(self) -> None:
+        usage = {"input_tokens": 1_000_000, "output_tokens": 1_000_000}
+        # 10.00 + 50.00 = $60.00 = 60_000_000 micro-USD.
+        assert compute_cost(usage, "claude-fable-5", date(2026, 6, 1)) == 60_000_000

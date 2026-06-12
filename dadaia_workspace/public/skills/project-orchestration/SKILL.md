@@ -18,9 +18,16 @@ slugs, or optional domain-pack assumptions.
 Default topology: 9 core agents (constitution §14 roster). Roles, phases, and lease
 relationships are normative in the §7/§14 matrices; this table is the dispatch view.
 
-| Agent | Phase (§7) | Primary mission | Dispatches to | Do not call when |
+The "Routes next to" column is **handoff routing, not executable dispatch**: it names
+the agent the dispatcher (PM, top-level) should send to next after consuming this
+agent's handoff. Only the top-level session agent holds dispatch capability — a
+dispatched sub-agent cannot spawn another agent in either harness, at any approval
+level. `project-manager` is the only roster entry whose cell is real dispatch, and only
+when it runs as the top-level session agent.
+
+| Agent | Phase (§7) | Primary mission | Routes next to (via PM) | Do not call when |
 |---|---|---|---|---|
-| `project-manager` | 1–2; coordinates all MUTATING phases | Backlog/bug intake, cross-agent dispatch, mediation, lease coordinator | any core agent | A single specialist can complete the task directly |
+| `project-manager` | 1–2; coordinates all MUTATING phases | Backlog/bug intake, cross-agent dispatch, mediation, lease coordinator | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
 | `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
 | `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
@@ -50,8 +57,11 @@ of the public default install unless explicitly selected by the operator.
 
 ## Dispatch Protocol
 
-Only dispatchers call other agents. Leaf specialists do not chain further
-dispatch unless the operator explicitly approves it.
+Only the top-level dispatcher calls other agents. Leaf specialists **cannot** chain
+further dispatch — the harness does not grant dispatch capability to sub-agents (this
+is a runtime fact, not a policy that an operator approval can lift). A leaf that needs
+another agent's work returns a handoff naming `next_handoff.agent`; the dispatcher
+routes it.
 
 Use this shape for sub-agent prompts:
 

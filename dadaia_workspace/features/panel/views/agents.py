@@ -11,15 +11,14 @@ Security (OWASP A03):
   data.
 
 Recovery / Secure-Delete Procedure (devops T12):
-  If the telemetry database or the panel auth token are suspected to be compromised,
-  or if corruption is detected (503 on API endpoints with ``telemetry_degraded``),
-  use the following secure-delete recipe to purge all sensitive local state:
+  If the telemetry database is suspected to be compromised, or if corruption is
+  detected (503 on API endpoints with ``telemetry_degraded``), use the following
+  secure-delete recipe to purge the sensitive local state:
 
       shred -u ~/.dadaia/state/telemetry/telemetry.sqlite
-      shred -u ~/.dadaia/state/panel.token
 
-  After shredding, restart the panel via ``dadaia panel start``.  A fresh SQLite
-  database and auth token will be generated on next startup.
+  After shredding, restart the panel via ``dadaia panel``.  A fresh SQLite
+  database will be generated on next startup.  (The panel uses no auth token.)
 
   Corrupt database quarantine files (``telemetry.sqlite.corrupt.<utc_ts>``) can be
   found at ``~/.dadaia/state/telemetry/`` and should also be shredded:

@@ -140,3 +140,31 @@ class GitSubprocessClient:
         if result.returncode != 0:
             return False
         return Path(result.stdout.strip()).resolve() == path.resolve()
+
+    def list_untracked(self, path: Path) -> list[str]:
+        """Return repo-relative paths of untracked, non-gitignored files.
+
+        Uses ``git ls-files --others --exclude-standard`` so that ``.gitignore``
+        is honoured (gitignored files are NOT returned). The result drives the
+        ``dead()`` review gate: an untracked file here is content that would be
+        newly committed and pushed, so it must be reviewed/scanned first.
+        """
+        result = _run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=path,
+        )
+        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+    def remote_url(self, path: Path) -> str:
+        """Return the URL of the ``origin`` remote, or ``""`` if none is configured.
+
+        Drives the repo_url back-fill (FR-W2-03 / T-011-08): when a context record
+        has an empty ``repo_url`` but the repo is on disk with an ``origin`` remote,
+        ``alive``/``dead`` read the canonical URL straight from the repo. Returns
+        the empty string on any failure (no remote, not a repo) so callers treat it
+        as "nothing to back-fill" rather than raising.
+        """
+        result = _run(["git", "remote", "get-url", "origin"], cwd=path)
+        if result.returncode != 0:
+            return ""
+        return result.stdout.strip()

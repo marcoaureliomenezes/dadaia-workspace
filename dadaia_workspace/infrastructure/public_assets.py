@@ -23,7 +23,6 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     dcx4_claude_strings,
     dcx5_empty_developer_instructions,
     dcx6_codex_runtime_adapters,
-    lint_legacy_software_engineer,
 )
 from dadaia_workspace.infrastructure.install_helpers import (
     build_agents_index,
@@ -187,9 +186,6 @@ class FileSystemPublicAssetManager:
 
     def _classify_workflows(self, agentic_dir: Path) -> list[str]:
         return classify_workflows(agentic_dir)
-
-    def _lint_legacy_software_engineer(self) -> list[str]:
-        return lint_legacy_software_engineer(self._public_dir, self._iter_files)
 
     def _claude_settings(self, workspace_root: Path) -> dict[str, object]:
         return _build_claude_settings(workspace_root)
@@ -399,7 +395,6 @@ class FileSystemPublicAssetManager:
         )
 
         reports.extend(classify_workflows(agentic_dir))
-        reports.extend(lint_legacy_software_engineer(self._public_dir, self._iter_files))
         reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))

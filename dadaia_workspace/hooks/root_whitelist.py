@@ -1,4 +1,4 @@
-"""PreToolUse workspace-root whitelist gate (Windows-safe port of ``root-whitelist-gate.sh``).
+"""PreToolUse workspace-root whitelist gate (the canonical, cross-platform gate surface).
 
 The Law: the workspace root may contain ONLY these entries::
 
@@ -59,23 +59,51 @@ def _operator_exception(workspace: Path, basename: str) -> bool:
     return False
 
 
-def main() -> int:
-    """Run the root-whitelist gate. Returns 0 always (block via the stdout envelope)."""
-    payload = _common.read_stdin_json()
+def evaluate_payload(payload: dict[str, object]) -> str | None:
+    """Pure root-whitelist policy over an ALREADY-PARSED hook payload.
+
+    Returns a block reason when ANY write target lands a forbidden new entry at the
+    workspace root, else ``None`` (ALLOW). This is the reusable policy surface the merged
+    ``pre_gate`` entrypoint drives; ``main`` is a thin back-compat wrapper kept one release.
+
+    FR-W4-04: a multi-file apply_patch surfaces every file header; ANY forbidden header
+    blocks the whole patch (most restrictive wins).
+    """
     name = _common.tool_name(payload)
     # NotebookEdit is not root-relevant in the shell version; keep the same tool set.
     if name not in _common.WRITE_TOOLS - {"NotebookEdit"}:
-        return 0
+        return None
 
-    raw_path = _common.target_path(payload)
-    if not raw_path:
-        return 0  # fail open
+    raw_paths = _common.target_paths(payload)
+    if not raw_paths:
+        return None  # fail open
 
     try:
         workspace = _resolve_workspace()
     except Exception:  # noqa: BLE001 — fail-open
-        return 0
+        return None
 
+    for raw_path in raw_paths:
+        block = _root_violation(workspace, raw_path)
+        if block is not None:
+            return block
+    return None
+
+
+def main() -> int:
+    """Run the root-whitelist gate. Returns 0 always (block via the stdout envelope)."""
+    payload = _common.read_stdin_json()
+    reason = evaluate_payload(payload)
+    if reason is not None:
+        _common.emit_block(reason)
+    return 0
+
+
+def _root_violation(workspace: Path, raw_path: str) -> str | None:
+    """Return a block reason if *raw_path* writes a forbidden new root entry, else ``None``.
+
+    Fail-open: an unresolvable parent or a non-root target yields ``None`` (allowed).
+    """
     fpath = Path(raw_path)
     if not fpath.is_absolute():
         fpath = workspace / fpath
@@ -84,17 +112,17 @@ def main() -> int:
     try:
         is_at_root = fpath.parent.resolve() == workspace.resolve()
     except OSError:
-        return 0
+        return None
     if not is_at_root:
-        return 0
+        return None
 
     basename = fpath.name
     if basename in _WHITELIST:
-        return 0
+        return None
     if _operator_exception(workspace, basename):
-        return 0
+        return None
 
-    _common.emit_block(
+    return (
         f"[ROOT WHITELIST GATE] Writing '{basename}' at workspace root is forbidden. "
         "The workspace root may only contain: .agents/ .claude/ .codex/ .dadaia/ "
         ".opencode/ repos/ AGENTS.md CLAUDE.md prompt.md. Redirect output to "
@@ -103,7 +131,6 @@ def main() -> int:
         "required at root, add a glob pattern to .dadaia/states/root_exceptions.txt and "
         "retry. Operator-created files are exempt — add them to root_exceptions.txt."
     )
-    return 0
 
 
 if __name__ == "__main__":

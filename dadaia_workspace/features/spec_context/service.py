@@ -2,6 +2,7 @@
 
 import contextlib
 import logging
+import re
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from dadaia_workspace.core.exceptions import (
     ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
+    DadaiaError,
     GitSyncError,
 )
 from dadaia_workspace.core.lock_liveness import is_stale
@@ -32,8 +34,144 @@ _SCAFFOLD_SRC = _PUBLIC_DIR / "scaffold"
 _log = logging.getLogger(__name__)
 
 
+class DeadReviewRequiredError(DadaiaError):
+    """Raised when dead() finds untracked files but no explicit --commit consent.
+
+    F-5 (sec audit): dead() must NOT auto-stage and push untracked non-gitignored
+    files without review. When such files exist and the caller did not pass
+    ``commit=True``, dead() refuses, pushes nothing, and leaves the repo on disk
+    untouched. The message lists the offending files so the operator can review,
+    gitignore, or delete them and then re-run with ``--commit`` to consent.
+    """
+
+
+class DeadSecretFoundError(DadaiaError):
+    """Raised when --commit was given but a planted secret/IP/hostname is found.
+
+    The privacy/secret scan runs over the content of the untracked files that
+    ``--commit`` would newly commit. Any match blocks the push (repo left on disk,
+    nothing committed or pushed). The message is redacted: it names the file and
+    the rule that fired, never the secret value itself.
+    """
+
+
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+# --------------------------------------------------------------------- secret scan
+#
+# Structural secret/identifier patterns reused as the privacy/secret engine for the
+# dead() --commit review gate (F-5 / AC-R7-01). These are content-shape rules — no
+# operator-specific terms are hardcoded here (dev-guardrail #4). The operator denylist
+# baseline (R7b / T-010-20) lives in infrastructure/privacy_check.py and is orthogonal;
+# this scan is the structural layer that blocks pushing newly-committed files that look
+# like they carry a secret, private IP, or internal hostname.
+_SECRET_SCAN_TEXT_SUFFIXES = {
+    ".cfg",
+    ".conf",
+    ".css",
+    ".env",
+    ".html",
+    ".ini",
+    ".j2",
+    ".js",
+    ".json",
+    ".md",
+    ".py",
+    ".sh",
+    ".toml",
+    ".ts",
+    ".txt",
+    ".yaml",
+    ".yml",
+    "",
+}
+
+# R-2 (v0.1.10 rc-2 sec audit LOW): cryptographic key / certificate material is
+# commonly stored in binary-suffix files (.pem can be text, .key/.p12/.pfx are
+# typically binary) that the text-suffix scan above skips. A private-key file in
+# an untracked dead()-push set is a finding *by its suffix alone* — regardless of
+# whether the bytes happen to be UTF-8 decodable. PEM files are also content-scanned
+# (they overlap with the text path) so a real key block is caught both ways.
+_SECRET_SCAN_KEY_SUFFIXES = {
+    ".pem",
+    ".key",
+    ".p12",
+    ".pfx",
+    ".crt",
+    ".cer",
+    ".der",
+    ".keystore",
+    ".jks",
+}
+
+# (rule-name, compiled-pattern). Names are surfaced in the error; values never are.
+_SECRET_SCAN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("private-key-block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("aws-access-key-id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
+    ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    (
+        "generic-secret-assignment",
+        re.compile(
+            r"(?i)(?:password|passwd|secret|api[_-]?key|access[_-]?token|"
+            r"private[_-]?key)\s*[:=]\s*['\"]?[A-Za-z0-9/+_\-]{8,}",
+        ),
+    ),
+    (
+        "private-ipv4",
+        re.compile(
+            r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+            r"|192\.168\.\d{1,3}\.\d{1,3}"
+            r"|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b",
+        ),
+    ),
+    (
+        "internal-hostname",
+        re.compile(r"(?i)\b[a-z0-9][a-z0-9-]*\.(?:internal|local|lan|corp|intranet)\b"),
+    ),
+)
+
+
+def _scan_file_for_secrets(path: Path) -> list[str]:
+    """Return rule names that match *path* (empty list ⇒ clean).
+
+    Two layers (R-2):
+
+    1. **Suffix presence** — a cryptographic key / certificate suffix
+       (``.pem``/``.key``/``.p12``/``.pfx``/...) is itself a finding
+       (``cert-key-file-suffix``), because such a file does not belong in an
+       untracked dead()-push set regardless of its byte content. This catches
+       binary key material the text scan below skips.
+    2. **Content rules** — for text-decodable files (the text-suffix allowlist,
+       plus PEM/key files that happen to be ASCII), the structural secret rules
+       run over the decoded content.
+
+    Binary / unreadable / unsupported-suffix files that are not key material are
+    skipped. Never returns the matched secret value — only the rule name, so
+    callers can build a redacted report.
+    """
+    suffix = path.suffix.lower()
+    hits: list[str] = []
+
+    is_key_file = suffix in _SECRET_SCAN_KEY_SUFFIXES
+    if is_key_file:
+        # Presence of cert/key material is a finding by itself.
+        hits.append("cert-key-file-suffix")
+
+    # Content-scan only files we can decode: the text allowlist, plus key files
+    # (PEM is frequently ASCII — a decodable .pem also triggers private-key-block).
+    if suffix not in _SECRET_SCAN_TEXT_SUFFIXES and not is_key_file:
+        return hits
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return hits
+    for rule_name, pattern in _SECRET_SCAN_RULES:
+        if pattern.search(text):
+            hits.append(rule_name)
+    return hits
 
 
 def _merge_scaffold_into(
@@ -126,6 +264,57 @@ class SpecContextService:
             self._store.save(ctx)
         return ctx
 
+    # ------------------------------------------------------------------ update_url
+
+    def update_url(self, name: str, repo_url: str) -> SpecContextProject:
+        """Repair a context's ``repo_url`` through the store ``update()`` API.
+
+        FR-W2-03 (c) / T-011-08: the operator repair verb for the VPS-migration
+        scenario where no on-disk repo is present to back-fill from. Preserves the
+        record shape and locking discipline (the store ``update()`` does the JSON
+        write under the workspace lock). Raises ``ContextNotFoundError`` if the
+        context does not exist.
+        """
+        with workspace_lock(self._workspace_root):
+            ctx = self._store.get(name)
+            if ctx is None:
+                raise ContextNotFoundError(f"Context '{name}' not found.")
+            updated = SpecContextProject(
+                name=ctx.name,
+                state=ctx.state,
+                repo_slug=ctx.repo_slug,
+                repo_url=repo_url,
+                created_at=ctx.created_at,
+                alive_since=ctx.alive_since,
+                dead_since=ctx.dead_since,
+                current_branch=ctx.current_branch,
+            )
+            self._store.update(updated)
+        return updated
+
+    # ------------------------------------------------------------------ back-fill
+
+    def _backfill_repo_url(self, repo_slug: str, current_url: str) -> str:
+        """Return the on-disk ``origin`` URL when the record URL is empty.
+
+        FR-W2-03 (b) / T-011-08: ``alive``/``dead`` back-fill ``repo_url`` from
+        ``git remote get-url origin`` when the record's URL is empty and a repo is
+        on disk (the repo knows its own remote). Goes exclusively through the
+        per-context git-ops port — no raw subprocess in features. Returns the
+        existing URL unchanged when it is already set, when no repo is on disk, or
+        when the repo has no ``origin`` remote.
+        """
+        if current_url:
+            return current_url
+        repo_path = self._repo_path(repo_slug)
+        if not repo_path.exists() or not self._git.is_git_root(repo_path):
+            return current_url
+        try:
+            discovered = self._git.remote_url(repo_path)
+        except Exception:
+            return current_url
+        return discovered or current_url
+
     # ------------------------------------------------------------------ list / show
 
     def list_all(self) -> list[SpecContextProject]:
@@ -167,6 +356,7 @@ class SpecContextService:
         # Lock 2: serialize ALL per-repo filesystem ops for this slug.
         # Released before Lock 1 is requested — no simultaneous L1+L2 hold here.
         actual_branch: str | None = None
+        backfilled_url: str = ctx.repo_url
         with context_lock(self._workspace_root, repo_slug):
             # Re-read ctx inside Lock 2 so we use the freshest repo_url / current_branch.
             ctx_l2 = self._store.get(name)
@@ -192,6 +382,11 @@ class SpecContextService:
                 actual_branch = self._git.current_branch(repo_path)
             except Exception:
                 actual_branch = None
+
+            # Back-fill repo_url from the on-disk origin remote when the record's URL
+            # is empty (FR-W2-03 b / T-011-08) — keeps the context portable for a
+            # later export/import + alive clone on another machine.
+            backfilled_url = self._backfill_repo_url(repo_slug, ctx_l2.repo_url)
 
             # Scaffold specs/. A fresh tree is copied whole; a pre-existing tree is
             # SAFE-PRESERVED — snapshot it to specs_bkp/preserve-<UTC>/ before merging
@@ -240,11 +435,14 @@ class SpecContextService:
             if ctx_fresh.state == ContextState.ALIVE:
                 return ctx_fresh  # another thread already transitioned
 
+            # Prefer the back-filled URL only when the freshest record URL is still
+            # empty — never clobber a URL another writer set in the meantime.
+            resolved_url = ctx_fresh.repo_url or backfilled_url
             alive_ctx = SpecContextProject(
                 name=ctx_fresh.name,
                 state=ContextState.ALIVE,
                 repo_slug=ctx_fresh.repo_slug,
-                repo_url=ctx_fresh.repo_url,
+                repo_url=resolved_url,
                 created_at=ctx_fresh.created_at,
                 alive_since=_now(),
                 dead_since=None,
@@ -256,10 +454,77 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 
-    def dead(self, name: str) -> SpecContextProject:
+    def _enforce_dead_review_gate(self, name: str, repo_path: Path, *, commit: bool) -> None:
+        """Gate dead() on untracked content (F-5 / AC-R7-01).
+
+        No untracked files ⇒ no-op (clean-tree / tracked-only path unchanged).
+        Untracked files + not *commit* ⇒ raise DeadReviewRequiredError (refuse).
+        Untracked files + *commit* ⇒ secret-scan their content; any match raises
+        DeadSecretFoundError. This runs before any commit/push/rmtree so a refusal
+        leaves the repo untouched.
+        """
+        try:
+            untracked = self._git.list_untracked(repo_path)
+        except Exception:
+            # Fail-closed for the gate: if we cannot enumerate untracked files we
+            # cannot prove the tree is clean. Without consent, refuse.
+            if commit:
+                return
+            raise DeadReviewRequiredError(
+                f"Context '{name}': could not verify the working tree of '{repo_path}'. "
+                "Re-run with --commit to consent to committing+pushing any changes, "
+                "or clean the tree first."
+            ) from None
+
+        if not untracked:
+            return  # clean tree (no untracked files) — behave exactly as before
+
+        if not commit:
+            shown = untracked[:20]
+            more = "" if len(untracked) <= 20 else f"\n  ... and {len(untracked) - 20} more"
+            listing = "\n".join(f"  {f}" for f in shown)
+            raise DeadReviewRequiredError(
+                f"Context '{name}' has {len(untracked)} untracked file(s) that dead() "
+                f"would otherwise commit and push WITHOUT review:\n"
+                f"{listing}{more}\n"
+                "Review them, then either delete/gitignore them, or re-run with "
+                "'dadaia context dead "
+                f"{name} --commit' to explicitly consent to committing and pushing them."
+            )
+
+        # commit=True: scan the content of the files we are about to newly commit.
+        flagged: list[str] = []
+        for rel in untracked:
+            file_path = repo_path / rel
+            if not file_path.is_file():
+                continue
+            hits = _scan_file_for_secrets(file_path)
+            if hits:
+                flagged.append(f"  {rel}: {', '.join(sorted(set(hits)))}")
+        if flagged:
+            report = "\n".join(flagged)
+            raise DeadSecretFoundError(
+                f"Context '{name}': secret scan blocked dead() --commit. "
+                f"{len(flagged)} untracked file(s) match a secret/identifier rule "
+                "(values redacted):\n"
+                f"{report}\n"
+                "Remove or redact the flagged content, then re-run. Nothing was pushed."
+            )
+
+    def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
         """Transition a context from ALIVE to DEAD; sets dead_since, removes repo.
 
         Raises ContextLockedError if a live lease record exists for this context.
+
+        Review gate (F-5 / AC-R7-01): if the repo has untracked non-gitignored
+        files and *commit* is False, dead() REFUSES — it raises
+        ``DeadReviewRequiredError`` listing the files, pushes nothing, and leaves
+        the repo on disk untouched. Passing ``commit=True`` is explicit operator
+        consent to commit+push those files; before pushing, their content is run
+        through the structural secret scan and any match raises
+        ``DeadSecretFoundError`` (push blocked, repo untouched). Tracked-but-dirty
+        modifications keep the existing auto-sync behaviour (FR-R7: only untracked
+        content is gated). A clean tree behaves exactly as before.
 
         Lock 1 wraps the JSON write (spec_contexts.json update).
         Lock 2 wraps git push and shutil.rmtree (OUTSIDE Lock 1).
@@ -279,6 +544,15 @@ class SpecContextService:
 
         repo_path = self._repo_path(ctx.repo_slug)
         branch_before_sync: str | None = None
+        # Back-fill repo_url from the on-disk origin remote while the repo still
+        # exists (FR-W2-03 b / T-011-08), BEFORE the rmtree below removes it — a
+        # DEAD record with a known URL stays portable for a future alive clone.
+        backfilled_url: str = self._backfill_repo_url(ctx.repo_slug, ctx.repo_url)
+
+        # Review gate (F-5): evaluate untracked content BEFORE any lock, commit,
+        # push, or rmtree, so a refusal leaves the repo entirely untouched on disk.
+        if repo_path.exists() and self._git.is_git_root(repo_path):
+            self._enforce_dead_review_gate(name, repo_path, commit=commit)
 
         # Git sync + rmtree under Lock 2 (OUTSIDE Lock 1)
         if repo_path.exists():
@@ -326,7 +600,7 @@ class SpecContextService:
                 name=ctx.name,
                 state=ContextState.DEAD,
                 repo_slug=ctx.repo_slug,
-                repo_url=ctx.repo_url,
+                repo_url=ctx.repo_url or backfilled_url,
                 created_at=ctx.created_at,
                 alive_since=None,
                 dead_since=_now(),

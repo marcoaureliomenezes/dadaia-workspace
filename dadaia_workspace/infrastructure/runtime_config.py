@@ -47,30 +47,36 @@ def _hook_cmd(workspace_root: Path, module: str) -> str:
     return f"{_python_bin(workspace_root)} -m {module}"
 
 
+# T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse gate matcher.
+# The SDD gate and root-whitelist gate police filesystem writes (the write tools); the
+# W3 venv guard (T-014-12) additionally polices Bash invocations of `dadaia`/`pip`/
+# `python -m dadaia_workspace`. The merged pre_gate entrypoint therefore fires on the
+# write tools AND Bash — still a scoped explicit matcher, never the forbidden empty
+# (match-all) form the ai audit flagged.
+_CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
+# Claude Code's canonical explicit match-all for tool-matching events. Used on
+# PostToolUse so the lease heartbeat (T-010-04) fires after *every* tool, including
+# Bash, not just write tools. Deliberately the explicit "*" form, NOT the empty
+# string the ai audit forbids.
+_CLAUDE_MATCH_ALL = "*"
+
+
 def claude_settings(workspace_root: Path) -> dict[str, object]:
     """Return the Claude Code settings.json dict for *workspace_root*."""
     return {
         "hooks": {
+            # FR-W4-01 (T-014-05): a SINGLE merged PreToolUse entrypoint (pre_gate) reads
+            # stdin once and runs root-whitelist → venv-guard → SDD gate in order. The old
+            # dual sdd_gate + root_whitelist wiring is gone (one interpreter spawn per write).
             "PreToolUse": [
                 {
                     "hooks": [
                         {
-                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.sdd_gate"),
+                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.pre_gate"),
                             "type": "command",
                         }
                     ],
-                    "matcher": "",
-                },
-                {
-                    "hooks": [
-                        {
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.root_whitelist"
-                            ),
-                            "type": "command",
-                        }
-                    ],
-                    "matcher": "",
+                    "matcher": _CLAUDE_WRITE_TOOLS,
                 },
             ],
             "PostToolUse": [
@@ -83,9 +89,11 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                             "type": "command",
                         }
                     ],
-                    "matcher": "",
+                    # Heartbeat must fire on ALL tools (T-010-04) — explicit match-all.
+                    "matcher": _CLAUDE_MATCH_ALL,
                 }
             ],
+            # UserPromptSubmit has no tool to match; matcher unchanged (empty).
             "UserPromptSubmit": [
                 {
                     "hooks": [
@@ -135,38 +143,38 @@ def codex_config(agentic_dir: Path) -> str:
 
 def codex_hooks(workspace_root: Path) -> dict[str, object]:
     """Return the .codex/hooks.json dict for *workspace_root*."""
-    write_matcher = "^(apply_patch|Edit|Write)$"
+    # PreToolUse gate fires on the write tools (filesystem writes) AND Bash — the W3 venv
+    # guard (T-014-12) polices `dadaia`/`pip`/`python -m dadaia_workspace` Bash invocations.
+    # Read-only tools are still excluded.
+    write_matcher = "^(apply_patch|Edit|Write|Bash)$"
     python_bin = _python_bin(workspace_root)
     ctx_inject_module = "dadaia_workspace.hooks.ctx_inject"
     return {
         "hooks": {
+            # FR-W4-01 (T-014-05): single merged PreToolUse entrypoint (pre_gate) — one
+            # interpreter spawn runs root-whitelist → venv-guard → SDD gate. The old dual
+            # sdd_gate + root_whitelist wiring is removed.
             "PreToolUse": [
                 {
                     "matcher": write_matcher,
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.sdd_gate"),
-                            "statusMessage": "Checking SDD gate",
-                        }
-                    ],
-                },
-                {
-                    "matcher": write_matcher,
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.root_whitelist"
-                            ),
-                            "statusMessage": "Checking root whitelist",
+                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.pre_gate"),
+                            "statusMessage": "Checking dadaia PreToolUse gate",
                         }
                     ],
                 },
             ],
+            # N-2 (v0.1.10 rc-2): the lease heartbeat MUST fire after *every* tool,
+            # including Bash and read-only tools — otherwise a long non-write Codex
+            # call (e.g. a multi-minute pytest run) starves the heartbeat and the
+            # lease goes TTL-stale, the original lease-starvation incident's Codex
+            # flavor. Codex's canonical match-all is an *omitted* matcher (same form
+            # used by UserPromptSubmit), so the heartbeat block carries no matcher and
+            # thus runs on all tools, mirroring Claude's explicit "*".
             "PostToolUse": [
                 {
-                    "matcher": write_matcher,
                     "hooks": [
                         {
                             "type": "command",

@@ -8,7 +8,10 @@ Coverage:
 - Absolute-path-style attempt: returns 400
 - Path traversal via symlink that escapes base_dir: returns 400
 - 404 on valid id that has no corresponding agent file
-- Bearer auth: 401 when missing or wrong token (handler integration test)
+
+Panel auth removed by operator decision 2026-06-11 — these are view-level unit
+tests (no HTTP credential); the no-auth + Host-guard handler contract is pinned
+in test_no_auth_contract.py.
 """
 
 from __future__ import annotations

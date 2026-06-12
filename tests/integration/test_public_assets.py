@@ -13,6 +13,7 @@ from dadaia_workspace.infrastructure.public_assets import (
     _parse_agent_frontmatter,
     _render_agent_toml_block,
     _render_codex_agent_toml,
+    _render_codex_command_policy_rules,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -359,35 +360,49 @@ def test_render_agent_toml_block_emits_tools_array_literal() -> None:
 
 
 def test_render_codex_agent_toml_emits_description() -> None:
+    # T-013-12: model_reasoning_effort is now derived from the agent's registry
+    # tier via its claude_model (ai-engineer -> claude-fable-5 -> deep -> high),
+    # not from a per-agent name list.
     result = _render_codex_agent_toml(
         "ai-engineer",
-        "gpt-5.3-codex",
+        "gpt-5.5",
         "Follow the Codex persona.",
         description="AI entity authoring agent.",
+        claude_model="claude-fable-5",
     )
 
     parsed = tomllib.loads(result)
     assert parsed["name"] == "ai-engineer"
     assert parsed["description"] == "AI entity authoring agent."
-    assert parsed["model"] == "gpt-5.3-codex"
+    assert parsed["model"] == "gpt-5.5"
     assert parsed["sandbox_mode"] == "workspace-write"
     assert parsed["model_reasoning_effort"] == "high"
     assert parsed["developer_instructions"].strip() == "Follow the Codex persona."
 
 
 def test_render_codex_agent_toml_emits_read_only_boundary_for_reviewers() -> None:
-    result = _render_codex_agent_toml(
-        "qa-engineer",
-        "gpt-5.3-codex",
-        "Review without production edits.",
-    )
+    for name in ("qa-engineer", "code-reviewer", "security-reviewer", "project-auditor"):
+        result = _render_codex_agent_toml(
+            name,
+            "gpt-5.3-codex",
+            "Review without production edits.",
+        )
 
-    parsed = tomllib.loads(result)
-    assert parsed["sandbox_mode"] == "read-only"
-    assert parsed["model_reasoning_effort"] == "medium"
-    assert "provider" not in parsed
-    assert "api_key" not in parsed
-    assert "telemetry" not in parsed
+        parsed = tomllib.loads(result)
+        assert parsed["sandbox_mode"] == "read-only"
+        assert parsed["model_reasoning_effort"] == "medium"
+        assert "provider" not in parsed
+        assert "api_key" not in parsed
+        assert "telemetry" not in parsed
+
+
+def test_render_codex_command_policy_uses_documented_prefix_rules() -> None:
+    result = _render_codex_command_policy_rules()
+
+    assert "prefix_rule(" in result
+    assert "command_allowed(" not in result
+    assert 'decision = "prompt"' in result
+    assert 'pattern = ["git", "push"]' in result
 
 
 # ---------------------------------------------------------------------------

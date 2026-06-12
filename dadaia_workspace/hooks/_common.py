@@ -73,25 +73,45 @@ def is_write_tool(name: str) -> bool:
     return name in WRITE_TOOLS
 
 
-def target_path(payload: dict[str, Any]) -> str:
-    """Extract the write-target path from a hook payload.
+def target_paths(payload: dict[str, Any]) -> list[str]:
+    """Extract ALL write-target paths from a hook payload.
 
-    Handles direct keys (``file_path``/``path``/``notebook_path``) and Codex
-    ``apply_patch`` commands (first ``*** Add/Update/Delete File:`` header). Returns
-    ``""`` when no path can be parsed (caller fails open).
+    Handles direct keys (``file_path``/``path``/``notebook_path`` — always a single
+    path) and Codex ``apply_patch`` commands (EVERY ``*** Add/Update/Delete File:``
+    header, in source order). Returns ``[]`` when no path can be parsed (caller fails
+    open).
+
+    FR-W4-04 (T-014-02): a multi-file ``apply_patch`` must surface every file header so
+    the gate can classify each path and let the most-restrictive verdict win (one FROZEN
+    or PROTECTED header blocks the whole patch). Closes
+    ``sdd-gate-apply-patch-multi-file-first-header-only``.
     """
     inp = payload.get("tool_input")
     src: dict[str, Any] = inp if isinstance(inp, dict) else payload
     direct = src.get("file_path") or src.get("path") or src.get("notebook_path") or ""
     if direct:
-        return str(direct)
+        return [str(direct)]
     command = src.get("command") or ""
+    paths: list[str] = []
     if isinstance(command, str):
         for line in command.splitlines():
             for prefix in _PATCH_PREFIXES:
                 if line.startswith(prefix):
-                    return line[len(prefix) :].strip()
-    return ""
+                    paths.append(line[len(prefix) :].strip())
+                    break
+    return paths
+
+
+def target_path(payload: dict[str, Any]) -> str:
+    """Extract the FIRST write-target path from a hook payload (single-value back-compat).
+
+    Direct keys (``file_path``/``path``/``notebook_path``) or the FIRST Codex
+    ``apply_patch`` file header. Returns ``""`` when no path can be parsed (caller fails
+    open). Retained for callers not yet migrated to :func:`target_paths`; the multi-file
+    bug fix (FR-W4-04) lives in callers switching to :func:`target_paths`.
+    """
+    paths = target_paths(payload)
+    return paths[0] if paths else ""
 
 
 def sanitize_session_id(raw: str | None) -> str:

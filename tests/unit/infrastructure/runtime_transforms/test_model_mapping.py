@@ -1,16 +1,20 @@
 """Unit tests for dadaia_workspace.infrastructure.runtime_transforms.model_mapping.
 
 Covers:
-- All four canonical Claude → Codex mappings (ADR-5 table).
+- All canonical Claude → Codex mappings (ADR-5 table), as a DERIVED view over
+  ``core.model_registry``.
 - ValueError on an unknown Claude identifier.
-- Guard that MODEL_MAP has exactly 4 entries (prevents accidental expansion without
-  a corresponding test update and ADR amendment).
+- Cross-table key-equality contract: MODEL_MAP keys == registry claude_ids
+  (the standalone ``len(MODEL_MAP) == 5`` pin was removed — it contradicted the
+  pricing-table content and broke the moment the registry grew; the registry is
+  now the single source and the key-set is asserted against it).
 """
 
 from __future__ import annotations
 
 import pytest
 
+from dadaia_workspace.core.model_registry import REGISTRY
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import (
     MODEL_MAP,
     map_model,
@@ -33,6 +37,10 @@ def test_opus_4_8_maps_to_gpt55() -> None:
     assert map_model("claude-opus-4-8") == "gpt-5.5"
 
 
+def test_fable_5_maps_to_gpt55() -> None:
+    assert map_model("claude-fable-5") == "gpt-5.5"
+
+
 def test_unknown_identifier_raises_value_error() -> None:
     unknown = "claude-unknown-9-9"
     with pytest.raises(ValueError) as exc_info:
@@ -40,11 +48,15 @@ def test_unknown_identifier_raises_value_error() -> None:
     assert unknown in str(exc_info.value)
 
 
-def test_model_map_is_complete() -> None:
-    """Guard: MODEL_MAP must have exactly 4 entries.
-
-    If a new Claude model is added to agent frontmatter, the install pipeline
-    will raise ValueError (by design). This test ensures no entry is silently
-    added or removed from MODEL_MAP without a deliberate update to ADR-5.
+def test_model_map_keys_equal_registry_claude_ids() -> None:
+    """Cross-table contract: MODEL_MAP is a derived view over the registry, so
+    its keys must be exactly the registry's claude_ids (no drift, no manual
+    expansion). Replaces the old brittle ``len(MODEL_MAP) == 5`` pin.
     """
-    assert len(MODEL_MAP) == 4
+    assert set(MODEL_MAP) == {entry.claude_id for entry in REGISTRY}
+
+
+def test_model_map_values_match_registry_codex_ids() -> None:
+    """Derived-view correctness: each MODEL_MAP value is the registry codex_id."""
+    for entry in REGISTRY:
+        assert MODEL_MAP[entry.claude_id] == entry.codex_id

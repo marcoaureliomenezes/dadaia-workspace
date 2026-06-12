@@ -69,14 +69,15 @@ def test_project_orchestration_defines_full_done_gate() -> None:
 
 def test_task_manager_blocks_done_until_review_approval() -> None:
     content = _read(TASK_MANAGER_SKILL)
-    assert "Implementação completa não é DONE" in content
+    flat = " ".join(content.split())
+    assert "Implementation complete is not DONE" in flat
     assert "qa-engineer" in content
     assert "code-reviewer" in content
     assert "security-reviewer" in content
-    assert "Antes dessas aprovações, é proibido marcar `[x]`" in content
-    assert "abrir PR" in content
-    assert "fazer\ndeploy" in content
-    assert "escrever `CLOSURE.md`" in content
+    assert "it is forbidden to mark `[x]`" in flat
+    assert "open a PR" in flat
+    assert "deploy" in flat
+    assert "write `CLOSURE.md`" in flat
 
 
 def test_project_manager_enforces_pre_and_post_implementation_gates() -> None:

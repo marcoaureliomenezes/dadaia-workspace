@@ -17,6 +17,7 @@ class WorkflowSummaryDTO:
     has_parallel: bool
     has_gates: bool
     source_path: str
+    lifecycle_phase: str = "Unmapped"
 
 
 @dataclass(frozen=True)
@@ -74,3 +75,6 @@ class WorkflowDefinition:
     inputs: tuple[WorkflowInput, ...]
     stages: tuple[WorkflowStage, ...]
     exit_criteria: tuple[ExitCriterion, ...] = field(default_factory=tuple)
+    # Development-lifecycle phase, sourced from the workflow markdown frontmatter
+    # `lifecycle_phase:` key. Falls back to "Unmapped" when absent or unrecognised.
+    lifecycle_phase: str = "Unmapped"

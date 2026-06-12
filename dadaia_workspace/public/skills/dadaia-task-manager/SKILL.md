@@ -1,153 +1,168 @@
 ---
 name: dadaia-task-manager
 description: >
-  Protocolo obrigatório para todo agente que vá modificar arquivos de produção
-  dentro de um Spec Context Project. Define como reservar, executar e concluir
-  tasks em TASKS.md usando os 3 markers canônicos: [ ] OPEN → [-] IN PROGRESS → [x] DONE.
-  Combinado com o gate sdd-spec-gate.sh v2, garante rastreabilidade total de
-  "quem pegou o quê" e impede que dois agentes paralelos editem a mesma task.
+  Mandatory protocol for every agent that modifies production files inside a
+  Spec Context Project. Defines how to reserve, execute, and complete tasks in
+  TASKS.md using the 3 canonical markers: [ ] OPEN → [-] IN PROGRESS → [x] DONE.
+  Marker discipline is the human-auditable trace of "who took what"; the SDD
+  gate hook enforces path-class × lease × phase × mode separately.
 applyTo: "specs/**/TASKS.md"
 ---
 
 # dadaia-task-manager — Task State Protocol
 
-## Contrato dos 3 markers
+## The 3-marker contract
 
-| Marker | Estado | Semântica |
+| Marker | State | Meaning |
 |---|---|---|
-| `[ ]` | OPEN | Task declarada, ninguém trabalhando nela. Default. |
-| `[-]` | IN PROGRESS | Algum agente reservou. Trabalho ativo. |
-| `[x]` | DONE | Implementada, revisada por QA/code/security, aprovada, commitada. |
+| `[ ]` | OPEN | Task declared, nobody working on it. Default. |
+| `[-]` | IN PROGRESS | An agent reserved it. Work is active. |
+| `[x]` | DONE | Implemented, reviewed by QA/code/security, approved, committed. |
 
-**Regra invariante:** nunca dois `[-]` simultâneos no mesmo `TASKS.md`. Se você
-encontrar dois `[-]` ao começar uma sessão, **pare** e reporte ao operador.
+**Invariant:** never two simultaneous `[-]` in the same `TASKS.md`. If you find two
+`[-]` when starting a session, **stop** and report to the operator.
 
-## Protocolo de 4 passos
+**Honesty note — markers are discipline, not a hook check.** The SDD-gate stage of the
+merged `dadaia_workspace.hooks.pre_gate` PreToolUse hook never reads `TASKS.md`,
+`SPEC.md`, or any status marker. What it enforces deterministically is path-class ×
+lease × phase × mode on file-write tool calls (see the `workspace-protocol` rule §1). Marker discipline exists
+for traceability and coordination between agents and the operator — uphold it even
+though no hook will block you for skipping it.
 
-Quando você for trabalhar em produção (qualquer arquivo coberto pelo gate
-`sdd-enforcement`), siga estes 4 passos **na ordem**:
+## The 4-step protocol
 
-### Passo 1 — Identificar a task
+When you are about to work on production (any MUTATING path under the active context),
+follow these 4 steps **in order**:
 
-Leia o `TASKS.md` relevante (primary: `specs/releases/<active>/TASKS.md`, resolvido via
-`specs/releases/ACTIVE.md`; Legacy compat: se `releases/ACTIVE.md` ausente, cair em
-`specs/features/<feat>/TASKS.md` com `SDD_LEGACY_FEATURES=1`).
-Identifique a task que você vai executar. Ela **deve** existir e estar `[ ]`
-(OPEN). Se não estiver em OPEN, abra interrupção com o operador antes de
-prosseguir.
+### Step 1 — Identify the task
 
-### Passo 2 — Reservar (`[ ]` → `[-]`) e commitar
+Read the relevant `TASKS.md` (primary: `specs/releases/<active>/TASKS.md`, resolved via
+`specs/releases/ACTIVE.md`; legacy compat: if `releases/ACTIVE.md` is absent, fall back
+to `specs/features/<feat>/TASKS.md` with `SDD_LEGACY_FEATURES=1`).
+Identify the task you will execute. It **must** exist and be `[ ]` (OPEN). If it is not
+OPEN, raise an interruption with the operator before proceeding.
 
-Use Edit/Write para mudar o marker da task de `[ ]` para `[-]`. Em seguida,
-faça um commit **isolado** apenas dessa mudança:
+### Step 2 — Reserve (`[ ]` → `[-]`) and commit
+
+Use Edit/Write to flip the task marker from `[ ]` to `[-]`. Then make an **isolated**
+commit containing only that change:
 
 ```
 chore(tasks): start <task-id>
 ```
 
-Exemplo:
+Example:
 ```
 chore(tasks): start T128
 ```
 
-Esse commit é o **lock observável** que diz "agente X reservou a task". Outros
-agentes em sessões paralelas verão esse commit via `git pull` ou ao reler o
-arquivo.
+That commit is the **observable reservation** saying "agent X took this task". Other
+agents in parallel sessions see it via `git pull` or by re-reading the file.
 
-### Passo 3 — Executar o trabalho
+### Step 3 — Do the work
 
-Faça a implementação. Pode haver múltiplos commits durante essa fase
-(intermediários, refactors, fixes). O marker permanece `[-]` durante todo o
-trabalho.
+Implement. Multiple commits are fine during this phase (intermediates, refactors,
+fixes). The marker stays `[-]` for the whole duration.
 
-### Passo 4 — Concluir (`[-]` → `[x]`) e commitar
+### Step 4 — Complete (`[-]` → `[x]`) and commit
 
-Quando terminar e os critérios de aceite da task estiverem satisfeitos:
+When the work is done and the task's acceptance criteria are satisfied:
 
-**Implementação completa não é DONE.** Depois que o implementer termina código,
-unit tests e integration tests, a task permanece `[-]` até existir aprovação
-verde de `qa-engineer`, `code-reviewer` e `security-reviewer` para o mesmo
-commit. Tasks de UI também exigem aprovação de `design-specialist`.
+**Implementation complete is not DONE.** After the implementer finishes code, unit
+tests, and integration tests, the task remains `[-]` until `qa-engineer`,
+`code-reviewer`, and `security-reviewer` return green approval for the same commit
+(per the `release-governance` cadence: alpha-N boundaries are qa-only; reviews mature
+the release, and the push boundary itself is mechanically gated — the pre-push
+security-verdict chokepoint requires an APPROVED `security-reviewer` handoff whose
+`metrics.commit_sha` equals each pushed ref sha, per push-cycle). UI tasks also
+require `design-specialist` approval.
 
-Antes dessas aprovações, é proibido marcar `[x]`, abrir PR, pedir merge, fazer
-deploy, fechar release, escrever `CLOSURE.md` ou atualizar memory. Se qualquer
-revisor pedir mudanças, volte ao Passo 3 e mantenha `[-]`.
+Before those approvals, it is forbidden to mark `[x]`, open a PR, request merge,
+deploy, close the release, write `CLOSURE.md`, or update memory. If any reviewer
+requests changes, return to Step 3 and keep `[-]`.
 
-1. Mude o marker `[-]` → `[x]`.
-2. Faça o **último commit da task** com convencional commits, incluindo no
-   diff tanto o marker `[x]` quanto qualquer arquivo final ainda pendente.
+1. Flip the marker `[-]` → `[x]`.
+2. Make the **final task commit** with conventional commits, including in the diff both
+   the `[x]` marker and any final pending file.
 
-Exemplo de commit final:
+Example final commit:
 ```
 feat(orchestration): implement run.resume idempotency (T128)
 ```
 
-## Recovery — quando algo dá errado
+## Recovery — when something goes wrong
 
-### Encontrei um `[-]` antigo de outra sessão
+### I found an old `[-]` from another session
 
-**Não flip silenciosamente para `[x]`.** Você não sabe se a task foi concluída
-ou abandonada. Pare, leia o `git log` para entender o histórico, e reporte ao
-operador antes de qualquer transição.
+**Do not silently flip it to `[x]`.** You do not know whether the task was completed or
+abandoned. Stop, read `git log` to understand the history, and report to the operator
+before any transition.
 
-### Encontrei dois `[-]` simultâneos
+### I found two simultaneous `[-]`
 
-Violação da invariante. Pare. Reporte ao operador. Espere a decisão antes de
-qualquer edição em produção.
+Invariant violation. Stop. Report to the operator. Wait for a decision before any
+production edit.
 
-### Preciso abandonar uma task sem concluir
+### I need to abandon a task without completing it
 
-Mude o marker `[-]` → `[ ]` e commit:
+Flip the marker `[-]` → `[ ]` and commit:
 ```
 chore(tasks): abandon <task-id>
 ```
-Documente o motivo na mensagem do commit. Outro agente pode pegar a task
-depois.
+Document the reason in the commit message. Another agent can pick up the task later.
 
-### O gate `sdd-spec-gate.sh` me bloqueou
+### The SDD gate blocked my write
 
-Significa que:
-- (a) você não tem nenhuma task `[-]` no `TASKS.md` relevante e está
-  tentando editar produção, ou
-- (b) a resolução do contexto ativo falhou (env var `DADAIA_CONTEXT` ausente e nenhum context `alive` em `spec_contexts.json`).
+The merged `pre_gate` hook blocks for **kernel** reasons, never for marker reasons
+(stages: root-whitelist → venv-guard → SDD gate, first-block-wins). The block message
+tells you which rule fired. The SDD-gate stage's reasons:
 
-Em (a): volte ao Passo 1–2. (b) não deve mais acontecer: o contexto resolve
-automaticamente a partir do primeiro context `alive` em `spec_contexts.json`, e o
-gate é fail-safe — nunca bloqueia o fluxo por contexto/lock. Nunca peça ao operador
-para fazer rebind da sessão.
+- **Live foreign lease** — another session genuinely holds this context's lease
+  (heartbeat fresh, or its recorded harness pid is still running — a live holder is
+  never stolen). Additive paths (`specs/bugs/`, `specs/backlog/`, `specs/audits/`,
+  `.dadaia/reports|handoff|tmp/`) remain writable; the lease frees itself when the
+  holder finishes or dies. Never ask the operator to rebind or steal.
+- **READ-mode session** — this session's mode resolved READ (the context was bound
+  `--mode read`; bind refreshes the context's incumbent pointer, which the gate reads).
+  Write rights require the operator binding once:
+  `dadaia context bind <ctx> --mode implementation`.
+- **MEMORY phase** — `specs/memory/` is writable only in DEFINITION/CLOSURE phase.
+- **FROZEN / PROTECTED** — `specs/_archive/` is read-only; `.dadaia/sessions/` is
+  CLI-owned (never write it via file tools).
 
-## Onde TASKS.md vive
+A missing `[-]` marker never produces a gate block — it produces a **discipline
+violation** that reviewers and the operator will catch. Reserve anyway, always.
 
-O gate v3 procura tasks `[-]` recursivamente em todo `<primary_specs_dir>/`, com prioridade:
+## Where TASKS.md lives
 
-- **Primário:** `<primary_specs_dir>/releases/<active-release-id>/TASKS.md` — onde a
-  release ativa (apontada por `<primary_specs_dir>/releases/ACTIVE.md`) mantém suas tasks.
-- **Legacy compat:** `<primary_specs_dir>/features/*/TASKS.md` — habilitado quando a env
-  var `SDD_LEGACY_FEATURES=1` (default durante janela de migração). Após a release de
-  migração concluir, esse fallback é desligado.
-- **Raiz (legado):** `<primary_specs_dir>/TASKS.md` — só durante a migração; após, é
-  reportado pelo doctor como erro estrutural.
+- **Primary:** `<specs_dir>/releases/<active-release-id>/TASKS.md` — the active release
+  (pointed at by `<specs_dir>/releases/ACTIVE.md`) keeps its tasks here.
+- **Legacy compat:** `<specs_dir>/features/*/TASKS.md` — only when
+  `SDD_LEGACY_FEATURES=1` during a migration window.
+- **Root (legacy):** `<specs_dir>/TASKS.md` — migration-only; `specs doctor` reports it
+  as a structural error afterwards.
 
-A presença de **pelo menos uma** task `[-]` em qualquer um desses caminhos libera o gate
-para todo o `repos/<primary_slug>/`. O gate não valida que a task `[-]` cobre exatamente
-o arquivo-alvo — é responsabilidade sua estar trabalhando no escopo declarado pela task.
+It is your responsibility to work inside the scope the reserved task declares — no
+hook validates that the `[-]` task covers the exact target file.
 
-TASKS.md **permanece em markdown** mesmo após a migração de memory para HTML. Os markers
-`[ ]/[-]/[x]` são contrato máquina e exigem parsing simples por grep.
+TASKS.md **stays in Markdown**. The `[ ]/[-]/[x]` markers are a machine contract and
+must remain grep-parsable.
 
-## Por que o commit extra `chore(tasks): start`?
+## Why the extra `chore(tasks): start` commit?
 
-Sem ele, o estado `[-]` não é observável por outros agentes nem registrado no
-histórico. O custo de um commit extra é trivial; o ganho de rastreabilidade é
-alto. Se a poluição do histórico incomodar, o operador faz **squash no merge**
-do PR — política de cada repo.
+Without it, the `[-]` state is not observable by other agents nor recorded in history.
+The cost of one extra commit is trivial; the traceability gain is high. If history
+pollution bothers anyone, the operator squashes on PR merge — per-repo policy.
 
-## Em uma frase
+## In one sentence
 
-> Antes de tocar qualquer arquivo de produção: declare a task com `[-]` e
-> commit. Antes de encerrar: só feche com `[x]` depois de QA/code/security
-> aprovarem o handoff de implementação. Sem exceção.
+> Before touching any production file: declare the task with `[-]` and commit. Before
+> closing: only flip to `[x]` after QA/code/security approve the implementation
+> handoff. No exception.
 
 ## Segments (ADR-1/ADR-5)
 
-For a segmented release, the active TASKS.md lives at `specs/releases/<release-id>/<segment>/TASKS.md` (segment = `alpha-N`/`rc-N` from `ACTIVE.md`'s `segment:` line). Reserve/flip `[ ] -> [-] -> [x]` markers there. Flat (no-segment) releases keep `releases/<release-id>/TASKS.md`. The SDD gate resolves the same path automatically.
+For a segmented release, the active TASKS.md lives at
+`specs/releases/<release-id>/<segment>/TASKS.md` (segment = `alpha-N`/`rc-N` from
+`ACTIVE.md`'s `segment:` line). Reserve/flip `[ ] -> [-] -> [x]` markers there. Flat
+(no-segment) releases keep `releases/<release-id>/TASKS.md`.

@@ -64,7 +64,7 @@ def import_workspace(
     try:
         svc = ImportService(workspace_root=resolved_workspace)
         result = svc.run(options)
-    except ValueError as exc:
+    except (ValueError, RuntimeError) as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from None
 

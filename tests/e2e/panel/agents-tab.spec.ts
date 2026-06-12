@@ -16,10 +16,24 @@ test('Agents tab renders the current agent catalog as usable cards', async ({ pa
   expect(count).toBeGreaterThan(0);
 
   const first = cards.first();
+  // Minimalist card redesign (operator live-review round 2, ab859c7): the collapsed
+  // card carries exactly four data points — name (+tier label), Model, Lifecycle,
+  // Workflows. Status badge / description / skill chips moved into the detail modal
+  // (the modal + /api/agents envelope keep their own assertions below).
   await expect(first.locator('.agent-card__name')).toHaveText(/\S+/);
-  await expect(first.locator('.agent-status-badge')).toHaveText(/ACTIVE|INACTIVE/i);
-  await expect(first.locator('.agent-card__description')).toHaveText(/\S+/);
-  await expect(first.locator('.skill-chip:not(.skeleton-pulse)').first()).toBeVisible();
+  await expect(first.locator('.agent-card__tier-label')).toHaveText(/^T[123] \S+/);
+  const factLabels = first.locator('.agent-fact__label');
+  await expect(factLabels).toHaveText(['Model', 'Lifecycle', 'Workflows']);
+  // Model is a configured model id or the explicit "inherited default" marker —
+  // never empty, never fabricated.
+  await expect(
+    first.locator('.agent-card__model-id, .agent-card__model-inherited')
+  ).toHaveText(/\S+/);
+  const factValues = first.locator('.agent-fact__value');
+  await expect(factValues).toHaveCount(3);
+  for (let i = 0; i < 3; i++) {
+    await expect(factValues.nth(i)).toHaveText(/\S+/);
+  }
   await expect(first).toHaveAttribute('aria-haspopup', 'dialog');
 });
 

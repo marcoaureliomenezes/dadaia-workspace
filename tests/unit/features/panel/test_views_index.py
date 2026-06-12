@@ -180,6 +180,18 @@ def test_index_renders_panel_sections(section_id: str, visible_text: str) -> Non
     assert visible_text in html
 
 
+def test_agentic_subsection_order_is_agents_workflows_kanban() -> None:
+    """Operator demand: inside the Agentic tab the order must be
+    Agents → Workflows → Kanban (Kanban was previously first)."""
+    html = _render(_build_service())
+    idx_agents = html.index('id="agents-grid"')
+    idx_workflows = html.index('id="workflows-grid"')
+    idx_kanban = html.index('id="kanban-board"')
+    assert idx_agents < idx_workflows < idx_kanban, (
+        "Agentic subsections must render Agents → Workflows → Kanban"
+    )
+
+
 def test_index_tablist_contract() -> None:
     """The nav must expose the current tab order and active default tab.
 
@@ -247,8 +259,16 @@ def test_index_tabpanel_contract(section_id: str, tab_id: str) -> None:
     assert html.count('role="tabpanel"') == 6
 
 
-def test_panel_js_keyboard_and_auth_contract() -> None:
-    """The assembled panel JS must support tab keyboard nav and authenticated API calls."""
+def test_panel_js_keyboard_nav_and_credential_free_fetch_contract() -> None:
+    """The assembled panel JS supports tab keyboard nav and credential-free API calls.
+
+    Panel auth removed by operator decision 2026-06-11 — the JS sends NO
+    credential.  ``authedFetch`` is kept as a thin alias of ``fetch`` (so call
+    sites do not churn) and core.js purges any stale ``panel_token`` left in
+    localStorage by an older build.  The former assertions on ``Authorization`` /
+    ``Bearer`` / ``history.replaceState`` (launch-URL cleanup) were DELETED with
+    that change; the no-auth contract is pinned in test_no_auth_contract.py.
+    """
     panel_js = _build_panel_js()
     for expected in [
         "ArrowRight",
@@ -256,17 +276,22 @@ def test_panel_js_keyboard_and_auth_contract() -> None:
         "Home",
         "End",
         "keydown",
-        "panel_token",
+        "panel_token",  # core.js purges the stale credential key from localStorage
         "localStorage",
-        "URLSearchParams",
-        "history.replaceState",
-        "authedFetch",
-        "Authorization",
-        "Bearer",
+        "authedFetch",  # kept as a thin alias of fetch — adds no credential header
         "authedFetch('/api/agents?runtime='",
         "authedFetch('/api/workflows?runtime='",
     ]:
         assert expected in panel_js
+
+    # Negative pins: the JS must NOT build or send a credential any more.  The
+    # words "Authorization"/"Bearer" survive ONLY inside an explanatory comment;
+    # we pin against the dead *code* patterns that actually constructed a header.
+    assert "setRequestHeader" not in panel_js, "panel JS must not set request headers"
+    assert "'Bearer '" not in panel_js, "panel JS must not build a 'Bearer ' header value"
+    assert "Authorization:" not in panel_js, "panel JS must not emit an Authorization header"
+    # authedFetch must be a pass-through to fetch (no credential injection).
+    assert "return fetch(url" in panel_js, "authedFetch must be a thin alias of fetch"
 
 
 @pytest.mark.parametrize(
@@ -372,17 +397,32 @@ def test_project_card_contract() -> None:
         'aria-live="polite"',
         'class="card-zone-d card-chips"',
         'class="memory-chip"',
+        'href="/memory-view/my-workspace/constitution.md"',
         'href="/memory-view/my-workspace/architecture.md"',
         'href="/memory-view/my-workspace/tech-stack.md"',
+        'href="/memory-view/my-workspace/quality-assurance.md"',
         'href="/memory-view/my-workspace/product/index.md"',
+        ">Constitution<",
         ">Architecture<",
         ">Tech Stack<",
+        ">Quality<",
         ">Product<",
     ]:
         assert expected in card
 
     assert card.find('class="card-zone-b"') < card.find('class="card-zone-c"')
     assert card.find('class="card-zone-c"') < card.find('class="card-zone-d')
+    # Five-chip contract (operator demand 2026-06-11): Constitution leads, then
+    # Architecture / Tech Stack / Quality / Product.
+    order = [
+        card.find(">Constitution<"),
+        card.find(">Architecture<"),
+        card.find(">Tech Stack<"),
+        card.find(">Quality<"),
+        card.find(">Product<"),
+    ]
+    assert order == sorted(order) and -1 not in order
+
     # T-016-P03 regression guard: chip hrefs must use .md, never .html
     assert 'href="/memory-view/my-workspace/architecture.html"' not in card
     assert 'href="/memory-view/my-workspace/tech-stack.html"' not in card

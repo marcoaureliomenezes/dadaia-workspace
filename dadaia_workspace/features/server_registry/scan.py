@@ -21,7 +21,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import subprocess
 from collections.abc import Iterable
 
 from dadaia_workspace.core.models.server_registry import (
@@ -47,19 +46,20 @@ _USERS_PID_RE = re.compile(r'\("(?P<exe>[^"]+)",pid=(?P<pid>\d+)')
 
 
 def _ss_command_output() -> str | None:
-    """Return raw ``ss -tlnp`` stdout, or None if ss is unavailable / errored."""
+    """Return raw ``ss -tlnp`` stdout, or None if ss is unavailable / errored.
+
+    Delegates to ``dadaia_workspace.infrastructure.subprocess_runner.SubprocessProcessRunner``
+    so that this module never imports ``subprocess`` directly.
+    """
+    from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
+
+    runner = SubprocessProcessRunner()
     try:
-        result = subprocess.run(
-            ["ss", "-tlnp"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-        )
+        result = runner.run(["ss", "-tlnp"], timeout=5.0)
     except FileNotFoundError:
         logger.warning("scan: ss not found on PATH — orphan detection unavailable")
         return None
-    except subprocess.TimeoutExpired:
+    except TimeoutError:
         logger.warning("scan: ss -tlnp timed out after 5s — orphan detection unavailable")
         return None
 

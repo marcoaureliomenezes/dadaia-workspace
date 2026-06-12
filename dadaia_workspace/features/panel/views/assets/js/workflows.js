@@ -14,8 +14,13 @@
 //   GET /api/workflows → {
 //     source_hint: string,
 //     workflows: [{ name, display_name, description, agent_ids, stage_count,
-//                   version, schema_version, has_parallel, has_gates, source_path }]
+//                   version, schema_version, has_parallel, has_gates,
+//                   lifecycle_phase, source_path }]
 //   }
+//
+// Workflows are grouped in the grid by development-lifecycle phase
+// (lifecycle_phase, sourced from public/workflows/*.md frontmatter). The Run
+// affordance was removed (operator decision 2026-06-11): DAG cards do not run.
 //   GET /api/workflows/<name> → {
 //     name, description, version, schema_version, inputs, stages, diagram_svg,
 //     source_path
@@ -152,13 +157,6 @@
       + ' aria-label="View DAG for ' + escAttr(displayName) + '">'
       + 'View DAG &#8594;'
       + '</button>'
-      + '<button type="button"'
-      + ' class="workflow-run-btn"'
-      + ' data-workflow-name="' + escAttr(name) + '"'
-      + ' aria-label="Run workflow ' + escAttr(displayName) + '">'
-      + '&#9654; Run'
-      + '</button>'
-      + '<span class="workflow-run-badge" id="run-badge-' + escAttr(name) + '" hidden></span>'
       + '</div>'
       + '</article>';
   }
@@ -418,44 +416,6 @@
     }
   }
 
-  // ── Run workflow ───────────────────────────────────────────────────────────────
-
-  function runWorkflow(workflowName, btn, badge) {
-    btn.disabled = true;
-    badge.hidden = false;
-    badge.className = 'workflow-run-badge';
-    badge.textContent = '…';
-
-    window.authedFetch('/api/workflows/' + encodeURIComponent(workflowName) + '/run', {
-      method: 'POST',
-    })
-      .then(function (r) {
-        if (r.status === 202) {
-          return r.json().then(function (data) {
-            badge.className = 'workflow-run-badge workflow-run-badge--started';
-            badge.textContent = 'Started (PID: ' + (data.pid || '?') + ')';
-            btn.disabled = false;
-          });
-        }
-        if (r.status === 409) {
-          badge.className = 'workflow-run-badge workflow-run-badge--running';
-          badge.textContent = 'Already running';
-          btn.disabled = false;
-          return null;
-        }
-        badge.className = 'workflow-run-badge workflow-run-badge--error';
-        badge.textContent = 'Failed (HTTP ' + r.status + ')';
-        btn.disabled = false;
-        return null;
-      })
-      .catch(function (err) {
-        badge.className = 'workflow-run-badge workflow-run-badge--error';
-        badge.textContent = 'Failed';
-        btn.disabled = false;
-        void err;
-      });
-  }
-
   // ── CTA button wiring (card grid) ─────────────────────────────────────────────
 
   function wireCTAButtons(grid) {
@@ -466,17 +426,6 @@
         if (!name) { return; }
         history.pushState(null, '', location.pathname + location.search + buildDetailHash(name));
         loadDetail(name);
-      });
-    });
-
-    grid.querySelectorAll('.workflow-run-btn[data-workflow-name]').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        var name = btn.getAttribute('data-workflow-name');
-        if (!name) { return; }
-        var badge = document.getElementById('run-badge-' + name);
-        if (!badge) { return; }
-        runWorkflow(name, btn, badge);
       });
     });
   }
@@ -527,6 +476,52 @@
       });
   }
 
+  // ── Lifecycle-phase grouping ────────────────────────────────────────────────
+  // Canonical group order mirrors the dadaia-workspace development lifecycle.
+  // Any workflow whose lifecycle_phase is absent/unrecognised lands in
+  // "Unmapped" so the grouping is honest (never a fabricated phase).
+
+  var PHASE_ORDER = [
+    'Backlog Definition',
+    'Research',
+    'Release Definition',
+    'Implementation + Review',
+    'Audits',
+    'Closure',
+    'Unmapped'
+  ];
+
+  function phaseOf(w) {
+    var p = w && w.lifecycle_phase ? String(w.lifecycle_phase) : 'Unmapped';
+    return PHASE_ORDER.indexOf(p) >= 0 ? p : 'Unmapped';
+  }
+
+  // Build the grouped grid HTML: one <section> per non-empty phase, in the
+  // canonical order above, each containing its workflow cards.
+  function renderGroupedGrid(workflows) {
+    var buckets = {};
+    workflows.forEach(function (w) {
+      var p = phaseOf(w);
+      (buckets[p] || (buckets[p] = [])).push(w);
+    });
+    var html = '';
+    PHASE_ORDER.forEach(function (phase) {
+      var items = buckets[phase];
+      if (!items || items.length === 0) { return; }
+      var countLabel = items.length + ' workflow' + (items.length === 1 ? '' : 's');
+      html += '<section class="workflow-phase-group" aria-label="' + escAttr(phase) + '">'
+        + '<h4 class="workflow-phase-heading">'
+        + escHtml(phase)
+        + '<span class="workflow-phase-count">' + escHtml(countLabel) + '</span>'
+        + '</h4>'
+        + '<div class="workflow-phase-cards">'
+        + items.map(renderCard).join('')
+        + '</div>'
+        + '</section>';
+    });
+    return html;
+  }
+
   // ── Grid render ────────────────────────────────────────────────────────────────
 
   function render(data) {
@@ -554,7 +549,7 @@
     }
 
     if (empty) { empty.hidden = true; }
-    var gridHtml = workflows.map(renderCard).join('');
+    var gridHtml = renderGroupedGrid(workflows);
     grid.innerHTML = gridHtml;
     _cachedGrid = gridHtml;
 
@@ -567,21 +562,13 @@
     var grid = getGrid();
     if (!grid) { return; }
     grid.setAttribute('aria-busy', 'false');
-    if (status === 401) {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + '<strong>Authentication required.</strong> '
-        + 'Re-authenticate by opening the panel with '
-        + '<code>dadaia panel start</code> and using the token URL provided.'
-        + '</div>';
-    } else {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + 'Failed to load workflows (HTTP ' + escHtml(String(status)) + '). '
-        + '<button type="button" id="workflows-retry-btn" class="retry-link">Retry</button>'
-        + '</div>';
-      var retryBtn = document.getElementById('workflows-retry-btn');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', function () { load(); });
-      }
+    grid.innerHTML = '<div class="error-state" role="alert">'
+      + 'Failed to load workflows (HTTP ' + escHtml(String(status)) + '). '
+      + '<button type="button" id="workflows-retry-btn" class="retry-link">Retry</button>'
+      + '</div>';
+    var retryBtn = document.getElementById('workflows-retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', function () { load(); });
     }
   }
 

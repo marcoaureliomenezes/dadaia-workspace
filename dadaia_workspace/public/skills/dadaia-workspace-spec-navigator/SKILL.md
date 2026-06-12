@@ -78,4 +78,4 @@ canonical order for the current task.
 - Never reference `standby`, `context_dir`, `select`, or `is_selected` — these concepts do
   not exist in v3.0.
 - Markdown memory files are read-only for every agent except `product-engineer` during the
-  CLOSURE phase. Reading is always allowed.
+  DEFINITION and CLOSURE phases (constitution §13). Reading is always allowed.

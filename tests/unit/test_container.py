@@ -1,8 +1,10 @@
 """Unit tests for container.py builder functions."""
 
 import json
+import os
 import sys
 import types
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -150,6 +152,107 @@ def test_build_repos_service_returns_service() -> None:
 
     svc = container.build_repos_service()
     assert isinstance(svc, ReposService)
+
+
+# ---------------------------------------------------------------------------
+# rc-1 code-review HIGH fix (T-011-02 follow-up): build_doctor_service must wire
+# the PID-liveness probe so LOCK-GC honours the no-steal invariant (FR-W1-02).
+#
+# These tests go through PRODUCTION container wiring — NO injected probe lambda —
+# so they pin the seam end-to-end. Against the UNFIXED container (DoctorService
+# constructed without pid_probe -> None -> TTL-only LOCK-GC), the live-pid case
+# below would FAIL: a TTL-expired record whose holder is os.getpid() (this very
+# test process, demonstrably alive) would be reported reclaimable and deleted by
+# --fix. The fix wires _build_pid_probe() into the DoctorService.
+# ---------------------------------------------------------------------------
+
+from dadaia_workspace.features.spec_context import lease  # noqa: E402
+
+_GC_CTX = "containergcctx"
+
+
+def _init_states_v2(tmp_path: Path) -> Path:
+    """Initialize a v2 spec_contexts.json (the LOCK-GC path actually loads the store)."""
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "spec_contexts.json").write_text(json.dumps({"schema_version": "2", "contexts": []}))
+    return states
+
+
+def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
+    """Plant a TTL-expired lease record under ctx_locks/. Returns its path."""
+    ctx_locks = tmp_path / ".dadaia" / "states" / "ctx_locks"
+    ctx_locks.mkdir(parents=True, exist_ok=True)
+    hb = (datetime.now(tz=UTC) - timedelta(seconds=lease.LEASE_TTL_SECONDS + 600)).isoformat()
+    rec: dict[str, object] = {
+        "context": _GC_CTX,
+        "release": "v0.1.11",
+        "session_id": "holder",
+        "mode": "IMPLEMENTATION",
+        "acquired_at": hb,
+        "heartbeat": hb,
+        "ttl": lease.LEASE_TTL_SECONDS,
+    }
+    if pid is not None:
+        rec["pid"] = pid
+    path = ctx_locks / f"{_GC_CTX}.lock.json"
+    path.write_text(json.dumps(rec, indent=2), encoding="utf-8")
+    return path
+
+
+def test_build_doctor_service_wires_pid_probe_live_holder_never_reclaimed(tmp_path: Path) -> None:
+    """Production wiring: a TTL-expired lease held by the LIVE test pid is NEVER reclaimed.
+
+    Exercises container.build_doctor_service() with the real OsProcessProbe — no lambda.
+    os.getpid() is demonstrably alive, so the probe must veto LOCK-GC. Against the unfixed
+    container (pid_probe=None, TTL-only) this record would be reported + deleted by --fix.
+    """
+    pytest.importorskip("fcntl")  # ctx-lock GC is POSIX-seamed like the gate.
+    _init_states_v2(tmp_path)
+    path = _seed_stale_lock(tmp_path, pid=os.getpid())
+
+    doctor = container.build_doctor_service(tmp_path)
+
+    lock_gc = [i for i in doctor.check() if i.code == "LOCK-GC"]
+    assert lock_gc == [], (
+        "live-pid holder must NOT be reported reclaimable through production container "
+        "wiring — build_doctor_service must inject the PID-liveness probe (FR-W1-02)"
+    )
+
+    doctor.fix()
+    assert path.exists(), "live-pid TTL-expired lease must NEVER be deleted by --fix"
+    stored = json.loads(path.read_text())
+    assert stored["session_id"] == "holder"
+
+
+def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Path) -> None:
+    """Production wiring: a TTL-expired lease held by a DEAD pid is reported + reclaimed.
+
+    Companion to the live-holder case. Uses a pid that is virtually certain to be dead
+    (a freshly spawned child that has already exited), proving the probe does not over-veto:
+    genuinely-dead holders are still garbage-collected by --fix.
+    """
+    pytest.importorskip("fcntl")
+    _init_states_v2(tmp_path)
+
+    # Spawn a child and reap it so its pid is dead by the time the probe runs.
+    dead_pid = os.fork() if hasattr(os, "fork") else None
+    if dead_pid == 0:  # pragma: no cover — child path exits immediately.
+        os._exit(0)
+    if dead_pid is not None:
+        os.waitpid(dead_pid, 0)
+    else:  # No os.fork (non-POSIX): fall back to a pid unlikely to exist.
+        dead_pid = 2147480000
+
+    path = _seed_stale_lock(tmp_path, pid=dead_pid)
+    doctor = container.build_doctor_service(tmp_path)
+
+    lock_gc = [i for i in doctor.check() if i.code == "LOCK-GC"]
+    assert lock_gc, "TTL-expired dead-holder lease must be reported LOCK-GC via container wiring"
+
+    actions = doctor.fix()
+    assert not path.exists(), "TTL-expired dead-holder lease should be reclaimed by --fix"
+    assert any("LOCK-GC" in a for a in actions)
 
 
 def test_build_panel_service_raises_when_not_initialized(tmp_path: Path) -> None:

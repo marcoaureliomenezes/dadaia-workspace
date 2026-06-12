@@ -4,12 +4,15 @@ title: sdd-bug-backlog-governance
 category: product
 tldr: >-
   Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless
-  subsumed, mandatory grill; alpha-N/rc-N; PM curates backlog (convention).
+  subsumed, grill mandatório; push gated por security APPROVE; PM curates backlog.
 summary: >-
   Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill),
-  alpha-N/rc-N maturity model (ADR-1..5), review cadence (alpha=qa-commit /
-  rc=ship-trio), pre-push CI gate, and backlog-ownership as a PM coordination
-  convention (NOT gate-enforced since 0.1.7 rc-3; backlog is ADDITIVE-allow).
+  o segment model alpha-N/rc-N (estrutura de folders, ADR-1..5), a cadência de
+  revisão pós-G6: push gated mecanicamente por security-reviewer APPROVE
+  (metrics.commit_sha por sha pushed; trio-at-rc-push abolido; qa-per-task-group
+  e code-review-at-PR são disciplina PM até o gate ladder completo em v0.1.15),
+  pre-push CI gate, and backlog-ownership as a PM coordination convention (NOT
+  gate-enforced since 0.1.7 rc-3; backlog is ADDITIVE-allow).
 tags:
   - sdd
   - governance
@@ -19,9 +22,9 @@ tags:
   - alpha-rc-model
   - backlog-ownership
 agent_tier: self-pull
-token_estimate: 1350
-last_updated: '2026-06-09'
-release_origin: v0.1.5
+token_estimate: 1683
+last_updated: '2026-06-12'
+release_origin: v0.1.14
 ---
 
 Skill: `dadaia-release-definition` · Rule: `release-governance.md` (always-on) · Rule: `backlog-ownership.md` (always-on, D5) · ADRs: ADR-1..5 in `specs/releases/v0.1.5/SPEC.md §8`
@@ -120,23 +123,27 @@ O scaffolder cria segmentos via:
 - `dadaia specs release open v<x>` → cria folder + `alpha-1` + atualiza ACTIVE.
 - `dadaia specs segment open <alpha-N|rc-N>` → abre próximo segmento.
 
-### Parte 3 — Cadência de revisão (ADR-3)
+### Parte 3 — Cadência de revisão (G6 as amended, v0.1.14)
 
-Uma branch única `feature/{version}` por release (ex: `feature/0.1.5`). Segmentos
+Uma branch única `feature/{version}` por release (ex: `feature/v0.1.14`). Segmentos
 alpha **nunca** criam sub-branches.
 
-**Fim de cada `alpha-N`:**
-- Apenas `qa-engineer` revisa.
-- Resultado: commit na feature branch.
-- Sem push, sem PR, sem outros revisores.
+O modelo **alpha=qa-only / trio-at-rc-push foi abolido** (governance grill ADR-2/ADR-9;
+G6 amended 2026-06-12). A cadência vigente:
 
-**Fim de cada `rc-N`** — operador escolhe:
-- **Ship**: convocar trio (`qa-engineer` + `code-reviewer` + `security-reviewer`).
-  Todos devem `APPROVE`. Então: push + PR → merge → CLOSURE → próxima release.
-- **Iterar**: abrir `rc-(N+1)`. Sem trio necessário.
+- **Commits** ficam review-unblocked (lease-only via o pre-commit lease gate) — o inner
+  loop TDD tem zero fricção; commits nunca são review-blocked.
+- **Push** é gated **mecanicamente**: o hook pre-push exige um handoff
+  `security-reviewer` com `"verdict": "APPROVED"` cujo `metrics.commit_sha` seja igual a
+  cada sha pushed (ref lines do stdin; APPROVE stale não passa; deleções/tag-only
+  passam) — ver [[sdd-gate-v3]].
+- **qa-per-task-group-commit** e **code-review-at-PR** são disciplina de coordenação do
+  PM nesta release; a codificação do gate ladder completo (qa→commit, code-review→PR) é
+  escopo de v0.1.15 (`sdd-governance-v2-agents-lifecycle`).
 
-Esse modelo **substitui** o per-task reviewer fan-out. A disciplina per-task de
-implementação (markers, testes, pre-push gate) permanece inalterada.
+Esse modelo substitui tanto o per-task reviewer fan-out quanto o trio-at-rc-push. A
+disciplina per-task de implementação (markers, testes, pre-push gate) permanece
+inalterada.
 
 ### Parte 4 — Hotfix unification (ADR-2)
 
@@ -150,7 +157,7 @@ canônico é o ADR-1 + ADR-2 documentado aqui.
 A reconciliação mecânica de `dadaia specs hotfix open` + SPEC-DOC-016 para o modelo
 de segmentos foi entregue por T-ENG-07.
 
-### Parte 5 — Pre-push CI gate (T-GATE-01)
+### Parte 5 — Pre-push CI gate (T-GATE-01; estendido em v0.1.14)
 
 Script `dadaia_workspace/public/scripts/pre-push-ci-gate.sh` instalado como git
 `pre-push` hook. Executa:
@@ -158,6 +165,8 @@ Script `dadaia_workspace/public/scripts/pre-push-ci-gate.sh` instalado como git
 - `ruff check`
 - `mypy --strict`
 - `pytest` (caches fora do repo)
+- `dadaia ci push-gate-check` — o check mecânico de verdict de security (stdin ref
+  lines encaminhadas; ver Parte 3)
 
 Bloqueia `git push` em qualquer falha. Motivação: a família v0.1.4 foi empurrada com
 CI vermelho — CI é rede de segurança, não primeira linha de defesa.
@@ -192,7 +201,7 @@ grill, e o segmento model impede colisões de versão.
 
 ## Dependências
 
-- [[sdd-gate-v3]] — gate RULE A valida que `specs/memory/` só é escrito em fase CLOSURE; RULE C exige marker `[-]` ativo; gate path-resolution aponta para `releases/<ver>/<seg>/TASKS.md` quando `segment:` está presente em ACTIVE; hard backlog gate (D5) bloqueia writes não-PM em `specs/backlog/**`.
+- [[sdd-gate-v3]] — gate RULE A valida que `specs/memory/` só é escrito em fase DEFINITION/CLOSURE; markers `[-]` e aprovações são disciplina, não mecanismo do gate; `specs/backlog/**` é ADDITIVE (sempre flui — o hard backlog gate D5 foi removido em 0.1.7 rc-3); o pre-push security-verdict gate é o chokepoint mecânico do push boundary.
 - [[specs-doctor]] — valida estrutura de segmentos (T-ENG-05: SPEC-DOC-004 segment-aware; SPEC-DOC-016 replaced by segment-structure check).
 - [[public-asset-distribution]] — propaga `pre-push-ci-gate.sh`, skill `dadaia-release-definition`, rule `release-governance.md`, rule `backlog-ownership.md`, persona edits (`product-engineer.md`, `project-manager.md`) via `dadaia public install --target all`.
 - [[sdd-hotfix-track]] — superseded by ADR-2; mantido como histórico, não deletado.

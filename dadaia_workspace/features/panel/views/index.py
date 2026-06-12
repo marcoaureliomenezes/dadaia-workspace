@@ -148,6 +148,10 @@ def render_index(
         <p>Agents, Workflows and Kanban &mdash; stacked below.</p>
       </div>
 
+      {agents_subsection}
+
+      {workflows_subsection}
+
       <div class="ops-subsection" id="ops-subsection-kanban">
         <div class="ops-subsection-header">
           <h3 class="ops-subsection-title">Kanban</h3>
@@ -157,10 +161,6 @@ def render_index(
         <div id="kanban-board" class="kanban-board" aria-label="Kanban board" aria-live="polite">
         </div>
       </div>
-
-      {workflows_subsection}
-
-      {agents_subsection}
     </section>
 
     {academy_section}
@@ -244,8 +244,10 @@ def _render_context_card(ctx: PanelContext) -> str:
         f"</div>"
         f"{zone_c}"
         f'<nav class="card-zone-d card-chips" aria-label="Memory links">'
+        f'<a class="memory-chip" href="{memory_view_url(slug, "constitution.md")}">Constitution</a>'
         f'<a class="memory-chip" href="{memory_view_url(slug, "architecture.md")}">Architecture</a>'
         f'<a class="memory-chip" href="{memory_view_url(slug, "tech-stack.md")}">Tech Stack</a>'
+        f'<a class="memory-chip" href="{memory_view_url(slug, "quality-assurance.md")}">Quality</a>'
         f'<a class="memory-chip" href="{memory_view_url(slug, "product/index.md")}">Product</a>'
         f"</nav>"
         f"</article>"

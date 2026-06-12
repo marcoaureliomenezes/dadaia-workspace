@@ -13,10 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.public_assets import (
+from dadaia_workspace.infrastructure.privacy_check import (
+    _BASELINE_OK_MARKER,
     _PRIVACY_DENYLIST_ENV,
-    FileSystemPublicAssetManager,
+    _load_privacy_baseline,
     _load_privacy_denylist,
+)
+from dadaia_workspace.infrastructure.public_assets import (
+    FileSystemPublicAssetManager,
 )
 
 _TEST_TERM = "10.99.99.99"
@@ -72,16 +76,19 @@ def test_public_privacy_gate_ignores_bytecode_cache(
     assert manager._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
 
 
-def test_public_privacy_gate_noop_without_denylist_source(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """With no denylist source the shipped library reports clean (no private terms)."""
+def _disable_operator_denylist(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Ensure no operator denylist resolves (env unset + chdir outside any workspace)."""
     monkeypatch.delenv(_PRIVACY_DENYLIST_ENV, raising=False)
-    # chdir to a directory with NO sentinel so resolve_workspace_root raises — no file fallback.
     no_ws = tmp_path / "no_workspace"
-    no_ws.mkdir()
+    no_ws.mkdir(exist_ok=True)
     monkeypatch.chdir(no_ws)
 
+
+def test_baseline_flags_planted_ip_when_no_operator_denylist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fail-closed: absent operator denylist still runs the baseline structural scan."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
     public_dir = tmp_path / "public"
     data_dir = public_dir / "data"
     data_dir.mkdir(parents=True)
@@ -90,7 +97,102 @@ def test_public_privacy_gate_noop_without_denylist_source(
     manager = FileSystemPublicAssetManager()
     manager._public_dir = public_dir  # noqa: SLF001
 
-    assert manager._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
+    report = manager._check_public_privacy()  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") for line in report)
+    assert any("10.99.99.99" in line for line in report)
+
+
+def test_baseline_flags_internal_hostname(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    data_dir = public_dir / "data"
+    data_dir.mkdir(parents=True)
+    (data_dir / "AGENTS.md").write_text("host: bastion.internal\n", encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+
+    report = manager._check_public_privacy()  # noqa: SLF001
+    assert any("bastion.internal" in line for line in report)
+
+
+def test_baseline_clean_fixture_reports_ok_with_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Clean public/ + no operator denylist ⇒ [ok] with the baseline-scan marker."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    data_dir = public_dir / "data"
+    data_dir.mkdir(parents=True)
+    (data_dir / "AGENTS.md").write_text("# clean generic content\n", encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+
+    assert manager._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+def test_baseline_does_not_flag_loopback_or_doc_ranges(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Loopback (127.x / ::1 / 0.0.0.0) and RFC-5737 doc ranges must NOT be flagged."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    data_dir = public_dir / "data"
+    data_dir.mkdir(parents=True)
+    (data_dir / "AGENTS.md").write_text(
+        "bind 127.0.0.1 and 0.0.0.0; doc 192.0.2.10 / 203.0.113.5; v6 ::1\n",
+        encoding="utf-8",
+    )
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+
+    assert manager._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+def test_baseline_does_not_flag_sha_hash_in_lockfile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Conservative: a 64-hex SHA in a lockfile must not trip the secret-token pattern."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    data_dir = public_dir / "data"
+    data_dir.mkdir(parents=True)
+    sha = "a" * 64
+    (data_dir / "lock.json").write_text(f'{{"hash": "sha256:{sha}"}}\n', encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+
+    assert manager._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+def test_operator_denylist_merges_additive_over_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Operator terms are ADDITIVE: both an operator term and a baseline pattern fire."""
+    _seed_denylist_env(monkeypatch, tmp_path)  # operator term = "10.99.99.99"
+    public_dir = tmp_path / "public"
+    data_dir = public_dir / "data"
+    data_dir.mkdir(parents=True)
+    # operator term + a baseline-only hit (internal hostname)
+    (data_dir / "AGENTS.md").write_text(f"ip {_TEST_TERM}\nhost db.internal\n", encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+
+    report = manager._check_public_privacy()  # noqa: SLF001
+    assert any(_TEST_TERM in line for line in report)
+    assert any("db.internal" in line for line in report)
+
+
+def test_baseline_data_loads_with_version_header() -> None:
+    """Packaged baseline data ships with a versioned, documented header."""
+    patterns = _load_privacy_baseline()
+    assert patterns, "baseline must ship at least one structural pattern"
+    ids = {p.id for p in patterns}
+    assert {"ipv4-literal", "internal-hostname", "home-abs-path", "email-address"} <= ids
 
 
 def test_public_privacy_gate_scans_root_agents_md(

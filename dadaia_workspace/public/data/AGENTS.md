@@ -38,11 +38,15 @@ Agent-generated temp files go to `.dadaia/tmp/<agent>/<YYYYMMDD>/` (see the
 `tmp-file-guardrail` rule). Tool caches go under `.dadaia/` (ruff `cache-dir`, coverage
 `data_file`, etc.). MCP server working dirs go under `.dadaia/mcps/<server>/`.
 
-This law is enforced deterministically by the `root-whitelist-gate.sh` PreToolUse hook.
-Any write that would create a new top-level root entry not in the whitelist above is
-**blocked**. The hook reads an optional operator exception list from
-`.dadaia/states/root_exceptions.txt` (one glob per line) for documented, deliberate
-exceptions (e.g. tool configs that a specific tool hard-requires at root).
+This law is enforced deterministically **for file-write tools** by the root-whitelist
+policy inside the merged `dadaia_workspace.hooks.pre_gate` PreToolUse entrypoint
+(Python — see the SDD Gate section). Any such write that would create a new top-level
+root entry not in the whitelist above is **blocked**. Writes performed through the
+`Bash` tool are not classified by this policy — they are governed by this rule as
+discipline, with `dadaia doctor` as the after-the-fact backstop. The policy reads an
+optional operator exception list from `.dadaia/states/root_exceptions.txt` (one glob
+per line) for documented, deliberate exceptions (e.g. tool configs that a specific
+tool hard-requires at root).
 
 ## Repository Hygiene
 
@@ -116,8 +120,10 @@ context bind/alive/dead, panel, reports, the `dadaia` CLI, or any production
 behavior that breaks its own contract — you MUST register a bug file before the
 turn ends. In this self-hosting source workspace, bugs go to
 `repos/dadaia-workspace/specs/bugs/`; in a consumer workspace, to the active
-context's `specs/bugs/` plus an upstream report. Bug files are ADDITIVE (never
-gate-blocked) — there is no excuse to defer. Do NOT file a bug for an error in
+context's `specs/bugs/` plus an upstream report. Bug files are ADDITIVE — the gate's
+path classifier resolves `specs/bugs/` (at the workspace root **and** inside any
+`repos/<slug>/`) to the ADDITIVE class, which is never blocked and never takes a
+lease — there is no excuse to defer. Do NOT file a bug for an error in
 your own throwaway script or for a validation the tool is *designed* to emit
 (e.g. doctor correctly flagging a non-compliant tree, or the gate correctly
 blocking an unauthorized write). See the `bug-registration-guardrail` rule for
@@ -125,7 +131,59 @@ the full record format and redaction requirement.
 
 ## SDD Gate
 
-Production edits require an active approved release:
+The gate has two layers. Know which one you are relying on.
+
+**Deterministic enforcement** — a single merged PreToolUse entrypoint
+(`dadaia_workspace.hooks.pre_gate`, Python) reads each tool payload once and evaluates
+three policies in fixed order, **first-block-wins**:
+
+1. **root-whitelist** — blocks file-tool writes that would create a new top-level
+   workspace-root entry outside the whitelist (see Workspace Root Law).
+2. **venv-guard** — Bash-only, fixed leading-token patterns (no general shell
+   parsing): `dadaia`, `pip`, and `python -m dadaia_workspace` invocations must be
+   rooted in `.dadaia/.venv/bin/`; the block message carries the corrected command.
+3. **SDD gate** — evaluates every file-write tool call as
+   **path-class × lease × phase × mode**:
+   - **Path class** (context-relative — the same `specs/` taxonomy applies at the
+     workspace root and inside every `repos/<slug>/`): ADDITIVE (`specs/bugs/`,
+     `specs/backlog/`, `specs/audits/`, `.dadaia/reports|handoff|tmp/`) always allows;
+     MEMORY (`specs/memory/`) allows only in `DEFINITION`/`CLOSURE` phase; FROZEN
+     (`specs/_archive/`) always blocks; PROTECTED (`.dadaia/sessions/`) always blocks
+     (fail-closed, lease-identity integrity); everything else in-repo is MUTATING.
+   - **Lease**: a MUTATING write acquires the single per-context TTL lease (O_EXCL
+     CAS). The record carries the long-lived harness pid (hook payload pid when
+     present, else the hook's parent process). A live foreign holder — heartbeat fresh
+     **or** recorded pid demonstrably alive — is never stolen; the gate yields with an
+     actionable message.
+   - **Mode**: resolved env → session record → the context's incumbent pointer
+     (refreshed by `dadaia context bind`) → IMPLEMENTATION default. A session
+     resolving READ is non-acquiring — MUTATING writes are blocked before any lease
+     call; ADDITIVE paths stay writable.
+
+**Chokepoint envelope** — the PreToolUse gate does not parse arbitrary shell command
+strings; the `Bash`-write hole is closed at the git chokepoints instead, which run as
+git hooks and do not depend on any harness hook firing:
+
+- **pre-commit lease gate** — a commit into a Spec Context repo from a session that
+  does not hold the context's live MUTATING lease is blocked with an actionable
+  message. The holder's commits flow; commits flow when no lease exists (ADDITIVE work
+  commits freely). When holder identity is indeterminate (ancestry probe unavailable,
+  or the holder pid is dead) the gate ALLOWs with a logged WARN — zero-false-block
+  dominates.
+- **pre-push security-verdict gate** — a push is blocked unless an APPROVED
+  `security-reviewer` handoff whose `metrics.commit_sha` equals each pushed ref sha
+  exists; branch deletions and tag-only pushes pass. Runs alongside the CI preflight
+  in the same pre-push hook. Commits are never review-blocked — only pushes.
+- An **advisory reconciler** (PostToolUse) flags out-of-lease dirty MUTATING paths;
+  it never blocks. Doctor coherence checks remain the after-the-fact backstop.
+
+**Bind-driven injection** — `dadaia context bind` writes a bind-epoch marker and is
+the sole trigger for context-memory injection. An unbound session receives generic
+preflight only (no context memory; there is no first-ALIVE injection fallback). Bind
+is never a precondition for ADDITIVE work.
+
+**Agent discipline (not hook-enforced)** — the hook reads no SDD artifacts. The
+following are protocol you must uphold yourself:
 
 - `ACTIVE.md` points at the release.
 - `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
@@ -133,11 +191,11 @@ Production edits require an active approved release:
 - The task is reserved in `TASKS.md` with `[-]`.
 - The edit stays inside the task's declared write set.
 
-If the gate is missing, stop with:
+If any discipline precondition is missing, stop with:
 
 ```text
 [SDD HARD STOP]
-Cannot proceed without an approved gate.
+Cannot proceed without an approved release context.
 Missing:
 - [ ] SPEC.md/PLAN.md/TASKS.md with **Status:** Aprovado
 - [ ] a [-] reservation by the calling agent
@@ -154,22 +212,27 @@ Do not edit specs to justify code already written.
 Memory is current product truth, not history.
 
 - Read memory before changing production behavior.
-- Do not write `specs/memory/**` during implementation.
-- Only `product-engineer` writes memory, in the `DEFINITION` or `CLOSURE` phase (constitution §13).
+- Do not write `specs/memory/**` during implementation. The gate enforces the phase
+  half deterministically: `specs/memory/` (root or in-repo) is the MEMORY class,
+  writable via file tools only when `ACTIVE.md` phase is `DEFINITION` or `CLOSURE`.
+- Only `product-engineer` writes memory, in the `DEFINITION` or `CLOSURE` phase
+  (constitution §13). The who half is discipline — the hook cannot see persona identity.
 - Changelog/history belongs in `CLOSURE.md` and `_archive/`.
 
 ## Reports and Panel
 
-Every agent report goes under:
-
-```text
-.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html
-```
-
-Every HTML report that feeds another agent must have a handoff JSON file under:
+Emission is **handoff-first** (`workspace-protocol` rule §4): the default output of any
+agent task is a handoff JSON under:
 
 ```text
 .dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json
+```
+
+An HTML report is written **only** when the operator explicitly requests one or the
+next handoff target is human, under:
+
+```text
+.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html
 ```
 
 Validate it:

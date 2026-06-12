@@ -23,6 +23,25 @@ in `CODEX_HOME` first, then the project from repo root down to the current
 directory. Closer files appear later and win on conflict. Almost every decision
 below is an application of "which layer owns this, and does it win where it must."
 
+Current-doc corrections to keep active:
+- Codex subagents are available in current Codex, but Codex spawns them only when
+  explicitly asked for subagents, delegation, or parallel agent work. A custom-agent
+  TOML file makes a role spawnable; it does not route prompts by itself.
+- Codex Rules use documented Starlark `prefix_rule(...)` declarations. Treat any
+  generated `command_allowed(cmd)` policy as compatibility debt unless a local Codex
+  binary proves it still loads.
+- Project `.codex/config.toml`, project hooks, and project rules load only when the
+  project layer is trusted. Provider/auth/telemetry settings remain user/admin
+  concerns and must not be emitted from dadaia public assets.
+- Hook matchers are event-specific. `UserPromptSubmit` and `Stop` ignore matchers;
+  command hooks are the only handler type that runs today.
+- HEADLINE (live-verified, codex-cli 0.139.0): command hooks fire ONLY in the
+  interactive `codex` TUI. Under headless `codex exec` they never run, in any
+  configuration form. Harness-hook gate enforcement on Codex is interactive-only
+  today; on the headless path the git chokepoints (pre-commit lease gate, pre-push
+  security-verdict gate, v0.1.14) provide the deterministic coverage — they fire as
+  git hooks, independent of any harness hook (§9).
+
 ---
 
 ## 1. AGENTS.md as scoped constitution — discovery + stacking
@@ -96,7 +115,9 @@ and emit one of three decisions.
 prefix_rule(
     pattern = ["git", "push"],
     decision = "prompt",
-    justification = "...",
+    justification = "Publishing requires operator approval.",
+    match = ["git push origin feature/x"],
+    not_match = ["git status"],
 )
 ```
 
@@ -125,6 +146,11 @@ must follow QA/review), `prompt` on `dadaia context dead` and `dadaia public ins
 destructive sweeps over `repos/` (user projects). If you want the model to *think*
 differently, that is a skill or AGENTS.md, not a Rule.
 
+Projection invariant: generated `.codex/rules/dadaia-command-policy.rules` must
+contain `prefix_rule(` and must not contain `command_allowed(`. Keep a focused test
+for that shape because it separates current documented Codex command policy from
+older compatibility assumptions.
+
 ---
 
 ## 4. Skills in Codex — discovery, frontmatter deltas, cross-harness authoring
@@ -135,6 +161,20 @@ A skill is a folder with `SKILL.md`. Codex first sees only the frontmatter
 (`name`, `description`) and opens the full body **only when it decides to use the
 skill**. The description is the trigger surface — it must be short, verb-first, and
 scenario-named ("Use when…" / "Use for…").
+
+Codex scans repo `.agents/skills` directories from CWD upward to the repository
+root, plus user/admin/system locations. This repo discovery is **native and
+automatic — no config key enables it**. Large skill inventories are listing-
+budgeted, so descriptions must front-load trigger words; a skill omitted from the
+initial list can still be used when explicitly mentioned.
+
+Config-key facts (live-verified 0.139.0 via `--strict-config` + official
+config-reference):
+
+| Claimed key | Reality |
+|---|---|
+| `[skills] paths = [...]` | **INVALID** — unknown field (hard error under `--strict-config`, silently ignored otherwise). Do not emit it. |
+| `skills.config` | The real surface: an array of per-skill `{path, enabled}` override objects — enable/disable only, not a search path. |
 
 ### Frontmatter deltas vs Claude Code
 
@@ -170,17 +210,25 @@ and `.codex`/`.agents`. Therefore:
 
 ### Mental model (and the key delta vs Claude Code)
 
-Codex does **not** spawn subagents automatically. The operator (or a dispatcher)
-must explicitly request delegation or parallel work. Each subagent does its own
-read/execute/synthesize; the primary consolidates. This is the central audit
-correction: a declarative workflow YAML/topology does **not** equal a running
-subagent — it does not execute parallelism by itself.
+Codex has native subagent workflows and custom-agent TOML, but it does **not**
+spawn subagents automatically. The operator (or a dispatcher running in the main
+thread) must explicitly request delegation or parallel work. Each subagent does
+its own read/execute/synthesize; the primary consolidates. This is the central
+audit correction: a declarative workflow YAML/topology does **not** equal a
+running subagent — it does not execute parallelism by itself.
 
 | Axis | Claude Code dispatch | Codex fan-out |
 |---|---|---|
 | Trigger | dispatcher agent with dispatch authority | explicit operator/dispatcher request for real spawn |
-| Declarative topology | maps toward dispatch | does NOT auto-execute; needs explicit spawn or manual handoff |
+| Declarative topology | maps toward dispatch | does NOT auto-execute; needs explicit spawn, a real executor, or manual handoff |
 | Safest pattern | task tool to a subagent | parallel **read** (explore, review, triage, logs, tests, compare) |
+
+Current Codex custom-agent schema requires `name`, `description`, and
+`developer_instructions`. Optional `model`, `model_reasoning_effort`,
+`sandbox_mode`, `mcp_servers`, and skill config inherit when omitted. Use
+`sandbox_mode` as a real role-boundary signal: evidence-only reviewers should not
+be projected as general workspace writers unless their role explicitly writes
+artifacts.
 
 ### Guard conditions for fan-out correctness
 
@@ -205,19 +253,29 @@ custom agents with scoped tools.
 
 Codex reads config in layers: personal config in `~/.codex/config.toml`; project
 config in `.codex/config.toml` **loaded only when the project is trusted**; closer
-files may override earlier values. Some sensitive keys can never be overridden by
-project-local config.
+files may override earlier values. Some sensitive keys are ignored from project-
+local config and must remain user/admin-global.
 
 ### Trust classification (decision table)
 
 | Concern | Layer | Project-local? | Why |
 |---|---|---|---|
 | Personal model / verbosity preference | `~/.codex/config.toml` | No — user-global | personal, not a product artifact |
-| dadaia projected agents | `.codex/agents/*.toml` | Yes (generated) | runtime projection from `public/` |
-| Skill search paths | `.codex` skills config | Yes (generated) | `[skills] paths = [".agents/skills", ".codex/skills"]` |
+| dadaia projected agents | `.codex/agents/*.toml` registered via `agents.<name>.config_file` | Yes (generated) | `config_file` is a real documented key (live-verified 0.139.0 accepts it under `--strict-config`) |
+| Skill enable/disable overrides | `skills.config` array | Yes (only if per-skill overrides needed) | `[skills] paths` is NOT a key (live-verified 0.139.0); `.agents/skills` repo discovery is native — never emit a paths key |
 | SDD-gate / hook wiring | `.codex/hooks.json` | Yes, but must point to **trusted workspace-level scripts** | hooks run host commands |
 | Provider / base URL / auth / telemetry | user or admin config | **NEVER project-local** | a repo must not change credentials or host-owned behavior |
 | Sandbox / approval level | profile or per-command | escalate cautiously | stricter for review; permissive only in a trusted workspace |
+
+Project-local config must not emit `openai_base_url`, `chatgpt_base_url`,
+`model_provider`, `model_providers`, `profile`, `profiles`, `notify`, or `otel`.
+Those keys redirect credentials, host-owned behavior, or telemetry and belong to
+the operator/admin.
+
+Non-keys to never emit (live-verified 0.139.0): `approved_commands` is NOT a
+config key — unknown field under `--strict-config`, silently ignored otherwise.
+Command approval is owned by Rules (`.rules`) and the `approval_policy` /
+`[tools]` keys, not a flat allow-list. Same class: `[skills] paths` (see §4).
 
 ### dadaia audit findings — what must NOT be project-local (apply as constraints)
 
@@ -291,6 +349,40 @@ Authoring consequences:
 
 Codex hooks can fire on: `SessionStart`, `UserPromptSubmit`, `PreToolUse`,
 `PostToolUse`, `PreCompact`, `PostCompact`, `SubagentStart`, `SubagentStop`, `Stop`.
+Only command hook handlers run today; `prompt` and `agent` handlers are parsed but
+skipped. `UserPromptSubmit` and `Stop` do not honor matchers, so never depend on a
+matcher there for selective behavior.
+
+### Verified hook contract (codex-cli 0.139.0)
+
+| Fact | Evidence level |
+|---|---|
+| The PreToolUse `matcher` is a **regex string**; the anchored form `^(apply_patch\|Edit\|Write)$` is valid — official examples include `^apply_patch$` | official docs |
+| `Edit`/`Write` are matcher **aliases** for `apply_patch`; hook input still reports `tool_name: "apply_patch"` | official docs |
+| Deny mechanisms: preferred `hookSpecificOutput.permissionDecision = "deny"`; legacy `{"decision":"block","reason":...}` with exit 0 is ACCEPTED; exit 2 + reason on stderr also denies | docs; legacy envelope **live-verified** blocking a FROZEN write interactively |
+| Hook `command` strings run **through a shell** — env-prefix `VAR=x cmd`, `$(...)`, and `~` all work | live-verified (shell `>>` redirection markers fired) |
+| Real apply_patch PreToolUse payload: `tool_input.command = "*** Begin Patch..."` with **NO `file_path` key** — path classification must parse `*** Add/Update/Delete File:` headers | live-verified (payload captured) |
+
+From the payload fact: the gate's header parser classifies EVERY
+`*** Add/Update/Delete File:` header of a multi-file patch; the most restrictive
+verdict wins (fixed in v0.1.14 — bug
+`sdd-gate-apply-patch-multi-file-first-header-only` closed).
+
+### Enforcement reality — interactive-only (live-verified 0.139.0)
+
+| Path | Hooks fire? | Consequence |
+|---|---|---|
+| Interactive `codex` TUI | **YES** — all four wired events (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse); the block envelope is honored (FROZEN write blocked live) | deterministic gate enforcement EXISTS interactively |
+| Headless `codex exec` | **NO** — across all four config forms (project `.codex/hooks.json`, inline `[hooks]` in trusted project config, user-layer `hooks.json`, match-all), with trusted project + `--dangerously-bypass-hook-trust` + hooks feature flag on | the merged pre_gate, ctx-inject, and heartbeat DO NOT run; harness-hook enforcement is absent on this path |
+
+**Never claim "harness-hook enforcement on Codex" unqualified.** Harness hooks fire
+only in interactive sessions today (upstream defect, bug
+`codex-exec-hooks-do-not-fire-headless`, resolved per its option (b)). The headless
+gap is covered by the **git chokepoints** (v0.1.14): the pre-commit lease gate and
+the pre-push security-verdict gate run as git hooks and fire regardless of whether
+any harness hook ran — file-tool-level gating is absent headless, but commits and
+pushes stay deterministically gated. Agent discipline plus doctor checks cover the
+remainder.
 
 > **Inject full context once per session, not every prompt.** Wire the full static
 > context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the
@@ -314,12 +406,22 @@ Codex hooks can fire on: `SessionStart`, `UserPromptSubmit`, `PreToolUse`,
 | Validate SDD gate before write | Decide product scope |
 | Block forbidden repo artifacts | Rewrite SPEC to justify code |
 | Validate handoff/report format | Hide human approval |
-| Update session heartbeat after write | Depend on fragile state with no timeout or clear message |
+| Update session heartbeat after every tool call | Depend on fragile state with no timeout or clear message |
 
-dadaia reference wiring (observed shape): `PreToolUse apply_patch/Edit/Write →
-sdd-spec-gate.sh` and `→ root-whitelist-gate.sh`; `PostToolUse … → sdd-post-gate.sh`;
-`UserPromptSubmit → ctx-inject.sh`. Risk to guard against: absolute paths and local
-projections leaking into public packages.
+dadaia reference wiring (live shape, v0.1.14): a SINGLE merged PreToolUse entrypoint —
+`PreToolUse ^(apply_patch|Edit|Write|Bash)$ → python -m dadaia_workspace.hooks.pre_gate`
+— evaluates root-whitelist → venv-guard → SDD gate in order, first-block-wins (one
+interpreter spawn per tool call; `Bash` is in the matcher only for the venv-guard's
+fixed-pattern check — no shell parsing); `PostToolUse → …hooks.sdd_post_gate` with the
+matcher **omitted** — Codex's canonical match-all form — so the lease heartbeat fires
+after every tool; `SessionStart → …hooks.ctx_inject` (injection itself is bind-driven:
+re-injection only on a bind-epoch marker newer than the session sentinel; no first-ALIVE
+fallback). The anchored matcher is documented-valid and NOT to be changed
+(live-verified; see the contract table above). The legacy bash hook quartet was retired
+in v0.1.10 (Decision D-1) — the hooks are production Python owned by software-engineer.
+This wiring enforces only in interactive sessions; headless commits/pushes are covered
+by the git chokepoints (see Enforcement reality above). Risk to guard against: absolute
+paths and local projections leaking into public packages.
 
 ---
 

@@ -142,7 +142,10 @@ def test_script_tag_is_stripped_from_output(tmp_path: Path) -> None:
 
     assert status == 200
     html = body.decode("utf-8")
-    assert "<script>" not in html
+    # The document chrome carries a trusted theme-prepaint <script>; assert the
+    # atom-injected script and its payload are stripped from the rendered body.
+    main_body = html.split('<main class="memory-doc">', 1)[1]
+    assert "<script>" not in main_body
     assert "alert('xss')" not in html
 
 
@@ -299,9 +302,11 @@ def test_fixture_md_renders_correctly(
     assert "text/html" in content_type
     html = body.decode("utf-8")
 
-    # No XSS
-    assert "<script>" not in html
-    assert "<style>" not in html
+    # No XSS in the atom body. The document chrome carries a trusted
+    # theme-prepaint <script>; the atom body (inside <main>) must not.
+    main_body = html.split('<main class="memory-doc">', 1)[1]
+    assert "<script>" not in main_body
+    assert "<style>" not in main_body
 
     # Mermaid
     if expect_mermaid:
@@ -316,3 +321,175 @@ def test_fixture_md_renders_correctly(
         assert "/memory-view/" in html
         for slug in expected_slugs:
             assert slug in html, f"{slug_name}: expected [[{slug}]] to appear in rendered HTML"
+
+
+# ---------------------------------------------------------------------------
+# Constitution allowlist (operator demand 2026-06-11): the single literal path
+# `constitution.md` re-roots to repos/<slug>/specs/constitution.md. Nothing
+# else under specs/ is reachable through the memory routes.
+# ---------------------------------------------------------------------------
+
+
+def _mk_ws(tmp_path):
+    slug = "ctx"
+    specs = tmp_path / "repos" / slug / "specs"
+    (specs / "memory").mkdir(parents=True)
+    (specs / "releases").mkdir()
+    (specs / "constitution.md").write_text("# Constitution\n\nThe law of the project.\n")
+    (specs / "releases" / "ACTIVE.md").write_text("release: x\n")
+    (specs / "memory" / "architecture.md").write_text("# Arch\n")
+    return slug
+
+
+def test_constitution_md_served_via_allowlist(tmp_path) -> None:
+    from dadaia_workspace.features.panel.views.memory import render_memory
+
+    slug = _mk_ws(tmp_path)
+    view = render_memory(tmp_path)
+    status, ct, body = view(slug=slug, path="constitution.md")
+    assert status == 200
+    assert "text/html" in ct
+    html = body.decode("utf-8")
+    assert "<h1" in html and "Constitution" in html
+    assert "# Constitution" not in html  # rendered, not raw
+
+
+def test_specs_paths_other_than_constitution_stay_404(tmp_path) -> None:
+    from dadaia_workspace.features.panel.views.memory import render_memory
+
+    slug = _mk_ws(tmp_path)
+    view = render_memory(tmp_path)
+    for escape in (
+        "../constitution.md",
+        "../releases/ACTIVE.md",
+        "releases/ACTIVE.md",
+        "../../specs/constitution.md",
+    ):
+        status, _, _ = view(slug=slug, path=escape)
+        assert status == 404, f"{escape!r} must stay unreachable"
+
+
+def test_constitution_missing_file_is_404(tmp_path) -> None:
+    from dadaia_workspace.features.panel.views.memory import render_memory
+
+    slug = "bare"
+    (tmp_path / "repos" / slug / "specs" / "memory").mkdir(parents=True)
+    view = render_memory(tmp_path)
+    status, _, _ = view(slug=slug, path="constitution.md")
+    assert status == 404
+
+
+# ---------------------------------------------------------------------------
+# Visual identity (operator demand 2026-06-11): the rendered memory document
+# is a full HTML page carrying the dadaia identity stylesheet, and the YAML
+# frontmatter is surfaced as a styled meta header (never raw key:value soup).
+# ---------------------------------------------------------------------------
+
+
+def test_rendered_doc_links_identity_stylesheets(tmp_path: Path) -> None:
+    """Rendered .md document must be a full page linking the identity CSS."""
+    md = "# Title\n\nBody text.\n"
+    workspace_root = _write_md(tmp_path, "proj", "doc.md", md)
+
+    view = render_memory(workspace_root)
+    status, content_type, body = view(slug="proj", path="doc.md")
+
+    assert status == 200
+    assert "text/html" in content_type
+    html = body.decode("utf-8")
+    assert "<!DOCTYPE html>" in html
+    assert '<link rel="stylesheet" href="/static/memory-doc.css">' in html
+    assert '<link rel="stylesheet" href="/static/tokens.css">' in html
+    assert '<main class="memory-doc">' in html
+
+
+def test_rendered_doc_theme_prepaint(tmp_path: Path) -> None:
+    """Document must apply the stored panel theme before first paint."""
+    workspace_root = _write_md(tmp_path, "proj", "doc.md", "# X\n")
+    view = render_memory(workspace_root)
+    _, _, body = view(slug="proj", path="doc.md")
+    html = body.decode("utf-8")
+    assert "dadaia-panel-theme" in html
+    assert "dataset.theme" in html
+
+
+def test_frontmatter_rendered_as_styled_meta_not_raw(tmp_path: Path) -> None:
+    """YAML frontmatter must become a styled meta header, not raw key:value text."""
+    md = (
+        "---\n"
+        "slug: arch\n"
+        "title: Architecture Memory\n"
+        "tldr: The layered architecture of the system.\n"
+        "tags:\n"
+        "  - architecture\n"
+        "  - layers\n"
+        "last_updated: '2026-06-11'\n"
+        "---\n\n"
+        "## Body heading\n\nContent.\n"
+    )
+    workspace_root = _write_md(tmp_path, "proj", "arch.md", md)
+
+    view = render_memory(workspace_root)
+    status, _, body = view(slug="proj", path="arch.md")
+
+    assert status == 200
+    html = body.decode("utf-8")
+    # Styled meta header present
+    assert '<header class="memory-meta">' in html
+    assert '<h1 class="memory-meta__title">Architecture Memory</h1>' in html
+    assert "The layered architecture of the system." in html
+    # Tags rendered as chips
+    assert '<li class="memory-meta__chip">architecture</li>' in html
+    assert '<li class="memory-meta__chip">layers</li>' in html
+    assert "2026-06-11" in html
+    # Raw YAML key:value soup must NOT survive in the rendered body
+    main_body = html.split('<main class="memory-doc">', 1)[1]
+    assert "slug: arch" not in main_body
+    assert "tldr:" not in main_body
+    assert "last_updated:" not in main_body
+    # The actual Markdown body still renders
+    assert "Body heading" in html
+
+
+def test_frontmatter_title_used_as_document_title(tmp_path: Path) -> None:
+    """The <title> element should use the frontmatter title when present."""
+    md = "---\ntitle: My Atom\n---\n\nbody\n"
+    workspace_root = _write_md(tmp_path, "proj", "a.md", md)
+    view = render_memory(workspace_root)
+    _, _, body = view(slug="proj", path="a.md")
+    html = body.decode("utf-8")
+    assert "<title>My Atom</title>" in html
+
+
+def test_no_frontmatter_still_renders_document(tmp_path: Path) -> None:
+    """An atom with no frontmatter renders a styled document with no meta header."""
+    md = "# Just a heading\n\nplain body\n"
+    workspace_root = _write_md(tmp_path, "proj", "plain.md", md)
+    view = render_memory(workspace_root)
+    status, _, body = view(slug="proj", path="plain.md")
+    assert status == 200
+    html = body.decode("utf-8")
+    assert '<main class="memory-doc">' in html
+    assert "memory-meta" not in html  # no frontmatter => no meta header
+    assert "Just a heading" in html
+
+
+def test_meta_header_escapes_html(tmp_path: Path) -> None:
+    """Frontmatter values must be HTML-escaped in the meta header (OWASP A03)."""
+    md = '---\ntitle: "<img src=x onerror=alert(1)>"\n---\n\nbody\n'
+    workspace_root = _write_md(tmp_path, "proj", "evil.md", md)
+    view = render_memory(workspace_root)
+    _, _, body = view(slug="proj", path="evil.md")
+    html = body.decode("utf-8")
+    assert "<img src=x onerror=alert(1)>" not in html
+    assert "&lt;img" in html
+
+
+def test_malformed_frontmatter_does_not_crash(tmp_path: Path) -> None:
+    """A malformed YAML frontmatter block must not raise; the doc still renders."""
+    md = "---\ntitle: [unclosed\n---\n\n# Heading\n"
+    workspace_root = _write_md(tmp_path, "proj", "bad.md", md)
+    view = render_memory(workspace_root)
+    status, _, body = view(slug="proj", path="bad.md")
+    assert status == 200
+    assert b"Heading" in body

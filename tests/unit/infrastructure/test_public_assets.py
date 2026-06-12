@@ -268,6 +268,33 @@ class TestRenderCodexAgentToml:
             '"""here' not in out.split("developer_instructions", 1)[1].strip().lstrip('= \n"')[:-3]
         )
 
+    def test_reasoning_effort_high_for_deep_tier_model(self) -> None:
+        """T-013-12: a deep-tier claude model yields high reasoning effort."""
+        out = _render_codex_agent_toml(
+            "ai-engineer", "gpt-5.5", "body", claude_model="claude-fable-5"
+        )
+        assert 'model_reasoning_effort = "high"' in out
+
+    def test_reasoning_effort_medium_for_dispatch_tier_model(self) -> None:
+        """T-013-12: a dispatch-tier claude model yields medium reasoning effort."""
+        out = _render_codex_agent_toml(
+            "project-manager", "gpt-5.5", "body", claude_model="claude-opus-4-8"
+        )
+        assert 'model_reasoning_effort = "medium"' in out
+
+    def test_reasoning_effort_medium_for_fast_tier_model(self) -> None:
+        out = _render_codex_agent_toml(
+            "qa-engineer", "gpt-5.4-mini", "body", claude_model="claude-haiku-4-5-20251001"
+        )
+        assert 'model_reasoning_effort = "medium"' in out
+
+    def test_reasoning_effort_default_when_model_unknown(self) -> None:
+        """Unknown/None claude model falls back to medium (never breaks install)."""
+        out = _render_codex_agent_toml("x", "m", "body", claude_model="claude-not-in-registry")
+        assert 'model_reasoning_effort = "medium"' in out
+        out_none = _render_codex_agent_toml("x", "m", "body")
+        assert 'model_reasoning_effort = "medium"' in out_none
+
 
 # ---------------------------------------------------------------------------
 # _render_agents_into_codex_config
@@ -1118,6 +1145,50 @@ class TestDcx4ClaudeStrings:
         out = manager._dcx4_claude_strings(codex_dir)
         assert out == []
 
+    def test_flags_standalone_anthropic_tier_name(self, tmp_path: Path) -> None:
+        """T-013-12: standalone Anthropic tier prose (e.g. 'Sonnet') is flagged."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        codex_dir = workspace_root / ".codex"
+        codex_dir.mkdir()
+        (codex_dir / "ai-engineer.toml").write_text(
+            'developer_instructions = """\nRecommend Sonnet for mid-tier work.\n"""\n',
+            encoding="utf-8",
+        )
+        manager = FileSystemPublicAssetManager()
+        out = manager._dcx4_claude_strings(codex_dir)
+        assert any("[error]" in line and "anthropic-tier-name" in line for line in out)
+
+    def test_clean_toml_without_tier_names_passes(self, tmp_path: Path) -> None:
+        """A Codex persona that uses registry-tier terms is not flagged."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        codex_dir = workspace_root / ".codex"
+        codex_dir.mkdir()
+        (codex_dir / "ai-engineer.toml").write_text(
+            'developer_instructions = """\n'
+            "Recommend the deep / dispatch / fast registry tiers; tune "
+            "model_reasoning_effort per workload.\n"
+            '"""\n',
+            encoding="utf-8",
+        )
+        manager = FileSystemPublicAssetManager()
+        out = manager._dcx4_claude_strings(codex_dir)
+        assert out == []
+
+    def test_harness_skill_name_not_false_positive(self, tmp_path: Path) -> None:
+        """ai-harness-claude-code skill name must not trip the tier-name pattern."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        codex_dir = workspace_root / ".codex"
+        codex_dir.mkdir()
+        (codex_dir / "ai-engineer.toml").write_text(
+            'developer_instructions = """\n'
+            "Use the ai-harness-claude-code skill when auditing projections.\n"
+            '"""\n',
+            encoding="utf-8",
+        )
+        manager = FileSystemPublicAssetManager()
+        out = manager._dcx4_claude_strings(codex_dir)
+        assert out == []
+
 
 # ---------------------------------------------------------------------------
 # D-CX-5: _dcx5_empty_developer_instructions
@@ -1548,47 +1619,6 @@ class TestCompare:
 
 
 # ---------------------------------------------------------------------------
-# _lint_legacy_software_engineer
-# ---------------------------------------------------------------------------
-
-
-class TestLintLegacySoftwareEngineer:
-    def test_reports_legacy_alias_in_public_dir(self, tmp_path: Path) -> None:
-        """Build a fake public dir containing a file with the legacy alias."""
-        manager = FileSystemPublicAssetManager()
-        # Patch _public_dir to point at tmp_path
-        manager._public_dir = tmp_path
-        (tmp_path / "agents").mkdir()
-        (tmp_path / "agents" / "bad.md").write_text(
-            "subagent_type: software-engineer\n", encoding="utf-8"
-        )
-        out = manager._lint_legacy_software_engineer()
-        assert any("[LINT]" in line for line in out)
-
-    def test_no_report_for_split_alias(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        manager._public_dir = tmp_path
-        (tmp_path / "agents").mkdir()
-        (tmp_path / "agents" / "good.md").write_text(
-            "subagent_type: software-engineer-python\n", encoding="utf-8"
-        )
-        out = manager._lint_legacy_software_engineer()
-        assert out == []
-
-    def test_empty_public_dir_no_reports(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        manager._public_dir = tmp_path
-        out = manager._lint_legacy_software_engineer()
-        assert out == []
-
-    def test_nonexistent_public_dir_returns_empty(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        manager._public_dir = tmp_path / "nonexistent"
-        out = manager._lint_legacy_software_engineer()
-        assert out == []
-
-
-# ---------------------------------------------------------------------------
 # _classify_workflows
 # ---------------------------------------------------------------------------
 
@@ -1642,17 +1672,22 @@ class TestConfigGenerators:
         matchers = hooks["PreToolUse"]
         assert isinstance(matchers, list)
         assert len(matchers) > 0
-        assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
+        assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write|Bash)$"
+        assert "Bash" in matchers[0]["matcher"]  # T-014-12: W3 venv guard fires on Bash.
         assert matchers[0]["hooks"][0]["type"] == "command"
-        sdd_gate_cmd = str(matchers[0]["hooks"][0]["command"])
-        assert "dadaia_workspace.hooks.sdd_gate" in sdd_gate_cmd
-        assert "sdd-spec-gate.sh" not in sdd_gate_cmd
-        # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module
+        # T-014-05: single merged PreToolUse entrypoint (pre_gate).
+        pre_gate_cmd = str(matchers[0]["hooks"][0]["command"])
+        assert "dadaia_workspace.hooks.pre_gate" in pre_gate_cmd
+        assert "sdd-spec-gate.sh" not in pre_gate_cmd
+        # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module.
+        # N-2 (v0.1.10 rc-2): the heartbeat now fires on ALL tools — Codex's
+        # canonical match-all is an *omitted* matcher (see
+        # test_codex_posttooluse_heartbeat_fires_on_all_tools).
         assert "PostToolUse" in hooks
         post_matchers = hooks["PostToolUse"]
         assert isinstance(post_matchers, list)
         assert len(post_matchers) > 0
-        assert post_matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
+        assert "matcher" not in post_matchers[0]
         assert post_matchers[0]["hooks"][0]["type"] == "command"
         post_cmd = str(post_matchers[0]["hooks"][0]["command"])
         assert "dadaia_workspace.hooks.sdd_post_gate" in post_cmd
@@ -1683,6 +1718,40 @@ class TestConfigGenerators:
         assert "dadaia_workspace.hooks.ctx_inject" in cmd
         assert "ctx-inject.sh" not in cmd
 
+    def test_codex_posttooluse_heartbeat_fires_on_all_tools(self, tmp_path: Path) -> None:
+        """N-2 (v0.1.10 rc-2 re-audit HIGH): the Codex lease-heartbeat PostToolUse
+        block must fire on ALL tools (omitted matcher = Codex canonical match-all),
+        NOT only on the write tools. Pinning it to ``^(apply_patch|Edit|Write)$``
+        starved the heartbeat during long Bash / read-only Codex calls, letting the
+        lease go TTL-stale (the original lease-starvation incident's Codex flavor).
+
+        The PreToolUse write gates stay scoped to the write tools only.
+        Regression guard for runtime_config.codex_hooks.
+        """
+        manager = FileSystemPublicAssetManager()
+        hooks = manager._codex_hooks(tmp_path)["hooks"]
+
+        # PostToolUse heartbeat: omitted matcher => fires on every tool.
+        post = hooks["PostToolUse"]
+        assert isinstance(post, list) and len(post) == 1
+        assert "matcher" not in post[0], (
+            "Codex heartbeat must NOT be pinned to the write tools — an omitted "
+            "matcher is Codex's canonical match-all (N-2)."
+        )
+        post_cmds = [str(h["command"]) for h in post[0]["hooks"]]
+        assert any("dadaia_workspace.hooks.sdd_post_gate" in c for c in post_cmds)
+
+        # PreToolUse: single merged entrypoint, scoped to the write tools (T-014-05).
+        pre = hooks["PreToolUse"]
+        assert isinstance(pre, list) and len(pre) == 1
+        for entry in pre:
+            assert entry["matcher"] == "^(apply_patch|Edit|Write|Bash)$"
+            assert "Bash" in entry["matcher"]  # T-014-12: W3 venv guard.
+        pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
+        assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
+
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         # T-018-17: hook commands are now Python module invocations, not .sh paths.
         manager = FileSystemPublicAssetManager()
@@ -1699,9 +1768,59 @@ class TestConfigGenerators:
         assert any("dadaia_workspace.hooks.sdd_post_gate" in str(c) for c in commands)
         assert not any("sdd-post-gate.sh" in str(c) for c in commands)
 
+    def test_claude_settings_matcher_scoping(self, tmp_path: Path) -> None:
+        """T-010-18 (R6c, AC-R6-05, ai C-12): PreToolUse write-gate hooks are scoped
+        to the write tools; PostToolUse heartbeat fires on all tools; UserPromptSubmit
+        is unchanged (no empty match-all on the write gates)."""
+        manager = FileSystemPublicAssetManager()
+        settings = manager._claude_settings(tmp_path)
+        hooks = settings["hooks"]
+        # T-014-12: the merged gate now also fires on Bash for the W3 venv guard.
+        write_matcher = "Edit|Write|MultiEdit|NotebookEdit|Bash"
+
+        # PreToolUse: single merged entrypoint scoped to the write tools + Bash (T-014-05/12).
+        pre = hooks["PreToolUse"]
+        assert isinstance(pre, list) and len(pre) == 1
+        for entry in pre:
+            assert entry["matcher"] == write_matcher
+            assert "Bash" in entry["matcher"]  # W3 venv guard.
+            assert entry["matcher"] != "", "write gate must not use the empty match-all"
+        pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
+        assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
+        assert not any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
+
+        # PostToolUse: heartbeat must fire on ALL tools via the explicit match-all.
+        post = hooks["PostToolUse"]
+        assert isinstance(post, list) and len(post) == 1
+        assert post[0]["matcher"] == "*"
+        post_cmds = [str(h["command"]) for h in post[0]["hooks"]]
+        assert any("dadaia_workspace.hooks.sdd_post_gate" in c for c in post_cmds)
+
+        # UserPromptSubmit: unchanged (empty matcher, ctx-inject).
+        ups = hooks["UserPromptSubmit"]
+        assert isinstance(ups, list) and len(ups) == 1
+        assert ups[0]["matcher"] == ""
+        ups_cmds = [str(h["command"]) for h in ups[0]["hooks"]]
+        assert any("dadaia_workspace.hooks.ctx_inject" in c for c in ups_cmds)
+
+    def test_seed5_single_pretooluse_command_per_runtime(self, tmp_path: Path) -> None:
+        """Seed-5 static proof (T-014-05): exactly ONE registered PreToolUse hook command
+        per runtime config (the merged pre_gate), down from the old dual sdd_gate +
+        root_whitelist wiring — one interpreter spawn per write tool call."""
+        manager = FileSystemPublicAssetManager()
+        for hooks in (
+            manager._claude_settings(tmp_path)["hooks"],
+            manager._codex_hooks(tmp_path)["hooks"],
+        ):
+            pre = hooks["PreToolUse"]
+            commands = [str(h["command"]) for entry in pre for h in entry.get("hooks", [])]
+            assert len(commands) == 1, f"expected one PreToolUse command, got {commands}"
+            assert "dadaia_workspace.hooks.pre_gate" in commands[0]
+
     def test_claude_settings_root_whitelist_gate_present(self, tmp_path: Path) -> None:
-        """T-SANI-01: root-whitelist hook must be registered as a PreToolUse hook.
-        T-018-17: command is now Python module invocation, not .sh path."""
+        """T-SANI-01 + T-014-05: the root-whitelist policy is registered as a PreToolUse
+        hook — now via the merged pre_gate entrypoint (which runs root-whitelist first)."""
         manager = FileSystemPublicAssetManager()
         settings = manager._claude_settings(tmp_path)
         pre_tool_use = settings["hooks"]["PreToolUse"]
@@ -1709,16 +1828,17 @@ class TestConfigGenerators:
         all_commands = [
             str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
-        assert any("dadaia_workspace.hooks.root_whitelist" in cmd for cmd in all_commands), (
-            "dadaia_workspace.hooks.root_whitelist not found in claude settings PreToolUse hooks"
+        assert any("dadaia_workspace.hooks.pre_gate" in cmd for cmd in all_commands), (
+            "dadaia_workspace.hooks.pre_gate (carries root-whitelist policy) not found in "
+            "claude settings PreToolUse hooks"
         )
         assert not any("root-whitelist-gate.sh" in cmd for cmd in all_commands), (
             "stale root-whitelist-gate.sh still present in claude settings PreToolUse hooks"
         )
 
     def test_codex_hooks_root_whitelist_gate_present(self, tmp_path: Path) -> None:
-        """T-SANI-01: root-whitelist hook must be registered as a Codex PreToolUse hook.
-        T-018-17: command is now Python module invocation, not .sh path."""
+        """T-SANI-01 + T-014-05: the root-whitelist policy is registered as a Codex
+        PreToolUse hook — now via the merged pre_gate entrypoint."""
         manager = FileSystemPublicAssetManager()
         config = manager._codex_hooks(tmp_path)
         pre_tool_use = config["hooks"]["PreToolUse"]
@@ -1726,8 +1846,9 @@ class TestConfigGenerators:
         all_commands = [
             str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
-        assert any("dadaia_workspace.hooks.root_whitelist" in cmd for cmd in all_commands), (
-            "dadaia_workspace.hooks.root_whitelist not found in codex hooks PreToolUse hooks"
+        assert any("dadaia_workspace.hooks.pre_gate" in cmd for cmd in all_commands), (
+            "dadaia_workspace.hooks.pre_gate (carries root-whitelist policy) not found in "
+            "codex hooks PreToolUse hooks"
         )
         assert not any("root-whitelist-gate.sh" in cmd for cmd in all_commands), (
             "stale root-whitelist-gate.sh still present in codex hooks PreToolUse hooks"
@@ -1819,6 +1940,44 @@ class TestInstallCodexRules:
         manager._install_codex_rules(agentic_dir, workspace_root, force=True, installed=installed)
         assert (workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
         assert len(installed) == 1
+
+    def test_dadaia_rules_gate_venv_invocation_form(self) -> None:
+        """T-013-10: dadaia-gating prefix rules must match the mandated venv form.
+
+        prefix_rule matches the argv prefix literally, so a pattern whose first
+        token is bare `dadaia` never fires against the workspace-mandated
+        `.dadaia/.venv/bin/dadaia ...` invocation. The generated policy must carry
+        a venv-relative pattern for both `public install` and `context dead`, and
+        prove the real form in `match=` (closes
+        codex-rules-dadaia-prefix-never-matches-venv-invocation).
+        """
+        from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+            _render_codex_command_policy_rules,
+        )
+
+        rules = _render_codex_command_policy_rules()
+
+        # The mandated venv invocation is the FIRST argv token in a pattern.
+        assert 'pattern = [".dadaia/.venv/bin/dadaia", "public", "install"]' in rules
+        assert 'pattern = [".dadaia/.venv/bin/dadaia", "context", "dead"]' in rules
+
+        # `match=` examples self-document using the REAL invocation form.
+        assert ".dadaia/.venv/bin/dadaia public install --target codex" in rules
+        assert ".dadaia/.venv/bin/dadaia context dead dadaia-workspace" in rules
+
+        # Shape invariant kept (D-CX-8): prefix_rule, no command_allowed.
+        assert "prefix_rule(" in rules
+        assert "command_allowed(" not in rules
+
+    def test_dadaia_rules_keep_bare_name_fallback(self) -> None:
+        """T-013-10: a bare-name `dadaia` fallback pattern remains for PATH invocations."""
+        from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+            _render_codex_command_policy_rules,
+        )
+
+        rules = _render_codex_command_policy_rules()
+        assert 'pattern = ["dadaia", "public", "install"]' in rules
+        assert 'pattern = ["dadaia", "context", "dead"]' in rules
 
 
 # ---------------------------------------------------------------------------

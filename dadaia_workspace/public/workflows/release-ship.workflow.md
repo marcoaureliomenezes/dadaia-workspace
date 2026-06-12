@@ -57,7 +57,8 @@ single MUTATING actor under the PM-held release lease (§8/§9).
 > **Honesty note.** This is a dispatch-reference document. Claude Code and Codex workflow
 > Markdown does not auto-execute at runtime (constitution §4). This file is read by an
 > agent only when `project-manager` explicitly loads it as context. It is not a Claude Code
-> or Codex runtime primitive.
+> or Codex runtime primitive. In Codex, fan-out requires an explicit subagent delegation
+> request or a future real executor; this file alone never spawns agents.
 
 ## When to use
 

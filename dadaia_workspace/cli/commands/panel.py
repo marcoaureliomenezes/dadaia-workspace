@@ -14,7 +14,6 @@ import typer
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import PlatformSecurityError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.panel.auth import ensure_token
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.server import build_panel_http_server
 
@@ -112,12 +111,10 @@ def panel(
 
     workspace_root = resolve_workspace_root()
 
-    # Ensure Bearer token exists (generates once with owner-only permissions if missing).
-    # Use the platform-appropriate FilePermissionSetter for the parent dir restriction
-    # (TOCTOU option a on Windows, defense-in-depth on POSIX).
-    # PlatformSecurityError propagates — the panel MUST NOT start with an unprotected token.
-    permission_setter = container._build_permission_setter()
-    token = ensure_token(permission_setter=permission_setter)
+    # No authentication (operator decision 2026-06-11): the panel is a
+    # loopback-only local dev tool.  No token is minted, no cookie, no launch
+    # URL.  The handler's Host-header allowlist is the only residual guard
+    # (DNS-rebinding protection — never a credential).
 
     # Build telemetry first so it can be injected into the panel service,
     # enabling the canonical agent overlay (PR3-08).
@@ -131,9 +128,7 @@ def panel(
 
     handler_cls = make_handler_class(
         views,
-        token=token,
         telemetry=telemetry,
-        loopback_bypass=(bind in _LOOPBACK_ONLY),
     )
 
     try:
@@ -152,15 +147,20 @@ def panel(
     shutdown_handler = container.build_shutdown_handler()
     shutdown_handler.install(server)
 
-    # Print URL with ?token=<value> for browser convenience (SPEC § Auth model).
-    # SECURITY NOTE: the token appears in the URL only for the first browser load;
-    # JS migrates it to a session cookie after the first fetch (P8 implementation).
-    # The token is printed to stdout (terminal only); never logged.
+    # Print the readiness banner.  No credential, no launch URL — the panel is
+    # open without auth on loopback (operator decision 2026-06-11); the browser
+    # opens the bare URL directly.
     typer.echo(f"Panel running at http://{bind}:{port}/")
-    typer.echo(f"First-load URL:  http://{bind}:{port}/?token={token}")
+    # Flush the readiness banner before entering the blocking serve loop. stdout
+    # is block-buffered when piped (e.g. a supervising launcher or the e2e
+    # harness); without this flush the line can sit in the buffer until the
+    # process exits — which never happens under serve_forever — so any
+    # readiness handoff over stdout would hang. Flush makes the handoff
+    # deterministic.
+    sys.stdout.flush()
 
     if not no_open:
-        webbrowser.open(f"http://{bind}:{port}/?token={token}")
+        webbrowser.open(f"http://{bind}:{port}/")
 
     server.serve_forever()
     sys.exit(0)

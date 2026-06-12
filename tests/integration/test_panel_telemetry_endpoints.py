@@ -244,11 +244,11 @@ def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes
 
 
 class TestAgentsEndpoint:
-    def test_agents_endpoint_401_without_token(self, panel_server) -> None:
-        """GET /api/agents without Authorization header → 401."""
+    def test_agents_endpoint_200_without_token(self, panel_server) -> None:
+        """GET /api/agents without Authorization header → 200 (no-auth contract (operator decision 2026-06-11): credential-less serves)."""
         base, token, stub = panel_server
         status, headers, body = _get(f"{base}/api/agents")
-        assert status == 401
+        assert status == 200
 
     def test_agents_endpoint_200_with_token(self, panel_server) -> None:
         """GET /api/agents with Bearer token → 200, valid JSON."""
@@ -275,11 +275,11 @@ class TestAgentsEndpoint:
 
 
 class TestWorkflowsEndpoint:
-    def test_workflows_endpoint_401_without_token(self, panel_server) -> None:
-        """GET /api/workflows without Authorization header → 401."""
+    def test_workflows_endpoint_200_without_token(self, panel_server) -> None:
+        """GET /api/workflows without Authorization header → 200 (no-auth contract (operator decision 2026-06-11): credential-less serves)."""
         base, token, stub = panel_server
         status, headers, body = _get(f"{base}/api/workflows")
-        assert status == 401
+        assert status == 200
 
     def test_workflows_endpoint_200_with_token(self, panel_server) -> None:
         """GET /api/workflows with Bearer token → 200, valid JSON."""
@@ -301,11 +301,11 @@ class TestAgentSessionsEndpoint:
         assert "sessions" in data
         assert isinstance(data["sessions"], list)
 
-    def test_agent_sessions_401_without_token(self, panel_server) -> None:
-        """GET /api/agents/foo/sessions without token → 401."""
+    def test_agent_sessions_200_without_token(self, panel_server) -> None:
+        """GET /api/agents/foo/sessions without token → 200 (no-auth contract (operator decision 2026-06-11): credential-less serves)."""
         base, token, stub = panel_server
         status, headers, body = _get(f"{base}/api/agents/foo/sessions")
-        assert status == 401
+        assert status == 200
 
 
 class TestPrivacyAndSecurity:

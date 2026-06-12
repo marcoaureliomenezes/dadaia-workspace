@@ -73,6 +73,17 @@ touch dependencies").
 - `specs/memory/architecture.md` — <one-liner>
 - `specs/memory/tech-stack.md` — <one-liner or "no change: reason">
 
+## Dispositions
+
+Disposition-sweep ledger (mandatory — see "Disposition sweep" below). One row per
+backlog item and bug picked into (or superseded by) this release.
+
+| File | Kind | Terminal status | Evidence |
+|------|------|-----------------|----------|
+| `specs/bugs/<slug>.md` | bug | `Closed` | `<CLOSURE section \| commit sha>` |
+| `specs/backlog/<slug>.md` | backlog | `DELIVERED — <release-id>` | `<CLOSURE section \| commit sha>` |
+| ... | ... | ... | ... |
+
 ## Backlog returns
 
 Items discovered during implementation that did not fit this release's scope. Each goes
@@ -90,6 +101,28 @@ candidate for next planning round).
 (Alternative: `KEEP` — leave the release in `specs/releases/` only if explicitly justified
 by the operator. Should be rare.)
 ```
+
+## Disposition sweep (mandatory)
+
+Before archive, flip every backlog item and bug picked into (or superseded by) the
+release to a terminal status token per the ADR-11 vocabulary, and record each flip as a
+row in the CLOSURE `## Dispositions` table with an evidence pointer (CLOSURE section or
+commit SHA). A release whose CLOSURE lacks the sweep is not closeable.
+
+| Kind | Terminal tokens | Format |
+|------|-----------------|--------|
+| Bug (`specs/bugs/**`) | `Closed` | frontmatter `status: Closed`; add `superseded_by: <backlog-slug>` when a picked backlog item superseded the fix |
+| Backlog (`specs/backlog/**`) | `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED` | Status line, case-insensitive prefix match; suffix allowed, e.g. `DELIVERED — vX.Y.Z`, `SUPERSEDED — <slug>` |
+
+Never-delete law (release-governance): a bug or backlog file is **never deleted** —
+always marked with a terminal token and a reason. A bug is never silently dropped:
+either it is fixed (`Closed`) or a superseding backlog item covers its acceptance
+(`Closed` + `superseded_by: <slug>`). Stale or invalid items are dispositioned
+`DEFERRED` or `REJECTED` with a reason, never removed.
+
+`dadaia specs doctor` backstops the sweep: SPEC-DOC-031 WARNs on a backlog entry left
+non-terminal (`OPEN`/`PICKED`/`CANDIDATE`) while referenced by an archived release;
+SPEC-DOC-032 WARNs on a bug `status:` outside the {`Open`, `Closed`} canon.
 
 ## Memory Markdown update protocol
 
@@ -126,7 +159,8 @@ by the operator. Should be rare.)
 
 ## Move-to-archive command
 
-After CLOSURE.md is written, memory is updated, and `dadaia specs doctor` reports green:
+After CLOSURE.md is written, the disposition sweep is complete, memory is updated, and
+`dadaia specs doctor` reports green:
 
 ```bash
 git mv specs/releases/<release-id> specs/_archive/releases/<release-id>

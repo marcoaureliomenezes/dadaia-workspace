@@ -56,7 +56,11 @@ one of these at root, it must be added as a documented exception in
 **Operator exception:** any file or directory created by the human operator is always
 allowed and must never be auto-deleted (e.g. `prompt.md`, `sessions-tab-1280.png`).
 
-This whitelist is enforced by the `root-whitelist-gate.sh` PreToolUse hook.
+This whitelist is enforced for file-write tools by the root-whitelist stage of the
+merged `dadaia_workspace.hooks.pre_gate` PreToolUse hook (Python; root-whitelist →
+venv-guard → SDD gate, first-block-wins). `Bash` is in the hook's matcher only for the
+venv-guard stage — `Bash`-side file writes are outside the root-whitelist envelope
+(Decision D-2) and are governed by this rule as discipline.
 
 ## No cache/state dirs inside repos
 
@@ -76,6 +80,12 @@ Tools must run with caching disabled or redirected outside the repo:
 
 Gitignoring these dirs is defence-in-depth only — gitignore is not a licence to create them. See the `## Repo cleanliness` section in the root `AGENTS.md` for the full policy.
 
-## Enforcement
+## Discipline
 
-Before writing a file outside `.dadaia/tmp/` that matches the temp-file criteria above, STOP and redirect to `.dadaia/tmp/<agent-name>/<YYYYMMDD>/`. Report any stray temp files found at root or in forbidden locations — do not silently ignore workspace pollution. Reports go to `.dadaia/reports/<ctx>/<agent>/`, never to `.dadaia/tmp/`.
+The temp-file landing zone is **agent discipline, not hook-enforced**: no hook inspects
+where a temp file lands (only new top-level root entries are deterministically blocked,
+per the root-whitelist stage above). Before writing a file outside `.dadaia/tmp/` that
+matches the temp-file criteria above, STOP and redirect to
+`.dadaia/tmp/<agent-name>/<YYYYMMDD>/`. Report any stray temp files found at root or in
+forbidden locations — do not silently ignore workspace pollution. Reports go to
+`.dadaia/reports/<ctx>/<agent>/`, never to `.dadaia/tmp/`.

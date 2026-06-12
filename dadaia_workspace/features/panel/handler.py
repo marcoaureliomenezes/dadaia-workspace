@@ -9,15 +9,27 @@ Design (architect D3):
   ``make_handler_class(views)``, so this module carries zero rendering logic
   and can be unit-tested with stub views without spinning a real server.
 
-Auth (T-AM-13, T-AM-15, T-016-P05):
-  Every registered route carries an explicit ``auth_class`` in the declarative
-  ``_ROUTE_TABLE`` constant.  ``auth_class`` is one of:
+No authentication (operator decision 2026-06-11):
+  The panel is a loopback-only (127.0.0.1-bound) local dev tool.  The operator
+  ruled out all credentials — no Bearer tokens, no cookies, no launch URLs.
+  Every route serves WITHOUT any credential.  The v0.1.11 token/cookie design
+  shipped a browser-dead panel and was removed in full.
 
-      PUBLIC             — no auth required.
-      BEARER             — Bearer token required; no telemetry dependency.
-      BEARER_SECOND_LOOP — Bearer required when NOT on loopback; data is workspace-
-                           sensitive but not gated by telemetry.
-      BEARER_TELEMETRY   — Bearer required; returns 503 when telemetry is None.
+  The ``AuthClass`` enum and the declarative ``_ROUTE_TABLE`` are retained as
+  the route registry shape, but the classes no longer enforce credentials:
+
+      PUBLIC             — served without credential.
+      BEARER             — served without credential (legacy classification).
+      BEARER_SECOND_LOOP — served without credential (legacy classification).
+      BEARER_TELEMETRY   — served without credential, but still returns 503 when
+                           the telemetry service is None or degraded.
+
+  The single silent guard that remains is a **Host-header allowlist** (NOT
+  authentication, zero UX cost): a request whose ``Host`` header is not one of
+  ``127.0.0.1[:port]`` / ``localhost[:port]`` / ``[::1][:port]`` is answered with
+  403.  This is DNS-rebinding protection — a browser on the same machine always
+  sends a matching ``Host`` when talking to the loopback bind, so it costs the
+  legitimate local user nothing.  It applies to every route, including PUBLIC.
 
   A route omitted from ``_ROUTE_TABLE`` cannot exist — there is no silent-public
   fallback.  Adding a route without assigning an ``auth_class`` is a
@@ -50,7 +62,40 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from typing import Any
 
-from dadaia_workspace.features.panel.auth import validate as _validate_bearer
+# ---------------------------------------------------------------------------
+# Host-header allowlist (DNS-rebinding protection — NOT authentication).
+#
+# The panel binds loopback only.  A browser on the same machine always sends a
+# Host header matching the loopback address it connected to.  A request whose
+# Host is a foreign name (e.g. an attacker's DNS-rebound domain pointing at
+# 127.0.0.1) is answered with 403.  Empty/absent Host is allowed (HTTP/1.0
+# clients, curl without --header) — the threat model is a browser tricked into
+# sending a foreign Host, which always sets the header.
+# ---------------------------------------------------------------------------
+_ALLOWED_HOST_NAMES: frozenset[str] = frozenset({"127.0.0.1", "localhost", "[::1]"})
+
+
+def _is_allowed_host(host_header: str | None) -> bool:
+    """Return True iff *host_header* targets the loopback interface.
+
+    Accepts ``127.0.0.1``, ``localhost``, ``[::1]`` with or without a ``:port``
+    suffix.  An absent/empty Host header is allowed (non-browser clients).  A
+    foreign hostname is rejected (DNS-rebinding guard).
+    """
+    if not host_header:
+        return True
+    host = host_header.strip()
+    # IPv6 literal with optional port: "[::1]" or "[::1]:4999".
+    if host.startswith("["):
+        closing = host.find("]")
+        if closing == -1:
+            return False
+        name = host[: closing + 1]
+        return name in _ALLOWED_HOST_NAMES
+    # IPv4 / hostname with optional port: split on the LAST colon only.
+    name = host.rsplit(":", 1)[0] if ":" in host else host
+    return name in _ALLOWED_HOST_NAMES
+
 
 # ---------------------------------------------------------------------------
 # CSP script-src SHA-256 hashes (T-14..T-17).
@@ -74,14 +119,12 @@ _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/panel-status /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
-    b"/api/workflows /api/workflows/<name> /api/workflows/<name>/run "
+    b"/api/workflows /api/workflows/<name> "
     b"/api/sessions /api/sessions/<runtime>/<session_id> "
     b"/api/kanban "
     b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
-
-_WORKFLOW_NAME_RE = re.compile(r"^[a-zA-Z0-9\-]+$")
 
 # ---------------------------------------------------------------------------
 # Forbidden field names for T1 privacy check (belt-and-suspenders; the reader
@@ -98,18 +141,22 @@ _FORBIDDEN_JSON_KEYS: frozenset[str] = frozenset(
 
 
 class AuthClass(enum.Enum):
-    """Auth classification for every registered panel route.
+    """Route classification for every registered panel route.
+
+    Retained as the route-registry shape after the no-auth decision
+    (2026-06-11).  No class enforces credentials any more; the only residual
+    behavioural difference is BEARER_TELEMETRY's 503-when-telemetry-unavailable.
 
     PUBLIC:
-        No auth required (e.g. index, static assets, health).
+        Served without credential (e.g. index, static assets, health).
     BEARER:
-        Bearer token required; no telemetry dependency (bearer-only routes).
+        Served without credential (legacy bearer-only routes).
     BEARER_SECOND_LOOP:
-        Bearer required when NOT loopback-bound; returns workspace-sensitive data
-        (e.g. server registry, context paths, report/memory content).
+        Served without credential (legacy workspace-sensitive routes — server
+        registry, context paths, report/memory content).
     BEARER_TELEMETRY:
-        Bearer required; returns 503 when telemetry is None or degraded
-        (e.g. agent sessions, agent list with telemetry overlay).
+        Served without credential, but returns 503 when telemetry is None or
+        degraded (e.g. agent sessions, agent list with telemetry overlay).
     """
 
     PUBLIC = "PUBLIC"
@@ -139,6 +186,12 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     (r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$", "memory", AuthClass.BEARER_SECOND_LOOP),
     (r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$", "memory_view", AuthClass.BEARER_SECOND_LOOP),
     (r"^/reports/(?P<path>.+)$", "reports_serve", AuthClass.BEARER_SECOND_LOOP),
+    # Academy lesson render (read-only; path-traversal guard lives in the view/service).
+    (
+        r"^/academy/(?P<module>[^/]+)/(?P<lesson>[^/]+)$",
+        "academy_lesson",
+        AuthClass.BEARER_SECOND_LOOP,
+    ),
     # BEARER-only routes (auth required; no telemetry dependency)
     (r"^/api/academy$", "api_academy", AuthClass.BEARER),
     (r"^/api/kanban$", "api_kanban", AuthClass.BEARER),
@@ -147,8 +200,7 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important", AuthClass.BEARER),
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete", AuthClass.BEARER),
     (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt", AuthClass.BEARER),
-    # /api/workflows/<name>/run and /api/workflows/<name> before /api/workflows
-    (r"^/api/workflows/(?P<workflow_name>[^/]+)/run$", "api_workflow_run", AuthClass.BEARER),
+    # /api/workflows/<name> before /api/workflows
     (
         r"^/api/workflows/(?P<workflow_name>[^/]+)$",
         "api_workflow_detail",
@@ -212,8 +264,6 @@ _SECOND_LOOP_AUTH_ROUTES = _SECOND_LOOP_AUTH_ROUTE_NAMES
 # Backward-compatible flat raw routes list (pattern, name) — consumed by some tests.
 _RAW_ROUTES: list[tuple[str, str]] = [(pat, name) for pat, name, _ in _ROUTE_TABLE]
 
-_POST_WORKFLOW_RUN_RE = re.compile(r"^/api/workflows/(?P<workflow_name>[^/]+)/run$")
-
 # Routes that are GET-only and must return 405 Method Not Allowed on POST.
 _GET_ONLY_API_ROUTES_RE = re.compile(r"^/api/kanban$")
 
@@ -276,9 +326,8 @@ def make_handler_class(
     *,
     token: str | None = None,
     telemetry: Any = None,
-    loopback_bypass: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
-    """Return a PanelHandler subclass with *views* and auth/telemetry injected.
+    """Return a PanelHandler subclass with *views* and telemetry injected.
 
     Parameters
     ----------
@@ -288,27 +337,25 @@ def make_handler_class(
         ``(status_code, content_type, body_bytes)`` triple.
 
         Required keys: ``"index"``, ``"api_panel_status"``, ``"api_contexts"``,
-        ``"api_academy"``, ``"memory"``, ``"memory_view"``, ``"static"``.
+        ``"api_academy"``, ``"academy_lesson"``, ``"memory"``, ``"memory_view"``,
+        ``"static"``.
 
     token:
-        The expected Bearer token.  When provided, all ``/api/*`` routes
-        enforce ``Authorization: Bearer <token>``.  If None, telemetry
-        routes return 503 Service Unavailable (auth not configured).
+        Deprecated and ignored (no-auth decision, 2026-06-11).  Accepted for
+        backward compatibility with existing callers/tests that still pass it;
+        no credential is ever validated.
 
     telemetry:
         A TelemetryService (or compatible stub) instance.  When None,
-        telemetry routes return 503 Service Unavailable.
+        BEARER_TELEMETRY routes return 503 Service Unavailable.
 
-    loopback_bypass:
-        When True (set by panel.py when ``bind == "127.0.0.1"``), the Bearer
-        token requirement on ``/api/*`` routes is waived.  This allows local
-        human and AI-agent clients to call the panel API without supplying an
-        Authorization header.  Detection is at the server bind level — NOT
-        derived from the client TCP peer address.
-
-        Security note: any local process can read panel data without a token
-        when this flag is active — a deliberate dev-local trade-off for a
-        read-only GET surface.
+    Security note (operator decision, 2026-06-11 — no-auth loopback panel):
+        The panel is a loopback-only local dev tool and serves every route
+        WITHOUT any credential.  The only residual guard is the Host-header
+        allowlist (``_is_allowed_host``): a request whose ``Host`` is a foreign
+        name is answered with 403 (DNS-rebinding protection).  A browser on the
+        same machine always sends a matching Host, so this costs the legitimate
+        local user nothing.
     """
     # Build compiled route list, filtering only routes whose names are in views
     # OR that are telemetry-dispatched (handled inline, not via views).
@@ -323,18 +370,11 @@ def make_handler_class(
             # are registered without a view callable — dispatch handles them inline.
             compiled.append((re.compile(pat), name, auth, None))
 
-    _token = token
+    # token is accepted-but-ignored (no-auth decision); bind to _ to mark unused.
+    _ = token
     _telemetry = telemetry
-    _loopback_bypass = loopback_bypass
 
-    if _loopback_bypass:
-        import logging as _logging
-
-        _logging.getLogger(__name__).warning(
-            "[PANEL] Auth disabled for loopback (127.0.0.1) connections."
-        )
-
-    _UNAUTHORIZED_BODY = b'{"error": "unauthorized"}'
+    _FORBIDDEN_HOST_BODY = b'{"error": "forbidden host"}'
 
     # Keep the legacy tel_patterns for _dispatch_telemetry (used for BEARER_TELEMETRY routes).
     _BEARER_AUTH_ROUTE_NAMES = (
@@ -360,7 +400,20 @@ def make_handler_class(
         _compiled_routes = compiled
         _tel_patterns = telemetry_patterns
 
+        def _host_rejected(self) -> bool:
+            """403 + True if the Host header is foreign (DNS-rebinding guard).
+
+            Applies to EVERY route, including PUBLIC.  A loopback browser always
+            sends a matching Host, so the legitimate local user is never blocked.
+            """
+            if not _is_allowed_host(self.headers.get("Host")):
+                self._respond(403, "application/json", _FORBIDDEN_HOST_BODY)
+                return True
+            return False
+
         def do_GET(self) -> None:  # noqa: N802
+            if self._host_rejected():
+                return
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
             qs = urllib.parse.parse_qs(parsed.query)
@@ -370,34 +423,11 @@ def make_handler_class(
                 if m is None:
                     continue
 
-                # Auth enforcement based on auth_class.
-                if auth_class == AuthClass.PUBLIC:
-                    # No auth required.
-                    pass
-                elif auth_class == AuthClass.BEARER:
-                    # Bearer required; no telemetry dependency.
-                    if not _loopback_bypass and (
-                        _token is None
-                        or not _validate_bearer(self.headers.get("Authorization"), _token)
-                    ):
-                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
-                        return
-                elif auth_class == AuthClass.BEARER_SECOND_LOOP:
-                    # Bearer required on non-loopback connections.
-                    if not _loopback_bypass and (
-                        _token is None
-                        or not _validate_bearer(self.headers.get("Authorization"), _token)
-                    ):
-                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
-                        return
-                elif auth_class == AuthClass.BEARER_TELEMETRY:
-                    # Bearer required; telemetry must be available.
-                    if not _loopback_bypass and (
-                        _token is None
-                        or not _validate_bearer(self.headers.get("Authorization"), _token)
-                    ):
-                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
-                        return
+                # No authentication (operator decision 2026-06-11): every route
+                # serves without a credential.  The only class with residual
+                # behaviour is BEARER_TELEMETRY, which still 503s when telemetry
+                # is unavailable or degraded.
+                if auth_class == AuthClass.BEARER_TELEMETRY:
                     if _telemetry is None:
                         self._respond(
                             503,
@@ -416,7 +446,7 @@ def make_handler_class(
 
                 # Dispatch.
                 if view is not None:
-                    # BEARER-only or PUBLIC routes dispatched directly from views.
+                    # PUBLIC / BEARER / BEARER_SECOND_LOOP routes dispatched directly from views.
                     if auth_class in (
                         AuthClass.PUBLIC,
                         AuthClass.BEARER,
@@ -443,16 +473,14 @@ def make_handler_class(
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
 
         def do_DELETE(self) -> None:  # noqa: N802
+            if self._host_rejected():
+                return
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
             # Use the dedicated DELETE route table (ordering is structural).
             for pattern, route_name in _COMPILED_DELETE_ROUTE_TABLE:
                 m = pattern.match(path)
                 if m is not None:
-                    auth_header = self.headers.get("Authorization")
-                    if _token is None or not _validate_bearer(auth_header, _token):
-                        self._respond(401, "application/json", _UNAUTHORIZED_BODY)
-                        return
                     if route_name == "api_report_mark_important":
                         # DELETE /important → unmark action.
                         if "api_report_unmark_important" in views:
@@ -468,6 +496,8 @@ def make_handler_class(
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
 
         def do_POST(self) -> None:  # noqa: N802
+            if self._host_rejected():
+                return
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
 
@@ -486,46 +516,7 @@ def make_handler_class(
                     "api_report_mark_important",
                 }:
                     continue
-                auth_header = self.headers.get("Authorization")
-                if _token is None or not _validate_bearer(auth_header, _token):
-                    self._respond(401, "application/json", _UNAUTHORIZED_BODY)
-                    return
                 self._dispatch_telemetry(route_name, m_api.groupdict(), {})
-                return
-
-            m = _POST_WORKFLOW_RUN_RE.match(path)
-            if m is not None:
-                auth_header = self.headers.get("Authorization")
-                if _token is None or not _validate_bearer(auth_header, _token):
-                    self._respond(401, "application/json", _UNAUTHORIZED_BODY)
-                    return
-                workflow_name = m.group("workflow_name")
-                if not _WORKFLOW_NAME_RE.match(workflow_name):
-                    self._respond(
-                        400,
-                        "application/json",
-                        b'{"error": "invalid workflow name"}',
-                    )
-                    return
-                if "api_workflow_run" in views:
-                    try:
-                        status, content_type, body = views["api_workflow_run"](
-                            workflow_name=workflow_name,
-                        )
-                        self._respond(status, content_type, body)
-                    except Exception as exc:  # noqa: BLE001
-                        import logging
-
-                        logging.getLogger(__name__).warning(
-                            "PanelHandler: api_workflow_run error: %s", exc
-                        )
-                        self._respond(
-                            500,
-                            "application/json",
-                            b'{"error": "internal server error"}',
-                        )
-                else:
-                    self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
                 return
 
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
@@ -702,12 +693,16 @@ def make_handler_class(
             content_type: str,
             body: bytes,
             cache_control: str | None = None,
+            extra_headers: list[tuple[str, str]] | None = None,
         ) -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self._security_headers(content_type)
             if cache_control is not None:
                 self.send_header("Cache-Control", cache_control)
+            if extra_headers is not None:
+                for name, value in extra_headers:
+                    self.send_header(name, value)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

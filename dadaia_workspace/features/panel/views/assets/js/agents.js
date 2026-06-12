@@ -44,25 +44,6 @@
     return escHtml(s);
   }
 
-  // Format a UTC ISO-8601 timestamp as a relative human-readable string.
-  // Returns "Never" if null/empty.
-  function fmtRelativeDate(iso) {
-    if (!iso) { return 'Never'; }
-    var then = new Date(iso);
-    if (isNaN(then.getTime())) { return 'Never'; }
-    var nowMs = Date.now();
-    var diffMs = nowMs - then.getTime();
-    var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) { return 'just now'; }
-    if (diffDays === 0) { return 'today'; }
-    if (diffDays === 1) { return 'yesterday'; }
-    if (diffDays < 30) { return diffDays + ' days ago'; }
-    var diffMonths = Math.floor(diffDays / 30);
-    if (diffMonths < 12) { return diffMonths + ' month' + (diffMonths === 1 ? '' : 's') + ' ago'; }
-    var diffYears = Math.floor(diffMonths / 12);
-    return diffYears + ' year' + (diffYears === 1 ? '' : 's') + ' ago';
-  }
-
   // Format cost: null/undefined or !costKnown → "—"; otherwise "$N.NN"
   // Cost example: $12.34 for total_cost_usd = 12.3456
   function fmtCost(v, costKnown) {
@@ -85,63 +66,64 @@
   function renderSkeletons(count) {
     var cards = '';
     for (var i = 0; i < count; i++) {
-      cards += '<div class="agent-card agent-card--skeleton" aria-hidden="true">'
+      cards += '<div class="agent-card agent-card--minimal agent-card--skeleton" aria-hidden="true">'
         + '<div class="agent-card__header">'
-        + '<span class="skeleton-badge skeleton-pulse"></span>'
         + '<span class="skeleton-name skeleton-pulse"></span>'
-        + '<span class="skeleton-chevron skeleton-pulse"></span>'
         + '</div>'
+        + '<div class="agent-card__facts">'
+        + '<div class="skeleton-line skeleton-pulse" style="width:70%"></div>'
         + '<div class="skeleton-line skeleton-pulse" style="width:85%"></div>'
-        + '<div class="skeleton-line skeleton-pulse" style="width:65%"></div>'
-        + '<div class="agent-card__stats">'
-        + '<div class="agent-stat skeleton-pulse"></div>'
-        + '<div class="agent-stat skeleton-pulse"></div>'
-        + '<div class="agent-stat skeleton-pulse"></div>'
-        + '</div>'
-        + '<div class="agent-card__skills">'
-        + '<span class="skill-chip skeleton-pulse" style="width:90px"></span>'
-        + '<span class="skill-chip skeleton-pulse" style="width:70px"></span>'
+        + '<div class="skeleton-line skeleton-pulse" style="width:60%"></div>'
         + '</div>'
         + '</div>';
     }
     return cards;
   }
 
-  // ── Collapsed card rendering ─────────────────────────────────────────────────
+  // ── Minimalist card rendering (operator demand — Agentic tab redesign) ───────
 
-  // Render a single collapsed agent card.
-  // Card root is a <button aria-haspopup="dialog"> — clicking opens the agent modal.
-  // Zone A: status badge + name/tier block
-  // Zone B: description (2-line clamp)
-  // Zone C: stats row (Sessions, Cost Life, Last Seen)
-  // Zone D: skills chips + "+N more"
-  function renderCard(agent) {
-    var tel = agent.telemetry || {};
-    var isActive = agent.status === 'active';
-    var statusClass = isActive ? 'agent-status-badge--active' : 'agent-status-badge--inactive';
-    var statusLabel = isActive ? 'ACTIVE' : 'INACTIVE';
-    var borderClass = isActive ? 'agent-card--active' : '';
+  // Render the model line: configured model id, or the inherited harness default
+  // with an explicit marker when the agent declares no model: frontmatter.
+  // NEVER fabricate a model id.
+  function renderModelValue(agent) {
+    if (agent.model) {
+      return '<code class="agent-card__model-id">' + escHtml(agent.model) + '</code>';
+    }
+    // model_inherited is true (or model is null) → inherited default, marked.
+    return '<span class="agent-card__model-inherited" title="No model: in frontmatter; '
+      + 'uses the harness-inherited default">inherited default</span>';
+  }
 
-    var sessions = tel.session_count != null ? String(tel.session_count) : '0';
-    var cost = fmtCost(tel.total_cost_usd, tel.cost_known);
-    var lastSeen = fmtRelativeDate(tel.last_activity_at);
-
-    // Skills chips on the collapsed card: show first 2, then "+N more" if more exist
-    var skills = agent.skills || [];
-    var visibleSkills = skills.slice(0, 2);
-    var hiddenCount = skills.length - visibleSkills.length;
-    var skillsHtml = visibleSkills.map(function (s) {
-      return '<span class="skill-chip">' + escHtml(s) + '</span>';
+  // Render the lifecycle phase chips (§7-derived). Neutral "—" when none.
+  function renderPhases(phases) {
+    var list = phases || [];
+    if (list.length === 0) {
+      return '<span class="agent-meta-none">&mdash;</span>';
+    }
+    return list.map(function (p) {
+      return '<span class="phase-chip">' + escHtml(p) + '</span>';
     }).join('');
-    if (hiddenCount > 0) {
-      skillsHtml += '<span class="skill-chip skill-chip--more">+' + hiddenCount + ' more</span>';
-    }
-    if (skills.length === 0) {
-      skillsHtml = '<span class="skill-chip skill-chip--none">no skills</span>';
-    }
+  }
 
-    var description = agent.description || '';
+  // Render the workflow membership chips. Neutral "—" when the agent is in none.
+  function renderWorkflows(workflows) {
+    var list = workflows || [];
+    if (list.length === 0) {
+      return '<span class="agent-meta-none">&mdash;</span>';
+    }
+    return list.map(function (w) {
+      return '<span class="workflow-chip">' + escHtml(w) + '</span>';
+    }).join('');
+  }
 
+  // Render a single MINIMALIST collapsed agent card.
+  // Card root is a <button aria-haspopup="dialog"> — clicking opens the agent modal.
+  // Exactly four data points (no review counts / last-seen / token-cost noise):
+  //   1. agent name (+ tier label, retained as a low-key subtitle)
+  //   2. agent MODEL (configured model id, or "inherited default" marker)
+  //   3. development-lifecycle phase(s) it owns/gates (§7-derived)
+  //   4. workflows it takes part in (workflow-definition-derived)
+  function renderCard(agent) {
     // data-tier drives the CSS left-accent colour per the tier-aware design spec (PR4-18).
     // Defensive fallback: if agent.tier is absent/null/undefined, default to 3 (T3 Leaf).
     var tierNum = (agent.tier === 1 || agent.tier === 2 || agent.tier === 3)
@@ -149,38 +131,32 @@
       : 3;
 
     return '<button type="button"'
-      + ' class="agent-card ' + escAttr(borderClass) + '"'
+      + ' class="agent-card agent-card--minimal"'
       + ' data-agent-id="' + escAttr(agent.agent_id) + '"'
       + ' data-tier="' + tierNum + '"'
       + ' aria-haspopup="dialog"'
       + ' aria-label="View details for ' + escAttr(agent.display_name || agent.agent_id) + '"'
       + '>'
       + '<div class="agent-card__header">'
-      + '<span class="agent-status-badge ' + escAttr(statusClass) + '">'
-      + '<span class="agent-status-badge__dot" aria-hidden="true"></span>'
-      + escHtml(statusLabel)
-      + '</span>'
       + '<span class="agent-card__name-block">'
       + '<span class="agent-card__name">' + escHtml(agent.display_name || agent.agent_id) + '</span>'
       + '<span class="agent-card__tier-label">' + escHtml(tierLabel(tierNum)) + '</span>'
       + '</span>'
       + '</div>'
-      + '<p class="agent-card__description">' + escHtml(description) + '</p>'
-      + '<div class="agent-card__stats">'
-      + '<div class="agent-stat">'
-      + '<span class="agent-stat__label">Sessions</span>'
-      + '<span class="agent-stat__value">' + escHtml(sessions) + '</span>'
+      + '<dl class="agent-card__facts">'
+      + '<div class="agent-fact">'
+      + '<dt class="agent-fact__label">Model</dt>'
+      + '<dd class="agent-fact__value">' + renderModelValue(agent) + '</dd>'
       + '</div>'
-      + '<div class="agent-stat">'
-      + '<span class="agent-stat__label">Cost (life)</span>'
-      + '<span class="agent-stat__value">' + escHtml(cost) + '</span>'
+      + '<div class="agent-fact">'
+      + '<dt class="agent-fact__label">Lifecycle</dt>'
+      + '<dd class="agent-fact__value agent-fact__chips">' + renderPhases(agent.phases) + '</dd>'
       + '</div>'
-      + '<div class="agent-stat">'
-      + '<span class="agent-stat__label">Last seen</span>'
-      + '<span class="agent-stat__value">' + escHtml(lastSeen) + '</span>'
+      + '<div class="agent-fact">'
+      + '<dt class="agent-fact__label">Workflows</dt>'
+      + '<dd class="agent-fact__value agent-fact__chips">' + renderWorkflows(agent.workflows) + '</dd>'
       + '</div>'
-      + '</div>'
-      + '<div class="agent-card__skills">' + skillsHtml + '</div>'
+      + '</dl>'
       + '</button>';
   }
 
@@ -316,12 +292,6 @@
 
   // Render error state in the modal body.
   function renderModalError(status) {
-    if (status === 401) {
-      return '<div class="agent-detail agent-detail--error" role="alert">'
-        + '<strong>Authentication required.</strong> '
-        + 'Re-authenticate via <code>dadaia panel start</code>.'
-        + '</div>';
-    }
     return '<div class="agent-detail agent-detail--error" role="alert">'
       + 'Failed to load system prompt (HTTP ' + escHtml(String(status)) + ').'
       + '</div>';
@@ -431,11 +401,10 @@
 
     if (!grid) { return; }
 
-    // Update meta line
+    // Update meta line (minimalist: agent count only — no window/cost noise)
     if (meta) {
       var count = (data.agents || []).length;
-      meta.textContent = count + ' agent' + (count === 1 ? '' : 's')
-        + ' · window ' + (data.status_window_days || 30) + 'd';
+      meta.textContent = count + ' agent' + (count === 1 ? '' : 's');
     }
 
     // Staleness banner
@@ -491,21 +460,13 @@
     var grid = document.getElementById('agents-grid');
     if (!grid) { return; }
     grid.setAttribute('aria-busy', 'false');
-    if (status === 401) {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + '<strong>Authentication required.</strong> '
-        + 'Re-authenticate by opening the panel with '
-        + '<code>dadaia panel start</code> and using the token URL provided.'
-        + '</div>';
-    } else {
-      grid.innerHTML = '<div class="error-state" role="alert">'
-        + 'Failed to load agents (HTTP ' + escHtml(String(status)) + '). '
-        + '<button type="button" id="agents-retry-btn" class="retry-link">Retry</button>'
-        + '</div>';
-      var retryBtn = document.getElementById('agents-retry-btn');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', function () { load(); });
-      }
+    grid.innerHTML = '<div class="error-state" role="alert">'
+      + 'Failed to load agents (HTTP ' + escHtml(String(status)) + '). '
+      + '<button type="button" id="agents-retry-btn" class="retry-link">Retry</button>'
+      + '</div>';
+    var retryBtn = document.getElementById('agents-retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', function () { load(); });
     }
   }
 

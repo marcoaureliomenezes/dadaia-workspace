@@ -215,6 +215,19 @@ def test_dcx8_markdown_rules_rejected(installed_workspace: Path) -> None:
     assert any("D-CX-8" in r and "workspace-protocol.md" in r for r in reports)
 
 
+def test_dcx8_undocumented_command_allowed_rejected(installed_workspace: Path) -> None:
+    rules_path = installed_workspace / ".codex" / "rules" / "dadaia-command-policy.rules"
+    rules_path.write_text(
+        "def command_allowed(cmd):\n    return True\n",
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-8" in r and "command_allowed" in r for r in reports)
+    assert any("D-CX-8" in r and "missing prefix_rule" in r for r in reports)
+
+
 def test_dcx9_missing_hook_command_detected(installed_workspace: Path) -> None:
     # T-018-17: codex hooks invoke the Python governance hooks
     # (``<python> -m dadaia_workspace.hooks.<name>``), not the bash ``.sh`` scripts.
@@ -246,6 +259,23 @@ def test_dcx10_missing_agent_boundary_detected(installed_workspace: Path) -> Non
     assert any("D-CX-10" in r and "qa-engineer.toml" in r and "sandbox_mode" in r for r in reports)
 
 
+def test_dcx10_reviewer_workspace_write_detected(installed_workspace: Path) -> None:
+    toml_path = installed_workspace / ".codex" / "agents" / "security-reviewer.toml"
+    text = toml_path.read_text(encoding="utf-8")
+    assert 'sandbox_mode = "read-only"' in text
+    toml_path.write_text(
+        text.replace('sandbox_mode = "read-only"', 'sandbox_mode = "workspace-write"', 1),
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any(
+        "D-CX-10" in r and "security-reviewer.toml" in r and "must be read-only" in r
+        for r in reports
+    )
+
+
 def test_check_memory_phase_single_source(tmp_path) -> None:
     """SINGLE-SRC-1 lint (rc-4 / T-017-31): flags a CLOSURE-only memory-write phase claim,
     accepts DEFINITION+CLOSURE, ignores incidental 'release closure' + memory mentions."""
@@ -272,3 +302,86 @@ def test_check_memory_phase_single_source(tmp_path) -> None:
     assert any("bad.md" in line and "SINGLE-SRC-1" in line for line in out), out
     assert not any("good.md" in line for line in out), out
     assert not any("SKILL.md" in line for line in out), out
+
+
+# ---------------------------------------------------------------------------
+# T-013-09 — description field runs through transform_for_codex; D-CX-4 flags
+# Claude tool names (codex-agent-description-claude-ism-leak)
+# ---------------------------------------------------------------------------
+
+
+def test_description_field_transformed_through_codex_replacements(
+    installed_workspace: Path,
+) -> None:
+    """The agent TOML description must be run through transform_for_codex.
+
+    project-manager's source description says "dispatches sub-agents via Agent tool".
+    After install, the rendered TOML description must carry no Claude tool-name
+    Claude-ism — the "Agent tool" phrase must be replaced.
+    """
+    toml_path = installed_workspace / ".codex" / "agents" / "project-manager.toml"
+    data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    description = data.get("description", "")
+    assert description, "project-manager.toml must carry a description"
+    assert "Agent tool" not in description, (
+        "Description must be transformed; 'Agent tool' Claude-ism leaked: " + description
+    )
+    assert "explicit Codex subagent delegation" in description
+
+
+def test_dcx4_flags_claude_tool_name_in_artifact(installed_workspace: Path) -> None:
+    """D-CX-4 must flag a Codex artifact that contains a Claude tool-name pattern."""
+    toml_path = installed_workspace / ".codex" / "agents" / "ai-engineer.toml"
+    text = toml_path.read_text(encoding="utf-8")
+    # Clean artifact: no tool-name leak reported.
+    clean = FileSystemPublicAssetManager().doctor(installed_workspace)
+    assert not any("D-CX-4" in r and "claude-tool-name" in r for r in clean)
+
+    toml_path.write_text(text + '\ndescription = "delegate via Agent tool"\n', encoding="utf-8")
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+    assert any(
+        "D-CX-4" in r and "claude-tool-name" in r and "ai-engineer.toml" in r for r in reports
+    ), reports
+
+
+# ---------------------------------------------------------------------------
+# T-013-11 — canonical `software-engineer` is the constitution §14 implementer;
+# the stale T-35 roster lint that flagged it is deleted. A public asset
+# referencing `subagent_type: software-engineer` must produce NO doctor error
+# (regression for bug stale-legacy-software-engineer-lint-inverts-roster).
+# ---------------------------------------------------------------------------
+
+
+def test_canonical_software_engineer_subagent_type_produces_no_doctor_error(
+    installed_workspace: Path,
+) -> None:
+    """`subagent_type: software-engineer` is canonical and must not be flagged.
+
+    The deleted ``lint_legacy_software_engineer`` used to emit a ``[LINT]`` report
+    for this exact string. After T-013-11 the canonical implementer name is the
+    constitution §14 roster member, so doctor() must return zero error/lint reports
+    referencing it for that reason.
+    """
+    workspace_root = installed_workspace
+    codex_agents = workspace_root / ".codex" / "agents"
+    canonical = codex_agents / "project-manager.toml"
+    assert canonical.exists(), "Pre-condition: project-manager.toml must exist after install."
+
+    # Inject the canonical implementer reference into an installed Codex artifact.
+    text = canonical.read_text(encoding="utf-8")
+    canonical.write_text(
+        text + "\n# dispatch note: subagent_type: software-engineer\n",
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(workspace_root)
+
+    offending = [
+        r
+        for r in reports
+        if "software-engineer" in r and (r.startswith("[error]") or "[LINT]" in r)
+    ]
+    assert not offending, (
+        "Canonical 'software-engineer' must not produce any error/lint report.\n"
+        "Offending reports:\n" + "\n".join(offending)
+    )

@@ -6,9 +6,8 @@ Coverage:
   schema_version, stage_count (integer), agent_ids, has_parallel, has_gates, source_path.
 - No "diagram_svg" key on any item: LIST is a lean summary endpoint.
 - No "stages" key on any item.
-- Returns 401 without Bearer token.
-- Returns 401 with wrong Bearer token.
-- Returns 200 with correct Bearer token.
+- Returns 200 (the view is credential-free; panel auth removed 2026-06-11 — the
+  no-auth contract is pinned in test_no_auth_contract.py).
 - Empty workflows dir → {"workflows": []} with 200 (no 503 from telemetry path).
 - stage_count is an int, not a list.
 """
@@ -66,8 +65,8 @@ def _make_summary(
 
 
 class TestApiWorkflowsListEnvelope:
-    def test_returns_200_with_bearer(self) -> None:
-        """GET /api/workflows with valid Bearer → 200."""
+    def test_returns_200(self) -> None:
+        """The /api/workflows view returns 200 (credential-free)."""
         service = _FakeService([_make_summary()])
         view = render_api_workflows_list(service)  # type: ignore[arg-type]
         status, ct, body = view()

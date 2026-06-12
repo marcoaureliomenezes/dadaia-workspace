@@ -1,5 +1,15 @@
 """Unit tests for PanelHandler dispatch — T-2.2 / T-2.3.
 
+Panel auth removed by operator decision 2026-06-11 — see handler.py module
+docstring; the no-auth + Host-guard contract is pinned in
+``test_no_auth_contract.py``.  The Bearer/launch-token/session-cookie tests that
+used to live in this file (the ``T-010-21`` loopback-auth block, the ``T-011-13``
+launch-token exchange block, and ``test_make_handler_class_rejects_loopback_bypass_kwarg``)
+were DELETED with that change — the panel is a loopback-only local dev tool that
+serves every route WITHOUT a credential.  What remains here is the still-real
+behaviour: regex route dispatch, named-group capture, the 404 error contract, and
+POST workflow-run dispatch/validation (now credential-free).
+
 Tests use a thin in-process driver that wires stub view callables into
 ``make_handler_class`` and exercises the dispatch logic without spinning a
 real HTTP server.
@@ -17,7 +27,7 @@ Assertions:
   (e) ``/static/panel.css`` invokes the static view with
       ``name="panel.css"``.
   (f) ``/unknown`` returns HTTP 404 with the error-contract body.
-  (g) ``/health`` returns HTTP 200 with JSON body (public, no auth).
+  (g) ``/health`` returns HTTP 200 with JSON body (no credential).
 """
 
 from __future__ import annotations
@@ -25,8 +35,6 @@ from __future__ import annotations
 import io
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler
-
-import pytest
 
 from dadaia_workspace.features.panel.handler import _NOT_FOUND_BODY, make_handler_class
 
@@ -103,10 +111,11 @@ def _dispatch(
 ) -> tuple[int, bytes]:
     """Drive a single GET request through *handler_class* for *path*.
 
-    Returns ``(status_code, response_body_bytes)`` by inspecting the raw bytes
-    written to the fake socket's wfile.
+    Sends a loopback ``Host`` header (no credential — the panel serves every
+    route without one).  Returns ``(status_code, response_body_bytes)`` from the
+    fake socket's wfile.
     """
-    raw_request = f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
+    raw_request = (f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").encode()
     fake_sock = _FakeSocket(raw_request)
 
     # Instantiate the handler; it will process the request in __init__.
@@ -131,7 +140,7 @@ def _dispatch(
 def test_dispatch_index() -> None:
     """(a) GET / invokes the index stub."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/")
 
@@ -146,7 +155,7 @@ def test_dispatch_index() -> None:
 def test_dispatch_api_panel_status() -> None:
     """(b) GET /api/panel-status invokes the api_panel_status stub with no captured groups."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/api/panel-status")
 
@@ -157,7 +166,7 @@ def test_dispatch_api_panel_status() -> None:
 def test_dispatch_api_contexts() -> None:
     """GET /api/contexts invokes the api_contexts stub."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/api/contexts")
 
@@ -168,7 +177,7 @@ def test_dispatch_api_contexts() -> None:
 def test_dispatch_memory_with_named_groups() -> None:
     """(c) GET /memory/foo/bar.html invokes memory view with slug="foo", path="bar.html"."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/memory/foo/bar.html")
 
@@ -179,7 +188,7 @@ def test_dispatch_memory_with_named_groups() -> None:
 def test_dispatch_memory_view_with_named_groups() -> None:
     """(d) GET /memory-view/foo/bar.html invokes memory_view with slug="foo", path="bar.html"."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/memory-view/foo/bar.html")
 
@@ -190,7 +199,7 @@ def test_dispatch_memory_view_with_named_groups() -> None:
 def test_dispatch_static_with_named_group() -> None:
     """(e) GET /static/panel.css invokes static view with name="panel.css"."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/static/panel.css")
 
@@ -201,7 +210,7 @@ def test_dispatch_static_with_named_group() -> None:
 def test_dispatch_unknown_returns_404_with_error_contract_body() -> None:
     """(f) GET /unknown returns HTTP 404 with the error-contract body (T-2.3)."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     status, body = _dispatch(handler_class, "/unknown")
 
@@ -216,7 +225,7 @@ def test_dispatch_unknown_returns_404_with_error_contract_body() -> None:
 def test_dispatch_strips_query_string_before_matching() -> None:
     """Route matching strips query string so /api/panel-status?x=1 still dispatches."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/api/panel-status?refresh=1")
 
@@ -224,7 +233,7 @@ def test_dispatch_strips_query_string_before_matching() -> None:
 
 
 def test_dispatch_health_returns_200() -> None:
-    """(g) GET /health returns HTTP 200 with JSON body containing status=ok (public, no auth)."""
+    """(g) GET /health returns HTTP 200 with JSON body containing status=ok (no credential)."""
     import json
 
     stubs = _make_stubs()
@@ -232,7 +241,7 @@ def test_dispatch_health_returns_200() -> None:
     stubs["health"].content_type = "application/json"
     stubs["health"].body = json.dumps({"status": "ok", "version": "0.1.2"}).encode()
     stubs["health"].status = 200
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     status, body = _dispatch(handler_class, "/health")
 
@@ -245,7 +254,7 @@ def test_dispatch_health_returns_200() -> None:
 def test_dispatch_memory_nested_path() -> None:
     """Memory route captures multi-segment paths: /memory/foo/dir/file.html."""
     stubs = _make_stubs()
-    handler_class = make_handler_class(stubs, loopback_bypass=True)  # type: ignore[arg-type]
+    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
     _dispatch(handler_class, "/memory/foo/dir/file.html")
 
@@ -253,291 +262,5 @@ def test_dispatch_memory_nested_path() -> None:
     assert stubs["memory"].last_kwargs == {"slug": "foo", "path": "dir/file.html"}
 
 
-# ---------------------------------------------------------------------------
-# T-WH-18 — POST /api/workflows/<name>/run handler tests
-# ---------------------------------------------------------------------------
-
-
-_POST_TOKEN = "test-post-token"
-
-
-@dataclass
-class _PostStubView:
-    name: str
-    call_count: int = 0
-    last_kwargs: dict[str, str] = field(default_factory=dict)
-    status: int = 202
-    content_type: str = "application/json"
-    body: bytes = b'{"status":"started","workflow":"test","pid":1}'
-
-    def __call__(self, **kwargs: str) -> tuple[int, str, bytes]:
-        self.call_count += 1
-        self.last_kwargs = dict(kwargs)
-        return (self.status, self.content_type, self.body)
-
-
-def _dispatch_post(
-    handler_class: type[BaseHTTPRequestHandler],
-    path: str,
-    token: str | None = None,
-) -> tuple[int, bytes]:
-    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = f"POST {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
-    fake_sock = _FakeSocket(raw_request)
-    handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
-    response = fake_sock._wfile.getvalue()
-    status_line = response.split(b"\r\n", 1)[0]
-    status_code = int(status_line.split(b" ")[1])
-    body = response.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in response else b""
-    return status_code, body
-
-
-def test_post_workflow_run_requires_auth() -> None:
-    """POST /api/workflows/<name>/run without token returns 401."""
-    run_view = _PostStubView(name="api_workflow_run")
-    stubs = _make_stubs()
-    stubs["api_workflow_run"] = run_view  # type: ignore[assignment]
-    handler_class = make_handler_class(stubs, token=_POST_TOKEN)  # type: ignore[arg-type]
-
-    status, _ = _dispatch_post(handler_class, "/api/workflows/my-workflow/run")
-
-    assert status == 401
-    assert run_view.call_count == 0
-
-
-def test_post_workflow_run_rejects_invalid_name() -> None:
-    """POST /api/workflows/<name>/run with shell-unsafe name returns 400."""
-    run_view = _PostStubView(name="api_workflow_run")
-    stubs = _make_stubs()
-    stubs["api_workflow_run"] = run_view  # type: ignore[assignment]
-    handler_class = make_handler_class(stubs, token=_POST_TOKEN)  # type: ignore[arg-type]
-
-    # Shell-unsafe: contains semicolon
-    status, body = _dispatch_post(handler_class, "/api/workflows/bad;name/run", token=_POST_TOKEN)
-
-    assert status == 400
-    assert run_view.call_count == 0
-
-
-def test_post_workflow_run_dispatches_view_with_valid_token() -> None:
-    """POST /api/workflows/<name>/run with valid token dispatches to api_workflow_run."""
-    run_view = _PostStubView(name="api_workflow_run")
-    stubs = _make_stubs()
-    stubs["api_workflow_run"] = run_view  # type: ignore[assignment]
-    handler_class = make_handler_class(stubs, token=_POST_TOKEN)  # type: ignore[arg-type]
-
-    status, _ = _dispatch_post(handler_class, "/api/workflows/my-workflow/run", token=_POST_TOKEN)
-
-    assert status == 202
-    assert run_view.call_count == 1
-    assert run_view.last_kwargs == {"workflow_name": "my-workflow"}
-
-
-# ---------------------------------------------------------------------------
-# T-PUX-06 — loopback_bypass flag (F5 security risk acceptance)
-# ---------------------------------------------------------------------------
-
-_BYPASS_TOKEN = "test-bypass-token"
-
-
-def _make_stubs_with_api_reports() -> dict[str, _StubView]:
-    """Return stubs that include an api_reports entry.
-
-    ``api_reports`` is in ``_BEARER_AUTH_ROUTE_NAMES`` (exercises the auth
-    branch) AND in ``_BEARER_ONLY_ROUTES`` (no telemetry stub required), making
-    it the ideal route for loopback_bypass unit tests.
-    """
-    stubs = _make_stubs()
-    stubs["api_reports"] = _StubView(
-        name="api_reports",
-        status=200,
-        content_type="application/json",
-        body=b'{"reports": []}',
-    )
-    return stubs
-
-
-def _dispatch_get_with_auth(
-    handler_class: type[BaseHTTPRequestHandler],
-    path: str,
-    token: str | None = None,
-) -> tuple[int, bytes]:
-    """Drive a single GET request with an optional Authorization header."""
-    auth_line = f"Authorization: Bearer {token}\r\n" if token else ""
-    raw_request = f"GET {path} HTTP/1.1\r\nHost: localhost\r\n{auth_line}\r\n".encode()
-    fake_sock = _FakeSocket(raw_request)
-    handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
-    response = fake_sock._wfile.getvalue()
-    status_line = response.split(b"\r\n", 1)[0]
-    status_code = int(status_line.split(b" ")[1])
-    body = response.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in response else b""
-    return status_code, body
-
-
-def test_loopback_bypass_allows_api_get_without_token() -> None:
-    """(a) GET /api/* with no Authorization header returns 200 when loopback_bypass=True.
-
-    Security acceptance (F5 / T-PUX-06): any local process can read panel data
-    without a Bearer token when loopback_bypass is active — deliberate dev-local
-    trade-off for a read-only GET surface.
-
-    Uses ``/api/reports`` (bearer-only, no telemetry required) so the test
-    exercises the auth branch end-to-end without a telemetry stub.
-    """
-    stubs = _make_stubs_with_api_reports()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=True
-    )
-
-    # No Authorization header supplied.
-    status, _ = _dispatch_get_with_auth(handler_class, "/api/reports")
-
-    assert status == 200
-    assert stubs["api_reports"].call_count == 1
-
-
-def test_no_bypass_requires_token_for_api_get() -> None:
-    """(b) GET /api/* with no Authorization header returns 401 when loopback_bypass=False."""
-    stubs = _make_stubs_with_api_reports()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
-    )
-
-    # No Authorization header — must be rejected.
-    status, body = _dispatch_get_with_auth(handler_class, "/api/reports")
-
-    assert status == 401
-    assert b"unauthorized" in body
-    assert stubs["api_reports"].call_count == 0
-
-
-def test_no_bypass_rejects_invalid_token_for_api_get() -> None:
-    """(b) GET /api/* with invalid Bearer token returns 401 when loopback_bypass=False."""
-    stubs = _make_stubs_with_api_reports()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
-    )
-
-    status, body = _dispatch_get_with_auth(handler_class, "/api/reports", token="wrong-token")
-
-    assert status == 401
-    assert b"unauthorized" in body
-    assert stubs["api_reports"].call_count == 0
-
-
-def test_valid_token_works_with_loopback_bypass_enabled() -> None:
-    """(c) A valid Bearer token still works when loopback_bypass=True."""
-    stubs = _make_stubs_with_api_reports()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=True
-    )
-
-    status, _ = _dispatch_get_with_auth(handler_class, "/api/reports", token=_BYPASS_TOKEN)
-
-    assert status == 200
-    assert stubs["api_reports"].call_count == 1
-
-
-def test_valid_token_works_with_loopback_bypass_disabled() -> None:
-    """(c) A valid Bearer token still works when loopback_bypass=False."""
-    stubs = _make_stubs_with_api_reports()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
-    )
-
-    status, _ = _dispatch_get_with_auth(handler_class, "/api/reports", token=_BYPASS_TOKEN)
-
-    assert status == 200
-    assert stubs["api_reports"].call_count == 1
-
-
-def test_loopback_bypass_default_is_false() -> None:
-    """make_handler_class() defaults loopback_bypass=False (secure by default)."""
-    stubs = _make_stubs_with_api_reports()
-    # No loopback_bypass kwarg — defaults to False.
-    handler_class = make_handler_class(stubs, token=_BYPASS_TOKEN)  # type: ignore[arg-type]
-
-    # No Authorization header — must be rejected (bypass is off by default).
-    status, _ = _dispatch_get_with_auth(handler_class, "/api/reports")
-
-    assert status == 401
-    assert stubs["api_reports"].call_count == 0
-
-
-# ---------------------------------------------------------------------------
-# Second-loop auth gate (F-01 / F-02 / F-04)
-#
-# Routes that expose workspace-sensitive data — server registry/ports, repo
-# filesystem paths, and report/memory file contents — are dispatched by the
-# non-telemetry loop. They must require Bearer auth when loopback_bypass is OFF
-# (defense in depth for non-loopback binds) while staying open under loopback.
-# ---------------------------------------------------------------------------
-
-_SENSITIVE_ROUTE_CASES = [
-    ("/api/panel-status", "api_panel_status"),
-    ("/api/contexts", "api_contexts"),
-    ("/reports/sub/report.html", "reports_serve"),
-    ("/memory/foo/bar.html", "memory"),
-    ("/memory-view/foo/bar.html", "memory_view"),
-]
-
-
-def _make_stubs_with_reports_serve() -> dict[str, _StubView]:
-    stubs = _make_stubs()
-    stubs["reports_serve"] = _StubView(name="reports_serve")
-    return stubs
-
-
-@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
-def test_sensitive_route_requires_token_when_not_loopback(path: str, route_name: str) -> None:
-    stubs = _make_stubs_with_reports_serve()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
-    )
-
-    status, body = _dispatch_get_with_auth(handler_class, path)
-
-    assert status == 401
-    assert b"unauthorized" in body
-    assert stubs[route_name].call_count == 0
-
-
-@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
-def test_sensitive_route_rejects_invalid_token_when_not_loopback(
-    path: str, route_name: str
-) -> None:
-    stubs = _make_stubs_with_reports_serve()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
-    )
-
-    status, _ = _dispatch_get_with_auth(handler_class, path, token="wrong-token")
-
-    assert status == 401
-    assert stubs[route_name].call_count == 0
-
-
-@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
-def test_sensitive_route_allows_valid_token_when_not_loopback(path: str, route_name: str) -> None:
-    stubs = _make_stubs_with_reports_serve()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=False
-    )
-
-    status, _ = _dispatch_get_with_auth(handler_class, path, token=_BYPASS_TOKEN)
-
-    assert status == 200
-    assert stubs[route_name].call_count == 1
-
-
-@pytest.mark.parametrize(("path", "route_name"), _SENSITIVE_ROUTE_CASES)
-def test_sensitive_route_open_under_loopback_bypass(path: str, route_name: str) -> None:
-    stubs = _make_stubs_with_reports_serve()
-    handler_class = make_handler_class(  # type: ignore[arg-type]
-        stubs, token=_BYPASS_TOKEN, loopback_bypass=True
-    )
-
-    status, _ = _dispatch_get_with_auth(handler_class, path)  # no auth header
-
-    assert status == 200
-    assert stubs[route_name].call_count == 1
+# The POST /api/workflows/<name>/run route was removed with the Run button
+# (operator decision 2026-06-11: workflow DAGs are documentation, not executables).

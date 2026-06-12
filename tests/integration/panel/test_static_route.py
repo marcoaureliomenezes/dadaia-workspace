@@ -5,7 +5,11 @@ Coverage areas:
   - Path traversal defence-in-depth (names with / \\ .. rejected with 400)
   - Unknown file names → 404
   - Cache-Control: no-cache header is present on /static/ responses
-  - Static route is accessible without Bearer token
+  - Static route is accessible without any credential
+
+Panel auth removed by operator decision 2026-06-11 — the panel serves every
+route without a credential; the no-auth + Host-guard contract is pinned in
+tests/unit/features/panel/test_no_auth_contract.py.
 """
 
 from __future__ import annotations
@@ -26,10 +30,8 @@ from dadaia_workspace.features.panel.views.static import render_static
 # ---------------------------------------------------------------------------
 
 
-def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes]:
+def _get(url: str) -> tuple[int, dict[str, str], bytes]:
     req = urllib.request.Request(url)
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
     try:
         with urllib.request.urlopen(req) as resp:
             headers = {k.lower(): v for k, v in resp.headers.items()}
@@ -54,8 +56,8 @@ def _build_static_server() -> ThreadingHTTPServer:
         "memory_view": _stub_html,
         "static": render_static(),
     }
-    # No token required for static routes — auth enforcement is only on /api/*
-    HandlerClass = make_handler_class(views, token="unused-token", telemetry=None)
+    # The panel serves every route without a credential (no-auth decision).
+    HandlerClass = make_handler_class(views, telemetry=None)
     return ThreadingHTTPServer(("127.0.0.1", 0), HandlerClass)
 
 
@@ -98,8 +100,8 @@ class TestStaticKnownAssets:
         assert "svg" in headers.get("content-type", "")
         assert len(body) > 0
 
-    def test_static_route_no_auth_required(self, static_server: str) -> None:
-        """GET /static/tokens.css succeeds without Authorization header."""
+    def test_static_route_no_credential_required(self, static_server: str) -> None:
+        """GET /static/tokens.css succeeds without any credential header."""
         status, _, _ = _get(f"{static_server}/static/tokens.css")
         assert status == 200
 

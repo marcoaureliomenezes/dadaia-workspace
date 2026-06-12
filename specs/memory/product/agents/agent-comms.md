@@ -6,14 +6,16 @@ tldr: 'handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/.'
 summary: 'contrato handoff-v1.1 separa evidência humana de coordenação entre agentes:
   reports HTML em .dadaia/reports/<context>/<agent>/ e handoffs JSON em
   .dadaia/handoff/<context>/. O CLI valida schema e hash de artifact.path dentro
-  do workspace; reports next e o gate QA/security consomem a raiz canônica.'
+  do workspace — qualquer path relativo existente sob o root resolve
+  workspace-rooted (incl. repos/<slug>/specs/audits), com fallback legacy
+  handoff-dir; reports next e o gate QA/security consomem a raiz canônica.'
 tags:
 - agent-comms
 - handoff
 - schema
 agent_tier: self-pull
 token_estimate: 1230
-last_updated: '2026-06-04'
+last_updated: '2026-06-11'
 release_origin: v0.1.4.3
 ---
 
@@ -48,6 +50,7 @@ Required fields: `schema_version` (literal `"handoff-v1.1"`), `agent`, `context`
   * **Validator stdlib-only** (~85 LoC em `infrastructure/stdlib_handoff_validator.py`): `json`, `re`, `datetime.fromisoformat`. Whitelist explícita de keywords (`type`, `required`, `enum`, `pattern`, `properties`, `items`, `additionalProperties`, `format`, `minimum`, `minItems`). Schema com keyword fora do whitelist (`oneOf`, `allOf`, `$ref`) levanta `HandoffSchemaError` no init.
   * **Discovery:** `--all` lê `.dadaia/handoff/` por padrão. Paths explícitos continuam suportados.
   * **Hash:** quando `artifact.path` existe, `validate_file()` resolve o artefato dentro do workspace e reprova mismatch, artefato ausente ou referência fora do workspace.
+  * **Resolução de `artifact.path` (workspace-rooted):** qualquer path **relativo** que exista sob o workspace root resolve a partir do root — cobre `repos/<slug>/specs/audits/<UTC>/…` (o canal committado do auditor) e qualquer outro path workspace-rooted, não só `.dadaia/…`. O fallback legacy (resolução relativa ao diretório do próprio handoff) é mantido para paths que só existem lá; quando um path resolve das duas formas, **workspace-root vence**. Paths absolutos e segmentos `..` continuam rejeitados pelo schema; o guard `_within_workspace` permanece.
   * **Exit codes:** `0` = todos válidos (ou violations em non-strict); `1` = violation em strict; `2` = file not found; `3` = bad invocation (sem PATHS nem `--all`, ou workspace não inicializado).
   * **Default`--strict=false`**: violations aparecem como warning em non-strict. Gates de release usam handoffs QA/security com `verdict`, `release_id`, `context` e `agent` coerentes.
   * **Composição (constitution L67-compliant):** `cli/commands/reports.py` resolve `ReportsValidationService` via `container.build_reports_validation_service(workspace_root)`; `service.py` não importa `StdlibHandoffValidator` direto — recebe via `ValidatorPort` Protocol em `core/protocols/handoff_validator.py`.

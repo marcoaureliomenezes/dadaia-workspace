@@ -1,33 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="36" height="36" aria-hidden="true">
-  <title>dadaia workspace rhino</title>
-  <!-- Body: large ellipse, semi-transparent fill -->
-  <ellipse cx="24" cy="30" rx="17" ry="10"
-    fill="currentColor" fill-opacity="0.12"
-    stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-  <!-- Head: rounded rectangle, semi-transparent fill -->
-  <rect x="30" y="18" width="14" height="11" rx="3" ry="3"
-    fill="currentColor" fill-opacity="0.12"
-    stroke="currentColor" stroke-width="1.6"/>
-  <!-- Horn: filled triangle on snout -->
-  <path d="M44 20 L47 14 L44 18 Z"
-    fill="currentColor" stroke="none"/>
-  <!-- Ear: small filled triangle on top of head -->
-  <path d="M33 18 L35 13 L37 18 Z"
-    fill="currentColor" stroke="none"/>
-  <!-- Eye: small circle -->
-  <circle cx="40" cy="22" r="1.5"
-    fill="currentColor" stroke="none"/>
-  <!-- Front legs -->
-  <line x1="16" y1="39" x2="14" y2="46"
-    stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-  <line x1="22" y1="40" x2="21" y2="46"
-    stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-  <!-- Rear legs -->
-  <line x1="28" y1="40" x2="27" y2="46"
-    stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-  <line x1="34" y1="39" x2="35" y2="46"
-    stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-  <!-- Tail: open stroke curve -->
-  <path d="M7 28 Q3 24 5 20"
-    fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <title>dadaia workspace mark</title>
+  <!-- The workspace: a rounded frame holding stacked spec contexts (bars);
+       the accent dot is the bound/active context. Drawn entirely with
+       currentColor so every theme recolors the mark. -->
+  <rect x="5.5" y="5.5" width="37" height="37" rx="11" fill="none" stroke="currentColor" stroke-width="3.5"/>
+  <line x1="14.5" y1="18.5" x2="33.5" y2="18.5" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="14.5" y1="26.5" x2="28.5" y2="26.5" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="14.5" y1="34.5" x2="23" y2="34.5" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="32.5" cy="34.5" r="3.4" fill="currentColor"/>
 </svg>

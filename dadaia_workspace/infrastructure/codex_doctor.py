@@ -16,7 +16,6 @@ from pathlib import Path
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
     _FRONTMATTER_PARALLEL_GROUP_RE,
-    _LEGACY_SE_ALIAS_RE,
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
 )
@@ -28,7 +27,33 @@ _CODEX_CLAUDE_MODEL_RE: re.Pattern[str] = re.compile(
     r"(?:^|[^a-zA-Z0-9_-])claude-(?:opus|sonnet|haiku)-[\w.-]+",
     re.MULTILINE,
 )
+# Claude-only tool names that have no Codex meaning. Codex uses explicit subagent
+# delegation, not the Claude Code `Agent`/`Task` tools, so these must not leak into
+# any Codex-projected artifact (codex-agent-description-claude-ism-leak, T-013-09).
+_CODEX_CLAUDE_TOOL_RE: re.Pattern[str] = re.compile(
+    r"\b(?:Agent|Task) tool\b",
+)
+# Anthropic marketing TIER names used as standalone tier words in model-strategy
+# prose (codex-personas-claude-model-tiering-leak, T-013-12). These leak into
+# Codex personas when persona prose recommends Anthropic tiers ("Opus / Sonnet /
+# Haiku") instead of Codex-native tier terms. Matched on a word boundary so a
+# legitimate ``claude-*`` model id (already caught by _CODEX_CLAUDE_MODEL_RE) and
+# the skill name ``ai-harness-claude-code`` are NOT false-positived: those never
+# contain a standalone capitalised ``Opus``/``Sonnet``/``Haiku`` word.
+_CODEX_ANTHROPIC_TIER_RE: re.Pattern[str] = re.compile(
+    r"\b(?:Opus|Sonnet|Haiku)\b",
+)
 _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
+_CODEX_EXPECTED_READ_ONLY_AGENTS: frozenset[str] = frozenset(
+    {
+        "code-reviewer",
+        "design-specialist",
+        "project-auditor",
+        "qa-engineer",
+        "security-reviewer",
+        "software-architect",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +170,12 @@ def dcx4_claude_strings(codex_dir: Path) -> list[str]:
         if _CODEX_CLAUDE_MODEL_RE.search(text) or ".claude/rules/" in text:
             rel = path.relative_to(codex_dir).as_posix()
             out.append(f"[error] codex:claude-model-or-path in {rel} (D-CX-4)")
+        elif _CODEX_CLAUDE_TOOL_RE.search(text):
+            rel = path.relative_to(codex_dir).as_posix()
+            out.append(f"[error] codex:claude-tool-name in {rel} (D-CX-4)")
+        elif _CODEX_ANTHROPIC_TIER_RE.search(text):
+            rel = path.relative_to(codex_dir).as_posix()
+            out.append(f"[error] codex:anthropic-tier-name in {rel} (D-CX-4)")
     return out
 
 
@@ -240,6 +271,20 @@ def dcx8_codex_rules_shape(codex_dir: Path) -> list[str]:
         return out
     if not any(rules_dir.glob("*.rules")):
         out.append("[missing] codex:rules/*.rules (D-CX-8)")
+    for rules_file in sorted(rules_dir.glob("*.rules")):
+        try:
+            text = rules_file.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if "command_allowed(" in text:
+            out.append(
+                f"[error] codex:rules/{rules_file.name}: undocumented command_allowed policy "
+                "(D-CX-8)"
+            )
+        if "prefix_rule(" not in text:
+            out.append(
+                f"[error] codex:rules/{rules_file.name}: missing prefix_rule declarations (D-CX-8)"
+            )
     for md_file in sorted(rules_dir.glob("*.md")):
         out.append(f"[extra] codex:rules/{md_file.name}: markdown is not Codex Rules (D-CX-8)")
     return out
@@ -259,9 +304,11 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError):
         return ["[error] codex:hooks.json missing or invalid (D-CX-9)"]
     text = json.dumps(hooks)
+    # T-014-05 merged the standalone sdd_gate + root_whitelist PreToolUse hooks into the
+    # single ``pre_gate`` entrypoint, so the wiring now references pre_gate + sdd_post_gate
+    # + ctx_inject (sdd_gate / root_whitelist are no longer emitted into hooks.json).
     for module in (
-        "dadaia_workspace.hooks.sdd_gate",
-        "dadaia_workspace.hooks.root_whitelist",
+        "dadaia_workspace.hooks.pre_gate",
         "dadaia_workspace.hooks.sdd_post_gate",
         "dadaia_workspace.hooks.ctx_inject",
     ):
@@ -286,6 +333,14 @@ def dcx10_codex_agent_boundaries(codex_dir: Path) -> list[str]:
         for field in ("sandbox_mode", "model_reasoning_effort"):
             if field not in data:
                 out.append(f"[missing] codex:agents/{toml_file.name}:{field} (D-CX-10)")
+        if (
+            toml_file.stem in _CODEX_EXPECTED_READ_ONLY_AGENTS
+            and data.get("sandbox_mode") != "read-only"
+        ):
+            out.append(
+                f"[error] codex:agents/{toml_file.name}:sandbox_mode must be read-only "
+                "for evidence-only role (D-CX-10)"
+            )
         for forbidden in ("provider", "api_key", "telemetry"):
             if forbidden in data:
                 out.append(f"[error] codex:agents/{toml_file.name}:{forbidden} (D-CX-10)")
@@ -387,30 +442,6 @@ def check_memory_phase_single_source(public_dir: Path) -> list[str]:
                         f"[drift] {rel}:{n}: memory-write phase cites CLOSURE only — the "
                         f"canonical rule is DEFINITION+CLOSURE (constitution §13). (SINGLE-SRC-1)"
                     )
-    return out
-
-
-def lint_legacy_software_engineer(public_dir: Path, iter_files_fn: object) -> list[str]:
-    """T-35: reject the legacy `software-engineer` subagent alias in public/."""
-    out: list[str] = []
-    if not public_dir.exists():
-        return out
-    from collections.abc import Iterable as _Iterable
-
-    files: _Iterable[Path] = iter_files_fn(public_dir)  # type: ignore[operator]
-    for path in files:
-        if path.suffix not in {".md", ".yaml", ".yml", ".json", ".toml", ".txt"}:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        if _LEGACY_SE_ALIAS_RE.search(text):
-            rel = path.relative_to(public_dir).as_posix()
-            out.append(
-                f"[LINT] Legacy alias 'software-engineer' in {rel}. "
-                "Use 'software-engineer-python' or 'software-engineer-node'."
-            )
     return out
 
 

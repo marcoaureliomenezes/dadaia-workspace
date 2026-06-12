@@ -18,7 +18,8 @@ including `product-engineer` and all specialists — should treat the backlog as
 release; it does not curate the backlog itself.
 
 This is a **coordination convention, not a gate.** The SDD gate does **not** block
-backlog writes — backlog is an ADDITIVE path that always flows, like bugs and audits.
+backlog writes — `specs/backlog/` is an ADDITIVE path class (workspace-root and
+in-repo alike) that always flows, like bugs and audits.
 Enforcing ownership as a deterministic file-write lock was removed in 0.1.7 rc-3: that
 lock had no key (no harness can assert an agent's persona to the hook, in any runtime),
 so it blocked the legitimate owner instead of protecting the backlog. Ownership is now

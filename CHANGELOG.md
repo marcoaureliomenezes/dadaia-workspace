@@ -11,6 +11,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scaffolder renders templates with a Jinja2 `SandboxedEnvironment`, blocking template access to Python internals. (F-03)
 - `GitSubprocessClient.clone` refuses unsafe URLs (`ext::` transport and option-injection via a leading `-`) before invoking git. (F-05)
 
+## [0.1.10] — 2026-06-10
+
+Full-remediation release: one release closing every finding of the 5-agent
+workspace audit (overall score 5/10 → 9.0/10 on all six dimensions).
+
+### Fixed
+- SDD gate classifier re-rooted context-relatively: ADDITIVE/MEMORY/FROZEN classes
+  now live inside `repos/<slug>/` (unmatched in-repo ⇒ MUTATING, never UNGATED);
+  symlinks canonicalized before classification. Kills the lease-theft-by-additive-write
+  CRITICAL.
+- Lease liveness = TTL + PID veto: holder records a long-lived harness pid
+  (payload/getppid); TTL-stale + alive ⇒ yield (no takeover), dead ⇒ takeover;
+  renew runs inside the same O_EXCL CAS (race fixed); heartbeat renews on every
+  PostToolUse from the harness-native session id (Claude `*` matcher, Codex match-all).
+- Session identity consolidated into a single owner module (`session_identity`);
+  bind `--mode` optional (default read), persisted in the session record + context
+  incumbent pointer (eval-export theater removed, `--print-env` legacy escape);
+  gate mode resolution env → record → live-incumbent → IMPLEMENTATION; READ binds
+  are non-acquiring.
+- `dadaia ci preflight` no longer self-pollutes (ruff `--no-cache`, mypy cache
+  redirected, pollution guard = session snapshot diff) — the pre-push gate passes
+  end-to-end for the first time; pre-push hook probes the workspace venv
+  (`$DADAIA_BIN` → walk-up → poetry → repo venv, fail-closed).
+- specs doctor ledger invariants (SPEC-DOC-024..029): phase↔markers, CLOSURE-before-
+  archive, unique release ids, naming canon, constitution ref resolution, lease↔session
+  coherence; archive id collisions repaired (`v0.2.0/alpha-N`, mapping README).
+- Model registry single source (`core/model_registry`): MODEL_MAP/PRICING_TABLE are
+  derived views; public doctor validates agent `model:` frontmatter + key-set sync.
+
+### Security
+- Panel loopback auth bypass removed (tokenless sensitive API ⇒ 401 even on
+  127.0.0.1; tokenized-URL handoff, token file modes re-tightened to 0o600).
+- `context dead` refuses untracked files without `--commit`; `--commit` runs a
+  structural secret scan (incl. cert/key file suffixes) before any push.
+- public-privacy gate fails closed: packaged baseline structural denylist scans
+  even without an operator denylist.
+
+### Changed
+- Bash hook quartet retired; Python hooks are the sole gate surface (PreToolUse
+  scoped to write tools; Bash-tool writes documented out of the determinism
+  envelope with doctor backstops).
+- AI surface (AGENTS.md, rules, skills, personas) rewritten to describe real
+  enforcement vs discipline (14 contradictions fixed); memory + constitution §8
+  rewritten to the merged kernel.
+- Test architecture: harness-env fixture contract (hook behavior tests run as real
+  subprocesses; `DADAIA_*` setenv + hook-import ratchets at zero baseline), two-actor
+  concurrency e2e asserting on lock-file history, drift-ratifying tests killed,
+  consistency-contract + lifecycle-asymmetry policies; 2795 tests.
+
+## [0.1.9] — 2026-06-09
+
+### Changed
+- Completed the layering law for process execution: `features/` modules no longer import
+  `subprocess` directly. New `ProcessRunner` Protocol (`core/protocols/process_runner.py`)
+  with production adapter `infrastructure/subprocess_runner.py`; consumed via DI by
+  `import_`, `ci_preflight`, `specs/doctor`, and `server_registry`. New import-linter
+  contract `features-no-subprocess` enforces it in CI.
+- `container.py` platform branching now reads the `PLATFORM` capability singleton instead
+  of an inline `sys.platform` comparison.
+- Agent persona parity pass: `[SCOPE ERROR]` redirect block present in all 9 core personas;
+  duplicated report-emission prose deduplicated to the `workspace-protocol §4` rule;
+  vestigial `opencode_model` frontmatter keys removed; `dev-server-registry` skill wired to
+  `software-engineer`; `ai-context-engineering` I1 schema reference refreshed.
+- Agent model assignments retiered: `claude-fable-5` for product-engineer, qa-engineer,
+  ai-engineer, software-architect, and project-auditor; `claude-opus-4-8` for
+  software-engineer, security-reviewer, and code-reviewer.
+
+### Fixed
+- Spec/memory fidelity: all 34 confirmed findings of the 2026-06-09 drift audit resolved —
+  memory atoms now document the real doctor check codes (`LOCK-NEW`/`INV-4`/`INV-5`/
+  `SENTINEL-GC`), the Python-hook SDD gate (bash scripts described as legacy fallback only),
+  the hard-gated 3-OS CI matrix, the full 21-subcommand CLI and 21-protocol inventory, the
+  actual `specs doctor` check-ID set (SPEC-DOC 001–009/012/016, TREE-1..7 + TREE-5M), the
+  correct project-manager model, the 18-skill count, and a roster without the phantom
+  `researcher` agent. Archived 0.1.6 CLOSURE backfilled to structural doctor compliance.
+
 ## [0.1.8] — 2026-06-09
 
 ### Added

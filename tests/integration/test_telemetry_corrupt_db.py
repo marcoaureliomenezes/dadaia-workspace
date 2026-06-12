@@ -249,13 +249,14 @@ class TestHandlerDegradedResponses:
             f"Response body must have error='telemetry_degraded', got: {data}"
         )
 
-    def test_api_agents_without_token_returns_401(self, degraded_panel: Any) -> None:
-        """GET /api/agents WITHOUT Bearer → 401 (auth check precedes degraded check)."""
+    def test_api_agents_without_token_returns_503_degraded(self, degraded_panel: Any) -> None:
+        """GET /api/agents credential-less → 503 degraded (no-auth contract,
+        operator decision 2026-06-11: there is no auth step; the degraded-mode
+        telemetry check is what gates the route)."""
         base, token = degraded_panel
         status, body = _get(f"{base}/api/agents")
-        assert status == 401, (
-            f"Expected 401 for missing token but got {status}. "
-            "Auth must be checked before the degraded-mode 503."
+        assert status == 503, (
+            f"Expected degraded-mode 503 for credential-less /api/agents, got {status}."
         )
 
     def test_api_workflows_with_token_returns_200(self, degraded_panel: Any) -> None:
@@ -275,11 +276,11 @@ class TestHandlerDegradedResponses:
         status, body = _get(f"{base}/api/agents/some-agent/sessions", token=token)
         assert status == 503
 
-    def test_api_sessions_without_token_returns_401(self, degraded_panel: Any) -> None:
-        """GET /api/agents/{id}/sessions without token → 401 regardless of degraded."""
+    def test_api_sessions_without_token_returns_503_degraded(self, degraded_panel: Any) -> None:
+        """GET /api/agents/{id}/sessions credential-less → 503 degraded (no-auth contract)."""
         base, token = degraded_panel
         status, body = _get(f"{base}/api/agents/some-agent/sessions")
-        assert status == 401
+        assert status == 503
 
     def test_503_body_contains_message(self, degraded_panel: Any) -> None:
         """503 response body must mention 'telemetry_degraded' and quarantine path."""
