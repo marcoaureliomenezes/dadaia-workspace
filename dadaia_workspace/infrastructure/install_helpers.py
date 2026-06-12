@@ -405,6 +405,7 @@ def install_codex_agents(
             codex_model,
             body,
             description=codex_description,
+            claude_model=claude_model,
         )
         dst = agents_dst / f"{agent_name}.toml"
         if dst.exists() and not force:

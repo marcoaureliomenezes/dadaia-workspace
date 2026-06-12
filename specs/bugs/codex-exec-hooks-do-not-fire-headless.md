@@ -3,6 +3,7 @@ name: codex-exec-hooks-do-not-fire-headless
 status: Open
 severity: HIGH
 reported: 2026-06-11
+session_id: null
 surface: codex projection — .codex/hooks.json / config.toml [hooks] (SDD gate enforcement on Codex)
 ---
 

@@ -130,7 +130,7 @@ qa-engineer only.
   the real invocation form matches and bare-name-only patterns are gone. Closes
   bug `codex-rules-dadaia-prefix-never-matches-venv-invocation`.
 
-### [-] T-013-11 — Delete/invert the stale T-35 roster lint
+### [x] T-013-11 — Delete/invert the stale T-35 roster lint
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_doctor.py`
   (`lint_legacy_software_engineer`),
@@ -142,7 +142,7 @@ qa-engineer only.
   name passing and (if inverted) dead names failing. Closes bug
   `stale-legacy-software-engineer-lint-inverts-roster`.
 
-### [ ] T-013-12 — Codex-native model strategy (per-runtime tier rendering)
+### [x] T-013-12 — Codex-native model strategy (per-runtime tier rendering)
 - **Owner:** software-engineer (rendering/registry code); ai-engineer (persona
   source prose — disjoint write set)
 - **Write set:** `dadaia_workspace/infrastructure/runtime_transforms/codex.py` +

@@ -10,6 +10,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.model_registry import (
+    codex_effort_for_tier,
+    codex_tier_views,
+    registry_by_claude_id,
+)
 from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 
 # ---------------------------------------------------------------------------
@@ -27,11 +32,6 @@ _FRONTMATTER_COLOR_RE = re.compile(r"^color:[^\n]*\n", re.MULTILINE)
 _FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
 # Single `  - <Tool>` list item inside a `tools:` YAML block.
 _FRONTMATTER_TOOLS_LIST_ITEM_RE = re.compile(r"^  - ([^\n]+)$", re.MULTILINE)
-# T-35: forbid the legacy `software-engineer` alias inside public/
-_LEGACY_SE_ALIAS_RE = re.compile(
-    r"subagent_type\s*[:=]\s*[\"']?software-engineer(?![-_a-z])",
-    re.IGNORECASE,
-)
 # Parallel workflow detection
 _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
 
@@ -45,7 +45,9 @@ _CODEX_READ_ONLY_AGENTS = frozenset(
         "software-architect",
     }
 )
-_CODEX_HIGH_EFFORT_AGENTS = frozenset({"ai-engineer", "project-manager", "product-engineer"})
+# Fallback reasoning effort when an agent's ``model:`` is unknown to the registry
+# (defensive only — every canonical agent's model id is registry-backed).
+_CODEX_DEFAULT_EFFORT = "medium"
 _CODEX_SKILL_REF_PREFIXES = (
     "ai-harness-",
     "dev-server-registry",
@@ -142,11 +144,36 @@ def _render_agents_into_codex_config(agents_dir: Path) -> str:
     return "\n".join(blocks) + ("\n" if blocks else "")
 
 
+def _codex_reasoning_effort_for_model(claude_model: str | None) -> str:
+    """Resolve the Codex ``model_reasoning_effort`` from an agent's ``model:``.
+
+    The effort is derived from the registry tier view (the single source of
+    truth) rather than a hand-maintained per-agent table: the frontmatter
+    ``model:`` (a Claude id) resolves to its registry tier, which the
+    per-runtime view maps to a Codex reasoning effort (``deep`` -> ``high``,
+    everything else -> ``medium``). This call also exercises
+    :func:`codex_tier_views`, so a tier collapse (two distinct tiers resolving
+    to one (model, effort) pair) fails loudly at projection time.
+
+    Returns ``_CODEX_DEFAULT_EFFORT`` when *claude_model* is ``None`` or not in
+    the registry (defensive — never breaks install).
+    """
+    # Invariant guard: raises loudly if the live registry collapses two tiers.
+    codex_tier_views()
+    if not claude_model:
+        return _CODEX_DEFAULT_EFFORT
+    entry = registry_by_claude_id().get(claude_model)
+    if entry is None:
+        return _CODEX_DEFAULT_EFFORT
+    return codex_effort_for_tier(entry.tier)
+
+
 def _render_codex_agent_toml(
     name: str,
     model: str,
     developer_instructions: str,
     description: str | None = None,
+    claude_model: str | None = None,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
 
@@ -155,7 +182,8 @@ def _render_codex_agent_toml(
     - ``description`` — basic string when available
     - ``model`` — basic string
     - ``sandbox_mode`` — conservative role boundary
-    - ``model_reasoning_effort`` — explicit reasoning profile
+    - ``model_reasoning_effort`` — explicit reasoning profile (derived from the
+      registry tier of *claude_model* via the per-runtime tier view)
     - ``developer_instructions`` — triple-quoted multiline basic string
 
     The function avoids external TOML serialiser dependencies; it builds the
@@ -176,7 +204,7 @@ def _render_codex_agent_toml(
     if description:
         lines.append(f"description = {_toml_escape(description)}\n")
     sandbox_mode = "read-only" if name in _CODEX_READ_ONLY_AGENTS else "workspace-write"
-    reasoning_effort = "high" if name in _CODEX_HIGH_EFFORT_AGENTS else "medium"
+    reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
     lines.extend(
         [
             f"model = {_toml_escape(model)}\n",

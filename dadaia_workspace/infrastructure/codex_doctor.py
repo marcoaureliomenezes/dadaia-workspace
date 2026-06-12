@@ -16,7 +16,6 @@ from pathlib import Path
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
     _FRONTMATTER_PARALLEL_GROUP_RE,
-    _LEGACY_SE_ALIAS_RE,
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
 )
@@ -33,6 +32,16 @@ _CODEX_CLAUDE_MODEL_RE: re.Pattern[str] = re.compile(
 # any Codex-projected artifact (codex-agent-description-claude-ism-leak, T-013-09).
 _CODEX_CLAUDE_TOOL_RE: re.Pattern[str] = re.compile(
     r"\b(?:Agent|Task) tool\b",
+)
+# Anthropic marketing TIER names used as standalone tier words in model-strategy
+# prose (codex-personas-claude-model-tiering-leak, T-013-12). These leak into
+# Codex personas when persona prose recommends Anthropic tiers ("Opus / Sonnet /
+# Haiku") instead of Codex-native tier terms. Matched on a word boundary so a
+# legitimate ``claude-*`` model id (already caught by _CODEX_CLAUDE_MODEL_RE) and
+# the skill name ``ai-harness-claude-code`` are NOT false-positived: those never
+# contain a standalone capitalised ``Opus``/``Sonnet``/``Haiku`` word.
+_CODEX_ANTHROPIC_TIER_RE: re.Pattern[str] = re.compile(
+    r"\b(?:Opus|Sonnet|Haiku)\b",
 )
 _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
 _CODEX_EXPECTED_READ_ONLY_AGENTS: frozenset[str] = frozenset(
@@ -164,6 +173,9 @@ def dcx4_claude_strings(codex_dir: Path) -> list[str]:
         elif _CODEX_CLAUDE_TOOL_RE.search(text):
             rel = path.relative_to(codex_dir).as_posix()
             out.append(f"[error] codex:claude-tool-name in {rel} (D-CX-4)")
+        elif _CODEX_ANTHROPIC_TIER_RE.search(text):
+            rel = path.relative_to(codex_dir).as_posix()
+            out.append(f"[error] codex:anthropic-tier-name in {rel} (D-CX-4)")
     return out
 
 
@@ -428,30 +440,6 @@ def check_memory_phase_single_source(public_dir: Path) -> list[str]:
                         f"[drift] {rel}:{n}: memory-write phase cites CLOSURE only — the "
                         f"canonical rule is DEFINITION+CLOSURE (constitution §13). (SINGLE-SRC-1)"
                     )
-    return out
-
-
-def lint_legacy_software_engineer(public_dir: Path, iter_files_fn: object) -> list[str]:
-    """T-35: reject the legacy `software-engineer` subagent alias in public/."""
-    out: list[str] = []
-    if not public_dir.exists():
-        return out
-    from collections.abc import Iterable as _Iterable
-
-    files: _Iterable[Path] = iter_files_fn(public_dir)  # type: ignore[operator]
-    for path in files:
-        if path.suffix not in {".md", ".yaml", ".yml", ".json", ".toml", ".txt"}:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        if _LEGACY_SE_ALIAS_RE.search(text):
-            rel = path.relative_to(public_dir).as_posix()
-            out.append(
-                f"[LINT] Legacy alias 'software-engineer' in {rel}. "
-                "Use 'software-engineer-python' or 'software-engineer-node'."
-            )
     return out
 
 

@@ -360,17 +360,21 @@ def test_render_agent_toml_block_emits_tools_array_literal() -> None:
 
 
 def test_render_codex_agent_toml_emits_description() -> None:
+    # T-013-12: model_reasoning_effort is now derived from the agent's registry
+    # tier via its claude_model (ai-engineer -> claude-fable-5 -> deep -> high),
+    # not from a per-agent name list.
     result = _render_codex_agent_toml(
         "ai-engineer",
-        "gpt-5.3-codex",
+        "gpt-5.5",
         "Follow the Codex persona.",
         description="AI entity authoring agent.",
+        claude_model="claude-fable-5",
     )
 
     parsed = tomllib.loads(result)
     assert parsed["name"] == "ai-engineer"
     assert parsed["description"] == "AI entity authoring agent."
-    assert parsed["model"] == "gpt-5.3-codex"
+    assert parsed["model"] == "gpt-5.5"
     assert parsed["sandbox_mode"] == "workspace-write"
     assert parsed["model_reasoning_effort"] == "high"
     assert parsed["developer_instructions"].strip() == "Follow the Codex persona."

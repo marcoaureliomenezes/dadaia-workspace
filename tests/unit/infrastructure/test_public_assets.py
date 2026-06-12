@@ -268,6 +268,33 @@ class TestRenderCodexAgentToml:
             '"""here' not in out.split("developer_instructions", 1)[1].strip().lstrip('= \n"')[:-3]
         )
 
+    def test_reasoning_effort_high_for_deep_tier_model(self) -> None:
+        """T-013-12: a deep-tier claude model yields high reasoning effort."""
+        out = _render_codex_agent_toml(
+            "ai-engineer", "gpt-5.5", "body", claude_model="claude-fable-5"
+        )
+        assert 'model_reasoning_effort = "high"' in out
+
+    def test_reasoning_effort_medium_for_dispatch_tier_model(self) -> None:
+        """T-013-12: a dispatch-tier claude model yields medium reasoning effort."""
+        out = _render_codex_agent_toml(
+            "project-manager", "gpt-5.5", "body", claude_model="claude-opus-4-8"
+        )
+        assert 'model_reasoning_effort = "medium"' in out
+
+    def test_reasoning_effort_medium_for_fast_tier_model(self) -> None:
+        out = _render_codex_agent_toml(
+            "qa-engineer", "gpt-5.4-mini", "body", claude_model="claude-haiku-4-5-20251001"
+        )
+        assert 'model_reasoning_effort = "medium"' in out
+
+    def test_reasoning_effort_default_when_model_unknown(self) -> None:
+        """Unknown/None claude model falls back to medium (never breaks install)."""
+        out = _render_codex_agent_toml("x", "m", "body", claude_model="claude-not-in-registry")
+        assert 'model_reasoning_effort = "medium"' in out
+        out_none = _render_codex_agent_toml("x", "m", "body")
+        assert 'model_reasoning_effort = "medium"' in out_none
+
 
 # ---------------------------------------------------------------------------
 # _render_agents_into_codex_config
@@ -1118,6 +1145,50 @@ class TestDcx4ClaudeStrings:
         out = manager._dcx4_claude_strings(codex_dir)
         assert out == []
 
+    def test_flags_standalone_anthropic_tier_name(self, tmp_path: Path) -> None:
+        """T-013-12: standalone Anthropic tier prose (e.g. 'Sonnet') is flagged."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        codex_dir = workspace_root / ".codex"
+        codex_dir.mkdir()
+        (codex_dir / "ai-engineer.toml").write_text(
+            'developer_instructions = """\nRecommend Sonnet for mid-tier work.\n"""\n',
+            encoding="utf-8",
+        )
+        manager = FileSystemPublicAssetManager()
+        out = manager._dcx4_claude_strings(codex_dir)
+        assert any("[error]" in line and "anthropic-tier-name" in line for line in out)
+
+    def test_clean_toml_without_tier_names_passes(self, tmp_path: Path) -> None:
+        """A Codex persona that uses registry-tier terms is not flagged."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        codex_dir = workspace_root / ".codex"
+        codex_dir.mkdir()
+        (codex_dir / "ai-engineer.toml").write_text(
+            'developer_instructions = """\n'
+            "Recommend the deep / dispatch / fast registry tiers; tune "
+            "model_reasoning_effort per workload.\n"
+            '"""\n',
+            encoding="utf-8",
+        )
+        manager = FileSystemPublicAssetManager()
+        out = manager._dcx4_claude_strings(codex_dir)
+        assert out == []
+
+    def test_harness_skill_name_not_false_positive(self, tmp_path: Path) -> None:
+        """ai-harness-claude-code skill name must not trip the tier-name pattern."""
+        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+        codex_dir = workspace_root / ".codex"
+        codex_dir.mkdir()
+        (codex_dir / "ai-engineer.toml").write_text(
+            'developer_instructions = """\n'
+            "Use the ai-harness-claude-code skill when auditing projections.\n"
+            '"""\n',
+            encoding="utf-8",
+        )
+        manager = FileSystemPublicAssetManager()
+        out = manager._dcx4_claude_strings(codex_dir)
+        assert out == []
+
 
 # ---------------------------------------------------------------------------
 # D-CX-5: _dcx5_empty_developer_instructions
@@ -1545,47 +1616,6 @@ class TestCompare:
     def test_compare_content_missing(self, tmp_path: Path) -> None:
         manager = FileSystemPublicAssetManager()
         assert manager._compare_content("x", tmp_path / "no.txt", "lbl") == "[missing] lbl"
-
-
-# ---------------------------------------------------------------------------
-# _lint_legacy_software_engineer
-# ---------------------------------------------------------------------------
-
-
-class TestLintLegacySoftwareEngineer:
-    def test_reports_legacy_alias_in_public_dir(self, tmp_path: Path) -> None:
-        """Build a fake public dir containing a file with the legacy alias."""
-        manager = FileSystemPublicAssetManager()
-        # Patch _public_dir to point at tmp_path
-        manager._public_dir = tmp_path
-        (tmp_path / "agents").mkdir()
-        (tmp_path / "agents" / "bad.md").write_text(
-            "subagent_type: software-engineer\n", encoding="utf-8"
-        )
-        out = manager._lint_legacy_software_engineer()
-        assert any("[LINT]" in line for line in out)
-
-    def test_no_report_for_split_alias(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        manager._public_dir = tmp_path
-        (tmp_path / "agents").mkdir()
-        (tmp_path / "agents" / "good.md").write_text(
-            "subagent_type: software-engineer-python\n", encoding="utf-8"
-        )
-        out = manager._lint_legacy_software_engineer()
-        assert out == []
-
-    def test_empty_public_dir_no_reports(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        manager._public_dir = tmp_path
-        out = manager._lint_legacy_software_engineer()
-        assert out == []
-
-    def test_nonexistent_public_dir_returns_empty(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        manager._public_dir = tmp_path / "nonexistent"
-        out = manager._lint_legacy_software_engineer()
-        assert out == []
 
 
 # ---------------------------------------------------------------------------

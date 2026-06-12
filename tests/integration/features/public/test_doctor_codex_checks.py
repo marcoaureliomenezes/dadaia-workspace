@@ -342,3 +342,46 @@ def test_dcx4_flags_claude_tool_name_in_artifact(installed_workspace: Path) -> N
     assert any(
         "D-CX-4" in r and "claude-tool-name" in r and "ai-engineer.toml" in r for r in reports
     ), reports
+
+
+# ---------------------------------------------------------------------------
+# T-013-11 — canonical `software-engineer` is the constitution §14 implementer;
+# the stale T-35 roster lint that flagged it is deleted. A public asset
+# referencing `subagent_type: software-engineer` must produce NO doctor error
+# (regression for bug stale-legacy-software-engineer-lint-inverts-roster).
+# ---------------------------------------------------------------------------
+
+
+def test_canonical_software_engineer_subagent_type_produces_no_doctor_error(
+    installed_workspace: Path,
+) -> None:
+    """`subagent_type: software-engineer` is canonical and must not be flagged.
+
+    The deleted ``lint_legacy_software_engineer`` used to emit a ``[LINT]`` report
+    for this exact string. After T-013-11 the canonical implementer name is the
+    constitution §14 roster member, so doctor() must return zero error/lint reports
+    referencing it for that reason.
+    """
+    workspace_root = installed_workspace
+    codex_agents = workspace_root / ".codex" / "agents"
+    canonical = codex_agents / "project-manager.toml"
+    assert canonical.exists(), "Pre-condition: project-manager.toml must exist after install."
+
+    # Inject the canonical implementer reference into an installed Codex artifact.
+    text = canonical.read_text(encoding="utf-8")
+    canonical.write_text(
+        text + "\n# dispatch note: subagent_type: software-engineer\n",
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(workspace_root)
+
+    offending = [
+        r
+        for r in reports
+        if "software-engineer" in r and (r.startswith("[error]") or "[LINT]" in r)
+    ]
+    assert not offending, (
+        "Canonical 'software-engineer' must not produce any error/lint report.\n"
+        "Offending reports:\n" + "\n".join(offending)
+    )

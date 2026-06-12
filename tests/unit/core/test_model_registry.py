@@ -19,6 +19,8 @@ from dadaia_workspace.core.model_registry import (
     REGISTRY,
     ModelEntry,
     ModelPricing,
+    codex_effort_for_tier,
+    codex_tier_views,
     current_pricing,
     registry_by_claude_id,
 )
@@ -115,6 +117,95 @@ def test_haiku_id_resolved_to_4_5() -> None:
     current = current_pricing(haiku)
     assert current.input_per_mtok == 0.80
     assert current.output_per_mtok == 4.00
+
+
+# ---------------------------------------------------------------------------
+# Per-runtime Codex tier view (bug codex-personas-claude-model-tiering-leak).
+# ---------------------------------------------------------------------------
+
+
+def test_codex_tier_views_yield_id_and_effort_for_every_tier() -> None:
+    """Each registry tier renders to a Codex (model id, reasoning effort) pair."""
+    views = codex_tier_views()
+    tiers = {v.tier for v in views}
+    assert tiers == {"deep", "dispatch", "fast", "plugin"}
+    for view in views:
+        assert view.codex_id, f"{view.tier} has empty codex_id"
+        assert not view.codex_id.startswith("claude-")
+        assert view.reasoning_effort in ("high", "medium", "low")
+
+
+def test_current_registry_is_collapse_free() -> None:
+    """The LIVE registry must not collapse two distinct tiers into one
+    (model id, reasoning effort) pair — proves the live values are valid."""
+    views = codex_tier_views()  # raises on collapse
+    pairs = [(v.codex_id, v.reasoning_effort) for v in views]
+    assert len(pairs) == len(set(pairs)), f"tier collapse in live registry: {pairs}"
+
+
+def test_deep_and_dispatch_share_id_but_differ_on_effort() -> None:
+    """deep and dispatch share gpt-5.5 today; their effort keeps them distinct."""
+    by_tier = {v.tier: v for v in codex_tier_views()}
+    assert by_tier["deep"].codex_id == by_tier["dispatch"].codex_id
+    assert by_tier["deep"].reasoning_effort == "high"
+    assert by_tier["dispatch"].reasoning_effort == "medium"
+
+
+def test_codex_effort_for_tier_mapping() -> None:
+    assert codex_effort_for_tier("deep") == "high"
+    assert codex_effort_for_tier("dispatch") == "medium"
+    assert codex_effort_for_tier("fast") == "medium"
+    assert codex_effort_for_tier("plugin") == "medium"
+
+
+def test_codex_tier_views_raises_on_synthetic_collapse() -> None:
+    """A synthetic registry whose deep and dispatch tiers resolve to the IDENTICAL
+    (model id, effort) pair must raise, naming both tiers."""
+    import dadaia_workspace.core.model_registry as mr
+
+    # Both deep and dispatch -> gpt-collide, and force both efforts to "high" so
+    # the pair is identical and the distinction collapses.
+    colliding = (
+        ModelEntry(
+            "claude-a", "gpt-collide", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "deep"
+        ),
+        ModelEntry(
+            "claude-b", "gpt-collide", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "dispatch"
+        ),
+        ModelEntry("claude-c", "gpt-fast", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "fast"),
+        ModelEntry("claude-d", "gpt-plg", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "plugin"),
+    )
+    original_reg = mr.REGISTRY
+    original_effort = dict(mr._CODEX_TIER_EFFORT)
+    mr.REGISTRY = colliding  # type: ignore[misc]
+    mr._CODEX_TIER_EFFORT["dispatch"] = "high"  # collapse: deep & dispatch both high
+    try:
+        with pytest.raises(ValueError, match="Codex tier collapse.*deep.*dispatch|dispatch.*deep"):
+            codex_tier_views()
+    finally:
+        mr.REGISTRY = original_reg  # type: ignore[misc]
+        mr._CODEX_TIER_EFFORT.clear()
+        mr._CODEX_TIER_EFFORT.update(original_effort)
+
+
+def test_codex_tier_views_raises_when_tier_maps_to_multiple_ids() -> None:
+    """A tier carried by entries with disagreeing codex_ids is ambiguous → raise."""
+    import dadaia_workspace.core.model_registry as mr
+
+    ambiguous = (
+        ModelEntry("claude-a", "gpt-x", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "deep"),
+        ModelEntry("claude-b", "gpt-y", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "deep"),
+        ModelEntry("claude-c", "gpt-d", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "dispatch"),
+        ModelEntry("claude-e", "gpt-f", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "fast"),
+        ModelEntry("claude-g", "gpt-p", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "plugin"),
+    )
+    original = mr.REGISTRY
+    mr.REGISTRY = ambiguous  # type: ignore[misc]
+    try:
+        with pytest.raises(ValueError, match="multiple Codex ids"):
+            codex_tier_views()
+    finally:
+        mr.REGISTRY = original  # type: ignore[misc]
 
 
 def test_fable_5_entry_present_with_expected_pricing() -> None:

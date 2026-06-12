@@ -196,15 +196,19 @@ tables, instruction-hierarchy ordering, consistency invariants, and audit proced
 The model-tier orientation below is the only piece kept inline because it gates cost on
 every dispatch:
 
-Tier names and model ids derive from `core/model_registry.py` (single source of truth
-for model identity, pricing, and tier — never hand-maintain a copy):
+Tier names derive from `core/model_registry.py` (single source of truth for model
+identity, pricing, and tier — never hand-maintain a copy):
 
-| Registry tier | Workload character | Current model id |
-|---|---|---|
-| `deep` | Heavy synthesis, recursive analysis, persona authoring, audit | `claude-fable-5` |
-| `dispatch` | Orchestration, dispatch authority, review verdicts, standard implementation with broad context | `claude-opus-4-8` |
-| `plugin` | Plugin-domain implementation (frontend/design/devops surfaces) | `claude-sonnet-4-6` |
-| `fast` | High-volume mechanical reformatting, bulk renames | `claude-haiku-4-5-20251001` |
+| Registry tier | Workload character |
+|---|---|
+| `deep` | Heavy synthesis, recursive analysis, persona authoring, audit |
+| `dispatch` | Orchestration, dispatch authority, review verdicts, standard implementation with broad context |
+| `plugin` | Plugin-domain implementation (frontend/design/devops surfaces) |
+| `fast` | High-volume mechanical reformatting, bulk renames |
+
+Current per-runtime model ids and (for Codex) reasoning-effort come from
+`core/model_registry.py` via the per-runtime tier view — never hand-copied. On Codex
+the tiering axis is (model id × model_reasoning_effort); on Claude it is the model id.
 
 Use a heavier tier only when the depth of reasoning justifies the cost (quote the
 registry pricing row in any recommendation). A persona stuck one tier too high is a
@@ -239,8 +243,9 @@ For each target, identify:
 
 ### Step 4 — Recommend tier moves
 
-For each target, recommend Opus / Sonnet / Haiku based on the workload-character table
-above. Justify with a one-sentence rationale grounded in concrete invocation traces.
+For each target, recommend a registry tier (`deep`/`dispatch`/`plugin`/`fast`) based on
+the workload-character table above. Justify with a one-sentence rationale grounded in
+concrete invocation traces.
 
 ### Step 5 — Recommend skill extraction
 

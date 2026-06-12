@@ -259,16 +259,20 @@ The **dominant** task drives the tier — not the easiest or the rarest.
 
 ### Step 2 — Apply the decision table
 
-Tier names and model ids are **derived from `core/model_registry.py`** (the single
+Tier names are **derived from `core/model_registry.py`** (the single
 source of truth for model identity, pricing, and tier — never hand-maintain a copy
 that can drift):
 
-| Registry tier | Workload character | Current model id |
-|---|---|---|
-| `deep` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning | `claude-fable-5` |
-| `dispatch` | Orchestration, dispatch authority, review verdicts, standard implementation with broad context | `claude-opus-4-8` |
-| `plugin` | Plugin-domain implementation (frontend/design/devops surfaces) | `claude-sonnet-4-6` |
-| `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms | `claude-haiku-4-5-20251001` |
+| Registry tier | Workload character |
+|---|---|
+| `deep` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning |
+| `dispatch` | Orchestration, dispatch authority, review verdicts, standard implementation with broad context |
+| `plugin` | Plugin-domain implementation (frontend/design/devops surfaces) |
+| `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
+
+Current per-runtime model ids and (for Codex) reasoning-effort come from
+`core/model_registry.py` via the per-runtime tier view — never hand-copied. On Codex
+the tiering axis is (model id × model_reasoning_effort); on Claude it is the model id.
 
 When recommending a tier move, quote the registry entry (id + latest pricing row) so
 the cost delta comes from live data, not a stale table. Move **up** a tier only when

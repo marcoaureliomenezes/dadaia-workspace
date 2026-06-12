@@ -129,6 +129,15 @@ def test_maps_known_claude_model_identifiers_only() -> None:
     assert "ai-harness-claude-code" in result
 
 
+def test_anthropic_tier_phrase_replaced() -> None:
+    """T-013-12 defense-in-depth: the 'Opus / Sonnet / Haiku' tier-recommendation
+    phrase is rewritten to Codex-native registry tier terms."""
+    body = "recommend Opus / Sonnet / Haiku based on the workload-character table."
+    result = transform_for_codex(body, "ai-engineer")
+    assert "Opus / Sonnet / Haiku" not in result
+    assert "deep / dispatch / fast registry tiers" in result
+
+
 def test_generic_agent_preserved_verbatim() -> None:
     """software-architect has no Agent tool references — output must equal input."""
     body = _load_body("software-architect")
