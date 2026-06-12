@@ -52,7 +52,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   that workflow files are reference/context unless a runtime dispatcher actually
   spawns agents.
 
-### [-] T-013-07 — Make the panel Academy tab browse knowledge_basis modules and lessons
+### [x] T-013-07 — Make the panel Academy tab browse knowledge_basis modules and lessons
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/panel/views/academy.py`,
   `dadaia_workspace/features/panel/views/api.py` (academy view only),

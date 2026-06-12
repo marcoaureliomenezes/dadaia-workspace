@@ -146,6 +146,14 @@ class AcademyService:
         """
         if not lesson.endswith(".md"):
             return None
+        # ``module`` and ``lesson`` must be single, literal path segments — never
+        # carry a separator or a ``..`` component. A crafted ``lesson`` such as
+        # ``"../06_other/README.md"`` would otherwise resolve to a *sibling* module
+        # while still satisfying the depth check below (parent.parent == root), so
+        # reject any traversal-bearing component up front (OWASP A03).
+        for part in (module, lesson):
+            if part in ("", ".", "..") or "/" in part or "\\" in part:
+                return None
         target = (_KNOWLEDGE_ROOT / module / lesson).resolve()
         if not target.is_relative_to(_KNOWLEDGE_ROOT):
             return None
