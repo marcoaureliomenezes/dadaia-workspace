@@ -84,7 +84,7 @@ Order: T-013-08 runs FIRST — its verified facts gate the final shape of
 T-013-09/T-013-10 (matcher form, rules semantics). End-of-alpha-2 review:
 qa-engineer only.
 
-### [-] T-013-08 — WS-CDX-VERIFY: live Codex contract harness + fact recording
+### [x] T-013-08 — WS-CDX-VERIFY: live Codex contract harness + fact recording
 - **Owner:** software-engineer (harness + matcher alignment); ai-engineer
   (skill/academy fact recording — disjoint write set)
 - **Write set:** harness script + focused tests under `tests/` (throwaway
@@ -105,7 +105,7 @@ qa-engineer only.
   with the documented form if the live run shows the anchored form misbehaves.
   Closes the audit's F-1/F-6/F-8 UNVERIFIED cells.
 
-### [ ] T-013-09 — Description-field transform + D-CX-4 tool-name patterns
+### [-] T-013-09 — Description-field transform + D-CX-4 tool-name patterns
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/install_helpers.py`
   (`install_codex_agents`),
