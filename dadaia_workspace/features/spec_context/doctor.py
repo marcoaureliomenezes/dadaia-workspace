@@ -2,6 +2,7 @@
 
 import fnmatch
 import json
+import os
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from pathlib import Path
 from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
 from dadaia_workspace.features.spec_context import lease, session_identity
@@ -408,6 +410,57 @@ class DoctorService:
             )
         return issues
 
+    def _check_venv_health(self) -> list[DoctorIssue]:
+        """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
+
+        FR-W3-02 (ADR-G4). The workspace law requires ``dadaia`` / ``pip`` / ``python -m
+        dadaia_workspace`` to run from ``<ws>/.dadaia/.venv/bin/`` (the W3 Bash gate
+        enforces this for agents). This invariant surfaces a broken venv before an agent
+        hits the gate: the venv dir is absent, or its ``dadaia`` entrypoint is missing or
+        non-executable. Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
+        and the exec check uses ``os.access`` (the platform-correct probe). Not fixable:
+        rebuilding a venv is an operator action (``dadaia init`` / re-bootstrap), never an
+        auto-repair.
+        """
+        venv_bin = self._workspace_root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+        if not venv_bin.is_dir():
+            return [
+                DoctorIssue(
+                    code="VENV-1",
+                    description=(
+                        f"Workspace venv missing: '{venv_bin}' does not exist. Workspace "
+                        "tooling (dadaia/pip/python -m dadaia_workspace) must run from this "
+                        "venv. Re-bootstrap it (e.g. 'dadaia init' or the documented "
+                        "venv setup)."
+                    ),
+                    fixable=False,
+                )
+            ]
+        entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
+        if not entry.is_file():
+            return [
+                DoctorIssue(
+                    code="VENV-1",
+                    description=(
+                        f"Workspace venv entrypoint missing: '{entry}' not found. "
+                        "Re-bootstrap the workspace venv."
+                    ),
+                    fixable=False,
+                )
+            ]
+        if not os.access(entry, os.X_OK):
+            return [
+                DoctorIssue(
+                    code="VENV-1",
+                    description=(
+                        f"Workspace venv entrypoint not executable: '{entry}'. "
+                        "Restore the exec bit (chmod +x) or re-bootstrap the venv."
+                    ),
+                    fixable=False,
+                )
+            ]
+        return []
+
     def check(self) -> list[DoctorIssue]:
         issues: list[DoctorIssue] = []
         contexts = self._store.list_all()
@@ -526,6 +579,9 @@ class DoctorService:
 
         # ---- Stale-lease GC (probe-aware reclaim; T-011-02) ----
         issues.extend(self._check_lock_gc())
+
+        # ---- Venv health (FR-W3-02, T-014-13) ----
+        issues.extend(self._check_venv_health())
 
         return issues
 

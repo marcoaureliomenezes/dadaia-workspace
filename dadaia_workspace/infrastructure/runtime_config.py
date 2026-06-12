@@ -47,11 +47,13 @@ def _hook_cmd(workspace_root: Path, module: str) -> str:
     return f"{_python_bin(workspace_root)} -m {module}"
 
 
-# T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse write-gate matcher.
-# The SDD gate and root-whitelist gate only police filesystem writes, so they fire
-# exactly on the write tools — never on read-only / Bash tools. This scopes them
-# instead of using the forbidden empty (match-all) matcher the ai audit flagged.
-_CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit"
+# T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse gate matcher.
+# The SDD gate and root-whitelist gate police filesystem writes (the write tools); the
+# W3 venv guard (T-014-12) additionally polices Bash invocations of `dadaia`/`pip`/
+# `python -m dadaia_workspace`. The merged pre_gate entrypoint therefore fires on the
+# write tools AND Bash — still a scoped explicit matcher, never the forbidden empty
+# (match-all) form the ai audit flagged.
+_CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 # Claude Code's canonical explicit match-all for tool-matching events. Used on
 # PostToolUse so the lease heartbeat (T-010-04) fires after *every* tool, including
 # Bash, not just write tools. Deliberately the explicit "*" form, NOT the empty
@@ -141,9 +143,10 @@ def codex_config(agentic_dir: Path) -> str:
 
 def codex_hooks(workspace_root: Path) -> dict[str, object]:
     """Return the .codex/hooks.json dict for *workspace_root*."""
-    # PreToolUse write gates are scoped to the write tools only — they police
-    # filesystem writes and must never fire on Bash / read-only tools.
-    write_matcher = "^(apply_patch|Edit|Write)$"
+    # PreToolUse gate fires on the write tools (filesystem writes) AND Bash — the W3 venv
+    # guard (T-014-12) polices `dadaia`/`pip`/`python -m dadaia_workspace` Bash invocations.
+    # Read-only tools are still excluded.
+    write_matcher = "^(apply_patch|Edit|Write|Bash)$"
     python_bin = _python_bin(workspace_root)
     ctx_inject_module = "dadaia_workspace.hooks.ctx_inject"
     return {

@@ -40,8 +40,9 @@ _PTY_COLS = 80
 # Marker event names wired into the events fixture.
 MARKER_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse")
 
-# The documented anchored PreToolUse matcher form (FACTS.md P1).
-PRETOOLUSE_MATCHER = r"^(apply_patch|Edit|Write)$"
+# The documented anchored PreToolUse matcher form (FACTS.md P1). T-014-12 added Bash so
+# the merged pre_gate entrypoint also runs the W3 venv guard on shell invocations.
+PRETOOLUSE_MATCHER = r"^(apply_patch|Edit|Write|Bash)$"
 
 
 def codex_binary() -> str | None:

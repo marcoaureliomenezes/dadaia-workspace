@@ -32,17 +32,19 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.hooks import _common, root_whitelist, sdd_gate
+from dadaia_workspace.hooks import _common, root_whitelist, sdd_gate, venv_guard
 
 
 def _venv_guard_reason(payload: dict[str, object]) -> str | None:
-    """Venv-guard policy slot (FR-W3-01, wired in TG-4).
+    """Venv-guard policy slot (FR-W3-01, T-014-12).
 
-    Until the venv guard lands it is a no-op that always allows. Keeping the slot here now
-    fixes the evaluation order (root-whitelist → venv-guard → SDD gate) so TG-4 only fills
-    the body — it does not re-order the entrypoint.
+    Delegates to :func:`dadaia_workspace.hooks.venv_guard.evaluate_payload` — a narrow
+    Bash-only check that blocks ``dadaia`` / ``pip`` / ``python -m dadaia_workspace``
+    invocations not rooted in ``.dadaia/.venv/bin/`` (ADR-G4). The evaluation order
+    (root-whitelist → venv-guard → SDD gate) was fixed when the slot was introduced; this
+    only fills the body.
     """
-    return None
+    return venv_guard.evaluate_payload(payload)
 
 
 #: Ordered PreToolUse policies. First block wins; allow requires all.

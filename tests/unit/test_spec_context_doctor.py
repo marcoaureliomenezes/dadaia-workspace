@@ -7,11 +7,25 @@ import pytest
 
 pytest.importorskip("fcntl")
 
+import stat  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject  # noqa: E402
+from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+
+
+def _make_healthy_venv(root: Path) -> None:
+    """Create a SYNTHETIC healthy venv tree so the FR-W3-02 VENV-1 invariant is satisfied.
+
+    Synthetic only (mkdir/touch/chmod) — never a real venv build (QA memory law).
+    """
+    bindir = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    bindir.mkdir(parents=True, exist_ok=True)
+    entry = bindir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    entry.write_text("#!/bin/sh\n")
+    entry.chmod(entry.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def _ctx(
@@ -52,6 +66,7 @@ def _make_doctor(
 def test_check_clean_state_no_issues(tmp_path: Path) -> None:
     ctx = _ctx("alpha", state=ContextState.ALIVE)
     (tmp_path / "repos" / "alpha").mkdir(parents=True)
+    _make_healthy_venv(tmp_path)  # FR-W3-02: a clean workspace has a healthy venv.
     svc, _ = _make_doctor(tmp_path, [ctx])
     issues = svc.check()
     assert issues == []

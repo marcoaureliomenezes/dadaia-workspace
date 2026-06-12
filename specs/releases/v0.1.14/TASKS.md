@@ -216,7 +216,7 @@ Write set (group): `dadaia_workspace/hooks/venv_guard.py` (NEW),
 `dadaia_workspace/infrastructure/runtime_config.py` (matcher gains Bash),
 tests. Sequential after TG-1 on `pre_gate.py` + `runtime_config.py`.
 
-### [ ] T-014-12 — Venv-guard policy + Bash matcher wiring
+### [x] T-014-12 — Venv-guard policy + Bash matcher wiring
 - **Owner:** software-engineer
 - **FR:** FR-W3-01 (ADR-G4)
 - **Files:** `dadaia_workspace/hooks/venv_guard.py` (NEW),
@@ -232,7 +232,7 @@ tests. Sequential after TG-1 on `pre_gate.py` + `runtime_config.py`.
 - **Done:** narrow fixed-pattern guard live inside `pre_gate`; matcher updated
   in both runtime templates; seed-4 acceptance cases green.
 
-### [ ] T-014-13 — Doctor venv-health check
+### [x] T-014-13 — Doctor venv-health check
 - **Owner:** software-engineer
 - **FR:** FR-W3-02
 - **Files:** workspace doctor module under `dadaia_workspace/features/`

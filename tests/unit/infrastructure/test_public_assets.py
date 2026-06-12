@@ -1672,7 +1672,8 @@ class TestConfigGenerators:
         matchers = hooks["PreToolUse"]
         assert isinstance(matchers, list)
         assert len(matchers) > 0
-        assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write)$"
+        assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write|Bash)$"
+        assert "Bash" in matchers[0]["matcher"]  # T-014-12: W3 venv guard fires on Bash.
         assert matchers[0]["hooks"][0]["type"] == "command"
         # T-014-05: single merged PreToolUse entrypoint (pre_gate).
         pre_gate_cmd = str(matchers[0]["hooks"][0]["command"])
@@ -1744,7 +1745,8 @@ class TestConfigGenerators:
         pre = hooks["PreToolUse"]
         assert isinstance(pre, list) and len(pre) == 1
         for entry in pre:
-            assert entry["matcher"] == "^(apply_patch|Edit|Write)$"
+            assert entry["matcher"] == "^(apply_patch|Edit|Write|Bash)$"
+            assert "Bash" in entry["matcher"]  # T-014-12: W3 venv guard.
         pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
         assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
         assert not any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
@@ -1773,13 +1775,15 @@ class TestConfigGenerators:
         manager = FileSystemPublicAssetManager()
         settings = manager._claude_settings(tmp_path)
         hooks = settings["hooks"]
-        write_matcher = "Edit|Write|MultiEdit|NotebookEdit"
+        # T-014-12: the merged gate now also fires on Bash for the W3 venv guard.
+        write_matcher = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 
-        # PreToolUse: single merged entrypoint scoped to the write tools (T-014-05).
+        # PreToolUse: single merged entrypoint scoped to the write tools + Bash (T-014-05/12).
         pre = hooks["PreToolUse"]
         assert isinstance(pre, list) and len(pre) == 1
         for entry in pre:
             assert entry["matcher"] == write_matcher
+            assert "Bash" in entry["matcher"]  # W3 venv guard.
             assert entry["matcher"] != "", "write gate must not use the empty match-all"
         pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
         assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
