@@ -294,6 +294,72 @@ def test_context_bind_refreshes_context_incumbent_pointer(workspace: Path) -> No
     assert identity["mode"] == "READ"
 
 
+# --- FR-W2-02 (T-014-09): bind writes the standalone bind-epoch marker --------
+
+
+def test_context_bind_writes_bind_epoch_marker(workspace: Path) -> None:
+    """FR-W2-02: a successful bind stamps `.dadaia/states/bind_epoch/<ctx>` (standalone).
+
+    The marker is the SOLE trigger for context-memory injection and the ctx-inject hook's
+    harness-real discovery source. It is NOT a field in the lease `.ptr`.
+    """
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    assert result.exit_code == 0, result.output
+    marker = workspace / ".dadaia" / "states" / "bind_epoch" / "myctx"
+    assert marker.is_file(), "bind must write a standalone bind-epoch marker"
+
+
+def test_context_bind_marker_dir_created_on_demand(workspace: Path) -> None:
+    """FR-W2-02: the bind_epoch dir is created on demand by the first bind."""
+    _register_alive_ctx(workspace)
+    marker_dir = workspace / ".dadaia" / "states" / "bind_epoch"
+    assert not marker_dir.exists()
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    assert result.exit_code == 0, result.output
+    assert marker_dir.is_dir()
+
+
+def test_context_bind_does_not_write_marker_into_ptr(workspace: Path) -> None:
+    """FR-W2-02: the bind-epoch is a standalone file; the `.ptr` is untouched by it.
+
+    The incumbent `.ptr` content must remain the bare session id — the epoch lives in
+    its own file, never coupled to lease-incumbency.
+    """
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    assert result.exit_code == 0, result.output
+    record = _session_record_for(workspace, result.output)
+    incumbent = session_identity.read_incumbent_ptr(workspace, "myctx")
+    assert incumbent == record["session_id"]
+    # The `.ptr` carries ONLY the session id — no epoch/marker payload folded in.
+    ptr_text = (
+        (workspace / ".dadaia" / "sessions" / "runtime" / "myctx.ptr")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+    assert ptr_text == record["session_id"]
+
+
+def test_context_rebind_refreshes_marker_mtime(workspace: Path) -> None:
+    """FR-W2-02: re-binding the same context refreshes the marker mtime."""
+    import os
+
+    _register_alive_ctx(workspace)
+    marker = workspace / ".dadaia" / "states" / "bind_epoch" / "myctx"
+
+    assert _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"]).exit_code == 0
+    first_mtime = marker.stat().st_mtime
+    # Backdate the marker so a refresh is observable regardless of clock granularity.
+    os.utime(marker, (first_mtime - 100, first_mtime - 100))
+    backdated = marker.stat().st_mtime
+
+    assert _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"]).exit_code == 0
+    assert marker.stat().st_mtime > backdated, "re-bind must refresh the bind-epoch mtime"
+
+
 def test_context_bind_implementation_persists_bound_implementation(workspace: Path) -> None:
     """FR-R4-02: --mode implementation persists BOUND_IMPLEMENTATION + creates session."""
     _register_alive_ctx(workspace)

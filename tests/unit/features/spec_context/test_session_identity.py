@@ -8,6 +8,7 @@ ignored-and-superseded legacy-artifact law. No real time.sleep; tmp_path workspa
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -237,3 +238,56 @@ def test_liveness_timestamp_falls_back_to_creation_when_no_last_seen_at(tmp_path
 def test_liveness_timestamp_empty_when_no_timestamp_field(tmp_path: Path) -> None:
     """No last_seen_at and no creation field ⇒ empty string (is_stale treats as fresh)."""
     assert si.liveness_timestamp({"mode": "READ"}) == ""
+
+
+# --------------------------------------------------------------------------- bind-epoch
+# FR-W2-02 (ADR-G5): standalone .dadaia/states/bind_epoch/<ctx> marker.
+
+
+def test_write_bind_epoch_creates_marker_and_dir(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    marker_dir = ws / ".dadaia" / "states" / "bind_epoch"
+    assert not marker_dir.exists()
+    si.write_bind_epoch(ws, CTX)
+    marker = marker_dir / CTX
+    assert marker.is_file()
+    assert si.bind_epoch_path(ws, CTX) == marker
+
+
+def test_write_bind_epoch_refreshes_mtime(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX)
+    marker = si.bind_epoch_path(ws, CTX)
+    base = marker.stat().st_mtime
+    os.utime(marker, (base - 100, base - 100))
+    backdated = marker.stat().st_mtime
+    si.write_bind_epoch(ws, CTX)
+    assert marker.stat().st_mtime > backdated
+
+
+def test_bind_epoch_rejects_traversal_name(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    with pytest.raises(ValueError):
+        si.write_bind_epoch(ws, "../escape")
+
+
+def test_iter_bind_epochs_returns_slug_mtime_pairs(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, "alpha")
+    si.write_bind_epoch(ws, "beta")
+    epochs = dict(si.iter_bind_epochs(ws))
+    assert set(epochs) == {"alpha", "beta"}
+    assert all(isinstance(m, float) for m in epochs.values())
+
+
+def test_iter_bind_epochs_empty_when_dir_absent(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    assert si.iter_bind_epochs(ws) == []
+
+
+def test_iter_bind_epochs_skips_invalid_names(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, "good")
+    bad = si.bind_epoch_dir(ws, create=True) / "bad name!"
+    bad.write_text("x", encoding="utf-8")
+    assert dict(si.iter_bind_epochs(ws)).keys() == {"good"}

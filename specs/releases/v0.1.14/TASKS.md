@@ -168,7 +168,7 @@ Write set (group): `dadaia_workspace/hooks/ctx_inject.py`,
 `dadaia_workspace/cli/commands/context.py` (bind fn only), tests. Sequential
 after TG-2 on `cli/commands/context.py`.
 
-### [ ] T-014-09 — `bind` writes the bind-epoch marker
+### [x] T-014-09 — `bind` writes the bind-epoch marker
 - **Owner:** software-engineer
 - **FR:** FR-W2-02 (DP-2, CLI half)
 - **Files:** `dadaia_workspace/cli/commands/context.py` (bind fn), tests
@@ -179,7 +179,7 @@ after TG-2 on `cli/commands/context.py`.
 - **Done:** marker written on every successful bind; `.ptr` untouched by this
   task.
 
-### [ ] T-014-10 — `ctx_inject` resolution rewrite + re-injection state machine (bug fold)
+### [x] T-014-10 — `ctx_inject` resolution rewrite + re-injection state machine (bug fold)
 - **Owner:** software-engineer
 - **FR:** FR-W2-01 + FR-W2-02 — closes
   `ctx-inject-ignores-session-bind-first-alive-proxy`
@@ -196,7 +196,7 @@ after TG-2 on `cli/commands/context.py`.
   bind-epoch marker → generic preflight (dispatcher preflight + ALIVE list,
   no memory); first-ALIVE loop deleted from this hook only.
 
-### [ ] T-014-11 — Seed-3 injection e2e across the real process boundary
+### [x] T-014-11 — Seed-3 injection e2e across the real process boundary
 - **Owner:** software-engineer
 - **FR:** FR-W2 acceptance (seed 3)
 - **Files:** `tests/e2e/` (new test module; reuse

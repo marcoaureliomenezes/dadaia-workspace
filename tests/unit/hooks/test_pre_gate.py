@@ -7,14 +7,17 @@ Two layers:
   including the multi-file apply_patch most-restrictive rule, NotebookEdit handling, and
   the fail-CLOSED PROTECTED path.
 * **Subprocess-free single-spawn contract (in-process)** — driving ``pre_gate.main()`` /
-  ``evaluate_payload`` with fixture stdin spawns NO child process and never execs: the
-  entrypoint reads stdin once and dispatches to pure policy functions (the perf invariant,
-  seed 5). ``subprocess.Popen``/``run`` and ``os.exec*`` are monkeypatched to raise.
+  ``evaluate_payload`` spawns NO child process and never execs: the entrypoint reads stdin
+  once and dispatches to pure policy functions (the perf invariant, seed 5).
+  ``subprocess.Popen``/``run`` and ``os.exec*`` are monkeypatched to raise. These in-process
+  tests fault-inject ``_common.read_stdin_json`` (a production internal) to supply the
+  payload — they never simulate ``sys.stdin``, so they stay on the contract's white-box
+  carve-out. The harness-real latency-log behavior tests flow through
+  ``run_hook_subprocess`` (the sanctioned subprocess channel).
 """
 
 from __future__ import annotations
 
-import io
 import json
 import subprocess
 from pathlib import Path
@@ -22,7 +25,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.hooks import pre_gate
+from dadaia_workspace.hooks import _common, pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -168,8 +171,10 @@ def test_main_is_subprocess_free(
 ) -> None:
     _no_subprocess(monkeypatch)
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    # Reads stdin once, dispatches to pure policy functions, returns 0 — no child spawned.
+    # Fault-inject the production stdin reader (NOT sys.stdin) so the entrypoint runs fully
+    # in-process per the harness-env contract carve-out: reads the payload once, dispatches
+    # to pure policy functions, returns 0 — no child spawned.
+    monkeypatch.setattr(_common, "read_stdin_json", lambda: dict(payload))
     assert pre_gate.main() == 0
 
 
@@ -208,15 +213,14 @@ def test_faulty_policy_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _drive_main(monkeypatch: pytest.MonkeyPatch, workspace: Path, payload: dict[str, Any]) -> None:
-    monkeypatch.setenv("WORKSPACE_ROOT", str(workspace))
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    assert pre_gate.main() == 0
-
-
-def test_main_appends_one_latency_record(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.delenv("DADAIA_HOOK_EVENT", raising=False)
-    _drive_main(monkeypatch, tmp_path, {"tool_name": "Read", "tool_input": {"file_path": "x"}})
+def test_main_appends_one_latency_record(tmp_path: Path) -> None:
+    # Harness-real path: spawn the hook as a real subprocess (no DADAIA_HOOK_EVENT override
+    # → the latency record falls back to "PreToolUse").
+    env = claude_hook_env(tmp_path)
+    result = run_hook_subprocess(
+        "pre_gate", {"tool_name": "Read", "tool_input": {"file_path": "x"}}, env
+    )
+    assert result.returncode == 0, result.stderr
     log = tmp_path / ".dadaia" / "logs" / "hook-latency.jsonl"
     lines = log.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
@@ -227,9 +231,15 @@ def test_main_appends_one_latency_record(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert "ts" in rec
 
 
-def test_latency_event_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("DADAIA_HOOK_EVENT", "Bash")
-    _drive_main(monkeypatch, tmp_path, {"tool_name": "Bash", "tool_input": {"command": "ls"}})
+def test_latency_event_from_env(tmp_path: Path) -> None:
+    # DADAIA_HOOK_EVENT is a harness-control var (HARNESS_CONTROL_DADAIA_ENV): pass it through
+    # the SUBPROCESS env via ``extra`` — the harness-real channel — never via an in-process
+    # setenv (which the env contract forbids).
+    env = claude_hook_env(tmp_path, extra={"DADAIA_HOOK_EVENT": "Bash"})
+    result = run_hook_subprocess(
+        "pre_gate", {"tool_name": "Bash", "tool_input": {"command": "ls"}}, env
+    )
+    assert result.returncode == 0, result.stderr
     log = tmp_path / ".dadaia" / "logs" / "hook-latency.jsonl"
     rec = json.loads(log.read_text(encoding="utf-8").strip().splitlines()[0])
     assert rec["event"] == "Bash"
@@ -239,12 +249,14 @@ def test_telemetry_failure_does_not_change_verdict(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     # An unwritable logs path must not alter the gate verdict or the exit code (fail-open).
+    # Fault-inject the production stdin reader (NOT sys.stdin) to stay in-process per the
+    # contract carve-out.
     def boom(*_a: object, **_k: object) -> None:
         raise OSError("logs dir unwritable")
 
     monkeypatch.setattr(Path, "mkdir", boom)
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"tool_name": "Read"})))
+    monkeypatch.setattr(_common, "read_stdin_json", lambda: {"tool_name": "Read"})
     assert pre_gate.main() == 0  # no crash, verdict unaffected
 
 

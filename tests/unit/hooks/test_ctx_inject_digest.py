@@ -85,10 +85,16 @@ def _ws_with_catalog(tmp_path: Path, slug: str = "ctx") -> Path:
     return tmp_path
 
 
-def _run(tmp_path: Path, session_id: str) -> str:
-    env = claude_hook_env(tmp_path)
+def _run(tmp_path: Path, session_id: str, *, context: str | None = "ctx") -> str:
+    """Invoke ctx_inject. ``context`` binds via the ``DADAIA_CONTEXT`` env leg so the
+    catalog digest is injected (FR-W2-01: an UNBOUND session injects no memory). Pass
+    ``context=None`` to exercise the unbound generic-preflight path.
+    """
+    extra = {"DADAIA_CONTEXT": context} if context else None
+    env = claude_hook_env(tmp_path, extra=extra)
     env.pop("CLAUDE_CODE_SESSION_ID", None)
-    env.pop("DADAIA_CONTEXT", None)
+    if context is None:
+        env.pop("DADAIA_CONTEXT", None)
     result = run_hook_subprocess("ctx_inject", {"session_id": session_id}, env)
     assert result.returncode == 0, result.stderr
     return result.stdout

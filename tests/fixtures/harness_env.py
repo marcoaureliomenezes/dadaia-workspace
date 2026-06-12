@@ -105,6 +105,12 @@ CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 #:   - ``DADAIA_MODE`` — the operator-shell mode escape, order (1) of
 #:     ``hooks/sdd_gate._resolve_mode``. Harness-never-set (scrubbed from subprocess env)
 #:     but read from the environment by design when an operator exports it.
+#:   - ``DADAIA_TESTING`` — the test-fixture flag the ``lease._before_write`` TOCTOU seam
+#:     guard reads at import time (``features/spec_context/lease.py:112`` —
+#:     ``os.environ.get("DADAIA_TESTING") == "1"``): the only sanctioned way to install the
+#:     test-only ``_before_write`` interleave hook. Production code reads it by design (the
+#:     assert is the named production reader), so a unit test ``setenv``-ing it exercises a
+#:     real env-read path, not harness-fiction.
 ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
@@ -113,6 +119,7 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         "DADAIA_AGENT_RUNTIME",
         "DADAIA_SESSION_ID",
         "DADAIA_MODE",
+        "DADAIA_TESTING",
     }
 )
 

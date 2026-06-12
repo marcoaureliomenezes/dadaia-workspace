@@ -67,7 +67,10 @@ __all__ = [
     "SESSION_CREATION_FIELDS",
     "SESSION_GC_TTL_FIELD",
     "SESSION_HEARTBEAT_FIELD",
+    "bind_epoch_dir",
+    "bind_epoch_path",
     "coherence",
+    "iter_bind_epochs",
     "iter_ptr_files",
     "iter_session_records",
     "liveness_timestamp",
@@ -79,6 +82,7 @@ __all__ = [
     "sessions_dir",
     "set_incumbent",
     "touch_last_seen_at",
+    "write_bind_epoch",
     "write_incumbent_ptr",
     "write_session",
 ]
@@ -170,6 +174,72 @@ def iter_ptr_files(workspace: Path) -> list[Path]:
     if not runtime.exists():
         return []
     return sorted(p for p in runtime.iterdir() if p.name.endswith(".ptr"))
+
+
+# ---------------------------------------------------------------------------
+# Bind-epoch marker — .dadaia/states/bind_epoch/<ctx>  (FR-W2-02, ADR-G5)
+# ---------------------------------------------------------------------------
+#
+# A standalone marker file written by ``dadaia context bind`` on every successful
+# bind. It is deliberately NOT a field in the lease incumbent ``<ctx>.ptr`` (the
+# ``.ptr`` is lease-incumbency, rewritten by ``lease.acquire`` on first MUTATING
+# write — overloading it would couple injection to the lease kernel and risk spurious
+# re-injection/clobber). The marker doubles as the ctx-inject hook's harness-real
+# context-discovery source: the bind CLI mints its own sid, so a harness session's
+# ``read_session(harness_sid)`` is structurally None in the default flow, and the
+# marker's mtime + name (the slug) is what the hook scans to re-inject after a bind.
+
+
+def bind_epoch_dir(workspace: Path, *, create: bool = False) -> Path:
+    """Path of the bind-epoch marker directory ``.dadaia/states/bind_epoch/``."""
+    d = workspace / ".dadaia" / "states" / "bind_epoch"
+    if create:
+        d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def bind_epoch_path(workspace: Path, ctx: str, *, create: bool = False) -> Path:
+    """Path of the bind-epoch marker ``.dadaia/states/bind_epoch/<ctx>``."""
+    _validate(ctx, field="context")
+    return bind_epoch_dir(workspace, create=create) / ctx
+
+
+def write_bind_epoch(workspace: Path, ctx: str) -> None:
+    """Stamp the bind-epoch marker for ``ctx`` (create-or-refresh mtime).
+
+    Written on every successful bind. The marker dir is created on demand. Re-binding
+    the same context refreshes the file's mtime (the hook compares it against a session
+    sentinel's mtime to decide whether to re-inject). Raises on validation/OS error.
+    """
+    path = bind_epoch_path(workspace, ctx, create=True)
+    # Touch semantics: create if absent, bump mtime if present. ``Path.touch`` updates
+    # the mtime to now on an existing file, which is exactly the epoch-refresh contract.
+    path.touch()
+    os.utime(path, None)
+
+
+def iter_bind_epochs(workspace: Path) -> list[tuple[str, float]]:
+    """Return ``(ctx_slug, mtime)`` for every bind-epoch marker (empty if absent).
+
+    The hook scans this to find the newest qualifying marker. Fails soft: a marker whose
+    name is not a valid context slug, or that cannot be ``stat``'d, is skipped. The list
+    is unsorted — the caller picks the newest by ``mtime``.
+    """
+    base = bind_epoch_dir(workspace)
+    out: list[tuple[str, float]] = []
+    try:
+        entries = list(base.iterdir())
+    except OSError:
+        return out
+    for entry in entries:
+        if not _NAME_RE.fullmatch(entry.name):
+            continue
+        try:
+            if entry.is_file():
+                out.append((entry.name, entry.stat().st_mtime))
+        except OSError:
+            continue
+    return out
 
 
 # ---------------------------------------------------------------------------

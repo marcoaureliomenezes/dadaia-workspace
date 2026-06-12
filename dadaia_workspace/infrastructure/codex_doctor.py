@@ -304,9 +304,11 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError):
         return ["[error] codex:hooks.json missing or invalid (D-CX-9)"]
     text = json.dumps(hooks)
+    # T-014-05 merged the standalone sdd_gate + root_whitelist PreToolUse hooks into the
+    # single ``pre_gate`` entrypoint, so the wiring now references pre_gate + sdd_post_gate
+    # + ctx_inject (sdd_gate / root_whitelist are no longer emitted into hooks.json).
     for module in (
-        "dadaia_workspace.hooks.sdd_gate",
-        "dadaia_workspace.hooks.root_whitelist",
+        "dadaia_workspace.hooks.pre_gate",
         "dadaia_workspace.hooks.sdd_post_gate",
         "dadaia_workspace.hooks.ctx_inject",
     ):

@@ -411,6 +411,12 @@ def bind(
         with workspace_lock(workspace_root):
             session_identity.write_session(workspace_root, session_id, session_data)
             session_identity.set_incumbent(workspace_root, name, session_id)
+            # FR-W2-02 (ADR-G5): stamp the bind-epoch marker. This is the SOLE trigger for
+            # context-memory injection and the ctx-inject hook's harness-real discovery
+            # source — the bind CLI's minted sid is invisible to the harness, so the marker's
+            # mtime+name is what the hook scans to re-inject on the next prompt. Standalone
+            # file, NOT a `.ptr` field (the `.ptr` is lease-incumbency, untouched here).
+            session_identity.write_bind_epoch(workspace_root, name)
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
