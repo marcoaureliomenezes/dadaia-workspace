@@ -2,7 +2,7 @@
 name: qa-engineer
 description: QA + E2E specialist + pre-commit checkpoint. Multi-language E2E owner across repos. Audits test pyramid, validates deploys. ADDITIVE evidence only — no lease. Pairs with software-engineer to define E2E criteria before implementation.
 tier: 3
-model: claude-fable-5
+model: claude-opus-4-8
 activity_class: ADDITIVE
 lease_relationship: "no lease — concurrent"
 gate_role: checkpoint-pre-commit
