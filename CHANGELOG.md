@@ -4,115 +4,108 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.7] — 2026-06-13
 
-### Security
-- Panel HTTP handler: enforce Bearer auth on workspace-sensitive routes that were previously served by the unauthenticated dispatch loop — `/reports/<path>`, `/api/panel-status`, `/api/contexts`, `/memory/<slug>/<path>`, `/memory-view/<slug>/<path>` — whenever the panel is NOT loopback-bound (defense in depth; loopback keeps the zero-friction local default). (F-01/F-02/F-04)
-- Scaffolder renders templates with a Jinja2 `SandboxedEnvironment`, blocking template access to Python internals. (F-03)
-- `GitSubprocessClient.clone` refuses unsafe URLs (`ext::` transport and option-injection via a leading `-`) before invoking git. (F-05)
+Consolidated release: the single published version after `0.1.5`. It folds in all
+work from the never-tagged `0.1.6`–`0.1.10` development line — cross-platform
+support, the process-execution layering law, spec/memory fidelity, the full
+workspace-audit remediation, and panel/scaffolder/git security hardening — shipped
+under one version through the release-candidate gate rather than as a string of
+per-fix releases.
 
-## [0.1.10] — 2026-06-10
+### Added
+- **Cross-platform support (Linux / macOS / Windows).** `core/platform.py`
+  platform-detection seam (sole `sys.platform` call site) + a port/adapter boundary
+  for OS-sensitive domains: file locks (fcntl / msvcrt), telemetry refresh lock, file
+  permissions (chmod / `icacls`), process probe, and signals/shutdown. New
+  `dadaia_workspace/hooks/` Python governance package replaces the bash hooks so SDD
+  governance is enforced on stock Windows (no Git Bash required). 3-tier resilience
+  contract (fail-loud security / degrade-with-log / unsupported-at-construction).
+  `import-linter` contracts enforce the layering law in CI.
+- Phased 3-OS CI matrix: an importability-smoke job (Windows + macOS) plus
+  Windows/macOS unit and contract legs (Ubuntu remains the hard gate).
 
-Full-remediation release: one release closing every finding of the 5-agent
-workspace audit (overall score 5/10 → 9.0/10 on all six dimensions).
+### Changed
+- **Model strategy unified on the registry single source** (`core/model_registry`):
+  `MODEL_MAP` / `PRICING_TABLE` are derived views; public doctor validates agent
+  `model:` frontmatter + key-set sync. Deep-tier personas (product-engineer,
+  qa-engineer, ai-engineer, software-architect, project-auditor) and the
+  dispatch-tier personas (software-engineer, security-reviewer, code-reviewer) all
+  run `claude-opus-4-8`.
+- Process-execution layering law completed: `features/` modules no longer import
+  `subprocess` directly. New `ProcessRunner` Protocol
+  (`core/protocols/process_runner.py`) with production adapter
+  (`infrastructure/subprocess_runner.py`), consumed via DI by `import_`,
+  `ci_preflight`, `specs/doctor`, and `server_registry`; `import-linter` contract
+  `features-no-subprocess` enforces it. `container.py` platform branching reads the
+  `PLATFORM` capability singleton.
+- Bash hook quartet retired; Python hooks are the sole gate surface (PreToolUse
+  scoped to write tools; Bash-tool writes documented out of the determinism envelope
+  with doctor backstops).
+- AI surface (AGENTS.md, rules, skills, personas) rewritten to describe real
+  enforcement vs discipline (14 contradictions fixed); memory + constitution §8
+  rewritten to the merged kernel. Agent persona parity pass: `[SCOPE ERROR]` redirect
+  block in all 9 core personas; report-emission prose deduplicated to
+  `workspace-protocol §4`; vestigial `opencode_model` frontmatter keys removed.
+- `Operating System :: OS Independent` classifier corrected to
+  `Operating System :: POSIX :: Linux` until the 3-OS CI matrix graduates to a hard
+  gate.
+- All text I/O specifies `encoding="utf-8"` (Windows cp1252 corruption fix); JSON
+  stores route through a single `_atomic_write_text` chokepoint using `os.replace`.
+  venv executable paths resolved via the platform seam (`Scripts/python.exe` on
+  Windows).
+- Test architecture: harness-env fixture contract (hook behavior tests run as real
+  subprocesses; `DADAIA_*` setenv + hook-import ratchets at zero baseline), two-actor
+  concurrency e2e asserting on lock-file history, drift-ratifying tests killed,
+  consistency-contract + lifecycle-asymmetry policies.
 
 ### Fixed
 - SDD gate classifier re-rooted context-relatively: ADDITIVE/MEMORY/FROZEN classes
   now live inside `repos/<slug>/` (unmatched in-repo ⇒ MUTATING, never UNGATED);
-  symlinks canonicalized before classification. Kills the lease-theft-by-additive-write
-  CRITICAL.
+  symlinks canonicalized before classification. Kills the
+  lease-theft-by-additive-write CRITICAL.
 - Lease liveness = TTL + PID veto: holder records a long-lived harness pid
-  (payload/getppid); TTL-stale + alive ⇒ yield (no takeover), dead ⇒ takeover;
-  renew runs inside the same O_EXCL CAS (race fixed); heartbeat renews on every
-  PostToolUse from the harness-native session id (Claude `*` matcher, Codex match-all).
-- Session identity consolidated into a single owner module (`session_identity`);
-  bind `--mode` optional (default read), persisted in the session record + context
-  incumbent pointer (eval-export theater removed, `--print-env` legacy escape);
-  gate mode resolution env → record → live-incumbent → IMPLEMENTATION; READ binds
-  are non-acquiring.
+  (payload/getppid); TTL-stale + alive ⇒ yield (no takeover), dead ⇒ takeover; renew
+  runs inside the same O_EXCL CAS (race fixed); heartbeat renews on every PostToolUse
+  from the harness-native session id (Claude `*` matcher, Codex match-all).
+- Session identity consolidated into a single owner module (`session_identity`); bind
+  `--mode` optional (default read), persisted in the session record + context
+  incumbent pointer; gate mode resolution env → record → live-incumbent →
+  IMPLEMENTATION; READ binds are non-acquiring.
 - `dadaia ci preflight` no longer self-pollutes (ruff `--no-cache`, mypy cache
   redirected, pollution guard = session snapshot diff) — the pre-push gate passes
-  end-to-end for the first time; pre-push hook probes the workspace venv
-  (`$DADAIA_BIN` → walk-up → poetry → repo venv, fail-closed).
-- specs doctor ledger invariants (SPEC-DOC-024..029): phase↔markers, CLOSURE-before-
-  archive, unique release ids, naming canon, constitution ref resolution, lease↔session
-  coherence; archive id collisions repaired (`v0.2.0/alpha-N`, mapping README).
-- Model registry single source (`core/model_registry`): MODEL_MAP/PRICING_TABLE are
-  derived views; public doctor validates agent `model:` frontmatter + key-set sync.
+  end-to-end; pre-push hook probes the workspace venv (`$DADAIA_BIN` → walk-up →
+  poetry → repo venv, fail-closed).
+- specs doctor ledger invariants (SPEC-DOC-024..029): phase↔markers,
+  CLOSURE-before-archive, unique release ids, naming canon, constitution ref
+  resolution, lease↔session coherence.
+- Spec/memory fidelity: all 34 confirmed findings of the drift audit resolved —
+  memory atoms document the real doctor check codes, the Python-hook SDD gate, the
+  hard-gated 3-OS CI matrix, the full CLI/protocol inventory, and a roster without the
+  phantom `researcher` agent.
+- The CLI is now importable on Windows: the unconditional top-level `import fcntl` in
+  the locking and telemetry modules (which crashed every `dadaia` invocation at
+  import) is removed and delegated to platform adapters.
+- Windows security no-ops closed: the panel auth token is owner-only via `icacls` or
+  the panel refuses to start (CWE-732); `/proc` scans and `os.getuid` degrade safely
+  off-Linux.
 
 ### Security
+- Panel HTTP handler: enforce Bearer auth on workspace-sensitive routes that were
+  previously served by the unauthenticated dispatch loop — `/reports/<path>`,
+  `/api/panel-status`, `/api/contexts`, `/memory/<slug>/<path>`,
+  `/memory-view/<slug>/<path>` — whenever the panel is NOT loopback-bound (defense in
+  depth; loopback keeps the zero-friction local default). (F-01/F-02/F-04)
+- Scaffolder renders templates with a Jinja2 `SandboxedEnvironment`, blocking template
+  access to Python internals. (F-03)
+- `GitSubprocessClient.clone` refuses unsafe URLs (`ext::` transport and
+  option-injection via a leading `-`) before invoking git. (F-05)
 - Panel loopback auth bypass removed (tokenless sensitive API ⇒ 401 even on
   127.0.0.1; tokenized-URL handoff, token file modes re-tightened to 0o600).
 - `context dead` refuses untracked files without `--commit`; `--commit` runs a
   structural secret scan (incl. cert/key file suffixes) before any push.
-- public-privacy gate fails closed: packaged baseline structural denylist scans
-  even without an operator denylist.
-
-### Changed
-- Bash hook quartet retired; Python hooks are the sole gate surface (PreToolUse
-  scoped to write tools; Bash-tool writes documented out of the determinism
-  envelope with doctor backstops).
-- AI surface (AGENTS.md, rules, skills, personas) rewritten to describe real
-  enforcement vs discipline (14 contradictions fixed); memory + constitution §8
-  rewritten to the merged kernel.
-- Test architecture: harness-env fixture contract (hook behavior tests run as real
-  subprocesses; `DADAIA_*` setenv + hook-import ratchets at zero baseline), two-actor
-  concurrency e2e asserting on lock-file history, drift-ratifying tests killed,
-  consistency-contract + lifecycle-asymmetry policies; 2795 tests.
-
-## [0.1.9] — 2026-06-09
-
-### Changed
-- Completed the layering law for process execution: `features/` modules no longer import
-  `subprocess` directly. New `ProcessRunner` Protocol (`core/protocols/process_runner.py`)
-  with production adapter `infrastructure/subprocess_runner.py`; consumed via DI by
-  `import_`, `ci_preflight`, `specs/doctor`, and `server_registry`. New import-linter
-  contract `features-no-subprocess` enforces it in CI.
-- `container.py` platform branching now reads the `PLATFORM` capability singleton instead
-  of an inline `sys.platform` comparison.
-- Agent persona parity pass: `[SCOPE ERROR]` redirect block present in all 9 core personas;
-  duplicated report-emission prose deduplicated to the `workspace-protocol §4` rule;
-  vestigial `opencode_model` frontmatter keys removed; `dev-server-registry` skill wired to
-  `software-engineer`; `ai-context-engineering` I1 schema reference refreshed.
-- Agent model assignments retiered: `claude-fable-5` for product-engineer, qa-engineer,
-  ai-engineer, software-architect, and project-auditor; `claude-opus-4-8` for
-  software-engineer, security-reviewer, and code-reviewer.
-
-### Fixed
-- Spec/memory fidelity: all 34 confirmed findings of the 2026-06-09 drift audit resolved —
-  memory atoms now document the real doctor check codes (`LOCK-NEW`/`INV-4`/`INV-5`/
-  `SENTINEL-GC`), the Python-hook SDD gate (bash scripts described as legacy fallback only),
-  the hard-gated 3-OS CI matrix, the full 21-subcommand CLI and 21-protocol inventory, the
-  actual `specs doctor` check-ID set (SPEC-DOC 001–009/012/016, TREE-1..7 + TREE-5M), the
-  correct project-manager model, the 18-skill count, and a roster without the phantom
-  `researcher` agent. Archived 0.1.6 CLOSURE backfilled to structural doctor compliance.
-
-## [0.1.8] — 2026-06-09
-
-### Added
-- **Cross-platform support (Linux / macOS / Windows).** `core/platform.py` platform-detection seam
-  (sole `sys.platform` call site) + a port/adapter boundary for OS-sensitive domains: file locks
-  (fcntl / msvcrt), telemetry refresh lock, file permissions (chmod / `icacls`), process probe, and
-  signals/shutdown. New `dadaia_workspace/hooks/` Python governance package replaces the bash hooks
-  so SDD governance is enforced on stock Windows (no Git Bash required). 3-tier resilience contract
-  (fail-loud security / degrade-with-log / unsupported-at-construction). `import-linter` contracts
-  enforce the layering law in CI.
-- Phased 3-OS CI matrix: an importability-smoke job (Windows + macOS) plus Windows/macOS unit and
-  contract legs (allow-fail during graduation; Ubuntu remains the hard gate).
-
-### Changed
-- `Operating System :: OS Independent` classifier corrected to `Operating System :: POSIX :: Linux`
-  until the 3-OS CI matrix graduates to a hard gate.
-- All text I/O now specifies `encoding="utf-8"` (Windows cp1252 corruption fix); the JSON stores
-  route through a single `_atomic_write_text` chokepoint using `os.replace`.
-- venv executable paths resolved via the platform seam (`Scripts/python.exe` on Windows).
-
-### Fixed
-- The CLI is now importable on Windows: the unconditional top-level `import fcntl` in the locking and
-  telemetry modules (which crashed every `dadaia` invocation at import) is removed and delegated to
-  platform adapters.
-- Windows security no-ops closed: the panel auth token is owner-only via `icacls` or the panel
-  refuses to start (Tier-1, CWE-732); `/proc` scans and `os.getuid` degrade safely off-Linux.
+- public-privacy gate fails closed: packaged baseline structural denylist scans even
+  without an operator denylist.
 
 ## [0.1.4] — 2026-06-03
 
