@@ -132,7 +132,7 @@ def test_pricing_keyset_is_registry_derived_not_cross_feature_import(
 
 
 def test_current_tree_resolves_clean() -> None:
-    """The live canonical public/ tree (5 fable-5 + opus/etc) resolves ⇒ [ok]."""
+    """The live canonical public/ tree (opus-4-8 deep agents + etc) resolves ⇒ [ok]."""
     public_dir = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
     assert public_dir.is_dir(), public_dir
 
