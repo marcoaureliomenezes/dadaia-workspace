@@ -47,6 +47,53 @@ def _hook_cmd(workspace_root: Path, module: str) -> str:
     return f"{_python_bin(workspace_root)} -m {module}"
 
 
+_CODEX_HOOK_WRAPPERS: dict[str, tuple[str, dict[str, str]]] = {
+    "codex-pre-gate": ("dadaia_workspace.hooks.pre_gate", {}),
+    "codex-post-gate": ("dadaia_workspace.hooks.sdd_post_gate", {}),
+    "codex-ctx-inject": (
+        "dadaia_workspace.hooks.ctx_inject",
+        {"DADAIA_HOOK_OUTPUT": "codex-json"},
+    ),
+    "codex-ctx-inject-session-start": (
+        "dadaia_workspace.hooks.ctx_inject",
+        {"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"},
+    ),
+}
+
+
+def codex_hook_wrapper_contents() -> dict[str, str]:
+    """Return generated executable wrapper contents for Codex command hooks.
+
+    Codex command execution differs across surfaces: some paths shell-parse command
+    strings, while others direct-exec the string as an executable. The wrappers make the
+    hook contract one executable path with no arguments or env-prefix syntax in
+    ``hooks.json``. Each wrapper resolves the workspace venv Python relative to its own
+    location, so moving/importing a workspace does not leave stale absolute Python paths.
+    """
+    wrappers: dict[str, str] = {}
+    for name, (module, env) in _CODEX_HOOK_WRAPPERS.items():
+        exports = "".join(f'{key}="{value}"\nexport {key}\n' for key, value in env.items())
+        wrappers[name] = (
+            "#!/usr/bin/env sh\n"
+            "set -eu\n"
+            'SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n'
+            'WORKSPACE_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)\n'
+            'PYTHON_BIN="$WORKSPACE_ROOT/.dadaia/.venv/bin/python"\n'
+            'if [ ! -x "$PYTHON_BIN" ]; then\n'
+            '  echo "dadaia Codex hook wrapper: missing executable $PYTHON_BIN" >&2\n'
+            "  exit 127\n"
+            "fi\n"
+            f"{exports}"
+            f'exec "$PYTHON_BIN" -m {module} "$@"\n'
+        )
+    return wrappers
+
+
+def _codex_hook_wrapper_command(name: str) -> str:
+    """Return a direct-exec-safe hook command path for a generated wrapper."""
+    return f".dadaia/hooks/{name}"
+
+
 # T-010-18 (R6c, AC-R6-05, ai C-12): Claude Code PreToolUse gate matcher.
 # The SDD gate and root-whitelist gate police filesystem writes (the write tools); the
 # W3 venv guard (T-014-12) additionally polices Bash invocations of `dadaia`/`pip`/
@@ -147,8 +194,6 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
     # guard (T-014-12) polices `dadaia`/`pip`/`python -m dadaia_workspace` Bash invocations.
     # Read-only tools are still excluded.
     write_matcher = "^(apply_patch|Edit|Write|Bash)$"
-    python_bin = _python_bin(workspace_root)
-    ctx_inject_module = "dadaia_workspace.hooks.ctx_inject"
     return {
         "hooks": {
             # FR-W4-01 (T-014-05): single merged PreToolUse entrypoint (pre_gate) — one
@@ -160,7 +205,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_cmd(workspace_root, "dadaia_workspace.hooks.pre_gate"),
+                            "command": _codex_hook_wrapper_command("codex-pre-gate"),
                             "statusMessage": "Checking dadaia PreToolUse gate",
                         }
                     ],
@@ -178,9 +223,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _hook_cmd(
-                                workspace_root, "dadaia_workspace.hooks.sdd_post_gate"
-                            ),
+                            "command": _codex_hook_wrapper_command("codex-post-gate"),
                             "statusMessage": "Refreshing SDD session heartbeat",
                         }
                     ],
@@ -196,10 +239,8 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": (
-                                "DADAIA_HOOK_OUTPUT=codex-json "
-                                "DADAIA_HOOK_EVENT=SessionStart "
-                                f"{python_bin} -m {ctx_inject_module}"
+                            "command": _codex_hook_wrapper_command(
+                                "codex-ctx-inject-session-start"
                             ),
                             "statusMessage": "Loading dadaia context",
                         }
@@ -211,9 +252,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": (
-                                f"DADAIA_HOOK_OUTPUT=codex-json {python_bin} -m {ctx_inject_module}"
-                            ),
+                            "command": _codex_hook_wrapper_command("codex-ctx-inject"),
                             "statusMessage": "Loading dadaia context",
                         }
                     ],

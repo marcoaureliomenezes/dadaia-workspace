@@ -22,6 +22,7 @@ mock substitution.
 from __future__ import annotations
 
 import re
+import sys
 import tomllib
 from pathlib import Path
 
@@ -45,6 +46,9 @@ def installed_workspace(tmp_path: Path) -> Path:
     manager = FileSystemPublicAssetManager()
     manager.stage(tmp_path)
     manager.install(tmp_path, target="codex", force=True)
+    venv_bin = tmp_path / ".dadaia" / ".venv" / "bin"
+    venv_bin.mkdir(parents=True, exist_ok=True)
+    (venv_bin / "python").symlink_to(Path(sys.executable))
     return tmp_path
 
 
@@ -229,21 +233,45 @@ def test_dcx8_undocumented_command_allowed_rejected(installed_workspace: Path) -
 
 
 def test_dcx9_missing_hook_command_detected(installed_workspace: Path) -> None:
-    # T-018-17: codex hooks invoke the Python governance hooks
-    # (``<python> -m dadaia_workspace.hooks.<name>``), not the bash ``.sh`` scripts.
-    # D-CX-9 now verifies the Python module references in .codex/hooks.json; strip one
-    # and assert it is flagged.
+    # Codex hooks invoke direct-exec wrapper paths, not shell command strings. Strip one
+    # wrapper command and assert D-CX-9 catches the missing executable wiring.
     hooks_path = installed_workspace / ".codex" / "hooks.json"
     text = hooks_path.read_text(encoding="utf-8")
-    assert "dadaia_workspace.hooks.ctx_inject" in text
+    assert ".dadaia/hooks/codex-ctx-inject" in text
     hooks_path.write_text(
-        text.replace("dadaia_workspace.hooks.ctx_inject", "dadaia_workspace.hooks.DELETED"),
+        text.replace(".dadaia/hooks/codex-ctx-inject", ".dadaia/hooks/DELETED"),
         encoding="utf-8",
     )
 
     reports = FileSystemPublicAssetManager().doctor(installed_workspace)
 
-    assert any("D-CX-9" in r and "dadaia_workspace.hooks.ctx_inject" in r for r in reports)
+    assert any("D-CX-9" in r and ".dadaia/hooks/codex-ctx-inject" in r for r in reports)
+
+
+def test_dcx9_non_executable_wrapper_detected(installed_workspace: Path) -> None:
+    wrapper = installed_workspace / ".dadaia" / "hooks" / "codex-pre-gate"
+    assert wrapper.exists()
+    wrapper.chmod(0o644)
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-9" in r and "not executable" in r and "codex-pre-gate" in r for r in reports)
+
+
+def test_dcx9_shell_command_string_detected(installed_workspace: Path) -> None:
+    hooks_path = installed_workspace / ".codex" / "hooks.json"
+    text = hooks_path.read_text(encoding="utf-8")
+    hooks_path.write_text(
+        text.replace(
+            ".dadaia/hooks/codex-pre-gate",
+            "/tmp/workspace/.dadaia/.venv/bin/python -m dadaia_workspace.hooks.pre_gate",
+        ),
+        encoding="utf-8",
+    )
+
+    reports = FileSystemPublicAssetManager().doctor(installed_workspace)
+
+    assert any("D-CX-9" in r and "must use .dadaia/hooks wrapper" in r for r in reports)
 
 
 def test_dcx10_missing_agent_boundary_detected(installed_workspace: Path) -> None:

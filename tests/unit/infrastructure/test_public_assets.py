@@ -1675,9 +1675,10 @@ class TestConfigGenerators:
         assert matchers[0]["matcher"] == "^(apply_patch|Edit|Write|Bash)$"
         assert "Bash" in matchers[0]["matcher"]  # T-014-12: W3 venv guard fires on Bash.
         assert matchers[0]["hooks"][0]["type"] == "command"
-        # T-014-05: single merged PreToolUse entrypoint (pre_gate).
+        # T-014-05/T-VPS: single merged PreToolUse entrypoint via direct-exec wrapper.
         pre_gate_cmd = str(matchers[0]["hooks"][0]["command"])
-        assert "dadaia_workspace.hooks.pre_gate" in pre_gate_cmd
+        assert pre_gate_cmd == ".dadaia/hooks/codex-pre-gate"
+        assert " " not in pre_gate_cmd
         assert "sdd-spec-gate.sh" not in pre_gate_cmd
         # AC-T13-10: PostToolUse must be present and point to sdd_post_gate module.
         # N-2 (v0.1.10 rc-2): the heartbeat now fires on ALL tools — Codex's
@@ -1690,7 +1691,8 @@ class TestConfigGenerators:
         assert "matcher" not in post_matchers[0]
         assert post_matchers[0]["hooks"][0]["type"] == "command"
         post_cmd = str(post_matchers[0]["hooks"][0]["command"])
-        assert "dadaia_workspace.hooks.sdd_post_gate" in post_cmd
+        assert post_cmd == ".dadaia/hooks/codex-post-gate"
+        assert " " not in post_cmd
         assert "sdd-post-gate.sh" not in post_cmd
         assert "UserPromptSubmit" in hooks
         prompt_matchers = hooks["UserPromptSubmit"]
@@ -1698,8 +1700,9 @@ class TestConfigGenerators:
         assert "matcher" not in prompt_matchers[0]
         assert prompt_matchers[0]["hooks"][0]["type"] == "command"
         prompt_command = str(prompt_matchers[0]["hooks"][0]["command"])
-        assert prompt_command.startswith("DADAIA_HOOK_OUTPUT=codex-json ")
-        assert "dadaia_workspace.hooks.ctx_inject" in prompt_command
+        assert prompt_command == ".dadaia/hooks/codex-ctx-inject"
+        assert " " not in prompt_command
+        assert "DADAIA_HOOK_OUTPUT=" not in prompt_command
         assert "ctx-inject.sh" not in prompt_command
 
     def test_codex_hooks_wire_sessionstart(self, tmp_path: Path) -> None:
@@ -1713,9 +1716,10 @@ class TestConfigGenerators:
         assert isinstance(ss, list) and ss
         assert ss[0]["matcher"] == "startup|resume"
         cmd = str(ss[0]["hooks"][0]["command"])
-        assert "DADAIA_HOOK_EVENT=SessionStart" in cmd
-        assert "DADAIA_HOOK_OUTPUT=codex-json" in cmd
-        assert "dadaia_workspace.hooks.ctx_inject" in cmd
+        assert cmd == ".dadaia/hooks/codex-ctx-inject-session-start"
+        assert " " not in cmd
+        assert "DADAIA_HOOK_EVENT=" not in cmd
+        assert "DADAIA_HOOK_OUTPUT=" not in cmd
         assert "ctx-inject.sh" not in cmd
 
     def test_codex_posttooluse_heartbeat_fires_on_all_tools(self, tmp_path: Path) -> None:
@@ -1739,7 +1743,8 @@ class TestConfigGenerators:
             "matcher is Codex's canonical match-all (N-2)."
         )
         post_cmds = [str(h["command"]) for h in post[0]["hooks"]]
-        assert any("dadaia_workspace.hooks.sdd_post_gate" in c for c in post_cmds)
+        assert ".dadaia/hooks/codex-post-gate" in post_cmds
+        assert all(" " not in c for c in post_cmds)
 
         # PreToolUse: single merged entrypoint, scoped to the write tools (T-014-05).
         pre = hooks["PreToolUse"]
@@ -1748,9 +1753,25 @@ class TestConfigGenerators:
             assert entry["matcher"] == "^(apply_patch|Edit|Write|Bash)$"
             assert "Bash" in entry["matcher"]  # T-014-12: W3 venv guard.
         pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
-        assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
+        assert ".dadaia/hooks/codex-pre-gate" in pre_cmds
+        assert all(" " not in c for c in pre_cmds)
         assert not any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
         assert not any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
+
+    def test_codex_hook_wrapper_contents(self) -> None:
+        from dadaia_workspace.infrastructure.runtime_config import codex_hook_wrapper_contents
+
+        wrappers = codex_hook_wrapper_contents()
+        assert set(wrappers) == {
+            "codex-pre-gate",
+            "codex-post-gate",
+            "codex-ctx-inject",
+            "codex-ctx-inject-session-start",
+        }
+        assert "dadaia_workspace.hooks.pre_gate" in wrappers["codex-pre-gate"]
+        assert "dadaia_workspace.hooks.sdd_post_gate" in wrappers["codex-post-gate"]
+        assert 'DADAIA_HOOK_OUTPUT="codex-json"' in wrappers["codex-ctx-inject"]
+        assert 'DADAIA_HOOK_EVENT="SessionStart"' in wrappers["codex-ctx-inject-session-start"]
 
     def test_claude_settings_structure(self, tmp_path: Path) -> None:
         # T-018-17: hook commands are now Python module invocations, not .sh paths.
@@ -1816,7 +1837,10 @@ class TestConfigGenerators:
             pre = hooks["PreToolUse"]
             commands = [str(h["command"]) for entry in pre for h in entry.get("hooks", [])]
             assert len(commands) == 1, f"expected one PreToolUse command, got {commands}"
-            assert "dadaia_workspace.hooks.pre_gate" in commands[0]
+            assert (
+                "dadaia_workspace.hooks.pre_gate" in commands[0]
+                or commands[0] == ".dadaia/hooks/codex-pre-gate"
+            )
 
     def test_claude_settings_root_whitelist_gate_present(self, tmp_path: Path) -> None:
         """T-SANI-01 + T-014-05: the root-whitelist policy is registered as a PreToolUse
@@ -1846,10 +1870,15 @@ class TestConfigGenerators:
         all_commands = [
             str(hook["command"]) for entry in pre_tool_use for hook in entry.get("hooks", [])
         ]
-        assert any("dadaia_workspace.hooks.pre_gate" in cmd for cmd in all_commands), (
-            "dadaia_workspace.hooks.pre_gate (carries root-whitelist policy) not found in "
+        assert ".dadaia/hooks/codex-pre-gate" in all_commands, (
+            "codex-pre-gate wrapper (carries pre_gate/root-whitelist policy) not found in "
             "codex hooks PreToolUse hooks"
         )
+        wrappers = __import__(
+            "dadaia_workspace.infrastructure.runtime_config",
+            fromlist=["codex_hook_wrapper_contents"],
+        ).codex_hook_wrapper_contents()
+        assert "dadaia_workspace.hooks.pre_gate" in wrappers["codex-pre-gate"]
         assert not any("root-whitelist-gate.sh" in cmd for cmd in all_commands), (
             "stale root-whitelist-gate.sh still present in codex hooks PreToolUse hooks"
         )

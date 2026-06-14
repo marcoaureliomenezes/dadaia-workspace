@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -73,6 +74,9 @@ from dadaia_workspace.infrastructure.runtime_config import (
 )
 from dadaia_workspace.infrastructure.runtime_config import (
     codex_config as _build_codex_config,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
+    codex_hook_wrapper_contents as _build_codex_hook_wrapper_contents,
 )
 from dadaia_workspace.infrastructure.runtime_config import (
     codex_hooks as _build_codex_hooks,
@@ -372,6 +376,14 @@ class FileSystemPublicAssetManager:
                 "codex:hooks.json",
             )
         )
+        for name, content in _build_codex_hook_wrapper_contents().items():
+            reports.append(
+                self._compare_content(
+                    content,
+                    workspace_root / ".dadaia" / "hooks" / name,
+                    f"dadaia:hooks/{name}",
+                )
+            )
         reports.append(
             self._compare_content(
                 _build_codex_config(agentic_dir),
@@ -499,6 +511,12 @@ class FileSystemPublicAssetManager:
                 self._public_dir, workspace_root, force, installed, copy_file
             )
         if only is None:
+            hooks_dir = workspace_root / ".dadaia" / "hooks"
+            for name, content in _build_codex_hook_wrapper_contents().items():
+                dst = hooks_dir / name
+                write_generated(dst, content, force, installed)
+                with contextlib.suppress(OSError):
+                    dst.chmod(0o755)
             write_generated(
                 codex_dir / "hooks.json",
                 _json_dump(_build_codex_hooks(workspace_root)),
