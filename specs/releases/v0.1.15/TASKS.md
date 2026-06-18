@@ -119,7 +119,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   status, and required handoffs; failures return typed blocked state with next
   operator command when available.
 
-### [ ] T-015-11 - lifecycle run-state store
+### [-] T-015-11 - lifecycle run-state store
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/run_store.py`,
   `dadaia_workspace/infrastructure/json_lifecycle_run_store.py`,
