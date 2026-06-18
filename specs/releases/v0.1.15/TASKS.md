@@ -59,7 +59,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   folders and repo-tree destinations; validate handoff/report artifacts where
   applicable.
 
-### [ ] T-015-05 - shared hygiene service and TTL reconciliation
+### [-] T-015-05 - shared hygiene service and TTL reconciliation
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/hygiene.py`,
   `dadaia_workspace/features/workspace_clean/service.py`,
