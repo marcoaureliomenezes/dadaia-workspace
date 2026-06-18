@@ -110,7 +110,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   reject malformed, stale, wrong-agent, wrong-release, wrong-context,
   wrong-commit, and substring-only evidence.
 
-### [ ] T-015-10 - preflight service and blocked/resume state
+### [-] T-015-10 - preflight service and blocked/resume state
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/service.py`,
   `tests/unit/features/lifecycle/test_preflight*.py`
