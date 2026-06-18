@@ -130,7 +130,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## W4 - CLI and report workflow
 
-### [-] T-015-12 - lifecycle command group
+### [x] T-015-12 - lifecycle command group
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`,
   `dadaia_workspace/cli/main.py`,

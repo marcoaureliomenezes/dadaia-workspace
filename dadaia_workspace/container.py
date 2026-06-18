@@ -14,6 +14,8 @@ from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
+from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
@@ -60,6 +62,7 @@ from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
+from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
@@ -417,6 +420,24 @@ def build_reports_retention_service(workspace_root: Path) -> ReportRetentionServ
     """Compose ``ReportRetentionService`` for workspace runtime report state."""
     _guard_initialized(workspace_root)
     return ReportRetentionService(workspace_root)
+
+
+def build_lifecycle_hygiene_service(workspace_root: Path) -> LifecycleHygieneService:
+    """Compose lifecycle hygiene service."""
+    _guard_initialized(workspace_root)
+    return LifecycleHygieneService(workspace_root)
+
+
+def build_lifecycle_preflight_service(workspace_root: Path) -> LifecyclePreflightService:
+    """Compose lifecycle preflight service."""
+    _guard_initialized(workspace_root)
+    return LifecyclePreflightService()
+
+
+def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
+    """Compose lifecycle run-state store."""
+    _guard_initialized(workspace_root)
+    return JsonLifecycleRunStore(workspace_root)
 
 
 def build_panel_views(

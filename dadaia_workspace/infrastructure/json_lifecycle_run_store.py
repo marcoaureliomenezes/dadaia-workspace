@@ -82,6 +82,8 @@ class JsonLifecycleRunStore:
         return self._root / f"{run_id}.json"
 
     def _reject_repo_tree_root(self) -> None:
+        if self._is_initialized_workspace_root(self._workspace_root):
+            return
         has_workspace_marker = False
         for path in (self._workspace_root, *self._workspace_root.parents):
             if path.joinpath(".git").exists():
@@ -93,6 +95,13 @@ class JsonLifecycleRunStore:
                 has_workspace_marker = True
         if not has_workspace_marker:
             return
+
+    @staticmethod
+    def _is_initialized_workspace_root(path: Path) -> bool:
+        return (
+            path.joinpath(".dadaia", "states", "spec_contexts.json").is_file()
+            and path.joinpath("repos").is_dir()
+        )
 
     def _atomic_write(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

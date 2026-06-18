@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from dadaia_workspace.core.models.hygiene import HygieneCounters
 from dadaia_workspace.core.models.lifecycle import (
@@ -12,6 +13,10 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecyclePhase,
 )
 from dadaia_workspace.features.lifecycle.gates import HandoffGateValidator
+from dadaia_workspace.features.lifecycle.run_store import (
+    LifecycleRunStore,
+    LifecycleRunStoreError,
+)
 
 
 @dataclass(frozen=True)
@@ -97,6 +102,21 @@ class LifecyclePreflightResult:
     evidence: tuple[GateEvidence, ...] = ()
 
 
+class LifecycleCommandStatus(StrEnum):
+    OK = "OK"
+    BLOCKED = "BLOCKED"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+
+
+@dataclass(frozen=True)
+class LifecycleCommandResult:
+    """Service-level outcome for lifecycle CLI commands."""
+
+    status: LifecycleCommandStatus
+    message: str
+    blocked: BlockedState | None = None
+
+
 class LifecyclePreflightService:
     """Evaluate lifecycle preconditions and return typed blocked state."""
 
@@ -122,6 +142,50 @@ class LifecyclePreflightService:
             return handoff_result
 
         return LifecyclePreflightResult(ok=True, evidence=handoff_result.evidence)
+
+    def unresolved_runtime_preflight(
+        self, current_step: str = "preflight"
+    ) -> LifecycleCommandResult:
+        """Return the deterministic blocked state used until runtime probes are wired."""
+        blocked = BlockedState(
+            reason="lifecycle preflight requires resolved runtime inputs",
+            blocked_at_step=current_step,
+            resume_token=f"unresolved:{current_step}",
+            detail={"current_step": current_step},
+        )
+        return LifecycleCommandResult(
+            status=LifecycleCommandStatus.BLOCKED,
+            message=blocked.reason,
+            blocked=blocked,
+        )
+
+    def unavailable_workflow(self, workflow: str) -> LifecycleCommandResult:
+        """Return a service-owned blocked outcome for guarded skeleton workflows."""
+        blocked = BlockedState(
+            reason=f"{workflow} workflow is not implemented yet",
+            blocked_at_step=workflow,
+            resume_token=f"unavailable:{workflow}",
+            detail={"workflow": workflow},
+        )
+        return LifecycleCommandResult(
+            status=LifecycleCommandStatus.BLOCKED,
+            message=blocked.reason,
+            blocked=blocked,
+        )
+
+    def resume_run(self, run_store: LifecycleRunStore, run_id: str) -> LifecycleCommandResult:
+        """Resume a lifecycle run and translate persistence failures to typed output."""
+        try:
+            run = run_store.resume(run_id)
+        except LifecycleRunStoreError as exc:
+            return LifecycleCommandResult(
+                status=LifecycleCommandStatus.INTERNAL_ERROR,
+                message=str(exc),
+            )
+        return LifecycleCommandResult(
+            status=LifecycleCommandStatus.OK,
+            message=f"resumed {run.run_id}",
+        )
 
     def _check_binding(self, data: LifecyclePreflightInput) -> BlockedState | None:
         if data.binding is None:

@@ -145,6 +145,19 @@ def test_refuses_repo_root_even_when_dadaia_already_exists(tmp_path: Path) -> No
         JsonLifecycleRunStore(repo_root)
 
 
+def test_refuses_repo_root_with_dadaia_and_repos_but_no_workspace_sentinel(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / ".git").mkdir()
+    (repo_root / ".dadaia").mkdir()
+    (repo_root / "repos").mkdir()
+
+    with pytest.raises(LifecycleRunStoreError, match="repository tree"):
+        JsonLifecycleRunStore(repo_root)
+
+
 def test_refuses_subdirectory_inside_repo_tree(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     nested = repo_root / "src" / "pkg"
@@ -166,3 +179,21 @@ def test_refuses_subdirectory_inside_repo_tree_even_with_nested_dadaia(
 
     with pytest.raises(LifecycleRunStoreError, match="repository tree"):
         JsonLifecycleRunStore(nested)
+
+
+def test_allows_self_hosting_workspace_root_with_git_and_dadaia(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".git").mkdir()
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
+    (workspace / "repos").mkdir()
+
+    store = JsonLifecycleRunStore(workspace)
+
+    assert store.root == workspace / ".dadaia" / "states" / "lifecycle"
