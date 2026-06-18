@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from enum import IntEnum
+from pathlib import Path
+from typing import Any
 
 import typer
 
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
 from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandResult,
     LifecycleCommandStatus,
@@ -27,9 +31,28 @@ class LifecycleExitCode(IntEnum):
     BLOCKED = 3
 
 
-def _emit_command_result(result: LifecycleCommandResult) -> None:
-    is_error = result.status is LifecycleCommandStatus.INTERNAL_ERROR
-    typer.echo(f"{result.status.value} {result.message}", err=is_error)
+def _emit_json(payload: dict[str, Any]) -> None:
+    typer.echo(json.dumps(payload, sort_keys=True))
+
+
+def _command_result_payload(result: LifecycleCommandResult) -> dict[str, Any]:
+    return {
+        "status": result.status.value,
+        "message": result.message,
+        "blocked": result.blocked.to_dict() if result.blocked else None,
+    }
+
+
+def _emit_command_result(result: LifecycleCommandResult, *, json_output: bool = False) -> None:
+    if json_output:
+        _emit_json(_command_result_payload(result))
+    else:
+        is_error = result.status is LifecycleCommandStatus.INTERNAL_ERROR
+        typer.echo(f"{result.status.value} {result.message}", err=is_error)
+    _exit_for_command_result(result)
+
+
+def _exit_for_command_result(result: LifecycleCommandResult) -> None:
     if result.status is LifecycleCommandStatus.OK:
         return
     if result.status is LifecycleCommandStatus.INTERNAL_ERROR:
@@ -49,22 +72,58 @@ def _emit_unavailable_workflow(workflow: str) -> None:
     _emit_command_result(service.unavailable_workflow(workflow))
 
 
+def _relative_path_refs(workspace_root: Path, paths: tuple[Path, ...]) -> list[str]:
+    refs: list[str] = []
+    for path in paths:
+        try:
+            refs.append(path.relative_to(workspace_root).as_posix())
+        except ValueError:
+            refs.append(path.as_posix())
+    return refs
+
+
+def _cleanup_result_payload(
+    result: HygieneCleanupResult, *, workspace_root: Path
+) -> dict[str, Any]:
+    return {
+        "status": LifecycleCommandStatus.OK.value,
+        "dry_run": result.dry_run,
+        "candidate_count": len(result.candidates),
+        "candidates": [candidate.to_dict() for candidate in result.candidates],
+        "deleted_paths": _relative_path_refs(workspace_root, result.deleted_paths),
+        "skipped_paths": _relative_path_refs(workspace_root, result.skipped_paths),
+        "pruned_dirs": _relative_path_refs(workspace_root, result.pruned_dirs),
+    }
+
+
 @app.command()
-def status() -> None:
+def status(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Show lifecycle status."""
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
     service = container.build_lifecycle_hygiene_service(workspace_root)
     counters = service.status()
+    if json_output:
+        _emit_json(
+            {
+                "status": LifecycleCommandStatus.OK.value,
+                "counters": counters.to_dict(),
+            }
+        )
+        return
     typer.echo(f"OK cleanup_candidates={counters.cleanup_candidate_count}")
 
 
 @app.command()
-def preflight() -> None:
+def preflight(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Run lifecycle preflight."""
     service = _preflight_service()
-    _emit_command_result(service.unresolved_runtime_preflight())
+    _emit_command_result(service.unresolved_runtime_preflight(), json_output=json_output)
 
 
 @app.command()
@@ -85,25 +144,43 @@ def resume(run_id: str) -> None:
 
 
 @hygiene_app.command("status")
-def hygiene_status() -> None:
+def hygiene_status(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Show lifecycle hygiene status."""
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
     counters = container.build_lifecycle_hygiene_service(workspace_root).status()
+    if json_output:
+        _emit_json(
+            {
+                "status": LifecycleCommandStatus.OK.value,
+                "counters": counters.to_dict(),
+            }
+        )
+        return
     typer.echo(f"OK cleanup_candidates={counters.cleanup_candidate_count}")
 
 
 @hygiene_app.command("clean")
 def hygiene_clean(
-    apply: bool = typer.Option(False, "--apply", help="Apply cleanup. Default is dry-run."),
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run/--apply",
+        help="Preview cleanup or apply it explicitly.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run lifecycle hygiene cleanup."""
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
-    result = container.build_lifecycle_hygiene_service(workspace_root).cleanup(dry_run=not apply)
-    mode = "applied" if apply else "dry-run"
+    result = container.build_lifecycle_hygiene_service(workspace_root).cleanup(dry_run=dry_run)
+    if json_output:
+        _emit_json(_cleanup_result_payload(result, workspace_root=workspace_root))
+        return
+    mode = "dry-run" if dry_run else "applied"
     typer.echo(f"OK {mode} candidates={len(result.candidates)}")
 
 
