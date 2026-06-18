@@ -49,7 +49,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## W2 - Runtime files and hygiene
 
-### [ ] T-015-04 - filesystem runtime-file adapters
+### [-] T-015-04 - filesystem runtime-file adapters
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/runtime_files.py`,
   `tests/unit/infrastructure/test_runtime_files*.py`,
