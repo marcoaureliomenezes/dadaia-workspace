@@ -70,7 +70,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   without deleting; implementation avoids file-content reads for metadata-only
   decisions.
 
-### [ ] T-015-06 - boundary-safe cleanup and preservation rules
+### [-] T-015-06 - boundary-safe cleanup and preservation rules
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/hygiene.py`,
   `tests/integration/test_lifecycle_hygiene_cleanup.py`
