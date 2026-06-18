@@ -101,7 +101,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   data-driven and tested; transition inputs are structured evidence; no LLM or
   filesystem dependency.
 
-### [-] T-015-09 - semantic handoff gate validators
+### [x] T-015-09 - semantic handoff gate validators
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/gates.py`,
   `tests/unit/features/lifecycle/test_gates*.py`
