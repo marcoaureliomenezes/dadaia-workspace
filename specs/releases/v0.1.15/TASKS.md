@@ -140,7 +140,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   codes distinguish OK, BLOCKED, usage error, and internal error; commands use
   services instead of embedding workflow logic.
 
-### [ ] T-015-13 - status, preflight, and hygiene CLI behavior
+### [-] T-015-13 - status, preflight, and hygiene CLI behavior
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`,
   `tests/integration/cli/test_lifecycle_hygiene_cli.py`
