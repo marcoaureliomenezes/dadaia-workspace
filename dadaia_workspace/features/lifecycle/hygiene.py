@@ -93,9 +93,6 @@ class LifecycleHygieneService:
 
         orphan_handoffs, malformed_handoffs = self._handoff_semantic_counts()
         protected_paths = self._protected_paths()
-        protected_residual_count = sum(
-            1 for candidate in self._cleanup_candidates(protected_paths) if candidate.protected
-        )
         cleanup_candidates = sum(expired_totals.values())
         elapsed = int((self._clock() - started).total_seconds() * 1000)
         return HygieneCounters(
@@ -105,7 +102,7 @@ class LifecycleHygieneService:
             malformed_handoff_count=malformed_handoffs,
             unknown_top_level_dirs=self._unknown_top_level_dirs(),
             cleanup_candidate_count=cleanup_candidates,
-            protected_residual_count=protected_residual_count,
+            protected_residual_count=self._protected_residual_count(protected_paths),
             scan_elapsed_ms=elapsed,
         )
 
@@ -119,9 +116,10 @@ class LifecycleHygieneService:
             zone_dir = self._dadaia_root / zone.value
             if not zone_dir.is_dir():
                 continue
+            zone_root = zone_dir.resolve()
             cutoff = self._clock() - dt.timedelta(seconds=self._policy.ttl_for(zone))
             for path in sorted(zone_dir.rglob("*")):
-                if not path.is_file() or not self._is_mutable_safe_zone_file(path):
+                if not path.is_file() or not self._is_under_resolved(path, zone_root):
                     continue
                 mtime = dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.UTC)
                 if mtime >= cutoff:
@@ -151,9 +149,10 @@ class LifecycleHygieneService:
         handoff_dir = self._dadaia_root / HygieneZone.HANDOFF.value
         if not handoff_dir.is_dir():
             return protected
+        handoff_root = handoff_dir.resolve()
 
         for handoff in sorted(handoff_dir.rglob("*.handoff.json")):
-            if not handoff.is_file() or not self._is_under(handoff, handoff_dir):
+            if not handoff.is_file() or not self._is_under_resolved(handoff, handoff_root):
                 continue
             handoff_ref = self._workspace_ref(handoff)
             if self._is_review_or_audit_ref(handoff_ref):
@@ -172,6 +171,21 @@ class LifecycleHygieneService:
                 if artifact_ref is not None:
                     protected[artifact_ref] = HygieneProtectionKind.CURRENT_RELEASE_EVIDENCE
         return protected
+
+    def _protected_residual_count(self, protected_paths: dict[str, HygieneProtectionKind]) -> int:
+        count = 0
+        for rel in protected_paths:
+            path = self._workspace_root / rel
+            if not path.is_file():
+                continue
+            zone = self._zone_for_path(path)
+            if zone is None:
+                continue
+            cutoff = self._clock() - dt.timedelta(seconds=self._policy.ttl_for(zone))
+            mtime = dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.UTC)
+            if mtime < cutoff:
+                count += 1
+        return count
 
     def _important_paths(self) -> set[str]:
         state_path = self._dadaia_root / "states" / "report_retention.json"
@@ -221,9 +235,10 @@ class LifecycleHygieneService:
             zone_dir = self._dadaia_root / zone.value
             if not zone_dir.is_dir():
                 continue
+            zone_root = zone_dir.resolve()
             dirs = sorted((path for path in zone_dir.rglob("*") if path.is_dir()), reverse=True)
             for directory in dirs:
-                if not self._is_under(directory, zone_dir):
+                if not self._is_under_resolved(directory, zone_root):
                     continue
                 try:
                     directory.rmdir()
@@ -236,11 +251,12 @@ class LifecycleHygieneService:
         zone_dir = self._dadaia_root / zone.value
         if not zone_dir.is_dir():
             return 0, 0
+        zone_root = zone_dir.resolve()
         cutoff = self._clock() - dt.timedelta(seconds=self._policy.ttl_for(zone))
         total = 0
         expired = 0
         for path in zone_dir.rglob("*"):
-            if not path.is_file() or not self._is_under(path, zone_dir):
+            if not path.is_file() or not self._is_under_resolved(path, zone_root):
                 continue
             total += 1
             mtime = dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.UTC)
@@ -264,10 +280,11 @@ class LifecycleHygieneService:
         handoff_dir = self._dadaia_root / HygieneZone.HANDOFF.value
         if not handoff_dir.is_dir():
             return 0, 0
+        handoff_root = handoff_dir.resolve()
         orphan = 0
         malformed = 0
         for path in handoff_dir.rglob("*.handoff.json"):
-            if not path.is_file() or not self._is_under(path, handoff_dir):
+            if not path.is_file() or not self._is_under_resolved(path, handoff_root):
                 continue
             try:
                 doc = json.loads(path.read_text(encoding="utf-8"))
@@ -319,6 +336,12 @@ class LifecycleHygieneService:
             self._is_under(path, self._dadaia_root / zone.value) for zone in self._policy.safe_zones
         )
 
+    def _zone_for_path(self, path: Path) -> HygieneZone | None:
+        for zone in self._policy.safe_zones:
+            if self._is_under(path, self._dadaia_root / zone.value):
+                return zone
+        return None
+
     def _operator_exception_globs(self) -> list[str]:
         exc_file = self._dadaia_root / "states" / "root_exceptions.txt"
         try:
@@ -350,8 +373,12 @@ class LifecycleHygieneService:
 
     @staticmethod
     def _is_under(path: Path, root: Path) -> bool:
+        return LifecycleHygieneService._is_under_resolved(path, root.resolve())
+
+    @staticmethod
+    def _is_under_resolved(path: Path, root_resolved: Path) -> bool:
         try:
-            path.resolve().relative_to(root.resolve())
+            path.resolve().relative_to(root_resolved)
         except ValueError:
             return False
         return True
