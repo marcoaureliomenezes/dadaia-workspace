@@ -30,7 +30,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   gate requirements, evidence, agent requests/results; tests cover creation and
   serialization; no I/O imports in core.
 
-### [-] T-015-02 - hygiene models and SlopPolicy
+### [x] T-015-02 - hygiene models and SlopPolicy
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/models/hygiene.py`,
   `tests/unit/core/test_hygiene*.py`
