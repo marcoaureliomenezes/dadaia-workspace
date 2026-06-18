@@ -93,7 +93,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## W3 - State machine and gates
 
-### [ ] T-015-08 - lifecycle state machine
+### [-] T-015-08 - lifecycle state machine
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/state_machine.py`,
   `tests/unit/features/lifecycle/test_state_machine*.py`
