@@ -38,7 +38,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   include zone totals, expired totals, orphan/malformed handoffs, unknown
   `.dadaia/` dirs, cleanup candidates, protected residuals, and scan metrics.
 
-### [-] T-015-03 - runtime file and agent runtime protocols
+### [x] T-015-03 - runtime file and agent runtime protocols
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/protocols/runtime_files.py`,
   `dadaia_workspace/core/protocols/agent_runtime.py`,
