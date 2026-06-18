@@ -22,7 +22,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## W1 - Models and contracts
 
-### [-] T-015-01 - lifecycle core models
+### [x] T-015-01 - lifecycle core models
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/models/lifecycle.py`,
   `tests/unit/core/test_lifecycle*.py`
