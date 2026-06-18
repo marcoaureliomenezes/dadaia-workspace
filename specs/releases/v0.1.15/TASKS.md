@@ -81,7 +81,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   sessions, operator-protected paths, and anything outside safe zones; prunes
   safe empty dirs.
 
-### [ ] T-015-07 - hygiene snapshot and high-volume scan test
+### [-] T-015-07 - hygiene snapshot and high-volume scan test
 - **Owner:** qa-engineer
 - **Write set:** `tests/integration/test_lifecycle_hygiene_snapshot.py`,
   `tests/performance/test_lifecycle_hygiene_scan.py`
