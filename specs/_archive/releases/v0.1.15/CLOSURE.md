@@ -38,7 +38,7 @@ The release is intentionally foundational. It does not automate every backlog/re
 | T-015-20 | Review gate integration | `37c9417` |
 | T-015-21 | Temp workspace lifecycle smoke | `d76f8da` |
 | T-015-22 | Final validation | `0b8d510` |
-| T-015-23 | CLOSURE, memory, and disposition sweep | closure commit |
+| T-015-23 | CLOSURE, memory, and disposition sweep | `ca5ba47` |
 
 ## Validations
 
