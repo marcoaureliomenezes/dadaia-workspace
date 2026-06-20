@@ -168,7 +168,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## W5 - Codex worker integration
 
-### [-] T-015-16 - fake AgentRuntimePort tests
+### [x] T-015-16 - fake AgentRuntimePort tests
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/agent_runner.py`,
   `tests/unit/features/lifecycle/test_agent_runtime_fake.py`
