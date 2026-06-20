@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T14:37:12Z",
+  "generated_at": "2026-06-20T17:08:08.165943+00:00",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -9,7 +9,6 @@
       "category": "product",
       "tldr": "handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/.",
       "summary": "contrato handoff-v1.1 separa evidência humana de coordenação entre agentes: reports HTML em .dadaia/reports/<context>/<agent>/ e handoffs JSON em .dadaia/handoff/<context>/. O CLI valida schema e hash de artifact.path dentro do workspace — qualquer path relativo existente sob o root resolve workspace-rooted (incl. repos/<slug>/specs/audits), com fallback legacy handoff-dir; reports next e o gate QA/security consomem a raiz canônica.",
-      "path": "specs/memory/product/agents/agent-comms.md",
       "tags": [
         "agent-comms",
         "handoff",
@@ -17,6 +16,7 @@
       ],
       "token_estimate": 1230,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/agent-comms.md",
       "depends_on": [
         "public-asset-distribution"
       ]
@@ -28,7 +28,6 @@
       "category": "product",
       "tldr": "telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privac...",
       "summary": "telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privacidade por construção.",
-      "path": "specs/memory/product/agents/agent-monitoring.md",
       "tags": [
         "monitoring",
         "telemetry",
@@ -36,6 +35,7 @@
       ],
       "token_estimate": 1318,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/agent-monitoring.md",
       "depends_on": [
         "panel",
         "context-management",
@@ -49,7 +49,6 @@
       "category": "product",
       "tldr": "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 2 workflows; dispatcher purity.",
       "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), ADDITIVE vs MUTATING activity classes, and the minimal 2-workflow set.",
-      "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
         "agents",
@@ -58,6 +57,7 @@
       ],
       "token_estimate": 865,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/agent-orchestration.md",
       "depends_on": []
     },
     {
@@ -67,7 +67,6 @@
       "category": "product",
       "tldr": "9-core agents aligned to constitution §7 lifecycle phases; sub-agent model; dispatcher purity; Markdown memory protocol.",
       "summary": "Defines how the 9-core agent roster maps to lifecycle phases (constitution §7 and §14), the sub-agent model (PE + software-engineer under PM lease), dispatcher purity (only PM and project-auditor dispatch), and SDD memory protocol.",
-      "path": "specs/memory/product/agents/agent-sdd-alignment.md",
       "tags": [
         "sdd",
         "agents",
@@ -76,6 +75,7 @@
       ],
       "token_estimate": 695,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/agent-sdd-alignment.md",
       "depends_on": []
     },
     {
@@ -85,7 +85,6 @@
       "category": "product",
       "tldr": "Deep ai-engineer skill covering token economy, instruction hierarchy, persona-consistency invariants, model-tier selection, and scope-drift detection.",
       "summary": "Harness-agnostic context-engineering craft for ai-engineer. Covers token economy (cost-per-line discipline, tables vs prose compression, link vs inline decision), the canonical 10-section instruction hierarchy and attention ordering, five persona-consistency invariants (frontmatter schema, body order, [SCOPE ERROR] format, TDD flow, handoff contract), model-tier selection decision table (Opus/Sonnet/Haiku rubric), and recursive scope-drift detection with three detection rules and topology guard protocol. Extracted and expanded from the ai-engineer persona. Restricted to ai-engineer.",
-      "path": "specs/memory/product/agents/ai-context-engineering.md",
       "tags": [
         "ai-engineer",
         "context-engineering",
@@ -95,6 +94,7 @@
       ],
       "token_estimate": 468,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/ai-context-engineering.md",
       "depends_on": []
     },
     {
@@ -104,7 +104,6 @@
       "category": "product",
       "tldr": "Deep ai-engineer skill for Claude Code: agentic loop, context hierarchy, rules, skills, hooks, subagents, tools, MCP, and composition decision tree.",
       "summary": "Provides ai-engineer with actionable, protocol-oriented mastery of the Claude Code harness — covering the agentic loop and compaction boundary, the 8-layer context hierarchy decision protocol, rules enforcement (always_on vs path-scoped), skills mechanics and listing-budget management, hooks lifecycle and matcher semantics, subagent dispatch authority, tool permission model, MCP tool injection, and a composition decision tree encoding academy findings F1-F8 as protocol constraints. Restricted to ai-engineer by harness-skill-scope rule.",
-      "path": "specs/memory/product/agents/ai-harness-claude-code.md",
       "tags": [
         "ai-engineer",
         "harness",
@@ -114,6 +113,7 @@
       ],
       "token_estimate": 520,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/ai-harness-claude-code.md",
       "depends_on": []
     },
     {
@@ -123,7 +123,6 @@
       "category": "product",
       "tldr": "Deep ai-engineer Codex skill — AGENTS.md law, rules collision, trust model, live-verified hook facts.",
       "summary": "Provides ai-engineer with actionable mastery of the Codex harness — covering AGENTS.md as the scoped constitution, the naming-collision disambiguation between Codex Starlark .rules and dadaia workflow-protocols, Codex skill discovery, subagent fan-out model, config trust layers (global vs project), customization decision table, SDD phase integration, and hooks. Carries live-verified contract facts (codex-cli 0.139.0, evidence-level annotated) — hooks fire only in interactive sessions, never under headless codex exec. Restricted to ai-engineer by harness-skill-scope rule.",
-      "path": "specs/memory/product/agents/ai-harness-codex.md",
       "tags": [
         "ai-engineer",
         "harness",
@@ -133,6 +132,7 @@
       ],
       "token_estimate": 890,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/ai-harness-codex.md",
       "depends_on": []
     },
     {
@@ -142,7 +142,6 @@
       "category": "product",
       "tldr": "Middle-depth harness literacy for all agents: primitive definitions, Claude Code vs Codex deltas, dadaia projection mechanics, and ai-engineer defer checklist.",
       "summary": "Available to all 9 core agents. Defines at middle depth what each AI harness primitive is (agent persona, subagent, skill, rule, hook, AGENTS.md, MCP), how Claude Code and Codex differ in naming and enforcement for each primitive, how dadaia stages and projects them (public/ -> stage -> install -> .claude/.codex/.opencode/.agents; manifest SHA256; doctor checks), and a decision checklist for when to defer deeper questions to ai-engineer. Complements the ai-engineer-only deep skills without duplicating their protocol depth.",
-      "path": "specs/memory/product/agents/harness-primitives.md",
       "tags": [
         "harness",
         "primitives",
@@ -153,6 +152,7 @@
       ],
       "token_estimate": 495,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/agents/harness-primitives.md",
       "depends_on": []
     },
     {
@@ -162,7 +162,6 @@
       "category": "product",
       "tldr": "knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI.",
       "summary": "a aba Academy do panel navega diretamente os módulos da knowledge_basis (GET /api/academy lista todos os módulos com títulos e contagem de lições; rota read-only traversal-guarded GET /academy/<module>/<lesson> renderiza a lição em Markdown). A CLI copy-from-template (dadaia academy create/update/delete) permanece como superfície de gestão de cursos derivados.",
-      "path": "specs/memory/product/distribution/academy.md",
       "tags": [
         "academy",
         "onboarding",
@@ -170,6 +169,7 @@
       ],
       "token_estimate": 660,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/distribution/academy.md",
       "depends_on": [
         "workspace-init",
         "panel"
@@ -182,7 +182,6 @@
       "category": "product",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots.",
       "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
-      "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
         "assets",
@@ -192,6 +191,7 @@
       ],
       "token_estimate": 678,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "depends_on": []
     },
     {
@@ -201,7 +201,6 @@
       "category": "product",
       "tldr": "paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1).",
       "summary": "paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1).",
-      "path": "specs/memory/product/panel/brand-identity.md",
       "tags": [
         "brand",
         "design",
@@ -210,6 +209,7 @@
       ],
       "token_estimate": 338,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/panel/brand-identity.md",
       "depends_on": []
     },
     {
@@ -219,7 +219,6 @@
       "category": "product",
       "tldr": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com ...",
       "summary": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com agent cards brand-identity (mint/sage/warm palette, WCAG AA badges), 12 workflow cards + DAG SVG server-rendered, tabela Sessions 8 colunas com per-cell min-width (CSS class selectors, floor 792px) + overflow-x:auto + Codex placeholder '—' em PROJECT, theme switcher 3 paletas, per-tab runtime toggle Claude/Codex, memory .md renderizado in-memory via mistune (D-4, memory-markdown-source-v1), Bearer token + CSP/nosniff; loopback bypass (panel-ux-fix-v1): GET /api/* retorna 200 sem token quando bind=127.0.0.1 (loopback_bypass=True em make_handler_class()).",
-      "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
         "ui",
@@ -228,6 +227,7 @@
       ],
       "token_estimate": 3983,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/panel/panel.md",
       "depends_on": [
         "agent-monitoring",
         "server-registry",
@@ -246,7 +246,6 @@
       "category": "product",
       "tldr": "Identity, pillars, lifecycle, concurrency model, agent roster, and anti-slop stance — the normative shape of dadaia-workspace from docs/01_medium_codex.md.",
       "summary": "Current-truth distillation of the normative Product Vision (docs/01_medium_codex.md). Covers the workspace identity (what it is and is not), the five design pillars, the canonical scaffold and operational layout, the development lifecycle phases, the concurrency model, the nine-core agent model, and the anti-slop operating stance. Constitution §0 operationalizes this vision into binding law; this atom cites, does not duplicate, constitution sections.",
-      "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
         "vision",
         "philosophy",
@@ -256,6 +255,7 @@
       ],
       "token_estimate": 950,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/philosophy/product-vision.md",
       "depends_on": [
         "spec-context-project",
         "agent-sdd-alignment",
@@ -270,7 +270,6 @@
       "category": "product",
       "tldr": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
       "summary": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
-      "path": "specs/memory/product/philosophy/repos-catalog.md",
       "tags": [
         "repos",
         "catalog",
@@ -278,6 +277,7 @@
       ],
       "token_estimate": 212,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/philosophy/repos-catalog.md",
       "depends_on": [
         "workspace-init",
         "context-management"
@@ -290,7 +290,6 @@
       "category": "product",
       "tldr": "The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0).",
       "summary": "Defines the Spec Context Project — the central organizing unit of dadaia-workspace. One canonical specs folder bound to one repository. Session binding triggers the bind→inject→enforce→parallel-multi-project value chain that lets a generic agent fleet build real projects safely and concurrently. Constitution §0 is the single source of truth for this concept.",
-      "path": "specs/memory/product/philosophy/spec-context-project.md",
       "tags": [
         "spec-context",
         "sdd",
@@ -299,6 +298,7 @@
       ],
       "token_estimate": 700,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/philosophy/spec-context-project.md",
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
@@ -313,7 +313,6 @@
       "category": "product",
       "tldr": "multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa.",
       "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind` (--mode opcional, default read) persiste contexto/modo/pid no session record CLI-owned via session_identity, atualiza o incumbent pointer E escreve o marker `.dadaia/states/bind_epoch/<ctx>` — o ÚNICO trigger de injeção de context-memory (first-ALIVE deletado da cadeia de injeção; sessão unbound recebe só preflight genérico + lista de contexts ALIVE); sessões READ são non-acquiring no gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS em acquire e renew, TTL piso de kernel_tunables + PID veto, stable-session-identity via .ptr, by-session index `ctx_locks/by-session/<sid>.json` escrito na MESMA transação CAS) plus port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); `dadaia context release` solta o(s) lease(s) da sessão (eval flow por sid; default flow por bound-context + dead-pid-ou-ancestry, nunca solta holder estrangeiro vivo) e o heartbeat jamais ressuscita lease de sessão released; lock steal e doctor LOCK-GC probe-gated (holder com pid vivo nunca é reclaimed); bind records renovados por heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog/bug new, dadaia memory product add.",
-      "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
         "lifecycle",
@@ -322,6 +321,7 @@
       ],
       "token_estimate": 2700,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/context-management.md",
       "depends_on": [
         "workspace-init",
         "sdd-gate-v3",
@@ -336,7 +336,6 @@
       "category": "product",
       "tldr": "dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash).",
       "summary": "Establishes the cross-platform foundation for dadaia-workspace v0.1.8 — a PLATFORM singleton (sole sys.platform call site), typed platform exceptions, 4 protocol ports, 9 infrastructure adapters, a Python governance hooks package, and a hard-gated 3-OS CI matrix. Defines the 3-tier resilience contract (fail-loud for security, degrade-with-log for non-security, unsupported-platform at construction). As of 0.1.8 rc-2 the Windows + macOS CI legs are GREEN and HARD-GATED (no continue-on-error; branch-protection required); classifier is POSIX::Linux + MacOS + Microsoft::Windows.",
-      "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
         "cross-platform",
@@ -349,6 +348,7 @@
       ],
       "token_estimate": 1440,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/cross-platform-portability.md",
       "depends_on": [
         "workspace-init",
         "context-management",
@@ -363,7 +363,6 @@
       "category": "product",
       "tldr": "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules).",
       "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only, per the §8 enforcement matrix), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks; OpenCode is canonized \"advisory + chokepoint-protected\" (ADR-G3). Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with no behavior until the plugin is installed.",
-      "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
         "opencode",
@@ -373,6 +372,7 @@
       ],
       "token_estimate": 606,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/multi-platform-parity.md",
       "depends_on": []
     },
     {
@@ -382,7 +382,6 @@
       "category": "product",
       "tldr": "registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos.",
       "summary": "registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos.",
-      "path": "specs/memory/product/platform/server-registry.md",
       "tags": [
         "server",
         "registry",
@@ -391,6 +390,7 @@
       ],
       "token_estimate": 626,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/server-registry.md",
       "depends_on": [
         "workspace-init",
         "panel"
@@ -403,7 +403,6 @@
       "category": "product",
       "tldr": "diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, LOCK-GC, CTX-URL-1, INV-4, INV-5, SENTINEL-GC, PTR-GC, VENV-1.",
       "summary": "diagnóstico + repair de invariantes do workspace state com --fix opcional. Cobre context ALIVE/DEAD (INV-4, INV-5), TTL-lease inválido (LOCK-NEW), reclaim probe-gated de lease stale de holder morto/unprobeable (LOCK-GC — nunca reclama pid vivo), context ALIVE com repo_url vazio (CTX-URL-1, manual via context update --url), orphan sentinel files (SENTINEL-GC), orphan .ptr files (PTR-GC) e saúde do venv do workspace (VENV-1 — .dadaia/.venv presente, entrypoint dadaia executável). Bind/session records decaem por TTL contra last_seen_at heartbeat-renovado. Invariantes SEM-1 e Lock-3 foram removidos em v0.1.6; os antigos LEASE-1..4 nunca existiram no código.",
-      "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
         "doctor",
@@ -412,6 +411,7 @@
       ],
       "token_estimate": 950,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/workspace-doctor.md",
       "depends_on": [
         "workspace-init",
         "specs-doctor",
@@ -425,7 +425,6 @@
       "category": "product",
       "tldr": "porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente.",
       "summary": "porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente; PreToolUse registrado como UM comando Python (python -m dadaia_workspace.hooks.pre_gate), não bash; ctx-inject.sh retido apenas como fallback não-instalado.",
-      "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
         "init",
@@ -434,6 +433,7 @@
       ],
       "token_estimate": 620,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/workspace-init.md",
       "depends_on": []
     },
     {
@@ -443,7 +443,6 @@
       "category": "product",
       "tldr": "export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas.",
       "summary": "export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas.",
-      "path": "specs/memory/product/platform/workspace-portability.md",
       "tags": [
         "portability",
         "export",
@@ -452,6 +451,7 @@
       ],
       "token_estimate": 336,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/platform/workspace-portability.md",
       "depends_on": [
         "context-management",
         "workspace-init"
@@ -459,12 +459,30 @@
     },
     {
       "rank": 23,
+      "slug": "lifecycle-foundation",
+      "title": "lifecycle-foundation",
+      "category": "product",
+      "tldr": "Deterministic Codex lifecycle foundation with Python-owned state, gates, hygiene, blocked/resume, and scoped Codex exec.",
+      "summary": "`dadaia lifecycle` is the Codex-side deterministic lifecycle spine. The CLI stays thin and calls Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Codex is a bounded worker behind `AgentRuntimePort`, with a fake runtime for CI and an exec-backed adapter that uses explicit cwd/env/model/profile inputs and redacts credentials. The foundation exposes status, preflight, hygiene, report, resume, and guarded backlog/release/implementation/review/close skeletons; full autonomous workflow bodies remain future releases.",
+      "tags": [
+        "sdd",
+        "lifecycle",
+        "codex",
+        "hygiene",
+        "gates"
+      ],
+      "token_estimate": 620,
+      "agent_tier": "self-pull",
+      "path": "specs/memory/product/sdd/lifecycle-foundation.md",
+      "depends_on": []
+    },
+    {
+      "rank": 24,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
-      "tldr": "Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, grill mandatório; push gated por security APPROVE; PM curates backlog.",
-      "summary": "Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill), o segment model alpha-N/rc-N (estrutura de folders, ADR-1..5), a cadência de revisão pós-G6: push gated mecanicamente por security-reviewer APPROVE (metrics.commit_sha por sha pushed; trio-at-rc-push abolido; qa-per-task-group e code-review-at-PR são disciplina PM até o gate ladder completo em v0.1.15), pre-push CI gate, and backlog-ownership as a PM coordination convention (NOT gate-enforced since 0.1.7 rc-3; backlog is ADDITIVE-allow).",
-      "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
+      "tldr": "Bugs+backlog → releases with mandatory grill, bug disposition, lifecycle preflight, blocked/resume, semantic gates, and security-gated push.",
+      "summary": "Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill), o segment model alpha-N/rc-N (estrutura de folders, ADR-1..5), a cadência de revisão atual: push gated mecanicamente por security-reviewer APPROVE (metrics.commit_sha por sha pushed), lifecycle foundation command surface for typed preflight/blocked/resume and semantic QA, security, and code-review handoff validation, pre-push CI gate, and backlog-ownership as a PM coordination convention (not gate-enforced; backlog is ADDITIVE-allow).",
       "tags": [
         "sdd",
         "governance",
@@ -474,10 +492,12 @@
         "alpha-rc-model",
         "backlog-ownership"
       ],
-      "token_estimate": 1683,
+      "token_estimate": 1470,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "depends_on": [
         "sdd-gate-v3",
+        "lifecycle-foundation",
         "sdd-hotfix-track",
         "specs-doctor",
         "public-asset-distribution",
@@ -485,13 +505,12 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
       "tldr": "SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD, first-block-wins); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto.",
       "summary": "Enforcement em duas camadas. (1) Hooks Python: o PreToolUse roda por UM entrypoint merged — `dadaia_workspace.hooks.pre_gate` — que lê o stdin uma vez e avalia as policies em ordem fixa root-whitelist → venv-guard → SDD gate, first-block-wins, cada policy fail-open (PROTECTED é o único caminho fail-closed). O classificador SDD é context-relative (ADDITIVE allow sem lease, MEMORY gated por fase, FROZEN block, MUTATING adquire o TTL-lease via O_EXCL CAS com PID veto); apply_patch multi-file classifica TODOS os headers (veredito mais restritivo vence); READ é non-acquiring. O PostToolUse renova heartbeat via by-session index (sem full scan) e roda o reconciler advisory (nunca bloqueia). (2) Chokepoints git: pre-commit lease gate (cadeia DP-4, zero-false-block, degradação advisory ALLOW+WARN) e pre-push gate mecânico de verdict de security (metrics.commit_sha por sha pushed) — rodam independentemente de hooks de harness. Tunables em core/kernel_tunables.py; latência de hook em .dadaia/logs/hook-latency.jsonl.",
-      "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
         "gate",
@@ -501,19 +520,19 @@
       ],
       "token_estimate": 3024,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "depends_on": [
         "context-management",
         "agent-orchestration"
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "sdd-hotfix-track",
       "title": "sdd-hotfix-track",
       "category": "product",
       "tldr": "SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog).",
       "summary": "SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog).",
-      "path": "specs/memory/product/sdd/sdd-hotfix-track.md",
       "tags": [
         "sdd",
         "hotfix",
@@ -522,6 +541,7 @@
       ],
       "token_estimate": 852,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/sdd/sdd-hotfix-track.md",
       "depends_on": [
         "sdd-bug-backlog-governance",
         "sdd-gate-v3",
@@ -530,13 +550,12 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
       "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4.",
       "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$ com allowlist legacy documentada), 028 (file refs da constitution resolvem), 029 (coerência lease↔session com triagem em 3 estados: stale-dead WARN com remediação / live-incoerente ERR / coerente ok), 030 (naming de dirs novos em specs/audits/, WARN), 031 (backlog consumido por release arquivada com status não-terminal, WARN), 032 (status de bug fora do canon {Open, Closed}, WARN); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
-      "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
         "doctor",
@@ -545,6 +564,7 @@
       ],
       "token_estimate": 1650,
       "agent_tier": "self-pull",
+      "path": "specs/memory/product/sdd/specs-doctor.md",
       "depends_on": [
         "workspace-doctor",
         "context-management",

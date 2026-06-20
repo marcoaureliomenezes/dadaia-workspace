@@ -16,23 +16,24 @@
 | `agent-sdd-alignment` | agent-sdd-alignment | 9-core agents aligned to constitution §7 lifecycle phases; sub-agent model; dispatcher purity; Markdown memory protocol. |
 | `ai-context-engineering` | ai-context-engineering | Deep ai-engineer skill covering token economy, instruction hierarchy, persona-consistency invariants, model-tier selection, and scope-drift detection. |
 | `ai-harness-claude-code` | ai-harness-claude-code | Deep ai-engineer skill for Claude Code: agentic loop, context hierarchy, rules, skills, hooks, subagents, tools, MCP, and composition decision tree. |
-| `ai-harness-codex` | ai-harness-codex | Deep ai-engineer skill for Codex: AGENTS.md constitution, rules naming collision, config trust model, subagent fan-out, and customization decision table. |
+| `ai-harness-codex` | ai-harness-codex | Deep ai-engineer Codex skill — AGENTS.md law, rules collision, trust model, live-verified hook facts. |
 | `harness-primitives` | harness-primitives | Middle-depth harness literacy for all agents: primitive definitions, Claude Code vs Codex deltas, dadaia projection mechanics, and ai-engineer defer checklist. |
-| `academy` | academy | sistema de cursos copy-from-template para onboarding de contribuidores e agentes. |
+| `academy` | academy | knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI. |
 | `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots. |
 | `brand-identity` | brand-identity | paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1). |
 | `panel` | panel | superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com ... |
 | `product-vision` | product-vision | Identity, pillars, lifecycle, concurrency model, agent roster, and anti-slop stance — the normative shape of dadaia-workspace from docs/01_medium_codex.md. |
 | `repos-catalog` | repos-catalog | lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL. |
 | `spec-context-project` | spec-context-project | The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0). |
-| `context-management` | context-management | multi-context ALIVE/DEAD; bind persiste modo no session record E escreve o bind-epoch marker (injeção bind-driven); TTL+PID-veto lease com by-session index; `context release` solta o lease; dead() exige tree limpa ou --commit. |
+| `context-management` | context-management | multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa. |
 | `cross-platform-portability` | cross-platform-portability | dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash). |
 | `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, LOCK-GC, CTX-URL-1, INV-4, INV-5, SENTINEL-GC, PTR-GC, VENV-1. |
 | `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente. |
 | `workspace-portability` | workspace-portability | export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas. |
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, mandatory grill; push gated mecanicamente por security APPROVE; PM curates backlog (convention). |
-| `sdd-gate-v3` | sdd-gate-v3 | SDD gate v0.1.14: entrypoint PreToolUse único pre_gate (root-whitelist → venv-guard → SDD, first-block-wins); chokepoints git pre-commit/pre-push; lease O_EXCL CAS com pid veto; heartbeat by-session index. |
+| `lifecycle-foundation` | lifecycle-foundation | Deterministic Codex lifecycle foundation with Python-owned state, gates, hygiene, blocked/resume, and scoped Codex exec. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Bugs+backlog → releases with mandatory grill, bug disposition, lifecycle preflight, blocked/resume, semantic gates, and security-gated push. |
+| `sdd-gate-v3` | sdd-gate-v3 | SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD, first-block-wins); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto. |
 | `sdd-hotfix-track` | sdd-hotfix-track | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
-| `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-030, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4. |
+| `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4. |

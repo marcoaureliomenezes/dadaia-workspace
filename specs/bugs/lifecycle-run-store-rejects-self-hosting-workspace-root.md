@@ -1,10 +1,11 @@
 ---
-status: open
+status: Closed
 severity: high
 created_at: 2026-06-18
 reported_by: codex
 session_id: null
 release: v0.1.15
+resolved_by: v0.1.15
 ---
 
 # lifecycle run store rejects self-hosting workspace root
@@ -46,3 +47,9 @@ workspace runtime state:
 
 `JsonLifecycleRunStore(/home/marco/workspace/dadaia/repos/dadaia-workspace)` and
 subdirectories under that repo must still be rejected.
+
+## Resolution
+
+Fixed in v0.1.15 by allowing the initialized self-hosting workspace root while
+continuing to reject repo-tree stores. Regression evidence: commit `9682c88`
+and `tests/unit/features/lifecycle/test_run_store.py::test_allows_self_hosting_workspace_root_with_git_and_dadaia`.

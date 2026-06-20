@@ -2,7 +2,7 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: Layer rules, 9+3 agent topology, merged pre_gate hook + git chokepoints, context-relative gate taxonomy, TTL+PID-veto lease, 3-channel comms, projection chain.
+tldr: Layer rules, lifecycle spine, agent topology, merged pre_gate hook, git chokepoints, TTL+PID-veto lease, and projection chain.
 summary: Defines the three-ring architecture (cli/features/infrastructure), dependency
   rules, 9-core agent roster with coordinator+sub-agent topology, the concurrency
   kernel (merged pre_gate PreToolUse entrypoint; context-relative path classifier;
@@ -18,8 +18,8 @@ tags:
 - agents
 agent_tier: self-pull
 token_estimate: 7000
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+last_updated: '2026-06-20'
+release_origin: v0.1.15
 ---
 
 ## Visão geral
@@ -41,9 +41,9 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 
 ## Camadas
 
-**cli/** — typer app + 21 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`. Thin wrapper sobre features; sem business logic.
+**cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`, `lifecycle`. Thin wrapper sobre features; sem business logic.
 
-**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `migrate`, `orchestration`, `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
+**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `lifecycle` (deterministic Codex lifecycle foundation: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts, run store, and AgentRuntimePort runner), `migrate`, `orchestration`, `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
 
 **panel — arquitetura HTTP interna (pós R5):**
 

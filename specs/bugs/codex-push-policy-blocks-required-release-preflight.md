@@ -1,11 +1,12 @@
 ---
 name: codex-push-policy-blocks-required-release-preflight
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-18
 surface: Codex command policy / release-definition preflight
 session_id: null
 release: v0.1.15
+resolved_by: v0.1.15
 ---
 
 **Symptom:** A release-definition workflow precondition required clean worktrees
@@ -29,3 +30,7 @@ operator complete the push and resume without ambiguity.
 **Notes:** This is not a git remote failure and not an SDD lease conflict. It is
 a mismatch between a required release-definition ritual and the available Codex
 command policy surface in a no-approval session.
+
+**Resolution:** v0.1.15 implements lifecycle blocked/resume preflight. The
+regression is covered by `tests/integration/test_lifecycle_push_preflight.py`
+and commit `04ec27d`.
