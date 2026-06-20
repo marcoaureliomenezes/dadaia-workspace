@@ -191,7 +191,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   profile widening requires explicit operator-controlled input and is visible in
   the run record; live Codex tests are opt-in only.
 
-### [ ] T-015-18 - scoped prompt builder and write allowlist contract
+### [-] T-015-18 - scoped prompt builder and write allowlist contract
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/prompt_builder.py`,
   `tests/unit/features/lifecycle/test_prompt_builder.py`,
