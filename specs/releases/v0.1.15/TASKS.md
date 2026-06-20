@@ -229,7 +229,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## W7 - Final gates and closure
 
-### [-] T-015-22 - final validation
+### [x] T-015-22 - final validation
 - **Owner:** software-engineer
 - **Write set:** none expected
 - **Acceptance:** ruff format/check, mypy strict, pytest, specs doctor, public
