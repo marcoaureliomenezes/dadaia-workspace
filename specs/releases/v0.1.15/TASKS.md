@@ -176,7 +176,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   structured output and diff/write-scope validation; "agent says approved" alone
   does not pass a gate.
 
-### [ ] T-015-17 - Codex exec adapter decision and implementation
+### [-] T-015-17 - Codex exec adapter decision and implementation
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_runtime.py`,
   `tests/unit/infrastructure/test_codex_runtime*.py`,
