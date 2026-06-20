@@ -15,6 +15,7 @@ from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
+from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportWorkflow
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
@@ -75,6 +76,7 @@ from dadaia_workspace.infrastructure.process_ancestry_adapter import (
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
@@ -438,6 +440,17 @@ def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
     """Compose lifecycle run-state store."""
     _guard_initialized(workspace_root)
     return JsonLifecycleRunStore(workspace_root)
+
+
+def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWorkflow:
+    """Compose lifecycle report workflow."""
+    _guard_initialized(workspace_root)
+    return LifecycleReportWorkflow(
+        workspace_root=workspace_root,
+        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
+        hygiene=LifecycleHygieneService(workspace_root),
+        validation=build_reports_validation_service(workspace_root),
+    )
 
 
 def build_panel_views(

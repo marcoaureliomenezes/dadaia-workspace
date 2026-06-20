@@ -9,6 +9,7 @@ from typing import Any
 
 import typer
 
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
 from dadaia_workspace.features.lifecycle.service import (
@@ -96,6 +97,15 @@ def _cleanup_result_payload(
     }
 
 
+def _runtime_ref_payload(ref: RuntimeFileRef) -> dict[str, object]:
+    return {
+        "kind": ref.kind.value,
+        "path": ref.path,
+        "content_hash": ref.content_hash,
+        "ttl_seconds": ref.ttl_seconds,
+    }
+
+
 @app.command()
 def status(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
@@ -127,9 +137,43 @@ def preflight(
 
 
 @app.command()
-def report() -> None:
+def report(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Report context."),
+    release_id: str = typer.Option("v0.1.15", "--release-id", help="Release id."),
+    run_id: str = typer.Option("lifecycle-report", "--run-id", help="Lifecycle run id."),
+    apply_cleanup: bool = typer.Option(
+        False,
+        "--apply-cleanup",
+        help="Apply hygiene cleanup after writing the report.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Run lifecycle report workflow."""
-    _emit_unavailable_workflow("report")
+    from dadaia_workspace import container
+
+    workspace_root = resolve_workspace_root()
+    result = container.build_lifecycle_report_workflow(workspace_root).run(
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        apply_cleanup=apply_cleanup,
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": LifecycleCommandStatus.OK.value,
+                "report": _runtime_ref_payload(result.report),
+                "handoff": _runtime_ref_payload(result.handoff),
+                "baseline_snapshot": _runtime_ref_payload(result.baseline_snapshot),
+                "final_snapshot": _runtime_ref_payload(result.final_snapshot),
+                "cleanup_dry_run": result.cleanup.dry_run,
+                "cleanup_candidate_count": len(result.cleanup.candidates),
+                "validation_valid": result.validation.valid,
+                "validation_hash_status": result.validation.hash_status,
+            }
+        )
+        return
+    typer.echo(f"OK report={result.report.path} handoff={result.handoff.path}")
 
 
 @app.command()

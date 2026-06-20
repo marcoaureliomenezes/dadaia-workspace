@@ -149,7 +149,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   workspaces; status/preflight never call Codex; cleanup apply requires explicit
   flag.
 
-### [-] T-015-14 - report workflow proof
+### [x] T-015-14 - report workflow proof
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/report_workflow.py`,
   `tests/integration/test_lifecycle_report_workflow.py`
