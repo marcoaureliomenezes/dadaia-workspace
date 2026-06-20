@@ -219,7 +219,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   agent/context/release/verdict/commit identity match; stale and wrong-context
   approvals fail.
 
-### [ ] T-015-21 - temp workspace lifecycle smoke
+### [-] T-015-21 - temp workspace lifecycle smoke
 - **Owner:** qa-engineer
 - **Write set:** `tests/e2e/test_lifecycle_engine_smoke.py`
 - **Acceptance:** disposable workspace runs status -> preflight blocked ->
