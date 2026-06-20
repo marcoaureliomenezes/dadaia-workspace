@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from dadaia_workspace.core.models.hygiene import HygieneCounters
@@ -12,6 +13,7 @@ from dadaia_workspace.core.models.lifecycle import (
     GateRequirement,
     LifecyclePhase,
 )
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort, RuntimeFileRef
 from dadaia_workspace.features.lifecycle.gates import HandoffGateValidator
 from dadaia_workspace.features.lifecycle.run_store import (
     LifecycleRunStore,
@@ -117,6 +119,14 @@ class LifecycleCommandResult:
     blocked: BlockedState | None = None
 
 
+@dataclass(frozen=True)
+class BlockedPushResult:
+    """Blocked push preflight state plus emitted handoff evidence."""
+
+    command: LifecycleCommandResult
+    handoff: RuntimeFileRef
+
+
 class LifecyclePreflightService:
     """Evaluate lifecycle preconditions and return typed blocked state."""
 
@@ -186,6 +196,66 @@ class LifecyclePreflightService:
             status=LifecycleCommandStatus.OK,
             message=f"resumed {run.run_id}",
         )
+
+    def blocked_push_preflight(
+        self,
+        *,
+        context: str,
+        release_id: str,
+        commit_sha: str,
+        runtime_files: RuntimeFilePort,
+        run_id: str,
+    ) -> BlockedPushResult:
+        """Return and emit the resumable blocked state for no-approval push."""
+        blocked = BlockedState(
+            reason="push requires security-reviewer approval",
+            blocked_at_step="push",
+            resume_token=f"{context}:{release_id}:push:{commit_sha}",
+            operator_command="git push",
+            detail={
+                "context": context,
+                "release_id": release_id,
+                "commit_sha": commit_sha,
+            },
+        )
+        command = LifecycleCommandResult(
+            status=LifecycleCommandStatus.BLOCKED,
+            message=blocked.reason,
+            blocked=blocked,
+        )
+        handoff = runtime_files.write_handoff(
+            context=context,
+            filename=f"{run_id}-blocked-push.handoff.json",
+            payload={
+                "schema_version": "handoff-v1.1",
+                "agent": "lifecycle",
+                "context": context,
+                "release_id": release_id,
+                "produced_at": datetime.now(UTC)
+                .isoformat(timespec="seconds")
+                .replace(
+                    "+00:00",
+                    "Z",
+                ),
+                "artifact": {"type": "other"},
+                "scope": "blocked-push",
+                "metrics": {
+                    "commit_sha": commit_sha,
+                    "blocked_at_step": blocked.blocked_at_step,
+                    "operator_command": blocked.operator_command or "",
+                    "resume_token": blocked.resume_token or "",
+                },
+                "findings": [
+                    {
+                        "severity": "HIGH",
+                        "message": blocked.reason,
+                        "detail_md": "Push is blocked until security-reviewer handoff approval.",
+                        "fix_recommendation": blocked.operator_command or "git push",
+                    }
+                ],
+            },
+        )
+        return BlockedPushResult(command=command, handoff=handoff)
 
     def _check_binding(self, data: LifecyclePreflightInput) -> BlockedState | None:
         if data.binding is None:

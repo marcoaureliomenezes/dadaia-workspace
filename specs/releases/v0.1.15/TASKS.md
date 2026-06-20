@@ -203,7 +203,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## W6 - Bug proof and end-to-end validation
 
-### [-] T-015-19 - blocked push/resume regression
+### [x] T-015-19 - blocked push/resume regression
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/service.py`,
   `tests/integration/test_lifecycle_push_preflight.py`
