@@ -68,9 +68,9 @@ def _preflight_service() -> LifecyclePreflightService:
     return container.build_lifecycle_preflight_service(workspace_root)
 
 
-def _emit_unavailable_workflow(workflow: str) -> None:
+def _emit_unavailable_workflow(workflow: str, *, json_output: bool = False) -> None:
     service = _preflight_service()
-    _emit_command_result(service.unavailable_workflow(workflow))
+    _emit_command_result(service.unavailable_workflow(workflow), json_output=json_output)
 
 
 def _relative_path_refs(workspace_root: Path, paths: tuple[Path, ...]) -> list[str]:
@@ -229,45 +229,59 @@ def hygiene_clean(
 
 
 @backlog_app.command("define")
-def backlog_define() -> None:
+def backlog_define(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Define backlog through the lifecycle workflow."""
-    _emit_unavailable_workflow("backlog definition")
+    _emit_unavailable_workflow("backlog definition", json_output=json_output)
 
 
 @release_app.command("define")
-def release_define() -> None:
+def release_define(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Define a release through the lifecycle workflow."""
-    _emit_unavailable_workflow("release definition")
+    _emit_unavailable_workflow("release definition", json_output=json_output)
 
 
 @app.command()
-def implement() -> None:
+def implement(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Run lifecycle implementation workflow."""
-    _emit_unavailable_workflow("implementation")
+    _emit_unavailable_workflow("implementation", json_output=json_output)
 
 
 @review_app.command("qa")
-def review_qa() -> None:
+def review_qa(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Run QA review gate."""
-    _emit_unavailable_workflow("QA review")
+    _emit_unavailable_workflow("QA review", json_output=json_output)
 
 
 @review_app.command("security")
-def review_security() -> None:
+def review_security(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Run security review gate."""
-    _emit_unavailable_workflow("security review")
+    _emit_unavailable_workflow("security review", json_output=json_output)
 
 
 @review_app.command("code")
-def review_code() -> None:
+def review_code(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Run code review gate."""
-    _emit_unavailable_workflow("code review")
+    _emit_unavailable_workflow("code review", json_output=json_output)
 
 
 @app.command()
-def close() -> None:
+def close(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
     """Close the active lifecycle release."""
-    _emit_unavailable_workflow("release closure")
+    _emit_unavailable_workflow("release closure", json_output=json_output)
 
 
 app.add_typer(hygiene_app, name="hygiene")

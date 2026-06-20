@@ -158,7 +158,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   cleanup apply occurs only with explicit option/policy and fresh artifacts
   remain.
 
-### [-] T-015-15 - guarded skeleton commands
+### [x] T-015-15 - guarded skeleton commands
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`,
   `tests/integration/cli/test_lifecycle_command_skeletons.py`
