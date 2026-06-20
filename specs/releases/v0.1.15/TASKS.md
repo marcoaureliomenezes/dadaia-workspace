@@ -211,7 +211,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   operator command and resume token; emits valid handoff; no Codex command
   policy change is made in this release.
 
-### [-] T-015-20 - review gate integration
+### [x] T-015-20 - review gate integration
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/gates.py`,
   `tests/integration/test_lifecycle_review_gates.py`
