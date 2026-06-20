@@ -71,7 +71,7 @@ segment model.
 - **CLI:** minimal `dadaia bugs` group — `append` (schema-validated, rotation-aware),
   `status` (fold events → current per-bug status), `stats` (counts by component/
   surface/severity/root-cause tag, feeding the bug-trend audit). Doctor SPEC-DOC-026
-  is rewritten from markdown-frontmatter validation to JSONL schema + rotation + 
+  is rewritten from markdown-frontmatter validation to JSONL schema + rotation +
   event-coherence validation (e.g. `resolved` without prior `reported` = error).
 - **Migration:** one-time converter — existing `specs/bugs/*.md`: open bugs →
   `reported` events (fields mapped from frontmatter); closed/superseded bugs →

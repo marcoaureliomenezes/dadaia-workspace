@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import LifecycleRun
-from dadaia_workspace.features.lifecycle.run_store import LifecycleRunStoreError
+from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStoreError
 
 _SCHEMA_VERSION = "lifecycle-run-v1"
 
