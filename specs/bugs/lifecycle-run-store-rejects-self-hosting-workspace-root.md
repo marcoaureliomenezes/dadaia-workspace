@@ -3,6 +3,7 @@ status: open
 severity: high
 created_at: 2026-06-18
 reported_by: codex
+session_id: null
 release: v0.1.15
 ---
 
