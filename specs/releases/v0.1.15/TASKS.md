@@ -11,7 +11,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## Pre-work
 
-### [ ] T-015-00 - Release approval and implementation branch
+### [x] T-015-00 - Release approval and implementation branch
 - **Owner:** product-engineer
 - **Maps:** SPEC scope boundary; PLAN PRE
 - **Write set:** `specs/releases/ACTIVE.md`, release handoff/report only
@@ -236,7 +236,7 @@ Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   doctor, lifecycle smoke, and hygiene performance evidence pass; outputs are
   captured for CLOSURE.
 
-### [ ] T-015-23 - CLOSURE, memory, and backlog/bug disposition
+### [-] T-015-23 - CLOSURE, memory, and backlog/bug disposition
 - **Owner:** product-engineer
 - **Write set:** `specs/releases/v0.1.15/CLOSURE.md`,
   `specs/memory/**`, picked backlog/bug metadata,
