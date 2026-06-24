@@ -8,7 +8,9 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
+from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
@@ -309,6 +311,46 @@ def _select_dispatcher(runtime: str | None) -> AgentDispatcher:
     if runtime == "codex":
         return CodexAgentDispatcher()
     return CliAgentDispatcher()
+
+
+def build_agent_runtime(
+    kind: AgentRuntimeKind,
+    *,
+    cwd: Path | None = None,
+) -> AgentRuntimePort:
+    """Map an ``AgentRuntimeKind`` to its concrete adapter behind ``AgentRuntimePort``.
+
+    This is the single seam that binds a runtime kind to an infrastructure adapter —
+    the runtime-adapter analogue of ``PLATFORM`` selecting OS adapters and
+    ``_select_dispatcher`` selecting reference dispatchers. ``core/`` and ``features/``
+    stay provider-agnostic and never import an adapter directly; a lifecycle workflow
+    asks for the kind a step declares and injects the result into ``LifecycleAgentRunner``.
+
+    Codex is a live adapter; Claude SDK and OpenCode ship as documented stubs behind the
+    port (their live bodies are deferred — see release ``multiharness-engine-v0116``).
+    The factory is total over the enum: an unhandled kind raises ``ValueError``.
+    """
+    run_dir = cwd or Path.cwd()
+    if kind is AgentRuntimeKind.FAKE:
+        from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+        return FakeAgentRuntime()
+    if kind is AgentRuntimeKind.CODEX_EXEC:
+        from dadaia_workspace.infrastructure.codex_runtime import (
+            CodexExecAdapter,
+            CodexExecConfig,
+        )
+
+        return CodexExecAdapter(CodexExecConfig(cwd=run_dir))
+    if kind is AgentRuntimeKind.OPENCODE_RUN:
+        from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
+
+        return OpenCodeAdapter(cwd=run_dir)
+    if kind is AgentRuntimeKind.CLAUDE_SDK:
+        from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
+
+        return ClaudeSdkAdapter(cwd=run_dir)
+    raise ValueError(f"unsupported agent runtime kind: {kind!r}")
 
 
 def _agent_catalog(workspace_root: Path) -> tuple[str, ...]:

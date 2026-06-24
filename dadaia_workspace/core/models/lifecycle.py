@@ -45,6 +45,8 @@ class GateVerdict(StrEnum):
 class AgentRuntimeKind(StrEnum):
     FAKE = "fake"
     CODEX_EXEC = "codex_exec"
+    CLAUDE_SDK = "claude_sdk"
+    OPENCODE_RUN = "opencode_run"
 
 
 class AgentRunStatus(StrEnum):

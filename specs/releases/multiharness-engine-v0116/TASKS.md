@@ -1,0 +1,108 @@
+# TASKS — Release: multiharness-engine-v0116
+
+**Status:** Aprovado
+**Release ID:** multiharness-engine-v0116
+**Owner:** product-engineer
+**Created:** 2026-06-24
+
+Markers: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
+TDD-first: each task lands its failing test before the fix. Maximum one `[-]` per owner unless tasks
+have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} → 04 → 05 → 06 → 07.
+
+---
+
+## Pre-work
+
+### [x] T-016-00 — Release start: ACTIVE.md → multiharness-engine-v0116 IMPLEMENTATION
+- **Owner:** product-engineer
+- **Write set:** `specs/releases/ACTIVE.md`
+- **Acceptance:** `ACTIVE.md` reads `release: multiharness-engine-v0116` / `phase: IMPLEMENTATION`
+  with SPEC/PLAN/TASKS `**Status:** Aprovado`.
+- **Parallelism:** first, before all waves.
+
+---
+
+## W1 — Runtime kinds
+
+### [x] T-016-01 — Add CLAUDE_SDK + OPENCODE_RUN to AgentRuntimeKind
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/core/models/lifecycle.py`, `tests/unit/core/test_agent_runtime_kind.py`
+- **Acceptance:** enum has FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN; `AgentRunRequest` to_dict /
+  from_dict round-trips all four; test asserts `AgentRuntimeKind(v.value) == v` for every member.
+
+---
+
+## W3 — OpenCode adapter stub (disjoint from W4)
+
+### [x] T-016-02 — OpenCodeAdapter stub behind the port
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/infrastructure/opencode_runtime.py`,
+  `tests/unit/infrastructure/test_opencode_runtime.py`
+- **Acceptance:** implements `AgentRuntimePort` (`@runtime_checkable` passes);
+  `runtime_kind() == OPENCODE_RUN`; `run(request)` raises `NotImplementedError` whose message names
+  the deferred workstream and the unverified `opencode run` API. Test asserts isinstance-of-port and
+  the raise + message substring.
+
+---
+
+## W4 — Claude SDK adapter stub (disjoint from W3)
+
+### [x] T-016-03 — ClaudeSdkAdapter stub behind the port
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/infrastructure/claude_sdk_runtime.py`,
+  `tests/unit/infrastructure/test_claude_sdk_runtime.py`
+- **Acceptance:** implements `AgentRuntimePort`; `runtime_kind() == CLAUDE_SDK`; `run(request)`
+  raises `NotImplementedError` whose message names `claude-agent-sdk` + the deferred live
+  integration. No import of `claude_agent_sdk` / `anthropic` at module load. Test asserts the raise +
+  no-import.
+
+---
+
+## W2 — Runtime factory (depends on W1, W3, W4)
+
+### [x] T-016-04 — build_agent_runtime factory in container.py
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/container.py`,
+  `tests/unit/test_build_agent_runtime.py`
+- **Acceptance:** `build_agent_runtime(kind, *, cwd=None) -> AgentRuntimePort` returns
+  `FakeAgentRuntime` for FAKE, `CodexExecAdapter` for CODEX_EXEC, `OpenCodeAdapter` for OPENCODE_RUN,
+  `ClaudeSdkAdapter` for CLAUDE_SDK; the returned port's `runtime_kind()` equals the requested kind
+  (FAKE may map to a fake whose kind is FAKE); unknown / unhandled kind raises a clear `ValueError`.
+  Test parametrizes all four kinds + the error path.
+
+---
+
+## W5 — Integration proof
+
+### [x] T-016-05 — Factory-built FAKE runtime drives LifecycleAgentRunner green
+- **Owner:** software-engineer
+- **Write set:** `tests/unit/features/lifecycle/test_runner_with_factory_runtime.py`
+- **Acceptance:** `LifecycleAgentRunner(runtime=build_agent_runtime(FAKE, …))` produces an accepted
+  `TransitionDecision` for a well-formed request — proving the factory output satisfies the runner's
+  injection contract end-to-end.
+
+---
+
+## Verification + closure
+
+### [x] T-016-06 — Full local gate green
+- **Owner:** software-engineer / qa-engineer
+- **Acceptance:** `ruff format --check`, `ruff check`, `mypy --strict`, `pytest` all green;
+  `_repo_root_write_guard` clean; no new venvs. QA review handoff recorded.
+
+### [ ] T-016-07 — CLOSURE (deferred to rc / operator ship decision)
+- **Owner:** product-engineer
+- **Write set:** `specs/releases/multiharness-engine-v0116/CLOSURE.md`, `specs/memory/**`,
+  `specs/releases/ACTIVE.md`
+- **Acceptance:** CLOSURE.md with evidence triples; memory atoms updated (DEFINITION/CLOSURE phase
+  only); release archived. **Held** until the operator chooses to ship alpha-1 or iterate to alpha-2
+  (WS-1 per-phase workflows).
+
+---
+
+## Deferred waves (DEFINED, not this alpha — see SPEC §4)
+
+- **WS-1** per-phase workflow orchestrators (replace `unavailable_workflow` stubs) — alpha-2.
+- **WS-3** markdown `orchestrate` collapse — separate atomic release.
+- **WS-4 live** Claude Agent SDK integration — operator dep-approval release.
+- **WS-6** anti-slop self-governance, **WS-7** prompt prefix-cache, **D12** surface-collapse.
