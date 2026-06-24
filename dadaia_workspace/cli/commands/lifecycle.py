@@ -464,6 +464,77 @@ def close(
     )
 
 
+@app.command()
+def pipeline(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("pipeline", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Default harness for all steps."),
+    step_harness: list[str] | None = typer.Option(
+        None,
+        "--step-harness",
+        help="Per-step override 'label=harness' (repeatable); labels: "
+        "implement, review_qa, review_security, review_code.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the multi-step release pipeline (implement→qa→security→code) with per-step harness mixing."""
+    from dataclasses import replace
+
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+    overrides: dict[str, AgentRuntimeKind] = {}
+    for item in step_harness or []:
+        label, sep, kind_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-harness expects 'label=harness', got {item!r}")
+        overrides[label.strip()] = _resolve_harness(kind_str.strip())
+
+    steps = tuple(
+        replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+        for step in implementation_ladder(default_kind)
+    )
+    pipe = container.build_lifecycle_pipeline(
+        workspace_root, context=context, release_id=release_id
+    )
+    result = pipe.run(run_id, steps)
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "final_phase": result.final_phase.value,
+                "steps": [
+                    {
+                        "label": step.label,
+                        "runtime": step.runtime_kind.value,
+                        "accepted": step.accepted,
+                        "phase": step.phase.value,
+                    }
+                    for step in result.steps
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        trail = " → ".join(
+            f"{s.label}[{s.runtime_kind.value}]:{'ok' if s.accepted else 'BLOCKED'}"
+            for s in result.steps
+        )
+        typer.echo(f"{status} run={result.run_id} phase={result.final_phase.value} {trail}")
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
 app.add_typer(hygiene_app, name="hygiene")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(release_app, name="release")

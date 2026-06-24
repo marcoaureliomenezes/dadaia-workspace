@@ -190,6 +190,26 @@ have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} �
 
 ---
 
+## W10 — WS-1 multi-step: the release pipeline with per-step harness mixing
+
+### [x] T-016-12 — LifecyclePipeline (implement→qa→security→code), harness-mixable per step
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/lifecycle/pipeline.py` (NEW),
+  `dadaia_workspace/container.py` (`build_lifecycle_pipeline`),
+  `dadaia_workspace/cli/commands/lifecycle.py` (`pipeline` verb + `--step-harness`),
+  `tests/unit/features/lifecycle/test_pipeline.py`,
+  `tests/integration/cli/test_lifecycle_pipeline_cli.py`.
+- **Acceptance:** `LifecyclePipeline.run(run_id, steps)` threads ONE `LifecycleRun` through an
+  ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step on its declared
+  `AgentRuntimeKind` via an injected runtime factory (so claude-implements / codex-reviews mixing is
+  a per-step adapter swap), persisting at every step and stopping at the first blocked gate.
+  `dadaia lifecycle pipeline --release-id <id> --harness <default> --step-harness label=kind`
+  drives the canonical `implementation_ladder`; with FAKE it blocks at `implement` (no verdict).
+  Gate green (ruff/mypy --strict/pytest). This is the headline multi-harness workflow.
+- **Done:** WS-1 multi-step (single-step verbs were T-016-08/09).
+
+---
+
 ## Deferred waves (DEFINED, not yet — see SPEC §4)
 
 - **WS-1 multi-step** — true multi-step phase workflows (e.g. implement → per-task-group qa gate in

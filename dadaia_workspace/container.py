@@ -17,6 +17,7 @@ from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
 from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
+from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
 from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportWorkflow
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
@@ -497,6 +498,29 @@ def build_lifecycle_phase_workflow(
     return LifecyclePhaseWorkflow(
         runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root),
         run_store=build_lifecycle_run_store(workspace_root),
+    )
+
+
+def build_lifecycle_pipeline(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    cwd: Path | None = None,
+) -> LifecyclePipeline:
+    """Compose the multi-step lifecycle pipeline with a per-step harness factory.
+
+    The injected ``runtime_factory`` resolves each step's declared ``AgentRuntimeKind`` to
+    its adapter, so a single run can mix harnesses across steps (claude implements, codex
+    reviews, ...).
+    """
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    return LifecyclePipeline(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=lambda kind: build_agent_runtime(kind, cwd=run_cwd),
     )
 
 
