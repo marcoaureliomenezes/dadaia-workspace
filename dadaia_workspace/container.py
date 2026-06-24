@@ -9,7 +9,6 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
-from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
@@ -56,12 +55,6 @@ from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.features.workflows.service import WorkflowsService
 from dadaia_workspace.features.workspace.service import WorkspaceService
-from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
-from dadaia_workspace.infrastructure.cli_agent_dispatcher import (
-    CliAgentDispatcher,
-    OpenCodeAgentDispatcher,
-)
-from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -301,19 +294,6 @@ def build_export_service(workspace_root: Path) -> ExportService:
     )
 
 
-def _select_dispatcher(runtime: str | None) -> AgentDispatcher:
-    import os
-
-    runtime = (runtime or os.environ.get("DADAIA_AGENT_RUNTIME") or "cli").lower()
-    if runtime == "claude":
-        return ClaudeAgentDispatcher()
-    if runtime == "opencode":
-        return OpenCodeAgentDispatcher()
-    if runtime == "codex":
-        return CodexAgentDispatcher()
-    return CliAgentDispatcher()
-
-
 def build_agent_runtime(
     kind: AgentRuntimeKind,
     *,
@@ -322,10 +302,10 @@ def build_agent_runtime(
     """Map an ``AgentRuntimeKind`` to its concrete adapter behind ``AgentRuntimePort``.
 
     This is the single seam that binds a runtime kind to an infrastructure adapter —
-    the runtime-adapter analogue of ``PLATFORM`` selecting OS adapters and
-    ``_select_dispatcher`` selecting reference dispatchers. ``core/`` and ``features/``
-    stay provider-agnostic and never import an adapter directly; a lifecycle workflow
-    asks for the kind a step declares and injects the result into ``LifecycleAgentRunner``.
+    the runtime-adapter analogue of ``PLATFORM`` selecting OS adapters. ``core/`` and
+    ``features/`` stay provider-agnostic and never import an adapter directly; a
+    lifecycle workflow asks for the kind a step declares and injects the result into
+    ``LifecycleAgentRunner``.
 
     Codex is a live adapter; Claude SDK and OpenCode ship as documented stubs behind the
     port (their live bodies are deferred — see release ``multiharness-engine-v0116``).
@@ -364,7 +344,14 @@ def _agent_catalog(workspace_root: Path) -> tuple[str, ...]:
 def build_orchestration_service(
     workspace_root: Path, runtime: str | None = None
 ) -> OrchestrationService:
+    """Compose the read-only orchestration catalog/run-status surface.
+
+    Workflow execution moved to the lifecycle engine (WS-3); this service no longer
+    takes a dispatcher. The ``runtime`` parameter is retained for CLI call-site
+    compatibility (it is now inert — no agent runtime is selected here).
+    """
     _guard_initialized(workspace_root)
+    _ = runtime  # retained for CLI compatibility; no dispatcher is selected.
     workflows_dir = workspace_root / ".dadaia" / "agentic" / "workflows"
     runs_dir = workspace_root / ".dadaia" / "runs"
     return OrchestrationService(
@@ -372,8 +359,6 @@ def build_orchestration_service(
             workflows_dir, agent_catalog=_agent_catalog(workspace_root)
         ),
         run_state_store=JsonRunStateStore(runs_dir),
-        dispatcher=_select_dispatcher(runtime),
-        workspace_root=workspace_root,
     )
 
 

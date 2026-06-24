@@ -5,18 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.exceptions import (
-    OrchestrationUnsupportedError,
     RunNotFoundError,
     WorkflowNotFoundError,
 )
 from dadaia_workspace.core.models.run_state import (
-    DispatcherCapabilities,
-    DispatcherMode,
     RunEvent,
     RunManifest,
-    StageInvocation,
-    StageResult,
-    StageStatus,
 )
 from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
@@ -206,48 +200,6 @@ class FakeRunStateStore:
 
     def iter_events(self, run_id: str) -> Iterable[RunEvent]:
         return list(self.events.get(run_id, []))
-
-
-class FakeAgentDispatcher:
-    """Configurable fake — defaults to native (Claude-like). Use _set_mode for variants."""
-
-    def __init__(self, mode: DispatcherMode = DispatcherMode.NATIVE) -> None:
-        self._mode = mode
-        self.dispatched: list[StageInvocation] = []
-        self.parallel_dispatched: list[tuple[StageInvocation, ...]] = []
-
-    def capabilities(self) -> DispatcherCapabilities:
-        runtime_name = {
-            DispatcherMode.NATIVE: "claude",
-            DispatcherMode.BEST_EFFORT_SEQUENTIAL: "opencode",
-            DispatcherMode.UNSUPPORTED: "codex",
-            DispatcherMode.CLI_ONLY: "cli",
-        }[self._mode]
-        return DispatcherCapabilities(
-            runtime_name=runtime_name,
-            supports_parallel=self._mode == DispatcherMode.NATIVE,
-            supports_gates_inline=False,
-            mode=self._mode,
-        )
-
-    def dispatch(self, invocation: StageInvocation) -> StageResult:
-        self.dispatched.append(invocation)
-        return StageResult(
-            run_id=invocation.run_id,
-            stage_id=invocation.stage_id,
-            status=StageStatus.AWAITING_GATE,
-            output_path=invocation.expected_output_path,
-        )
-
-    def dispatch_parallel(
-        self, invocations: tuple[StageInvocation, ...]
-    ) -> tuple[StageResult, ...]:
-        if self._mode == DispatcherMode.UNSUPPORTED and any(
-            inv.parallel_group for inv in invocations
-        ):
-            raise OrchestrationUnsupportedError("fake codex dispatcher rejects parallel_group")
-        self.parallel_dispatched.append(invocations)
-        return tuple(self.dispatch(inv) for inv in invocations)
 
 
 class FakeFilePermissionSetter:

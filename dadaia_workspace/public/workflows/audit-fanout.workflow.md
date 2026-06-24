@@ -46,6 +46,12 @@ exit_criteria:
 
 # audit-fanout
 
+> **REFERENCE DOC ONLY.** This `.workflow.md` is no longer executed by
+> `dadaia orchestrate` — workflow execution is driven by the **`dadaia lifecycle`**
+> engine. `dadaia orchestrate run`/`resume` dispatch nothing; they emit a notice and
+> exit. Read this file as the canonical description of the sequence and drive it via
+> `dadaia lifecycle`.
+
 The deterministic audit dispatch sequence. `project-manager` triggers it; `project-auditor`
 executes the read-only audit and emits a findings handoff; PM reads the handoff and decides
 the disposition. The step order is fixed and the output format (handoff JSON) is

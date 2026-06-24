@@ -169,6 +169,27 @@ have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} �
 
 ---
 
+## W9 — WS-3: collapse the reference-only markdown-orchestrate layer
+
+### [x] T-016-11 — Retire the dead dispatch path; .workflow.md become docs-only
+- **Owner:** software-engineer
+- **Write set:** delete `core/protocols/agent_dispatcher.py`, `infrastructure/{claude,cli,codex}_agent_dispatcher.py`,
+  `features/orchestration/{runner,resolver}.py`; rewire `features/orchestration/service.py`
+  (dispatcher-free, read-only), `container.py` (drop `_select_dispatcher` + `build_orchestration_service`
+  dispatcher), `cli/commands/orchestrate.py` (`run`/`resume` → honest "moved to lifecycle" no-op),
+  `infrastructure/workflow_launcher_adapter.py`, `public/workflows/*.workflow.md` (docs-only banner);
+  migrate/delete ~60 dispatcher/execution tests.
+- **Acceptance:** the four reference-only `AgentDispatcher`s (which spawned nothing) and the
+  `orchestrate` execution path are gone; `OrchestrationService` no longer takes a dispatcher and keeps
+  only read-only listing; `dadaia orchestrate run <wf>` exits 0 with a message steering to
+  `dadaia lifecycle`; `.workflow.md` are reference docs only. **Panel remains intact** (loads, lists,
+  launcher target exits 0 — verified). Gate green (ruff/mypy --strict/pytest).
+- **Done:** WS-3.
+- **CLOSURE follow-up:** re-stage/install the edited `public/workflows/*.workflow.md` projection
+  (`dadaia public stage && install`) so the live instance reflects the docs-only banner.
+
+---
+
 ## Deferred waves (DEFINED, not yet — see SPEC §4)
 
 - **WS-1 multi-step** — true multi-step phase workflows (e.g. implement → per-task-group qa gate in

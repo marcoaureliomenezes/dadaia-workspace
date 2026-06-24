@@ -96,8 +96,8 @@ CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 #:     ``features/agents/reader`` (``os.environ.get("DADAIA_AGENTS_DIR")``).
 #:   - ``DADAIA_WORKFLOWS_DIR`` — workflows-dir override (resolution branch 1); read by
 #:     ``features/workflows/service`` (``os.environ.get("DADAIA_WORKFLOWS_DIR")``).
-#:   - ``DADAIA_AGENT_RUNTIME`` — runtime selector; read by ``container._select_dispatcher``
-#:     and the ``context``/``orchestrate`` CLI commands.
+#:   - ``DADAIA_AGENT_RUNTIME`` — runtime selector; read by the lifecycle runtime
+#:     wiring and the ``context`` CLI command.
 #:   - ``DADAIA_SESSION_ID`` — the operator **override** leg of ``resolve_session_id``
 #:     (``hooks/_common`` reads it first, ahead of the harness-native id vars). The harness
 #:     never sets it (so it stays in :data:`_FORBIDDEN_HOOK_ENV`, scrubbed from a real hook
