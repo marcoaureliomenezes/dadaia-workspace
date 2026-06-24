@@ -143,6 +143,32 @@ have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} �
 
 ---
 
+## W8 — WS-4: live Claude Agent SDK adapter (optional extra)
+
+### [x] T-016-10 — ClaudeSdkAdapter with real Ring-1 write boundary + injectable transport
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/infrastructure/claude_sdk_runtime.py`,
+  `dadaia_workspace/features/lifecycle/scope_match.py` (NEW, shared Ring-1/Ring-2 matcher),
+  `dadaia_workspace/features/lifecycle/agent_runner.py` (use the shared matcher),
+  `tests/unit/infrastructure/test_claude_sdk_runtime.py`,
+  `tests/unit/features/lifecycle/test_scope_match.py`.
+- **Acceptance:** `ClaudeSdkAdapter` implements `AgentRuntimePort`; derives a Ring-1
+  `write_permission` decider from the request's allowed/forbidden paths via the SAME
+  `scope_match` the runner's Ring-2 uses (one classifier, two boundaries); maps a Claude run
+  to `AgentRunResult` (verdict/changed_paths/artifacts); transport is injectable (`query_fn`) so
+  permission + mapping are tested hermetically. `claude-agent-sdk` is an **optional,
+  operator-installed runtime extra** — NOT a locked dependency (offline-first build); the default
+  transport lazily imports it and returns a FAILED result with an actionable
+  `pip install claude-agent-sdk` message when absent. Gate green (ruff/mypy --strict/pytest).
+- **Done:** WS-4 core.
+- **LIVE-VERIFICATION CAVEAT (tracked):** the exact `claude-agent-sdk` `query()`/`can_use_tool`
+  binding is isolated in `_default_query_fn` and must be confirmed the first time the package is
+  installed in a networked env. Offline here (no network, lock-pinned), so the SDK call line is the
+  one unverified piece; all engine-depended logic (Ring-1 decider + result mapping) is real + tested.
+- **CLOSURE follow-up:** record `claude-agent-sdk` as an optional runtime extra in tech-stack memory.
+
+---
+
 ## Deferred waves (DEFINED, not yet — see SPEC §4)
 
 - **WS-1 multi-step** — true multi-step phase workflows (e.g. implement → per-task-group qa gate in

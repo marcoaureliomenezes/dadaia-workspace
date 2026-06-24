@@ -16,6 +16,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
 )
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
+from dadaia_workspace.features.lifecycle.scope_match import out_of_scope_paths
 from dadaia_workspace.features.lifecycle.state_machine import (
     LifecycleStateMachine,
     TransitionDecision,
@@ -115,16 +116,11 @@ class LifecycleAgentRunner:
         request: AgentRunRequest,
         paths: tuple[str, ...],
     ) -> tuple[str, ...]:
-        out_of_scope: list[str] = []
-        for path in paths:
-            if any(_matches_path(path, forbidden) for forbidden in request.forbidden_paths):
-                out_of_scope.append(path)
-                continue
-            if request.allowed_paths and not any(
-                _matches_path(path, allowed) for allowed in request.allowed_paths
-            ):
-                out_of_scope.append(path)
-        return tuple(out_of_scope)
+        return out_of_scope_paths(
+            paths,
+            allowed=request.allowed_paths,
+            forbidden=request.forbidden_paths,
+        )
 
     @staticmethod
     def _changed_paths(result: AgentRunResult) -> tuple[str, ...]:
@@ -164,13 +160,3 @@ class LifecycleAgentRunner:
             )
             for kind, source in zip(request.required_evidence, result.artifact_refs, strict=False)
         )
-
-
-def _matches_path(path: str, pattern: str) -> bool:
-    if pattern.endswith("/**"):
-        prefix = pattern[:-3]
-        return path == prefix or path.startswith(f"{prefix}/")
-    if pattern.endswith("/*"):
-        prefix = pattern[:-1]
-        return path.startswith(prefix) and "/" not in path[len(prefix) :]
-    return path == pattern or path.startswith(f"{pattern}/")
