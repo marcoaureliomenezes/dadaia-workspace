@@ -136,6 +136,35 @@ def status(
 
 
 @app.command()
+def slop(
+    limit: int = typer.Option(10, "--limit", help="Number of top offenders to show."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Show the directory-aware anti-slop metric (read-only).
+
+    Unlike file-only hygiene, a directory tree counts as ONE entry with its recursive
+    byte size — so stray venvs/caches no longer hide from the metric. Never deletes.
+    """
+    from dadaia_workspace import container
+
+    workspace_root = resolve_workspace_root()
+    report = container.build_slop_report(workspace_root)
+    if json_output:
+        payload = report.to_dict()
+        payload["status"] = LifecycleCommandStatus.OK.value
+        payload["top_offenders"] = [entry.to_dict() for entry in report.top_offenders(limit)]
+        _emit_json(payload)
+        return
+    typer.echo(
+        f"OK entries={report.total_entries} stale={report.stale_count} "
+        f"reclaimable_bytes={report.reclaimable_bytes}"
+    )
+    for entry in report.top_offenders(limit):
+        marker = "dir " if entry.is_dir else "file"
+        typer.echo(f"  [{entry.kind.value}] {marker} {entry.size_bytes:>12} B  {entry.path}")
+
+
+@app.command()
 def preflight(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:

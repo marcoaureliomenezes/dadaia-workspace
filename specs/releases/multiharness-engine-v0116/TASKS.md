@@ -210,6 +210,28 @@ have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} �
 
 ---
 
+## W11 — WS-6 anti-slop self-governance: directory-aware slop metric + CLI visibility
+
+### [x] T-016-13 — Directory-aware slop metric (`slop_scan`) + `dadaia lifecycle slop`
+
+Close the directory-BLIND gap (D3/D4): the existing `LifecycleHygieneService._cleanup_candidates`
+only matches `path.is_file()`, so multi-GB dir trees (venvs/caches) hide from the metric. Add a
+read-only, directory-aware slop metric whose canonical manifest derives from
+`hooks/root_whitelist._WHITELIST` (never a hand-maintained copy), plus a `dadaia lifecycle slop`
+CLI command that emits counts + total bytes + top offenders.
+
+- NEW `features/lifecycle/antislop/slop_scan.py`: `SlopEntry`, `SlopReport`, `slop_scan(...)` — pure,
+  injected clock, NO FS mutation, directory tree counts as ONE entry with recursive size.
+- `cli/commands/lifecycle.py`: `dadaia lifecycle slop [--json]` (read-only).
+- `container.py`: wiring helper.
+- Tests: hermetic `tmp_path` + injected clock (no real venvs); dir-tree counted once with recursive
+  size; non-swept stray not counted; past-TTL vs fresh straddle; drift-guard test
+  (manifest derives from `root_whitelist._WHITELIST`); CLI smoke.
+- Scope = metric + visibility only; full retention-sweep consolidation (D5) stays deferred.
+- **Done.** Also bundles the fix for bug `infrastructure-claude-sdk-imports-features-scope-match`
+  (a WS-4/T-016-10 layering break surfaced by `lint-imports`): `scope_match` moved
+  `features/lifecycle/ → core/`; `lint-imports` now 6 kept / 0 broken.
+
 ## Deferred waves (DEFINED, not yet — see SPEC §4)
 
 - **WS-1 multi-step** — true multi-step phase workflows (e.g. implement → per-task-group qa gate in

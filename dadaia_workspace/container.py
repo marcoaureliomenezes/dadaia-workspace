@@ -1,5 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,7 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.models.hygiene import SlopPolicy
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
@@ -15,6 +17,7 @@ from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.lifecycle.antislop.slop_scan import SlopReport, slop_scan
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
 from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
 from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
@@ -457,6 +460,23 @@ def build_lifecycle_hygiene_service(workspace_root: Path) -> LifecycleHygieneSer
     """Compose lifecycle hygiene service."""
     _guard_initialized(workspace_root)
     return LifecycleHygieneService(workspace_root)
+
+
+def build_slop_report(
+    workspace_root: Path,
+    *,
+    now: dt.datetime | None = None,
+    policy: SlopPolicy | None = None,
+) -> SlopReport:
+    """Run the read-only directory-aware anti-slop metric (WS-6).
+
+    Pure measurement: walks the canonical swept ``.dadaia/`` zones and classifies each
+    reporting unit (a directory tree counts as one entry with recursive size). Never
+    mutates the filesystem. The clock is injectable for hermetic tests.
+    """
+    _guard_initialized(workspace_root)
+    scan_now = now or dt.datetime.now(tz=dt.UTC)
+    return slop_scan(workspace_root, now=scan_now, policy=policy or SlopPolicy())
 
 
 def build_lifecycle_preflight_service(workspace_root: Path) -> LifecyclePreflightService:

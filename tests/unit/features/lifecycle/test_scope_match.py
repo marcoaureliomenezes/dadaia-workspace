@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dadaia_workspace.features.lifecycle.scope_match import (
+from dadaia_workspace.core.scope_match import (
     is_in_scope,
     matches_path,
     out_of_scope_paths,

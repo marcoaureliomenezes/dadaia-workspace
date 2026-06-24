@@ -16,7 +16,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
 )
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
-from dadaia_workspace.features.lifecycle.scope_match import out_of_scope_paths
+from dadaia_workspace.core.scope_match import out_of_scope_paths
 from dadaia_workspace.features.lifecycle.state_machine import (
     LifecycleStateMachine,
     TransitionDecision,

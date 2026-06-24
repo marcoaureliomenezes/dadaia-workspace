@@ -8,7 +8,7 @@ imports it and fails with an actionable message when it is absent.
 
 Ring-1 write boundary: the adapter derives a permission decider from the request's
 allowed/forbidden paths using the SAME scope matching the runner's Ring-2 detective
-check uses (:mod:`dadaia_workspace.features.lifecycle.scope_match`) and wires it into the
+check uses (:mod:`dadaia_workspace.core.scope_match`) and wires it into the
 SDK's ``can_use_tool`` callback, so out-of-scope writes are denied before bytes hit
 disk. The SDK transport is injectable (``query_fn``), so the permission logic and result
 mapping are exercised hermetically without the package installed.
@@ -32,7 +32,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
-from dadaia_workspace.features.lifecycle.scope_match import is_in_scope
+from dadaia_workspace.core.scope_match import is_in_scope
 
 #: ``path -> may the worker write it?`` — the Ring-1 pre-disk decision.
 WritePermission = Callable[[str], bool]
