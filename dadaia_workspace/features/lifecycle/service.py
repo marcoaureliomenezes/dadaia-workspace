@@ -169,20 +169,6 @@ class LifecyclePreflightService:
             blocked=blocked,
         )
 
-    def unavailable_workflow(self, workflow: str) -> LifecycleCommandResult:
-        """Return a service-owned blocked outcome for guarded skeleton workflows."""
-        blocked = BlockedState(
-            reason=f"{workflow} workflow is not implemented yet",
-            blocked_at_step=workflow,
-            resume_token=f"unavailable:{workflow}",
-            detail={"workflow": workflow},
-        )
-        return LifecycleCommandResult(
-            status=LifecycleCommandStatus.BLOCKED,
-            message=blocked.reason,
-            blocked=blocked,
-        )
-
     def resume_run(self, run_store: LifecycleRunStore, run_id: str) -> LifecycleCommandResult:
         """Resume a lifecycle run and translate persistence failures to typed output."""
         try:

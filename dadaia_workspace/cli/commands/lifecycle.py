@@ -81,11 +81,6 @@ def _preflight_service() -> LifecyclePreflightService:
     return container.build_lifecycle_preflight_service(workspace_root)
 
 
-def _emit_unavailable_workflow(workflow: str, *, json_output: bool = False) -> None:
-    service = _preflight_service()
-    _emit_command_result(service.unavailable_workflow(workflow), json_output=json_output)
-
-
 def _relative_path_refs(workspace_root: Path, paths: tuple[Path, ...]) -> list[str]:
     refs: list[str] = []
     for path in paths:
@@ -243,26 +238,68 @@ def hygiene_clean(
 
 @backlog_app.command("define")
 def backlog_define(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("backlog-define", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Define backlog through the lifecycle workflow."""
-    _emit_unavailable_workflow("backlog definition", json_output=json_output)
+    """Run the backlog-definition step on a selectable harness."""
+    _run_phase_step(
+        label="backlog-define",
+        role="project-manager",
+        from_phase=LifecyclePhase.BACKLOG_DEFINITION,
+        target_phase=LifecyclePhase.RELEASE_DEFINITION,
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        harness=harness,
+        json_output=json_output,
+    )
 
 
 @release_app.command("define")
 def release_define(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Define a release through the lifecycle workflow."""
-    _emit_unavailable_workflow("release definition", json_output=json_output)
+    """Run the release-definition step on a selectable harness."""
+    _run_phase_step(
+        label="release-define",
+        role="product-engineer",
+        from_phase=LifecyclePhase.RELEASE_DEFINITION,
+        target_phase=LifecyclePhase.IMPLEMENTATION,
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        harness=harness,
+        json_output=json_output,
+    )
 
 
 @app.command()
 def implement(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("implement", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run lifecycle implementation workflow."""
-    _emit_unavailable_workflow("implementation", json_output=json_output)
+    """Run the implementation step on a selectable harness."""
+    _run_phase_step(
+        label="implement",
+        role="software-engineer",
+        from_phase=LifecyclePhase.IMPLEMENTATION,
+        target_phase=LifecyclePhase.QA_REVIEW,
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        harness=harness,
+        json_output=json_output,
+    )
 
 
 def _resolve_harness(harness: str) -> AgentRuntimeKind:
@@ -273,7 +310,7 @@ def _resolve_harness(harness: str) -> AgentRuntimeKind:
         raise typer.BadParameter(f"unknown harness '{harness}'; choose one of: {choices}") from exc
 
 
-def _run_review(
+def _run_phase_step(
     *,
     label: str,
     role: str,
@@ -285,6 +322,12 @@ def _run_review(
     harness: str,
     json_output: bool,
 ) -> None:
+    """Run one bounded lifecycle step through the engine on a selectable harness.
+
+    Shared by every single-step lifecycle verb (backlog/release define, implement,
+    review qa|security|code, close). The harness is chosen per invocation; the worker
+    must emit an APPROVED handoff with an artifact_ref to advance the phase.
+    """
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
@@ -296,7 +339,7 @@ def _run_review(
         release_id=release_id,
         task_id=run_id,
         prompt=(
-            f"Run the {label} review gate for release {release_id} in context {context}. "
+            f"Run the {label} step for release {release_id} in context {context}. "
             "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
             "artifact_ref pointing at the handoff document."
         ),
@@ -305,7 +348,7 @@ def _run_review(
     )
     result = workflow.run(
         run_id=run_id,
-        command=f"review-{label}",
+        command=label,
         from_phase=from_phase,
         target_phase=target_phase,
         scope=scope,
@@ -342,7 +385,7 @@ def review_qa(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the QA review gate on a selectable harness."""
-    _run_review(
+    _run_phase_step(
         label="qa",
         role="qa-engineer",
         from_phase=LifecyclePhase.IMPLEMENTATION,
@@ -364,7 +407,7 @@ def review_security(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the security review gate on a selectable harness."""
-    _run_review(
+    _run_phase_step(
         label="security",
         role="security-reviewer",
         from_phase=LifecyclePhase.QA_REVIEW,
@@ -386,7 +429,7 @@ def review_code(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the code review gate on a selectable harness."""
-    _run_review(
+    _run_phase_step(
         label="code",
         role="code-reviewer",
         from_phase=LifecyclePhase.SECURITY_REVIEW,
@@ -401,10 +444,24 @@ def review_code(
 
 @app.command()
 def close(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Close the active lifecycle release."""
-    _emit_unavailable_workflow("release closure", json_output=json_output)
+    """Run the release-closure step on a selectable harness."""
+    _run_phase_step(
+        label="close",
+        role="product-engineer",
+        from_phase=LifecyclePhase.CODE_REVIEW,
+        target_phase=LifecyclePhase.CLOSURE,
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        harness=harness,
+        json_output=json_output,
+    )
 
 
 app.add_typer(hygiene_app, name="hygiene")

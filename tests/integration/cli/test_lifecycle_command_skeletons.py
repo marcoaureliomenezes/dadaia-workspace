@@ -37,35 +37,43 @@ def _payload(output: str) -> dict[str, object]:
 
 
 @pytest.mark.parametrize(
-    ("command", "workflow"),
+    "command",
     (
-        (["lifecycle", "backlog", "define"], "backlog definition"),
-        (["lifecycle", "release", "define"], "release definition"),
-        (["lifecycle", "implement"], "implementation"),
-        (["lifecycle", "close"], "release closure"),
-        # NOTE: review qa|security|code are no longer skeletons — they run the real
-        # phase workflow (see tests/integration/test_lifecycle_review_cli.py).
+        ["lifecycle", "backlog", "define"],
+        ["lifecycle", "release", "define"],
+        ["lifecycle", "implement"],
+        ["lifecycle", "close"],
+        ["lifecycle", "review", "qa"],
+        ["lifecycle", "review", "security"],
+        ["lifecycle", "review", "code"],
     ),
 )
-def test_guarded_skeleton_commands_return_typed_blocked_state(
+def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     command: list[str],
-    workflow: str,
 ) -> None:
+    """Every single-step lifecycle verb now drives the engine (no `unavailable_workflow`).
+
+    With the FAKE harness the worker emits no APPROVED verdict, so the real typed gate
+    blocks — proving the engine path executed end-to-end on a selectable harness.
+    """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
-    result = _runner.invoke(app, [*command, "--json"])
+    result = _runner.invoke(
+        app,
+        [*command, "--release-id", "multiharness-engine-v0116", "--harness", "fake", "--json"],
+    )
 
-    assert result.exit_code == 3
+    assert result.exit_code == 3, result.output
     payload = _payload(result.output)
     assert payload["status"] == "BLOCKED"
-    assert payload["message"] == f"{workflow} workflow is not implemented yet"
+    assert payload["runtime"] == "fake"
+    assert payload["accepted"] is False
     blocked = payload["blocked"]
     assert isinstance(blocked, dict)
-    assert blocked["blocked_at_step"] == workflow
-    assert blocked["resume_token"] == f"unavailable:{workflow}"
+    assert "APPROVED verdict" in blocked["reason"]
 
 
 def test_resume_existing_run_returns_ok_next_state(

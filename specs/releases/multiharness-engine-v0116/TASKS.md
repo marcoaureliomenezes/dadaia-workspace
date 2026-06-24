@@ -121,10 +121,32 @@ have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} �
 
 ---
 
+## W7 — Alpha-3: every single-step lifecycle verb runs the engine
+
+### [x] T-016-09 — Wire backlog/release/implement/close to the engine; retire the stub layer
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/cli/commands/lifecycle.py` (generalize `_run_review` →
+  `_run_phase_step`; wire `backlog define`, `release define`, `implement`, `close`),
+  `dadaia_workspace/features/lifecycle/service.py` (remove dead `unavailable_workflow`),
+  `tests/integration/cli/test_lifecycle_command_skeletons.py` (assert all 7 verbs drive the engine),
+  remove redundant `tests/integration/test_lifecycle_review_cli.py`.
+- **Acceptance:** all seven single-step verbs (`backlog define`, `release define`, `implement`,
+  `review {qa,security,code}`, `close`) run `LifecyclePhaseWorkflow` on a `--harness`-selectable
+  runtime over a legal transition; the `unavailable_workflow` service method + CLI helper are deleted
+  (no dead stub layer). Integration test proves every verb blocks on the real gate with FAKE.
+  Gate green (ruff/mypy --strict/pytest 3322). QA review gate recorded.
+- **Done:** alpha-3.
+- **Known simplification (tracked):** the runner applies a uniform APPROVED-verdict gate to every
+  step, so non-review phases (implement/define) also require the worker to emit an APPROVED handoff.
+  Phase-specific gating (e.g. implement needs evidence, not self-approval) is a follow-up runner
+  refinement, not this release.
+
+---
+
 ## Deferred waves (DEFINED, not yet — see SPEC §4)
 
-- **WS-1 remainder** — backlog-define / release-define / implement / close orchestrators (the review
-  slice landed in T-016-08; these multi-step phase workflows remain, shadow-first).
+- **WS-1 multi-step** — true multi-step phase workflows (e.g. implement → per-task-group qa gate in
+  one run) beyond the single-step verbs landed in T-016-08/09; shadow-first.
 - **WS-3** markdown `orchestrate` collapse — separate atomic release.
 - **WS-4 live** Claude Agent SDK integration — operator dep-approval release.
 - **WS-6** anti-slop self-governance, **WS-7** prompt prefix-cache, **D12** surface-collapse.
