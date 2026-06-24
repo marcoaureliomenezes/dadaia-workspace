@@ -42,10 +42,9 @@ def _payload(output: str) -> dict[str, object]:
         (["lifecycle", "backlog", "define"], "backlog definition"),
         (["lifecycle", "release", "define"], "release definition"),
         (["lifecycle", "implement"], "implementation"),
-        (["lifecycle", "review", "qa"], "QA review"),
-        (["lifecycle", "review", "security"], "security review"),
-        (["lifecycle", "review", "code"], "code review"),
         (["lifecycle", "close"], "release closure"),
+        # NOTE: review qa|security|code are no longer skeletons — they run the real
+        # phase workflow (see tests/integration/test_lifecycle_review_cli.py).
     ),
 )
 def test_guarded_skeleton_commands_return_typed_blocked_state(

@@ -9,14 +9,27 @@ from typing import Any
 
 import typer
 
+from dadaia_workspace.core.models.lifecycle import (
+    AgentRuntimeKind,
+    GateEvidenceKind,
+    LifecyclePhase,
+)
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
+from dadaia_workspace.features.lifecycle.prompt_builder import PromptScope
 from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandResult,
     LifecycleCommandStatus,
     LifecyclePreflightService,
 )
+
+_HARNESS_KINDS = {
+    "fake": AgentRuntimeKind.FAKE,
+    "codex": AgentRuntimeKind.CODEX_EXEC,
+    "claude": AgentRuntimeKind.CLAUDE_SDK,
+    "opencode": AgentRuntimeKind.OPENCODE_RUN,
+}
 
 app = typer.Typer(help="Deterministic lifecycle workflow commands.", no_args_is_help=True)
 hygiene_app = typer.Typer(help="Lifecycle hygiene commands.", no_args_is_help=True)
@@ -252,28 +265,138 @@ def implement(
     _emit_unavailable_workflow("implementation", json_output=json_output)
 
 
+def _resolve_harness(harness: str) -> AgentRuntimeKind:
+    try:
+        return _HARNESS_KINDS[harness.lower()]
+    except KeyError as exc:
+        choices = ", ".join(sorted(_HARNESS_KINDS))
+        raise typer.BadParameter(f"unknown harness '{harness}'; choose one of: {choices}") from exc
+
+
+def _run_review(
+    *,
+    label: str,
+    role: str,
+    from_phase: LifecyclePhase,
+    target_phase: LifecyclePhase,
+    context: str,
+    release_id: str,
+    run_id: str,
+    harness: str,
+    json_output: bool,
+) -> None:
+    from dadaia_workspace import container
+
+    workspace_root = resolve_workspace_root()
+    kind = _resolve_harness(harness)
+    workflow = container.build_lifecycle_phase_workflow(workspace_root, runtime_kind=kind)
+    scope = PromptScope(
+        role=role,
+        context=context,
+        release_id=release_id,
+        task_id=run_id,
+        prompt=(
+            f"Run the {label} review gate for release {release_id} in context {context}. "
+            "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
+            "artifact_ref pointing at the handoff document."
+        ),
+        allowed_paths=(f".dadaia/handoff/{context}/**",),
+        required_evidence=(GateEvidenceKind.HANDOFF,),
+    )
+    result = workflow.run(
+        run_id=run_id,
+        command=f"review-{label}",
+        from_phase=from_phase,
+        target_phase=target_phase,
+        scope=scope,
+    )
+    status = (
+        LifecycleCommandStatus.OK.value if result.accepted else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "accepted": result.accepted,
+                "phase": result.phase.value,
+                "runtime": result.runtime_kind.value,
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        typer.echo(
+            f"{status} {label} run={result.run_id} "
+            f"harness={result.runtime_kind.value} phase={result.phase.value}"
+        )
+    if not result.accepted:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
 @review_app.command("qa")
 def review_qa(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("review-qa", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run QA review gate."""
-    _emit_unavailable_workflow("QA review", json_output=json_output)
+    """Run the QA review gate on a selectable harness."""
+    _run_review(
+        label="qa",
+        role="qa-engineer",
+        from_phase=LifecyclePhase.IMPLEMENTATION,
+        target_phase=LifecyclePhase.QA_REVIEW,
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        harness=harness,
+        json_output=json_output,
+    )
 
 
 @review_app.command("security")
 def review_security(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run security review gate."""
-    _emit_unavailable_workflow("security review", json_output=json_output)
+    """Run the security review gate on a selectable harness."""
+    _run_review(
+        label="security",
+        role="security-reviewer",
+        from_phase=LifecyclePhase.QA_REVIEW,
+        target_phase=LifecyclePhase.SECURITY_REVIEW,
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        harness=harness,
+        json_output=json_output,
+    )
 
 
 @review_app.command("code")
 def review_code(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run code review gate."""
-    _emit_unavailable_workflow("code review", json_output=json_output)
+    """Run the code review gate on a selectable harness."""
+    _run_review(
+        label="code",
+        role="code-reviewer",
+        from_phase=LifecyclePhase.SECURITY_REVIEW,
+        target_phase=LifecyclePhase.CODE_REVIEW,
+        context=context,
+        release_id=release_id,
+        run_id=run_id,
+        harness=harness,
+        json_output=json_output,
+    )
 
 
 @app.command()

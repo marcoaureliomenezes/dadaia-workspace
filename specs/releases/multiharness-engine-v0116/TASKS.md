@@ -100,9 +100,31 @@ have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} �
 
 ---
 
-## Deferred waves (DEFINED, not this alpha — see SPEC §4)
+## W6 — Alpha-2: first real engine-driven verb (WS-1 slice)
 
-- **WS-1** per-phase workflow orchestrators (replace `unavailable_workflow` stubs) — alpha-2.
+### [x] T-016-08 — LifecyclePhaseWorkflow + wire review verbs to the engine
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/lifecycle/phase_workflow.py`,
+  `dadaia_workspace/container.py` (`build_lifecycle_phase_workflow`),
+  `dadaia_workspace/cli/commands/lifecycle.py` (`review qa|security|code`),
+  `tests/unit/features/lifecycle/test_phase_workflow.py`,
+  `tests/integration/test_lifecycle_review_cli.py`,
+  `tests/integration/cli/test_lifecycle_command_skeletons.py` (drop the 3 review skeletons).
+- **Acceptance:** `LifecyclePhaseWorkflow.run(...)` threads scoped prompt → factory-selected
+  `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted `LifecycleRun`.
+  `dadaia lifecycle review {qa,security,code} --harness fake|codex|claude|opencode --release-id <id>`
+  runs the engine (no longer `unavailable_workflow`): FAKE worker (no APPROVED verdict) BLOCKS with
+  the real gate reason and persists the run; an injected APPROVED result advances the phase. Gate
+  green (ruff/mypy --strict/pytest 3325). **NOTE:** `decision.accepted` is True even for a legal
+  transition INTO BLOCKED — pass/fail is `run.blocked is None`.
+- **Done:** alpha-2; QA review gate recorded.
+
+---
+
+## Deferred waves (DEFINED, not yet — see SPEC §4)
+
+- **WS-1 remainder** — backlog-define / release-define / implement / close orchestrators (the review
+  slice landed in T-016-08; these multi-step phase workflows remain, shadow-first).
 - **WS-3** markdown `orchestrate` collapse — separate atomic release.
 - **WS-4 live** Claude Agent SDK integration — operator dep-approval release.
 - **WS-6** anti-slop self-governance, **WS-7** prompt prefix-cache, **D12** surface-collapse.

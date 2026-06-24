@@ -17,6 +17,7 @@ from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
+from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
 from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportWorkflow
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
@@ -492,6 +493,25 @@ def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWork
         runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
         hygiene=LifecycleHygieneService(workspace_root),
         validation=build_reports_validation_service(workspace_root),
+    )
+
+
+def build_lifecycle_phase_workflow(
+    workspace_root: Path,
+    *,
+    runtime_kind: AgentRuntimeKind,
+    cwd: Path | None = None,
+) -> LifecyclePhaseWorkflow:
+    """Compose the single-step lifecycle phase workflow on a selected harness.
+
+    Binds the per-step runtime adapter (via :func:`build_agent_runtime`) to the
+    persistent run store. The chosen ``runtime_kind`` is what makes the harness
+    selectable per verb invocation.
+    """
+    _guard_initialized(workspace_root)
+    return LifecyclePhaseWorkflow(
+        runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root),
+        run_store=build_lifecycle_run_store(workspace_root),
     )
 
 
