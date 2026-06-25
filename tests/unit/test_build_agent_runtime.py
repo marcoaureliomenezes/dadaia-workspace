@@ -14,6 +14,7 @@ from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
 from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
+from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
 
 
 @pytest.mark.parametrize("kind", list(AgentRuntimeKind))
@@ -33,6 +34,9 @@ def test_factory_returns_expected_concrete_types(tmp_path: Path) -> None:
     )
     assert isinstance(
         build_agent_runtime(AgentRuntimeKind.CLAUDE_SDK, cwd=tmp_path), ClaudeSdkAdapter
+    )
+    assert isinstance(
+        build_agent_runtime(AgentRuntimeKind.PI_HEADLESS, cwd=tmp_path), PiHeadlessAdapter
     )
 
 

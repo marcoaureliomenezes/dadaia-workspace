@@ -337,6 +337,16 @@ def build_agent_runtime(
         from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
 
         return ClaudeSdkAdapter(cwd=run_dir)
+    if kind is AgentRuntimeKind.PI_HEADLESS:
+        from dadaia_workspace.infrastructure.pi_runtime import (
+            PiHeadlessAdapter,
+            PiHeadlessConfig,
+        )
+
+        return PiHeadlessAdapter(
+            PiHeadlessConfig(cwd=run_dir),
+            git=GitSubprocessClient(),
+        )
     raise ValueError(f"unsupported agent runtime kind: {kind!r}")
 
 

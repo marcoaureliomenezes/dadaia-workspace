@@ -29,6 +29,7 @@ _HARNESS_KINDS = {
     "codex": AgentRuntimeKind.CODEX_EXEC,
     "claude": AgentRuntimeKind.CLAUDE_SDK,
     "opencode": AgentRuntimeKind.OPENCODE_RUN,
+    "pi": AgentRuntimeKind.PI_HEADLESS,
 }
 
 app = typer.Typer(help="Deterministic lifecycle workflow commands.", no_args_is_help=True)

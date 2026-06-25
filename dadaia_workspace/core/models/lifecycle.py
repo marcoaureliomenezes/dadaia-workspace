@@ -47,6 +47,7 @@ class AgentRuntimeKind(StrEnum):
     CODEX_EXEC = "codex_exec"
     CLAUDE_SDK = "claude_sdk"
     OPENCODE_RUN = "opencode_run"
+    PI_HEADLESS = "pi_headless"
 
 
 class AgentRunStatus(StrEnum):

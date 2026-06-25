@@ -11,7 +11,25 @@ def test_runtime_kind_members() -> None:
         "codex_exec",
         "claude_sdk",
         "opencode_run",
+        "pi_headless",
     }
+
+
+def test_pi_headless_value_roundtrip() -> None:
+    assert AgentRuntimeKind("pi_headless") is AgentRuntimeKind.PI_HEADLESS
+
+
+def test_pi_headless_request_roundtrips() -> None:
+    request = AgentRunRequest(
+        role="software-engineer",
+        prompt="do work",
+        runtime=AgentRuntimeKind.PI_HEADLESS,
+        context="dadaia-workspace",
+        release_id="pi-fourth-harness-v1",
+    )
+    restored = AgentRunRequest.from_dict(request.to_dict())
+    assert restored.runtime is AgentRuntimeKind.PI_HEADLESS
+    assert restored == request
 
 
 def test_runtime_kind_value_roundtrip() -> None:

@@ -17,7 +17,7 @@
 
 ---
 
-### [ ] T-PI-01 — Enum: add `PI_HEADLESS` member
+### [x] T-PI-01 — Enum: add `PI_HEADLESS` member
 
 - **Owner:** software-engineer
 - **Write set:**
@@ -32,7 +32,7 @@
   `AgentRuntimeKind(str(...))`).
 - **Parallelism:** none — spine root.
 
-### [ ] T-PI-02 — Adapter (minimal parser): `PiHeadlessAdapter` + `PiHeadlessConfig`
+### [x] T-PI-02 — Adapter (minimal parser): `PiHeadlessAdapter` + `PiHeadlessConfig`
 
 - **Owner:** software-engineer
 - **Write set:**
@@ -54,7 +54,7 @@
   (subprocess only); `ANTHROPIC_API_KEY` redacted from output.
 - **Parallelism:** none.
 
-### [ ] T-PI-03 — Factory branch in `build_agent_runtime`
+### [x] T-PI-03 — Factory branch in `build_agent_runtime`
 
 - **Owner:** software-engineer
 - **Write set:**
@@ -68,7 +68,7 @@
 - **Done criterion:** test passes; factory stays total over the enum (`ValueError` path intact).
 - **Parallelism:** none.
 
-### [ ] T-PI-04 — CLI harness map: `--harness pi` / `--step-harness x=pi`
+### [x] T-PI-04 — CLI harness map: `--harness pi` / `--step-harness x=pi`
 
 - **Owner:** software-engineer
 - **Write set:**
@@ -83,7 +83,7 @@
   `phase_workflow.py` / `pipeline.py`.
 - **Parallelism:** none.
 
-### [ ] T-PI-05 — Result extraction (WS-PI-2): harden `_result_from_output`
+### [x] T-PI-05 — Result extraction (WS-PI-2): harden `_result_from_output`
 
 - **Owner:** software-engineer
 - **Write set:**
@@ -100,7 +100,7 @@
   append-system-prompt sentinel is used ONLY as the in-band verdict channel, not primary transport.
 - **Parallelism:** none.
 
-### [ ] T-PI-06 — `changed_paths` via git diff (Ring-2 root-cause) + end-to-end block test
+### [x] T-PI-06 — `changed_paths` via git diff (Ring-2 root-cause) + end-to-end block test
 
 - **Owner:** software-engineer
 - **Write set:**
@@ -123,7 +123,7 @@
   self-report; Ring-2 demonstrably blocks an out-of-scope PI write.
 - **Parallelism:** none — closes the WS-PI-2 root-cause gate.
 
-### [ ] T-PI-07 — Live-`pi` integration seam (opt-in, NOT CI-gated)
+### [x] T-PI-07 — Live-`pi` integration seam (opt-in, NOT CI-gated)
 
 - **Owner:** software-engineer
 - **Write set:**
@@ -140,7 +140,7 @@
 - **Parallelism:** disjoint write set from T-PI-08 (different files) — may run in parallel with
   T-PI-08 if a second owner is assigned; otherwise serial.
 
-### [ ] T-PI-08 — Full local gate green
+### [x] T-PI-08 — Full local gate green
 
 - **Owner:** software-engineer
 - **Write set:** none (verification only; fix-ups land in the relevant prior task's files).
