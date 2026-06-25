@@ -18,6 +18,7 @@ from dadaia_workspace.features.lifecycle.pipeline import (
     PipelineStep,
     implementation_ladder,
 )
+from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
 
 
 @dataclass(frozen=True)
@@ -168,3 +169,39 @@ def test_pipeline_stops_at_first_blocked_step() -> None:
     assert result.steps[0].accepted and result.steps[1].accepted
     assert result.steps[2].accepted is False
     assert result.final_phase is LifecyclePhase.BLOCKED
+
+
+class _RecordingFake:
+    def __init__(self, kind: AgentRuntimeKind, captured: list[AgentRunRequest]) -> None:
+        self._kind = kind
+        self._captured = captured
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return self._kind
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        self._captured.append(request)
+        return _approved()
+
+
+def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
+    captured: list[AgentRunRequest] = []
+    store = _MemoryRunStore()
+    prefix = PromptPrefix.from_sections({"constitution": "C", "memory": "M"})
+    pipe = LifecyclePipeline(
+        context="dadaia-workspace",
+        release_id="multiharness-engine-v0116",
+        run_store=store,
+        runtime_factory=lambda kind: _RecordingFake(kind, captured),
+        prefix=prefix,
+    )
+
+    result = pipe.run("run-pfx", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    assert len(captured) == 4
+    # Every step's worker prompt leads with the SAME cached prefix bytes (WS-7).
+    assert all(req.prompt.startswith(prefix.text) for req in captured)
+    # Step model tiers applied: implement=sonnet, reviews=opus.
+    assert captured[0].model_profile == "sonnet"
+    assert [req.model_profile for req in captured[1:]] == ["opus", "opus", "opus"]

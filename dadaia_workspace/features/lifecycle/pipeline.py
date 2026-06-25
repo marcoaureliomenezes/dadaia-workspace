@@ -31,6 +31,7 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
 )
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     LifecyclePromptBuilder,
+    PromptPrefix,
     PromptScope,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
@@ -49,6 +50,7 @@ class PipelineStep:
     target_phase: LifecyclePhase
     runtime_kind: AgentRuntimeKind
     requirements: tuple[GateRequirement, ...] = ()
+    model_profile: str | None = None
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,7 @@ class LifecyclePipeline:
         release_id: str,
         run_store: LifecycleRunStore,
         runtime_factory: RuntimeFactory,
+        prefix: PromptPrefix | None = None,
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
     ) -> None:
@@ -86,6 +89,7 @@ class LifecyclePipeline:
         self._release_id = release_id
         self._run_store = run_store
         self._runtime_factory = runtime_factory
+        self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
 
@@ -108,7 +112,9 @@ class LifecyclePipeline:
         for step in steps:
             runtime = self._runtime_factory(step.runtime_kind)
             built = self._prompt_builder.build(
-                self._scope(step, run_id), runtime=runtime.runtime_kind()
+                self._scope(step, run_id),
+                runtime=runtime.runtime_kind(),
+                prefix=self._prefix,
             )
             runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
             decision = runner.run(
@@ -160,13 +166,16 @@ class LifecyclePipeline:
             ),
             allowed_paths=(f".dadaia/handoff/{self._context}/**",),
             required_evidence=(GateEvidenceKind.HANDOFF,),
+            model_profile=step.model_profile,
         )
 
 
 def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep, ...]:
     """The canonical release-implementation pipeline: implement → qa → security → code.
 
-    Each step defaults to ``default_kind``; callers override per step for harness mixing.
+    Each step defaults to ``default_kind`` (override per step for harness mixing) and carries
+    a step model tier (EPIC D11): implementation runs the standard tier, reviews/judgments run
+    the deep tier — inverting the all-steps-on-the-top-tier tax.
     """
     return (
         PipelineStep(
@@ -175,6 +184,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.IMPLEMENTATION,
             target_phase=LifecyclePhase.QA_REVIEW,
             runtime_kind=default_kind,
+            model_profile="sonnet",
         ),
         PipelineStep(
             label="review_qa",
@@ -182,6 +192,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.QA_REVIEW,
             target_phase=LifecyclePhase.SECURITY_REVIEW,
             runtime_kind=default_kind,
+            model_profile="opus",
         ),
         PipelineStep(
             label="review_security",
@@ -189,6 +200,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.SECURITY_REVIEW,
             target_phase=LifecyclePhase.CODE_REVIEW,
             runtime_kind=default_kind,
+            model_profile="opus",
         ),
         PipelineStep(
             label="review_code",
@@ -196,6 +208,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.CODE_REVIEW,
             target_phase=LifecyclePhase.CLOSURE,
             runtime_kind=default_kind,
+            model_profile="opus",
         ),
     )
 

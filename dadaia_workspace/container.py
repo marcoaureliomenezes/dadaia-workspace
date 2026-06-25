@@ -21,6 +21,7 @@ from dadaia_workspace.features.lifecycle.antislop.slop_scan import SlopReport, s
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
 from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
 from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
+from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
 from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportWorkflow
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
@@ -526,13 +527,15 @@ def build_lifecycle_pipeline(
     *,
     context: str,
     release_id: str,
+    prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
 ) -> LifecyclePipeline:
     """Compose the multi-step lifecycle pipeline with a per-step harness factory.
 
     The injected ``runtime_factory`` resolves each step's declared ``AgentRuntimeKind`` to
     its adapter, so a single run can mix harnesses across steps (claude implements, codex
-    reviews, ...).
+    reviews, ...). An optional cacheable ``prefix`` (WS-7) is assembled once and reused
+    verbatim by every step.
     """
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
@@ -541,6 +544,7 @@ def build_lifecycle_pipeline(
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
         runtime_factory=lambda kind: build_agent_runtime(kind, cwd=run_cwd),
+        prefix=prefix,
     )
 
 

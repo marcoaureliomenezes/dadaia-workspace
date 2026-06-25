@@ -232,10 +232,34 @@ CLI command that emits counts + total bytes + top offenders.
   (a WS-4/T-016-10 layering break surfaced by `lint-imports`): `scope_match` moved
   `features/lifecycle/ → core/`; `lint-imports` now 6 kept / 0 broken.
 
-## Deferred waves (DEFINED, not yet — see SPEC §4)
+## W12 — WS-7: cacheable prompt prefix + step model-tiering
 
-- **WS-1 multi-step** — true multi-step phase workflows (e.g. implement → per-task-group qa gate in
-  one run) beyond the single-step verbs landed in T-016-08/09; shadow-first.
-- **WS-3** markdown `orchestrate` collapse — separate atomic release.
-- **WS-4 live** Claude Agent SDK integration — operator dep-approval release.
-- **WS-6** anti-slop self-governance, **WS-7** prompt prefix-cache, **D12** surface-collapse.
+### [x] T-016-14 — PromptPrefix (deterministic, hashed) reused per step + per-step tiers
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/lifecycle/prompt_builder.py` (`PromptPrefix`,
+  `build(..., prefix=)`), `dadaia_workspace/features/lifecycle/pipeline.py`
+  (`PipelineStep.model_profile`, prefix reuse, tiered `implementation_ladder`),
+  `dadaia_workspace/container.py` (`build_lifecycle_pipeline(..., prefix=)`),
+  `tests/unit/features/lifecycle/test_prompt_prefix.py`, `test_pipeline.py` (reuse+tier test).
+- **Acceptance:** `PromptPrefix.from_sections` assembles a byte-identical, sha256-hashed stable
+  context block (sorted → order-independent); `build(scope, prefix=p)` prepends it verbatim and
+  records `prefix_hash`; the pipeline builds the prefix ONCE and every step reuses the same bytes
+  (provider-cache-friendly, EPIC D11); steps carry model tiers (implement=sonnet, reviews=opus).
+  Gate green (ruff/mypy --strict/pytest + lint-imports 6/0).
+- **Done:** WS-7 core. Follow-up: assemble the prefix from real release context + wire provider
+  cache-control markers in the live Claude adapter (pending SDK live-binding verification).
+
+---
+
+## Status of the engine workstreams (multiharness-engine-v0116)
+
+**DONE on feature/v0.1.16:** runtime kinds + factory (W1–W5) · single-step verbs (WS-1 slice,
+T-016-08/09) · WS-4 Claude adapter Ring-1 · WS-3 orchestrate collapse · WS-1 multi-step pipeline ·
+WS-6 slop metric · WS-7 prompt prefix + tiers.
+
+**REMAINING (deferred):**
+- **D5** — directory-aware **retention SWEEP** consolidation (the deleter; WS-6 shipped the metric).
+- **D12** — AI-surface reduction execution (designed, shadow-validated fast-follow).
+- **Live Claude SDK binding** verification (first networked install) + provider cache-control wiring.
+- **Phase-specific gate** refinement (drop the uniform APPROVED-verdict requirement for non-review
+  phases) — tracked simplification from T-016-09.
