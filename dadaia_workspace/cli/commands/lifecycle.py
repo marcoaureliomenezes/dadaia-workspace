@@ -308,7 +308,9 @@ def backlog_define(
     context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("backlog-define", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the backlog-definition step on a selectable harness."""
@@ -330,7 +332,9 @@ def release_define(
     context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the release-definition step on a selectable harness."""
@@ -352,7 +356,9 @@ def implement(
     context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("implement", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the implementation step on a selectable harness."""
@@ -448,7 +454,9 @@ def review_qa(
     context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-qa", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the QA review gate on a selectable harness."""
@@ -470,7 +478,9 @@ def review_security(
     context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the security review gate on a selectable harness."""
@@ -492,7 +502,9 @@ def review_code(
     context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the code review gate on a selectable harness."""
@@ -514,7 +526,9 @@ def close(
     context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Harness: fake|codex|claude|opencode."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the release-closure step on a selectable harness."""

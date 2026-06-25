@@ -156,7 +156,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     to flip `Closed` at CLOSURE.
   - **Parallelism:** software-engineer slot. **Precedes T-PIO-11.**
 
-- [ ] **T-PIO-12** — Memory atom drift fixes F1–F4 (DEFINITION/CLOSURE phase).
+- [x] **T-PIO-12** — Memory atom drift fixes F1–F4 (DEFINITION/CLOSURE phase).
   - **Owner:** product-engineer
   - **Write set:** `specs/memory/architecture.md` (F1/D-1/D-2: two-layer section +
     Layer-2 worker table [5 kinds] + scope parity table to Layer-1 + "três runtimes"
@@ -171,7 +171,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
   - **Parallelism:** product-engineer slot. (Memory writes require the memory-write phase;
     coordinate with CLOSURE — see T-PIO-16.)
 
-- [ ] **T-PIO-13** — product-vision (F2) — gated on operator vision-doc confirmation.
+- [x] **T-PIO-13** — product-vision (F2) — gated on operator vision-doc confirmation.
   - **Owner:** product-engineer + operator decision
   - **Write set:** `specs/memory/product/philosophy/product-vision.md`.
   - **Preconditions:** operator confirms `docs/01_medium_codex.md` stance on PI / 4
@@ -182,7 +182,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     CLOSURE.
   - **Parallelism:** product-engineer slot; operator-gated.
 
-- [ ] **T-PIO-14** — `token_estimate` frontmatter refresh (F5).
+- [x] **T-PIO-14** — `token_estimate` frontmatter refresh (F5).
   - **Owner:** product-engineer
   - **Write set:** frontmatter of `specs/memory/tech-stack.md`,
     `specs/memory/product/.../lifecycle-foundation.md`,
@@ -193,7 +193,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     cleared for these atoms.
   - **Parallelism:** product-engineer slot.
 
-- [ ] **T-PIO-11** — Regenerate `index.md` from catalog (F11) — depends on T-PIO-10.
+- [x] **T-PIO-11** — Regenerate `index.md` from catalog (F11) — depends on T-PIO-10.
   - **Owner:** product-engineer
   - **Write set:** `specs/memory/product/index.md`.
   - **Preconditions:** **T-PIO-10 done**; memory-write phase.
@@ -227,7 +227,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     re-install (idempotent); `dadaia specs doctor` 0 errors.
   - **Parallelism:** terminal; runs after all implementation tasks.
 
-- [ ] **T-PIO-16** — CLOSURE: CLOSURE.md + memory finalization + drift RE-AUDIT + archive.
+- [x] **T-PIO-16** — CLOSURE: CLOSURE.md + memory finalization + drift RE-AUDIT + archive.
   - **Owner:** product-engineer
   - **Preconditions:** all prior tasks `[x]`; gate ladder (qa-engineer + security-reviewer
     + code-reviewer) APPROVE; commit + push + PR per release-governance.

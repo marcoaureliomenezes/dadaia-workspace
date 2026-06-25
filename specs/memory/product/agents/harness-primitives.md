@@ -17,17 +17,25 @@ tags:
 - codex
 - literacy
 agent_tier: self-pull
-token_estimate: 495
-last_updated: '2026-06-04'
-release_origin: v0.1.4.6
+token_estimate: 620
+last_updated: '2026-06-25'
+release_origin: v0.1.18
 ---
 
 ## Propósito
 
-`harness-primitives` is the shared middle-depth literacy skill available to all 15
-default agents. It answers the question "what is this harness thing I keep seeing
+`harness-primitives` is the shared middle-depth literacy skill available to all 9 core
+agents. It answers the question "what is this harness thing I keep seeing
 referenced in workspace rules?" at a depth sufficient for agents to follow workspace
 protocols without needing to become harness specialists.
+
+"Harness" carries two meanings, and the skill teaches both (the **two-layer agentic
+model** — see [[architecture]]): **Layer 1** is the entry harness the operator launches
+in the terminal — `claude`, `codex`, `opencode`, or `pi` — where governance is
+`AGENTS.md` + the projected `.X/` asset trees; **Layer 2** is the per-step worker harness
+the lifecycle engine drives behind `AgentRuntimePort` (`FAKE`, `CODEX_EXEC`,
+`CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS`), selectable via `--harness`. PI is the fourth
+harness at both layers. The Claude-Code-vs-Codex deltas below are Layer-1 deltas.
 
 The skill defines each primitive (agent persona, subagent/dispatch, skill, rule,
 hook, AGENTS.md, MCP tool injection), explains how Claude Code and Codex differ in

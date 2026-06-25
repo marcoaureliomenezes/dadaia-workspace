@@ -24,7 +24,7 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 760
+token_estimate: 1500
 last_updated: '2026-06-25'
 release_origin: pi-fourth-harness-v1
 ---

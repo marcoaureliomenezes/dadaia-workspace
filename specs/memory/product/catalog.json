@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T05:56:46Z",
+  "generated_at": "2026-06-25T15:22:16Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -151,9 +151,11 @@
         "codex",
         "literacy"
       ],
-      "token_estimate": 495,
+      "token_estimate": 620,
       "agent_tier": "self-pull",
-      "depends_on": []
+      "depends_on": [
+        "architecture"
+      ]
     },
     {
       "rank": 9,
@@ -254,10 +256,12 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 950,
+      "token_estimate": 1080,
       "agent_tier": "self-pull",
       "depends_on": [
         "spec-context-project",
+        "architecture",
+        "lifecycle-foundation",
         "agent-sdd-alignment",
         "sdd-gate-v3",
         "public-asset-distribution"
@@ -297,7 +301,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 700,
+      "token_estimate": 885,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
@@ -371,9 +375,12 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 606,
+      "token_estimate": 1300,
       "agent_tier": "self-pull",
-      "depends_on": []
+      "depends_on": [
+        "architecture",
+        "lifecycle-foundation"
+      ]
     },
     {
       "rank": 19,
@@ -472,7 +479,7 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 760,
+      "token_estimate": 1500,
       "agent_tier": "self-pull",
       "depends_on": []
     },

@@ -21,17 +21,43 @@ tags:
 - parity
 - multi-platform
 agent_tier: self-pull
-token_estimate: 606
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+token_estimate: 1300
+last_updated: '2026-06-25'
+release_origin: v0.1.18
 ---
 
 ## Propósito
 
 Multi-platform parity means the same canonical public assets are projected to
-Claude Code, Codex, and OpenCode without pretending the runtimes are identical.
-Each projection must be truthful about the runtime's native concepts, supported
-hooks, config loading, workflow support, and skill discovery.
+Claude Code, Codex, OpenCode, and (post-v0.1.18) PI without pretending the runtimes
+are identical. Each projection must be truthful about the runtime's native concepts,
+supported hooks, config loading, workflow support, and skill discovery.
+
+### Two-layer scope: projection-parity vs worker-runtime parity
+
+This atom is about **Layer-1 projection parity** — how one canonical source projects
+into the entry harnesses the operator launches. It must not be read as the full harness
+set. dadaia-workspace runs harnesses at two layers (see [[architecture]] "Two-layer
+agentic model"):
+
+- **Layer 1 (this atom) — entry-harness projection parity.** Source
+  (`dadaia_workspace/public/`) → `.claude/`, `.codex/`, `.opencode/`, `.pi/` asset trees
+  via `dadaia public install`. Each tree is truthful about its runtime. PI's `.pi/`
+  projection (target `pi`, structural mirror of OpenCode in `public_assets.py`) is
+  **minimal**: `.pi/SYSTEM.md` POINTS AT `AGENTS.md` (no law restatement) + a generic
+  `.pi/settings.json` + an optional `.pi/prompts/` affordance.
+- **Layer 2 — worker-runtime parity (NOT projection parity).** The lifecycle engine's
+  per-step worker harnesses behind `AgentRuntimePort` (`FAKE`, `CODEX_EXEC`,
+  `CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS`). These have **no projection tree** — they
+  are subprocess/SDK adapters selected per step, governed by `--harness`, not by `.X/`
+  asset projection. PI shipped here first (`pi --mode json`). [[lifecycle-foundation]]
+  is the normative source for Layer 2.
+
+**`.pi/` trust surface.** `.pi/**` is a post-trust, unsandboxed, executable-capable
+surface (a real privilege grant — the operator who runs `pi` after seeing `.pi/`
+extensions grants execution). The `.pi/SYSTEM.md` carries an inline trust-boundary note;
+no secrets or operator-local values appear in `public/pi/**` and `[ok] public-privacy`
+must stay green.
 
 ## Public surface counts (v0.2.0)
 

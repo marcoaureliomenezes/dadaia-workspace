@@ -1,6 +1,6 @@
 ---
 name: public-source-hygiene-flaky-pycache-pollution
-status: Resolved
+status: Closed
 severity: MEDIUM
 reported: 2026-06-25
 surface: tests/contract/test_public_source_hygiene.py (full-suite run) + public/scripts/*.py bytecode guard

@@ -11,7 +11,7 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 1200
+token_estimate: 1800
 last_updated: '2026-06-25'
 release_origin: pi-fourth-harness-v1
 ---

@@ -1,6 +1,6 @@
 ---
 name: retention-sweep-test-uses-windows-unsupported-utime-followsymlinks
-status: Resolved
+status: Closed
 severity: LOW
 reported: 2026-06-25
 surface: tests/unit/features/lifecycle/test_retention_sweep.py (D5 retention sweep)

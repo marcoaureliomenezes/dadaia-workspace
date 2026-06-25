@@ -17,16 +17,16 @@ tags:
 - adr
 - agents
 agent_tier: self-pull
-token_estimate: 7000
+token_estimate: 7600
 last_updated: '2026-06-25'
-release_origin: pi-fourth-harness-v1
+release_origin: v0.1.18
 ---
 
 ## Visão geral
 
 Arquitetura em três anéis: (1) CLI thin em `dadaia_workspace/cli/`; (2) features isoladas em `dadaia_workspace/features/<name>/` cada uma com seu service/doctor/etc; (3) infrastructure em `dadaia_workspace/infrastructure/` (Git, JSON stores, public asset projection). Núcleo em `dadaia_workspace/core/` mantém models, protocols e exceptions — sem I/O. Dependency injection via `dadaia_workspace/container.py`.
 
-Asset chain canonical → projeções: a fonte de cada agente, skill, rule, command, script, template, workflow vive em `dadaia_workspace/public/<type>/`; staging em `.dadaia/agentic/<type>/` (snapshots imutáveis com manifest.json); instalação espalha por `.claude/`, `.codex/`, `.opencode/`, `.agents/` seguindo regras por tool.
+Asset chain canonical → projeções: a fonte de cada agente, skill, rule, command, script, template, workflow vive em `dadaia_workspace/public/<type>/`; staging em `.dadaia/agentic/<type>/` (snapshots imutáveis com manifest.json); instalação espalha por `.claude/`, `.codex/`, `.opencode/`, `.pi/` (Layer-1 PI, target `pi`, mirror estrutural de OpenCode em `public_assets.py`), `.agents/` seguindo regras por tool.
 
 ## O Spec Context Project (conceito central)
 
@@ -472,7 +472,7 @@ Locais canônicos de estado em disco e seu propósito:
 
 ## Memory injection subsystem
 
-O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto. Opera em três runtimes (Claude Code, OpenCode, Codex).
+O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto. Opera em três runtimes de entrada — Layer 1 (Claude Code, OpenCode, Codex); o quarto harness PI (`pi`) é um worker de Layer 2 headless, sem hook de entrada, e por isso não participa desta injeção up-tree de Layer 1 — ver "Two-layer agentic model" abaixo.
 
 ### Lean payload
 
@@ -535,14 +535,59 @@ Invocado por doctor check `LINT-1`. Exit 0 = all valid; exit 1 = ao menos um ERR
 
 ## Multi-harness runtime parity (constitution §4)
 
+### Two-layer agentic model
+
+dadaia-workspace runs agents at **two distinct layers**, and "harness" means a
+different thing at each. Conflating them is the source of most parity confusion.
+
+- **Layer 1 — entry harness (terminal).** The AI coding harness the operator launches
+  in the workspace terminal: `claude`, `codex`, `opencode`, and (post-v0.1.18) `pi`.
+  Governance at this layer is `AGENTS.md` read up-tree natively + the projected `.X/`
+  asset trees (`.claude/`, `.codex/`, `.opencode/`, `.pi/`) staged from
+  `dadaia_workspace/public/` by `dadaia public install`. Deterministic enforcement at
+  Layer 1 is per-entry-harness (PreToolUse hooks where supported + git chokepoints) —
+  the table immediately below is the **Layer-1 entry-harness** enforcement parity, not
+  the worker-runtime set.
+- **Layer 2 — worker harness (inside the lifecycle engine).** The bounded agent workers
+  that `dadaia lifecycle` drives per step behind `AgentRuntimePort`
+  (`container.build_agent_runtime(kind)`), one harness selectable per step via
+  `--harness` / `--step-harness`. There are **five `AgentRuntimeKind`s**
+  (`core/models/lifecycle.py`): `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`,
+  `PI_HEADLESS`. The transport differs per harness: **SDK** (Claude — in-process
+  `claude_sdk_runtime.py`, the only adapter with a real Ring-1 write boundary via
+  `core/scope_match`), **CLI-headless** (Codex `codex exec`, OpenCode `opencode run`,
+  PI `pi --mode json` — subprocess-backed, one-shot per step), and **RPC** (designed,
+  not yet shipped). The factory is total over the enum; `core/`/`features/` stay
+  provider-agnostic. See [[lifecycle-foundation]] for the engine spine.
+
+A harness can exist at one layer and not the other. PI ships as a real **Layer-2**
+worker (`PiHeadlessAdapter`, wired in `container.py`) and, post-v0.1.18, a minimal
+**Layer-1** `.pi/` projection that points at the law; it runs no Layer-1 PreToolUse
+hook, so its Layer-1 posture is advisory + chokepoint-protected (no Ring-1).
+
+### Layer-1 entry-harness enforcement parity
+
 | Runtime | PreToolUse hooks (`pre_gate`) | Git chokepoints | Postura |
 |---------|-------------------------------|-----------------|---------|
 | Claude Code | sim — `python -m dadaia_workspace.hooks.pre_gate` (matcher `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash`) | sim | determinístico: hooks + chokepoints |
 | Codex interativo (TUI) | sim — `pre_gate` em `.codex/hooks.json` (matcher `^(apply_patch\|Edit\|Write\|Bash)$`) | sim | determinístico: hooks + chokepoints |
 | Codex headless (`codex exec`) | **não — exec não dispara hooks** (defeito upstream codex-cli 0.139.0, live-verificado) | sim | **chokepoints only** |
 | OpenCode | plugins `.ts` chamam hooks Python via subprocess (venv-path resolution `.dadaia/.venv/bin/python` → `Scripts/python.exe` → `python`); `dadaia public doctor` reporta `[unsupported]` para PostToolUse opencode — esperado | sim | advisory + chokepoint-protected (ADR-G3) |
+| PI (`pi`) | **não — o `pi` CLI não expõe hook pre-disk (Ring-1 deferido, WS-PI-4)** | sim | advisory + chokepoint-protected; projeção `.pi/` aponta para a lei (honestidade preservada) |
 
 Codex-specific behavior é expresso em termos Codex-nativos: `AGENTS.md` context, `.codex/config.toml`, `.codex/skills`, hooks onde suportados, e deferred tool discovery para multi-agent capability.
+
+### Layer-2 worker-runtime posture (`AgentRuntimePort`)
+
+| AgentRuntimeKind | Adapter | Transport | Ring-1 write boundary |
+|------------------|---------|-----------|------------------------|
+| `FAKE` | `fake_runtime.py` | in-process | n/a (test/offline) |
+| `CODEX_EXEC` | `codex_runtime.py` | CLI-headless (`codex exec`) | não |
+| `CLAUDE_SDK` | `claude_sdk_runtime.py` | SDK (in-process) | **sim** — `core/scope_match` |
+| `OPENCODE_RUN` | `opencode_runtime.py` | CLI-headless (`opencode run`) | não (stub) |
+| `PI_HEADLESS` | `pi_runtime.py` | CLI-headless (`pi --mode json`) | não |
+
+Apenas `CLAUDE_SDK` enforça hoje um Ring-1 real; os demais workers são one-shot por step. Transporte RPC (`pi --mode rpc`, ponte Python↔Node) é desenhado mas não shipado (engine é one-shot-per-step). Selecionável por step via `--harness`/`--step-harness` (`cli/commands/lifecycle.py` `_HARNESS_KINDS`).
 
 **path-scope (disciplina, não gate)** — `paths.write_allowlist` do frontmatter dos agentes é **convenção de instrução de agente** (workspace-protocol §6), não enforcement do gate: nenhum hook conhece a persona do processo que escreve. O que o gate PreToolUse enforça deterministicamente é path-class × lease × fase × modo sobre os write tools. A divisão de superfície (`ai-engineer` dono de `dadaia_workspace/public/{skills,rules,workflows,commands,agents}/**`; `software-engineer` dono do código Python, incluindo `dadaia_workspace/hooks/*.py`) é mantida por disciplina de persona e review.
 

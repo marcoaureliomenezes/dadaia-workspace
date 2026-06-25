@@ -1,6 +1,6 @@
 ---
 name: memory-catalog-cli-skips-index-md
-status: Resolved
+status: Closed
 severity: MEDIUM
 reported: 2026-06-25
 surface: dadaia memory catalog generate (features/specs/catalog.py)
