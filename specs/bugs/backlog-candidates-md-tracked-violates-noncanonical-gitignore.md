@@ -1,6 +1,6 @@
 ---
 name: backlog-candidates-md-tracked-violates-noncanonical-gitignore
-status: Resolved
+status: Closed
 severity: LOW
 reported: 2026-06-24
 surface: repo hygiene — specs/backlog/candidates.md vs .gitignore /specs/* policy

@@ -1,6 +1,6 @@
 ---
 name: infrastructure-claude-sdk-imports-features-scope-match
-status: Resolved
+status: Closed
 severity: MEDIUM
 reported: 2026-06-24
 surface: import-linter (lint-imports / CI lint job)

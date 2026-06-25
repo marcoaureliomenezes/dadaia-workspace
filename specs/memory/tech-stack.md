@@ -12,8 +12,8 @@ tags:
 - constraints
 agent_tier: inject
 token_estimate: 1200
-last_updated: '2026-06-10'
-release_origin: v0.1.10
+last_updated: '2026-06-25'
+release_origin: multiharness-engine-v0116
 ---
 
 ## Linguagens
@@ -40,7 +40,7 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 
 ## Agent runtimes
 
-  * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`.
+  * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`. O `ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`) dirige um worker Claude por trás de `AgentRuntimePort` num step do lifecycle; depende do extra **opcional** `claude-agent-sdk` (lazy-imported — NÃO é dependência travada; build offline-first preservado; ausência ⇒ resultado FAILED com `pip install claude-agent-sdk` acionável).
   * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..8 (D-CX-4 lint inclui tool-names Claude e tier-names Anthropic). 9 agentes core TOML em `.codex/agents/` com tiering registry-derived (model id × `model_reasoning_effort` via `core/model_registry.codex_tier_views()`; deep→high, dispatch→medium; collapse guard loud-fail). Zero leak `claude-*`/Opus/Sonnet/Haiku. Command policy `.codex/rules/*.rules` em `prefix_rule(...)` com paths venv-form. **Hooks executam só em sessão interativa** — `codex exec` headless não dispara hooks (codex-cli 0.139.0, live-verified; harness opt-in `tests/integration/codex_live/`, `DADAIA_CODEX_LIVE=1`). Workflows em `.codex/workflows/` (reference-only).
   * **OpenCode** : projeção via strip de frontmatter de tools; workflows e skills projetados em `.opencode/`.
   * **CLI** : agentes invocados via `claude --agent <name>` ou equivalente; modo manual sem paralelização automática.
@@ -112,6 +112,7 @@ import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` decla
 
   * NÃO adicionar dependências fora desta lista sem release aprovada que justifique.
   * NÃO usar libs com network em build/test (offline-first).
+  * `claude-agent-sdk` é um **runtime extra OPCIONAL instalado pelo operador**, NÃO uma dependência travada/pinned: não entra em `poetry.lock`, não é importado em module-load, e é lazy-imported apenas pelo `ClaudeSdkAdapter` quando o operador escolhe rodar um step no harness Claude SDK. O build e os testes permanecem offline-first sem ele.
   * NÃO usar threading/multiprocessing nas features — orquestração concorrente fica em `features/orchestration/`.
   * NÃO chamar `os.system`/`subprocess` fora de `infrastructure/` — features usam protocols.
   * NÃO importar Python <3.12 backports — runtime mínimo é 3.12 (match/case, generic types nativos, type statement).

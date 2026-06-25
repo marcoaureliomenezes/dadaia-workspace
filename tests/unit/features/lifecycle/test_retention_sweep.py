@@ -204,8 +204,11 @@ def test_symlink_escaping_dadaia_is_refused(tmp_path: Path) -> None:
     link = tmp_path / ".dadaia" / "tmp" / "escape"
     link.parent.mkdir(parents=True, exist_ok=True)
     link.symlink_to(outside, target_is_directory=True)
-    old = (NOW - dt.timedelta(seconds=_TMP_TTL + 99)).timestamp()
-    os.utime(link, (old, old), follow_symlinks=False)
+    # A symlink is collected as a candidate unconditionally (the deleter treats it as a
+    # leaf regardless of TTL — see RetentionSweep._collect_unit), so it does not need to be
+    # aged past TTL to reach the escape guard. We deliberately do NOT call
+    # os.utime(link, follow_symlinks=False) here: that is unavailable on Windows
+    # (NotImplementedError) and is unnecessary for this assertion.
 
     result = _sweep(tmp_path).sweep(apply=True)
 

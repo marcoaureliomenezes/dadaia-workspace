@@ -90,7 +90,7 @@ have disjoint write sets as declared. Hard spine: T-016-00 → 01 → {02,03} �
 - **Acceptance:** `ruff format --check`, `ruff check`, `mypy --strict`, `pytest` all green;
   `_repo_root_write_guard` clean; no new venvs. QA review handoff recorded.
 
-### [ ] T-016-07 — CLOSURE (deferred to rc / operator ship decision)
+### [x] T-016-07 — CLOSURE (deferred to rc / operator ship decision)
 - **Owner:** product-engineer
 - **Write set:** `specs/releases/multiharness-engine-v0116/CLOSURE.md`, `specs/memory/**`,
   `specs/releases/ACTIVE.md`
