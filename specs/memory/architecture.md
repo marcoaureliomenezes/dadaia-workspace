@@ -17,9 +17,9 @@ tags:
 - adr
 - agents
 agent_tier: self-pull
-token_estimate: 7600
+token_estimate: 7900
 last_updated: '2026-06-25'
-release_origin: v0.1.18
+release_origin: v0.1.19
 ---
 
 ## Visão geral
@@ -43,7 +43,7 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 
 **cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`, `lifecycle`. Thin wrapper sobre features; sem business logic.
 
-**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only listing apenas — o dispatch path foi retirado em WS-3; ver abaixo), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
+**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
 
 **panel — arquitetura HTTP interna (pós R5):**
 
@@ -539,6 +539,40 @@ Invocado por doctor check `LINT-1`. Exit 0 = all valid; exit 1 = ao menos um ERR
 
 dadaia-workspace runs agents at **two distinct layers**, and "harness" means a
 different thing at each. Conflating them is the source of most parity confusion.
+
+```mermaid
+flowchart TB
+    OP(["Operator no terminal"])
+    subgraph L1["LAYER 1 — entry harness (terminal)"]
+        direction LR
+        CC["claude"]:::h
+        CX["codex"]:::h
+        OC["opencode"]:::h
+        PIe["pi"]:::h
+    end
+    GOV["Governança Layer 1:<br/>AGENTS.md up-tree + projeções .claude/ .codex/ .opencode/ .pi/<br/>PreToolUse pre_gate (onde suportado) + git chokepoints"]
+    CLI["dadaia lifecycle &lt;verb&gt; --harness &lt;x&gt;<br/>(workflow procedural Python)"]
+    subgraph L2["LAYER 2 — worker harness (AgentRuntimePort)"]
+        direction LR
+        FK["FAKE<br/>in-process"]:::w
+        CXk["CODEX_EXEC<br/>codex exec"]:::w
+        CLk["CLAUDE_SDK<br/>SDK · Ring-1"]:::w
+        OCk["OPENCODE_RUN<br/>opencode run"]:::w
+        PIk["PI_HEADLESS<br/>pi --mode json"]:::w
+    end
+    OP --> L1
+    L1 --> GOV
+    L1 -->|"o harness invoca a CLI dadaia"| CLI
+    CLI --> L2
+    L2 -->|"Ring-2: git-diff changed_paths + git chokepoints"| OUT(["produção: código · specs · memory"])
+    classDef h fill:#1f6feb,color:#fff,stroke:#1f6feb;
+    classDef w fill:#238636,color:#fff,stroke:#238636;
+```
+
+A mesma palavra "harness" nomeia coisas diferentes em cada layer: no Layer 1 é o agente
+de terminal que o operador inicia; no Layer 2 é um worker `AgentRuntimeKind` que o engine
+dirige por step. PI aparece nos dois (entrada `.pi/` + worker `PI_HEADLESS`); FAKE existe
+só no Layer 2.
 
 - **Layer 1 — entry harness (terminal).** The AI coding harness the operator launches
   in the workspace terminal: `claude`, `codex`, `opencode`, and (post-v0.1.18) `pi`.

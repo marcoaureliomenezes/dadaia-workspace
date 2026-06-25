@@ -47,7 +47,7 @@ _FENCED_JSON = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
 class _GitDiffPort(Protocol):
     """Narrow git seam the adapter needs — satisfied by ``GitSubprocessClient``."""
 
-    def diff_name_only(self, cwd: Path) -> tuple[str, ...]: ...
+    def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T15:22:16Z",
+  "generated_at": "2026-06-25T16:25:46Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -56,7 +56,7 @@
         "workflows",
         "dispatch"
       ],
-      "token_estimate": 865,
+      "token_estimate": 1080,
       "agent_tier": "self-pull",
       "depends_on": []
     },
@@ -256,7 +256,7 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 1080,
+      "token_estimate": 1095,
       "agent_tier": "self-pull",
       "depends_on": [
         "spec-context-project",
@@ -365,8 +365,8 @@
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
-      "tldr": "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules).",
-      "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only, per the §8 enforcement matrix), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks; OpenCode is canonized \"advisory + chokepoint-protected\" (ADR-G3). Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with no behavior until the plugin is installed.",
+      "tldr": "Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows).",
+      "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only, per the §8 enforcement matrix), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks; OpenCode is canonized \"advisory + chokepoint-protected\" (ADR-G3). PI (the fourth harness, post-v0.1.18) projects an inert `.pi/` surface and is Layer-1-governed via AGENTS.md natively (no PreToolUse hook → chokepoints-only). Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with no behavior until the plugin is installed.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
@@ -375,7 +375,7 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 1300,
+      "token_estimate": 1480,
       "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
@@ -479,9 +479,11 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 1500,
+      "token_estimate": 1780,
       "agent_tier": "self-pull",
-      "depends_on": []
+      "depends_on": [
+        "architecture"
+      ]
     },
     {
       "rank": 24,
@@ -570,7 +572,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 1650,
+      "token_estimate": 1820,
       "agent_tier": "self-pull",
       "depends_on": [
         "workspace-doctor",

@@ -5,7 +5,9 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets import (
     _PRIVACY_DENYLIST_ENV,
@@ -17,6 +19,8 @@ from dadaia_workspace.infrastructure.public_assets import (
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
+
+_runner = CliRunner()
 
 
 def test_stage_creates_agentic_manifest(tmp_path: Path) -> None:
@@ -112,6 +116,67 @@ def test_install_target_pi_is_idempotent(tmp_path: Path) -> None:
     assert pi_lines and all(r.startswith("[ok]") for r in pi_lines), pi_lines
     drift = [r for r in reports if r.startswith(("[drift]", "[missing]")) and "pi" in r]
     assert not drift, drift
+
+
+def test_cli_install_target_pi_projects_and_doctor_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Layer-1 e2e through the REAL CLI: `dadaia public install --target pi` is the
+    command the operator runs to 'enter pi'. Drive it via CliRunner against an isolated
+    temp workspace, then `dadaia public doctor` — assert the `.pi/` tree lands and doctor
+    reports the pi projection green (proving the operator-facing path, not just the
+    manager API)."""
+    from dadaia_workspace.features.workspace.service import WorkspaceService
+    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+    workspace = tmp_path / "ws"
+    # Initialize a real workspace root the CLI resolver can find (conftest backstops
+    # real venv creation). This is the state `dadaia init` leaves behind.
+    WorkspaceService(
+        public_assets=FileSystemPublicAssetManager(),
+        python_env=VenvPythonEnvironmentManager(),
+    ).init(workspace)
+    monkeypatch.chdir(workspace)
+
+    install = _runner.invoke(app, ["public", "install", "--target", "pi"])
+    assert install.exit_code == 0, install.output
+
+    assert (workspace / ".pi" / "SYSTEM.md").exists()
+    assert (workspace / ".pi" / "settings.json").exists()
+    assert (workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
+
+    doctor = _runner.invoke(app, ["public", "doctor"])
+    assert doctor.exit_code == 0, doctor.output
+    assert "pi:" in doctor.output
+
+
+def test_install_target_pi_system_note_carries_governance_markers(tmp_path: Path) -> None:
+    """Layer-1 governance content: the projected `.pi/SYSTEM.md` must bind PI to the
+    workspace law (AGENTS.md), name the `dadaia` CLI operational surface and SDD
+    discipline, and declare the post-trust executable boundary — AND honestly carry NO
+    restated law and no operator-local absolute paths (the honesty property the audit
+    requires)."""
+    workspace = tmp_path / "ws"
+    FileSystemPublicAssetManager().install(workspace, target="pi")
+
+    system_note = (workspace / ".pi" / "SYSTEM.md").read_text(encoding="utf-8")
+    context_prompt = (workspace / ".pi" / "prompts" / "dadaia-context.md").read_text(
+        encoding="utf-8"
+    )
+
+    # Binds to the law and the operational surface.
+    assert "AGENTS.md" in system_note
+    assert "dadaia" in system_note
+    assert "SDD" in system_note
+    assert "Layer-1" in system_note
+    # Declares the post-trust executable trust boundary.
+    assert "post-trust" in system_note
+    # Honesty: the note must NOT restate the law (it defers to AGENTS.md).
+    assert "this note carries none" in system_note
+    # No operator-local absolute paths leaked into the post-trust executable surface.
+    assert "/home/" not in system_note
+    assert "/home/" not in context_prompt
+    assert "dadaia" in context_prompt
 
 
 def test_doctor_emits_pi_ok_lines(tmp_path: Path) -> None:

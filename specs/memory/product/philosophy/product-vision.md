@@ -17,9 +17,9 @@ tags:
   - lifecycle
   - anti-slop
 agent_tier: self-pull
-token_estimate: 1080
+token_estimate: 1095
 last_updated: '2026-06-25'
-release_origin: v0.1.18
+release_origin: v0.1.19
 ---
 
 ## Propósito
@@ -42,7 +42,9 @@ The workspace combines seven elements:
 3. Spec Context Projects (the keystone concept — see [[spec-context-project]]).
 4. Multi-agent roles, skills, hooks, rules, and scoped `AGENTS.md`.
 5. Multi-harness support at two layers: four entry harnesses (Claude Code, Codex,
-   OpenCode, PI) and four worker harnesses driven inside the lifecycle engine.
+   OpenCode, PI) and five `AgentRuntimeKind` worker runtimes driven inside the
+   lifecycle engine — four real (Claude SDK, Codex headless, OpenCode headless, PI
+   headless) plus a FAKE runtime for offline/test.
 6. Reports, handoffs, audits, memory, and a panel.
 7. A strict anti-slop operating model.
 

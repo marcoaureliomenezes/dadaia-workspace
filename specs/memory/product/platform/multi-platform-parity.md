@@ -2,7 +2,7 @@
 slug: multi-platform-parity
 title: multi-platform-parity
 category: product
-tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules)."
+tldr: "Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows)."
 summary: Codex uses native config, shared and Codex-specific skills, interactive-only
   hook execution (codex exec never fires hooks — headless posture is chokepoints-only,
   per the §8 enforcement matrix), native Starlark .rules command policy with venv-path
@@ -11,6 +11,8 @@ summary: Codex uses native config, shared and Codex-specific skills, interactive
   model_reasoning_effort). All harnesses are protected by the git chokepoints
   (pre-commit lease gate + pre-push security-verdict gate), which fire independently
   of harness hooks; OpenCode is canonized "advisory + chokepoint-protected" (ADR-G3).
+  PI (the fourth harness, post-v0.1.18) projects an inert `.pi/` surface and is
+  Layer-1-governed via AGENTS.md natively (no PreToolUse hook → chokepoints-only).
   Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs
   (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with
   no behavior until the plugin is installed.
@@ -21,9 +23,9 @@ tags:
 - parity
 - multi-platform
 agent_tier: self-pull
-token_estimate: 1300
+token_estimate: 1480
 last_updated: '2026-06-25'
-release_origin: v0.1.18
+release_origin: v0.1.19
 ---
 
 ## Propósito
@@ -125,8 +127,19 @@ reference, but shared docs must not assume Claude-only mechanisms exist in
 Codex or OpenCode.
 
 OpenCode receives transformed agent definitions, permissions mapped to its
-runtime categories, and plugins that delegate SDD gate/context behavior to the
-same shell scripts used by the other runtimes.
+runtime categories, and TypeScript plugins that delegate SDD gate/context behavior
+to the same **Python** governance hook the other runtimes use — they invoke
+`python -m dadaia_workspace.hooks.{pre_gate,ctx_inject}` via subprocess (with
+venv-path resolution), not a shell script (ADR-7: the plugin no longer shells out
+to `bash <script>.sh`). The only remaining shell asset in the product is the
+`pre-push-ci-gate.sh` git chokepoint.
+
+PI receives an inert `.pi/` projection (`SYSTEM.md`, `settings.json`,
+`prompts/dadaia-context.md`) via `dadaia public install --target pi`. PI reads
+`AGENTS.md`/`CLAUDE.md` natively up the tree, so workspace law rides for free;
+`.pi/` carries no executable extension and no policy restatement (the Ring-1
+`.pi/extensions/` gate is deferred). `.pi/**` is post-trust executable TypeScript
+when PI loads it — a deliberate operator privilege grant, never hand-edited.
 
 ## Estado runtime tocado
 

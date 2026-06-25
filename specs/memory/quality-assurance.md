@@ -15,9 +15,9 @@ tags:
   - quality
   - test-architecture
 agent_tier: self-pull
-token_estimate: 900
-last_updated: '2026-06-07'
-release_origin: v0.2.1
+token_estimate: 1150
+last_updated: '2026-06-25'
+release_origin: v0.1.19
 ---
 
 ## Propósito
@@ -32,6 +32,35 @@ Each layer has a machine-readable pytest marker declared in `pyproject.toml`. Th
 default local invocation (`pytest`) does not run coverage; coverage is measured only
 in CI's dedicated `contract-coverage` job, keeping local runs fast and avoiding
 coverage inflation that hides weak contracts.
+
+```mermaid
+flowchart TB
+    subgraph PYR["Test architecture — 5 layers (pytest markers)"]
+        direction TB
+        E["e2e — named user journeys · process boundary"]
+        IT["integration — real fs · Typer CliRunner · multi-component"]
+        CT["contract — CLI / API / schema / security / projection"]
+        U["unit — pure / near-pure · fastest (base)"]
+        E --> IT --> CT --> U
+        TM["tmp — one-off repro · quarantined · excluded from default collection"]
+    end
+    PYR --> CI
+    subgraph CI["CI — 7 jobs · cada um com timeout + marker filter"]
+        direction LR
+        J1["lint<br/>ruff + import-linter"]
+        J2["typecheck<br/>mypy --strict"]
+        J3["unit-fast"]
+        J4["contract-coverage<br/>(coverage gate)"]
+        J5["integration"]
+        J6["e2e-python"]
+        J7["e2e-panel<br/>(playwright)"]
+    end
+```
+
+Os quatro adapters de harness (Codex/Claude-SDK/OpenCode/PI) seguem a mesma taxonomia:
+`unit` para construção de comando/parse/redaction/Ring-2, `integration` para projeção
+Layer-1 e o seam CLI `--harness`, e um teste `live` **opt-in** (`DADAIA_*_LIVE=1`, nunca
+CI-gated) para o binding upstream real.
 
 The no-slop policy is the durable rule that prevents a test pile from accumulating:
 no test may be named after a PR, release, or task id; no test may assert that

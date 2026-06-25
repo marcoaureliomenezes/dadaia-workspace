@@ -12,9 +12,9 @@ tags:
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 865
-last_updated: '2026-06-07'
-release_origin: v0.2.2
+token_estimate: 1080
+last_updated: '2026-06-25'
+release_origin: v0.1.19
 ---
 
 ## Propósito
@@ -28,6 +28,35 @@ agents belong in optional packs or local overlays.
 
 The public default has **9 core agents** in the coordinator + sub-agent architecture
 defined by constitution §9:
+
+```mermaid
+graph TD
+  OP["Operator"] --> PM["project-manager<br/>(dispatcher · holds the 1 MUTATING lease)"]
+  OP --> PA["project-auditor<br/>(dispatcher · audit fan-out · ADDITIVE)"]
+  PM --> PE["product-engineer<br/>(curator: SPEC/PLAN/TASKS/CLOSURE + memory)"]
+  PM --> SE["software-engineer<br/>(code + tests)"]
+  PM -. "review checkpoints" .-> QA["qa-engineer → commit gate"]
+  PM -. .-> SEC["security-reviewer → push gate"]
+  PM -. .-> CR["code-reviewer → PR gate"]
+  PA --> QA
+  PA --> SEC
+  PA --> CR
+  PA --> SA["software-architect<br/>(anti-slop review · ADDITIVE)"]
+  PA --> AI["ai-engineer<br/>(public AI-entity surface)"]
+  subgraph Plugins["plugin stubs (not in core roster — no behavior until pack installed)"]
+    FE["frontend-engineer"]
+    DS["design-specialist"]
+    DV["devops-engineer"]
+  end
+  classDef disp fill:#1f6feb,color:#fff,stroke:#1f6feb;
+  classDef plug fill:#30363d,color:#8b949e,stroke:#30363d,stroke-dasharray:3 3;
+  class PM,PA disp;
+  class FE,DS,DV plug;
+```
+
+Only the two dispatchers (solid `-->`) invoke the Agent tool; review specialists are
+ADDITIVE workers reachable by either dispatcher (dashed `-.->`). Workers never dispatch
+workers.
 
 **Dispatchers (only 2 may dispatch through the active harness's delegation primitive — constitution §9):**
 - `project-manager` — lease coordinator; holds the single MUTATING lease through
@@ -101,8 +130,13 @@ Codex custom agents are real configured delegates projected under `.codex/agents
 they are not simulated with fake tool names or stale tool-discovery promises. Codex
 workflow Markdown is still documentation: it does not auto-execute, schedule fan-out, or
 turn a workflow file into a runtime primitive by itself. OpenCode uses its own agent and
-plugin projection. The dispatcher layer must report unsupported runtime capabilities
-honestly instead of simulating success.
+plugin projection. **PI** (`@earendil-works/pi-coding-agent`), the fourth harness, is
+governed at Layer 1 natively via `AGENTS.md`/`CLAUDE.md` plus its inert projected `.pi/`
+surface — it exposes **no** PreToolUse hook, so Layer-1 PI has no pre-disk (Ring-1)
+enforcement and relies on git chokepoints; at Layer 2 the `PiHeadlessAdapter` drives a
+real `pi --mode json` worker behind `AgentRuntimePort` with a git-diff Ring-2 boundary.
+The dispatcher layer must report unsupported runtime capabilities honestly instead of
+simulating success.
 
 ## Estado runtime tocado
 
@@ -111,8 +145,12 @@ honestly instead of simulating success.
 `software-engineer` owns implementation code and tests, not public agentic assets.
 `product-engineer` owns specs and memory according to SDD phase.
 
-The SDD gate validates write allowlists, task ownership, active context, and
-memory phase rules. Reports are emitted under `.dadaia/reports/<context>/<agent>/`
+The SDD gate enforces **path-class × lease × memory-phase × mode** only. It does
+**not** validate write-allowlists, task markers, or `Aprovado` status — the RULE-D
+allowlist check was removed in 0.1.7 rc-3 (no harness can assert persona identity to a
+hook). Write-allowlists, `[-]` task reservation, and `Aprovado` status are agent/PM
+**discipline**, not gate mechanism (workspace-protocol §6). Reports are emitted under
+`.dadaia/reports/<context>/<agent>/`
 with machine-readable handoff sidecars. Agent↔agent handoffs go to
 `.dadaia/handoff/<context>/`. Audit results go to `specs/audits/<ts>-<session_id_8chars>/`
 (committed Markdown — constitution §11).
@@ -124,5 +162,6 @@ with machine-readable handoff sidecars. Agent↔agent handoffs go to
 
 Shared literacy skill (all agents): `harness-primitives`.
 
-Public rules inventory (5): `workspace-protocol`, `tmp-file-guardrail`,
-`plugin-scope`, `dadaia-workspace-dev-guardrail`, `harness-skill-scope`.
+Public rules inventory (8): `workspace-protocol`, `tmp-file-guardrail`,
+`plugin-scope`, `dadaia-workspace-dev-guardrail`, `harness-skill-scope`,
+`backlog-ownership`, `bug-registration-guardrail`, `release-governance`.

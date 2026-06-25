@@ -20,9 +20,9 @@ tags:
 - validation
 - sdd
 agent_tier: self-pull
-token_estimate: 1650
-last_updated: '2026-06-11'
-release_origin: v0.1.10
+token_estimate: 1820
+last_updated: '2026-06-25'
+release_origin: v0.1.19
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1
@@ -35,6 +35,24 @@ Valida invariantes estruturais do diretório `specs/` sob o modelo SDD release-l
   * **TREE-1..7 + TREE-5M** (8 checks, sem TREE-8): canonical `specs/` tree v2 shape. TREE-3 (pós v0.2.1) exige `specs/memory/quality-assurance.md` no top-level (não em `product/sdd/`). O check de `specs/memory/AGENTS.md` é **TREE-5M** (não TREE-8). CAT-1 e SPEC-DOC-002 usam `rglob` para detectar atoms nested em subdiretórios.
 
 Os checks STRUCT-1..4, SYNC-1, YAML-absent guard e SPEC-DOC-008 (byte-identity de HTML) não existem mais (eram específicos ao modelo YAML/HTML).
+
+```mermaid
+flowchart TB
+    CMD["dadaia specs doctor [--fix] [--json]"] --> RUN["resolve specs_dir · roda todos os checks em ordem"]
+    RUN --> FAM
+    subgraph FAM["Famílias de invariantes"]
+        direction LR
+        A["SPEC-DOC 001..016<br/>presença · forma"]
+        B["Ledger 024..032<br/>estado da máquina SDD"]
+        C["TREE-1..7 + 5M<br/>shape canônico do tree"]
+        D["LINT-1<br/>memory atoms:<br/>frontmatter · headings · wikilinks · token drift"]
+        E["D-OC-1<br/>orchestration registry"]
+    end
+    FAM --> VERD{"algum ERROR?"}
+    VERD -->|sim| EX1(["exit 1 — bloqueia merge em CI"])
+    VERD -->|"só WARN / verde"| EX0(["exit 0"])
+    CMD -.->|"--fix"| FIX["auto-repara TREE-3/TREE-4 · migration guard TREE-1/2 · demais inalterados"]
+```
 
 ### Ledger invariants (SPEC-DOC-024/026/027/028/029/030/031/032)
 

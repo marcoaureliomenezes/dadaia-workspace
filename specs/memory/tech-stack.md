@@ -11,9 +11,9 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 1800
+token_estimate: 2100
 last_updated: '2026-06-25'
-release_origin: pi-fourth-harness-v1
+release_origin: v0.1.19
 ---
 
 ## Linguagens
@@ -50,11 +50,11 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 
 ## Model assignments (9 core agents + 3 plugin stubs)
 
-Atribuição em dois tiers: `claude-fable-5` para os leaves de raciocínio profundo
-(spec authoring, QA, harness, arquitetura, auditoria) e `claude-opus-4-8` para
-dispatchers e gate leaves. Override per-dispatch via `DADAIA_MODEL_OVERRIDE`
-quando a política do dispatcher justificar. Optional packs podem definir agentes
-e modelos próprios fora do default público.
+**Tier único na prática:** os **9 agentes core** rodam em `claude-opus-4-8` — não
+há tier-split em produção (verificável: os 9 frontmatter `model:` resolvem todos
+para `claude-opus-4-8`). Override per-dispatch via `DADAIA_MODEL_OVERRIDE` quando a
+política do dispatcher justificar. Optional packs podem definir agentes e modelos
+próprios fora do default público.
 
 **Single source:** `dadaia_workspace/core/model_registry.py` é a única fonte de
 ids/pricing/tier de modelo (`ModelEntry{claude_id, codex_id, pricing dated
@@ -62,15 +62,22 @@ append-only, tier}`); `MODEL_MAP` (runtime transforms) e `PRICING_TABLE`
 (telemetry) são views derivadas, com contract test de key-equality. `dadaia
 public doctor` falha em `model:` frontmatter que não resolve no registry.
 
+**Entrada reservada (não usada por nenhum agente):** o registry ainda define
+`claude-fable-5` com `tier="deep"` (e o mapeamento Codex `deep→high`), mas **zero
+agente core resolve para ela** — todos os 9 são `dispatch`-tier opus-4-8.
+`claude-fable-5` é region-restricted; a regra do operador é **NUNCA** pinar um
+agente a Fable-5. A entrada permanece como definição reservada do registry, não
+como atribuição viva.
+
 Agente| Modelo| Nota
 ---|---|---
 project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator
-project-auditor| `claude-fable-5`| Dispatcher / audit fan-out
-product-engineer| `claude-fable-5`| Curator / memory guardian
+project-auditor| `claude-opus-4-8`| Dispatcher / audit fan-out
+product-engineer| `claude-opus-4-8`| Curator / memory guardian
 software-engineer| `claude-opus-4-8`| Implementation leaf (absorbs python/node/backend)
-ai-engineer| `claude-fable-5`| AI-entity surface owner (harness-mastery synthesis workload)
-software-architect| `claude-fable-5`| Architectural review leaf (ADDITIVE)
-qa-engineer| `claude-fable-5`| Review → commit gate leaf
+ai-engineer| `claude-opus-4-8`| AI-entity surface owner (harness-mastery synthesis workload)
+software-architect| `claude-opus-4-8`| Architectural review leaf (ADDITIVE)
+qa-engineer| `claude-opus-4-8`| Review → commit gate leaf
 security-reviewer| `claude-opus-4-8`| Review → push gate leaf
 code-reviewer| `claude-opus-4-8`| Review → PR gate leaf
 frontend-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
@@ -108,6 +115,27 @@ import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` decla
 **Pins de tooling do workspace (não são deps do projeto):** `poetry` ≥ 2.3.4 e
 `dulwich` ≥ 1.2.5 nos ambientes de operação (CVEs nomeados em comentário no
 `pyproject.toml`); não entram em `poetry.lock` — o build-backend é `poetry-core`.
+
+Onde cada dependência vive, e os bans de import que o `import-linter` enforça em
+CI (camadas hexagonais — seta = direção de import permitida):
+
+```mermaid
+graph TD
+  CLI["cli/<br/>typer · rich"]
+  FEAT["features/<br/>pyyaml · jsonschema · jinja2 · mistune"]
+  INFRA["infrastructure/<br/>openpyxl · pyyaml · git_subprocess · adapters de harness"]
+  CORE["core/<br/>stdlib only<br/>model_registry · scope_match · models · protocols"]
+  CLI --> FEAT
+  CLI --> INFRA
+  FEAT --> CORE
+  INFRA --> CORE
+  FEAT -. "BANIDO (import-linter): features ✗→ infrastructure" .-> INFRA
+  CORE -. "BANIDO: core ✗→ os/subprocess/fcntl" .-> OSP["OS primitives"]
+```
+
+`features/` fala com o mundo externo apenas por `core/protocols/*`, implementados em
+`infrastructure/` e injetados no `container.py` (hexagonal port/adapter). `core/` é
+puro: zero I/O, zero OS primitive — por isso é testável e cross-platform.
 
 ## Restrições e proibições
 

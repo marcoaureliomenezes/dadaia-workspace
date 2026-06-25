@@ -4,6 +4,8 @@ APPROVED worker result)."""
 
 from __future__ import annotations
 
+import pytest
+
 from dadaia_workspace.container import build_agent_runtime
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -20,7 +22,11 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
 )
+from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
+from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
+from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
 
 
 def _run() -> LifecycleRun:
@@ -38,6 +44,37 @@ def _run() -> LifecycleRun:
 
 def test_factory_fake_is_the_production_fake_runtime() -> None:
     assert isinstance(build_agent_runtime(AgentRuntimeKind.FAKE), FakeAgentRuntime)
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected_adapter"),
+    [
+        (AgentRuntimeKind.FAKE, FakeAgentRuntime),
+        (AgentRuntimeKind.CODEX_EXEC, CodexExecAdapter),
+        (AgentRuntimeKind.CLAUDE_SDK, ClaudeSdkAdapter),
+        (AgentRuntimeKind.OPENCODE_RUN, OpenCodeAdapter),
+        (AgentRuntimeKind.PI_HEADLESS, PiHeadlessAdapter),
+    ],
+)
+def test_factory_maps_every_kind_to_its_adapter(
+    kind: AgentRuntimeKind, expected_adapter: type
+) -> None:
+    # The factory is total over the enum: each AgentRuntimeKind resolves to its
+    # concrete adapter, and the adapter reports back the same kind. This closes the
+    # previously-untested "kind -> adapter" wiring branch for ALL harnesses.
+    runtime = build_agent_runtime(kind)
+    assert isinstance(runtime, expected_adapter)
+    assert runtime.runtime_kind() is kind
+
+
+def test_factory_pi_headless_carries_real_git_seam() -> None:
+    # The Layer-2 PI wiring the operator reaches via `--harness pi` must construct a
+    # PiHeadlessAdapter with a real git client — that git seam is what gives PI its
+    # Ring-2 changed-paths write boundary (not a model self-report).
+    runtime = build_agent_runtime(AgentRuntimeKind.PI_HEADLESS)
+    assert isinstance(runtime, PiHeadlessAdapter)
+    assert runtime._git is not None
+    assert hasattr(runtime._git, "diff_name_only")
 
 
 def test_factory_fake_runtime_satisfies_runner_injection_contract() -> None:

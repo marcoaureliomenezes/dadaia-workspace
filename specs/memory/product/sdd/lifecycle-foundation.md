@@ -24,12 +24,41 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 1500
+token_estimate: 1780
 last_updated: '2026-06-25'
-release_origin: pi-fourth-harness-v1
+release_origin: v0.1.19
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`.
+
+The engine is the **Layer-2** half of the two-layer model (see [[architecture]] for the
+full two-layer picture): a Layer-1 entry harness invokes `dadaia lifecycle`, which threads
+one `LifecycleRun` through the phase ladder, running each step on a per-step selectable
+worker harness behind `AgentRuntimePort` and advancing only when the gate passes.
+
+```mermaid
+flowchart TB
+    OP["dadaia lifecycle pipeline --release &lt;id&gt;<br/>(ou implement · review qa|security|code · close)"]
+    OP --> PB["prompt_builder · PromptPrefix<br/>(sha256, cacheable, reusado byte-a-byte por step)"]
+    PB --> LAD
+    subgraph LAD["LifecyclePipeline — phase ladder (1 LifecycleRun · persiste a cada step · para no 1º bloqueio)"]
+        direction LR
+        I["IMPLEMENTATION"] --> Q["QA_REVIEW"] --> S["SECURITY_REVIEW"] --> C["CODE_REVIEW"] --> CLp["CLOSURE"]
+    end
+    LAD -.->|"build_agent_runtime(kind) — --step-harness"| RT
+    subgraph RT["AgentRuntimePort — worker harness selecionável por step"]
+        direction LR
+        FK["FAKE"]:::w
+        CXk["CODEX_EXEC"]:::w
+        CLk["CLAUDE_SDK<br/>Ring-1"]:::w
+        OCk["OPENCODE_RUN"]:::w
+        PIk["PI_HEADLESS"]:::w
+    end
+    RT --> GATE{"LifecycleAgentRunner gate:<br/>verdict APPROVED?<br/>Ring-2 changed_paths in-scope?"}
+    GATE -->|sim| NEXT(["transição legal → próximo step"])
+    GATE -->|não| BLK(["BlockedState + resume token"])
+    classDef w fill:#238636,color:#fff,stroke:#238636;
+```
 
 ## Purpose
 

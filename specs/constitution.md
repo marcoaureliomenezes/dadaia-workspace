@@ -543,7 +543,10 @@ architect review is parallel and optional. PM mediates throughout.
    checkpoint.
 
 The full commit/push/PR gate ladder — mechanizing the qa→commit and
-code-review→PR halves — is law-deferred to v0.1.15 (the governance release).
+code-review→PR halves — was codified in v0.1.15 (the governance release) and is
+now in force: the per-push-cycle security-verdict chokepoint mechanically gates
+every push, while the qa→commit and code-review→PR checkpoints are upheld as
+coordinator discipline (see the `release-governance` rule).
 
 Each coordinator checkpoint requires a handoff JSON with `"verdict": "APPROVED"`. A REJECT
 verdict blocks the transition and re-opens the relevant implementation task (marker
