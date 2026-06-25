@@ -12,5 +12,5 @@
 - [x] T-22-04 — H3: archive `specs/releases/v0.1.12` (honest superseded CLOSURE + `git mv` to `_archive`).
 
 ## CLOSURE
-- [ ] T-22-05 — preflight green + review ladder (QA + code-review + security) APPROVED.
-- [ ] T-22-06 — CLOSURE.md + archive v0.1.22 + gated push + PR + CI watched green.
+- [x] T-22-05 — preflight green + review ladder (QA + code-review + security) APPROVED.
+- [x] T-22-06 — CLOSURE.md + archive v0.1.22 + gated push + PR + CI watched green.
