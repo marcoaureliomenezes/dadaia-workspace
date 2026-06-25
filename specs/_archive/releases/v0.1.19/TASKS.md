@@ -37,7 +37,7 @@ Markers: `[ ]` open · `[-]` reserved · `[x]` done. Reserve before writing.
 
 ## CLOSURE
 
-- [ ] T-19-18 — preflight green + `poetry build` wheel; review ladder (QA +
+- [x] T-19-18 — preflight green + `poetry build` wheel; review ladder (QA +
   code-review + security) APPROVED on closing tip.
-- [ ] T-19-19 — CLOSURE.md, archive release, regenerate catalog, auto-memory
+- [x] T-19-19 — CLOSURE.md, archive release, regenerate catalog, auto-memory
   update; gated push + PR update + CI watched green; fresh drift re-audit = zero.
