@@ -26,8 +26,11 @@ sections, agents and contributors must read `docs/01_medium_codex.md` first.
 
 `dadaia-workspace` is a **multi-AI-harness × multi-project × SDD-oriented ×
 multi-agent** development workspace. It runs the same agent fleet across more than
-one AI coding harness (Claude Code, Codex, and — when installed — OpenCode), over
-more than one software project at once, under Spec-Driven Development, coordinated
+one AI coding harness — at Layer 1 (entry harness) the operator may launch Claude Code,
+Codex, OpenCode, or PI (`pi-coding-agent`); at Layer 2 (worker harness) the lifecycle
+engine drives bounded workers on any of these behind `AgentRuntimePort` (§0 "The two
+agentic layers") — over more than one software project at once, under Spec-Driven
+Development, coordinated
 by a roster of specialized agents. Its product is not any single project's code: it
 is the **workspace-level context-engineering** that orients an otherwise generic
 agent fleet so those agents can build many projects safely, in an organized way,
@@ -89,8 +92,10 @@ project; only the injected context changes.
 
 Each agent is specialized along one axis:
 
-- **ai-engineer** — the multi-harness AI-entity surface: agent personas, skills,
-  rules, workflows, hooks, and the context-engineering that drives them.
+- **ai-engineer** — the multi-harness AI-entity surface (the four harnesses: Claude Code,
+  Codex, OpenCode, PI): agent personas, skills, rules, workflows, hooks, and the
+  context-engineering that drives them, across both agentic layers (§0 "The two agentic
+  layers").
 - **product-engineer** — specs and memory: SPEC/PLAN/TASKS/CLOSURE, the memory
   canon, and anti-slop guardianship of the single-source-of-truth law.
 - **project-manager** — the full lifecycle as coordinator: it knows every agent's
@@ -102,6 +107,42 @@ code-reviewer, software-architect) are each specialized to the phase they own or
 gate in §7. The canonical roster is §14; the dispatcher-purity rule (only
 project-manager and project-auditor dispatch sub-agents) is §9.
 
+### The two agentic layers
+
+dadaia-workspace runs its agents at **two distinct agentic layers**. Naming them is
+load-bearing: enforcement, transport, and projection differ per layer, and conflating
+them is the source of the harness-count confusion this section closes.
+
+**Layer 1 — the entry harness (interactive).** A human opens a terminal and launches a
+coding harness directly — `claude`, `codex`, `opencode`, or `pi`. That running harness
+**is** the first agentic layer. It is governed by (a) the workspace-root `AGENTS.md` —
+read natively up the directory tree by Codex, OpenCode, and PI, and via the
+`CLAUDE.md` → `@AGENTS.md` bridge by Claude Code (§0 layout) — and (b) the per-harness
+projected assets (`.claude/`, `.codex/`, `.opencode/`, `.pi/`). At Layer 1 the harness
+may invoke the `dadaia` CLI. Layer-1 deterministic enforcement is the per-harness
+PreToolUse + git-chokepoint matrix of §4/§8.
+
+**Layer 2 — the worker harness (programmatic).** A `dadaia lifecycle` CLI verb runs a
+procedural **Python workflow** (`LifecyclePhaseWorkflow` for a single step;
+`LifecyclePipeline` for the IMPLEMENTATION → QA → SECURITY → CODE → CLOSURE ladder)
+that drives bounded agent **workers**. Each worker is reached through the
+**`AgentRuntimePort`** seam (the Layer-2 abstraction; concrete runtimes are built by
+`build_agent_runtime(kind)`), selectable and mixable per step via `--harness` /
+`--step-harness label=kind`. The worker is reached by the transport appropriate to its
+harness:
+
+- **SDK** — the Claude Agent SDK (`CLAUDE_SDK`), which enforces a real pre-disk (Ring-1)
+  write boundary via `core/scope_match`.
+- **CLI-headless** — `codex exec` (`CODEX_EXEC`), `opencode run` (`OPENCODE_RUN`), and
+  `pi --mode json` (`PI_HEADLESS`); these have no pre-disk hook and are bounded by
+  Ring-2 + the git chokepoints.
+- **RPC** — reserved for future per-harness transports; none ship today.
+
+The five `AgentRuntimeKind`s today are **FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN,
+PI_HEADLESS**. Layer 2 is where prompts-inside-workflows run; it is distinct from Layer 1.
+The Layer-1 enforcement matrix (§4/§8) governs entry harnesses and their hooks; it does
+**not** describe Layer-2 worker enforcement, which is the per-runtime ring posture above.
+
 ### Value proposition
 
 An operator chooses dadaia-workspace because it turns a generic agent fleet into a
@@ -112,20 +153,26 @@ collision or re-derivation.
 
 ### Workspace root & operational layout
 
-The workspace root is not a git repo. The nine allowed root entries are:
+The workspace root is not a git repo. The ten allowed root entries are:
 
 1. `.agents/` — universal agent assets and shared skills.
 2. `.claude/` — Claude Code projection.
 3. `.codex/` — Codex projection.
 4. `.dadaia/` — operational data for the workspace.
 5. `.opencode/` — OpenCode projection.
-6. `repos/` — alive repos associated with Spec Context Projects.
-7. `AGENTS.md` — root workspace rules (the primary agent instruction file).
-8. `CLAUDE.md` — required Claude Code bridge. Claude Code does not read `AGENTS.md`
+6. `.pi/` — PI (`pi-coding-agent`) Layer-1 projection: PI-specific entry-harness assets
+   (`SYSTEM.md`, `settings.json`, and optional `prompts`/`skills`). **Trust boundary:**
+   `.pi/**` assets are loaded by PI only **after the operator grants trust**, and PI
+   executes them as TypeScript **without a sandbox**. Treat `.pi/**` as post-trust
+   executable code: it is lib-originated (manifest-tracked), never carries secrets or
+   operator-local paths, and is a deliberate privilege grant — not inert config.
+7. `repos/` — alive repos associated with Spec Context Projects.
+8. `AGENTS.md` — root workspace rules (the primary agent instruction file).
+9. `CLAUDE.md` — required Claude Code bridge. Claude Code does not read `AGENTS.md`
    natively (per official Claude Code documentation); a root `CLAUDE.md` containing
    `@AGENTS.md` is the correct import bridge. This entry is therefore mandatory
    for Claude Code users and is authorized as a permanent root entry.
-9. `prompt.md` — optional human-created long prompt file for operator use.
+10. `prompt.md` — optional human-created long prompt file for operator use.
 
 Agents must not create extra root files or directories. Human-created exceptions are
 allowed, but default agent behavior must preserve root cleanliness. This list
@@ -172,15 +219,20 @@ legacy or generated formats and must not be committed as product memory.
 
 ## 4. Runtime Parity Must Be Honest
 
-Claude Code, Codex, and OpenCode projections must describe what each runtime
+Claude Code, Codex, OpenCode, and PI projections must describe what each runtime
 actually supports. Runtime adapters may differ, but doctor output and AGENTS.md
 instructions must not claim behavior that the runtime does not enforce.
 
-Enforcement per harness follows §8's per-harness enforcement matrix (normative):
-Claude Code = deterministic (PreToolUse hooks + git chokepoints); Codex
-interactive = deterministic (PreToolUse hooks + git chokepoints); Codex headless
-(`codex exec`) = chokepoints only (exec hooks do not fire — upstream codex-cli
-defect); OpenCode = advisory + chokepoint-protected (ADR-G3).
+This honesty clause is scoped to **Layer-1 entry-harness enforcement** (§0 "The two
+agentic layers"). Enforcement per Layer-1 harness follows §8's per-harness enforcement
+matrix (normative): Claude Code = deterministic (PreToolUse hooks + git chokepoints);
+Codex interactive = deterministic (PreToolUse hooks + git chokepoints); Codex headless
+(`codex exec`) = chokepoints only (exec hooks do not fire — upstream codex-cli defect);
+OpenCode = advisory + chokepoint-protected (ADR-G3); PI = advisory + chokepoint-protected
+(PI exposes no pre-disk hook in its CLI, so Layer-1 PI has no PreToolUse enforcement; its
+`.pi/` assets are post-trust executable and a Ring-1 PreToolUse extension is deferred —
+see §8). The Layer-2 worker-runtime ring posture is governed separately in §8 and is not
+described by this matrix.
 
 Codex-specific behavior must be expressed in Codex-native terms: `AGENTS.md`
 context, `.codex/config.toml`, `.codex/skills`, hooks where supported, and
@@ -375,7 +427,8 @@ regardless of whether any harness hook fired:
   them. The posture is deterministic-at-the-chokepoint, not unbypassable; the
   doctor's lease↔session coherence checks remain the post-hoc backstop.
 
-**Per-harness enforcement matrix:**
+**Layer-1 entry-harness enforcement matrix** (governs the harness a human launches in a
+terminal; see §0 "The two agentic layers"):
 
 | Harness | PreToolUse hooks (`pre_gate`) | Git chokepoints | Posture |
 |---|---|---|---|
@@ -383,6 +436,16 @@ regardless of whether any harness hook fired:
 | Codex interactive | yes | yes | deterministic: hooks + chokepoints |
 | Codex headless (`codex exec`) | **no — exec hooks do not fire** (upstream codex-cli defect) | yes | chokepoints only |
 | OpenCode | no | yes | advisory + chokepoint-protected (ADR-G3) |
+| PI (`pi-coding-agent`) | **no — PI CLI exposes no pre-disk hook (no Ring-1)** | yes | advisory + chokepoint-protected; `.pi/**` is post-trust executable; a Ring-1 PreToolUse extension is deferred |
+
+**Layer-2 worker-runtime posture** (governs bounded workers driven by `dadaia lifecycle`
+behind `AgentRuntimePort`; this is NOT the entry-harness matrix above): the worker
+runtimes are FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN, PI_HEADLESS. Only CLAUDE_SDK
+enforces a real pre-disk (Ring-1) write boundary, via `core/scope_match`; CODEX_EXEC,
+OPENCODE_RUN, and PI_HEADLESS are CLI-headless and bounded by Ring-2 + the git
+chokepoints. A Ring-1 boundary for the headless worker runtimes is deferred. The honesty
+clause of §4 applies to both layers: no projection or doctor line may claim enforcement a
+runtime does not perform.
 
 ## 9. Coordinator + Sub-Agent Architecture
 

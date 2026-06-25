@@ -9,7 +9,11 @@ import typer
 
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.spec_artifacts.memory import memory_product_add
-from dadaia_workspace.features.specs.catalog import generate_catalog, write_catalog
+from dadaia_workspace.features.specs.catalog import (
+    generate_catalog,
+    write_catalog,
+    write_index,
+)
 
 app = typer.Typer(help="Memory catalog management commands.")
 product_app = typer.Typer(help="Product memory catalog commands.")
@@ -84,11 +88,13 @@ def catalog_generate(
         help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
-    """Generate (or regenerate) specs/memory/product/catalog.json from .md frontmatter.
+    """Generate (or regenerate) the product memory catalog from .md frontmatter.
 
     Reads YAML frontmatter from all ``*.md`` feature atom files in
-    ``specs/memory/product/`` and writes a machine-readable ``catalog.json``
-    to the same directory.  Running the command a second time is idempotent.
+    ``specs/memory/product/`` and writes BOTH a machine-readable ``catalog.json``
+    and the human-readable ``index.md`` TOC to the same directory, from the same
+    single source. Running the command a second time is idempotent. Keeping both
+    artifacts in lockstep closes the drift bug ``memory-catalog-cli-skips-index-md``.
     """
     try:
         target = _resolve_specs_dir(specs_dir)
@@ -107,5 +113,7 @@ def catalog_generate(
         sys.exit(1)
 
     out_path = write_catalog(target, catalog)
+    index_path = write_index(target, catalog)
     n = len(catalog.get("features", []))
     typer.echo(f"[ok] catalog.json written ({n} feature{'s' if n != 1 else ''}): {out_path}")
+    typer.echo(f"[ok] index.md written: {index_path}")

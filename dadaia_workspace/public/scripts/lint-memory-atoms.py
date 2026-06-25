@@ -99,7 +99,46 @@ _HEADING_GROUP_C: frozenset[str] = frozenset(
     ]
 )
 
-HEADING_ALLOWLIST: frozenset[str] = _HEADING_GROUP_A | _HEADING_GROUP_B | _HEADING_GROUP_C
+# Group D — Legitimate current-atom canon headings (F9 / T-PIO-09).
+# The PI / two-layer drift audit flagged these real headings from architecture,
+# lifecycle-foundation, spec-context-project, multi-platform-parity, and the agent
+# atoms as LINT-1 WARNings even though they are legitimate, stable section headings.
+# Adding them here resolves the EN/PT canon and silences the spurious WARNs without
+# touching any atom content. Exact strings, case-sensitive.
+_HEADING_GROUP_D: frozenset[str] = frozenset(
+    [
+        "Acquire do lease (O_EXCL CAS + stable-session-identity)",
+        "Adoção (9 agentes core)",
+        "Agent roster and phase ownership (constitution §14 + §7)",
+        "Blocking and resume",
+        "CI matrix 3-OS (graduated — hard-gated)",
+        "Contrato de resiliência — 3 tiers",
+        "Core services",
+        "Current limits",
+        "Dispatcher purity (constitution §9)",
+        "Fluxo de dados — gate v3 SDD (v0.1.14: entrypoint merged pre_gate)",
+        "Gating note (current behavior)",
+        "Harness runtime boundary",
+        "Hygiene and anti-slop behavior",
+        "Model assignments (9 core agents + 3 plugin stubs)",
+        "Modelo de concorrência e lease (v0.1.14)",
+        "Multi-harness runtime parity (constitution §4)",
+        "Os 3 canais de reporte/comunicação (constitution §11)",
+        "O Spec Context Project (conceito central)",
+        "Plataforma seam — `core/platform.py`",
+        "Portos e adapters (4 + 9)",
+        "Public surface counts (v0.2.0)",
+        "Purpose",
+        "Python governance hooks package",
+        "Structured-memory-source subsystem (memory-markdown-source-v1)",
+        "Sub-agent model (constitution §9)",
+        "Topologia de agentes (9 core + 3 plugins)",
+    ]
+)
+
+HEADING_ALLOWLIST: frozenset[str] = (
+    _HEADING_GROUP_A | _HEADING_GROUP_B | _HEADING_GROUP_C | _HEADING_GROUP_D
+)
 
 # Forbidden headings — belt-and-suspenders, checked independently of the allowlist.
 # Case-insensitive match (strip/lower comparison).

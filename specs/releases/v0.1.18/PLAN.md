@@ -1,7 +1,7 @@
-# PLAN — Release `pi-operational-two-layer-v1`
+# PLAN — Release `v0.1.18`
 
 > **Status:** Aprovado
-> **Release ID:** pi-operational-two-layer-v1
+> **Release ID:** v0.1.18
 > **Owner:** product-engineer
 > **Created:** 2026-06-25
 

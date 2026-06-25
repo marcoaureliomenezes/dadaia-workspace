@@ -48,6 +48,21 @@ def test_whitelisted_root_entry_allows(tmp_path: Path) -> None:
     assert block is None
 
 
+def test_pi_root_entry_allows(tmp_path: Path) -> None:
+    """`.pi` is a whitelisted root entry (PI Layer-2 harness home).
+
+    A write whose immediate parent is the workspace root and whose basename is ``.pi``
+    must be ALLOWED; before T-PIO-05 this was BLOCKED.
+    """
+    ws = _ws(tmp_path)
+    out, block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(ws / ".pi")}},
+    )
+    assert out == ""
+    assert block is None
+
+
 def test_subdir_write_allows(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     target = ws / "repos" / "x" / "file.py"

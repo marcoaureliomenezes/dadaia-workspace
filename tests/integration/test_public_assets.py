@@ -67,6 +67,64 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
     assert (workspace / "opencode.json").exists()
+    # T-PIO-03: the `pi` target is part of `all`.
+    assert (workspace / ".pi" / "SYSTEM.md").exists()
+    assert (workspace / ".pi" / "settings.json").exists()
+
+
+def test_install_target_pi_projects_pi_tree(tmp_path: Path) -> None:
+    """T-PIO-03: `dadaia public install --target pi` projects `public/pi/` -> `.pi/`."""
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+
+    manager.install(workspace, target="pi")
+
+    assert (workspace / ".pi" / "SYSTEM.md").exists()
+    assert (workspace / ".pi" / "settings.json").exists()
+    assert (workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
+    # settings.json is valid JSON, generic-only.
+    settings = json.loads((workspace / ".pi" / "settings.json").read_text(encoding="utf-8"))
+    assert isinstance(settings, dict)
+
+
+def test_install_target_pi_is_idempotent(tmp_path: Path) -> None:
+    """T-PIO-03/T-PIO-07: re-install of `--target pi` skips already-canonical files.
+
+    Live `--target pi` projection smoke in an ISOLATED temp workspace (never the repo
+    root / live workspace): produce `.pi/`, re-install (idempotent, no drift), and prove
+    `public doctor` reports `[ok] pi:` + `[ok] public-privacy` with no drift/missing.
+    """
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+
+    manager.install(workspace, target="pi")
+    second = manager.install(workspace, target="pi")
+
+    # The .pi files must report [skip] on the second pass (hash-compare no-op).
+    pi_results = [line for line in second if str(workspace / ".pi") in line]
+    assert pi_results, "expected .pi/ projection lines on re-install"
+    assert all("[skip]" in line for line in pi_results), pi_results
+
+    reports = manager.doctor(workspace)
+    pi_lines = [r for r in reports if "pi:" in r]
+    assert pi_lines and all(r.startswith("[ok]") for r in pi_lines), pi_lines
+    assert "[ok] public-privacy" in reports
+    drift = [r for r in reports if r.startswith(("[drift]", "[missing]")) and "pi" in r]
+    assert not drift, drift
+
+
+def test_doctor_emits_pi_ok_lines(tmp_path: Path) -> None:
+    """T-PIO-04: `dadaia public doctor` emits `[ok] pi:` lines after a clean install."""
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace, target="all", force=True)
+
+    reports = manager.doctor(workspace)
+
+    pi_lines = [r for r in reports if "pi:" in r]
+    assert any("[ok] pi:SYSTEM.md" in r for r in reports), reports
+    assert any("[ok] pi:settings.json" in r for r in reports), reports
+    assert all(r.startswith("[ok]") for r in pi_lines), pi_lines
 
 
 def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:

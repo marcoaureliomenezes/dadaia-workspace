@@ -1,7 +1,7 @@
-# TASKS — Release `pi-operational-two-layer-v1`
+# TASKS — Release `v0.1.18`
 
 > **Status:** Aprovado
-> **Release ID:** pi-operational-two-layer-v1
+> **Release ID:** v0.1.18
 > **Owner:** product-engineer (task authority); per-task owners below
 > **Created:** 2026-06-25
 
@@ -26,7 +26,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
 
 ## Thread A — Constitution amendment (owner: product-engineer)
 
-- [ ] **T-PIO-01** — Apply constitution amendment blocks 1.1–1.6 (operator sign-off required).
+- [x] **T-PIO-01** — Apply constitution amendment blocks 1.1–1.6 (operator sign-off required).
   - **Owner:** product-engineer
   - **Write set:** `specs/constitution.md`
   - **Preconditions:** ACTIVE.md phase allows MUTATING constitution edit; operator sign-off
@@ -46,7 +46,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
 ## Thread C — Root-whitelist update (owners: software-engineer + ai-engineer)
 *(Listed before B because it gates B's live smoke.)*
 
-- [ ] **T-PIO-05** — Add `.pi/` to the `pre_gate` root-whitelist hook (TDD).
+- [x] **T-PIO-05** — Add `.pi/` to the `pre_gate` root-whitelist hook (TDD).
   - **Owner:** software-engineer
   - **Write set:** `dadaia_workspace/hooks/root_whitelist.py`; hook unit test module;
     the `dadaia doctor` ROOT check that enumerates the whitelist (+ its test).
@@ -57,7 +57,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     `.pi/`; unit tests cover both allow (`.pi/`) and still-block (other) cases; tests green.
   - **Parallelism:** software-engineer slot. **MUST merge before T-PIO-07 live smoke.**
 
-- [ ] **T-PIO-06** — Update the projected root-law surface for `.pi/`.
+- [x] **T-PIO-06** — Update the projected root-law surface for `.pi/`.
   - **Owner:** ai-engineer
   - **Write set:** `dadaia_workspace/public/rules/tmp-file-guardrail.md` (root-whitelist
     table); `dadaia_workspace/public/data/AGENTS.md` (Workspace Root Law text).
@@ -71,7 +71,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
 
 ## Thread B — WS-PI-3 `.pi/` projection (owners: ai-engineer + software-engineer)
 
-- [ ] **T-PIO-02** — Author the `public/pi/` source tree.
+- [x] **T-PIO-02** — Author the `public/pi/` source tree.
   - **Owner:** ai-engineer
   - **Write set:** `dadaia_workspace/public/pi/SYSTEM.md`,
     `dadaia_workspace/public/pi/settings.json`,
@@ -84,7 +84,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     private names/paths/IPs anywhere in `public/pi/**`.
   - **Parallelism:** ai-engineer slot; can be authored in parallel with T-PIO-05/06.
 
-- [ ] **T-PIO-03** — Wire the `pi` install target (TDD) mirroring OpenCode.
+- [x] **T-PIO-03** — Wire the `pi` install target (TDD) mirroring OpenCode.
   - **Owner:** software-engineer
   - **Write set:** `dadaia_workspace/infrastructure/public_assets.py` (`_install_pi`,
     `all` targets tuple, install dispatch); `dadaia_workspace/infrastructure/public_assets_common.py`
@@ -97,7 +97,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
   - **Parallelism:** software-engineer slot (after T-PIO-05 if same owner serializes;
     distinct write set from T-PIO-05 so order is owner-internal).
 
-- [ ] **T-PIO-04** — `dadaia public doctor` PI lines + manifest tracking (TDD).
+- [x] **T-PIO-04** — `dadaia public doctor` PI lines + manifest tracking (TDD).
   - **Owner:** software-engineer
   - **Write set:** doctor compare set in `public_assets.py` (PI files);
     `.dadaia/agentic/manifest.json` (via `stage()`, lib-originated); doctor unit tests.
@@ -107,7 +107,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     public-privacy` stays green; `.pi/**` projections are manifest-tracked; tests green.
   - **Parallelism:** software-engineer slot, after T-PIO-03.
 
-- [ ] **T-PIO-07** — Live `--target pi` projection smoke + clean re-install.
+- [x] **T-PIO-07** — Live `--target pi` projection smoke + clean re-install.
   - **Owner:** software-engineer
   - **Write set:** none beyond running the projection (produces `.pi/` at workspace root —
     a generated projection, NOT a source edit).
@@ -121,7 +121,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
 
 ## Thread D — Drift fixes F1–F12 (owners: product-engineer, ai-engineer, software-engineer)
 
-- [ ] **T-PIO-08** — Public-surface drift fixes F6–F8.
+- [x] **T-PIO-08** — Public-surface drift fixes F6–F8.
   - **Owner:** ai-engineer
   - **Write set:** `public/agents/ai-engineer.md` (F6: "two runtime harnesses" → four + PI
     row + two-layer + PI skill ref); `public/skills/harness-primitives/SKILL.md` (F7:
@@ -135,7 +135,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     && install --target all && doctor` exits 0.
   - **Parallelism:** ai-engineer slot.
 
-- [ ] **T-PIO-09** — `lint-memory-atoms.py` heading allowlist (F9, TDD).
+- [x] **T-PIO-09** — `lint-memory-atoms.py` heading allowlist (F9, TDD).
   - **Owner:** software-engineer
   - **Write set:** `lint-memory-atoms.py` curated allowlist; its test.
   - **Preconditions:** failing test first — the legitimate WARNing headings no longer WARN.
@@ -145,7 +145,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
     canon resolved; LINT-1 heading WARNs gone; tests green.
   - **Parallelism:** software-engineer slot.
 
-- [ ] **T-PIO-10** — `dadaia memory catalog generate` emits `index.md` (F10/M-4, TDD).
+- [x] **T-PIO-10** — `dadaia memory catalog generate` emits `index.md` (F10/M-4, TDD).
   - **Owner:** software-engineer
   - **Write set:** `dadaia_workspace/features/specs/catalog.py`; its test; close bug
     `specs/bugs/memory-catalog-cli-skips-index-md.md` (disposition at CLOSURE).
@@ -205,7 +205,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
 
 ## Thread E — "no 2 projects" pointer (owner: product-engineer)
 
-- [ ] **T-PIO-17** — Deprecation README pointer for `dadaia-pi-workspace`.
+- [x] **T-PIO-17** — Deprecation README pointer for `dadaia-pi-workspace`.
   - **Owner:** product-engineer
   - **Write set:** `repos/dadaia-pi-workspace/README.md`.
   - **Preconditions:** none (minimal/ADDITIVE-ish).
@@ -218,7 +218,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
 
 ## Global gates & gate ladder
 
-- [ ] **T-PIO-15** — Global gates (last implementation task).
+- [x] **T-PIO-15** — Global gates (last implementation task).
   - **Owner:** software-engineer
   - **Preconditions:** T-PIO-01..14, T-PIO-17 done; **T-PIO-05 merged** (live smoke).
   - **Done criterion:** `dadaia ci preflight` 4/4; `lint-imports` 6/0; `dadaia public stage
@@ -231,7 +231,7 @@ depends on **T-PIO-10** (catalog CLI emits index.md).
   - **Owner:** product-engineer
   - **Preconditions:** all prior tasks `[x]`; gate ladder (qa-engineer + security-reviewer
     + code-reviewer) APPROVE; commit + push + PR per release-governance.
-  - **Write set:** `specs/releases/pi-operational-two-layer-v1/CLOSURE.md`; final
+  - **Write set:** `specs/releases/v0.1.18/CLOSURE.md`; final
     `specs/memory/**` atomic finalization (CLOSURE phase); `specs/releases/ACTIVE.md`.
   - **Done criterion:** CLOSURE.md complete (summary, tasks+SHAs, validations triples,
     drifts, memory updates, **disposition sweep** [bug `memory-catalog-cli-skips-index-md`

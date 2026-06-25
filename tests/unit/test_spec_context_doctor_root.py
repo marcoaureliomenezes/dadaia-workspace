@@ -79,6 +79,14 @@ class TestRoot1:
         codes = {i.code for i in svc.check()}
         assert "ROOT-1" not in codes
 
+    def test_pi_dir_allowed(self, tmp_path: Path) -> None:
+        """`.pi/` (PI Layer-2 harness home) does not trigger ROOT-1."""
+        _init_workspace(tmp_path)
+        (tmp_path / ".pi").mkdir(exist_ok=True)
+        svc = _make_doctor(tmp_path)
+        codes = {i.code for i in svc.check()}
+        assert "ROOT-1" not in codes
+
     def test_gitignore_is_allowed(self, tmp_path: Path) -> None:
         """.gitignore at root is always permitted."""
         _init_workspace(tmp_path)

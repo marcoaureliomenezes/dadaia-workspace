@@ -39,6 +39,7 @@ The workspace root may contain **only** the following entries:
 | `.codex/` | dir | lib-originated projection |
 | `.dadaia/` | dir | workspace state directory |
 | `.opencode/` | dir | lib-originated projection |
+| `.pi/` | dir | lib-originated projection (PI Layer-1; post-trust executable — see below) |
 | `repos/` | dir | spec context project repos |
 | `AGENTS.md` | file | lib-originated (dadaia public install) |
 | `CLAUDE.md` | file | Claude Code bridge importing `@AGENTS.md` (constitution §3) |
@@ -47,6 +48,12 @@ The workspace root may contain **only** the following entries:
 `CLAUDE.md` is required: Claude Code does not read `AGENTS.md` natively, so a root
 `CLAUDE.md` containing `@AGENTS.md` is the authorized import bridge that loads the
 workspace law. `prompt.md` is an optional operator-authored long-prompt file.
+
+`.pi/` is the PI (`pi-coding-agent`) Layer-1 projection. Unlike the other projection
+dirs, its assets are **post-trust executable**: PI loads `.pi/**` only after the operator
+grants trust and runs it as unsandboxed TypeScript. It is still lib-originated
+(manifest-tracked), carries no secrets or operator-local paths, and must never be
+hand-edited in place — treat it as a deliberate privilege grant, not inert config.
 
 **Nothing else belongs at root.** Files such as `opencode.json`, `.mcp.json`,
 and `scripts/` are NOT default-whitelisted. If a specific tool genuinely requires

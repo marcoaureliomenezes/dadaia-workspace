@@ -60,6 +60,7 @@ from dadaia_workspace.infrastructure.public_assets_common import (  # noqa: F401
     _CLAUDE_DIRS,
     _COPY_DIRS,
     _OPENCODE_DIRS,
+    _PI_DIRS,
     _SCHEMA_VERSION,
     _VALID_TARGETS,
     _atomic_write_text,
@@ -280,7 +281,7 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
-        targets = ("agents", "claude", "codex", "opencode") if target == "all" else (target,)
+        targets = ("agents", "claude", "codex", "opencode", "pi") if target == "all" else (target,)
         data_agents_md = agentic_dir / "data" / "AGENTS.md"
         if data_agents_md.exists():
             guard_targets: dict[str, set[Literal["workspace", "repos"]]] = {
@@ -314,6 +315,8 @@ class FileSystemPublicAssetManager:
                 self._install_codex(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "opencode":
                 self._install_opencode(agentic_dir, workspace_root, force, installed, only=only)
+            elif item == "pi":
+                self._install_pi(agentic_dir, workspace_root, force, installed, only=only)
 
         if target in {"all", "claude", "codex"}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
@@ -405,6 +408,13 @@ class FileSystemPublicAssetManager:
                 "opencode:opencode.json",
             )
         )
+
+        # PI (Layer-2 worker harness): verbatim source↔staging↔projected comparison.
+        pi_staged = agentic_dir / "pi"
+        pi_projected = workspace_root / ".pi"
+        for staged in self._iter_files(pi_staged):
+            rel = staged.relative_to(pi_staged)
+            reports.append(self._compare(staged, pi_projected / rel, f"pi:{rel.as_posix()}"))
 
         reports.extend(classify_workflows(agentic_dir))
         reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
@@ -560,6 +570,33 @@ class FileSystemPublicAssetManager:
                 force,
                 installed,
             )
+
+    def _install_pi(
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
+    ) -> None:
+        """Project the staged ``pi/`` tree into ``<workspace_root>/.pi/``.
+
+        Mirrors :meth:`_install_opencode`: the staged ``pi/`` assets (``SYSTEM.md``,
+        ``settings.json`` and the ``prompts/`` affordance dir) are plain md/json — a
+        straight hash-compare copy with orphan-pruning, idempotent on re-install.
+
+        The PI harness is a Layer-2 worker; its files carry no workspace-specific or
+        operator-local values, so the copy is verbatim (no generated config like the
+        OpenCode ``opencode.json``).
+        """
+        pi_src = agentic_dir / "pi"
+        pi_dst = workspace_root / ".pi"
+        if only is None:
+            copy_tree(pi_src, pi_dst, force, installed, self._iter_files)
+            return
+        # `only` filters to a single staged subdirectory (e.g. "prompts").
+        if only in _PI_DIRS:
+            copy_tree(pi_src / only, pi_dst / only, force, installed, self._iter_files)
 
     def _install_scripts(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
