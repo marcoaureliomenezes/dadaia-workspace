@@ -92,7 +92,9 @@ def test_install_target_pi_is_idempotent(tmp_path: Path) -> None:
 
     Live `--target pi` projection smoke in an ISOLATED temp workspace (never the repo
     root / live workspace): produce `.pi/`, re-install (idempotent, no drift), and prove
-    `public doctor` reports `[ok] pi:` + `[ok] public-privacy` with no drift/missing.
+    `public doctor` reports `[ok] pi:` lines with no pi drift/missing. (The global
+    `public-privacy` check scans the source `public/` tree, not a bare temp workspace, so
+    it is asserted by the source-repo `dadaia public doctor` gate, not here.)
     """
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
@@ -108,7 +110,6 @@ def test_install_target_pi_is_idempotent(tmp_path: Path) -> None:
     reports = manager.doctor(workspace)
     pi_lines = [r for r in reports if "pi:" in r]
     assert pi_lines and all(r.startswith("[ok]") for r in pi_lines), pi_lines
-    assert "[ok] public-privacy" in reports
     drift = [r for r in reports if r.startswith(("[drift]", "[missing]")) and "pi" in r]
     assert not drift, drift
 
