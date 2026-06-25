@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T04:21:21Z",
+  "generated_at": "2026-06-25T05:56:46Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -463,7 +463,7 @@
       "title": "lifecycle-foundation",
       "category": "product",
       "tldr": "Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort.",
-      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind)` (FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN). Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→ SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps, which carry model tiers. Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
+      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind)` (FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN, PI_HEADLESS). Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→ SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps, which carry model tiers. Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
       "path": "specs/memory/product/sdd/lifecycle-foundation.md",
       "tags": [
         "sdd",

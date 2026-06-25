@@ -151,7 +151,7 @@
   Record the exact commands + evidence (SHA / stdout snippet) for CLOSURE.
 - **Parallelism:** none — final implementation gate before CLOSURE.
 
-### [ ] T-PI-09 — CLOSURE (held for ship)
+### [x] T-PI-09 — CLOSURE (held for ship)
 
 - **Owner:** product-engineer
 - **Write set:**

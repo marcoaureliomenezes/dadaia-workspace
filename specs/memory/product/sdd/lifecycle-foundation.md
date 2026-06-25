@@ -10,7 +10,7 @@ summary: >-
   semantic handoff gates, blocked/resume states, and scoped worker prompts. Each
   lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the
   harness selectable per step via `build_agent_runtime(kind)` (FAKE, CODEX_EXEC,
-  CLAUDE_SDK, OPENCODE_RUN). Single-step verbs run `LifecyclePhaseWorkflow`; the
+  CLAUDE_SDK, OPENCODE_RUN, PI_HEADLESS). Single-step verbs run `LifecyclePhaseWorkflow`; the
   multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→
   SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter
   enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier;
@@ -26,7 +26,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 760
 last_updated: '2026-06-25'
-release_origin: multiharness-engine-v0116
+release_origin: pi-fourth-harness-v1
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`.
@@ -37,7 +37,7 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 
 ## Core services
 
-- `core/models/lifecycle.py` and `core/models/hygiene.py` define pure run, gate, blocked-state, agent-request, and hygiene models. `AgentRuntimeKind` enumerates `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`.
+- `core/models/lifecycle.py` and `core/models/hygiene.py` define pure run, gate, blocked-state, agent-request, and hygiene models. `AgentRuntimeKind` enumerates `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS`.
 - `core/scope_match.py` is the shared, pure path classifier used by BOTH the runner's Ring-2 out-of-scope detection and the Claude adapter's Ring-1 write-permission decider — one classifier, two boundaries.
 - `core/protocols/agent_runtime.py` and `core/protocols/runtime_files.py` define the runtime and artifact ports.
 - `features/lifecycle/state_machine.py` owns legal, illegal, blocked, and resume transitions.
@@ -53,9 +53,11 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 
 ## Harness runtime boundary
 
-Lifecycle code depends on `AgentRuntimePort`; `build_agent_runtime(kind, *, cwd=None)` in `container.py` is the factory that maps a kind to its adapter: `FAKE→FakeAgentRuntime`, `CODEX_EXEC→CodexExecAdapter` (`infrastructure/codex_runtime.py`), `OPENCODE_RUN→OpenCodeAdapter` (`infrastructure/opencode_runtime.py`, stub), `CLAUDE_SDK→ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`). CI uses the fake runtime to prove that Python advances only after structured output and write-scope evidence pass validation.
+Lifecycle code depends on `AgentRuntimePort`; `build_agent_runtime(kind, *, cwd=None)` in `container.py` is the factory that maps a kind to its adapter: `FAKE→FakeAgentRuntime`, `CODEX_EXEC→CodexExecAdapter` (`infrastructure/codex_runtime.py`), `OPENCODE_RUN→OpenCodeAdapter` (`infrastructure/opencode_runtime.py`, stub), `CLAUDE_SDK→ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`), `PI_HEADLESS→PiHeadlessAdapter` (`infrastructure/pi_runtime.py`). The factory stays total over the enum. `--harness pi` / `--step-harness x=pi` resolve across every `dadaia lifecycle` verb with zero change to `phase_workflow.py` / `pipeline.py` — a clean adapter addition. CI uses the fake runtime to prove that Python advances only after structured output and write-scope evidence pass validation.
 
 The Codex adapter does not read project-local provider/auth/profile configuration, does not pass through `os.environ`, accepts only an explicit environment allowlist, redacts credential-looking values, and records sandbox/profile widening only when operator-controlled input requests it. The Claude SDK adapter derives a real Ring-1 `write_permission` decider from the request's allowed/forbidden paths via the same `core/scope_match` classifier the runner's Ring-2 uses; its transport is injectable (`query_fn`) so permission + result mapping are tested hermetically. `claude-agent-sdk` is an OPTIONAL, operator-installed runtime extra (not a locked dependency, offline-first build); the default transport lazily imports it and returns an actionable `pip install claude-agent-sdk` message when absent.
+
+The PI adapter (`PiHeadlessAdapter` + frozen `PiHeadlessConfig`) is a structural twin of `CodexExecAdapter`: it drives `pi --mode json --tools <csv> -p -` (prompt on stdin) over an injectable subprocess runner, imports no PI client at module load (offline-first preserved), and accepts only an explicit env allowlist (incl. `ANTHROPIC_API_KEY`, redacted from output). Result mapping parses the line-delimited JSON stream and takes the **last** `message_end` event's assistant text from `message.content`, handling both string and content-block shapes; an absent or unparseable `message_end` degrades to raw stdout as the summary (SUCCEEDED, never crashes), and a fenced JSON block matching the request's `expected_schema` populates `structured_output`. A valid terminal `message_end` maps to SUCCEEDED **even when `pi` exits non-zero** — the terminal assistant message is trusted over the raw exit code (deliberate precedence); the downstream verdict gate and the Ring-2 write boundary still apply. PI's Ring-2 write boundary is real: `changed_paths` is computed from the injected git client's `diff_name_only(cwd)` (working-tree + staged + untracked, non-ignored) at result time and written into `structured_output["changed_paths"]`, **unconditionally overwriting any model self-report** — so the runner's Ring-2 out-of-scope block fires for PI exactly as for Codex/OpenCode. PI has no CLI-level pre-disk (Ring-1) gate yet: its enforcement posture is Ring-2 + git chokepoints, identical to Codex/OpenCode. The first-layer `.pi/` projection (WS-PI-3) and the Ring-1 `.pi/` `tool_call` extension (WS-PI-4) are deferred. The live `pi --mode json` event schema — specifically the `AgentMessage.content` shape — is the one upstream-owned unverified seam, verified via the opt-in `DADAIA_PI_LIVE=1` integration test (`tests/integration/pi_live/`), not CI-gated.
 
 ## Gating note (current behavior)
 
