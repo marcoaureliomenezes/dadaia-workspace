@@ -165,6 +165,43 @@ def slop(
 
 
 @app.command()
+def clean(
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Actually reclaim (delete). Default is dry-run preview only.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Directory-aware retention SWEEP (D5) — the guarded deleter.
+
+    Reclaims past-TTL / non-canonical entries from the recognised swept ``.dadaia/`` zones:
+    whole directory trees via rmtree (the stray-venv case the file-only cleanup misses) and
+    files via unlink. DRY-RUN BY DEFAULT — pass ``--apply`` to actually delete. Never touches
+    a live lifecycle run's tmp, an operator-marked-important report, a canonical/durable
+    path, anything outside ``.dadaia/``, or a symlink whose target escapes ``.dadaia/``.
+    """
+    from dadaia_workspace import container
+
+    workspace_root = resolve_workspace_root()
+    result = container.build_retention_sweep(workspace_root).sweep(apply=apply)
+    if json_output:
+        payload = result.to_dict()
+        payload["status"] = LifecycleCommandStatus.OK.value
+        _emit_json(payload)
+        return
+    mode = "applied" if result.applied else "dry-run"
+    typer.echo(
+        f"OK {mode} reclaimed={len(result.reclaimed_paths)} "
+        f"reclaimed_bytes={result.reclaimed_bytes} skipped={len(result.skipped)}"
+    )
+    for rel in result.reclaimed_paths:
+        typer.echo(f"  reclaim {rel}")
+    for rel, reason in result.skipped:
+        typer.echo(f"  skip [{reason.value}] {rel}")
+
+
+@app.command()
 def preflight(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:

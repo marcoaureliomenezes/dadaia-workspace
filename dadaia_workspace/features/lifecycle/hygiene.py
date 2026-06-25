@@ -80,6 +80,15 @@ class LifecycleHygieneService:
             pruned_dirs=tuple(pruned),
         )
 
+    def protected_refs(self) -> frozenset[str]:
+        """Workspace-relative refs the hygiene service protects from deletion.
+
+        Reused by the directory-aware retention SWEEP (D5) so the deleter inherits the
+        same operator-marked-important + current-release-evidence + protected-handoff
+        protection the file-only cleanup already enforces. Read-only; no mutation.
+        """
+        return frozenset(self._protected_paths())
+
     def status(self) -> HygieneCounters:
         """Return metadata-only counters for canonical runtime zones."""
         started = self._clock()

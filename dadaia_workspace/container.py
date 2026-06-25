@@ -17,6 +17,7 @@ from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.lifecycle.antislop.retention import RetentionSweep
 from dadaia_workspace.features.lifecycle.antislop.slop_scan import SlopReport, slop_scan
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
 from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
@@ -478,6 +479,73 @@ def build_slop_report(
     _guard_initialized(workspace_root)
     scan_now = now or dt.datetime.now(tz=dt.UTC)
     return slop_scan(workspace_root, now=scan_now, policy=policy or SlopPolicy())
+
+
+def _live_lifecycle_claims(workspace_root: Path) -> Callable[[], frozenset[str]]:
+    """Composition-root provider of swept-zone paths claimed by LIVE lifecycle runs (D6).
+
+    The retention SWEEP must NEVER reclaim a tmp/handoff/report path that a live worker is
+    mid-flight on. This callable reads the persisted ``LifecycleRun`` records and, for every
+    NON-TERMINAL run (status not COMPLETED/FAILED), claims any of that run's
+    ``expected_artifacts`` whose path falls inside a recognised swept zone
+    (``.dadaia/{tmp,reports,handoff,runs}``). The deleter (``RetentionSweep``) spares any
+    candidate equal to, nested under, or containing a claim.
+
+    ``features/lifecycle/antislop/retention.py`` never imports the run-store adapter — the
+    container injects this callable, mirroring the ``pid_probe`` seam. Fail-soft: any
+    store/parse error ⇒ empty set (the sweep then relies on TTL + zone + escape guards
+    alone, never reclaiming inside ``.dadaia/`` it cannot read).
+    """
+    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+
+    terminal = {LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED}
+    swept_prefixes = tuple(f".dadaia/{zone}/" for zone in ("tmp", "reports", "handoff", "runs"))
+
+    def _provider() -> frozenset[str]:
+        store = build_lifecycle_run_store(workspace_root)
+        run_dir = store.root
+        if not run_dir.is_dir():
+            return frozenset()
+        claims: set[str] = set()
+        for record in sorted(run_dir.glob("*.json")):
+            try:
+                run = store.load(record.stem)
+            except Exception:  # noqa: BLE001 — a single bad record never breaks the sweep.
+                continue
+            if run is None or run.status in terminal:
+                continue
+            for artifact in run.expected_artifacts:
+                ref = artifact.lstrip("/")
+                if ref.startswith(swept_prefixes):
+                    claims.add(ref)
+        return frozenset(claims)
+
+    return _provider
+
+
+def build_retention_sweep(
+    workspace_root: Path,
+    *,
+    now: dt.datetime | None = None,
+    policy: SlopPolicy | None = None,
+) -> RetentionSweep:
+    """Compose the directory-aware retention SWEEP (D5) — the guarded deleter.
+
+    Dry-run by default; deletes only when ``RetentionSweep.sweep(apply=True)`` is called
+    explicitly. The live-claim provider (``_live_lifecycle_claims``) gates the destructive
+    path against in-flight lifecycle runs (D6); the important-ref provider reuses
+    ``LifecycleHygieneService`` so operator-marked reports and current-release evidence are
+    spared. The clock is injectable for hermetic tests.
+    """
+    _guard_initialized(workspace_root)
+    hygiene = LifecycleHygieneService(workspace_root)
+    return RetentionSweep(
+        workspace_root,
+        now=now or dt.datetime.now(tz=dt.UTC),
+        policy=policy or SlopPolicy(),
+        live_claims=_live_lifecycle_claims(workspace_root),
+        important_paths=hygiene.protected_refs,
+    )
 
 
 def build_lifecycle_preflight_service(workspace_root: Path) -> LifecyclePreflightService:

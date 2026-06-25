@@ -232,6 +232,28 @@ CLI command that emits counts + total bytes + top offenders.
   (a WS-4/T-016-10 layering break surfaced by `lint-imports`): `scope_match` moved
   `features/lifecycle/ → core/`; `lint-imports` now 6 kept / 0 broken.
 
+## W11b — D5: directory-aware retention SWEEP (the deleter)
+
+### [x] T-016-15 — RetentionSweep (`retention.py`) + `dadaia lifecycle clean`
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/lifecycle/antislop/retention.py`,
+  `dadaia_workspace/features/lifecycle/hygiene.py` (`protected_refs` accessor),
+  `dadaia_workspace/cli/commands/lifecycle.py` (`clean` command),
+  `dadaia_workspace/container.py` (`build_retention_sweep` + live-claims provider),
+  `tests/unit/features/lifecycle/test_retention_sweep.py`,
+  `tests/integration/cli/test_lifecycle_clean_cli.py`.
+- **Acceptance:** `RetentionSweep.sweep(*, apply=False)` is dry-run by default and deletes
+  only with `apply=True`; reclaims past-TTL/non-canonical swept-zone entries (dir trees via
+  rmtree, files via unlink); HARD liveness gate (never reclaims a live lifecycle run's tmp,
+  D6); important-protected; refuses canonical/outside-.dadaia/symlink-escape paths;
+  idempotent with injected clock; returns a typed `RetentionResult`. `dadaia lifecycle clean
+  [--apply] [--json]` (default dry-run) delegates to it. Gate green (ruff/mypy --strict/
+  pytest) + lint-imports 6 kept / 0 broken.
+- **Follow-up (out of scope this pass):** rewire legacy `dadaia clean` / `reports cleanup`
+  onto `RetentionSweep`; persist explicit per-run tmp working-dir claims in `LifecycleRun`
+  so the liveness provider keys on a registered workdir rather than `expected_artifacts`.
+- **Done:** D5 deferred line item, now implemented.
+
 ## W12 — WS-7: cacheable prompt prefix + step model-tiering
 
 ### [x] T-016-14 — PromptPrefix (deterministic, hashed) reused per step + per-step tiers
