@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T20:18:38Z",
+  "generated_at": "2026-06-25T20:33:15Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -528,7 +528,7 @@
         "enforcement",
         "chokepoints"
       ],
-      "token_estimate": 3024,
+      "token_estimate": 3140,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",

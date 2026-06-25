@@ -18,5 +18,5 @@
 
 ## CLOSURE
 
-- [ ] T-21-08 — preflight green; review ladder (QA + code-review + security) APPROVED on closing tip.
-- [ ] T-21-09 — CLOSURE.md (incl. trusted-run verification recipe); archive; gated push; CI watched green; drift re-check.
+- [x] T-21-08 — preflight green; review ladder (QA + code-review + security) APPROVED on closing tip.
+- [x] T-21-09 — CLOSURE.md (incl. trusted-run verification recipe); archive; gated push; CI watched green; drift re-check.

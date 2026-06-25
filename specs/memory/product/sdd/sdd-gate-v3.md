@@ -24,9 +24,9 @@ tags:
 - enforcement
 - chokepoints
 agent_tier: self-pull
-token_estimate: 3024
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+token_estimate: 3140
+last_updated: '2026-06-25'
+release_origin: v0.1.21
 ---
 
 Assets: `python -m dadaia_workspace.hooks.pre_gate` (PreToolUse, entrypoint único) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse, heartbeat + reconciler advisory) · `python -m dadaia_workspace.hooks.ctx_inject` · git hooks `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (instalados via `dadaia ci install-hook`; backends `dadaia ci pre-commit-check` / `dadaia ci push-gate-check`). Os módulos `sdd_gate` e `root_whitelist` são thin policy modules consumidos por `pre_gate` (`evaluate_payload()`); seus `main()` legados ficam mantidos por uma release.
@@ -254,3 +254,5 @@ Claude Code| `.claude/settings.json` matcher `Edit\|Write\|MultiEdit\|NotebookEd
 Codex interativo (TUI)| `.codex/hooks.json` matcher `^(apply_patch\|Edit\|Write\|Bash)$` → `pre_gate`| **sem matcher** (match-all canônico)| sim| determinístico: hooks + chokepoints
 Codex headless (`codex exec`)| **não — exec não dispara hooks** (defeito upstream codex-cli 0.139.0; live-verificado, `tests/integration/codex_live/`, opt-in `DADAIA_CODEX_LIVE=1`)| não| sim| **chokepoints only**
 OpenCode| Plugin TS chama os hooks Python via subprocess (venv-path resolution)| sem post-hook separado (doctor `[unsupported]` — esperado)| sim| advisory + chokepoint-protected (ADR-G3)
+PI (`pi`) — Layer 1 interativo| Extensão TS `.pi/extensions/dadaia-sdd-gate.ts` registra o hook `tool_call`; mapeia write→Write/edit→Edit e delega ao `pre_gate` via subprocess (venv-path resolution); **ativa post-trust** (WS-PI-4)| sem post-hook (efeito Ring-1 só pré-disk via tool_call)| sim| determinístico post-trust + chokepoints; `.pi/**` é post-trust executable
+PI — Layer 2 worker (`PI_HEADLESS`)| n/a — worker headless `pi --mode json`, sem hook de entrada| n/a| sim| Ring-2 (git-diff) + chokepoints (não tem Ring-1; distinto do Layer 1)
