@@ -136,10 +136,11 @@ dadaia lifecycle pipeline    --release-id <id> \                 # the full ladd
     --harness claude --step-harness review_security=pi
 ```
 
-The `pipeline` threads one run through the ladder
-**IMPLEMENTATION → QA → SECURITY → CODE → CLOSURE**, with a harness selectable per step
-(`--step-harness <phase>=<harness>`), persisting at every step and stopping at the first
-blocked gate.
+The `pipeline` threads one run through the four execution steps
+**implement → review-qa → review-security → review-code** (advancing the run to the
+CLOSURE phase), with a harness selectable per step (`--step-harness <phase>=<harness>`),
+persisting at every step and stopping at the first blocked gate. CLOSURE itself is run
+separately via `dadaia lifecycle close`.
 
 ---
 

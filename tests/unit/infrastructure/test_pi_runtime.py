@@ -55,8 +55,8 @@ class _FakeGit:
         self._changed = changed
         self.calls: list[Path] = []
 
-    def diff_name_only(self, cwd: Path) -> tuple[str, ...]:
-        self.calls.append(cwd)
+    def diff_name_only(self, path: Path) -> tuple[str, ...]:
+        self.calls.append(path)
         return self._changed
 
 

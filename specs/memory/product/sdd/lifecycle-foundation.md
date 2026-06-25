@@ -43,7 +43,8 @@ flowchart TB
     PB --> LAD
     subgraph LAD["LifecyclePipeline — phase ladder (1 LifecycleRun · persiste a cada step · para no 1º bloqueio)"]
         direction LR
-        I["IMPLEMENTATION"] --> Q["QA_REVIEW"] --> S["SECURITY_REVIEW"] --> C["CODE_REVIEW"] --> CLp["CLOSURE"]
+        I["implement"] --> Q["review_qa"] --> S["review_security"] --> C["review_code<br/>(→ fase CLOSURE)"]
+        C -.->|"close é step separado"| CLp["CLOSURE<br/>(dadaia lifecycle close)"]
     end
     LAD -.->|"build_agent_runtime(kind) — --step-harness"| RT
     subgraph RT["AgentRuntimePort — worker harness selecionável por step"]

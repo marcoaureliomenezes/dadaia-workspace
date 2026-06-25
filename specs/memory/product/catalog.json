@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T16:25:46Z",
+  "generated_at": "2026-06-25T16:55:01Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -563,8 +563,8 @@
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
-      "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4.",
-      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$ com allowlist legacy documentada), 028 (file refs da constitution resolvem), 029 (coerência lease↔session com triagem em 3 estados: stale-dead WARN com remediação / live-incoerente ERR / coerente ok), 030 (naming de dirs novos em specs/audits/, WARN), 031 (backlog consumido por release arquivada com status não-terminal, WARN), 032 (status de bug fora do canon {Open, Closed}, WARN); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
+      "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-4 (TREE-3 é warn-only).",
+      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$ com allowlist legacy documentada), 028 (file refs da constitution resolvem), 029 (coerência lease↔session com triagem em 3 estados: stale-dead WARN com remediação / live-incoerente ERR / coerente ok), 030 (naming de dirs novos em specs/audits/, WARN), 031 (backlog consumido por release arquivada com status não-terminal, WARN), 032 (status de bug fora do canon {Open, Closed}, WARN); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-4 (TREE-3 é warn-only).",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",

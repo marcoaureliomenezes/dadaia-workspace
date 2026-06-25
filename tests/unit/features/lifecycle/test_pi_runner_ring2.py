@@ -32,7 +32,7 @@ class _FakeGit:
     def __init__(self, changed: tuple[str, ...]) -> None:
         self._changed = changed
 
-    def diff_name_only(self, cwd: Path) -> tuple[str, ...]:
+    def diff_name_only(self, path: Path) -> tuple[str, ...]:
         return self._changed
 
 
