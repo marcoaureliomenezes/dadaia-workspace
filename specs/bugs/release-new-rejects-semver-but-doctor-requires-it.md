@@ -1,11 +1,20 @@
 ---
 name: release-new-rejects-semver-but-doctor-requires-it
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-25
 surface: dadaia release new (release-id validator) vs dadaia specs doctor (SPEC-DOC-027 naming canon)
 session_id: null
 ---
+
+**Resolution (v0.1.22, fix option a):** `release_new`
+(`features/spec_artifacts/new_artifacts.py`) now validates the release id via
+`_is_valid_release_id` = SemVer canon `^v\d+\.\d+\.\d+$` (mirrors
+`scaffolder._RELEASE_SEMVER_RE` / SPEC-DOC-027) **OR** the legacy slug `^[a-z][a-z0-9-]+$`.
+`dadaia release new v0.1.23` now succeeds; the doctor canon and backlog/bug slug validators
+are unchanged. The CLI help + docstring updated; unit tests pin SemVer-accepted /
+slug-accepted / dotted-non-SemVer-rejected (e.g. `0.1.23`, `v0.1`, `v0.1.2.3` still reject).
+The naming contract is now coherent: SemVer `vX.Y.Z` is both creatable and doctor-canonical.
 
 **Symptom:** Two tooling rules give contradictory naming constraints for a release directory:
 - `dadaia release new <id>` rejects any id containing a dot — the id validator is

@@ -48,7 +48,7 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 def release_new_cmd(
     release_id: str = typer.Argument(
         ...,
-        help="New release ID (e.g. my-feature-v1). Must match ^[a-z][a-z0-9-]+$.",
+        help="New release ID. SemVer vX.Y.Z (e.g. v0.1.23 — preferred, matches the specs-doctor canon) or the legacy slug ^[a-z][a-z0-9-]+$.",
     ),
     specs_dir: str | None = typer.Option(
         None,

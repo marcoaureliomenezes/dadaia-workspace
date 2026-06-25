@@ -16,9 +16,21 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 # ── slug validation patterns ──────────────────────────────────────────────────
-# Shared pattern for release IDs and backlog/bug slugs:
+# Shared pattern for backlog/bug slugs (and the legacy release-id form):
 # must start with a lowercase letter, followed by lowercase letters, digits, or hyphens.
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
+
+# Canonical release-dir SemVer form REQUIRED by `specs doctor` SPEC-DOC-027 for a live
+# release dir (mirrors `features/specs/scaffolder._RELEASE_SEMVER_RE`). A release id must
+# satisfy EITHER this SemVer canon (preferred) OR the legacy slug — closing the bug
+# `release-new-rejects-semver-but-doctor-requires-it`, where the old slug-only validator
+# rejected the very `vX.Y.Z` form the doctor mandates.
+_RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+
+
+def _is_valid_release_id(release_id: str) -> bool:
+    """A release id is valid if it is the SemVer canon (``vX.Y.Z``) or the legacy slug."""
+    return bool(_RELEASE_SEMVER_RE.match(release_id) or _SLUG_RE.match(release_id))
 
 
 def _today() -> str:
@@ -149,19 +161,22 @@ def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
 
     Args:
         specs_dir:  Absolute path to the ``specs/`` directory.
-        release_id: New release identifier.  Must match ``^[a-z][a-z0-9-]+$``.
+        release_id: New release identifier. Must be the SemVer canon ``vX.Y.Z``
+            (preferred — what ``specs doctor`` SPEC-DOC-027 requires for a live dir) OR
+            the legacy slug ``^[a-z][a-z0-9-]+$``.
 
     Returns:
         :class:`NewArtifactResult` with the path to the created ``SPEC.md``.
 
     Raises:
-        ValueError:    If ``release_id`` does not match the slug pattern.
+        ValueError:    If ``release_id`` is neither the SemVer canon nor the legacy slug.
         FileExistsError: If the release directory already exists (no-clobber).
     """
-    if not _SLUG_RE.match(release_id):
+    if not _is_valid_release_id(release_id):
         raise ValueError(
             f"Invalid release ID {release_id!r}. "
-            "Must match ^[a-z][a-z0-9-]+$ "
+            "Must be SemVer ^v\\d+\\.\\d+\\.\\d+$ (e.g. v0.1.23 — preferred, matches the "
+            "specs-doctor naming canon) or the legacy slug ^[a-z][a-z0-9-]+$ "
             "(lowercase letters, digits, and hyphens; must start with a letter)."
         )
 
