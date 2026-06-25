@@ -24,62 +24,37 @@ any source file or writing any output.
 
 ---
 
-## Protocol
+## Mechanics moved to the engine (D12)
 
-### Precondition — Is the bootstrap already injected?
+The **deterministic load sequence** — assembling the lean bootstrap prefix (tech-stack
++ catalog) and laying it into the context once per session — is now the engine's
+prompt-prefix assembly: `features/lifecycle/prompt_builder.py` constructs the cacheable
+`PromptPrefix` that carries the bootstrapped context. The lean payload (tech-stack
+verbatim + `catalog.json`) is also injected once per session by the ctx-inject hook
+(`dadaia_workspace.hooks.ctx_inject`); when present, it is already in your context.
 
-A lean bootstrap (tech-stack + catalog) is injected once per session by the
-ctx-inject hook (`dadaia_workspace.hooks.ctx_inject`, wired on all harnesses). If it is
-present in your context, skip the self-pull step below and go directly to Step 1.
+What this skill keeps is the **judgment** the engine cannot make for you: *read the
+relevant atoms before acting.* The prefix gives you the catalog; choosing which atoms
+the task actually needs, and reading them before deciding, is yours.
 
-If you are running standalone, or in any environment where the ctx-inject hook has
-not run, self-pull manually:
+## The judgment — read the relevant atoms before acting
 
-```
-Read: specs/memory/tech-stack.md          # verbatim; no strip pass needed
-Read: specs/memory/product/catalog.json   # machine index generated from frontmatter
-```
+1. **Scan the catalog, pick 1-3 relevant atoms.** From
+   `specs/memory/product/catalog.json` (in your context via the prefix; self-pull it if
+   running standalone with no ctx-inject), use each entry's `tldr`/`summary` to identify
+   the **1 to 3 features** most relevant to your current task. Self-pull each chosen
+   atom: `specs/memory/product/<slug>.md`. Atoms are plain Markdown — read directly,
+   no stripping. `[[slug]]` wikilinks resolve to `specs/memory/<slug>.md`. If
+   `catalog.json` is absent (migration), fall back to `specs/memory/product/index.md`.
+2. **Self-pull architecture only when the decision needs it.** `architecture.md` is NOT
+   in the prefix (it is large). Read `specs/memory/architecture.md` before any decision
+   touching layer boundaries / cross-layer dependency rules, agent topology or dispatch
+   graphs, schema contracts, or any structural design choice — and skip it when the task
+   is self-contained within one well-understood component.
 
-### Step 1 — Scan the catalog and identify relevant features
-
-Read `specs/memory/product/catalog.json`. For each entry, the `tldr` field
-provides a one-sentence first-pass scan. Use `summary` to decide whether a
-feature warrants a full self-pull.
-
-Identify the **1 to 3 features** most relevant to your current task. Note their
-`slug` values — you will self-pull the corresponding atom in Step 3.
-
-If `catalog.json` is absent (e.g. during migration), fall back to reading
-`specs/memory/product/index.md` verbatim.
-
-### Step 2 — Self-pull architecture before any architectural decision
-
-`architecture.md` is NOT injected by the ctx-inject hook (it is large). You MUST
-read it before any decision that touches:
-
-- Layer boundaries or cross-layer dependency rules
-- Agent topology or dispatch graphs
-- Schema contracts between components
-- Any structural or design decision
-
-```
-Read: specs/memory/architecture.md
-```
-
-Skip this step only if your task is entirely self-contained within a single
-well-understood component and makes no cross-layer or design decisions.
-
-### Step 3 — Self-pull the relevant feature atoms
-
-For each slug identified in Step 1:
-
-```
-Read: specs/memory/product/<slug>.md
-```
-
-Atoms are plain Markdown with YAML frontmatter. Read them directly — no HTML
-stripping, no conversion needed. `[[slug]]` wikilinks in atom bodies are
-plain text; resolve them by reading `specs/memory/<slug>.md` if needed.
+The discipline: do not begin implementation, review, or report until you have grounded
+yourself in the atoms the task touches. Skipping the read means working from stale or
+missing context.
 
 ---
 

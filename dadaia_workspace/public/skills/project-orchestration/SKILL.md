@@ -98,87 +98,48 @@ Every HTML report that feeds another agent must have a handoff JSON file under:
 .dadaia/handoff/<context-name>/<UTC>-<agent-name>-<task-slug>.handoff.json
 ```
 
-## Strict Implementation-Review-QA Contract
+## Mechanics moved to the engine (D12)
 
-This contract applies to every implementation task in an approved SDD release.
-`project-manager` owns orchestration discipline; `product-engineer` owns SDD
-artifact approval; implementers and reviewers own their evidence.
+The **ordered review/QA sequence** — the per-task → end-of-alpha → rc-ship transition
+ladder and its gate ordering — is the engine's TRANSITIONS made executable:
+`features/lifecycle/state_machine.py` owns the legal phase transitions and gate ordering
+(`is_legal_transition`, `TransitionDecision`), `features/lifecycle/gates.py` owns the
+typed handoff gate (the APPROVED-verdict requirement), and
+`features/lifecycle/pipeline.py` + `phase_workflow.py` own run sequencing and the
+per-step harness. This skill no longer narrates that ordered procedure step by step.
 
-**Review cadence (ADR-3 — segment/ship boundaries, not per task).** A release
-matures on a single `feature/{version}` branch through `alpha-N → rc-N` segments.
-The reviewer fan-out attaches to **segment and ship boundaries** — this replaces
-the old per-task reviewer fan-out:
+What it keeps is the **orchestration judgment** the engine cannot make: who may dispatch
+(dispatcher purity), the persona inventory and routing, decision authority, mediation,
+escalation, and the forbidden actions. The gate cadence below is the human-readable
+contract the engine's transitions correspond to — kept as a pointer, not a procedure.
 
-- **Per task** — implementer discipline only (sections 0–1): TDD, unit/integration
-  tests, the mandatory pre-push CI gate, and an `implementation-complete` handoff.
-  The `[-]`→`[x]` marker discipline (per `dadaia-task-manager`) is unchanged; there
-  is no per-task reviewer gate.
-- **End of each `alpha-N`** — `qa-engineer` only (section 2) returns `APPROVE` or
-  `REQUEST_CHANGES`, then a commit lands on the feature branch. No push, no PR, no
-  `code-reviewer`/`security-reviewer`.
-- **At `rc-N` ship** (operator elects to ship) — the full Review/QA Fan-Out
-  (section 2) and the Ship Gate (section 3): `qa-engineer` + `code-reviewer` +
-  `security-reviewer` must all `APPROVE` before the release ships. If the operator
-  instead iterates, open `rc-(N+1)` and continue.
+## Review/QA gate cadence (the contract the engine enforces)
 
-Sections 0–3 below define the mechanics applied at those boundaries.
+`project-manager` owns orchestration discipline; `product-engineer` owns SDD artifact
+approval; implementers and reviewers own their evidence. Per ADR-3 (segment/ship
+boundaries, not per task), and per the `release-governance` rule and the
+`dadaia-task-manager` skill (marker discipline):
 
-### 0. Pre-Implementation Agreement
+| Boundary | Who validates | What unlocks |
+|---|---|---|
+| Per task | implementer discipline only — TDD, unit/integration tests, pre-push CI gate, `implementation-complete` handoff; marker stays `[-]` | nothing; no per-task reviewer gate |
+| End of each `alpha-N` | `qa-engineer` only returns `APPROVE`/`REQUEST_CHANGES` (the **Review/QA Fan-Out**, qa-only) | a qa-gated commit on `feature/{version}` — no push/PR/merge/CLOSURE |
+| At `rc-N` ship (operator elects) | full **Review/QA Fan-Out** — `qa-engineer` + `code-reviewer` + `security-reviewer` (+ `design-specialist` plugin for UI, if installed) must all `APPROVE` the **same implementation commit** | mark the task `[x]`, push implementation commits, open or update a PR, merge, deploy, or close the release, write `CLOSURE.md`/memory |
 
-Before `TASKS.md` is approved, the task definition must be agreed by:
+Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing evidence, or
+stale report sends the work back to implementation; the rework loop continues until every
+required validator approves the **same implementation commit** or the operator stops the
+release. Before the applicable gate, the unlock actions above — mark the task `[x]`, push
+implementation commits, open or update a PR, and merge, deploy, or close the release — are
+forbidden; a local commit is workspace evidence, never release completion.
 
-- the owning implementer agent or implementer set
-- `qa-engineer`
-- `code-reviewer`
-- `security-reviewer`
-- the `design-specialist` plugin when the task touches browser UI, visual UX, flows, or design tokens (only if the plugin is installed)
-
-The approved task must state implementation scope, declared write set, unit and
-integration test plan, E2E/validation plan, code-review criteria, security and
-privacy checks, and expected evidence paths. Missing agreement blocks TASKS
-approval; it is not deferred to implementation time.
-
-### 1. Implementation Handoff
-
-When an implementer finishes code and local unit/integration checks, the work is
-only `implementation-complete`. It is not DONE. The implementer emits a handoff
-report with changed files, commits, test commands, known residual risk, and any
-security/privacy-sensitive areas. The task marker stays `[-]`.
-
-### 2. Review/QA Fan-Out
-
-`project-manager` dispatches validators at the **segment/ship boundary** (not per
-task):
-
-- **End of each `alpha-N`** — `qa-engineer` only: validates the E2E/acceptance
-  plan and operator-visible behavior for the segment.
-- **At `rc-N` ship** — the full set:
-  - `qa-engineer` validates the E2E/acceptance plan and operator-visible behavior
-  - `code-reviewer` reviews architecture, maintainability, tests, and regressions
-  - `security-reviewer` reviews security, privacy, secrets, dependency, and deploy leakage risk
-  - the `design-specialist` plugin reviews UI/design compliance when applicable (if installed)
-
-Each validator returns `APPROVE` or `REQUEST_CHANGES` in its handoff JSON.
-Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing
-evidence, or stale report sends the work back to implementation. The rework loop
-continues until every required validator approves the same implementation commit
-or the operator explicitly stops the release.
-
-### 3. Ship Gate
-
-Only after all required validators approve (qa-only at an alpha commit; the full
-trio at an rc ship) may the orchestrator or task owner:
-
-- mark the task `[x]`
-- push implementation commits
-- open or update a PR for merge
-- merge, deploy, or close the release
-- write release `CLOSURE.md` or memory updates
-
-Within an alpha, push/PR/merge/CLOSURE are **not** available — only the qa-gated
-commit on `feature/{version}`. Before the applicable gate, those actions are
-forbidden. A local commit is acceptable as workspace evidence, but it is not
-release completion and must not be represented as approved work.
+**Pre-Implementation Agreement (settled at TASKS approval, not at implementation time).**
+The task definition must be agreed by the owning implementer set, `qa-engineer`,
+`code-reviewer`, `security-reviewer`, and the `design-specialist` plugin for browser
+UI/UX/design-token tasks (if installed). The approved task states implementation scope,
+declared write set, unit and integration test plan, E2E/validation plan, code-review
+criteria, security and privacy checks, and expected evidence paths. Missing agreement
+blocks TASKS approval.
 
 ## Decision Authority
 

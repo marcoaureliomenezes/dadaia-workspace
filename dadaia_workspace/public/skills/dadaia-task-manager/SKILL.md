@@ -29,66 +29,42 @@ lease × phase × mode on file-write tool calls (see the `workspace-protocol` ru
 for traceability and coordination between agents and the operator — uphold it even
 though no hook will block you for skipping it.
 
-## The 4-step protocol
+## Mechanics moved to the engine (D12)
 
-When you are about to work on production (any MUTATING path under the active context),
-follow these 4 steps **in order**:
+The **ordered task-state mechanics** — reserve `[ ]`→`[-]`, run the work, complete
+`[-]`→`[x]`, and the per-step sequencing — are now enforced by the lifecycle engine:
+`features/lifecycle/state_machine.py` owns the legal phase transitions
+(`is_legal_transition`, `TransitionDecision`) and `features/lifecycle/pipeline.py` owns
+per-step sequencing (each `PipelineStep` carries the `task_id` it transitions). This
+skill no longer narrates that ordered procedure; it records the **human-auditable marker
+discipline** the engine's transitions correspond to, plus the judgment a human applies
+when the mechanics meet reality (recovery, gate blocks, where TASKS.md lives).
 
-### Step 1 — Identify the task
+## Marker discipline (the human-auditable trace)
 
-Read the relevant `TASKS.md` (primary: `specs/releases/<active>/TASKS.md`, resolved via
-`specs/releases/ACTIVE.md`; legacy compat: if `releases/ACTIVE.md` is absent, fall back
-to `specs/features/<feat>/TASKS.md` with `SDD_LEGACY_FEATURES=1`).
-Identify the task you will execute. It **must** exist and be `[ ]` (OPEN). If it is not
-OPEN, raise an interruption with the operator before proceeding.
+When you work on production (any MUTATING path under the active context), the marker
+trace is:
 
-### Step 2 — Reserve (`[ ]` → `[-]`) and commit
+1. **Reserve.** Flip `[ ]`→`[-]` for an OPEN task that exists in the active `TASKS.md`
+   (resolved via `specs/releases/ACTIVE.md`), then make an isolated
+   `chore(tasks): start <task-id>` commit. That commit is the **observable
+   reservation** — it is how a parallel session learns "agent X took this task".
+   If the task is not OPEN, raise an interruption with the operator first.
+2. **Work.** The marker stays `[-]` for the whole duration; intermediate commits are
+   fine.
+3. **Complete.** Flip `[-]`→`[x]` only when the acceptance criteria are met **and** the
+   review gate has cleared — see below — in a final conventional-commit.
 
-Use Edit/Write to flip the task marker from `[ ]` to `[-]`. Then make an **isolated**
-commit containing only that change:
-
-```
-chore(tasks): start <task-id>
-```
-
-Example:
-```
-chore(tasks): start T128
-```
-
-That commit is the **observable reservation** saying "agent X took this task". Other
-agents in parallel sessions see it via `git pull` or by re-reading the file.
-
-### Step 3 — Do the work
-
-Implement. Multiple commits are fine during this phase (intermediates, refactors,
-fixes). The marker stays `[-]` for the whole duration.
-
-### Step 4 — Complete (`[-]` → `[x]`) and commit
-
-When the work is done and the task's acceptance criteria are satisfied:
-
-**Implementation complete is not DONE.** After the implementer finishes code, unit
-tests, and integration tests, the task remains `[-]` until `qa-engineer`,
-`code-reviewer`, and `security-reviewer` return green approval for the same commit
-(per the `release-governance` cadence: alpha-N boundaries are qa-only; reviews mature
-the release, and the push boundary itself is mechanically gated — the pre-push
-security-verdict chokepoint requires an APPROVED `security-reviewer` handoff whose
-`metrics.commit_sha` equals each pushed ref sha, per push-cycle). UI tasks also
-require `design-specialist` approval.
-
-Before those approvals, it is forbidden to mark `[x]`, open a PR, request merge,
-deploy, close the release, write `CLOSURE.md`, or update memory. If any reviewer
-requests changes, return to Step 3 and keep `[-]`.
-
-1. Flip the marker `[-]` → `[x]`.
-2. Make the **final task commit** with conventional commits, including in the diff both
-   the `[x]` marker and any final pending file.
-
-Example final commit:
-```
-feat(orchestration): implement run.resume idempotency (T128)
-```
+**Implementation complete is not DONE (judgment, not mechanic).** After the implementer
+finishes code, unit tests, and integration tests, the task remains `[-]` until
+`qa-engineer`, `code-reviewer`, and `security-reviewer` return green approval for the
+same commit (per the `release-governance` cadence: alpha-N boundaries are qa-only;
+reviews mature the release, and the push boundary itself is mechanically gated — the
+pre-push security-verdict chokepoint requires an APPROVED `security-reviewer` handoff
+whose `metrics.commit_sha` equals each pushed ref sha, per push-cycle). UI tasks also
+require `design-specialist` approval. Before those approvals it is forbidden to mark
+`[x]`, open a PR, request merge, deploy, close the release, write `CLOSURE.md`, or update
+memory. If any reviewer requests changes, return to step 2 and keep `[-]`.
 
 ## Recovery — when something goes wrong
 
@@ -146,13 +122,9 @@ It is your responsibility to work inside the scope the reserved task declares �
 hook validates that the `[-]` task covers the exact target file.
 
 TASKS.md **stays in Markdown**. The `[ ]/[-]/[x]` markers are a machine contract and
-must remain grep-parsable.
-
-## Why the extra `chore(tasks): start` commit?
-
-Without it, the `[-]` state is not observable by other agents nor recorded in history.
-The cost of one extra commit is trivial; the traceability gain is high. If history
-pollution bothers anyone, the operator squashes on PR merge — per-repo policy.
+must remain grep-parsable. The `chore(tasks): start` reservation commit exists so the
+`[-]` state is observable by other agents and recorded in history; the operator may
+squash on PR merge per-repo policy.
 
 ## In one sentence
 

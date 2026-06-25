@@ -273,6 +273,24 @@ CLI command that emits counts + total bytes + top offenders.
 
 ---
 
+## W13 — D12: bounded AI-surface collapse (the 3 full-collapse skills)
+
+### [x] T-016-16 — Trim engine-owned ordered mechanics out of 3 skills (keep identity/judgment)
+- **Owner:** ai-engineer
+- **Write set:** `dadaia_workspace/public/skills/{dadaia-task-manager,dadaia-step0-memory-bootstrap,project-orchestration}/SKILL.md` (source; projected via `public stage`/`install`).
+- **Acceptance:** the ordered pass/fail mechanics these skills duplicated — now owned by the engine
+  (`state_machine.py` TRANSITIONS, `gates.py`, `pipeline.py`/`phase_workflow.py`, `prompt_builder.py`
+  PromptPrefix) — are trimmed to concise engine pointers; ALL identity/scope/refusal/rubric/contract
+  vocabulary is KEPT (the orchestration contract terms were restored after an over-trim caught by the
+  contract test). −92 lines total. `dadaia public doctor` `[ok] public-privacy` exit 0; projection
+  consistent across `.claude/.codex/.opencode`; `ci preflight` green + `lint-imports` 6/0.
+- **Done:** D12 bounded full-collapse subset.
+- **CAVEAT (tracked):** full shadow-validation (engine verdict matching human discipline over a live
+  release) is not yet possible — engine doesn't drive live releases. This is the design-complete,
+  REVERSIBLE trim. PARTIAL skills + rules + AGENTS.md collapse remain a follow-up after shadow-validation.
+
+---
+
 ## Status of the engine workstreams (multiharness-engine-v0116)
 
 **DONE on feature/v0.1.16:** runtime kinds + factory (W1–W5) · single-step verbs (WS-1 slice,
