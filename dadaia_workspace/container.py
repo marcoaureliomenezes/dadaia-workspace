@@ -313,9 +313,12 @@ def build_agent_runtime(
     lifecycle workflow asks for the kind a step declares and injects the result into
     ``LifecycleAgentRunner``.
 
-    Codex is a live adapter; Claude SDK and OpenCode ship as documented stubs behind the
-    port (their live bodies are deferred — see release ``multiharness-engine-v0116``).
-    The factory is total over the enum: an unhandled kind raises ``ValueError``.
+    Codex (``codex exec``) and PI (``pi --mode json``) are live CLI-headless adapters.
+    The Claude SDK adapter body is real (Ring-1 write boundary via ``core/scope_match``);
+    only its default ``query_fn`` transport is deferred (lazy ``claude-agent-sdk`` import).
+    OpenCode ships as a documented stub behind the port (live body deferred — see release
+    ``multiharness-engine-v0116``). The factory is total over the enum: an unhandled kind
+    raises ``ValueError``.
     """
     run_dir = cwd or Path.cwd()
     if kind is AgentRuntimeKind.FAKE:

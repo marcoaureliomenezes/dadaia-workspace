@@ -87,7 +87,7 @@ Código| O que detecta| Severity| `--fix` policy
 TREE-1| Diretório `specs/foundation/` presente (depreciado)| WARN| warn-only; **migration guard** impresso independente de `--fix` — instrução: `dadaia migrate tree-v2`
 TREE-2| Arquivo `specs/SPEC.md` na raiz (pre-release-model)| WARN| warn-only; **migration guard** impresso — instrução: `dadaia migrate tree-v2`
 TREE-3| Memory `.md` atom obrigatório ausente — checa `memory/architecture.md`, `memory/tech-stack.md`, `memory/quality-assurance.md` (top-level, pós v0.2.1) e `memory/product/index.md`| WARNING| **no-fix** (warn-only): atoms `.md` são operator-authored, não gerados de template — `--fix` não os recria
-TREE-4| Um ou mais de `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` ausentes| ERROR| **auto-fix** : recria diretório(s) ausente(s) com `.gitkeep`
+TREE-4| Um ou mais de `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` ausentes| WARNING| **auto-fix** : recria diretório(s) ausente(s) com README.md + `.gitkeep` (quando há scaffold source; senão warn "create manually")
 TREE-5| `specs/AGENTS.md` ausente (drift em relação ao template canônico)| WARN| warn-only (sem auto-overwrite — arquivo pode ter customizações do consumer)
 TREE-5M| `specs/memory/AGENTS.md` ausente| WARN| warn-only (projetado via `dadaia public install` — WS-2)
 TREE-6| Diretório de release em `specs/releases/` sem pelo menos um artefato SDD obrigatório (`SPEC.md`)| ERROR| no-fix (decisão humana)
