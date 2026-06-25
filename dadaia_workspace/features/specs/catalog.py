@@ -262,8 +262,15 @@ _TABLE_HEADER = "| slug | title | tldr |\n|------|-------|------|\n"
 def render_index_md(catalog: dict[str, Any]) -> str:
     """Render a Markdown TOC from a catalog dict (sourced entirely from the catalog).
 
-    Mirrors ``generate-memory-catalog.py:generate_index_md`` so the CLI and the
-    standalone script produce byte-identical index output for the same catalog.
+    Mirrors ``generate-memory-catalog.py:generate_index_md``: for the same catalog the
+    two renderers produce identical output EXCEPT the "re-run" instruction line, which
+    names the tool that produced the file (``dadaia memory catalog generate`` here vs
+    ``generate-memory-catalog.py`` in the standalone script). Both write the same
+    ``index.md`` from the same atom frontmatter, so whichever path runs keeps the file
+    in lockstep with the catalog. The standalone script is a projected, importless
+    consumer-workspace fallback that cannot import this module, so the small template is
+    duplicated by necessity and kept aligned by convention (differing only on that
+    re-run line); ``TestIndexMdParity`` covers the catalog→index single-source rendering.
     """
     by_category: dict[str, list[dict[str, Any]]] = {}
     for feature in catalog.get("features", []):
