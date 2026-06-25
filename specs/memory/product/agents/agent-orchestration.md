@@ -12,9 +12,9 @@ tags:
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 1080
+token_estimate: 1160
 last_updated: '2026-06-25'
-release_origin: v0.1.19
+release_origin: v0.1.21
 ---
 
 ## Propósito
@@ -131,10 +131,13 @@ they are not simulated with fake tool names or stale tool-discovery promises. Co
 workflow Markdown is still documentation: it does not auto-execute, schedule fan-out, or
 turn a workflow file into a runtime primitive by itself. OpenCode uses its own agent and
 plugin projection. **PI** (`@earendil-works/pi-coding-agent`), the fourth harness, is
-governed at Layer 1 natively via `AGENTS.md`/`CLAUDE.md` plus its inert projected `.pi/`
-surface — it exposes **no** PreToolUse hook, so Layer-1 PI has no pre-disk (Ring-1)
-enforcement and relies on git chokepoints; at Layer 2 the `PiHeadlessAdapter` drives a
-real `pi --mode json` worker behind `AgentRuntimePort` with a git-diff Ring-2 boundary.
+governed at Layer 1 via `AGENTS.md`/`CLAUDE.md` (read natively) plus its projected `.pi/`
+surface — and, post-v0.1.21 (WS-PI-4), a real pre-disk (Ring-1) SDD-gate extension
+(`.pi/extensions/dadaia-sdd-gate.ts`): PI's CLI exposes a `tool_call` hook that can block a
+write before it executes, and the extension delegates write/edit to the same Python
+`pre_gate` the other harnesses use (active once the operator trusts `.pi/`). At Layer 2 the
+`PiHeadlessAdapter` drives a real `pi --mode json` worker behind `AgentRuntimePort` with a
+git-diff Ring-2 boundary (the Layer-2 worker has no Ring-1 — the two layers differ).
 The dispatcher layer must report unsupported runtime capabilities honestly instead of
 simulating success.
 

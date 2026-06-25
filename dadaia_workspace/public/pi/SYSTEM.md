@@ -30,3 +30,10 @@ after the operator grants trust, and PI executes them directly. Treat `.pi/**` a
 deliberate privilege grant: it is lib-originated (manifest-tracked), carries **no
 secrets** and **no operator-local paths**, and must never be hand-edited in place (edit
 the source under `dadaia_workspace/public/pi/`, then re-project).
+
+One of those assets is `extensions/dadaia-sdd-gate.ts` — the Layer-1 **SDD gate**: a
+`tool_call` hook that blocks an out-of-policy `write`/`edit` before it touches disk by
+delegating to the workspace's Python `pre_gate` (the same gate Claude Code and Codex use).
+It is listed in `settings.json` (`extensions`) and loads once you trust `.pi/`. To force
+it explicitly: `pi --extension .pi/extensions/dadaia-sdd-gate.ts`. It fails open — a gate
+or interpreter error never blocks a legitimate edit.

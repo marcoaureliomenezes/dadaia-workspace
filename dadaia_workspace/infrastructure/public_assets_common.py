@@ -36,7 +36,7 @@ _COPY_DIRS = (
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
 _OPENCODE_DIRS = ("commands", "skills", "agents", "plugins", "workflows")
 #: Subdirectories of the staged ``pi/`` tree that are copied as-is into ``.pi/``.
-_PI_DIRS = ("prompts",)
+_PI_DIRS = ("prompts", "extensions")
 
 
 def _sha256(path: Path) -> str:

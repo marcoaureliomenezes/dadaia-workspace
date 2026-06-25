@@ -228,10 +228,13 @@ agentic layers"). Enforcement per Layer-1 harness follows §8's per-harness enfo
 matrix (normative): Claude Code = deterministic (PreToolUse hooks + git chokepoints);
 Codex interactive = deterministic (PreToolUse hooks + git chokepoints); Codex headless
 (`codex exec`) = chokepoints only (exec hooks do not fire — upstream codex-cli defect);
-OpenCode = advisory + chokepoint-protected (ADR-G3); PI = advisory + chokepoint-protected
-(PI exposes no pre-disk hook in its CLI, so Layer-1 PI has no PreToolUse enforcement; its
-`.pi/` assets are post-trust executable and a Ring-1 PreToolUse extension is deferred —
-see §8). The Layer-2 worker-runtime ring posture is governed separately in §8 and is not
+OpenCode = advisory + chokepoint-protected (ADR-G3); PI = deterministic post-trust +
+chokepoints (PI's CLI exposes a genuine pre-disk hook — an extension's `tool_call`
+handler can block a write before it executes; the projected `.pi/extensions/`
+SDD-gate extension delegates write/edit to the same Python `pre_gate` the other
+harnesses use, so Layer-1 PI gains a real Ring-1 boundary that is **active once the
+operator grants `.pi/` trust** — its `.pi/**` assets are post-trust executable — see §8;
+WS-PI-4). The Layer-2 worker-runtime ring posture is governed separately in §8 and is not
 described by this matrix.
 
 Codex-specific behavior must be expressed in Codex-native terms: `AGENTS.md`
@@ -436,7 +439,7 @@ terminal; see §0 "The two agentic layers"):
 | Codex interactive | yes | yes | deterministic: hooks + chokepoints |
 | Codex headless (`codex exec`) | **no — exec hooks do not fire** (upstream codex-cli defect) | yes | chokepoints only |
 | OpenCode | no | yes | advisory + chokepoint-protected (ADR-G3) |
-| PI (`pi-coding-agent`) | **no — PI CLI exposes no pre-disk hook (no Ring-1)** | yes | advisory + chokepoint-protected; `.pi/**` is post-trust executable; a Ring-1 PreToolUse extension is deferred |
+| PI (`pi-coding-agent`) | **yes (post-trust)** — `.pi/extensions/dadaia-sdd-gate.ts` `tool_call` hook delegates write/edit to `pre_gate` (WS-PI-4); active once the operator trusts `.pi/` | yes | deterministic post-trust + chokepoints; `.pi/**` is post-trust executable |
 
 **Layer-2 worker-runtime posture** (governs bounded workers driven by `dadaia lifecycle`
 behind `AgentRuntimePort`; this is NOT the entry-harness matrix above): the worker

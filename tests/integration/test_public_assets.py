@@ -76,6 +76,36 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert (workspace / ".pi" / "settings.json").exists()
 
 
+def test_install_target_pi_projects_ring1_sdd_gate_extension(tmp_path: Path) -> None:
+    """WS-PI-4: `--target pi` projects the Layer-1 Ring-1 SDD-gate extension, settings.json
+    lists it, and the extension body carries its invariants (tool_call → pre_gate; the
+    write→Write/edit→Edit mapping; fail-open; venv resolution; the block-envelope check) —
+    AND, as a post-trust executable asset, carries NO operator-local path or secret."""
+    workspace = tmp_path / "ws"
+    FileSystemPublicAssetManager().install(workspace, target="pi")
+
+    ext = workspace / ".pi" / "extensions" / "dadaia-sdd-gate.ts"
+    assert ext.exists()
+    body = ext.read_text(encoding="utf-8")
+    # Delegates to the single Python gate — never re-derives policy in TS.
+    assert "dadaia_workspace.hooks.pre_gate" in body
+    assert 'pi.on("tool_call"' in body or "pi.on('tool_call'" in body
+    # Maps PI's lowercase tool names to the gate's canonical WRITE_TOOLS vocabulary.
+    assert "write" in body and "Write" in body and "edit" in body and "Edit" in body
+    # Blocks only on the explicit decision envelope; fail-open otherwise.
+    assert '"decision":"block"' in body or "decision" in body
+    assert "block: true" in body
+    # venv resolution (no bash dependency) mirrors the OpenCode plugin.
+    assert ".venv" in body and "python" in body
+    # Post-trust executable surface: no operator-local path / no secret leakage.
+    assert "/home/" not in body and "/Users/" not in body
+    for secret_token in ("ANTHROPIC_API_KEY", "TOKEN=", "SECRET", "password"):
+        assert secret_token not in body
+
+    settings = json.loads((workspace / ".pi" / "settings.json").read_text(encoding="utf-8"))
+    assert any("dadaia-sdd-gate" in entry for entry in settings.get("extensions", [])), settings
+
+
 def test_install_target_pi_projects_pi_tree(tmp_path: Path) -> None:
     """T-PIO-03: `dadaia public install --target pi` projects `public/pi/` -> `.pi/`."""
     workspace = tmp_path / "ws"
@@ -86,6 +116,7 @@ def test_install_target_pi_projects_pi_tree(tmp_path: Path) -> None:
     assert (workspace / ".pi" / "SYSTEM.md").exists()
     assert (workspace / ".pi" / "settings.json").exists()
     assert (workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
+    assert (workspace / ".pi" / "extensions" / "dadaia-sdd-gate.ts").exists()
     # settings.json is valid JSON, generic-only.
     settings = json.loads((workspace / ".pi" / "settings.json").read_text(encoding="utf-8"))
     assert isinstance(settings, dict)

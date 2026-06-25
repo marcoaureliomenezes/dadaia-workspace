@@ -12,7 +12,8 @@ summary: Codex uses native config, shared and Codex-specific skills, interactive
   (pre-commit lease gate + pre-push security-verdict gate), which fire independently
   of harness hooks; OpenCode is canonized "advisory + chokepoint-protected" (ADR-G3).
   PI (the fourth harness, post-v0.1.18) projects an inert `.pi/` surface and is
-  Layer-1-governed via AGENTS.md natively (no PreToolUse hook → chokepoints-only).
+  Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate extension
+  (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4).
   Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs
   (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with
   no behavior until the plugin is installed.
@@ -23,9 +24,9 @@ tags:
 - parity
 - multi-platform
 agent_tier: self-pull
-token_estimate: 1480
+token_estimate: 1600
 last_updated: '2026-06-25'
-release_origin: v0.1.19
+release_origin: v0.1.21
 ---
 
 ## Propósito
@@ -134,12 +135,18 @@ venv-path resolution), not a shell script (ADR-7: the plugin no longer shells ou
 to `bash <script>.sh`). The only remaining shell asset in the product is the
 `pre-push-ci-gate.sh` git chokepoint.
 
-PI receives an inert `.pi/` projection (`SYSTEM.md`, `settings.json`,
-`prompts/dadaia-context.md`) via `dadaia public install --target pi`. PI reads
-`AGENTS.md`/`CLAUDE.md` natively up the tree, so workspace law rides for free;
-`.pi/` carries no executable extension and no policy restatement (the Ring-1
-`.pi/extensions/` gate is deferred). `.pi/**` is post-trust executable TypeScript
-when PI loads it — a deliberate operator privilege grant, never hand-edited.
+PI receives a `.pi/` projection (`SYSTEM.md`, `settings.json`,
+`prompts/dadaia-context.md`, and `extensions/dadaia-sdd-gate.ts`) via `dadaia public
+install --target pi`. PI reads `AGENTS.md`/`CLAUDE.md` natively up the tree, so workspace
+law rides for free; post-v0.1.21 (WS-PI-4) the `.pi/extensions/dadaia-sdd-gate.ts`
+extension adds a real Layer-1 **Ring-1** pre-disk gate — its `tool_call` handler maps
+write→Write/edit→Edit and delegates to the same Python `pre_gate` the other harnesses use,
+returning `{block:true}` on an SDD block, fail-open otherwise. The extension carries **no
+policy restatement** (policy lives only in Python) and no secrets/operator-local paths.
+`.pi/**` is post-trust executable TypeScript when PI loads it — a deliberate operator
+privilege grant, never hand-edited — so the Ring-1 block is active once the operator
+trusts `.pi/` (the upstream trust seam; live efficacy verified on a trusted interactive
+run, the same class as the `pi --mode json` live test).
 
 ## Estado runtime tocado
 

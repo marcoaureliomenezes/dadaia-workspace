@@ -17,9 +17,9 @@ tags:
 - adr
 - agents
 agent_tier: self-pull
-token_estimate: 7900
+token_estimate: 8050
 last_updated: '2026-06-25'
-release_origin: v0.1.19
+release_origin: v0.1.21
 ---
 
 ## Visão geral
@@ -595,9 +595,14 @@ só no Layer 2.
   provider-agnostic. See [[lifecycle-foundation]] for the engine spine.
 
 A harness can exist at one layer and not the other. PI ships as a real **Layer-2**
-worker (`PiHeadlessAdapter`, wired in `container.py`) and, post-v0.1.18, a minimal
-**Layer-1** `.pi/` projection that points at the law; it runs no Layer-1 PreToolUse
-hook, so its Layer-1 posture is advisory + chokepoint-protected (no Ring-1).
+worker (`PiHeadlessAdapter`, wired in `container.py`, Ring-2 only) and a **Layer-1** `.pi/`
+projection that, post-v0.1.18, points at the law and, post-v0.1.21 (WS-PI-4), carries a
+real **Ring-1** SDD-gate extension (`.pi/extensions/dadaia-sdd-gate.ts`): PI's CLI exposes
+a genuine pre-disk hook (an extension `tool_call` handler can block a write before it
+executes), and the extension delegates write/edit to the same Python `pre_gate` the other
+harnesses use. The block is **active once the operator grants `.pi/` trust** (the assets
+are post-trust executable). Note the two PI layers differ: the Layer-2 `PI_HEADLESS`
+worker keeps Ring-2 + chokepoints; the Layer-1 interactive `pi` gains the post-trust Ring-1.
 
 ### Layer-1 entry-harness enforcement parity
 
@@ -607,7 +612,7 @@ hook, so its Layer-1 posture is advisory + chokepoint-protected (no Ring-1).
 | Codex interativo (TUI) | sim — `pre_gate` em `.codex/hooks.json` (matcher `^(apply_patch\|Edit\|Write\|Bash)$`) | sim | determinístico: hooks + chokepoints |
 | Codex headless (`codex exec`) | **não — exec não dispara hooks** (defeito upstream codex-cli 0.139.0, live-verificado) | sim | **chokepoints only** |
 | OpenCode | plugins `.ts` chamam hooks Python via subprocess (venv-path resolution `.dadaia/.venv/bin/python` → `Scripts/python.exe` → `python`); `dadaia public doctor` reporta `[unsupported]` para PostToolUse opencode — esperado | sim | advisory + chokepoint-protected (ADR-G3) |
-| PI (`pi`) | **não — o `pi` CLI não expõe hook pre-disk (Ring-1 deferido, WS-PI-4)** | sim | advisory + chokepoint-protected; projeção `.pi/` aponta para a lei (honestidade preservada) |
+| PI (`pi`) | **sim (post-trust)** — `.pi/extensions/dadaia-sdd-gate.ts` `tool_call` hook mapeia write→Write/edit→Edit e delega ao `pre_gate` (WS-PI-4); ativo quando o operador concede trust a `.pi/` | sim | determinístico post-trust + chokepoints; `.pi/**` é post-trust executable |
 
 Codex-specific behavior é expresso em termos Codex-nativos: `AGENTS.md` context, `.codex/config.toml`, `.codex/skills`, hooks onde suportados, e deferred tool discovery para multi-agent capability.
 
