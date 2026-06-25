@@ -574,9 +574,10 @@ class SpecsDoctor:
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
         """Apply auto-fixes for all fixable issues.
 
-        Resolves TREE-3 (render missing memory HTML from Jinja templates) and
-        TREE-4 (create missing dirs with README.md + .gitkeep).  Warn-only and
-        no-fix invariants are never touched.
+        Resolves TREE-4 only (create missing spec-tree dirs with README.md +
+        .gitkeep, from the canonical scaffold source).  TREE-3 memory atoms are
+        operator-authored ``.md`` (no Jinja/HTML generation) and are warn-only;
+        warn-only and no-fix invariants are never touched.
 
         Args:
             issues: Pre-computed issue list (avoids a second ``check()`` call).

@@ -2,7 +2,7 @@
 slug: specs-doctor
 title: specs-doctor
 category: product
-tldr: 'Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4.'
+tldr: 'Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-4 (TREE-3 é warn-only).'
 summary: 'Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003,
   004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1,
   ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants
@@ -13,16 +13,16 @@ summary: 'Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L,
   dirs novos em specs/audits/, WARN), 031 (backlog consumido por release arquivada com
   status não-terminal, WARN), 032 (status de bug fora do canon {Open, Closed}, WARN);
   + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md;
-  check #8 grep direto no .md body. --fix auto-repara TREE-3/4.'
+  check #8 grep direto no .md body. --fix auto-repara TREE-4 (TREE-3 é warn-only).'
 tags:
 - specs
 - doctor
 - validation
 - sdd
 agent_tier: self-pull
-token_estimate: 1650
-last_updated: '2026-06-11'
-release_origin: v0.1.10
+token_estimate: 1820
+last_updated: '2026-06-25'
+release_origin: v0.1.19
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1
@@ -35,6 +35,24 @@ Valida invariantes estruturais do diretório `specs/` sob o modelo SDD release-l
   * **TREE-1..7 + TREE-5M** (8 checks, sem TREE-8): canonical `specs/` tree v2 shape. TREE-3 (pós v0.2.1) exige `specs/memory/quality-assurance.md` no top-level (não em `product/sdd/`). O check de `specs/memory/AGENTS.md` é **TREE-5M** (não TREE-8). CAT-1 e SPEC-DOC-002 usam `rglob` para detectar atoms nested em subdiretórios.
 
 Os checks STRUCT-1..4, SYNC-1, YAML-absent guard e SPEC-DOC-008 (byte-identity de HTML) não existem mais (eram específicos ao modelo YAML/HTML).
+
+```mermaid
+flowchart TB
+    CMD["dadaia specs doctor [--fix] [--json]"] --> RUN["resolve specs_dir · roda todos os checks em ordem"]
+    RUN --> FAM
+    subgraph FAM["Famílias de invariantes"]
+        direction LR
+        A["SPEC-DOC 001..016<br/>presença · forma"]
+        B["Ledger 024..032<br/>estado da máquina SDD"]
+        C["TREE-1..7 + 5M<br/>shape canônico do tree"]
+        D["LINT-1<br/>memory atoms:<br/>frontmatter · headings · wikilinks · token drift"]
+        E["D-OC-1<br/>orchestration registry"]
+    end
+    FAM --> VERD{"algum ERROR?"}
+    VERD -->|sim| EX1(["exit 1 — bloqueia merge em CI"])
+    VERD -->|"só WARN / verde"| EX0(["exit 0"])
+    CMD -.->|"--fix"| FIX["auto-repara TREE-4 (cria dirs) · migration guard TREE-1/2 · TREE-3/5..7 warn-only"]
+```
 
 ### Ledger invariants (SPEC-DOC-024/026/027/028/029/030/031/032)
 
@@ -68,8 +86,8 @@ Código| O que detecta| Severity| `--fix` policy
 ---|---|---|---
 TREE-1| Diretório `specs/foundation/` presente (depreciado)| WARN| warn-only; **migration guard** impresso independente de `--fix` — instrução: `dadaia migrate tree-v2`
 TREE-2| Arquivo `specs/SPEC.md` na raiz (pre-release-model)| WARN| warn-only; **migration guard** impresso — instrução: `dadaia migrate tree-v2`
-TREE-3| `specs/memory/quality-assurance.md` **top-level** ausente (pós v0.2.1: path canônico é top-level, não `product/sdd/`)| ERROR| **auto-fix** : regenera stub do template canônico
-TREE-4| Um ou mais de `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` ausentes| ERROR| **auto-fix** : recria diretório(s) ausente(s) com `.gitkeep`
+TREE-3| Memory `.md` atom obrigatório ausente — checa `memory/architecture.md`, `memory/tech-stack.md`, `memory/quality-assurance.md` (top-level, pós v0.2.1) e `memory/product/index.md`| WARNING| **no-fix** (warn-only): atoms `.md` são operator-authored, não gerados de template — `--fix` não os recria
+TREE-4| Um ou mais de `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` ausentes| WARNING| **auto-fix** : recria diretório(s) ausente(s) com README.md + `.gitkeep` (quando há scaffold source; senão warn "create manually")
 TREE-5| `specs/AGENTS.md` ausente (drift em relação ao template canônico)| WARN| warn-only (sem auto-overwrite — arquivo pode ter customizações do consumer)
 TREE-5M| `specs/memory/AGENTS.md` ausente| WARN| warn-only (projetado via `dadaia public install` — WS-2)
 TREE-6| Diretório de release em `specs/releases/` sem pelo menos um artefato SDD obrigatório (`SPEC.md`)| ERROR| no-fix (decisão humana)
@@ -80,7 +98,7 @@ TREE-7| Arquivo de bug em `specs/bugs/` sem campo `session_id` no frontmatter| E
 ## Fluxo de uso
 
   1. `dadaia specs doctor` — resolve `specs_dir` via `--specs-dir` ou contexto de sessão bound, roda todos os checks em ordem (SPEC-DOC IDs não-sequenciais + TREE-1..7+5M), exibe issues formatados com código + severity + path. LINT-1 invoca `lint-memory-atoms.py` nos átomos `.md`; token drift é WARN; violações de frontmatter ou heading proibido são ERROR.
-  2. `dadaia specs doctor --fix` — executa os checks e auto-repara os invariantes com policy `auto-fix` (TREE-3, TREE-4); emite migration guard para TREE-1/2; deixa TREE-5..7 como warnings/errors sem alterar arquivos.
+  2. `dadaia specs doctor --fix` — executa os checks e auto-repara apenas o invariante com policy `auto-fix` (TREE-4: recria diretórios ausentes); emite migration guard para TREE-1/2; deixa TREE-3 e TREE-5..7 como warnings/errors sem alterar arquivos (TREE-3 é warn-only — atoms `.md` são operator-authored, não gerados).
   3. Para automação: `dadaia specs doctor --json` emite payload `{specs_dir, issues[], summary{errors, warnings}}`.
   4. Em CI: usado como gate de PR para bloquear merge se houver erros estruturais nos specs.
 
@@ -99,7 +117,7 @@ Sem este validador, drift entre modelo SDD e a realidade no disco vira bug laten
 ## Estado runtime tocado
 
   * Read-only sobre todo `specs_dir` (modo padrão).
-  * **Com`--fix`:** escreve em `specs_dir` apenas para os invariantes com policy `auto-fix`: regenera `specs/memory/product/index.md` stub (TREE-3) e recria diretórios ausentes com `.gitkeep` (TREE-4). Todos os outros invariantes permanecem read-only mesmo com `--fix`.
+  * **Com`--fix`:** escreve em `specs_dir` apenas para o único invariante com policy `auto-fix`: recria diretórios ausentes (`backlog/`, `bugs/`, `releases/`) com `.gitkeep` (TREE-4). TREE-3 (memory atoms ausentes) é warn-only — não é recriado por `--fix`, pois atoms `.md` são operator-authored. Todos os outros invariantes permanecem read-only mesmo com `--fix`.
 
 
 

@@ -24,9 +24,16 @@ take precedence.
 
 The workspace **root** may contain **only**:
 
-- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.opencode/`, `repos/`
+- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.opencode/`, `.pi/`,
+  `repos/`
 - Files: `AGENTS.md`, `CLAUDE.md` (Claude Code bridge importing `@AGENTS.md`),
   `prompt.md` (optional operator long-prompt file)
+
+`.pi/` is the PI (`pi-coding-agent`) Layer-1 projection. It is lib-originated like the
+other projection dirs, but its assets are **post-trust executable**: PI loads `.pi/**`
+only after the operator grants trust and runs it as unsandboxed TypeScript. It carries
+no secrets and no operator-local paths, and must never be hand-edited in place — a
+deliberate privilege grant, not inert config.
 
 **Operator exception:** any file or directory created by the human operator is always
 allowed and MUST never be auto-deleted (e.g. `prompt.md`, screenshots). Operator
@@ -56,7 +63,7 @@ files at the repo root.
 
 Forbidden root artefacts:
 
-- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.opencode/`
+- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `.pi/`
 - `CLAUDE.md`, `opencode.json`, `Makefile`, `playwright.config.ts`
 - `playwright-report/`, `test-results/`, coverage/cache directories
 

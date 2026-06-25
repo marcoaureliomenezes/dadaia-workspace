@@ -2,7 +2,7 @@
 slug: multi-platform-parity
 title: multi-platform-parity
 category: product
-tldr: "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules)."
+tldr: "Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows)."
 summary: Codex uses native config, shared and Codex-specific skills, interactive-only
   hook execution (codex exec never fires hooks — headless posture is chokepoints-only,
   per the §8 enforcement matrix), native Starlark .rules command policy with venv-path
@@ -11,6 +11,9 @@ summary: Codex uses native config, shared and Codex-specific skills, interactive
   model_reasoning_effort). All harnesses are protected by the git chokepoints
   (pre-commit lease gate + pre-push security-verdict gate), which fire independently
   of harness hooks; OpenCode is canonized "advisory + chokepoint-protected" (ADR-G3).
+  PI (the fourth harness, post-v0.1.18) projects an inert `.pi/` surface and is
+  Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate extension
+  (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4).
   Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs
   (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with
   no behavior until the plugin is installed.
@@ -21,17 +24,43 @@ tags:
 - parity
 - multi-platform
 agent_tier: self-pull
-token_estimate: 606
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+token_estimate: 1600
+last_updated: '2026-06-25'
+release_origin: v0.1.21
 ---
 
 ## Propósito
 
 Multi-platform parity means the same canonical public assets are projected to
-Claude Code, Codex, and OpenCode without pretending the runtimes are identical.
-Each projection must be truthful about the runtime's native concepts, supported
-hooks, config loading, workflow support, and skill discovery.
+Claude Code, Codex, OpenCode, and (post-v0.1.18) PI without pretending the runtimes
+are identical. Each projection must be truthful about the runtime's native concepts,
+supported hooks, config loading, workflow support, and skill discovery.
+
+### Two-layer scope: projection-parity vs worker-runtime parity
+
+This atom is about **Layer-1 projection parity** — how one canonical source projects
+into the entry harnesses the operator launches. It must not be read as the full harness
+set. dadaia-workspace runs harnesses at two layers (see [[architecture]] "Two-layer
+agentic model"):
+
+- **Layer 1 (this atom) — entry-harness projection parity.** Source
+  (`dadaia_workspace/public/`) → `.claude/`, `.codex/`, `.opencode/`, `.pi/` asset trees
+  via `dadaia public install`. Each tree is truthful about its runtime. PI's `.pi/`
+  projection (target `pi`, structural mirror of OpenCode in `public_assets.py`) is
+  **minimal**: `.pi/SYSTEM.md` POINTS AT `AGENTS.md` (no law restatement) + a generic
+  `.pi/settings.json` + an optional `.pi/prompts/` affordance.
+- **Layer 2 — worker-runtime parity (NOT projection parity).** The lifecycle engine's
+  per-step worker harnesses behind `AgentRuntimePort` (`FAKE`, `CODEX_EXEC`,
+  `CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS`). These have **no projection tree** — they
+  are subprocess/SDK adapters selected per step, governed by `--harness`, not by `.X/`
+  asset projection. PI shipped here first (`pi --mode json`). [[lifecycle-foundation]]
+  is the normative source for Layer 2.
+
+**`.pi/` trust surface.** `.pi/**` is a post-trust, unsandboxed, executable-capable
+surface (a real privilege grant — the operator who runs `pi` after seeing `.pi/`
+extensions grants execution). The `.pi/SYSTEM.md` carries an inline trust-boundary note;
+no secrets or operator-local values appear in `public/pi/**` and `[ok] public-privacy`
+must stay green.
 
 ## Public surface counts (v0.2.0)
 
@@ -99,8 +128,25 @@ reference, but shared docs must not assume Claude-only mechanisms exist in
 Codex or OpenCode.
 
 OpenCode receives transformed agent definitions, permissions mapped to its
-runtime categories, and plugins that delegate SDD gate/context behavior to the
-same shell scripts used by the other runtimes.
+runtime categories, and TypeScript plugins that delegate SDD gate/context behavior
+to the same **Python** governance hook the other runtimes use — they invoke
+`python -m dadaia_workspace.hooks.{pre_gate,ctx_inject}` via subprocess (with
+venv-path resolution), not a shell script (ADR-7: the plugin no longer shells out
+to `bash <script>.sh`). The only remaining shell asset in the product is the
+`pre-push-ci-gate.sh` git chokepoint.
+
+PI receives a `.pi/` projection (`SYSTEM.md`, `settings.json`,
+`prompts/dadaia-context.md`, and `extensions/dadaia-sdd-gate.ts`) via `dadaia public
+install --target pi`. PI reads `AGENTS.md`/`CLAUDE.md` natively up the tree, so workspace
+law rides for free; post-v0.1.21 (WS-PI-4) the `.pi/extensions/dadaia-sdd-gate.ts`
+extension adds a real Layer-1 **Ring-1** pre-disk gate — its `tool_call` handler maps
+write→Write/edit→Edit and delegates to the same Python `pre_gate` the other harnesses use,
+returning `{block:true}` on an SDD block, fail-open otherwise. The extension carries **no
+policy restatement** (policy lives only in Python) and no secrets/operator-local paths.
+`.pi/**` is post-trust executable TypeScript when PI loads it — a deliberate operator
+privilege grant, never hand-edited — so the Ring-1 block is active once the operator
+trusts `.pi/` (the upstream trust seam; live efficacy verified on a trusted interactive
+run, the same class as the `pi --mode json` live test).
 
 ## Estado runtime tocado
 

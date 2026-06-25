@@ -348,6 +348,48 @@ def test_unknown_heading_warns_not_errors(tmp_path: Path) -> None:
     )
 
 
+def test_legitimate_canon_headings_in_allowlist() -> None:
+    """T-PIO-09 (F9): legitimate current-atom headings must NOT warn.
+
+    The drift audit flagged these real headings from architecture / lifecycle-foundation
+    / spec-context-project / multi-platform-parity / agent atoms as LINT-1 WARNings even
+    though they are legitimate canon. They must be in the curated allowlist so
+    `specs doctor` stops emitting heading WARNs for existing atoms. No atom content
+    changes — only the allowlist grows.
+    """
+    allowlist = _lint_mod.HEADING_ALLOWLIST
+    legitimate = [
+        "Acquire do lease (O_EXCL CAS + stable-session-identity)",
+        "Adoção (9 agentes core)",
+        "Agent roster and phase ownership (constitution §14 + §7)",
+        "Blocking and resume",
+        "CI matrix 3-OS (graduated — hard-gated)",
+        "Contrato de resiliência — 3 tiers",
+        "Core services",
+        "Current limits",
+        "Dispatcher purity (constitution §9)",
+        "Fluxo de dados — gate v3 SDD (v0.1.14: entrypoint merged pre_gate)",
+        "Gating note (current behavior)",
+        "Harness runtime boundary",
+        "Hygiene and anti-slop behavior",
+        "Model assignments (9 core agents + 3 plugin stubs)",
+        "Modelo de concorrência e lease (v0.1.14)",
+        "Multi-harness runtime parity (constitution §4)",
+        "Os 3 canais de reporte/comunicação (constitution §11)",
+        "O Spec Context Project (conceito central)",
+        "Plataforma seam — `core/platform.py`",
+        "Portos e adapters (4 + 9)",
+        "Public surface counts (v0.2.0)",
+        "Purpose",
+        "Python governance hooks package",
+        "Structured-memory-source subsystem (memory-markdown-source-v1)",
+        "Sub-agent model (constitution §9)",
+        "Topologia de agentes (9 core + 3 plugins)",
+    ]
+    missing = [h for h in legitimate if h not in allowlist]
+    assert not missing, f"Legitimate headings still missing from allowlist: {missing}"
+
+
 def test_exit_code_warn_only_is_two(tmp_path: Path) -> None:
     """_exit_code returns 2 when only warnings exist."""
     schema = _load_schema_real()

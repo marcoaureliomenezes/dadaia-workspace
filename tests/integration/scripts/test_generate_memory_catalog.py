@@ -40,7 +40,17 @@ _SCRIPT = _REPO_ROOT / "dadaia_workspace" / "public" / "scripts" / "generate-mem
 _spec = importlib.util.spec_from_file_location("generate_memory_catalog", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
 _catalog_mod: types.ModuleType = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_catalog_mod)  # type: ignore[union-attr]
+# Disable bytecode writing across exec_module: CPython's SourceFileLoader decides to
+# write the cached .pyc based on sys.dont_write_bytecode at exec time, BEFORE the
+# script's own in-module guard line runs — so without this the import pollutes
+# dadaia_workspace/public/scripts/__pycache__/ and trips the public-source-hygiene
+# contract under full-suite ordering (bug public-source-hygiene-flaky-pycache-pollution).
+_prev_dont_write_bytecode = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
+try:
+    _spec.loader.exec_module(_catalog_mod)  # type: ignore[union-attr]
+finally:
+    sys.dont_write_bytecode = _prev_dont_write_bytecode
 
 generate_catalog = _catalog_mod.generate_catalog
 generate_index_md = _catalog_mod.generate_index_md

@@ -1,5 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -8,12 +9,22 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.protocols.agent_dispatcher import AgentDispatcher
+from dadaia_workspace.core.models.hygiene import SlopPolicy
+from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.lifecycle.antislop.retention import RetentionSweep
+from dadaia_workspace.features.lifecycle.antislop.slop_scan import SlopReport, slop_scan
+from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
+from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
+from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
+from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
+from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportWorkflow
+from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
@@ -50,16 +61,11 @@ from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.features.workflows.service import WorkflowsService
 from dadaia_workspace.features.workspace.service import WorkspaceService
-from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
-from dadaia_workspace.infrastructure.cli_agent_dispatcher import (
-    CliAgentDispatcher,
-    OpenCodeAgentDispatcher,
-)
-from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
+from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
@@ -72,6 +78,7 @@ from dadaia_workspace.infrastructure.process_ancestry_adapter import (
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
@@ -293,17 +300,57 @@ def build_export_service(workspace_root: Path) -> ExportService:
     )
 
 
-def _select_dispatcher(runtime: str | None) -> AgentDispatcher:
-    import os
+def build_agent_runtime(
+    kind: AgentRuntimeKind,
+    *,
+    cwd: Path | None = None,
+) -> AgentRuntimePort:
+    """Map an ``AgentRuntimeKind`` to its concrete adapter behind ``AgentRuntimePort``.
 
-    runtime = (runtime or os.environ.get("DADAIA_AGENT_RUNTIME") or "cli").lower()
-    if runtime == "claude":
-        return ClaudeAgentDispatcher()
-    if runtime == "opencode":
-        return OpenCodeAgentDispatcher()
-    if runtime == "codex":
-        return CodexAgentDispatcher()
-    return CliAgentDispatcher()
+    This is the single seam that binds a runtime kind to an infrastructure adapter —
+    the runtime-adapter analogue of ``PLATFORM`` selecting OS adapters. ``core/`` and
+    ``features/`` stay provider-agnostic and never import an adapter directly; a
+    lifecycle workflow asks for the kind a step declares and injects the result into
+    ``LifecycleAgentRunner``.
+
+    Codex (``codex exec``) and PI (``pi --mode json``) are live CLI-headless adapters.
+    The Claude SDK adapter body is real (Ring-1 write boundary via ``core/scope_match``);
+    only its default ``query_fn`` transport is deferred (lazy ``claude-agent-sdk`` import).
+    OpenCode ships as a documented stub behind the port (live body deferred — see release
+    ``multiharness-engine-v0116``). The factory is total over the enum: an unhandled kind
+    raises ``ValueError``.
+    """
+    run_dir = cwd or Path.cwd()
+    if kind is AgentRuntimeKind.FAKE:
+        from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+        return FakeAgentRuntime()
+    if kind is AgentRuntimeKind.CODEX_EXEC:
+        from dadaia_workspace.infrastructure.codex_runtime import (
+            CodexExecAdapter,
+            CodexExecConfig,
+        )
+
+        return CodexExecAdapter(CodexExecConfig(cwd=run_dir))
+    if kind is AgentRuntimeKind.OPENCODE_RUN:
+        from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
+
+        return OpenCodeAdapter(cwd=run_dir)
+    if kind is AgentRuntimeKind.CLAUDE_SDK:
+        from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
+
+        return ClaudeSdkAdapter(cwd=run_dir)
+    if kind is AgentRuntimeKind.PI_HEADLESS:
+        from dadaia_workspace.infrastructure.pi_runtime import (
+            PiHeadlessAdapter,
+            PiHeadlessConfig,
+        )
+
+        return PiHeadlessAdapter(
+            PiHeadlessConfig(cwd=run_dir),
+            git=GitSubprocessClient(),
+        )
+    raise ValueError(f"unsupported agent runtime kind: {kind!r}")
 
 
 def _agent_catalog(workspace_root: Path) -> tuple[str, ...]:
@@ -316,7 +363,14 @@ def _agent_catalog(workspace_root: Path) -> tuple[str, ...]:
 def build_orchestration_service(
     workspace_root: Path, runtime: str | None = None
 ) -> OrchestrationService:
+    """Compose the read-only orchestration catalog/run-status surface.
+
+    Workflow execution moved to the lifecycle engine (WS-3); this service no longer
+    takes a dispatcher. The ``runtime`` parameter is retained for CLI call-site
+    compatibility (it is now inert — no agent runtime is selected here).
+    """
     _guard_initialized(workspace_root)
+    _ = runtime  # retained for CLI compatibility; no dispatcher is selected.
     workflows_dir = workspace_root / ".dadaia" / "agentic" / "workflows"
     runs_dir = workspace_root / ".dadaia" / "runs"
     return OrchestrationService(
@@ -324,8 +378,6 @@ def build_orchestration_service(
             workflows_dir, agent_catalog=_agent_catalog(workspace_root)
         ),
         run_state_store=JsonRunStateStore(runs_dir),
-        dispatcher=_select_dispatcher(runtime),
-        workspace_root=workspace_root,
     )
 
 
@@ -417,6 +469,164 @@ def build_reports_retention_service(workspace_root: Path) -> ReportRetentionServ
     """Compose ``ReportRetentionService`` for workspace runtime report state."""
     _guard_initialized(workspace_root)
     return ReportRetentionService(workspace_root)
+
+
+def build_lifecycle_hygiene_service(workspace_root: Path) -> LifecycleHygieneService:
+    """Compose lifecycle hygiene service."""
+    _guard_initialized(workspace_root)
+    return LifecycleHygieneService(workspace_root)
+
+
+def build_slop_report(
+    workspace_root: Path,
+    *,
+    now: dt.datetime | None = None,
+    policy: SlopPolicy | None = None,
+) -> SlopReport:
+    """Run the read-only directory-aware anti-slop metric (WS-6).
+
+    Pure measurement: walks the canonical swept ``.dadaia/`` zones and classifies each
+    reporting unit (a directory tree counts as one entry with recursive size). Never
+    mutates the filesystem. The clock is injectable for hermetic tests.
+    """
+    _guard_initialized(workspace_root)
+    scan_now = now or dt.datetime.now(tz=dt.UTC)
+    return slop_scan(workspace_root, now=scan_now, policy=policy or SlopPolicy())
+
+
+def _live_lifecycle_claims(workspace_root: Path) -> Callable[[], frozenset[str]]:
+    """Composition-root provider of swept-zone paths claimed by LIVE lifecycle runs (D6).
+
+    The retention SWEEP must NEVER reclaim a tmp/handoff/report path that a live worker is
+    mid-flight on. This callable reads the persisted ``LifecycleRun`` records and, for every
+    NON-TERMINAL run (status not COMPLETED/FAILED), claims any of that run's
+    ``expected_artifacts`` whose path falls inside a recognised swept zone
+    (``.dadaia/{tmp,reports,handoff,runs}``). The deleter (``RetentionSweep``) spares any
+    candidate equal to, nested under, or containing a claim.
+
+    ``features/lifecycle/antislop/retention.py`` never imports the run-store adapter — the
+    container injects this callable, mirroring the ``pid_probe`` seam. Fail-soft: any
+    store/parse error ⇒ empty set (the sweep then relies on TTL + zone + escape guards
+    alone, never reclaiming inside ``.dadaia/`` it cannot read).
+    """
+    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+
+    terminal = {LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED}
+    swept_prefixes = tuple(f".dadaia/{zone}/" for zone in ("tmp", "reports", "handoff", "runs"))
+
+    def _provider() -> frozenset[str]:
+        store = build_lifecycle_run_store(workspace_root)
+        run_dir = store.root
+        if not run_dir.is_dir():
+            return frozenset()
+        claims: set[str] = set()
+        for record in sorted(run_dir.glob("*.json")):
+            try:
+                run = store.load(record.stem)
+            except Exception:  # noqa: BLE001 — a single bad record never breaks the sweep.
+                continue
+            if run is None or run.status in terminal:
+                continue
+            for artifact in run.expected_artifacts:
+                ref = artifact.lstrip("/")
+                if ref.startswith(swept_prefixes):
+                    claims.add(ref)
+        return frozenset(claims)
+
+    return _provider
+
+
+def build_retention_sweep(
+    workspace_root: Path,
+    *,
+    now: dt.datetime | None = None,
+    policy: SlopPolicy | None = None,
+) -> RetentionSweep:
+    """Compose the directory-aware retention SWEEP (D5) — the guarded deleter.
+
+    Dry-run by default; deletes only when ``RetentionSweep.sweep(apply=True)`` is called
+    explicitly. The live-claim provider (``_live_lifecycle_claims``) gates the destructive
+    path against in-flight lifecycle runs (D6); the important-ref provider reuses
+    ``LifecycleHygieneService`` so operator-marked reports and current-release evidence are
+    spared. The clock is injectable for hermetic tests.
+    """
+    _guard_initialized(workspace_root)
+    hygiene = LifecycleHygieneService(workspace_root)
+    return RetentionSweep(
+        workspace_root,
+        now=now or dt.datetime.now(tz=dt.UTC),
+        policy=policy or SlopPolicy(),
+        live_claims=_live_lifecycle_claims(workspace_root),
+        important_paths=hygiene.protected_refs,
+    )
+
+
+def build_lifecycle_preflight_service(workspace_root: Path) -> LifecyclePreflightService:
+    """Compose lifecycle preflight service."""
+    _guard_initialized(workspace_root)
+    return LifecyclePreflightService()
+
+
+def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
+    """Compose lifecycle run-state store."""
+    _guard_initialized(workspace_root)
+    return JsonLifecycleRunStore(workspace_root)
+
+
+def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWorkflow:
+    """Compose lifecycle report workflow."""
+    _guard_initialized(workspace_root)
+    return LifecycleReportWorkflow(
+        workspace_root=workspace_root,
+        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
+        hygiene=LifecycleHygieneService(workspace_root),
+        validation=build_reports_validation_service(workspace_root),
+    )
+
+
+def build_lifecycle_phase_workflow(
+    workspace_root: Path,
+    *,
+    runtime_kind: AgentRuntimeKind,
+    cwd: Path | None = None,
+) -> LifecyclePhaseWorkflow:
+    """Compose the single-step lifecycle phase workflow on a selected harness.
+
+    Binds the per-step runtime adapter (via :func:`build_agent_runtime`) to the
+    persistent run store. The chosen ``runtime_kind`` is what makes the harness
+    selectable per verb invocation.
+    """
+    _guard_initialized(workspace_root)
+    return LifecyclePhaseWorkflow(
+        runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root),
+        run_store=build_lifecycle_run_store(workspace_root),
+    )
+
+
+def build_lifecycle_pipeline(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+) -> LifecyclePipeline:
+    """Compose the multi-step lifecycle pipeline with a per-step harness factory.
+
+    The injected ``runtime_factory`` resolves each step's declared ``AgentRuntimeKind`` to
+    its adapter, so a single run can mix harnesses across steps (claude implements, codex
+    reviews, ...). An optional cacheable ``prefix`` (WS-7) is assembled once and reused
+    verbatim by every step.
+    """
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    return LifecyclePipeline(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=lambda kind: build_agent_runtime(kind, cwd=run_cwd),
+        prefix=prefix,
+    )
 
 
 def build_panel_views(

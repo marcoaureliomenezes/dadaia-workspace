@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import re
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -291,32 +293,75 @@ def dcx8_codex_rules_shape(codex_dir: Path) -> list[str]:
 
 
 def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
-    """D-CX-9: generated Codex hooks must invoke the Python governance hooks.
-
-    T-018-17: hook commands are emitted as ``<python> -m dadaia_workspace.hooks.<name>``
-    (cross-platform — the bash ``.sh`` hooks are dead on stock Windows), so the check
-    verifies the Python module references rather than ``.dadaia/scripts/*.sh`` paths.
-    """
+    """D-CX-9: generated Codex hooks must invoke executable wrapper commands."""
     hooks_path = workspace_root / ".codex" / "hooks.json"
     out: list[str] = []
     try:
         hooks = json.loads(hooks_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return ["[error] codex:hooks.json missing or invalid (D-CX-9)"]
-    text = json.dumps(hooks)
-    # T-014-05 merged the standalone sdd_gate + root_whitelist PreToolUse hooks into the
-    # single ``pre_gate`` entrypoint, so the wiring now references pre_gate + sdd_post_gate
-    # + ctx_inject (sdd_gate / root_whitelist are no longer emitted into hooks.json).
-    for module in (
-        "dadaia_workspace.hooks.pre_gate",
-        "dadaia_workspace.hooks.sdd_post_gate",
-        "dadaia_workspace.hooks.ctx_inject",
-    ):
-        if module not in text:
-            out.append(f"[missing] codex:hooks.json command for {module} (D-CX-9)")
-    if "DADAIA_HOOK_OUTPUT=codex-json" not in text:
-        out.append("[missing] codex:hooks.json codex-json prompt output (D-CX-9)")
+
+    expected = {
+        ".dadaia/hooks/codex-pre-gate",
+        ".dadaia/hooks/codex-post-gate",
+        ".dadaia/hooks/codex-ctx-inject",
+        ".dadaia/hooks/codex-ctx-inject-session-start",
+    }
+    commands = set(_codex_hook_commands(hooks))
+    missing = expected - commands
+    for command in sorted(missing):
+        out.append(f"[missing] codex:hooks.json command {command} (D-CX-9)")
+
+    stale = commands - expected
+    for command in sorted(stale):
+        out.append(
+            f"[error] codex:hooks.json command must use .dadaia/hooks wrapper, got "
+            f"{command!r} (D-CX-9)"
+        )
+
+    for command in sorted(commands & expected):
+        wrapper = workspace_root / command
+        if not wrapper.is_file():
+            out.append(f"[missing] codex hook wrapper {command} (D-CX-9)")
+            continue
+        if not os.access(wrapper, os.X_OK):
+            out.append(f"[error] codex hook wrapper not executable {command} (D-CX-9)")
+            continue
+        try:
+            proc = subprocess.run(
+                [str(wrapper)],
+                input='{"session_id":"doctor","tool_name":"Read","tool_input":{}}',
+                capture_output=True,
+                text=True,
+                cwd=workspace_root,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            out.append(f"[error] codex hook wrapper launch failed {command}: {exc} (D-CX-9)")
+            continue
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout).strip().splitlines()
+            suffix = f": {detail[0]}" if detail else ""
+            out.append(
+                f"[error] codex hook wrapper exited {proc.returncode} {command}{suffix} (D-CX-9)"
+            )
     return out
+
+
+def _codex_hook_commands(value: object) -> list[str]:
+    """Collect command strings from a Codex hooks.json structure."""
+    commands: list[str] = []
+    if isinstance(value, dict):
+        command = value.get("command")
+        if isinstance(command, str):
+            commands.append(command)
+        for child in value.values():
+            commands.extend(_codex_hook_commands(child))
+    elif isinstance(value, list):
+        for item in value:
+            commands.extend(_codex_hook_commands(item))
+    return commands
 
 
 def dcx10_codex_agent_boundaries(codex_dir: Path) -> list[str]:

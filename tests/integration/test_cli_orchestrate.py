@@ -1,4 +1,10 @@
-"""dadaia orchestrate CLI — happy path + error paths via Typer test runner."""
+"""dadaia orchestrate CLI — read-only surface + honest no-op run/resume via Typer runner.
+
+Workflow execution moved to the lifecycle engine (WS-3); ``orchestrate run``/``resume``
+no longer dispatch and create no run state — they print the "moved to lifecycle" notice
+and exit 0 so the panel workflow launcher (which spawns
+``python -m dadaia_workspace orchestrate <workflow>``) terminates cleanly.
+"""
 
 import json
 from pathlib import Path
@@ -22,10 +28,6 @@ def _init_workspace(workspace: Path) -> None:
     FileSystemPublicAssetManager().stage(workspace)
 
 
-def _bind_context(monkeypatch, name: str = "test-ctx") -> None:
-    monkeypatch.setenv("DADAIA_CONTEXT", name)
-
-
 def test_orchestrate_list_returns_seed_workflows(tmp_path: Path, monkeypatch) -> None:
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -35,79 +37,44 @@ def test_orchestrate_list_returns_seed_workflows(tmp_path: Path, monkeypatch) ->
     assert "release-ship" in result.output
 
 
-def test_orchestrate_run_rejects_without_context(tmp_path: Path, monkeypatch) -> None:
+def test_orchestrate_run_is_honest_noop_and_exits_clean(tmp_path: Path, monkeypatch) -> None:
+    """`orchestrate run` dispatches nothing, emits the moved-to-lifecycle notice, exits 0.
+
+    No context is needed and no run state is created — this guarantees the panel
+    workflow launcher (which spawns `orchestrate <workflow>`) always exits cleanly.
+    """
     _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
-    result = _runner.invoke(
-        app,
-        ["orchestrate", "run", "audit-fanout", "--runtime", "cli"],
-    )
-    assert result.exit_code != 0
-
-
-def test_orchestrate_run_happy_path(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _bind_context(monkeypatch)
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(
-        app,
-        [
-            "orchestrate",
-            "run",
-            "audit-fanout",
-            "--runtime",
-            "cli",
-            "--input",
-            "context=test-ctx",
-        ],
-    )
+    result = _runner.invoke(app, ["orchestrate", "run", "audit-fanout"])
     assert result.exit_code == 0, result.output
-    assert "started" in result.output
-    runs_dir = tmp_path / ".dadaia" / "runs"
-    assert runs_dir.exists()
-    assert any(runs_dir.iterdir())
-
-
-def test_orchestrate_dry_run_does_not_create_state(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _bind_context(monkeypatch)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(
-        app,
-        [
-            "orchestrate",
-            "run",
-            "audit-fanout",
-            "--runtime",
-            "cli",
-            "--input",
-            "context=test-ctx",
-            "--dry-run",
-        ],
-    )
-    assert result.exit_code == 0
-    assert "dry-run" in result.output
+    assert "lifecycle" in result.output
+    assert "started" not in result.output
     assert not (tmp_path / ".dadaia" / "runs").exists()
 
 
-def test_input_kv_parsing_error(tmp_path: Path, monkeypatch) -> None:
+def test_orchestrate_run_unknown_workflow_errors(tmp_path: Path, monkeypatch) -> None:
     _init_workspace(tmp_path)
-    _bind_context(monkeypatch)
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(
-        app,
-        [
-            "orchestrate",
-            "run",
-            "audit-fanout",
-            "--runtime",
-            "cli",
-            "--input",
-            "no-equals-sign",
-        ],
-    )
+    result = _runner.invoke(app, ["orchestrate", "run", "no-such-workflow"])
     assert result.exit_code != 0
+
+
+def test_orchestrate_resume_is_honest_noop_and_exits_clean(tmp_path: Path, monkeypatch) -> None:
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = _runner.invoke(app, ["orchestrate", "resume", "any-run-id"])
+    assert result.exit_code == 0, result.output
+    assert "lifecycle" in result.output
+
+
+def test_orchestrate_dry_run_validates_only(tmp_path: Path, monkeypatch) -> None:
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = _runner.invoke(app, ["orchestrate", "run", "audit-fanout", "--dry-run"])
+    assert result.exit_code == 0
+    assert "dry-run" in result.output
+    assert not (tmp_path / ".dadaia" / "runs").exists()
 
 
 def test_orchestrate_show_json_output(tmp_path: Path, monkeypatch) -> None:
@@ -125,31 +92,6 @@ def test_orchestrate_list_on_uninitialized_workspace_errors(tmp_path: Path, monk
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["orchestrate", "list"])
     assert result.exit_code != 0
-
-
-def test_orchestrate_status_all_json_output(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _bind_context(monkeypatch)
-    monkeypatch.chdir(tmp_path)
-    # Start a run first
-    _runner.invoke(
-        app,
-        [
-            "orchestrate",
-            "run",
-            "audit-fanout",
-            "--runtime",
-            "cli",
-            "--input",
-            "context=test-ctx",
-        ],
-    )
-    result = _runner.invoke(app, ["orchestrate", "status", "--json"])
-    assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
-    assert isinstance(data, list)
-    assert len(data) >= 1
-    assert "run_id" in data[0]
 
 
 def test_orchestrate_status_no_runs_json(tmp_path: Path, monkeypatch) -> None:

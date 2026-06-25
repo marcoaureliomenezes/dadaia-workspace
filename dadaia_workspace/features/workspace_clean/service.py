@@ -3,16 +3,16 @@
 Implements ``dadaia clean`` (T-016-Z03):
 
   - Dry-run by default: lists candidates without deleting.
-  - Declarative per-zone TTL for .dadaia/tmp/, .dadaia/reports/, .dadaia/dev-report/.
+  - Declarative per-zone TTL for .dadaia/tmp/, .dadaia/reports/, .dadaia/handoff/.
   - Safe-delete: never touches files protected by root_exceptions.txt; never
     deletes anything outside .dadaia/.
   - Logs every reclaim in the returned CleanResult.
 
 Zones and default TTLs
 ----------------------
-  tmp/          2 days — highly ephemeral agent scratch files
-  reports/      7 days — human-readable HTML reports persist longer
-  dev-report/   3 days — dev/debug reports kept briefly
+  tmp/          24 hours — highly ephemeral agent scratch files
+  reports/      48 hours — human-readable HTML reports
+  handoff/      24 hours — machine-readable handoff artifacts
 
 The TTLs are applied per-file using the file's mtime.  Empty directories
 created during scanning are left in place (only files are reclaimed here; the
@@ -27,16 +27,19 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dadaia_workspace.core.models.hygiene import SlopPolicy
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Default per-zone TTLs
 # ---------------------------------------------------------------------------
 
+_POLICY = SlopPolicy()
 _ZONE_TTLS: dict[str, dt.timedelta] = {
-    "tmp": dt.timedelta(days=2),
-    "reports": dt.timedelta(days=7),
-    "dev-report": dt.timedelta(days=3),
+    "tmp": dt.timedelta(seconds=_POLICY.tmp_ttl_seconds),
+    "reports": dt.timedelta(seconds=_POLICY.reports_ttl_seconds),
+    "handoff": dt.timedelta(seconds=_POLICY.handoff_ttl_seconds),
 }
 
 

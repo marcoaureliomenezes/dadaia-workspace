@@ -24,6 +24,19 @@ from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api import render_api_agents_canonical
 
 
+def _days_ago_iso(days: int) -> str:
+    """ISO-8601 UTC timestamp ``days`` in the past, relative to now.
+
+    Status windows are computed against ``datetime.now(UTC)`` in production
+    (see ``api.py``: ``cutoff = now - timedelta(days=...)``), so fixtures must
+    express activity relative to the current time. Absolute timestamps are
+    time-bombs that silently flip active->inactive as wall-clock time passes.
+    """
+    import datetime
+
+    return (datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=days)).isoformat()
+
+
 class FakeServerRegistryService:
     def list_entries(self, project=None, include_stale=True):
         return []
@@ -223,22 +236,22 @@ class TestDefaultWindow:
         assert data["status_window_days"] == 30
 
     @pytest.mark.parametrize(
-        ("last_activity_at", "expected_status"),
+        ("days_ago", "expected_status"),
         [
-            ("2026-05-17T10:00:00Z", "active"),
-            ("2026-03-18T10:00:00Z", "inactive"),
+            (10, "active"),  # within the 30-day window
+            (60, "inactive"),  # outside the 30-day window
         ],
     )
     def test_default_window_status(
         self,
-        last_activity_at: str,
+        days_ago: int,
         expected_status: str,
     ) -> None:
         """The default status window marks recent telemetry active and old telemetry inactive."""
         agents = [_make_dto()]
         summary = _make_agent_summary(
             agent_id="software-engineer",
-            last_activity_at=last_activity_at,
+            last_activity_at=_days_ago_iso(days_ago),
         )
         tel = FakeTelemetryService(agent_summaries=[summary])
         svc = _make_service(agents=agents, telemetry_stub=tel)
@@ -257,10 +270,10 @@ class TestCustomWindow:
     def test_custom_window_changes_active_inactive(self) -> None:
         """Agent active 60 days ago is inactive with window=30 but active with window=90."""
         agents = [_make_dto()]
-        # last_activity_at 60 days ago
+        # last_activity_at 60 days ago (relative to now, not a fixed date)
         summary = _make_agent_summary(
             agent_id="software-engineer",
-            last_activity_at="2026-03-18T10:00:00Z",
+            last_activity_at=_days_ago_iso(60),
         )
         tel = FakeTelemetryService(agent_summaries=[summary])
         svc = _make_service(agents=agents, telemetry_stub=tel)

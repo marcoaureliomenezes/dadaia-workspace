@@ -1,6 +1,12 @@
-"""dadaia orchestrate subcommands."""
+"""dadaia orchestrate subcommands.
 
-import os
+Read-only catalog/run-status surface over the markdown workflow definitions plus
+reference-only ``run``/``resume`` shims. Workflow *execution* has moved to the
+lifecycle engine (``dadaia lifecycle``); the ``.workflow.md`` files are reference
+documents only. ``run``/``resume`` keep working (and exit 0) so the panel workflow
+launcher — which spawns ``python -m dadaia_workspace orchestrate <workflow>`` — still
+terminates cleanly.
+"""
 
 import typer
 from rich.console import Console
@@ -14,37 +20,22 @@ from dadaia_workspace.core.exceptions import (
     WorkflowSchemaError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.orchestration.service import OrchestrationService
 
-app = typer.Typer(help="Run and manage multi-agent workflows.")
+app = typer.Typer(help="Inspect multi-agent workflow reference docs (execution: dadaia lifecycle).")
 console = Console()
 err_console = Console(stderr=True)
 
 
-def _service(runtime: str | None = None) -> OrchestrationService:
+def _service() -> OrchestrationService:
     try:
-        return container.build_orchestration_service(resolve_workspace_root(), runtime=runtime)
+        return container.build_orchestration_service(resolve_workspace_root())
     except WorkspaceNotInitializedError:
         err_console.print(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
         )
         raise typer.Exit(1) from None
-
-
-def _resolve_context(explicit: str | None) -> str:
-    return resolve_bound_context_name(explicit) or ""
-
-
-def _parse_inputs(items: list[str]) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for item in items:
-        if "=" not in item:
-            raise typer.BadParameter(f"--input value '{item}' must be in 'key=value' form")
-        key, _, value = item.partition("=")
-        out[key.strip()] = value.strip()
-    return out
 
 
 @app.command(name="list")
@@ -138,26 +129,20 @@ def run(
     runtime: str = typer.Option(
         "",
         "--runtime",
-        help="claude | opencode | codex | cli (default: env DADAIA_AGENT_RUNTIME or cli)",
+        help="(retained for compatibility; inert — execution moved to `dadaia lifecycle`)",
     ),
-    input_kv: list[str] = typer.Option([], "--input", help="key=value workflow inputs"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Validate without persisting state"),
+    input_kv: list[str] = typer.Option([], "--input", help="(retained; inert)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate the workflow exists only"),
 ) -> None:
-    """Start a new run of WORKFLOW under the active context."""
-    ctx = _resolve_context(context or None)
-    if not ctx:
-        err_console.print(
-            "[red]Error:[/red] no active context. "
-            "Run [bold]eval $(dadaia context bind <name> --mode read)[/bold] or pass --context."
-        )
-        raise typer.Exit(2)
-    service = _service(runtime or None)
-    runtime_label = runtime or os.environ.get("DADAIA_AGENT_RUNTIME") or "cli"
-    try:
-        inputs = _parse_inputs(input_kv)
-    except typer.BadParameter as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(2) from None
+    """Reference-only: workflow execution has moved to ``dadaia lifecycle``.
+
+    ``orchestrate run`` no longer dispatches any agent — the ``.workflow.md`` files are
+    reference documents only. This command validates the workflow name, prints the
+    "moved to lifecycle" notice, and exits 0 so callers (including the panel workflow
+    launcher) terminate cleanly.
+    """
+    _ = (context, runtime, input_kv)  # accepted for compatibility; inert.
+    service = _service()
     if dry_run:
         try:
             service.show_workflow(workflow)
@@ -167,21 +152,11 @@ def run(
         console.print("[green]✓[/green] dry-run validated")
         return
     try:
-        manifest, invocations = service.start_run(
-            workflow, context=ctx, runtime=runtime_label, inputs=inputs
-        )
+        outcome = service.start_run(workflow)
     except (WorkflowNotFoundError, WorkflowSchemaError, OrchestrationUnsupportedError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(2) from None
-    console.print(
-        f"[green]✓[/green] run [bold]{manifest.run_id}[/bold] started "
-        f"(workflow={manifest.workflow_name}, runtime={runtime_label}, context={ctx})"
-    )
-    if invocations:
-        console.print("\nNext invocations prepared:")
-        for inv in invocations:
-            console.print(f"  - {inv.invocation_path}")
-        console.print(f"\nWhen done, run [bold]dadaia orchestrate resume {manifest.run_id}[/bold].")
+    console.print(f"[yellow]•[/yellow] {outcome.message}")
 
 
 @app.command()
@@ -271,20 +246,8 @@ def status(
 
 
 @app.command()
-def resume(run_id: str = typer.Argument(..., help="Run id to resume")) -> None:
-    """Resume a run paused on a gate or recover from failure."""
+def resume(run_id: str = typer.Argument(..., help="Run id (retained for compatibility)")) -> None:
+    """Reference-only: there is nothing to resume — execution moved to ``dadaia lifecycle``."""
     service = _service()
-    try:
-        manifest, invocations = service.resume_run(run_id)
-    except RunNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(2) from None
-    if manifest.status.value == "completed" and not invocations:
-        console.print("run já concluído")
-        return
-    console.print(
-        f"[green]✓[/green] resumed (status={manifest.status.value}, "
-        f"new_invocations={len(invocations)})"
-    )
-    for inv in invocations:
-        console.print(f"  - {inv.invocation_path}")
+    outcome = service.resume_run(run_id)
+    console.print(f"[yellow]•[/yellow] {outcome.message}")

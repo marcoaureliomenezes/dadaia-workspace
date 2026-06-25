@@ -2,7 +2,7 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: Layer rules, 9+3 agent topology, merged pre_gate hook + git chokepoints, context-relative gate taxonomy, TTL+PID-veto lease, 3-channel comms, projection chain.
+tldr: Layer rules, lifecycle spine, agent topology, merged pre_gate hook, git chokepoints, TTL+PID-veto lease, and projection chain.
 summary: Defines the three-ring architecture (cli/features/infrastructure), dependency
   rules, 9-core agent roster with coordinator+sub-agent topology, the concurrency
   kernel (merged pre_gate PreToolUse entrypoint; context-relative path classifier;
@@ -17,16 +17,16 @@ tags:
 - adr
 - agents
 agent_tier: self-pull
-token_estimate: 7000
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+token_estimate: 8050
+last_updated: '2026-06-25'
+release_origin: v0.1.21
 ---
 
 ## Visão geral
 
 Arquitetura em três anéis: (1) CLI thin em `dadaia_workspace/cli/`; (2) features isoladas em `dadaia_workspace/features/<name>/` cada uma com seu service/doctor/etc; (3) infrastructure em `dadaia_workspace/infrastructure/` (Git, JSON stores, public asset projection). Núcleo em `dadaia_workspace/core/` mantém models, protocols e exceptions — sem I/O. Dependency injection via `dadaia_workspace/container.py`.
 
-Asset chain canonical → projeções: a fonte de cada agente, skill, rule, command, script, template, workflow vive em `dadaia_workspace/public/<type>/`; staging em `.dadaia/agentic/<type>/` (snapshots imutáveis com manifest.json); instalação espalha por `.claude/`, `.codex/`, `.opencode/`, `.agents/` seguindo regras por tool.
+Asset chain canonical → projeções: a fonte de cada agente, skill, rule, command, script, template, workflow vive em `dadaia_workspace/public/<type>/`; staging em `.dadaia/agentic/<type>/` (snapshots imutáveis com manifest.json); instalação espalha por `.claude/`, `.codex/`, `.opencode/`, `.pi/` (Layer-1 PI, target `pi`, mirror estrutural de OpenCode em `public_assets.py`), `.agents/` seguindo regras por tool.
 
 ## O Spec Context Project (conceito central)
 
@@ -41,9 +41,9 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 
 ## Camadas
 
-**cli/** — typer app + 21 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`. Thin wrapper sobre features; sem business logic.
+**cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`, `lifecycle`. Thin wrapper sobre features; sem business logic.
 
-**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `migrate`, `orchestration`, `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
+**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
 
 **panel — arquitetura HTTP interna (pós R5):**
 
@@ -64,8 +64,9 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 - `core/exceptions.py` — `PlatformSecurityError(DadaiaError)` e `PlatformCapabilityError(DadaiaError)` com atributos `feature_name: str` e `platform: str`.
 - `core/protocols/` — OS-sensitive ports (`file_lock`, `telemetry_lock`, `platform_services`, `shutdown_handler`, `process_ancestry` — `ProcessAncestry`, probe read-only de ancestralidade de processo com adapters Linux `/proc` walk / macOS `ps -o ppid=` via ProcessRunner / Windows Toolhelp32 read-only, NUNCA `os.kill`; consumido pelo pre-commit lease gate e pelo `context release` default-flow) + domain protocols for DI, incluindo `process_runner` (`ProcessRunner`/`ProcessResult` — seam de execução de subprocess para features; nenhuma feature importa `subprocess` diretamente).
 - `core/kernel_tunables.py` — single home das constantes do kernel de concorrência (lease TTL, GC TTLs, CAS retries, sentinel TTL, throttle do reconciler); constantes puras, zero I/O; leaf no import-linter.
+- `core/scope_match.py` — classifier de path puro, compartilhado pelo Ring-2 do `LifecycleAgentRunner` e pelo Ring-1 write-permission decider do `ClaudeSdkAdapter` (one classifier, two boundaries). Vive em `core/` (não em `features/`) para que `infrastructure/` possa importá-lo sem violar o layering — correção da quebra `infrastructure → features` apanhada pelo `lint-imports`.
 
-**infrastructure/** — implementações concretas dos protocols: `git_subprocess`, `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `claude_agent_dispatcher`, `cli_agent_dispatcher`, `excel_reader`, `python_env`, `subprocess_runner` (`SubprocessProcessRunner` — implementação production do `ProcessRunner`; consumida por `features/import_`, `features/ci_preflight`, `features/specs/doctor` e `features/server_registry` via Protocol/DI; contrato import-linter `features-no-subprocess` em `setup.cfg` proíbe `features → subprocess`). Toda I/O fica aqui. Adaptadores de plataforma: `file_lock_posix`, `file_lock_windows`, `telemetry_lock_posix`, `telemetry_lock_windows`, `file_permission_posix`, `file_permission_windows`, `process_probe_adapter`, `signal_shutdown_posix`, `signal_shutdown_windows`.
+**infrastructure/** — implementações concretas dos protocols: `git_subprocess` (inclui `GitSubprocessClient.diff_name_only(path)` — lista de `git diff --name-only` working-tree+staged+untracked, fonte do Ring-2 `changed_paths` do PI), `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, os agent-runtime adapters por trás de `AgentRuntimePort` (`codex_runtime.CodexExecAdapter`, `opencode_runtime.OpenCodeAdapter` stub, `claude_sdk_runtime.ClaudeSdkAdapter` com Ring-1 write boundary via `core/scope_match` + transport `query_fn` injetável; `claude-agent-sdk` é extra opcional lazy-imported; `pi_runtime.PiHeadlessAdapter` + `PiHeadlessConfig` — twin estrutural do `CodexExecAdapter`, dirige `pi --mode json` via runner subprocess injetável, sem PI client em module-load, Ring-2 `changed_paths` de git-diff), `excel_reader`, `python_env`, `subprocess_runner` (`SubprocessProcessRunner` — implementação production do `ProcessRunner`; consumida por `features/import_`, `features/ci_preflight`, `features/specs/doctor` e `features/server_registry` via Protocol/DI; contrato import-linter `features-no-subprocess` em `setup.cfg` proíbe `features → subprocess`). Toda I/O fica aqui. Adaptadores de plataforma: `file_lock_posix`, `file_lock_windows`, `telemetry_lock_posix`, `telemetry_lock_windows`, `file_permission_posix`, `file_permission_windows`, `process_probe_adapter`, `signal_shutdown_posix`, `signal_shutdown_windows`.
 
 **container.py** — sole composition root. Lê `PLATFORM`, seleciona adapters (POSIX vs Windows) e injeta via `build_*_service(workspace_root)` factories. CLI commands chamam o container para obter serviços. `container.py` é o único local onde `PLATFORM` determina qual adapter concreto é instanciado.
 
@@ -471,7 +472,7 @@ Locais canônicos de estado em disco e seu propósito:
 
 ## Memory injection subsystem
 
-O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto. Opera em três runtimes (Claude Code, OpenCode, Codex).
+O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto. Opera em três runtimes de entrada — Layer 1 (Claude Code, OpenCode, Codex); o quarto harness PI (`pi`) é um worker de Layer 2 headless, sem hook de entrada, e por isso não participa desta injeção up-tree de Layer 1 — ver "Two-layer agentic model" abaixo.
 
 ### Lean payload
 
@@ -534,14 +535,98 @@ Invocado por doctor check `LINT-1`. Exit 0 = all valid; exit 1 = ao menos um ERR
 
 ## Multi-harness runtime parity (constitution §4)
 
+### Two-layer agentic model
+
+dadaia-workspace runs agents at **two distinct layers**, and "harness" means a
+different thing at each. Conflating them is the source of most parity confusion.
+
+```mermaid
+flowchart TB
+    OP(["Operator no terminal"])
+    subgraph L1["LAYER 1 — entry harness (terminal)"]
+        direction LR
+        CC["claude"]:::h
+        CX["codex"]:::h
+        OC["opencode"]:::h
+        PIe["pi"]:::h
+    end
+    GOV["Governança Layer 1:<br/>AGENTS.md up-tree + projeções .claude/ .codex/ .opencode/ .pi/<br/>PreToolUse pre_gate (onde suportado) + git chokepoints"]
+    CLI["dadaia lifecycle &lt;verb&gt; --harness &lt;x&gt;<br/>(workflow procedural Python)"]
+    subgraph L2["LAYER 2 — worker harness (AgentRuntimePort)"]
+        direction LR
+        FK["FAKE<br/>in-process"]:::w
+        CXk["CODEX_EXEC<br/>codex exec"]:::w
+        CLk["CLAUDE_SDK<br/>SDK · Ring-1"]:::w
+        OCk["OPENCODE_RUN<br/>opencode run"]:::w
+        PIk["PI_HEADLESS<br/>pi --mode json"]:::w
+    end
+    OP --> L1
+    L1 --> GOV
+    L1 -->|"o harness invoca a CLI dadaia"| CLI
+    CLI --> L2
+    L2 -->|"Ring-2: git-diff changed_paths + git chokepoints"| OUT(["produção: código · specs · memory"])
+    classDef h fill:#1f6feb,color:#fff,stroke:#1f6feb;
+    classDef w fill:#238636,color:#fff,stroke:#238636;
+```
+
+A mesma palavra "harness" nomeia coisas diferentes em cada layer: no Layer 1 é o agente
+de terminal que o operador inicia; no Layer 2 é um worker `AgentRuntimeKind` que o engine
+dirige por step. PI aparece nos dois (entrada `.pi/` + worker `PI_HEADLESS`); FAKE existe
+só no Layer 2.
+
+- **Layer 1 — entry harness (terminal).** The AI coding harness the operator launches
+  in the workspace terminal: `claude`, `codex`, `opencode`, and (post-v0.1.18) `pi`.
+  Governance at this layer is `AGENTS.md` read up-tree natively + the projected `.X/`
+  asset trees (`.claude/`, `.codex/`, `.opencode/`, `.pi/`) staged from
+  `dadaia_workspace/public/` by `dadaia public install`. Deterministic enforcement at
+  Layer 1 is per-entry-harness (PreToolUse hooks where supported + git chokepoints) —
+  the table immediately below is the **Layer-1 entry-harness** enforcement parity, not
+  the worker-runtime set.
+- **Layer 2 — worker harness (inside the lifecycle engine).** The bounded agent workers
+  that `dadaia lifecycle` drives per step behind `AgentRuntimePort`
+  (`container.build_agent_runtime(kind)`), one harness selectable per step via
+  `--harness` / `--step-harness`. There are **five `AgentRuntimeKind`s**
+  (`core/models/lifecycle.py`): `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`,
+  `PI_HEADLESS`. The transport differs per harness: **SDK** (Claude — in-process
+  `claude_sdk_runtime.py`, the only adapter with a real Ring-1 write boundary via
+  `core/scope_match`), **CLI-headless** (Codex `codex exec`, OpenCode `opencode run`,
+  PI `pi --mode json` — subprocess-backed, one-shot per step), and **RPC** (designed,
+  not yet shipped). The factory is total over the enum; `core/`/`features/` stay
+  provider-agnostic. See [[lifecycle-foundation]] for the engine spine.
+
+A harness can exist at one layer and not the other. PI ships as a real **Layer-2**
+worker (`PiHeadlessAdapter`, wired in `container.py`, Ring-2 only) and a **Layer-1** `.pi/`
+projection that, post-v0.1.18, points at the law and, post-v0.1.21 (WS-PI-4), carries a
+real **Ring-1** SDD-gate extension (`.pi/extensions/dadaia-sdd-gate.ts`): PI's CLI exposes
+a genuine pre-disk hook (an extension `tool_call` handler can block a write before it
+executes), and the extension delegates write/edit to the same Python `pre_gate` the other
+harnesses use. The block is **active once the operator grants `.pi/` trust** (the assets
+are post-trust executable). Note the two PI layers differ: the Layer-2 `PI_HEADLESS`
+worker keeps Ring-2 + chokepoints; the Layer-1 interactive `pi` gains the post-trust Ring-1.
+
+### Layer-1 entry-harness enforcement parity
+
 | Runtime | PreToolUse hooks (`pre_gate`) | Git chokepoints | Postura |
 |---------|-------------------------------|-----------------|---------|
 | Claude Code | sim — `python -m dadaia_workspace.hooks.pre_gate` (matcher `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash`) | sim | determinístico: hooks + chokepoints |
 | Codex interativo (TUI) | sim — `pre_gate` em `.codex/hooks.json` (matcher `^(apply_patch\|Edit\|Write\|Bash)$`) | sim | determinístico: hooks + chokepoints |
 | Codex headless (`codex exec`) | **não — exec não dispara hooks** (defeito upstream codex-cli 0.139.0, live-verificado) | sim | **chokepoints only** |
 | OpenCode | plugins `.ts` chamam hooks Python via subprocess (venv-path resolution `.dadaia/.venv/bin/python` → `Scripts/python.exe` → `python`); `dadaia public doctor` reporta `[unsupported]` para PostToolUse opencode — esperado | sim | advisory + chokepoint-protected (ADR-G3) |
+| PI (`pi`) | **sim (post-trust)** — `.pi/extensions/dadaia-sdd-gate.ts` `tool_call` hook mapeia write→Write/edit→Edit e delega ao `pre_gate` (WS-PI-4); ativo quando o operador concede trust a `.pi/` | sim | determinístico post-trust + chokepoints; `.pi/**` é post-trust executable |
 
 Codex-specific behavior é expresso em termos Codex-nativos: `AGENTS.md` context, `.codex/config.toml`, `.codex/skills`, hooks onde suportados, e deferred tool discovery para multi-agent capability.
+
+### Layer-2 worker-runtime posture (`AgentRuntimePort`)
+
+| AgentRuntimeKind | Adapter | Transport | Ring-1 write boundary |
+|------------------|---------|-----------|------------------------|
+| `FAKE` | `fake_runtime.py` | in-process | n/a (test/offline) |
+| `CODEX_EXEC` | `codex_runtime.py` | CLI-headless (`codex exec`) | não |
+| `CLAUDE_SDK` | `claude_sdk_runtime.py` | SDK (in-process) | **sim** — `core/scope_match` |
+| `OPENCODE_RUN` | `opencode_runtime.py` | CLI-headless (`opencode run`) | não (stub) |
+| `PI_HEADLESS` | `pi_runtime.py` | CLI-headless (`pi --mode json`) | não |
+
+Apenas `CLAUDE_SDK` enforça hoje um Ring-1 real; os demais workers são one-shot por step. Transporte RPC (`pi --mode rpc`, ponte Python↔Node) é desenhado mas não shipado (engine é one-shot-per-step). Selecionável por step via `--harness`/`--step-harness` (`cli/commands/lifecycle.py` `_HARNESS_KINDS`).
 
 **path-scope (disciplina, não gate)** — `paths.write_allowlist` do frontmatter dos agentes é **convenção de instrução de agente** (workspace-protocol §6), não enforcement do gate: nenhum hook conhece a persona do processo que escreve. O que o gate PreToolUse enforça deterministicamente é path-class × lease × fase × modo sobre os write tools. A divisão de superfície (`ai-engineer` dono de `dadaia_workspace/public/{skills,rules,workflows,commands,agents}/**`; `software-engineer` dono do código Python, incluindo `dadaia_workspace/hooks/*.py`) é mantida por disciplina de persona e review.
 

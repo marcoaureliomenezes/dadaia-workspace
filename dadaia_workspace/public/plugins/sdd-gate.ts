@@ -3,8 +3,11 @@
 // Mirrors the Claude Code / Codex PreToolUse hook: intercepts write-like tool calls and
 // delegates the allow/block decision to the Python governance hook
 // `python -m dadaia_workspace.hooks.sdd_gate` — the single cross-runtime source of truth
-// for SDD enforcement (Claude Code, Codex, OpenCode). The Python hook itself delegates to
-// `gate_policy.evaluate()` / `gate_policy.classify_path()`, so policy is never re-derived.
+// for SDD enforcement across the PreToolUse-capable Layer-1 entry harnesses (Claude Code,
+// Codex, OpenCode). PI is a 4th Layer-1 entry harness but exposes no pre-disk hook, so it
+// has no PreToolUse enforcement here — it is advisory + git-chokepoint-protected
+// (constitution §8). The Python hook itself delegates to `gate_policy.evaluate()` /
+// `gate_policy.classify_path()`, so policy is never re-derived.
 //
 // ADR-7 (T-018-19): this plugin no longer shells out to `bash <script>.sh`. The Python
 // venv binary is resolved with NO bash dependency:

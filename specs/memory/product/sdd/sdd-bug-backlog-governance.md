@@ -2,17 +2,16 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: >-
-  Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless
-  subsumed, grill mandatório; push gated por security APPROVE; PM curates backlog.
+tldr: Bugs+backlog → releases with mandatory grill, bug disposition, lifecycle preflight, blocked/resume, semantic gates, and security-gated push.
 summary: >-
   Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill),
   o segment model alpha-N/rc-N (estrutura de folders, ADR-1..5), a cadência de
-  revisão pós-G6: push gated mecanicamente por security-reviewer APPROVE
-  (metrics.commit_sha por sha pushed; trio-at-rc-push abolido; qa-per-task-group
-  e code-review-at-PR são disciplina PM até o gate ladder completo em v0.1.15),
-  pre-push CI gate, and backlog-ownership as a PM coordination convention (NOT
-  gate-enforced since 0.1.7 rc-3; backlog is ADDITIVE-allow).
+  revisão atual: push gated mecanicamente por security-reviewer APPROVE
+  (metrics.commit_sha por sha pushed), lifecycle
+  foundation command surface for typed preflight/blocked/resume and semantic QA,
+  security, and code-review handoff validation, pre-push CI gate, and
+  backlog-ownership as a PM coordination convention (not gate-enforced;
+  backlog is ADDITIVE-allow).
 tags:
   - sdd
   - governance
@@ -22,9 +21,9 @@ tags:
   - alpha-rc-model
   - backlog-ownership
 agent_tier: self-pull
-token_estimate: 1683
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+token_estimate: 1470
+last_updated: '2026-06-20'
+release_origin: v0.1.15
 ---
 
 Skill: `dadaia-release-definition` · Rule: `release-governance.md` (always-on) · Rule: `backlog-ownership.md` (always-on, D5) · ADRs: ADR-1..5 in `specs/releases/v0.1.5/SPEC.md §8`
@@ -32,10 +31,9 @@ Skill: `dadaia-release-definition` · Rule: `release-governance.md` (always-on) 
 ## Propósito
 
 Define o ciclo completo de **como bugs e backlog viram releases** e **como releases
-maturam e são revisadas** no dadaia-workspace. Antes desta release (v0.1.5), não havia
-regra que governasse quem pega quais bugs/backlog, nem como o processo de maturação
-(implementação → revisão → ship) se estruturava. Isso produziu colisões de versão
-(dois `v0.1.4.3`), releases empurradas com CI vermelho, e fastlanes sem auditoria.
+maturam e são revisadas** no dadaia-workspace. O contrato canônico exige intake
+sanitizado, pick explícito, grill obrigatório antes da SPEC, release rastreável,
+gates semânticos por etapa e push bloqueado mecanicamente por security review.
 
 A governança tem três pilares:
 1. **Bug/Backlog → Release** — protocolo formal para transformar itens dos ficheiros
@@ -43,16 +41,13 @@ A governança tem três pilares:
 2. **Modelo de maturação** — o modelo `alpha-N → rc-N` que substitui o anti-padrão de
    4-segmentos (`v0.1.4.1`, `v0.1.4.2`, …) por uma estrutura onde cada release cresce
    dentro de um folder `v<M>.<m>.<p>/` com segmentos ordenados.
-3. **Backlog-ownership como convenção de coordenação (D5; gate removido em 0.1.7 rc-3)** —
+3. **Backlog-ownership como convenção de coordenação** —
    `project-manager` é o **curador/coordenador** do `specs/backlog/**`; os demais agentes
    leem livremente e roteiam mudanças via PM por disciplina; `product-engineer` consome
    backlog para criar release specs. **Não há gate** sobre backlog: `specs/backlog/**` é um
-   caminho ADDITIVE que sempre flui (como `bugs/` e `audits/`). O hard PreToolUse gate
-   original (v0.1.5-rc-1) foi **removido em 0.1.7 rc-3**: era uma trava sem chave — nenhum
-   harness consegue afirmar a persona de um agente ao hook (env só do processo-harness; o
-   ponteiro `.persona` nunca era escrito por CLI; o agente escrevê-lo é forgery, bloqueado
-   por PROTECTED). A trava bloqueava o próprio dono legítimo em todos os harnesses (Codex +
-   Claude). Enforcement agora é por convenção:
+   caminho ADDITIVE que sempre flui (como `bugs/` e `audits/`). O hook não usa persona como
+   autoridade para ownership porque nenhum harness consegue provar identidade de agente ao
+   gate de forma confiável; enforcement é por convenção e por workflows:
    - Regra always-on `backlog-ownership.md` que declara a curadoria do PM (não-gate).
    - **Única trava determinística do produto:** o lease single-session por Spec Context
      (release-definition / implementation+review). Nenhum workflow é jamais lock-blocked por
@@ -123,13 +118,12 @@ O scaffolder cria segmentos via:
 - `dadaia specs release open v<x>` → cria folder + `alpha-1` + atualiza ACTIVE.
 - `dadaia specs segment open <alpha-N|rc-N>` → abre próximo segmento.
 
-### Parte 3 — Cadência de revisão (G6 as amended, v0.1.14)
+### Parte 3 — Cadência de revisão e lifecycle foundation
 
 Uma branch única `feature/{version}` por release (ex: `feature/v0.1.14`). Segmentos
 alpha **nunca** criam sub-branches.
 
-O modelo **alpha=qa-only / trio-at-rc-push foi abolido** (governance grill ADR-2/ADR-9;
-G6 amended 2026-06-12). A cadência vigente:
+Cadência vigente:
 
 - **Commits** ficam review-unblocked (lease-only via o pre-commit lease gate) — o inner
   loop TDD tem zero fricção; commits nunca são review-blocked.
@@ -137,22 +131,26 @@ G6 amended 2026-06-12). A cadência vigente:
   `security-reviewer` com `"verdict": "APPROVED"` cujo `metrics.commit_sha` seja igual a
   cada sha pushed (ref lines do stdin; APPROVE stale não passa; deleções/tag-only
   passam) — ver [[sdd-gate-v3]].
-- **qa-per-task-group-commit** e **code-review-at-PR** são disciplina de coordenação do
-  PM nesta release; a codificação do gate ladder completo (qa→commit, code-review→PR) é
-  escopo de v0.1.15 (`sdd-governance-v2-agents-lifecycle`).
+- **qa-per-task-group-commit** e **code-review-at-PR** são validados por semantic gates
+  em `features/lifecycle/gates.py`: os handoffs precisam casar agent, context,
+  release, verdict, commit/task group, age, artifact hash, and severity policy. O
+  chokepoint mecânico que bloqueia push continua sendo o pre-push security verdict
+  gate; QA/code-review são lifecycle gates consumidos pelos workflows Python.
+- **Blocked/resume:** quando Codex não pode executar uma ação externa (por exemplo
+  push com approvals disabled), `dadaia lifecycle preflight` retorna BLOCKED com
+  handoff válido, comando exato para o operador, e resume token.
 
-Esse modelo substitui tanto o per-task reviewer fan-out quanto o trio-at-rc-push. A
+A autoridade de avanço de workflow fica em Python, não em texto livre do agente. A
 disciplina per-task de implementação (markers, testes, pre-push gate) permanece
-inalterada.
+inalterada. Ver [[lifecycle-foundation]].
 
 ### Parte 4 — Hotfix unification (ADR-2)
 
 Hotfixes são releases normais sob o mesmo modelo ADR-1. A distinção é que um
 hotfix tipicamente abre `alpha-1` e faz ship imediatamente dali (sem rc).
 
-O atom [[sdd-hotfix-track]] está **anotado como superseded** por ADR-2. O fluxo
-condensado descrito lá ainda é válido como referência histórica, mas o modelo
-canônico é o ADR-1 + ADR-2 documentado aqui.
+O modelo canônico é o ADR-1 + ADR-2 documentado aqui. O atom [[sdd-hotfix-track]]
+permanece apenas como referência superseded.
 
 A reconciliação mecânica de `dadaia specs hotfix open` + SPEC-DOC-016 para o modelo
 de segmentos foi entregue por T-ENG-07.
@@ -168,8 +166,8 @@ Script `dadaia_workspace/public/scripts/pre-push-ci-gate.sh` instalado como git
 - `dadaia ci push-gate-check` — o check mecânico de verdict de security (stdin ref
   lines encaminhadas; ver Parte 3)
 
-Bloqueia `git push` em qualquer falha. Motivação: a família v0.1.4 foi empurrada com
-CI vermelho — CI é rede de segurança, não primeira linha de defesa.
+Bloqueia `git push` em qualquer falha. O push boundary exige árvore validada antes de
+publicar histórico remoto.
 
 ## Trigger típico
 
@@ -180,15 +178,10 @@ que precisa de subsumption ou nova release.
 
 ## Diferencial
 
-Sem esta governança: bugs são silenciosamente descartados ao serem cobertos por
-backlog items sem rastreamento; releases são abertas sem grill (resultando em SPEC
-que descobre problemas durante implementação); a família de versões se fragmenta em
-anti-padrão (v0.1.4.1, v0.1.4.2, v0.1.4.3 × 2); e CI vermelho chega ao histórico
-do repo principal.
-
 Com esta governança: toda decisão de release tem dono explícito (PE, dispatch de PM),
 toda subsumption é rastreada, todo bug tem destino declarado, toda release nasce de
-grill, e o segmento model impede colisões de versão.
+grill, os gates semânticos validam evidência por etapa, e o modelo de segmentos mantém
+a maturação de release ordenada.
 
 ## Estado runtime tocado
 
@@ -201,7 +194,7 @@ grill, e o segmento model impede colisões de versão.
 
 ## Dependências
 
-- [[sdd-gate-v3]] — gate RULE A valida que `specs/memory/` só é escrito em fase DEFINITION/CLOSURE; markers `[-]` e aprovações são disciplina, não mecanismo do gate; `specs/backlog/**` é ADDITIVE (sempre flui — o hard backlog gate D5 foi removido em 0.1.7 rc-3); o pre-push security-verdict gate é o chokepoint mecânico do push boundary.
+- [[sdd-gate-v3]] — gate RULE A valida que `specs/memory/` só é escrito em fase DEFINITION/CLOSURE; markers `[-]` e aprovações são disciplina, não mecanismo do gate; `specs/backlog/**` é ADDITIVE e sempre flui; o pre-push security-verdict gate é o chokepoint mecânico do push boundary.
 - [[specs-doctor]] — valida estrutura de segmentos (T-ENG-05: SPEC-DOC-004 segment-aware; SPEC-DOC-016 replaced by segment-structure check).
 - [[public-asset-distribution]] — propaga `pre-push-ci-gate.sh`, skill `dadaia-release-definition`, rule `release-governance.md`, rule `backlog-ownership.md`, persona edits (`product-engineer.md`, `project-manager.md`) via `dadaia public install --target all`.
 - [[sdd-hotfix-track]] — superseded by ADR-2; mantido como histórico, não deletado.

@@ -43,7 +43,7 @@ _PRODUCTION_WRITE_EVENTS: frozenset[str] = frozenset(
 
 #: Directories allowed at workspace root (exact names, no wildcards).
 _ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".opencode", "repos"}
+    {".agents", ".claude", ".codex", ".dadaia", ".opencode", ".pi", "repos"}
 )
 
 #: Files allowed at workspace root (exact names, no wildcards).

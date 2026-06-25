@@ -45,6 +45,12 @@ exit_criteria:
 
 # release-ship
 
+> **REFERENCE DOC ONLY.** This `.workflow.md` is no longer executed by
+> `dadaia orchestrate` — workflow execution is driven by the **`dadaia lifecycle`**
+> engine. `dadaia orchestrate run`/`resume` dispatch nothing; they emit a notice and
+> exit. Read this file as the canonical description of the sequence and drive it via
+> `dadaia lifecycle`.
+
 The deterministic deploy gate sequence for shipping an rc-N segment. `project-manager`
 runs this **only after it has decided to ship** — the ship decision is a judgment call
 that lives in the PM persona, not in this file. This workflow encodes the no-judgment

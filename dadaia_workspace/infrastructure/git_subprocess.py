@@ -155,6 +155,25 @@ class GitSubprocessClient:
         )
         return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
+    def diff_name_only(self, path: Path) -> tuple[str, ...]:
+        """Return the worker's net changed paths in *path*, model-independently.
+
+        Combines tracked modifications/deletions (``git diff --name-only``, plus
+        staged changes via ``--cached``) with untracked, non-gitignored files
+        (``git ls-files --others --exclude-standard``). The deduped, sorted tuple
+        is the trustworthy Ring-2 signal: it reflects what was actually written,
+        never a model self-report. Returns ``()`` on a clean tree or any failure.
+        """
+        changed: set[str] = set()
+        for extra in ([], ["--cached"]):
+            result = _run(["git", "diff", "--name-only", *extra], cwd=path)
+            if result.returncode == 0:
+                changed.update(line.strip() for line in result.stdout.splitlines() if line.strip())
+        untracked = _run(["git", "ls-files", "--others", "--exclude-standard"], cwd=path)
+        if untracked.returncode == 0:
+            changed.update(line.strip() for line in untracked.stdout.splitlines() if line.strip())
+        return tuple(sorted(changed))
+
     def remote_url(self, path: Path) -> str:
         """Return the URL of the ``origin`` remote, or ``""`` if none is configured.
 

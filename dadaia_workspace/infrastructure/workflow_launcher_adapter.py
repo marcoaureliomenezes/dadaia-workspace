@@ -36,15 +36,20 @@ class SubprocessWorkflowLauncher:
         *,
         python_executable: str,
     ) -> int:
-        """Spawn ``<python> -m dadaia_workspace orchestrate <workflow_name>``.
+        """Spawn ``<python> -m dadaia_workspace orchestrate run <workflow_name>``.
 
-        stdout and stderr are discarded (DEVNULL) — the workflow writes its
-        own run-state to ``.dadaia/runs/``.
+        Since WS-3 (release ``multiharness-engine-v0116``), ``orchestrate run`` is a
+        reference-only no-op: it validates the workflow name, prints the
+        "execution moved to ``dadaia lifecycle``" notice, and exits 0. The explicit
+        ``run`` subcommand is required — a bare ``orchestrate <workflow_name>`` is
+        parsed by Typer as an unknown subcommand and would exit non-zero.
+
+        stdout and stderr are discarded (DEVNULL); the process exits cleanly.
 
         Returns the PID of the spawned process.
         """
         proc = subprocess.Popen(
-            [python_executable, "-m", "dadaia_workspace", "orchestrate", workflow_name],
+            [python_executable, "-m", "dadaia_workspace", "orchestrate", "run", workflow_name],
             cwd=workspace_root,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

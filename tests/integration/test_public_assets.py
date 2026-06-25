@@ -5,7 +5,9 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets import (
     _PRIVACY_DENYLIST_ENV,
@@ -17,6 +19,8 @@ from dadaia_workspace.infrastructure.public_assets import (
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
+
+_runner = CliRunner()
 
 
 def test_stage_creates_agentic_manifest(tmp_path: Path) -> None:
@@ -67,6 +71,157 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
     assert (workspace / "opencode.json").exists()
+    # T-PIO-03: the `pi` target is part of `all`.
+    assert (workspace / ".pi" / "SYSTEM.md").exists()
+    assert (workspace / ".pi" / "settings.json").exists()
+
+
+def test_install_target_pi_projects_ring1_sdd_gate_extension(tmp_path: Path) -> None:
+    """WS-PI-4: `--target pi` projects the Layer-1 Ring-1 SDD-gate extension, settings.json
+    lists it, and the extension body carries its invariants (tool_call → pre_gate; the
+    write→Write/edit→Edit mapping; fail-open; venv resolution; the block-envelope check) —
+    AND, as a post-trust executable asset, carries NO operator-local path or secret."""
+    workspace = tmp_path / "ws"
+    FileSystemPublicAssetManager().install(workspace, target="pi")
+
+    ext = workspace / ".pi" / "extensions" / "dadaia-sdd-gate.ts"
+    assert ext.exists()
+    body = ext.read_text(encoding="utf-8")
+    # Delegates to the single Python gate — never re-derives policy in TS.
+    assert "dadaia_workspace.hooks.pre_gate" in body
+    assert 'pi.on("tool_call"' in body or "pi.on('tool_call'" in body
+    # Maps PI's lowercase tool names to the gate's canonical WRITE_TOOLS vocabulary.
+    assert "write" in body and "Write" in body and "edit" in body and "Edit" in body
+    # Blocks only on the explicit decision envelope; fail-open otherwise.
+    assert '"decision":"block"' in body or "decision" in body
+    assert "block: true" in body
+    # venv resolution (no bash dependency) mirrors the OpenCode plugin.
+    assert ".venv" in body and "python" in body
+    # Post-trust executable surface: no operator-local path / no secret leakage.
+    assert "/home/" not in body and "/Users/" not in body
+    for secret_token in ("ANTHROPIC_API_KEY", "TOKEN=", "SECRET", "password"):
+        assert secret_token not in body
+
+    settings = json.loads((workspace / ".pi" / "settings.json").read_text(encoding="utf-8"))
+    assert any("dadaia-sdd-gate" in entry for entry in settings.get("extensions", [])), settings
+
+
+def test_install_target_pi_projects_pi_tree(tmp_path: Path) -> None:
+    """T-PIO-03: `dadaia public install --target pi` projects `public/pi/` -> `.pi/`."""
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+
+    manager.install(workspace, target="pi")
+
+    assert (workspace / ".pi" / "SYSTEM.md").exists()
+    assert (workspace / ".pi" / "settings.json").exists()
+    assert (workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
+    assert (workspace / ".pi" / "extensions" / "dadaia-sdd-gate.ts").exists()
+    # settings.json is valid JSON, generic-only.
+    settings = json.loads((workspace / ".pi" / "settings.json").read_text(encoding="utf-8"))
+    assert isinstance(settings, dict)
+
+
+def test_install_target_pi_is_idempotent(tmp_path: Path) -> None:
+    """T-PIO-03/T-PIO-07: re-install of `--target pi` skips already-canonical files.
+
+    Live `--target pi` projection smoke in an ISOLATED temp workspace (never the repo
+    root / live workspace): produce `.pi/`, re-install (idempotent, no drift), and prove
+    `public doctor` reports `[ok] pi:` lines with no pi drift/missing. (The global
+    `public-privacy` check scans the source `public/` tree, not a bare temp workspace, so
+    it is asserted by the source-repo `dadaia public doctor` gate, not here.)
+    """
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+
+    manager.install(workspace, target="pi")
+    second = manager.install(workspace, target="pi")
+
+    # The .pi files must report [skip] on the second pass (hash-compare no-op).
+    pi_results = [line for line in second if str(workspace / ".pi") in line]
+    assert pi_results, "expected .pi/ projection lines on re-install"
+    assert all("[skip]" in line for line in pi_results), pi_results
+
+    reports = manager.doctor(workspace)
+    pi_lines = [r for r in reports if "pi:" in r]
+    assert pi_lines and all(r.startswith("[ok]") for r in pi_lines), pi_lines
+    drift = [r for r in reports if r.startswith(("[drift]", "[missing]")) and "pi" in r]
+    assert not drift, drift
+
+
+def test_cli_install_target_pi_projects_and_doctor_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Layer-1 e2e through the REAL CLI: `dadaia public install --target pi` is the
+    command the operator runs to 'enter pi'. Drive it via CliRunner against an isolated
+    temp workspace, then `dadaia public doctor` — assert the `.pi/` tree lands and doctor
+    reports the pi projection green (proving the operator-facing path, not just the
+    manager API)."""
+    from dadaia_workspace.features.workspace.service import WorkspaceService
+    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+    workspace = tmp_path / "ws"
+    # Initialize a real workspace root the CLI resolver can find (conftest backstops
+    # real venv creation). This is the state `dadaia init` leaves behind.
+    WorkspaceService(
+        public_assets=FileSystemPublicAssetManager(),
+        python_env=VenvPythonEnvironmentManager(),
+    ).init(workspace)
+    monkeypatch.chdir(workspace)
+
+    install = _runner.invoke(app, ["public", "install", "--target", "pi"])
+    assert install.exit_code == 0, install.output
+
+    assert (workspace / ".pi" / "SYSTEM.md").exists()
+    assert (workspace / ".pi" / "settings.json").exists()
+    assert (workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
+
+    doctor = _runner.invoke(app, ["public", "doctor"])
+    assert doctor.exit_code == 0, doctor.output
+    assert "pi:" in doctor.output
+
+
+def test_install_target_pi_system_note_carries_governance_markers(tmp_path: Path) -> None:
+    """Layer-1 governance content: the projected `.pi/SYSTEM.md` must bind PI to the
+    workspace law (AGENTS.md), name the `dadaia` CLI operational surface and SDD
+    discipline, and declare the post-trust executable boundary — AND honestly carry NO
+    restated law and no operator-local absolute paths (the honesty property the audit
+    requires)."""
+    workspace = tmp_path / "ws"
+    FileSystemPublicAssetManager().install(workspace, target="pi")
+
+    system_note = (workspace / ".pi" / "SYSTEM.md").read_text(encoding="utf-8")
+    context_prompt = (workspace / ".pi" / "prompts" / "dadaia-context.md").read_text(
+        encoding="utf-8"
+    )
+
+    # Binds to the law and the operational surface.
+    assert "AGENTS.md" in system_note
+    assert "dadaia" in system_note
+    assert "SDD" in system_note
+    assert "Layer-1" in system_note
+    # Declares the post-trust executable trust boundary.
+    assert "post-trust" in system_note
+    # Honesty: the note must NOT restate the law (it defers to AGENTS.md).
+    assert "this note carries none" in system_note
+    # No operator-local absolute paths leaked into the post-trust executable surface.
+    assert "/home/" not in system_note
+    assert "/home/" not in context_prompt
+    assert "dadaia" in context_prompt
+
+
+def test_doctor_emits_pi_ok_lines(tmp_path: Path) -> None:
+    """T-PIO-04: `dadaia public doctor` emits `[ok] pi:` lines after a clean install."""
+    workspace = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace, target="all", force=True)
+
+    reports = manager.doctor(workspace)
+
+    pi_lines = [r for r in reports if "pi:" in r]
+    assert any("[ok] pi:SYSTEM.md" in r for r in reports), reports
+    assert any("[ok] pi:settings.json" in r for r in reports), reports
+    assert all(r.startswith("[ok]") for r in pi_lines), pi_lines
 
 
 def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:

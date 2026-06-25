@@ -11,7 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs.catalog import generate_catalog, write_catalog
+from dadaia_workspace.features.specs.catalog import (
+    generate_catalog,
+    render_index_md,
+    write_catalog,
+    write_index,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers — build .md atoms with frontmatter
@@ -292,6 +297,68 @@ class TestWriteCatalog:
         out_path = write_catalog(specs, catalog)
         parsed = json.loads(out_path.read_text(encoding="utf-8"))
         assert isinstance(parsed, dict)
+
+
+# ---------------------------------------------------------------------------
+# T-PIO-10 (F10): the CLI catalog path must ALSO emit index.md (single source).
+# Closes bug memory-catalog-cli-skips-index-md.
+# ---------------------------------------------------------------------------
+
+
+class TestIndexMdParity:
+    def test_render_index_md_contains_all_slugs(self, tmp_path: Path) -> None:
+        specs = _make_specs_dir(tmp_path)
+        catalog = generate_catalog(specs)
+        index_md = render_index_md(catalog)
+        for atom in _ATOMS_3:
+            assert atom["slug"] in index_md, f"slug {atom['slug']} missing from index.md"
+
+    def test_render_index_md_uses_catalog_tldr(self, tmp_path: Path) -> None:
+        """index.md rows are sourced from the catalog (single source of truth)."""
+        specs = _make_specs_dir(tmp_path)
+        catalog = generate_catalog(specs)
+        index_md = render_index_md(catalog)
+        for feature in catalog["features"]:
+            assert feature["tldr"] in index_md, (
+                f"index.md row for {feature['slug']} does not carry catalog tldr"
+            )
+
+    def test_write_index_writes_to_product_index_md(self, tmp_path: Path) -> None:
+        specs = _make_specs_dir(tmp_path)
+        catalog = generate_catalog(specs)
+        out_path = write_index(specs, catalog)
+        expected = specs / "memory" / "product" / "index.md"
+        assert out_path == expected
+        assert out_path.exists()
+        assert out_path.read_text(encoding="utf-8").endswith("\n")
+
+    def test_cli_generate_emits_both_catalog_and_index(self, tmp_path: Path) -> None:
+        """`dadaia memory catalog generate` writes BOTH catalog.json and index.md.
+
+        This is the regression the bug describes: the CLI used to write only
+        catalog.json, letting index.md silently drift. Both must now be emitted from
+        the same atom-frontmatter source, and the index must reflect the catalog tldr.
+        """
+        from typer.testing import CliRunner
+
+        from dadaia_workspace.cli.commands.memory import app as memory_app
+
+        specs = _make_specs_dir(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(memory_app, ["catalog", "generate", "--specs-dir", str(specs)])
+        assert result.exit_code == 0, result.output
+
+        catalog_path = specs / "memory" / "product" / "catalog.json"
+        index_path = specs / "memory" / "product" / "index.md"
+        assert catalog_path.exists(), "catalog.json must be written"
+        assert index_path.exists(), "index.md must ALSO be written (bug fix)"
+
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        index_text = index_path.read_text(encoding="utf-8")
+        for feature in catalog["features"]:
+            assert feature["tldr"] in index_text, (
+                f"index.md is out of sync with catalog for {feature['slug']}"
+            )
 
 
 # ---------------------------------------------------------------------------

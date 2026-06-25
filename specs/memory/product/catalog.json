@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T14:37:12Z",
+  "generated_at": "2026-06-25T20:33:15Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -56,7 +56,7 @@
         "workflows",
         "dispatch"
       ],
-      "token_estimate": 865,
+      "token_estimate": 1160,
       "agent_tier": "self-pull",
       "depends_on": []
     },
@@ -151,9 +151,11 @@
         "codex",
         "literacy"
       ],
-      "token_estimate": 495,
+      "token_estimate": 620,
       "agent_tier": "self-pull",
-      "depends_on": []
+      "depends_on": [
+        "architecture"
+      ]
     },
     {
       "rank": 9,
@@ -254,10 +256,12 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 950,
+      "token_estimate": 1095,
       "agent_tier": "self-pull",
       "depends_on": [
         "spec-context-project",
+        "architecture",
+        "lifecycle-foundation",
         "agent-sdd-alignment",
         "sdd-gate-v3",
         "public-asset-distribution"
@@ -297,7 +301,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 700,
+      "token_estimate": 885,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
@@ -361,8 +365,8 @@
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
-      "tldr": "Claude Code, Codex, and OpenCode receive honest runtime-specific projections from the same public source (9 agents / 18 skills / 2 workflows / Codex .rules).",
-      "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only, per the §8 enforcement matrix), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks; OpenCode is canonized \"advisory + chokepoint-protected\" (ADR-G3). Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with no behavior until the plugin is installed.",
+      "tldr": "Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows).",
+      "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only, per the §8 enforcement matrix), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks; OpenCode is canonized \"advisory + chokepoint-protected\" (ADR-G3). PI (the fourth harness, post-v0.1.18) projects an inert `.pi/` surface and is Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate extension (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4). Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with no behavior until the plugin is installed.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
@@ -371,9 +375,12 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 606,
+      "token_estimate": 1600,
       "agent_tier": "self-pull",
-      "depends_on": []
+      "depends_on": [
+        "architecture",
+        "lifecycle-foundation"
+      ]
     },
     {
       "rank": 19,
@@ -459,11 +466,32 @@
     },
     {
       "rank": 23,
+      "slug": "lifecycle-foundation",
+      "title": "lifecycle-foundation",
+      "category": "product",
+      "tldr": "Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort.",
+      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind)` (FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN, PI_HEADLESS). Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→ SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps, which carry model tiers. Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
+      "path": "specs/memory/product/sdd/lifecycle-foundation.md",
+      "tags": [
+        "sdd",
+        "lifecycle",
+        "multi-harness",
+        "hygiene",
+        "gates"
+      ],
+      "token_estimate": 1870,
+      "agent_tier": "self-pull",
+      "depends_on": [
+        "architecture"
+      ]
+    },
+    {
+      "rank": 24,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
-      "tldr": "Bugs+backlog → releases: PE picks (PM-dispatched), bug-always-solved unless subsumed, grill mandatório; push gated por security APPROVE; PM curates backlog.",
-      "summary": "Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill), o segment model alpha-N/rc-N (estrutura de folders, ADR-1..5), a cadência de revisão pós-G6: push gated mecanicamente por security-reviewer APPROVE (metrics.commit_sha por sha pushed; trio-at-rc-push abolido; qa-per-task-group e code-review-at-PR são disciplina PM até o gate ladder completo em v0.1.15), pre-push CI gate, and backlog-ownership as a PM coordination convention (NOT gate-enforced since 0.1.7 rc-3; backlog is ADDITIVE-allow).",
+      "tldr": "Bugs+backlog → releases with mandatory grill, bug disposition, lifecycle preflight, blocked/resume, semantic gates, and security-gated push.",
+      "summary": "Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill), o segment model alpha-N/rc-N (estrutura de folders, ADR-1..5), a cadência de revisão atual: push gated mecanicamente por security-reviewer APPROVE (metrics.commit_sha por sha pushed), lifecycle foundation command surface for typed preflight/blocked/resume and semantic QA, security, and code-review handoff validation, pre-push CI gate, and backlog-ownership as a PM coordination convention (not gate-enforced; backlog is ADDITIVE-allow).",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -474,10 +502,11 @@
         "alpha-rc-model",
         "backlog-ownership"
       ],
-      "token_estimate": 1683,
+      "token_estimate": 1470,
       "agent_tier": "self-pull",
       "depends_on": [
         "sdd-gate-v3",
+        "lifecycle-foundation",
         "sdd-hotfix-track",
         "specs-doctor",
         "public-asset-distribution",
@@ -485,7 +514,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -499,7 +528,7 @@
         "enforcement",
         "chokepoints"
       ],
-      "token_estimate": 3024,
+      "token_estimate": 3140,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
@@ -507,7 +536,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "sdd-hotfix-track",
       "title": "sdd-hotfix-track",
       "category": "product",
@@ -530,12 +559,12 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
-      "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-3/4.",
-      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$ com allowlist legacy documentada), 028 (file refs da constitution resolvem), 029 (coerência lease↔session com triagem em 3 estados: stale-dead WARN com remediação / live-incoerente ERR / coerente ok), 030 (naming de dirs novos em specs/audits/, WARN), 031 (backlog consumido por release arquivada com status não-terminal, WARN), 032 (status de bug fora do canon {Open, Closed}, WARN); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-3/4.",
+      "tldr": "Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-4 (TREE-3 é warn-only).",
+      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016) cobrindo memory .md atômico via LINT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1 bidirectional; + ledger invariants SPEC-DOC-024 (fase↔markers), 026 (release ids únicos releases+archive), 027 (naming canon ^v\\d+\\.\\d+\\.\\d+$ com allowlist legacy documentada), 028 (file refs da constitution resolvem), 029 (coerência lease↔session com triagem em 3 estados: stale-dead WARN com remediação / live-incoerente ERR / coerente ok), 030 (naming de dirs novos em specs/audits/, WARN), 031 (backlog consumido por release arquivada com status não-terminal, WARN), 032 (status de bug fora do canon {Open, Closed}, WARN); + TREE-1..7 e TREE-5M (canonical tree v2 shape). check #2 aceita ## headings .md; check #8 grep direto no .md body. --fix auto-repara TREE-4 (TREE-3 é warn-only).",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
@@ -543,7 +572,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 1650,
+      "token_estimate": 1820,
       "agent_tier": "self-pull",
       "depends_on": [
         "workspace-doctor",

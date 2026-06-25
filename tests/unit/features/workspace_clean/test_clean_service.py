@@ -6,7 +6,7 @@ Coverage:
   - TTL is respected per zone
   - operator-created files (in .dadaia/states/root_exceptions.txt) are never deleted
   - never deletes files outside .dadaia/
-  - zones: .dadaia/tmp/, .dadaia/reports/, .dadaia/dev-report/
+  - zones: .dadaia/tmp/, .dadaia/reports/, .dadaia/handoff/
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def _make_workspace(tmp_path: Path) -> Path:
     dadaia = tmp_path / ".dadaia"
     (dadaia / "states").mkdir(parents=True)
     (dadaia / "states" / "spec_contexts.json").write_text('{"schema_version":"2","contexts":[]}')
-    for zone in ("tmp", "reports", "dev-report"):
+    for zone in ("tmp", "reports", "handoff"):
         (dadaia / zone).mkdir(parents=True)
     return tmp_path
 
@@ -127,11 +127,11 @@ class TestRealDelete:
         assert not stale.exists()
         assert stale in result.deleted
 
-    def test_real_delete_removes_stale_dev_report_file(self, tmp_path: Path) -> None:
+    def test_real_delete_removes_stale_handoff_file(self, tmp_path: Path) -> None:
         ws = _make_workspace(tmp_path)
         stale = _write_file(
-            ws / ".dadaia" / "dev-report" / "2026-01-01T000000Z-test.html",
-            mtime_offset=dt.timedelta(days=5),
+            ws / ".dadaia" / "handoff" / "ctx" / "old.handoff.json",
+            mtime_offset=dt.timedelta(hours=25),
         )
         svc = WorkspaceCleanService(ws)
 
@@ -178,15 +178,15 @@ class TestTTL:
         assert old in candidate_paths
         assert fresh not in candidate_paths
 
-    def test_reports_zone_ttl_default_7_days(self, tmp_path: Path) -> None:
+    def test_reports_zone_ttl_default_48_hours(self, tmp_path: Path) -> None:
         ws = _make_workspace(tmp_path)
         old = _write_file(
             ws / ".dadaia" / "reports" / "ctx" / "ag" / "old.html",
-            mtime_offset=dt.timedelta(days=10),  # older than default 7d TTL
+            mtime_offset=dt.timedelta(hours=49),
         )
         recent = _write_file(
             ws / ".dadaia" / "reports" / "ctx" / "ag" / "recent.html",
-            mtime_offset=dt.timedelta(days=3),  # within 7d TTL
+            mtime_offset=dt.timedelta(hours=47),
         )
         svc = WorkspaceCleanService(ws)
 
@@ -196,15 +196,15 @@ class TestTTL:
         assert old in candidate_paths
         assert recent not in candidate_paths
 
-    def test_dev_report_zone_ttl_default_3_days(self, tmp_path: Path) -> None:
+    def test_handoff_zone_ttl_default_24_hours(self, tmp_path: Path) -> None:
         ws = _make_workspace(tmp_path)
         old = _write_file(
-            ws / ".dadaia" / "dev-report" / "2026-01-01T000000Z-old.html",
-            mtime_offset=dt.timedelta(days=5),  # older than default 3d TTL
+            ws / ".dadaia" / "handoff" / "ctx" / "old.handoff.json",
+            mtime_offset=dt.timedelta(hours=25),
         )
         fresh = _write_file(
-            ws / ".dadaia" / "dev-report" / "2026-06-07T000000Z-fresh.html",
-            mtime_offset=dt.timedelta(hours=12),  # within TTL
+            ws / ".dadaia" / "handoff" / "ctx" / "fresh.handoff.json",
+            mtime_offset=dt.timedelta(hours=23),
         )
         svc = WorkspaceCleanService(ws)
 

@@ -64,46 +64,6 @@ def test_build_export_service_raises_when_not_initialized(tmp_path: Path) -> Non
         container.build_export_service(tmp_path)
 
 
-def test_select_dispatcher_returns_claude(monkeypatch) -> None:
-    from dadaia_workspace.infrastructure.claude_agent_dispatcher import ClaudeAgentDispatcher
-
-    monkeypatch.delenv("DADAIA_AGENT_RUNTIME", raising=False)
-    dispatcher = container._select_dispatcher("claude")
-    assert isinstance(dispatcher, ClaudeAgentDispatcher)
-
-
-def test_select_dispatcher_returns_opencode(monkeypatch) -> None:
-    from dadaia_workspace.infrastructure.cli_agent_dispatcher import OpenCodeAgentDispatcher
-
-    monkeypatch.delenv("DADAIA_AGENT_RUNTIME", raising=False)
-    dispatcher = container._select_dispatcher("opencode")
-    assert isinstance(dispatcher, OpenCodeAgentDispatcher)
-
-
-def test_select_dispatcher_returns_codex(monkeypatch) -> None:
-    from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
-
-    monkeypatch.delenv("DADAIA_AGENT_RUNTIME", raising=False)
-    dispatcher = container._select_dispatcher("codex")
-    assert isinstance(dispatcher, CodexAgentDispatcher)
-
-
-def test_select_dispatcher_defaults_to_cli(monkeypatch) -> None:
-    from dadaia_workspace.infrastructure.cli_agent_dispatcher import CliAgentDispatcher
-
-    monkeypatch.delenv("DADAIA_AGENT_RUNTIME", raising=False)
-    dispatcher = container._select_dispatcher(None)
-    assert isinstance(dispatcher, CliAgentDispatcher)
-
-
-def test_select_dispatcher_reads_env_var(monkeypatch) -> None:
-    from dadaia_workspace.infrastructure.codex_agent_dispatcher import CodexAgentDispatcher
-
-    monkeypatch.setenv("DADAIA_AGENT_RUNTIME", "codex")
-    dispatcher = container._select_dispatcher(None)
-    assert isinstance(dispatcher, CodexAgentDispatcher)
-
-
 def test_agent_catalog_returns_empty_when_no_agents_dir(tmp_path: Path) -> None:
     result = container._agent_catalog(tmp_path)
     assert result == ()

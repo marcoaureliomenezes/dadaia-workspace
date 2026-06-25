@@ -13,7 +13,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-_DEFAULT_TTL = dt.timedelta(hours=48)
+from dadaia_workspace.core.models.hygiene import SlopPolicy
+
+_DEFAULT_TTL = dt.timedelta(seconds=SlopPolicy().reports_ttl_seconds)
 _TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)")
 
 

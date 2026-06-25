@@ -264,3 +264,41 @@ def test_append_latency_no_workspace_is_noop(tmp_path: Path) -> None:
     # workspace=None (unresolvable) → no file written, no error.
     pre_gate._append_latency(None, "PreToolUse", 1.0)
     assert not (tmp_path / ".dadaia").exists()
+
+
+# --------------------------------------------------------------------------- #
+# WS-PI-4: the PI Layer-1 SDD-gate extension maps its tool names to the gate's
+# canonical vocabulary (write→Write, edit→Edit) before delegating to pre_gate.
+# These tests prove (a) why the mapping is necessary and (b) that the mapped
+# names are enforced by the same gate the other harnesses use.
+# --------------------------------------------------------------------------- #
+
+
+def test_pi_raw_lowercase_write_name_is_not_a_write_tool(tmp_path: Path) -> None:
+    # PI's built-in tool is named "write" (lowercase) — NOT in the gate's WRITE_TOOLS
+    # vocabulary, so an unmapped payload would slip through. This is exactly why the
+    # `.pi/extensions/dadaia-sdd-gate.ts` shim maps write→Write before calling pre_gate.
+    assert _common.is_write_tool("write") is False
+    assert _common.is_write_tool("edit") is False
+    assert _common.is_write_tool("Write") is True
+    assert _common.is_write_tool("Edit") is True
+
+
+def test_pi_mapped_write_name_blocks_frozen_path(tmp_path: Path) -> None:
+    # A PI write to a FROZEN archive path, sent with the mapped canonical name "Write"
+    # (as the extension sends it), is BLOCKED by pre_gate — proving PI's Ring-1 extension
+    # hits the real SDD gate.
+    ws = _mk_workspace(tmp_path, "a")
+    target = ws / "repos" / "a" / "specs" / "_archive" / "old.md"
+    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
+    assert block is not None
+    assert "_archive" in block["reason"] or "FROZEN" in block["reason"].upper()
+
+
+def test_pi_mapped_write_name_allows_additive_path(tmp_path: Path) -> None:
+    # An ADDITIVE in-repo path (specs/bugs) sent with the mapped name "Write" is allowed —
+    # the mapping does not over-block; only the path class decides.
+    ws = _mk_workspace(tmp_path, "a")
+    target = ws / "repos" / "a" / "specs" / "bugs" / "some-bug.md"
+    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
+    assert block is None

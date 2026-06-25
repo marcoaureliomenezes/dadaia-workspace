@@ -11,9 +11,9 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 1200
-last_updated: '2026-06-10'
-release_origin: v0.1.10
+token_estimate: 2100
+last_updated: '2026-06-25'
+release_origin: v0.1.19
 ---
 
 ## Linguagens
@@ -40,20 +40,21 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 
 ## Agent runtimes
 
-  * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`.
+  * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`. O `ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`) dirige um worker Claude por trás de `AgentRuntimePort` num step do lifecycle; depende do extra **opcional** `claude-agent-sdk` (lazy-imported — NÃO é dependência travada; build offline-first preservado; ausência ⇒ resultado FAILED com `pip install claude-agent-sdk` acionável).
   * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..8 (D-CX-4 lint inclui tool-names Claude e tier-names Anthropic). 9 agentes core TOML em `.codex/agents/` com tiering registry-derived (model id × `model_reasoning_effort` via `core/model_registry.codex_tier_views()`; deep→high, dispatch→medium; collapse guard loud-fail). Zero leak `claude-*`/Opus/Sonnet/Haiku. Command policy `.codex/rules/*.rules` em `prefix_rule(...)` com paths venv-form. **Hooks executam só em sessão interativa** — `codex exec` headless não dispara hooks (codex-cli 0.139.0, live-verified; harness opt-in `tests/integration/codex_live/`, `DADAIA_CODEX_LIVE=1`). Workflows em `.codex/workflows/` (reference-only).
   * **OpenCode** : projeção via strip de frontmatter de tools; workflows e skills projetados em `.opencode/`.
+  * **PI (`@earendil-works/pi-coding-agent`)** : quarto second-layer harness, peer de Claude/Codex/OpenCode, selecionável por step via `--harness pi` / `--step-harness x=pi`. O `PiHeadlessAdapter` (`infrastructure/pi_runtime.py`) dirige um worker PI por trás de `AgentRuntimePort` via `pi --mode json` (subprocess, runner injetável, sem PI client em module-load). PI é um **runtime CLI externo OPCIONAL instalado pelo operador** (Node + binário `pi` + `ANTHROPIC_API_KEY`), invocado como binário externo — **NUNCA** uma dependência Python/Node travada/pinned: não entra em `poetry.lock`, não é importado em build/test, e o build permanece offline-first sem ele. O schema do event stream `pi --mode json` (especificamente a forma de `AgentMessage.content`: string vs array de content-blocks) é o único seam upstream não-verificado, verificado pelo teste de integração opt-in `DADAIA_PI_LIVE=1` (`tests/integration/pi_live/`, **não** CI-gated). A versão exata de `pi` verificada deve ser capturada/pinada na primeira execução do live seam num ambiente com rede — não é pinável offline agora.
   * **CLI** : agentes invocados via `claude --agent <name>` ou equivalente; modo manual sem paralelização automática.
 
 
 
 ## Model assignments (9 core agents + 3 plugin stubs)
 
-Atribuição em dois tiers: `claude-fable-5` para os leaves de raciocínio profundo
-(spec authoring, QA, harness, arquitetura, auditoria) e `claude-opus-4-8` para
-dispatchers e gate leaves. Override per-dispatch via `DADAIA_MODEL_OVERRIDE`
-quando a política do dispatcher justificar. Optional packs podem definir agentes
-e modelos próprios fora do default público.
+**Tier único na prática:** os **9 agentes core** rodam em `claude-opus-4-8` — não
+há tier-split em produção (verificável: os 9 frontmatter `model:` resolvem todos
+para `claude-opus-4-8`). Override per-dispatch via `DADAIA_MODEL_OVERRIDE` quando a
+política do dispatcher justificar. Optional packs podem definir agentes e modelos
+próprios fora do default público.
 
 **Single source:** `dadaia_workspace/core/model_registry.py` é a única fonte de
 ids/pricing/tier de modelo (`ModelEntry{claude_id, codex_id, pricing dated
@@ -61,15 +62,22 @@ append-only, tier}`); `MODEL_MAP` (runtime transforms) e `PRICING_TABLE`
 (telemetry) são views derivadas, com contract test de key-equality. `dadaia
 public doctor` falha em `model:` frontmatter que não resolve no registry.
 
+**Entrada reservada (não usada por nenhum agente):** o registry ainda define
+`claude-fable-5` com `tier="deep"` (e o mapeamento Codex `deep→high`), mas **zero
+agente core resolve para ela** — todos os 9 são `dispatch`-tier opus-4-8.
+`claude-fable-5` é region-restricted; a regra do operador é **NUNCA** pinar um
+agente a Fable-5. A entrada permanece como definição reservada do registry, não
+como atribuição viva.
+
 Agente| Modelo| Nota
 ---|---|---
 project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator
-project-auditor| `claude-fable-5`| Dispatcher / audit fan-out
-product-engineer| `claude-fable-5`| Curator / memory guardian
+project-auditor| `claude-opus-4-8`| Dispatcher / audit fan-out
+product-engineer| `claude-opus-4-8`| Curator / memory guardian
 software-engineer| `claude-opus-4-8`| Implementation leaf (absorbs python/node/backend)
-ai-engineer| `claude-fable-5`| AI-entity surface owner (harness-mastery synthesis workload)
-software-architect| `claude-fable-5`| Architectural review leaf (ADDITIVE)
-qa-engineer| `claude-fable-5`| Review → commit gate leaf
+ai-engineer| `claude-opus-4-8`| AI-entity surface owner (harness-mastery synthesis workload)
+software-architect| `claude-opus-4-8`| Architectural review leaf (ADDITIVE)
+qa-engineer| `claude-opus-4-8`| Review → commit gate leaf
 security-reviewer| `claude-opus-4-8`| Review → push gate leaf
 code-reviewer| `claude-opus-4-8`| Review → PR gate leaf
 frontend-engineer (plugin)| `claude-sonnet-4-6`| Plugin stub (frontend-design); no behavior without plugin
@@ -108,10 +116,33 @@ import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` decla
 `dulwich` ≥ 1.2.5 nos ambientes de operação (CVEs nomeados em comentário no
 `pyproject.toml`); não entram em `poetry.lock` — o build-backend é `poetry-core`.
 
+Onde cada dependência vive, e os bans de import que o `import-linter` enforça em
+CI (camadas hexagonais — seta = direção de import permitida):
+
+```mermaid
+graph TD
+  CLI["cli/<br/>typer · rich"]
+  FEAT["features/<br/>pyyaml · jsonschema · jinja2 · mistune"]
+  INFRA["infrastructure/<br/>openpyxl · pyyaml · git_subprocess · adapters de harness"]
+  CORE["core/<br/>stdlib only<br/>model_registry · scope_match · models · protocols"]
+  CLI --> FEAT
+  CLI --> INFRA
+  FEAT --> CORE
+  INFRA --> CORE
+  FEAT -. "BANIDO (import-linter): features ✗→ infrastructure" .-> INFRA
+  CORE -. "BANIDO: core ✗→ os/subprocess/fcntl" .-> OSP["OS primitives"]
+```
+
+`features/` fala com o mundo externo apenas por `core/protocols/*`, implementados em
+`infrastructure/` e injetados no `container.py` (hexagonal port/adapter). `core/` é
+puro: zero I/O, zero OS primitive — por isso é testável e cross-platform.
+
 ## Restrições e proibições
 
   * NÃO adicionar dependências fora desta lista sem release aprovada que justifique.
   * NÃO usar libs com network em build/test (offline-first).
+  * `claude-agent-sdk` é um **runtime extra OPCIONAL instalado pelo operador**, NÃO uma dependência travada/pinned: não entra em `poetry.lock`, não é importado em module-load, e é lazy-imported apenas pelo `ClaudeSdkAdapter` quando o operador escolhe rodar um step no harness Claude SDK. O build e os testes permanecem offline-first sem ele.
+  * `pi` / `@earendil-works/pi-coding-agent` é um **runtime CLI externo OPCIONAL instalado pelo operador** (Node + `ANTHROPIC_API_KEY`), invocado como binário externo pelo `PiHeadlessAdapter` via subprocess — **NÃO** uma dependência Python/Node travada/pinned: não entra em `poetry.lock`, não é importado em module-load, e os testes são totalmente faked (offline-first preservado). A versão verificada de `pi` deve ser pinada/registrada aqui na primeira execução do live seam (`DADAIA_PI_LIVE=1`) num ambiente com rede.
   * NÃO usar threading/multiprocessing nas features — orquestração concorrente fica em `features/orchestration/`.
   * NÃO chamar `os.system`/`subprocess` fora de `infrastructure/` — features usam protocols.
   * NÃO importar Python <3.12 backports — runtime mínimo é 3.12 (match/case, generic types nativos, type statement).
