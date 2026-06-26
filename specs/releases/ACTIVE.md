@@ -1,26 +1,20 @@
 ---
 release: v0.1.28
-phase: IMPLEMENTATION
+phase: CLOSURE
 ---
 
 # Active release: v0.1.28 — Workflow Model Governance + Panel Control Plane
 
-Implements `FEAT-WORKFLOW-MODEL-GOVERNANCE-01` (whole epic A→D, sliced into 4 waves).
+All 20 implementation tasks (Waves A→D) `[x]`. rc-ship review trio APPROVED:
+- qa-engineer: gate green (3777 passed, 14 skipped); Playwright E2E 5/5 + 7/7 headless.
+- code-reviewer: APPROVE (0 crit/high; 1 MEDIUM → v0.1.29 follow-up: harness/snapshot
+  divergence under `--harness pi`).
+- security-reviewer: APPROVED, `metrics.commit_sha = 28379a71...` (HEAD).
 
-**Phase:** IMPLEMENTATION. DEFINITION complete — SPEC/PLAN/TASKS Aprovado; grill recorded
-in `GRILL.md`; DEFINITION review APPROVED by software-architect (0 crit/high, 3 MEDIUM)
-and qa-engineer (0 crit, 2 HIGH impl-time obligations). Review handoffs under
-`.dadaia/handoff/dadaia-workspace/`.
+Public projection done: schema staged + installed, `dadaia public doctor` exit 0
+(`[ok] public-privacy`).
 
-Binding implementation-time obligations carried from review:
-- M3: Wave A resolver sources library defaults from `model_profiles.py` directly so Wave A
-  is independently green; catalog defaults (Wave B) extend, not gate, the resolver.
-- M1: keep `LifecycleRun` schema version literal; assert old-format records still load.
-- M2: single ordered precedence for resolved_model vs legacy tier-match in CodexExecAdapter.
-- H1: panel editor E2E is a Playwright `tests/e2e/panel/*.spec.ts`; update existing
-  `workflows-tab.spec.ts` for first-class Workflows nav (D-5).
-- H2: closure pins the GitHub Actions `e2e-panel` job green (not run by `ci preflight`).
-- AC-6: in-flight test injects the policy mutation BETWEEN step 1 and step 2 via fake hook.
-- AC-7: historical-run read pinned to a task; reads snapshot, never re-resolves.
+**Phase:** CLOSURE — product-engineer authoring CLOSURE.md + memory atoms (current product
+truth) + backlog disposition for the consumed item.
 
-Branch: `feature/v0.1.28`. Waves run A → B → C → D, each green before the next.
+Branch: `feature/v0.1.28`.
