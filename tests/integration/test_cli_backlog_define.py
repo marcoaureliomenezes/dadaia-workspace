@@ -9,6 +9,7 @@ Acceptance §3.7.6:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,23 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 _runner = CliRunner()
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+_BOX_CHARS = "│╭╮╰╯─"
+
+
+def _clean(output: str) -> str:
+    """Normalize Typer/Rich error output for substring checks.
+
+    Typer renders ``BadParameter`` messages in a Rich error box: ANSI colour codes,
+    box-drawing borders, and line-wrapping at the (environment-dependent) terminal
+    width. A human message like ``takes no --model`` can therefore be split across a
+    wrap + box border in CI while staying on one line locally. Strip ANSI + box glyphs
+    and collapse whitespace so the assertion is width-independent.
+    """
+    text = _ANSI_RE.sub("", output)
+    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
+    return re.sub(r"\s+", " ", text)
 
 
 @pytest.fixture
@@ -76,7 +94,8 @@ def test_claude_harness_rejected_law1(workspace: Path) -> None:
         ["lifecycle", "backlog", "define", "--release-id", "v0.1.26", "--harness", "claude"],
     )
     assert result.exit_code != 0
-    assert "Layer-2 workflow harness" in result.output or "LAW 1" in result.output
+    cleaned = _clean(result.output)
+    assert "Layer-2 workflow harness" in cleaned or "LAW 1" in cleaned
 
 
 def test_bad_model_rejected_law2(workspace: Path) -> None:
@@ -113,4 +132,4 @@ def test_fake_harness_takes_no_model_law2(workspace: Path) -> None:
         ],
     )
     assert result.exit_code != 0
-    assert "no --model" in result.output
+    assert "no --model" in _clean(result.output)
