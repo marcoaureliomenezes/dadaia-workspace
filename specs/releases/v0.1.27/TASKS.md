@@ -140,7 +140,7 @@
 - [x] T-5 — Producer post-step on `release define` (A1, E2E)
 - [x] T-6 — Define→close loop (A2, E2E)
 - [x] T-7 — Document `**Consumes:**` convention (A3)
-- [ ] T-8 — Full gate + hygiene
+- [x] T-8 — Full gate + hygiene
 
 ## Acceptance traceability
 
