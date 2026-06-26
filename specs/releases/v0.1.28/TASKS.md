@@ -97,7 +97,7 @@ Acceptance: `--step-model <step>=<profile-id>` resolves through the profile regi
 `--show-policy` + `--json` print the resolved policy; `workflow policy show` + `workflow
 profiles list` read-only verbs (AC-3, AC-4).
 
-### [ ] T-28-A-10 — Wave A green checkpoint (D-4 end-to-end demo)
+### [-] T-28-A-10 — Wave A green checkpoint (D-4 end-to-end demo)
 Goal: prove resolver + run snapshot end-to-end on the implementation pipeline.
 Write set: `tests/integration/cli/test_pipeline_policy_e2e.py` (NEW) (+ fixtures under
 `tests/` only).
