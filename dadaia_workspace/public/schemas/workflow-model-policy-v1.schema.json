@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workflow-model-policy-v1",
+  "title": "Workflow Model Policy Overlay v1",
+  "description": "Operator-editable, validated JSON overlay that selects per-workflow / per-step model profiles. Missing file = library defaults; an invalid file blocks workflow execution (missing != invalid). D-2: only the 'default' context overlay is honored this release; the 'contexts' shape reserves per-context overlays for a future release but a non-'default' key is inert.",
+  "type": "object",
+  "required": ["schema_version"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "workflow-model-policy-v1",
+      "description": "Schema version identifier. Must equal 'workflow-model-policy-v1'."
+    },
+    "policy_id": {
+      "type": "string",
+      "description": "Stable identifier for this overlay (recorded in the run snapshot's overlay_id). Defaults to 'default'."
+    },
+    "contexts": {
+      "type": "object",
+      "description": "Per-context overlays. D-2: only the 'default' key is honored/validated this release; other keys are reserved (inert).",
+      "additionalProperties": {
+        "$ref": "#/$defs/contextOverlay"
+      }
+    }
+  },
+  "$defs": {
+    "contextOverlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflows": {
+          "type": "object",
+          "description": "Per-workflow overrides keyed by workflow id (e.g. 'implementation').",
+          "additionalProperties": {
+            "$ref": "#/$defs/workflowOverlay"
+          }
+        }
+      }
+    },
+    "workflowOverlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "object",
+          "description": "Per-step profile id, keyed by step label (e.g. 'implement'). The value is a built-in model-profile id valid for the step's harness.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -29,7 +29,7 @@ Acceptance: built-in-only (D-2); import-time assert ties every profile `model_id
 registry (mirror `_assert_ids_known`); `resolve`, `profiles_for(harness)`, `to_option`;
 no `claude-*` id; deprecated profiles carry a `replacement`.
 
-### [ ] T-28-A-03 — Overlay JSON store (atomic + last-good)
+### [x] T-28-A-03 — Overlay JSON store (atomic + last-good)
 Goal: read/write `.dadaia/states/workflow_model_policy.json`, missing ≠ invalid.
 Write set: `dadaia_workspace/infrastructure/json_workflow_model_policy_store.py` (NEW);
 `dadaia_workspace/public/data/schemas/workflow-model-policy-v1.schema.json` (NEW);
