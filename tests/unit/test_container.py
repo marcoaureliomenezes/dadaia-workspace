@@ -306,3 +306,91 @@ def test_select_lock_adapter_returns_windows_when_not_has_fcntl(
             sys.modules.pop(module_key, None)
             if original is not None:
                 sys.modules[module_key] = original
+
+
+# ---------------------------------------------------------------------------
+# T-28-A-08 — governance layer composition (registry / store / resolver)
+# ---------------------------------------------------------------------------
+
+
+def test_build_workflow_model_profile_registry_returns_catalog() -> None:
+    catalog = container.build_workflow_model_profile_registry()
+    impl = catalog.workflow("implementation")
+    assert impl is not None
+    assert [s.label for s in impl.steps] == [
+        "implement",
+        "review_qa",
+        "review_security",
+        "review_code",
+    ]
+
+
+def test_build_workflow_model_policy_store_guards_init(tmp_path: Path) -> None:
+    with pytest.raises(WorkspaceNotInitializedError):
+        container.build_workflow_model_policy_store(tmp_path)
+
+
+def test_build_workflow_model_policy_store_path_is_canonical(tmp_path: Path) -> None:
+    _init_states(tmp_path)
+    store = container.build_workflow_model_policy_store(tmp_path)
+    assert store.path == tmp_path / ".dadaia" / "states" / "workflow_model_policy.json"
+
+
+def test_build_workflow_policy_resolver_missing_overlay_uses_defaults(tmp_path: Path) -> None:
+    _init_states(tmp_path)
+    resolver = container.build_workflow_policy_resolver(tmp_path)
+    snapshot = resolver.resolve("implementation", context="default")
+    from dadaia_workspace.core.models.workflow_execution import PolicySource
+
+    impl = snapshot.step("implement")
+    assert impl is not None
+    assert impl.source is PolicySource.LIBRARY_DEFAULT
+    assert impl.model_profile == "codex-implementation-standard"
+
+
+def test_build_workflow_policy_resolver_honors_overlay(tmp_path: Path) -> None:
+    _init_states(tmp_path)
+    store = container.build_workflow_model_policy_store(tmp_path)
+    overlay = store.parse(
+        {
+            "schema_version": "workflow-model-policy-v1",
+            "policy_id": "default",
+            "contexts": {
+                "default": {
+                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
+                }
+            },
+        }
+    )
+    store.save(overlay)
+
+    resolver = container.build_workflow_policy_resolver(tmp_path)
+    impl = resolver.resolve("implementation", context="default").step("implement")
+    assert impl is not None
+    assert impl.model_profile == "codex-review-deep"
+
+
+def test_build_workflow_policy_resolver_invalid_overlay_raises(tmp_path: Path) -> None:
+    _init_states(tmp_path)
+    bad = tmp_path / ".dadaia" / "states" / "workflow_model_policy.json"
+    bad.write_text("{ not valid json", encoding="utf-8")
+    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+        WorkflowModelPolicyStoreError,
+    )
+
+    with pytest.raises(WorkflowModelPolicyStoreError):
+        container.build_workflow_policy_resolver(tmp_path)
+
+
+def test_build_lifecycle_pipeline_accepts_policy_snapshot(tmp_path: Path) -> None:
+    _init_states(tmp_path)
+    (tmp_path / "repos").mkdir(exist_ok=True)
+    resolver = container.build_workflow_policy_resolver(tmp_path)
+    snapshot = resolver.resolve("implementation", context="default")
+    pipe = container.build_lifecycle_pipeline(
+        tmp_path,
+        context="dadaia-workspace",
+        release_id="v0.1.28",
+        policy_snapshot=snapshot,
+    )
+    assert pipe is not None

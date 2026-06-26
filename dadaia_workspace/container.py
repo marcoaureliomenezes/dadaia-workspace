@@ -6,14 +6,22 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
+    )
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowCatalog,
+        WorkflowExecutionPolicyResolver,
     )
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         BacklogDefinitionWorkflow,
     )
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionWorkflow,
+    )
+    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+        JsonWorkflowModelPolicyStore,
     )
 
 from dadaia_workspace.core.exceptions import (
@@ -599,6 +607,61 @@ def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
     return JsonLifecycleRunStore(workspace_root)
 
 
+def build_workflow_model_profile_registry() -> "WorkflowCatalog":
+    """Compose the governed workflow catalog the policy resolver reads (T-28-A-08).
+
+    Wave A sources the catalog (per-step default harness + default profile, validated
+    against the built-in :mod:`model_profiles` registry) directly from the implementation
+    pipeline via :func:`library_workflow_catalog` — M3: NOT the Wave-B ``dadaia_catalog``,
+    so the governance layer is independently green. The function is pure (no I/O), so it
+    takes no ``workspace_root``.
+    """
+    from dadaia_workspace.features.lifecycle.policy_resolver import library_workflow_catalog
+
+    return library_workflow_catalog()
+
+
+def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowModelPolicyStore":
+    """Compose the workflow-model-policy overlay store (T-28-A-08).
+
+    Reads/writes ``.dadaia/states/workflow_model_policy.json`` with atomic temp+rename and
+    a ``.last-good.json`` backup. ``load()`` returns ``None`` on a missing file (defaults);
+    a present-but-invalid file raises (missing != invalid).
+    """
+    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+        JsonWorkflowModelPolicyStore,
+    )
+
+    _guard_initialized(workspace_root)
+    return JsonWorkflowModelPolicyStore(workspace_root)
+
+
+def build_workflow_policy_resolver(
+    workspace_root: Path,
+    *,
+    context: str = "default",
+) -> "WorkflowExecutionPolicyResolver":
+    """Compose the single shared :class:`WorkflowExecutionPolicyResolver` (T-28-A-08).
+
+    Loads the overlay from the policy store (missing ⇒ ``None`` ⇒ library defaults; an
+    invalid overlay raises here, before any model call — LAW 4/5) and binds it to the
+    governed catalog. CLI and panel both consume *this* resolver so they never disagree on
+    which model a step runs. ``context`` is reserved for future per-context overlays; only
+    the ``default`` context is honored this release (D-2).
+    """
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+    )
+
+    _guard_initialized(workspace_root)
+    _ = context  # reserved (D-2: only `default` honored); recorded for call-site clarity.
+    overlay = build_workflow_model_policy_store(workspace_root).load()
+    return WorkflowExecutionPolicyResolver(
+        catalog=build_workflow_model_profile_registry(),
+        overlay=overlay,
+    )
+
+
 def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWorkflow:
     """Compose lifecycle report workflow."""
     _guard_initialized(workspace_root)
@@ -622,7 +685,9 @@ def build_lifecycle_phase_workflow(
     Binds the per-step runtime adapter (via :func:`build_agent_runtime`) to the
     persistent run store. The chosen ``runtime_kind`` is what makes the harness
     selectable per verb invocation; ``model`` is the discrete Layer-2 model (LAW 2)
-    threaded into the adapter when supplied.
+    threaded into the adapter when supplied. The caller passes a resolved
+    ``policy_snapshot`` to ``LifecyclePhaseWorkflow.run`` (composed via
+    :func:`build_workflow_policy_resolver`) — the workflow itself never parses policy JSON.
     """
     _guard_initialized(workspace_root)
     return LifecyclePhaseWorkflow(
@@ -639,6 +704,7 @@ def build_lifecycle_pipeline(
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
     models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
 ) -> LifecyclePipeline:
     """Compose the multi-step lifecycle pipeline with a per-step harness factory.
 
@@ -647,7 +713,9 @@ def build_lifecycle_pipeline(
     reviews, ...). ``models`` maps a runtime kind to its discrete Layer-2 model (LAW 2),
     so a step running on a given harness gets that harness's selected ``(id, effort)``.
     An optional cacheable ``prefix`` (WS-7) is assembled once and reused verbatim by
-    every step.
+    every step. ``policy_snapshot`` is the resolved governance snapshot (T-28-A-08, from
+    :func:`build_workflow_policy_resolver`); when present it is frozen onto the run before
+    the first step (LAW 7) — an overlay mutated after start cannot change the in-flight run.
     """
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
@@ -660,6 +728,7 @@ def build_lifecycle_pipeline(
             kind, cwd=run_cwd, model=model_by_kind.get(kind)
         ),
         prefix=prefix,
+        policy_snapshot=policy_snapshot,
     )
 
 

@@ -80,7 +80,7 @@ Acceptance: pipeline replaces the hard-coded `_DEFAULT_STEP_MODEL` effort litera
 resolved per-step config; snapshot persisted to the run before the first worker call; an
 overlay mutated after start does not change the in-flight run (AC-6).
 
-### [-] T-28-A-08 — Container wiring for the governance layer
+### [x] T-28-A-08 — Container wiring for the governance layer
 Goal: compose registry/store/resolver and thread the resolver into pipeline/phase builders.
 Write set: `dadaia_workspace/container.py`;
 `tests/unit/test_container.py`.
