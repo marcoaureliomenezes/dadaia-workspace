@@ -40,6 +40,12 @@ from collections.abc import Callable
 from typing import Protocol
 
 from dadaia_workspace.features.lifecycle import model_profiles
+from dadaia_workspace.features.lifecycle.fragments.loader import (
+    Fragment,
+    FragmentError,
+    FragmentLoader,
+    FragmentNotFoundError,
+)
 from dadaia_workspace.features.lifecycle.policy_resolver import (
     PolicyResolutionError,
     WorkflowCatalog,
@@ -72,6 +78,11 @@ _MAX_POLICY_BODY_BYTES = 64 * 1024
 
 #: A governed workflow id is a conservative identifier — letters, digits, underscore.
 _WORKFLOW_ID_RE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
+
+#: A fragment id is ``workflow.step`` — letters, digits, underscore, and a single dot
+#: separator. The conservative pattern rejects path traversal (``..``, ``/``) and any
+#: shell/path metacharacter before the loader ever touches disk (OWASP A03).
+_FRAGMENT_ID_RE = re.compile(r"^[A-Za-z0-9_]+\.[A-Za-z0-9_]+$")
 
 _JSON = "application/json; charset=utf-8"
 
@@ -222,6 +233,77 @@ def render_api_workflow_model_profiles() -> Callable[..., tuple[int, str, bytes]
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         profiles = [p.to_dict() for p in model_profiles.list_profiles()]
         return _json_response(200, {"generated_at": _now_iso(), "profiles": profiles})
+
+    return _view
+
+
+def _fragment_to_dict(fragment: Fragment) -> dict[str, object]:
+    """Project a loaded fragment onto the read-only inspector payload.
+
+    Carries the resolved body plus the inspector-relevant metadata: dynamic-context
+    selectors (``dynamic_inputs``), static inputs, and the output schema id. The
+    filesystem ``path`` is deliberately NOT exposed (no operator-local path leak, A06).
+    """
+    return {
+        "id": fragment.id,
+        "role": fragment.role,
+        "workflow": fragment.workflow,
+        "step": fragment.step,
+        "static_inputs": list(fragment.static_inputs),
+        "dynamic_inputs": list(fragment.dynamic_inputs),
+        "output_schema": fragment.output_schema,
+        "max_context_policy": fragment.max_context_policy,
+        "body": fragment.body,
+    }
+
+
+def render_api_workflow_fragment(
+    loader: FragmentLoader,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """GET /api/workflow-fragments/<fragment_id> — one fragment, read-only (T-28-D-01).
+
+    Resolves a governed step's fragment id to its resolved body + dynamic-context
+    selectors + output schema via the shared :class:`FragmentLoader`. The endpoint is
+    strictly read-only — the panel inspector renders fragment content but never edits it
+    (editing fragments is source-controlled release work, SPEC §6).
+
+    Guardrails: the id is validated against :data:`_FRAGMENT_ID_RE` before any disk read
+    (A03 — no path traversal); an unknown id is a 404; a malformed/unreadable fragment
+    surfaces a 422 with an actionable message; no error echoes a filesystem path (A06).
+    """
+
+    def _view(fragment_id: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
+        if not fragment_id or not _FRAGMENT_ID_RE.match(fragment_id):
+            return _json_response(
+                400,
+                {
+                    "error": "invalid_fragment_id",
+                    "message": "Fragment id must be of the form '<workflow>.<step>'.",
+                },
+            )
+        try:
+            fragment = loader.load_fragment(fragment_id)
+        except FragmentNotFoundError:
+            return _json_response(
+                404,
+                {
+                    "error": "not_found",
+                    "message": f"No fragment with id {fragment_id!r}.",
+                },
+            )
+        except FragmentError as exc:
+            # A malformed fragment must not blank the inspector or leak a path: surface a
+            # generic, actionable message (the precise loader message may carry the disk
+            # path, so it is intentionally not forwarded to the client — A06).
+            _ = exc
+            return _json_response(
+                422,
+                {
+                    "error": "invalid_fragment",
+                    "message": f"Fragment {fragment_id!r} could not be loaded.",
+                },
+            )
+        return _json_response(200, _fragment_to_dict(fragment))
 
     return _view
 
@@ -511,6 +593,7 @@ __all__ = [
     "render_api_lifecycle_runs",
     "render_api_workflow_catalog",
     "render_api_workflow_catalog_detail",
+    "render_api_workflow_fragment",
     "render_api_workflow_model_policy",
     "render_api_workflow_model_profiles",
     "render_post_workflow_model_policy_validate",

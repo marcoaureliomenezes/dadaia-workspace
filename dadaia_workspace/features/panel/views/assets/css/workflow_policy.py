@@ -79,4 +79,60 @@ WORKFLOW_POLICY_CSS: str = """
   border-bottom: 1px solid var(--border, #e5e5e5);
 }
 .wfp-error { color: #9b1c1c; }
+
+/* Read-only fragment inspector (T-28-D-01). */
+.wfp-frag-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  background: var(--surface-2, #f6f7fb);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  margin: 0 0.15rem 0.15rem 0;
+  cursor: pointer;
+  color: var(--accent, #2f6feb);
+}
+.wfp-frag-btn:hover { background: var(--surface-3, #eceefb); }
+.wfp-inspector {
+  margin-top: 0.6rem;
+  padding: 0.6rem;
+  background: var(--surface-2, #f6f7fb);
+  border-radius: 6px;
+}
+.wfp-fragment-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+}
+.wfp-fragment-id { font-weight: 600; }
+.wfp-fragment-meta { font-size: 0.8rem; color: var(--text-muted, #667); }
+.wfp-fragment-readonly {
+  margin-left: auto;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #667);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+.wfp-fragment-fields { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.8rem; margin: 0 0 0.5rem; }
+.wfp-fragment-fields dt { font-size: 0.8rem; color: var(--text-muted, #667); }
+.wfp-fragment-fields dd { margin: 0; font-size: 0.82rem; }
+.wfp-frag-input { font-size: 0.78rem; }
+.wfp-frag-none { color: var(--text-muted, #667); }
+.wfp-fragment-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.78rem;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 4px;
+  padding: 0.5rem;
+  max-height: 22rem;
+  overflow: auto;
+  margin: 0;
+}
 """

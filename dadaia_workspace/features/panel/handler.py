@@ -224,6 +224,12 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     ),
     (r"^/api/workflow-catalog$", "api_workflow_catalog", AuthClass.BEARER),
     (r"^/api/workflow-model-profiles$", "api_workflow_model_profiles", AuthClass.BEARER),
+    # Read-only fragment inspector (Wave D — T-28-D-01): /<fragment_id> path param.
+    (
+        r"^/api/workflow-fragments/(?P<fragment_id>[^/]+)$",
+        "api_workflow_fragment",
+        AuthClass.BEARER,
+    ),
     (r"^/api/workflow-model-policy$", "api_workflow_model_policy", AuthClass.BEARER),
     (r"^/api/lifecycle-runs$", "api_lifecycle_runs", AuthClass.BEARER),
     # BEARER_TELEMETRY routes (require active telemetry service)

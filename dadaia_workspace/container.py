@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
     )
+    from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         WorkflowCatalog,
         WorkflowExecutionPolicyResolver,
@@ -76,6 +77,7 @@ from dadaia_workspace.features.panel.views.workflow_policy import (
     render_api_lifecycle_runs,
     render_api_workflow_catalog,
     render_api_workflow_catalog_detail,
+    render_api_workflow_fragment,
     render_api_workflow_model_policy,
     render_api_workflow_model_profiles,
     render_post_workflow_model_policy_validate,
@@ -632,6 +634,19 @@ def build_workflow_model_profile_registry() -> "WorkflowCatalog":
     return governed_workflow_catalog()
 
 
+def build_fragment_loader() -> "FragmentLoader":
+    """Compose the shared :class:`FragmentLoader` over the packaged fragment library.
+
+    Used by the read-only panel fragment inspector (Wave D — T-28-D-01) to resolve a
+    governed step's fragment id to its resolved body + metadata. The loader reads from
+    the packaged ``public/lifecycle_fragments/`` root (no I/O at construction), so it
+    takes no ``workspace_root``.
+    """
+    from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
+
+    return FragmentLoader()
+
+
 def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowModelPolicyStore":
     """Compose the workflow-model-policy overlay store (T-28-A-08).
 
@@ -1027,6 +1042,7 @@ def build_panel_views(
     wf_catalog = build_workflow_model_profile_registry()
     policy_store = build_workflow_model_policy_store(workspace_root)
     run_store = build_lifecycle_run_store(workspace_root)
+    fragment_loader = build_fragment_loader()
 
     def _resolver_factory(
         context: str, *, overlay: "WorkflowModelPolicyOverlay | None" = None
@@ -1062,6 +1078,8 @@ def build_panel_views(
             wf_catalog, _resolver_factory
         ),
         "api_workflow_model_profiles": render_api_workflow_model_profiles(),
+        # Read-only fragment inspector (Wave D — T-28-D-01).
+        "api_workflow_fragment": render_api_workflow_fragment(fragment_loader),
         "api_workflow_model_policy": render_api_workflow_model_policy(policy_store),
         "api_workflow_model_policy_validate": render_post_workflow_model_policy_validate(
             policy_store, _resolver_factory

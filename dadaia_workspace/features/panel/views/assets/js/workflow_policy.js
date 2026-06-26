@@ -111,7 +111,15 @@
       : '<span class="wfp-diff wfp-diff--none">default</span>';
     var gate = step.is_gate || step.gate
       ? '<span class="wfp-gate" title="gate step">◉</span>' : '';
-    var fragments = (step.fragments || []).map(escHtml).join(', ') || '—';
+    // Read-only fragment inspector (T-28-D-01): each fragment id is a button that opens
+    // the resolved fragment body + dynamic inputs + output schema. No edit affordance.
+    var fragList = step.fragments || [];
+    var fragments = fragList.length
+      ? fragList.map(function (fid) {
+          return '<button type="button" class="wfp-frag-btn" data-wfp-fragment="' +
+            escHtml(fid) + '">' + escHtml(fid) + '</button>';
+        }).join(' ')
+      : '—';
 
     return '<tr class="' + rowCls + '" data-wfp-step-row="' + escHtml(step.step) + '">' +
       '<td class="wfp-c-step">' + escHtml(step.step) + '</td>' +
@@ -145,6 +153,7 @@
         '<th>Step</th><th>Role</th><th>Harness</th><th>Model profile</th>' +
         '<th>Concrete model</th><th>Fragments</th><th>Gate</th><th>Default vs effective</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div class="wfp-inspector" data-wfp-inspector-panel="' + escHtml(wf.workflow_id) + '" hidden></div>' +
       '<div class="wfp-runs" data-wfp-runs-panel="' + escHtml(wf.workflow_id) + '" hidden></div>' +
       '</section>';
   }
@@ -229,6 +238,70 @@
         loadRuns(btn.getAttribute('data-wfp-runs'));
       });
     });
+
+    // Read-only fragment inspector buttons (T-28-D-01).
+    root.querySelectorAll('[data-wfp-fragment]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var workflowSection = btn.closest('[data-wfp-workflow-card]');
+        if (!workflowSection) { return; }
+        var workflowId = workflowSection.getAttribute('data-wfp-workflow-card');
+        loadFragment(workflowId, btn.getAttribute('data-wfp-fragment'));
+      });
+    });
+  }
+
+  // ── Read-only fragment inspector (T-28-D-01) ──────────────────────────────────
+
+  function loadFragment(workflowId, fragmentId) {
+    var panel = document.querySelector(
+      '[data-wfp-inspector-panel="' + cssEsc(workflowId) + '"]');
+    if (!panel) { return; }
+    panel.hidden = false;
+    panel.innerHTML = '<p class="wfp-loading">Loading fragment…</p>';
+    fetchJson('/api/workflow-fragments/' + encodeURIComponent(fragmentId))
+      .then(function (res) {
+        if (res.status !== 200 || !res.body) {
+          var msg = (res.body && res.body.message) || 'Fragment could not be loaded.';
+          panel.innerHTML = '<p class="wfp-error" data-testid="wfp-fragment-error">' +
+            escHtml(msg) + '</p>';
+          return;
+        }
+        panel.innerHTML = renderFragment(res.body);
+      })
+      .catch(function () {
+        panel.innerHTML = '<p class="wfp-error">Could not load fragment.</p>';
+      });
+  }
+
+  function renderInputList(items) {
+    if (!items || !items.length) { return '<span class="wfp-frag-none">—</span>'; }
+    return items.map(function (x) {
+      return '<code class="wfp-frag-input">' + escHtml(x) + '</code>';
+    }).join(' ');
+  }
+
+  function renderFragment(frag) {
+    // Read-only: body is rendered as escaped <pre> text (NEVER as markup) so a fragment
+    // body can never inject script into the panel (A03/A07). No edit affordance.
+    return '<div class="wfp-fragment" data-testid="wfp-fragment-detail">' +
+      '<header class="wfp-fragment-head"><code class="wfp-fragment-id">' +
+        escHtml(frag.id) + '</code>' +
+        '<span class="wfp-fragment-meta">' + escHtml(frag.role || '') + ' · ' +
+        escHtml(frag.workflow || '') + '.' + escHtml(frag.step || '') + '</span>' +
+        '<span class="wfp-fragment-readonly" title="Fragments are source-controlled; ' +
+        'edit them in a release, not the panel">read-only</span></header>' +
+      '<dl class="wfp-fragment-fields">' +
+        '<dt>Dynamic inputs</dt><dd data-testid="wfp-fragment-dynamic">' +
+          renderInputList(frag.dynamic_inputs) + '</dd>' +
+        '<dt>Static inputs</dt><dd>' + renderInputList(frag.static_inputs) + '</dd>' +
+        '<dt>Output schema</dt><dd data-testid="wfp-fragment-schema"><code>' +
+          escHtml(frag.output_schema || '—') + '</code></dd>' +
+        '<dt>Max context</dt><dd><code>' +
+          escHtml(frag.max_context_policy || '—') + '</code></dd>' +
+      '</dl>' +
+      '<pre class="wfp-fragment-body" data-testid="wfp-fragment-body">' +
+        escHtml(frag.body || '') + '</pre>' +
+      '</div>';
   }
 
   // ── Policy payload ───────────────────────────────────────────────────────────
