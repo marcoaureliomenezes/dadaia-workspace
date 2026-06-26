@@ -402,6 +402,68 @@ class ContextSelector:
     def sel_candidate_backlog(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
         return self._render(name, policy, self._backlog_refs(open_only=True))
 
+    def sel_backlog_index(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
+        """Return a compact bound-intent index of every surviving backlog item (SPEC §3.5).
+
+        For each ``specs/backlog/*.md`` item (``ideas.md``/``candidates.md``/the catalog
+        excluded via the R1 ``load_backlog_items`` loader), emit its **status** and its
+        **bound intents** — each intent's canonical anchor id + change, resolved through the
+        R1 canonical-subject registry. Only the ``intents[]`` frontmatter + status are read;
+        the body is never touched (ADR-D). All roots are derived from the injected
+        ``SpecContext`` (source root = ``specs_dir.parent``), never cwd (SPEC §3.8).
+        """
+        # Local imports keep the selector module free of a hard backlog-feature import cycle.
+        from dadaia_workspace.features.backlog.preview import (
+            bound_anchor_changes,
+            load_backlog_items,
+        )
+        from dadaia_workspace.features.backlog.subject_registry import build_registry
+
+        backlog_dir = self._ctx.specs_dir / "backlog"
+        items = load_backlog_items(backlog_dir)
+        if not items:
+            return SelectionResult(name=name, policy=policy, content="", refs=())
+
+        source_root = self._ctx.specs_dir.parent
+        registry = build_registry(
+            source_root=source_root,
+            catalog_path=self._catalog_path(),
+            alias_map_path=self._alias_map_path(),
+            specs_dir=self._ctx.specs_dir,
+        )
+
+        blocks: list[str] = []
+        refs: list[str] = []
+        for item in items:
+            anchor_changes, unresolved = bound_anchor_changes(item, registry)
+            status = item.status or "(no status)"
+            lines = [f"### {item.slug}", f"- status: {status}"]
+            if anchor_changes:
+                lines.append("- bound intents:")
+                for anchor_id in sorted(anchor_changes):
+                    lines.append(f"  - {anchor_id} => {anchor_changes[anchor_id]}")
+            for message in unresolved:
+                lines.append(f"  - UNRESOLVED: {message}")
+            if not anchor_changes and not unresolved:
+                lines.append("- bound intents: (none)")
+            blocks.append("\n".join(lines))
+            refs.append(self._specs_ref(item.path))
+
+        return SelectionResult(
+            name=name,
+            policy=policy,
+            content="\n\n".join(blocks),
+            refs=tuple(refs),
+        )
+
+    def _alias_map_path(self) -> Path:
+        """Resolve the operator alias-map path up from ``specs_dir`` (never cwd, SPEC §3.8)."""
+        here = self._ctx.specs_dir.resolve()
+        for parent in (here, *here.parents):
+            if (parent / ".dadaia").is_dir():
+                return parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
+        return self._ctx.specs_dir.parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
+
     def sel_selected_backlog_items(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
         return self._render(name, policy, self._backlog_refs(open_only=False))
 
@@ -566,6 +628,7 @@ _SELECTORS: dict[str, _SelectorFn] = {
     "open_bugs": ContextSelector.sel_open_bugs,
     "open_audits": ContextSelector.sel_open_audits,
     "candidate_backlog": ContextSelector.sel_candidate_backlog,
+    "backlog_index": ContextSelector.sel_backlog_index,
     "architecture_summary": ContextSelector.sel_architecture_summary,
     "product_catalog_summary": ContextSelector.sel_product_catalog_summary,
     "approved_spec": ContextSelector.sel_approved_spec,

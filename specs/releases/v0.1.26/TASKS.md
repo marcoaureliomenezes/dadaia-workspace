@@ -17,7 +17,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
 
 ---
 
-## [ ] T-26-01 — `backlog_index` context selector
+## [x] T-26-01 — `backlog_index` context selector
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/context_selector.py`,
