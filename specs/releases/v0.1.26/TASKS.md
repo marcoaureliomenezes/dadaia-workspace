@@ -69,7 +69,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
 - **Done-when:** round-trip unit test `write_consumed` → R1 `read_consumed` → expected map
   (acceptance §3.7.8); mypy/ruff clean.
 
-## [ ] T-26-04 — Residual-aware closure removal hook (copy-before-remove)
+## [x] T-26-04 — Residual-aware closure removal hook (copy-before-remove)
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/backlog/removal.py`,
