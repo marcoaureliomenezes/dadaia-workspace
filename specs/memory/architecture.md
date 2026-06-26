@@ -16,10 +16,11 @@ tags:
 - dependency-rules
 - adr
 - agents
+- backlog
 agent_tier: self-pull
-token_estimate: 8400
+token_estimate: 9100
 last_updated: '2026-06-26'
-release_origin: v0.1.24
+release_origin: v0.1.25
 ---
 
 ## Visão geral
@@ -43,7 +44,7 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 
 **cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`, `lifecycle`. Thin wrapper sobre features; sem business logic.
 
-**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
+**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `backlog` (backlog-consistency engine, v0.1.25: `subject_registry.py` registry auto-derivado, `classifier.py` classificador fail-closed, `doctor.py` BL-* checks, `ledger.py` reader do sidecar `consumed_backlog.json`, `preview.py` superfície read-only — ver "Backlog-consistency subsystem" abaixo), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
 
 **panel — arquitetura HTTP interna (pós R5):**
 
@@ -467,6 +468,8 @@ Locais canônicos de estado em disco e seu propósito:
   * `specs/memory/*.md` — memory atômica (Markdown + frontmatter YAML; rendered in-memory pelo panel via mistune).
   * `specs/memory/product/catalog.json` — gerado por `generate-memory-catalog.py` a partir do frontmatter dos `.md`; committed; índice machine-readable.
   * `specs/_archive/releases/<id>/` — releases concluídas com CLOSURE.
+  * `specs/_archive/<release-id>/consumed_backlog.json` — sidecar JSON machine-readable (um por release arquivada; entries `{slug, shipped_anchors[]}`) lido por `backlog doctor` BL-STALE via exact slug membership; escrito por release-definition/closure (R2). Ausência = no-op (sem false ERROR).
+  * `.dadaia/states/backlog_subject_aliases.txt` — alias map do backlog mantida pelo operador (uma linha `synonym -> canonical-anchor`); lida por path injetado; em R1 é o único caminho de binding para subjects `panel`/`api`.
 
 **Stores que não existem (não recriar):** `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (semaphore / Lock 4), `.dadaia/logs/semaphore-reclaims.jsonl`, marcador global de contexto, e qualquer script bash de gate em `.dadaia/scripts/`. O mutex MUTATING é exclusivamente o TTL-lease em `.dadaia/states/ctx_locks/<ctx>.lock.json`; o session record `.dadaia/sessions/<id>.json` não é mecanismo de locking — carrega identidade/modo da sessão (lido pelo gate para resolução de modo) e alimenta o Kanban.
 
@@ -532,6 +535,84 @@ Valida cada atom:
 - Forbidden headings — hard ERROR
 
 Invocado por doctor check `LINT-1`. Exit 0 = all valid; exit 1 = ao menos um ERROR.
+
+## Backlog-consistency subsystem (`features/backlog/`, v0.1.25)
+
+O backlog é mantido como um **SET deduplicado, conflict-free e não-stale**, enforçado
+**mecanicamente** — não por julgamento de modelo nem por vigilância humana/de agente (ambos
+já falharam e corromperam um projeto). O subsistema vive em `dadaia_workspace/features/backlog/`
+(módulos puros, roots sempre injetados, espelhando `features/ci_preflight/`).
+
+**Item schema — `intents[]`.** Todo item de backlog carrega frontmatter `intents[]`, onde
+cada intent é `Subject{kind, ref} → change`. `Subject` e `Intent` são dataclasses frozen
+puras em `core/models/backlog.py`; `kind ∈ {code, api, cli, panel, doc, invariant, catalog}`
+e `ref` é uma **referência tipada, nunca free text**. Refs de `code` são sempre
+**module-relative** `path#symbol` (ex. `dadaia_workspace/core/models/lifecycle.py#AgentRuntimeKind`)
+— a registry rejeita paths absolutos/operator-local e nomes de repo privado de qualquer
+intent committado (privacy).
+
+**Registry canônico de subjects (a linchpin) — `subject_registry.py`.** **Auto-derivado,
+recomputado a partir da verdade viva a cada run** — nunca um arquivo de registry armazenado
+(que iria ele mesmo ficar stale, a meta-versão do bug que corrigimos). R1 auto-deriva
+exatamente **cinco** kinds de anchor, cada um lastreado por um registry-of-truth real na
+árvore viva: `code` (`path#symbol` validado por walk AST com fallback grep), `cli` (ids de
+comando do Typer app-tree), `catalog` (slugs de `specs/memory/product/catalog.json` + ids de
+atom), `doc` (ids spec-doc `SPEC-DOC-NNN` + heading anchors de memory), `invariant` (`INV-*`
+nomeados). **`panel`/`api` NÃO são auto-deriváveis em R1** (não há route registry de onde
+derivar; grep-derivá-los seria a heurística fuzzy que este design rejeita) — ligam **apenas**
+pela alias map; auto-derivação desses kinds é diferida para R2. Mais um **alias map** mantido
+pelo operador em `.dadaia/states/backlog_subject_aliases.txt` (uma linha
+`synonym -> canonical-anchor`), lido por **path explicitamente injetado** (nunca cwd), que
+colapsa sinônimos a um anchor canônico — e, em R1, é o único caminho de binding para
+`panel`/`api`. **Contrato de binding:** o modelo **propõe** uma string de subject; Python
+normaliza + **liga** a um anchor de registry e **HALTa (rejeita, não silent NEW)** qualquer
+intent cujo subject resolva para nenhum anchor ou um set ambíguo.
+
+**Classificador determinístico fail-closed — `classifier.py`.** Python é dono da fronteira
+UNRELATED/CONFLICT via **set-intersection de anchors canônicos**; o modelo nunca decide
+UNRELATED-vs-não. Intersecção vazia → `UNRELATED` (final, sem chamada de modelo); mesmos
+anchors + mesma change → `DUPLICATE`; **anchor compartilhado + change divergente** defaulta
+**fail-closed** a `DIVERGENT_CONFLICT` (o gêmeo perigoso). O modelo só pode **downgrade**
+(para `OVERLAP`/`SUPERSEDES`) com um merge explícito, estruturado e provado-compatível —
+nunca pode *perder* um conflito, porque same-anchor+differing-change defaulta a conflito. R1
+embarca o **core determinístico** (steps 1–2 + o default fail-closed); a seam de
+model-adjudication é exposta mas **OFFLINE** em R1 (um `Callable` defaultando a "no
+downgrade") — R2 exercita o step de modelo dentro do workflow.
+
+**`dadaia backlog doctor` (o backstop ENFORCED) — `doctor.py`.** Postura honesta
+oriented-vs-enforced: `specs/backlog/` é gitignored + ADDITIVE, então a gate PreToolUse/lease
+NÃO classifica um arquivo de backlog hand-written como MUTATING — o **workflow (R2) é o
+happy-path ORIENTED; o doctor no chokepoint git é o ENFORCEMENT real**. Um único engine de
+check **parametrizado** (sem fan-out copy-paste) emite quatro check codes (StrEnum):
+**BL-SCHEMA** (todo item tem `intents[]` ligado + status válido), **BL-DUP** (dois itens
+compartilham anchor-set + change → ERROR), **BL-CONFLICT** (dois itens compartilham um anchor
+com change incompatível → ERROR — o gêmeo divergente, apanhado mesmo se hand-written),
+**BL-STALE** (um slug listado no ledger `consumed_backlog` de qualquer release arquivada que
+ainda existe em `specs/backlog/` → ERROR). `run_backlog_doctor(*, specs_dir, source_root,
+catalog_path, alias_map_path, archive_root)` — todos os paths injetados. Wiring: `backlog
+doctor` roda no **pre-commit chokepoint** (ao lado dos checks lease/CI existentes, via o
+backend `dadaia ci pre-commit-check`) e em **CI** (`ci.yml`), mirrorando o padrão
+`ci preflight` — um gêmeo divergente hand-written é **rejeitado no commit**, fechando o
+bypass gitignore/ADDITIVE. Superfície read-only de resolve/preview (`preview.py`):
+`dadaia backlog subjects` (lista o anchor set vivo, opcional `--kind`/`--resolve "<ref>"`) e
+`dadaia backlog doctor --explain` (mostra como um subject proposto resolve: anchor ligado, ou
+`UNRESOLVED`/`AMBIGUOUS` + candidate set + sugestão de alias) — nunca escreve um arquivo de
+backlog ou a alias map.
+
+**Ledger `consumed_backlog` (read-only em R1) — `ledger.py`.** BL-STALE liga a um **ledger
+estruturado** fixado a um **sidecar JSON machine-readable** em
+`specs/_archive/<release-id>/consumed_backlog.json` (um arquivo por release arquivada;
+entries `{slug, shipped_anchors[]}` keyed pelo set de subject-anchors verificado realmente
+shipado) e casa por **exact slug membership** — substituindo a heurística de prosa
+SPEC-DOC-031. `read_consumed(archive_root)` varre todos os
+`specs/_archive/*/consumed_backlog.json` por membership exata e **tolera ausência** (sem
+ledger arquivado → BL-STALE é no-op, nunca false ERROR). R1 **define o formato + lê**; o
+**writer** (release-definition/closure) é **R2**.
+
+**Diferido para R2 (v0.1.26):** o corpo do workflow `backlog_definition` (o step ladder de
+`dadaia lifecycle backlog define`), o hook de removal-on-release no closure que **escreve** o
+ledger `consumed_backlog`, os fragments reais, e o step de model-adjudication rodando
+end-to-end.
 
 ## Multi-harness runtime parity (constitution §4)
 

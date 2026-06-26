@@ -11,9 +11,9 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 2200
+token_estimate: 2300
 last_updated: '2026-06-26'
-release_origin: v0.1.24
+release_origin: v0.1.25
 ---
 
 ## Linguagens
@@ -184,3 +184,8 @@ Como rodar, testar, lintar e empacotar:
     # SDD
     dadaia specs doctor                     # estrutura SDD
     dadaia specs doctor --json              # machine-readable
+
+    # Backlog-consistency engine (features/backlog/, v0.1.25)
+    dadaia backlog subjects                 # lista o anchor set canônico vivo (opcional --kind / --resolve "<ref>")
+    dadaia backlog doctor                   # BL-SCHEMA/DUP/CONFLICT/STALE; exit !=0 em violação (wired no pre-commit + CI)
+    dadaia backlog doctor --explain         # mostra como um subject proposto resolve (anchor | UNRESOLVED | AMBIGUOUS)

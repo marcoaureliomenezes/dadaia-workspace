@@ -1,6 +1,6 @@
 ---
 release: v0.1.25
-phase: IMPLEMENTATION
+phase: CLOSURE
 segment: alpha-1
 ---
 
