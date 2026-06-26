@@ -115,7 +115,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   actionable `ImportError` when absent; map any SDK exception to `FAILED`.
 - **Done when:** `_default_query_fn` no longer raises `NotImplementedError` when the package
   is present; module-load import discipline preserved.
-- `[ ]`
+- `[x]`
 
 ### T-23-10 — Claude SDK adapter unit tests for permission wiring (WS-2)
 - **Owner:** software-engineer
@@ -125,7 +125,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   module/object (no network): in-scope write allowed, out-of-scope write denied, SDK
   exception → `FAILED`, absent package → actionable `ImportError`.
 - **Done when:** all cases covered; CI green; no network.
-- `[ ]`
+- `[x]`
 
 ### T-23-11 — Claude opt-in live contract test (WS-2)
 - **Owner:** software-engineer
@@ -135,7 +135,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   `ANTHROPIC_API_KEY`; auto-SKIP otherwise; NOT CI-gated; asserts a typed result and that an
   out-of-scope write is denied by the Ring-1 wiring.
 - **Done when:** collected + SKIPs cleanly with env unset.
-- `[ ]`
+- `[x]`
 
 ### T-23-12 — Codex Layer-2 adapter opt-in live contract test (WS-3 live half)
 - **Owner:** software-engineer
