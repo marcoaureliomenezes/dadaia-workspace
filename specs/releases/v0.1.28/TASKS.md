@@ -197,7 +197,7 @@ Acceptance: fails on invalid policy JSON, unknown profile, harness/profile misma
 workflow/step id, missing default profile per supported harness, unresolved fragment/output
 schema, and any `claude`/`opencode` Layer-2 policy/profile residue; never crashes the panel.
 
-### [ ] T-28-D-03 — Wave D green checkpoint
+### [x] T-28-D-03 — Wave D green checkpoint
 Write set: none (verification only).
 Acceptance: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`, panel E2E green;
 all SPEC §6 acceptance criteria satisfied.
