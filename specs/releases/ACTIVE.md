@@ -1,17 +1,21 @@
 ---
-release: none
-phase: ARCHIVED
+release: v0.1.27
+phase: IMPLEMENTATION
+segment: alpha-1
 ---
 
-No active release. **v0.1.26 (R2 — `backlog_definition` workflow body +
-removal-on-release)** is CLOSED — CLOSURE.md written + memory atoms updated; pending the
-coordinator's `git mv` to `specs/_archive/releases/v0.1.26/`. With R1 (v0.1.25) + R2
-(v0.1.26) both shipped, the epic `FEAT-BACKLOG-DEFINITION-WORKFLOW-01` is dispositioned
-`DELIVERED — v0.1.26`.
+Active release: **v0.1.27 — wire the consumed_backlog PRODUCER at release-definition**
+(the v0.1.26 R2 residual, `FEAT-BACKLOG-CONSUME-PRODUCER-WIRING-01`, HIGH). R2 shipped
+the full removal-on-release mechanism + the closure-side `remove` invocation, but left
+the producer unwired: nothing writes `consumed_backlog.json` in production, so
+`remove_at_closure` no-ops and the BL-STALE loop never fires end-to-end.
 
-**Next step:** the R2 residual —
-`specs/backlog/wire-consumed-ledger-producer-at-release-definition.md`
-(`FEAT-BACKLOG-CONSUME-PRODUCER-WIRING-01`, HIGH): wire the `consumed_backlog` ledger
-**producer** (`consume_at_release_definition`) into the real release-definition surface so
-removal-on-release fires end-to-end (the closure consumer is already wired into
-`dadaia lifecycle close`). Then: `workflow-model-governance-panel-control-plane`.
+**Operator-resolved design decision (2026-06-26):** a release declares its consumed
+backlog items via a machine-readable `**Consumes:** slug1, slug2` line in the release
+SPEC. At `dadaia lifecycle release define`, a guarded `post_step` parses that line, binds
+each slug's intents through the R1 registry → the verified shipped-anchor set, and calls
+`BacklogRemovalLifecycle.consume(...)` to write the ledger — symmetric with the
+`dadaia lifecycle close` removal already wired in R2.
+
+Source backlog: `specs/backlog/wire-consumed-ledger-producer-at-release-definition.md`.
+Then: `workflow-model-governance-panel-control-plane`.
