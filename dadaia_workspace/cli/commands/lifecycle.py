@@ -52,14 +52,25 @@ _HARNESS_CATALOG_KEY = {
     "pi": PI_HARNESS,
 }
 
-# Layer-1 harness names rejected as Layer-2 workflow harnesses (LAW 1) with a pointer.
-_LAYER1_ONLY_HARNESSES = {"claude", "claude_sdk", "claude-sdk"}
+# Harness names rejected as Layer-2 workflow harnesses (LAW 1) with a pointer. Claude is a
+# Layer-1 entry harness; OpenCode was removed as a Layer-2 worker in v0.1.24. Layer-2
+# workers are pi or codex only; ``fake`` is the deterministic test adapter.
+_LAYER1_ONLY_HARNESSES = {
+    "claude",
+    "claude_sdk",
+    "claude-sdk",
+    "opencode",
+    "open-code",
+}
 
 app = typer.Typer(help="Deterministic lifecycle workflow commands.", no_args_is_help=True)
 hygiene_app = typer.Typer(help="Lifecycle hygiene commands.", no_args_is_help=True)
 review_app = typer.Typer(help="Lifecycle review commands.", no_args_is_help=True)
 backlog_app = typer.Typer(help="Lifecycle backlog commands.", no_args_is_help=True)
 release_app = typer.Typer(help="Lifecycle release commands.", no_args_is_help=True)
+workflow_app = typer.Typer(
+    help="Read-only workflow model-governance inspection.", no_args_is_help=True
+)
 
 
 class LifecycleExitCode(IntEnum):
@@ -722,6 +733,48 @@ def _resolve_model(harness: str, model: str | None) -> HarnessModelOption | None
         raise typer.BadParameter(str(exc)) from exc
 
 
+def _looks_like_raw_model(value: str) -> bool:
+    """Return whether *value* looks like a raw ``<id>:<effort>`` discrete model string.
+
+    D-3: ``--step-model`` accepts a registry **profile id** only. A raw model string (it
+    contains a ``:`` separating id and effort) must be rejected with an actionable message
+    rather than silently accepted.
+    """
+    return ":" in value
+
+
+def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object, ...]:
+    """Parse ``--step-model 'step=profile-id'`` items into resolver ``StepOverride``s (D-3).
+
+    Profile ids ONLY: a raw ``<id>:<effort>`` model string, or an id that is not a built-in
+    profile, is rejected here with an actionable ``BadParameter`` (the resolver re-validates
+    harness match / deprecation against the catalog). Returns a tuple of ``StepOverride``.
+    """
+    from dadaia_workspace.features.lifecycle import model_profiles
+    from dadaia_workspace.features.lifecycle.model_profiles import UnknownProfileError
+    from dadaia_workspace.features.lifecycle.policy_resolver import StepOverride
+
+    overrides: list[object] = []
+    for item in step_model or []:
+        label, sep, profile_id = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'step=profile-id', got {item!r}")
+        clean_label = label.strip()
+        clean_profile = profile_id.strip()
+        if _looks_like_raw_model(clean_profile):
+            valid = ", ".join(p.id for p in model_profiles.list_profiles())
+            raise typer.BadParameter(
+                f"--step-model takes a profile id, not a raw model string {clean_profile!r} "
+                f"(D-3). Valid profiles: {valid}"
+            )
+        try:
+            model_profiles.resolve(clean_profile)
+        except UnknownProfileError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        overrides.append(StepOverride(step=clean_label, profile_id=clean_profile))
+    return tuple(overrides)
+
+
 def _run_phase_step(
     *,
     label: str,
@@ -976,56 +1029,76 @@ def pipeline(
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
-        help="Per-step model override 'label=model' (repeatable); model is "
-        "'<id>:<effort>' valid for that step's harness (LAW 2).",
+        help="Per-step model override 'label=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
+        "profiles list'.",
+    ),
+    show_policy: bool = typer.Option(
+        False,
+        "--show-policy",
+        help="Print the resolved per-step model policy and exit without running.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the multi-step release pipeline (implement→qa→security→code) with per-step harness mixing."""
+    """Run the multi-step release pipeline (implement→qa→security→code) with per-step harness mixing.
+
+    The per-step model is governed: ``--step-model label=profile-id`` selects a built-in
+    model profile (D-3), resolved through the shared ``WorkflowExecutionPolicyResolver``
+    (CLI > overlay > library default). The resolved policy is snapshotted onto the run
+    before the first step (LAW 7). ``--show-policy`` prints the resolved policy and exits.
+    """
     from dataclasses import replace
 
     from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+    from dadaia_workspace.features.lifecycle.pipeline import (
+        apply_resolved_policy,
+        implementation_ladder,
+    )
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        PolicyResolutionError,
+        StepOverride,
+    )
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
+    _ = model  # legacy discrete --model is superseded by profile-id --step-model (D-3).
+
     overrides: dict[str, AgentRuntimeKind] = {}
-    harness_by_label: dict[str, str] = {}
     for item in step_harness or []:
         label, sep, kind_str = item.partition("=")
         if not sep:
             raise typer.BadParameter(f"--step-harness expects 'label=harness', got {item!r}")
-        clean_label = label.strip()
-        clean_harness = kind_str.strip()
-        overrides[clean_label] = _resolve_harness(clean_harness)
-        harness_by_label[clean_label] = clean_harness
+        overrides[label.strip()] = _resolve_harness(kind_str.strip())
 
-    steps = tuple(
+    # D-3: --step-model takes profile ids only; the shared resolver applies precedence and
+    # validates each override against the catalog (step id + profile id + harness match).
+    cli_overrides = _parse_step_profile_overrides(step_model)
+    typed_overrides: tuple[StepOverride, ...] = tuple(
+        ov for ov in cli_overrides if isinstance(ov, StepOverride)
+    )
+    resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
+    try:
+        snapshot = resolver.resolve(
+            "implementation", context="default", cli_overrides=typed_overrides
+        )
+    except PolicyResolutionError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if show_policy:
+        _emit_json(_policy_snapshot_payload(snapshot)) if json_output else _print_policy(snapshot)
+        return
+
+    base = tuple(
         replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
         for step in implementation_ladder(default_kind)
     )
-
-    # LAW 2 — resolve the discrete model per step, keyed by the step's runtime kind so
-    # the factory hands each harness its selected (id, effort). The default --model
-    # applies to the default harness; --step-model overrides per label.
-    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
-    default_model = _resolve_model(harness, model)
-    if default_model is not None:
-        models[default_kind] = default_model
-    step_model_by_label: dict[str, str] = {}
-    for item in step_model or []:
-        label, sep, model_str = item.partition("=")
-        if not sep:
-            raise typer.BadParameter(f"--step-model expects 'label=model', got {item!r}")
-        step_model_by_label[label.strip()] = model_str.strip()
-    for label, model_str in step_model_by_label.items():
-        step_harness_name = harness_by_label.get(label, harness)
-        resolved = _resolve_model(step_harness_name, model_str)
-        if resolved is not None:
-            models[_resolve_harness(step_harness_name)] = resolved
+    steps = apply_resolved_policy(base, snapshot)
 
     pipe = container.build_lifecycle_pipeline(
-        workspace_root, context=context, release_id=release_id, models=models
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        policy_snapshot=snapshot,
     )
     result = pipe.run(run_id, steps)
     status = (
@@ -1050,6 +1123,7 @@ def pipeline(
                     for step in result.steps
                 ],
                 "blocked": result.blocked.to_dict() if result.blocked else None,
+                "workflow_policy": _policy_snapshot_payload(snapshot),
             }
         )
     else:
@@ -1062,7 +1136,82 @@ def pipeline(
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
+def _policy_snapshot_payload(snapshot: object) -> dict[str, Any]:
+    """Project a ``WorkflowPolicySnapshot`` to a JSON-serializable dict for CLI output."""
+    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
+
+    assert isinstance(snapshot, WorkflowPolicySnapshot)
+    return snapshot.to_dict()
+
+
+def _print_policy(snapshot: object) -> None:
+    """Print a resolved policy snapshot as a human-readable step table."""
+    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
+
+    assert isinstance(snapshot, WorkflowPolicySnapshot)
+    typer.echo(f"OK workflow={snapshot.workflow_id} policy={snapshot.policy_id}")
+    for entry in snapshot.steps:
+        typer.echo(
+            f"  {entry.step}: profile={entry.model_profile} harness={entry.harness} "
+            f"model={entry.model} reasoning={entry.reasoning} source={entry.source.value}"
+        )
+
+
+workflow_policy_app = typer.Typer(help="Workflow policy inspection.", no_args_is_help=True)
+workflow_profiles_app = typer.Typer(help="Model-profile inspection.", no_args_is_help=True)
+
+
+@workflow_policy_app.command("show")
+def workflow_policy_show(
+    workflow: str = typer.Argument("implementation", help="Workflow id to resolve."),
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Show the resolved model policy for a workflow (read-only).
+
+    Resolves through the shared ``WorkflowExecutionPolicyResolver`` (overlay > library
+    default) with no CLI overrides — what a run would use today before any ``--step-model``.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.policy_resolver import PolicyResolutionError
+
+    workspace_root = resolve_workspace_root()
+    resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
+    try:
+        snapshot = resolver.resolve(workflow, context="default")
+    except PolicyResolutionError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if json_output:
+        _emit_json(_policy_snapshot_payload(snapshot))
+    else:
+        _print_policy(snapshot)
+
+
+@workflow_profiles_app.command("list")
+def workflow_profiles_list(
+    harness: str | None = typer.Option(None, "--harness", help="Filter to a harness (codex|pi)."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """List the built-in model profiles (read-only) — the valid ``--step-model`` ids (D-3)."""
+    from dadaia_workspace.features.lifecycle import model_profiles
+
+    profiles = model_profiles.profiles_for(harness) if harness else model_profiles.list_profiles()
+    if json_output:
+        _emit_json({"profiles": [p.to_dict() for p in profiles]})
+        return
+    for profile in profiles:
+        flag = " [deprecated]" if profile.deprecated else ""
+        typer.echo(
+            f"  {profile.id}: harness={profile.harness} model={profile.model_id}:{profile.effort} "
+            f"— {profile.purpose}{flag}"
+        )
+
+
+workflow_app.add_typer(workflow_policy_app, name="policy")
+workflow_app.add_typer(workflow_profiles_app, name="profiles")
+
 app.add_typer(hygiene_app, name="hygiene")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(release_app, name="release")
 app.add_typer(review_app, name="review")
+app.add_typer(workflow_app, name="workflow")
