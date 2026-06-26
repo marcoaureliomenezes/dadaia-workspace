@@ -862,6 +862,24 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     return specs_dir, source_root
 
 
+def build_release_spec_path(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+) -> Path:
+    """Resolve ``<specs_dir>/releases/<release_id>/SPEC.md`` for a context's release.
+
+    Uses the same root resolution as :func:`build_backlog_removal_lifecycle`
+    (:func:`_backlog_context_roots`): a consumer context resolves to ``repos/<ctx>/specs``;
+    the self-hosting library repo falls back to the workspace-root ``specs``. All roots are
+    derived from ``workspace_root`` — never cwd. The producer post-step reads the
+    ``**Consumes:**`` line from this path (SPEC §3.2).
+    """
+    specs_dir, _source_root = _backlog_context_roots(workspace_root, context)
+    return specs_dir / "releases" / release_id / "SPEC.md"
+
+
 def build_backlog_removal_lifecycle(
     workspace_root: Path,
     *,

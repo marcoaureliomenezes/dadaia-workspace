@@ -559,6 +559,23 @@ def release_define(
     )
     result = workflow.run(run_id, sequence)
 
+    # Producer post-step (SPEC §3.2): on a COMPLETED definition, parse the release SPEC's
+    # **Consumes:** line, bind the declared slugs' anchors through the R1 registry, and write
+    # the consumed_backlog ledger via BacklogRemovalLifecycle.consume — symmetric with the
+    # close verb's _apply_closure_removal. `release_define` has no post_step seam (it calls
+    # workflow.run directly), so the guard is inlined here with the same try/except shape: it
+    # runs ONLY when the definition completed, and a bind error surfaces as post_step_error
+    # (never a silent skip) without corrupting the already-accepted definition result.
+    post_step_result: dict[str, Any] | None = None
+    post_step_error: str | None = None
+    if result.completed:
+        try:
+            post_step_result = _apply_release_consume(
+                workspace_root, context=context, release_id=release_id
+            )
+        except Exception as exc:  # noqa: BLE001 — surface, never swallow; do not corrupt the run.
+            post_step_error = f"{type(exc).__name__}: {exc}"
+
     status = (
         LifecycleCommandStatus.OK.value
         if result.completed
@@ -582,6 +599,8 @@ def release_define(
                     for step in result.steps
                 ],
                 "blocked": result.blocked.to_dict() if result.blocked else None,
+                "post_step": post_step_result,
+                "post_step_error": post_step_error,
             }
         )
     else:
@@ -589,8 +608,53 @@ def release_define(
         typer.echo(
             f"{status} release-define run={result.run_id} phase={result.final_phase.value} {trail}"
         )
+        if post_step_result is not None:
+            typer.echo(f"  post_step: {post_step_result}")
+        if post_step_error is not None:
+            typer.echo(f"  post_step ERROR: {post_step_error}")
     if not result.completed:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
+def _apply_release_consume(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+) -> dict[str, Any]:
+    """Write the consumed_backlog ledger from the release SPEC's ``**Consumes:**`` line.
+
+    Resolves ``<specs_dir>/releases/<release_id>/SPEC.md`` (container seam, no cwd), parses
+    its ``**Consumes:**`` slugs, binds them to the union shipped-anchor set through the R1
+    registry, and calls ``BacklogRemovalLifecycle.consume`` to write the ledger under
+    ``specs/_archive/<release_id>/``. An absent/empty ``**Consumes:**`` line no-ops cleanly
+    (empty slug list ⇒ empty shipped set ⇒ a ledger with no entries). A declared slug that
+    does not resolve raises ``ConsumesBindError``, surfaced by the caller as
+    ``post_step_error`` — never a silent skip.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.backlog.consumes import parse_consumes_line, shipped_anchors_for
+
+    spec_path = container.build_release_spec_path(
+        workspace_root, context=context, release_id=release_id
+    )
+    spec_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else ""
+    slugs = parse_consumes_line(spec_text)
+
+    lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
+    shipped = shipped_anchors_for(
+        slugs, backlog_dir=lifecycle.backlog_dir, registry=lifecycle.registry
+    )
+    ledger_path = lifecycle.consume(release_id=release_id, shipped_anchors=shipped)
+    try:
+        ledger_rel = ledger_path.relative_to(workspace_root).as_posix()
+    except ValueError:
+        ledger_rel = str(ledger_path)
+    return {
+        "consumed_slugs": list(slugs),
+        "shipped_anchors": sorted(shipped),
+        "ledger": ledger_rel,
+    }
 
 
 @app.command()
