@@ -13,7 +13,7 @@
 
 ## Wave A — model-policy foundation
 
-### [-] T-28-A-01 — Resolved-policy core DTOs
+### [x] T-28-A-01 — Resolved-policy core DTOs
 Goal: add the pure DTOs the governance layer threads through every layer.
 Write set: `dadaia_workspace/core/models/workflow_execution.py` (NEW);
 `tests/unit/core/models/test_workflow_execution.py` (NEW).
