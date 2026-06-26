@@ -608,17 +608,18 @@ def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
 
 
 def build_workflow_model_profile_registry() -> "WorkflowCatalog":
-    """Compose the governed workflow catalog the policy resolver reads (T-28-A-08).
+    """Compose the governed workflow catalog the policy resolver reads (T-28-B-01).
 
-    Wave A sources the catalog (per-step default harness + default profile, validated
-    against the built-in :mod:`model_profiles` registry) directly from the implementation
-    pipeline via :func:`library_workflow_catalog` — M3: NOT the Wave-B ``dadaia_catalog``,
-    so the governance layer is independently green. The function is pure (no I/O), so it
-    takes no ``workspace_root``.
+    Wave B promotes :mod:`dadaia_workspace.features.workflows.dadaia_catalog` to **the**
+    governed source: every worker step carries a default harness + a default model profile
+    per supported harness (validated at import time against the built-in :mod:`model_profiles`
+    registry). :func:`governed_workflow_catalog` projects that single source onto the
+    resolver's :class:`WorkflowCatalog` seam, so the resolver and the panel read the *same*
+    catalog (no second table). The function is pure (no I/O), so it takes no ``workspace_root``.
     """
-    from dadaia_workspace.features.lifecycle.policy_resolver import library_workflow_catalog
+    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
 
-    return library_workflow_catalog()
+    return governed_workflow_catalog()
 
 
 def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowModelPolicyStore":
