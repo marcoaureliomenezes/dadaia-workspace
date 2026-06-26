@@ -313,12 +313,12 @@ def build_agent_runtime(
     lifecycle workflow asks for the kind a step declares and injects the result into
     ``LifecycleAgentRunner``.
 
-    Codex (``codex exec``) and PI (``pi --mode json``) are live CLI-headless adapters.
+    Codex (``codex exec``), PI (``pi --mode json``), and OpenCode
+    (``opencode run --format json``) are live CLI-headless adapters, each carrying a
+    real git-diff Ring-2 ``changed_paths`` boundary via the injected ``GitSubprocessClient``.
     The Claude SDK adapter body is real (Ring-1 write boundary via ``core/scope_match``);
     only its default ``query_fn`` transport is deferred (lazy ``claude-agent-sdk`` import).
-    OpenCode ships as a documented stub behind the port (live body deferred — see release
-    ``multiharness-engine-v0116``). The factory is total over the enum: an unhandled kind
-    raises ``ValueError``.
+    The factory is total over the enum: an unhandled kind raises ``ValueError``.
     """
     run_dir = cwd or Path.cwd()
     if kind is AgentRuntimeKind.FAKE:
@@ -338,7 +338,7 @@ def build_agent_runtime(
     if kind is AgentRuntimeKind.OPENCODE_RUN:
         from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
 
-        return OpenCodeAdapter(cwd=run_dir)
+        return OpenCodeAdapter(cwd=run_dir, git=GitSubprocessClient())
     if kind is AgentRuntimeKind.CLAUDE_SDK:
         from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
 

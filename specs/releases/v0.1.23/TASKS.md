@@ -83,7 +83,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   guard returning `FAILED`. Document the verified output contract in the docstring.
 - **Done when:** adapter no longer raises on a valid request; `build_agent_runtime(
   OPENCODE_RUN)` returns it with no call-site change; the studied contract is documented.
-- `[ ]`
+- `[x]`
 
 ### T-23-07 — OpenCode adapter unit tests (WS-1)
 - **Owner:** software-engineer
@@ -93,7 +93,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   timeout, OSError-on-start, malformed-stream degrade, secret redaction, changed_paths from
   git.
 - **Done when:** all branches covered; CI green.
-- `[ ]`
+- `[x]`
 
 ### T-23-08 — OpenCode opt-in live contract test (WS-1)
 - **Owner:** software-engineer
@@ -104,7 +104,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   NOT CI-gated; sandbox under `.dadaia/tmp/`.
 - **Done when:** test collected + SKIPs cleanly with env unset; asserts a non-crashing typed
   result when run live.
-- `[ ]`
+- `[x]`
 
 ### T-23-09 — Complete `ClaudeSdkAdapter._default_query_fn` binding (WS-2)
 - **Owner:** software-engineer
@@ -147,7 +147,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   + binary + `~/.codex/auth.json`; auto-SKIP; NOT CI-gated. Do not modify the existing
   Layer-1 hook tests.
 - **Done when:** collected + SKIPs cleanly with env unset.
-- `[ ]`
+- `[x]`
 
 ---
 
