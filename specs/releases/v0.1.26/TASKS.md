@@ -177,7 +177,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
 - **Done-when:** `dadaia public doctor` exit 0 with `[ok] public-privacy`; the new
   fragments present in projections; no stray root artefacts.
 
-## [ ] T-26-10 — Final live-tree verification
+## [x] T-26-10 — Final live-tree verification
 
 - **Owner:** software-engineer
 - **Write set:** none (verification only; touch a test fixture only if a gap is found,
