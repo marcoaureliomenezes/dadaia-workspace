@@ -9,14 +9,20 @@ summary: >-
   owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup,
   semantic handoff gates, blocked/resume states, and scoped worker prompts. Each
   lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the
-  harness selectable per step via `build_agent_runtime(kind)` (FAKE, CODEX_EXEC,
-  CLAUDE_SDK, OPENCODE_RUN, PI_HEADLESS). Single-step verbs run `LifecyclePhaseWorkflow`; the
-  multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→
-  SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter
-  enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier;
-  a cacheable hashed `PromptPrefix` is reused across steps, which carry model tiers.
-  Anti-slop self-governance is built in: a directory-aware slop metric and a
-  boundary-safe retention sweep.
+  harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (FAKE,
+  CODEX_EXEC, CLAUDE_SDK, PI_HEADLESS — OPENCODE_RUN removed in v0.1.24). LAW 1: the
+  selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a
+  workflow harness; CLAUDE_SDK kept/tested for Layer-1). LAW 2: a discrete per-harness
+  GPT model catalog selected on the CLI (--model/--step-model; pi-3 / codex-2). The verbs
+  are dadaia-workflows: Python bodies that import prompt fragments, select dynamic
+  context, call workers, and advance Python-validated gates; the release-definition
+  workflow is the first fully fragment-driven workflow. Single-step verbs run
+  `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the
+  IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude
+  SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match`
+  classifier; a cacheable hashed `PromptPrefix` is reused across steps. Anti-slop
+  self-governance is built in: a directory-aware slop metric and a boundary-safe retention
+  sweep.
 tags:
 - sdd
 - lifecycle
@@ -24,9 +30,9 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 1870
-last_updated: '2026-06-25'
-release_origin: v0.1.21
+token_estimate: 1980
+last_updated: '2026-06-26'
+release_origin: v0.1.24
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`.
@@ -47,18 +53,18 @@ flowchart TB
         C -.->|"close é step separado"| CLp["CLOSURE<br/>(dadaia lifecycle close)"]
     end
     LAD -.->|"build_agent_runtime(kind) — --step-harness"| RT
-    subgraph RT["AgentRuntimePort — worker harness selecionável por step"]
+    subgraph RT["AgentRuntimePort — worker harness selecionável por step (LAW 1: pi/codex/fake)"]
         direction LR
         FK["FAKE"]:::w
         CXk["CODEX_EXEC"]:::w
-        CLk["CLAUDE_SDK<br/>Ring-1"]:::w
-        OCk["OPENCODE_RUN"]:::w
         PIk["PI_HEADLESS"]:::w
+        CLk["CLAUDE_SDK · Ring-1<br/>(kept, NOT workflow harness)"]:::x
     end
     RT --> GATE{"LifecycleAgentRunner gate:<br/>verdict APPROVED?<br/>Ring-2 changed_paths in-scope?"}
     GATE -->|sim| NEXT(["transição legal → próximo step"])
     GATE -->|não| BLK(["BlockedState + resume token"])
     classDef w fill:#238636,color:#fff,stroke:#238636;
+    classDef x fill:#6e7681,color:#fff,stroke:#6e7681;
 ```
 
 ## Purpose
@@ -67,14 +73,16 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 
 ## Core services
 
-- `core/models/lifecycle.py` and `core/models/hygiene.py` define pure run, gate, blocked-state, agent-request, and hygiene models. `AgentRuntimeKind` enumerates `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS`.
+- `core/models/lifecycle.py` and `core/models/hygiene.py` define pure run, gate, blocked-state, agent-request, and hygiene models. `AgentRuntimeKind` enumerates `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `PI_HEADLESS` (`OPENCODE_RUN` removed in v0.1.24).
 - `core/scope_match.py` is the shared, pure path classifier used by BOTH the runner's Ring-2 out-of-scope detection and the Claude adapter's Ring-1 write-permission decider — one classifier, two boundaries.
 - `core/protocols/agent_runtime.py` and `core/protocols/runtime_files.py` define the runtime and artifact ports.
 - `features/lifecycle/state_machine.py` owns legal, illegal, blocked, and resume transitions.
 - `features/lifecycle/gates.py` validates handoff evidence semantically: agent, context, release, verdict, artifact hash, commit SHA, task group, age, and severity thresholds.
 - `features/lifecycle/phase_workflow.py` (`LifecyclePhaseWorkflow`) threads a scoped prompt → factory-selected `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted run, for any single lifecycle step.
-- `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a model tier (implement=sonnet, reviews=opus).
-- `features/lifecycle/prompt_builder.py` builds scoped worker prompts; `PromptPrefix.from_sections` assembles a byte-identical, sha256-hashed, order-independent context block, and `build(scope, prefix=)` prepends it verbatim and records `prefix_hash`. The pipeline builds the prefix once and every step reuses the same bytes (provider-cache-friendly). Whole-workspace or repo-wide scopes are rejected.
+- `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`).
+- `core/harness_models.py` (v0.1.24) is the discrete per-harness GPT model catalog (LAW 2): `harness → ordered model options` with a `validate(harness, model) → (model_id, effort?)` helper, consistent with — but not a tier-view of — `core/model_registry.py`. **pi → 3:** `(gpt-5.5,high)`, `(gpt-5.5,low)`, `(gpt-5.3-codex,medium)`; **codex → 2:** `(gpt-5.5,high)`, `(gpt-5.5,medium)`. Both catalogs are GPT-only (PI runs on the operator's Codex subscription); no `claude-*` id is ever a Layer-2 option. An invalid `(harness, model)` pair is rejected with the valid set.
+- `features/lifecycle/fragments/loader.py` (v0.1.24) loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`). `features/lifecycle/workflows/release_definition.py` is the first fully fragment-driven dadaia-workflow: each step's prompt is `role + fragment bundle + selected context + output schema + discrete (harness, model)`, Python owns step order and blocks on missing/rejected handoffs. Backlog/audit/research/bug-report workflow bodies are scaffolded + fail-loud (`NotImplementedError("deferred to follow-up release")`).
+- `features/lifecycle/prompt_builder.py` builds scoped worker prompts; `PromptPrefix.from_sections` assembles a byte-identical, sha256-hashed, order-independent context block, and `build(scope, prefix=)` prepends it verbatim and records `prefix_hash`. The pipeline builds the prefix once and every step reuses the same bytes (provider-cache-friendly). Whole-workspace or repo-wide scopes are rejected. v0.1.24 adds a fragment-suffix path: a workflow step's prompt is assembled from a fragment bundle (not the generic "Run the step" suffix). **Prompt observability (v0.1.24):** each lifecycle run record persists, per step, the fragment ids, dynamic context refs, `prefix_hash`, the discrete model, the runtime kind, the output schema, and the gate result — surfaced in a panel/report view; whole-memory injection is never the default (context selection is scoped).
 - `features/lifecycle/hygiene.py` owns the canonical `SlopPolicy`: reports TTL 48h, handoffs TTL 24h, tmp TTL 24h, safe-zone cleanup, protected residuals, unknown `.dadaia/` top-level detection, malformed/orphan handoffs, and elapsed scan metrics.
 - `features/lifecycle/antislop/slop_scan.py` is the directory-aware slop metric: a directory tree counts as ONE entry with recursive size (closing the directory-blind gap where multi-GB caches/venvs hid from the file-only metric); the canonical manifest derives from `hooks/root_whitelist._WHITELIST`, never hand-copied. Surfaced via `dadaia lifecycle slop`.
 - `features/lifecycle/antislop/retention.py` (`RetentionSweep.sweep`) is the deleter: dry-run by default, deletes only with `apply=True`; reclaims past-TTL non-canonical swept-zone entries; has a HARD liveness gate (never reclaims a live run's tmp); refuses canonical/outside-`.dadaia`/symlink-escape paths (resolve + relative_to, TOCTOU re-confine). Surfaced via `dadaia lifecycle clean [--apply]`.
@@ -83,7 +91,7 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 
 ## Harness runtime boundary
 
-Lifecycle code depends on `AgentRuntimePort`; `build_agent_runtime(kind, *, cwd=None)` in `container.py` is the factory that maps a kind to its adapter: `FAKE→FakeAgentRuntime`, `CODEX_EXEC→CodexExecAdapter` (`infrastructure/codex_runtime.py`), `OPENCODE_RUN→OpenCodeAdapter` (`infrastructure/opencode_runtime.py`, stub), `CLAUDE_SDK→ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`), `PI_HEADLESS→PiHeadlessAdapter` (`infrastructure/pi_runtime.py`). The factory stays total over the enum. `--harness pi` / `--step-harness x=pi` resolve across every `dadaia lifecycle` verb with zero change to `phase_workflow.py` / `pipeline.py` — a clean adapter addition. CI uses the fake runtime to prove that Python advances only after structured output and write-scope evidence pass validation.
+Lifecycle code depends on `AgentRuntimePort`; `build_agent_runtime(kind, *, cwd=None, model=None)` in `container.py` is the factory that maps a kind to its adapter: `FAKE→FakeAgentRuntime`, `CODEX_EXEC→CodexExecAdapter` (`infrastructure/codex_runtime.py`), `CLAUDE_SDK→ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`), `PI_HEADLESS→PiHeadlessAdapter` (`infrastructure/pi_runtime.py`). (`OPENCODE_RUN`/`OpenCodeAdapter` were removed entirely in v0.1.24.) The factory stays total over the enum and threads the discrete `model` into `PiHeadlessConfig.model` (PI honors `pi --model <id>`) and `CodexExecConfig.model`+`reasoning_effort` (Codex takes the discrete `(id, effort)` verbatim; the tier fallback remains only when no discrete model is given). **LAW 1:** the workflow `--harness` choices are `{pi, codex, fake}`; `claude` is rejected with a Layer-1 pointer (the SDK adapter stays importable + unit-tested). `--harness pi` / `--step-harness x=pi` + `--model`/`--step-model` resolve across every `dadaia lifecycle` verb with zero change to `phase_workflow.py` / `pipeline.py`. CI uses the fake runtime to prove that Python advances only after structured output and write-scope evidence pass validation.
 
 The Codex adapter does not read project-local provider/auth/profile configuration, does not pass through `os.environ`, accepts only an explicit environment allowlist, redacts credential-looking values, and records sandbox/profile widening only when operator-controlled input requests it. The Claude SDK adapter derives a real Ring-1 `write_permission` decider from the request's allowed/forbidden paths via the same `core/scope_match` classifier the runner's Ring-2 uses; its transport is injectable (`query_fn`) so permission + result mapping are tested hermetically. `claude-agent-sdk` is an OPTIONAL, operator-installed runtime extra (not a locked dependency, offline-first build); the default transport lazily imports it and returns an actionable `pip install claude-agent-sdk` message when absent.
 
@@ -108,6 +116,10 @@ Every single-step verb and the multi-step pipeline run the engine over a real
 release. Deferred: live Claude SDK binding verification (the `_default_query_fn`
 `query()`/`can_use_tool` call is the one unverified piece — offline build) plus provider
 cache-control marker wiring; phase-specific gate refinement (dropping the uniform
-APPROVED-verdict requirement for non-review phases); the live OpenCode `opencode run`
-adapter (currently a documented stub); and persisting explicit per-run tmp working-dir
-claims in `LifecycleRun` so the retention liveness provider keys on a registered workdir.
+APPROVED-verdict requirement for non-review phases); the full runnable
+backlog/audit/research/bug-report workflow bodies (scaffolded + fail-loud only in v0.1.24);
+**live pi/codex worker runs of the fragment-driven release-definition workflow** (the FAKE
+e2e proves the seam; live confirmation against real PI/Codex workers is deferred to real
+use — the upstream CLI contracts cannot be proven by mocked tests); and persisting explicit
+per-run tmp working-dir claims in `LifecycleRun` so the retention liveness provider keys on
+a registered workdir.

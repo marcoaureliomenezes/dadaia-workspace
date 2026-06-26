@@ -2,7 +2,7 @@
 slug: multi-platform-parity
 title: multi-platform-parity
 category: product
-tldr: "Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows)."
+tldr: "Claude Code, Codex, and PI get honest runtime-specific projections from one public source (OpenCode removed in v0.1.24; 9 agents / 18 skills / 2 workflows)."
 summary: Codex uses native config, shared and Codex-specific skills, interactive-only
   hook execution (codex exec never fires hooks — headless posture is chokepoints-only,
   per the §8 enforcement matrix), native Starlark .rules command policy with venv-path
@@ -10,31 +10,34 @@ summary: Codex uses native config, shared and Codex-specific skills, interactive
   evidence-only reviewers, and registry-derived Codex-native model tiering (model id ×
   model_reasoning_effort). All harnesses are protected by the git chokepoints
   (pre-commit lease gate + pre-push security-verdict gate), which fire independently
-  of harness hooks; OpenCode is canonized "advisory + chokepoint-protected" (ADR-G3).
-  PI (the fourth harness, post-v0.1.18) projects an inert `.pi/` surface and is
-  Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate extension
-  (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4).
-  Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs
-  (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with
-  no behavior until the plugin is installed.
+  of harness hooks. The Layer-1 entry-harness set is exactly {claude, codex, pi} —
+  OpenCode was removed entirely in v0.1.24 (both layers; no opencode target/.opencode
+  projection/OPENCODE_RUN worker). PI (post-v0.1.18) projects a minimal `.pi/` surface
+  and is Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate
+  extension (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4). Public surface is
+  9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer,
+  design-specialist, devops-engineer) project as thin stubs with no behavior until the
+  plugin is installed.
 tags:
 - codex
-- opencode
 - claude-code
+- pi
 - parity
 - multi-platform
 agent_tier: self-pull
-token_estimate: 1600
-last_updated: '2026-06-25'
-release_origin: v0.1.21
+token_estimate: 1550
+last_updated: '2026-06-26'
+release_origin: v0.1.24
 ---
 
 ## Propósito
 
 Multi-platform parity means the same canonical public assets are projected to
-Claude Code, Codex, OpenCode, and (post-v0.1.18) PI without pretending the runtimes
-are identical. Each projection must be truthful about the runtime's native concepts,
-supported hooks, config loading, workflow support, and skill discovery.
+Claude Code, Codex, and PI without pretending the runtimes are identical. Each
+projection must be truthful about the runtime's native concepts, supported hooks,
+config loading, workflow support, and skill discovery. The Layer-1 entry-harness set is
+exactly `{claude, codex, pi}` — **OpenCode was removed entirely in v0.1.24** (both
+layers).
 
 ### Two-layer scope: projection-parity vs worker-runtime parity
 
@@ -44,17 +47,20 @@ set. dadaia-workspace runs harnesses at two layers (see [[architecture]] "Two-la
 agentic model"):
 
 - **Layer 1 (this atom) — entry-harness projection parity.** Source
-  (`dadaia_workspace/public/`) → `.claude/`, `.codex/`, `.opencode/`, `.pi/` asset trees
-  via `dadaia public install`. Each tree is truthful about its runtime. PI's `.pi/`
-  projection (target `pi`, structural mirror of OpenCode in `public_assets.py`) is
-  **minimal**: `.pi/SYSTEM.md` POINTS AT `AGENTS.md` (no law restatement) + a generic
-  `.pi/settings.json` + an optional `.pi/prompts/` affordance.
+  (`dadaia_workspace/public/`) → `.claude/`, `.codex/`, `.pi/` asset trees via
+  `dadaia public install` (targets `{agents, claude, codex, pi}`; **no `opencode` target
+  / no `.opencode/` projection** post-v0.1.24). Each tree is truthful about its runtime.
+  PI's `.pi/` projection (target `pi`) is **minimal**: `.pi/SYSTEM.md` POINTS AT
+  `AGENTS.md` (no law restatement) + a generic `.pi/settings.json` + an optional
+  `.pi/prompts/` affordance.
 - **Layer 2 — worker-runtime parity (NOT projection parity).** The lifecycle engine's
   per-step worker harnesses behind `AgentRuntimePort` (`FAKE`, `CODEX_EXEC`,
-  `CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS`). These have **no projection tree** — they
-  are subprocess/SDK adapters selected per step, governed by `--harness`, not by `.X/`
-  asset projection. PI shipped here first (`pi --mode json`). [[lifecycle-foundation]]
-  is the normative source for Layer 2.
+  `CLAUDE_SDK`, `PI_HEADLESS` — `OPENCODE_RUN` removed in v0.1.24). These have **no
+  projection tree** — they are subprocess/SDK adapters selected per step, governed by
+  `--harness`, not by `.X/` asset projection. **LAW 1 (v0.1.24):** the selectable Layer-2
+  **workflow** harnesses are exactly `{pi, codex, fake}`; `CLAUDE_SDK` is kept/tested but
+  `claude` is rejected as a workflow `--harness` (Layer-1 use only). PI shipped here first
+  (`pi --mode json`). [[lifecycle-foundation]] is the normative source for Layer 2.
 
 **`.pi/` trust surface.** `.pi/**` is a post-trust, unsandboxed, executable-capable
 surface (a real privilege grant — the operator who runs `pi` after seeing `.pi/`
@@ -125,15 +131,11 @@ workspace venv is absent.
 Claude Code receives the canonical agent bodies, Claude-native frontmatter,
 skills, commands, hooks, and rules. Claude remains the strongest hook/runtime
 reference, but shared docs must not assume Claude-only mechanisms exist in
-Codex or OpenCode.
+Codex or PI.
 
-OpenCode receives transformed agent definitions, permissions mapped to its
-runtime categories, and TypeScript plugins that delegate SDD gate/context behavior
-to the same **Python** governance hook the other runtimes use — they invoke
-`python -m dadaia_workspace.hooks.{pre_gate,ctx_inject}` via subprocess (with
-venv-path resolution), not a shell script (ADR-7: the plugin no longer shells out
-to `bash <script>.sh`). The only remaining shell asset in the product is the
-`pre-push-ci-gate.sh` git chokepoint.
+(OpenCode was removed entirely in v0.1.24 — no `.opencode/` projection, no
+`public/plugins/sdd-gate.ts`, no `opencode` install target. The only remaining shell
+asset in the product is the `pre-push-ci-gate.sh` git chokepoint.)
 
 PI receives a `.pi/` projection (`SYSTEM.md`, `settings.json`,
 `prompts/dadaia-context.md`, and `extensions/dadaia-sdd-gate.ts`) via `dadaia public
@@ -157,9 +159,10 @@ run, the same class as the `pi --mode json` live test).
   as executable rules.
 - `.claude/skills/`, `.agents/skills/`: 18 skill directories.
 - Codex workflows as reference-only, not missing runtime behavior.
-- OpenCode workflow limitations separately.
+- No `.opencode/` projection and no opencode manifest entry (OpenCode removed in v0.1.24).
 - All staged SHA256 hashes match projected files (`[ok]` for every asset; `[drift]` on mismatch).
 
-`dadaia public install --target all` propagates source → all runtimes; no `--force`
+`dadaia public install --target all` propagates source → all runtimes (`{agents, claude,
+codex, pi}`; `--target opencode` errors with an unknown-target message); no `--force`
 needed for ordinary source edits (plain install overwrites on hash mismatch). `--force`
 is only for clobbering a locally-diverged projection.

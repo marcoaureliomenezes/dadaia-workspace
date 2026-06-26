@@ -1,5 +1,5 @@
 ---
 release: v0.1.24
-phase: IMPLEMENTATION
+phase: CLOSURE
 segment: rc-1
 ---

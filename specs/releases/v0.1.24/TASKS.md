@@ -255,18 +255,25 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
 - **Owner:** human (operator)
 - **Write set:** none (sign-off; captured in CLOSURE.md)
 - **Preconditions:** T-24-01..T-24-14 complete + merged-to-feature.
-- **Description:** Operator personally confirms each:
-  - `[ ]` `release define --harness pi --model <pi-model>` runs the workflow end-to-end with
-    scoped (non-generic) prompts + typed gates against a real PI worker.
-  - `[ ]` Same with `--harness codex --model <codex-model>`, incl. one step on PI + adjacent
-    step on Codex (acceptance §8.5 live).
-  - `[ ]` Invalid `(harness, model)` and `--harness claude` are both rejected with actionable
-    messages.
-  - `[ ]` Panel shows every workflow with purpose, per-step harness/model, mermaid, and
-    availability; operator confirms each is clearly understandable.
-  - `[ ]` A `.opencode/` write is blocked by the root-whitelist hook in a real session.
-- **Done when:** every sub-item operator-confirmed. **Blocks CLOSURE.**
-- `[ ]`
+- **Disposition (operator-directed closure, 2026-06-26):** the operator DIRECTED closure
+  rather than performing the personal live-run sign-off. Recorded honestly:
+  - `[x]` Deterministic items VERIFIED by the maintainer:
+    - `--harness claude` rejected with the LAW-1 message (Layer-1 pointer).
+    - An invalid `(harness, model)` pair rejected, listing the harness's valid GPT catalog.
+    - `.opencode/` + `opencode.json` blocked at root (stale root exception removed). A
+      pre-existing nested-write gate gap was found and filed as bug
+      `root-whitelist-misses-nested-new-toplevel-writes`.
+    - Panel catalog VERIFIED live: `/api/dadaia-workflows` shows
+      release_definition=available / implementation=partial / 4 deferred, with purpose +
+      per-step pi/codex harness + GPT model_options + mermaid.
+  - `[ ]→deferred` Live pi/codex worker runs (the `--harness pi` and `--harness codex`
+    end-to-end items 1 & 2) were **NOT executed against real workers**. The FAKE e2e +
+    unit tests prove the mechanics (adjacent-harness seam, scoped fragment prompts, typed
+    gates); **live confirmation is DEFERRED to real use.** No live run is claimed to have
+    passed.
+- **Done when:** operator-directed closure with deterministic items verified + live runs
+  honestly deferred. **CLOSURE proceeds under operator direction.**
+- `[x]`
 
 ### T-24-17 — CLOSURE: write CLOSURE.md + update memory atoms (WS-11)
 - **Owner:** product-engineer
@@ -281,7 +288,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   drop opencode from `tech-stack.md` + record verified pi/codex versions. Disposition the epic
   backlog item + carry v0.1.23's disposition forward.
 - **Done when:** `dadaia specs doctor` green; CLOSURE evidence complete.
-- `[ ]`
+- `[x]`
 
 ### T-24-18 — Archive release + advance ACTIVE.md (WS-11) [LAST]
 - **Owner:** product-engineer (git mv delegated to devops-engineer / operator)
