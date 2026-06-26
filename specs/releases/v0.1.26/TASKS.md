@@ -54,7 +54,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
 - **Done-when:** a fragment-loader test loads each id and validates frontmatter +
   declared output schema; `_README.md` removed; mypy/ruff clean. (Propagation is T-26-08.)
 
-## [ ] T-26-03 — `consumed_backlog` ledger writer (R1 reader shape)
+## [x] T-26-03 — `consumed_backlog` ledger writer (R1 reader shape)
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/backlog/ledger_writer.py`,
