@@ -157,7 +157,7 @@ read the body via content-length, reject non-`application/json` (415), reject ov
 validate before write, atomic write + `.last-good.json` backup, return structured field-path
 errors (400); Host-guard-first invariant preserved; no bearer (AC-5).
 
-### [ ] T-28-C-03 — First-class Workflows nav + detail/step-matrix/editor
+### [-] T-28-C-03 — First-class Workflows nav + detail/step-matrix/editor
 Goal: promote Workflows to top-level; build the editor UX (D-5).
 Write set: `dadaia_workspace/features/panel/views/index.py`;
 `dadaia_workspace/features/panel/views/workflows.py`;
