@@ -388,7 +388,6 @@ class TestLogCleanupError:
         assert "[cleanup-warning]" in captured.err
 
 
-
 # ---------------------------------------------------------------------------
 # _consumer_repos_for_root
 # ---------------------------------------------------------------------------
@@ -1307,7 +1306,6 @@ class TestInstallCodexAgents:
         assert installed == []
 
 
-
 # ---------------------------------------------------------------------------
 # _agents_md_source — templates fallback
 # ---------------------------------------------------------------------------
@@ -1425,9 +1423,7 @@ class TestClassifyWorkflows:
         manager = FileSystemPublicAssetManager()
         out = manager._classify_workflows(agentic_dir)
         assert any(line == "[ok] claude:workflows/parallel.workflow.md" for line in out)
-        assert any(
-            "[reference-only]" in line and "parallel.workflow.md" in line for line in out
-        )
+        assert any("[reference-only]" in line and "parallel.workflow.md" in line for line in out)
 
 
 # ---------------------------------------------------------------------------
@@ -1938,7 +1934,6 @@ class TestInstallClaudeSettingsSkip:
         assert settings_path.read_text(encoding="utf-8") == canonical_content
         assert settings_path.stat().st_mtime == mtime_before
         assert any("[skip]" in e and "settings.json" in e for e in installed)
-
 
 
 # ---------------------------------------------------------------------------

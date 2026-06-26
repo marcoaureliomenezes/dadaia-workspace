@@ -239,7 +239,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   install + `public doctor`.
 - **Done when:** ritual-reintroduction fails the check; clean surface exits 0; `public doctor`
   exit 0; tests green.
-- `[ ]`
+- `[x]`
 
 ### T-24-15 — Mark v0.1.23 superseded; carry-forward note (WS-11 prep, ADR-F)
 - **Owner:** product-engineer
@@ -249,7 +249,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   v0.1.24 supersedes it (keeps surviving acceptance, deletes the OpenCode work, ships in its
   place; v0.1.23 was never deployed). Do NOT close/deploy v0.1.23 independently.
 - **Done when:** v0.1.23 SPEC carries the supersede marker + note.
-- `[ ]`
+- `[x]`
 
 ### T-24-16 — Operator live-validation acceptance gate (WS-10) [HARD GATE]
 - **Owner:** human (operator)

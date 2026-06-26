@@ -13,17 +13,19 @@ Drives the release-definition workflow on FAKE and asserts:
    reused, never rebuilt per step. This is the provider-cache cost win.
 
 3. **No whole-memory injection by default (the cost regression guard).** A default
-   release-definition step does NOT inject the entire memory corpus — only the bounded
-   slice the fragment's ``max_context_policy`` allows. ``architecture.md`` is the large,
-   structural memory atom that the shipped release-definition fragments only ever pull
-   under the ``summary`` policy (via ``architecture_summary``), never in full. The guard
-   plants a sentinel deep in the architecture body (past the frontmatter / leading lines
-   a summary returns) and asserts it never reaches any step's prompt — proving the
-   selector returns a bounded summary, not the whole atom body.
+   release-definition step injects only what its fragment declares — the bounded dynamic
+   slice its ``max_context_policy`` allows plus its declared ``static_inputs`` — never a
+   blind dump of the whole ``memory/`` corpus. The guard plants a sentinel in an
+   **unreferenced** memory atom (named by no selector and no fragment ``static_inputs``)
+   and asserts it never reaches any step's prompt — proving the assembly never slurps the
+   whole memory tree. (Declared static inputs such as ``memory/architecture.md`` DO reach
+   the cacheable prefix by design — that is the point of static-input injection — so the
+   sentinel deliberately lives in a file nothing references.)
 """
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,11 +49,11 @@ from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecyc
 _CONTEXT = "dadaia-workspace"
 _RELEASE = "v0.1.24"
 
-#: A unique string buried deep in the large ``architecture.md`` body (past the
-#: frontmatter / leading lines a summary returns). The shipped release-definition
-#: fragments only ever pull architecture under the ``summary`` policy, so this sentinel
-#: must NEVER appear in any step's prompt. If the selector ever slurped the whole atom
-#: body (a whole-memory-injection cost regression), this would leak.
+#: A unique string in an UNREFERENCED memory atom — no selector and no fragment
+#: ``static_inputs`` entry names it. It must NEVER appear in any step's prompt. If the
+#: assembly ever slurped the whole ``memory/`` tree (a whole-memory-injection cost
+#: regression), this would leak. (architecture.md is a declared static input and now
+#: legitimately reaches the cacheable prefix, so the sentinel lives elsewhere.)
 _MEMORY_SENTINEL = "ZZZ_WHOLE_MEMORY_LEAK_SENTINEL_ZZZ"
 
 
@@ -93,26 +95,40 @@ def _approved() -> AgentRunResult:
     )
 
 
+#: A constitution body distinctive enough that the static-input injection assertion can
+#: prove the declared static input's content actually reaches the assembled prompt.
+_CONSTITUTION_BODY = (
+    "# constitution\n\nThe constitution static-input marker: STATIC_CONST_MARKER_42.\n"
+)
+_ARCH_STATIC_MARKER = "STATIC_ARCH_MARKER_77"
+
+
 def _specs_tree(tmp_path: Path) -> Path:
     """A minimal specs tree the context selector can resolve dynamic inputs against.
 
-    The large ``architecture.md`` atom carries the ``_MEMORY_SENTINEL`` deep in its body
-    (well past the frontmatter and the leading lines a ``summary`` returns) so the
-    no-whole-memory-injection guard has a genuine whole-body leak to detect against.
+    An UNREFERENCED memory atom carries the ``_MEMORY_SENTINEL`` so the
+    no-whole-memory-injection guard has a genuine whole-tree leak to detect against:
+    nothing (no selector, no static input) names that file, so it must never appear.
+    ``architecture.md`` and ``constitution.md`` are declared static inputs and carry
+    distinctive markers used to assert static-input content reaches the prompt.
     """
     specs = tmp_path / "repos" / _CONTEXT / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     (specs / "releases" / _RELEASE).mkdir(parents=True)
-    (specs / "constitution.md").write_text("# constitution\n", encoding="utf-8")
-    # architecture.md: a real frontmatter block + bulky body; the sentinel sits far past
-    # the leading lines a `summary` slice returns. Only a whole-body read would surface it.
+    (specs / "constitution.md").write_text(_CONSTITUTION_BODY, encoding="utf-8")
+    # architecture.md is a declared static input — it legitimately reaches the prefix.
     architecture = (
         "---\nname: architecture\nsummary: the two-layer engine\n---\n\n# Architecture\n\n"
         + ("structural prose line that is summary-irrelevant.\n" * 60)
-        + f"\n{_MEMORY_SENTINEL}\n"
+        + f"\n{_ARCH_STATIC_MARKER}\n"
     )
     (specs / "memory" / "architecture.md").write_text(architecture, encoding="utf-8")
     (specs / "memory" / "quality-assurance.md").write_text("# qa\n", encoding="utf-8")
+    # An UNREFERENCED memory atom: no selector and no static_inputs entry names it. Its
+    # sentinel must never leak — proving the assembly does not slurp the whole memory tree.
+    (specs / "memory" / "secret-unreferenced.md").write_text(
+        f"---\nname: secret\n---\n\n# Secret\n\n{_MEMORY_SENTINEL}\n", encoding="utf-8"
+    )
     (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     (specs / "memory" / "product" / "some-atom.md").write_text(
         "---\nname: some-atom\n---\n\n# Some atom\n\nbody\n", encoding="utf-8"
@@ -177,11 +193,20 @@ def test_run_record_persists_per_step_prompt_composition(tmp_path: Path) -> None
     run = store.load("obs-1")
     assert run is not None
     by_step = {entry.step: entry for entry in run.injected_context}
+    # The workflow folds the fragments' static_inputs into the cacheable prefix, so the
+    # effective prefix hash is shared by every step (one value) — not necessarily the
+    # hash of the bare input prefix.
+    effective_hashes = {by_step[label].prefix_hash for label in _model_steps()}
+    assert len(effective_hashes) == 1
+    effective_hash = next(iter(effective_hashes))
+    assert effective_hash is not None
+    # Static inputs were folded in, so the effective hash differs from the bare prefix.
+    assert effective_hash != prefix.content_hash
     # Every model step recorded a full composition record.
     for label in _model_steps():
         entry = by_step[label]
         assert entry.fragment_ids, f"{label} missing fragment ids"
-        assert entry.prefix_hash == prefix.content_hash
+        assert entry.prefix_hash == effective_hash
         assert entry.runtime_kind == AgentRuntimeKind.FAKE.value
         assert entry.output_schema  # the fragment's declared output contract
         assert entry.gate_result == GateVerdict.APPROVED.value
@@ -205,9 +230,14 @@ def test_prompt_composition_round_trips_through_json_store(tmp_path: Path) -> No
     assert reloaded is not None
     # The whole record round-trips byte-for-byte: to_dict(from_dict(to_dict)) is stable.
     assert LifecycleRun.from_dict(reloaded.to_dict()) == reloaded
-    # The WS-9 fields survived persistence (not dropped by the store).
+    # The WS-9 fields survived persistence (not dropped by the store). The effective
+    # prefix hash (with static_inputs folded in) is shared across steps and round-trips.
+    effective_hashes = {
+        e.prefix_hash for e in reloaded.injected_context if e.prefix_hash is not None
+    }
+    assert len(effective_hashes) == 1
     arch_review = next(e for e in reloaded.injected_context if e.step == "spec_arch_review")
-    assert arch_review.prefix_hash == prefix.content_hash
+    assert arch_review.prefix_hash == next(iter(effective_hashes))
     assert arch_review.runtime_kind == AgentRuntimeKind.FAKE.value
     assert arch_review.output_schema
     assert arch_review.gate_result == GateVerdict.APPROVED.value
@@ -236,27 +266,84 @@ def test_prefix_bytes_are_byte_identical_across_steps(tmp_path: Path) -> None:
 
     model_steps = [s for s in result.steps if s.fragment_id is not None]
     assert len(model_steps) >= 2, "need >=2 model steps to assert prefix reuse"
-    # Every step that shares the prefix records the SAME hash...
+    # The workflow folds the fragments' static_inputs into the cacheable prefix once, so the
+    # effective prefix is re-derived; every step must still record exactly ONE prefix hash...
     run = store.load("obs-3")
     assert run is not None
     hashes = {e.prefix_hash for e in run.injected_context if e.prefix_hash is not None}
-    assert hashes == {prefix.content_hash}, "prefix hash differs across steps — not cacheable"
-    # ...and the prefix BYTES lead every emitted prompt verbatim (built once, reused).
+    assert len(hashes) == 1, "prefix hash differs across steps — not cacheable"
+    effective_hash = next(iter(hashes))
+    # ...and the SAME prefix BYTES lead every emitted prompt verbatim (built once, reused).
+    leading = model_steps[0].prompt_text
+    assert leading is not None
+    common_prefix = leading.split("\n\n---\n\n", 1)[0]
     for step in model_steps:
         assert step.prompt_text is not None
-        assert step.prompt_text.startswith(prefix.text), (
+        assert step.prompt_text.startswith(common_prefix), (
             f"step {step.label} did not reuse the cacheable prefix bytes verbatim"
         )
-    # Recompute the digest from the shared bytes to prove hash == sha256(prefix bytes).
-    assert (
-        PromptPrefix.from_sections(
-            {
-                "constitution": "the release-stable constitution block",
-                "tech-stack": "the release-stable tech-stack block",
-            }
-        ).content_hash
-        == prefix.content_hash
+    # The recorded hash is sha256 of those exact shared prefix bytes (cacheable invariant).
+    assert effective_hash == hashlib.sha256(common_prefix.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# 2b. Declared static_inputs content reaches the assembled prompt (fix #3)
+# ---------------------------------------------------------------------------
+
+
+def test_declared_static_inputs_reach_the_assembled_prompt(tmp_path: Path) -> None:
+    # The release_definition fragments declare static_inputs (specs/constitution.md and
+    # specs/memory/architecture.md). Their content must be injected into the assembled
+    # prompt (via the cacheable prefix). Drive the workflow and assert both markers appear.
+    store = _MemoryRunStore()
+    wf = _workflow(
+        tmp_path,
+        store,
+        lambda kind: _KindFake(kind, _approved()),
+        prefix=_stable_prefix(),
     )
+
+    result = wf.run("obs-static")
+
+    model_steps = [s for s in result.steps if s.fragment_id is not None]
+    assert model_steps
+    for step in model_steps:
+        assert step.prompt_text is not None
+        # constitution.md is a static input of spec_create; architecture.md of several steps.
+        assert "STATIC_CONST_MARKER_42" in step.prompt_text, (
+            f"step {step.label} did not receive the constitution static-input content"
+        )
+        assert _ARCH_STATIC_MARKER in step.prompt_text, (
+            f"step {step.label} did not receive the architecture static-input content"
+        )
+
+
+def test_missing_static_input_degrades_gracefully(tmp_path: Path) -> None:
+    # Remove a declared static input file; the workflow must not crash and must still run
+    # every step, simply omitting the absent file's content (graceful skip).
+    specs = _specs_tree(tmp_path)
+    (specs / "constitution.md").unlink()
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs, release_id=_RELEASE, handoff_dir=tmp_path / "handoff")
+    )
+    wf = ReleaseDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=_MemoryRunStore(),  # type: ignore[arg-type]
+        runtime_factory=lambda kind: _KindFake(kind, _approved()),  # type: ignore[arg-type, return-value]
+        context_selector=selector,
+        prefix=_stable_prefix(),
+    )
+
+    result = wf.run("obs-missing")
+
+    assert result.completed
+    model_steps = [s for s in result.steps if s.fragment_id is not None]
+    for step in model_steps:
+        assert step.prompt_text is not None
+        # constitution.md is gone — its marker must be absent, but architecture remains.
+        assert "STATIC_CONST_MARKER_42" not in step.prompt_text
+        assert _ARCH_STATIC_MARKER in step.prompt_text
 
 
 # ---------------------------------------------------------------------------

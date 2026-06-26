@@ -6,6 +6,14 @@ applyTo: "specs/backlog/**"
 
 # dadaia-release-definition
 
+> **Not the lifecycle enforcement mechanism.** Ordered release-definition execution is
+> owned by the **`release define` dadaia-workflow** (`dadaia lifecycle release define`) —
+> a Python workflow body that assembles fragment-scoped per-step prompts
+> (`release_scope → spec_create → spec_*_review → plan_create → … → definition_commit_gate`)
+> and advances Python-validated gates. This skill is reference / manual-operator guidance
+> only; it does not enforce the sequence. See **`dadaia panel` → Agentic →
+> dadaia-workflows** for the live workflow description.
+
 ## When to invoke
 
 When the operator asks for a new release built from bugs and/or backlog (e.g.

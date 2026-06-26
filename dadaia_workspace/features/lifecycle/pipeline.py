@@ -224,9 +224,7 @@ class LifecyclePipeline:
         """
         assert step.fragment_id is not None
         fragment = self._fragment_loader.load_fragment(step.fragment_id)
-        shared = tuple(
-            self._fragment_loader.load_fragment(fid) for fid in step.shared_fragment_ids
-        )
+        shared = tuple(self._fragment_loader.load_fragment(fid) for fid in step.shared_fragment_ids)
         selected = self._select_context(step, fragment)
         return build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),

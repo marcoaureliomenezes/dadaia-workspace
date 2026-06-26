@@ -92,6 +92,22 @@ class SpecContext:
 
 
 @dataclass(frozen=True)
+class StaticInput:
+    """A resolved (or gracefully-skipped) fragment ``static_inputs`` entry.
+
+    ``static_inputs`` are stable, release-level files (constitution, architecture memory)
+    that belong in the cacheable prompt prefix. ``present`` is ``False`` and ``note``
+    carries the reason when the declared file is absent in the active context, so a
+    missing static input degrades gracefully rather than crashing the assembly.
+    """
+
+    ref: str
+    present: bool
+    content: str
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class SelectionResult:
     """The resolved content for one dynamic input, plus the refs injected."""
 
@@ -186,6 +202,41 @@ class ContextSelector:
 
     def __init__(self, context: SpecContext) -> None:
         self._ctx = context
+
+    @property
+    def spec_context(self) -> SpecContext:
+        return self._ctx
+
+    # -- static-input resolution -----------------------------------------
+
+    def resolve_static_input(self, declared: str) -> StaticInput:
+        """Resolve a fragment's declared ``static_inputs`` entry to its file content.
+
+        A ``static_inputs`` entry is a workspace-relative path (e.g.
+        ``specs/constitution.md``, ``specs/memory/architecture.md``). It is resolved
+        under the context root (``specs_dir.parent``). When the declared file is absent
+        in this context the resolution degrades gracefully: ``present`` is ``False``,
+        ``content`` is empty, and a human-readable ``note`` records the skip — the caller
+        never crashes on a missing static input.
+        """
+        root = self._ctx.specs_dir.parent
+        ref = declared.strip().lstrip("/")
+        path = (root / ref).resolve()
+        # Path-traversal guard: a declared static input must stay inside the context root.
+        try:
+            path.relative_to(root.resolve())
+        except ValueError:
+            return StaticInput(
+                ref=ref,
+                present=False,
+                content="",
+                note=f"declared static input outside context root: {ref}",
+            )
+        if not path.is_file():
+            return StaticInput(
+                ref=ref, present=False, content="", note=f"static input not found in context: {ref}"
+            )
+        return StaticInput(ref=ref, present=True, content=_read_text(path), note="")
 
     # -- batch API -------------------------------------------------------
 

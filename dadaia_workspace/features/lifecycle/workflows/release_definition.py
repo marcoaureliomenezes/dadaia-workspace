@@ -53,6 +53,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
     ContextSelector,
     MaxContextPolicy,
     SelectionAudit,
+    StaticInput,
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import (
     Fragment,
@@ -206,6 +207,10 @@ class ReleaseDefinitionWorkflow:
         """Execute the sequence; stop at the first blocked gate; advance on success."""
         if not sequence:
             raise ValueError("release-definition workflow requires at least one step")
+        # Fold each fragment's declared static_inputs into the cacheable prefix once: they
+        # are stable across every step, so they live in the byte-identical prefix (not the
+        # per-step suffix) and the provider prompt cache reads them at a fraction of cost.
+        self._prefix = self._prefix_with_static_inputs(sequence)
         run = LifecycleRun(
             run_id=run_id,
             context=self._context,
@@ -354,6 +359,51 @@ class ReleaseDefinitionWorkflow:
             injected_context=run.injected_context,
         )
         return advanced, ReleaseStepResult(label=step.label, accepted=True, is_gate=True)
+
+    # -- static-input injection (folded into the cacheable prefix) -------
+
+    def _prefix_with_static_inputs(self, sequence: tuple[ReleaseStep, ...]) -> PromptPrefix | None:
+        """Return the prefix augmented with every fragment's resolved static_inputs.
+
+        Static inputs (e.g. ``specs/constitution.md``, ``specs/memory/architecture.md``)
+        are stable across the whole release, so they belong in the cacheable prefix. We
+        gather the de-duplicated declared static inputs across all model-step fragments,
+        resolve each via the context selector (graceful skip when absent), and re-derive a
+        single prefix carrying them as stable sections. When there are no resolvable static
+        inputs the original prefix is returned unchanged — the byte-identity guard for runs
+        with no static inputs is preserved exactly.
+        """
+        resolved = self._collect_static_inputs(sequence)
+        present = [item for item in resolved if item.present]
+        if not present:
+            return self._prefix
+        sections: dict[str, str] = {}
+        if self._prefix is not None and self._prefix.text:
+            sections["release-context"] = self._prefix.text
+        for item in present:
+            sections[f"static-input:{item.ref}"] = item.content
+        return PromptPrefix.from_sections(sections)
+
+    def _collect_static_inputs(self, sequence: tuple[ReleaseStep, ...]) -> tuple[StaticInput, ...]:
+        """Resolve the de-duplicated static_inputs declared across the sequence's fragments.
+
+        Each entry is resolved at most once (first declaration order wins). A declared
+        static input absent from this context is included with ``present=False`` so the
+        skip is recorded/auditable; only present ones reach the prefix.
+        """
+        seen: set[str] = set()
+        out: list[StaticInput] = []
+        for step in sequence:
+            if step.fragment_id is None:
+                continue
+            fragment = self._loader.load_fragment(step.fragment_id)
+            for declared in fragment.static_inputs:
+                ref = declared.strip().lstrip("/")
+                if ref in seen:
+                    continue
+                seen.add(ref)
+                out.append(self._selector.resolve_static_input(declared))
+        return tuple(out)
 
     # -- assembly helpers ------------------------------------------------
 

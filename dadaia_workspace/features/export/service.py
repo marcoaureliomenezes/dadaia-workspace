@@ -77,7 +77,6 @@ class ExportService:
         _add_if_exists(codex / "hooks.json", ".codex/hooks.json")
         _add_if_exists(codex / "rules", ".codex/rules")
 
-
         mnt = root / "mnt"
         if not options.exclude_mnt and mnt.exists():
             includes.append((mnt, "mnt"))

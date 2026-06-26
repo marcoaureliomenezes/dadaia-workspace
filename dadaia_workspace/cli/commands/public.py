@@ -8,8 +8,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+import dadaia_workspace
 from dadaia_workspace import container
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.ai_surface.doctor import check_ai_surface_ritual
 
 app = typer.Typer(help="Manage distributed public agent assets.")
 console = Console()
@@ -141,6 +143,12 @@ def doctor() -> None:
     """Diagnose drift between package source, staging, and runtime projections."""
     workspace_root = resolve_workspace_root()
     reports = container.build_public_service().doctor(workspace_root)
+    # AI-surface check (v0.1.24 WS-7): fail if mandatory ordered-lifecycle ritual is
+    # reintroduced into a dehydrated surface. Wired at the CLI (not the infrastructure
+    # service) because the `infrastructure → features` import is forbidden by the
+    # import-linter `features-no-subprocess`/layering contract.
+    public_dir = Path(dadaia_workspace.__file__).parent / "public"
+    reports.extend(check_ai_surface_ritual(public_dir))
     has_issues = False
     for item in reports:
         if item.startswith("[ok]"):
