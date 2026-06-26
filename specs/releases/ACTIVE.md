@@ -1,15 +1,15 @@
 ---
-release: none
-phase: ARCHIVED
+release: v0.1.28
+phase: DEFINITION
 ---
 
-No active release.
+# Active release: v0.1.28 — Workflow Model Governance + Panel Control Plane
 
-Last shipped: **v0.1.27 — wire the consumed_backlog PRODUCER at release-definition**
-(CLOSED + Aprovado; closure at `specs/_archive/releases/v0.1.27/CLOSURE.md` once the
-coordinator runs `git mv specs/releases/v0.1.27 specs/_archive/releases/v0.1.27`). v0.1.27
-resolved the v0.1.26 R2 producer residual: removal-on-release now fires end-to-end
-(producer at `dadaia lifecycle release define` via the `**Consumes:**` SPEC line, consumer
-at `dadaia lifecycle close`).
+Implements the `workflow-model-governance-panel-control-plane` epic
+(`FEAT-WORKFLOW-MODEL-GOVERNANCE-01`), the operator-chosen **whole epic A→D** in one
+release (sliced internally A/B/C/D for wave implementation).
 
-Next step: **workflow-model-governance-panel-control-plane**.
+**Phase:** DEFINITION — `product-engineer` authoring SPEC/PLAN/TASKS from the
+operator-resolved grill (see `GRILL.md`).
+
+Branch: `feature/v0.1.28` (descends from v0.1.27 @ 44b3109).
