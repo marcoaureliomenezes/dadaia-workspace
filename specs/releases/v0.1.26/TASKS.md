@@ -147,7 +147,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
   `_deferred`); `--harness claude` rejected; bad `--model` rejected (acceptance §3.7.6);
   mypy/ruff clean.
 
-## [ ] T-26-08 — Wire removal-on-release into the lifecycle + BL-STALE loop
+## [-] T-26-08 — Wire removal-on-release into the lifecycle + BL-STALE loop
 
 - **Owner:** software-engineer
 - **Write set:** the release-definition/closure lifecycle surface that invokes the writer
