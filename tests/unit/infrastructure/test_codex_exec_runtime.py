@@ -331,3 +331,55 @@ def test_codex_exec_adapter_no_git_client_preserves_prior_behavior(tmp_path: Pat
     # No git client: the adapter does not synthesize changed_paths; the model's own
     # value passes through untouched (no Ring-2 override).
     assert result.structured_output["changed_paths"] == "lies/fake.py"
+
+
+def test_codex_resolved_model_wins_over_config_and_tier(tmp_path: Path) -> None:
+    """T-28-A-06 / M2: the per-request resolved_model wins over config.model and tier.
+
+    The single ordered precedence is resolved_model > config.model > model_profile tier >
+    dispatch default. Here both a construction-time config model AND a request tier exist;
+    the resolved_model must still be the one that reaches ``-m`` / ``model_reasoning_effort``.
+    """
+    import dataclasses
+
+    from dadaia_workspace.core.harness_models import validate
+    from dadaia_workspace.core.models.workflow_execution import (
+        PolicySource,
+        ResolvedModelConfig,
+    )
+    from dadaia_workspace.infrastructure.codex_runtime import CodexExecConfig
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured["argv"] = argv
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text('{"summary":"done"}', encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    # Construction-time config model is gpt-5.5:medium ...
+    option = validate("codex", "gpt-5.5:medium")
+    adapter = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path, model=option.model_id, reasoning_effort=option.effort),
+        runner=fake_runner,
+        environ={},
+    )
+    # ... but the resolved_model says gpt-5.5:high — which must win.
+    request = dataclasses.replace(
+        _request(model_profile="deep"),
+        resolved_model=ResolvedModelConfig(
+            profile_id="codex-review-deep",
+            harness="codex",
+            model="gpt-5.5",
+            reasoning="high",
+            source=PolicySource.CLI,
+        ),
+    )
+
+    adapter.run(request)
+
+    argv = captured["argv"]
+    assert argv[argv.index("-m") + 1] == "gpt-5.5"
+    assert 'model_reasoning_effort="high"' in argv

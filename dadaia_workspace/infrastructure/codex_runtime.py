@@ -9,7 +9,7 @@ import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, get_args
 
 from dadaia_workspace.core.model_registry import CodexEffort, codex_tier_views
 from dadaia_workspace.core.models.lifecycle import (
@@ -31,6 +31,22 @@ _DEFAULT_ENV_ALLOWLIST = (
     "TERM",
 )
 _SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
+
+_VALID_CODEX_EFFORTS: frozenset[str] = frozenset(get_args(CodexEffort))
+
+
+def _as_codex_effort(effort: str) -> CodexEffort:
+    """Narrow a resolved reasoning string to the ``CodexEffort`` literal.
+
+    Raises:
+        ValueError: if *effort* is not one of ``high``/``medium``/``low``.
+    """
+    if effort not in _VALID_CODEX_EFFORTS:
+        raise ValueError(
+            f"invalid Codex reasoning effort {effort!r}; "
+            f"valid: {', '.join(sorted(_VALID_CODEX_EFFORTS))}"
+        )
+    return effort  # type: ignore[return-value]
 
 
 class _GitDiffPort(Protocol):
@@ -150,6 +166,20 @@ class CodexExecAdapter:
         return args
 
     def _model_and_effort(self, request: AgentRunRequest) -> tuple[str, CodexEffort]:
+        """Resolve the ``(model, reasoning_effort)`` for one request — ONE ordered precedence.
+
+        M2 (T-28-A-06): the governance-resolved per-request model config wins; the legacy
+        tier-name match is a fallback only. The single precedence, highest → lowest:
+
+        1. ``request.resolved_model`` — the policy-resolved concrete model (governance).
+        2. construction-time ``config.model`` + ``config.reasoning_effort`` — the
+           container's per-step ``--model`` selection (legacy LAW-2 path).
+        3. ``request.model_profile`` interpreted as a Codex *tier name* (legacy
+           observability fallback — predates the profile registry).
+        4. the ``dispatch`` tier view (last-resort default).
+        """
+        if request.resolved_model is not None:
+            return request.resolved_model.model, _as_codex_effort(request.resolved_model.reasoning)
         if self._config.model is not None and self._config.reasoning_effort is not None:
             return self._config.model, self._config.reasoning_effort
         if request.model_profile:

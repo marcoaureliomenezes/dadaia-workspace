@@ -106,7 +106,7 @@ class PiHeadlessAdapter:
                 error=f"unsupported runtime: {request.runtime.value}",
             )
 
-        args = self._command()
+        args = self._command(request)
         try:
             proc = self._runner(
                 args,
@@ -142,7 +142,20 @@ class PiHeadlessAdapter:
             return result
         return self._with_changed_paths(result)
 
-    def _command(self) -> list[str]:
+    def _command(self, request: AgentRunRequest) -> list[str]:
+        """Build the ``pi --mode json`` argv, threading the resolved per-request model.
+
+        M2 (T-28-A-06): ONE ordered precedence for the ``--model`` id, highest → lowest:
+
+        1. ``request.resolved_model.model`` — the policy-resolved concrete model
+           (governance); this is what makes per-step model selection reach the command.
+        2. construction-time ``config.model`` — the container's per-step ``--model``
+           selection (legacy LAW-2 path).
+        3. neither ⇒ no ``--model`` flag (PI uses its own default).
+
+        PI exposes no verified separate reasoning-effort flag, so only ``--model`` is
+        forwarded (see :class:`PiHeadlessConfig`).
+        """
         args = [
             self._config.pi_bin,
             "--mode",
@@ -150,10 +163,16 @@ class PiHeadlessAdapter:
             "--tools",
             ",".join(self._config.tools),
         ]
-        if self._config.model is not None:
-            args += ["--model", self._config.model]
+        model = self._resolve_model(request)
+        if model is not None:
+            args += ["--model", model]
         args += ["-p", "-"]
         return args
+
+    def _resolve_model(self, request: AgentRunRequest) -> str | None:
+        if request.resolved_model is not None:
+            return request.resolved_model.model
+        return self._config.model
 
     def _env(self) -> dict[str, str]:
         return {
