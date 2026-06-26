@@ -23,7 +23,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
 - **Done when:** no doc states RPC as supported/current; transport set stated as two
   everywhere outside memory; `grep -ri "rpc" specs/constitution.md README.md` shows only
   future-labelled mentions (or none).
-- `[ ]`
+- `[x]`
 
 ### T-23-02 — Workflow happy-path e2e: IMPLEMENTATION → CLOSURE on FAKE (WS-5)
 - **Owner:** software-engineer

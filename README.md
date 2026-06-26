@@ -81,9 +81,9 @@ flowchart TB
 - **Layer 2 — the worker harness.** The bounded agent workers that `dadaia lifecycle`
   drives, one selectable per step, behind a single `AgentRuntimePort`. There are five
   runtime kinds — `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS` —
-  reached over different transports: **SDK** (Claude, in-process), **CLI-headless**
-  (`codex exec`, `opencode run`, `pi --mode json`), and **RPC** (designed, not yet
-  shipped).
+  reached over **two** supported transports: **SDK** (Claude, in-process) and
+  **CLI-headless** (`codex exec`, `opencode run`, `pi --mode json`). (A long-lived RPC
+  transport is a possible future, not part of the supported architecture.)
 
 A harness can exist at one layer and not the other (e.g. `FAKE` is Layer-2 only). PI
 exists at both: an inert `.pi/` Layer-1 projection and a `PI_HEADLESS` Layer-2 worker.
