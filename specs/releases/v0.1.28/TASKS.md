@@ -125,7 +125,7 @@ Write set: `dadaia_workspace/features/workflows/service.py`;
 Acceptance: `get_detail`/`list_summaries` documented as reference-only; no executable
 behavior reads them as authority; existing read path still functions for the legacy view.
 
-### [ ] T-28-B-03 — Wave B green checkpoint
+### [x] T-28-B-03 — Wave B green checkpoint
 Write set: none (verification only).
 Acceptance: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest` green; catalog is
 the single governed workflow source.
