@@ -331,7 +331,10 @@ def build_agent_runtime(
             CodexExecConfig,
         )
 
-        return CodexExecAdapter(CodexExecConfig(cwd=run_dir))
+        return CodexExecAdapter(
+            CodexExecConfig(cwd=run_dir),
+            git=GitSubprocessClient(),
+        )
     if kind is AgentRuntimeKind.OPENCODE_RUN:
         from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
 

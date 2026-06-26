@@ -54,7 +54,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   mapping, fail-open default, venv resolution without bash, block-envelope check. Do NOT
   re-add the already-existing projection/delegation assertions.
 - **Done when:** new content-invariant assertions present and CI green.
-- `[ ]`
+- `[x]`
 
 ### T-23-05 — Codex adapter Ring-2 `_GitDiffPort` parity (WS-3 unit half / GAP-B)
 - **Owner:** software-engineer
@@ -66,7 +66,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   with a fake git client. (If operator scopes out, abandon → backlog return.)
 - **Done when:** Codex `changed_paths` sourced from git diff when a git client is injected;
   unit test green; `build_agent_runtime` signature unchanged for callers.
-- `[ ]`
+- `[x]`
 
 ---
 

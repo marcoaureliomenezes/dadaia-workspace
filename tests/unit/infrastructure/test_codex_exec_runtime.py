@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,18 @@ from dadaia_workspace.core.models.lifecycle import (
     GateEvidenceKind,
 )
 from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter, CodexExecConfig
+
+
+class _FakeGit:
+    """Fake GitSubprocessClient seam — returns a canned diff list per cwd snapshot."""
+
+    def __init__(self, changed: tuple[str, ...] = ()) -> None:
+        self._changed = changed
+        self.calls: list[Path] = []
+
+    def diff_name_only(self, path: Path) -> tuple[str, ...]:
+        self.calls.append(path)
+        return self._changed
 
 
 def _request(*, model_profile: str | None = "dispatch") -> AgentRunRequest:
@@ -187,3 +200,73 @@ def test_codex_exec_adapter_redacts_successful_json_output(tmp_path: Path) -> No
     assert result.summary == "completed with [REDACTED]"
     assert result.artifact_refs == (".dadaia/handoff/[REDACTED].handoff.json",)
     assert result.structured_output["token"] == "[REDACTED]"
+
+
+# ---------------------------------------------------------------------------
+# GAP-B — changed_paths from a FAKED git diff (never a model self-report)
+# ---------------------------------------------------------------------------
+
+
+def _git_diff_runner(model_changed: str) -> Callable[..., subprocess.CompletedProcess[str]]:
+    """Runner whose codex output self-reports a (lying) ``changed_paths``."""
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text(
+            json.dumps(
+                {
+                    "summary": "done",
+                    "structured_output": {"changed_paths": model_changed},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    return fake_runner
+
+
+def test_codex_exec_adapter_changed_paths_from_git_diff(tmp_path: Path) -> None:
+    fake_git = _FakeGit(changed=("src/a.py", "src/b.py"))
+
+    result = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path),
+        runner=_git_diff_runner(model_changed="lies/fake.py"),
+        environ={},
+        git=fake_git,
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    # The real git diff WINS over the model's self-reported changed_paths.
+    assert result.structured_output["changed_paths"] == "src/a.py,src/b.py"
+    assert fake_git.calls == [tmp_path]
+
+
+def test_codex_exec_adapter_changed_paths_empty_when_no_diff(tmp_path: Path) -> None:
+    fake_git = _FakeGit(changed=())
+
+    result = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path),
+        runner=_git_diff_runner(model_changed="lies/fake.py"),
+        environ={},
+        git=fake_git,
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.structured_output["changed_paths"] == ""
+    assert fake_git.calls == [tmp_path]
+
+
+def test_codex_exec_adapter_no_git_client_preserves_prior_behavior(tmp_path: Path) -> None:
+    result = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path),
+        runner=_git_diff_runner(model_changed="lies/fake.py"),
+        environ={},
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    # No git client: the adapter does not synthesize changed_paths; the model's own
+    # value passes through untouched (no Ring-2 override).
+    assert result.structured_output["changed_paths"] == "lies/fake.py"
