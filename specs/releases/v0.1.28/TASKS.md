@@ -56,7 +56,7 @@ Acceptance: `AgentRunRequest.resolved_model` + `LifecycleRun.workflow_policy` ad
 optional; `to_dict`/`from_dict` + `prompt_composition()` updated; old v1 records (no
 snapshot) still load (back-compat); no `_SCHEMA_VERSION` change that rejects v1.
 
-### [ ] T-28-A-06 — Adapters consume resolved model config
+### [-] T-28-A-06 — Adapters consume resolved model config
 Goal: Codex/PI/fake honor the per-request resolved model.
 Write set: `dadaia_workspace/infrastructure/codex_runtime.py`;
 `dadaia_workspace/infrastructure/pi_runtime.py`;
