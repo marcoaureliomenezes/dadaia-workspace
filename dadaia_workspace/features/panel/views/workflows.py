@@ -127,6 +127,50 @@ def render_dadaia_workflows_section() -> str:
     )
 
 
+def render_workflows_first_class_section() -> str:
+    """The first-class Workflows panel area (D-5, T-28-C-03).
+
+    Promotes Workflows from the Ops subtab to a top-level nav area. It carries:
+
+    - the **model-governance editor**: a toolbar (validate / save) + banner + an empty
+      ``#wfp-root`` that ``workflow-policy.js`` populates with one step matrix per governed
+      workflow (Step | Role | Harness | Model profile | Concrete model | Fragments | Gate
+      | default-vs-effective diff), the segmented codex/pi harness control, the
+      harness-filtered profile dropdown, reset-to-default, validate-before-save, save→PUT,
+      and the per-workflow run-snapshot evidence view (reads the persisted snapshot —
+      never re-resolves);
+    - the **server-rendered dadaia-workflow catalog** (diagrams + step sequence) below it,
+      fully SSR for first paint and as the no-JS fallback. The server-rendered SVG DAG is
+      the canonical, offline diagram — browser-Mermaid is never an execution dependency.
+
+    Agents and Kanban remain available in the Ops tab during the transition (D-5).
+    """
+    return (
+        '<section id="section-workflows" class="section panel-section" role="tabpanel" '
+        'tabindex="0" aria-labelledby="tab-workflows">\n'
+        '  <div class="section-header">\n'
+        "    <h2>Workflows</h2>\n"
+        "    <p>Govern the per-step model policy for every dadaia-workflow, and inspect "
+        "what each run actually executed.</p>\n"
+        "  </div>\n"
+        '  <div class="wfp-toolbar">\n'
+        '    <button type="button" class="wfp-validate-btn" id="wfp-validate-btn">'
+        "Validate</button>\n"
+        '    <button type="button" class="wfp-save-btn" id="wfp-save-btn">Save policy'
+        "</button>\n"
+        "  </div>\n"
+        '  <div class="wfp-banner" id="wfp-banner" role="status" aria-live="polite" hidden>'
+        "</div>\n"
+        '  <div id="wfp-root" class="wfp-catalog" aria-live="polite">'
+        '<p class="wfp-loading">Loading workflow model policy…</p></div>\n'
+        '  <details class="wfp-reference">\n'
+        "    <summary>Reference: full step sequence + diagrams</summary>\n"
+        f"    {render_dadaia_workflows_section()}\n"
+        "  </details>\n"
+        "</section>"
+    )
+
+
 def render_workflows_section() -> str:
     """Return the static HTML scaffold for the Workflows tab card grid (legacy).
 

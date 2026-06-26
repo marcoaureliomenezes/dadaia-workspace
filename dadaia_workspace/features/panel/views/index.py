@@ -33,7 +33,7 @@ from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
 from dadaia_workspace.features.panel.views.workflows import (
-    render_dadaia_workflows_section,
+    render_workflows_first_class_section,
     render_workflows_subsection,
 )
 
@@ -57,7 +57,7 @@ def render_index(
         reports_section = render_reports_section()
         agents_subsection = render_agents_subsection()
         workflows_subsection = render_workflows_subsection()
-        dadaia_workflows_section = render_dadaia_workflows_section()
+        workflows_section = render_workflows_first_class_section()
         sessions_section = render_sessions_section()
 
         body = f"""<!DOCTYPE html>
@@ -73,6 +73,7 @@ def render_index(
   <link rel="stylesheet" href="/static/projects.css">
   <link rel="stylesheet" href="/static/agents.css">
   <link rel="stylesheet" href="/static/workflows.css">
+  <link rel="stylesheet" href="/static/workflow-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
   <link rel="stylesheet" href="/static/reports.css">
@@ -112,6 +113,7 @@ def render_index(
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
+    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="Workflows">Workflows</button>
     <button class="nav-tab" data-section="ops" aria-selected="false" role="tab" id="tab-ops" aria-label="Agentic">Agentic</button>
     <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
@@ -146,17 +148,18 @@ def render_index(
       </div>
     </section>
 
+    {workflows_section}
+
     <section id="section-ops" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-ops">
       <div class="section-header">
         <h2>Agentic</h2>
-        <p>Agents, Workflows and Kanban &mdash; stacked below.</p>
+        <p>Agents, legacy workflow DAGs and Kanban &mdash; stacked below. Model
+        governance now lives in the first-class Workflows tab.</p>
       </div>
 
       {agents_subsection}
 
       {workflows_subsection}
-
-      {dadaia_workflows_section}
 
       <div class="ops-subsection" id="ops-subsection-kanban">
         <div class="ops-subsection-header">
@@ -181,6 +184,7 @@ def render_index(
   <script src="/static/core.js"></script>
   <script src="/static/agents.js"></script>
   <script src="/static/workflows.js"></script>
+  <script src="/static/workflow-policy.js"></script>
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>

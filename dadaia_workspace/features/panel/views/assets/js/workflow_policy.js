@@ -1,0 +1,379 @@
+// workflow_policy.js — Workflows first-class nav: model-governance control plane (Wave C, D-5).
+//
+// Renders, per governed workflow, a step matrix
+//   (Step | Role | Harness | Effective profile | Concrete model | Fragments | Gate)
+// with a per-step model editor:
+//   - segmented codex/pi harness control
+//   - profile dropdown filtered by the selected harness
+//   - reset-to-default per step
+//   - default-vs-effective diff (a step whose effective != default is flagged)
+//   - validate-before-save banner (POST /api/workflow-model-policy/validate)
+//   - save (PUT /api/workflow-model-policy)
+// plus a run-snapshot evidence view per workflow that reads the persisted snapshot
+//   (GET /api/lifecycle-runs) — it shows the model actually used, never re-resolving.
+//
+// Data sources (Wave C GET routes, all loopback, no credential):
+//   GET /api/workflow-catalog            → { workflows: [{ workflow_id, steps:[...] }] }
+//   GET /api/workflow-model-profiles     → { profiles: [{ id, harness, label, ... }] }
+//   GET /api/workflow-model-policy       → { exists, policy }
+//   GET /api/lifecycle-runs?workflow=&context=
+// Mutations:
+//   POST /api/workflow-model-policy/validate   (dry-run)
+//   PUT  /api/workflow-model-policy            (persist)
+//
+// Security: every value rendered into the DOM goes through escHtml; the only innerHTML
+// injected from the server is the diagram SVG (server-controlled). No browser-Mermaid is
+// an execution dependency — the server-rendered SVG (already on the page) is canonical.
+
+(function () {
+  'use strict';
+
+  var CONTEXT = 'default'; // D-2: only the default overlay is honored this release.
+
+  function escHtml(s) {
+    return (window.escHtml || function (x) {
+      return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    })(s);
+  }
+
+  function fetchJson(url, opts) {
+    var f = window.authedFetch || window.fetch;
+    return f(url, opts || {}).then(function (r) {
+      return r.json().then(function (body) { return { status: r.status, body: body }; });
+    });
+  }
+
+  // In-memory edit state: { workflow_id: { step: profile_id } } — pending overrides.
+  var pending = {};
+  var profilesByHarness = {}; // harness -> [profile]
+  var catalog = null;         // last catalog payload
+
+  function profilesFor(harness) {
+    return profilesByHarness[harness] || [];
+  }
+
+  // ── Rendering ──────────────────────────────────────────────────────────────
+
+  function effectiveProfile(workflowId, step) {
+    var p = pending[workflowId] && pending[workflowId][step.step];
+    return p != null ? p : step.effective_profile;
+  }
+
+  function harnessForProfile(profileId, fallback) {
+    for (var h in profilesByHarness) {
+      var list = profilesByHarness[h];
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id === profileId) { return h; }
+      }
+    }
+    return fallback;
+  }
+
+  function renderProfileOptions(harness, selectedId) {
+    var list = profilesFor(harness);
+    var out = '';
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      var sel = p.id === selectedId ? ' selected' : '';
+      out += '<option value="' + escHtml(p.id) + '"' + sel + '>' +
+        escHtml(p.label || p.id) + '</option>';
+    }
+    return out;
+  }
+
+  function renderHarnessSegment(workflowId, step, harness) {
+    // Only harnesses that actually carry profiles are selectable (codex/pi).
+    var harnesses = Object.keys(profilesByHarness).sort();
+    var out = '<span class="wfp-seg" role="radiogroup" aria-label="Harness">';
+    for (var i = 0; i < harnesses.length; i++) {
+      var h = harnesses[i];
+      var active = h === harness ? ' wfp-seg-btn--active' : '';
+      var checked = h === harness ? 'true' : 'false';
+      out += '<button type="button" class="wfp-seg-btn' + active + '" role="radio" ' +
+        'aria-checked="' + checked + '" data-wfp-harness="' + escHtml(h) + '" ' +
+        'data-wfp-workflow="' + escHtml(workflowId) + '" data-wfp-step="' + escHtml(step.step) + '">' +
+        escHtml(h) + '</button>';
+    }
+    out += '</span>';
+    return out;
+  }
+
+  function renderStepRow(workflowId, step) {
+    var eff = effectiveProfile(workflowId, step);
+    var harness = harnessForProfile(eff, step.harness);
+    var isOverridden = eff !== step.default_profile;
+    var rowCls = 'wfp-step-row' + (isOverridden ? ' wfp-step-row--overridden' : '');
+    var diff = isOverridden
+      ? '<span class="wfp-diff" data-testid="wfp-diff">default: ' +
+        escHtml(step.default_profile) + ' → ' + escHtml(eff) + '</span>'
+      : '<span class="wfp-diff wfp-diff--none">default</span>';
+    var gate = step.is_gate || step.gate
+      ? '<span class="wfp-gate" title="gate step">◉</span>' : '';
+    var fragments = (step.fragments || []).map(escHtml).join(', ') || '—';
+
+    return '<tr class="' + rowCls + '" data-wfp-step-row="' + escHtml(step.step) + '">' +
+      '<td class="wfp-c-step">' + escHtml(step.step) + '</td>' +
+      '<td class="wfp-c-role">' + escHtml(step.role || '') + '</td>' +
+      '<td class="wfp-c-harness">' + renderHarnessSegment(workflowId, step, harness) + '</td>' +
+      '<td class="wfp-c-profile">' +
+        '<select class="wfp-profile-select" aria-label="Model profile for ' + escHtml(step.step) + '" ' +
+        'data-wfp-workflow="' + escHtml(workflowId) + '" data-wfp-step="' + escHtml(step.step) + '">' +
+        renderProfileOptions(harness, eff) + '</select>' +
+      '</td>' +
+      '<td class="wfp-c-model">' + escHtml(step.model || '—') +
+        (step.reasoning ? ' <span class="wfp-effort">(' + escHtml(step.reasoning) + ')</span>' : '') + '</td>' +
+      '<td class="wfp-c-frag">' + fragments + '</td>' +
+      '<td class="wfp-c-gate">' + gate + '</td>' +
+      '<td class="wfp-c-diff">' + diff +
+        ' <button type="button" class="wfp-reset-btn" data-wfp-reset ' +
+        'data-wfp-workflow="' + escHtml(workflowId) + '" data-wfp-step="' + escHtml(step.step) + '" ' +
+        (isOverridden ? '' : 'disabled ') + '>reset</button></td>' +
+      '</tr>';
+  }
+
+  function renderWorkflow(wf) {
+    var rows = (wf.steps || []).map(function (s) { return renderStepRow(wf.workflow_id, s); }).join('');
+    return '<section class="wfp-workflow" data-wfp-workflow-card="' + escHtml(wf.workflow_id) + '">' +
+      '<header class="wfp-workflow-head"><h3 class="wfp-workflow-title">' +
+        escHtml(wf.workflow_id) + '</h3>' +
+        '<button type="button" class="wfp-runs-btn" data-wfp-runs="' + escHtml(wf.workflow_id) + '">' +
+        'Run snapshots</button></header>' +
+      (wf.error ? '<p class="wfp-error" data-testid="wfp-workflow-error">' + escHtml(wf.error) + '</p>' : '') +
+      '<table class="wfp-matrix"><thead><tr>' +
+        '<th>Step</th><th>Role</th><th>Harness</th><th>Model profile</th>' +
+        '<th>Concrete model</th><th>Fragments</th><th>Gate</th><th>Default vs effective</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div class="wfp-runs" data-wfp-runs-panel="' + escHtml(wf.workflow_id) + '" hidden></div>' +
+      '</section>';
+  }
+
+  function render() {
+    var root = document.getElementById('wfp-root');
+    if (!root || !catalog) { return; }
+    var html = (catalog.workflows || []).map(renderWorkflow).join('');
+    root.innerHTML = html ||
+      '<p class="empty-state" data-testid="wfp-empty">No governed workflows.</p>';
+    bindRowEvents();
+  }
+
+  function setBanner(kind, message) {
+    var banner = document.getElementById('wfp-banner');
+    if (!banner) { return; }
+    banner.className = 'wfp-banner wfp-banner--' + kind;
+    banner.textContent = message;
+    banner.hidden = !message;
+  }
+
+  // ── Events ──────────────────────────────────────────────────────────────────
+
+  function setPending(workflowId, step, profileId, defaultProfile) {
+    if (!pending[workflowId]) { pending[workflowId] = {}; }
+    if (profileId === defaultProfile) {
+      delete pending[workflowId][step];
+      if (Object.keys(pending[workflowId]).length === 0) { delete pending[workflowId]; }
+    } else {
+      pending[workflowId][step] = profileId;
+    }
+  }
+
+  function stepByLabel(workflowId, label) {
+    var wf = (catalog.workflows || []).find(function (w) { return w.workflow_id === workflowId; });
+    if (!wf) { return null; }
+    return (wf.steps || []).find(function (s) { return s.step === label; }) || null;
+  }
+
+  function bindRowEvents() {
+    var root = document.getElementById('wfp-root');
+    if (!root) { return; }
+
+    root.querySelectorAll('.wfp-profile-select').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var wfId = sel.getAttribute('data-wfp-workflow');
+        var stepLabel = sel.getAttribute('data-wfp-step');
+        var step = stepByLabel(wfId, stepLabel);
+        if (!step) { return; }
+        setPending(wfId, stepLabel, sel.value, step.default_profile);
+        render();
+      });
+    });
+
+    root.querySelectorAll('.wfp-seg-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var wfId = btn.getAttribute('data-wfp-workflow');
+        var stepLabel = btn.getAttribute('data-wfp-step');
+        var harness = btn.getAttribute('data-wfp-harness');
+        var step = stepByLabel(wfId, stepLabel);
+        if (!step) { return; }
+        // Switching harness picks that harness's first profile (filtered dropdown).
+        var list = profilesFor(harness);
+        if (list.length) {
+          setPending(wfId, stepLabel, list[0].id, step.default_profile);
+        }
+        render();
+      });
+    });
+
+    root.querySelectorAll('[data-wfp-reset]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var wfId = btn.getAttribute('data-wfp-workflow');
+        var stepLabel = btn.getAttribute('data-wfp-step');
+        if (pending[wfId]) { delete pending[wfId][stepLabel]; }
+        render();
+      });
+    });
+
+    root.querySelectorAll('[data-wfp-runs]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        loadRuns(btn.getAttribute('data-wfp-runs'));
+      });
+    });
+  }
+
+  // ── Policy payload ───────────────────────────────────────────────────────────
+
+  function buildPolicyPayload() {
+    var workflows = {};
+    for (var wfId in pending) {
+      var steps = {};
+      for (var step in pending[wfId]) { steps[step] = pending[wfId][step]; }
+      if (Object.keys(steps).length) { workflows[wfId] = { steps: steps }; }
+    }
+    return {
+      schema_version: 'workflow-model-policy-v1',
+      policy_id: 'default',
+      contexts: { default: { workflows: workflows } }
+    };
+  }
+
+  function jsonBody(payload) {
+    return {
+      method: '',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    };
+  }
+
+  function validate() {
+    var opts = jsonBody(buildPolicyPayload());
+    opts.method = 'POST';
+    setBanner('info', 'Validating…');
+    return fetchJson('/api/workflow-model-policy/validate?context=' + CONTEXT, opts)
+      .then(function (res) {
+        if (res.status === 200 && res.body.valid) {
+          setBanner('ok', 'Valid — ready to save.');
+          return true;
+        }
+        var msg = (res.body.errors && res.body.errors.map(function (e) {
+          return e.path + ': ' + e.message;
+        }).join('; ')) || res.body.message || 'Invalid policy.';
+        setBanner('error', 'Validation failed — ' + msg);
+        return false;
+      })
+      .catch(function () { setBanner('error', 'Validation request failed.'); return false; });
+  }
+
+  function save() {
+    // Validate-before-save: never PUT without a green validate first.
+    return validate().then(function (ok) {
+      if (!ok) { return; }
+      var opts = jsonBody(buildPolicyPayload());
+      opts.method = 'PUT';
+      return fetchJson('/api/workflow-model-policy?context=' + CONTEXT, opts).then(function (res) {
+        if (res.status === 200 && res.body.saved) {
+          setBanner('ok', 'Saved.');
+          pending = {};
+          return loadCatalog();
+        }
+        var msg = (res.body.errors && res.body.errors.map(function (e) {
+          return e.path + ': ' + e.message;
+        }).join('; ')) || res.body.message || res.body.error || 'Save failed.';
+        setBanner('error', 'Save failed — ' + msg);
+      });
+    });
+  }
+
+  // ── Run-snapshot evidence (AC-7) ──────────────────────────────────────────────
+
+  function loadRuns(workflowId) {
+    var panel = document.querySelector('[data-wfp-runs-panel="' + cssEsc(workflowId) + '"]');
+    if (!panel) { return; }
+    panel.hidden = false;
+    panel.innerHTML = '<p class="wfp-loading">Loading run snapshots…</p>';
+    fetchJson('/api/lifecycle-runs?workflow=' + encodeURIComponent(workflowId) +
+      '&context=' + CONTEXT).then(function (res) {
+      var runs = (res.body && res.body.runs) || [];
+      if (!runs.length) {
+        panel.innerHTML = '<p class="wfp-runs-empty">No runs recorded for this workflow.</p>';
+        return;
+      }
+      panel.innerHTML = runs.map(renderRunSnapshot).join('');
+    }).catch(function () {
+      panel.innerHTML = '<p class="wfp-error">Could not load run snapshots.</p>';
+    });
+  }
+
+  function renderRunSnapshot(run) {
+    var snap = run.workflow_policy;
+    var steps = (snap && snap.steps) || [];
+    var rows = steps.map(function (s) {
+      return '<tr><td>' + escHtml(s.step) + '</td><td>' + escHtml(s.harness) +
+        '</td><td>' + escHtml(s.model_profile) + '</td><td>' + escHtml(s.model) +
+        ' (' + escHtml(s.reasoning) + ')</td><td>' + escHtml(s.source) + '</td></tr>';
+    }).join('');
+    return '<div class="wfp-run" data-testid="wfp-run-snapshot">' +
+      '<div class="wfp-run-head"><code>' + escHtml(run.run_id) + '</code> · ' +
+      escHtml(run.status) + ' · prefix ' +
+      escHtml((snap && snap.prefix_hash) || '—') + '</div>' +
+      '<table class="wfp-run-table"><thead><tr><th>Step</th><th>Harness</th>' +
+      '<th>Profile</th><th>Model used</th><th>Source</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div>';
+  }
+
+  function cssEsc(s) {
+    return String(s).replace(/["\\]/g, '\\$&');
+  }
+
+  // ── Load ──────────────────────────────────────────────────────────────────────
+
+  function loadProfiles() {
+    return fetchJson('/api/workflow-model-profiles').then(function (res) {
+      profilesByHarness = {};
+      ((res.body && res.body.profiles) || []).forEach(function (p) {
+        if (!profilesByHarness[p.harness]) { profilesByHarness[p.harness] = []; }
+        profilesByHarness[p.harness].push(p);
+      });
+    });
+  }
+
+  function loadCatalog() {
+    return fetchJson('/api/workflow-catalog?context=' + CONTEXT).then(function (res) {
+      catalog = res.body;
+      render();
+    });
+  }
+
+  var loaded = false;
+
+  function load() {
+    if (loaded) { return; }
+    loaded = true;
+    var saveBtn = document.getElementById('wfp-save-btn');
+    var validateBtn = document.getElementById('wfp-validate-btn');
+    if (saveBtn) { saveBtn.addEventListener('click', save); }
+    if (validateBtn) { validateBtn.addEventListener('click', validate); }
+    loadProfiles().then(loadCatalog).catch(function () {
+      var root = document.getElementById('wfp-root');
+      if (root) { root.innerHTML = '<p class="wfp-error">Could not load the workflow catalog.</p>'; }
+    });
+  }
+
+  window.WorkflowPolicy = {
+    load: load,
+    isLoaded: function () { return loaded; }
+  };
+  if (window.Panel && window.Panel.register) {
+    window.Panel.register('workflow_policy', { load: load });
+  }
+})();

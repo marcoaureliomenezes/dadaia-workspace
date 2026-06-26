@@ -248,6 +248,13 @@
         window.Panel.activate('kanban');
       }
 
+      // ── Workflows tab (first-class, D-5): load the model-governance editor ──────
+      if (target === 'workflows') {
+        if (window.WorkflowPolicy && !window.WorkflowPolicy.isLoaded()) {
+          window.WorkflowPolicy.load();
+        }
+      }
+
       if (target === 'sessions') {
         window.Panel.activate('sessions');
       }
