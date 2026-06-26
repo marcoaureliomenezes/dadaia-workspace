@@ -133,7 +133,7 @@
 
 ## Marker board
 
-- [-] T-1 — Parser `parse_consumes_line`
+- [x] T-1 — Parser `parse_consumes_line`
 - [ ] T-2 — Binder `shipped_anchors_for` (happy path)
 - [ ] T-3 — Binder fail-loud: unknown slug
 - [ ] T-4 — Binder fail-loud: unbindable intents
