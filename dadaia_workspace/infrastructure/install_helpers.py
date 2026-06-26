@@ -22,7 +22,6 @@ from dadaia_workspace.infrastructure.public_assets_common import (
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _parse_write_allowlist,
-    _prepare_agent_for_opencode,
     _render_codex_agent_toml,
 )
 from dadaia_workspace.infrastructure.workspace_guardrail import (
@@ -247,13 +246,13 @@ def runtime_expectations(
     workspace_root: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
     claude_dirs: tuple[str, ...],
-    opencode_dirs: tuple[str, ...],
     agents_md_source_fn: Callable[[Path], Path | None],
 ) -> Iterable[tuple[Path | None, Path, str, bool]]:
     """Yield (src, dst, label, transform) tuples for doctor comparison.
 
-    transform=True means dst was produced by a content transform (e.g. OpenCode
-    agent tools-strip) and must be compared by content rather than by file hash.
+    transform=True means dst was produced by a content transform (e.g. the
+    generated CLAUDE.md stub) and must be compared by content rather than by
+    file hash.
     """
     agents_md = agents_md_source_fn(agentic_dir)
     if agents_md is not None:
@@ -321,20 +320,6 @@ def runtime_expectations(
                 f"claude:{name}/{rel.as_posix()}",
                 False,
             )
-
-    for name in opencode_dirs:
-        base = agentic_dir / name
-        for src in iter_files_fn(base):
-            rel = src.relative_to(base)
-            is_opencode_agent = name == "agents"
-            yield (
-                src,
-                workspace_root / ".opencode" / name / rel,
-                f"opencode:{name}/{rel.as_posix()}",
-                is_opencode_agent,
-            )
-
-    yield (None, workspace_root / ".opencode" / "hooks", "opencode:hooks", False)
 
     scripts_base = agentic_dir / "scripts"
     for src in iter_files_fn(scripts_base):
@@ -446,38 +431,3 @@ def install_codex_runtime_adapters(
         skill_dst = dst_root / slug_dir.name / "SKILL.md"
         skill_dst.parent.mkdir(parents=True, exist_ok=True)
         copy_file_fn(skill_src, skill_dst, force, installed)
-
-
-def copy_agents_for_opencode(
-    src_dir: Path,
-    dst_dir: Path,
-    force: bool,
-    installed: list[str],
-    iter_files_fn: Callable[[Path], Iterable[Path]],
-) -> None:
-    """Copy agent .md files stripping the ``tools`` array from frontmatter."""
-    if not src_dir.exists():
-        return
-    managed: set[Path] = set()
-    for src in iter_files_fn(src_dir):
-        rel = src.relative_to(src_dir)
-        managed.add(rel)
-        dst = dst_dir / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        content = _prepare_agent_for_opencode(src.read_text(encoding="utf-8"))
-        if dst.exists() and not force:
-            dst_sha = _sha256(dst)
-            src_sha = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            if dst_sha == src_sha:
-                installed.append(f"[skip] {dst}")
-                continue
-        # LF-exact write so the skip hash-compare matches on Windows (FR-RC2-2).
-        _atomic_write_text(dst, content)
-        installed.append(f"[ok]   {dst}")
-    # Prune orphan projections (rc-4 / T-017-32 — fixes install-does-not-prune-orphan-
-    # projections): an agent .md removed from source must not linger in .opencode/agents/.
-    if dst_dir.exists():
-        for dst in iter_files_fn(dst_dir):
-            if dst.relative_to(dst_dir) not in managed:
-                dst.unlink(missing_ok=True)
-                installed.append(f"[prune] {dst}")

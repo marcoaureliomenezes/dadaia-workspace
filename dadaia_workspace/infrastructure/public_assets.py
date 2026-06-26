@@ -28,7 +28,6 @@ from dadaia_workspace.infrastructure.codex_doctor import (
 from dadaia_workspace.infrastructure.install_helpers import (
     build_agents_index,
     build_manifest,
-    copy_agents_for_opencode,
     copy_file,
     copy_tree,
     install_agents_md,
@@ -59,7 +58,6 @@ from dadaia_workspace.infrastructure.privacy_check import (
 from dadaia_workspace.infrastructure.public_assets_common import (  # noqa: F401
     _CLAUDE_DIRS,
     _COPY_DIRS,
-    _OPENCODE_DIRS,
     _PI_DIRS,
     _SCHEMA_VERSION,
     _VALID_TARGETS,
@@ -82,19 +80,14 @@ from dadaia_workspace.infrastructure.runtime_config import (
 from dadaia_workspace.infrastructure.runtime_config import (
     codex_hooks as _build_codex_hooks,
 )
-from dadaia_workspace.infrastructure.runtime_config import (
-    opencode_config as _build_opencode_config,
-)
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  # noqa: F401
     _parse_agent_frontmatter,
     _parse_write_allowlist,
-    _prepare_agent_for_opencode,
     _render_agent_toml_block,
     _render_agents_config_file_blocks,
     _render_agents_into_codex_config,
     _render_codex_agent_toml,
     _render_codex_command_policy_rules,
-    _strip_tools_from_frontmatter,
 )
 from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
     _CLAUDE_MD_STUB,
@@ -136,7 +129,6 @@ class FileSystemPublicAssetManager:
             workspace_root,
             self._iter_files,
             _CLAUDE_DIRS,
-            _OPENCODE_DIRS,
             self._agents_md_source,
         )
 
@@ -200,9 +192,6 @@ class FileSystemPublicAssetManager:
 
     def _codex_hooks(self, workspace_root: Path) -> dict[str, object]:
         return _build_codex_hooks(workspace_root)
-
-    def _opencode_config(self, workspace_root: Path) -> dict[str, object]:
-        return _build_opencode_config(workspace_root)
 
     # ------------------------------------------------------------------
     # Public API
@@ -281,7 +270,7 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
-        targets = ("agents", "claude", "codex", "opencode", "pi") if target == "all" else (target,)
+        targets = ("agents", "claude", "codex", "pi") if target == "all" else (target,)
         data_agents_md = agentic_dir / "data" / "AGENTS.md"
         if data_agents_md.exists():
             guard_targets: dict[str, set[Literal["workspace", "repos"]]] = {
@@ -313,8 +302,6 @@ class FileSystemPublicAssetManager:
                 self._install_claude(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "codex":
                 self._install_codex(agentic_dir, workspace_root, force, installed, only=only)
-            elif item == "opencode":
-                self._install_opencode(agentic_dir, workspace_root, force, installed, only=only)
             elif item == "pi":
                 self._install_pi(agentic_dir, workspace_root, force, installed, only=only)
 
@@ -352,16 +339,12 @@ class FileSystemPublicAssetManager:
             workspace_root,
             self._iter_files,
             _CLAUDE_DIRS,
-            _OPENCODE_DIRS,
             self._agents_md_source,
         ):
             if expected_src is None and transform:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
                 reports.append(f"[unsupported] {label}")
-            elif transform:
-                content = _prepare_agent_for_opencode(expected_src.read_text(encoding="utf-8"))
-                reports.append(self._compare_content(content, dst, label))
             else:
                 reports.append(self._compare(expected_src, dst, label))
 
@@ -401,14 +384,6 @@ class FileSystemPublicAssetManager:
                 "codex:rules/dadaia-command-policy.rules",
             )
         )
-        reports.append(
-            self._compare_content(
-                _json_dump(_build_opencode_config(workspace_root)),
-                workspace_root / "opencode.json",
-                "opencode:opencode.json",
-            )
-        )
-
         # PI (Layer-2 worker harness): verbatim source↔staging↔projected comparison.
         pi_staged = agentic_dir / "pi"
         pi_projected = workspace_root / ".pi"
@@ -540,37 +515,6 @@ class FileSystemPublicAssetManager:
                 installed,
             )
 
-    def _install_opencode(
-        self,
-        agentic_dir: Path,
-        workspace_root: Path,
-        force: bool,
-        installed: list[str],
-        only: str | None = None,
-    ) -> None:
-        opencode_dir = workspace_root / ".opencode"
-        dirs = _OPENCODE_DIRS if only is None else tuple(d for d in _OPENCODE_DIRS if d == only)
-        for name in dirs:
-            if name == "agents":
-                copy_agents_for_opencode(
-                    agentic_dir / name,
-                    opencode_dir / name,
-                    force,
-                    installed,
-                    self._iter_files,
-                )
-            else:
-                copy_tree(
-                    agentic_dir / name, opencode_dir / name, force, installed, self._iter_files
-                )
-        if only is None:
-            write_generated(
-                workspace_root / "opencode.json",
-                _json_dump(_build_opencode_config(workspace_root)),
-                force,
-                installed,
-            )
-
     def _install_pi(
         self,
         agentic_dir: Path,
@@ -581,13 +525,12 @@ class FileSystemPublicAssetManager:
     ) -> None:
         """Project the staged ``pi/`` tree into ``<workspace_root>/.pi/``.
 
-        Mirrors :meth:`_install_opencode`: the staged ``pi/`` assets (``SYSTEM.md``,
-        ``settings.json`` and the ``prompts/`` affordance dir) are plain md/json — a
-        straight hash-compare copy with orphan-pruning, idempotent on re-install.
+        The staged ``pi/`` assets (``SYSTEM.md``, ``settings.json`` and the
+        ``prompts/`` affordance dir) are plain md/json — a straight hash-compare copy
+        with orphan-pruning, idempotent on re-install.
 
         The PI harness is a Layer-2 worker; its files carry no workspace-specific or
-        operator-local values, so the copy is verbatim (no generated config like the
-        OpenCode ``opencode.json``).
+        operator-local values, so the copy is verbatim (no generated config file).
         """
         pi_src = agentic_dir / "pi"
         pi_dst = workspace_root / ".pi"

@@ -1,6 +1,6 @@
 # bug-registration-guardrail
 
-This rule is always active, for every Layer-1 entry harness (Claude, Codex, OpenCode, PI).
+This rule is always active, for every Layer-1 entry harness (Claude, Codex, PI).
 
 ## Law
 

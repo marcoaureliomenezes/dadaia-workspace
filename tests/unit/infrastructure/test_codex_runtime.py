@@ -1,10 +1,10 @@
 """T-13: SHA null-regression and doctor leak detection tests.
 
-AC C7 (ADR-CX-004): Adding a Codex-only adapter must leave .claude/** and
-.opencode/** byte-identical before and after the install call.
+AC C7 (ADR-CX-004): Adding a Codex-only adapter must leave .claude/**
+byte-identical before and after the install call.
 
 AC C8 (D-CX-6): Doctor must detect missing, drift, and accidental leak of
-Codex-only adapters into .claude/skills/ or .opencode/skills/.
+Codex-only adapters into .claude/skills/.
 """
 
 from __future__ import annotations
@@ -55,7 +55,6 @@ def _make_workspace(tmp_path: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]
               skills/
                 existing-skill/
                   SKILL.md   ← must not be touched by codex install
-            .opencode/       ← must not gain files
             .codex/          ← install target
     """
     public_dir = tmp_path / "public"
@@ -69,9 +68,6 @@ def _make_workspace(tmp_path: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]
     existing_skill_dir = workspace_root / ".claude" / "skills" / "existing-skill"
     existing_skill_dir.mkdir(parents=True)
     (existing_skill_dir / "SKILL.md").write_text(_EXISTING_CLAUDE_SKILL_CONTENT, encoding="utf-8")
-
-    # Empty .opencode/ dir
-    (workspace_root / ".opencode").mkdir(parents=True)
 
     # Empty .codex/ dir
     (workspace_root / ".codex").mkdir(parents=True)
@@ -92,7 +88,7 @@ def _make_manager(public_dir: pathlib.Path) -> FileSystemPublicAssetManager:
 
 
 class TestShaNull:
-    """SHA snapshot tests: codex install must not touch .claude/** or .opencode/**."""
+    """SHA snapshot tests: codex install must not touch .claude/**."""
 
     def test_codex_null_regression_claude_unchanged(self, tmp_path: pathlib.Path) -> None:
         """SHA tree of .claude/ is byte-identical before and after _install_codex_runtime_adapters."""
@@ -106,21 +102,6 @@ class TestShaNull:
 
         assert sha_before == sha_after, (
             ".claude/ was modified by _install_codex_runtime_adapters. "
-            f"Before: {sha_before!r}  After: {sha_after!r}"
-        )
-
-    def test_codex_null_regression_opencode_unchanged(self, tmp_path: pathlib.Path) -> None:
-        """SHA tree of .opencode/ is byte-identical before and after _install_codex_runtime_adapters."""
-        public_dir, workspace_root = _make_workspace(tmp_path)
-        manager = _make_manager(public_dir)
-
-        sha_before = _sha_tree(workspace_root / ".opencode")
-        installed: list[str] = []
-        manager._install_codex_runtime_adapters(workspace_root, force=False, installed=installed)
-        sha_after = _sha_tree(workspace_root / ".opencode")
-
-        assert sha_before == sha_after, (
-            ".opencode/ was modified by _install_codex_runtime_adapters. "
             f"Before: {sha_before!r}  After: {sha_after!r}"
         )
 
@@ -159,7 +140,6 @@ class TestDcx6DoctorLeakDetection:
         workspace_root = tmp_path / "workspace"
         (workspace_root / ".codex").mkdir(parents=True)
         (workspace_root / ".claude").mkdir(parents=True)
-        (workspace_root / ".opencode").mkdir(parents=True)
 
         return public_dir, workspace_root
 
@@ -238,28 +218,4 @@ class TestDcx6DoctorLeakDetection:
         )
         assert any("claude:skills/my-adapter/SKILL.md" in line for line in leak_lines), (
             f"[leak] line does not reference 'claude:skills/my-adapter/SKILL.md': {leak_lines!r}"
-        )
-
-    def test_dcx6_leak_to_opencode_detected(self, tmp_path: pathlib.Path) -> None:
-        """If adapter is also present in .opencode/skills/, doctor reports [leak] opencode:skills/."""
-        public_dir, workspace_root = self._make_single_adapter_workspace(tmp_path)
-        manager = _make_manager(public_dir)
-
-        # Install adapter to .codex/skills/ (correct).
-        installed: list[str] = []
-        manager._install_codex_runtime_adapters(workspace_root, force=True, installed=installed)
-
-        # Also copy it to .opencode/skills/ (incorrect — leak).
-        leak_dir = workspace_root / ".opencode" / "skills" / "my-adapter"
-        leak_dir.mkdir(parents=True)
-        (leak_dir / "SKILL.md").write_text(_ADAPTER_CONTENT, encoding="utf-8")
-
-        result = manager._dcx6_codex_runtime_adapters(workspace_root)
-
-        leak_lines = [r for r in result if "[leak]" in r and "opencode" in r and "my-adapter" in r]
-        assert leak_lines, (
-            f"Expected a [leak] entry for opencode:skills/my-adapter but got: {result!r}"
-        )
-        assert any("opencode:skills/my-adapter/SKILL.md" in line for line in leak_lines), (
-            f"[leak] line does not reference 'opencode:skills/my-adapter/SKILL.md': {leak_lines!r}"
         )

@@ -14,6 +14,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from dadaia_workspace.core.harness_models import (
+    CODEX_HARNESS,
+    HarnessModelOption,
+    options_for,
+)
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
@@ -170,13 +175,29 @@ class LifecyclePipeline:
         )
 
 
-def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep, ...]:
+#: Default Layer-2 discrete model for pipeline steps when the caller does not select
+#: one (LAW 2 / ADR-B). Codex's first catalog option is the standard worker profile;
+#: the prior ``"sonnet"/"opus"`` tier literals were never valid Codex tier names and
+#: are dropped. ``model_profile`` now carries the discrete option's effort string so
+#: the seam remains observable without re-introducing a tier abstraction.
+_DEFAULT_STEP_MODEL: HarnessModelOption = options_for(CODEX_HARNESS)[0]
+
+
+def implementation_ladder(
+    default_kind: AgentRuntimeKind,
+    *,
+    model: HarnessModelOption | None = None,
+) -> tuple[PipelineStep, ...]:
     """The canonical release-implementation pipeline: implement → qa → security → code.
 
-    Each step defaults to ``default_kind`` (override per step for harness mixing) and carries
-    a step model tier (EPIC D11): implementation runs the standard tier, reviews/judgments run
-    the deep tier — inverting the all-steps-on-the-top-tier tax.
+    Each step defaults to ``default_kind`` (override per step for harness mixing). The
+    discrete Layer-2 model defaults from the catalog (LAW 2 / ADR-B) — no ``sonnet``/
+    ``opus`` literals. Each step's ``model_profile`` records the chosen option's effort
+    so the pipeline run record stays auditable; the actual ``(id, effort)`` reaches the
+    adapter through the runtime factory (``build_agent_runtime(..., model=...)``).
     """
+    chosen = model or _DEFAULT_STEP_MODEL
+    effort = chosen.effort
     return (
         PipelineStep(
             label="implement",
@@ -184,7 +205,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.IMPLEMENTATION,
             target_phase=LifecyclePhase.QA_REVIEW,
             runtime_kind=default_kind,
-            model_profile="sonnet",
+            model_profile=effort,
         ),
         PipelineStep(
             label="review_qa",
@@ -192,7 +213,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.QA_REVIEW,
             target_phase=LifecyclePhase.SECURITY_REVIEW,
             runtime_kind=default_kind,
-            model_profile="opus",
+            model_profile=effort,
         ),
         PipelineStep(
             label="review_security",
@@ -200,7 +221,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.SECURITY_REVIEW,
             target_phase=LifecyclePhase.CODE_REVIEW,
             runtime_kind=default_kind,
-            model_profile="opus",
+            model_profile=effort,
         ),
         PipelineStep(
             label="review_code",
@@ -208,7 +229,7 @@ def implementation_ladder(default_kind: AgentRuntimeKind) -> tuple[PipelineStep,
             from_phase=LifecyclePhase.CODE_REVIEW,
             target_phase=LifecyclePhase.CLOSURE,
             runtime_kind=default_kind,
-            model_profile="opus",
+            model_profile=effort,
         ),
     )
 

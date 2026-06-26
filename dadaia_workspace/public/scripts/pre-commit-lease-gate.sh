@@ -8,7 +8,7 @@
 # — never a review verdict (commits are never review-blocked; that is the push gate).
 #
 # This is the harness-independent chokepoint: it fires in every runtime (Claude Code,
-# Codex interactive, `codex exec` headless, OpenCode, plain git) because it is a git hook,
+# Codex interactive, `codex exec` headless, PI, plain git) because it is a git hook,
 # closing the `codex-exec-hooks-do-not-fire-headless` gap at the commit boundary.
 #
 # Installed to .git/hooks/pre-commit by `dadaia ci install-hook`.

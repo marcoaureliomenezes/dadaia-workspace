@@ -38,7 +38,6 @@ The workspace root may contain **only** the following entries:
 | `.claude/` | dir | lib-originated projection |
 | `.codex/` | dir | lib-originated projection |
 | `.dadaia/` | dir | workspace state directory |
-| `.opencode/` | dir | lib-originated projection |
 | `.pi/` | dir | lib-originated projection (PI Layer-1; post-trust executable — see below) |
 | `repos/` | dir | spec context project repos |
 | `AGENTS.md` | file | lib-originated (dadaia public install) |
@@ -55,7 +54,7 @@ grants trust and runs it as unsandboxed TypeScript. It is still lib-originated
 (manifest-tracked), carries no secrets or operator-local paths, and must never be
 hand-edited in place — treat it as a deliberate privilege grant, not inert config.
 
-**Nothing else belongs at root.** Files such as `opencode.json`, `.mcp.json`,
+**Nothing else belongs at root.** Files such as `.mcp.json`
 and `scripts/` are NOT default-whitelisted. If a specific tool genuinely requires
 one of these at root, it must be added as a documented exception in
 `.dadaia/states/root_exceptions.txt` (one glob per line) after operator approval.

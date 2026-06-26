@@ -2,7 +2,7 @@
 
 The Law: the workspace root may contain ONLY these entries::
 
-    .agents/ .claude/ .codex/ .dadaia/ .opencode/ .pi/ repos/   (directories)
+    .agents/ .claude/ .codex/ .dadaia/ .pi/ repos/             (directories)
     AGENTS.md CLAUDE.md prompt.md                               (files)
 
 Any other top-level entry is blocked. An operator exception list at
@@ -27,7 +27,6 @@ _WHITELIST: frozenset[str] = frozenset(
         ".claude",
         ".codex",
         ".dadaia",
-        ".opencode",
         ".pi",
         "repos",
         "AGENTS.md",
@@ -126,7 +125,7 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
     return (
         f"[ROOT WHITELIST GATE] Writing '{basename}' at workspace root is forbidden. "
         "The workspace root may only contain: .agents/ .claude/ .codex/ .dadaia/ "
-        ".opencode/ .pi/ repos/ AGENTS.md CLAUDE.md prompt.md. Redirect output to "
+        ".pi/ repos/ AGENTS.md CLAUDE.md prompt.md. Redirect output to "
         ".dadaia/<subdir> (temp files: .dadaia/tmp/<agent>/<date>/; tool caches: "
         ".dadaia/; MCP output: .dadaia/mcps/<server>/). If this entry is genuinely "
         "required at root, add a glob pattern to .dadaia/states/root_exceptions.txt and "

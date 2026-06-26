@@ -15,12 +15,10 @@ Protected paths (relative to the repo root, checked recursively):
   .claude/
   .agents/
   .codex/
-  .opencode/
   .dadaia/
 
 Protected root files:
   CLAUDE.md
-  opencode.json
   Makefile
   playwright.config.ts
 
@@ -105,13 +103,11 @@ _GUARDED_DIRS: tuple[str, ...] = (
     ".claude",
     ".agents",
     ".codex",
-    ".opencode",
     ".dadaia",
 )
 
 _GUARDED_ROOT_FILES: tuple[str, ...] = (
     "CLAUDE.md",
-    "opencode.json",
     "Makefile",
     "playwright.config.ts",
 )

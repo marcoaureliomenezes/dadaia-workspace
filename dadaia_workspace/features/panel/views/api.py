@@ -53,7 +53,6 @@ JSON shapes (stable contract — if changed, panel.js must be updated in lockste
         "tools":          list[str],
         "model":          str | null,
         "model_inherited": bool,     # true when no model: frontmatter — show inherited default
-        "opencode_model": str | null,
         "max_turns":      int | null,
         "input_contract": dict | null,
         "gate_role":      str | null,  # §7 review-gate / phase role from frontmatter
@@ -401,7 +400,6 @@ def render_api_agents_canonical(
                     "tools": list(dto.tools),
                     "model": dto.model,
                     "model_inherited": dto.model is None,
-                    "opencode_model": dto.opencode_model,
                     "max_turns": dto.max_turns,
                     "input_contract": dto.input_contract,
                     "gate_role": dto.gate_role,

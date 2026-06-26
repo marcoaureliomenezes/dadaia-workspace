@@ -42,9 +42,9 @@ informative yield message. The message never instructs the operator to rebind, r
 or steal — there is no manual unblock ceremony. A finished or dead holder is freed
 automatically by reclaim-iff-stale after ``LEASE_TTL_SECONDS`` without a heartbeat.
 
-Cross-harness honesty: this record + ``doctor`` GC are the real enforcement on
-opencode (which cannot block via JSON PreToolUse); Claude Code / Codex also get a
-real PreToolUse block.
+Cross-harness honesty: this record + ``doctor`` GC are the real enforcement
+backstop across harnesses; Claude Code / Codex / Pi also get a real PreToolUse
+block.
 """
 
 from __future__ import annotations

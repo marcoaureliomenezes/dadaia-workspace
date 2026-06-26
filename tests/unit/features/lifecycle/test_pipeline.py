@@ -202,6 +202,26 @@ def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
     assert len(captured) == 4
     # Every step's worker prompt leads with the SAME cached prefix bytes (WS-7).
     assert all(req.prompt.startswith(prefix.text) for req in captured)
-    # Step model tiers applied: implement=sonnet, reviews=opus.
-    assert captured[0].model_profile == "sonnet"
-    assert [req.model_profile for req in captured[1:]] == ["opus", "opus", "opus"]
+    # No "sonnet"/"opus" tier literals remain (LAW 2): the step model defaults from the
+    # discrete catalog, and model_profile records the chosen option's effort.
+    assert all(req.model_profile not in ("sonnet", "opus") for req in captured)
+    assert all(req.model_profile == "high" for req in captured)
+
+
+def test_implementation_ladder_default_model_comes_from_catalog() -> None:
+    from dadaia_workspace.core.harness_models import CODEX_HARNESS, options_for
+    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+
+    steps = implementation_ladder(AgentRuntimeKind.FAKE)
+    expected_effort = options_for(CODEX_HARNESS)[0].effort
+    assert all(step.model_profile == expected_effort for step in steps)
+    assert all(step.model_profile not in ("sonnet", "opus") for step in steps)
+
+
+def test_implementation_ladder_honors_explicit_discrete_model() -> None:
+    from dadaia_workspace.core.harness_models import validate
+    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+
+    chosen = validate("codex", "gpt-5.5:medium")
+    steps = implementation_ladder(AgentRuntimeKind.FAKE, model=chosen)
+    assert all(step.model_profile == "medium" for step in steps)

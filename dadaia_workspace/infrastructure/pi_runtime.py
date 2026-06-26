@@ -52,11 +52,21 @@ class _GitDiffPort(Protocol):
 
 @dataclass(frozen=True)
 class PiHeadlessConfig:
-    """Explicit controls for one headless PI adapter instance."""
+    """Explicit controls for one headless PI adapter instance.
+
+    ``model`` is the discrete Layer-2 GPT id (LAW 2 / ADR-B) PI runs against its Codex
+    subscription; it is passed verbatim as ``pi --model <id>``. ``reasoning_effort``
+    carries the chosen option's effort for observability/parity, but PI's CLI exposes
+    **no verified separate reasoning-effort flag**, so the effort is *not* forwarded as
+    a flag — only ``--model`` reaches the command. (Limitation noted per WS-2: a unit
+    test asserts the discrete id reaches ``pi --model``; effort honoring is upstream-CLI
+    dependent and is a follow-up if/when PI exposes the flag.)
+    """
 
     cwd: Path
     pi_bin: str = "pi"
     model: str | None = None
+    reasoning_effort: str | None = None
     timeout_seconds: int = 900
     env_allowlist: tuple[str, ...] = _DEFAULT_ENV_ALLOWLIST
     tools: tuple[str, ...] = ("read", "write", "edit", "bash")

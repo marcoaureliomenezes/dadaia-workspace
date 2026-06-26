@@ -179,7 +179,6 @@ def test_known_fields_all_present(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(se.skills, list)
     assert isinstance(se.tools, list)
     assert se.model == "claude-sonnet-4-6"
-    assert se.opencode_model is None  # not set in fixture
     assert se.max_turns == 60
     # input_contract may be a dict or None — must be present as attribute
     assert hasattr(se, "input_contract")
@@ -202,7 +201,6 @@ def test_optional_fields_default_to_none_or_empty(
     assert minimal.skills == []
     assert minimal.tools == []
     assert minimal.model is None
-    assert minimal.opencode_model is None
     assert minimal.max_turns is None
     assert minimal.input_contract is None
 
@@ -262,21 +260,11 @@ def test_agent_dto_is_dataclass_or_typed(monkeypatch: pytest.MonkeyPatch) -> Non
         "skills",
         "tools",
         "model",
-        "opencode_model",
         "max_turns",
         "input_contract",
     }
     for field in required_fields:
         assert hasattr(dto, field), f"AgentDTO missing field: {field}"
-
-
-def test_opencode_model_loaded_when_present(monkeypatch: pytest.MonkeyPatch) -> None:
-    """opencode_model field is populated when present in frontmatter."""
-    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
-    fe = next((a for a in agents if a.id == "frontend-engineer"), None)
-    assert fe is not None
-    assert fe.opencode_model == "claude-sonnet-4-6"
 
 
 def test_raw_to_dto_missing_name_returns_empty_agent_list(

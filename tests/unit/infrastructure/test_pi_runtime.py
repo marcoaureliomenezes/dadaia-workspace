@@ -113,6 +113,53 @@ def test_pi_adapter_builds_controlled_command_and_env(tmp_path: Path) -> None:
     assert "Do bounded work" in call["kwargs"]["input"]
 
 
+def test_pi_adapter_discrete_model_reaches_pi_model_flag(tmp_path: Path) -> None:
+    """WS-2 (LAW 2): the discrete GPT model id reaches ``pi --model <id>``.
+
+    Built via the container seam ``build_agent_runtime(PI_HEADLESS, model=...)`` to prove
+    the discrete catalog option threads all the way to the command.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.harness_models import validate
+    from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind as _Kind
+    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured["argv"] = argv
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end("ok"))
+
+    option = validate("pi", "gpt-5.3-codex:medium")
+    adapter = container.build_agent_runtime(_Kind.PI_HEADLESS, cwd=tmp_path, model=option)
+    assert isinstance(adapter, PiHeadlessAdapter)
+    # Re-bind the runner onto the container-built adapter (it owns a real config).
+    adapter._runner = fake_runner  # type: ignore[attr-defined]
+    adapter._environ = {}  # type: ignore[attr-defined]
+    adapter._git = None  # type: ignore[attr-defined]
+    adapter.run(_request())
+
+    argv = captured["argv"]
+    assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "gpt-5.3-codex"]
+
+
+def test_pi_config_carries_effort_for_observability(tmp_path: Path) -> None:
+    """The discrete option's effort is recorded on the config even though PI has no
+    verified effort flag (WS-2 limitation note)."""
+    from dadaia_workspace import container
+    from dadaia_workspace.core.harness_models import validate
+    from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind as _Kind
+    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
+
+    option = validate("pi", "gpt-5.5:low")
+    adapter = container.build_agent_runtime(_Kind.PI_HEADLESS, cwd=tmp_path, model=option)
+    assert isinstance(adapter, PiHeadlessAdapter)
+    assert adapter._config.model == "gpt-5.5"  # type: ignore[attr-defined]
+    assert adapter._config.reasoning_effort == "low"  # type: ignore[attr-defined]
+
+
 def test_pi_adapter_omits_model_flag_when_unset(tmp_path: Path) -> None:
     captured: dict[str, list[str]] = {}
 

@@ -101,3 +101,92 @@ def test_lifecycle_resume_missing_uses_internal_error_exit_code(
 
     assert result.exit_code == 1
     assert "INTERNAL_ERROR" in result.output
+
+
+# ---------------------------------------------------------------------------
+# WS-2 (T-24-06) — LAW 1 harness restriction + LAW 2 discrete model validation
+# ---------------------------------------------------------------------------
+
+
+def test_lifecycle_implement_rejects_claude_harness_with_layer1_pointer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LAW 1: ``--harness claude`` is rejected, pointing to Layer-1 use."""
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        ["lifecycle", "implement", "--release-id", "v0.1.24", "--harness", "claude"],
+    )
+
+    assert result.exit_code != 0
+    assert "Layer-1" in result.output
+    assert "pi or codex" in result.output
+
+
+def test_lifecycle_implement_rejects_invalid_model_with_valid_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LAW 2: an invalid ``(harness, model)`` pair lists the harness's valid options."""
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "implement",
+            "--release-id",
+            "v0.1.24",
+            "--harness",
+            "codex",
+            "--model",
+            "gpt-9.9:high",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "gpt-5.5:high" in result.output
+    assert "gpt-5.5:medium" in result.output
+
+
+def test_lifecycle_implement_rejects_claude_step_harness_in_pipeline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LAW 1: ``--step-harness label=claude`` is rejected in the pipeline too."""
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "v0.1.24",
+            "--step-harness",
+            "implement=claude",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Layer-1" in result.output
+
+
+def test_claude_sdk_adapter_remains_importable_and_enum_value_kept() -> None:
+    """LAW 1 keeps the CLAUDE_SDK adapter + enum value in code (Layer-1 unaffected)."""
+    from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+    from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
+
+    assert AgentRuntimeKind.CLAUDE_SDK.value == "claude_sdk"
+    adapter = ClaudeSdkAdapter(cwd=Path("/tmp"))
+    assert adapter.runtime_kind() is AgentRuntimeKind.CLAUDE_SDK
+
+
+def test_claude_not_a_workflow_harness_choice() -> None:
+    """LAW 1: ``claude`` is not in the Layer-2 workflow harness set."""
+    from dadaia_workspace.cli.commands.lifecycle import _HARNESS_KINDS
+
+    assert "claude" not in _HARNESS_KINDS
+    assert set(_HARNESS_KINDS) == {"fake", "codex", "pi"}

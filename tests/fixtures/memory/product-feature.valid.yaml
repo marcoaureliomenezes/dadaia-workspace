@@ -7,8 +7,8 @@ feature_subtitle: "CLI surface: dadaia init [--workspace PATH] [--skip-assets]"
 purpose: |
   Entry point of the product. Bootstraps a new workspace by creating the idempotent
   structure under .dadaia/ (academy, agentic, reports, scripts, states, src), the Python
-  virtualenv (.venv), the runtime directories for four agentic tools (.claude/, .agents/,
-  .codex/, .opencode/), stages + installs canonical public assets, and configures the
+  virtualenv (.venv), the runtime directories for the agentic tools (.claude/, .agents/,
+  .codex/), stages + installs canonical public assets, and configures the
   UserPromptSubmit hook in .claude/settings.json.
 
   This is the only feature that can run in a zero-state workspace — without it, no other

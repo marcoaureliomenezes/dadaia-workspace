@@ -85,7 +85,9 @@ def _inject_passing_fake(
     calls = {"n": 0}
     per_step = result_for or {}
 
-    def fake_build(kind: AgentRuntimeKind, *, cwd: Path | None = None) -> AgentRuntimePort:
+    def fake_build(
+        kind: AgentRuntimeKind, *, cwd: Path | None = None, model: object = None
+    ) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
             idx = calls["n"]
             calls["n"] = idx + 1

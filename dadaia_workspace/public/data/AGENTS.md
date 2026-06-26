@@ -24,7 +24,7 @@ take precedence.
 
 The workspace **root** may contain **only**:
 
-- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.opencode/`, `.pi/`,
+- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.pi/`,
   `repos/`
 - Files: `AGENTS.md`, `CLAUDE.md` (Claude Code bridge importing `@AGENTS.md`),
   `prompt.md` (optional operator long-prompt file)
@@ -63,8 +63,8 @@ files at the repo root.
 
 Forbidden root artefacts:
 
-- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `.pi/`
-- `CLAUDE.md`, `opencode.json`, `Makefile`, `playwright.config.ts`
+- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.pi/`
+- `CLAUDE.md`, `Makefile`, `playwright.config.ts`
 - `playwright-report/`, `test-results/`, coverage/cache directories
 
 Run projection/install smoke tests in a temp workspace under `.dadaia/tmp/` or

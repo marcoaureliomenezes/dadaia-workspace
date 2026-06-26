@@ -26,7 +26,7 @@ from typing import Any
 
 from dadaia_workspace.core.platform import PLATFORM
 
-#: Write-like tool names intercepted by the PreToolUse gates (Claude / Codex / OpenCode).
+#: Write-like tool names intercepted by the PreToolUse gates (Claude / Codex).
 WRITE_TOOLS: frozenset[str] = frozenset(
     {
         "Write",
@@ -129,7 +129,6 @@ def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
         os.environ.get("DADAIA_SESSION_ID")
         or os.environ.get("CLAUDE_CODE_SESSION_ID")
         or os.environ.get("CODEX_SESSION_ID")
-        or os.environ.get("OPENCODE_SESSION_ID")
         or str(payload.get("session_id") or "")
     )
     sanitized = sanitize_session_id(candidate)

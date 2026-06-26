@@ -27,7 +27,6 @@ def _caller_session_id() -> str:
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CODEX_SESSION_ID",
-        "OPENCODE_SESSION_ID",
     ):
         val = os.environ.get(var)
         if val:

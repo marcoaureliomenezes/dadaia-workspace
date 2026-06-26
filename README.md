@@ -7,11 +7,11 @@
 
 `dadaia-workspace` gives AI coding agents a structured, governed shared workspace:
 scoped project contexts, a Spec-Driven Development (SDD) lifecycle with enforced
-gates, canonical agentic-asset projection across **four** AI harnesses, a procedural
+gates, canonical agentic-asset projection across **three** AI harnesses, a procedural
 multi-harness **workflow engine**, and a real-time monitoring panel.
 
 It runs agents at **two distinct layers** (explained below) and supports
-**Claude Code, Codex, OpenCode, and PI** as peers.
+**Claude Code, Codex, and PI** as peers.
 
 Open source under the MIT license. Source, issues, and contributions:
 [github.com/marcoaureliomenezes/dadaia-workspace](https://github.com/marcoaureliomenezes/dadaia-workspace).
@@ -31,7 +31,7 @@ Requires Python 3.12+.
 ## Quick start
 
 ```bash
-dadaia init        # bootstrap .dadaia/ and project agentic assets into .claude/, .codex/, .opencode/, .pi/
+dadaia init        # bootstrap .dadaia/ and project agentic assets into .claude/, .codex/, .pi/
 dadaia doctor      # health check: contexts, assets, panel, SDD gate, leases
 dadaia panel       # launch the local dashboard (http://localhost:8080)
 ```
@@ -53,17 +53,15 @@ flowchart TB
         direction LR
         CC["claude"]:::h
         CX["codex"]:::h
-        OC["opencode"]:::h
         PI["pi"]:::h
     end
-    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .opencode/ .pi/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
+    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .pi/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
     CLI["dadaia lifecycle &lt;verb&gt; --harness &lt;x&gt;<br/>(a procedural Python workflow)"]
     subgraph L2["LAYER 2 — worker harness (inside the workflow engine)"]
         direction LR
         FK["FAKE"]:::w
         CXk["CODEX_EXEC"]:::w
         CLk["CLAUDE_SDK"]:::w
-        OCk["OPENCODE_RUN"]:::w
         PIk["PI_HEADLESS"]:::w
     end
     OP --> L1 --> GOV
@@ -74,15 +72,15 @@ flowchart TB
 ```
 
 - **Layer 1 — the entry harness.** The AI coding agent a human launches in the
-  terminal: `claude`, `codex`, `opencode`, or `pi`. It is governed by the
+  terminal: `claude`, `codex`, or `pi`. It is governed by the
   workspace-root `AGENTS.md` (read natively up the directory tree) plus the projected
-  per-runtime asset trees (`.claude/`, `.codex/`, `.opencode/`, `.pi/`). This is where
+  per-runtime asset trees (`.claude/`, `.codex/`, `.pi/`). This is where
   you sit when you "enter the terminal and type `claude`".
 - **Layer 2 — the worker harness.** The bounded agent workers that `dadaia lifecycle`
-  drives, one selectable per step, behind a single `AgentRuntimePort`. There are five
-  runtime kinds — `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS` —
+  drives, one selectable per step, behind a single `AgentRuntimePort`. There are four
+  runtime kinds — `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `PI_HEADLESS` —
   reached over **two** supported transports: **SDK** (Claude, in-process) and
-  **CLI-headless** (`codex exec`, `opencode run`, `pi --mode json`). (A long-lived RPC
+  **CLI-headless** (`codex exec`, `pi --mode json`). (A long-lived RPC
   transport is a possible future, not part of the supported architecture.)
 
 A harness can exist at one layer and not the other (e.g. `FAKE` is Layer-2 only). PI
@@ -96,7 +94,6 @@ exists at both: an inert `.pi/` Layer-1 projection and a `PI_HEADLESS` Layer-2 w
 |---|---|---|---|
 | **Claude Code** | ✅ `.claude/` + PreToolUse hook + chokepoints | ✅ `CLAUDE_SDK` (only adapter with a pre-disk Ring-1 boundary) | SDK (in-process) |
 | **Codex** | ✅ `.codex/` (hooks fire in the interactive TUI; `codex exec` headless is chokepoints-only) | ✅ `CODEX_EXEC` | CLI-headless (`codex exec`) |
-| **OpenCode** | ✅ `.opencode/` (TS plugins call the Python hook) | ◻️ `OPENCODE_RUN` (stub) | CLI-headless (`opencode run`) |
 | **PI** (`@earendil-works/pi-coding-agent`) | ✅ inert `.pi/` (no PreToolUse hook → chokepoints-only) | ✅ `PI_HEADLESS` | CLI-headless (`pi --mode json`) |
 
 All projections are generated from one canonical source at `dadaia_workspace/public/`
@@ -216,7 +213,7 @@ dadaia [COMMAND] --help   # always works at every level
 ```bash
 dadaia public stage                     # stage canonical assets into .dadaia/agentic/
 dadaia public install --target all      # project to all runtimes
-dadaia public install --target pi       # project to one runtime (claude|codex|opencode|pi|agents)
+dadaia public install --target pi       # project to one runtime (claude|codex|pi|agents)
 dadaia public doctor                    # detect drift source → staging → projection
 ```
 

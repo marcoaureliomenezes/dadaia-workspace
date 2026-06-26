@@ -9,6 +9,14 @@ from typing import Any
 
 import typer
 
+from dadaia_workspace.core.harness_models import (
+    CODEX_HARNESS,
+    PI_HARNESS,
+    HarnessModelOption,
+)
+from dadaia_workspace.core.harness_models import (
+    validate as validate_harness_model,
+)
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     GateEvidenceKind,
@@ -24,13 +32,26 @@ from dadaia_workspace.features.lifecycle.service import (
     LifecyclePreflightService,
 )
 
+# Layer-2 workflow harnesses (LAW 1, ADR-A): pi/codex run as workers; fake is the
+# deterministic test adapter. ``claude`` is intentionally ABSENT — Claude Code is a
+# Layer-1 entry harness; running it as a Layer-2 worker spends credits outside the
+# operator's subscription. The CLAUDE_SDK adapter + enum value remain in code (Layer-1)
+# but are not selectable as a workflow harness.
 _HARNESS_KINDS = {
     "fake": AgentRuntimeKind.FAKE,
     "codex": AgentRuntimeKind.CODEX_EXEC,
-    "claude": AgentRuntimeKind.CLAUDE_SDK,
-    "opencode": AgentRuntimeKind.OPENCODE_RUN,
     "pi": AgentRuntimeKind.PI_HEADLESS,
 }
+
+# Harness names → the CLI ``--harness`` value that selects a discrete model catalog
+# (LAW 2). ``fake`` carries no model. Used to map a chosen harness to its catalog key.
+_HARNESS_CATALOG_KEY = {
+    "codex": CODEX_HARNESS,
+    "pi": PI_HARNESS,
+}
+
+# Layer-1 harness names rejected as Layer-2 workflow harnesses (LAW 1) with a pointer.
+_LAYER1_ONLY_HARNESSES = {"claude", "claude_sdk", "claude-sdk"}
 
 app = typer.Typer(help="Deterministic lifecycle workflow commands.", no_args_is_help=True)
 hygiene_app = typer.Typer(help="Lifecycle hygiene commands.", no_args_is_help=True)
@@ -309,7 +330,12 @@ def backlog_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("backlog-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -323,6 +349,7 @@ def backlog_define(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -333,7 +360,12 @@ def release_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -347,6 +379,7 @@ def release_define(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -357,7 +390,12 @@ def implement(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("implement", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -371,16 +409,44 @@ def implement(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
 
 def _resolve_harness(harness: str) -> AgentRuntimeKind:
+    key = harness.lower()
+    if key in _LAYER1_ONLY_HARNESSES:
+        raise typer.BadParameter(
+            f"'{harness}' is not a Layer-2 workflow harness (LAW 1). Claude Code is a "
+            "Layer-1 harness; Layer-2 workers are pi or codex. Use 'pi' or 'codex' here, "
+            "and run Claude Code directly at Layer 1."
+        )
     try:
-        return _HARNESS_KINDS[harness.lower()]
+        return _HARNESS_KINDS[key]
     except KeyError as exc:
         choices = ", ".join(sorted(_HARNESS_KINDS))
         raise typer.BadParameter(f"unknown harness '{harness}'; choose one of: {choices}") from exc
+
+
+def _resolve_model(harness: str, model: str | None) -> HarnessModelOption | None:
+    """Validate a ``(harness, model)`` selection against the discrete catalog (LAW 2).
+
+    Returns ``None`` when no model is requested (adapter keeps its default), or when the
+    harness has no catalog (``fake``). An invalid pair raises a ``BadParameter`` whose
+    message lists the harness's valid options.
+    """
+    if model is None:
+        return None
+    key = _HARNESS_CATALOG_KEY.get(harness.lower())
+    if key is None:
+        raise typer.BadParameter(
+            f"harness '{harness}' takes no --model; only pi and codex select a discrete model"
+        )
+    try:
+        return validate_harness_model(key, model)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def _run_phase_step(
@@ -394,18 +460,24 @@ def _run_phase_step(
     run_id: str,
     harness: str,
     json_output: bool,
+    model: str | None = None,
 ) -> None:
     """Run one bounded lifecycle step through the engine on a selectable harness.
 
     Shared by every single-step lifecycle verb (backlog/release define, implement,
-    review qa|security|code, close). The harness is chosen per invocation; the worker
-    must emit an APPROVED handoff with an artifact_ref to advance the phase.
+    review qa|security|code, close). The harness is chosen per invocation (LAW 1:
+    pi/codex/fake only — ``claude`` is rejected); ``--model`` selects the discrete
+    Layer-2 model (LAW 2). The worker must emit an APPROVED handoff with an
+    artifact_ref to advance the phase.
     """
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
     kind = _resolve_harness(harness)
-    workflow = container.build_lifecycle_phase_workflow(workspace_root, runtime_kind=kind)
+    resolved_model = _resolve_model(harness, model)
+    workflow = container.build_lifecycle_phase_workflow(
+        workspace_root, runtime_kind=kind, model=resolved_model
+    )
     scope = PromptScope(
         role=role,
         context=context,
@@ -455,7 +527,12 @@ def review_qa(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-qa", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -469,6 +546,7 @@ def review_qa(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -479,7 +557,12 @@ def review_security(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -493,6 +576,7 @@ def review_security(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -503,7 +587,12 @@ def review_code(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -517,6 +606,7 @@ def review_code(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -527,7 +617,12 @@ def close(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -541,6 +636,7 @@ def close(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -551,11 +647,22 @@ def pipeline(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("pipeline", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option("fake", "--harness", help="Default harness for all steps."),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Default discrete Layer-2 model '<id>:<effort>' for the default harness (LAW 2).",
+    ),
     step_harness: list[str] | None = typer.Option(
         None,
         "--step-harness",
         help="Per-step override 'label=harness' (repeatable); labels: "
         "implement, review_qa, review_security, review_code.",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'label=model' (repeatable); model is "
+        "'<id>:<effort>' valid for that step's harness (LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -568,18 +675,42 @@ def pipeline(
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
     overrides: dict[str, AgentRuntimeKind] = {}
+    harness_by_label: dict[str, str] = {}
     for item in step_harness or []:
         label, sep, kind_str = item.partition("=")
         if not sep:
             raise typer.BadParameter(f"--step-harness expects 'label=harness', got {item!r}")
-        overrides[label.strip()] = _resolve_harness(kind_str.strip())
+        clean_label = label.strip()
+        clean_harness = kind_str.strip()
+        overrides[clean_label] = _resolve_harness(clean_harness)
+        harness_by_label[clean_label] = clean_harness
 
     steps = tuple(
         replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
         for step in implementation_ladder(default_kind)
     )
+
+    # LAW 2 — resolve the discrete model per step, keyed by the step's runtime kind so
+    # the factory hands each harness its selected (id, effort). The default --model
+    # applies to the default harness; --step-model overrides per label.
+    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
+    default_model = _resolve_model(harness, model)
+    if default_model is not None:
+        models[default_kind] = default_model
+    step_model_by_label: dict[str, str] = {}
+    for item in step_model or []:
+        label, sep, model_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'label=model', got {item!r}")
+        step_model_by_label[label.strip()] = model_str.strip()
+    for label, model_str in step_model_by_label.items():
+        step_harness_name = harness_by_label.get(label, harness)
+        resolved = _resolve_model(step_harness_name, model_str)
+        if resolved is not None:
+            models[_resolve_harness(step_harness_name)] = resolved
+
     pipe = container.build_lifecycle_pipeline(
-        workspace_root, context=context, release_id=release_id
+        workspace_root, context=context, release_id=release_id, models=models
     )
     result = pipe.run(run_id, steps)
     status = (

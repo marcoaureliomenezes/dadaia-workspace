@@ -36,7 +36,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   `_ROOT_ALLOWED_DIRS`, import/export opencode refs.
 - **Done when:** `mypy --strict` green; zero opencode references in the listed modules;
   `_VALID_TARGETS == {agents, claude, codex, pi}`.
-- `[ ]`
+- `[x]`
 
 ### T-24-02 — Delete OpenCode files/tests/academy + conftest/CI refs (WS-1)
 - **Owner:** software-engineer
@@ -52,7 +52,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   guarded dirs + the CI script.
 - **Done when:** files gone; `grep -ri opencode dadaia_workspace/ tests/ .github/` clean;
   full `pytest` green (no orphaned imports).
-- `[ ]`
+- `[x]`
 
 ### T-24-03 — Purge OpenCode from docs + reproject (WS-1)
 - **Owner:** software-engineer
@@ -65,19 +65,21 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   doctor`.
 - **Done when:** `public doctor` exit 0; no `.opencode/` projection; no opencode manifest
   entry; `dadaia public install --target opencode` errors with unknown-target.
-- `[ ]`
+- `[x]`
 
-### T-24-04 — Discrete per-harness model catalog (WS-2, LAW 2) [BLOCKED on OD-1/OD-2]
+### T-24-04 — Discrete per-harness model catalog (WS-2, LAW 2)
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/harness_models.py` (new), `tests/unit/core/test_harness_models.py` (new)
-- **Preconditions:** T-24-01; **operator confirmation of OD-1 (codex-2) + OD-2 (pi-3) ids.**
+- **Preconditions:** T-24-01.
 - **Description:** Typed catalog `harness → ordered discrete model options` (pi: 3, codex: 2),
   sourced from `model_registry.REGISTRY` (no second drifting table). Provide
   `validate(harness, model) -> resolved (model_id, effort?)`. Parameterize ids so confirming
-  is a data change.
+  is a data change. **Confirmed catalog (operator 2026-06-26 — GPT-only at Layer 2):**
+  pi = `(gpt-5.5, high)` / `(gpt-5.5, low)` / `(gpt-5.3-codex, medium)`;
+  codex = `(gpt-5.5, high)` / `(gpt-5.5, medium)`. No `claude-*` id is ever a Layer-2 option.
 - **Done when:** catalog present; valid pairs resolve, invalid pairs raise with the valid set;
   unit tests green.
-- `[ ]`
+- `[x]`
 
 ### T-24-05 — Thread discrete model through `build_agent_runtime` + PI + Codex (WS-2)
 - **Owner:** software-engineer
@@ -95,7 +97,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   defaults model from the catalog.
 - **Done when:** unit tests assert the discrete id reaches PI `--model` and Codex
   `(id, effort)`; pipeline default model comes from the catalog; `pytest` green.
-- `[ ]`
+- `[x]`
 
 ### T-24-06 — CLI `--model`/`--step-model` + Layer-2 harness = {pi,codex,fake}; reject claude (WS-2, LAW 1)
 - **Owner:** software-engineer
@@ -107,7 +109,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   against the catalog. Keep `CLAUDE_SDK` adapter + enum value importable/tested.
 - **Done when:** invalid `(harness, model)` errors with valid set; `--harness claude` rejected;
   a test asserts `ClaudeSdkAdapter` stays importable + unit-tested; `pytest` green.
-- `[ ]`
+- `[x]`
 
 ---
 
@@ -123,10 +125,16 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
 - **Description:** Create `shared/` + `release_definition/` fragment bundles (others
   scaffolded as stubs) with frontmatter metadata (`id, role, workflow, step, static_inputs,
   dynamic_inputs, output_schema, max_context_policy`); a loader that validates + rejects
-  malformed metadata + rejects harness-specific tool tokens in universal fragments; project +
-  manifest-track via `public install`.
+  malformed metadata; project + manifest-track via `public install`. **Harness-universal
+  guarantee (PRIMARY — behavioral):** run each shipped fragment's `output_schema` through
+  BOTH adapter parsers — PI (fenced-json / `message_end`) and Codex
+  (`--output-last-message`) — via FAKE fixtures and assert **identical verdict
+  extraction**; rely on WS-2's unified `model_profile` semantics (PI honors the discrete id,
+  Codex takes `(id, effort)`). Keep the prose denylist of harness-specific tool tokens as a
+  **secondary lint** only.
 - **Done when:** every fragment referenced by a shipped workflow exists + loads; malformed
-  metadata rejected; harness-universal check fails on a forbidden token; `public doctor` exit
+  metadata rejected; the dual-parser cross-extraction test asserts identical verdicts from
+  both adapters; the secondary denylist lint fails on a forbidden token; `public doctor` exit
   0; tests green.
 - `[ ]`
 

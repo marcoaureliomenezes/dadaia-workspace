@@ -58,7 +58,7 @@ def test_ring1_write_permission_mirrors_scope() -> None:
 
 def test_run_redacts_secret_env_value_from_surfaced_error() -> None:
     """CWE-209 parity: a secret-named env value must never surface in the error string,
-    matching the opencode/codex redaction discipline."""
+    matching the codex redaction discipline."""
     secret = "sk-ant-supersecret-xyz"
 
     def _leaky_query(prompt: str, permission: WritePermission) -> ClaudeRunOutput:

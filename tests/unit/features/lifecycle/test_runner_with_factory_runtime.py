@@ -25,7 +25,6 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
 from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
 from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
-from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
 from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
 
 
@@ -52,7 +51,6 @@ def test_factory_fake_is_the_production_fake_runtime() -> None:
         (AgentRuntimeKind.FAKE, FakeAgentRuntime),
         (AgentRuntimeKind.CODEX_EXEC, CodexExecAdapter),
         (AgentRuntimeKind.CLAUDE_SDK, ClaudeSdkAdapter),
-        (AgentRuntimeKind.OPENCODE_RUN, OpenCodeAdapter),
         (AgentRuntimeKind.PI_HEADLESS, PiHeadlessAdapter),
     ],
 )

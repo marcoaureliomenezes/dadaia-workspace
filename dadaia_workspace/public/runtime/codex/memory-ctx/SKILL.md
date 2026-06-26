@@ -18,7 +18,7 @@ the universal product foundation that all roles require.
 ## Purpose
 
 The equivalent of the ctx-inject hook's (`dadaia_workspace.hooks.ctx_inject`) memory
-bootstrap payload for Claude Code and OpenCode sessions — delivered here for Codex
+bootstrap payload for Claude Code sessions — delivered here for Codex
 sessions where the hook does not fire.
 Every Codex session receives:
 
@@ -133,4 +133,4 @@ This file lives at `public/runtime/codex/memory-ctx/SKILL.md` and is projected t
 It is auto-discovered by `_install_codex_runtime_adapters` via directory iteration —
 no `config.toml` entry is needed or exists for this purpose (ADR-CX-001).
 
-It does NOT appear in `.claude/skills/` or `.opencode/skills/`.
+It does NOT appear in `.claude/skills/`.

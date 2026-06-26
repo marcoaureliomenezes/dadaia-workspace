@@ -16,7 +16,6 @@ Files listed in `.dadaia/agentic/manifest.json` are **lib-originated** (generate
 - `.claude/agents/*.md`, `.claude/rules/*.md`, `.claude/skills/**`, `.claude/workflows/*.md`
 - `.agents/skills/**`
 - `.codex/agents/*.toml`, `.codex/config.toml`, `.codex/hooks.json`
-- `.opencode/agents/*.md`, `opencode.json`
 - `AGENTS.md` (workspace root and all consumer repos)
 
 **Correct edit workflow:**

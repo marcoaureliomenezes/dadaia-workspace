@@ -125,6 +125,67 @@ def test_codex_exec_adapter_resolves_model_from_registry_tier(tmp_path: Path) ->
     assert 'model_reasoning_effort="medium"' in captured["argv"]
 
 
+def test_codex_discrete_model_and_effort_reach_command_verbatim(tmp_path: Path) -> None:
+    """WS-2 (LAW 2): a supplied discrete ``(id, effort)`` is used verbatim, NOT the tier.
+
+    Built via the container seam ``build_agent_runtime(CODEX_EXEC, model=...)`` to prove
+    the discrete catalog option threads to ``-m <id> -c model_reasoning_effort=<effort>``.
+    Even though the request still carries a ``model_profile`` tier, the discrete config
+    wins (tier is fallback only).
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.harness_models import validate
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured["argv"] = argv
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text('{"summary":"done"}', encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    option = validate("codex", "gpt-5.5:medium")
+    adapter = container.build_agent_runtime(AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path, model=option)
+    assert isinstance(adapter, CodexExecAdapter)
+    adapter._runner = fake_runner  # type: ignore[attr-defined]
+    adapter._environ = {}  # type: ignore[attr-defined]
+    adapter._git = None  # type: ignore[attr-defined]
+    # Request carries a tier profile, which MUST be ignored in favour of the discrete model.
+    adapter.run(_request(model_profile="deep"))
+
+    argv = captured["argv"]
+    assert argv[argv.index("-m") + 1] == "gpt-5.5"
+    assert 'model_reasoning_effort="medium"' in argv
+
+
+def test_codex_tier_fallback_used_when_no_discrete_model(tmp_path: Path) -> None:
+    """When no discrete model is supplied, the registry tier view is the fallback."""
+    from dadaia_workspace import container
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured["argv"] = argv
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text('{"summary":"done"}', encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    adapter = container.build_agent_runtime(AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path)
+    assert isinstance(adapter, CodexExecAdapter)
+    adapter._runner = fake_runner  # type: ignore[attr-defined]
+    adapter._environ = {}  # type: ignore[attr-defined]
+    adapter._git = None  # type: ignore[attr-defined]
+    adapter.run(_request(model_profile="fast"))
+
+    argv = captured["argv"]
+    # 'fast' tier resolves to gpt-5.4-mini via codex_tier_views().
+    assert argv[argv.index("-m") + 1] == "gpt-5.4-mini"
+
+
 def test_codex_exec_adapter_rejects_wrong_runtime_without_calling_codex(tmp_path: Path) -> None:
     called = False
 

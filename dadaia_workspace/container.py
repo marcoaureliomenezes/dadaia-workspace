@@ -9,6 +9,7 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.harness_models import HarnessModelOption
 from dadaia_workspace.core.models.hygiene import SlopPolicy
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
@@ -304,6 +305,7 @@ def build_agent_runtime(
     kind: AgentRuntimeKind,
     *,
     cwd: Path | None = None,
+    model: HarnessModelOption | None = None,
 ) -> AgentRuntimePort:
     """Map an ``AgentRuntimeKind`` to its concrete adapter behind ``AgentRuntimePort``.
 
@@ -313,9 +315,17 @@ def build_agent_runtime(
     lifecycle workflow asks for the kind a step declares and injects the result into
     ``LifecycleAgentRunner``.
 
-    Codex (``codex exec``), PI (``pi --mode json``), and OpenCode
-    (``opencode run --format json``) are live CLI-headless adapters, each carrying a
-    real git-diff Ring-2 ``changed_paths`` boundary via the injected ``GitSubprocessClient``.
+    ``model`` is the discrete Layer-2 model selection (LAW 2 / ADR-B) resolved from
+    :mod:`core.harness_models` — a ``(model_id, effort)`` pair. When supplied it is
+    threaded verbatim into the adapter config: PI passes ``pi --model <model_id>`` and
+    Codex passes ``-m <model_id> -c model_reasoning_effort=<effort>``. When ``None``
+    each adapter keeps its prior behaviour (PI omits ``--model``; Codex falls back to
+    the registry tier view). ``model`` is inert for ``FAKE`` and ``CLAUDE_SDK`` (the
+    latter is Layer-1 only — LAW 1).
+
+    Codex (``codex exec``) and PI (``pi --mode json``) are live CLI-headless adapters,
+    each carrying a real git-diff Ring-2 ``changed_paths`` boundary via the injected
+    ``GitSubprocessClient``.
     The Claude SDK adapter body is real (Ring-1 write boundary via ``core/scope_match``);
     only its default ``query_fn`` transport is deferred (lazy ``claude-agent-sdk`` import).
     The factory is total over the enum: an unhandled kind raises ``ValueError``.
@@ -331,14 +341,12 @@ def build_agent_runtime(
             CodexExecConfig,
         )
 
-        return CodexExecAdapter(
-            CodexExecConfig(cwd=run_dir),
-            git=GitSubprocessClient(),
+        codex_config = (
+            CodexExecConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
+            if model is not None
+            else CodexExecConfig(cwd=run_dir)
         )
-    if kind is AgentRuntimeKind.OPENCODE_RUN:
-        from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
-
-        return OpenCodeAdapter(cwd=run_dir, git=GitSubprocessClient())
+        return CodexExecAdapter(codex_config, git=GitSubprocessClient())
     if kind is AgentRuntimeKind.CLAUDE_SDK:
         from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
 
@@ -349,10 +357,12 @@ def build_agent_runtime(
             PiHeadlessConfig,
         )
 
-        return PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=run_dir),
-            git=GitSubprocessClient(),
+        pi_config = (
+            PiHeadlessConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
+            if model is not None
+            else PiHeadlessConfig(cwd=run_dir)
         )
+        return PiHeadlessAdapter(pi_config, git=GitSubprocessClient())
     raise ValueError(f"unsupported agent runtime kind: {kind!r}")
 
 
@@ -592,16 +602,18 @@ def build_lifecycle_phase_workflow(
     *,
     runtime_kind: AgentRuntimeKind,
     cwd: Path | None = None,
+    model: HarnessModelOption | None = None,
 ) -> LifecyclePhaseWorkflow:
     """Compose the single-step lifecycle phase workflow on a selected harness.
 
     Binds the per-step runtime adapter (via :func:`build_agent_runtime`) to the
     persistent run store. The chosen ``runtime_kind`` is what makes the harness
-    selectable per verb invocation.
+    selectable per verb invocation; ``model`` is the discrete Layer-2 model (LAW 2)
+    threaded into the adapter when supplied.
     """
     _guard_initialized(workspace_root)
     return LifecyclePhaseWorkflow(
-        runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root),
+        runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root, model=model),
         run_store=build_lifecycle_run_store(workspace_root),
     )
 
@@ -613,21 +625,27 @@ def build_lifecycle_pipeline(
     release_id: str,
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
+    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
 ) -> LifecyclePipeline:
     """Compose the multi-step lifecycle pipeline with a per-step harness factory.
 
     The injected ``runtime_factory`` resolves each step's declared ``AgentRuntimeKind`` to
-    its adapter, so a single run can mix harnesses across steps (claude implements, codex
-    reviews, ...). An optional cacheable ``prefix`` (WS-7) is assembled once and reused
-    verbatim by every step.
+    its adapter, so a single run can mix harnesses across steps (pi implements, codex
+    reviews, ...). ``models`` maps a runtime kind to its discrete Layer-2 model (LAW 2),
+    so a step running on a given harness gets that harness's selected ``(id, effort)``.
+    An optional cacheable ``prefix`` (WS-7) is assembled once and reused verbatim by
+    every step.
     """
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
+    model_by_kind = models or {}
     return LifecyclePipeline(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=lambda kind: build_agent_runtime(kind, cwd=run_cwd),
+        runtime_factory=lambda kind: build_agent_runtime(
+            kind, cwd=run_cwd, model=model_by_kind.get(kind)
+        ),
         prefix=prefix,
     )
 

@@ -5,7 +5,6 @@ description: >
   HTML, CSS, browser JavaScript, TypeScript, and React.
 tier: 3
 model: claude-sonnet-4-6
-opencode_model: claude-sonnet-4-6
 tools:
   - Read
   - Write

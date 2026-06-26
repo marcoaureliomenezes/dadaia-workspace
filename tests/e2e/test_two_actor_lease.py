@@ -424,7 +424,7 @@ _HOOK_DRIVER = textwrap.dedent(
     env = dict(os.environ)
     env["WORKSPACE_ROOT"] = str(ws)
     env["CLAUDE_CODE_SESSION_ID"] = sid
-    for bad in ("DADAIA_SESSION_ID", "DADAIA_MODE", "CODEX_SESSION_ID", "OPENCODE_SESSION_ID"):
+    for bad in ("DADAIA_SESSION_ID", "DADAIA_MODE", "CODEX_SESSION_ID"):
         env.pop(bad, None)
 
     # Spawn the REAL gate hook as a CHILD of this driver. The hook records getppid() == this

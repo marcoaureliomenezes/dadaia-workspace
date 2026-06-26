@@ -13,7 +13,6 @@ from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
 from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
-from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
 from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
 
 
@@ -28,9 +27,6 @@ def test_factory_returns_expected_concrete_types(tmp_path: Path) -> None:
     assert isinstance(build_agent_runtime(AgentRuntimeKind.FAKE), FakeAgentRuntime)
     assert isinstance(
         build_agent_runtime(AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path), CodexExecAdapter
-    )
-    assert isinstance(
-        build_agent_runtime(AgentRuntimeKind.OPENCODE_RUN, cwd=tmp_path), OpenCodeAdapter
     )
     assert isinstance(
         build_agent_runtime(AgentRuntimeKind.CLAUDE_SDK, cwd=tmp_path), ClaudeSdkAdapter

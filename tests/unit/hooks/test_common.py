@@ -120,7 +120,6 @@ def test_resolve_session_id_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CODEX_SESSION_ID",
-        "OPENCODE_SESSION_ID",
     ):
         monkeypatch.delenv(var, raising=False)
     # Stdin field used when no env var is set.
@@ -136,7 +135,6 @@ def test_resolve_session_id_default(monkeypatch: pytest.MonkeyPatch) -> None:
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CODEX_SESSION_ID",
-        "OPENCODE_SESSION_ID",
     ):
         monkeypatch.delenv(var, raising=False)
     assert _common.resolve_session_id({}, default="workspace") == "workspace"

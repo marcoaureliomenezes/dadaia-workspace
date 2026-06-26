@@ -235,8 +235,6 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
         ws = resolve_workspace_root()
         ctx = container.build_spec_context_service(ws).alive(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
-        with contextlib.suppress(Exception):
-            container.build_public_service().install(ws, target="opencode", force=True)
         # FR-S05/S06: a pre-existing specs/ tree below the canonical pattern version is
         # only safe-preserved + add-missing-merged — never silently upgraded. Offer the
         # backup-protected upgrade explicitly so structural drift is the operator's choice.

@@ -108,6 +108,6 @@ Dev server state  : <list of name:port entries, or "none registered">
 This file lives at `public/runtime/codex/frontend-ctx/SKILL.md` and is projected to
 `.codex/skills/frontend-ctx/SKILL.md` by `dadaia public install --target codex`.
 
-It does NOT appear in `.claude/skills/` or `.opencode/skills/`.
+It does NOT appear in `.claude/skills/`.
 
 Source path is governed by ADR-CX-001.

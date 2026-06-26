@@ -23,8 +23,11 @@ and may be broken.
 - **Layer 1 (entry):** the operator types `pi`/`codex`/`claude` in the terminal → binds a
   spec context. **Claude Code, Codex, and Pi are ALL fully supported at Layer 1.**
 - **Layer 2 (dadaia-workflows):** a NEW first-class concept. A dadaia-workflow is a **CLI
-  command the Layer-1 agent is strongly oriented / enforced to use across the whole dev
-  lifecycle.** Each command runs a **Python workflow body** (loops, if/else, imports of
+  command the Layer-1 agent is oriented toward across the whole dev lifecycle, and
+  safety-gate-enforced at the disk/commit boundary** (the SDD gate / git chokepoints
+  enforce write-scope, lease, and phase on every write and commit — NOT that the workflow
+  verb was invoked; a workflow-run-provenance token is a follow-up, see ADR-C). Each
+  command runs a **Python workflow body** (loops, if/else, imports of
   text fragments) that calls **worker agents** and advances **Python-validated gates**.
   - **LAW 1 (harness):** the CLI call passes which harness to use; Layer-2 workers are
     **pi or codex ONLY** (plus `fake` for tests). **No Claude Code / Claude SDK in
@@ -163,10 +166,12 @@ harness choices = `{pi, codex, fake}`.
 
 **Acceptance:**
 - A per-harness **discrete model catalog** exists as an explicit registry: **pi → 3
-  models, codex → 2 models** (concrete ids proposed in ADR-B, pending operator
-  confirmation). The catalog is the single source of truth for validation and panel
-  display, and is derived from / consistent with `core/model_registry.py` (no second
-  drifting table).
+  models, codex → 2 models** (concrete ids confirmed in ADR-B — GPT-only at Layer 2: pi =
+  `(gpt-5.5,high)`/`(gpt-5.5,low)`/`(gpt-5.3-codex,medium)`, codex =
+  `(gpt-5.5,high)`/`(gpt-5.5,medium)`). The catalog is the single source of truth for
+  validation and panel display, and is derived from / consistent with
+  `core/model_registry.py` (no second drifting table). `claude-*` is never a Layer-2
+  catalog entry.
 - `build_agent_runtime(kind, *, cwd, model=None)` accepts a discrete model id; `cwd`
   semantics unchanged.
 - PI honors the model: the adapter reads the resolved model (request or config) and passes
@@ -204,8 +209,15 @@ Implement the epic's fragment library (§5) and a loader, projected and versiona
   `public doctor` (exit 0). They are versionable (file-based, hashed).
 - A test proves **every fragment referenced by a shipped workflow exists and is loadable**;
   a doctor/test check fails if a workflow references a fragment id with no source.
-- No universal fragment depends on a Codex-only or Claude-only tool name (epic §3
-  harness-universal constraint), enforced by a loader/test check.
+- **Harness-universal guarantee (PRIMARY — behavioral, not prose).** Each shipped
+  fragment's declared `output_schema` is run through **BOTH** adapter parsers — PI
+  (fenced-json / `message_end`) and Codex (`--output-last-message`) — via **FAKE
+  fixtures**, and the test asserts **identical verdict extraction** from both. The
+  `model_profile` semantics are unified in WS-2 so the same fragment bundle resolves
+  consistently per harness: PI honors the discrete id, Codex takes `(id, effort)`. This
+  behavioral cross-parser test is the guarantee that a fragment is genuinely
+  harness-universal. A prose **denylist** of Codex-only / Claude-only tool tokens is
+  retained only as a **secondary lint** (a loader/test check), not the primary guarantee.
 
 ### WS-4 — Dynamic context selector
 
@@ -405,30 +417,43 @@ in code** (tested; Layer-1 claude unaffected) but `claude` is **removed from the
 *Rationale:* OpenCode is untested/possibly broken and must not ship; Claude as a Layer-2
 worker spends credits outside the operator's subscription.
 
-### ADR-B — Discrete per-harness model catalog (LAW 2): pi-3 / codex-2
+### ADR-B — Discrete per-harness model catalog (LAW 2): pi-3 / codex-2 — GPT-only at Layer 2
 Introduce an explicit discrete model catalog: **pi → 3 models, codex → 2 models**, derived
 from / consistent with `core/model_registry.py` (no second drifting table). The CLI takes
 `--harness` + `--model` (and `--step-harness`/`--step-model`), validated against the
 chosen harness's set. `build_agent_runtime(kind, *, cwd, model)` carries the discrete id;
 PI honors it (`pi --model <id>`); Codex takes a discrete `(id, effort)` rather than only a
-tier. **Proposed concrete ids — FLAGGED FOR OPERATOR CONFIRMATION (open decision, §5.x):**
-- **pi (3):** `claude-opus-4-8` (deep), `claude-sonnet-4-6` (balanced),
-  `claude-haiku-4-5-20251001` (fast). (PI runs Anthropic models via `pi --model`; these are
-  the three live registry ids spanning the deep/balanced/fast band.)
-- **codex (2):** `gpt-5.5` at `high` effort (deep) and `gpt-5.5` at `medium` effort
-  (balanced) — **OR** two distinct gpt ids (`gpt-5.5` deep + `gpt-5.4-mini` fast) if the
-  operator prefers two distinct *models* rather than one model at two efforts. The registry
-  today only carries `gpt-5.5` / `gpt-5.3-codex` / `gpt-5.4-mini`. **Operator must confirm
-  which two codex options are the supported pair** (model+effort pairs vs two distinct
-  models). This is the single most load-bearing open decision in the release.
+tier.
 
-### ADR-C — dadaia-workflows are the canonical Layer-2 verbs; Layer-1 enforced toward them
+**CONFIRMED catalog (operator, 2026-06-26).** PI runs on the operator's **Codex
+subscription**, so PI's Layer-2 models are **GPT / codex model ids**, NOT Claude ids. Both
+the pi and codex Layer-2 catalogs are therefore **GPT-only**:
+- **pi (3):** `(gpt-5.5, high)`, `(gpt-5.5, low)`, `(gpt-5.3-codex, medium)` — GPT ids
+  selected via `pi --model <id>` against PI's Codex subscription.
+- **codex (2):** `(gpt-5.5, high)`, `(gpt-5.5, medium)` — two `(model, effort)` profiles of
+  the one model `gpt-5.5` (OD-1 resolved to model+effort profiles, not two distinct models).
+
+**Invariant (replaces the prior model-catalog risk).** `claude-*` is **NEVER** selectable
+at Layer 2: no Claude id (including the region-restricted `claude-fable-5`) can appear in
+either L2 catalog, because both catalogs are GPT-only by construction. The catalog is
+explicit GPT data keyed by harness, parameterized so any future id change is a data edit —
+it is NOT derived from a registry tier. Layer-1 Claude (the `CLAUDE_SDK` adapter) is
+unaffected; this invariant governs Layer-2 worker selection only.
+
+### ADR-C — dadaia-workflows are the canonical Layer-2 verbs; Layer-1 oriented toward them, safety-gate-enforced at the disk/commit boundary
 The lifecycle CLI verbs are formalized as the canonical "dadaia-workflows": each a Python
 body that imports fragments, selects dynamic context, calls workers, and advances
-Python-validated gates. The Layer-1 agent is **enforced toward them** by dehydrating
-AGENTS.md to point at the workflows (WS-7) and retaining the gate/chokepoints as Layer-1
-safety. *Rationale:* lifecycle correctness must live in Python, not in probabilistically-read
-instruction surfaces (epic §2/§3).
+Python-validated gates. The Layer-1 agent is **oriented toward, and safety-gate-enforced at
+the disk/commit boundary** — AGENTS.md is dehydrated to point at the workflows (WS-7) and
+the SDD gate / git chokepoints enforce **write-scope, lease, and phase** on every disk
+write and commit (NOT "you invoked the workflow"). There is no procedural enforcement that
+a given workflow verb was actually run; the safety gate constrains *what* may be written,
+not *how* it was produced. *Rationale:* lifecycle correctness must live in Python, not in
+probabilistically-read instruction surfaces (epic §2/§3).
+
+> **Note (follow-up, not this release):** a workflow-run-provenance gate token — proving a
+> mutation originated from a real dadaia-workflow run — is a FOLLOW-UP, not v0.1.24. This
+> release relies on the disk/commit safety gate, not procedural workflow enforcement.
 
 ### ADR-D — Fragment library at `public/lifecycle_fragments/`, projected + versionable; release-definition first
 Fragments live under `dadaia_workspace/public/lifecycle_fragments/` (OQ-1 → projected
@@ -477,7 +502,7 @@ v0.1.23's OpenCode adapter would ship exactly what the operator now wants delete
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | **Large surface change** (OpenCode removal touches ~30 modules + docs + projections). | HIGH | Stage it: remove the enum first and let `mypy --strict` enumerate every consumer; prune tests alongside; verify with `public doctor` + full `pytest` before moving on. |
-| **The exact pi-3 / codex-2 model ids are unconfirmed** (ADR-B). | HIGH | Flagged as the single load-bearing open decision; proposed ids derived from the live registry; WS-2 implementation parameterizes the catalog so confirming ids is a data change, not a rewrite. **Operator must confirm before WS-2 reaches `Aprovado` impl.** |
+| ~~The exact pi-3 / codex-2 model ids are unconfirmed (ADR-B).~~ **RESOLVED** (operator-confirmed 2026-06-26). | HIGH → RESOLVED | Catalog confirmed GPT-only and parameterized as data: pi = `(gpt-5.5,high)`/`(gpt-5.5,low)`/`(gpt-5.3-codex,medium)`, codex = `(gpt-5.5,high)`/`(gpt-5.5,medium)`. The model-catalog-vs-tier concern is resolved because the catalog is explicit GPT data keyed by harness, **not** derived from any registry tier; and because both L2 catalogs are GPT-only, no `claude-*` id (incl. region-restricted `claude-fable-5`) can ever be selected at Layer 2. |
 | **Fragment migration is iterative** — only release-definition ships end-to-end; the broad dehydration is conservative. | MEDIUM | Scope is explicit (§3.12): one workflow fully migrated, others scaffolded + fail-loud; the AI-surface doctor prevents silent regression of ritual back into personas. |
 | PI/Codex live behavior (model honoring, discrete codex model+effort) is upstream-CLI-owned. | MEDIUM | Unit tests assert the args reach the command; WS-10 operator live run confirms real behavior (mocked tests cannot prove upstream CLI contracts). |
 | Removing `claude` from Layer-2 while keeping the SDK adapter could confuse callers. | LOW | A test asserts `claude` is rejected as a workflow harness AND the adapter stays importable/tested; the rejection message points to Layer-1 use. |
@@ -492,15 +517,14 @@ v0.1.23's OpenCode adapter would ship exactly what the operator now wants delete
 - `specs/memory/product/<lifecycle/harness atoms>.md` — only atoms that state the
   harness/transport/workflow surface.
 
-### Open decisions the operator must resolve (grill output — confirm before impl `Aprovado`)
-- **OD-1 (load-bearing):** The exact codex-2 option pair — two `(model, effort)` profiles of
-  one model (`gpt-5.5` high + `gpt-5.5` medium), or two distinct models (`gpt-5.5` +
-  `gpt-5.4-mini`)? (ADR-B.)
-- **OD-2:** Confirm the pi-3 ids (`claude-opus-4-8` / `claude-sonnet-4-6` /
-  `claude-haiku-4-5-20251001`) or substitute. (ADR-B.)
-- **OD-3:** Is removing `claude` from Layer-2 `--harness` choices acceptable as enforcement
-  by validation (the directive says yes), or should it remain selectable with a cost
-  warning? (Directive says delete from choices — confirm no exception.)
+### Open decisions (grill output)
+- **OD-1 — RESOLVED** (operator, 2026-06-26): the codex-2 pair is **two `(model, effort)`
+  profiles of one model** — `(gpt-5.5, high)` + `(gpt-5.5, medium)`. (ADR-B.)
+- **OD-2 — RESOLVED** (operator, 2026-06-26): pi-3 = `(gpt-5.5, high)`, `(gpt-5.5, low)`,
+  `(gpt-5.3-codex, medium)` — **GPT ids, not Claude** (PI runs on the operator's Codex
+  subscription). The earlier Claude proposal is withdrawn. (ADR-B.)
+- **OD-3 — CONFIRMED:** removing `claude` from Layer-2 `--harness` choices is enforcement by
+  validation, no exception (directive confirmed). Layer-1 Claude is unaffected.
 - **OD-4:** Is the WS-7 conservative dehydration scope (AGENTS.md pointers + doctor check
   only, old surfaces retained-with-banner) acceptable for this release, with deep
   dehydration deferred? (§3.12.)

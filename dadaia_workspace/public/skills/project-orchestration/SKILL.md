@@ -107,8 +107,8 @@ ladder and its gate ordering — is the engine's TRANSITIONS made executable:
 typed handoff gate (the APPROVED-verdict requirement), and
 `features/lifecycle/pipeline.py` + `phase_workflow.py` own run sequencing and the
 per-step **Layer-2 worker harness** — the bounded worker each step drives behind
-`AgentRuntimePort`, selectable per step across the five worker runtimes (FAKE,
-CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN, PI_HEADLESS); see constitution §0 "The two agentic
+`AgentRuntimePort`, selectable per step across the four worker runtimes (FAKE,
+CODEX_EXEC, CLAUDE_SDK, PI_HEADLESS); see constitution §0 "The two agentic
 layers". This skill no longer narrates that ordered procedure step by step.
 
 What it keeps is the **orchestration judgment** the engine cannot make: who may dispatch
