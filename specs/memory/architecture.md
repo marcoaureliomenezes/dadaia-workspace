@@ -20,7 +20,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 9100
 last_updated: '2026-06-26'
-release_origin: v0.1.25
+release_origin: v0.1.26
 ---
 
 ## Visão geral
@@ -44,7 +44,7 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 
 **cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`, `lifecycle`. Thin wrapper sobre features; sem business logic.
 
-**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `backlog` (backlog-consistency engine, v0.1.25: `subject_registry.py` registry auto-derivado, `classifier.py` classificador fail-closed, `doctor.py` BL-* checks, `ledger.py` reader do sidecar `consumed_backlog.json`, `preview.py` superfície read-only — ver "Backlog-consistency subsystem" abaixo), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
+**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `backlog` (backlog-consistency engine: v0.1.25 `subject_registry.py` registry auto-derivado, `classifier.py` classificador fail-closed, `doctor.py` BL-* checks, `ledger.py` reader do sidecar `consumed_backlog.json`, `preview.py` superfície read-only; v0.1.26 `ledger_writer.py` writer do sidecar na shape exata do reader R1, `removal.py` hook de closure residual-aware (rewrite-down-to-residual default; full removal só a zero residual, com cópia durável em `_archive/<release>/consumed-backlog/` ANTES do unlink — ADR-C copy-before-remove), `removal_lifecycle.py` facade `BacklogRemovalLifecycle` ligando os dois lados — ver "Backlog-consistency subsystem" abaixo), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, `workflows/backlog_definition.py` — o corpo da workflow `backlog_definition` (§4: intake_grill → subject_bind → existing_backlog_review → reconcile_decision → conflict_resolution_grill → backlog_author → backlog_review_gate; mirror estrutural de `release_definition.py`, gates Python-owned), `context_selector.py` com o selector `backlog_index` (bound intents + status por item, frontmatter-only, paths injetados), e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
 
 **panel — arquitetura HTTP interna (pós R5):**
 
@@ -468,7 +468,8 @@ Locais canônicos de estado em disco e seu propósito:
   * `specs/memory/*.md` — memory atômica (Markdown + frontmatter YAML; rendered in-memory pelo panel via mistune).
   * `specs/memory/product/catalog.json` — gerado por `generate-memory-catalog.py` a partir do frontmatter dos `.md`; committed; índice machine-readable.
   * `specs/_archive/releases/<id>/` — releases concluídas com CLOSURE.
-  * `specs/_archive/<release-id>/consumed_backlog.json` — sidecar JSON machine-readable (um por release arquivada; entries `{slug, shipped_anchors[]}`) lido por `backlog doctor` BL-STALE via exact slug membership; escrito por release-definition/closure (R2). Ausência = no-op (sem false ERROR).
+  * `specs/_archive/<release-id>/consumed_backlog.json` — sidecar JSON machine-readable (um por release arquivada; entries `{slug, shipped_anchors[]}`) lido por `backlog doctor` BL-STALE via exact slug membership; escrito por `ledger_writer.write_consumed` (v0.1.26) via a facade `BacklogRemovalLifecycle`. **Producer wiring na superfície real de release-definition é resíduo R2 (`wire-consumed-ledger-producer-at-release-definition`)** — em produção o sidecar ainda não é emitido. Ausência = no-op (sem false ERROR).
+  * `specs/_archive/<release-id>/consumed-backlog/<slug>.md` — cópia durável de um item de backlog full-removed no closure (escrita por `removal.apply_removal` ANTES do unlink — ADR-C copy-before-remove; backlog é gitignored, então esta é a única cópia sobrevivente de um registro de segurança CRITICAL).
   * `.dadaia/states/backlog_subject_aliases.txt` — alias map do backlog mantida pelo operador (uma linha `synonym -> canonical-anchor`); lida por path injetado; em R1 é o único caminho de binding para subjects `panel`/`api`.
 
 **Stores que não existem (não recriar):** `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (semaphore / Lock 4), `.dadaia/logs/semaphore-reclaims.jsonl`, marcador global de contexto, e qualquer script bash de gate em `.dadaia/scripts/`. O mutex MUTATING é exclusivamente o TTL-lease em `.dadaia/states/ctx_locks/<ctx>.lock.json`; o session record `.dadaia/sessions/<id>.json` não é mecanismo de locking — carrega identidade/modo da sessão (lido pelo gate para resolução de modo) e alimenta o Kanban.
@@ -599,20 +600,45 @@ bypass gitignore/ADDITIVE. Superfície read-only de resolve/preview (`preview.py
 `UNRESOLVED`/`AMBIGUOUS` + candidate set + sugestão de alias) — nunca escreve um arquivo de
 backlog ou a alias map.
 
-**Ledger `consumed_backlog` (read-only em R1) — `ledger.py`.** BL-STALE liga a um **ledger
-estruturado** fixado a um **sidecar JSON machine-readable** em
+**Ledger `consumed_backlog` — `ledger.py` (reader) + `ledger_writer.py` (writer, v0.1.26).**
+BL-STALE liga a um **ledger estruturado** fixado a um **sidecar JSON machine-readable** em
 `specs/_archive/<release-id>/consumed_backlog.json` (um arquivo por release arquivada;
 entries `{slug, shipped_anchors[]}` keyed pelo set de subject-anchors verificado realmente
 shipado) e casa por **exact slug membership** — substituindo a heurística de prosa
 SPEC-DOC-031. `read_consumed(archive_root)` varre todos os
 `specs/_archive/*/consumed_backlog.json` por membership exata e **tolera ausência** (sem
-ledger arquivado → BL-STALE é no-op, nunca false ERROR). R1 **define o formato + lê**; o
-**writer** (release-definition/closure) é **R2**.
+ledger arquivado → BL-STALE é no-op, nunca false ERROR). O writer (`write_consumed`, v0.1.26)
+emite exatamente essa shape de reader; roots injetados; anchors module-relative.
 
-**Diferido para R2 (v0.1.26):** o corpo do workflow `backlog_definition` (o step ladder de
-`dadaia lifecycle backlog define`), o hook de removal-on-release no closure que **escreve** o
-ledger `consumed_backlog`, os fragments reais, e o step de model-adjudication rodando
-end-to-end.
+**Workflow `backlog_definition` + removal-on-release (v0.1.26).** O happy-path ORIENTED
+existe: `features/lifecycle/workflows/backlog_definition.py` é o corpo §4 da workflow
+(`intake_grill → subject_bind → existing_backlog_review → reconcile_decision →
+conflict_resolution_grill → backlog_author → backlog_review_gate`), mirror estrutural de
+`release_definition.py`, com **gates Python-owned**, atrás de `dadaia lifecycle backlog
+define` (container factory `build_backlog_definition_workflow`; LAW 1 `{pi,codex,fake}`,
+LAW 2 modelo discreto). O step `existing_backlog_review` **roda o classifier R1 live**:
+Python dispõe todo veredito determinístico; o modelo é invocado **só** pela seam `downgrade`
+para um par same-anchor differing-change e **só para downgrade com evidência** (fail-closed →
+`DIVERGENT_CONFLICT`) — a seam que R1 embarcou OFFLINE agora é exercitada end-to-end. O
+selector `backlog_index` (frontmatter-only, paths injetados) alimenta os steps de review com
+os bound intents + status de cada item. Os fragments reais
+(`public/lifecycle_fragments/backlog_definition/{intake_grill,conflict_scan,conflict_resolution_grill,backlog_authoring}.md`)
+substituíram o stub `_README.md` e são staged/installed.
+
+O **mecanismo** de removal-on-release existe: o writer (`ledger_writer.py`), o hook de
+closure residual-aware (`removal.py` — rewrite-down-to-residual default; full removal só a
+zero residual, com cópia durável em `_archive/<release>/consumed-backlog/<slug>.md` ANTES do
+unlink), e a facade `BacklogRemovalLifecycle` (`removal_lifecycle.py`) ligando producer
+(`consume_at_release_definition`) e consumer (`remove_at_closure`). **O lado de closure
+(`remove_at_closure`) está wired em `dadaia lifecycle close`; o lado producer
+(`consume_at_release_definition`) ainda NÃO está wired na superfície real de
+release-definition** — em produção nada escreve o ledger ainda, então `remove_at_closure`
+lê um ledger vazio e no-opa, e o loop BL-STALE está provado só a nível
+função/integração (`tests/integration/test_backlog_removal_loop.py`), **não end-to-end em
+release real**. Wiring do producer (depende de uma convenção de declaração-de-consumo no
+release) é o resíduo R2, rastreado em
+`specs/backlog/wire-consumed-ledger-producer-at-release-definition.md`
+(`FEAT-BACKLOG-CONSUME-PRODUCER-WIRING-01`, HIGH).
 
 ## Multi-harness runtime parity (constitution §4)
 

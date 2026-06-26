@@ -13,7 +13,7 @@ tags:
 agent_tier: inject
 token_estimate: 2300
 last_updated: '2026-06-26'
-release_origin: v0.1.25
+release_origin: v0.1.26
 ---
 
 ## Linguagens
@@ -189,3 +189,6 @@ Como rodar, testar, lintar e empacotar:
     dadaia backlog subjects                 # lista o anchor set canônico vivo (opcional --kind / --resolve "<ref>")
     dadaia backlog doctor                   # BL-SCHEMA/DUP/CONFLICT/STALE; exit !=0 em violação (wired no pre-commit + CI)
     dadaia backlog doctor --explain         # mostra como um subject proposto resolve (anchor | UNRESOLVED | AMBIGUOUS)
+
+    # backlog_definition dadaia-workflow (features/lifecycle/workflows/backlog_definition.py, v0.1.26)
+    dadaia lifecycle backlog define --harness {pi|codex|fake} --model <id>   # workflow §4 ORIENTED; gates Python-owned; LAW 1/LAW 2 (claude rejeitado)
