@@ -32,7 +32,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
 - **Done-when:** unit test over a fixed `tmp_path` backlog fixture asserts bound intents +
   status per item and the exclusions (acceptance §3.7.7); mypy/ruff clean.
 
-## [ ] T-26-02 — Real `backlog_definition` step fragments
+## [x] T-26-02 — Real `backlog_definition` step fragments
 
 - **Owner:** software-engineer
 - **Write set:**

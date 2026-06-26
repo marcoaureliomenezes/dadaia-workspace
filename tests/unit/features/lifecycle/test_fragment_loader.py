@@ -59,10 +59,10 @@ _SHARED_IDS = {
 # Workflow dirs that still ship only a `_README.md` stub (no authored step fragments).
 # ``implementation`` left this set in v0.1.24 (T-24-11): it now ships three authored step
 # fragments (implement_tdd, self_verify, qa_review). The implementation workflow's
-# ``closure`` step stays a README-only stub.
+# ``closure`` step stays a README-only stub. ``backlog_definition`` left this set in v0.1.26
+# R2 (T-26-02): it now ships four authored step fragments.
 _DEFERRED_WORKFLOW_DIRS = {
     "audit",
-    "backlog_definition",
     "bug_report",
     "closure",
     "research",
