@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from enum import IntEnum
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
+from dadaia_workspace.features.lifecycle.phase_workflow import PhaseWorkflowResult
 from dadaia_workspace.features.lifecycle.prompt_builder import PromptScope
 from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandResult,
@@ -668,6 +670,7 @@ def _run_phase_step(
     harness: str,
     json_output: bool,
     model: str | None = None,
+    post_step: Callable[[PhaseWorkflowResult], dict[str, Any] | None] | None = None,
 ) -> None:
     """Run one bounded lifecycle step through the engine on a selectable harness.
 
@@ -708,6 +711,16 @@ def _run_phase_step(
     status = (
         LifecycleCommandStatus.OK.value if result.accepted else LifecycleCommandStatus.BLOCKED.value
     )
+    # Post-step action (e.g. closure-time backlog removal). Runs ONLY when the phase step
+    # was accepted, so a blocked step never triggers side effects. Guarded so a post-step
+    # error surfaces clearly without corrupting the already-accepted phase result.
+    post_step_result: dict[str, Any] | None = None
+    post_step_error: str | None = None
+    if result.accepted and post_step is not None:
+        try:
+            post_step_result = post_step(result)
+        except Exception as exc:  # noqa: BLE001 — surface, never swallow; do not corrupt the step.
+            post_step_error = f"{type(exc).__name__}: {exc}"
     if json_output:
         _emit_json(
             {
@@ -717,6 +730,8 @@ def _run_phase_step(
                 "phase": result.phase.value,
                 "runtime": result.runtime_kind.value,
                 "blocked": result.blocked.to_dict() if result.blocked else None,
+                "post_step": post_step_result,
+                "post_step_error": post_step_error,
             }
         )
     else:
@@ -724,6 +739,10 @@ def _run_phase_step(
             f"{status} {label} run={result.run_id} "
             f"harness={result.runtime_kind.value} phase={result.phase.value}"
         )
+        if post_step_result is not None:
+            typer.echo(f"  post_step: {post_step_result}")
+        if post_step_error is not None:
+            typer.echo(f"  post_step ERROR: {post_step_error}")
     if not result.accepted:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
@@ -833,7 +852,31 @@ def close(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the release-closure step on a selectable harness."""
+    """Run the release-closure step on a selectable harness.
+
+    On a successful closure phase step, mechanically applies residual-aware
+    backlog removal over the consumed-ledger (SPEC §3.6): items whose intents
+    fully shipped are archived-then-removed; partially-shipped items are
+    rewritten to their residual. If no consumed ledger exists, removal is a
+    no-op (``remove_at_closure`` reads an empty ledger). The removal runs as a
+    guarded post-step so a removal error surfaces clearly without corrupting the
+    closure result.
+    """
+
+    def _apply_closure_removal(_result: PhaseWorkflowResult) -> dict[str, Any]:
+        from dadaia_workspace import container
+
+        workspace_root = resolve_workspace_root()
+        lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
+        removal = lifecycle.remove(release_id=release_id)
+        return {
+            "removed": [
+                a.slug for a in removal.actions if a.action.value == "archived_and_removed"
+            ],
+            "rewritten": [a.slug for a in removal.actions if a.action.value == "rewritten"],
+            "unchanged": [a.slug for a in removal.actions if a.action.value == "unchanged"],
+        }
+
     _run_phase_step(
         label="close",
         role="product-engineer",
@@ -845,6 +888,7 @@ def close(
         harness=harness,
         model=model,
         json_output=json_output,
+        post_step=_apply_closure_removal,
     )
 
 

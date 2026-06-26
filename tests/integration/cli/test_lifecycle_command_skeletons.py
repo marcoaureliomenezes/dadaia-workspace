@@ -39,7 +39,6 @@ def _payload(output: str) -> dict[str, object]:
 @pytest.mark.parametrize(
     "command",
     (
-        ["lifecycle", "backlog", "define"],
         ["lifecycle", "implement"],
         ["lifecycle", "close"],
         ["lifecycle", "review", "qa"],
@@ -56,8 +55,8 @@ def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
 
     With the FAKE harness the bare worker emits no APPROVED verdict, so the real typed
     gate blocks — proving the engine path executed end-to-end on a selectable harness.
-    (``release define`` is the fragment-driven multi-step workflow now — covered
-    separately below.)
+    (``release define`` and ``backlog define`` are the fragment-driven multi-step workflows
+    now — they complete on FAKE and are covered separately, not in this generic matrix.)
     """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)

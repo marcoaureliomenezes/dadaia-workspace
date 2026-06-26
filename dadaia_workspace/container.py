@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from dadaia_workspace.features.backlog.removal_lifecycle import (
+        BacklogRemovalLifecycle,
+    )
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         BacklogDefinitionWorkflow,
     )
@@ -840,6 +843,51 @@ def build_backlog_definition_workflow(
         registry=registry,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
+    )
+
+
+def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Path]:
+    """Resolve ``(specs_dir, source_root)`` for a context's backlog ops.
+
+    Mirrors the release/backlog-definition factories: a consumer context resolves to
+    ``repos/<ctx>/specs`` + ``repos/<ctx>``; the self-hosting library repo falls back to the
+    workspace-root tree. All roots are derived from ``workspace_root`` — never cwd.
+    """
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    source_root = workspace_root / "repos" / context_name
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+        source_root = workspace_root
+    return specs_dir, source_root
+
+
+def build_backlog_removal_lifecycle(
+    workspace_root: Path,
+    *,
+    context: str,
+) -> "BacklogRemovalLifecycle":
+    """Compose the removal-on-release lifecycle (SPEC §3.6) over a context's backlog.
+
+    Binds the injected backlog/archive roots + the R1 canonical-subject registry so the
+    caller can write the ``consumed_backlog`` ledger at release-definition and apply the
+    residual-aware removal hook at closure. All roots are derived from ``workspace_root``.
+    """
+    from dadaia_workspace.features.backlog.removal_lifecycle import BacklogRemovalLifecycle
+    from dadaia_workspace.features.backlog.subject_registry import build_registry
+
+    _guard_initialized(workspace_root)
+    specs_dir, source_root = _backlog_context_roots(workspace_root, context)
+    registry = build_registry(
+        source_root=source_root,
+        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
+        alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
+        specs_dir=specs_dir,
+    )
+    return BacklogRemovalLifecycle(
+        backlog_dir=specs_dir / "backlog",
+        archive_root=specs_dir / "_archive",
+        registry=registry,
     )
 
 
