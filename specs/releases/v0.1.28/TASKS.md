@@ -146,7 +146,7 @@ Acceptance: `GET /api/workflow-catalog[/<id>]`, `GET /api/workflow-model-profile
 `GET /api/workflow-model-policy`, `GET /api/lifecycle-runs?workflow=&context=` registered +
 served; Host-guard applies; no secrets exposed; route registration asserted.
 
-### [-] T-28-C-02 — Panel mutation routes: PUT/validate policy
+### [x] T-28-C-02 — Panel mutation routes: PUT/validate policy
 Goal: guarded writes (LAW 5) — handler currently has no PUT and a near-empty POST.
 Write set: `dadaia_workspace/features/panel/handler.py`;
 `dadaia_workspace/features/panel/service.py`;

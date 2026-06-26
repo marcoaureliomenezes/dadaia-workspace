@@ -9,6 +9,7 @@ SAME governed source the CLI reads (no second model table).
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import (
@@ -50,7 +51,7 @@ def _store(tmp_path: Path) -> JsonWorkflowModelPolicyStore:
 
 def _resolver_factory(
     store: JsonWorkflowModelPolicyStore,
-):
+) -> Callable[..., WorkflowExecutionPolicyResolver]:
     catalog = governed_workflow_catalog()
 
     def _factory(
