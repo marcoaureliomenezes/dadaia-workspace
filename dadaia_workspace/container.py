@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        BacklogDefinitionWorkflow,
+    )
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionWorkflow,
     )
@@ -739,6 +742,102 @@ def build_release_definition_workflow(
             context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
         ),
         context_selector=selector,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+    )
+
+
+def _backlog_definition_runtime_factory(
+    *,
+    context: str,
+    run_cwd: Path,
+    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Build the per-step runtime factory for the backlog-definition workflow.
+
+    Real harnesses (pi/codex) resolve to their live adapters; ``FAKE`` resolves to a
+    *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref, so
+    ``--harness fake`` walks the whole §4 sequence deterministically (mirrors the
+    release-definition fake factory).
+    """
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunResult,
+        AgentRunStatus,
+    )
+    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+    approving = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="fake backlog-definition worker: APPROVED",
+        artifact_refs=(f".dadaia/handoff/{context}/backlog-definition-step.handoff.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return FakeAgentRuntime(result=approving)
+        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+
+    return factory
+
+
+def build_backlog_definition_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+) -> "BacklogDefinitionWorkflow":
+    """Compose the fragment-driven backlog-definition workflow (R2 / epic §4).
+
+    Mirrors :func:`build_release_definition_workflow` field-for-field: the injected runtime
+    factory resolves each step's ``AgentRuntimeKind`` to its adapter (``FAKE`` drives the
+    sequence end-to-end); the :class:`ContextSelector` resolves each fragment's dynamic
+    inputs bounded by ``max_context_policy``; the R1 canonical-subject :class:`Registry`
+    backs the ``subject_bind`` Python step. ``models`` maps a runtime kind to its discrete
+    Layer-2 model (LAW 2). All roots are derived from ``workspace_root`` — never cwd.
+    """
+    from dadaia_workspace.features.backlog.subject_registry import build_registry
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        BacklogDefinitionWorkflow,
+    )
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    model_by_kind = models or {}
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    source_root = workspace_root / "repos" / context_name
+    if not specs_dir.is_dir():
+        # Self-hosting library repo: specs live at the workspace-root tree.
+        specs_dir = workspace_root / "specs"
+        source_root = workspace_root
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    registry = build_registry(
+        source_root=source_root,
+        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
+        alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
+        specs_dir=specs_dir,
+    )
+    return BacklogDefinitionWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_backlog_definition_runtime_factory(
+            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
+        ),
+        context_selector=selector,
+        registry=registry,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
     )

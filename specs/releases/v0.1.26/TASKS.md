@@ -129,7 +129,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
   (§3.7.3) and a stubbed compatible-merge downgrade yields `OVERLAP`/`SUPERSEDES`;
   mypy/ruff clean.
 
-## [-] T-26-07 — CLI wiring + container factory
+## [x] T-26-07 — CLI wiring + container factory
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py` (re-point `backlog_define`

@@ -330,28 +330,142 @@ def backlog_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("backlog-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="Default discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+    ),
+    step_harness: list[str] | None = typer.Option(
+        None,
+        "--step-harness",
+        help="Per-step harness override 'step=harness' (repeatable); steps are the §4 "
+        "model-step labels (intake_grill, conflict_resolution_grill, backlog_author).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=model' (repeatable); model is "
+        "'<id>:<effort>' valid for that step's harness (LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the backlog-definition step on a selectable harness."""
-    _run_phase_step(
-        label="backlog-define",
-        role="project-manager",
-        from_phase=LifecyclePhase.BACKLOG_DEFINITION,
-        target_phase=LifecyclePhase.RELEASE_DEFINITION,
+    """Run the backlog-definition workflow (§4) as a fragment-driven sequence.
+
+    Python owns step order and the typed gates; each model step's prompt is assembled
+    from its fragment bundle + selected dynamic context + output schema + the discrete
+    ``(harness, model)``. The §4 Python steps (``subject_bind``, ``existing_backlog_review``,
+    ``reconcile_decision``, ``backlog_review_gate``) dispose deterministically via the R1
+    registry + classifier; a blocked gate stops the sequence. ``--harness fake`` walks the
+    whole sequence; ``claude`` is rejected (LAW 1); an invalid ``--model`` is rejected (LAW 2).
+    """
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace import container
+    from dadaia_workspace.features.backlog.classifier import BoundItem
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        _SEQUENCE,
+        AuthoredItem,
+        BacklogDemand,
+    )
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+
+    # Per-step harness overrides, keyed by the §4 model-step labels.
+    valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
+    overrides: dict[str, AgentRuntimeKind] = {}
+    harness_by_label: dict[str, str] = {}
+    for item in step_harness or []:
+        label, sep, kind_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
+        clean_label = label.strip()
+        if clean_label not in valid_labels:
+            raise typer.BadParameter(
+                f"unknown backlog-definition step {clean_label!r}; "
+                f"valid steps: {', '.join(sorted(valid_labels))}"
+            )
+        overrides[clean_label] = _resolve_harness(kind_str.strip())
+        harness_by_label[clean_label] = kind_str.strip()
+
+    # LAW 2 — resolve the discrete model per runtime kind.
+    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
+    default_model = _resolve_model(harness, model)
+    if default_model is not None:
+        models[default_kind] = default_model
+    for item in step_model or []:
+        label, sep, model_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'step=model', got {item!r}")
+        clean_label = label.strip()
+        step_harness_name = harness_by_label.get(clean_label, harness)
+        resolved = _resolve_model(step_harness_name, model_str.strip())
+        if resolved is not None:
+            models[_resolve_harness(step_harness_name)] = resolved
+
+    workflow = container.build_backlog_definition_workflow(
+        workspace_root,
         context=context,
         release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        model=model,
-        json_output=json_output,
+        default_runtime_kind=default_kind,
+        models=models,
     )
+    sequence = tuple(
+        _replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+        for step in _SEQUENCE
+    )
+    # The CLI verb walks the §4 sequence on the chosen harness; absent a structured demand
+    # source it threads an empty demand (no proposed intents, an empty authored result) so
+    # the Python gates dispose deterministically and the sequence completes on ``fake``.
+    demand = BacklogDemand(
+        proposed_intents=(),
+        existing=(),
+        authored=AuthoredItem(
+            slug=run_id,
+            is_new=True,
+            bound=BoundItem(slug=run_id, anchor_changes={}),
+        ),
+    )
+    result = workflow.run(run_id, demand, sequence=sequence)
+
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "final_phase": result.final_phase.value,
+                "steps": [
+                    {
+                        "label": step.label,
+                        "kind": step.kind.value,
+                        "fragment_id": step.fragment_id,
+                        "accepted": step.accepted,
+                        "skipped": step.skipped,
+                        "runtime": step.runtime_kind.value if step.runtime_kind else None,
+                    }
+                    for step in result.steps
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        trail = " → ".join(
+            f"{s.label}:{'skip' if s.skipped else ('ok' if s.accepted else 'BLOCKED')}"
+            for s in result.steps
+        )
+        typer.echo(
+            f"{status} backlog-define run={result.run_id} phase={result.final_phase.value} {trail}"
+        )
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
 @release_app.command("define")
