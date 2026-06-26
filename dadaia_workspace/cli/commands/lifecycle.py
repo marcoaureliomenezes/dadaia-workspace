@@ -360,28 +360,121 @@ def release_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="Default discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+    ),
+    step_harness: list[str] | None = typer.Option(
+        None,
+        "--step-harness",
+        help="Per-step harness override 'step=harness' (repeatable); steps are the "
+        "§6.1 labels (release_scope, spec_create, spec_arch_review, ...).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=model' (repeatable); model is "
+        "'<id>:<effort>' valid for that step's harness (LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the release-definition step on a selectable harness."""
-    _run_phase_step(
-        label="release-define",
-        role="product-engineer",
-        from_phase=LifecyclePhase.RELEASE_DEFINITION,
-        target_phase=LifecyclePhase.IMPLEMENTATION,
+    """Run the release-definition workflow (§6.1) as a fragment-driven sequence.
+
+    Python owns step order and the typed gates; each model step's prompt is assembled
+    from its fragment bundle + selected dynamic context + output schema + the discrete
+    ``(harness, model)`` — there is no generic "Run the step" suffix. A REJECTED or
+    missing review handoff BLOCKS advancement; the terminal ``definition_commit_gate``
+    advances the release to IMPLEMENTATION only when every gate passed.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+
+    # Per-step harness overrides, keyed by the §6.1 step label.
+    valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
+    overrides: dict[str, AgentRuntimeKind] = {}
+    harness_by_label: dict[str, str] = {}
+    for item in step_harness or []:
+        label, sep, kind_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
+        clean_label = label.strip()
+        if clean_label not in valid_labels:
+            raise typer.BadParameter(
+                f"unknown release-definition step {clean_label!r}; "
+                f"valid steps: {', '.join(sorted(valid_labels))}"
+            )
+        overrides[clean_label] = _resolve_harness(kind_str.strip())
+        harness_by_label[clean_label] = kind_str.strip()
+
+    # LAW 2 — resolve the discrete model per runtime kind. The default --model applies to
+    # the default harness; --step-model overrides per label (keyed onto its step's kind).
+    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
+    default_model = _resolve_model(harness, model)
+    if default_model is not None:
+        models[default_kind] = default_model
+    for item in step_model or []:
+        label, sep, model_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'step=model', got {item!r}")
+        clean_label = label.strip()
+        step_harness_name = harness_by_label.get(clean_label, harness)
+        resolved = _resolve_model(step_harness_name, model_str.strip())
+        if resolved is not None:
+            models[_resolve_harness(step_harness_name)] = resolved
+
+    workflow = container.build_release_definition_workflow(
+        workspace_root,
         context=context,
         release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        model=model,
-        json_output=json_output,
+        default_runtime_kind=default_kind,
+        models=models,
     )
+    from dataclasses import replace as _replace
+
+    sequence = tuple(
+        _replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+        for step in _SEQUENCE
+    )
+    result = workflow.run(run_id, sequence)
+
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "final_phase": result.final_phase.value,
+                "steps": [
+                    {
+                        "label": step.label,
+                        "is_gate": step.is_gate,
+                        "fragment_id": step.fragment_id,
+                        "accepted": step.accepted,
+                        "runtime": step.runtime_kind.value if step.runtime_kind else None,
+                    }
+                    for step in result.steps
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        trail = " → ".join(f"{s.label}:{'ok' if s.accepted else 'BLOCKED'}" for s in result.steps)
+        typer.echo(
+            f"{status} release-define run={result.run_id} phase={result.final_phase.value} {trail}"
+        )
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
 @app.command()

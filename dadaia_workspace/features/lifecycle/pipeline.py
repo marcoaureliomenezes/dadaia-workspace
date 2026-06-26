@@ -34,10 +34,21 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
 )
+from dadaia_workspace.features.lifecycle.context_selector import (
+    ContextSelector,
+    MaxContextPolicy,
+    SelectionAudit,
+)
+from dadaia_workspace.features.lifecycle.fragments.loader import (
+    Fragment,
+    FragmentLoader,
+)
 from dadaia_workspace.features.lifecycle.prompt_builder import (
+    FragmentBundle,
     LifecyclePromptBuilder,
     PromptPrefix,
     PromptScope,
+    build_fragment_suffix,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 
@@ -47,7 +58,16 @@ RuntimeFactory = Callable[[AgentRuntimeKind], AgentRuntimePort]
 
 @dataclass(frozen=True)
 class PipelineStep:
-    """One bounded step in a lifecycle pipeline, bound to a chosen harness."""
+    """One bounded step in a lifecycle pipeline, bound to a chosen harness.
+
+    A step may carry a ``fragment_id`` (``workflow.step``) plus the shared fragment ids it
+    cites. When present, the step's prompt suffix is assembled from that fragment bundle —
+    the fragment's own body, the cited shared bodies, the dynamically selected context
+    (bounded by the fragment's ``max_context_policy``), and the fragment's output schema —
+    instead of the generic ``"Run the {label} step"`` placeholder (WS-6). A step with no
+    ``fragment_id`` keeps the generic suffix (the remaining pipeline steps are not migrated
+    in this release).
+    """
 
     label: str
     role: str
@@ -56,6 +76,8 @@ class PipelineStep:
     runtime_kind: AgentRuntimeKind
     requirements: tuple[GateRequirement, ...] = ()
     model_profile: str | None = None
+    fragment_id: str | None = None
+    shared_fragment_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -89,6 +111,8 @@ class LifecyclePipeline:
         prefix: PromptPrefix | None = None,
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
+        fragment_loader: FragmentLoader | None = None,
+        context_selector: ContextSelector | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -97,6 +121,13 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # A step that declares a ``fragment_id`` is assembled from the fragment library
+        # (WS-6). The loader defaults to the packaged fragment root; the context selector
+        # is optional — when absent, fragment steps still emit fragment-sourced prompts
+        # (the fragment body + cited shared bodies + output schema), only without the
+        # dynamically resolved file context.
+        self._fragment_loader = fragment_loader or FragmentLoader()
+        self._context_selector = context_selector
 
     def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
         if not steps:
@@ -159,19 +190,87 @@ class LifecyclePipeline:
         )
 
     def _scope(self, step: PipelineStep, run_id: str) -> PromptScope:
+        prompt = (
+            self._fragment_prompt(step)
+            if step.fragment_id is not None
+            else self._generic_prompt(step)
+        )
         return PromptScope(
             role=step.role,
             context=self._context,
             release_id=self._release_id,
             task_id=f"{run_id}:{step.label}",
-            prompt=(
-                f"Run the {step.label} step for release {self._release_id} in context "
-                f"{self._context}. Emit a handoff whose structured_output.verdict is APPROVED "
-                "or REJECTED, with an artifact_ref pointing at the handoff document."
-            ),
+            prompt=prompt,
             allowed_paths=(f".dadaia/handoff/{self._context}/**",),
             required_evidence=(GateEvidenceKind.HANDOFF,),
             model_profile=step.model_profile,
+        )
+
+    def _generic_prompt(self, step: PipelineStep) -> str:
+        return (
+            f"Run the {step.label} step for release {self._release_id} in context "
+            f"{self._context}. Emit a handoff whose structured_output.verdict is APPROVED "
+            "or REJECTED, with an artifact_ref pointing at the handoff document."
+        )
+
+    def _fragment_prompt(self, step: PipelineStep) -> str:
+        """Assemble a fragment-sourced suffix for a step that declares a ``fragment_id``.
+
+        Uses the same fragment-suffix path as the release-definition workflow
+        (:func:`build_fragment_suffix` + :class:`FragmentLoader` + the context selector,
+        honoring the fragment's ``max_context_policy``). When no context selector is
+        wired, the dynamic context is empty but the fragment body + cited shared bodies +
+        output schema still drive the prompt — never the generic placeholder.
+        """
+        assert step.fragment_id is not None
+        fragment = self._fragment_loader.load_fragment(step.fragment_id)
+        shared = tuple(
+            self._fragment_loader.load_fragment(fid) for fid in step.shared_fragment_ids
+        )
+        selected = self._select_context(step, fragment)
+        return build_fragment_suffix(
+            self._fragment_bundle(step, fragment, shared),
+            selected_context=self._render_selection(selected),
+        )
+
+    def _select_context(self, step: PipelineStep, fragment: Fragment) -> SelectionAudit:
+        """Resolve the fragment's dynamic inputs, bounded by its ``max_context_policy``.
+
+        Returns an empty audit when no context selector is wired — the fragment material
+        still carries the prompt; only the dynamically resolved files are omitted.
+        """
+        if self._context_selector is None:
+            return SelectionAudit(step=step.label)
+        policy = MaxContextPolicy.parse(fragment.max_context_policy)
+        return self._context_selector.select_all(
+            step.label,
+            fragment.dynamic_inputs,
+            policy,
+            fragment_ids=(fragment.id, *step.shared_fragment_ids),
+        )
+
+    @staticmethod
+    def _render_selection(audit: SelectionAudit) -> str:
+        blocks = [
+            f"### {result.name}\n{result.content}".rstrip()
+            for result in audit.results
+            if result.content.strip()
+        ]
+        return "\n\n".join(blocks)
+
+    def _fragment_bundle(
+        self,
+        step: PipelineStep,
+        fragment: Fragment,
+        shared: tuple[Fragment, ...],
+    ) -> FragmentBundle:
+        return FragmentBundle(
+            fragment_id=fragment.id,
+            role=step.role,
+            body=fragment.body,
+            output_schema=fragment.output_schema,
+            shared_bodies=tuple(frag.body for frag in shared),
+            shared_ids=tuple(frag.id for frag in shared),
         )
 
 
@@ -206,6 +305,16 @@ def implementation_ladder(
             target_phase=LifecyclePhase.QA_REVIEW,
             runtime_kind=default_kind,
             model_profile=effort,
+            # WS-6: the implementation step runs on the fragment library. Its bundle is
+            # the TDD implement fragment, citing the shared write-scope / anti-slop /
+            # output-handoff disciplines plus the self-verify fragment.
+            fragment_id="implementation.implement_tdd",
+            shared_fragment_ids=(
+                "shared.write_scope",
+                "shared.anti_slop",
+                "shared.output_handoff",
+                "implementation.self_verify",
+            ),
         ),
         PipelineStep(
             label="review_qa",
@@ -214,6 +323,8 @@ def implementation_ladder(
             target_phase=LifecyclePhase.SECURITY_REVIEW,
             runtime_kind=default_kind,
             model_profile=effort,
+            # WS-6: the QA review step is the second fragment-driven pipeline step.
+            fragment_id="implementation.qa_review",
         ),
         PipelineStep(
             label="review_security",

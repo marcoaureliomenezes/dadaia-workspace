@@ -32,7 +32,10 @@ from dadaia_workspace.features.panel.views.agents import render_agents_subsectio
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
-from dadaia_workspace.features.panel.views.workflows import render_workflows_subsection
+from dadaia_workspace.features.panel.views.workflows import (
+    render_dadaia_workflows_section,
+    render_workflows_subsection,
+)
 
 
 def render_index(
@@ -54,6 +57,7 @@ def render_index(
         reports_section = render_reports_section()
         agents_subsection = render_agents_subsection()
         workflows_subsection = render_workflows_subsection()
+        dadaia_workflows_section = render_dadaia_workflows_section()
         sessions_section = render_sessions_section()
 
         body = f"""<!DOCTYPE html>
@@ -152,6 +156,8 @@ def render_index(
 
       {workflows_subsection}
 
+      {dadaia_workflows_section}
+
       <div class="ops-subsection" id="ops-subsection-kanban">
         <div class="ops-subsection-header">
           <h3 class="ops-subsection-title">Kanban</h3>
@@ -179,6 +185,29 @@ def render_index(
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>
   <script src="/static/kanban.js"></script>
+  <!--
+    Mermaid hydration for the dadaia-workflow catalog (WS-8 / ADR-E).
+    The step-sequence diagrams are emitted server-side as <pre class="mermaid">
+    blocks; this lazily imports mermaid from CDN and renders them. It degrades
+    gracefully offline: the panel is loopback, and every workflow ALSO carries a
+    server-rendered SVG DAG (.dadaia-wf-diagram-svg) that needs no network — so an
+    offline operator still sees a full diagram per workflow even if the CDN import
+    fails (the catch is a silent no-op).
+  -->
+  <script type="module">
+    (async function () {{
+      var blocks = document.querySelectorAll('.dadaia-wf-diagram-mermaid pre.mermaid');
+      if (!blocks.length) return;
+      try {{
+        var m = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+        var mermaid = m.default;
+        mermaid.initialize({{ startOnLoad: false, securityLevel: 'strict' }});
+        await mermaid.run({{ querySelector: '.dadaia-wf-diagram-mermaid pre.mermaid' }});
+      }} catch (e) {{
+        /* offline / CDN blocked: server-rendered SVG DAG remains visible. */
+      }}
+    }})();
+  </script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))

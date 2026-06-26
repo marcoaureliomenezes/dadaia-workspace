@@ -3,7 +3,12 @@
 import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        ReleaseDefinitionWorkflow,
+    )
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
@@ -36,6 +41,8 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_agent_prompt,
     render_api_agents_canonical,
     render_api_contexts,
+    render_api_dadaia_workflow_detail,
+    render_api_dadaia_workflows_list,
     render_api_reports,
     render_api_servers,
     render_api_session_detail,
@@ -650,6 +657,93 @@ def build_lifecycle_pipeline(
     )
 
 
+def _release_definition_runtime_factory(
+    *,
+    context: str,
+    run_cwd: Path,
+    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Build the per-step runtime factory for the release-definition workflow.
+
+    Real harnesses (pi/codex/claude) resolve to their live adapters. ``FAKE`` resolves
+    to a *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref —
+    so ``--harness fake`` walks the whole §6.1 sequence deterministically (the DoD
+    requirement), exercising every fragment-assembled prompt and Python gate without a
+    live worker. The artifact_ref stays inside the step's allowed handoff path.
+    """
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunResult,
+        AgentRunStatus,
+    )
+    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+    approving = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="fake release-definition worker: APPROVED",
+        artifact_refs=(f".dadaia/handoff/{context}/release-definition-step.handoff.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return FakeAgentRuntime(result=approving)
+        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+
+    return factory
+
+
+def build_release_definition_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+) -> "ReleaseDefinitionWorkflow":
+    """Compose the fragment-driven release-definition workflow (WS-5 / §6.1).
+
+    The workflow runs the §6.1 step sequence with fragment-assembled, scoped prompts and
+    Python-owned gates (no generic ``"Run the step"`` suffix). The injected runtime
+    factory resolves each step's ``AgentRuntimeKind`` to its adapter so harnesses can be
+    mixed per step; ``FAKE`` drives the sequence end-to-end. ``models`` maps a runtime
+    kind to its discrete Layer-2 model (LAW 2). The :class:`ContextSelector` resolves
+    each fragment's dynamic inputs, bounded by the fragment's ``max_context_policy``.
+    """
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        ReleaseDefinitionWorkflow,
+    )
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    model_by_kind = models or {}
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    if not specs_dir.is_dir():
+        # Self-hosting library repo: specs live at the workspace-root tree.
+        specs_dir = workspace_root / "specs"
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    return ReleaseDefinitionWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_release_definition_runtime_factory(
+            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
+        ),
+        context_selector=selector,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+    )
+
+
 def build_panel_views(
     workspace_root: Path,
     telemetry: object | None = None,
@@ -692,6 +786,8 @@ def build_panel_views(
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
         "api_workflow_detail": render_api_workflow_detail(workflows_service),
+        "api_dadaia_workflows": render_api_dadaia_workflows_list(workflows_service),
+        "api_dadaia_workflow_detail": render_api_dadaia_workflow_detail(workflows_service),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),

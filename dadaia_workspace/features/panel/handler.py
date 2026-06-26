@@ -207,6 +207,13 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
         AuthClass.BEARER,
     ),
     (r"^/api/workflows$", "api_workflows", AuthClass.BEARER),
+    # dadaia-workflow catalog (WS-8 / ADR-E): /api/dadaia-workflows/<name> before list
+    (
+        r"^/api/dadaia-workflows/(?P<workflow_name>[^/]+)$",
+        "api_dadaia_workflow_detail",
+        AuthClass.BEARER,
+    ),
+    (r"^/api/dadaia-workflows$", "api_dadaia_workflows", AuthClass.BEARER),
     # BEARER_TELEMETRY routes (require active telemetry service)
     (
         r"^/api/agents/(?P<agent_id>[^/]+)/sessions$",
@@ -389,6 +396,8 @@ def make_handler_class(
         "api_reports",
         "api_workflows",
         "api_workflow_detail",
+        "api_dadaia_workflows",
+        "api_dadaia_workflow_detail",
         "api_sessions",
         "api_session_detail",
     )

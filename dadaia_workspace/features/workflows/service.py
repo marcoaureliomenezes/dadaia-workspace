@@ -11,7 +11,10 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dadaia_workspace.features.workflows.dadaia_catalog import DadaiaWorkflowDTO
 
 from dadaia_workspace.core.models.workflow import (
     WorkflowSummaryDTO as WorkflowSummaryDTO,  # re-export
@@ -179,6 +182,29 @@ class WorkflowsService:
                 )
             )
         return summaries
+
+    # -- dadaia-workflow catalog (WS-8 / ADR-E) --------------------------
+    #
+    # The methods below describe the *real* Python-owned dadaia-workflows
+    # (release_definition, implementation, deferred) — purpose, per-step
+    # harness/model options, availability, and a server-rendered SVG + Mermaid
+    # diagram — for the panel catalog. They are wholly additive: the legacy
+    # ``*.workflow.md`` accessors above (``list_summaries`` / ``get_detail``)
+    # are untouched. The catalog is pure data assembly over the authoritative
+    # workflow definitions, so it needs neither the markdown store nor a
+    # workspace-root resolution.
+
+    def list_dadaia_workflows(self) -> list["DadaiaWorkflowDTO"]:
+        """Return every dadaia-workflow, fully described, in catalog order."""
+        from dadaia_workspace.features.workflows.dadaia_catalog import list_dadaia_workflows
+
+        return list_dadaia_workflows()
+
+    def get_dadaia_workflow(self, name: str) -> "DadaiaWorkflowDTO | None":
+        """Return one fully-described dadaia-workflow by name, or ``None``."""
+        from dadaia_workspace.features.workflows.dadaia_catalog import get_dadaia_workflow
+
+        return get_dadaia_workflow(name)
 
     def get_detail(self, name: str) -> "WorkflowDetailDTO | None":
         result = self._ensure_store()

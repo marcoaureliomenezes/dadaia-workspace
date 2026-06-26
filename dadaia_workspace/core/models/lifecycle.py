@@ -201,6 +201,76 @@ class GateRequirement:
 
 
 @dataclass(frozen=True)
+class InjectedContext:
+    """Auditable record of the prompt composition injected into one workflow step.
+
+    Records which fragment ids were assembled and which dynamic-context refs
+    (file paths, atom slugs, handoff ids) the context selector (WS-4) resolved for
+    a step, plus the ``max_context_policy`` that bounded each resolution. This makes
+    context selection auditable per epic §8.8 — every run records which fragments and
+    which dynamic files were injected.
+
+    The WS-9 prompt-observability fields complete the per-step composition record so a
+    run's prompt is fully queryable without re-running it:
+
+    - ``prefix_hash`` — sha256 of the cacheable :class:`PromptPrefix` reused across
+      steps (byte-identity is the cacheability invariant);
+    - ``model`` — the discrete model id selected for the step (LAW 2);
+    - ``runtime_kind`` — the Layer-2 harness the step ran on (pi/codex/fake);
+    - ``output_schema`` — the fragment's declared output contract; and
+    - ``gate_result`` — the Python gate verdict for the step (``APPROVED`` /
+      ``REJECTED``), or ``None`` for a non-gated step.
+
+    The five WS-9 fields default to ``None`` so the WS-4 context-audit seam
+    (``to_injected_context``) and existing run records remain valid; the workflow
+    enriches the entry with them once the step's gate has run.
+    """
+
+    step: str
+    fragment_ids: tuple[str, ...] = ()
+    refs: tuple[str, ...] = ()
+    policies: tuple[str, ...] = ()
+    prefix_hash: str | None = None
+    model: str | None = None
+    runtime_kind: str | None = None
+    output_schema: str | None = None
+    gate_result: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "step": self.step,
+            "fragment_ids": list(self.fragment_ids),
+            "refs": list(self.refs),
+            "policies": list(self.policies),
+            "prefix_hash": self.prefix_hash,
+            "model": self.model,
+            "runtime_kind": self.runtime_kind,
+            "output_schema": self.output_schema,
+            "gate_result": self.gate_result,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> InjectedContext:
+        fragment_ids = data.get("fragment_ids", [])
+        refs = data.get("refs", [])
+        policies = data.get("policies", [])
+        assert isinstance(fragment_ids, list)
+        assert isinstance(refs, list)
+        assert isinstance(policies, list)
+        return cls(
+            step=str(data["step"]),
+            fragment_ids=tuple(str(item) for item in fragment_ids),
+            refs=tuple(str(item) for item in refs),
+            policies=tuple(str(item) for item in policies),
+            prefix_hash=_optional_str(data.get("prefix_hash")),
+            model=_optional_str(data.get("model")),
+            runtime_kind=_optional_str(data.get("runtime_kind")),
+            output_schema=_optional_str(data.get("output_schema")),
+            gate_result=_optional_str(data.get("gate_result")),
+        )
+
+
+@dataclass(frozen=True)
 class LifecycleRun:
     run_id: str
     context: str
@@ -212,6 +282,18 @@ class LifecycleRun:
     expected_artifacts: tuple[str, ...] = ()
     idempotency_key: str | None = None
     blocked: BlockedState | None = None
+    injected_context: tuple[InjectedContext, ...] = ()
+
+    def prompt_composition(self) -> tuple[dict[str, Any], ...]:
+        """Return the per-step prompt composition for this run (WS-9 observability).
+
+        A minimal, queryable projection of each step's ``InjectedContext`` — the
+        fragment ids, dynamic-context refs, prefix hash, discrete model, runtime kind,
+        output schema, and gate result. This is the deferred-panel-view stand-in: the
+        fields are persisted and surfaced as plain data so a report/panel view can read
+        them without re-running the workflow.
+        """
+        return tuple(entry.to_dict() for entry in self.injected_context)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -225,6 +307,7 @@ class LifecycleRun:
             "expected_artifacts": list(self.expected_artifacts),
             "idempotency_key": self.idempotency_key,
             "blocked": self.blocked.to_dict() if self.blocked else None,
+            "injected_context": [entry.to_dict() for entry in self.injected_context],
         }
 
     @classmethod
@@ -233,6 +316,12 @@ class LifecycleRun:
         assert isinstance(artifacts_raw, list)
         blocked_raw = data.get("blocked")
         assert blocked_raw is None or isinstance(blocked_raw, dict)
+        injected_raw = data.get("injected_context", [])
+        assert isinstance(injected_raw, list)
+        injected: list[InjectedContext] = []
+        for entry in injected_raw:
+            assert isinstance(entry, dict)
+            injected.append(InjectedContext.from_dict(entry))
         return cls(
             run_id=str(data["run_id"]),
             context=str(data["context"]),
@@ -244,6 +333,7 @@ class LifecycleRun:
             expected_artifacts=tuple(str(item) for item in artifacts_raw),
             idempotency_key=_optional_str(data.get("idempotency_key")),
             blocked=BlockedState.from_dict(blocked_raw) if blocked_raw else None,
+            injected_context=tuple(injected),
         )
 
 

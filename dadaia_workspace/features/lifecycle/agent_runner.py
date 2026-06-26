@@ -12,16 +12,92 @@ from dadaia_workspace.core.models.lifecycle import (
     GateEvidence,
     GateRequirement,
     GateVerdict,
+    InjectedContext,
     LifecyclePhase,
     LifecycleRun,
 )
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.scope_match import out_of_scope_paths
+from dadaia_workspace.features.lifecycle.context_selector import SelectionAudit
 from dadaia_workspace.features.lifecycle.state_machine import (
     LifecycleStateMachine,
     TransitionDecision,
     TransitionInput,
 )
+
+
+def record_injected_context(
+    lifecycle_run: LifecycleRun,
+    audit: SelectionAudit,
+) -> LifecycleRun:
+    """Append a context-selection audit entry to the run record.
+
+    Returns a new :class:`LifecycleRun` whose ``injected_context`` carries the
+    fragment ids and resolved dynamic-context refs that were injected for a step,
+    making context selection auditable (epic §8.8). The run record is the persisted
+    audit seam — callers persist the returned run via the lifecycle run store.
+    """
+    entry = audit.to_injected_context()
+    return replace_injected_context(lifecycle_run, (*lifecycle_run.injected_context, entry))
+
+
+def record_prompt_composition(
+    lifecycle_run: LifecycleRun,
+    step: str,
+    *,
+    prefix_hash: str | None,
+    model: str | None,
+    runtime_kind: str | None,
+    output_schema: str | None,
+    gate_result: str | None,
+) -> LifecycleRun:
+    """Enrich the run's *step* audit entry with WS-9 prompt-composition fields.
+
+    The WS-4 seam (:func:`record_injected_context`) records fragment ids + resolved
+    refs before the worker runs; this completes the same entry once the step's prompt
+    is built and its gate has decided, persisting the prefix hash, discrete model,
+    runtime kind, output schema, and gate verdict. It updates the existing entry for
+    *step* (the most recent one) in place rather than appending a duplicate, so the run
+    record carries exactly one composition record per step.
+    """
+    entries = list(lifecycle_run.injected_context)
+    target = next((i for i in reversed(range(len(entries))) if entries[i].step == step), None)
+    enriched = InjectedContext(
+        step=step,
+        fragment_ids=entries[target].fragment_ids if target is not None else (),
+        refs=entries[target].refs if target is not None else (),
+        policies=entries[target].policies if target is not None else (),
+        prefix_hash=prefix_hash,
+        model=model,
+        runtime_kind=runtime_kind,
+        output_schema=output_schema,
+        gate_result=gate_result,
+    )
+    if target is None:
+        entries.append(enriched)
+    else:
+        entries[target] = enriched
+    return replace_injected_context(lifecycle_run, tuple(entries))
+
+
+def replace_injected_context(
+    lifecycle_run: LifecycleRun,
+    entries: tuple[InjectedContext, ...],
+) -> LifecycleRun:
+    """Return a copy of *lifecycle_run* with its ``injected_context`` replaced."""
+    return LifecycleRun(
+        run_id=lifecycle_run.run_id,
+        context=lifecycle_run.context,
+        release_id=lifecycle_run.release_id,
+        command=lifecycle_run.command,
+        phase=lifecycle_run.phase,
+        status=lifecycle_run.status,
+        current_step=lifecycle_run.current_step,
+        expected_artifacts=lifecycle_run.expected_artifacts,
+        idempotency_key=lifecycle_run.idempotency_key,
+        blocked=lifecycle_run.blocked,
+        injected_context=entries,
+    )
 
 
 @dataclass(frozen=True)
@@ -46,6 +122,22 @@ class LifecycleAgentRunner:
     ) -> None:
         self._runtime = runtime
         self._state_machine = state_machine or LifecycleStateMachine()
+
+    def evaluate_gate(
+        self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
+    ) -> BlockedState | None:
+        """Run the request and return the gate's :class:`BlockedState`, or ``None`` if it passes.
+
+        This is the gate decision *without* a phase transition — used by multi-step
+        workflows (WS-5) where several bounded worker steps run inside one phase before
+        a single terminal step transitions the release. ``None`` means the worker
+        returned an APPROVED verdict with in-scope artifact evidence (the gate passed);
+        a non-``None`` :class:`BlockedState` carries the rejection/missing-evidence
+        reason. The pass/block logic is the same as :meth:`run` so reviews gate
+        identically whether or not a transition follows.
+        """
+        result = self._runtime.run(data.request)
+        return self._blocked_result(lifecycle_run, data, result)
 
     def run(self, lifecycle_run: LifecycleRun, data: AgentRunnerInput) -> TransitionDecision:
         result = self._runtime.run(data.request)

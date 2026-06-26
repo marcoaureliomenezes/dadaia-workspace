@@ -136,7 +136,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   metadata rejected; the dual-parser cross-extraction test asserts identical verdicts from
   both adapters; the secondary denylist lint fails on a forbidden token; `public doctor` exit
   0; tests green.
-- `[ ]`
+- `[x]`
 
 ### T-24-08 — Dynamic context selector + max-context policies + run-record audit (WS-4)
 - **Owner:** software-engineer
@@ -151,7 +151,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   `previous-handoff-only`; record selected fragments + dynamic files in the run record.
 - **Done when:** each implemented selector + policy unit-tested; run record lists injected
   refs; `pytest` green.
-- `[ ]`
+- `[x]`
 
 ### T-24-09 — Release-definition workflow body on fragments + gates (WS-5)
 - **Owner:** software-engineer
@@ -165,7 +165,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   write SPEC/PLAN/TASKS only in-phase + in-write-set.
 - **Done when:** the verb runs the fragment-driven sequence (no generic "Run the step" suffix
   for release-definition).
-- `[ ]`
+- `[x]`
 
 ### T-24-10 — Release-definition workflow e2e (FAKE) + adjacent-harness seam (WS-5)
 - **Owner:** software-engineer
@@ -176,7 +176,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   blocks advancement; assert the adjacent-step different-harness seam (FAKE proves the seam).
 - **Done when:** e2e asserts terminal commit gate + scoped prompt + blocked-on-rejection +
   seam; CI green.
-- `[ ]`
+- `[x]`
 
 ### T-24-11 — Fragment suffix for implementation + one review step; scaffold deferred workflows (WS-6)
 - **Owner:** software-engineer
@@ -189,7 +189,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   that raise `NotImplementedError("deferred to follow-up release")`.
 - **Done when:** the two pipeline steps emit fragment-sourced prompts; the deferred workflows
   fail loud when invoked (asserted); `pytest` green.
-- `[ ]`
+- `[x]`
 
 ### T-24-12 — Panel workflow catalog: purpose + per-step harness/model + availability + mermaid (WS-8)
 - **Owner:** software-engineer
@@ -204,7 +204,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   workflow source; render in the catalog view; `/api/workflows/<name>` returns the new fields.
 - **Done when:** new fields additive (old shape + `diagram_svg` intact); deferred workflow
   shown unavailable; release-definition fully described; tests green.
-- `[ ]`
+- `[x]`
 
 ### T-24-13 — Prompt observability: run-record fields + view + prefix byte-identity (WS-9)
 - **Owner:** software-engineer
@@ -218,7 +218,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   default.
 - **Done when:** run record carries prompt composition; prefix byte-identity asserted; tests
   green.
-- `[ ]`
+- `[x]`
 
 ---
 
