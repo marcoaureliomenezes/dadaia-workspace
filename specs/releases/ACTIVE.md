@@ -1,9 +1,10 @@
 ---
-release: v0.1.25
-phase: CLOSURE
-segment: alpha-1
+release: none
+phase: none
+segment: none
 ---
 
-Active release: v0.1.25 — Backlog-consistency foundation (R1 of FEAT-BACKLOG-DEFINITION-WORKFLOW-01):
-`intents[]` schema + canonical-subject registry + deterministic conflict classifier +
-`backlog doctor` (BL-DUP/CONFLICT/STALE) wired into pre-commit/CI + backfill of survivors.
+No active release. v0.1.25 (R1 — backlog-consistency foundation: typed intents +
+canonical-subject registry + conflict classifier + `backlog doctor` BL-* at pre-commit/CI)
+was closed and archived to `specs/_archive/releases/v0.1.25/` on 2026-06-26. Next: R2
+(`backlog_definition` workflow body + removal-on-release hook), then workflow-model-governance.
