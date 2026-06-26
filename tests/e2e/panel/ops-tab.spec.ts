@@ -41,7 +41,7 @@ test('OPS-01 — Agentic tab present; individual Agents/Workflows/Kanban tabs ar
 // ---------------------------------------------------------------------------
 // OPS-02 — Clicking Ops activates section-ops; sub-sections are visible
 // ---------------------------------------------------------------------------
-test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, and Kanban sub-sections', async ({ page }) => {
+test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, dadaia-workflows, and Kanban sub-sections', async ({ page }) => {
   await gotoPanel(page);
   await activateTab(page, 'ops');
 
@@ -51,9 +51,10 @@ test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, and 
   );
   expect(sectionActive).toBe(true);
 
-  // All three sub-sections must exist inside section-ops
+  // All sub-sections must exist inside section-ops
   await expect(page.locator('#section-ops #ops-subsection-agents')).toBeAttached();
   await expect(page.locator('#section-ops #ops-subsection-workflows')).toBeAttached();
+  await expect(page.locator('#section-ops #ops-subsection-dadaia-workflows')).toBeAttached();
   await expect(page.locator('#section-ops #ops-subsection-kanban')).toBeAttached();
 
   // Agents grid must be in the DOM
@@ -63,15 +64,17 @@ test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, and 
   // Kanban board must be in the DOM
   await expect(page.locator('#kanban-board')).toBeAttached();
 
-  // Subsection order: Agents (top) → Workflows → Kanban (bottom) — Agentic tab
-  // restructure (operator live-review round 2, ab859c7) supersedes T-016-P11.
+  // Subsection order: Agents (top) → Workflows → dadaia-workflows → Kanban
+  // (bottom). The dadaia-workflows catalog (WS-8 / ADR-E) was inserted between
+  // Workflows and Kanban in v0.1.24; this assertion tracks the current layout.
   const subsectionIds = await page.$$eval(
     '#section-ops .ops-subsection',
     (els) => els.map((el) => el.id)
   );
   expect(subsectionIds[0]).toBe('ops-subsection-agents');
   expect(subsectionIds[1]).toBe('ops-subsection-workflows');
-  expect(subsectionIds[2]).toBe('ops-subsection-kanban');
+  expect(subsectionIds[2]).toBe('ops-subsection-dadaia-workflows');
+  expect(subsectionIds[3]).toBe('ops-subsection-kanban');
 });
 
 // ---------------------------------------------------------------------------

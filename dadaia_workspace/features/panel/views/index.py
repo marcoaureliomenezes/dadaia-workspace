@@ -186,28 +186,14 @@ def render_index(
   <script src="/static/reports.js"></script>
   <script src="/static/kanban.js"></script>
   <!--
-    Mermaid hydration for the dadaia-workflow catalog (WS-8 / ADR-E).
-    The step-sequence diagrams are emitted server-side as <pre class="mermaid">
-    blocks; this lazily imports mermaid from CDN and renders them. It degrades
-    gracefully offline: the panel is loopback, and every workflow ALSO carries a
-    server-rendered SVG DAG (.dadaia-wf-diagram-svg) that needs no network — so an
-    offline operator still sees a full diagram per workflow even if the CDN import
-    fails (the catch is a silent no-op).
+    The dadaia-workflow catalog renders each step-sequence diagram as a
+    server-rendered SVG DAG (.dadaia-wf-diagram-svg) plus the raw mermaid source
+    in a <pre class="mermaid"> block (same convention as memory atoms). No
+    client-side mermaid hydration is attempted: the panel is loopback with a
+    strict CSP whose script-src is 'self' + hashed inline snippets only — it does
+    not allow an external CDN origin, so a CDN mermaid import can never execute.
+    The server-rendered SVG is the canonical, offline diagram.
   -->
-  <script type="module">
-    (async function () {{
-      var blocks = document.querySelectorAll('.dadaia-wf-diagram-mermaid pre.mermaid');
-      if (!blocks.length) return;
-      try {{
-        var m = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
-        var mermaid = m.default;
-        mermaid.initialize({{ startOnLoad: false, securityLevel: 'strict' }});
-        await mermaid.run({{ querySelector: '.dadaia-wf-diagram-mermaid pre.mermaid' }});
-      }} catch (e) {{
-        /* offline / CDN blocked: server-rendered SVG DAG remains visible. */
-      }}
-    }})();
-  </script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
