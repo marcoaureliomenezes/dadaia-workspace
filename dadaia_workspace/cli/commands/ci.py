@@ -131,6 +131,49 @@ def pre_commit_check() -> None:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
+    # Backlog-consistency backstop (v0.1.25 R1, ADR-D): a hand-written divergent twin (and
+    # planted BL-SCHEMA/DUP/CONFLICT/STALE violations) is rejected at the commit boundary even
+    # though specs/backlog/ is gitignored + ADDITIVE. Runs over the committing repo's specs/.
+    _run_backlog_doctor_gate(repo_root)
+
+
+def _run_backlog_doctor_gate(repo_root: Path) -> None:
+    """Run BL-* over ``<repo_root>/specs`` at the pre-commit chokepoint (v0.1.25 R1).
+
+    A no-op when the repo has no ``specs/backlog/`` (not an SDD spec context). Any ERROR
+    finding blocks the commit with an actionable per-finding listing.
+    """
+    specs_dir = repo_root / "specs"
+    if not (specs_dir / "backlog").is_dir():
+        return
+    from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
+
+    # Code refs in committed intents are REPO-ROOT-relative (e.g.
+    # ``dadaia_workspace/core/models/lifecycle.py#Sym``), so the registry's source root is the
+    # repo root — anchors are derived as ``<repo-relative-path>#symbol`` matching the refs.
+    source_root = repo_root
+    workspace = _resolve_workspace_root(repo_root)
+    alias_map_path = workspace / ".dadaia" / "states" / "backlog_subject_aliases.txt"
+
+    findings = run_backlog_doctor(
+        specs_dir=specs_dir,
+        source_root=source_root,
+        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
+        alias_map_path=alias_map_path,
+        archive_root=specs_dir / "_archive",
+    )
+    errors = [f for f in findings if f.severity is Severity.ERROR]
+    if errors:
+        typer.secho(
+            f"[pre-commit] BLOCKED: backlog doctor found {len(errors)} error(s):",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        for finding in errors:
+            slug = f" [{finding.slug}]" if finding.slug else ""
+            typer.echo(f"  {finding.code.value}{slug} {finding.message}", err=True)
+        raise typer.Exit(1)
+
 
 @app.command("push-gate-check")
 def push_gate_check() -> None:

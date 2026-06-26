@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Pre-commit lease gate — dadaia-workspace v0.1.14 (FR-W1-01, T-014-14).
+# Pre-commit lease gate + backlog-consistency gate — dadaia-workspace (FR-W1-01; v0.1.25 R1).
 #
 # Blocks a `git commit` into a Spec Context repo when the committing session does NOT
 # hold that context's MUTATING lease. The holder's own commits flow; a commit while no
 # live lease exists flows (ADDITIVE work commits freely — zero-false-block); a live
 # FOREIGN holder is blocked with an actionable message. The gate consults the lease ONLY
 # — never a review verdict (commits are never review-blocked; that is the push gate).
+#
+# v0.1.25 R1: the same `dadaia ci pre-commit-check` backend ALSO runs `backlog doctor`
+# (BL-SCHEMA/DUP/CONFLICT/STALE) over the committing repo's specs/, so a hand-written
+# divergent twin is rejected at the commit boundary even though specs/backlog/ is
+# gitignored + ADDITIVE (ADR-D). No extra hook invocation is needed — the backend chains it.
 #
 # This is the harness-independent chokepoint: it fires in every runtime (Claude Code,
 # Codex interactive, `codex exec` headless, PI, plain git) because it is a git hook,

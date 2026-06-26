@@ -364,6 +364,24 @@ jobs:
       - name: Fail if projection or runtime files are git-tracked
         run: bash .github/scripts/check_no_repo_local_claude.sh
 
+  backlog-doctor:
+    name: Backlog consistency (BL-SCHEMA/DUP/CONFLICT/STALE)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: pip install -e .
+      # Runs backlog doctor over the checked-out tree (v0.1.25 R1, ADR-D). A clean backlog
+      # exits 0; a planted BL-SCHEMA/DUP/CONFLICT/STALE violation fails the job. specs/backlog/
+      # is gitignored in this source repo, so the check runs over whatever survivors are
+      # tracked — an empty backlog is trivially clean.
+      - name: dadaia backlog doctor
+        run: dadaia backlog doctor --specs-dir specs --source-root .
+
   hotfix-branch-name:
     name: Hotfix branch SemVer (PATCH>=1)
     runs-on: ubuntu-latest

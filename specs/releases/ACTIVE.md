@@ -1,9 +1,9 @@
 ---
-release: none
-phase: none
-segment: none
+release: v0.1.25
+phase: IMPLEMENTATION
+segment: alpha-1
 ---
 
-No active release. v0.1.24 (two-layer redesign: OpenCode removal + dadaia-workflows
-fragment engine + discrete pi/codex model catalog) was closed and archived to
-`specs/_archive/releases/v0.1.24/` on 2026-06-26.
+Active release: v0.1.25 — Backlog-consistency foundation (R1 of FEAT-BACKLOG-DEFINITION-WORKFLOW-01):
+`intents[]` schema + canonical-subject registry + deterministic conflict classifier +
+`backlog doctor` (BL-DUP/CONFLICT/STALE) wired into pre-commit/CI + backfill of survivors.
