@@ -1,5 +1,5 @@
 ---
-release: v0.1.23
+release: v0.1.24
 phase: IMPLEMENTATION
 segment: alpha-1
 ---

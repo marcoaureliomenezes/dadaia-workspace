@@ -4,6 +4,19 @@
 **Release ID:** v0.1.23
 **Owner:** product-engineer
 **Opened:** 2026-06-25
+**superseded_by:** v0.1.24
+
+> **SUPERSEDED by v0.1.24 (2026-06-26).** After this release was defined and its
+> implementer work landed (T-23-01..12 `[x]`), the operator redesigned the harness model:
+> Layer-2 workers become **pi/codex only** and **OpenCode is deleted entirely**. v0.1.23's
+> open human gate (T-23-13/14/15: live-validation, CLOSURE, deploy) was never confirmed and
+> this release was **never deployed**. v0.1.24 branches off `feature/v0.1.23`, **keeps the
+> surviving parts** (RPC-drop ADR-23-1, Codex Ring-2 git-diff parity T-23-05, the
+> IMPLEMENTATION→CLOSURE + backtrack pipeline e2e T-23-02/03, the Claude SDK binding
+> T-23-09..11 as Layer-1/SDK code), and **reverses the OpenCode work** (deletes the
+> `OpenCodeAdapter` from T-23-06..08 and the opencode parity test T-23-04) plus removes
+> `claude` from the Layer-2 `--harness` choices. Do NOT close or deploy v0.1.23
+> independently — v0.1.24 is the shipping release and carries its acceptance forward.
 
 ---
 
