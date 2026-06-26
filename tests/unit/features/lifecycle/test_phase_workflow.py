@@ -97,3 +97,65 @@ def test_phase_workflow_blocks_when_factory_fake_gives_no_verdict() -> None:
     assert "APPROVED verdict" in result.blocked.reason
     # Even a blocked run is persisted for resume/audit.
     assert "run-qa-2" in store.saved
+
+
+def test_phase_workflow_persists_policy_snapshot_and_threads_resolved_model() -> None:
+    # T-28-A-07: a single-step run persists the workflow_policy snapshot, and the resolved
+    # model on the scope reaches the worker's request.
+    import dataclasses
+
+    from dadaia_workspace.core.models.workflow_execution import (
+        PolicySource,
+        ResolvedModelConfig,
+        WorkflowPolicySnapshot,
+        WorkflowPolicyStepEntry,
+    )
+
+    approved = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="ok",
+        artifact_refs=(".dadaia/handoff/dadaia-workspace/qa.handoff.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+    runtime = FakeAgentRuntime(result=approved)
+    store = _MemoryRunStore()
+    workflow = LifecyclePhaseWorkflow(runtime=runtime, run_store=store)
+
+    resolved = ResolvedModelConfig(
+        profile_id="codex-review-deep",
+        harness="codex",
+        model="gpt-5.5",
+        reasoning="high",
+        source=PolicySource.CLI,
+    )
+    snapshot = WorkflowPolicySnapshot(
+        workflow_id="implementation",
+        policy_id="default",
+        resolved_at="2026-06-26T12:00:00Z",
+        steps=(
+            WorkflowPolicyStepEntry(
+                step="review_qa",
+                harness="codex",
+                model_profile="codex-review-deep",
+                model="gpt-5.5",
+                reasoning="high",
+                source=PolicySource.CLI,
+            ),
+        ),
+    )
+
+    workflow.run(
+        run_id="run-qa-policy",
+        command="review-qa",
+        from_phase=LifecyclePhase.IMPLEMENTATION,
+        target_phase=LifecyclePhase.QA_REVIEW,
+        scope=dataclasses.replace(_scope(), resolved_model=resolved),
+        policy_snapshot=snapshot,
+    )
+
+    # snapshot persisted on the run (survives the transition via dataclasses.replace)
+    persisted = store.saved["run-qa-policy"]
+    assert persisted.workflow_policy is not None
+    assert persisted.workflow_policy.step("review_qa") is not None
+    # resolved model threaded into the worker request
+    assert runtime.received_models[0] == resolved

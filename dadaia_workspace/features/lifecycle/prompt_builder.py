@@ -12,6 +12,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     GateEvidenceKind,
 )
+from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
 
 
 class PromptScopeError(ValueError):
@@ -110,6 +111,10 @@ class PromptScope:
     expected_schema: str = "agent-run-result-v1"
     required_evidence: tuple[GateEvidenceKind, ...] = ()
     model_profile: str | None = None
+    # The governance-resolved concrete model for this step (T-28-A-07). When present it is
+    # threaded into the request so the adapter runs the policy-selected model (M2). Kept
+    # additive-optional: ``model_profile`` stays for back-compat / observability.
+    resolved_model: ResolvedModelConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -147,6 +152,7 @@ class LifecyclePromptBuilder:
             forbidden_paths=scope.forbidden_paths,
             expected_schema=scope.expected_schema,
             required_evidence=scope.required_evidence,
+            resolved_model=scope.resolved_model,
         )
         prompt_text = self._prompt_text(scope)
         if prefix is not None:

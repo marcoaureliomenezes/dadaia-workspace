@@ -21,6 +21,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
     LifecycleRunStatus,
 )
+from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.lifecycle.agent_runner import (
@@ -71,8 +72,13 @@ class LifecyclePhaseWorkflow:
         scope: PromptScope,
         requirements: tuple[GateRequirement, ...] = (),
         current_step: str | None = None,
+        policy_snapshot: WorkflowPolicySnapshot | None = None,
     ) -> PhaseWorkflowResult:
         step = current_step or target_phase.value
+        # The resolved governance snapshot (T-28-A-07 / LAW 7) is frozen onto the run before
+        # the worker call; the resolved per-step model reaches the adapter via the scope's
+        # ``resolved_model``. ``dataclasses.replace`` in the runner/state-machine preserves
+        # the snapshot through the transition.
         run = LifecycleRun(
             run_id=run_id,
             context=scope.context,
@@ -82,6 +88,7 @@ class LifecyclePhaseWorkflow:
             status=LifecycleRunStatus.RUNNING,
             current_step=step,
             idempotency_key=run_id,
+            workflow_policy=policy_snapshot,
         )
         self._run_store.save(run)
 

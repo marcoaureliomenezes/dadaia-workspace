@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -84,20 +84,14 @@ def replace_injected_context(
     lifecycle_run: LifecycleRun,
     entries: tuple[InjectedContext, ...],
 ) -> LifecycleRun:
-    """Return a copy of *lifecycle_run* with its ``injected_context`` replaced."""
-    return LifecycleRun(
-        run_id=lifecycle_run.run_id,
-        context=lifecycle_run.context,
-        release_id=lifecycle_run.release_id,
-        command=lifecycle_run.command,
-        phase=lifecycle_run.phase,
-        status=lifecycle_run.status,
-        current_step=lifecycle_run.current_step,
-        expected_artifacts=lifecycle_run.expected_artifacts,
-        idempotency_key=lifecycle_run.idempotency_key,
-        blocked=lifecycle_run.blocked,
-        injected_context=entries,
-    )
+    """Return a copy of *lifecycle_run* with its ``injected_context`` replaced.
+
+    Uses ``dataclasses.replace`` so every other field — including the additive
+    ``workflow_policy`` governance snapshot (T-28-A-07) — is preserved verbatim. A manual
+    reconstruction here previously dropped any new field, which would silently erase the
+    run's resolved-policy snapshot.
+    """
+    return replace(lifecycle_run, injected_context=entries)
 
 
 @dataclass(frozen=True)

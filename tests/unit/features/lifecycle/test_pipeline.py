@@ -321,3 +321,64 @@ def test_deferred_workflows_are_discoverable() -> None:
     )
     for name in workflows.DEFERRED_WORKFLOWS:
         assert callable(getattr(workflows, name))
+
+
+# ---------------------------------------------------------------------------
+# T-28-A-07 — pipeline threads resolved policy + persists the snapshot before step 1
+# ---------------------------------------------------------------------------
+
+
+class _PolicyRecordingFake:
+    def __init__(self, kind: AgentRuntimeKind) -> None:
+        self.kind = kind
+        self.requests: list[AgentRunRequest] = []
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return self.kind
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        self.requests.append(request)
+        return _approved()
+
+
+def _snapshot_for_implementation() -> object:
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+        library_workflow_catalog,
+    )
+
+    resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
+    return resolver.resolve("implementation", context="default")
+
+
+def test_pipeline_threads_resolved_model_and_persists_snapshot() -> None:
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    store = _MemoryRunStore()
+    recorder = _PolicyRecordingFake(AgentRuntimeKind.FAKE)
+    snapshot = _snapshot_for_implementation()
+
+    pipe = LifecyclePipeline(
+        context="dadaia-workspace",
+        release_id="v0.1.28",
+        run_store=store,
+        runtime_factory=lambda kind: recorder,  # type: ignore[arg-type, return-value]
+        policy_snapshot=snapshot,  # type: ignore[arg-type]
+    )
+    base = implementation_ladder(AgentRuntimeKind.FAKE)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    result = pipe.run("run-policy", steps)
+
+    assert result.completed is True
+    # Each request carried the resolved concrete model from the snapshot.
+    impl_req = recorder.requests[0]
+    assert impl_req.resolved_model is not None
+    assert impl_req.resolved_model.profile_id == "codex-implementation-standard"
+    qa_req = recorder.requests[1]
+    assert qa_req.resolved_model is not None
+    assert qa_req.resolved_model.profile_id == "codex-review-deep"
+    # The persisted run carries the resolved-policy snapshot (LAW 6).
+    persisted = store.saved["run-policy"]
+    assert persisted.workflow_policy is not None
+    assert persisted.workflow_policy.workflow_id == "implementation"
+    assert persisted.workflow_policy.step("implement") is not None

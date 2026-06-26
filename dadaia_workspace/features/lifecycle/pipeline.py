@@ -28,6 +28,10 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
     LifecycleRunStatus,
 )
+from dadaia_workspace.core.models.workflow_execution import (
+    ResolvedModelConfig,
+    WorkflowPolicySnapshot,
+)
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.lifecycle.agent_runner import (
@@ -78,6 +82,9 @@ class PipelineStep:
     model_profile: str | None = None
     fragment_id: str | None = None
     shared_fragment_ids: tuple[str, ...] = ()
+    # The governance-resolved concrete model for this step (T-28-A-07). Threaded into the
+    # step's scope/request so the adapter runs the policy-selected model. Additive-optional.
+    resolved_model: ResolvedModelConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -113,6 +120,7 @@ class LifecyclePipeline:
         state_machine: LifecycleStateMachine | None = None,
         fragment_loader: FragmentLoader | None = None,
         context_selector: ContextSelector | None = None,
+        policy_snapshot: WorkflowPolicySnapshot | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -121,6 +129,12 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # The resolved governance snapshot (T-28-A-07 / LAW 7). When present it is frozen
+        # onto the run BEFORE the first step; an overlay mutated after start cannot change
+        # the in-flight run because the run carries this immutable snapshot, not the live
+        # overlay. ``dataclasses.replace`` in the state machine + agent runner preserves it
+        # across every step transition.
+        self._policy_snapshot = policy_snapshot
         # A step that declares a ``fragment_id`` is assembled from the fragment library
         # (WS-6). The loader defaults to the packaged fragment root; the context selector
         # is optional — when absent, fragment steps still emit fragment-sourced prompts
@@ -141,6 +155,7 @@ class LifecyclePipeline:
             status=LifecycleRunStatus.RUNNING,
             current_step=steps[0].label,
             idempotency_key=run_id,
+            workflow_policy=self._policy_snapshot,
         )
         self._run_store.save(run)
 
@@ -204,6 +219,7 @@ class LifecyclePipeline:
             allowed_paths=(f".dadaia/handoff/{self._context}/**",),
             required_evidence=(GateEvidenceKind.HANDOFF,),
             model_profile=step.model_profile,
+            resolved_model=step.resolved_model,
         )
 
     def _generic_prompt(self, step: PipelineStep) -> str:
@@ -343,6 +359,37 @@ def implementation_ladder(
     )
 
 
+def apply_resolved_policy(
+    steps: tuple[PipelineStep, ...],
+    snapshot: WorkflowPolicySnapshot,
+) -> tuple[PipelineStep, ...]:
+    """Overlay a resolved policy snapshot's per-step model onto pipeline steps (T-28-A-07).
+
+    Matches each step to its snapshot entry by label and threads the resolved concrete
+    model into the step's ``resolved_model`` (and ``model_profile`` for observability). The
+    step's ``runtime_kind`` is left as the caller selected — the resolved model is the
+    governance choice; which harness adapter runs it is the CLI/container choice. A step
+    with no matching snapshot entry is returned unchanged.
+    """
+    from dataclasses import replace
+
+    out: list[PipelineStep] = []
+    for step in steps:
+        entry = snapshot.step(step.label)
+        if entry is None:
+            out.append(step)
+            continue
+        resolved = ResolvedModelConfig(
+            profile_id=entry.model_profile,
+            harness=entry.harness,
+            model=entry.model,
+            reasoning=entry.reasoning,
+            source=entry.source,
+        )
+        out.append(replace(step, resolved_model=resolved, model_profile=entry.model_profile))
+    return tuple(out)
+
+
 # Re-exported for callers assembling custom ladders.
 __all__ = [
     "LifecyclePipeline",
@@ -350,5 +397,6 @@ __all__ = [
     "PipelineStep",
     "PipelineStepResult",
     "RuntimeFactory",
+    "apply_resolved_policy",
     "implementation_ladder",
 ]
