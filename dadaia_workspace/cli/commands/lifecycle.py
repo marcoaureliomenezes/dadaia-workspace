@@ -1207,6 +1207,36 @@ def workflow_profiles_list(
         )
 
 
+@workflow_app.command("doctor")
+def workflow_doctor(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the workflow-model-policy governance doctor (WMP-* invariants, AC-10).
+
+    Checks the governed catalog + built-in profile registry + persisted overlay for:
+    workflow/step id uniqueness, default-profile resolution + harness match, fragment +
+    output-schema resolution, overlay override validity, and any ``claude``/``opencode``
+    Layer-2 residue. An invalid overlay state file is reported as an actionable error and
+    never crashes. Exit 1 if any ERROR finding is present.
+    """
+    from dadaia_workspace.features.lifecycle.policy_doctor import (
+        Severity,
+        run_policy_doctor,
+    )
+
+    workspace_root = resolve_workspace_root()
+    findings = run_policy_doctor(workspace_root=workspace_root)
+    if json_output:
+        _emit_json({"findings": [f.to_dict() for f in findings]})
+    else:
+        if not findings:
+            typer.echo("[ok] workflow-model-policy (no governance issues)")
+        for finding in findings:
+            typer.echo(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
+    if any(f.severity is Severity.ERROR for f in findings):
+        raise typer.Exit(LifecycleExitCode.INTERNAL_ERROR)
+
+
 workflow_app.add_typer(workflow_policy_app, name="policy")
 workflow_app.add_typer(workflow_profiles_app, name="profiles")
 

@@ -93,6 +93,58 @@ def test_workflow_policy_show_unknown_workflow_rejected(tmp_path: Path, monkeypa
 
 
 # ---------------------------------------------------------------------------
+# workflow doctor (T-28-D-02 — WMP-* governance invariants)
+# ---------------------------------------------------------------------------
+
+
+def test_workflow_doctor_clean_tree_passes(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    errors = [f for f in payload["findings"] if f["severity"] == "error"]
+    assert errors == [], errors
+
+
+def test_workflow_doctor_invalid_overlay_fails_actionably(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    overlay = workspace / ".dadaia" / "states" / "workflow_model_policy.json"
+    overlay.write_text("{ not valid json", encoding="utf-8")
+    result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
+    # Invalid state file is an ERROR → exit non-zero, but never a crash (clean JSON out).
+    assert result.exit_code != 0, result.output
+    payload = json.loads(result.output)
+    codes = {f["code"] for f in payload["findings"]}
+    assert "WMP-STATE" in codes
+
+
+def test_workflow_doctor_bad_overlay_override_fails(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    overlay = workspace / ".dadaia" / "states" / "workflow_model_policy.json"
+    overlay.write_text(
+        json.dumps(
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "default": {
+                        "workflows": {"implementation": {"steps": {"ghost": "codex-review-deep"}}}
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
+    assert result.exit_code != 0, result.output
+    payload = json.loads(result.output)
+    assert "WMP-OVERLAY" in {f["code"] for f in payload["findings"]}
+
+
+# ---------------------------------------------------------------------------
 # pipeline --step-model (D-3: profile ids only) + --show-policy
 # ---------------------------------------------------------------------------
 

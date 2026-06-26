@@ -188,7 +188,7 @@ Write set: `dadaia_workspace/features/panel/views/workflows.py`;
 Acceptance: inspector renders each model step's fragment ids + resolved body (via
 `FragmentLoader`), dynamic-context selectors, output schema; read-only (no fragment editing).
 
-### [-] T-28-D-02 — Doctor checks for the governance layer
+### [x] T-28-D-02 — Doctor checks for the governance layer
 Goal: keep the layer from rotting (AC-10).
 Write set: `dadaia_workspace/features/lifecycle/policy_doctor.py` (NEW or doctor extension);
 `dadaia_workspace/cli/commands/lifecycle.py` (doctor verb surface) and/or the public-doctor
