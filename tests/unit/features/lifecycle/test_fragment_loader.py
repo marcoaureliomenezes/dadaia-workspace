@@ -142,7 +142,7 @@ def test_load_fragment_unknown_id_raises() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Counts (5 shared, 8 release_definition, 6 deferred stub dirs).
+# Counts (5 shared, 8 release_definition; backlog_definition now ships 4 authored fragments).
 # ---------------------------------------------------------------------------
 
 

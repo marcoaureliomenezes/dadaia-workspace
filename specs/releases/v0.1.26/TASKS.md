@@ -112,7 +112,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
   (§3.7.4); `backlog_review_gate` blocks a dirty result (§3.7.5). Gate behaviours are
   **one parameterized** step-matrix test (§3.7.11). mypy/ruff clean.
 
-## [ ] T-26-06 — Feed the R1 classifier into `existing_backlog_review` (model downgrade seam)
+## [x] T-26-06 — Feed the R1 classifier into `existing_backlog_review` (model downgrade seam)
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/backlog_definition.py`
