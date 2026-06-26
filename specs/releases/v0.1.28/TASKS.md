@@ -170,7 +170,7 @@ Concrete model|Fragments|Gate) + default-vs-effective diff + run-snapshot eviden
 profile dropdown filtered by harness + reset + validate-before-save + save via mutation API;
 CSP hashes updated for any new inline script (AC-9, AC-13).
 
-### [ ] T-28-C-04 — Wave C green checkpoint (panel E2E)
+### [-] T-28-C-04 — Wave C green checkpoint (panel E2E)
 Write set: `tests/e2e/features/test_panel_workflow_policy_editor.py` (NEW) (+ tests only).
 Acceptance: E2E proves save / reset / default-vs-effective / invalid-policy-banner;
 `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`, panel E2E green.
