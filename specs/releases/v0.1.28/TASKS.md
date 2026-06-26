@@ -134,7 +134,7 @@ the single governed workflow source.
 
 ## Wave C — panel model-governance UX + mutation API
 
-### [-] T-28-C-01 — Panel GET routes: catalog, profiles, policy, runs
+### [x] T-28-C-01 — Panel GET routes: catalog, profiles, policy, runs
 Goal: read endpoints for the control plane.
 Write set: `dadaia_workspace/features/panel/handler.py`;
 `dadaia_workspace/features/panel/service.py`;

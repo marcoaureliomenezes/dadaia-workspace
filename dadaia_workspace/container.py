@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     )
     from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
         JsonWorkflowModelPolicyStore,
+        WorkflowModelPolicyOverlay,
     )
 
 from dadaia_workspace.core.exceptions import (
@@ -71,6 +72,15 @@ from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.kanban import render_api_kanban
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
+from dadaia_workspace.features.panel.views.workflow_policy import (
+    render_api_lifecycle_runs,
+    render_api_workflow_catalog,
+    render_api_workflow_catalog_detail,
+    render_api_workflow_model_policy,
+    render_api_workflow_model_profiles,
+    render_post_workflow_model_policy_validate,
+    render_put_workflow_model_policy,
+)
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reports_next.service import ReportsNextService
@@ -641,6 +651,7 @@ def build_workflow_policy_resolver(
     workspace_root: Path,
     *,
     context: str = "default",
+    overlay: "WorkflowModelPolicyOverlay | None" = None,
 ) -> "WorkflowExecutionPolicyResolver":
     """Compose the single shared :class:`WorkflowExecutionPolicyResolver` (T-28-A-08).
 
@@ -649,6 +660,11 @@ def build_workflow_policy_resolver(
     governed catalog. CLI and panel both consume *this* resolver so they never disagree on
     which model a step runs. ``context`` is reserved for future per-context overlays; only
     the ``default`` context is honored this release (D-2).
+
+    ``overlay`` lets a caller bind a **candidate** overlay (the panel validate/PUT path,
+    T-28-C-02) instead of the on-disk one — the validation resolve runs against the
+    candidate without persisting it. When ``overlay`` is ``None`` the on-disk overlay is
+    loaded (the normal execution path).
     """
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         WorkflowExecutionPolicyResolver,
@@ -656,10 +672,12 @@ def build_workflow_policy_resolver(
 
     _guard_initialized(workspace_root)
     _ = context  # reserved (D-2: only `default` honored); recorded for call-site clarity.
-    overlay = build_workflow_model_policy_store(workspace_root).load()
+    resolved_overlay = (
+        overlay if overlay is not None else build_workflow_model_policy_store(workspace_root).load()
+    )
     return WorkflowExecutionPolicyResolver(
         catalog=build_workflow_model_profile_registry(),
-        overlay=overlay,
+        overlay=resolved_overlay,
     )
 
 
@@ -1000,6 +1018,21 @@ def build_panel_views(
     academy = build_academy_service(workspace_root)
     workflows_service = build_workflow_catalog_service(workspace_root)
     service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
+
+    # Workflow model-governance control plane (Wave C). The panel reads the SAME governed
+    # catalog + built-in profiles + policy store + run snapshots the CLI uses, through the
+    # shared resolver — one source of truth, no second model table. The resolver +
+    # overlay types are TYPE_CHECKING-only imports (used in the closure's string
+    # annotations below).
+    wf_catalog = build_workflow_model_profile_registry()
+    policy_store = build_workflow_model_policy_store(workspace_root)
+    run_store = build_lifecycle_run_store(workspace_root)
+
+    def _resolver_factory(
+        context: str, *, overlay: "WorkflowModelPolicyOverlay | None" = None
+    ) -> "WorkflowExecutionPolicyResolver":
+        return build_workflow_policy_resolver(workspace_root, context=context, overlay=overlay)
+
     return {
         "index": render_index(service),
         "api_panel_status": render_api_servers(service),
@@ -1023,6 +1056,20 @@ def build_panel_views(
         "api_workflow_detail": render_api_workflow_detail(workflows_service),
         "api_dadaia_workflows": render_api_dadaia_workflows_list(workflows_service),
         "api_dadaia_workflow_detail": render_api_dadaia_workflow_detail(workflows_service),
+        # Workflow model-governance control plane (Wave C — T-28-C-01/02).
+        "api_workflow_catalog": render_api_workflow_catalog(wf_catalog, _resolver_factory),
+        "api_workflow_catalog_detail": render_api_workflow_catalog_detail(
+            wf_catalog, _resolver_factory
+        ),
+        "api_workflow_model_profiles": render_api_workflow_model_profiles(),
+        "api_workflow_model_policy": render_api_workflow_model_policy(policy_store),
+        "api_workflow_model_policy_validate": render_post_workflow_model_policy_validate(
+            policy_store, _resolver_factory
+        ),
+        "api_workflow_model_policy_put": render_put_workflow_model_policy(
+            policy_store, _resolver_factory
+        ),
+        "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),

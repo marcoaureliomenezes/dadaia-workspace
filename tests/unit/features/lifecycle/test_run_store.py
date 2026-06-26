@@ -131,6 +131,33 @@ def test_save_replaces_existing_run_state(tmp_path: Path) -> None:
     assert store.load("run-1") == replacement
 
 
+def test_list_runs_returns_empty_when_no_runs(tmp_path: Path) -> None:
+    store = JsonLifecycleRunStore(_workspace(tmp_path))
+    assert store.list_runs() == []
+
+
+def test_list_runs_returns_every_persisted_run(tmp_path: Path) -> None:
+    store = JsonLifecycleRunStore(_workspace(tmp_path))
+    store.save(_run("run-a"))
+    store.save(_run("run-b"))
+
+    runs = store.list_runs()
+
+    assert {r.run_id for r in runs} == {"run-a", "run-b"}
+
+
+def test_list_runs_skips_corrupt_files_without_raising(tmp_path: Path) -> None:
+    # A corrupt run JSON must not break the panel run-history listing — it is skipped.
+    store = JsonLifecycleRunStore(_workspace(tmp_path))
+    store.save(_run("run-ok"))
+    store.root.mkdir(parents=True, exist_ok=True)
+    (store.root / "run-bad.json").write_text("{not json", encoding="utf-8")
+
+    runs = store.list_runs()
+
+    assert [r.run_id for r in runs] == ["run-ok"]
+
+
 def test_missing_resume_raises_actionable_error(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     store = JsonLifecycleRunStore(workspace)

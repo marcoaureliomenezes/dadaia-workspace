@@ -33,3 +33,6 @@ class LifecycleRunStore(Protocol):
 
     def resume(self, run_id: str) -> LifecycleRun:
         """Return persisted run state for idempotent resume."""
+
+    def list_runs(self) -> list[LifecycleRun]:
+        """Return every persisted lifecycle run (run-history read)."""
