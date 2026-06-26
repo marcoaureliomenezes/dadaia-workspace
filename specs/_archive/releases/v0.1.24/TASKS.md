@@ -298,7 +298,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
 - **Description:** Set ACTIVE.md phase ARCHIVED, request the `git mv` to `_archive/`, then
   point ACTIVE.md at the next release (or `release: none`).
 - **Done when:** release archived; ACTIVE.md updated.
-- `[ ]`
+- `[x]`
 
 ---
 
