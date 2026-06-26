@@ -1,4 +1,10 @@
-"""MarkdownWorkflowStore — reads and validates *.workflow.md files."""
+"""MarkdownWorkflowStore — reads and validates *.workflow.md files.
+
+Reference/doc-only since v0.1.28 (T-28-B-02 / AC-15): the ``*.workflow.md`` files this
+store reads are no longer the authority for executable workflow behavior. The Python-owned
+``features.workflows.dadaia_catalog`` (the governed catalog the policy resolver reads) is
+the single source of truth; this store powers only the legacy reference view.
+"""
 
 import re
 from collections.abc import Iterable

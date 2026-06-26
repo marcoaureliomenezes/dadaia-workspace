@@ -118,7 +118,7 @@ Acceptance: `DadaiaWorkflowStepDTO`/`DadaiaWorkflowDTO` expose `default_harness`
 `default_profile` per supported harness + fragment ids; resolver reads catalog defaults;
 diagrams still from `render_dag_svg`/`render_step_mermaid`; one source (no second table).
 
-### [-] T-28-B-02 — Demote `*.workflow.md` to reference/doc-only
+### [x] T-28-B-02 — Demote `*.workflow.md` to reference/doc-only
 Goal: stop treating Markdown workflows as the executable authority (AC-15).
 Write set: `dadaia_workspace/features/workflows/service.py`;
 `tests/unit/features/workflows/test_workflows_service.py`.

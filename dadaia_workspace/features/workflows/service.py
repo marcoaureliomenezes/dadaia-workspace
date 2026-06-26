@@ -5,6 +5,17 @@ with a per-process in-memory mtime cache.
 
 Cache keyed by (path, mtime, size); cache size bounded by file count in source
 dir; ETag header is P2 follow-up.
+
+.. note::
+   **Reference/doc-only since v0.1.28 (T-28-B-02 / AC-15).** The legacy Markdown
+   ``*.workflow.md`` read path served by :meth:`WorkflowsService.list_summaries` and
+   :meth:`WorkflowsService.get_detail` is **no longer the authority** for executable
+   workflow behavior. The Python-owned :mod:`dadaia_workspace.features.workflows.dadaia_catalog`
+   (surfaced via :meth:`list_dadaia_workflows` / :meth:`get_dadaia_workflow` and the
+   :func:`~dadaia_workspace.features.workflows.dadaia_catalog.governed_workflow_catalog`
+   the policy resolver reads) is the single governed source of truth. The Markdown methods
+   remain only to power the legacy reference view; no executable lifecycle behavior reads
+   them.
 """
 
 import logging
@@ -141,6 +152,12 @@ class WorkflowsService:
     """Wraps MarkdownWorkflowStore; provides list_summaries() and get_detail().
 
     Per-process in-memory cache keyed by (path, mtime, size).
+
+    **Reference/doc-only Markdown path (v0.1.28).** The ``*.workflow.md`` accessors
+    (:meth:`list_summaries`, :meth:`get_detail`) are kept for the legacy reference view but
+    are no longer the authority for executable workflow behavior — the Python-owned
+    governed catalog (:meth:`list_dadaia_workflows` / :meth:`get_dadaia_workflow`) is the
+    single authoritative source (T-28-B-02 / AC-15).
     """
 
     def __init__(self, workspace_root: Path) -> None:
@@ -159,6 +176,12 @@ class WorkflowsService:
         return workflows_dir, self._store
 
     def list_summaries(self) -> list[WorkflowSummaryDTO]:
+        """List the legacy ``*.workflow.md`` summaries (reference/doc-only — AC-15).
+
+        This Markdown read path is **no longer the authority** for executable workflow
+        behavior; it powers only the legacy reference view. Use :meth:`list_dadaia_workflows`
+        for the authoritative governed catalog.
+        """
         result = self._ensure_store()
         if result is None:
             return []
@@ -207,6 +230,12 @@ class WorkflowsService:
         return get_dadaia_workflow(name)
 
     def get_detail(self, name: str) -> "WorkflowDetailDTO | None":
+        """Read one legacy ``*.workflow.md`` detail (reference/doc-only — AC-15).
+
+        This Markdown read path is **no longer the authority** for executable workflow
+        behavior; it powers only the legacy reference view. Use :meth:`get_dadaia_workflow`
+        for the authoritative governed catalog.
+        """
         result = self._ensure_store()
         if result is None:
             return None
