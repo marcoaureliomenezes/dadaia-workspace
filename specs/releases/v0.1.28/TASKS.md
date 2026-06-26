@@ -110,7 +110,7 @@ resolved policy; invalid overlay blocks before the first step with last-good int
 
 ## Wave B — Python workflow catalog as governed source
 
-### [ ] T-28-B-01 — Catalog carries default harness + default profile per step
+### [-] T-28-B-01 — Catalog carries default harness + default profile per step
 Goal: make `dadaia_catalog` the governed source the resolver + panel read.
 Write set: `dadaia_workspace/features/workflows/dadaia_catalog.py`;
 `tests/unit/features/workflows/test_dadaia_catalog.py`.
