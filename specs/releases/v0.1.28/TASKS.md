@@ -38,7 +38,7 @@ Acceptance: atomic temp+rename (mkstemp in target dir → `os.replace`); `load()
 `None` on missing; raises typed error on invalid JSON / unknown top-level field; `save()`
 writes `.last-good.json` from the prior valid file; only `default` context honored (D-2).
 
-### [ ] T-28-A-04 — WorkflowExecutionPolicyResolver (precedence)
+### [-] T-28-A-04 — WorkflowExecutionPolicyResolver (precedence)
 Goal: the single shared resolver consumed by CLI and panel.
 Write set: `dadaia_workspace/features/lifecycle/policy_resolver.py` (NEW);
 `tests/unit/features/lifecycle/test_policy_resolver.py` (NEW).
