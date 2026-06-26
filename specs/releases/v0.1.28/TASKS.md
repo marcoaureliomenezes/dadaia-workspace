@@ -179,7 +179,7 @@ Acceptance: E2E proves save / reset / default-vs-effective / invalid-policy-bann
 
 ## Wave D — fragment inspector + doctor
 
-### [ ] T-28-D-01 — Read-only fragment inspector per step
+### [-] T-28-D-01 — Read-only fragment inspector per step
 Goal: surface fragment ids/body + dynamic inputs + output schema per model step (AC-14).
 Write set: `dadaia_workspace/features/panel/views/workflows.py`;
 `dadaia_workspace/features/panel/views/assets/js/workflows.js`;
