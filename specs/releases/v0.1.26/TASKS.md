@@ -85,7 +85,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
 - **Done-when:** unit tests cover both branches; the residual==0 test asserts the archive
   copy exists at the moment of removal (acceptance §3.7.9); mypy/ruff clean.
 
-## [ ] T-26-05 — `BacklogDefinitionWorkflow` body (§4 sequence, Python gates)
+## [x] T-26-05 — `BacklogDefinitionWorkflow` body (§4 sequence, Python gates)
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/backlog_definition.py`,

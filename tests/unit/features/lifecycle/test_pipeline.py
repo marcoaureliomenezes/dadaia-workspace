@@ -298,7 +298,7 @@ def test_implementation_and_qa_steps_emit_fragment_sourced_prompts() -> None:
 
 @pytest.mark.parametrize(
     "name",
-    ["backlog_definition", "audit", "research", "bug_report"],
+    ["audit", "research", "bug_report"],
 )
 def test_deferred_workflows_fail_loud_when_invoked(name: str) -> None:
     from dadaia_workspace.features.lifecycle import workflows
@@ -315,7 +315,6 @@ def test_deferred_workflows_are_discoverable() -> None:
     from dadaia_workspace.features.lifecycle import workflows
 
     assert workflows.DEFERRED_WORKFLOWS == (
-        "backlog_definition",
         "audit",
         "research",
         "bug_report",

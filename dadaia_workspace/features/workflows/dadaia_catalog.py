@@ -15,7 +15,9 @@ introspected directly from its authoritative definition:
   available — the WS-5 reference workflow);
 - ``implementation`` → :func:`...lifecycle.pipeline.implementation_ladder` (partial —
   two steps are fragment-driven, the rest still carry the generic suffix);
-- ``backlog_definition`` / ``audit`` / ``research`` / ``bug_report`` →
+- ``backlog_definition`` → :data:`...workflows.backlog_definition._SEQUENCE` (available —
+  the v0.1.26 R2 §4 workflow body with Python-owned gates);
+- ``audit`` / ``research`` / ``bug_report`` →
   :data:`...workflows._deferred.DEFERRED_WORKFLOWS` (deferred — entry points raise).
 
 The per-step harness/model options come from the single discrete Layer-2 catalog
@@ -35,6 +37,9 @@ from dadaia_workspace.core import harness_models
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
 from dadaia_workspace.features.lifecycle.workflows._deferred import DEFERRED_WORKFLOWS
+from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+    _SEQUENCE as _BACKLOG_SEQUENCE,
+)
 from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
 from dadaia_workspace.features.workflows.dag import render_dag_svg
 from dadaia_workspace.features.workflows.service import StageDTO
@@ -154,6 +159,37 @@ _IMPLEMENTATION_STEP_PURPOSE: dict[str, str] = {
     ),
 }
 
+_BACKLOG_STEP_PURPOSE: dict[str, str] = {
+    "intake_grill": (
+        "Project-manager grills the operator demand into proposed (subject -> change) "
+        "intents (mandatory grill; fragment-driven)."
+    ),
+    "subject_bind": (
+        "Python binds every proposed subject through the canonical-subject registry; HALTs "
+        "on any unresolved/ambiguous subject (no silent NEW)."
+    ),
+    "existing_backlog_review": (
+        "Python runs the deterministic set-intersection classifier over the bound intents "
+        "vs every existing item (model offline by default; downgrade seam fail-closed)."
+    ),
+    "reconcile_decision": (
+        "Python blocks a NEW file unless every existing item is UNRELATED; otherwise forces "
+        "an UPDATE/MERGE."
+    ),
+    "conflict_resolution_grill": (
+        "Project-manager grills a DIVERGENT_CONFLICT into one reconciled change — conditional, "
+        "runs only when the review found a conflict (fragment-driven)."
+    ),
+    "backlog_author": (
+        "Product-engineer authors the single consistent item (NEW file XOR edit existing — "
+        "never a twin; fragment-driven)."
+    ),
+    "backlog_review_gate": (
+        "Python re-runs the classifier over the authored result and blocks any "
+        "DUPLICATE/DIVERGENT_CONFLICT it would introduce."
+    ),
+}
+
 _WORKFLOW_PURPOSE: dict[str, str] = {
     "release_definition": (
         "Turns an approved bug + backlog set into an approved release definition. Python "
@@ -170,9 +206,14 @@ _WORKFLOW_PURPOSE: dict[str, str] = {
         "generic suffix (partial migration), so the workflow is marked partial."
     ),
     "backlog_definition": (
-        "Will turn raw bug/backlog signal into curated, grilled backlog entries ready for "
-        "a release. Scaffolded only — the entry point raises NotImplementedError; deferred "
-        "to a follow-up release."
+        "Turns an operator demand into one consistent backlog item by construction. Python "
+        "owns the gates: it binds every proposed subject through the canonical-subject "
+        "registry (HALT on unresolved), classifies the demand against every existing item "
+        "with the deterministic set-intersection classifier (model offline by default), "
+        "blocks a NEW file unless every existing item is UNRELATED, runs a conditional "
+        "conflict-resolution grill only on a DIVERGENT_CONFLICT, and re-validates the "
+        "authored result. It walks intake_grill → subject_bind → existing_backlog_review → "
+        "reconcile_decision → conflict_resolution_grill → backlog_author → backlog_review_gate."
     ),
     "audit": (
         "Will run the project-auditor fan-out (multi-lens review producing committed audit "
@@ -336,6 +377,30 @@ def _implementation_steps() -> list[DadaiaWorkflowStepDTO]:
     return steps
 
 
+def _backlog_definition_steps() -> list[DadaiaWorkflowStepDTO]:
+    steps: list[DadaiaWorkflowStepDTO] = []
+    for order, bstep in enumerate(_BACKLOG_SEQUENCE, start=1):
+        is_worker = bstep.fragment_id is not None
+        harness_options, model_options = _harness_options_for(is_worker_step=is_worker)
+        runtime = bstep.runtime_kind.value if bstep.runtime_kind is not None else None
+        steps.append(
+            DadaiaWorkflowStepDTO(
+                order=order,
+                label=bstep.label,
+                role=bstep.role,
+                purpose=_BACKLOG_STEP_PURPOSE.get(bstep.label, ""),
+                # Python-disposing steps (no fragment) are the gates; the conditional grill
+                # and the model steps are worker steps.
+                is_gate=bstep.fragment_id is None,
+                harness_options=harness_options,
+                model_options=model_options,
+                runtime_kind=runtime,
+                fragment_id=bstep.fragment_id,
+            )
+        )
+    return steps
+
+
 def _build_workflow(
     name: str, availability: str, steps: list[DadaiaWorkflowStepDTO]
 ) -> DadaiaWorkflowDTO:
@@ -360,6 +425,7 @@ def _all_workflows() -> list[DadaiaWorkflowDTO]:
     workflows: list[DadaiaWorkflowDTO] = [
         _build_workflow("release_definition", AVAILABILITY_AVAILABLE, _release_definition_steps()),
         _build_workflow("implementation", AVAILABILITY_PARTIAL, _implementation_steps()),
+        _build_workflow("backlog_definition", AVAILABILITY_AVAILABLE, _backlog_definition_steps()),
     ]
     for name in DEFERRED_WORKFLOWS:
         workflows.append(_build_workflow(name, AVAILABILITY_DEFERRED, []))

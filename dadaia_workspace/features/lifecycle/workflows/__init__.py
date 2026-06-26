@@ -12,9 +12,14 @@ from __future__ import annotations
 from dadaia_workspace.features.lifecycle.workflows._deferred import (
     DEFERRED_WORKFLOWS,
     audit,
-    backlog_definition,
     bug_report,
     research,
+)
+from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+    BacklogDefinitionResult,
+    BacklogDefinitionWorkflow,
+    BacklogDemand,
+    BacklogStepResult,
 )
 from dadaia_workspace.features.lifecycle.workflows.release_definition import (
     ReleaseDefinitionResult,
@@ -24,11 +29,14 @@ from dadaia_workspace.features.lifecycle.workflows.release_definition import (
 
 __all__ = [
     "DEFERRED_WORKFLOWS",
+    "BacklogDefinitionResult",
+    "BacklogDefinitionWorkflow",
+    "BacklogDemand",
+    "BacklogStepResult",
     "ReleaseDefinitionResult",
     "ReleaseDefinitionWorkflow",
     "ReleaseStepResult",
     "audit",
-    "backlog_definition",
     "bug_report",
     "research",
 ]

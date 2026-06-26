@@ -76,12 +76,14 @@ class TestDadaiaWorkflowsList:
         assert "release_definition" in by_name
         assert "backlog_definition" in by_name
         assert by_name["release_definition"]["availability"] == AVAILABILITY_AVAILABLE
+        # backlog_definition shipped its real workflow body in v0.1.26 R2 — now available.
+        assert by_name["backlog_definition"]["availability"] == AVAILABILITY_AVAILABLE
 
     def test_list_marks_deferred_workflow_unavailable(self) -> None:
         """A deferred workflow is listed with availability == 'deferred' (unavailable)."""
         _status, data = _list()
         by_name = {w["name"]: w for w in data["workflows"]}
-        for deferred in ("backlog_definition", "audit", "research", "bug_report"):
+        for deferred in ("audit", "research", "bug_report"):
             assert by_name[deferred]["availability"] == AVAILABILITY_DEFERRED
 
     def test_list_items_carry_purpose_and_step_count(self) -> None:

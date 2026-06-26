@@ -17,8 +17,9 @@ from __future__ import annotations
 from typing import NoReturn
 
 #: The deferred workflow names, in catalog order. Each maps to an entry point below.
+#: ``backlog_definition`` LEFT this set in v0.1.26 R2 — it now ships a real workflow body
+#: (:mod:`dadaia_workspace.features.lifecycle.workflows.backlog_definition`).
 DEFERRED_WORKFLOWS: tuple[str, ...] = (
-    "backlog_definition",
     "audit",
     "research",
     "bug_report",
@@ -27,11 +28,6 @@ DEFERRED_WORKFLOWS: tuple[str, ...] = (
 
 def _deferred(name: str) -> NoReturn:
     raise NotImplementedError(f"{name} workflow deferred to a follow-up release")
-
-
-def backlog_definition(*_args: object, **_kwargs: object) -> NoReturn:
-    """Backlog-definition workflow — deferred to a follow-up release (fails loud)."""
-    _deferred("backlog_definition")
 
 
 def audit(*_args: object, **_kwargs: object) -> NoReturn:
@@ -52,7 +48,6 @@ def bug_report(*_args: object, **_kwargs: object) -> NoReturn:
 __all__ = [
     "DEFERRED_WORKFLOWS",
     "audit",
-    "backlog_definition",
     "bug_report",
     "research",
 ]
