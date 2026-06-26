@@ -68,7 +68,7 @@ Acceptance: Codex prefers `request.resolved_model` in `_model_and_effort`; PI `_
 adds `--model <id>` from the per-request resolved model; fake echoes the resolved config;
 AC-12 asserted.
 
-### [ ] T-28-A-07 — Pipeline + phase workflow + prompt builder use the resolver
+### [-] T-28-A-07 — Pipeline + phase workflow + prompt builder use the resolver
 Goal: build steps from the resolved snapshot; snapshot before step 1 (LAW 7).
 Write set: `dadaia_workspace/features/lifecycle/pipeline.py`;
 `dadaia_workspace/features/lifecycle/phase_workflow.py`;
