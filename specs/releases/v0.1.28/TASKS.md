@@ -21,7 +21,7 @@ Acceptance: `ResolvedModelConfig`, `WorkflowModelProfile`, `WorkflowPolicySnapsh
 dataclasses with `to_dict`/`from_dict` round-trip; zero I/O; import-linter clean (`core` no
 OS primitives).
 
-### [-] T-28-A-02 — Built-in model-profile registry
+### [x] T-28-A-02 — Built-in model-profile registry
 Goal: named profiles (Codex + recommended PI aliases) resolving to `harness_models` options.
 Write set: `dadaia_workspace/features/lifecycle/model_profiles.py` (NEW);
 `tests/unit/features/lifecycle/test_model_profiles.py` (NEW).
