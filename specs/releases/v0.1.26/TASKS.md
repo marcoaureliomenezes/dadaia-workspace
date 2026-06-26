@@ -164,7 +164,7 @@ verification last. **Build on R1; never re-do R1 (SPEC §3.8).**
 - **Done-when:** BL-STALE loop integration test green (both directions); e2e green;
   mypy/ruff clean.
 
-## [ ] T-26-09 — Stage + install + doctor the new fragments (public propagation)
+## [x] T-26-09 — Stage + install + doctor the new fragments (public propagation)
 
 - **Owner:** software-engineer
 - **Write set:** none (runs `dadaia public stage && dadaia public install --target all &&
