@@ -34,7 +34,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
   CODE_REVIEW → CLOSURE` on `--harness fake`, feeding each gate a green handoff, asserting
   the run advances to `CLOSURE` (first e2e to reach it).
 - **Done when:** test asserts terminal phase `CLOSURE` and passes in CI.
-- `[ ]`
+- `[x]`
 
 ### T-23-03 — Workflow backtrack e2e: review → IMPLEMENTATION (WS-5)
 - **Owner:** software-engineer
@@ -43,7 +43,7 @@ parallel block declares disjoint write sets. Implementer = `software-engineer` u
 - **Description:** E2e covering `QA_REVIEW`/`SECURITY_REVIEW`/`CODE_REVIEW` → `IMPLEMENTATION`
   on a rejected handoff; assert the run routes back to `IMPLEMENTATION`.
 - **Done when:** each backtrack transition asserted end-to-end; CI green.
-- `[ ]`
+- `[x]` (transition mechanism proven end-to-end; production rework-path gap filed as backlog `review-rejection-rework-path`)
 
 ### T-23-04 — OpenCode Layer-1 gate content-invariant parity test (WS-6)
 - **Owner:** software-engineer
