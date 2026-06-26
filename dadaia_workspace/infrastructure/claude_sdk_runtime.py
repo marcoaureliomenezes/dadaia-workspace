@@ -26,6 +26,7 @@ and fully tested hermetically with an injected fake SDK module.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +45,9 @@ WritePermission = Callable[[str], bool]
 
 #: Tool-input keys that carry a write target for Write/Edit-family tools.
 _WRITE_PATH_KEYS = ("file_path", "path", "notebook_path")
+
+#: Env-var name fragments whose values must never appear in surfaced output.
+_SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
 
 @dataclass(frozen=True)
@@ -76,9 +80,11 @@ class ClaudeSdkAdapter:
         *,
         cwd: Path | None = None,
         query_fn: ClaudeQueryFn | None = None,
+        environ: dict[str, str] | None = None,
     ) -> None:
         self._cwd = cwd or Path.cwd()
         self._query_fn = query_fn
+        self._environ = dict(os.environ) if environ is None else dict(environ)
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.CLAUDE_SDK
@@ -92,6 +98,16 @@ class ClaudeSdkAdapter:
             return is_in_scope(path, allowed=allowed, forbidden=forbidden)
 
         return _decide
+
+    def _redact(self, text: str) -> str:
+        """Scrub any secret-named env value from surfaced output (adapter parity)."""
+        redacted = text
+        for key, value in self._environ.items():
+            if not value:
+                continue
+            if any(part in key.upper() for part in _SECRET_NAME_PARTS):
+                redacted = redacted.replace(value, "[REDACTED]")
+        return redacted
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         if request.runtime is not AgentRuntimeKind.CLAUDE_SDK:
@@ -108,19 +124,19 @@ class ClaudeSdkAdapter:
             return AgentRunResult(
                 status=AgentRunStatus.FAILED,
                 summary="claude-agent-sdk not installed",
-                error=str(exc),
+                error=self._redact(str(exc)),
             )
         except Exception as exc:  # a bounded worker never crashes the engine
             return AgentRunResult(
                 status=AgentRunStatus.FAILED,
                 summary="claude run failed",
-                error=str(exc),
+                error=self._redact(str(exc)),
             )
         if output.error:
             return AgentRunResult(
                 status=AgentRunStatus.FAILED,
-                summary=output.summary,
-                error=output.error,
+                summary=self._redact(output.summary),
+                error=self._redact(output.error),
             )
         structured: dict[str, str] = {}
         if output.verdict is not None:
@@ -129,7 +145,7 @@ class ClaudeSdkAdapter:
             structured["changed_paths"] = ",".join(output.changed_paths)
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
-            summary=output.summary,
+            summary=self._redact(output.summary),
             artifact_refs=output.artifact_refs,
             structured_output=structured,
         )

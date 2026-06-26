@@ -56,6 +56,24 @@ def test_ring1_write_permission_mirrors_scope() -> None:
     assert decide("repos/dadaia-workspace/src/app.py") is False  # outside allowed
 
 
+def test_run_redacts_secret_env_value_from_surfaced_error() -> None:
+    """CWE-209 parity: a secret-named env value must never surface in the error string,
+    matching the opencode/codex redaction discipline."""
+    secret = "sk-ant-supersecret-xyz"
+
+    def _leaky_query(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
+        raise RuntimeError(f"connection failed using token {secret}")
+
+    adapter = ClaudeSdkAdapter(
+        query_fn=_leaky_query,
+        environ={"ANTHROPIC_API_KEY": secret},
+    )
+    result = adapter.run(_request())
+    assert result.status is AgentRunStatus.FAILED
+    assert secret not in (result.error or "")
+    assert "[REDACTED]" in (result.error or "")
+
+
 def test_run_maps_approved_output_to_succeeded_result() -> None:
     def query_fn(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
         # The transport is handed the Ring-1 decider; an out-of-scope write is denied.
