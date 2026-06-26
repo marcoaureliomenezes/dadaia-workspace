@@ -69,6 +69,28 @@ Only now write the release SPEC (Draft), with:
 Then continue the normal SDD flow (PLAN → TASKS → implementation), with reviews
 per the segment/release cadence (alpha = qa-only; rc-ship = qa + code + security).
 
+### 6. Declare consumed backlog (`**Consumes:**`)
+If this release **fully consumes** one or more backlog items, declare them in a
+machine-readable bold-key line in the SPEC, alongside `**Status:**` / `**Release ID:**`:
+
+```
+**Consumes:** slug-a, slug-b
+```
+
+This is the producer half of removal-on-release. At `dadaia lifecycle release define`,
+a guarded post-step parses this line, binds each declared slug's `intents[]` through the
+canonical-subject registry → the verified **shipped-anchor set**, and writes
+`specs/_archive/<release-id>/consumed_backlog.json`. At `dadaia lifecycle close`, the
+residual-aware removal hook reads that ledger and drops each fully-consumed item from the
+live `specs/backlog/` SET (archiving a copy first), so `backlog doctor` reports zero
+BL-STALE. Rules:
+- **Full-slug granularity:** a declared slug is treated as *fully* consumed (all its bound
+  anchors shipped). A partially-shipped item must NOT be declared — leave it in the
+  backlog and rewrite it to its residual by hand.
+- **Fail-loud:** an unknown slug, or one whose intents do not bind in the registry, aborts
+  the define post-step (no silent skip) — fix the slug or the item's `intents[]`.
+- Omit the line entirely when a release consumes no backlog item.
+
 ## Authority & dispatch
 
 `product-engineer` owns picking and SPEC authorship; `project-manager` dispatches
@@ -83,3 +105,4 @@ release-definition playbook and the `release-governance` rule.
 - [ ] Every picked bug fixed-in-release OR `superseded_by` a picked backlog item.
 - [ ] `dadaia-grill-me` session completed (report emitted).
 - [ ] SPEC authored from the refined, picked set.
+- [ ] `**Consumes:**` line declared for any fully-consumed backlog item (or omitted if none).

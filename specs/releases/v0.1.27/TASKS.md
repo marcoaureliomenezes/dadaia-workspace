@@ -139,7 +139,7 @@
 - [x] T-4 — Binder fail-loud: unbindable intents
 - [x] T-5 — Producer post-step on `release define` (A1, E2E)
 - [x] T-6 — Define→close loop (A2, E2E)
-- [ ] T-7 — Document `**Consumes:**` convention (A3)
+- [x] T-7 — Document `**Consumes:**` convention (A3)
 - [ ] T-8 — Full gate + hygiene
 
 ## Acceptance traceability
