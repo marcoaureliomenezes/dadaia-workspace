@@ -136,7 +136,7 @@
 - [x] T-1 — Parser `parse_consumes_line`
 - [x] T-2 — Binder `shipped_anchors_for` (happy path)
 - [x] T-3 — Binder fail-loud: unknown slug
-- [ ] T-4 — Binder fail-loud: unbindable intents
+- [x] T-4 — Binder fail-loud: unbindable intents
 - [ ] T-5 — Producer post-step on `release define` (A1, E2E)
 - [ ] T-6 — Define→close loop (A2, E2E)
 - [ ] T-7 — Document `**Consumes:**` convention (A3)
