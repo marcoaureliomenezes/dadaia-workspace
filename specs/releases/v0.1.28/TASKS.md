@@ -88,7 +88,7 @@ Acceptance: `build_workflow_model_profile_registry`, `build_workflow_model_polic
 `build_workflow_policy_resolver(workspace_root, context)`; `build_lifecycle_pipeline` and
 `build_lifecycle_phase_workflow` accept/use the resolver; no ad-hoc construction in CLI/views.
 
-### [ ] T-28-A-09 — CLI: profile-id `--step-model`, `--show-policy`, inspection verbs
+### [-] T-28-A-09 — CLI: profile-id `--step-model`, `--show-policy`, inspection verbs
 Goal: D-3 (profile ids only) + scriptable inspection.
 Write set: `dadaia_workspace/cli/commands/lifecycle.py`;
 `tests/integration/cli/test_lifecycle_policy_cli.py` (NEW).
