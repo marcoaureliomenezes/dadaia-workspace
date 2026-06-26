@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from dadaia_workspace.core.models.workflow_execution import (
+    ResolvedModelConfig,
+    WorkflowPolicySnapshot,
+)
+
 
 class LifecyclePhase(StrEnum):
     BACKLOG_DEFINITION = "backlog_definition"
@@ -283,6 +288,11 @@ class LifecycleRun:
     idempotency_key: str | None = None
     blocked: BlockedState | None = None
     injected_context: tuple[InjectedContext, ...] = ()
+    # Additive-optional governance snapshot (T-28-A-05 / LAW 6/7). Resolved + frozen once
+    # before the first worker step; an in-flight run reads this, never the live overlay.
+    # Old records (no ``workflow_policy`` key) still load — the run-store ``_SCHEMA_VERSION``
+    # literal is deliberately unchanged (M1).
+    workflow_policy: WorkflowPolicySnapshot | None = None
 
     def prompt_composition(self) -> tuple[dict[str, Any], ...]:
         """Return the per-step prompt composition for this run (WS-9 observability).
@@ -308,6 +318,7 @@ class LifecycleRun:
             "idempotency_key": self.idempotency_key,
             "blocked": self.blocked.to_dict() if self.blocked else None,
             "injected_context": [entry.to_dict() for entry in self.injected_context],
+            "workflow_policy": (self.workflow_policy.to_dict() if self.workflow_policy else None),
         }
 
     @classmethod
@@ -322,6 +333,9 @@ class LifecycleRun:
         for entry in injected_raw:
             assert isinstance(entry, dict)
             injected.append(InjectedContext.from_dict(entry))
+        # Additive-optional: absent ``workflow_policy`` (old v1 records) ⇒ ``None`` (M1).
+        policy_raw = data.get("workflow_policy")
+        assert policy_raw is None or isinstance(policy_raw, dict)
         return cls(
             run_id=str(data["run_id"]),
             context=str(data["context"]),
@@ -334,6 +348,7 @@ class LifecycleRun:
             idempotency_key=_optional_str(data.get("idempotency_key")),
             blocked=BlockedState.from_dict(blocked_raw) if blocked_raw else None,
             injected_context=tuple(injected),
+            workflow_policy=(WorkflowPolicySnapshot.from_dict(policy_raw) if policy_raw else None),
         )
 
 
@@ -350,6 +365,10 @@ class AgentRunRequest:
     forbidden_paths: tuple[str, ...] = ()
     expected_schema: str | None = None
     required_evidence: tuple[GateEvidenceKind, ...] = ()
+    # Additive-optional resolved concrete model config (T-28-A-05). When present, the
+    # adapter prefers this over the legacy ``model_profile`` tier-name fallback (M2).
+    # ``model_profile`` is kept for back-compat / observability.
+    resolved_model: ResolvedModelConfig | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -364,6 +383,7 @@ class AgentRunRequest:
             "forbidden_paths": list(self.forbidden_paths),
             "expected_schema": self.expected_schema,
             "required_evidence": [kind.value for kind in self.required_evidence],
+            "resolved_model": self.resolved_model.to_dict() if self.resolved_model else None,
         }
 
     @classmethod
@@ -374,6 +394,8 @@ class AgentRunRequest:
         assert isinstance(allowed_paths, list)
         assert isinstance(forbidden_paths, list)
         assert isinstance(required_evidence, list)
+        resolved_raw = data.get("resolved_model")
+        assert resolved_raw is None or isinstance(resolved_raw, dict)
         return cls(
             role=str(data["role"]),
             prompt=str(data["prompt"]),
@@ -386,6 +408,7 @@ class AgentRunRequest:
             forbidden_paths=tuple(str(path) for path in forbidden_paths),
             expected_schema=_optional_str(data.get("expected_schema")),
             required_evidence=tuple(GateEvidenceKind(str(kind)) for kind in required_evidence),
+            resolved_model=(ResolvedModelConfig.from_dict(resolved_raw) if resolved_raw else None),
         )
 
 

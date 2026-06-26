@@ -46,7 +46,7 @@ Acceptance: precedence CLI > context overlay > default overlay > library default
 overrides vs catalog step ids + profile ids + harness match; deprecated-without-replacement
 fails; returns a `WorkflowPolicySnapshot`; only `default` context honored (D-2).
 
-### [-] T-28-A-05 — AgentRunRequest + LifecycleRun carry resolved policy
+### [x] T-28-A-05 — AgentRunRequest + LifecycleRun carry resolved policy
 Goal: thread resolved model into the request; persist the snapshot on the run.
 Write set: `dadaia_workspace/core/models/lifecycle.py`;
 `dadaia_workspace/infrastructure/json_lifecycle_run_store.py`;

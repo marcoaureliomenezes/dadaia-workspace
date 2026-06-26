@@ -53,6 +53,40 @@ def test_json_store_persists_under_canonical_states_lifecycle(tmp_path: Path) ->
     assert store.load("run-1") == run
 
 
+def test_json_store_loads_old_format_record_without_workflow_policy(tmp_path: Path) -> None:
+    # M1 (T-28-A-05): a literal old-format record — current 'lifecycle-run-v1' schema,
+    # NO 'workflow_policy' key — must still load. The schema version literal is unchanged.
+    import json as _json
+
+    workspace = _workspace(tmp_path)
+    store = JsonLifecycleRunStore(workspace)
+    store.root.mkdir(parents=True, exist_ok=True)
+    legacy_payload = {
+        "schema_version": "lifecycle-run-v1",
+        "run": {
+            "run_id": "legacy-1",
+            "context": "dadaia-workspace",
+            "release_id": "v0.1.15",
+            "command": "implement",
+            "phase": "implementation",
+            "status": "running",
+            "current_step": "implement",
+            "expected_artifacts": [],
+            "idempotency_key": "idem-1",
+            "blocked": None,
+            "injected_context": [],
+        },
+    }
+    (store.root / "legacy-1.json").write_text(
+        _json.dumps(legacy_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+    loaded = store.load("legacy-1")
+    assert loaded is not None
+    assert loaded.run_id == "legacy-1"
+    assert loaded.workflow_policy is None
+
+
 def test_json_store_can_persist_under_runs_lifecycle(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     store = JsonLifecycleRunStore(workspace, location="runs")
