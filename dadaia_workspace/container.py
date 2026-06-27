@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionWorkflow,
     )
+    from dadaia_workspace.infrastructure.json_local_model_profile_store import (
+        JsonLocalModelProfileStore,
+    )
     from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
         JsonWorkflowModelPolicyStore,
         WorkflowModelPolicyOverlay,
@@ -660,6 +663,40 @@ def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowMode
 
     _guard_initialized(workspace_root)
     return JsonWorkflowModelPolicyStore(workspace_root)
+
+
+def build_local_model_profile_store(
+    workspace_root: Path,
+) -> "JsonLocalModelProfileStore":
+    """Compose the operator-local model-profile store (T-30-C-01 / WS-PROFILES).
+
+    Reads ``.dadaia/states/workflow_model_profiles.local.json`` with atomic temp+rename.
+    ``load()`` returns ``()`` on a missing file (default-first — L3) and raises on a
+    present-but-invalid store (``harness != "pi"`` per L1, any API-key-bearing field per
+    L8, corrupt JSON, unknown field). The store is workspace-local and **never projected**
+    into ``public/`` (L8).
+    """
+    from dadaia_workspace.infrastructure.json_local_model_profile_store import (
+        JsonLocalModelProfileStore,
+    )
+
+    _guard_initialized(workspace_root)
+    return JsonLocalModelProfileStore(workspace_root)
+
+
+def load_operator_model_profiles(workspace_root: Path) -> None:
+    """Load + merge the operator-local profiles into the process registry (WS-PROFILES).
+
+    Idempotent: re-reads the local store and re-registers its profiles with
+    :mod:`features.lifecycle.model_profiles`, so :func:`model_profiles.list_profiles` /
+    :func:`profiles_for` / :func:`resolve` surface built-in + operator profiles. A missing
+    store loads nothing (default-first — L3); a present-but-invalid store raises through the
+    store's typed error, before any model call.
+    """
+    from dadaia_workspace.features.lifecycle import model_profiles
+
+    store = build_local_model_profile_store(workspace_root)
+    model_profiles.load_operator_profiles(store)
 
 
 def build_workflow_policy_resolver(

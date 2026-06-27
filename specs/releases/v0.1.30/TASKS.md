@@ -89,7 +89,7 @@
 
 ## Wave C — workflow-model-governance: operator profiles + overlays + nits (Item 4)
 
-- [-] **T-30-C-01** — WS-PROFILES: local PI-profile store + port.
+- [x] **T-30-C-01** — WS-PROFILES: local PI-profile store + port.
   - Goal: `.dadaia/states/workflow_model_profiles.local.json` adapter (atomic; validate
     `harness=pi`; reject API keys; never projected) + port wired via container.
   - Write set: `dadaia_workspace/infrastructure/json_local_model_profile_store.py` (NEW);
@@ -97,7 +97,7 @@
     `dadaia_workspace/container.py`.
   - Acceptance: A14 (store/validation half).
 
-- [ ] **T-30-C-02** — WS-PROFILES: merge operator profiles into `model_profiles`.
+- [-] **T-30-C-02** — WS-PROFILES: merge operator profiles into `model_profiles`.
   - Goal: `list_profiles`/`profiles_for` merge built-in + operator-loaded; preserve
     `UnknownProfileError` fail-closed; default-first when store missing.
   - Write set: `dadaia_workspace/features/lifecycle/model_profiles.py`.
