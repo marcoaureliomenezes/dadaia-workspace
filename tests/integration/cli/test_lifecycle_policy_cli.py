@@ -16,6 +16,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
@@ -88,6 +89,31 @@ def test_workflow_policy_show_unknown_workflow_rejected(tmp_path: Path, monkeypa
     workspace = _init_states(tmp_path)
     monkeypatch.chdir(workspace)
     result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", "ghost-workflow"])
+    assert result.exit_code != 0
+    assert "unknown workflow" in _norm(result.output)
+
+
+def test_workflow_policy_show_closure_resolves(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """T-29-B-03 (AC-7): the completed catalog makes `policy show closure` resolvable."""
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", "closure", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["workflow_id"] == "closure"
+    steps = {s["step"]: s for s in payload["steps"]}
+    assert "close" in steps, "closure's real close worker step is not in the resolved policy"
+    # The generic close step resolves a governed model profile on the default harness.
+    assert steps["close"]["model_profile"]
+    assert steps["close"]["harness"] in {"codex", "pi"}
+
+
+@pytest.mark.parametrize("name", ["audit", "research", "bug_report"])
+def test_workflow_policy_show_deferred_rejected(name: str, tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """A deferred workflow has no governed steps — `policy show` rejects it actionably."""
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", name])
     assert result.exit_code != 0
     assert "unknown workflow" in _norm(result.output)
 
