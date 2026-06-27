@@ -66,7 +66,7 @@ harness.
 **Acceptance:** AC-4 wiring; `--show-policy` shows pi when `--harness pi`; `fake` dry-run
 still completes.
 
-### [-] T-29-A-08 — Wave A green checkpoint
+### [x] T-29-A-08 — Wave A green checkpoint
 **Goal:** `ruff format --check && ruff check && mypy --strict && pytest` all pass.
 **Write set:** (none — fixes only if red.)
 **Acceptance:** full suite green; AC-1/AC-2/AC-3/AC-9/AC-10 unit tests added and passing.

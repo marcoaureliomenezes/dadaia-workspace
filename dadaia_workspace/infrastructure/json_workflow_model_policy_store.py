@@ -220,9 +220,7 @@ class JsonWorkflowModelPolicyStore:
 
     def _parse_context(
         self, value: object, *, path: Path | None
-    ) -> tuple[
-        dict[str, dict[str, str]], dict[str, str], dict[str, dict[str, str]]
-    ]:
+    ) -> tuple[dict[str, dict[str, str]], dict[str, str], dict[str, dict[str, str]]]:
         if not isinstance(value, dict):
             raise WorkflowModelPolicyStoreError(
                 "workflow-model-policy context overlay must be an object", path
@@ -294,9 +292,7 @@ class JsonWorkflowModelPolicyStore:
             step_harness[str(step_label)] = resolved
         return steps, default_harness, step_harness
 
-    def _parse_harness_value(
-        self, value: object, *, what: str, path: Path | None
-    ) -> str | None:
+    def _parse_harness_value(self, value: object, *, what: str, path: Path | None) -> str | None:
         """Validate an optional harness string against the Layer-2 allow-set (codex|pi)."""
         if value is None:
             return None
