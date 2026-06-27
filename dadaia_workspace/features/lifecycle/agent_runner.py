@@ -133,6 +133,20 @@ class LifecycleAgentRunner:
         result = self._runtime.run(data.request)
         return self._blocked_result(lifecycle_run, data, result)
 
+    def evaluate_gate_with_result(
+        self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
+    ) -> tuple[AgentRunResult, BlockedState | None]:
+        """Run the request ONCE and return both the worker result and the gate decision.
+
+        Used by the release-definition workflow (T-30-D-05) when the workflow-step handoff
+        resolver is wired: the workflow needs the worker's ``structured_output`` to write
+        the immutable step payload, AND the same single run's gate decision. Running the
+        worker once and returning both avoids a double execution while keeping the gate
+        logic identical to :meth:`evaluate_gate`.
+        """
+        result = self._runtime.run(data.request)
+        return result, self._blocked_result(lifecycle_run, data, result)
+
     def run(self, lifecycle_run: LifecycleRun, data: AgentRunnerInput) -> TransitionDecision:
         result = self._runtime.run(data.request)
         blocked = self._blocked_result(lifecycle_run, data, result)

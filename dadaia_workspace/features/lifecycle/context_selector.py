@@ -517,7 +517,14 @@ class ContextSelector:
     def sel_tasks_draft(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
         return self._release_artifact(name, policy, "TASKS.md")
 
-    # ---- handoffs ------------------------------------------------------
+    # ---- handoffs (LEGACY / manual contexts only — A25) ----------------
+    #
+    # These ``.dadaia/handoff/*.handoff.json`` selectors are the **filename-glob** path.
+    # Required prompt-to-prompt communication in a governed workflow does NOT use them —
+    # it routes through :class:`WorkflowHandoffResolver`, which resolves the exact upstream
+    # payload by ``(run id, producer step, attempt)`` (A19/A25). The selectors below remain
+    # for legacy / manual contexts that read durable external evidence handoffs, and they
+    # render a COMPACT digest (verdict / summary / findings / refs), never the raw JSON.
 
     def _handoffs(self, *, agent: str | None = None) -> tuple[_FileRef, ...]:
         directory = self._ctx.handoff_dir
@@ -538,13 +545,42 @@ class ContextSelector:
     ) -> SelectionResult:
         if policy is MaxContextPolicy.PREVIOUS_HANDOFF_ONLY and refs:
             refs = (refs[-1],)
-        blocks = [f"### {fref.ref}\n{_read_text(fref.path)}".rstrip() for fref in refs]
+        blocks = [f"### {fref.ref}\n{self._handoff_digest(fref.path)}".rstrip() for fref in refs]
         return SelectionResult(
             name=name,
             policy=policy,
             content="\n\n".join(blocks),
             refs=tuple(fref.ref for fref in refs),
         )
+
+    @staticmethod
+    def _handoff_digest(path: Path) -> str:
+        """Render a compact digest of a handoff JSON — verdict / summary / findings / refs.
+
+        Never pastes the raw JSON document (A25 / anti-slop): the prompt cites the handoff
+        by name and reads only its key fields. A malformed handoff degrades to a one-line
+        note rather than crashing the selection.
+        """
+        try:
+            doc = json.loads(_read_text(path))
+        except (json.JSONDecodeError, OSError):
+            return "(unreadable handoff)"
+        if not isinstance(doc, dict):
+            return "(malformed handoff)"
+        lines: list[str] = []
+        for key in ("agent", "scope", "verdict", "verdict_reason"):
+            value = doc.get(key)
+            if isinstance(value, str) and value.strip():
+                lines.append(f"- {key}: {value.strip()}")
+        findings = doc.get("findings")
+        if isinstance(findings, list) and findings:
+            lines.append(f"- findings: {len(findings)}")
+            for finding in findings[:5]:
+                if isinstance(finding, dict):
+                    sev = finding.get("severity", "?")
+                    msg = finding.get("message", "")
+                    lines.append(f"  - [{sev}] {msg}")
+        return "\n".join(lines) if lines else "(empty handoff)"
 
     def sel_release_scope_handoff(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
         return self._render_handoffs(name, policy, self._handoffs(agent="project-manager"))
