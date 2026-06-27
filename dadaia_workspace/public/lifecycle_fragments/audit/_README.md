@@ -1,14 +1,12 @@
-# audit — scaffolded, deferred
+# audit — shipped (v0.1.30)
 
-This workflow directory is scaffolded but carries no step fragments yet. The `audit`
-workflow is deferred to a follow-up release; only its directory and this stub ship
-now.
+This workflow is a real fragment+gate body (`features/lifecycle/workflows/audit.py`,
+shipped v0.1.30 / T-30-E-01). It scopes an audit, scans for drift, and triages findings
+into dispositions; its steps communicate through the run-scoped workflow-step handoff
+ledger (v0.1.30 Item 5). The terminal Python gate is disposition-only — it advances no
+release phase and **deletes nothing** (audit output is disposition-ready: status tokens
+and routing, never a destructive change).
 
-When implemented, this workflow scopes an audit, runs the doctors, scans for drift,
-and triages findings into dispositions. Planned steps (see the epic, §6.5):
-`audit_scope` (project-auditor), `doctor_pass` (Python), `drift_scan`
-(project-auditor), `triage` (project-manager / product-engineer). Audit output must
-be disposition-ready and land in the audit channel.
-
-Do not reference fragments from this directory in any shipped workflow until the step
-fragments exist — the loader and workflow checks will fail on a dangling fragment id.
+The fragment files in this directory are the per-step prompt bodies. The authoritative
+step sequence lives in the workflow body module (`_SEQUENCE` in `audit.py`); it is not
+duplicated here, to avoid drift.

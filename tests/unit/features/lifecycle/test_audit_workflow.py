@@ -22,6 +22,8 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
     LifecyclePhase,
+    LifecycleRun,
+    LifecycleRunStatus,
 )
 from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
 from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
@@ -110,6 +112,33 @@ def test_audit_body_runs_end_to_end_on_fake_runtime(tmp_path: Path) -> None:
     labels = [s.label for s in result.steps]
     assert labels == ["audit_scope", "drift_scan", "triage", "audit_disposition_gate"]
     assert result.steps[-1].is_gate is True
+
+
+def test_audit_disposition_gate_blocks_on_incomplete_handoff_graph(tmp_path: Path) -> None:
+    """The terminal gate's graph-completeness BLOCK branch (A26/A28): a run that reached the
+    gate un-blocked but whose ledger is missing a declared producer edge must BLOCK — proves
+    the advance-vs-block gate logic, not just the upstream-resolve block path."""
+    _workspace(tmp_path)
+    wf = _workflow(tmp_path, _resolver(tmp_path))
+    gate_step = _SEQUENCE[-1]
+    # blocked is None (no prior gate fired) but workflow_steps is empty: the producing
+    # steps declared `produces` yet wrote no ledger payload → graph incomplete.
+    run = LifecycleRun(
+        run_id="aud-incomplete",
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        command="audit",
+        phase=LifecyclePhase.QA_REVIEW,
+        status=LifecycleRunStatus.RUNNING,
+        current_step="triage",
+        blocked=None,
+    )
+    block = wf._graph_completeness_block(run, gate_step)
+    assert block is not None
+    assert "graph incomplete" in block.reason
+    # And with no resolver wired, the gate degrades to a no-op (no ledger to check).
+    wf_no_resolver = _workflow(tmp_path, None)
+    assert wf_no_resolver._graph_completeness_block(run, gate_step) is None
 
 
 def test_audit_body_records_injected_fragments_and_context(tmp_path: Path) -> None:

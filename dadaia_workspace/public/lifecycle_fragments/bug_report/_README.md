@@ -1,13 +1,12 @@
-# bug_report — scaffolded, deferred
+# bug_report — shipped (v0.1.30)
 
-This workflow directory is scaffolded but carries no step fragments yet. The
-`bug_report` workflow is deferred to a follow-up release; only its directory and this
-stub ship now.
+This workflow is a real fragment+gate body (`features/lifecycle/workflows/bug_report.py`,
+shipped v0.1.30 / T-30-E-03). It normalizes a reported symptom into an additive bug
+record, deduplicating against existing bugs; its steps communicate through the run-scoped
+workflow-step handoff ledger (v0.1.30 Item 5). The writing step is scope-locked to the
+ADDITIVE `specs/bugs/**` class only (no lease, never blocked); an out-of-scope write is
+gate-BLOCKED. Bug records are additive — never a destructive change.
 
-When implemented, this workflow normalizes a reported symptom into an additive bug
-record, deduplicating against existing bugs. Planned steps (see the epic, §6.7):
-`bug_intake` (any / PM), `dedupe` (Python / product-engineer), `bug_write`
-(Python / product-engineer). Bug records are additive and land in the bug channel.
-
-Do not reference fragments from this directory in any shipped workflow until the step
-fragments exist — the loader and workflow checks will fail on a dangling fragment id.
+The fragment files in this directory are the per-step prompt bodies. The authoritative
+step sequence lives in the workflow body module (`_SEQUENCE` in `bug_report.py`); it is
+not duplicated here, to avoid drift.
