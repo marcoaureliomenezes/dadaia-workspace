@@ -13,7 +13,7 @@
 
 ## Wave A — Resolver + overlay + CLI harness governance (D-1, D-2, D-3 store/schema)
 
-### [-] T-29-A-01 — Add per-harness default profiles to the resolver CatalogStep
+### [x] T-29-A-01 — Add per-harness default profiles to the resolver CatalogStep
 **Goal:** `CatalogStep` carries `default_profiles: dict[str, str]` so the resolver can
 auto-select a profile per effective harness.
 **Write set:** `dadaia_workspace/features/lifecycle/policy_resolver.py`,

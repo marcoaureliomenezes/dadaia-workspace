@@ -567,6 +567,9 @@ def _governed_step(step: DadaiaWorkflowStepDTO) -> CatalogStep | None:
         role=step.role,
         default_harness=step.default_harness,
         default_profile=default_profile,
+        # T-29-A-01: carry the per-harness default profile map onto the resolver seam so
+        # the resolver can auto-select a profile for an effective-harness override (D-1).
+        default_profiles=dict(step.default_profiles),
         fragments=fragments,
         output_schema=_OUTPUT_SCHEMA_DEFAULT if step.fragment_id else None,
     )

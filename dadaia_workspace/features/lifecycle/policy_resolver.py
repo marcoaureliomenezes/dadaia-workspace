@@ -70,14 +70,17 @@ class CatalogStep:
     """One governed step in the library workflow catalog (M3 — built in Wave A).
 
     ``default_harness`` is the Layer-2 harness the step defaults to; ``default_profile``
-    is the built-in profile id for that harness. ``fragments`` / ``output_schema`` are
-    carried for the run snapshot's auditability.
+    is the built-in profile id for that harness. ``default_profiles`` (v0.1.29 / T-29-A-01)
+    maps every supported harness to its built-in default profile id so the resolver can
+    auto-select a profile per *effective* harness (D-1). ``fragments`` / ``output_schema``
+    are carried for the run snapshot's auditability.
     """
 
     label: str
     role: str
     default_harness: str
     default_profile: str
+    default_profiles: dict[str, str] = field(default_factory=dict)
     fragments: tuple[str, ...] = ()
     output_schema: str | None = None
 
@@ -124,6 +127,16 @@ _IMPLEMENTATION_STEP_PROFILE: dict[str, str] = {
     "review_code": "codex-review-deep",
 }
 
+# Per-harness default profile by step purpose (v0.1.29 / T-29-A-01) — the library-catalog
+# twin of ``dadaia_catalog._DEFAULT_PROFILE_BY_HARNESS_PURPOSE``. ``"standard"`` = a
+# producing worker step, ``"deep"`` = a review/gate worker step. Used to populate each
+# ``CatalogStep.default_profiles`` so the resolver can auto-select a profile per effective
+# harness (D-1). PI has no dedicated review profile, so its deep slot is ``pi-reasoning-high``.
+_DEFAULT_PROFILE_BY_HARNESS_PURPOSE: dict[str, dict[str, str]] = {
+    "codex": {"standard": "codex-implementation-standard", "deep": "codex-review-deep"},
+    "pi": {"standard": "pi-implementation-standard", "deep": "pi-reasoning-high"},
+}
+
 
 def library_workflow_catalog() -> WorkflowCatalog:
     """Build the Wave-A library workflow catalog from the pipeline + ``model_profiles``.
@@ -145,6 +158,12 @@ def library_workflow_catalog() -> WorkflowCatalog:
                 f"library default profile {profile_id!r} (harness {profile.harness!r}) "
                 f"does not match step {pstep.label!r} harness {harness!r}"
             )
+        # T-29-A-01: per-harness default profiles so the resolver can auto-select a profile
+        # for an effective-harness override. Review/gate steps default to the deep profile.
+        purpose = "deep" if pstep.label.startswith("review") else "standard"
+        default_profiles = {
+            h: by_purpose[purpose] for h, by_purpose in _DEFAULT_PROFILE_BY_HARNESS_PURPOSE.items()
+        }
         fragments = (pstep.fragment_id, *pstep.shared_fragment_ids) if pstep.fragment_id else ()
         steps.append(
             CatalogStep(
@@ -152,6 +171,7 @@ def library_workflow_catalog() -> WorkflowCatalog:
                 role=pstep.role,
                 default_harness=harness,
                 default_profile=profile_id,
+                default_profiles=default_profiles,
                 fragments=fragments,
                 output_schema="agent-run-result-v1",
             )
