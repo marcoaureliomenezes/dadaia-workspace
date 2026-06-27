@@ -13,7 +13,7 @@
 
 ## Wave A — shared-headless-adapter-base (FOUNDATION — must land first, D-3)
 
-- [-] **T-30-A-01** — Author the shared headless-adapter base.
+- [x] **T-30-A-01** — Author the shared headless-adapter base.
   - Goal: create the single home for `_redact`/`_SECRET_NAME_PARTS`, `_GitDiffPort`/
     `_with_changed_paths`, `_env`/allowlist, the `Runner` seam type, and the shared `_prompt`
     JSON-envelope builder; factor subprocess parts separable from redaction+git seam.
