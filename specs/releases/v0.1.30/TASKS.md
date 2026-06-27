@@ -117,7 +117,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/policy_resolver.py`.
   - Acceptance: A15.
 
-- [ ] **T-30-C-05** — WS-NITS: de-dup `_DEFAULT_PROFILE_BY_HARNESS_PURPOSE` + docstring + panel.
+- [-] **T-30-C-05** — WS-NITS: de-dup `_DEFAULT_PROFILE_BY_HARNESS_PURPOSE` + docstring + panel.
   - Goal: one shared home for the map (guarded by `_assert_catalog_defaults_resolve`);
     correct `policy_resolver` docstring to name `governed_workflow_catalog()`; panel
     `_semantic_check` 3-map union.
