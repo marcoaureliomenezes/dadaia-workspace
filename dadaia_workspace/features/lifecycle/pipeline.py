@@ -359,17 +359,38 @@ def implementation_ladder(
     )
 
 
+#: The resolved Layer-2 harness name → the pipeline ``AgentRuntimeKind`` that runs it
+#: (v0.1.29 / T-29-A-06 — the inverse of the catalog's kind→harness map). ``fake`` is NOT
+#: here: it is never a *resolved* governed harness — it is the dry-run/test sentinel that
+#: :func:`apply_resolved_policy` preserves explicitly.
+_HARNESS_TO_KIND: dict[str, AgentRuntimeKind] = {
+    "codex": AgentRuntimeKind.CODEX_EXEC,
+    "pi": AgentRuntimeKind.PI_HEADLESS,
+}
+
+
 def apply_resolved_policy(
     steps: tuple[PipelineStep, ...],
     snapshot: WorkflowPolicySnapshot,
 ) -> tuple[PipelineStep, ...]:
-    """Overlay a resolved policy snapshot's per-step model onto pipeline steps (T-28-A-07).
+    """Overlay a resolved policy snapshot onto pipeline steps — the single author of
+    ``runtime_kind`` (T-29-A-06 / D-2).
 
     Matches each step to its snapshot entry by label and threads the resolved concrete
-    model into the step's ``resolved_model`` (and ``model_profile`` for observability). The
-    step's ``runtime_kind`` is left as the caller selected — the resolved model is the
-    governance choice; which harness adapter runs it is the CLI/container choice. A step
-    with no matching snapshot entry is returned unchanged.
+    model into the step's ``resolved_model`` (and ``model_profile`` for observability), then
+    sets ``runtime_kind`` from the snapshot's **resolved harness** so the adapter that runs
+    and the snapshot that is recorded always agree — there is no separate post-resolve
+    ``runtime_kind`` swap. A step with no matching snapshot entry is returned unchanged.
+
+    **Fake dry-run is preserved (architect MEDIUM).** ``fake`` is never a *resolved*
+    harness; when the caller built the step on :data:`AgentRuntimeKind.FAKE` (a dry-run or
+    a test against ``FakeAgentRuntime``), the step keeps ``FAKE`` while the governed model
+    is still threaded for auditability. Only a real (non-fake) base step adopts the
+    resolved harness's kind.
+
+    Raises:
+        ValueError: if a snapshot entry names a harness with no known runtime kind (a
+            corrupt/forbidden Layer-2 harness leaked past resolution).
     """
     from dataclasses import replace
 
@@ -386,7 +407,24 @@ def apply_resolved_policy(
             reasoning=entry.reasoning,
             source=entry.source,
         )
-        out.append(replace(step, resolved_model=resolved, model_profile=entry.model_profile))
+        if step.runtime_kind is AgentRuntimeKind.FAKE:
+            runtime_kind = AgentRuntimeKind.FAKE
+        else:
+            mapped = _HARNESS_TO_KIND.get(entry.harness)
+            if mapped is None:
+                raise ValueError(
+                    f"step {step.label!r}: resolved harness {entry.harness!r} has no "
+                    f"runtime kind; Layer-2 workers are codex or pi only"
+                )
+            runtime_kind = mapped
+        out.append(
+            replace(
+                step,
+                runtime_kind=runtime_kind,
+                resolved_model=resolved,
+                model_profile=entry.model_profile,
+            )
+        )
     return tuple(out)
 
 

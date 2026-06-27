@@ -51,7 +51,7 @@ codex|pi) under `workflowOverlay`; keep `additionalProperties:false`.
 **Acceptance:** old overlay validates; harness overlay validates; non-codex/pi value
 rejected. (AC-6, AC-9.) Projection deferred to Wave D checkpoint.
 
-### [-] T-29-A-06 — pipeline.apply_resolved_policy sets runtime_kind from resolved harness
+### [x] T-29-A-06 — pipeline.apply_resolved_policy sets runtime_kind from resolved harness
 **Goal:** `apply_resolved_policy` maps each entry's resolved harness → `AgentRuntimeKind`
 and sets `PipelineStep.runtime_kind`; unmappable harness raises actionable error.
 **Write set:** `dadaia_workspace/features/lifecycle/pipeline.py`.

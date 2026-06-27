@@ -382,3 +382,55 @@ def test_pipeline_threads_resolved_model_and_persists_snapshot() -> None:
     assert persisted.workflow_policy is not None
     assert persisted.workflow_policy.workflow_id == "implementation"
     assert persisted.workflow_policy.step("implement") is not None
+
+
+# ---------------------------------------------------------------------------
+# v0.1.29 / T-29-A-06 — apply_resolved_policy owns runtime_kind from resolved harness
+# ---------------------------------------------------------------------------
+
+
+def _resolve(default_harness: str | None = None):  # type: ignore[no-untyped-def]
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+        library_workflow_catalog,
+    )
+
+    resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
+    return resolver.resolve("implementation", context="default", default_harness=default_harness)
+
+
+def test_apply_resolved_policy_sets_runtime_kind_from_resolved_harness() -> None:
+    # AC-3: a pi-resolved snapshot drives PI_HEADLESS on every step when the base
+    # ladder is built on a real (non-fake) harness.
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    snapshot = _resolve(default_harness="pi")
+    base = implementation_ladder(AgentRuntimeKind.CODEX_EXEC)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    for step in steps:
+        assert step.runtime_kind is AgentRuntimeKind.PI_HEADLESS
+
+
+def test_apply_resolved_policy_codex_resolves_codex_exec() -> None:
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    snapshot = _resolve()  # default codex
+    base = implementation_ladder(AgentRuntimeKind.PI_HEADLESS)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    for step in steps:
+        assert step.runtime_kind is AgentRuntimeKind.CODEX_EXEC
+
+
+def test_apply_resolved_policy_preserves_fake_for_dry_run() -> None:
+    # ARCHITECT MEDIUM: a base ladder built on FAKE (dry-run / test) keeps FAKE even
+    # though the snapshot resolves a governed harness — fake is never a resolved harness.
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    snapshot = _resolve(default_harness="pi")
+    base = implementation_ladder(AgentRuntimeKind.FAKE)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    for step in steps:
+        assert step.runtime_kind is AgentRuntimeKind.FAKE
+        # The governed model is still threaded for auditability.
+        assert step.resolved_model is not None
+        assert step.resolved_model.harness == "pi"
