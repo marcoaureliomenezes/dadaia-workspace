@@ -36,6 +36,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     Runner,
     SubprocessAdapterMixin,
     _GitDiffPort,
+    normalize_artifact_refs,
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
@@ -209,12 +210,11 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
 
         if verdict_payload is not None:
             summary = str(verdict_payload.get("summary", assistant_text))
-            refs_raw = verdict_payload.get("artifact_refs", [])
-            refs = refs_raw if isinstance(refs_raw, list) else []
+            refs = normalize_artifact_refs(verdict_payload)
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(summary or "pi headless completed"),
-                artifact_refs=tuple(self._redact(item) for item in refs if isinstance(item, str)),
+                artifact_refs=tuple(self._redact(path) for path in refs),
                 structured_output=self._structured_from_verdict(verdict_payload),
             )
 

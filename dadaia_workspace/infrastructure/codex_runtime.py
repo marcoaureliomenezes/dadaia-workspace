@@ -30,6 +30,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     Runner,
     SubprocessAdapterMixin,
     _GitDiffPort,
+    normalize_artifact_refs,
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
@@ -224,14 +225,11 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         # PRIMARY: shared strict-primary / structural-fallback result extraction.
         payload = self._extract_result_payload(raw, request.expected_schema)
         if payload is not None:
-            refs_raw = payload.get("artifact_refs", [])
-            refs = refs_raw if isinstance(refs_raw, list) else []
+            refs = normalize_artifact_refs(payload)
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(str(payload.get("summary", "codex exec completed"))),
-                artifact_refs=tuple(
-                    self._redact(str(item)) for item in refs if isinstance(item, str)
-                ),
+                artifact_refs=tuple(self._redact(path) for path in refs),
                 structured_output=self._structured_from_payload(payload),
             )
 

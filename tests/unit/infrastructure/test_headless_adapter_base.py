@@ -39,6 +39,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     SubprocessAdapterMixin,
     build_prompt_envelope,
     filter_env,
+    normalize_artifact_refs,
 )
 
 #: A factory producing a freshly-constructed adapter that mixes in ``RedactionMixin``.
@@ -277,3 +278,52 @@ def test_redaction_mixin_skips_empty_values() -> None:
 
 def test_module_lives_in_infrastructure_layer() -> None:
     assert headless_adapter_base.__name__.startswith("dadaia_workspace.infrastructure")
+
+
+# ---------------------------------------------------------------------------
+# normalize_artifact_refs — accept BOTH real-worker shapes (v0.1.32 Wave C)
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_artifact_refs_accepts_plain_string_list() -> None:
+    """The string-list shape a real worker emitted for release_scope."""
+    payload = {"artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"]}
+    assert normalize_artifact_refs(payload) == (".dadaia/handoff/dadaia-workspace/a.handoff.json",)
+
+
+def test_normalize_artifact_refs_accepts_object_list_with_path() -> None:
+    """The richer object shape a real worker emitted for spec_create — was silently dropped.
+
+    Before this, only ``str`` items were kept, so the object form yielded empty refs and a
+    real review/create step BLOCKed on "missing artifact evidence" (live e2e, v0.1.32).
+    """
+    payload = {
+        "artifact_refs": [
+            {
+                "type": "handoff",
+                "path": ".dadaia/handoff/dadaia-workspace/spec.handoff.json",
+                "content_hash": "f95...",
+            }
+        ]
+    }
+    assert normalize_artifact_refs(payload) == (
+        ".dadaia/handoff/dadaia-workspace/spec.handoff.json",
+    )
+
+
+def test_normalize_artifact_refs_mixed_and_ignores_garbage() -> None:
+    payload = {
+        "artifact_refs": [
+            "string/ref.json",
+            {"path": "object/ref.json"},
+            {"no_path": "x"},  # dict without a path → ignored
+            123,  # non-str/dict → ignored
+            "",  # empty string → ignored
+        ]
+    }
+    assert normalize_artifact_refs(payload) == ("string/ref.json", "object/ref.json")
+
+
+def test_normalize_artifact_refs_non_list_or_absent_is_empty() -> None:
+    assert normalize_artifact_refs({"artifact_refs": "not-a-list"}) == ()
+    assert normalize_artifact_refs({}) == ()

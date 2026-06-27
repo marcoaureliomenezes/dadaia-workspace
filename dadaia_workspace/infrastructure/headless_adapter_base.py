@@ -122,6 +122,32 @@ def is_result_payload(payload: dict[str, object], expected_schema: str) -> bool:
     return classify_result_payload(payload, expected_schema) is not ResultMatch.NONE
 
 
+def normalize_artifact_refs(payload: dict[str, object]) -> tuple[str, ...]:
+    """Extract artifact-reference PATHS from a result payload — single-sourced for pi+codex.
+
+    Real workers emit ``artifact_refs`` in two shapes, BOTH observed live (v0.1.32):
+    a list of plain path strings (``["…/x.handoff.json"]``), OR a list of richer objects
+    (``[{"type": "handoff", "path": "…", "content_hash": "…"}]`` — the form the
+    output-handoff contract shows for a written artifact). Accept both: a non-empty string
+    item is its own path; a dict item contributes its ``path`` value. Anything else is
+    ignored; a non-list yields ``()``. (Before this, only ``str`` items were kept, so the
+    object form was silently dropped → empty refs → a real review/create step BLOCKed on
+    "missing artifact evidence".)
+    """
+    raw = payload.get("artifact_refs")
+    if not isinstance(raw, list):
+        return ()
+    paths: list[str] = []
+    for item in raw:
+        if isinstance(item, str) and item.strip():
+            paths.append(item)
+        elif isinstance(item, dict):
+            path = item.get("path")
+            if isinstance(path, str) and path.strip():
+                paths.append(path)
+    return tuple(paths)
+
+
 def extract_result_payload(text: str, expected_schema: str | None) -> dict[str, object] | None:
     """Parse the step's structured result object from an assistant message — single-sourced.
 

@@ -151,19 +151,69 @@ def _sandbox_root() -> Path:
     return root
 
 
-def _specs_tree(tmp_path: Path) -> Path:
-    """A minimal throwaway specs tree the context selector resolves dynamic inputs against.
+# A substantive, genuinely-reviewable SPEC for a TRIVIAL, clearly-sound change. The live
+# review step (``spec_arch_review``, software-architect) is adversarial by design and will
+# REJECT a stub (an earlier ``# spec`` fixture was correctly rejected as "structurally
+# unreviewable"). To prove the APPROVED/pass path live, the fixture must satisfy the
+# architect's rubric: problem, scope, constraints, requirements, architecture fit, prior
+# art, and testable acceptance — for a change small enough that approval is the sound verdict.
+_REVIEWABLE_SPEC = """# SPEC — Release v0.1.31 — add `dadaia --version`
 
-    Created under ``tmp_path`` — the real ``specs/`` is NEVER touched.
+**Status:** Aprovado
+
+## 1. Problem and context
+The `dadaia` CLI has no `--version` flag, so operators and support cannot confirm which
+installed build they are running. This blocks reproducible bug reports.
+
+## 2. Objective
+Add a `--version` flag to the root `dadaia` Typer app that prints the installed package
+version and exits 0.
+
+## 3. Scope (acceptance criteria)
+- A1. `dadaia --version` prints exactly the version string from package metadata and exits 0.
+- A2. `--version` is an eager flag: it short-circuits before any subcommand runs.
+- A3. No existing subcommand behaviour changes.
+
+## 4. Out of scope
+- No new dependency. No change to any subcommand. No version-bump policy change.
+
+## 5. Architecture fit
+Extends the existing root Typer app callback (presentation/CLI layer only). Reads the
+version via the standard library `importlib.metadata.version("dadaia-workspace")` — no new
+layer, no new seam, no domain/infrastructure change. Prior art: the CLI already uses Typer
+callbacks for global options, so this follows the established pattern.
+
+## 6. Testable acceptance
+- Unit: invoke the app with `--version` via Typer's testing runner; assert stdout equals the
+  metadata version and exit code is 0 (A1/A2).
+- Regression: an existing subcommand still runs unchanged with no `--version` (A3).
+"""
+
+_ARCHITECTURE_MD = """# Architecture
+
+Hexagonal layering: `core` (domain models/protocols, no I/O) ← `features` (use-cases) ←
+`infrastructure` (adapters) and `cli` (Typer presentation). The CLI layer composes the
+root Typer app and may add global eager options in the app callback without touching
+features/core. Code map: `dadaia_workspace/cli/app.py` defines the root app + callback;
+package metadata is the version source of truth.
+"""
+
+
+def _specs_tree(tmp_path: Path) -> Path:
+    """A throwaway specs tree the context selector resolves dynamic inputs against.
+
+    Created under ``tmp_path`` — the real ``specs/`` is NEVER touched. The SPEC + architecture
+    are SUBSTANTIVE (not stubs) so the adversarial live review step can return a sound APPROVED
+    verdict — see :data:`_REVIEWABLE_SPEC`.
     """
     specs = tmp_path / "repos" / _CONTEXT / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     (specs / "releases" / _RELEASE).mkdir(parents=True)
     (specs / "constitution.md").write_text("# constitution\n", encoding="utf-8")
-    (specs / "memory" / "architecture.md").write_text("# architecture\n", encoding="utf-8")
+    (specs / "memory" / "architecture.md").write_text(_ARCHITECTURE_MD, encoding="utf-8")
     (specs / "memory" / "quality-assurance.md").write_text("# qa\n", encoding="utf-8")
     (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
-    (specs / "releases" / _RELEASE / "SPEC.md").write_text("# spec\n", encoding="utf-8")
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text(_REVIEWABLE_SPEC, encoding="utf-8")
     return specs
 
 
