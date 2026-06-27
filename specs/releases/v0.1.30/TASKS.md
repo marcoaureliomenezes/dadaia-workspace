@@ -111,7 +111,7 @@
     `dadaia_workspace/public/schemas/workflow-model-policy-v1.schema.json`.
   - Acceptance: A15, A16.
 
-- [-] **T-30-C-04** — WS-OVERLAYS: resolver chain resolution.
+- [x] **T-30-C-04** — WS-OVERLAYS: resolver chain resolution.
   - Goal: `policy_resolver` resolves a step's profile through the per-context overlay chain,
     fail-closed on unresolvable refs.
   - Write set: `dadaia_workspace/features/lifecycle/policy_resolver.py`.

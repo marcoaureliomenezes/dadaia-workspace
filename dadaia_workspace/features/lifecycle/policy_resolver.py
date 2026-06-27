@@ -6,11 +6,14 @@ consume to turn a workflow id + context + CLI overrides into a frozen
 never disagree on which model a step runs.
 
 **Precedence (per step):** ``CLI override > context overlay > default overlay > library
-default``. Only the ``default`` context overlay is honored this release (D-2); a
-non-``default`` context resolves to the library default (the overlay store already makes a
-non-``default`` key inert). The four sources collapse to two overlay layers in practice
-because only ``default`` is honored — but the precedence vocabulary is recorded on the
-snapshot for auditability.
+default``. Per-context overlays are honored (WS-OVERLAYS, replacing the D-2 collapse): a
+non-``default`` context resolves a step's profile/harness through its ``extends`` chain
+(``context → extends… → default``), the nearest level that defines a value winning. The
+overlay store parse-validates the ``extends`` graph (no cycle / no missing parent), so the
+chain walk here is total. An unresolvable ref (unknown profile, harness/profile mismatch,
+deprecated-without-replacement, or a stale overlay step id anywhere in the chain) is a hard
+failure (fail-closed). The precedence vocabulary is recorded on the snapshot for
+auditability.
 
 **M3 (Wave A independence):** the library step defaults come from
 :mod:`dadaia_workspace.features.lifecycle.model_profiles` directly — NOT the Wave-B
@@ -261,15 +264,13 @@ class WorkflowExecutionPolicyResolver:
                     f"workflow {workflow_id!r}; valid steps: {valid}"
                 )
 
-        # Validate the (honored) default-context overlay step ids against the catalog, so a
-        # stale overlay step id is a hard failure rather than a silently-ignored no-op (D-2:
-        # only the `default` context is honored, so only it is validated/applied).
-        if self._overlay is not None and context == DEFAULT_CONTEXT:
-            overlay_steps = self._overlay.contexts.get(context, {}).get(workflow_id, {})
-            overlay_harness_steps = self._overlay.step_harness_overlay.get(context, {}).get(
-                workflow_id, {}
-            )
-            for step_label in {*overlay_steps, *overlay_harness_steps}:
+        # Validate the resolved context's overlay step ids against the catalog (WS-OVERLAYS:
+        # every context is honored, walking its `extends` chain — not only `default`). A
+        # stale overlay step id anywhere in the chain is a hard failure rather than a
+        # silently-ignored no-op. The store has already validated the `extends` graph (no
+        # cycle / no missing parent), so walking it here is safe.
+        if self._overlay is not None:
+            for step_label in self._overlay_chain_steps(context, workflow_id):
                 if workflow.step(step_label) is None:
                     valid = ", ".join(s.label for s in workflow.steps)
                     raise PolicyResolutionError(
@@ -300,6 +301,41 @@ class WorkflowExecutionPolicyResolver:
             steps=tuple(entries),
             prefix_hash=prefix_hash,
         )
+
+    def _overlay_chain_steps(self, context: str, workflow_id: str) -> set[str]:
+        """Return every step label the overlay overrides across *context*'s ``extends`` chain.
+
+        Unions the profile-override steps and the per-step harness-override steps from each
+        level of ``context → extends… → default`` so a stale step id anywhere in the chain
+        is validated (WS-OVERLAYS). Returns the empty set when no overlay is bound.
+        """
+        if self._overlay is None:
+            return set()
+        steps: set[str] = set()
+        for level in self._context_chain(context):
+            steps |= set(self._overlay.contexts.get(level, {}).get(workflow_id, {}))
+            steps |= set(self._overlay.step_harness_overlay.get(level, {}).get(workflow_id, {}))
+        return steps
+
+    def _context_chain(self, context: str) -> list[str]:
+        """Return the ordered context chain ``[context, parent…, default]`` (WS-OVERLAYS).
+
+        Mirrors the store's chain walk over the parse-validated ``extends`` graph (no cycle /
+        no missing parent), so this terminates; a defensive ``seen`` guard breaks any
+        pathological case. ``default`` is always the tail.
+        """
+        if self._overlay is None:
+            return [context, DEFAULT_CONTEXT] if context != DEFAULT_CONTEXT else [DEFAULT_CONTEXT]
+        chain: list[str] = []
+        seen: set[str] = set()
+        current: str | None = context
+        while current is not None and current not in seen:
+            chain.append(current)
+            seen.add(current)
+            current = self._overlay.extends.get(current)
+        if DEFAULT_CONTEXT not in chain:
+            chain.append(DEFAULT_CONTEXT)
+        return chain
 
     def _assert_layer2_harness(self, harness: str, *, source: str) -> None:
         """Reject a harness that is not a Layer-2 worker (codex|pi) — AC-9."""
@@ -356,9 +392,9 @@ class WorkflowExecutionPolicyResolver:
             cli_harness_by_step=cli_harness_by_step,
         )
 
-        # Profile precedence: CLI > default-overlay (only `default` context, D-2) >
-        # auto-selected default for the EFFECTIVE harness (D-1 auto-profile). An explicit
-        # profile (CLI or overlay) is never overridden by harness auto-selection.
+        # Profile precedence: CLI > overlay (resolved through the context's `extends` chain,
+        # WS-OVERLAYS) > auto-selected default for the EFFECTIVE harness (D-1 auto-profile).
+        # An explicit profile (CLI or overlay) is never overridden by harness auto-selection.
         profile_id = self._default_profile_for_harness(step, effective_harness)
         source = PolicySource.LIBRARY_DEFAULT
         explicit = False

@@ -90,16 +90,30 @@ def test_cli_override_beats_overlay() -> None:
     assert impl.source is PolicySource.CLI
 
 
-def test_non_default_context_overlay_inert() -> None:
-    # D-2: overlay keyed on a non-default context must not affect resolution.
+def test_non_default_context_overlay_now_honored() -> None:
+    # WS-OVERLAYS (replaces the D-2 collapse, A15): an overlay keyed on a non-default
+    # context IS honored. The override must be harness-consistent — here 'other' sets both
+    # the per-step harness to pi and a pi profile, so resolution succeeds.
     overlay = WorkflowModelPolicyOverlay(
         policy_id="default",
         contexts={"other": {_WORKFLOW: {"implement": "pi-reasoning-high"}}},
+        step_harness_overlay={"other": {_WORKFLOW: {"implement": "pi"}}},
     )
     snapshot = _resolver(overlay).resolve(_WORKFLOW, context="other")
     impl = snapshot.step("implement")
     assert impl is not None
-    # falls back to library default, not the (inert) non-default overlay
+    assert impl.model_profile == "pi-reasoning-high"
+    assert impl.harness == "pi"
+    assert impl.source is PolicySource.DEFAULT_OVERLAY
+
+
+def test_non_default_context_unknown_falls_back_to_library_default() -> None:
+    # A non-default context with NO override anywhere in its chain inherits the library
+    # default (the chain tail is 'default', which here carries no overlay).
+    overlay = WorkflowModelPolicyOverlay(policy_id="default", contexts={})
+    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="unmapped")
+    impl = snapshot.step("implement")
+    assert impl is not None
     assert impl.model_profile == "codex-implementation-standard"
     assert impl.source is PolicySource.LIBRARY_DEFAULT
 
