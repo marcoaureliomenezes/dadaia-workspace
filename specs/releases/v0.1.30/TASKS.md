@@ -62,7 +62,7 @@
     `dadaia_workspace/public/skills/ai-harness-codex/SKILL.md`.
   - Acceptance: A7, A8, A9.
 
-- [ ] **T-30-B-03** — WS-PI-6: PI telemetry reader.
+- [-] **T-30-B-03** — WS-PI-6: PI telemetry reader.
   - Goal: incremental reader ingesting `~/.pi/agent/sessions/` metadata into the store (mirror
     `reader/codex.py`; metadata-only, T1; graceful idle on IO/parse failure).
   - Write set: `dadaia_workspace/features/telemetry/reader/pi.py` (NEW).
