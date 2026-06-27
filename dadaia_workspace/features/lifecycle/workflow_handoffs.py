@@ -146,7 +146,19 @@ def _validate_generic_handoff(payload: dict[str, object]) -> list[str]:
 
 
 #: Registry of named payload schemas → Python validators (A21). New named schemas are
-#: registered here; per-schema JSON Schema files follow incrementally (Slice D).
+#: registered here AT MODULE-IMPORT time (never mutated at runtime — Wave-E test-isolation
+#: nit). Per-schema JSON Schema files follow incrementally (Slice D). The Wave-E
+#: ``audit``/``research``/``bug_report`` workflow bodies (T-30-E-01..03) seed their
+#: output-schema validators here so a test never has to register them at runtime:
+#:
+#: - audit:      scope → ``audit-scope-handoff-v1`` (summary), drift-scan review →
+#:               ``audit-findings-handoff-v1`` (verdict), triage →
+#:               ``audit-disposition-handoff-v1`` (summary — disposition-ready output).
+#: - research:   scope → ``research-scope-handoff-v1`` (summary), synthesis →
+#:               ``research-findings-handoff-v1`` (summary).
+#: - bug_report: intake → ``bug-intake-handoff-v1`` (summary), dedupe review →
+#:               ``bug-dedupe-handoff-v1`` (verdict), bug_write →
+#:               ``bug-record-handoff-v1`` (summary — the ADDITIVE bug record).
 _PAYLOAD_VALIDATORS: dict[str, PayloadValidator] = {
     "release-scope-handoff-v1": _validate_release_scope_handoff,
     "spec-review-handoff-v1": _validate_review_verdict,
@@ -155,6 +167,17 @@ _PAYLOAD_VALIDATORS: dict[str, PayloadValidator] = {
     "qa-review-handoff-v1": _validate_review_verdict,
     "implementation-handoff-v1": _validate_generic_handoff,
     "generic-step-handoff-v1": _validate_generic_handoff,
+    # Wave E — audit workflow body (T-30-E-01).
+    "audit-scope-handoff-v1": _validate_generic_handoff,
+    "audit-findings-handoff-v1": _validate_review_verdict,
+    "audit-disposition-handoff-v1": _validate_generic_handoff,
+    # Wave E — research workflow body (T-30-E-02).
+    "research-scope-handoff-v1": _validate_generic_handoff,
+    "research-findings-handoff-v1": _validate_generic_handoff,
+    # Wave E — bug_report workflow body (T-30-E-03).
+    "bug-intake-handoff-v1": _validate_generic_handoff,
+    "bug-dedupe-handoff-v1": _validate_review_verdict,
+    "bug-record-handoff-v1": _validate_generic_handoff,
 }
 
 
