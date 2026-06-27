@@ -8,6 +8,13 @@ carries the assistant ``AgentMessage``.
 
 No ``pi`` client is imported at module load — subprocess only — so offline-first
 is preserved and the unit suite runs fully faked through an injected runner.
+
+The security-relevant invariants shared with the other real adapters — secret
+redaction, the env-allowlist filter, the git ``changed_paths`` override, the
+``Runner`` seam, and the prompt envelope — live in
+:mod:`dadaia_workspace.infrastructure.headless_adapter_base`. This module keeps
+only the genuinely PI-CLI-specific logic (``_command``, the JSONL parse, and
+result/stream extraction).
 """
 
 from __future__ import annotations
@@ -16,10 +23,9 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -27,8 +33,11 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
-
-Runner = Callable[..., subprocess.CompletedProcess[str]]
+from dadaia_workspace.infrastructure.headless_adapter_base import (
+    Runner,
+    SubprocessAdapterMixin,
+    _GitDiffPort,
+)
 
 _DEFAULT_ENV_ALLOWLIST = (
     "ANTHROPIC_API_KEY",
@@ -39,15 +48,8 @@ _DEFAULT_ENV_ALLOWLIST = (
     "XDG_DATA_HOME",
     "TERM",
 )
-_SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
 _FENCED_JSON = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
-
-
-class _GitDiffPort(Protocol):
-    """Narrow git seam the adapter needs — satisfied by ``GitSubprocessClient``."""
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
 
 
 @dataclass(frozen=True)
@@ -72,7 +74,7 @@ class PiHeadlessConfig:
     tools: tuple[str, ...] = ("read", "write", "edit", "bash")
 
 
-class PiHeadlessAdapter:
+class PiHeadlessAdapter(SubprocessAdapterMixin):
     """Run bounded lifecycle worker prompts through ``pi --mode json``.
 
     The adapter is infrastructure-only: it never decides lifecycle transitions,
@@ -94,6 +96,9 @@ class PiHeadlessAdapter:
         self._runner = runner
         self._environ = environ if environ is not None else os.environ
         self._git = git
+        # Wire the mixin seams to this adapter's config.
+        self._env_allowlist = config.env_allowlist
+        self._cwd_for_diff = config.cwd
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.PI_HEADLESS
@@ -173,29 +178,6 @@ class PiHeadlessAdapter:
         if request.resolved_model is not None:
             return request.resolved_model.model
         return self._config.model
-
-    def _env(self) -> dict[str, str]:
-        return {
-            key: self._environ[key] for key in self._config.env_allowlist if key in self._environ
-        }
-
-    @staticmethod
-    def _prompt(request: AgentRunRequest) -> str:
-        return json.dumps(
-            {
-                "role": request.role,
-                "prompt": request.prompt,
-                "context": request.context,
-                "release_id": request.release_id,
-                "task_id": request.task_id,
-                "allowed_paths": list(request.allowed_paths),
-                "forbidden_paths": list(request.forbidden_paths),
-                "expected_schema": request.expected_schema,
-                "required_evidence": [kind.value for kind in request.required_evidence],
-            },
-            indent=2,
-            sort_keys=True,
-        )
 
     # -- result extraction (WS-PI-2) -------------------------------------
 
@@ -312,28 +294,3 @@ class PiHeadlessAdapter:
             for key, value in extra.items():
                 structured[str(key)] = self._redact(str(value))
         return structured
-
-    # -- changed_paths via git diff (Ring-2 root-cause, WS-PI-2) ----------
-
-    def _with_changed_paths(self, result: AgentRunResult) -> AgentRunResult:
-        if self._git is None:
-            return result
-        changed = self._git.diff_name_only(self._config.cwd)
-        structured = dict(result.structured_output)
-        structured["changed_paths"] = ",".join(changed)
-        return AgentRunResult(
-            status=result.status,
-            summary=result.summary,
-            artifact_refs=result.artifact_refs,
-            structured_output=structured,
-            error=result.error,
-        )
-
-    def _redact(self, text: str) -> str:
-        redacted = text
-        for key, value in self._environ.items():
-            if not value:
-                continue
-            if any(part in key.upper() for part in _SECRET_NAME_PARTS):
-                redacted = redacted.replace(value, "[REDACTED]")
-        return redacted
