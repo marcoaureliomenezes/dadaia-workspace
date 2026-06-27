@@ -1,18 +1,20 @@
 ---
-release: none
-phase: ARCHIVED
+release: v0.1.30
+phase: DEFINITION
 ---
 
-No active release.
+# Active release: v0.1.30 — super release: PI/Codex Layer-2 + workflow system maturation
 
-Last shipped: **v0.1.29 — Harness as a governed dimension + catalog completion**
-(CLOSED + Aprovado; closure at `specs/_archive/releases/v0.1.29/CLOSURE.md`). PI is now a
-fully selectable, governed Layer-2 worker: effective-harness precedence (CLI > overlay >
-catalog default), auto-profile on harness override, snapshot records the effective harness,
-panel codex/pi toggle persists. Catalog complete to all 7 workflows (closure resolvable;
-audit/research/bug_report deferred stubs). Resolves the v0.1.28 harness-governance residual.
+Operator `/goal` 2026-06-27: a super release taking 6 correlated open backlog items
+(new architecture / PI / Codex / 2nd agentic layer / workflows).
 
-Shipped together with v0.1.28 (workflow model governance + panel control plane).
+**Phase:** DEFINITION — product-engineer authoring SPEC/PLAN/TASKS from `GRILL.md`
+(picked Core 6; WS-PI-5 deferred; foundation-first; **DEFINE ONLY then operator checkpoint**;
+v0.1.30).
 
-Deferred (backlog `workflow-model-governance-operator-profiles-and-context-overlays`):
-operator-added PI `.local.json` profiles + per-context overlay inheritance.
+Picked Core 6: shared-headless-adapter-base (foundation) · codex-runtime-fidelity ·
+pi-agent-fourth-harness (WS-PI-6 only) · workflow-model-governance-operator-profiles-and-context-overlays ·
+workflow-step-handoff-data-plane-cleanup (CRITICAL) · lifecycle-prompt-fragments-ai-surface-dehydration (CRITICAL).
+
+Branch: `feature/v0.1.30` (off main @ ccb8885). Cadence: stop at approved SPEC/PLAN/TASKS +
+DEFINITION review (architect + qa); do NOT implement until the operator approves the plan.
