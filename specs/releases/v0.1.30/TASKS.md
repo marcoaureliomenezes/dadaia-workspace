@@ -162,7 +162,7 @@
     `dadaia_workspace/infrastructure/json_lifecycle_run_store.py`.
   - Acceptance: A18.
 
-- [ ] **T-30-D-05** — Wire release-definition produces/consumes + terminal gate.
+- [-] **T-30-D-05** — Wire release-definition produces/consumes + terminal gate.
   - Goal: per-`ReleaseStep` edges; write+validate payloads; resolver-injected digests;
     terminal gate graph-completeness.
   - Write set: `dadaia_workspace/features/lifecycle/workflows/release_definition.py`;
