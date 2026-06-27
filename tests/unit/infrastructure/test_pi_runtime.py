@@ -100,7 +100,10 @@ def test_pi_adapter_builds_controlled_command_and_env(tmp_path: Path) -> None:
     assert argv[argv.index("--mode") : argv.index("--mode") + 2] == ["--mode", "json"]
     assert argv[argv.index("--tools") + 1] == "read,write,edit,bash"
     assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "claude-test"]
-    assert argv[-2:] == ["-p", "-"]
+    # ``-p`` (--print) only; the prompt is piped via stdin — NO trailing ``-`` (pi has no
+    # such option; bug pi-headless-command-trailing-dash-breaks-layer2).
+    assert argv[-1] == "-p"
+    assert "-" not in argv
     assert call["kwargs"]["cwd"] == tmp_path
     # Env is filtered to the allowlist only (ANTHROPIC_API_KEY is allowlisted).
     assert call["kwargs"]["env"] == {

@@ -171,7 +171,12 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         model = self._resolve_model(request)
         if model is not None:
             args += ["--model", model]
-        args += ["-p", "-"]
+        # ``--print``/-p is non-interactive; the prompt is piped via stdin
+        # (``subprocess.run(..., input=self._prompt(request))``). PI reads the piped
+        # stdin in print mode — do NOT append a ``-`` stdin marker: ``pi`` has no such
+        # option and rejects it ("Unknown option: -"), which BLOCKs every PI Layer-2
+        # step (bug pi-headless-command-trailing-dash-breaks-layer2).
+        args += ["-p"]
         return args
 
     def _resolve_model(self, request: AgentRunRequest) -> str | None:
