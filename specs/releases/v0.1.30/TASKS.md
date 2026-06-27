@@ -148,14 +148,14 @@
     `dadaia_workspace/public/lifecycle_fragments/shared/output-handoff.md`.
   - Acceptance: A21 (envelope+payload validation).
 
-- [-] **T-30-D-03** — Workflow-handoff resolver/service.
+- [x] **T-30-D-03** — Workflow-handoff resolver/service.
   - Goal: enqueue/resolve/ack/reclaim; envelope + named-payload validation; compact digest
     rendering; atomic consumption recording through the run store.
   - Write set: `dadaia_workspace/features/lifecycle/workflow_handoffs.py` (NEW);
     `dadaia_workspace/container.py`.
   - Acceptance: A19, A20, A22, A25.
 
-- [ ] **T-30-D-04** — Persist step payloads + run-store extension.
+- [x] **T-30-D-04** — Persist step payloads + run-store extension.
   - Goal: `write_run_artifact` step-payload path under `runs/lifecycle/<run_id>/steps/`;
     persist `workflow_steps` atomically.
   - Write set: `dadaia_workspace/infrastructure/runtime_files.py`;

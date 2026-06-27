@@ -15,6 +15,9 @@ if TYPE_CHECKING:
         WorkflowCatalog,
         WorkflowExecutionPolicyResolver,
     )
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        WorkflowHandoffResolver,
+    )
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         BacklogDefinitionWorkflow,
     )
@@ -620,6 +623,32 @@ def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
     """Compose lifecycle run-state store."""
     _guard_initialized(workspace_root)
     return JsonLifecycleRunStore(workspace_root)
+
+
+def build_workflow_handoff_resolver(
+    workspace_root: Path,
+) -> "WorkflowHandoffResolver":
+    """Compose the run-scoped workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-03).
+
+    The resolver is the queue engine over the ``LifecycleRun.workflow_steps`` control plane
+    (persisted atomically through the run store) and the immutable step payload data plane
+    (written under the WORKSPACE-ROOT ``.dadaia/runs/lifecycle/<run_id>/steps/`` canonical
+    zone by ``FilesystemRuntimeFileAdapter``, which satisfies the narrow
+    ``WorkflowStepPayloadWriter`` port). The clock is injected as an ISO-8601-UTC string
+    factory.
+    """
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
+
+    _guard_initialized(workspace_root)
+
+    def _clock() -> str:
+        return dt.datetime.now(tz=dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    return WorkflowHandoffResolver(
+        run_store=build_lifecycle_run_store(workspace_root),
+        payload_writer=FilesystemRuntimeFileAdapter(workspace_root),
+        clock=_clock,
+    )
 
 
 def build_workflow_model_profile_registry() -> "WorkflowCatalog":
