@@ -139,14 +139,21 @@ class WorkflowStepRecord:
         return WorkflowStepConsumptionState.PRODUCED
 
     def is_cleanup_eligible(self) -> bool:
-        """True iff every declared consumer has consumed this payload (A22).
+        """True iff this payload may be reclaimed by the consumed-TTL sweep (A22).
 
-        Cleanup-eligibility is *necessary* but not *sufficient* for reclaim: retention
-        mode and the consumed TTL are applied by the retention sweep on top of this.
-        A ``promote_to_evidence`` payload is never cleanup-eligible regardless of
-        consumption — it is durable evidence.
+        Cleanup-eligibility is *necessary* but not *sufficient* for reclaim: the consumed
+        TTL and the live-run guard are applied by the retention sweep on top of this.
+        Eligibility requires BOTH:
+
+        - ``retention_mode is DELETE_AFTER_CONSUMED`` — only transient prompt-to-prompt
+          payloads are reclaimed on the consumed-TTL path. ``PROMOTE_TO_EVIDENCE`` is
+          durable evidence; ``KEEP_UNTIL_FAILURE_TTL`` is kept on a separate (longer)
+          failure schedule, never reclaimed by the consumed-TTL sweep. Excluding both here
+          is the single source of truth the reclaim-allow set (container) and the doctor's
+          stale gate both rely on — a non-delete-after-consumed payload is NEVER eligible.
+        - every declared consumer has consumed it (``consumed_all``).
         """
-        if self.retention_mode is RetentionMode.PROMOTE_TO_EVIDENCE:
+        if self.retention_mode is not RetentionMode.DELETE_AFTER_CONSUMED:
             return False
         return self.consumption_state() is WorkflowStepConsumptionState.CONSUMED_ALL
 
