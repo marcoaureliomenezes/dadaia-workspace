@@ -59,19 +59,19 @@ _SHARED_IDS = {
 # Workflow dirs that still ship only a `_README.md` stub (no authored step fragments).
 # ``implementation`` left this set in v0.1.24 (T-24-11): it now ships three authored step
 # fragments (implement_tdd, self_verify, qa_review). ``backlog_definition`` left this set in
-# v0.1.26 R2 (T-26-02): it now ships four authored step fragments. ``audit``/``research``
-# left this set in v0.1.30 Wave E (T-30-E-01/02); ``bug_report`` follows in T-30-E-03.
-# ``closure`` stays a README-only stub (its close worker is generic, no fragment).
+# v0.1.26 R2 (T-26-02): it now ships four authored step fragments. ``audit``/``research``/
+# ``bug_report`` left this set in v0.1.30 Wave E (T-30-E-01..03): each now ships real
+# fragment+gate step fragments. ``closure`` stays a README-only stub (its close worker is
+# generic, no fragment).
 _DEFERRED_WORKFLOW_DIRS = {
     "closure",
-    "bug_report",
 }
 
 # Workflow dirs that ship authored step fragments backing a real fragment+gate body.
-# Grown task-by-task across Wave E: audit (E-01), research (E-02), bug_report (E-03).
 _AUTHORED_WORKFLOW_DIRS = {
     "audit",
     "research",
+    "bug_report",
 }
 
 _VALID_FRONTMATTER = """\

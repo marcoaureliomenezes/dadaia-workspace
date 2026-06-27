@@ -209,7 +209,7 @@
     `dadaia_workspace/public/lifecycle_fragments/` (research fragments).
   - Acceptance: A28 (research half).
 
-- [-] **T-30-E-03** — Real `bug_report` workflow body (ADDITIVE-safe).
+- [x] **T-30-E-03** — Real `bug_report` workflow body (ADDITIVE-safe).
   - Goal: fragment+gate body writing only `specs/bugs/` (ADDITIVE class — no lease).
   - Write set: `dadaia_workspace/features/lifecycle/workflows/bug_report.py` (NEW);
     `dadaia_workspace/public/lifecycle_fragments/` (bug_report fragments).
