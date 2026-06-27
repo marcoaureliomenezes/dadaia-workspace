@@ -93,7 +93,7 @@ omits them from the resolver seam and `resolve(<deferred>)` raises the actionabl
 unchanged).
 **Acceptance:** AC-7 (all 7 enumerated; deferred resolve raises actionable error).
 
-### [ ] T-29-B-03 — CLI `policy show` + container reach completed catalog
+### [-] T-29-B-03 — CLI `policy show` + container reach completed catalog
 **Goal:** confirm `dadaia lifecycle workflow policy show closure` resolves and the resolver
 factory/container sees the closure step; no second catalog source introduced.
 **Write set:** `dadaia_workspace/cli/commands/lifecycle.py` (only if a help/list string
