@@ -1,4 +1,12 @@
-"""Exec-backed Codex runtime adapter for lifecycle worker requests."""
+"""Exec-backed Codex runtime adapter for lifecycle worker requests.
+
+The security-relevant invariants shared with the other real adapters — secret
+redaction, the env-allowlist filter, the git ``changed_paths`` override, the
+``Runner`` seam, and the prompt envelope — live in
+:mod:`dadaia_workspace.infrastructure.headless_adapter_base`. This module keeps
+only the genuinely Codex-CLI-specific logic (``_command``, ``_model_and_effort``,
+effort narrowing, the ``--output-last-message`` read, and result extraction).
+"""
 
 from __future__ import annotations
 
@@ -6,10 +14,10 @@ import json
 import os
 import subprocess
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, get_args
+from typing import get_args
 
 from dadaia_workspace.core.model_registry import CodexEffort, codex_tier_views
 from dadaia_workspace.core.models.lifecycle import (
@@ -18,8 +26,11 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
-
-Runner = Callable[..., subprocess.CompletedProcess[str]]
+from dadaia_workspace.infrastructure.headless_adapter_base import (
+    Runner,
+    SubprocessAdapterMixin,
+    _GitDiffPort,
+)
 
 _DEFAULT_ENV_ALLOWLIST = (
     "PATH",
@@ -30,7 +41,6 @@ _DEFAULT_ENV_ALLOWLIST = (
     "XDG_DATA_HOME",
     "TERM",
 )
-_SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
 _VALID_CODEX_EFFORTS: frozenset[str] = frozenset(get_args(CodexEffort))
 
@@ -49,12 +59,6 @@ def _as_codex_effort(effort: str) -> CodexEffort:
     return effort  # type: ignore[return-value]
 
 
-class _GitDiffPort(Protocol):
-    """Narrow git seam the adapter needs — satisfied by ``GitSubprocessClient``."""
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
-
-
 @dataclass(frozen=True)
 class CodexExecConfig:
     """Explicit controls for one Codex exec adapter instance."""
@@ -69,7 +73,7 @@ class CodexExecConfig:
     timeout_seconds: int = 900
 
 
-class CodexExecAdapter:
+class CodexExecAdapter(SubprocessAdapterMixin):
     """Run bounded lifecycle worker prompts through `codex exec`.
 
     The adapter is intentionally infrastructure-only. It never decides lifecycle
@@ -95,6 +99,9 @@ class CodexExecAdapter:
         self._runner = runner
         self._environ = environ if environ is not None else os.environ
         self._git = git
+        # Wire the mixin seams to this adapter's config.
+        self._env_allowlist = config.env_allowlist
+        self._cwd_for_diff = config.cwd
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.CODEX_EXEC
@@ -191,29 +198,6 @@ class CodexExecAdapter:
                 return view.codex_id, view.reasoning_effort
         raise ValueError("Codex dispatch tier is not configured")
 
-    def _env(self) -> dict[str, str]:
-        return {
-            key: self._environ[key] for key in self._config.env_allowlist if key in self._environ
-        }
-
-    @staticmethod
-    def _prompt(request: AgentRunRequest) -> str:
-        return json.dumps(
-            {
-                "role": request.role,
-                "prompt": request.prompt,
-                "context": request.context,
-                "release_id": request.release_id,
-                "task_id": request.task_id,
-                "allowed_paths": list(request.allowed_paths),
-                "forbidden_paths": list(request.forbidden_paths),
-                "expected_schema": request.expected_schema,
-                "required_evidence": [kind.value for kind in request.required_evidence],
-            },
-            indent=2,
-            sort_keys=True,
-        )
-
     def _result_from_output(
         self,
         output_path: Path,
@@ -250,34 +234,3 @@ class CodexExecAdapter:
                 if isinstance(payload.get("structured_output"), dict)
             },
         )
-
-    # -- changed_paths via git diff (Ring-2 root-cause, GAP-B) ------------
-
-    def _with_changed_paths(self, result: AgentRunResult) -> AgentRunResult:
-        """Source ``changed_paths`` from ``git diff``, overriding any model claim.
-
-        When no git client is injected the result is returned untouched (prior
-        behaviour). When present, the real diff UNCONDITIONALLY overwrites any
-        ``changed_paths`` a lying worker may have self-reported.
-        """
-        if self._git is None:
-            return result
-        changed = self._git.diff_name_only(self._config.cwd)
-        structured = dict(result.structured_output)
-        structured["changed_paths"] = ",".join(changed)
-        return AgentRunResult(
-            status=result.status,
-            summary=result.summary,
-            artifact_refs=result.artifact_refs,
-            structured_output=structured,
-            error=result.error,
-        )
-
-    def _redact(self, text: str) -> str:
-        redacted = text
-        for key, value in self._environ.items():
-            if not value:
-                continue
-            if any(part in key.upper() for part in _SECRET_NAME_PARTS):
-                redacted = redacted.replace(value, "[REDACTED]")
-        return redacted
