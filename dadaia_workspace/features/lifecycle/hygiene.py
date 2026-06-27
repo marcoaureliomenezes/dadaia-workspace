@@ -119,7 +119,7 @@ class LifecycleHygieneService:
         return frozenset(self._protected_paths())
 
     def workflow_step_payload_counts(
-        self, run_store: "LifecycleRunStore"
+        self, run_store: LifecycleRunStore
     ) -> WorkflowStepPayloadCounts:
         """Count workflow-step payloads by ledger/disk state (v0.1.30 Item 5 / T-30-D-07).
 

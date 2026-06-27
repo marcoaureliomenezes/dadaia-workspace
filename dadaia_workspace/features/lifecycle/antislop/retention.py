@@ -262,11 +262,12 @@ class RetentionSweep:
         # Workflow-step payload reclaim allow-list (A23): when wired, a step payload is
         # reclaimable ONLY if its ref is explicitly cleanup-eligible. A step payload not in
         # the allow set (live-run, promoted, not-yet-consumed_all) is PROTECTED.
-        if self._step_payload_reclaim_allow is not None and self._is_step_payload_ref(
-            candidate.rel
+        if (
+            self._step_payload_reclaim_allow is not None
+            and self._is_step_payload_ref(candidate.rel)
+            and candidate.rel not in self._step_payload_reclaim_allow()
         ):
-            if candidate.rel not in self._step_payload_reclaim_allow():
-                return RetentionSkipReason.IMPORTANT
+            return RetentionSkipReason.IMPORTANT
         return None
 
     def _is_steps_dir(self, node: Path) -> bool:
