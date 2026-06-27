@@ -161,3 +161,74 @@ def test_resolver_rejects_unknown_step_override_against_governed_catalog() -> No
 def test_assert_catalog_defaults_resolve_is_exposed_and_idempotent() -> None:
     # The module ran its guard at import time; calling it again must not raise.
     dadaia_catalog._assert_catalog_defaults_resolve()
+
+
+# ---------------------------------------------------------------------------
+# Wave B (T-29-B-01): closure cataloged as its real single worker step
+# ---------------------------------------------------------------------------
+
+
+def test_catalog_enumerates_closure_workflow() -> None:
+    names = {w.name for w in list_dadaia_workflows()}
+    assert "closure" in names
+
+
+def test_closure_has_the_real_close_worker_step() -> None:
+    closure = get_dadaia_workflow("closure")
+    assert closure is not None
+    labels = [s.label for s in closure.steps]
+    assert "close" in labels
+    close_step = next(s for s in closure.steps if s.label == "close")
+    # The real close verb runs the product-engineer role (lifecycle.py:957).
+    assert close_step.role == "product-engineer"
+    # It is a worker (model) step, so it carries harness/model options + defaults.
+    assert close_step.harness_options
+    assert close_step.default_harness in close_step.default_profiles
+
+
+def test_closure_models_the_removal_post_step_as_a_gate() -> None:
+    closure = get_dadaia_workflow("closure")
+    assert closure is not None
+    gate = next((s for s in closure.steps if s.label == "closure_removal_gate"), None)
+    assert gate is not None, "closure_removal_gate Python gate step missing"
+    assert gate.is_gate is True
+    # A Python-owned gate runs no worker — no harness/model/default profile.
+    assert gate.harness_options == []
+    assert gate.default_harness is None
+    assert gate.default_profiles == {}
+
+
+def test_closure_availability_is_partial_generic_worker() -> None:
+    closure = get_dadaia_workflow("closure")
+    assert closure is not None
+    # closure's worker is generic (no fragment) — cataloged honestly as partial.
+    assert closure.availability == dadaia_catalog.AVAILABILITY_PARTIAL
+
+
+def test_closure_close_step_is_generic_no_fragment() -> None:
+    """The real close verb has no fragment, so per WMP-5 it carries no output schema."""
+    closure = get_dadaia_workflow("closure")
+    assert closure is not None
+    close_step = next(s for s in closure.steps if s.label == "close")
+    assert close_step.fragment_id is None
+
+
+def test_governed_catalog_carries_closure_with_close_step() -> None:
+    catalog = governed_workflow_catalog()
+    closure = catalog.workflow("closure")
+    assert closure is not None
+    close_step = closure.step("close")
+    assert close_step is not None
+    # A generic worker step carries no output schema (WMP-5 exemption).
+    assert close_step.output_schema is None
+
+
+def test_resolver_resolves_closure_policy() -> None:
+    resolver = WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog())
+    snapshot = resolver.resolve("closure")
+    assert snapshot.workflow_id == "closure"
+    labels = {e.step for e in snapshot.steps}
+    assert "close" in labels
+    for entry in snapshot.steps:
+        profile = model_profiles.resolve(entry.model_profile)
+        assert entry.harness == profile.harness

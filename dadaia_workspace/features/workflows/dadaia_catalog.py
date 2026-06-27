@@ -185,6 +185,18 @@ _IMPLEMENTATION_STEP_PURPOSE: dict[str, str] = {
     ),
 }
 
+_CLOSURE_STEP_PURPOSE: dict[str, str] = {
+    "close": (
+        "Product-engineer runs the release-closure step (CODE_REVIEW -> CLOSURE): writes "
+        "CLOSURE.md and finalizes the release. Generic worker step (not yet fragment-migrated)."
+    ),
+    "closure_removal_gate": (
+        "Python-owned terminal gate: applies residual-aware backlog removal over the "
+        "consumed-ledger (archive-then-remove fully-shipped items; rewrite partials). Runs "
+        "no worker."
+    ),
+}
+
 _BACKLOG_STEP_PURPOSE: dict[str, str] = {
     "intake_grill": (
         "Project-manager grills the operator demand into proposed (subject -> change) "
@@ -241,6 +253,13 @@ _WORKFLOW_PURPOSE: dict[str, str] = {
         "authored result. It walks intake_grill → subject_bind → existing_backlog_review → "
         "reconcile_decision → conflict_resolution_grill → backlog_author → backlog_review_gate."
     ),
+    "closure": (
+        "Closes a release: a single product-engineer worker step (close) advances "
+        "CODE_REVIEW -> CLOSURE, followed by a Python-owned terminal gate that applies "
+        "residual-aware backlog removal over the consumed-ledger. Closure has no multi-step "
+        "ladder; the close worker step is generic (not yet fragment-migrated), so the "
+        "workflow is marked partial."
+    ),
     "audit": (
         "Will run the project-auditor fan-out (multi-lens review producing committed audit "
         "reports). Scaffolded only — the entry point raises; deferred to a follow-up "
@@ -260,6 +279,7 @@ _DISPLAY_NAMES: dict[str, str] = {
     "release_definition": "Release Definition",
     "implementation": "Implementation",
     "backlog_definition": "Backlog Definition",
+    "closure": "Release Closure",
     "audit": "Audit Fan-out",
     "research": "Research",
     "bug_report": "Bug Report",
@@ -500,6 +520,58 @@ def _backlog_definition_steps() -> list[DadaiaWorkflowStepDTO]:
     return steps
 
 
+def _closure_steps() -> list[DadaiaWorkflowStepDTO]:
+    """Build closure's real step list (T-29-B-01).
+
+    Closure has **no** multi-step ladder. Its authoritative definition is the
+    ``dadaia lifecycle close`` verb (``cli/commands/lifecycle.py``): a single
+    ``_run_phase_step(label="close", role="product-engineer", CODE_REVIEW -> CLOSURE)``
+    worker step, plus a Python-owned ``_apply_closure_removal`` post-step (the
+    consumed-ledger backlog removal) modeled here as a terminal gate. The close worker step
+    is **generic** (no fragment) — so, per WMP-5, it carries no output-schema obligation; it
+    is cataloged honestly, not invented as a fragment-driven step.
+    """
+    # The single real worker step: generic (no fragment), so it carries no output schema.
+    close_harness_options, close_model_options = _harness_options_for(is_worker_step=True)
+    close_default_harness, close_default_profiles = _default_profiles_for(
+        harness_options=close_harness_options, is_gate=False
+    )
+    close_step = DadaiaWorkflowStepDTO(
+        order=1,
+        label="close",
+        role="product-engineer",
+        purpose=_CLOSURE_STEP_PURPOSE["close"],
+        is_gate=False,
+        harness_options=close_harness_options,
+        model_options=close_model_options,
+        runtime_kind=None,
+        fragment_id=None,
+        default_harness=close_default_harness,
+        default_profiles=close_default_profiles,
+        shared_fragment_ids=(),
+    )
+    # The Python-owned removal post-step modeled as a terminal gate: no worker.
+    gate_harness_options, gate_model_options = _harness_options_for(is_worker_step=False)
+    gate_default_harness, gate_default_profiles = _default_profiles_for(
+        harness_options=gate_harness_options, is_gate=True
+    )
+    removal_gate = DadaiaWorkflowStepDTO(
+        order=2,
+        label="closure_removal_gate",
+        role="python",
+        purpose=_CLOSURE_STEP_PURPOSE["closure_removal_gate"],
+        is_gate=True,
+        harness_options=gate_harness_options,
+        model_options=gate_model_options,
+        runtime_kind=None,
+        fragment_id=None,
+        default_harness=gate_default_harness,
+        default_profiles=gate_default_profiles,
+        shared_fragment_ids=(),
+    )
+    return [close_step, removal_gate]
+
+
 def _build_workflow(
     name: str, availability: str, steps: list[DadaiaWorkflowStepDTO]
 ) -> DadaiaWorkflowDTO:
@@ -525,6 +597,7 @@ def _all_workflows() -> list[DadaiaWorkflowDTO]:
         _build_workflow("release_definition", AVAILABILITY_AVAILABLE, _release_definition_steps()),
         _build_workflow("implementation", AVAILABILITY_PARTIAL, _implementation_steps()),
         _build_workflow("backlog_definition", AVAILABILITY_AVAILABLE, _backlog_definition_steps()),
+        _build_workflow("closure", AVAILABILITY_PARTIAL, _closure_steps()),
     ]
     for name in DEFERRED_WORKFLOWS:
         workflows.append(_build_workflow(name, AVAILABILITY_DEFERRED, []))
