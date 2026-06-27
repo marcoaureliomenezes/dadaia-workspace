@@ -133,7 +133,7 @@
 
 ## Wave D — workflow-step handoff data plane (Item 5) — **CRITICAL**
 
-- [-] **T-30-D-01** — Workflow-handoff models + LifecycleRun field (additive).
+- [x] **T-30-D-01** — Workflow-handoff models + LifecycleRun field (additive).
   - Goal: `WorkflowStepRecord`/`WorkflowStepConsumerRecord`/attempt ledger; additive
     `workflow_steps` on `LifecycleRun` with round-trip (old records load).
   - Write set: `dadaia_workspace/core/models/workflow_handoff.py` (NEW);
