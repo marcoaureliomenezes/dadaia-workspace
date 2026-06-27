@@ -19,7 +19,7 @@ import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
 // ---------------------------------------------------------------------------
 // OPS-01 — Ops tab present; individual Agents/Workflows/Kanban tabs absent
 // ---------------------------------------------------------------------------
-test('OPS-01 — Agentic tab present; individual Agents/Workflows/Kanban tabs are absent', async ({ page }) => {
+test('OPS-01 — Agentic + first-class Workflows tabs present; Agents/Kanban tabs are absent', async ({ page }) => {
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
@@ -28,20 +28,23 @@ test('OPS-01 — Agentic tab present; individual Agents/Workflows/Kanban tabs ar
   );
 
   expect(tabTexts).toContain('Agentic');
+  // v0.1.28 (D-5) promoted Workflows back to a first-class top-level tab — the model-
+  // governance control plane. Agents and Kanban remain consolidated under Agentic.
+  expect(tabTexts).toContain('Workflows');
   expect(tabTexts).not.toContain('Agents');
-  expect(tabTexts).not.toContain('Workflows');
   expect(tabTexts).not.toContain('Kanban');
 
-  // IDs for the old tabs must no longer exist
+  // The per-feature Agents/Kanban tabs stay consolidated under Agentic; Workflows is
+  // now its own first-class tab.
   expect(await page.$('#tab-agents')).toBeNull();
-  expect(await page.$('#tab-workflows')).toBeNull();
   expect(await page.$('#tab-kanban')).toBeNull();
+  expect(await page.$('#tab-workflows')).not.toBeNull();
 });
 
 // ---------------------------------------------------------------------------
 // OPS-02 — Clicking Ops activates section-ops; sub-sections are visible
 // ---------------------------------------------------------------------------
-test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, dadaia-workflows, and Kanban sub-sections', async ({ page }) => {
+test('OPS-02 — Clicking Agentic activates section-ops with Agents, Workflows, and Kanban sub-sections', async ({ page }) => {
   await gotoPanel(page);
   await activateTab(page, 'ops');
 
@@ -51,11 +54,15 @@ test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, dada
   );
   expect(sectionActive).toBe(true);
 
-  // All sub-sections must exist inside section-ops
+  // The Agentic sub-sections must exist inside section-ops. v0.1.28 (D-5) moved the
+  // dadaia-workflows control plane OUT of Agentic into the first-class Workflows tab
+  // (section-workflows), so it is no longer a section-ops sub-section.
   await expect(page.locator('#section-ops #ops-subsection-agents')).toBeAttached();
   await expect(page.locator('#section-ops #ops-subsection-workflows')).toBeAttached();
-  await expect(page.locator('#section-ops #ops-subsection-dadaia-workflows')).toBeAttached();
   await expect(page.locator('#section-ops #ops-subsection-kanban')).toBeAttached();
+  // dadaia-workflows now lives under the first-class Workflows tab, not Agentic.
+  await expect(page.locator('#section-ops #ops-subsection-dadaia-workflows')).toHaveCount(0);
+  await expect(page.locator('#section-workflows #ops-subsection-dadaia-workflows')).toBeAttached();
 
   // Agents grid must be in the DOM
   await expect(page.locator('#agents-grid')).toBeAttached();
@@ -64,17 +71,14 @@ test('OPS-02 — Clicking Ops activates section-ops with Agents, Workflows, dada
   // Kanban board must be in the DOM
   await expect(page.locator('#kanban-board')).toBeAttached();
 
-  // Subsection order: Agents (top) → Workflows → dadaia-workflows → Kanban
-  // (bottom). The dadaia-workflows catalog (WS-8 / ADR-E) was inserted between
-  // Workflows and Kanban in v0.1.24; this assertion tracks the current layout.
+  // Subsection order under Agentic: Agents (top) → Workflows → Kanban (bottom).
   const subsectionIds = await page.$$eval(
     '#section-ops .ops-subsection',
     (els) => els.map((el) => el.id)
   );
   expect(subsectionIds[0]).toBe('ops-subsection-agents');
   expect(subsectionIds[1]).toBe('ops-subsection-workflows');
-  expect(subsectionIds[2]).toBe('ops-subsection-dadaia-workflows');
-  expect(subsectionIds[3]).toBe('ops-subsection-kanban');
+  expect(subsectionIds[2]).toBe('ops-subsection-kanban');
 });
 
 // ---------------------------------------------------------------------------
