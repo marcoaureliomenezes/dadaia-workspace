@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,11 @@ _FILENAME = "workflow_model_policy.json"
 _ALLOWED_TOP_LEVEL = frozenset({"schema_version", "policy_id", "contexts"})
 #: The only context honored this release (D-2).
 DEFAULT_CONTEXT = "default"
+#: Allowed keys inside one workflow overlay (v0.1.29 adds the optional harness fields).
+_ALLOWED_WORKFLOW_KEYS = frozenset({"steps", "default_harness", "harnesses"})
+#: The Layer-2 worker harnesses an overlay may name (LAW 1). ``claude``/``opencode`` are
+#: rejected at parse time so an invalid harness never persists (mirrors the schema enum).
+_LAYER2_HARNESSES = frozenset({"codex", "pi"})
 
 
 @dataclass(frozen=True)
@@ -56,12 +61,21 @@ class WorkflowModelPolicyOverlay:
     """Parsed, validated overlay (in-memory).
 
     ``contexts`` maps a context name to ``{workflow_id -> {step_label -> profile_id}}``.
-    Only the ``default`` context is honored (D-2); other context keys are retained for
-    round-trip fidelity but :meth:`step_profile` ignores them.
+    ``default_harness_overlay`` (v0.1.29 / D-3) maps a context to
+    ``{workflow_id -> harness}`` (a per-workflow default harness override) and
+    ``step_harness_overlay`` to ``{workflow_id -> {step_label -> harness}}`` (a per-step
+    harness override). Only the ``default`` context is honored (D-2); other context keys
+    are retained for round-trip fidelity but the accessors ignore them.
+
+    **Back-compat:** the harness overlays default to empty, so a v0.1.28 overlay (no
+    harness field) parses and resolves exactly as before, and :meth:`to_dict` omits the
+    harness fields when empty (byte-stable round-trip).
     """
 
     policy_id: str
     contexts: dict[str, dict[str, dict[str, str]]]
+    default_harness_overlay: dict[str, dict[str, str]] = field(default_factory=dict)
+    step_harness_overlay: dict[str, dict[str, dict[str, str]]] = field(default_factory=dict)
 
     def step_profile(self, context: str, workflow_id: str, step: str) -> str | None:
         """Return the overridden profile id for a step, or ``None`` when not overridden.
@@ -72,14 +86,42 @@ class WorkflowModelPolicyOverlay:
             return None
         return self.contexts.get(context, {}).get(workflow_id, {}).get(step)
 
+    def workflow_default_harness(self, context: str, workflow_id: str) -> str | None:
+        """Return the overlay's per-workflow default harness, or ``None`` (D-3).
+
+        D-2: only the ``default`` context resolves; any other context yields ``None``.
+        """
+        if context != DEFAULT_CONTEXT:
+            return None
+        return self.default_harness_overlay.get(context, {}).get(workflow_id)
+
+    def step_harness(self, context: str, workflow_id: str, step: str) -> str | None:
+        """Return the overlay's per-step harness override, or ``None`` (D-3).
+
+        D-2: only the ``default`` context resolves; any other context yields ``None``.
+        """
+        if context != DEFAULT_CONTEXT:
+            return None
+        return self.step_harness_overlay.get(context, {}).get(workflow_id, {}).get(step)
+
     def to_dict(self) -> dict[str, Any]:
+        contexts: dict[str, Any] = {}
+        for ctx, workflows in self.contexts.items():
+            wf_out: dict[str, Any] = {}
+            for wf, steps in workflows.items():
+                entry: dict[str, Any] = {"steps": dict(steps)}
+                default_harness = self.default_harness_overlay.get(ctx, {}).get(wf)
+                if default_harness is not None:
+                    entry["default_harness"] = default_harness
+                harnesses = self.step_harness_overlay.get(ctx, {}).get(wf, {})
+                if harnesses:
+                    entry["harnesses"] = dict(harnesses)
+                wf_out[wf] = entry
+            contexts[ctx] = {"workflows": wf_out}
         return {
             "schema_version": _SCHEMA_VERSION,
             "policy_id": self.policy_id,
-            "contexts": {
-                ctx: {"workflows": {wf: {"steps": dict(steps)} for wf, steps in workflows.items()}}
-                for ctx, workflows in self.contexts.items()
-            },
+            "contexts": contexts,
         }
 
 
@@ -159,11 +201,28 @@ class JsonWorkflowModelPolicyStore:
                 "workflow-model-policy 'contexts' must be an object", path
             )
         contexts: dict[str, dict[str, dict[str, str]]] = {}
+        default_harness: dict[str, dict[str, str]] = {}
+        step_harness: dict[str, dict[str, dict[str, str]]] = {}
         for ctx_name, ctx_value in contexts_raw.items():
-            contexts[str(ctx_name)] = self._parse_context(ctx_value, path=path)
-        return WorkflowModelPolicyOverlay(policy_id=policy_id, contexts=contexts)
+            ctx_key = str(ctx_name)
+            steps_map, default_h, step_h = self._parse_context(ctx_value, path=path)
+            contexts[ctx_key] = steps_map
+            if default_h:
+                default_harness[ctx_key] = default_h
+            if step_h:
+                step_harness[ctx_key] = step_h
+        return WorkflowModelPolicyOverlay(
+            policy_id=policy_id,
+            contexts=contexts,
+            default_harness_overlay=default_harness,
+            step_harness_overlay=step_harness,
+        )
 
-    def _parse_context(self, value: object, *, path: Path | None) -> dict[str, dict[str, str]]:
+    def _parse_context(
+        self, value: object, *, path: Path | None
+    ) -> tuple[
+        dict[str, dict[str, str]], dict[str, str], dict[str, dict[str, str]]
+    ]:
         if not isinstance(value, dict):
             raise WorkflowModelPolicyStoreError(
                 "workflow-model-policy context overlay must be an object", path
@@ -179,14 +238,24 @@ class JsonWorkflowModelPolicyStore:
                 "context overlay 'workflows' must be an object", path
             )
         workflows: dict[str, dict[str, str]] = {}
+        default_harness: dict[str, str] = {}
+        step_harness: dict[str, dict[str, str]] = {}
         for wf_name, wf_value in workflows_raw.items():
-            workflows[str(wf_name)] = self._parse_workflow(wf_value, path=path)
-        return workflows
+            wf_key = str(wf_name)
+            steps, default_h, step_h = self._parse_workflow(wf_value, path=path)
+            workflows[wf_key] = steps
+            if default_h is not None:
+                default_harness[wf_key] = default_h
+            if step_h:
+                step_harness[wf_key] = step_h
+        return workflows, default_harness, step_harness
 
-    def _parse_workflow(self, value: object, *, path: Path | None) -> dict[str, str]:
+    def _parse_workflow(
+        self, value: object, *, path: Path | None
+    ) -> tuple[dict[str, str], str | None, dict[str, str]]:
         if not isinstance(value, dict):
             raise WorkflowModelPolicyStoreError("workflow overlay must be an object", path)
-        unknown = set(value) - {"steps"}
+        unknown = set(value) - _ALLOWED_WORKFLOW_KEYS
         if unknown:
             raise WorkflowModelPolicyStoreError(
                 f"unknown field(s) in workflow overlay: {', '.join(sorted(unknown))}", path
@@ -201,7 +270,47 @@ class JsonWorkflowModelPolicyStore:
                     f"step {step_label!r} profile must be a string profile id", path
                 )
             steps[str(step_label)] = profile_id
-        return steps
+
+        default_harness = self._parse_harness_value(
+            value.get("default_harness"), what="default_harness", path=path
+        )
+
+        harnesses_raw = value.get("harnesses", {})
+        if not isinstance(harnesses_raw, dict):
+            raise WorkflowModelPolicyStoreError(
+                "workflow overlay 'harnesses' must be an object", path
+            )
+        step_harness: dict[str, str] = {}
+        for step_label, harness in harnesses_raw.items():
+            if harness is None:
+                raise WorkflowModelPolicyStoreError(
+                    f"workflow overlay harnesses[{step_label!r}] must name a harness, not null",
+                    path,
+                )
+            resolved = self._parse_harness_value(
+                harness, what=f"harnesses[{step_label!r}]", path=path
+            )
+            assert resolved is not None  # guarded by the explicit null check above
+            step_harness[str(step_label)] = resolved
+        return steps, default_harness, step_harness
+
+    def _parse_harness_value(
+        self, value: object, *, what: str, path: Path | None
+    ) -> str | None:
+        """Validate an optional harness string against the Layer-2 allow-set (codex|pi)."""
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise WorkflowModelPolicyStoreError(
+                f"workflow overlay {what} must be a harness string", path
+            )
+        if value not in _LAYER2_HARNESSES:
+            raise WorkflowModelPolicyStoreError(
+                f"workflow overlay {what} names harness {value!r}; "
+                f"Layer-2 workers are codex or pi only (claude/opencode are not Layer-2)",
+                path,
+            )
+        return value
 
     def _atomic_write(self, path: Path, content: str) -> None:
         self._atomic_write_bytes(path, (content + "\n").encode("utf-8"))

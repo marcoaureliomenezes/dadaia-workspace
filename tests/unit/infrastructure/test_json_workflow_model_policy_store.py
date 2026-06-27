@@ -160,3 +160,75 @@ def test_step_profile_absent_returns_none(tmp_path: Path) -> None:
     parsed = store.parse(_valid_overlay())
     assert parsed.step_profile("default", "implementation", "missing-step") is None
     assert parsed.step_profile("default", "missing-workflow", "implement") is None
+
+
+# ---------------------------------------------------------------------------
+# v0.1.29 / T-29-A-04 — overlay carries harness (default_harness + per-step harnesses)
+# ---------------------------------------------------------------------------
+
+
+def _harness_overlay() -> dict[str, object]:
+    return {
+        "schema_version": "workflow-model-policy-v1",
+        "policy_id": "default",
+        "contexts": {
+            "default": {
+                "workflows": {
+                    "implementation": {
+                        "steps": {},
+                        "default_harness": "pi",
+                        "harnesses": {"implement": "codex"},
+                    }
+                }
+            }
+        },
+    }
+
+
+def test_back_compat_overlay_without_harness_parses(tmp_path: Path) -> None:
+    # A v0.1.28-shaped overlay (no harness fields) parses and exposes empty accessors.
+    store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
+    parsed = store.parse(_valid_overlay())
+    assert parsed.workflow_default_harness("default", "implementation") is None
+    assert parsed.step_harness("default", "implementation", "implement") is None
+
+
+def test_harness_overlay_parses_accessors(tmp_path: Path) -> None:
+    store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
+    parsed = store.parse(_harness_overlay())
+    assert parsed.workflow_default_harness("default", "implementation") == "pi"
+    assert parsed.step_harness("default", "implementation", "implement") == "codex"
+    assert parsed.step_harness("default", "implementation", "review_qa") is None
+
+
+def test_harness_overlay_round_trips(tmp_path: Path) -> None:
+    store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
+    parsed = store.parse(_harness_overlay())
+    store.save(parsed)
+    loaded = store.load()
+    assert loaded is not None
+    assert loaded.workflow_default_harness("default", "implementation") == "pi"
+    assert loaded.step_harness("default", "implementation", "implement") == "codex"
+
+
+def test_harness_overlay_to_dict_omits_empty_fields(tmp_path: Path) -> None:
+    # to_dict omits empty harness fields for a byte-stable v0.1.28-compatible round-trip.
+    store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
+    parsed = store.parse(_valid_overlay())
+    payload = parsed.to_dict()
+    wf = payload["contexts"]["default"]["workflows"]["implementation"]
+    assert "default_harness" not in wf
+    assert "harnesses" not in wf
+
+
+def test_non_default_harness_context_inert(tmp_path: Path) -> None:
+    store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
+    overlay = _harness_overlay()
+    contexts = overlay["contexts"]
+    assert isinstance(contexts, dict)
+    contexts["other"] = {
+        "workflows": {"implementation": {"default_harness": "pi", "harnesses": {}}}
+    }
+    parsed = store.parse(overlay)
+    assert parsed.workflow_default_harness("other", "implementation") is None
+    assert parsed.step_harness("other", "implementation", "implement") is None

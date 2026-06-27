@@ -36,7 +36,7 @@ becomes `default_profiles[effective_harness]`; `_validate_profile` compares agai
 **Acceptance:** AC-2 (PI default auto-selected, PI profile accepted on PI-resolved step);
 AC-9 (claude/opencode rejected); AC-10 (default path byte-identical).
 
-### [-] T-29-A-04 — Overlay store: harness fields + accessors
+### [x] T-29-A-04 — Overlay store: harness fields + accessors
 **Goal:** `WorkflowModelPolicyOverlay` carries optional per-workflow `default_harness` and
 per-step `harnesses`; add `step_harness` + `workflow_default_harness` accessors (default
 context only); `_parse_workflow` accepts the new optional fields; `to_dict` round-trips.
