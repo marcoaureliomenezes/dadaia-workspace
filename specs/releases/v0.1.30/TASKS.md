@@ -30,7 +30,7 @@
   - Write set: `dadaia_workspace/infrastructure/codex_runtime.py`.
   - Acceptance: A2, A4 — `test_codex_runtime.py` passes unchanged.
 
-- [ ] **T-30-A-04** — Refactor `claude_sdk_runtime` onto the base (redaction + git seam only).
+- [-] **T-30-A-04** — Refactor `claude_sdk_runtime` onto the base (redaction + git seam only).
   - Goal: reuse `_redact`/`_SECRET_NAME_PARTS` (+ git seam for parity) without subprocess bits.
   - Write set: `dadaia_workspace/infrastructure/claude_sdk_runtime.py`.
   - Acceptance: A2, A4 — Claude SDK adapter tests pass unchanged.
