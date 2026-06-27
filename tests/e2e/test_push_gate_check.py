@@ -56,7 +56,7 @@ def _init_repo(workspace: Path, slug: str) -> Path:
 def _hook_env(workspace: Path) -> dict[str, str]:
     """A harness-FREE env: only WORKSPACE_ROOT (mirrors the installed pre-push hook child)."""
     env = dict(os.environ)
-    for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "OPENCODE_SESSION_ID", "DADAIA_MODE"):
+    for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "DADAIA_MODE"):
         env.pop(bad, None)
     env["WORKSPACE_ROOT"] = str(workspace)
     return env

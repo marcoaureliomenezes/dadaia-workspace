@@ -70,7 +70,6 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
-    assert (workspace / "opencode.json").exists()
     # T-PIO-03: the `pi` target is part of `all`.
     assert (workspace / ".pi" / "SYSTEM.md").exists()
     assert (workspace / ".pi" / "settings.json").exists()
@@ -95,7 +94,7 @@ def test_install_target_pi_projects_ring1_sdd_gate_extension(tmp_path: Path) -> 
     # Blocks only on the explicit decision envelope; fail-open otherwise.
     assert '"decision":"block"' in body or "decision" in body
     assert "block: true" in body
-    # venv resolution (no bash dependency) mirrors the OpenCode plugin.
+    # venv resolution (no bash dependency).
     assert ".venv" in body and "python" in body
     # Post-trust executable surface: no operator-local path / no secret leakage.
     assert "/home/" not in body and "/Users/" not in body
@@ -239,7 +238,7 @@ def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:
         manager.install(workspace, target="all")
 
     assert not (workspace / ".dadaia").exists()
-    assert not (workspace / "opencode.json").exists()
+    assert not (workspace / ".codex").exists()
 
 
 def test_problematic_skill_files_have_frontmatter() -> None:
@@ -391,31 +390,19 @@ _CLASSIFY_WORKFLOWS_CASES = [
         "id": "codex_linear",
         "content": "# linear workflow\nstep: do_something\n",
         "expected_in": [
-            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)"
+            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)",
+            "[ok] claude:workflows/sample.workflow.md",
         ],
-        "expected_not_in": ["[partial] opencode:workflows/sample.workflow.md"],
+        "expected_not_in": ["[partial] claude:workflows/sample.workflow.md"],
     },
     {
         "id": "codex_parallel",
         "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
         "expected_in": [
-            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)"
+            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)",
+            "[ok] claude:workflows/sample.workflow.md",
         ],
-        "expected_not_in": ["[ok] opencode:workflows/sample.workflow.md"],
-    },
-    {
-        "id": "opencode_linear",
-        "content": "# linear workflow\nstep: do_something\n",
-        "expected_in": ["[ok] opencode:workflows/sample.workflow.md"],
-        "expected_not_in": ["[partial] opencode:workflows/sample.workflow.md"],
-    },
-    {
-        "id": "opencode_parallel",
-        "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
-        "expected_in": [
-            "[partial] opencode:workflows/sample.workflow.md (parallel_group sequentially)"
-        ],
-        "expected_not_in": ["[ok] opencode:workflows/sample.workflow.md"],
+        "expected_not_in": ["[partial] claude:workflows/sample.workflow.md"],
     },
 ]
 
@@ -492,11 +479,11 @@ def test_render_agent_toml_block_drops_unknown_fields() -> None:
         "name": "dev",
         "model": "claude-3",
         "skills": ["dadaia-handoff-emitter"],  # unknown field — must be dropped
-        "opencode_model": "claude-haiku",  # unknown field — must be dropped
+        "color": "yellow",  # unknown field — must be dropped
     }
     result = _render_agent_toml_block("dev", fm)
     assert "skills" not in result
-    assert "opencode_model" not in result
+    assert "color" not in result
     assert "claude-3" in result  # whitelisted field present
 
 

@@ -105,6 +105,6 @@ Latest QA rpt     : .dadaia/reports/<slug>/qa-engineer/<filename>
 This file lives at `public/runtime/codex/design-ctx/SKILL.md` and is projected to
 `.codex/skills/design-ctx/SKILL.md` by `dadaia public install --target codex`.
 
-It does NOT appear in `.claude/skills/` or `.opencode/skills/`.
+It does NOT appear in `.claude/skills/`.
 
 Source path is governed by ADR-CX-001.

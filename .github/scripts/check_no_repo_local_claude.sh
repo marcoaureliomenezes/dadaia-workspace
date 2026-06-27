@@ -5,7 +5,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
 
-forbidden_tracked_regex='^(\.(claude|agents|codex|opencode)/|\.dadaia/|CLAUDE\.md$|opencode\.json$|Makefile$|playwright\.config\.ts$|playwright-report/|test-results/)'
+forbidden_tracked_regex='^(\.(claude|agents|codex)/|\.dadaia/|CLAUDE\.md$|Makefile$|playwright\.config\.ts$|playwright-report/|test-results/)'
 tracked="$(git ls-files | grep -E "$forbidden_tracked_regex" || true)"
 
 if [[ -n "$tracked" ]]; then
@@ -14,7 +14,7 @@ if [[ -n "$tracked" ]]; then
     exit 1
 fi
 
-for path in .claude .agents .codex .opencode .dadaia CLAUDE.md opencode.json Makefile playwright.config.ts playwright-report test-results; do
+for path in .claude .agents .codex .dadaia CLAUDE.md Makefile playwright.config.ts playwright-report test-results; do
     if [[ -e "$path" ]]; then
         printf 'ERROR: forbidden repo-root artefact exists: %s\n' "$repo_root/$path" >&2
         printf 'Run projection smoke tests in a temporary workspace, then remove generated root artefacts before finishing.\n' >&2

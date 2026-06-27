@@ -9,6 +9,7 @@ import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, get_args
 
 from dadaia_workspace.core.model_registry import CodexEffort, codex_tier_views
 from dadaia_workspace.core.models.lifecycle import (
@@ -31,6 +32,28 @@ _DEFAULT_ENV_ALLOWLIST = (
 )
 _SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
+_VALID_CODEX_EFFORTS: frozenset[str] = frozenset(get_args(CodexEffort))
+
+
+def _as_codex_effort(effort: str) -> CodexEffort:
+    """Narrow a resolved reasoning string to the ``CodexEffort`` literal.
+
+    Raises:
+        ValueError: if *effort* is not one of ``high``/``medium``/``low``.
+    """
+    if effort not in _VALID_CODEX_EFFORTS:
+        raise ValueError(
+            f"invalid Codex reasoning effort {effort!r}; "
+            f"valid: {', '.join(sorted(_VALID_CODEX_EFFORTS))}"
+        )
+    return effort  # type: ignore[return-value]
+
+
+class _GitDiffPort(Protocol):
+    """Narrow git seam the adapter needs — satisfied by ``GitSubprocessClient``."""
+
+    def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
+
 
 @dataclass(frozen=True)
 class CodexExecConfig:
@@ -52,6 +75,12 @@ class CodexExecAdapter:
     The adapter is intentionally infrastructure-only. It never decides lifecycle
     transitions; it only returns structured `AgentRunResult` for Python services to
     validate. Live execution is opt-in through callers that instantiate this adapter.
+
+    When an injected ``git`` client is present, ``changed_paths`` is sourced from
+    ``git diff`` (the real working-tree+staged+untracked-non-ignored union), never
+    from a model self-report — that is what gives Codex a real Ring-2 write boundary,
+    matching ``PiHeadlessAdapter``. When ``git`` is ``None`` the prior behaviour is
+    preserved (no ``changed_paths`` injection).
     """
 
     def __init__(
@@ -60,10 +89,12 @@ class CodexExecAdapter:
         *,
         runner: Runner = subprocess.run,
         environ: Mapping[str, str] | None = None,
+        git: _GitDiffPort | None = None,
     ) -> None:
         self._config = config
         self._runner = runner
         self._environ = environ if environ is not None else os.environ
+        self._git = git
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.CODEX_EXEC
@@ -109,7 +140,8 @@ class CodexExecAdapter:
                     summary="codex exec returned non-zero exit",
                     error=self._redact((proc.stderr or proc.stdout or "").strip()),
                 )
-            return self._result_from_output(output_path, proc)
+            result = self._result_from_output(output_path, proc)
+            return self._with_changed_paths(result)
 
     def _command(self, request: AgentRunRequest, output_path: Path) -> list[str]:
         model, effort = self._model_and_effort(request)
@@ -134,6 +166,20 @@ class CodexExecAdapter:
         return args
 
     def _model_and_effort(self, request: AgentRunRequest) -> tuple[str, CodexEffort]:
+        """Resolve the ``(model, reasoning_effort)`` for one request — ONE ordered precedence.
+
+        M2 (T-28-A-06): the governance-resolved per-request model config wins; the legacy
+        tier-name match is a fallback only. The single precedence, highest → lowest:
+
+        1. ``request.resolved_model`` — the policy-resolved concrete model (governance).
+        2. construction-time ``config.model`` + ``config.reasoning_effort`` — the
+           container's per-step ``--model`` selection (legacy LAW-2 path).
+        3. ``request.model_profile`` interpreted as a Codex *tier name* (legacy
+           observability fallback — predates the profile registry).
+        4. the ``dispatch`` tier view (last-resort default).
+        """
+        if request.resolved_model is not None:
+            return request.resolved_model.model, _as_codex_effort(request.resolved_model.reasoning)
         if self._config.model is not None and self._config.reasoning_effort is not None:
             return self._config.model, self._config.reasoning_effort
         if request.model_profile:
@@ -203,6 +249,28 @@ class CodexExecAdapter:
                 for key, value in payload.get("structured_output", {}).items()
                 if isinstance(payload.get("structured_output"), dict)
             },
+        )
+
+    # -- changed_paths via git diff (Ring-2 root-cause, GAP-B) ------------
+
+    def _with_changed_paths(self, result: AgentRunResult) -> AgentRunResult:
+        """Source ``changed_paths`` from ``git diff``, overriding any model claim.
+
+        When no git client is injected the result is returned untouched (prior
+        behaviour). When present, the real diff UNCONDITIONALLY overwrites any
+        ``changed_paths`` a lying worker may have self-reported.
+        """
+        if self._git is None:
+            return result
+        changed = self._git.diff_name_only(self._config.cwd)
+        structured = dict(result.structured_output)
+        structured["changed_paths"] = ",".join(changed)
+        return AgentRunResult(
+            status=result.status,
+            summary=result.summary,
+            artifact_refs=result.artifact_refs,
+            structured_output=structured,
+            error=result.error,
         )
 
     def _redact(self, text: str) -> str:

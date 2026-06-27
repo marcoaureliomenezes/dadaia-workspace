@@ -64,32 +64,3 @@ def test_copy_tree_no_prune_when_in_sync(tmp_path: Path) -> None:
     mgr._copy_tree(src, dst, force=True, installed=installed)
     assert not any(line.startswith("[prune]") for line in installed)
     assert (dst / "a.md").exists()
-
-
-def test_copy_agents_for_opencode_prunes_orphan(tmp_path: Path) -> None:
-    """rc-4 / T-017-32: the opencode agent copy now prunes orphans too (it previously
-    only ever wrote forward, leaving deleted agents projected). Fixes
-    install-does-not-prune-orphan-projections for the .opencode/agents/ surface.
-    """
-    from dadaia_workspace.infrastructure.install_helpers import copy_agents_for_opencode
-
-    def _iter_files(d: Path) -> list[Path]:
-        return [p for p in d.rglob("*") if p.is_file()]
-
-    src = tmp_path / "src"
-    dst = tmp_path / "dst"
-    src.mkdir()
-    (src / "a.md").write_text("---\nname: a\ntools: [x]\n---\nbody a\n", encoding="utf-8")
-    (src / "b.md").write_text("---\nname: b\n---\nbody b\n", encoding="utf-8")
-
-    copy_agents_for_opencode(src, dst, force=True, installed=[], iter_files_fn=_iter_files)
-    assert (dst / "a.md").exists()
-    assert (dst / "b.md").exists()
-
-    # Source loses an agent → next projection must prune the orphan.
-    (src / "b.md").unlink()
-    installed2: list[str] = []
-    copy_agents_for_opencode(src, dst, force=True, installed=installed2, iter_files_fn=_iter_files)
-    assert (dst / "a.md").exists()
-    assert not (dst / "b.md").exists(), "orphan opencode agent projection must be pruned"
-    assert any(line.startswith("[prune]") and "b.md" in line for line in installed2)

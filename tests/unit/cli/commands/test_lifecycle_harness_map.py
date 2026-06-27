@@ -19,9 +19,16 @@ def test_harness_map_includes_pi() -> None:
     assert _HARNESS_KINDS["pi"] is AgentRuntimeKind.PI_HEADLESS
 
 
-def test_harness_map_covers_all_runtime_kinds() -> None:
-    # Every selectable runtime kind has a CLI label (FAKE is also wired for tests).
-    assert set(_HARNESS_KINDS.values()) == set(AgentRuntimeKind)
+def test_harness_map_covers_layer2_selectable_kinds() -> None:
+    # Layer-2 workflow harnesses are pi/codex/fake only (LAW 1). CLAUDE_SDK is a
+    # Layer-1 adapter, intentionally NOT selectable as a workflow harness, so the
+    # map covers exactly the L2-selectable kinds — not every AgentRuntimeKind.
+    assert set(_HARNESS_KINDS.values()) == {
+        AgentRuntimeKind.FAKE,
+        AgentRuntimeKind.CODEX_EXEC,
+        AgentRuntimeKind.PI_HEADLESS,
+    }
+    assert AgentRuntimeKind.CLAUDE_SDK not in _HARNESS_KINDS.values()
 
 
 def test_resolve_harness_pi() -> None:

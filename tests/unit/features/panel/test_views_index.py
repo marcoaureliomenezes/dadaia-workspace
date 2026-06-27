@@ -198,11 +198,14 @@ def test_index_tablist_contract() -> None:
     After T-016-P09: Agents, Workflows, and Kanban are merged into one "Agentic" tab.
     After T-016-P10: "Spec Context Projects" tab is renamed to "Projects",
                       "Ops" tab is renamed to "Agentic".
-    There are 6 tabs instead of 8.
+    After T-28-C-03 (D-5): Workflows is promoted back to a first-class top-level tab
+                      (model governance); Agents + Kanban remain in the Agentic tab.
+                      There are now 7 tabs.
     """
     html = _render(_build_service())
     expected = [
         ("tab-memories", "Projects"),
+        ("tab-workflows", "Workflows"),
         ("tab-ops", "Agentic"),
         ("tab-sessions", "Sessions"),
         ("tab-reports", "Reports"),
@@ -227,17 +230,20 @@ def test_index_tablist_contract() -> None:
     assert 'aria-label="Projects"' in memories_button
     assert 'aria-selected="false"' in servers_button
 
-    # Old individual tabs must not exist
+    # Agents and Kanban remain merged into the Agentic tab (no standalone tabs).
+    # Workflows is a first-class tab again (D-5).
     assert 'id="tab-agents"' not in html
-    assert 'id="tab-workflows"' not in html
     assert 'id="tab-kanban"' not in html
+    assert 'id="tab-workflows"' in html
 
 
 @pytest.mark.parametrize(
     ("section_id", "tab_id"),
     [
         ("section-memories", "tab-memories"),
-        # T-016-P09: Agents, Workflows, and Kanban merged into the Ops tab.
+        # D-5: Workflows is a first-class top-level section again (model governance).
+        ("section-workflows", "tab-workflows"),
+        # T-016-P09: Agents + Kanban remain merged into the Ops tab.
         ("section-ops", "tab-ops"),
         ("section-sessions", "tab-sessions"),
         ("section-reports", "tab-reports"),
@@ -248,15 +254,15 @@ def test_index_tablist_contract() -> None:
 def test_index_tabpanel_contract(section_id: str, tab_id: str) -> None:
     """Every top-level section must be connected to its tab for keyboard and screen-reader users.
 
-    After T-016-P09 there are 6 sections (not 8); section-ops replaces the three
-    former sections (section-agents, section-workflows, section-kanban).
+    After T-016-P09 there were 6 sections; T-28-C-03 (D-5) adds a first-class
+    section-workflows for model governance, so there are now 7.
     """
     html = _render(_build_service())
     section = _section_fragment(html, section_id)
     assert 'role="tabpanel"' in section
     assert 'tabindex="0"' in section
     assert f'aria-labelledby="{tab_id}"' in section
-    assert html.count('role="tabpanel"') == 6
+    assert html.count('role="tabpanel"') == 7
 
 
 def test_panel_js_keyboard_nav_and_credential_free_fetch_contract() -> None:

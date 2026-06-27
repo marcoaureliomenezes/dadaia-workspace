@@ -9,6 +9,10 @@ applyTo: ".dadaia/reports/**"
 
 # drift-detection — Memory ↔ Implementation Drift Audit
 
+> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the audit
+> workflow and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
+> skill is reference / manual-operator guidance only.
+
 ## Memory Atom Inventory
 
 All spec memory is stored as atomic Markdown files (`*.md`, with YAML frontmatter)

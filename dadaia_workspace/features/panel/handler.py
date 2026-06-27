@@ -207,6 +207,31 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
         AuthClass.BEARER,
     ),
     (r"^/api/workflows$", "api_workflows", AuthClass.BEARER),
+    # dadaia-workflow catalog (WS-8 / ADR-E): /api/dadaia-workflows/<name> before list
+    (
+        r"^/api/dadaia-workflows/(?P<workflow_name>[^/]+)$",
+        "api_dadaia_workflow_detail",
+        AuthClass.BEARER,
+    ),
+    (r"^/api/dadaia-workflows$", "api_dadaia_workflows", AuthClass.BEARER),
+    # Workflow model-governance control plane (Wave C — T-28-C-01/02). The
+    # /<id> detail pattern MUST precede the list pattern (more specific first).
+    # The static /validate path MUST precede the catch-all policy route.
+    (
+        r"^/api/workflow-catalog/(?P<workflow_id>[^/]+)$",
+        "api_workflow_catalog_detail",
+        AuthClass.BEARER,
+    ),
+    (r"^/api/workflow-catalog$", "api_workflow_catalog", AuthClass.BEARER),
+    (r"^/api/workflow-model-profiles$", "api_workflow_model_profiles", AuthClass.BEARER),
+    # Read-only fragment inspector (Wave D — T-28-D-01): /<fragment_id> path param.
+    (
+        r"^/api/workflow-fragments/(?P<fragment_id>[^/]+)$",
+        "api_workflow_fragment",
+        AuthClass.BEARER,
+    ),
+    (r"^/api/workflow-model-policy$", "api_workflow_model_policy", AuthClass.BEARER),
+    (r"^/api/lifecycle-runs$", "api_lifecycle_runs", AuthClass.BEARER),
     # BEARER_TELEMETRY routes (require active telemetry service)
     (
         r"^/api/agents/(?P<agent_id>[^/]+)/sessions$",
@@ -266,6 +291,39 @@ _RAW_ROUTES: list[tuple[str, str]] = [(pat, name) for pat, name, _ in _ROUTE_TAB
 
 # Routes that are GET-only and must return 405 Method Not Allowed on POST.
 _GET_ONLY_API_ROUTES_RE = re.compile(r"^/api/kanban$")
+
+# Control-plane GET routes (Wave C) that read the parsed query string. Only these
+# receive the ``qs`` kwarg in GET dispatch; every other view keeps its captured-groups
+# call convention unchanged.
+_QS_AWARE_GET_ROUTES: frozenset[str] = frozenset(
+    {
+        "api_workflow_catalog",
+        "api_workflow_catalog_detail",
+        "api_workflow_model_policy",
+        "api_lifecycle_runs",
+    }
+)
+
+# Mutation routes (Wave C) dispatched from do_PUT / do_POST with a body. PUT targets the
+# policy route; POST targets the validate route. Both read the request body + content
+# type and call the view with ``body`` / ``content_type`` / ``qs``.
+_PUT_ROUTE_TABLE: list[tuple[str, str]] = [
+    (r"^/api/workflow-model-policy$", "api_workflow_model_policy_put"),
+]
+_POST_BODY_ROUTE_TABLE: list[tuple[str, str]] = [
+    (r"^/api/workflow-model-policy/validate$", "api_workflow_model_policy_validate"),
+]
+_COMPILED_PUT_ROUTE_TABLE: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(pat), name) for pat, name in _PUT_ROUTE_TABLE
+]
+_COMPILED_POST_BODY_ROUTE_TABLE: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(pat), name) for pat, name in _POST_BODY_ROUTE_TABLE
+]
+
+#: Max accepted request body for any panel mutation, in bytes. A guard at the handler
+#: BEFORE reading the body (defence against an oversized Content-Length). The view also
+#: enforces its own 413 limit; this is the outer envelope.
+_MAX_MUTATION_BODY_BYTES = 256 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -389,6 +447,8 @@ def make_handler_class(
         "api_reports",
         "api_workflows",
         "api_workflow_detail",
+        "api_dadaia_workflows",
+        "api_dadaia_workflow_detail",
         "api_sessions",
         "api_session_detail",
     )
@@ -452,7 +512,13 @@ def make_handler_class(
                         AuthClass.BEARER,
                         AuthClass.BEARER_SECOND_LOOP,
                     ):
-                        status, content_type, body = view(**m.groupdict())
+                        # Only the query-string-aware control-plane GET routes
+                        # receive ``qs``; existing views keep their call convention
+                        # (captured groups only).
+                        if route_name in _QS_AWARE_GET_ROUTES:
+                            status, content_type, body = view(qs=qs, **m.groupdict())
+                        else:
+                            status, content_type, body = view(**m.groupdict())
                         is_static = path.startswith("/static/")
                         self._respond(
                             status,
@@ -519,7 +585,80 @@ def make_handler_class(
                 self._dispatch_telemetry(route_name, m_api.groupdict(), {})
                 return
 
+            # Body-reading POST mutation routes (Wave C: policy validate). These are
+            # gated by loopback bind + the Host-header allowlist above (NO bearer);
+            # the view performs content-type / size / shape / semantic validation.
+            qs = urllib.parse.parse_qs(parsed.query)
+            for pattern, route_name in _COMPILED_POST_BODY_ROUTE_TABLE:
+                if pattern.match(path) is not None:
+                    self._dispatch_mutation(route_name, qs)
+                    return
+
             self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+        def do_PUT(self) -> None:  # noqa: N802
+            """Body-reading PUT mutation routes (Wave C: policy write).
+
+            Host-guard runs FIRST (same posture as every other method); no bearer.
+            The matched view validates content-type (415), size (413), JSON + overlay
+            shape + semantic validity (400 with field-path errors) before any atomic
+            write, and keeps a ``.last-good.json`` backup (LAW 5).
+            """
+            if self._host_rejected():
+                return
+            parsed = urllib.parse.urlparse(self.path)
+            path = parsed.path
+            qs = urllib.parse.parse_qs(parsed.query)
+            for pattern, route_name in _COMPILED_PUT_ROUTE_TABLE:
+                if pattern.match(path) is not None:
+                    self._dispatch_mutation(route_name, qs)
+                    return
+            self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+
+        def _read_body(self) -> bytes | None:
+            """Read the request body by Content-Length; None when oversized/invalid.
+
+            Returns ``b""`` for a missing/zero Content-Length. Returns ``None`` (and
+            does NOT read the socket) when the declared length exceeds the outer
+            envelope ``_MAX_MUTATION_BODY_BYTES`` — the caller answers 413 without
+            consuming an attacker-controlled stream.
+            """
+            raw_len = self.headers.get("Content-Length")
+            if raw_len is None:
+                return b""
+            try:
+                length = int(raw_len)
+            except ValueError:
+                return None
+            if length < 0 or length > _MAX_MUTATION_BODY_BYTES:
+                return None
+            return self.rfile.read(length)
+
+        def _dispatch_mutation(self, route_name: str, qs: dict[str, list[str]]) -> None:
+            """Read the body + content type and call the mutation view; 404 if unwired."""
+            if route_name not in views:
+                self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
+                return
+            body = self._read_body()
+            if body is None:
+                self._respond(
+                    413,
+                    "application/json",
+                    b'{"error": "payload_too_large"}',
+                )
+                return
+            content_type = self.headers.get("Content-Type", "")
+            try:
+                status, ct, resp_body = views[route_name](
+                    body=body, content_type=content_type, qs=qs
+                )
+            except Exception as exc:  # noqa: BLE001
+                import logging
+
+                logging.getLogger(__name__).warning("PanelHandler: mutation route error: %s", exc)
+                self._respond(500, "application/json", b'{"error": "internal server error"}')
+                return
+            self._respond(status, ct, resp_body)
 
         def _dispatch_telemetry(
             self,

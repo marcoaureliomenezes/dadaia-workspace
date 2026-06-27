@@ -102,3 +102,30 @@ def test_rejects_repo_wide_scope(path: str) -> None:
 
     with pytest.raises(PromptScopeError, match="repo-wide"):
         LifecyclePromptBuilder().build(scope)
+
+
+def test_build_threads_resolved_model_into_request() -> None:
+    # T-28-A-07: PromptScope.resolved_model flows into AgentRunRequest.resolved_model.
+    from dadaia_workspace.core.models.workflow_execution import (
+        PolicySource,
+        ResolvedModelConfig,
+    )
+
+    resolved = ResolvedModelConfig(
+        profile_id="codex-review-deep",
+        harness="codex",
+        model="gpt-5.5",
+        reasoning="high",
+        source=PolicySource.DEFAULT_OVERLAY,
+    )
+    scope = PromptScope(
+        role="qa-engineer",
+        context="dadaia-workspace",
+        release_id="v0.1.28",
+        task_id="run:review_qa",
+        prompt="review",
+        allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
+        resolved_model=resolved,
+    )
+    built = LifecyclePromptBuilder().build(scope)
+    assert built.request.resolved_model == resolved

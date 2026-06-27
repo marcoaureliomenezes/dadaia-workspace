@@ -39,8 +39,6 @@ def _payload(output: str) -> dict[str, object]:
 @pytest.mark.parametrize(
     "command",
     (
-        ["lifecycle", "backlog", "define"],
-        ["lifecycle", "release", "define"],
         ["lifecycle", "implement"],
         ["lifecycle", "close"],
         ["lifecycle", "review", "qa"],
@@ -53,10 +51,12 @@ def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
     monkeypatch: pytest.MonkeyPatch,
     command: list[str],
 ) -> None:
-    """Every single-step lifecycle verb now drives the engine (no `unavailable_workflow`).
+    """Every generic single-step lifecycle verb drives the engine (no `unavailable_workflow`).
 
-    With the FAKE harness the worker emits no APPROVED verdict, so the real typed gate
-    blocks — proving the engine path executed end-to-end on a selectable harness.
+    With the FAKE harness the bare worker emits no APPROVED verdict, so the real typed
+    gate blocks — proving the engine path executed end-to-end on a selectable harness.
+    (``release define`` and ``backlog define`` are the fragment-driven multi-step workflows
+    now — they complete on FAKE and are covered separately, not in this generic matrix.)
     """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
@@ -74,6 +74,47 @@ def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
     blocked = payload["blocked"]
     assert isinstance(blocked, dict)
     assert "APPROVED verdict" in blocked["reason"]
+
+
+def test_release_define_runs_fragment_driven_sequence_on_fake(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`release define` runs the §6.1 fragment-driven sequence end-to-end on FAKE (T-24-09).
+
+    Unlike the generic single-step verbs, the release-definition verb composes
+    fragment-assembled, scoped prompts with Python-owned gates; the driving FAKE adapter
+    approves each step so the sequence reaches the terminal Python ``definition_commit_gate``
+    and advances the release to IMPLEMENTATION.
+    """
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "release",
+            "define",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = _payload(result.output)
+    assert payload["status"] == "OK"
+    assert payload["completed"] is True
+    assert payload["final_phase"] == "implementation"
+    steps = payload["steps"]
+    assert isinstance(steps, list)
+    labels = [step["label"] for step in steps]
+    assert labels[-1] == "definition_commit_gate"
+    # Fragment-driven: each model step carries a fragment id (not a generic step).
+    assert steps[0]["fragment_id"] == "release_definition.release_scope"
 
 
 def test_resume_existing_run_returns_ok_next_state(

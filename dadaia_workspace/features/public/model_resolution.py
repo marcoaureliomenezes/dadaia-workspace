@@ -42,8 +42,7 @@ from pathlib import Path
 from dadaia_workspace.core.model_registry import REGISTRY
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP
 
-# Matches a frontmatter ``model:`` line (first match wins; ``opencode_model:`` is a
-# different field and is intentionally not matched by this anchored pattern).
+# Matches a frontmatter ``model:`` line (first match wins).
 _MODEL_FRONTMATTER_RE = re.compile(r"^model:\s*(\S+)\s*$", re.MULTILINE)
 
 

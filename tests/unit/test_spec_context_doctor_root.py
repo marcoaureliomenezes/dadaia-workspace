@@ -71,9 +71,9 @@ class TestRoot1:
         assert "ROOT-1" in codes
 
     def test_whitelisted_dirs_allowed(self, tmp_path: Path) -> None:
-        """All six whitelisted dirs do not trigger ROOT-1."""
+        """All whitelisted dirs do not trigger ROOT-1."""
         _init_workspace(tmp_path)
-        for name in [".agents", ".claude", ".codex", ".opencode"]:
+        for name in [".agents", ".claude", ".codex", ".pi"]:
             (tmp_path / name).mkdir(exist_ok=True)
         svc = _make_doctor(tmp_path)
         codes = {i.code for i in svc.check()}
@@ -136,7 +136,7 @@ class TestRoot1:
         assert root1_issues[0].fixable is False
 
     def test_tool_configs_not_in_root1_but_root3(self, tmp_path: Path) -> None:
-        """Tool config files (.mcp.json, opencode.json, CLAUDE.md) trigger ROOT-3 not ROOT-1."""
+        """Tool config files (.mcp.json, CLAUDE.md) trigger ROOT-3 not ROOT-1."""
         _init_workspace(tmp_path)
         (tmp_path / ".mcp.json").write_text("{}")
         svc = _make_doctor(tmp_path)
@@ -267,14 +267,6 @@ class TestRoot3:
         codes = {i.code for i in svc.check()}
         assert "ROOT-3" in codes
 
-    def test_opencode_json_triggers_root3(self, tmp_path: Path) -> None:
-        """opencode.json at root triggers ROOT-3."""
-        _init_workspace(tmp_path)
-        (tmp_path / "opencode.json").write_text("{}")
-        svc = _make_doctor(tmp_path)
-        codes = {i.code for i in svc.check()}
-        assert "ROOT-3" in codes
-
     def test_claude_md_triggers_root3(self, tmp_path: Path) -> None:
         """CLAUDE.md at root triggers ROOT-3."""
         _init_workspace(tmp_path)
@@ -296,7 +288,7 @@ class TestRoot3:
     def test_root3_is_not_fixable(self, tmp_path: Path) -> None:
         """ROOT-3 is a WARN — not auto-fixable (requires research/relocation)."""
         _init_workspace(tmp_path)
-        (tmp_path / "opencode.json").write_text("{}")
+        (tmp_path / ".mcp.json").write_text("{}")
         svc = _make_doctor(tmp_path)
         root3_issues = [i for i in svc.check() if i.code == "ROOT-3"]
         assert len(root3_issues) == 1

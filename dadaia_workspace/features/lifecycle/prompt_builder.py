@@ -12,10 +12,67 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     GateEvidenceKind,
 )
+from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
 
 
 class PromptScopeError(ValueError):
     """Raised when a worker prompt would be broader than its declared scope."""
+
+
+@dataclass(frozen=True)
+class FragmentBundle:
+    """The static material for one fragment-driven step.
+
+    ``body`` is the step's own fragment body; ``shared_bodies`` are the bodies of the
+    shared fragments it cites (e.g. ``shared/output-handoff``), in citation order.
+    ``output_schema`` is the fragment's declared output contract. Bundling these here
+    keeps the workflow body free of fragment-assembly mechanics.
+    """
+
+    fragment_id: str
+    role: str
+    body: str
+    output_schema: str
+    shared_bodies: tuple[str, ...] = ()
+    shared_ids: tuple[str, ...] = ()
+
+
+def build_fragment_suffix(
+    bundle: FragmentBundle,
+    *,
+    selected_context: str,
+) -> str:
+    """Assemble a step's variable prompt suffix from a fragment bundle + selected context.
+
+    This is the fragment-driven replacement for the generic ``"Run the {label} step"``
+    suffix. The stable, cacheable release context belongs in the :class:`PromptPrefix`
+    (assembled once and reused verbatim across steps); this function produces only the
+    per-step *variable* suffix: the shared fragments the step cites, the step's own
+    fragment body, the resolved dynamic context, and the explicit output schema the
+    worker must satisfy. The returned text contains fragment-sourced content (the
+    fragment id banner + body), never a generic placeholder.
+
+    Args:
+        bundle: the step's fragment bundle (own body + cited shared bodies + schema).
+        selected_context: the dynamic context resolved by the context selector,
+            already bounded by each fragment's ``max_context_policy``.
+
+    Returns:
+        The variable suffix string to append after the cacheable :class:`PromptPrefix`.
+    """
+    sections: list[str] = []
+    for shared_id, shared_body in zip(bundle.shared_ids, bundle.shared_bodies, strict=False):
+        sections.append(f"<!-- fragment:{shared_id} -->\n{shared_body}".rstrip())
+    sections.append(f"<!-- fragment:{bundle.fragment_id} -->\n{bundle.body}".rstrip())
+    if selected_context.strip():
+        sections.append(f"## Selected context\n{selected_context}".rstrip())
+    sections.append(
+        "## Required output\n"
+        f"Emit a handoff whose structured_output.verdict is APPROVED or REJECTED and that "
+        f"conforms to the output schema `{bundle.output_schema}`, with an artifact_ref "
+        "pointing at the handoff document."
+    )
+    return "\n\n".join(sections)
 
 
 @dataclass(frozen=True)
@@ -54,6 +111,10 @@ class PromptScope:
     expected_schema: str = "agent-run-result-v1"
     required_evidence: tuple[GateEvidenceKind, ...] = ()
     model_profile: str | None = None
+    # The governance-resolved concrete model for this step (T-28-A-07). When present it is
+    # threaded into the request so the adapter runs the policy-selected model (M2). Kept
+    # additive-optional: ``model_profile`` stays for back-compat / observability.
+    resolved_model: ResolvedModelConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +152,7 @@ class LifecyclePromptBuilder:
             forbidden_paths=scope.forbidden_paths,
             expected_schema=scope.expected_schema,
             required_evidence=scope.required_evidence,
+            resolved_model=scope.resolved_model,
         )
         prompt_text = self._prompt_text(scope)
         if prefix is not None:

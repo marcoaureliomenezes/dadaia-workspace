@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "dadaia-workspace"
 version = "0.1.7"
-description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex, OpenCode and PI"
+description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and PI"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
@@ -9,7 +9,7 @@ packages = [{include = "dadaia_workspace"}]
 # sdist/wheel. poetry-core honours these globs for both artifacts.
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
 keywords = [
-    "ai-agents", "claude-code", "codex", "opencode",
+    "ai-agents", "claude-code", "codex", "pi",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
     "developer-tools", "cli", "agentic"
 ]
@@ -40,6 +40,15 @@ pyyaml = "^6.0"
 jinja2 = "^3.1"
 jsonschema = "^4"
 mistune = ">=3.0,<4.0"
+
+# Optional runtime extra — the Claude Agent SDK enables live Claude execution via
+# ClaudeSdkAdapter. It is NOT a base dependency: the offline-first build and lockfile
+# stay SDK-free, the adapter lazily imports it, and base installs never pull it. Enable
+# with `pip install dadaia-workspace[claude-sdk]`.
+claude-agent-sdk = {version = ">=0.2,<1.0", optional = true}
+
+[tool.poetry.extras]
+claude-sdk = ["claude-agent-sdk"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8,<10"

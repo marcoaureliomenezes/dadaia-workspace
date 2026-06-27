@@ -11,9 +11,9 @@ tags:
 - toolchain
 - constraints
 agent_tier: inject
-token_estimate: 2100
-last_updated: '2026-06-25'
-release_origin: v0.1.19
+token_estimate: 2300
+last_updated: '2026-06-26'
+release_origin: v0.1.26
 ---
 
 ## Linguagens
@@ -21,7 +21,7 @@ release_origin: v0.1.19
 Linguagem| Versão| Uso
 ---|---|---
 Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest.
-Bash| 4+ POSIX-compatível| Um único shell asset no produto: `pre-push-ci-gate.sh` (git hook, deliberadamente shell; git-for-Windows ships bash) — todos os hooks de governança são o pacote Python `dadaia_workspace/hooks/`. Python hooks inject lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code/OpenCode via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID).
+Bash| 4+ POSIX-compatível| Um único shell asset no produto: `pre-push-ci-gate.sh` (git hook, deliberadamente shell; git-for-Windows ships bash) — todos os hooks de governança são o pacote Python `dadaia_workspace/hooks/`. Python hooks inject lean payload (tech-stack.md verbatim + catalog.json, ~2.4K tokens) **uma vez por sessão** — Codex via `SessionStart`, Claude Code via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID). PI lê a law nativamente up-tree (sem hook de injeção de Layer 1).
 HTML5 + Mermaid| Mermaid via CDN| Reports em `.dadaia/reports/<ctx>/<agent>/*.html`; memory atoms são `.md` renderizados in-memory (D-4)
 Markdown| CommonMark| Memory atoms atômicos em `specs/memory/*.md` (frontmatter `memory-frontmatter-v1` + corpo Markdown); SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions
 YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows e memory atoms (`memory-frontmatter-v1`: `additionalProperties: false`)
@@ -42,8 +42,9 @@ git| 2.x| VCS; `git_subprocess.py` wrapeia comandos
 
   * **Claude (Anthropic)** : runtime nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`. O `ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`) dirige um worker Claude por trás de `AgentRuntimePort` num step do lifecycle; depende do extra **opcional** `claude-agent-sdk` (lazy-imported — NÃO é dependência travada; build offline-first preservado; ausência ⇒ resultado FAILED com `pip install claude-agent-sdk` acionável).
   * **Codex (OpenAI)** : parity guard ativo desde codex-agent-orchestration-parity-v1 (2026-05-20). Doctor checks D-CX-1..8 (D-CX-4 lint inclui tool-names Claude e tier-names Anthropic). 9 agentes core TOML em `.codex/agents/` com tiering registry-derived (model id × `model_reasoning_effort` via `core/model_registry.codex_tier_views()`; deep→high, dispatch→medium; collapse guard loud-fail). Zero leak `claude-*`/Opus/Sonnet/Haiku. Command policy `.codex/rules/*.rules` em `prefix_rule(...)` com paths venv-form. **Hooks executam só em sessão interativa** — `codex exec` headless não dispara hooks (codex-cli 0.139.0, live-verified; harness opt-in `tests/integration/codex_live/`, `DADAIA_CODEX_LIVE=1`). Workflows em `.codex/workflows/` (reference-only).
-  * **OpenCode** : projeção via strip de frontmatter de tools; workflows e skills projetados em `.opencode/`.
-  * **PI (`@earendil-works/pi-coding-agent`)** : quarto second-layer harness, peer de Claude/Codex/OpenCode, selecionável por step via `--harness pi` / `--step-harness x=pi`. O `PiHeadlessAdapter` (`infrastructure/pi_runtime.py`) dirige um worker PI por trás de `AgentRuntimePort` via `pi --mode json` (subprocess, runner injetável, sem PI client em module-load). PI é um **runtime CLI externo OPCIONAL instalado pelo operador** (Node + binário `pi` + `ANTHROPIC_API_KEY`), invocado como binário externo — **NUNCA** uma dependência Python/Node travada/pinned: não entra em `poetry.lock`, não é importado em build/test, e o build permanece offline-first sem ele. O schema do event stream `pi --mode json` (especificamente a forma de `AgentMessage.content`: string vs array de content-blocks) é o único seam upstream não-verificado, verificado pelo teste de integração opt-in `DADAIA_PI_LIVE=1` (`tests/integration/pi_live/`, **não** CI-gated). A versão exata de `pi` verificada deve ser capturada/pinada na primeira execução do live seam num ambiente com rede — não é pinável offline agora.
+  * **PI (`@earendil-works/pi-coding-agent`)** : harness de entrada de Layer 1 (`{claude, codex, pi}`) **e** worker de Layer 2, selecionável por step via `--harness pi` / `--step-harness x=pi`. O `PiHeadlessAdapter` (`infrastructure/pi_runtime.py`) dirige um worker PI por trás de `AgentRuntimePort` via `pi --mode json` (subprocess, runner injetável, sem PI client em module-load). PI é um **runtime CLI externo OPCIONAL instalado pelo operador** (Node + binário `pi`), invocado como binário externo — **NUNCA** uma dependência Python/Node travada/pinned: não entra em `poetry.lock`, não é importado em build/test, e o build permanece offline-first sem ele. **No Layer 2, PI roda sob a subscrição Codex do operador → ids de modelo GPT** (LAW 2: `(gpt-5.5,high)`/`(gpt-5.5,low)`/`(gpt-5.3-codex,medium)` via `pi --model <id>`). O schema do event stream `pi --mode json` (especificamente a forma de `AgentMessage.content`: string vs array de content-blocks) é o único seam upstream não-verificado, verificado pelo teste de integração opt-in `DADAIA_PI_LIVE=1` (`tests/integration/pi_live/`, **não** CI-gated). **TODO (versão):** a versão exata de `pi` verificada deve ser capturada/pinada na primeira execução do live seam num ambiente com rede — não capturada neste ciclo.
+  * **OpenCode** : **REMOVIDO inteiramente em v0.1.24** (ambas as layers). Não é mais um harness de entrada de Layer 1 (sem target `opencode`, sem projeção `.opencode/`) nem um worker de Layer 2 (`OPENCODE_RUN` removido do `AgentRuntimeKind`). Menções históricas vivem apenas em `_archive`/CLOSURE.
+  * **Layer-2 worker harnesses (LAW 1, v0.1.24)** : as harnesses workflow selecionáveis são exatamente **`{pi, codex, fake}`**. Codex (`codex exec`) toma um modelo GPT discreto `(id, effort)` — `(gpt-5.5,high)`/`(gpt-5.5,medium)`. `CLAUDE_SDK` é mantido importável + unit-tested (uso de Layer-1) mas `claude` é rejeitado como `--harness` de workflow. **TODO (versões CLI):** as versões verificadas de `pi` e `codex` não foram capturadas neste ciclo (não inventar).
   * **CLI** : agentes invocados via `claude --agent <name>` ou equivalente; modo manual sem paralelização automática.
 
 
@@ -146,7 +147,7 @@ puro: zero I/O, zero OS primitive — por isso é testável e cross-platform.
   * NÃO usar threading/multiprocessing nas features — orquestração concorrente fica em `features/orchestration/`.
   * NÃO chamar `os.system`/`subprocess` fora de `infrastructure/` — features usam protocols.
   * NÃO importar Python <3.12 backports — runtime mínimo é 3.12 (match/case, generic types nativos, type statement).
-  * NÃO escrever em `.claude/`, `.codex/`, `.opencode/`, `.agents/` diretamente — apenas via `dadaia public install` a partir de `public/`.
+  * NÃO escrever em `.claude/`, `.codex/`, `.pi/`, `.agents/` diretamente — apenas via `dadaia public install` a partir de `public/`. (`.opencode/` não existe mais — OpenCode removido em v0.1.24.)
 
 
 
@@ -183,3 +184,11 @@ Como rodar, testar, lintar e empacotar:
     # SDD
     dadaia specs doctor                     # estrutura SDD
     dadaia specs doctor --json              # machine-readable
+
+    # Backlog-consistency engine (features/backlog/, v0.1.25)
+    dadaia backlog subjects                 # lista o anchor set canônico vivo (opcional --kind / --resolve "<ref>")
+    dadaia backlog doctor                   # BL-SCHEMA/DUP/CONFLICT/STALE; exit !=0 em violação (wired no pre-commit + CI)
+    dadaia backlog doctor --explain         # mostra como um subject proposto resolve (anchor | UNRESOLVED | AMBIGUOUS)
+
+    # backlog_definition dadaia-workflow (features/lifecycle/workflows/backlog_definition.py, v0.1.26)
+    dadaia lifecycle backlog define --harness {pi|codex|fake} --model <id>   # workflow §4 ORIENTED; gates Python-owned; LAW 1/LAW 2 (claude rejeitado)

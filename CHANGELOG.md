@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.24] — Unreleased
+
+### Removed
+- **Removed OpenCode support entirely (both agentic layers).** The OpenCode entry
+  harness, the `OPENCODE_RUN` Layer-2 worker kind and its adapter, the `.opencode/`
+  projection target, `opencode.json`, the OpenCode gate plugin, and all OpenCode
+  references across code, tests, docs, and the AI surface are gone. The supported
+  harness set is now exactly **Claude Code, Codex, and PI**.
+
 ## [0.1.7] — 2026-06-13
 
 Consolidated release: the single published version after `0.1.5`. It folds in all

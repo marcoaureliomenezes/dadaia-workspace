@@ -11,15 +11,15 @@ exposes a subprocess runner so behavior tests invoke hooks the way the harness d
 
 Why these env vars and *only* these
 -----------------------------------
-A Claude Code / Codex / OpenCode hook is spawned by the harness as a child process. The
+A Claude Code / Codex hook is spawned by the harness as a child process. The
 harness passes through the operator's shell environment plus its own native variables.
 Crucially it does **not** invent ``DADAIA_*`` variables: the only ``DADAIA_*`` value a
 hook can rely on is whatever the *operator's shell* exported (``DADAIA_CONTEXT`` is the
 documented operator-shell convenience var). In particular the harness never sets:
 
 - ``DADAIA_SESSION_ID`` — the dadaia hooks resolve session identity from the harness's
-  *native* id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID`` /
-  ``OPENCODE_SESSION_ID``) or the stdin ``session_id`` field
+  *native* id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``) or the stdin
+  ``session_id`` field
   (``dadaia_workspace/hooks/_common.py:resolve_session_id``). ``DADAIA_SESSION_ID`` is an
   *operator override only*, never a harness-supplied value.
 - ``DADAIA_PERSONA`` / ``*_AGENT_PERSONA`` — no harness exposes the dispatched persona to
@@ -125,8 +125,8 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
 
 #: ``DADAIA_*`` vars the **harness wiring itself** sets on the hook command line (not the
 #: operator shell): the output contract that selects the codex-json / json envelope. The
-#: Codex hook command in ``infrastructure/runtime_config`` and the OpenCode Bun plugin
-#: (``public/plugins/ctx-inject.ts``) export these when they spawn the hook; ``ctx_inject``
+#: Codex hook command in ``infrastructure/runtime_config`` exports these when it spawns
+#: the hook; ``ctx_inject``
 #: reads them in ``_emit``. They are NOT operator-shell vars and must never be planted via
 #: an in-process ``setenv`` — a behavior test passes them through the *subprocess* env
 #: (:func:`run_hook_subprocess`), which is the harness-real channel. :func:`claude_hook_env`
@@ -145,10 +145,8 @@ _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
     "DADAIA_AGENT_PERSONA",
     "CLAUDE_AGENT_PERSONA",
     "CODEX_AGENT_PERSONA",
-    "OPENCODE_AGENT_PERSONA",
     CLAUDE_SESSION_ENV_VAR,
     CODEX_SESSION_ENV_VAR,
-    "OPENCODE_SESSION_ID",
 )
 
 #: The dadaia hook modules invocable as ``python -m dadaia_workspace.hooks.<name>``.

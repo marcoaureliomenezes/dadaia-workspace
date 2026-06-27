@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunResult,
@@ -202,6 +204,233 @@ def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
     assert len(captured) == 4
     # Every step's worker prompt leads with the SAME cached prefix bytes (WS-7).
     assert all(req.prompt.startswith(prefix.text) for req in captured)
-    # Step model tiers applied: implement=sonnet, reviews=opus.
-    assert captured[0].model_profile == "sonnet"
-    assert [req.model_profile for req in captured[1:]] == ["opus", "opus", "opus"]
+    # No "sonnet"/"opus" tier literals remain (LAW 2): the step model defaults from the
+    # discrete catalog, and model_profile records the chosen option's effort.
+    assert all(req.model_profile not in ("sonnet", "opus") for req in captured)
+    assert all(req.model_profile == "high" for req in captured)
+
+
+def test_implementation_ladder_default_model_comes_from_catalog() -> None:
+    from dadaia_workspace.core.harness_models import CODEX_HARNESS, options_for
+    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+
+    steps = implementation_ladder(AgentRuntimeKind.FAKE)
+    expected_effort = options_for(CODEX_HARNESS)[0].effort
+    assert all(step.model_profile == expected_effort for step in steps)
+    assert all(step.model_profile not in ("sonnet", "opus") for step in steps)
+
+
+def test_implementation_ladder_honors_explicit_discrete_model() -> None:
+    from dadaia_workspace.core.harness_models import validate
+    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+
+    chosen = validate("codex", "gpt-5.5:medium")
+    steps = implementation_ladder(AgentRuntimeKind.FAKE, model=chosen)
+    assert all(step.model_profile == "medium" for step in steps)
+
+
+# --- WS-6: fragment-sourced prompts for the implementation + QA-review steps ---------
+
+
+def _capture_pipeline(captured: list[AgentRunRequest]) -> LifecyclePipeline:
+    store = _MemoryRunStore()
+    return LifecyclePipeline(
+        context="dadaia-workspace",
+        release_id="v0.1.24",
+        run_store=store,
+        runtime_factory=lambda kind: _RecordingFake(kind, captured),
+    )
+
+
+def test_implementation_ladder_attaches_fragment_bundles_to_two_steps() -> None:
+    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+
+    steps = implementation_ladder(AgentRuntimeKind.FAKE)
+    by_label = {step.label: step for step in steps}
+
+    # The implementation step runs on the TDD implement fragment, citing the shared
+    # write-scope / anti-slop / output-handoff disciplines + the self-verify fragment.
+    assert by_label["implement"].fragment_id == "implementation.implement_tdd"
+    assert by_label["implement"].shared_fragment_ids == (
+        "shared.write_scope",
+        "shared.anti_slop",
+        "shared.output_handoff",
+        "implementation.self_verify",
+    )
+    # The QA review step runs on the qa-review fragment.
+    assert by_label["review_qa"].fragment_id == "implementation.qa_review"
+    # The remaining steps keep the generic path (full migration is out of scope).
+    assert by_label["review_security"].fragment_id is None
+    assert by_label["review_code"].fragment_id is None
+
+
+def test_implementation_and_qa_steps_emit_fragment_sourced_prompts() -> None:
+    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+
+    captured: list[AgentRunRequest] = []
+    pipe = _capture_pipeline(captured)
+
+    result = pipe.run("run-frag", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    by_label = {req.task_id.rsplit(":", 1)[1]: req for req in captured}
+
+    implement_prompt = by_label["implement"].prompt
+    # Fragment-sourced: carries the fragment id banners (own + cited shared), NOT the
+    # generic "Run the ... step" suffix.
+    assert "fragment:implementation.implement_tdd" in implement_prompt
+    assert "fragment:shared.write_scope" in implement_prompt
+    assert "fragment:implementation.self_verify" in implement_prompt
+    assert "Run the implement step" not in implement_prompt
+    # The output schema the fragment declares reaches the prompt.
+    assert "implementation-result-v1" in implement_prompt
+
+    qa_prompt = by_label["review_qa"].prompt
+    assert "fragment:implementation.qa_review" in qa_prompt
+    assert "Run the review_qa step" not in qa_prompt
+    assert "qa-review-verdict-v1" in qa_prompt
+
+    # A non-migrated step keeps the generic suffix.
+    security_prompt = by_label["review_security"].prompt
+    assert "Run the review_security step" in security_prompt
+    assert "fragment:" not in security_prompt
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["audit", "research", "bug_report"],
+)
+def test_deferred_workflows_fail_loud_when_invoked(name: str) -> None:
+    from dadaia_workspace.features.lifecycle import workflows
+
+    entry = getattr(workflows, name)
+    with pytest.raises(NotImplementedError) as excinfo:
+        entry()
+    message = str(excinfo.value)
+    assert name in message
+    assert "deferred to a follow-up release" in message
+
+
+def test_deferred_workflows_are_discoverable() -> None:
+    from dadaia_workspace.features.lifecycle import workflows
+
+    assert workflows.DEFERRED_WORKFLOWS == (
+        "audit",
+        "research",
+        "bug_report",
+    )
+    for name in workflows.DEFERRED_WORKFLOWS:
+        assert callable(getattr(workflows, name))
+
+
+# ---------------------------------------------------------------------------
+# T-28-A-07 — pipeline threads resolved policy + persists the snapshot before step 1
+# ---------------------------------------------------------------------------
+
+
+class _PolicyRecordingFake:
+    def __init__(self, kind: AgentRuntimeKind) -> None:
+        self.kind = kind
+        self.requests: list[AgentRunRequest] = []
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return self.kind
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        self.requests.append(request)
+        return _approved()
+
+
+def _snapshot_for_implementation() -> object:
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+        library_workflow_catalog,
+    )
+
+    resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
+    return resolver.resolve("implementation", context="default")
+
+
+def test_pipeline_threads_resolved_model_and_persists_snapshot() -> None:
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    store = _MemoryRunStore()
+    recorder = _PolicyRecordingFake(AgentRuntimeKind.FAKE)
+    snapshot = _snapshot_for_implementation()
+
+    pipe = LifecyclePipeline(
+        context="dadaia-workspace",
+        release_id="v0.1.28",
+        run_store=store,
+        runtime_factory=lambda kind: recorder,  # type: ignore[arg-type, return-value]
+        policy_snapshot=snapshot,  # type: ignore[arg-type]
+    )
+    base = implementation_ladder(AgentRuntimeKind.FAKE)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    result = pipe.run("run-policy", steps)
+
+    assert result.completed is True
+    # Each request carried the resolved concrete model from the snapshot.
+    impl_req = recorder.requests[0]
+    assert impl_req.resolved_model is not None
+    assert impl_req.resolved_model.profile_id == "codex-implementation-standard"
+    qa_req = recorder.requests[1]
+    assert qa_req.resolved_model is not None
+    assert qa_req.resolved_model.profile_id == "codex-review-deep"
+    # The persisted run carries the resolved-policy snapshot (LAW 6).
+    persisted = store.saved["run-policy"]
+    assert persisted.workflow_policy is not None
+    assert persisted.workflow_policy.workflow_id == "implementation"
+    assert persisted.workflow_policy.step("implement") is not None
+
+
+# ---------------------------------------------------------------------------
+# v0.1.29 / T-29-A-06 — apply_resolved_policy owns runtime_kind from resolved harness
+# ---------------------------------------------------------------------------
+
+
+def _resolve(default_harness: str | None = None):  # type: ignore[no-untyped-def]
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+        library_workflow_catalog,
+    )
+
+    resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
+    return resolver.resolve("implementation", context="default", default_harness=default_harness)
+
+
+def test_apply_resolved_policy_sets_runtime_kind_from_resolved_harness() -> None:
+    # AC-3: a pi-resolved snapshot drives PI_HEADLESS on every step when the base
+    # ladder is built on a real (non-fake) harness.
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    snapshot = _resolve(default_harness="pi")
+    base = implementation_ladder(AgentRuntimeKind.CODEX_EXEC)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    for step in steps:
+        assert step.runtime_kind is AgentRuntimeKind.PI_HEADLESS
+
+
+def test_apply_resolved_policy_codex_resolves_codex_exec() -> None:
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    snapshot = _resolve()  # default codex
+    base = implementation_ladder(AgentRuntimeKind.PI_HEADLESS)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    for step in steps:
+        assert step.runtime_kind is AgentRuntimeKind.CODEX_EXEC
+
+
+def test_apply_resolved_policy_preserves_fake_for_dry_run() -> None:
+    # ARCHITECT MEDIUM: a base ladder built on FAKE (dry-run / test) keeps FAKE even
+    # though the snapshot resolves a governed harness — fake is never a resolved harness.
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+
+    snapshot = _resolve(default_harness="pi")
+    base = implementation_ladder(AgentRuntimeKind.FAKE)
+    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
+    for step in steps:
+        assert step.runtime_kind is AgentRuntimeKind.FAKE
+        # The governed model is still threaded for auditability.
+        assert step.resolved_model is not None
+        assert step.resolved_model.harness == "pi"

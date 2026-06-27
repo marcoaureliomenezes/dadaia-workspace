@@ -165,7 +165,7 @@ cross-domain conflicts go to the operator.
 
 NEVER edit production code (`dadaia_workspace/`, `repos/`), specs (`specs/**` except
 `specs/backlog/**`), memory atoms, tests, CI YAML, or lib-originated projections
-(`.agents/`, `.claude/`, `.codex/`, `.opencode/`). NEVER run `dadaia public install --force`
+(`.agents/`, `.claude/`, `.codex/`, `.pi/`). NEVER run `dadaia public install --force`
 (operator only). STOP and escalate on 3+ unresolved conflicts or a demand outside any known
 playbook.
 

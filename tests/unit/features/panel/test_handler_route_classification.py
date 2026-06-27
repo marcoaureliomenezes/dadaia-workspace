@@ -20,6 +20,7 @@ from __future__ import annotations
 from dadaia_workspace.features.panel.handler import (
     _BEARER_ONLY_ROUTE_NAMES,
     _COMPILED_DELETE_ROUTE_TABLE,
+    _COMPILED_ROUTE_TABLE,
     _DELETE_ROUTE_TABLE,
     _ROUTE_TABLE,
     _SECOND_LOOP_AUTH_ROUTE_NAMES,
@@ -194,6 +195,21 @@ def test_api_contexts_requires_second_loop_auth() -> None:
 def test_api_kanban_requires_bearer() -> None:
     """api_kanban must require BEARER (no telemetry needed)."""
     assert _get_auth("api_kanban") == AuthClass.BEARER
+
+
+def test_api_workflow_fragment_route_registered_and_bearer() -> None:
+    """GET /api/workflow-fragments/<id> resolves to api_workflow_fragment under BEARER (Wave D)."""
+    assert _get_auth("api_workflow_fragment") == AuthClass.BEARER
+    matched_name: str | None = None
+    captured: str | None = None
+    for pattern, name, _auth in _COMPILED_ROUTE_TABLE:
+        m = pattern.match("/api/workflow-fragments/implementation.implement_tdd")
+        if m:
+            matched_name = name
+            captured = m.groupdict().get("fragment_id")
+            break
+    assert matched_name == "api_workflow_fragment"
+    assert captured == "implementation.implement_tdd"
 
 
 def test_api_reports_requires_bearer() -> None:

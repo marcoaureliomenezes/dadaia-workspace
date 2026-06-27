@@ -16,17 +16,18 @@ tags:
 - dependency-rules
 - adr
 - agents
+- backlog
 agent_tier: self-pull
-token_estimate: 8050
-last_updated: '2026-06-25'
-release_origin: v0.1.21
+token_estimate: 12900
+last_updated: '2026-06-27'
+release_origin: v0.1.29
 ---
 
 ## Visão geral
 
 Arquitetura em três anéis: (1) CLI thin em `dadaia_workspace/cli/`; (2) features isoladas em `dadaia_workspace/features/<name>/` cada uma com seu service/doctor/etc; (3) infrastructure em `dadaia_workspace/infrastructure/` (Git, JSON stores, public asset projection). Núcleo em `dadaia_workspace/core/` mantém models, protocols e exceptions — sem I/O. Dependency injection via `dadaia_workspace/container.py`.
 
-Asset chain canonical → projeções: a fonte de cada agente, skill, rule, command, script, template, workflow vive em `dadaia_workspace/public/<type>/`; staging em `.dadaia/agentic/<type>/` (snapshots imutáveis com manifest.json); instalação espalha por `.claude/`, `.codex/`, `.opencode/`, `.pi/` (Layer-1 PI, target `pi`, mirror estrutural de OpenCode em `public_assets.py`), `.agents/` seguindo regras por tool.
+Asset chain canonical → projeções: a fonte de cada agente, skill, rule, command, script, template, workflow vive em `dadaia_workspace/public/<type>/`; staging em `.dadaia/agentic/<type>/` (snapshots imutáveis com manifest.json); instalação espalha por `.claude/`, `.codex/`, `.pi/` (Layer-1 PI, target `pi`), `.agents/` seguindo regras por tool. O harness set de Layer-1 é exatamente **`{claude, codex, pi}`** — **OpenCode foi removido inteiramente em v0.1.24** (ambas as layers): não há mais target `opencode`, projeção `.opencode/`, nem entrada de manifest opencode; `_VALID_TARGETS` é `{agents, claude, codex, pi}` (+`all`). A fonte de prompt-fragments do lifecycle vive em `dadaia_workspace/public/lifecycle_fragments/` (projetada + manifest-tracked; ver "Two-layer agentic model").
 
 ## O Spec Context Project (conceito central)
 
@@ -43,7 +44,7 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 
 **cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`, `lifecycle`. Thin wrapper sobre features; sem business logic.
 
-**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
+**features/** — cada feature é uma pasta com `service.py` + opcionalmente `doctor.py`, `resolver.py`, `runner.py`. Features atuais: `academy`, `agents` (canonical agent reader sobre `MarkdownAgentStore`), `backlog` (backlog-consistency engine: v0.1.25 `subject_registry.py` registry auto-derivado, `classifier.py` classificador fail-closed, `doctor.py` BL-* checks, `ledger.py` reader do sidecar `consumed_backlog.json`, `preview.py` superfície read-only; v0.1.26 `ledger_writer.py` writer do sidecar na shape exata do reader R1, `removal.py` hook de closure residual-aware (rewrite-down-to-residual default; full removal só a zero residual, com cópia durável em `_archive/<release>/consumed-backlog/` ANTES do unlink — ADR-C copy-before-remove), `removal_lifecycle.py` facade `BacklogRemovalLifecycle` ligando os dois lados; v0.1.27 `consumes.py` (`parse_consumes_line` parser da linha `**Consumes:**` do SPEC + `shipped_anchors_for` binder fail-loud que une os bound anchors dos slugs declarados via o registry R1, `ConsumesBindError`) — alimenta o producer post-step de `dadaia lifecycle release define`, fechando o loop removal-on-release end-to-end — ver "Backlog-consistency subsystem" abaixo), `ci_preflight`, `export`, `import_`, `lifecycle` (multi-harness procedural lifecycle engine: state machine, preflight, semantic gates, hygiene, report workflow, scoped prompts + `prompt_builder.PromptPrefix` cacheable/hashed, run store, `agent_runner` Ring-2, `phase_workflow.py` single-step, `pipeline.py` multi-step phase ladder com per-step harness mixing + model tiers, `workflows/backlog_definition.py` — o corpo da workflow `backlog_definition` (§4: intake_grill → subject_bind → existing_backlog_review → reconcile_decision → conflict_resolution_grill → backlog_author → backlog_review_gate; mirror estrutural de `release_definition.py`, gates Python-owned), `context_selector.py` com o selector `backlog_index` (bound intents + status por item, frontmatter-only, paths injetados), e `antislop/{slop_scan,retention}.py` — directory-aware slop metric + boundary-safe RetentionSweep), `migrate`, `orchestration` (read-only reference: `list`/`show` mostram os workflow docs; `run`/`status`/`resume` permanecem como stubs inertes de compat — não despacham agente, exit 0 — pois o dispatch path foi retirado em WS-3 e a execução migrou para `dadaia lifecycle`), `panel` (descrito em detalhe abaixo), `public`, `repos`, `reports_next`, `reports_retention`, `server_registry`, `spec_artifacts`, `spec_context` (inclui `lease.py` — contrato de locking central), `specs`, `telemetry` (com `aggregator/queries.py` expondo `list_sessions(runtime, project=None, limit=None) -> SessionListResult` + `get_session(runtime, session_id) -> SessionDetail | None`; `aggregator/runtimes.py` declara o protocolo `RuntimeAdapter` com métodos `enrich_row`, `enrich_detail`, `liveness(session_id, cwd)` e implementações `ClaudeRuntimeAdapter` e `CodexRuntimeAdapter`; `TelemetryAggregator` mantém registry `{runtime: adapter}` e delega enrichment per row), `workflows` (`WorkflowsService` wrapping `MarkdownWorkflowStore` com mtime cache + `dag.py` SVG renderer server-side via longest-path layout), `workspace`.
 
 **panel — arquitetura HTTP interna (pós R5):**
 
@@ -66,13 +67,13 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
 - `core/kernel_tunables.py` — single home das constantes do kernel de concorrência (lease TTL, GC TTLs, CAS retries, sentinel TTL, throttle do reconciler); constantes puras, zero I/O; leaf no import-linter.
 - `core/scope_match.py` — classifier de path puro, compartilhado pelo Ring-2 do `LifecycleAgentRunner` e pelo Ring-1 write-permission decider do `ClaudeSdkAdapter` (one classifier, two boundaries). Vive em `core/` (não em `features/`) para que `infrastructure/` possa importá-lo sem violar o layering — correção da quebra `infrastructure → features` apanhada pelo `lint-imports`.
 
-**infrastructure/** — implementações concretas dos protocols: `git_subprocess` (inclui `GitSubprocessClient.diff_name_only(path)` — lista de `git diff --name-only` working-tree+staged+untracked, fonte do Ring-2 `changed_paths` do PI), `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, os agent-runtime adapters por trás de `AgentRuntimePort` (`codex_runtime.CodexExecAdapter`, `opencode_runtime.OpenCodeAdapter` stub, `claude_sdk_runtime.ClaudeSdkAdapter` com Ring-1 write boundary via `core/scope_match` + transport `query_fn` injetável; `claude-agent-sdk` é extra opcional lazy-imported; `pi_runtime.PiHeadlessAdapter` + `PiHeadlessConfig` — twin estrutural do `CodexExecAdapter`, dirige `pi --mode json` via runner subprocess injetável, sem PI client em module-load, Ring-2 `changed_paths` de git-diff), `excel_reader`, `python_env`, `subprocess_runner` (`SubprocessProcessRunner` — implementação production do `ProcessRunner`; consumida por `features/import_`, `features/ci_preflight`, `features/specs/doctor` e `features/server_registry` via Protocol/DI; contrato import-linter `features-no-subprocess` em `setup.cfg` proíbe `features → subprocess`). Toda I/O fica aqui. Adaptadores de plataforma: `file_lock_posix`, `file_lock_windows`, `telemetry_lock_posix`, `telemetry_lock_windows`, `file_permission_posix`, `file_permission_windows`, `process_probe_adapter`, `signal_shutdown_posix`, `signal_shutdown_windows`.
+**infrastructure/** — implementações concretas dos protocols: `git_subprocess` (inclui `GitSubprocessClient.diff_name_only(path)` — lista de `git diff --name-only` working-tree+staged+untracked, fonte do Ring-2 `changed_paths` do PI), `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, os agent-runtime adapters por trás de `AgentRuntimePort` (`codex_runtime.CodexExecAdapter`, `claude_sdk_runtime.ClaudeSdkAdapter` com Ring-1 write boundary via `core/scope_match` + transport `query_fn` injetável; `claude-agent-sdk` é extra opcional lazy-imported; `pi_runtime.PiHeadlessAdapter` + `PiHeadlessConfig` — twin estrutural do `CodexExecAdapter`, dirige `pi --mode json` via runner subprocess injetável, sem PI client em module-load, Ring-2 `changed_paths` de git-diff; `opencode_runtime` foi removido em v0.1.24), `excel_reader`, `python_env`, `subprocess_runner` (`SubprocessProcessRunner` — implementação production do `ProcessRunner`; consumida por `features/import_`, `features/ci_preflight`, `features/specs/doctor` e `features/server_registry` via Protocol/DI; contrato import-linter `features-no-subprocess` em `setup.cfg` proíbe `features → subprocess`). Toda I/O fica aqui. Adaptadores de plataforma: `file_lock_posix`, `file_lock_windows`, `telemetry_lock_posix`, `telemetry_lock_windows`, `file_permission_posix`, `file_permission_windows`, `process_probe_adapter`, `signal_shutdown_posix`, `signal_shutdown_windows`.
 
 **container.py** — sole composition root. Lê `PLATFORM`, seleciona adapters (POSIX vs Windows) e injeta via `build_*_service(workspace_root)` factories. CLI commands chamam o container para obter serviços. `container.py` é o único local onde `PLATFORM` determina qual adapter concreto é instanciado.
 
 **hooks/** — `dadaia_workspace/hooks/` Python package (8 módulos: `__init__`, `_common`, `pre_gate`, `sdd_gate`, `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`) — a única implementação dos hooks de governança. O PreToolUse roda por **um entrypoint merged**, `pre_gate`: lê o stdin uma vez e avalia as policies em ordem fixa root-whitelist → venv-guard (Bash apenas) → SDD gate, first-block-wins; cada policy é fail-open (PROTECTED fail-closed dentro da policy SDD); `sdd_gate` e `root_whitelist` são thin policy modules (`evaluate_payload()`; `main()` legado mantido por uma release). `runtime_config.py` emite UM comando PreToolUse por runtime (`python -m dadaia_workspace.hooks.pre_gate`) para `.claude/settings.json` e `.codex/hooks.json`: matcher `Edit|Write|MultiEdit|NotebookEdit|Bash` no Claude; `^(apply_patch|Edit|Write|Bash)$` no Codex; PostToolUse match-all (heartbeat + reconciler advisory em todo tool). Shell assets git-hook: `public/scripts/pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (chokepoints; instalados por `dadaia ci install-hook`; backends `dadaia ci pre-commit-check`/`push-gate-check`). `workspace/service.py` reconhece tanto o caminho `.sh` legado quanto o comando Python para evitar dupla-registro em settings pré-existentes. A policy SDD delega a `gate_policy.evaluate()` — não re-deriva política — e injeta o PID-probe no lease; `_common.target_paths()` classifica todos os headers de um `apply_patch` multi-file (veredito mais restritivo vence). Cada invocação de `pre_gate` appenda latência `{ts, hook, event, duration_ms}` em `.dadaia/logs/hook-latency.jsonl` (best-effort, fail-open). Constantes do kernel (lease TTL, GC TTLs, CAS retries, sentinel TTL, throttle do reconciler) têm single home em `core/kernel_tunables.py` (leaf; contrato import-linter).
 
-**public/** — assets canônicos versionados: `agents/`, `skills/`, `rules/`, `commands/`, `scripts/`, `templates/`, `workflows/`, `plugins/`, `data/`, `scaffold/`. `public_assets.py` stage/install/doctor. A função `_install_workspace_guardrail_pair` faz fan-out byte-identical de uma única fonte `data/AGENTS.md` para o par `AGENTS.md` + `CLAUDE.md` no workspace-root e em cada consumer-repo.
+**public/** — assets canônicos versionados: `agents/`, `skills/`, `rules/`, `commands/`, `scripts/`, `templates/`, `workflows/`, `lifecycle_fragments/` (prompt fragments do Layer-2; v0.1.24), `data/`, `scaffold/`. `public_assets.py` stage/install/doctor; targets de install = `{agents, claude, codex, pi}` (+`all`) — sem `opencode` (removido em v0.1.24). O `public/plugins/sdd-gate.ts` (gate plugin de Layer-1 do OpenCode) foi deletado. A função `_install_workspace_guardrail_pair` faz fan-out byte-identical de uma única fonte `data/AGENTS.md` para o par `AGENTS.md` + `CLAUDE.md` no workspace-root e em cada consumer-repo.
 
 ## Topologia de agentes (9 core + 3 plugins)
 
@@ -353,12 +354,12 @@ flowchart LR
     C --> D[dadaia public install --target all]
     D --> E[.claude/<type>/<file>]
     D --> F[.codex/<type>/<file>]
-    D --> G[.opencode/<type>/<file>]
+    D --> P[.pi/<type>/<file>]
     D --> H[.agents/<type>/<file>]
     I[manifest.json] --> J[dadaia public doctor]
     J -.audit.-> E
     J -.audit.-> F
-    J -.audit.-> G
+    J -.audit.-> P
     J -.audit.-> H
 ```
 
@@ -467,20 +468,25 @@ Locais canônicos de estado em disco e seu propósito:
   * `specs/memory/*.md` — memory atômica (Markdown + frontmatter YAML; rendered in-memory pelo panel via mistune).
   * `specs/memory/product/catalog.json` — gerado por `generate-memory-catalog.py` a partir do frontmatter dos `.md`; committed; índice machine-readable.
   * `specs/_archive/releases/<id>/` — releases concluídas com CLOSURE.
+  * `specs/_archive/<release-id>/consumed_backlog.json` — sidecar JSON machine-readable (um por release arquivada; entries `{slug, shipped_anchors[]}`) lido por `backlog doctor` BL-STALE via exact slug membership; escrito por `ledger_writer.write_consumed` (v0.1.26) via a facade `BacklogRemovalLifecycle`. **Producer wired na superfície real de release-definition (v0.1.27):** um post-step guardado em `dadaia lifecycle release define` parseia a linha `**Consumes:**` do SPEC da release, liga os slugs declarados a seus shipped-anchors via o registry R1 e chama `consume(...)` para emitir o sidecar — em produção o ledger é escrito. Ausência = no-op (sem false ERROR).
+  * `specs/_archive/<release-id>/consumed-backlog/<slug>.md` — cópia durável de um item de backlog full-removed no closure (escrita por `removal.apply_removal` ANTES do unlink — ADR-C copy-before-remove; backlog é gitignored, então esta é a única cópia sobrevivente de um registro de segurança CRITICAL).
+  * `.dadaia/states/backlog_subject_aliases.txt` — alias map do backlog mantida pelo operador (uma linha `synonym -> canonical-anchor`); lida por path injetado; em R1 é o único caminho de binding para subjects `panel`/`api`.
+  * `.dadaia/states/workflow_model_policy.json` — overlay de política de modelo de workflow (v0.1.28; schema `workflow-model-policy-v1`); per-step harness/profile choices do operador; path FIXO; escrito por `JsonWorkflowModelPolicyStore` (atomic `mkstemp(0600)`+`os.replace`) via `PUT /api/workflow-model-policy` (validate-before-write); ausente ⇒ library defaults; inválido ⇒ bloqueia execução. Só o contexto `default` é honrado (D-2).
+  * `.dadaia/states/workflow_model_policy.last-good.json` — backup do último overlay válido, escrito do arquivo válido anterior ANTES de cada save; um candidato inválido nunca o sobrescreve. Permite reset/rollback sem perder a config do operador.
 
 **Stores que não existem (não recriar):** `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (semaphore / Lock 4), `.dadaia/logs/semaphore-reclaims.jsonl`, marcador global de contexto, e qualquer script bash de gate em `.dadaia/scripts/`. O mutex MUTATING é exclusivamente o TTL-lease em `.dadaia/states/ctx_locks/<ctx>.lock.json`; o session record `.dadaia/sessions/<id>.json` não é mecanismo de locking — carrega identidade/modo da sessão (lido pelo gate para resolução de modo) e alimenta o Kanban.
 
 ## Memory injection subsystem
 
-O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto. Opera em três runtimes de entrada — Layer 1 (Claude Code, OpenCode, Codex); o quarto harness PI (`pi`) é um worker de Layer 2 headless, sem hook de entrada, e por isso não participa desta injeção up-tree de Layer 1 — ver "Two-layer agentic model" abaixo.
+O subsistema garante que agentes nunca iniciam trabalho sem contexto de produto. Opera nos runtimes de entrada de Layer 1 — Claude Code e Codex (hook `ctx_inject`); o harness de entrada PI (`pi`) lê `AGENTS.md`/`CLAUDE.md` nativamente up-tree (sem hook de injeção de Layer 1). O harness set de Layer-1 é `{claude, codex, pi}` — **OpenCode foi removido em v0.1.24**. PI também roda como worker de Layer 2 headless (`PI_HEADLESS`) sem hook de entrada — ver "Two-layer agentic model" abaixo.
 
 ### Lean payload
 
 O bootstrap injetado é **tech-stack + catalog apenas** (~2.400 tokens). `architecture.md` é intencionalmente não injetado — é large e é self-pulled pelos agentes antes de qualquer trabalho arquitetural ou cross-layer, exatamente como feature atoms são pulled on demand.
 
-### ctx_inject hook (Claude Code + Codex + OpenCode)
+### ctx_inject hook (Claude Code + Codex)
 
-`python -m dadaia_workspace.hooks.ctx_inject` — módulo do pacote de hooks Python. Em Codex roda no `SessionStart` (matcher `startup|resume`) carregando o contexto completo **uma vez por sessão**; em Claude Code roda no `UserPromptSubmit` e em OpenCode via plugin TS. Os hooks podem disparar a cada prompt, mas a injeção completa ocorre só uma vez por sessão lógica.
+`python -m dadaia_workspace.hooks.ctx_inject` — módulo do pacote de hooks Python. Em Codex roda no `SessionStart` (matcher `startup|resume`) carregando o contexto completo **uma vez por sessão**; em Claude Code roda no `UserPromptSubmit`. Os hooks podem disparar a cada prompt, mas a injeção completa ocorre só uma vez por sessão lógica. (PI lê a law nativamente up-tree, sem hook de injeção de Layer 1.)
 
 A injeção é **bind-driven** (DP-2, v0.1.14): `dadaia context bind` escreve o marker
 standalone `.dadaia/states/bind_epoch/<ctx>` e é o ÚNICO trigger de injeção de
@@ -533,6 +539,213 @@ Valida cada atom:
 
 Invocado por doctor check `LINT-1`. Exit 0 = all valid; exit 1 = ao menos um ERROR.
 
+## Backlog-consistency subsystem (`features/backlog/`, v0.1.25)
+
+O backlog é mantido como um **SET deduplicado, conflict-free e não-stale**, enforçado
+**mecanicamente** — não por julgamento de modelo nem por vigilância humana/de agente (ambos
+já falharam e corromperam um projeto). O subsistema vive em `dadaia_workspace/features/backlog/`
+(módulos puros, roots sempre injetados, espelhando `features/ci_preflight/`).
+
+**Item schema — `intents[]`.** Todo item de backlog carrega frontmatter `intents[]`, onde
+cada intent é `Subject{kind, ref} → change`. `Subject` e `Intent` são dataclasses frozen
+puras em `core/models/backlog.py`; `kind ∈ {code, api, cli, panel, doc, invariant, catalog}`
+e `ref` é uma **referência tipada, nunca free text**. Refs de `code` são sempre
+**module-relative** `path#symbol` (ex. `dadaia_workspace/core/models/lifecycle.py#AgentRuntimeKind`)
+— a registry rejeita paths absolutos/operator-local e nomes de repo privado de qualquer
+intent committado (privacy).
+
+**Registry canônico de subjects (a linchpin) — `subject_registry.py`.** **Auto-derivado,
+recomputado a partir da verdade viva a cada run** — nunca um arquivo de registry armazenado
+(que iria ele mesmo ficar stale, a meta-versão do bug que corrigimos). R1 auto-deriva
+exatamente **cinco** kinds de anchor, cada um lastreado por um registry-of-truth real na
+árvore viva: `code` (`path#symbol` validado por walk AST com fallback grep), `cli` (ids de
+comando do Typer app-tree), `catalog` (slugs de `specs/memory/product/catalog.json` + ids de
+atom), `doc` (ids spec-doc `SPEC-DOC-NNN` + heading anchors de memory), `invariant` (`INV-*`
+nomeados). **`panel`/`api` NÃO são auto-deriváveis em R1** (não há route registry de onde
+derivar; grep-derivá-los seria a heurística fuzzy que este design rejeita) — ligam **apenas**
+pela alias map; auto-derivação desses kinds é diferida para R2. Mais um **alias map** mantido
+pelo operador em `.dadaia/states/backlog_subject_aliases.txt` (uma linha
+`synonym -> canonical-anchor`), lido por **path explicitamente injetado** (nunca cwd), que
+colapsa sinônimos a um anchor canônico — e, em R1, é o único caminho de binding para
+`panel`/`api`. **Contrato de binding:** o modelo **propõe** uma string de subject; Python
+normaliza + **liga** a um anchor de registry e **HALTa (rejeita, não silent NEW)** qualquer
+intent cujo subject resolva para nenhum anchor ou um set ambíguo.
+
+**Classificador determinístico fail-closed — `classifier.py`.** Python é dono da fronteira
+UNRELATED/CONFLICT via **set-intersection de anchors canônicos**; o modelo nunca decide
+UNRELATED-vs-não. Intersecção vazia → `UNRELATED` (final, sem chamada de modelo); mesmos
+anchors + mesma change → `DUPLICATE`; **anchor compartilhado + change divergente** defaulta
+**fail-closed** a `DIVERGENT_CONFLICT` (o gêmeo perigoso). O modelo só pode **downgrade**
+(para `OVERLAP`/`SUPERSEDES`) com um merge explícito, estruturado e provado-compatível —
+nunca pode *perder* um conflito, porque same-anchor+differing-change defaulta a conflito. R1
+embarca o **core determinístico** (steps 1–2 + o default fail-closed); a seam de
+model-adjudication é exposta mas **OFFLINE** em R1 (um `Callable` defaultando a "no
+downgrade") — R2 exercita o step de modelo dentro do workflow.
+
+**`dadaia backlog doctor` (o backstop ENFORCED) — `doctor.py`.** Postura honesta
+oriented-vs-enforced: `specs/backlog/` é gitignored + ADDITIVE, então a gate PreToolUse/lease
+NÃO classifica um arquivo de backlog hand-written como MUTATING — o **workflow (R2) é o
+happy-path ORIENTED; o doctor no chokepoint git é o ENFORCEMENT real**. Um único engine de
+check **parametrizado** (sem fan-out copy-paste) emite quatro check codes (StrEnum):
+**BL-SCHEMA** (todo item tem `intents[]` ligado + status válido), **BL-DUP** (dois itens
+compartilham anchor-set + change → ERROR), **BL-CONFLICT** (dois itens compartilham um anchor
+com change incompatível → ERROR — o gêmeo divergente, apanhado mesmo se hand-written),
+**BL-STALE** (um slug listado no ledger `consumed_backlog` de qualquer release arquivada que
+ainda existe em `specs/backlog/` → ERROR). `run_backlog_doctor(*, specs_dir, source_root,
+catalog_path, alias_map_path, archive_root)` — todos os paths injetados. Wiring: `backlog
+doctor` roda no **pre-commit chokepoint** (ao lado dos checks lease/CI existentes, via o
+backend `dadaia ci pre-commit-check`) e em **CI** (`ci.yml`), mirrorando o padrão
+`ci preflight` — um gêmeo divergente hand-written é **rejeitado no commit**, fechando o
+bypass gitignore/ADDITIVE. Superfície read-only de resolve/preview (`preview.py`):
+`dadaia backlog subjects` (lista o anchor set vivo, opcional `--kind`/`--resolve "<ref>"`) e
+`dadaia backlog doctor --explain` (mostra como um subject proposto resolve: anchor ligado, ou
+`UNRESOLVED`/`AMBIGUOUS` + candidate set + sugestão de alias) — nunca escreve um arquivo de
+backlog ou a alias map.
+
+**Ledger `consumed_backlog` — `ledger.py` (reader) + `ledger_writer.py` (writer, v0.1.26).**
+BL-STALE liga a um **ledger estruturado** fixado a um **sidecar JSON machine-readable** em
+`specs/_archive/<release-id>/consumed_backlog.json` (um arquivo por release arquivada;
+entries `{slug, shipped_anchors[]}` keyed pelo set de subject-anchors verificado realmente
+shipado) e casa por **exact slug membership** — substituindo a heurística de prosa
+SPEC-DOC-031. `read_consumed(archive_root)` varre todos os
+`specs/_archive/*/consumed_backlog.json` por membership exata e **tolera ausência** (sem
+ledger arquivado → BL-STALE é no-op, nunca false ERROR). O writer (`write_consumed`, v0.1.26)
+emite exatamente essa shape de reader; roots injetados; anchors module-relative.
+
+**Workflow `backlog_definition` + removal-on-release (v0.1.26).** O happy-path ORIENTED
+existe: `features/lifecycle/workflows/backlog_definition.py` é o corpo §4 da workflow
+(`intake_grill → subject_bind → existing_backlog_review → reconcile_decision →
+conflict_resolution_grill → backlog_author → backlog_review_gate`), mirror estrutural de
+`release_definition.py`, com **gates Python-owned**, atrás de `dadaia lifecycle backlog
+define` (container factory `build_backlog_definition_workflow`; LAW 1 `{pi,codex,fake}`,
+LAW 2 modelo discreto). O step `existing_backlog_review` **roda o classifier R1 live**:
+Python dispõe todo veredito determinístico; o modelo é invocado **só** pela seam `downgrade`
+para um par same-anchor differing-change e **só para downgrade com evidência** (fail-closed →
+`DIVERGENT_CONFLICT`) — a seam que R1 embarcou OFFLINE agora é exercitada end-to-end. O
+selector `backlog_index` (frontmatter-only, paths injetados) alimenta os steps de review com
+os bound intents + status de cada item. Os fragments reais
+(`public/lifecycle_fragments/backlog_definition/{intake_grill,conflict_scan,conflict_resolution_grill,backlog_authoring}.md`)
+substituíram o stub `_README.md` e são staged/installed.
+
+**Removal-on-release está FULLY wired end-to-end (producer v0.1.27 + consumer v0.1.26).**
+O mecanismo: o writer (`ledger_writer.py`), o hook de closure residual-aware (`removal.py`
+— rewrite-down-to-residual default; full removal só a zero residual, com cópia durável em
+`_archive/<release>/consumed-backlog/<slug>.md` ANTES do unlink), e a facade
+`BacklogRemovalLifecycle` (`removal_lifecycle.py`) ligando producer
+(`consume_at_release_definition`) e consumer (`remove_at_closure`). **Ambos os lados estão
+wired:**
+
+- **Producer — `dadaia lifecycle release define` (v0.1.27).** Um post-step guardado
+  (`cli/commands/lifecycle.py`, simétrico com o `_apply_closure_removal` do `close`, rodando
+  só quando `result.completed`) resolve `<specs_dir>/releases/<release_id>/SPEC.md`, parseia
+  sua linha `**Consumes:**` (`features/backlog/consumes.parse_consumes_line` — bold-key
+  convention, dedup ordenado, trailing `.md` tolerado, linha ausente ⇒ no-op limpo), liga os
+  slugs declarados a seus anchors via `consumes.shipped_anchors_for` (UNION dos bound anchors
+  dos slugs declarados, via o registry R1 + `load_backlog_items` + `bound_anchor_changes`) e
+  chama `BacklogRemovalLifecycle.consume(release_id, shipped_anchors=...)` para escrever o
+  ledger. **Fail-loud:** um slug declarado que não existe como item vivo, ou cujos intents
+  ligam a zero/anchors irresolvíveis, levanta `ConsumesBindError` nomeando o slug/ref ANTES
+  de qualquer write — nenhum ledger parcial é escrito. **Full-slug-only granularity:** um
+  slug declarado = totalmente consumido; partial consumption é OUT of scope (itens parciais
+  ficam no SET vivo e são hand-rewritten). A convenção `**Consumes:**` está documentada no
+  skill `dadaia-release-definition` (§6).
+- **Consumer — `dadaia lifecycle close` (v0.1.26).** `_apply_closure_removal` chama
+  `lifecycle.remove(...)` → `remove_at_closure`, que lê todo `consumed_backlog.json`
+  arquivado, une os shipped anchors e roda `apply_removal`.
+
+O loop BL-STALE fica provado **end-to-end em release real** (`test_define_close_loop` dirige
+os verbos CLI reais `release define` então `close` sobre um workspace temp: o item totalmente
+consumido some do SET vivo, a cópia de archive precede o unlink, `backlog doctor` reporta zero
+BL-STALE) — não mais só a nível função/integração.
+
+## Workflow control plane subsystem (v0.1.28 + v0.1.29)
+
+A camada de **governança de modelo E harness** do Layer 2: built sobre os seams existentes
+(perfil → overlay → resolver → run snapshot → panel routes), não um subsistema paralelo. O
+`WorkflowExecutionPolicyResolver` é o **único** seam de política, consumido tanto pela CLI
+(`cli/commands/lifecycle.py`) quanto pelo panel (`features/panel/views/workflow_policy.py`)
+via o `container.py` — nenhuma construção ad-hoc em view/CLI. v0.1.29 torna o **harness uma
+dimensão governada de primeira classe** (não só o modelo): o resolver resolve um harness
+efetivo por step e valida o profile contra ele, o overlay/schema carregam harness, e
+`apply_resolved_policy` é o único autor de `runtime_kind`. Ver [[lifecycle-foundation]]
+para o spine do engine e [[panel]] para o control plane do panel.
+
+- **Profile registry** (`features/lifecycle/model_profiles.py`) — registry **built-in only**
+  (D-2) de `WorkflowModelProfile` (5 perfis: 2 Codex + 3 PI) layered sobre o catálogo
+  discreto `core/harness_models.py`. Cada perfil resolve a uma `HarnessModelOption` real; o
+  assert de import-time `_assert_profiles_resolve` (espelha `_assert_ids_known`) garante que
+  nunca é uma segunda tabela de modelo drifting (rejeita id `claude-*`, harness não-Layer-2,
+  par `(model_id, effort)` ausente do catálogo, id duplicado, deprecated sem replacement).
+- **Overlay store** (`infrastructure/json_workflow_model_policy_store.py`) — escreve o path
+  FIXO `.dadaia/states/workflow_model_policy.json` (schema `workflow-model-policy-v1` em
+  `public/data/schemas/`), atomic `mkstemp(0600)`+`os.replace` (mesmo padrão do
+  `JsonLifecycleRunStore`), backup `.last-good.json` do arquivo válido anterior. **Missing ≠
+  invalid:** ausente ⇒ defaults da biblioteca; presente-mas-inválido bloqueia execução antes
+  da primeira chamada de modelo, com o last-good intacto. Só o contexto `default` é honrado
+  (D-2; a shape `contexts{}` pode ser reservada mas chave não-`default` é inerte). Nomes de
+  context/workflow/step/profile são apenas keys de dict JSON dentro do arquivo único — nunca
+  interpolados em path de filesystem (sem path injection). **v0.1.29:** o overlay carrega
+  campos opcionais `default_harness` (per-workflow) e `harnesses` (per-step, keyed por label),
+  ambos enum Layer-2 `codex|pi`; store e schema ampliados em lockstep (`additionalProperties:
+  false` mantido; `to_dict` omite campos vazios ⇒ overlay profile-only round-trips
+  byte-stable). Accessors `step_harness` / `workflow_default_harness` (default context only).
+- **Resolver** (`features/lifecycle/policy_resolver.py`) — `resolve(workflow_id, context,
+  cli_overrides, default_harness, harness_overrides) → WorkflowPolicySnapshot`. **v0.1.29:**
+  resolve um **harness efetivo por step** com precedência total **CLI `--step-harness` > CLI
+  `--harness` > overlay step harness > overlay `default_harness` > catalog step default**
+  (`_resolve_harness`); o profile é validado contra o harness **efetivo**, não o catalog
+  default (corrige o mismatch `policy_resolver.py:288`); auto-profile-on-harness-override —
+  quando o harness é trocado sem profile explícito, o default vira
+  `CatalogStep.default_profiles[harness_efetivo]`. O profile precedence permanece **CLI >
+  context overlay > default overlay > library default**. Lê o catálogo governado
+  `governed_workflow_catalog()` (Wave B — `features/workflows/dadaia_catalog.py`), a fonte
+  única de verdade executável; o `library_workflow_catalog()` (Wave A) é demo-only.
+- **Run snapshot (LAW 7)** — `core/models/workflow_execution.py` define os DTOs puros
+  (`ResolvedModelConfig`, `WorkflowModelProfile`, `WorkflowPolicySnapshot`); `core/models/
+  lifecycle.py` ganha `AgentRunRequest.resolved_model` + `LifecycleRun.workflow_policy`
+  (ambos additive optional; records v1 antigos carregam `None` — schema literal inalterado,
+  back-compat read). O snapshot é resolvido + congelado no `LifecycleRun` **antes** do
+  primeiro step e preservado por `dataclasses.replace`; run in-flight ignora edições
+  posteriores do overlay; o panel lê o snapshot persistido para histórico. **Single source
+  of truth de `runtime_kind` (v0.1.29 / D-2):** `pipeline.apply_resolved_policy` é o **único**
+  autor de `PipelineStep.runtime_kind`, derivado do harness resolvido no snapshot (codex →
+  `CODEX_EXEC`, pi → `PI_HEADLESS`; harness não-mapeável raise). O swap post-resolve da CLI
+  foi removido ⇒ o adapter que roda e o snapshot persistido provavelmente concordam (corrige
+  a divergência v0.1.28 codex-gravado-enquanto-pi-rodava). **FAKE é preservado:** um step
+  construído em `AgentRuntimeKind.FAKE` mantém FAKE (`--harness fake` dry-run roda o fake
+  adapter) enquanto o snapshot grava o harness governado.
+- **Panel routes** (`features/panel/handler.py` + `views/workflow_policy.py`) — GET
+  catalog/profiles/policy/runs + `PUT /api/workflow-model-policy` +
+  `POST /api/workflow-model-policy/validate` + fragment-body read. O `do_PUT`/`do_POST`
+  rodam o Host-guard PRIMEIRO; `_read_body` checa Content-Length contra o cap (256KiB) ANTES
+  de ler o socket (413); a view enforça ordem 415 → 413 (64KiB inner) → 400 (JSON/shape com
+  field-path errors) → 400 (D-2 non-default context) → 400 (semantic resolve) ANTES de
+  qualquer write. O fragment-id valida contra `^[A-Za-z0-9_]+\.[A-Za-z0-9_]+$` (bloqueia
+  traversal antes de qualquer disk read; nunca ecoa paths). Sem bearer (postura loopback +
+  Host allowlist existente). O JS (`workflow_policy.js`) escapa todo campo dinâmico via
+  `escHtml` antes de innerHTML.
+- **Governança Layer-2 (LAW 1).** Workflow workers são apenas `codex`/`pi` (`fake`
+  test-only); `claude`/`opencode` são rejeitados na CLI E pelo check de doctor
+  `WMP-LAYER2-RESIDUE` — incluindo valores de harness no overlay (v0.1.29). `--step-model`
+  aceita só profile ids (D-3); o id de modelo que chega ao argv é o `model_id` constante do
+  registry — sem free-text para um worker.
+- **Catálogo governado completo — 7 workflows (v0.1.29 / D-4).** `governed_workflow_catalog()`
+  cobre os 3 workflows runnable + `closure` (seu real único worker step `close`, role
+  product-engineer, generic; mais o `closure_removal_gate` Python modelado como gate) ⇒
+  `policy show closure` resolve. `audit`/`research`/`bug_report` (os nomes em
+  `_deferred.DEFERRED_WORKFLOWS`) são enumerados como `deferred` com zero governed steps —
+  inspecionáveis na camada catalog/panel; `resolve(<deferred>)` raise a mensagem acionável
+  "no governed steps" (correto). Nenhuma ladder de step inventada, nenhuma segunda fonte.
+- **Doctor** — `dadaia lifecycle workflow doctor` (`features/lifecycle/policy_doctor.py`,
+  checks `WMP-1..WMP-7` sobre o catálogo completo): invalid policy JSON, unknown profile,
+  harness/profile mismatch, stale workflow/step id, missing default profile per supported
+  harness, unresolved fragment/output schema, e qualquer resíduo `claude`/`opencode` Layer-2.
+  **v0.1.29:** valida a dimensão harness — um harness de overlay referenciando um harness não
+  suportado pelo step é ERROR; um harness `claude`/`opencode` no overlay é
+  `WMP-LAYER2-RESIDUE`. O step generic `close` é WMP-5-exempt (sem output-schema obligation;
+  sem falso positivo). Nunca crasha o panel. `policy_public_doctor.py` adiciona um residue
+  scan da superfície pública via `dadaia public doctor`.
+
 ## Multi-harness runtime parity (constitution §4)
 
 ### Two-layer agentic model
@@ -547,18 +760,16 @@ flowchart TB
         direction LR
         CC["claude"]:::h
         CX["codex"]:::h
-        OC["opencode"]:::h
         PIe["pi"]:::h
     end
-    GOV["Governança Layer 1:<br/>AGENTS.md up-tree + projeções .claude/ .codex/ .opencode/ .pi/<br/>PreToolUse pre_gate (onde suportado) + git chokepoints"]
-    CLI["dadaia lifecycle &lt;verb&gt; --harness &lt;x&gt;<br/>(workflow procedural Python)"]
-    subgraph L2["LAYER 2 — worker harness (AgentRuntimePort)"]
+    GOV["Governança Layer 1:<br/>AGENTS.md up-tree + projeções .claude/ .codex/ .pi/<br/>PreToolUse pre_gate (onde suportado) + git chokepoints"]
+    CLI["dadaia lifecycle &lt;verb&gt; --harness {pi|codex|fake} --model &lt;id&gt;<br/>(dadaia-workflow: corpo Python + fragments + gates)"]
+    subgraph L2["LAYER 2 — worker harness (AgentRuntimePort) — LAW 1: pi/codex/fake"]
         direction LR
         FK["FAKE<br/>in-process"]:::w
         CXk["CODEX_EXEC<br/>codex exec"]:::w
-        CLk["CLAUDE_SDK<br/>SDK · Ring-1"]:::w
-        OCk["OPENCODE_RUN<br/>opencode run"]:::w
         PIk["PI_HEADLESS<br/>pi --mode json"]:::w
+        CLk["CLAUDE_SDK<br/>SDK · Ring-1 · kept, NOT um workflow harness"]:::x
     end
     OP --> L1
     L1 --> GOV
@@ -567,32 +778,47 @@ flowchart TB
     L2 -->|"Ring-2: git-diff changed_paths + git chokepoints"| OUT(["produção: código · specs · memory"])
     classDef h fill:#1f6feb,color:#fff,stroke:#1f6feb;
     classDef w fill:#238636,color:#fff,stroke:#238636;
+    classDef x fill:#6e7681,color:#fff,stroke:#6e7681;
 ```
 
 A mesma palavra "harness" nomeia coisas diferentes em cada layer: no Layer 1 é o agente
 de terminal que o operador inicia; no Layer 2 é um worker `AgentRuntimeKind` que o engine
 dirige por step. PI aparece nos dois (entrada `.pi/` + worker `PI_HEADLESS`); FAKE existe
-só no Layer 2.
+só no Layer 2. **OpenCode foi removido inteiramente em v0.1.24** (ambas as layers).
 
 - **Layer 1 — entry harness (terminal).** The AI coding harness the operator launches
-  in the workspace terminal: `claude`, `codex`, `opencode`, and (post-v0.1.18) `pi`.
+  in the workspace terminal: exactly `{claude, codex, pi}` (OpenCode removed in v0.1.24).
   Governance at this layer is `AGENTS.md` read up-tree natively + the projected `.X/`
-  asset trees (`.claude/`, `.codex/`, `.opencode/`, `.pi/`) staged from
-  `dadaia_workspace/public/` by `dadaia public install`. Deterministic enforcement at
-  Layer 1 is per-entry-harness (PreToolUse hooks where supported + git chokepoints) —
-  the table immediately below is the **Layer-1 entry-harness** enforcement parity, not
-  the worker-runtime set.
+  asset trees (`.claude/`, `.codex/`, `.pi/`) staged from `dadaia_workspace/public/` by
+  `dadaia public install`. Deterministic enforcement at Layer 1 is per-entry-harness
+  (PreToolUse hooks where supported + git chokepoints) — the table immediately below is
+  the **Layer-1 entry-harness** enforcement parity, not the worker-runtime set.
 - **Layer 2 — worker harness (inside the lifecycle engine).** The bounded agent workers
   that `dadaia lifecycle` drives per step behind `AgentRuntimePort`
-  (`container.build_agent_runtime(kind)`), one harness selectable per step via
-  `--harness` / `--step-harness`. There are **five `AgentRuntimeKind`s**
-  (`core/models/lifecycle.py`): `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `OPENCODE_RUN`,
-  `PI_HEADLESS`. The transport differs per harness: **SDK** (Claude — in-process
-  `claude_sdk_runtime.py`, the only adapter with a real Ring-1 write boundary via
-  `core/scope_match`), **CLI-headless** (Codex `codex exec`, OpenCode `opencode run`,
-  PI `pi --mode json` — subprocess-backed, one-shot per step), and **RPC** (designed,
-  not yet shipped). The factory is total over the enum; `core/`/`features/` stay
-  provider-agnostic. See [[lifecycle-foundation]] for the engine spine.
+  (`container.build_agent_runtime(kind, *, cwd, model)`), one harness selectable per step
+  via `--harness` / `--step-harness`. The `AgentRuntimeKind` enum (`core/models/lifecycle.py`)
+  is `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `PI_HEADLESS` (`OPENCODE_RUN` removed in v0.1.24).
+  **LAW 1 (v0.1.24):** the selectable Layer-2 **workflow** harnesses are exactly
+  `{pi, codex, fake}`. `CLAUDE_SDK` is **kept in code and unit-tested** (Layer-1 Claude is
+  unaffected) but is **NOT a selectable workflow `--harness`** — `claude` is rejected with a
+  Layer-1 pointer, because running Claude as a Layer-2 worker would spend credits outside
+  the operator's subscription. The transport differs per harness: **SDK** (Claude —
+  in-process `claude_sdk_runtime.py`, the only adapter with a real Ring-1 write boundary via
+  `core/scope_match`) and **CLI-headless** (Codex `codex exec`, PI `pi --mode json` —
+  subprocess-backed, one-shot per step). RPC stays dropped (ADR-23-1, carried forward). The
+  factory is total over the enum; `core/`/`features/` stay provider-agnostic. See
+  [[lifecycle-foundation]] for the engine spine.
+- **LAW 2 (v0.1.24) — discrete per-harness GPT model catalog.** Each Layer-2 workflow
+  harness has a discrete model catalog selected on the CLI (`--model` / `--step-model`),
+  validated against the chosen harness's set; an invalid `(harness, model)` pair is rejected
+  with the valid set. **pi → 3 models:** `(gpt-5.5, high)`, `(gpt-5.5, low)`,
+  `(gpt-5.3-codex, medium)`. **codex → 2 models:** `(gpt-5.5, high)`, `(gpt-5.5, medium)`.
+  Both catalogs are **GPT-only** by construction (PI runs on the operator's Codex
+  subscription → GPT ids): no `claude-*` id (including the region-restricted
+  `claude-fable-5`) is **ever** selectable at Layer 2. The catalog is explicit GPT data
+  keyed by harness (`core/harness_models.py`), consistent with — but not a tier-view of —
+  `core/model_registry.py`; PI honors the model (`pi --model <id>`), Codex takes the
+  discrete `(id, effort)`.
 
 A harness can exist at one layer and not the other. PI ships as a real **Layer-2**
 worker (`PiHeadlessAdapter`, wired in `container.py`, Ring-2 only) and a **Layer-1** `.pi/`
@@ -604,6 +830,30 @@ harnesses use. The block is **active once the operator grants `.pi/` trust** (th
 are post-trust executable). Note the two PI layers differ: the Layer-2 `PI_HEADLESS`
 worker keeps Ring-2 + chokepoints; the Layer-1 interactive `pi` gains the post-trust Ring-1.
 
+### dadaia-workflows + prompt-fragment library (Layer-2, v0.1.24)
+
+Os verbos de `dadaia lifecycle` são os **dadaia-workflows** canônicos: cada um é um corpo
+Python que (1) importa **prompt fragments** de `dadaia_workspace/public/lifecycle_fragments/`
+(Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/
+max_context_policy`, carregados/validados por `features/lifecycle/fragments/loader.py`,
+projetados + manifest-tracked), (2) seleciona contexto dinâmico via
+`features/lifecycle/context_selector.py` (selectors de memory atoms, catalog, backlog,
+bugs, audits, release artifacts, source summaries, diffs, test outputs, prior handoffs;
+políticas `exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`),
+(3) chama um worker `(harness, model)` discreto, e (4) avança **gates Python-validados** —
+o modelo recomenda, o Python decide a legalidade da transição e **bloqueia em handoff
+ausente/rejeitado**. A primeira workflow migrada end-to-end onto fragments é a
+**release-definition** (`features/lifecycle/workflows/release_definition.py`): seu prompt
+por step é `role + fragment bundle + dynamic context + output schema`, não mais o sufixo
+genérico. Cada run record persiste a composição do prompt por step (fragment ids, refs de
+contexto dinâmico, `prefix_hash`, modelo discreto, runtime kind, output schema, gate
+result) para observabilidade. Workflows backlog/audit/research/bug-report estão
+**scaffolded + fail-loud** (`NotImplementedError("deferred to follow-up release")`),
+explicitamente diferidas. A garantia de **harness-universalidade** é comportamental: o
+`output_schema` de cada fragment shipped passa pelos parsers PI (fenced-json/`message_end`)
+e Codex (`--output-last-message`) via fixtures FAKE com extração de verdict idêntica
+asseverada; a denylist de tokens harness-específicos é lint secundário.
+
 ### Layer-1 entry-harness enforcement parity
 
 | Runtime | PreToolUse hooks (`pre_gate`) | Git chokepoints | Postura |
@@ -611,22 +861,30 @@ worker keeps Ring-2 + chokepoints; the Layer-1 interactive `pi` gains the post-t
 | Claude Code | sim — `python -m dadaia_workspace.hooks.pre_gate` (matcher `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash`) | sim | determinístico: hooks + chokepoints |
 | Codex interativo (TUI) | sim — `pre_gate` em `.codex/hooks.json` (matcher `^(apply_patch\|Edit\|Write\|Bash)$`) | sim | determinístico: hooks + chokepoints |
 | Codex headless (`codex exec`) | **não — exec não dispara hooks** (defeito upstream codex-cli 0.139.0, live-verificado) | sim | **chokepoints only** |
-| OpenCode | plugins `.ts` chamam hooks Python via subprocess (venv-path resolution `.dadaia/.venv/bin/python` → `Scripts/python.exe` → `python`); `dadaia public doctor` reporta `[unsupported]` para PostToolUse opencode — esperado | sim | advisory + chokepoint-protected (ADR-G3) |
 | PI (`pi`) | **sim (post-trust)** — `.pi/extensions/dadaia-sdd-gate.ts` `tool_call` hook mapeia write→Write/edit→Edit e delega ao `pre_gate` (WS-PI-4); ativo quando o operador concede trust a `.pi/` | sim | determinístico post-trust + chokepoints; `.pi/**` é post-trust executable |
+
+(OpenCode foi removido como entry harness em v0.1.24 — o harness set de Layer-1 é
+exatamente `{claude, codex, pi}`.)
 
 Codex-specific behavior é expresso em termos Codex-nativos: `AGENTS.md` context, `.codex/config.toml`, `.codex/skills`, hooks onde suportados, e deferred tool discovery para multi-agent capability.
 
 ### Layer-2 worker-runtime posture (`AgentRuntimePort`)
 
-| AgentRuntimeKind | Adapter | Transport | Ring-1 write boundary |
-|------------------|---------|-----------|------------------------|
-| `FAKE` | `fake_runtime.py` | in-process | n/a (test/offline) |
-| `CODEX_EXEC` | `codex_runtime.py` | CLI-headless (`codex exec`) | não |
-| `CLAUDE_SDK` | `claude_sdk_runtime.py` | SDK (in-process) | **sim** — `core/scope_match` |
-| `OPENCODE_RUN` | `opencode_runtime.py` | CLI-headless (`opencode run`) | não (stub) |
-| `PI_HEADLESS` | `pi_runtime.py` | CLI-headless (`pi --mode json`) | não |
+| AgentRuntimeKind | Adapter | Transport | Ring-1 write boundary | Layer-2 workflow harness? |
+|------------------|---------|-----------|------------------------|---------------------------|
+| `FAKE` | `fake_runtime.py` | in-process | n/a (test/offline) | sim (`fake`) |
+| `CODEX_EXEC` | `codex_runtime.py` | CLI-headless (`codex exec`) | não | sim (`codex`) |
+| `PI_HEADLESS` | `pi_runtime.py` | CLI-headless (`pi --mode json`) | não | sim (`pi`) |
+| `CLAUDE_SDK` | `claude_sdk_runtime.py` | SDK (in-process) | **sim** — `core/scope_match` | **não** — kept/tested, mas `claude` é rejeitado como `--harness` (LAW 1) |
 
-Apenas `CLAUDE_SDK` enforça hoje um Ring-1 real; os demais workers são one-shot por step. Transporte RPC (`pi --mode rpc`, ponte Python↔Node) é desenhado mas não shipado (engine é one-shot-per-step). Selecionável por step via `--harness`/`--step-harness` (`cli/commands/lifecycle.py` `_HARNESS_KINDS`).
+Apenas `CLAUDE_SDK` enforça hoje um Ring-1 real; os demais workers são one-shot por step.
+**LAW 1 (v0.1.24):** as harnesses **workflow** selecionáveis no Layer 2 são exatamente
+`{pi, codex, fake}` — `claude` é rejeitado com um Layer-1 pointer (o adapter SDK permanece
+importável + unit-tested para uso de Layer-1). `OPENCODE_RUN` foi removido inteiramente em
+v0.1.24. Transporte RPC permanece dropado (ADR-23-1; engine é one-shot-per-step).
+Selecionável por step via `--harness`/`--step-harness` + modelo discreto via
+`--model`/`--step-model` (LAW 2; `cli/commands/lifecycle.py` `_HARNESS_KINDS` +
+`core/harness_models.py`).
 
 **path-scope (disciplina, não gate)** — `paths.write_allowlist` do frontmatter dos agentes é **convenção de instrução de agente** (workspace-protocol §6), não enforcement do gate: nenhum hook conhece a persona do processo que escreve. O que o gate PreToolUse enforça deterministicamente é path-class × lease × fase × modo sobre os write tools. A divisão de superfície (`ai-engineer` dono de `dadaia_workspace/public/{skills,rules,workflows,commands,agents}/**`; `software-engineer` dono do código Python, incluindo `dadaia_workspace/hooks/*.py`) é mantida por disciplina de persona e review.
 

@@ -167,6 +167,119 @@ def test_agent_run_result_round_trips_structured_output() -> None:
     assert AgentRunResult.from_dict(data) == result
 
 
+def test_agent_run_request_carries_resolved_model(tmp_path: object = None) -> None:
+    from dadaia_workspace.core.models.workflow_execution import (
+        PolicySource,
+        ResolvedModelConfig,
+    )
+
+    request = AgentRunRequest(
+        role="software-engineer",
+        prompt="Implement.",
+        runtime=AgentRuntimeKind.CODEX_EXEC,
+        context="dadaia-workspace",
+        release_id="v0.1.28",
+        resolved_model=ResolvedModelConfig(
+            profile_id="codex-implementation-standard",
+            harness="codex",
+            model="gpt-5.5",
+            reasoning="medium",
+            source=PolicySource.CLI,
+        ),
+    )
+    data = request.to_dict()
+    assert data["resolved_model"]["model"] == "gpt-5.5"
+    assert AgentRunRequest.from_dict(data) == request
+
+
+def test_agent_run_request_resolved_model_defaults_none() -> None:
+    request = AgentRunRequest(
+        role="r",
+        prompt="p",
+        runtime=AgentRuntimeKind.FAKE,
+        context="c",
+        release_id="v0.1.28",
+    )
+    assert request.resolved_model is None
+    assert request.to_dict()["resolved_model"] is None
+
+
+def test_agent_run_request_back_compat_without_resolved_model() -> None:
+    # An old serialized request (no 'resolved_model' key) still loads.
+    legacy = {
+        "role": "r",
+        "prompt": "p",
+        "runtime": "fake",
+        "context": "c",
+        "release_id": "v0.1.28",
+        "task_id": None,
+        "model_profile": None,
+        "allowed_paths": [],
+        "forbidden_paths": [],
+        "expected_schema": None,
+        "required_evidence": [],
+    }
+    request = AgentRunRequest.from_dict(legacy)
+    assert request.resolved_model is None
+
+
+def test_lifecycle_run_carries_workflow_policy_snapshot() -> None:
+    from dadaia_workspace.core.models.workflow_execution import (
+        PolicySource,
+        WorkflowPolicySnapshot,
+        WorkflowPolicyStepEntry,
+    )
+
+    snapshot = WorkflowPolicySnapshot(
+        workflow_id="implementation",
+        policy_id="default",
+        resolved_at="2026-06-26T12:00:00Z",
+        source_precedence=("cli", "library-default"),
+        steps=(
+            WorkflowPolicyStepEntry(
+                step="implement",
+                harness="codex",
+                model_profile="codex-implementation-standard",
+                model="gpt-5.5",
+                reasoning="medium",
+                source=PolicySource.LIBRARY_DEFAULT,
+            ),
+        ),
+    )
+    run = LifecycleRun(
+        run_id="run-1",
+        context="dadaia-workspace",
+        release_id="v0.1.28",
+        command="pipeline",
+        phase=LifecyclePhase.IMPLEMENTATION,
+        status=LifecycleRunStatus.RUNNING,
+        current_step="implement",
+        workflow_policy=snapshot,
+    )
+    data = run.to_dict()
+    assert data["workflow_policy"]["workflow_id"] == "implementation"
+    assert LifecycleRun.from_dict(data) == run
+
+
+def test_lifecycle_run_back_compat_without_workflow_policy() -> None:
+    # M1: an old v1 record (no 'workflow_policy' key) still loads.
+    legacy = {
+        "run_id": "run-1",
+        "context": "dadaia-workspace",
+        "release_id": "v0.1.15",
+        "command": "implement",
+        "phase": "implementation",
+        "status": "running",
+        "current_step": "implement",
+        "expected_artifacts": [],
+        "idempotency_key": "idem-1",
+        "blocked": None,
+        "injected_context": [],
+    }
+    run = LifecycleRun.from_dict(legacy)
+    assert run.workflow_policy is None
+
+
 def test_lifecycle_models_are_frozen() -> None:
     run = LifecycleRun(
         run_id="run-1",

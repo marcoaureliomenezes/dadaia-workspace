@@ -130,7 +130,7 @@ because reclaim-iff-stale already frees an abandoned lease without it.
 ```bash
 dadaia repos list                    # show known repos catalog
 dadaia public stage                  # project lib assets into .dadaia/agentic/
-dadaia public install --target all   # deploy assets to .agents/, .claude/, .codex/, .opencode/
+dadaia public install --target all   # deploy assets to .agents/, .claude/, .codex/, .pi/
 dadaia public install --target claude # deploy to .claude/ only
 dadaia public doctor                 # audit asset drift
 dadaia academy list                  # list courses

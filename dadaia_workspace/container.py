@@ -3,12 +3,34 @@
 import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
+    from dadaia_workspace.features.backlog.removal_lifecycle import (
+        BacklogRemovalLifecycle,
+    )
+    from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowCatalog,
+        WorkflowExecutionPolicyResolver,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        BacklogDefinitionWorkflow,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        ReleaseDefinitionWorkflow,
+    )
+    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+        JsonWorkflowModelPolicyStore,
+        WorkflowModelPolicyOverlay,
+    )
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.harness_models import HarnessModelOption
 from dadaia_workspace.core.models.hygiene import SlopPolicy
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
@@ -35,6 +57,8 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_agent_prompt,
     render_api_agents_canonical,
     render_api_contexts,
+    render_api_dadaia_workflow_detail,
+    render_api_dadaia_workflows_list,
     render_api_reports,
     render_api_servers,
     render_api_session_detail,
@@ -49,6 +73,16 @@ from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.kanban import render_api_kanban
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
+from dadaia_workspace.features.panel.views.workflow_policy import (
+    render_api_lifecycle_runs,
+    render_api_workflow_catalog,
+    render_api_workflow_catalog_detail,
+    render_api_workflow_fragment,
+    render_api_workflow_model_policy,
+    render_api_workflow_model_profiles,
+    render_post_workflow_model_policy_validate,
+    render_put_workflow_model_policy,
+)
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reports_next.service import ReportsNextService
@@ -304,6 +338,7 @@ def build_agent_runtime(
     kind: AgentRuntimeKind,
     *,
     cwd: Path | None = None,
+    model: HarnessModelOption | None = None,
 ) -> AgentRuntimePort:
     """Map an ``AgentRuntimeKind`` to its concrete adapter behind ``AgentRuntimePort``.
 
@@ -313,12 +348,20 @@ def build_agent_runtime(
     lifecycle workflow asks for the kind a step declares and injects the result into
     ``LifecycleAgentRunner``.
 
-    Codex (``codex exec``) and PI (``pi --mode json``) are live CLI-headless adapters.
+    ``model`` is the discrete Layer-2 model selection (LAW 2 / ADR-B) resolved from
+    :mod:`core.harness_models` — a ``(model_id, effort)`` pair. When supplied it is
+    threaded verbatim into the adapter config: PI passes ``pi --model <model_id>`` and
+    Codex passes ``-m <model_id> -c model_reasoning_effort=<effort>``. When ``None``
+    each adapter keeps its prior behaviour (PI omits ``--model``; Codex falls back to
+    the registry tier view). ``model`` is inert for ``FAKE`` and ``CLAUDE_SDK`` (the
+    latter is Layer-1 only — LAW 1).
+
+    Codex (``codex exec``) and PI (``pi --mode json``) are live CLI-headless adapters,
+    each carrying a real git-diff Ring-2 ``changed_paths`` boundary via the injected
+    ``GitSubprocessClient``.
     The Claude SDK adapter body is real (Ring-1 write boundary via ``core/scope_match``);
     only its default ``query_fn`` transport is deferred (lazy ``claude-agent-sdk`` import).
-    OpenCode ships as a documented stub behind the port (live body deferred — see release
-    ``multiharness-engine-v0116``). The factory is total over the enum: an unhandled kind
-    raises ``ValueError``.
+    The factory is total over the enum: an unhandled kind raises ``ValueError``.
     """
     run_dir = cwd or Path.cwd()
     if kind is AgentRuntimeKind.FAKE:
@@ -331,11 +374,12 @@ def build_agent_runtime(
             CodexExecConfig,
         )
 
-        return CodexExecAdapter(CodexExecConfig(cwd=run_dir))
-    if kind is AgentRuntimeKind.OPENCODE_RUN:
-        from dadaia_workspace.infrastructure.opencode_runtime import OpenCodeAdapter
-
-        return OpenCodeAdapter(cwd=run_dir)
+        codex_config = (
+            CodexExecConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
+            if model is not None
+            else CodexExecConfig(cwd=run_dir)
+        )
+        return CodexExecAdapter(codex_config, git=GitSubprocessClient())
     if kind is AgentRuntimeKind.CLAUDE_SDK:
         from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
 
@@ -346,10 +390,12 @@ def build_agent_runtime(
             PiHeadlessConfig,
         )
 
-        return PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=run_dir),
-            git=GitSubprocessClient(),
+        pi_config = (
+            PiHeadlessConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
+            if model is not None
+            else PiHeadlessConfig(cwd=run_dir)
         )
+        return PiHeadlessAdapter(pi_config, git=GitSubprocessClient())
     raise ValueError(f"unsupported agent runtime kind: {kind!r}")
 
 
@@ -573,6 +619,83 @@ def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
     return JsonLifecycleRunStore(workspace_root)
 
 
+def build_workflow_model_profile_registry() -> "WorkflowCatalog":
+    """Compose the governed workflow catalog the policy resolver reads (T-28-B-01).
+
+    Wave B promotes :mod:`dadaia_workspace.features.workflows.dadaia_catalog` to **the**
+    governed source: every worker step carries a default harness + a default model profile
+    per supported harness (validated at import time against the built-in :mod:`model_profiles`
+    registry). :func:`governed_workflow_catalog` projects that single source onto the
+    resolver's :class:`WorkflowCatalog` seam, so the resolver and the panel read the *same*
+    catalog (no second table). The function is pure (no I/O), so it takes no ``workspace_root``.
+    """
+    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+
+    return governed_workflow_catalog()
+
+
+def build_fragment_loader() -> "FragmentLoader":
+    """Compose the shared :class:`FragmentLoader` over the packaged fragment library.
+
+    Used by the read-only panel fragment inspector (Wave D — T-28-D-01) to resolve a
+    governed step's fragment id to its resolved body + metadata. The loader reads from
+    the packaged ``public/lifecycle_fragments/`` root (no I/O at construction), so it
+    takes no ``workspace_root``.
+    """
+    from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
+
+    return FragmentLoader()
+
+
+def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowModelPolicyStore":
+    """Compose the workflow-model-policy overlay store (T-28-A-08).
+
+    Reads/writes ``.dadaia/states/workflow_model_policy.json`` with atomic temp+rename and
+    a ``.last-good.json`` backup. ``load()`` returns ``None`` on a missing file (defaults);
+    a present-but-invalid file raises (missing != invalid).
+    """
+    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+        JsonWorkflowModelPolicyStore,
+    )
+
+    _guard_initialized(workspace_root)
+    return JsonWorkflowModelPolicyStore(workspace_root)
+
+
+def build_workflow_policy_resolver(
+    workspace_root: Path,
+    *,
+    context: str = "default",
+    overlay: "WorkflowModelPolicyOverlay | None" = None,
+) -> "WorkflowExecutionPolicyResolver":
+    """Compose the single shared :class:`WorkflowExecutionPolicyResolver` (T-28-A-08).
+
+    Loads the overlay from the policy store (missing ⇒ ``None`` ⇒ library defaults; an
+    invalid overlay raises here, before any model call — LAW 4/5) and binds it to the
+    governed catalog. CLI and panel both consume *this* resolver so they never disagree on
+    which model a step runs. ``context`` is reserved for future per-context overlays; only
+    the ``default`` context is honored this release (D-2).
+
+    ``overlay`` lets a caller bind a **candidate** overlay (the panel validate/PUT path,
+    T-28-C-02) instead of the on-disk one — the validation resolve runs against the
+    candidate without persisting it. When ``overlay`` is ``None`` the on-disk overlay is
+    loaded (the normal execution path).
+    """
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+    )
+
+    _guard_initialized(workspace_root)
+    _ = context  # reserved (D-2: only `default` honored); recorded for call-site clarity.
+    resolved_overlay = (
+        overlay if overlay is not None else build_workflow_model_policy_store(workspace_root).load()
+    )
+    return WorkflowExecutionPolicyResolver(
+        catalog=build_workflow_model_profile_registry(),
+        overlay=resolved_overlay,
+    )
+
+
 def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWorkflow:
     """Compose lifecycle report workflow."""
     _guard_initialized(workspace_root)
@@ -589,16 +712,20 @@ def build_lifecycle_phase_workflow(
     *,
     runtime_kind: AgentRuntimeKind,
     cwd: Path | None = None,
+    model: HarnessModelOption | None = None,
 ) -> LifecyclePhaseWorkflow:
     """Compose the single-step lifecycle phase workflow on a selected harness.
 
     Binds the per-step runtime adapter (via :func:`build_agent_runtime`) to the
     persistent run store. The chosen ``runtime_kind`` is what makes the harness
-    selectable per verb invocation.
+    selectable per verb invocation; ``model`` is the discrete Layer-2 model (LAW 2)
+    threaded into the adapter when supplied. The caller passes a resolved
+    ``policy_snapshot`` to ``LifecyclePhaseWorkflow.run`` (composed via
+    :func:`build_workflow_policy_resolver`) — the workflow itself never parses policy JSON.
     """
     _guard_initialized(workspace_root)
     return LifecyclePhaseWorkflow(
-        runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root),
+        runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root, model=model),
         run_store=build_lifecycle_run_store(workspace_root),
     )
 
@@ -610,22 +737,278 @@ def build_lifecycle_pipeline(
     release_id: str,
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
+    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
 ) -> LifecyclePipeline:
     """Compose the multi-step lifecycle pipeline with a per-step harness factory.
 
     The injected ``runtime_factory`` resolves each step's declared ``AgentRuntimeKind`` to
-    its adapter, so a single run can mix harnesses across steps (claude implements, codex
-    reviews, ...). An optional cacheable ``prefix`` (WS-7) is assembled once and reused
-    verbatim by every step.
+    its adapter, so a single run can mix harnesses across steps (pi implements, codex
+    reviews, ...). ``models`` maps a runtime kind to its discrete Layer-2 model (LAW 2),
+    so a step running on a given harness gets that harness's selected ``(id, effort)``.
+    An optional cacheable ``prefix`` (WS-7) is assembled once and reused verbatim by
+    every step. ``policy_snapshot`` is the resolved governance snapshot (T-28-A-08, from
+    :func:`build_workflow_policy_resolver`); when present it is frozen onto the run before
+    the first step (LAW 7) — an overlay mutated after start cannot change the in-flight run.
     """
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
+    model_by_kind = models or {}
     return LifecyclePipeline(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=lambda kind: build_agent_runtime(kind, cwd=run_cwd),
+        runtime_factory=lambda kind: build_agent_runtime(
+            kind, cwd=run_cwd, model=model_by_kind.get(kind)
+        ),
         prefix=prefix,
+        policy_snapshot=policy_snapshot,
+    )
+
+
+def _release_definition_runtime_factory(
+    *,
+    context: str,
+    run_cwd: Path,
+    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Build the per-step runtime factory for the release-definition workflow.
+
+    Real harnesses (pi/codex/claude) resolve to their live adapters. ``FAKE`` resolves
+    to a *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref —
+    so ``--harness fake`` walks the whole §6.1 sequence deterministically (the DoD
+    requirement), exercising every fragment-assembled prompt and Python gate without a
+    live worker. The artifact_ref stays inside the step's allowed handoff path.
+    """
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunResult,
+        AgentRunStatus,
+    )
+    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+    approving = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="fake release-definition worker: APPROVED",
+        artifact_refs=(f".dadaia/handoff/{context}/release-definition-step.handoff.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return FakeAgentRuntime(result=approving)
+        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+
+    return factory
+
+
+def build_release_definition_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+) -> "ReleaseDefinitionWorkflow":
+    """Compose the fragment-driven release-definition workflow (WS-5 / §6.1).
+
+    The workflow runs the §6.1 step sequence with fragment-assembled, scoped prompts and
+    Python-owned gates (no generic ``"Run the step"`` suffix). The injected runtime
+    factory resolves each step's ``AgentRuntimeKind`` to its adapter so harnesses can be
+    mixed per step; ``FAKE`` drives the sequence end-to-end. ``models`` maps a runtime
+    kind to its discrete Layer-2 model (LAW 2). The :class:`ContextSelector` resolves
+    each fragment's dynamic inputs, bounded by the fragment's ``max_context_policy``.
+    """
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        ReleaseDefinitionWorkflow,
+    )
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    model_by_kind = models or {}
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    if not specs_dir.is_dir():
+        # Self-hosting library repo: specs live at the workspace-root tree.
+        specs_dir = workspace_root / "specs"
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    return ReleaseDefinitionWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_release_definition_runtime_factory(
+            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
+        ),
+        context_selector=selector,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+    )
+
+
+def _backlog_definition_runtime_factory(
+    *,
+    context: str,
+    run_cwd: Path,
+    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Build the per-step runtime factory for the backlog-definition workflow.
+
+    Real harnesses (pi/codex) resolve to their live adapters; ``FAKE`` resolves to a
+    *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref, so
+    ``--harness fake`` walks the whole §4 sequence deterministically (mirrors the
+    release-definition fake factory).
+    """
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunResult,
+        AgentRunStatus,
+    )
+    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+    approving = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="fake backlog-definition worker: APPROVED",
+        artifact_refs=(f".dadaia/handoff/{context}/backlog-definition-step.handoff.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return FakeAgentRuntime(result=approving)
+        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+
+    return factory
+
+
+def build_backlog_definition_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+) -> "BacklogDefinitionWorkflow":
+    """Compose the fragment-driven backlog-definition workflow (R2 / epic §4).
+
+    Mirrors :func:`build_release_definition_workflow` field-for-field: the injected runtime
+    factory resolves each step's ``AgentRuntimeKind`` to its adapter (``FAKE`` drives the
+    sequence end-to-end); the :class:`ContextSelector` resolves each fragment's dynamic
+    inputs bounded by ``max_context_policy``; the R1 canonical-subject :class:`Registry`
+    backs the ``subject_bind`` Python step. ``models`` maps a runtime kind to its discrete
+    Layer-2 model (LAW 2). All roots are derived from ``workspace_root`` — never cwd.
+    """
+    from dadaia_workspace.features.backlog.subject_registry import build_registry
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        BacklogDefinitionWorkflow,
+    )
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    model_by_kind = models or {}
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    source_root = workspace_root / "repos" / context_name
+    if not specs_dir.is_dir():
+        # Self-hosting library repo: specs live at the workspace-root tree.
+        specs_dir = workspace_root / "specs"
+        source_root = workspace_root
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    registry = build_registry(
+        source_root=source_root,
+        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
+        alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
+        specs_dir=specs_dir,
+    )
+    return BacklogDefinitionWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_backlog_definition_runtime_factory(
+            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
+        ),
+        context_selector=selector,
+        registry=registry,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+    )
+
+
+def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Path]:
+    """Resolve ``(specs_dir, source_root)`` for a context's backlog ops.
+
+    Mirrors the release/backlog-definition factories: a consumer context resolves to
+    ``repos/<ctx>/specs`` + ``repos/<ctx>``; the self-hosting library repo falls back to the
+    workspace-root tree. All roots are derived from ``workspace_root`` — never cwd.
+    """
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    source_root = workspace_root / "repos" / context_name
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+        source_root = workspace_root
+    return specs_dir, source_root
+
+
+def build_release_spec_path(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+) -> Path:
+    """Resolve ``<specs_dir>/releases/<release_id>/SPEC.md`` for a context's release.
+
+    Uses the same root resolution as :func:`build_backlog_removal_lifecycle`
+    (:func:`_backlog_context_roots`): a consumer context resolves to ``repos/<ctx>/specs``;
+    the self-hosting library repo falls back to the workspace-root ``specs``. All roots are
+    derived from ``workspace_root`` — never cwd. The producer post-step reads the
+    ``**Consumes:**`` line from this path (SPEC §3.2).
+    """
+    specs_dir, _source_root = _backlog_context_roots(workspace_root, context)
+    return specs_dir / "releases" / release_id / "SPEC.md"
+
+
+def build_backlog_removal_lifecycle(
+    workspace_root: Path,
+    *,
+    context: str,
+) -> "BacklogRemovalLifecycle":
+    """Compose the removal-on-release lifecycle (SPEC §3.6) over a context's backlog.
+
+    Binds the injected backlog/archive roots + the R1 canonical-subject registry so the
+    caller can write the ``consumed_backlog`` ledger at release-definition and apply the
+    residual-aware removal hook at closure. All roots are derived from ``workspace_root``.
+    """
+    from dadaia_workspace.features.backlog.removal_lifecycle import BacklogRemovalLifecycle
+    from dadaia_workspace.features.backlog.subject_registry import build_registry
+
+    _guard_initialized(workspace_root)
+    specs_dir, source_root = _backlog_context_roots(workspace_root, context)
+    registry = build_registry(
+        source_root=source_root,
+        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
+        alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
+        specs_dir=specs_dir,
+    )
+    return BacklogRemovalLifecycle(
+        backlog_dir=specs_dir / "backlog",
+        archive_root=specs_dir / "_archive",
+        registry=registry,
     )
 
 
@@ -650,6 +1033,22 @@ def build_panel_views(
     academy = build_academy_service(workspace_root)
     workflows_service = build_workflow_catalog_service(workspace_root)
     service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
+
+    # Workflow model-governance control plane (Wave C). The panel reads the SAME governed
+    # catalog + built-in profiles + policy store + run snapshots the CLI uses, through the
+    # shared resolver — one source of truth, no second model table. The resolver +
+    # overlay types are TYPE_CHECKING-only imports (used in the closure's string
+    # annotations below).
+    wf_catalog = build_workflow_model_profile_registry()
+    policy_store = build_workflow_model_policy_store(workspace_root)
+    run_store = build_lifecycle_run_store(workspace_root)
+    fragment_loader = build_fragment_loader()
+
+    def _resolver_factory(
+        context: str, *, overlay: "WorkflowModelPolicyOverlay | None" = None
+    ) -> "WorkflowExecutionPolicyResolver":
+        return build_workflow_policy_resolver(workspace_root, context=context, overlay=overlay)
+
     return {
         "index": render_index(service),
         "api_panel_status": render_api_servers(service),
@@ -671,6 +1070,24 @@ def build_panel_views(
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_workflows": render_api_workflows_list(service),
         "api_workflow_detail": render_api_workflow_detail(workflows_service),
+        "api_dadaia_workflows": render_api_dadaia_workflows_list(workflows_service),
+        "api_dadaia_workflow_detail": render_api_dadaia_workflow_detail(workflows_service),
+        # Workflow model-governance control plane (Wave C — T-28-C-01/02).
+        "api_workflow_catalog": render_api_workflow_catalog(wf_catalog, _resolver_factory),
+        "api_workflow_catalog_detail": render_api_workflow_catalog_detail(
+            wf_catalog, _resolver_factory
+        ),
+        "api_workflow_model_profiles": render_api_workflow_model_profiles(),
+        # Read-only fragment inspector (Wave D — T-28-D-01).
+        "api_workflow_fragment": render_api_workflow_fragment(fragment_loader),
+        "api_workflow_model_policy": render_api_workflow_model_policy(policy_store),
+        "api_workflow_model_policy_validate": render_post_workflow_model_policy_validate(
+            policy_store, _resolver_factory
+        ),
+        "api_workflow_model_policy_put": render_put_workflow_model_policy(
+            policy_store, _resolver_factory
+        ),
+        "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),

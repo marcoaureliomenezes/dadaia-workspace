@@ -34,7 +34,6 @@ def test_init_creates_dadaia_dirs(service: WorkspaceService, workspace_root: Pat
     assert (workspace_root / ".agents" / "skills").is_dir()
     assert (workspace_root / ".claude").is_dir()
     assert (workspace_root / ".codex").is_dir()
-    assert (workspace_root / ".opencode").is_dir()
 
 
 def test_init_creates_report_subdirs(service: WorkspaceService, workspace_root: Path) -> None:

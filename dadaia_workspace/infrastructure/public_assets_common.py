@@ -17,7 +17,7 @@ from typing import Any
 _SCHEMA_VERSION = "1"
 
 # Shared layout constants for the install/stage pipeline.
-_VALID_TARGETS = {"all", "agents", "claude", "codex", "opencode", "pi"}
+_VALID_TARGETS = {"all", "agents", "claude", "codex", "pi"}
 _COPY_DIRS = (
     "rules",
     "skills",
@@ -31,10 +31,10 @@ _COPY_DIRS = (
     "plugins",
     "runtime",
     "workflows",
+    "lifecycle_fragments",
     "pi",
 )
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
-_OPENCODE_DIRS = ("commands", "skills", "agents", "plugins", "workflows")
 #: Subdirectories of the staged ``pi/`` tree that are copied as-is into ``.pi/``.
 _PI_DIRS = ("prompts", "extensions")
 

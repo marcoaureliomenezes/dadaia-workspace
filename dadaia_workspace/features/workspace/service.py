@@ -63,7 +63,6 @@ class WorkspaceService:
         (workspace.root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
         workspace.claude_dir.mkdir(parents=True, exist_ok=True)
         (workspace.root / ".codex").mkdir(parents=True, exist_ok=True)
-        (workspace.root / ".opencode").mkdir(parents=True, exist_ok=True)
 
         # Initialize JSON state files (idempotent — never overwrite existing data)
         self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)

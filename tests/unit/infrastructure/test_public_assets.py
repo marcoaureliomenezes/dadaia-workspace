@@ -29,13 +29,11 @@ from dadaia_workspace.infrastructure.public_assets import (
     _log_cleanup_error,
     _package_version,
     _parse_agent_frontmatter,
-    _prepare_agent_for_opencode,
     _render_agent_toml_block,
     _render_agents_config_file_blocks,
     _render_agents_into_codex_config,
     _render_codex_agent_toml,
     _sha256,
-    _strip_tools_from_frontmatter,
     _toml_escape,
 )
 
@@ -204,11 +202,6 @@ class TestParseAgentFrontmatter:
         text = "---\nname: a\ndescription: >\n  line one\n  line two\n---\n"
         fm = _parse_agent_frontmatter(text)
         assert "line one" in str(fm.get("description", ""))
-
-    def test_opencode_model_not_in_safe_fields(self) -> None:
-        text = "---\nname: a\nopencode_model: gpt-5\n---\n"
-        fm = _parse_agent_frontmatter(text)
-        assert "opencode_model" not in fm
 
 
 # ---------------------------------------------------------------------------
@@ -393,133 +386,6 @@ class TestLogCleanupError:
         _log_cleanup_error(None, "/path", (None, None, None))
         captured = capsys.readouterr()
         assert "[cleanup-warning]" in captured.err
-
-
-# ---------------------------------------------------------------------------
-# _strip_tools_from_frontmatter
-# ---------------------------------------------------------------------------
-
-
-class TestStripToolsFromFrontmatter:
-    def test_strips_tools_block(self) -> None:
-        content = "---\nname: a\ntools:\n  - Read\n  - Write\nmodel: m\n---\nbody\n"
-        result = _strip_tools_from_frontmatter(content)
-        assert "tools:" not in result
-        assert "Read" not in result
-        assert "name: a" in result
-        assert "body" in result
-
-    def test_no_frontmatter_returned_unchanged(self) -> None:
-        content = "just body\n"
-        assert _strip_tools_from_frontmatter(content) == content
-
-    def test_unterminated_frontmatter_returned_unchanged(self) -> None:
-        content = "---\nname: a\n"
-        assert _strip_tools_from_frontmatter(content) == content
-
-    def test_no_tools_returned_unchanged(self) -> None:
-        content = "---\nname: a\nmodel: m\n---\nbody\n"
-        assert _strip_tools_from_frontmatter(content) == content
-
-
-# ---------------------------------------------------------------------------
-# _prepare_agent_for_opencode
-# ---------------------------------------------------------------------------
-
-
-class TestPrepareAgentForOpencode:
-    def test_strips_tools(self) -> None:
-        content = "---\nname: a\ntools:\n  - Read\nmodel: m\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "tools:" not in result
-        assert "Read" not in result
-
-    def test_swaps_model_when_opencode_model_declared(self) -> None:
-        content = "---\nname: a\nmodel: claude-sonnet-4-6\nopencode_model: gpt-4o\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "gpt-4o" in result
-        assert "claude-sonnet-4-6" not in result
-
-    def test_opencode_model_field_removed_from_output(self) -> None:
-        content = "---\nname: a\nmodel: claude-sonnet-4-6\nopencode_model: gpt-4o\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "opencode_model:" not in result
-
-    def test_no_opencode_model_field_unchanged_model(self) -> None:
-        content = "---\nname: a\nmodel: claude-sonnet-4-6\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "claude-sonnet-4-6" in result
-
-    def test_no_frontmatter_returned_unchanged(self) -> None:
-        content = "just body\n"
-        assert _prepare_agent_for_opencode(content) == content
-
-    def test_strips_color_field(self) -> None:
-        # FR-OC-1: color: is Claude-specific and breaks OpenCode 1.14.x parse.
-        content = "---\nname: a\ncolor: yellow\nmodel: m\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "color:" not in result
-        assert "yellow" not in result
-
-    def test_color_strip_preserves_other_fields(self) -> None:
-        content = "---\nname: a\ncolor: orange\nmodel: claude-sonnet-4-6\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "name: a" in result
-        assert "model: claude-sonnet-4-6" in result
-        assert "body" in result
-
-    def test_no_color_field_unchanged(self) -> None:
-        content = "---\nname: a\nmodel: m\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert result == content
-
-    # --- T-OC-03 (FR-OC-2): permission: per-agent projection ---
-
-    def test_permission_allow_for_granted_tools(self) -> None:
-        content = (
-            "---\nname: be\ntools:\n  - Read\n  - Write\n  - Edit\n  - Bash\n"
-            "  - Glob\n  - Grep\nmodel: m\n---\nbody\n"
-        )
-        result = _prepare_agent_for_opencode(content)
-        assert "permission:" in result
-        assert "  edit: allow" in result
-        assert "  bash: allow" in result
-        # No WebFetch / Agent declared → deny.
-        assert "  webfetch: deny" in result
-        assert "  task: deny" in result
-
-    def test_permission_deny_for_readonly_agent(self) -> None:
-        content = (
-            "---\nname: ro\ntools:\n  - Read\n  - Glob\n  - Grep\n  - WebFetch\n"
-            "  - WebSearch\n  - Write\nmodel: m\n---\nbody\n"
-        )
-        result = _prepare_agent_for_opencode(content)
-        assert "  edit: allow" in result  # Write maps to edit
-        assert "  bash: deny" in result
-        assert "  webfetch: allow" in result
-        assert "  task: deny" in result
-
-    def test_websearch_emits_unsupported_comment(self) -> None:
-        content = "---\nname: r\ntools:\n  - Read\n  - WebSearch\nmodel: m\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "# [opencode-unsupported]: WebSearch" in result
-
-    def test_agent_tool_maps_to_task_allow(self) -> None:
-        content = "---\nname: pm\ntools:\n  - Read\n  - Agent\nmodel: m\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "  task: allow" in result
-
-    def test_no_tools_block_no_permission(self) -> None:
-        content = "---\nname: a\nmodel: m\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "permission:" not in result
-
-    def test_permission_block_after_tools_stripped(self) -> None:
-        # tools: list form must be gone; permission: object form must be present.
-        content = "---\nname: a\ntools:\n  - Bash\nmodel: m\n---\nbody\n"
-        result = _prepare_agent_for_opencode(content)
-        assert "tools:\n  - Bash" not in result
-        assert "  bash: allow" in result
 
 
 # ---------------------------------------------------------------------------
@@ -1301,26 +1167,6 @@ class TestRuntimeExpectations:
         assert "repos/my-repo:AGENTS.md" in labels
         assert "repos/my-repo:CLAUDE.md" in labels
 
-    def test_opencode_agent_has_transform_true(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        agents_dir = agentic_dir / "agents"
-        agents_dir.mkdir()
-        (agents_dir / "my-agent.md").write_text(_make_agent_md("my-agent"), encoding="utf-8")
-        manager = self._make_manager()
-        items = list(manager._runtime_expectations(agentic_dir, workspace_root))
-        opencode_agent_items = [t for t in items if "opencode:agents/" in t[2]]
-        assert all(t[3] is True for t in opencode_agent_items)
-
-    def test_opencode_hooks_yields_unsupported(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        manager = self._make_manager()
-        items = list(manager._runtime_expectations(agentic_dir, workspace_root))
-        hooks_items = [t for t in items if t[2] == "opencode:hooks"]
-        assert len(hooks_items) == 1
-        src, dst, label, transform = hooks_items[0]
-        assert src is None
-        assert transform is False  # "unsupported" branch
-
     def test_codex_rules_not_sourced_from_markdown_protocols(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         rules_dir = agentic_dir / "rules"
@@ -1461,81 +1307,6 @@ class TestInstallCodexAgents:
 
 
 # ---------------------------------------------------------------------------
-# _install_opencode
-# ---------------------------------------------------------------------------
-
-
-class TestInstallOpencode:
-    def test_creates_opencode_json(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        installed: list[str] = []
-        manager = FileSystemPublicAssetManager()
-        manager._install_opencode(agentic_dir, workspace_root, force=True, installed=installed)
-        opencode_json = workspace_root / "opencode.json"
-        assert opencode_json.exists()
-        data = json.loads(opencode_json.read_text(encoding="utf-8"))
-        assert "$schema" in data
-        assert "instructions" in data
-
-    def test_opencode_json_contains_agents_md(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        manager = FileSystemPublicAssetManager()
-        manager._install_opencode(agentic_dir, workspace_root, force=True, installed=[])
-        data = json.loads((workspace_root / "opencode.json").read_text(encoding="utf-8"))
-        assert "AGENTS.md" in data["instructions"]
-        assert "CLAUDE.md" in data["instructions"]
-
-    def test_agents_projected_to_opencode_dir(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        agents_src = agentic_dir / "agents"
-        agents_src.mkdir()
-        (agents_src / "my-agent.md").write_text(
-            _make_agent_md("my-agent", tools=["Read"]), encoding="utf-8"
-        )
-        installed: list[str] = []
-        manager = FileSystemPublicAssetManager()
-        manager._install_opencode(agentic_dir, workspace_root, force=True, installed=installed)
-        opencode_agent = workspace_root / ".opencode" / "agents" / "my-agent.md"
-        assert opencode_agent.exists()
-        content = opencode_agent.read_text(encoding="utf-8")
-        # tools: block must be stripped
-        assert "tools:" not in content
-
-    def test_overwrites_stale_opencode_json_when_force_false(self, tmp_path: Path) -> None:
-        """T-PROP-01: force=False + stale opencode.json → overwrite (hash-compare).
-
-        The OLD behavior skipped any existing file. The NEW behavior overwrites when the
-        generated content differs from the projected file.
-        """
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        opencode_json = workspace_root / "opencode.json"
-        opencode_json.write_text('{"old": true}\n', encoding="utf-8")
-        installed: list[str] = []
-        manager = FileSystemPublicAssetManager()
-        manager._install_opencode(agentic_dir, workspace_root, force=False, installed=installed)
-        # Hash mismatch → stale opencode.json must be overwritten with generated content.
-        result = opencode_json.read_text(encoding="utf-8")
-        assert result != '{"old": true}\n', "Expected stale opencode.json to be overwritten"
-        assert any("[ok]" in e and "opencode.json" in e for e in installed)
-
-    def test_skips_opencode_json_when_content_matches(self, tmp_path: Path) -> None:
-        """T-PROP-01: force=False + identical opencode.json → no-op (skip)."""
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        # First install with force=True to generate canonical opencode.json.
-        manager = FileSystemPublicAssetManager()
-        manager._install_opencode(agentic_dir, workspace_root, force=True, installed=[])
-        opencode_json = workspace_root / "opencode.json"
-        canonical_content = opencode_json.read_text(encoding="utf-8")
-        mtime_before = opencode_json.stat().st_mtime
-        # Second install with force=False — same content, must skip.
-        installed: list[str] = []
-        manager._install_opencode(agentic_dir, workspace_root, force=False, installed=installed)
-        assert opencode_json.read_text(encoding="utf-8") == canonical_content
-        assert opencode_json.stat().st_mtime == mtime_before
-        assert any("[skip]" in e and "opencode.json" in e for e in installed)
-
-
-# ---------------------------------------------------------------------------
 # _agents_md_source — templates fallback
 # ---------------------------------------------------------------------------
 
@@ -1639,7 +1410,6 @@ class TestClassifyWorkflows:
         )
         manager = FileSystemPublicAssetManager()
         out = manager._classify_workflows(agentic_dir)
-        assert any(line == "[ok] opencode:workflows/simple.workflow.md" for line in out)
         assert any(line == "[ok] claude:workflows/simple.workflow.md" for line in out)
         assert any("[reference-only]" in line and "simple.workflow.md" in line for line in out)
 
@@ -1652,11 +1422,12 @@ class TestClassifyWorkflows:
         )
         manager = FileSystemPublicAssetManager()
         out = manager._classify_workflows(agentic_dir)
-        assert any("[partial]" in line and "parallel.workflow.md" in line for line in out)
+        assert any(line == "[ok] claude:workflows/parallel.workflow.md" for line in out)
+        assert any("[reference-only]" in line and "parallel.workflow.md" in line for line in out)
 
 
 # ---------------------------------------------------------------------------
-# _codex_hooks / _claude_settings / _opencode_config
+# _codex_hooks / _claude_settings
 # ---------------------------------------------------------------------------
 
 
@@ -1901,31 +1672,6 @@ class TestConfigGenerators:
         assert any("[rm]" in item and "stale-agent.toml" in item for item in installed)
         assert any("[rm]" in item and "stale.workflow.md" in item for item in installed)
 
-    def test_opencode_config_structure(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        config = manager._opencode_config(tmp_path)
-        assert "$schema" in config
-        assert "AGENTS.md" in config["instructions"]
-        assert "permission" in config
-
-    def test_opencode_config_adds_repo_slug_when_context_exists(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        # Create spec_contexts.json pointing to a repo with AGENTS.md
-        states_dir = tmp_path / ".dadaia" / "states"
-        states_dir.mkdir(parents=True)
-        repo_slug = "my-project"
-        repo_agents = tmp_path / "repos" / repo_slug / "AGENTS.md"
-        repo_agents.parent.mkdir(parents=True)
-        repo_agents.write_text("# AGENTS\n", encoding="utf-8")
-        (states_dir / "spec_contexts.json").write_text(
-            json.dumps(
-                {"version": 2, "contexts": [{"name": "My Project", "repo_slug": repo_slug}]}
-            ),
-            encoding="utf-8",
-        )
-        config = manager._opencode_config(tmp_path)
-        assert f"repos/{repo_slug}/AGENTS.md" in config["instructions"]
-
     def test_codex_config_contains_approved_commands(self, tmp_path: Path) -> None:
         agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
         manager = FileSystemPublicAssetManager()
@@ -2117,29 +1863,6 @@ class TestDoctorMethod:
         reports = manager.doctor(workspace_root)
         assert any(r == "[drift] stage:testfile.txt" for r in reports)
 
-    def test_reports_unsupported_for_opencode_hooks(self, tmp_path: Path) -> None:
-        """opencode:hooks (src=None, transform=False) gets [unsupported] label."""
-        public_dir = tmp_path / "public"
-        public_dir.mkdir()
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        agentic_dir = workspace_root / ".dadaia" / "agentic"
-        agentic_dir.mkdir(parents=True)
-        (agentic_dir / "manifest.json").write_text(
-            json.dumps(
-                {
-                    "schema_version": "1",
-                    "package_version": "0",
-                    "generated_at": "2026-01-01T00:00:00+00:00",
-                    "assets": [],
-                }
-            ),
-            encoding="utf-8",
-        )
-        manager = self._make_manager_with_fake_public(public_dir)
-        reports = manager.doctor(workspace_root)
-        assert any(r == "[unsupported] opencode:hooks" for r in reports)
-
     def test_reports_claude_md_stub_check(self, tmp_path: Path) -> None:
         """When agents_md source exists, CLAUDE.md stub is verified by doctor."""
         public_dir = tmp_path / "public"
@@ -2211,23 +1934,6 @@ class TestInstallClaudeSettingsSkip:
         assert settings_path.read_text(encoding="utf-8") == canonical_content
         assert settings_path.stat().st_mtime == mtime_before
         assert any("[skip]" in e and "settings.json" in e for e in installed)
-
-
-# ---------------------------------------------------------------------------
-# _opencode_config — JSON decode error path
-# ---------------------------------------------------------------------------
-
-
-class TestOpencodeConfigJsonError:
-    def test_invalid_json_in_context_registry_ignored(self, tmp_path: Path) -> None:
-        states_dir = tmp_path / ".dadaia" / "states"
-        states_dir.mkdir(parents=True)
-        (states_dir / "spec_contexts.json").write_text("NOT JSON", encoding="utf-8")
-        manager = FileSystemPublicAssetManager()
-        # Should not raise; invalid JSON is silently swallowed
-        config = manager._opencode_config(tmp_path)
-        assert "instructions" in config
-        assert "AGENTS.md" in config["instructions"]
 
 
 # ---------------------------------------------------------------------------
@@ -2434,8 +2140,8 @@ class TestInstallCodexRuntimeAdapters:
         assert any("[skip]" in e for e in installed)
         assert not any("[ok]" in e for e in installed)
 
-    def test_does_not_write_to_claude_or_opencode(self, tmp_path: Path) -> None:
-        """Codex-only adapters are never written to .claude/ or .opencode/."""
+    def test_does_not_write_to_claude(self, tmp_path: Path) -> None:
+        """Codex-only adapters are never written to .claude/."""
         public_dir = tmp_path / "public"
         runtime_codex = public_dir / "runtime" / "codex" / "my-adapter"
         runtime_codex.mkdir(parents=True)
@@ -2445,7 +2151,6 @@ class TestInstallCodexRuntimeAdapters:
         manager = self._make_manager_with_fake_public(public_dir)
         manager._install_codex_runtime_adapters(workspace_root, force=True, installed=[])
         assert not (workspace_root / ".claude" / "skills" / "my-adapter" / "SKILL.md").exists()
-        assert not (workspace_root / ".opencode" / "skills" / "my-adapter" / "SKILL.md").exists()
 
     def test_multiple_adapters_all_copied(self, tmp_path: Path) -> None:
         """Multiple adapter subdirectories are all copied."""
@@ -2533,23 +2238,6 @@ class TestDcx6CodexRuntimeAdapters:
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
         assert any(
             "[leak]" in line and "claude" in line and "my-adapter" in line and "D-CX-6" in line
-            for line in out
-        )
-
-    def test_leak_when_adapter_in_opencode_skills(self, tmp_path: Path) -> None:
-        """[leak] reported when adapter appears in .opencode/skills/."""
-        public_dir = tmp_path / "public"
-        self._setup_adapter(public_dir, "my-adapter")
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        # Place the adapter in .opencode/skills/ — simulating a leak
-        leak_path = workspace_root / ".opencode" / "skills" / "my-adapter" / "SKILL.md"
-        leak_path.parent.mkdir(parents=True)
-        leak_path.write_text("# Leak\n", encoding="utf-8")
-        manager = self._make_manager_with_fake_public(public_dir)
-        out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert any(
-            "[leak]" in line and "opencode" in line and "my-adapter" in line and "D-CX-6" in line
             for line in out
         )
 

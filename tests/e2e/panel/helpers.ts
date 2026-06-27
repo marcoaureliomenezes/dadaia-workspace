@@ -56,8 +56,9 @@ export async function gotoPanel(page: Page, options?: { path?: string }): Promis
  */
 export async function activateTab(
   page: Page,
-  // 'agents' and 'workflows' removed in T-016-P09 — use 'ops' instead.
-  sectionId: 'memories' | 'servers' | 'ops' | 'sessions' | 'reports' | 'academy'
+  // 'agents' merged into 'ops' (T-016-P09). 'workflows' is a first-class tab again
+  // (T-28-C-03 / D-5) hosting the model-governance editor.
+  sectionId: 'memories' | 'servers' | 'ops' | 'sessions' | 'reports' | 'academy' | 'workflows'
 ): Promise<void> {
   const tabId = `#tab-${sectionId}`;
   await page.click(tabId);

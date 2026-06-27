@@ -58,7 +58,6 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "skills",
         "tools",
         "model",
-        "opencode_model",
         "maxTurns",  # frontmatter key (camelCase)
         "max_turns",  # alternative snake_case spelling
         "input_contract",
@@ -180,9 +179,6 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
     model_raw = raw.get("model")
     model: str | None = str(model_raw) if model_raw is not None else None
 
-    opencode_model_raw = raw.get("opencode_model")
-    opencode_model: str | None = str(opencode_model_raw) if opencode_model_raw is not None else None
-
     input_contract_raw = raw.get("input_contract")
     input_contract: dict[str, Any] | None = (
         input_contract_raw if isinstance(input_contract_raw, dict) else None
@@ -204,7 +200,6 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         skills=skills,
         tools=tools,
         model=model,
-        opencode_model=opencode_model,
         max_turns=max_turns,
         input_contract=input_contract,
         paths=paths,

@@ -89,6 +89,6 @@ Write a summary to `.dadaia/reports/<context-name>/dadaia-workspace-doctor/<YYYY
 
 ## Guardrail
 
-Never edit files under `.agents/`, `.claude/`, `.codex/`, or `.opencode/` directly for
+Never edit files under `.agents/`, `.claude/`, `.codex/`, or `.pi/` directly for
 drift repair — use `dadaia public stage` plus `dadaia public install --target all --force`
 instead. Manual edits to lib-originated files create new drift rather than resolving it.

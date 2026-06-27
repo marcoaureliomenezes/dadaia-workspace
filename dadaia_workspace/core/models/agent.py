@@ -31,7 +31,6 @@ class AgentDTO:
     skills: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
     model: str | None = None
-    opencode_model: str | None = None
     max_turns: int | None = None
     input_contract: dict[str, Any] | None = None
     paths: dict[str, list[str]] | None = None

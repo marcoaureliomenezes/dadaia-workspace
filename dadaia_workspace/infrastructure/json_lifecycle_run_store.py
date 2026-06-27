@@ -52,6 +52,27 @@ class JsonLifecycleRunStore:
             raise LifecycleRunStoreError("lifecycle run state not found", self._path_for(run_id))
         return run
 
+    def list_runs(self) -> list[LifecycleRun]:
+        """Return every persisted lifecycle run (run-history read for the panel).
+
+        Corrupt or unreadable run files are skipped (logged WARN) rather than failing
+        the whole listing — a single bad record must not break the panel run-history
+        view (AC-7 reads the persisted snapshot; this never re-resolves policy).
+        """
+        if not self._root.is_dir():
+            return []
+        runs: list[LifecycleRun] = []
+        for path in sorted(self._root.glob("*.json")):
+            try:
+                runs.append(self._load_path(path))
+            except LifecycleRunStoreError as exc:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "skipping corrupt lifecycle run record %s: %s", path, exc
+                )
+        return runs
+
     def _load_path(self, path: Path) -> LifecycleRun:
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))

@@ -133,6 +133,27 @@ class TestReleaseNew:
         result = release_new(specs, "release2026")
         assert result.path.is_file()
 
+    def test_accepts_semver_release_id(self, tmp_path: Path) -> None:
+        """H1 (bug release-new-rejects-semver-but-doctor-requires-it): the SemVer canon
+        ``vX.Y.Z`` — which `specs doctor` SPEC-DOC-027 REQUIRES for a live release dir —
+        must be accepted (it used to be rejected by the slug-only validator)."""
+        specs = tmp_path / "specs"
+        specs.mkdir()
+
+        result = release_new(specs, "v0.1.23")
+        assert (specs / "releases" / "v0.1.23" / "SPEC.md").is_file()
+        assert result.created is True
+
+    def test_rejects_dotted_non_semver_id(self, tmp_path: Path) -> None:
+        """A dotted id that is NOT the SemVer canon (e.g. missing the leading v or a
+        4th segment) is still rejected — the broadening is precise, not 'any dots'."""
+        specs = tmp_path / "specs"
+        specs.mkdir()
+
+        for bad in ("0.1.23", "v0.1", "v0.1.2.3", "v1.2.x"):
+            with pytest.raises(ValueError, match=r"Invalid release ID"):
+                release_new(specs, bad)
+
 
 # ── backlog_new ───────────────────────────────────────────────────────────────
 

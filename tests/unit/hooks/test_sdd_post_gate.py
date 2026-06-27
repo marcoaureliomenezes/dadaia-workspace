@@ -43,7 +43,6 @@ def _scrub_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CODEX_SESSION_ID",
-        "OPENCODE_SESSION_ID",
     ):
         monkeypatch.delenv(var, raising=False)
 

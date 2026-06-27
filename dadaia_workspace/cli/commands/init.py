@@ -19,7 +19,7 @@ def init(
         False, "--skip-assets", help="Skip installing public agent assets"
     ),
 ) -> None:
-    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets into all runtimes (.claude/, .codex/, .opencode/, .pi/, .agents/)."""
+    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets into all runtimes (.claude/, .codex/, .pi/, .agents/)."""
     root = resolve_workspace_root_for_init(workspace, explicit=workspace is not None)
     console.print(f"[bold]Initializing workspace:[/bold] {root}")
 

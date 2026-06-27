@@ -62,7 +62,7 @@ class ExportService:
         if options.include_reports:
             _add_if_exists(dadaia / "reports", ".dadaia/reports")
 
-        for name in ("CLAUDE.md", "AGENTS.md", "opencode.json"):
+        for name in ("CLAUDE.md", "AGENTS.md"):
             _add_if_exists(root / name, name)
 
         _add_if_exists(root / ".agents" / "skills", ".agents/skills")
@@ -76,8 +76,6 @@ class ExportService:
         _add_if_exists(codex / "config.toml", ".codex/config.toml")
         _add_if_exists(codex / "hooks.json", ".codex/hooks.json")
         _add_if_exists(codex / "rules", ".codex/rules")
-
-        _add_if_exists(root / ".opencode", ".opencode")
 
         mnt = root / "mnt"
         if not options.exclude_mnt and mnt.exists():

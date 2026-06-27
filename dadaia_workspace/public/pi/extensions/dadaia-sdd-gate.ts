@@ -6,7 +6,7 @@
 // `{ block: true, reason }` to deny a tool call before it touches disk
 // (verified against pi v0.79.3 `core/extensions/types.d.ts`).
 //
-// Like the OpenCode `sdd-gate.ts` plugin, this is a THIN shim: it delegates the allow/block
+// This is a THIN shim: it delegates the allow/block
 // decision to the single cross-runtime source of truth — the Python governance hook
 // `python -m dadaia_workspace.hooks.pre_gate` (root-whitelist → venv-guard → SDD gate,
 // first-block-wins). Policy is NEVER re-derived in TypeScript. The Python hook delegates to
@@ -25,7 +25,7 @@
 // Fail-open: any internal error (missing interpreter, spawn failure, parse error) ALLOWS
 // the tool — never block a legitimate edit by crashing. Only the explicit
 // `{"decision":"block"}` envelope from the Python hook blocks. This matches the gate's own
-// fail-open contract and the OpenCode plugin's posture.
+// fail-open contract.
 //
 // Runs on PI's Node runtime via `node:child_process.spawnSync` (not Bun).
 

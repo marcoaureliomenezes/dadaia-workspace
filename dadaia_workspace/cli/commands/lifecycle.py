@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from enum import IntEnum
 from pathlib import Path
 from typing import Any
 
 import typer
 
+from dadaia_workspace.core.harness_models import (
+    CODEX_HARNESS,
+    PI_HARNESS,
+    HarnessModelOption,
+)
+from dadaia_workspace.core.harness_models import (
+    validate as validate_harness_model,
+)
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     GateEvidenceKind,
@@ -17,6 +26,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
+from dadaia_workspace.features.lifecycle.phase_workflow import PhaseWorkflowResult
 from dadaia_workspace.features.lifecycle.prompt_builder import PromptScope
 from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandResult,
@@ -24,12 +34,33 @@ from dadaia_workspace.features.lifecycle.service import (
     LifecyclePreflightService,
 )
 
+# Layer-2 workflow harnesses (LAW 1, ADR-A): pi/codex run as workers; fake is the
+# deterministic test adapter. ``claude`` is intentionally ABSENT — Claude Code is a
+# Layer-1 entry harness; running it as a Layer-2 worker spends credits outside the
+# operator's subscription. The CLAUDE_SDK adapter + enum value remain in code (Layer-1)
+# but are not selectable as a workflow harness.
 _HARNESS_KINDS = {
     "fake": AgentRuntimeKind.FAKE,
     "codex": AgentRuntimeKind.CODEX_EXEC,
-    "claude": AgentRuntimeKind.CLAUDE_SDK,
-    "opencode": AgentRuntimeKind.OPENCODE_RUN,
     "pi": AgentRuntimeKind.PI_HEADLESS,
+}
+
+# Harness names → the CLI ``--harness`` value that selects a discrete model catalog
+# (LAW 2). ``fake`` carries no model. Used to map a chosen harness to its catalog key.
+_HARNESS_CATALOG_KEY = {
+    "codex": CODEX_HARNESS,
+    "pi": PI_HARNESS,
+}
+
+# Harness names rejected as Layer-2 workflow harnesses (LAW 1) with a pointer. Claude is a
+# Layer-1 entry harness; OpenCode was removed as a Layer-2 worker in v0.1.24. Layer-2
+# workers are pi or codex only; ``fake`` is the deterministic test adapter.
+_LAYER1_ONLY_HARNESSES = {
+    "claude",
+    "claude_sdk",
+    "claude-sdk",
+    "opencode",
+    "open-code",
 }
 
 app = typer.Typer(help="Deterministic lifecycle workflow commands.", no_args_is_help=True)
@@ -37,6 +68,9 @@ hygiene_app = typer.Typer(help="Lifecycle hygiene commands.", no_args_is_help=Tr
 review_app = typer.Typer(help="Lifecycle review commands.", no_args_is_help=True)
 backlog_app = typer.Typer(help="Lifecycle backlog commands.", no_args_is_help=True)
 release_app = typer.Typer(help="Lifecycle release commands.", no_args_is_help=True)
+workflow_app = typer.Typer(
+    help="Read-only workflow model-governance inspection.", no_args_is_help=True
+)
 
 
 class LifecycleExitCode(IntEnum):
@@ -309,22 +343,142 @@ def backlog_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("backlog-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Default discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+    ),
+    step_harness: list[str] | None = typer.Option(
+        None,
+        "--step-harness",
+        help="Per-step harness override 'step=harness' (repeatable); steps are the §4 "
+        "model-step labels (intake_grill, conflict_resolution_grill, backlog_author).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=model' (repeatable); model is "
+        "'<id>:<effort>' valid for that step's harness (LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the backlog-definition step on a selectable harness."""
-    _run_phase_step(
-        label="backlog-define",
-        role="project-manager",
-        from_phase=LifecyclePhase.BACKLOG_DEFINITION,
-        target_phase=LifecyclePhase.RELEASE_DEFINITION,
+    """Run the backlog-definition workflow (§4) as a fragment-driven sequence.
+
+    Python owns step order and the typed gates; each model step's prompt is assembled
+    from its fragment bundle + selected dynamic context + output schema + the discrete
+    ``(harness, model)``. The §4 Python steps (``subject_bind``, ``existing_backlog_review``,
+    ``reconcile_decision``, ``backlog_review_gate``) dispose deterministically via the R1
+    registry + classifier; a blocked gate stops the sequence. ``--harness fake`` walks the
+    whole sequence; ``claude`` is rejected (LAW 1); an invalid ``--model`` is rejected (LAW 2).
+    """
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace import container
+    from dadaia_workspace.features.backlog.classifier import BoundItem
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        _SEQUENCE,
+        AuthoredItem,
+        BacklogDemand,
+    )
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+
+    # Per-step harness overrides, keyed by the §4 model-step labels.
+    valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
+    overrides: dict[str, AgentRuntimeKind] = {}
+    harness_by_label: dict[str, str] = {}
+    for item in step_harness or []:
+        label, sep, kind_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
+        clean_label = label.strip()
+        if clean_label not in valid_labels:
+            raise typer.BadParameter(
+                f"unknown backlog-definition step {clean_label!r}; "
+                f"valid steps: {', '.join(sorted(valid_labels))}"
+            )
+        overrides[clean_label] = _resolve_harness(kind_str.strip())
+        harness_by_label[clean_label] = kind_str.strip()
+
+    # LAW 2 — resolve the discrete model per runtime kind.
+    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
+    default_model = _resolve_model(harness, model)
+    if default_model is not None:
+        models[default_kind] = default_model
+    for item in step_model or []:
+        label, sep, model_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'step=model', got {item!r}")
+        clean_label = label.strip()
+        step_harness_name = harness_by_label.get(clean_label, harness)
+        resolved = _resolve_model(step_harness_name, model_str.strip())
+        if resolved is not None:
+            models[_resolve_harness(step_harness_name)] = resolved
+
+    workflow = container.build_backlog_definition_workflow(
+        workspace_root,
         context=context,
         release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        json_output=json_output,
+        default_runtime_kind=default_kind,
+        models=models,
     )
+    sequence = tuple(
+        _replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+        for step in _SEQUENCE
+    )
+    # The CLI verb walks the §4 sequence on the chosen harness; absent a structured demand
+    # source it threads an empty demand (no proposed intents, an empty authored result) so
+    # the Python gates dispose deterministically and the sequence completes on ``fake``.
+    demand = BacklogDemand(
+        proposed_intents=(),
+        existing=(),
+        authored=AuthoredItem(
+            slug=run_id,
+            is_new=True,
+            bound=BoundItem(slug=run_id, anchor_changes={}),
+        ),
+    )
+    result = workflow.run(run_id, demand, sequence=sequence)
+
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "final_phase": result.final_phase.value,
+                "steps": [
+                    {
+                        "label": step.label,
+                        "kind": step.kind.value,
+                        "fragment_id": step.fragment_id,
+                        "accepted": step.accepted,
+                        "skipped": step.skipped,
+                        "runtime": step.runtime_kind.value if step.runtime_kind else None,
+                    }
+                    for step in result.steps
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        trail = " → ".join(
+            f"{s.label}:{'skip' if s.skipped else ('ok' if s.accepted else 'BLOCKED')}"
+            for s in result.steps
+        )
+        typer.echo(
+            f"{status} backlog-define run={result.run_id} phase={result.final_phase.value} {trail}"
+        )
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
 @release_app.command("define")
@@ -333,22 +487,185 @@ def release_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Default discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+    ),
+    step_harness: list[str] | None = typer.Option(
+        None,
+        "--step-harness",
+        help="Per-step harness override 'step=harness' (repeatable); steps are the "
+        "§6.1 labels (release_scope, spec_create, spec_arch_review, ...).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=model' (repeatable); model is "
+        "'<id>:<effort>' valid for that step's harness (LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the release-definition step on a selectable harness."""
-    _run_phase_step(
-        label="release-define",
-        role="product-engineer",
-        from_phase=LifecyclePhase.RELEASE_DEFINITION,
-        target_phase=LifecyclePhase.IMPLEMENTATION,
+    """Run the release-definition workflow (§6.1) as a fragment-driven sequence.
+
+    Python owns step order and the typed gates; each model step's prompt is assembled
+    from its fragment bundle + selected dynamic context + output schema + the discrete
+    ``(harness, model)`` — there is no generic "Run the step" suffix. A REJECTED or
+    missing review handoff BLOCKS advancement; the terminal ``definition_commit_gate``
+    advances the release to IMPLEMENTATION only when every gate passed.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+
+    # Per-step harness overrides, keyed by the §6.1 step label.
+    valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
+    overrides: dict[str, AgentRuntimeKind] = {}
+    harness_by_label: dict[str, str] = {}
+    for item in step_harness or []:
+        label, sep, kind_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
+        clean_label = label.strip()
+        if clean_label not in valid_labels:
+            raise typer.BadParameter(
+                f"unknown release-definition step {clean_label!r}; "
+                f"valid steps: {', '.join(sorted(valid_labels))}"
+            )
+        overrides[clean_label] = _resolve_harness(kind_str.strip())
+        harness_by_label[clean_label] = kind_str.strip()
+
+    # LAW 2 — resolve the discrete model per runtime kind. The default --model applies to
+    # the default harness; --step-model overrides per label (keyed onto its step's kind).
+    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
+    default_model = _resolve_model(harness, model)
+    if default_model is not None:
+        models[default_kind] = default_model
+    for item in step_model or []:
+        label, sep, model_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'step=model', got {item!r}")
+        clean_label = label.strip()
+        step_harness_name = harness_by_label.get(clean_label, harness)
+        resolved = _resolve_model(step_harness_name, model_str.strip())
+        if resolved is not None:
+            models[_resolve_harness(step_harness_name)] = resolved
+
+    workflow = container.build_release_definition_workflow(
+        workspace_root,
         context=context,
         release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        json_output=json_output,
+        default_runtime_kind=default_kind,
+        models=models,
     )
+    from dataclasses import replace as _replace
+
+    sequence = tuple(
+        _replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+        for step in _SEQUENCE
+    )
+    result = workflow.run(run_id, sequence)
+
+    # Producer post-step (SPEC §3.2): on a COMPLETED definition, parse the release SPEC's
+    # **Consumes:** line, bind the declared slugs' anchors through the R1 registry, and write
+    # the consumed_backlog ledger via BacklogRemovalLifecycle.consume — symmetric with the
+    # close verb's _apply_closure_removal. `release_define` has no post_step seam (it calls
+    # workflow.run directly), so the guard is inlined here with the same try/except shape: it
+    # runs ONLY when the definition completed, and a bind error surfaces as post_step_error
+    # (never a silent skip) without corrupting the already-accepted definition result.
+    post_step_result: dict[str, Any] | None = None
+    post_step_error: str | None = None
+    if result.completed:
+        try:
+            post_step_result = _apply_release_consume(
+                workspace_root, context=context, release_id=release_id
+            )
+        except Exception as exc:  # noqa: BLE001 — surface, never swallow; do not corrupt the run.
+            post_step_error = f"{type(exc).__name__}: {exc}"
+
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "final_phase": result.final_phase.value,
+                "steps": [
+                    {
+                        "label": step.label,
+                        "is_gate": step.is_gate,
+                        "fragment_id": step.fragment_id,
+                        "accepted": step.accepted,
+                        "runtime": step.runtime_kind.value if step.runtime_kind else None,
+                    }
+                    for step in result.steps
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+                "post_step": post_step_result,
+                "post_step_error": post_step_error,
+            }
+        )
+    else:
+        trail = " → ".join(f"{s.label}:{'ok' if s.accepted else 'BLOCKED'}" for s in result.steps)
+        typer.echo(
+            f"{status} release-define run={result.run_id} phase={result.final_phase.value} {trail}"
+        )
+        if post_step_result is not None:
+            typer.echo(f"  post_step: {post_step_result}")
+        if post_step_error is not None:
+            typer.echo(f"  post_step ERROR: {post_step_error}")
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
+def _apply_release_consume(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+) -> dict[str, Any]:
+    """Write the consumed_backlog ledger from the release SPEC's ``**Consumes:**`` line.
+
+    Resolves ``<specs_dir>/releases/<release_id>/SPEC.md`` (container seam, no cwd), parses
+    its ``**Consumes:**`` slugs, binds them to the union shipped-anchor set through the R1
+    registry, and calls ``BacklogRemovalLifecycle.consume`` to write the ledger under
+    ``specs/_archive/<release_id>/``. An absent/empty ``**Consumes:**`` line no-ops cleanly
+    (empty slug list ⇒ empty shipped set ⇒ a ledger with no entries). A declared slug that
+    does not resolve raises ``ConsumesBindError``, surfaced by the caller as
+    ``post_step_error`` — never a silent skip.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.backlog.consumes import parse_consumes_line, shipped_anchors_for
+
+    spec_path = container.build_release_spec_path(
+        workspace_root, context=context, release_id=release_id
+    )
+    spec_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else ""
+    slugs = parse_consumes_line(spec_text)
+
+    lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
+    shipped = shipped_anchors_for(
+        slugs, backlog_dir=lifecycle.backlog_dir, registry=lifecycle.registry
+    )
+    ledger_path = lifecycle.consume(release_id=release_id, shipped_anchors=shipped)
+    try:
+        ledger_rel = ledger_path.relative_to(workspace_root).as_posix()
+    except ValueError:
+        ledger_rel = str(ledger_path)
+    return {
+        "consumed_slugs": list(slugs),
+        "shipped_anchors": sorted(shipped),
+        "ledger": ledger_rel,
+    }
 
 
 @app.command()
@@ -357,7 +674,12 @@ def implement(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("implement", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -371,16 +693,86 @@ def implement(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
 
 def _resolve_harness(harness: str) -> AgentRuntimeKind:
+    key = harness.lower()
+    if key in _LAYER1_ONLY_HARNESSES:
+        raise typer.BadParameter(
+            f"'{harness}' is not a Layer-2 workflow harness (LAW 1). Claude Code is a "
+            "Layer-1 harness; Layer-2 workers are pi or codex. Use 'pi' or 'codex' here, "
+            "and run Claude Code directly at Layer 1."
+        )
     try:
-        return _HARNESS_KINDS[harness.lower()]
+        return _HARNESS_KINDS[key]
     except KeyError as exc:
         choices = ", ".join(sorted(_HARNESS_KINDS))
         raise typer.BadParameter(f"unknown harness '{harness}'; choose one of: {choices}") from exc
+
+
+def _resolve_model(harness: str, model: str | None) -> HarnessModelOption | None:
+    """Validate a ``(harness, model)`` selection against the discrete catalog (LAW 2).
+
+    Returns ``None`` when no model is requested (adapter keeps its default), or when the
+    harness has no catalog (``fake``). An invalid pair raises a ``BadParameter`` whose
+    message lists the harness's valid options.
+    """
+    if model is None:
+        return None
+    key = _HARNESS_CATALOG_KEY.get(harness.lower())
+    if key is None:
+        raise typer.BadParameter(
+            f"harness '{harness}' takes no --model; only pi and codex select a discrete model"
+        )
+    try:
+        return validate_harness_model(key, model)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+
+def _looks_like_raw_model(value: str) -> bool:
+    """Return whether *value* looks like a raw ``<id>:<effort>`` discrete model string.
+
+    D-3: ``--step-model`` accepts a registry **profile id** only. A raw model string (it
+    contains a ``:`` separating id and effort) must be rejected with an actionable message
+    rather than silently accepted.
+    """
+    return ":" in value
+
+
+def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object, ...]:
+    """Parse ``--step-model 'step=profile-id'`` items into resolver ``StepOverride``s (D-3).
+
+    Profile ids ONLY: a raw ``<id>:<effort>`` model string, or an id that is not a built-in
+    profile, is rejected here with an actionable ``BadParameter`` (the resolver re-validates
+    harness match / deprecation against the catalog). Returns a tuple of ``StepOverride``.
+    """
+    from dadaia_workspace.features.lifecycle import model_profiles
+    from dadaia_workspace.features.lifecycle.model_profiles import UnknownProfileError
+    from dadaia_workspace.features.lifecycle.policy_resolver import StepOverride
+
+    overrides: list[object] = []
+    for item in step_model or []:
+        label, sep, profile_id = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'step=profile-id', got {item!r}")
+        clean_label = label.strip()
+        clean_profile = profile_id.strip()
+        if _looks_like_raw_model(clean_profile):
+            valid = ", ".join(p.id for p in model_profiles.list_profiles())
+            raise typer.BadParameter(
+                f"--step-model takes a profile id, not a raw model string {clean_profile!r} "
+                f"(D-3). Valid profiles: {valid}"
+            )
+        try:
+            model_profiles.resolve(clean_profile)
+        except UnknownProfileError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        overrides.append(StepOverride(step=clean_label, profile_id=clean_profile))
+    return tuple(overrides)
 
 
 def _run_phase_step(
@@ -394,18 +786,25 @@ def _run_phase_step(
     run_id: str,
     harness: str,
     json_output: bool,
+    model: str | None = None,
+    post_step: Callable[[PhaseWorkflowResult], dict[str, Any] | None] | None = None,
 ) -> None:
     """Run one bounded lifecycle step through the engine on a selectable harness.
 
     Shared by every single-step lifecycle verb (backlog/release define, implement,
-    review qa|security|code, close). The harness is chosen per invocation; the worker
-    must emit an APPROVED handoff with an artifact_ref to advance the phase.
+    review qa|security|code, close). The harness is chosen per invocation (LAW 1:
+    pi/codex/fake only — ``claude`` is rejected); ``--model`` selects the discrete
+    Layer-2 model (LAW 2). The worker must emit an APPROVED handoff with an
+    artifact_ref to advance the phase.
     """
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
     kind = _resolve_harness(harness)
-    workflow = container.build_lifecycle_phase_workflow(workspace_root, runtime_kind=kind)
+    resolved_model = _resolve_model(harness, model)
+    workflow = container.build_lifecycle_phase_workflow(
+        workspace_root, runtime_kind=kind, model=resolved_model
+    )
     scope = PromptScope(
         role=role,
         context=context,
@@ -429,6 +828,16 @@ def _run_phase_step(
     status = (
         LifecycleCommandStatus.OK.value if result.accepted else LifecycleCommandStatus.BLOCKED.value
     )
+    # Post-step action (e.g. closure-time backlog removal). Runs ONLY when the phase step
+    # was accepted, so a blocked step never triggers side effects. Guarded so a post-step
+    # error surfaces clearly without corrupting the already-accepted phase result.
+    post_step_result: dict[str, Any] | None = None
+    post_step_error: str | None = None
+    if result.accepted and post_step is not None:
+        try:
+            post_step_result = post_step(result)
+        except Exception as exc:  # noqa: BLE001 — surface, never swallow; do not corrupt the step.
+            post_step_error = f"{type(exc).__name__}: {exc}"
     if json_output:
         _emit_json(
             {
@@ -438,6 +847,8 @@ def _run_phase_step(
                 "phase": result.phase.value,
                 "runtime": result.runtime_kind.value,
                 "blocked": result.blocked.to_dict() if result.blocked else None,
+                "post_step": post_step_result,
+                "post_step_error": post_step_error,
             }
         )
     else:
@@ -445,6 +856,10 @@ def _run_phase_step(
             f"{status} {label} run={result.run_id} "
             f"harness={result.runtime_kind.value} phase={result.phase.value}"
         )
+        if post_step_result is not None:
+            typer.echo(f"  post_step: {post_step_result}")
+        if post_step_error is not None:
+            typer.echo(f"  post_step ERROR: {post_step_error}")
     if not result.accepted:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
@@ -455,7 +870,12 @@ def review_qa(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-qa", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -469,6 +889,7 @@ def review_qa(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -479,7 +900,12 @@ def review_security(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -493,6 +919,7 @@ def review_security(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -503,7 +930,12 @@ def review_code(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -517,6 +949,7 @@ def review_code(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
     )
 
@@ -527,11 +960,40 @@ def close(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Harness: fake|codex|claude|opencode|pi."
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the release-closure step on a selectable harness."""
+    """Run the release-closure step on a selectable harness.
+
+    On a successful closure phase step, mechanically applies residual-aware
+    backlog removal over the consumed-ledger (SPEC §3.6): items whose intents
+    fully shipped are archived-then-removed; partially-shipped items are
+    rewritten to their residual. If no consumed ledger exists, removal is a
+    no-op (``remove_at_closure`` reads an empty ledger). The removal runs as a
+    guarded post-step so a removal error surfaces clearly without corrupting the
+    closure result.
+    """
+
+    def _apply_closure_removal(_result: PhaseWorkflowResult) -> dict[str, Any]:
+        from dadaia_workspace import container
+
+        workspace_root = resolve_workspace_root()
+        lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
+        removal = lifecycle.remove(release_id=release_id)
+        return {
+            "removed": [
+                a.slug for a in removal.actions if a.action.value == "archived_and_removed"
+            ],
+            "rewritten": [a.slug for a in removal.actions if a.action.value == "rewritten"],
+            "unchanged": [a.slug for a in removal.actions if a.action.value == "unchanged"],
+        }
+
     _run_phase_step(
         label="close",
         role="product-engineer",
@@ -541,7 +1003,9 @@ def close(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        model=model,
         json_output=json_output,
+        post_step=_apply_closure_removal,
     )
 
 
@@ -551,35 +1015,118 @@ def pipeline(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("pipeline", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option("fake", "--harness", help="Default harness for all steps."),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Default discrete Layer-2 model '<id>:<effort>' for the default harness (LAW 2).",
+    ),
     step_harness: list[str] | None = typer.Option(
         None,
         "--step-harness",
         help="Per-step override 'label=harness' (repeatable); labels: "
         "implement, review_qa, review_security, review_code.",
     ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'label=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
+        "profiles list'.",
+    ),
+    show_policy: bool = typer.Option(
+        False,
+        "--show-policy",
+        help="Print the resolved per-step model policy and exit without running.",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the multi-step release pipeline (implement→qa→security→code) with per-step harness mixing."""
+    """Run the multi-step release pipeline (implement→qa→security→code) with per-step harness mixing.
+
+    The per-step model is governed: ``--step-model label=profile-id`` selects a built-in
+    model profile (D-3), resolved through the shared ``WorkflowExecutionPolicyResolver``
+    (CLI > overlay > library default). The resolved policy is snapshotted onto the run
+    before the first step (LAW 7). ``--show-policy`` prints the resolved policy and exits.
+    """
     from dataclasses import replace
 
     from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+    from dadaia_workspace.features.lifecycle.pipeline import (
+        apply_resolved_policy,
+        implementation_ladder,
+    )
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        PolicyResolutionError,
+        StepHarnessOverride,
+        StepOverride,
+    )
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    overrides: dict[str, AgentRuntimeKind] = {}
+    _ = model  # legacy discrete --model is superseded by profile-id --step-model (D-3).
+
+    # Parse --step-harness into label→(kind, name). The kind drives the base ladder's
+    # dry-run sentinel (fake vs real); the name is threaded into the governed resolver.
+    step_harness_kinds: dict[str, AgentRuntimeKind] = {}
+    step_harness_names: dict[str, str] = {}
     for item in step_harness or []:
         label, sep, kind_str = item.partition("=")
         if not sep:
             raise typer.BadParameter(f"--step-harness expects 'label=harness', got {item!r}")
-        overrides[label.strip()] = _resolve_harness(kind_str.strip())
+        clean_label = label.strip()
+        clean_name = kind_str.strip().lower()
+        step_harness_kinds[clean_label] = _resolve_harness(clean_name)
+        step_harness_names[clean_label] = clean_name
 
-    steps = tuple(
-        replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+    # D-1 (T-29-A-07): thread harness inputs INTO the shared resolver so the governed
+    # snapshot — not just the execution adapter — reflects the chosen harness. ``fake`` is
+    # the dry-run sentinel: it is never a *resolved* governed harness, so it is NOT threaded
+    # into resolve (the base ladder built on FAKE is preserved by apply_resolved_policy).
+    default_harness_name = harness.lower()
+    resolve_default_harness = None if default_harness_name == "fake" else default_harness_name
+    typed_step_harness: tuple[StepHarnessOverride, ...] = tuple(
+        StepHarnessOverride(step=label, harness=name)
+        for label, name in step_harness_names.items()
+        if name != "fake"
+    )
+
+    # D-3: --step-model takes profile ids only; the shared resolver applies precedence and
+    # validates each override against the catalog (step id + profile id + harness match).
+    cli_overrides = _parse_step_profile_overrides(step_model)
+    typed_overrides: tuple[StepOverride, ...] = tuple(
+        ov for ov in cli_overrides if isinstance(ov, StepOverride)
+    )
+    resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
+    try:
+        snapshot = resolver.resolve(
+            "implementation",
+            context="default",
+            cli_overrides=typed_overrides,
+            default_harness=resolve_default_harness,
+            step_harness_overrides=typed_step_harness,
+        )
+    except PolicyResolutionError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if show_policy:
+        _emit_json(_policy_snapshot_payload(snapshot)) if json_output else _print_policy(snapshot)
+        return
+
+    # D-2: apply_resolved_policy is the SINGLE author of runtime_kind — it sets each step's
+    # kind from the resolved harness, preserving FAKE for a fake dry-run. The base ladder
+    # carries only the fake-vs-real selection (so `--harness fake` drives the fake adapter
+    # while the snapshot still records the governed harness); there is no separate
+    # post-resolve runtime_kind swap.
+    base = tuple(
+        replace(step, runtime_kind=step_harness_kinds.get(step.label, default_kind))
         for step in implementation_ladder(default_kind)
     )
+    steps = apply_resolved_policy(base, snapshot)
+
     pipe = container.build_lifecycle_pipeline(
-        workspace_root, context=context, release_id=release_id
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        policy_snapshot=snapshot,
     )
     result = pipe.run(run_id, steps)
     status = (
@@ -604,6 +1151,7 @@ def pipeline(
                     for step in result.steps
                 ],
                 "blocked": result.blocked.to_dict() if result.blocked else None,
+                "workflow_policy": _policy_snapshot_payload(snapshot),
             }
         )
     else:
@@ -616,7 +1164,112 @@ def pipeline(
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
+def _policy_snapshot_payload(snapshot: object) -> dict[str, Any]:
+    """Project a ``WorkflowPolicySnapshot`` to a JSON-serializable dict for CLI output."""
+    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
+
+    assert isinstance(snapshot, WorkflowPolicySnapshot)
+    return snapshot.to_dict()
+
+
+def _print_policy(snapshot: object) -> None:
+    """Print a resolved policy snapshot as a human-readable step table."""
+    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
+
+    assert isinstance(snapshot, WorkflowPolicySnapshot)
+    typer.echo(f"OK workflow={snapshot.workflow_id} policy={snapshot.policy_id}")
+    for entry in snapshot.steps:
+        typer.echo(
+            f"  {entry.step}: profile={entry.model_profile} harness={entry.harness} "
+            f"model={entry.model} reasoning={entry.reasoning} source={entry.source.value}"
+        )
+
+
+workflow_policy_app = typer.Typer(help="Workflow policy inspection.", no_args_is_help=True)
+workflow_profiles_app = typer.Typer(help="Model-profile inspection.", no_args_is_help=True)
+
+
+@workflow_policy_app.command("show")
+def workflow_policy_show(
+    workflow: str = typer.Argument("implementation", help="Workflow id to resolve."),
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Show the resolved model policy for a workflow (read-only).
+
+    Resolves through the shared ``WorkflowExecutionPolicyResolver`` (overlay > library
+    default) with no CLI overrides — what a run would use today before any ``--step-model``.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.policy_resolver import PolicyResolutionError
+
+    workspace_root = resolve_workspace_root()
+    resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
+    try:
+        snapshot = resolver.resolve(workflow, context="default")
+    except PolicyResolutionError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if json_output:
+        _emit_json(_policy_snapshot_payload(snapshot))
+    else:
+        _print_policy(snapshot)
+
+
+@workflow_profiles_app.command("list")
+def workflow_profiles_list(
+    harness: str | None = typer.Option(None, "--harness", help="Filter to a harness (codex|pi)."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """List the built-in model profiles (read-only) — the valid ``--step-model`` ids (D-3)."""
+    from dadaia_workspace.features.lifecycle import model_profiles
+
+    profiles = model_profiles.profiles_for(harness) if harness else model_profiles.list_profiles()
+    if json_output:
+        _emit_json({"profiles": [p.to_dict() for p in profiles]})
+        return
+    for profile in profiles:
+        flag = " [deprecated]" if profile.deprecated else ""
+        typer.echo(
+            f"  {profile.id}: harness={profile.harness} model={profile.model_id}:{profile.effort} "
+            f"— {profile.purpose}{flag}"
+        )
+
+
+@workflow_app.command("doctor")
+def workflow_doctor(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the workflow-model-policy governance doctor (WMP-* invariants, AC-10).
+
+    Checks the governed catalog + built-in profile registry + persisted overlay for:
+    workflow/step id uniqueness, default-profile resolution + harness match, fragment +
+    output-schema resolution, overlay override validity, and any ``claude``/``opencode``
+    Layer-2 residue. An invalid overlay state file is reported as an actionable error and
+    never crashes. Exit 1 if any ERROR finding is present.
+    """
+    from dadaia_workspace.features.lifecycle.policy_doctor import (
+        Severity,
+        run_policy_doctor,
+    )
+
+    workspace_root = resolve_workspace_root()
+    findings = run_policy_doctor(workspace_root=workspace_root)
+    if json_output:
+        _emit_json({"findings": [f.to_dict() for f in findings]})
+    else:
+        if not findings:
+            typer.echo("[ok] workflow-model-policy (no governance issues)")
+        for finding in findings:
+            typer.echo(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
+    if any(f.severity is Severity.ERROR for f in findings):
+        raise typer.Exit(LifecycleExitCode.INTERNAL_ERROR)
+
+
+workflow_app.add_typer(workflow_policy_app, name="policy")
+workflow_app.add_typer(workflow_profiles_app, name="profiles")
+
 app.add_typer(hygiene_app, name="hygiene")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(release_app, name="release")
 app.add_typer(review_app, name="review")
+app.add_typer(workflow_app, name="workflow")

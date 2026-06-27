@@ -53,6 +53,40 @@ def test_json_store_persists_under_canonical_states_lifecycle(tmp_path: Path) ->
     assert store.load("run-1") == run
 
 
+def test_json_store_loads_old_format_record_without_workflow_policy(tmp_path: Path) -> None:
+    # M1 (T-28-A-05): a literal old-format record — current 'lifecycle-run-v1' schema,
+    # NO 'workflow_policy' key — must still load. The schema version literal is unchanged.
+    import json as _json
+
+    workspace = _workspace(tmp_path)
+    store = JsonLifecycleRunStore(workspace)
+    store.root.mkdir(parents=True, exist_ok=True)
+    legacy_payload = {
+        "schema_version": "lifecycle-run-v1",
+        "run": {
+            "run_id": "legacy-1",
+            "context": "dadaia-workspace",
+            "release_id": "v0.1.15",
+            "command": "implement",
+            "phase": "implementation",
+            "status": "running",
+            "current_step": "implement",
+            "expected_artifacts": [],
+            "idempotency_key": "idem-1",
+            "blocked": None,
+            "injected_context": [],
+        },
+    }
+    (store.root / "legacy-1.json").write_text(
+        _json.dumps(legacy_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+    loaded = store.load("legacy-1")
+    assert loaded is not None
+    assert loaded.run_id == "legacy-1"
+    assert loaded.workflow_policy is None
+
+
 def test_json_store_can_persist_under_runs_lifecycle(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     store = JsonLifecycleRunStore(workspace, location="runs")
@@ -95,6 +129,33 @@ def test_save_replaces_existing_run_state(tmp_path: Path) -> None:
     store.save(replacement)
 
     assert store.load("run-1") == replacement
+
+
+def test_list_runs_returns_empty_when_no_runs(tmp_path: Path) -> None:
+    store = JsonLifecycleRunStore(_workspace(tmp_path))
+    assert store.list_runs() == []
+
+
+def test_list_runs_returns_every_persisted_run(tmp_path: Path) -> None:
+    store = JsonLifecycleRunStore(_workspace(tmp_path))
+    store.save(_run("run-a"))
+    store.save(_run("run-b"))
+
+    runs = store.list_runs()
+
+    assert {r.run_id for r in runs} == {"run-a", "run-b"}
+
+
+def test_list_runs_skips_corrupt_files_without_raising(tmp_path: Path) -> None:
+    # A corrupt run JSON must not break the panel run-history listing — it is skipped.
+    store = JsonLifecycleRunStore(_workspace(tmp_path))
+    store.save(_run("run-ok"))
+    store.root.mkdir(parents=True, exist_ok=True)
+    (store.root / "run-bad.json").write_text("{not json", encoding="utf-8")
+
+    runs = store.list_runs()
+
+    assert [r.run_id for r in runs] == ["run-ok"]
 
 
 def test_missing_resume_raises_actionable_error(tmp_path: Path) -> None:

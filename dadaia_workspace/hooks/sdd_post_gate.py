@@ -15,14 +15,14 @@ the process environment::
         return 0
 
 That guard made the heartbeat a **permanent no-op**: no real harness (Claude Code, Codex,
-OpenCode) exports ``DADAIA_SESSION_ID`` to a hook subprocess (audit 2026-06-10 finding 2;
+Codex) exports ``DADAIA_SESSION_ID`` to a hook subprocess (audit 2026-06-10 finding 2;
 bug ``lease-stolen…`` D2/D3). A holder running a long (>120 s) Bash call therefore never
 renewed, its lease went TTL-stale, and a concurrent session auto-TAKEOVER'd it — the
 lease-theft incident. Three corrections (FR-R2-01):
 
 1. **Session id is resolved from the stdin payload** via
    :func:`_common.resolve_session_id` — the harness-native id var
-   (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID`` / ``OPENCODE_SESSION_ID``) or the
+   (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``) or the
    stdin ``session_id`` field. ``DADAIA_SESSION_ID`` is honored only as an *operator
    override* (it sits first in ``resolve_session_id``'s order). The old no-op guard is
    gone.

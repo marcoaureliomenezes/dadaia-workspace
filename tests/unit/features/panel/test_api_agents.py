@@ -142,7 +142,6 @@ def _make_dto(
         skills=skills or [],
         tools=tools or [],
         model=model,
-        opencode_model=None,
         max_turns=max_turns,
         input_contract=None,
     )
@@ -196,7 +195,6 @@ class TestResponseShape:
             "skills",
             "tools",
             "model",
-            "opencode_model",
             "max_turns",
             "input_contract",
             "telemetry",

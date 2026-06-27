@@ -11,6 +11,11 @@ applyTo: "specs/**/TASKS.md"
 
 # dadaia-task-manager — Task State Protocol
 
+> **Not the lifecycle enforcement mechanism.** Ordered task reservation and the
+> per-phase lifecycle sequence are owned by the dadaia-workflows (`dadaia lifecycle`),
+> whose Python gates own task-state transitions. This skill is reference / manual-operator
+> guidance for the human-auditable marker discipline only.
+
 ## The 3-marker contract
 
 | Marker | State | Meaning |

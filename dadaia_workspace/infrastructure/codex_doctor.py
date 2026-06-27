@@ -17,7 +17,6 @@ from pathlib import Path
 
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
-    _FRONTMATTER_PARALLEL_GROUP_RE,
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
 )
@@ -209,7 +208,6 @@ def dcx6_codex_runtime_adapters(workspace_root: Path, public_dir: Path) -> list[
         return out
     codex_skills = workspace_root / ".codex" / "skills"
     claude_skills = workspace_root / ".claude" / "skills"
-    opencode_skills = workspace_root / ".opencode" / "skills"
     for slug_dir in sorted(src_root.iterdir()):
         if not slug_dir.is_dir():
             continue
@@ -219,7 +217,7 @@ def dcx6_codex_runtime_adapters(workspace_root: Path, public_dir: Path) -> list[
         slug = slug_dir.name
         src_text = skill_src.read_text(encoding="utf-8")
         # Leak checks
-        for leak_root, label in [(claude_skills, "claude"), (opencode_skills, "opencode")]:
+        for leak_root, label in [(claude_skills, "claude")]:
             leak_path = leak_root / slug / "SKILL.md"
             if leak_path.exists():
                 out.append(
@@ -497,13 +495,7 @@ def classify_workflows(agentic_dir: Path) -> list[str]:
     if not workflows_dir.exists():
         return out
     for wf in sorted(workflows_dir.glob("*.workflow.md")):
-        text = wf.read_text(encoding="utf-8")
-        has_parallel = bool(_FRONTMATTER_PARALLEL_GROUP_RE.search(text))
         tag = f"workflows/{wf.name}"
-        if has_parallel:
-            out.append(f"[partial] opencode:{tag} (parallel_group sequentially)")
-        else:
-            out.append(f"[ok] opencode:{tag}")
         out.append(f"[reference-only] codex:{tag} (installed, no workflow executor)")
         out.append(f"[ok] claude:{tag}")
     return out

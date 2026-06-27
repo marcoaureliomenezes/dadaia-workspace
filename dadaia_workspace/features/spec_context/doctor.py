@@ -43,7 +43,7 @@ _PRODUCTION_WRITE_EVENTS: frozenset[str] = frozenset(
 
 #: Directories allowed at workspace root (exact names, no wildcards).
 _ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".opencode", ".pi", "repos"}
+    {".agents", ".claude", ".codex", ".dadaia", ".pi", "repos"}
 )
 
 #: Files allowed at workspace root (exact names, no wildcards).
@@ -65,7 +65,7 @@ _ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
 
 #: Tool config files that have canonical homes elsewhere but are currently
 #: tolerated at root with a WARN (ROOT-3, lenient).
-_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json", "opencode.json", "CLAUDE.md"})
+_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json", "CLAUDE.md"})
 
 #: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4).
 _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(

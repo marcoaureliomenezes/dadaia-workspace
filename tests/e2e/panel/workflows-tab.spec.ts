@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
 
-// Workflows are now inside the Ops tab (T-016-P09 consolidation).
+// The legacy *.workflow.md DAG cards (/api/workflows) live in the Agentic (ops) tab.
+// The first-class Workflows tab (T-28-C-03 / D-5) hosts the model-governance editor and
+// is exercised separately by workflow-policy-editor.spec.ts. These tests target the
+// legacy DAG card grid, which remains inside the Agentic tab.
 async function openWorkflowsTab(page: any) {
   await gotoPanel(page);
   await activateTab(page, 'ops');
@@ -10,6 +13,17 @@ async function openWorkflowsTab(page: any) {
     { timeout: 15000 }
   );
 }
+
+test('First-class Workflows tab exists alongside the legacy Agentic DAG cards', async ({ page }) => {
+  await gotoPanel(page);
+  // D-5: Workflows promoted to a first-class top-level tab.
+  await expect(page.locator('#tab-workflows')).toBeVisible();
+  await activateTab(page, 'workflows');
+  await expect(page.locator('#section-workflows.active')).toBeVisible();
+  // The Agentic tab still carries the legacy workflow DAG grid.
+  await activateTab(page, 'ops');
+  await expect(page.locator('#workflows-grid')).toBeAttached();
+});
 
 test('Workflows tab renders current workflow cards', async ({ page }) => {
   await openWorkflowsTab(page);

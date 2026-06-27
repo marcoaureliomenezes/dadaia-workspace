@@ -6,6 +6,10 @@ applyTo: "specs/releases/*/CLOSURE.md"
 
 # dadaia-release-closure
 
+> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the closure
+> sequence and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
+> skill is reference / manual-operator guidance only.
+
 ## When to invoke
 
 After every task in `specs/releases/<release-id>/TASKS.md` is marked `[x] DONE` and

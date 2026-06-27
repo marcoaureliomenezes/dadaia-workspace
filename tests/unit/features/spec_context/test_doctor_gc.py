@@ -251,7 +251,6 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CODEX_SESSION_ID",
-        "OPENCODE_SESSION_ID",
     )
     saved_env = {k: os.environ.pop(k, None) for k in override_vars}
     saved_ws = os.environ.get("WORKSPACE_ROOT")

@@ -143,7 +143,6 @@ class ImportService:
     _PATH_REWRITE_TARGETS: tuple[str, ...] = (
         ".claude/settings.json",
         ".codex/hooks.json",
-        ".opencode/opencode.json",
     )
 
     def patch_json_paths(self, workspace_root: Path, old_root: Path) -> None:

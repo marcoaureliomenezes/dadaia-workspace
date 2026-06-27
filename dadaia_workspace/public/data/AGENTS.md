@@ -24,7 +24,7 @@ take precedence.
 
 The workspace **root** may contain **only**:
 
-- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.opencode/`, `.pi/`,
+- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.pi/`,
   `repos/`
 - Files: `AGENTS.md`, `CLAUDE.md` (Claude Code bridge importing `@AGENTS.md`),
   `prompt.md` (optional operator long-prompt file)
@@ -63,8 +63,8 @@ files at the repo root.
 
 Forbidden root artefacts:
 
-- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.opencode/`, `.pi/`
-- `CLAUDE.md`, `opencode.json`, `Makefile`, `playwright.config.ts`
+- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.pi/`
+- `CLAUDE.md`, `Makefile`, `playwright.config.ts`
 - `playwright-report/`, `test-results/`, coverage/cache directories
 
 Run projection/install smoke tests in a temp workspace under `.dadaia/tmp/` or
@@ -189,30 +189,25 @@ the sole trigger for context-memory injection. An unbound session receives gener
 preflight only (no context memory; there is no first-ALIVE injection fallback). Bind
 is never a precondition for ADDITIVE work.
 
-**Agent discipline (not hook-enforced)** — the hook reads no SDD artifacts. The
-following are protocol you must uphold yourself:
+**What the gate does NOT do.** The hook reads no SDD artifacts: it does not know the
+active phase from `ACTIVE.md`, whether `SPEC.md`/`PLAN.md`/`TASKS.md` are `Aprovado`,
+which task is reserved, or whether an edit is inside its declared write set. The
+deterministic gate constrains **what** may be written (path-class, lease, phase, mode) —
+not **how** the change was produced. (`Aprovado`, `Em revisão`, and `Draft` are the
+canonical SDD status tokens — do not translate or change them.)
 
-- `ACTIVE.md` points at the release.
-- `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
-  (`Aprovado`, `Em revisão`, and `Draft` are the canonical SDD status tokens — do not translate or change them.)
-- The task is reserved in `TASKS.md` with `[-]`.
-- The edit stays inside the task's declared write set.
-
-If any discipline precondition is missing, stop with:
-
-```text
-[SDD HARD STOP]
-Cannot proceed without an approved release context.
-Missing:
-- [ ] SPEC.md/PLAN.md/TASKS.md with **Status:** Aprovado
-- [ ] a [-] reservation by the calling agent
-What I can do now:
-- Draft the missing artifact for operator review
-- Refine open questions
-- Diagnose without modifying production files
-```
-
-Do not edit specs to justify code already written.
+**Ordered lifecycle is owned by the dadaia-workflows, not by this file.** The ordered
+ritual — reading SPEC/PLAN/TASKS, reserving a task, the per-phase definition →
+implementation → review → closure sequence — is executed by the **dadaia-workflows**
+(the `dadaia lifecycle` verbs: `release define`, the implementation pipeline, `close`,
+…). Each is a Python workflow body that assembles fragment-scoped per-step prompts,
+selects dynamic context, calls worker agents, and advances **Python-validated gates**.
+Layer-1 agents are **oriented toward** those workflows; the disk/commit boundary is
+**safety-gate-enforced** by the deterministic gate and git chokepoints described above
+(write-scope, lease, and phase) — there is no procedural check that a given workflow verb
+was actually run. For the full per-workflow description — purpose, ordered steps,
+per-step harness/model, mermaid diagram, and availability — open **`dadaia panel` →
+Agentic → dadaia-workflows**.
 
 ## Memory
 

@@ -13,18 +13,24 @@ SDK's ``can_use_tool`` callback, so out-of-scope writes are denied before bytes 
 disk. The SDK transport is injectable (``query_fn``), so the permission logic and result
 mapping are exercised hermetically without the package installed.
 
-Live-verification note: the precise ``claude-agent-sdk`` binding (``query()``,
-``can_use_tool`` → ``PermissionResultDeny``) is isolated in :func:`_default_query_fn` and
-must be confirmed against the installed SDK the first time the package is present in a
-networked environment. Everything the engine depends on — the Ring-1 decider and the
-``AgentRunResult`` mapping — is provider-agnostic and fully tested here.
+Live-verification note: the precise ``claude-agent-sdk`` binding (async ``query()``,
+``can_use_tool`` → ``PermissionResultDeny``, terminal ``ResultMessage`` extraction) is
+isolated in :func:`_default_query_fn`. It is bound against ``claude-agent-sdk`` v0.2.110
+(verified by introspection) and driven from the synchronous adapter via ``asyncio.run``.
+The opt-in live contract test (``tests/integration/claude_live/``, gated on
+``DADAIA_CLAUDE_LIVE=1``) confirms it against a networked install; everything the engine
+depends on — the Ring-1 decider and the ``AgentRunResult`` mapping — is provider-agnostic
+and fully tested hermetically with an injected fake SDK module.
 """
 
 from __future__ import annotations
 
+import asyncio
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -36,6 +42,12 @@ from dadaia_workspace.core.scope_match import is_in_scope
 
 #: ``path -> may the worker write it?`` — the Ring-1 pre-disk decision.
 WritePermission = Callable[[str], bool]
+
+#: Tool-input keys that carry a write target for Write/Edit-family tools.
+_WRITE_PATH_KEYS = ("file_path", "path", "notebook_path")
+
+#: Env-var name fragments whose values must never appear in surfaced output.
+_SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
 
 @dataclass(frozen=True)
@@ -68,9 +80,11 @@ class ClaudeSdkAdapter:
         *,
         cwd: Path | None = None,
         query_fn: ClaudeQueryFn | None = None,
+        environ: dict[str, str] | None = None,
     ) -> None:
         self._cwd = cwd or Path.cwd()
         self._query_fn = query_fn
+        self._environ = dict(os.environ) if environ is None else dict(environ)
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.CLAUDE_SDK
@@ -85,6 +99,16 @@ class ClaudeSdkAdapter:
 
         return _decide
 
+    def _redact(self, text: str) -> str:
+        """Scrub any secret-named env value from surfaced output (adapter parity)."""
+        redacted = text
+        for key, value in self._environ.items():
+            if not value:
+                continue
+            if any(part in key.upper() for part in _SECRET_NAME_PARTS):
+                redacted = redacted.replace(value, "[REDACTED]")
+        return redacted
+
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         if request.runtime is not AgentRuntimeKind.CLAUDE_SDK:
             return AgentRunResult(
@@ -92,7 +116,7 @@ class ClaudeSdkAdapter:
                 summary="request runtime does not match ClaudeSdkAdapter",
                 error=f"unsupported runtime: {request.runtime.value}",
             )
-        query_fn = self._query_fn or _default_query_fn
+        query_fn = self._query_fn or self._bound_default_query_fn(request)
         permission = self.write_permission(request)
         try:
             output = query_fn(request.prompt, permission)
@@ -100,19 +124,19 @@ class ClaudeSdkAdapter:
             return AgentRunResult(
                 status=AgentRunStatus.FAILED,
                 summary="claude-agent-sdk not installed",
-                error=str(exc),
+                error=self._redact(str(exc)),
             )
         except Exception as exc:  # a bounded worker never crashes the engine
             return AgentRunResult(
                 status=AgentRunStatus.FAILED,
                 summary="claude run failed",
-                error=str(exc),
+                error=self._redact(str(exc)),
             )
         if output.error:
             return AgentRunResult(
                 status=AgentRunStatus.FAILED,
-                summary=output.summary,
-                error=output.error,
+                summary=self._redact(output.summary),
+                error=self._redact(output.error),
             )
         structured: dict[str, str] = {}
         if output.verdict is not None:
@@ -121,26 +145,152 @@ class ClaudeSdkAdapter:
             structured["changed_paths"] = ",".join(output.changed_paths)
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
-            summary=output.summary,
+            summary=self._redact(output.summary),
             artifact_refs=output.artifact_refs,
             structured_output=structured,
         )
 
+    def _bound_default_query_fn(self, request: AgentRunRequest) -> ClaudeQueryFn:
+        """Bind ``cwd``/``model`` (adapter-owned) into the default SDK transport."""
+        cwd = self._cwd
+        model = request.model_profile
 
-def _default_query_fn(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
+        def _query(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
+            return _default_query_fn(prompt, permission, cwd=cwd, model=model)
+
+        return _query
+
+
+def _build_can_use_tool(permission: WritePermission, sdk: Any) -> Any:
+    """Adapt the synchronous Ring-1 decider into the SDK's async ``can_use_tool``.
+
+    The SDK calls ``can_use_tool(tool_name, tool_input, ctx)`` and awaits an
+    ``allow``/``deny`` result. For Write/Edit-family tools we extract the write target
+    from ``tool_input`` and deny — before bytes hit disk — when it is out of scope.
+    Tools that carry no write path (reads, bash, etc.) are allowed; the runner's Ring-2
+    git detective remains the backstop.
+    """
+
+    async def _can_use_tool(
+        tool_name: str,
+        tool_input: dict[str, Any],
+        ctx: Any,  # noqa: ARG001 — SDK passes a ToolPermissionContext we do not need here
+    ) -> Any:
+        path = _write_target(tool_input)
+        if path is not None and not permission(path):
+            return sdk.PermissionResultDeny(
+                message=(
+                    f"Ring-1 write boundary: '{path}' is outside the worker's "
+                    f"allowed write scope for tool '{tool_name}'."
+                ),
+                interrupt=False,
+            )
+        return sdk.PermissionResultAllow()
+
+    return _can_use_tool
+
+
+def _write_target(tool_input: dict[str, Any]) -> str | None:
+    """Return the write path from a tool input payload, or ``None`` for non-writes."""
+    if not isinstance(tool_input, dict):
+        return None
+    for key in _WRITE_PATH_KEYS:
+        value = tool_input.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _default_query_fn(
+    prompt: str,
+    permission: WritePermission,
+    *,
+    cwd: Path | None = None,
+    model: str | None = None,
+) -> ClaudeRunOutput:
     """Default transport: lazily import ``claude-agent-sdk`` and run one bounded query.
 
-    Isolated for live API verification (see module docstring). Raises ``ImportError`` with
-    an actionable message when the optional package is absent; when present, the precise
-    SDK binding must be completed/verified against the installed API.
+    Lazily imports the optional ``claude-agent-sdk`` (raising an actionable ``ImportError``
+    when absent — the offline build never imports it at module load), wires the Ring-1
+    ``permission`` decider into the SDK's async ``can_use_tool`` callback, drives the async
+    ``query()`` iterator to completion via ``asyncio.run``, and maps the terminal
+    ``ResultMessage`` (falling back to concatenated assistant text) into a
+    ``ClaudeRunOutput``. Any SDK error is surfaced as ``ClaudeRunOutput.error`` so the
+    adapter maps it to a ``FAILED`` result.
     """
     try:
-        import claude_agent_sdk  # noqa: F401
+        import claude_agent_sdk as sdk
     except ImportError as exc:
         raise ImportError(_MISSING_SDK) from exc
-    # The exact query()/can_use_tool binding is verified on first networked install.
-    raise NotImplementedError(  # pragma: no cover
-        "claude-agent-sdk is installed but its live transport binding is pending "
-        "first-install API verification; inject a query_fn or complete _default_query_fn "
-        "against the installed SDK (wire `permission` into can_use_tool)."
+
+    options = sdk.ClaudeAgentOptions(
+        model=model,
+        cwd=cwd,
+        # ``can_use_tool`` is only consulted under the 'default' permission mode; the
+        # other modes (acceptEdits/bypassPermissions/...) would bypass the Ring-1 decider.
+        permission_mode="default",
+        can_use_tool=_build_can_use_tool(permission, sdk),
     )
+
+    try:
+        return asyncio.run(_run_query(sdk, prompt, options))
+    except (
+        sdk.CLINotFoundError,
+        sdk.CLIConnectionError,
+        sdk.ProcessError,
+        sdk.ClaudeSDKError,
+    ) as exc:
+        return ClaudeRunOutput(summary="claude-agent-sdk run failed", error=str(exc))
+
+
+async def _run_query(sdk: Any, prompt: str, options: Any) -> ClaudeRunOutput:
+    """Consume the async ``query()`` iterator, collecting assistant text + terminal result.
+
+    The authoritative end is the terminal ``ResultMessage`` (mirrors PI's ``message_end``):
+    its ``is_error`` flag decides success/failure and its ``result``/``structured_output``
+    feed the summary. Assistant ``TextBlock`` text is concatenated as a fallback summary.
+    """
+    assistant_text_parts: list[str] = []
+    result_message: Any = None
+
+    async for message in sdk.query(prompt=prompt, options=options):
+        if isinstance(message, sdk.AssistantMessage):
+            assistant_text_parts.append(_assistant_text(message, sdk))
+        elif isinstance(message, sdk.ResultMessage):
+            result_message = message
+
+    assistant_text = "".join(assistant_text_parts).strip()
+
+    if result_message is not None:
+        if getattr(result_message, "is_error", False):
+            errors = getattr(result_message, "errors", None)
+            error = "; ".join(errors) if errors else (result_message.result or "claude run error")
+            return ClaudeRunOutput(summary="claude-agent-sdk reported an error", error=error)
+        summary = result_message.result or assistant_text or "claude run completed"
+        verdict = _verdict_from_structured(result_message.structured_output)
+        return ClaudeRunOutput(summary=summary, verdict=verdict)
+
+    return ClaudeRunOutput(summary=assistant_text or "claude run completed")
+
+
+def _assistant_text(message: Any, sdk: Any) -> str:
+    """Concatenate ``TextBlock.text`` from an ``AssistantMessage.content`` block list."""
+    content = getattr(message, "content", None)
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, sdk.TextBlock):
+            parts.append(block.text)
+    return "".join(parts)
+
+
+def _verdict_from_structured(structured: Any) -> str | None:
+    """Pull a ``verdict`` field out of the terminal ``structured_output`` when present."""
+    if isinstance(structured, dict):
+        value = structured.get("verdict")
+        if isinstance(value, str):
+            return value
+    return None

@@ -1,4 +1,4 @@
-"""Codex/OpenCode frontmatter-parsing and TOML/rules rendering free functions.
+"""Codex frontmatter-parsing and TOML/rules rendering free functions.
 
 These functions are extracted from ``public_assets.py`` to keep that module under
 600 lines.  All names remain importable from
@@ -21,17 +21,6 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 # Constants
 # ---------------------------------------------------------------------------
 
-# `opencode_model:` lets agents declare a cheaper model for the OpenCode projection.
-_FRONTMATTER_OPENCODE_MODEL_RE = re.compile(r"^opencode_model:\s*(.+?)$", re.MULTILINE)
-_FRONTMATTER_MODEL_VALUE_RE = re.compile(r"^(model:\s*)(.+?)$", re.MULTILINE)
-_FRONTMATTER_OPENCODE_MODEL_FIELD_RE = re.compile(r"^opencode_model:[^\n]*\n", re.MULTILINE)
-# `color:` is Claude Code-specific (panel tier accent) and causes a frontmatter parse
-# failure in OpenCode 1.14.x. Strip it from the OpenCode projection only (FR-OC-1).
-_FRONTMATTER_COLOR_RE = re.compile(r"^color:[^\n]*\n", re.MULTILINE)
-# OpenCode v1.14+ expects `tools` to be an object or omitted — not an array.
-_FRONTMATTER_TOOLS_RE = re.compile(r"^tools:\n(?:  - [^\n]+\n)*", re.MULTILINE)
-# Single `  - <Tool>` list item inside a `tools:` YAML block.
-_FRONTMATTER_TOOLS_LIST_ITEM_RE = re.compile(r"^  - ([^\n]+)$", re.MULTILINE)
 # Parallel workflow detection
 _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
 
@@ -59,20 +48,6 @@ _CODEX_SKILL_REF_PREFIXES = (
     "project-orchestration",
 )
 
-# T-OC-03 (FR-OC-2): project the agent's Claude `tools:` grants into an OpenCode
-# per-agent `permission:` block.
-_CLAUDE_TOOL_TO_OPENCODE_PERMISSION = {
-    "Edit": "edit",
-    "Write": "edit",
-    "Bash": "bash",
-    "WebFetch": "webfetch",
-    "Agent": "task",
-}
-# Categories always emitted (allow if granted, deny otherwise)
-_OPENCODE_PERMISSION_CATEGORIES = ("edit", "bash", "webfetch", "task")
-# Claude tools with no OpenCode permission equivalent
-_OPENCODE_UNSUPPORTED_TOOLS = ("WebSearch",)
-
 # Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
 _TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset({"name", "description", "model", "tools"})
 
@@ -86,31 +61,6 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # ---------------------------------------------------------------------------
 # Free functions
 # ---------------------------------------------------------------------------
-
-
-def _opencode_permission_block(frontmatter: str) -> str:
-    """Build an OpenCode ``permission:`` frontmatter block from a Claude ``tools:`` list.
-
-    Returns ``""`` when the agent declares no ``tools:`` block (nothing to map).
-    """
-    m = _FRONTMATTER_TOOLS_RE.search(frontmatter)
-    if not m:
-        return ""
-    tools = {t.strip() for t in _FRONTMATTER_TOOLS_LIST_ITEM_RE.findall(m.group(0))}
-    if not tools:
-        return ""
-    granted = {
-        _CLAUDE_TOOL_TO_OPENCODE_PERMISSION[t]
-        for t in tools
-        if t in _CLAUDE_TOOL_TO_OPENCODE_PERMISSION
-    }
-    lines = ["permission:"]
-    lines += [
-        f"  {cat}: {'allow' if cat in granted else 'deny'}"
-        for cat in _OPENCODE_PERMISSION_CATEGORIES
-    ]
-    lines += [f"# [opencode-unsupported]: {t}" for t in _OPENCODE_UNSUPPORTED_TOOLS if t in tools]
-    return "\n".join(lines) + "\n"
 
 
 def _render_agents_into_codex_config(agents_dir: Path) -> str:
@@ -487,46 +437,3 @@ def _parse_skills_from_frontmatter(text: str) -> list[str]:
             elif line and not line.startswith(" ") and not line.startswith("\t"):
                 in_skills = False  # next top-level key — skills block ended
     return skills
-
-
-def _strip_tools_from_frontmatter(content: str) -> str:
-    """Strip the `tools` array from YAML frontmatter for OpenCode compatibility."""
-    if not content.startswith("---\n"):
-        return content
-    end_idx = content.find("\n---\n", 4)
-    if end_idx == -1:
-        return content
-    frontmatter = content[4 : end_idx + 1]
-    cleaned = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
-    return f"---\n{cleaned}---\n{content[end_idx + 5 :]}"
-
-
-def _prepare_agent_for_opencode(content: str) -> str:
-    """Prepare an agent .md file for the OpenCode projection.
-
-    - Strips the `tools` array (OpenCode v1.14+ incompatibility with list form)
-    - If `opencode_model:` is declared, swaps the `model:` value and removes the field
-    """
-    if not content.startswith("---\n"):
-        return content
-    end_idx = content.find("\n---\n", 4)
-    if end_idx == -1:
-        return content
-    frontmatter = content[4 : end_idx + 1]
-    body = content[end_idx + 5 :]
-
-    # Derive the permission block from the ORIGINAL frontmatter (before tools is stripped).
-    permission_block = _opencode_permission_block(frontmatter)
-
-    m = _FRONTMATTER_OPENCODE_MODEL_RE.search(frontmatter)
-    if m:
-        opencode_model = m.group(1).strip()
-        frontmatter = _FRONTMATTER_MODEL_VALUE_RE.sub(
-            lambda match: f"{match.group(1)}{opencode_model}", frontmatter, count=1
-        )
-    frontmatter = _FRONTMATTER_TOOLS_RE.sub("", frontmatter)
-    frontmatter = _FRONTMATTER_OPENCODE_MODEL_FIELD_RE.sub("", frontmatter)
-    frontmatter = _FRONTMATTER_COLOR_RE.sub("", frontmatter)
-    if permission_block:
-        frontmatter = frontmatter + permission_block
-    return f"---\n{frontmatter}---\n{body}"

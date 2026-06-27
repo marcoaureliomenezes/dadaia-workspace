@@ -1,7 +1,7 @@
 """E2E tests for the public asset pipeline: stage → .dadaia/agentic/ → runtime targets.
 
 These tests use FileSystemPublicAssetManager with real I/O (tmp_path) to validate
-the full pipeline: canonical source → staging → Claude / OpenCode / Codex / .agents.
+the full pipeline: canonical source → staging → Claude / Codex / Pi / .agents.
 They catch content-level bugs that unit tests with fakes cannot detect.
 """
 
@@ -175,7 +175,7 @@ def _inject_synthetic_parallel_workflow(workspace: Path) -> None:
     staged_dir.mkdir(parents=True, exist_ok=True)
     (staged_dir / filename).write_text(content, encoding="utf-8")
     # Runtime targets (needed to satisfy D-CX-3 codex mirror check).
-    for runtime in (".agents", ".claude", ".codex", ".opencode"):
+    for runtime in (".agents", ".claude", ".codex"):
         rt_dir = workspace / runtime / "workflows"
         rt_dir.mkdir(parents=True, exist_ok=True)
         (rt_dir / filename).write_text(content, encoding="utf-8")
@@ -273,17 +273,6 @@ class TestInstallAll:
             f"  Extra:   {sorted(claude_agents - EXPECTED_AGENTS)}"
         )
 
-    def test_install_all_populates_opencode_agents(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
-
-        opencode_agents = _runtime_agents(workspace / ".opencode" / "agents")
-        assert opencode_agents == EXPECTED_AGENTS, (
-            f".opencode/agents/ mismatch.\n"
-            f"  Missing: {sorted(EXPECTED_AGENTS - opencode_agents)}\n"
-            f"  Extra:   {sorted(opencode_agents - EXPECTED_AGENTS)}"
-        )
-
     def test_install_all_populates_universal_skills(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
@@ -315,14 +304,6 @@ class TestInstallAll:
         claude_agents = _runtime_agents(workspace / ".claude" / "agents")
         stale_found = claude_agents & STALE_AGENTS
         assert not stale_found, f"Stale agents found in .claude/agents/: {sorted(stale_found)}"
-
-    def test_install_no_stale_agents_in_opencode(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
-
-        opencode_agents = _runtime_agents(workspace / ".opencode" / "agents")
-        stale_found = opencode_agents & STALE_AGENTS
-        assert not stale_found, f"Stale agents found in .opencode/agents/: {sorted(stale_found)}"
 
 
 # ---------------------------------------------------------------------------
@@ -362,19 +343,6 @@ class TestContentConsistency:
                     f"Agent '{agent_file.name}' references skill '{skill}' "
                     f"but '{skill_md.relative_to(workspace)}' does not exist"
                 )
-
-    def test_opencode_agents_have_no_tools_array(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
-
-        agents_dir = workspace / ".opencode" / "agents"
-        for agent_file in sorted(agents_dir.glob("*.md")):
-            content = agent_file.read_text(encoding="utf-8")
-            # tools: stripped for OpenCode compat — must NOT have the list form
-            assert "tools:\n  - " not in content, (
-                f".opencode/agents/{agent_file.name} still contains 'tools:' array — "
-                "OpenCode projection must strip it"
-            )
 
     def test_claude_agents_retain_tools_array(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
@@ -477,32 +445,10 @@ class TestWorkflows:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
         # Codex receives workflows as reference documents; it does not execute them.
-        for runtime in (".agents", ".claude", ".codex", ".opencode"):
+        for runtime in (".agents", ".claude", ".codex"):
             for stem in EXPECTED_WORKFLOWS:
                 projected = workspace / runtime / "workflows" / f"{stem}.workflow.md"
                 assert projected.exists(), f"workflow not projected to {projected}"
-
-    def test_doctor_reports_partial_for_opencode_when_parallel_group(self, tmp_path: Path) -> None:
-        """Doctor emits [partial] for opencode when a workflow contains parallel_group stages.
-
-        The two canonical workflows shipped by v0.1.9+ are both serial. This test injects a
-        synthetic workflow with an explicit parallel_group into the staged and runtime dirs so the
-        assertion is decoupled from which canonical workflows happen to ship.
-        """
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
-
-        # Inject a synthetic workflow with parallel_group into the staged area and all runtimes.
-        _inject_synthetic_parallel_workflow(workspace)
-
-        report = _manager().doctor(workspace)
-        partial_lines = [
-            line for line in report if line.startswith("[partial]") and "synthetic-parallel" in line
-        ]
-        assert partial_lines, (
-            "Doctor did not emit [partial] for opencode:synthetic-parallel.\n"
-            "Full report:\n" + "\n".join(report)
-        )
 
     def test_doctor_reports_reference_only_for_codex_when_parallel_group(
         self, tmp_path: Path
@@ -534,13 +480,12 @@ class TestWorkflows:
         _staged_install(workspace)
         report = _manager().doctor(workspace)
         # audit-fanout is a canonical serial workflow (no parallel_group) shipped by v0.1.9+.
-        # opencode and claude should be [ok]; codex emits [reference-only].
+        # claude should be [ok]; codex emits [reference-only].
         ok_lines = [
             line
             for line in report
             if line.startswith("[ok]") and "audit-fanout" in line and ":workflows/" in line
         ]
-        assert any("opencode" in line for line in ok_lines)
         assert any("claude" in line for line in ok_lines)
         # Codex check: [reference-only] because workflows are installed reference docs.
         ref_lines = [

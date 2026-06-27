@@ -136,7 +136,10 @@ harness:
 - **CLI-headless** — `codex exec` (`CODEX_EXEC`), `opencode run` (`OPENCODE_RUN`), and
   `pi --mode json` (`PI_HEADLESS`); these have no pre-disk hook and are bounded by
   Ring-2 + the git chokepoints.
-- **RPC** — reserved for future per-harness transports; none ship today.
+
+These are the **two supported Layer-2 transports**. A long-lived RPC transport
+(`pi --mode rpc`, a Python↔Node bridge) is a possible future — it is **not** part of the
+supported architecture today and no RPC code ships (the engine is one-shot-per-step).
 
 The five `AgentRuntimeKind`s today are **FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN,
 PI_HEADLESS**. Layer 2 is where prompts-inside-workflows run; it is distinct from Layer 1.

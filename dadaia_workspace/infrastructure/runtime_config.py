@@ -1,4 +1,4 @@
-"""Runtime configuration generators for Claude, Codex, and OpenCode projections.
+"""Runtime configuration generators for Claude and Codex projections.
 
 Extracted from ``FileSystemPublicAssetManager`` in ``public_assets.py`` to keep
 that module under 600 lines.  Each function takes explicit arguments instead of
@@ -11,7 +11,6 @@ using the venv-aware ``_python_bin()`` helper (Windows-safe fallbacks: Scripts/p
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -259,24 +258,4 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                 }
             ],
         }
-    }
-
-
-def opencode_config(workspace_root: Path) -> dict[str, object]:
-    """Return the opencode.json dict for *workspace_root*."""
-    instructions: list[str] = ["AGENTS.md", "CLAUDE.md"]
-    registry_json = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
-    if registry_json.exists():
-        try:
-            registry = json.loads(registry_json.read_text(encoding="utf-8"))
-            for ctx in registry.get("contexts", []):
-                repo_slug = ctx.get("repo_slug", "")
-                if repo_slug and (workspace_root / "repos" / repo_slug / "AGENTS.md").exists():
-                    instructions.append(f"repos/{repo_slug}/AGENTS.md")
-        except (json.JSONDecodeError, AttributeError, KeyError):
-            pass
-    return {
-        "$schema": "https://opencode.ai/config.json",
-        "instructions": instructions,
-        "permission": "allow",
     }

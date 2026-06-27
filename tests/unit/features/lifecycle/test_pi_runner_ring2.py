@@ -3,7 +3,7 @@
 Proves PI has a REAL write boundary: ``changed_paths`` is sourced from a (faked)
 git diff inside the adapter, and the engine's post-flight out-of-scope block
 (`agent_runner.py:114-123`) fires when those paths fall outside the request's
-allowed set — exactly as for Codex/OpenCode. An in-scope diff advances the phase.
+allowed set — exactly as for Codex. An in-scope diff advances the phase.
 """
 
 from __future__ import annotations

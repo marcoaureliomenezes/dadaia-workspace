@@ -1,4 +1,4 @@
-"""W1 — AgentRuntimeKind gains CLAUDE_SDK + OPENCODE_RUN; request round-trips."""
+"""W1 — AgentRuntimeKind members + request round-trips."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ def test_runtime_kind_members() -> None:
         "fake",
         "codex_exec",
         "claude_sdk",
-        "opencode_run",
         "pi_headless",
     }
 
