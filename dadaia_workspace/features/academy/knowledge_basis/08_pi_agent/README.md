@@ -11,14 +11,16 @@ controle de contexto e custo de sessao.
 1. Como iniciar o Pi do zero com setup seguro.
 2. Como operar no dia a dia com sessoes, slash commands e contexto.
 3. Como customizar Pi via extensions, skills e packages sem perder governanca.
+4. Como posicionar o Pi como quarto harness do dadaia-workspace.
 
 ## Ordem sugerida
 
 1. [01_modelo_mental_e_setup.md](./01_modelo_mental_e_setup.md)
 2. [02_operacao_cli_sessoes_e_contexto.md](./02_operacao_cli_sessoes_e_contexto.md)
 3. [03_customizacao_extensions_skills_packages.md](./03_customizacao_extensions_skills_packages.md)
-4. [EXERCISES.md](./EXERCISES.md)
-5. [REFERENCES.md](./REFERENCES.md)
+4. [04_pi_como_quarto_harness_dadaia.md](./04_pi_como_quarto_harness_dadaia.md)
+5. [EXERCISES.md](./EXERCISES.md)
+6. [REFERENCES.md](./REFERENCES.md)
 
 ## Resultado esperado
 

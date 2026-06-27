@@ -74,7 +74,7 @@
   - Write set: `dadaia_workspace/features/telemetry/aggregator/runtimes.py`.
   - Acceptance: A10, A12.
 
-- [-] **T-30-B-05** — PI fourth-harness academy module.
+- [x] **T-30-B-05** — PI fourth-harness academy module.
   - Goal: document enter-pi flow, trust boundary, per-step `--harness pi`.
   - Write set: `dadaia_workspace/features/academy/knowledge_basis/08_pi_agent/<module>.md` (NEW).
   - Acceptance: A13.
