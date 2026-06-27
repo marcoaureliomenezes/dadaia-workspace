@@ -20,6 +20,7 @@ from dadaia_workspace.core.harness_models import (
     options_for,
 )
 from dadaia_workspace.core.models.lifecycle import (
+    AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
     GateEvidenceKind,
@@ -32,6 +33,7 @@ from dadaia_workspace.core.models.workflow_execution import (
     ResolvedModelConfig,
     WorkflowPolicySnapshot,
 )
+from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.lifecycle.agent_runner import (
@@ -55,6 +57,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     build_fragment_suffix,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
+from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
 
 #: ``kind -> adapter`` — injected so tests can supply fakes per harness.
 RuntimeFactory = Callable[[AgentRuntimeKind], AgentRuntimePort]
@@ -105,6 +108,25 @@ class PipelineResult:
     blocked: BlockedState | None = None
 
 
+@dataclass(frozen=True)
+class ImplementReviewRound:
+    """One implement→review round of the bounded retry loop (T-30-D-06)."""
+
+    attempt: int
+    review_verdict: str
+
+
+@dataclass(frozen=True)
+class ImplementReviewLoopResult:
+    """Typed outcome of the implement/review attempt loop (A24)."""
+
+    run_id: str
+    completed: bool
+    attempts: int
+    rounds: tuple[ImplementReviewRound, ...] = ()
+    blocked: BlockedState | None = None
+
+
 class LifecyclePipeline:
     """Thread one run through an ordered, per-step-harness-selectable phase sequence."""
 
@@ -121,6 +143,8 @@ class LifecyclePipeline:
         fragment_loader: FragmentLoader | None = None,
         context_selector: ContextSelector | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
+        handoff_resolver: WorkflowHandoffResolver | None = None,
+        max_review_retries: int = 2,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -129,6 +153,14 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # Workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-06). Drives the
+        # implement/review attempt ledger so ``implement#2`` consumes the EXACT ``qa#1``
+        # rejection by (run, producer step, attempt) — never qa#0 / latest-by-filename.
+        self._handoff_resolver = handoff_resolver
+        # Bounded automatic retry for the implement/review loop (GRILL: default 2). When the
+        # review keeps REJECTING past this many retries the loop BLOCKS for operator
+        # intervention rather than looping forever.
+        self._max_review_retries = max_review_retries
         # The resolved governance snapshot (T-28-A-07 / LAW 7). When present it is frozen
         # onto the run BEFORE the first step; an overlay mutated after start cannot change
         # the in-flight run because the run carries this immutable snapshot, not the live
@@ -203,6 +235,136 @@ class LifecyclePipeline:
             final_phase=run.phase,
             steps=tuple(results),
         )
+
+    # -- implement/review attempt loop (T-30-D-06 / A24) ---------------------
+
+    def run_implement_review_loop(
+        self,
+        run_id: str,
+        *,
+        implement_step: PipelineStep,
+        review_step: PipelineStep,
+    ) -> ImplementReviewLoopResult:
+        """Run implement → review with run-scoped attempt tracking + bounded retry (A24).
+
+        Each round writes immutable per-attempt payloads through the handoff resolver:
+        ``implement#N`` then ``review#N``. On a REJECTED review the next implement attempt
+        consumes the EXACT ``review#N`` rejection by (run, producer step, attempt) — never
+        ``review#0`` / latest-by-filename. After ``max_review_retries`` rejected rounds the
+        loop BLOCKS for operator intervention rather than retrying forever.
+
+        Requires a wired ``handoff_resolver`` — the loop's whole point is the attempt
+        ledger. The two steps run on their declared harnesses via the runtime factory.
+        """
+        if self._handoff_resolver is None:
+            raise ValueError("run_implement_review_loop requires a wired handoff_resolver")
+        resolver = self._handoff_resolver
+
+        run = LifecycleRun(
+            run_id=run_id,
+            context=self._context,
+            release_id=self._release_id,
+            command="implement_review_loop",
+            phase=implement_step.from_phase,
+            status=LifecycleRunStatus.RUNNING,
+            current_step=implement_step.label,
+            idempotency_key=run_id,
+            workflow_policy=self._policy_snapshot,
+        )
+        self._run_store.save(run)
+
+        rounds: list[ImplementReviewRound] = []
+        # attempt 0 is the first try; up to max_review_retries additional attempts follow.
+        for attempt in range(self._max_review_retries + 1):
+            # implement#attempt — from attempt 1 it consumes the prior review rejection.
+            if attempt > 0:
+                resolved = resolver.resolve_required(
+                    run, producer_step=review_step.label, attempt=attempt - 1
+                )
+                run = resolver.record_consumption(
+                    run,
+                    producer_step=review_step.label,
+                    producer_attempt=attempt - 1,
+                    consumer_step=implement_step.label,
+                    consumer_attempt=attempt,
+                )
+                _ = resolved  # digest would be injected into the implement prompt here.
+            impl_result = self._run_loop_worker(run, implement_step, attempt)
+            run, _ = resolver.produce(
+                run,
+                producer_step=implement_step.label,
+                attempt=attempt,
+                output_schema="implementation-handoff-v1",
+                payload={"summary": impl_result.summary or "implementation"},
+                declared_consumers=(review_step.label,),
+            )
+
+            # review#attempt — consumes implement#attempt, produces its verdict.
+            run = resolver.record_consumption(
+                run,
+                producer_step=implement_step.label,
+                producer_attempt=attempt,
+                consumer_step=review_step.label,
+                consumer_attempt=attempt,
+            )
+            review_result = self._run_loop_worker(run, review_step, attempt)
+            verdict = review_result.structured_output.get("verdict")
+            run, _ = resolver.produce(
+                run,
+                producer_step=review_step.label,
+                attempt=attempt,
+                output_schema="qa-review-handoff-v1",
+                payload={
+                    "verdict": verdict if isinstance(verdict, str) else "REJECTED",
+                    "verdict_reason": review_result.summary or "review",
+                },
+                declared_consumers=(implement_step.label,),
+                retention_mode=RetentionMode.PROMOTE_TO_EVIDENCE,
+            )
+            rounds.append(ImplementReviewRound(attempt=attempt, review_verdict=str(verdict)))
+            if verdict == "APPROVED":
+                from dataclasses import replace
+
+                run = replace(run, status=LifecycleRunStatus.COMPLETED)
+                self._run_store.save(run)
+                return ImplementReviewLoopResult(
+                    run_id=run_id, completed=True, attempts=attempt + 1, rounds=tuple(rounds)
+                )
+
+        # Exhausted the retry budget — BLOCK for operator intervention.
+        from dataclasses import replace
+
+        blocked = BlockedState(
+            reason=(
+                f"implement/review loop exceeded the bounded retry count "
+                f"({self._max_review_retries}); operator intervention required"
+            ),
+            blocked_at_step=review_step.label,
+            detail={"attempts": str(self._max_review_retries + 1)},
+        )
+        run = replace(
+            run, phase=LifecyclePhase.BLOCKED, status=LifecycleRunStatus.BLOCKED, blocked=blocked
+        )
+        self._run_store.save(run)
+        return ImplementReviewLoopResult(
+            run_id=run_id,
+            completed=False,
+            attempts=self._max_review_retries + 1,
+            rounds=tuple(rounds),
+            blocked=blocked,
+        )
+
+    def _run_loop_worker(
+        self, run: LifecycleRun, step: PipelineStep, attempt: int
+    ) -> AgentRunResult:
+        """Run one implement/review worker for *attempt* and return its raw result."""
+        runtime = self._runtime_factory(step.runtime_kind)
+        built = self._prompt_builder.build(
+            self._scope(step, f"{run.run_id}#a{attempt}"),
+            runtime=runtime.runtime_kind(),
+            prefix=self._prefix,
+        )
+        return runtime.run(built.request)
 
     def _scope(self, step: PipelineStep, run_id: str) -> PromptScope:
         prompt = (
@@ -430,6 +592,8 @@ def apply_resolved_policy(
 
 # Re-exported for callers assembling custom ladders.
 __all__ = [
+    "ImplementReviewLoopResult",
+    "ImplementReviewRound",
     "LifecyclePipeline",
     "PipelineResult",
     "PipelineStep",

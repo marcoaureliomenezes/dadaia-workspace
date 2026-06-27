@@ -169,7 +169,7 @@
     `dadaia_workspace/features/lifecycle/context_selector.py`.
   - Acceptance: A18, A19, A20, A25.
 
-- [-] **T-30-D-06** — Implementation/review loop attempt tracking + bounded retry.
+- [x] **T-30-D-06** — Implementation/review loop attempt tracking + bounded retry.
   - Goal: attempts so `implement#2` consumes `qa#1`; bounded retry (default 2) → BLOCK.
   - Write set: `dadaia_workspace/features/lifecycle/pipeline.py`.
   - Acceptance: A24.
