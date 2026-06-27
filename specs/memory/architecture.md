@@ -18,9 +18,9 @@ tags:
 - agents
 - backlog
 agent_tier: self-pull
-token_estimate: 12429
-last_updated: '2026-06-26'
-release_origin: v0.1.28
+token_estimate: 12900
+last_updated: '2026-06-27'
+release_origin: v0.1.29
 ---
 
 ## Visão geral
@@ -658,13 +658,16 @@ os verbos CLI reais `release define` então `close` sobre um workspace temp: o i
 consumido some do SET vivo, a cópia de archive precede o unlink, `backlog doctor` reporta zero
 BL-STALE) — não mais só a nível função/integração.
 
-## Workflow control plane subsystem (v0.1.28)
+## Workflow control plane subsystem (v0.1.28 + v0.1.29)
 
-A camada de **governança de modelo** do Layer 2: built sobre os seams existentes (perfil →
-overlay → resolver → run snapshot → panel routes), não um subsistema paralelo. O
+A camada de **governança de modelo E harness** do Layer 2: built sobre os seams existentes
+(perfil → overlay → resolver → run snapshot → panel routes), não um subsistema paralelo. O
 `WorkflowExecutionPolicyResolver` é o **único** seam de política, consumido tanto pela CLI
 (`cli/commands/lifecycle.py`) quanto pelo panel (`features/panel/views/workflow_policy.py`)
-via o `container.py` — nenhuma construção ad-hoc em view/CLI. Ver [[lifecycle-foundation]]
+via o `container.py` — nenhuma construção ad-hoc em view/CLI. v0.1.29 torna o **harness uma
+dimensão governada de primeira classe** (não só o modelo): o resolver resolve um harness
+efetivo por step e valida o profile contra ele, o overlay/schema carregam harness, e
+`apply_resolved_policy` é o único autor de `runtime_kind`. Ver [[lifecycle-foundation]]
 para o spine do engine e [[panel]] para o control plane do panel.
 
 - **Profile registry** (`features/lifecycle/model_profiles.py`) — registry **built-in only**
@@ -681,11 +684,20 @@ para o spine do engine e [[panel]] para o control plane do panel.
   da primeira chamada de modelo, com o last-good intacto. Só o contexto `default` é honrado
   (D-2; a shape `contexts{}` pode ser reservada mas chave não-`default` é inerte). Nomes de
   context/workflow/step/profile são apenas keys de dict JSON dentro do arquivo único — nunca
-  interpolados em path de filesystem (sem path injection).
+  interpolados em path de filesystem (sem path injection). **v0.1.29:** o overlay carrega
+  campos opcionais `default_harness` (per-workflow) e `harnesses` (per-step, keyed por label),
+  ambos enum Layer-2 `codex|pi`; store e schema ampliados em lockstep (`additionalProperties:
+  false` mantido; `to_dict` omite campos vazios ⇒ overlay profile-only round-trips
+  byte-stable). Accessors `step_harness` / `workflow_default_harness` (default context only).
 - **Resolver** (`features/lifecycle/policy_resolver.py`) — `resolve(workflow_id, context,
-  cli_overrides) → WorkflowPolicySnapshot` com precedência **CLI > context overlay > default
-  overlay > library default**; valida cada override contra step ids do catálogo + profile ids
-  + harness match (deprecated sem replacement = hard failure). Lê o catálogo governado
+  cli_overrides, default_harness, harness_overrides) → WorkflowPolicySnapshot`. **v0.1.29:**
+  resolve um **harness efetivo por step** com precedência total **CLI `--step-harness` > CLI
+  `--harness` > overlay step harness > overlay `default_harness` > catalog step default**
+  (`_resolve_harness`); o profile é validado contra o harness **efetivo**, não o catalog
+  default (corrige o mismatch `policy_resolver.py:288`); auto-profile-on-harness-override —
+  quando o harness é trocado sem profile explícito, o default vira
+  `CatalogStep.default_profiles[harness_efetivo]`. O profile precedence permanece **CLI >
+  context overlay > default overlay > library default**. Lê o catálogo governado
   `governed_workflow_catalog()` (Wave B — `features/workflows/dadaia_catalog.py`), a fonte
   única de verdade executável; o `library_workflow_catalog()` (Wave A) é demo-only.
 - **Run snapshot (LAW 7)** — `core/models/workflow_execution.py` define os DTOs puros
@@ -694,7 +706,14 @@ para o spine do engine e [[panel]] para o control plane do panel.
   (ambos additive optional; records v1 antigos carregam `None` — schema literal inalterado,
   back-compat read). O snapshot é resolvido + congelado no `LifecycleRun` **antes** do
   primeiro step e preservado por `dataclasses.replace`; run in-flight ignora edições
-  posteriores do overlay; o panel lê o snapshot persistido para histórico.
+  posteriores do overlay; o panel lê o snapshot persistido para histórico. **Single source
+  of truth de `runtime_kind` (v0.1.29 / D-2):** `pipeline.apply_resolved_policy` é o **único**
+  autor de `PipelineStep.runtime_kind`, derivado do harness resolvido no snapshot (codex →
+  `CODEX_EXEC`, pi → `PI_HEADLESS`; harness não-mapeável raise). O swap post-resolve da CLI
+  foi removido ⇒ o adapter que roda e o snapshot persistido provavelmente concordam (corrige
+  a divergência v0.1.28 codex-gravado-enquanto-pi-rodava). **FAKE é preservado:** um step
+  construído em `AgentRuntimeKind.FAKE` mantém FAKE (`--harness fake` dry-run roda o fake
+  adapter) enquanto o snapshot grava o harness governado.
 - **Panel routes** (`features/panel/handler.py` + `views/workflow_policy.py`) — GET
   catalog/profiles/policy/runs + `PUT /api/workflow-model-policy` +
   `POST /api/workflow-model-policy/validate` + fragment-body read. O `do_PUT`/`do_POST`
@@ -707,14 +726,25 @@ para o spine do engine e [[panel]] para o control plane do panel.
   `escHtml` antes de innerHTML.
 - **Governança Layer-2 (LAW 1).** Workflow workers são apenas `codex`/`pi` (`fake`
   test-only); `claude`/`opencode` são rejeitados na CLI E pelo check de doctor
-  `WMP-LAYER2-RESIDUE`. `--step-model` aceita só profile ids (D-3); o id de modelo que chega
-  ao argv é o `model_id` constante do registry — sem free-text para um worker.
+  `WMP-LAYER2-RESIDUE` — incluindo valores de harness no overlay (v0.1.29). `--step-model`
+  aceita só profile ids (D-3); o id de modelo que chega ao argv é o `model_id` constante do
+  registry — sem free-text para um worker.
+- **Catálogo governado completo — 7 workflows (v0.1.29 / D-4).** `governed_workflow_catalog()`
+  cobre os 3 workflows runnable + `closure` (seu real único worker step `close`, role
+  product-engineer, generic; mais o `closure_removal_gate` Python modelado como gate) ⇒
+  `policy show closure` resolve. `audit`/`research`/`bug_report` (os nomes em
+  `_deferred.DEFERRED_WORKFLOWS`) são enumerados como `deferred` com zero governed steps —
+  inspecionáveis na camada catalog/panel; `resolve(<deferred>)` raise a mensagem acionável
+  "no governed steps" (correto). Nenhuma ladder de step inventada, nenhuma segunda fonte.
 - **Doctor** — `dadaia lifecycle workflow doctor` (`features/lifecycle/policy_doctor.py`,
-  checks `WMP-1..WMP-8`): invalid policy JSON, unknown profile, harness/profile mismatch,
-  stale workflow/step id, missing default profile per supported harness, unresolved
-  fragment/output schema, e qualquer resíduo `claude`/`opencode` Layer-2; nunca crasha o
-  panel. `policy_public_doctor.py` adiciona um residue scan da superfície pública via
-  `dadaia public doctor`.
+  checks `WMP-1..WMP-7` sobre o catálogo completo): invalid policy JSON, unknown profile,
+  harness/profile mismatch, stale workflow/step id, missing default profile per supported
+  harness, unresolved fragment/output schema, e qualquer resíduo `claude`/`opencode` Layer-2.
+  **v0.1.29:** valida a dimensão harness — um harness de overlay referenciando um harness não
+  suportado pelo step é ERROR; um harness `claude`/`opencode` no overlay é
+  `WMP-LAYER2-RESIDUE`. O step generic `close` é WMP-5-exempt (sem output-schema obligation;
+  sem falso positivo). Nunca crasha o panel. `policy_public_doctor.py` adiciona um residue
+  scan da superfície pública via `dadaia public doctor`.
 
 ## Multi-harness runtime parity (constitution §4)
 

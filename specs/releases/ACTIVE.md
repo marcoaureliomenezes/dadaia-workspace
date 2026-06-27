@@ -1,18 +1,18 @@
 ---
-release: v0.1.29
-phase: CLOSURE
+release: none
+phase: ARCHIVED
 ---
 
-# Active release: v0.1.29 — Harness as a governed dimension + catalog completion
+No active release.
 
-Closes the gap found auditing v0.1.28: model governance governs profiles but NOT the
-worker harness, so PI cannot be selected as a Layer-2 worker through the governed policy.
+Last shipped: **v0.1.29 — Harness as a governed dimension + catalog completion**
+(CLOSED + Aprovado; closure at `specs/_archive/releases/v0.1.29/CLOSURE.md`). PI is now a
+fully selectable, governed Layer-2 worker: effective-harness precedence (CLI > overlay >
+catalog default), auto-profile on harness override, snapshot records the effective harness,
+panel codex/pi toggle persists. Catalog complete to all 7 workflows (closure resolvable;
+audit/research/bug_report deferred stubs). Resolves the v0.1.28 harness-governance residual.
 
-**Phase:** DEFINITION — product-engineer authoring SPEC/PLAN/TASKS from `GRILL.md`
-(decisions D-1..D-5). Operator: fix now, complete the catalog (all 7 workflows), ship
-v0.1.28 + v0.1.29 together.
+Shipped together with v0.1.28 (workflow model governance + panel control plane).
 
-Branch: `feature/v0.1.29` (stacked on `feature/v0.1.28` @ bd710c57). v0.1.28 is
-CLOSED+archived on its branch; both ship together once machine load clears for the
-pre-push gate (a load-sensitive 437k-file perf test currently fails only under the
-concurrent aero-fighters Playwright suite, not from any v0.1.28/29 code).
+Deferred (backlog `workflow-model-governance-operator-profiles-and-context-overlays`):
+operator-added PI `.local.json` profiles + per-context overlay inheritance.

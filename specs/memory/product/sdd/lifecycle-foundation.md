@@ -23,10 +23,15 @@ summary: >-
   classifier; a cacheable hashed `PromptPrefix` is reused across steps. v0.1.28 adds the
   workflow model governance control plane: a built-in WorkflowModelProfile registry over
   harness_models, an atomic operator overlay (missing != invalid), one shared
-  WorkflowExecutionPolicyResolver (CLI > overlay > library default), a per-run policy
-  snapshot resolved once before step 1, and WMP-* governance doctor checks. Anti-slop
-  self-governance is built in: a directory-aware slop metric and a boundary-safe retention
-  sweep.
+  WorkflowExecutionPolicyResolver, a per-run policy snapshot resolved once before step 1,
+  and WMP-* governance doctor checks. v0.1.29 makes harness a first-class governed dimension:
+  an effective-harness precedence chain (CLI step > CLI default > overlay step > overlay
+  default_harness > catalog default), profile validated against the effective harness,
+  auto-profile-on-harness-override, apply_resolved_policy as the single runtime_kind author
+  (FAKE preserved), overlay default_harness/harnesses fields, and a completed governed
+  catalog of all 7 workflows (3 runnable + closure resolvable + 3 deferred zero-step) — so
+  PI is fully selectable as a Layer-2 worker. Anti-slop self-governance is built in: a
+  directory-aware slop metric and a boundary-safe retention sweep.
 tags:
 - sdd
 - lifecycle
@@ -34,9 +39,9 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 2180
-last_updated: '2026-06-26'
-release_origin: v0.1.28
+token_estimate: 3050
+last_updated: '2026-06-27'
+release_origin: v0.1.29
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
@@ -171,12 +176,69 @@ CLI and the panel (see [[panel]] for the panel control plane).
   (`WMP-LAYER2-RESIDUE`). A `public doctor` workflow-policy residue scan
   (`policy_public_doctor.py`) keeps the public surface clean. Doctor never crashes the panel.
 
-> Known limit (v0.1.28): under a `--harness` override the persisted snapshot records the
-> *governed* harness (the codex-defaulted `implementation` catalog), even when the CLI built
-> a different adapter (e.g. `--harness pi` runs the PI adapter with the codex-governed model
-> id). Reconciling snapshot `runtime_kind` with the governed harness is a deferred v0.1.29
-> refinement. Operator PI `.local.json` profiles and per-context overlays (`extends`) are
-> deferred (D-2).
+## Harness as a governed dimension (v0.1.29)
+
+The harness is now a **first-class governed dimension** alongside the model, so PI is fully
+usable as a Layer-2 worker through governance (not just as an execution adapter). The same
+shared resolver moves a step onto PI from three paths — the CLI, a persisted overlay, and
+the panel toggle — and the executed adapter and the recorded snapshot always agree.
+
+- **Effective-harness precedence (D-1).** `resolve()` takes harness inputs (a per-workflow
+  default-harness override and a `{step → harness}` map) and reads the overlay's harness
+  fields, computing the effective harness per step with the precedence
+  **CLI `--step-harness` > CLI `--harness` > overlay step harness > overlay `default_harness`
+  > catalog step default** (`_resolve_harness`). The chain is total: every governed step has
+  a catalog `default_harness` (`_DEFAULT_WORKER_HARNESS = codex`), so no step is left without
+  an effective harness.
+- **Profile validated against the effective harness.** `_validate_profile` compares
+  `profile.harness` to the step's **resolved** harness, not the catalog default — fixing the
+  v0.1.28 `policy_resolver.py:288` mismatch that rejected a PI profile on a codex-default
+  step. A CLI mismatch (e.g. `--harness pi` + a codex `--step-model`) resolves to a clean
+  rejection, not ambiguity.
+- **Auto-profile-on-harness-override (D-1).** When a step's harness is overridden with **no**
+  explicit profile override (neither CLI `--step-model` nor overlay step profile), the
+  library default becomes `CatalogStep.default_profiles[effective_harness]` — the harness's
+  default profile for the step's purpose (producing step → standard profile, review/gate step
+  → deep/reasoning profile). The per-harness default profiles live on the catalog DTO; the
+  resolver reads the effective harness's entry instead of only `default_profile`.
+- **Single source of truth for `runtime_kind` (D-2).** `pipeline.apply_resolved_policy` is
+  the **sole** author of each `PipelineStep.runtime_kind`, derived from the snapshot entry's
+  resolved harness (codex → `CODEX_EXEC`, pi → `PI_HEADLESS`; an unmappable harness raises).
+  The CLI's separate post-resolve `runtime_kind` swap was removed, so the executed adapter
+  and the persisted snapshot provably agree — fixing the v0.1.28
+  codex-recorded-while-pi-ran divergence. **FAKE is preserved:** a step built on
+  `AgentRuntimeKind.FAKE` keeps FAKE (so `--harness fake` dry-runs still drive the fake
+  adapter) while the snapshot records the governed harness.
+- **Overlay carries harness (D-3).** The overlay schema + store carry an optional per-step
+  `harnesses` map and a per-workflow `default_harness` (Layer-2 enum `codex|pi`, store +
+  schema widened in lockstep, `additionalProperties:false` kept). Accessors `step_harness`
+  and `workflow_default_harness` (default context only). **Back-compat:** an overlay with no
+  harness field resolves byte-identically to v0.1.28 (catalog default codex). The panel
+  codex/pi toggle persists a real harness change through `PUT /api/workflow-model-policy`;
+  the resolver honors it (see [[panel]]).
+- **Completed governed catalog — 7 workflows (D-4).** `closure` is cataloged as its real
+  single `close` worker step (role product-engineer, generic/no-fragment) plus the Python
+  `closure_removal_gate` modeled as a gate; `governed_workflow_catalog()` projects the
+  `close` step so `policy show closure` resolves. `audit` / `research` / `bug_report` (the
+  three `_deferred.DEFERRED_WORKFLOWS` names) are enumerated as `deferred` with zero governed
+  steps — inspectable at the catalog/panel layer; `resolve(<deferred>)` raises the actionable
+  "no governed steps" error (correct, not a gap). No invented model-step ladders, no second
+  drifting source.
+- **Doctor validates the harness dimension (D-doctor).** `dadaia lifecycle workflow doctor`
+  resolves every overlay harness override through the shared resolver, so an overlay harness
+  referencing a harness the step does not support is a hard ERROR; an overlay harness value
+  of `claude`/`opencode` is `WMP-LAYER2-RESIDUE`. WMP-1..WMP-7 pass over the completed
+  catalog (the generic `close` step is WMP-5-exempt — no false positive).
+
+Carried-forward laws hold unchanged: Layer-2 = codex|pi only (`fake` test-only;
+`claude`/`opencode` rejected); default-first (unconfigured → library defaults, codex);
+auditability snapshot frozen before step 1 and read verbatim for history; panel governance
+via validated overlay; resolve-once-before-step-1.
+
+> Still deferred (v0.1.28 D-2): operator-added PI profiles
+> (`.dadaia/states/workflow_model_profiles.local.json`, not loaded — built-in profiles only)
+> and per-context overlays + `extends` inheritance (only the `default` context is honored; a
+> non-`default` key is inert).
 
 ## Gating note (current behavior)
 

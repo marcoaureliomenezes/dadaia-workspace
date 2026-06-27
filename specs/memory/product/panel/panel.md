@@ -19,8 +19,8 @@ tags:
 - http
 - dashboard
 agent_tier: self-pull
-token_estimate: 4180
-last_updated: '2026-06-26'
+token_estimate: 4330
+last_updated: '2026-06-27'
 release_origin: 0.1.6
 ---
 
@@ -100,14 +100,24 @@ over the governed `dadaia_catalog` that the CLI uses.
 
 - **Detail view** — diagram (from Python metadata via `render_dag_svg`/`render_step_mermaid`,
   not browser Mermaid) + a step matrix `Step | Role | Harness | Effective profile | Concrete
-  model | Fragments | Gate`, a **default-vs-effective** diff, and a **run-snapshot evidence**
-  view that reads the persisted `workflow_policy` snapshot per run (so historical inspection
-  shows the model actually used, even after the current policy changes).
-- **Policy editor** — per-step profile dropdown **filtered by harness**, reset-to-default,
+  model | Fragments | Gate`, a **default-vs-effective** diff (carrying both the profile
+  `is_overridden` and the v0.1.29 `harness_overridden` flag per row), and a **run-snapshot
+  evidence** view that reads the persisted `workflow_policy` snapshot per run (so historical
+  inspection shows the harness + model actually used, even after the current policy changes).
+  `GET /api/workflow-catalog` enumerates all 7 governed workflows (v0.1.29): the 3 runnable
+  ones + `closure` (its real `close` step) with availability, and `audit`/`research`/
+  `bug_report` as `deferred` with zero governed steps.
+- **Policy editor** — per-step profile dropdown **filtered by harness**, a **codex/pi
+  segmented harness toggle** (v0.1.29) that persists a real harness change, reset-to-default,
   **validate-before-save**, and save through a guarded mutation route. Writes a **validated
   JSON overlay** (`.dadaia/states/workflow_model_policy.json`) — never Python source or
   projected agentic assets. Invalid policy blocks execution; missing policy = library
-  defaults.
+  defaults. The toggle writes the step `harness` into the PUT body (`harnesses` /
+  `default_harness`); the resolver honors the persisted harness, and the catalog
+  default-vs-effective diff carries a per-row `harness_overridden` flag + `default_harness`
+  alongside the existing profile `is_overridden` flag (v0.1.29 / D-3). A harness-only PUT
+  (no profile override) validates because the resolver auto-selects the harness's default
+  profile.
 - **Read-only fragment inspector** — each model step links to its prompt-fragment ids +
   resolved body (via `FragmentLoader`), dynamic-context selectors, and output schema.
   Editing fragments stays source-controlled release work (the inspector is read-only).
