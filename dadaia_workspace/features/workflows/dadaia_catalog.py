@@ -42,7 +42,9 @@ ungoverned or harness-mismatched.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from dadaia_workspace.core import harness_models
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
@@ -55,10 +57,17 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
     WorkflowCatalog,
 )
 from dadaia_workspace.features.lifecycle.workflows._deferred import DEFERRED_WORKFLOWS
+from dadaia_workspace.features.lifecycle.workflows.audit import _SEQUENCE as _AUDIT_SEQUENCE
 from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     _SEQUENCE as _BACKLOG_SEQUENCE,
 )
+from dadaia_workspace.features.lifecycle.workflows.bug_report import (
+    _SEQUENCE as _BUG_REPORT_SEQUENCE,
+)
 from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
+from dadaia_workspace.features.lifecycle.workflows.research import (
+    _SEQUENCE as _RESEARCH_SEQUENCE,
+)
 from dadaia_workspace.features.workflows.dag import render_dag_svg
 from dadaia_workspace.features.workflows.service import StageDTO
 
@@ -229,6 +238,64 @@ _BACKLOG_STEP_PURPOSE: dict[str, str] = {
     ),
 }
 
+# Wave-E fragment+gate workflow bodies (T-30-E-01..03). Each step's purpose is sourced from
+# its fragment role; the terminal gate is Python-owned (no worker).
+_AUDIT_STEP_PURPOSE: dict[str, str] = {
+    "audit_scope": (
+        "Project-auditor bounds the audit question, lenses, surfaces, and acceptance rubric "
+        "(fragment-driven)."
+    ),
+    "drift_scan": (
+        "Project-auditor scans the bounded surfaces for drift and returns a verdict + findings "
+        "(review gate — blocking drift BLOCKS)."
+    ),
+    "triage": (
+        "Project-manager disposes every finding into disposition-ready output (bug / backlog / "
+        "accepted-risk / resolved — never a deletion; fragment-driven)."
+    ),
+    "audit_disposition_gate": (
+        "Python-owned terminal gate: completes the audit only when every prior gate passed and "
+        "the workflow-step handoff graph is complete. Runs no worker."
+    ),
+}
+
+_RESEARCH_STEP_PURPOSE: dict[str, str] = {
+    "research_scope": (
+        "Project-manager frames the research question, the decision it informs, the evidence "
+        "bar, and the bounded surfaces (fragment-driven)."
+    ),
+    "investigate": (
+        "Software-architect gathers evidence within the bounded scope (fragment-driven)."
+    ),
+    "synthesis": (
+        "Project-manager synthesizes the evidence into a recommended next step — backlog / "
+        "release action / justified no-action (fragment-driven)."
+    ),
+    "research_synthesis_gate": (
+        "Python-owned terminal gate: completes the spike only when every prior step passed and "
+        "the workflow-step handoff graph is complete. Runs no worker."
+    ),
+}
+
+_BUG_REPORT_STEP_PURPOSE: dict[str, str] = {
+    "bug_intake": (
+        "Project-manager normalizes + redacts the reported symptom into the bug-record fields "
+        "(fragment-driven)."
+    ),
+    "dedupe": (
+        "Product-engineer decides new-vs-duplicate against tracked bugs (review gate — a "
+        "duplicate BLOCKS the write)."
+    ),
+    "bug_write": (
+        "Product-engineer files exactly one ADDITIVE specs/bugs/ record (no lease, never "
+        "blocked; fragment-driven)."
+    ),
+    "bug_record_gate": (
+        "Python-owned terminal gate: completes the run only when every prior gate passed and "
+        "the workflow-step handoff graph is complete. Runs no worker."
+    ),
+}
+
 _WORKFLOW_PURPOSE: dict[str, str] = {
     "release_definition": (
         "Turns an approved bug + backlog set into an approved release definition. Python "
@@ -262,17 +329,27 @@ _WORKFLOW_PURPOSE: dict[str, str] = {
         "workflow is marked partial."
     ),
     "audit": (
-        "Will run the project-auditor fan-out (multi-lens review producing committed audit "
-        "reports). Scaffolded only — the entry point raises; deferred to a follow-up "
-        "release."
+        "Runs a bounded audit: project-auditor scopes the audit question + lenses, scans the "
+        "bounded surfaces for drift (a review gate — blocking drift BLOCKS), and project-manager "
+        "triages every finding into disposition-ready output (bug / backlog / accepted-risk / "
+        "resolved — never a deletion). Python owns the step order, the drift-scan gate, and the "
+        "terminal disposition gate. It walks audit_scope → drift_scan → triage → "
+        "audit_disposition_gate."
     ),
     "research": (
-        "Will run a bounded research spike producing a findings handoff. Scaffolded only — "
-        "the entry point raises; deferred to a follow-up release."
+        "Runs a bounded research spike: project-manager frames the question + evidence bar, "
+        "software-architect investigates within the bounded scope, and project-manager "
+        "synthesizes the evidence into a recommended next step (backlog / release action / "
+        "justified no-action). Python owns the step order and the terminal synthesis gate. It "
+        "walks research_scope → investigate → synthesis → research_synthesis_gate."
     ),
     "bug_report": (
-        "Will drive structured bug triage + registration. Scaffolded only — the entry "
-        "point raises; deferred to a follow-up release."
+        "Normalizes a reported symptom into one additive bug record: project-manager captures + "
+        "redacts the symptom/repro/severity, product-engineer dedupes against tracked bugs (a "
+        "review gate — a duplicate BLOCKS the write), and product-engineer files exactly one "
+        "ADDITIVE specs/bugs/ record (no lease, never blocked). Python owns the step order, the "
+        "dedupe gate, and the terminal record gate. It walks bug_intake → dedupe → bug_write → "
+        "bug_record_gate."
     ),
 }
 
@@ -509,6 +586,78 @@ def _backlog_definition_steps() -> list[DadaiaWorkflowStepDTO]:
     return steps
 
 
+class _FragmentGateStep(Protocol):
+    """The structural shape shared by the Wave-E fragment+gate step dataclasses.
+
+    ``AuditStep`` / ``ResearchStep`` / ``BugReportStep`` are distinct frozen dataclasses
+    that mirror ``ReleaseStep``'s field shape. This Protocol lets one builder introspect any
+    of them without a hard import of each concrete type. Members are read-only properties so
+    a frozen dataclass with the same fields structurally matches.
+    """
+
+    @property
+    def label(self) -> str: ...
+    @property
+    def role(self) -> str: ...
+    @property
+    def fragment_id(self) -> str | None: ...
+    @property
+    def shared_fragment_ids(self) -> tuple[str, ...]: ...
+    @property
+    def is_review(self) -> bool: ...
+    @property
+    def runtime_kind(self) -> AgentRuntimeKind | None: ...
+
+
+def _fragment_gate_steps(
+    sequence: Sequence[_FragmentGateStep], purpose: dict[str, str]
+) -> list[DadaiaWorkflowStepDTO]:
+    """Build catalog step DTOs for a Wave-E fragment+gate workflow body.
+
+    Mirrors ``_release_definition_steps``: a model step (``fragment_id`` set) is a worker step
+    — a review step defaults to the deep profile, a producing step to the standard profile; a
+    step with no fragment is the Python-owned terminal gate (no worker).
+    """
+    steps: list[DadaiaWorkflowStepDTO] = []
+    for order, fstep in enumerate(sequence, start=1):
+        is_worker = fstep.fragment_id is not None
+        harness_options, model_options = _harness_options_for(is_worker_step=is_worker)
+        runtime = fstep.runtime_kind.value if fstep.runtime_kind is not None else None
+        is_gate = fstep.is_review or fstep.fragment_id is None
+        default_harness, default_profiles = _default_profiles_for(
+            harness_options=harness_options, is_gate=is_gate
+        )
+        steps.append(
+            DadaiaWorkflowStepDTO(
+                order=order,
+                label=fstep.label,
+                role=fstep.role,
+                purpose=purpose.get(fstep.label, ""),
+                is_gate=is_gate,
+                harness_options=harness_options,
+                model_options=model_options,
+                runtime_kind=runtime,
+                fragment_id=fstep.fragment_id,
+                default_harness=default_harness,
+                default_profiles=default_profiles,
+                shared_fragment_ids=fstep.shared_fragment_ids,
+            )
+        )
+    return steps
+
+
+def _audit_steps() -> list[DadaiaWorkflowStepDTO]:
+    return _fragment_gate_steps(_AUDIT_SEQUENCE, _AUDIT_STEP_PURPOSE)
+
+
+def _research_steps() -> list[DadaiaWorkflowStepDTO]:
+    return _fragment_gate_steps(_RESEARCH_SEQUENCE, _RESEARCH_STEP_PURPOSE)
+
+
+def _bug_report_steps() -> list[DadaiaWorkflowStepDTO]:
+    return _fragment_gate_steps(_BUG_REPORT_SEQUENCE, _BUG_REPORT_STEP_PURPOSE)
+
+
 def _closure_steps() -> list[DadaiaWorkflowStepDTO]:
     """Build closure's real step list (T-29-B-01).
 
@@ -587,7 +736,13 @@ def _all_workflows() -> list[DadaiaWorkflowDTO]:
         _build_workflow("implementation", AVAILABILITY_PARTIAL, _implementation_steps()),
         _build_workflow("backlog_definition", AVAILABILITY_AVAILABLE, _backlog_definition_steps()),
         _build_workflow("closure", AVAILABILITY_PARTIAL, _closure_steps()),
+        # Wave-E (v0.1.30 T-30-E-01..03): real fragment+gate bodies — now AVAILABLE.
+        _build_workflow("audit", AVAILABILITY_AVAILABLE, _audit_steps()),
+        _build_workflow("research", AVAILABILITY_AVAILABLE, _research_steps()),
+        _build_workflow("bug_report", AVAILABILITY_AVAILABLE, _bug_report_steps()),
     ]
+    # No workflow remains deferred (DEFERRED_WORKFLOWS is empty as of Wave E), but the loop is
+    # kept so a future deferred workflow is enumerated honestly without a code change.
     for name in DEFERRED_WORKFLOWS:
         workflows.append(_build_workflow(name, AVAILABILITY_DEFERRED, []))
     return workflows

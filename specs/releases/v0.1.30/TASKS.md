@@ -215,7 +215,7 @@
     `dadaia_workspace/public/lifecycle_fragments/` (bug_report fragments).
   - Acceptance: A28, A29 (bug_report half).
 
-- [-] **T-30-E-04** — Remove the three from `DEFERRED_WORKFLOWS`.
+- [x] **T-30-E-04** — Remove the three from `DEFERRED_WORKFLOWS`.
   - Goal: drop `audit`/`research`/`bug_report` stub entry points + names; a test asserts they
     no longer raise `NotImplementedError`.
   - Write set: `dadaia_workspace/features/lifecycle/workflows/_deferred.py`.

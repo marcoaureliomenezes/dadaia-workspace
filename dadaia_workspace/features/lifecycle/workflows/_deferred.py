@@ -1,53 +1,27 @@
-"""Deferred workflow entry points (WS-6) — scaffolded, not yet runnable.
+"""Deferred workflow names (WS-6) — now empty.
 
-The backlog / audit / research / bug-report workflow bodies are **deferred to a
-follow-up release** (SPEC §3.12). They are scaffolded here so the workflow surface is
-importable and discoverable, but every entry point **fails loud** — it raises
-``NotImplementedError`` when invoked rather than silently no-op'ing. A silent no-op
-would let a caller believe a deferred workflow ran; raising keeps the deferral honest
-(WS-6 acceptance: "a test asserts the scaffolded-but-deferred workflows fail loudly").
+This module historically scaffolded the ``audit`` / ``research`` / ``bug_report`` workflow
+entry points as fail-loud stubs (each raised ``NotImplementedError``) while those bodies
+were deferred. As of v0.1.30 Wave E (T-30-E-01..04) all three ship **real fragment+gate
+workflow bodies**:
 
-Each entry point is a thin callable. When a deferred workflow is implemented in a later
-release it replaces its entry point here with a real workflow body (mirroring
-:mod:`dadaia_workspace.features.lifecycle.workflows.release_definition`).
+- :mod:`dadaia_workspace.features.lifecycle.workflows.audit`
+- :mod:`dadaia_workspace.features.lifecycle.workflows.research`
+- :mod:`dadaia_workspace.features.lifecycle.workflows.bug_report`
+
+so they have **left** :data:`DEFERRED_WORKFLOWS` and their fail-loud stubs are removed
+(``backlog_definition`` left earlier, in v0.1.26 R2). No workflow remains deferred, so this
+set is now empty — it is kept (rather than deleted) as the single declared home of the
+"deferred workflow" concept that the panel catalog and tests read.
 """
 
 from __future__ import annotations
 
-from typing import NoReturn
-
-#: The deferred workflow names, in catalog order. Each maps to an entry point below.
-#: ``backlog_definition`` LEFT this set in v0.1.26 R2 — it now ships a real workflow body
-#: (:mod:`dadaia_workspace.features.lifecycle.workflows.backlog_definition`).
-DEFERRED_WORKFLOWS: tuple[str, ...] = (
-    "audit",
-    "research",
-    "bug_report",
-)
-
-
-def _deferred(name: str) -> NoReturn:
-    raise NotImplementedError(f"{name} workflow deferred to a follow-up release")
-
-
-def audit(*_args: object, **_kwargs: object) -> NoReturn:
-    """Audit workflow — deferred to a follow-up release (fails loud)."""
-    _deferred("audit")
-
-
-def research(*_args: object, **_kwargs: object) -> NoReturn:
-    """Research workflow — deferred to a follow-up release (fails loud)."""
-    _deferred("research")
-
-
-def bug_report(*_args: object, **_kwargs: object) -> NoReturn:
-    """Bug-report workflow — deferred to a follow-up release (fails loud)."""
-    _deferred("bug_report")
+#: The deferred workflow names, in catalog order. Empty as of v0.1.30 Wave E — every
+#: workflow now ships a real body. Kept as the declared seam the catalog iterates.
+DEFERRED_WORKFLOWS: tuple[str, ...] = ()
 
 
 __all__ = [
     "DEFERRED_WORKFLOWS",
-    "audit",
-    "bug_report",
-    "research",
 ]

@@ -109,13 +109,19 @@ def test_workflow_policy_show_closure_resolves(tmp_path: Path, monkeypatch) -> N
 
 
 @pytest.mark.parametrize("name", ["audit", "research", "bug_report"])
-def test_workflow_policy_show_deferred_rejected(name: str, tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    """A deferred workflow has no governed steps — `policy show` rejects it actionably."""
+def test_workflow_policy_show_wave_e_body_resolves(name: str, tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """T-30-E-04: audit/research/bug_report ship real bodies — `policy show` resolves them.
+
+    They left the deferred set in v0.1.30 Wave E, so the governed catalog now carries their
+    model steps and `policy show` succeeds (was: rejected as an unknown/deferred workflow).
+    """
     workspace = _init_states(tmp_path)
     monkeypatch.chdir(workspace)
-    result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", name])
-    assert result.exit_code != 0
-    assert "unknown workflow" in _norm(result.output)
+    result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", name, "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["workflow_id"] == name
+    assert payload["steps"], "resolved policy carries no governed steps"
 
 
 # ---------------------------------------------------------------------------

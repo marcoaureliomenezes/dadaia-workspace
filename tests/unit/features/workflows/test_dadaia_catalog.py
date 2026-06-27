@@ -235,10 +235,18 @@ def test_resolver_resolves_closure_policy() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Wave B (T-29-B-02): all 7 workflows enumerated; deferred ones are honest stubs
+# Wave B (T-29-B-02) → Wave E (T-30-E-04): all 7 workflows enumerated.
+# audit / research / bug_report ship real fragment+gate bodies as of v0.1.30 Wave E, so
+# they are AVAILABLE with real governed steps — no longer deferred zero-step stubs.
 # ---------------------------------------------------------------------------
 
-_DEFERRED = ("audit", "research", "bug_report")
+#: The three workflows that became real fragment+gate bodies in v0.1.30 Wave E, with their
+#: expected step labels (model steps + the terminal Python gate).
+_WAVE_E_BODIES: dict[str, list[str]] = {
+    "audit": ["audit_scope", "drift_scan", "triage", "audit_disposition_gate"],
+    "research": ["research_scope", "investigate", "synthesis", "research_synthesis_gate"],
+    "bug_report": ["bug_intake", "dedupe", "bug_write", "bug_record_gate"],
+}
 
 
 def test_catalog_enumerates_all_seven_workflows() -> None:
@@ -255,29 +263,49 @@ def test_catalog_enumerates_all_seven_workflows() -> None:
     }
 
 
-@pytest.mark.parametrize("name", _DEFERRED)
-def test_deferred_workflow_enumerated_with_zero_governed_steps(name: str) -> None:
+def test_no_workflow_remains_deferred() -> None:
+    """Wave E: DEFERRED_WORKFLOWS is empty — no workflow is cataloged as deferred."""
+    from dadaia_workspace.features.lifecycle.workflows._deferred import DEFERRED_WORKFLOWS
+
+    assert DEFERRED_WORKFLOWS == ()
+    deferred = [
+        w for w in list_dadaia_workflows() if w.availability == dadaia_catalog.AVAILABILITY_DEFERRED
+    ]
+    assert deferred == []
+
+
+@pytest.mark.parametrize("name", sorted(_WAVE_E_BODIES))
+def test_wave_e_body_available_with_real_steps(name: str) -> None:
     workflow = get_dadaia_workflow(name)
     assert workflow is not None
-    assert workflow.availability == dadaia_catalog.AVAILABILITY_DEFERRED
-    assert workflow.steps == []
-    assert workflow.step_count == 0
+    assert workflow.availability == dadaia_catalog.AVAILABILITY_AVAILABLE
+    assert [s.label for s in workflow.steps] == _WAVE_E_BODIES[name]
+    assert workflow.step_count == len(_WAVE_E_BODIES[name])
 
 
-@pytest.mark.parametrize("name", _DEFERRED)
-def test_governed_catalog_omits_deferred_workflow_from_resolver_seam(name: str) -> None:
+@pytest.mark.parametrize("name", sorted(_WAVE_E_BODIES))
+def test_wave_e_body_terminal_step_is_a_python_gate(name: str) -> None:
+    workflow = get_dadaia_workflow(name)
+    assert workflow is not None
+    gate = workflow.steps[-1]
+    assert gate.is_gate is True
+    # A Python-owned terminal gate runs no worker — no harness/model/default profile.
+    assert gate.harness_options == []
+    assert gate.default_harness is None
+    assert gate.default_profiles == {}
+
+
+@pytest.mark.parametrize("name", sorted(_WAVE_E_BODIES))
+def test_wave_e_body_is_governed_and_resolvable(name: str) -> None:
+    """A real body is in the resolver seam and resolves a snapshot (no silent no-op)."""
     catalog = governed_workflow_catalog()
-    assert catalog.workflow(name) is None
-
-
-@pytest.mark.parametrize("name", _DEFERRED)
-def test_resolve_deferred_workflow_raises_actionable_error(name: str) -> None:
-    """A deferred workflow has no governed steps — resolve raises, never silent no-op."""
-    from dadaia_workspace.features.lifecycle.policy_resolver import PolicyResolutionError
+    governed = catalog.workflow(name)
+    assert governed is not None
 
     resolver = WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog())
-    with pytest.raises(PolicyResolutionError) as exc:
-        resolver.resolve(name)
-    # The message names the unknown workflow and lists the governed ones (actionable).
-    assert name in str(exc.value)
-    assert "governed workflows" in str(exc.value)
+    snapshot = resolver.resolve(name)
+    assert snapshot.workflow_id == name
+    assert snapshot.steps, "snapshot has no governed steps"
+    for entry in snapshot.steps:
+        profile = model_profiles.resolve(entry.model_profile)
+        assert entry.harness == profile.harness

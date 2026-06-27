@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -296,31 +297,95 @@ def test_implementation_and_qa_steps_emit_fragment_sourced_prompts() -> None:
     assert "fragment:" not in security_prompt
 
 
-@pytest.mark.parametrize(
-    "name",
-    ["audit", "research", "bug_report"],
-)
-def test_deferred_workflows_fail_loud_when_invoked(name: str) -> None:
+# ---------------------------------------------------------------------------
+# T-30-E-04 — audit / research / bug_report are no longer deferred fail-loud stubs.
+# Each ships a real fragment+gate workflow body; DEFERRED_WORKFLOWS is now empty, and the
+# bodies advance/block via their Python gate rather than raising NotImplementedError (A28).
+# ---------------------------------------------------------------------------
+
+
+def test_no_workflow_is_deferred_anymore() -> None:
     from dadaia_workspace.features.lifecycle import workflows
 
-    entry = getattr(workflows, name)
-    with pytest.raises(NotImplementedError) as excinfo:
-        entry()
-    message = str(excinfo.value)
-    assert name in message
-    assert "deferred to a follow-up release" in message
-
-
-def test_deferred_workflows_are_discoverable() -> None:
-    from dadaia_workspace.features.lifecycle import workflows
-
-    assert workflows.DEFERRED_WORKFLOWS == (
-        "audit",
-        "research",
-        "bug_report",
+    # The fail-loud stub callables are gone — no NotImplementedError entry point remains.
+    assert workflows.DEFERRED_WORKFLOWS == ()
+    assert not hasattr(workflows, "audit") or not callable(
+        getattr(workflows.audit, "_deferred", None)
     )
-    for name in workflows.DEFERRED_WORKFLOWS:
-        assert callable(getattr(workflows, name))
+
+
+@pytest.mark.parametrize(
+    ("workflow_cls_name", "labels"),
+    [
+        ("AuditWorkflow", ["audit_scope", "drift_scan", "triage", "audit_disposition_gate"]),
+        (
+            "ResearchWorkflow",
+            ["research_scope", "investigate", "synthesis", "research_synthesis_gate"],
+        ),
+        ("BugReportWorkflow", ["bug_intake", "dedupe", "bug_write", "bug_record_gate"]),
+    ],
+)
+def test_former_deferred_workflows_run_via_python_gate(
+    tmp_path: Path, workflow_cls_name: str, labels: list[str]
+) -> None:
+    """A28: each former-deferred body runs end-to-end on the FAKE runtime via its gate.
+
+    Proves the body no longer raises ``NotImplementedError`` — it advances through every
+    model step and the terminal Python gate completes the run.
+    """
+    from dadaia_workspace.features.lifecycle import workflows
+    from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
+    from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
+
+    # AgentRunRequest/Result/Status/Kind, dataclass, LifecyclePhase are module-level imports.
+
+    context = "dadaia-workspace"
+    release = "v0.1.30"
+    specs = tmp_path / "repos" / context / "specs"
+    (specs / "memory" / "product").mkdir(parents=True)
+    (specs / "bugs").mkdir(parents=True)
+    (specs / "releases" / release).mkdir(parents=True)
+    (specs / "memory" / "architecture.md").write_text("# a\n", encoding="utf-8")
+    (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
+
+    @dataclass(frozen=True)
+    class _Fake:
+        kind: AgentRuntimeKind
+
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return self.kind
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            ref = (
+                f"repos/{context}/specs/bugs/x.md"
+                if request.task_id.endswith(":bug_write")
+                else f".dadaia/handoff/{context}/s.handoff.json"
+            )
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="ok",
+                artifact_refs=(ref,),
+                structured_output={"verdict": "APPROVED"},
+            )
+
+    selector = ContextSelector(
+        SpecContext(
+            specs_dir=specs, release_id=release, handoff_dir=tmp_path / ".dadaia" / "handoff"
+        )
+    )
+    cls = getattr(workflows, workflow_cls_name)
+    wf = cls(
+        context=context,
+        release_id=release,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _Fake(kind),
+        context_selector=selector,
+    )
+    result = wf.run("run-1")  # must not raise NotImplementedError
+
+    assert result.completed is True
+    assert [s.label for s in result.steps] == labels
+    assert result.steps[-1].is_gate is True
 
 
 # ---------------------------------------------------------------------------

@@ -512,6 +512,7 @@ class BugReportWorkflow:
         (``specs/bugs/**``) — no lease, never gate-blocked. Every other step is a
         non-writing analysis/review step and emits only to the handoff dir.
         """
+        allowed: tuple[str, ...]
         if step.label == _BUG_WRITE_STEP:
             allowed = (f"repos/{self._context}/specs/bugs/**", "specs/bugs/**")
         else:
