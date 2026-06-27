@@ -35,7 +35,7 @@
   - Write set: `dadaia_workspace/infrastructure/claude_sdk_runtime.py`.
   - Acceptance: A2, A4 — Claude SDK adapter tests pass unchanged.
 
-- [ ] **T-30-A-05** — Divergence test + base unit coverage.
+- [-] **T-30-A-05** — Divergence test + base unit coverage.
   - Goal: a test that FAILS if redaction or `changed_paths` override diverges between adapters.
   - Write set: `tests/unit/infrastructure/test_headless_adapter_base.py` (NEW).
   - Acceptance: A3.
