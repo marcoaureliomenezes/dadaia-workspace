@@ -46,6 +46,17 @@ _REVIEW_PHASES: frozenset[LifecyclePhase] = frozenset(
 )
 
 
+def is_review_phase(phase: LifecyclePhase) -> bool:
+    """Whether a target phase is a review/gate phase (verdict-gated) vs a create phase.
+
+    The single source of the review-vs-create distinction for phase-targeting callers —
+    used by :meth:`LifecyclePhaseWorkflow.run` (to set ``is_review`` on the runner input)
+    and by the CLI single-step verbs (to make the worker prompt step-kind-aware: review
+    steps are instructed to emit a verdict; create steps are not — v0.1.32 D-2/L1).
+    """
+    return phase in _REVIEW_PHASES
+
+
 @dataclass(frozen=True)
 class PhaseWorkflowResult:
     """Typed outcome of one engine-driven phase step."""
@@ -90,7 +101,7 @@ class LifecyclePhaseWorkflow:
         # The verdict gate is review-only (v0.1.31 / L1). A step targeting a review phase
         # (QA/SECURITY/CODE) is a review step; otherwise it is a create step. The caller may
         # override explicitly via ``is_review``; default derives it from the target phase.
-        review = is_review if is_review is not None else target_phase in _REVIEW_PHASES
+        review = is_review if is_review is not None else is_review_phase(target_phase)
         # The resolved governance snapshot (T-28-A-07 / LAW 7) is frozen onto the run before
         # the worker call; the resolved per-step model reaches the adapter via the scope's
         # ``resolved_model``. ``dataclasses.replace`` in the runner/state-machine preserves

@@ -53,7 +53,7 @@ Run the live review-path proof on demand (from the dadaia-workspace repo root, w
 workspace venv) — A16:
 
     DADAIA_E2E_REAL_WORKER=1 PI_BIN="$(command -v pi)" \\
-      /home/marco/workspace/dadaia/.dadaia/.venv/bin/pytest -p no:cacheprovider -q -s \\
+      <workspace-root>/.dadaia/.venv/bin/pytest -p no:cacheprovider -q -s \\
       tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py
 """
 

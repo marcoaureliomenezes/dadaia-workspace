@@ -26,7 +26,10 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
-from dadaia_workspace.features.lifecycle.phase_workflow import PhaseWorkflowResult
+from dadaia_workspace.features.lifecycle.phase_workflow import (
+    PhaseWorkflowResult,
+    is_review_phase,
+)
 from dadaia_workspace.features.lifecycle.prompt_builder import PromptScope
 from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandResult,
@@ -776,6 +779,33 @@ def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object,
     return tuple(overrides)
 
 
+def _phase_step_prompt(
+    label: str, release_id: str, context: str, target_phase: LifecyclePhase
+) -> str:
+    """Step-kind-aware worker instruction for a single-step lifecycle verb (v0.1.32 D-2/L1).
+
+    The CLI single-step verbs are the third worker-prompt surface (after
+    ``build_fragment_suffix`` and ``pipeline._generic_prompt``). A review-phase verb
+    (qa/security/code) is verdict-gated and must emit a verdict; a create verb
+    (implement/close/backlog|release define) produces an artifact and must NOT self-verdict
+    — its verdict is ignored by the review-only gate, and instructing it to self-verdict is
+    the Drift-1 incoherence this release eliminates.
+    """
+    if is_review_phase(target_phase):
+        output_instruction = (
+            "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
+            "artifact_ref pointing at the handoff document."
+        )
+    else:
+        output_instruction = (
+            "Emit a handoff with an artifact_ref pointing at the handoff document (the "
+            "artifact you produced). Do not self-verdict — create steps are not verdict-gated."
+        )
+    return (
+        f"Run the {label} step for release {release_id} in context {context}. {output_instruction}"
+    )
+
+
 def _run_phase_step(
     *,
     label: str,
@@ -811,11 +841,7 @@ def _run_phase_step(
         context=context,
         release_id=release_id,
         task_id=run_id,
-        prompt=(
-            f"Run the {label} step for release {release_id} in context {context}. "
-            "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
-            "artifact_ref pointing at the handoff document."
-        ),
+        prompt=_phase_step_prompt(label, release_id, context, target_phase),
         allowed_paths=(f".dadaia/handoff/{context}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )
