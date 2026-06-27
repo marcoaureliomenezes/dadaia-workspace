@@ -76,3 +76,14 @@ def test_sessions_js_toggles_codex_banner_before_rendering_rows() -> None:
 
     success = js[js.index("_allRows = data.sessions || [];") :][:300]
     assert success.index("updateBanner()") < success.index("renderTable(")
+
+
+def test_sessions_js_supports_pi_cost_unknown_banner() -> None:
+    """PI shares the Codex cost-unknown posture: its own banner + '—' cost (A12)."""
+    js = _sessions_js()
+
+    assert "PI_BANNER_TEXT" in js
+    assert "Cost not tracked for PI" in js
+    # The cost-unknown predicate must cover both codex and pi.
+    assert "isCostUnknownRuntime" in js
+    assert "runtime === 'codex' || runtime === 'pi'" in js

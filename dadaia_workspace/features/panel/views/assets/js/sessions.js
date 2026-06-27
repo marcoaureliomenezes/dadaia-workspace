@@ -42,6 +42,13 @@
   var FILTER_DEBOUNCE_MS = 200;
   var DEFAULT_RUNTIME = 'claude';
   var CODEX_BANNER_TEXT = 'Cost not tracked for Codex';
+  var PI_BANNER_TEXT = 'Cost not tracked for PI';
+
+  // Runtimes with no per-event pricing — cost is unknown and never fabricated.
+  // Codex and PI share this posture; the Cost column/banner behave identically.
+  function isCostUnknownRuntime(runtime) {
+    return runtime === 'codex' || runtime === 'pi';
+  }
 
   // ── Module state ─────────────────────────────────────────────────────────────
   var _allRows = [];           // last fetched SessionRow array (full set, pre-filter)
@@ -77,8 +84,8 @@
     var banner = document.getElementById('sessions-banner');
     if (!banner) { return; }
     var runtime = getRuntime();
-    if (runtime === 'codex') {
-      banner.textContent = CODEX_BANNER_TEXT;
+    if (isCostUnknownRuntime(runtime)) {
+      banner.textContent = (runtime === 'pi') ? PI_BANNER_TEXT : CODEX_BANNER_TEXT;
       banner.removeAttribute('hidden');
     } else {
       banner.textContent = '';
@@ -124,10 +131,10 @@
   function renderDashboard(stats) {
     var dash = document.getElementById('sessions-dashboard');
     if (!dash) { return; }
-    var isCodex = stats.runtime === 'codex';
-    var costVal = isCodex ? 'N/A'
+    var isCostUnknown = isCostUnknownRuntime(stats.runtime);
+    var costVal = isCostUnknown ? 'N/A'
       : (stats.totalCostUsd == null ? '—' : '$' + stats.totalCostUsd.toFixed(2));
-    var costClass = (!isCodex && stats.totalCostUsd != null)
+    var costClass = (!isCostUnknown && stats.totalCostUsd != null)
       ? 'sessions-stat-value sessions-stat-value--cost'
       : 'sessions-stat-value';
     var turnsStr = stats.totalTurns >= 1000000
@@ -148,7 +155,7 @@
       + '<div class="sessions-stat-card">'
         + '<span class="sessions-stat-label">Total Cost</span>'
         + '<span class="' + costClass + '">' + escHtml(costVal) + '</span>'
-        + '<span class="sessions-stat-sub">' + (isCodex ? 'not tracked for Codex' : '&nbsp;') + '</span>'
+        + '<span class="sessions-stat-sub">' + (isCostUnknown ? ('not tracked for ' + (stats.runtime === 'pi' ? 'PI' : 'Codex')) : '&nbsp;') + '</span>'
       + '</div>'
       + '<div class="sessions-stat-card">'
         + '<span class="sessions-stat-label">AI Turns</span>'
@@ -239,7 +246,7 @@
     // Phase E: when runtime is 'codex', Cost column always renders '—' because
     // cost tracking is not available for Codex sessions (SPEC §FR6, §4 out-of-scope).
     var runtime = getRuntime();
-    var cost = (runtime === 'codex') ? '—' : fmtCost(session.cumulative_cost_usd, session.cost_known);
+    var cost = isCostUnknownRuntime(runtime) ? '—' : fmtCost(session.cumulative_cost_usd, session.cost_known);
     var lastActivity = fmtRelativeDate(session.last_activity_at);
     var status = session.status || 'ended';
 

@@ -111,9 +111,9 @@ def _is_allowed_host(host_header: str | None) -> bool:
 _CSP_SCRIPT_HASH_1 = "'sha256-GRTndW6m1zCm5uxB5kEDoOXw05c1c9MDdem3TFqSMfQ='"
 # Runtime-switcher snippet (used in index.py only):
 #   (function(){var r=localStorage.getItem('dadaia-panel-runtime');
-#    if(r&&(r==='claude'||r==='codex')){
+#    if(r&&(r==='claude'||r==='codex'||r==='pi')){
 #    document.documentElement.dataset.runtime=r;}})();
-_CSP_SCRIPT_HASH_2 = "'sha256-u9QKVWf5nJ6CpgKA7eHqzt+KvUm6M4dcZhYWRxJuAbA='"
+_CSP_SCRIPT_HASH_2 = "'sha256-rrb6m84iyHOhA+A1XebxK17XtUkbhWfR95KsYvJgmpA='"
 
 _NOT_FOUND_BODY = (
     b"Route not found. "
