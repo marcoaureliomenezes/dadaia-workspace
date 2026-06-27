@@ -133,6 +133,10 @@ def test_catalog_row_carries_default_harness_and_unflagged_when_codex(tmp_path: 
     assert step["default_harness"] == "codex"
     assert step["harness"] == "codex"
     assert step["harness_overridden"] is False
+    # T-29-C-02: the per-harness default profiles are exposed for the panel auto-profile —
+    # the same map the resolver uses, so a harness toggle picks the resolver's choice.
+    assert step["default_profiles"]["codex"] == "codex-implementation-standard"
+    assert step["default_profiles"]["pi"] == "pi-implementation-standard"
 
 
 def test_catalog_row_flags_harness_override_from_overlay(tmp_path: Path) -> None:

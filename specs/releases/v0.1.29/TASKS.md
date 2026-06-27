@@ -115,7 +115,7 @@ PUT/validate accepts a harness-only overlay (resolvable via auto-profile).
 **Write set:** `dadaia_workspace/features/panel/views/workflow_policy.py`.
 **Acceptance:** AC-6 (catalog row shows pi harness + flag); a harness-only PUT returns 200.
 
-### [-] T-29-C-02 — Panel JS: codex/pi toggle persists harness
+### [x] T-29-C-02 — Panel JS: codex/pi toggle persists harness
 **Goal:** the segmented toggle writes the step `harness` into the PUT body and renders the
 harness-overridden flag in the diff. Re-stage/install the projected asset at the Wave D
 checkpoint.

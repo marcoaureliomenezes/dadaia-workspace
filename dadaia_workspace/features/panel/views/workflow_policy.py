@@ -130,6 +130,10 @@ def _effective_steps(
                 "harness": entry.harness,
                 "default_harness": cat_step.default_harness,
                 "default_profile": cat_step.default_profile,
+                # T-29-C-02: the per-harness default profiles so the panel can auto-select a
+                # profile when the harness toggle flips (single source of truth — the same map
+                # the resolver uses for D-1 auto-profile; no second JS table).
+                "default_profiles": dict(cat_step.default_profiles),
                 "effective_profile": entry.model_profile,
                 "model": entry.model,
                 "reasoning": entry.reasoning,
@@ -166,6 +170,7 @@ def _workflow_to_dict(
                 "harness": s.default_harness,
                 "default_harness": s.default_harness,
                 "default_profile": s.default_profile,
+                "default_profiles": dict(s.default_profiles),
                 "effective_profile": s.default_profile,
                 "is_overridden": False,
                 "harness_overridden": False,

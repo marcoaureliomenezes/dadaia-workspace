@@ -45,8 +45,10 @@
     });
   }
 
-  // In-memory edit state: { workflow_id: { step: profile_id } } — pending overrides.
+  // In-memory edit state: { workflow_id: { step: profile_id } } — pending profile overrides.
   var pending = {};
+  // Pending harness overrides: { workflow_id: { step: harness } } (D-3, T-29-C-02).
+  var pendingHarness = {};
   var profilesByHarness = {}; // harness -> [profile]
   var catalog = null;         // last catalog payload
 
@@ -56,9 +58,35 @@
 
   // ── Rendering ──────────────────────────────────────────────────────────────
 
+  // The step's effective harness: a pending toggle wins, else the catalog row's
+  // resolved harness (which already folds the persisted overlay, D-1 precedence).
+  function effectiveHarness(workflowId, step) {
+    var h = pendingHarness[workflowId] && pendingHarness[workflowId][step.step];
+    return h != null ? h : step.harness;
+  }
+
   function effectiveProfile(workflowId, step) {
     var p = pending[workflowId] && pending[workflowId][step.step];
-    return p != null ? p : step.effective_profile;
+    if (p != null) { return p; }
+    // No pending profile: if the harness was toggled away from the row's resolved
+    // harness, the row's effective_profile no longer matches — auto-select the toggled
+    // harness's default profile for the step purpose (D-1 auto-profile in the browser).
+    var ph = pendingHarness[workflowId] && pendingHarness[workflowId][step.step];
+    if (ph != null && ph !== step.harness) {
+      return defaultProfileForStep(ph, step);
+    }
+    return step.effective_profile;
+  }
+
+  // The harness's default profile for this step comes straight off the catalog row's
+  // ``default_profiles`` map — the SAME map the resolver uses for D-1 auto-profile, so the
+  // panel and the server never disagree on which profile a harness flip selects (no second
+  // JS table). Falls back to the harness's first profile only if the map is absent.
+  function defaultProfileForStep(harness, step) {
+    var byHarness = step.default_profiles || {};
+    if (byHarness[harness] != null) { return byHarness[harness]; }
+    var list = profilesFor(harness);
+    return list.length ? list[0].id : step.effective_profile;
   }
 
   function harnessForProfile(profileId, fallback) {
@@ -102,12 +130,20 @@
 
   function renderStepRow(workflowId, step) {
     var eff = effectiveProfile(workflowId, step);
-    var harness = harnessForProfile(eff, step.harness);
-    var isOverridden = eff !== step.default_profile;
+    // The effective harness drives the segmented control AND the dropdown filter; with a
+    // pending toggle this is the toggled harness, else the catalog row's resolved harness.
+    var harness = effectiveHarness(workflowId, step);
+    var defaultHarness = step.default_harness || harnessForProfile(step.default_profile, harness);
+    var harnessOverridden = harness !== defaultHarness;
+    var isOverridden = eff !== step.default_profile || harnessOverridden;
     var rowCls = 'wfp-step-row' + (isOverridden ? ' wfp-step-row--overridden' : '');
+    var harnessFlag = harnessOverridden
+      ? ' <span class="wfp-diff-harness" data-testid="wfp-diff-harness">harness: ' +
+        escHtml(defaultHarness) + ' → ' + escHtml(harness) + '</span>'
+      : '';
     var diff = isOverridden
       ? '<span class="wfp-diff" data-testid="wfp-diff">default: ' +
-        escHtml(step.default_profile) + ' → ' + escHtml(eff) + '</span>'
+        escHtml(step.default_profile) + ' → ' + escHtml(eff) + '</span>' + harnessFlag
       : '<span class="wfp-diff wfp-diff--none">default</span>';
     var gate = step.is_gate || step.gate
       ? '<span class="wfp-gate" title="gate step">◉</span>' : '';
@@ -187,6 +223,19 @@
     }
   }
 
+  // Record a pending harness override (T-29-C-02). A harness equal to the catalog default
+  // harness is NOT a pending override — it is cleared so the PUT body omits it (back-compat).
+  function setPendingHarness(workflowId, step, harness, catStep) {
+    if (!pendingHarness[workflowId]) { pendingHarness[workflowId] = {}; }
+    var defaultHarness = catStep.default_harness;
+    if (harness === defaultHarness) {
+      delete pendingHarness[workflowId][step];
+      if (Object.keys(pendingHarness[workflowId]).length === 0) { delete pendingHarness[workflowId]; }
+    } else {
+      pendingHarness[workflowId][step] = harness;
+    }
+  }
+
   function stepByLabel(workflowId, label) {
     var wf = (catalog.workflows || []).find(function (w) { return w.workflow_id === workflowId; });
     if (!wf) { return null; }
@@ -215,10 +264,13 @@
         var harness = btn.getAttribute('data-wfp-harness');
         var step = stepByLabel(wfId, stepLabel);
         if (!step) { return; }
-        // Switching harness picks that harness's first profile (filtered dropdown).
-        var list = profilesFor(harness);
-        if (list.length) {
-          setPending(wfId, stepLabel, list[0].id, step.default_profile);
+        setPendingHarness(wfId, stepLabel, harness, step);
+        // When the harness flips to one that doesn't carry the current profile, auto-select
+        // that harness's default profile for the step purpose (mirrors the resolver, D-1).
+        // A pending profile that already belongs to the toggled harness is preserved.
+        var currentProfile = effectiveProfile(wfId, step);
+        if (harnessForProfile(currentProfile, null) !== harness) {
+          setPending(wfId, stepLabel, defaultProfileForStep(harness, step), step.default_profile);
         }
         render();
       });
@@ -229,6 +281,7 @@
         var wfId = btn.getAttribute('data-wfp-workflow');
         var stepLabel = btn.getAttribute('data-wfp-step');
         if (pending[wfId]) { delete pending[wfId][stepLabel]; }
+        if (pendingHarness[wfId]) { delete pendingHarness[wfId][stepLabel]; }
         render();
       });
     });
@@ -308,10 +361,20 @@
 
   function buildPolicyPayload() {
     var workflows = {};
-    for (var wfId in pending) {
+    // Profile overrides → workflow.steps. Harness overrides → workflow.harnesses (D-3).
+    var wfId;
+    for (wfId in pending) {
       var steps = {};
       for (var step in pending[wfId]) { steps[step] = pending[wfId][step]; }
       if (Object.keys(steps).length) { workflows[wfId] = { steps: steps }; }
+    }
+    for (wfId in pendingHarness) {
+      var harnesses = {};
+      for (var hstep in pendingHarness[wfId]) { harnesses[hstep] = pendingHarness[wfId][hstep]; }
+      if (Object.keys(harnesses).length) {
+        if (!workflows[wfId]) { workflows[wfId] = { steps: {} }; }
+        workflows[wfId].harnesses = harnesses;
+      }
     }
     return {
       schema_version: 'workflow-model-policy-v1',
@@ -357,6 +420,7 @@
         if (res.status === 200 && res.body.saved) {
           setBanner('ok', 'Saved.');
           pending = {};
+          pendingHarness = {};
           return loadCatalog();
         }
         var msg = (res.body.errors && res.body.errors.map(function (e) {
