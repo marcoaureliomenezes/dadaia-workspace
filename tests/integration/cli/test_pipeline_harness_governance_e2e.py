@@ -23,7 +23,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+from typer.testing import CliRunner
+
 from dadaia_workspace import container
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
     AgentRunStatus,
@@ -110,6 +114,39 @@ def test_cli_harness_pi_resolves_pi_end_to_end(tmp_path: Path) -> None:
     _assert_all_pi(recorder, persisted)
 
 
+def test_cli_flag_harness_pi_show_policy_resolves_pi_per_step(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-29-C-03 — the real ``dadaia lifecycle pipeline --harness pi --show-policy`` FLAG
+    (not just the resolver kwarg) threads through the CLI into the shared resolver, so the
+    governed snapshot resolves harness=pi + a PI catalog model for every step.
+    ``--show-policy`` resolves + emits the snapshot WITHOUT running an adapter, keeping the
+    proof hermetic (no PI binary, no credits)."""
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "v0.1.29",
+            "--harness",
+            "pi",
+            "--show-policy",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    steps = payload["steps"]
+    assert steps, payload
+    for entry in steps:
+        assert entry["harness"] == "pi", entry
+        assert entry["model"] in _PI_MODELS, entry
+
+
 # ---------------------------------------------------------------------------
 # AC-5 — overlay path (default_harness: pi, no CLI flag)
 # ---------------------------------------------------------------------------
@@ -131,6 +168,54 @@ def test_overlay_default_harness_pi_resolves_pi_end_to_end(tmp_path: Path) -> No
 
     resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
     snapshot = resolver.resolve("implementation", context="default")  # no CLI flag
+    recorder, persisted = _run(workspace, snapshot)
+    _assert_all_pi(recorder, persisted)
+
+
+def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -> None:
+    """T-29-C-04 — an overlay persisted through the PANEL PUT route (``default_harness: pi``,
+    no CLI flag) makes a subsequent ``implementation`` run resolve PI for every step and
+    record harness=pi in the snapshot. Proves the panel-persisted overlay actually drives
+    execution — the same write path the codex/pi toggle uses (validate → atomic write)."""
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+    )
+    from dadaia_workspace.features.panel.views.workflow_policy import (
+        render_put_workflow_model_policy,
+    )
+    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+        WorkflowModelPolicyOverlay,
+    )
+
+    workspace = _init_workspace(tmp_path)
+    store = container.build_workflow_model_policy_store(workspace)
+    catalog = governed_workflow_catalog()
+
+    def _factory(
+        context: str, *, overlay: WorkflowModelPolicyOverlay | None = None
+    ) -> WorkflowExecutionPolicyResolver:
+        resolved = overlay if overlay is not None else store.load()
+        return WorkflowExecutionPolicyResolver(catalog=catalog, overlay=resolved)
+
+    put = render_put_workflow_model_policy(store, _factory)
+    body = json.dumps(
+        {
+            "schema_version": "workflow-model-policy-v1",
+            "policy_id": "default",
+            "contexts": {
+                "default": {"workflows": {"implementation": {"steps": {}, "default_harness": "pi"}}}
+            },
+        }
+    ).encode("utf-8")
+    status, _ct, _payload = put(
+        body=body, content_type="application/json", qs={"context": ["default"]}
+    )
+    assert status == 200, _payload
+
+    # Fresh resolver reads the PUT-persisted overlay from disk — no CLI flag, no in-memory hint.
+    resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
+    snapshot = resolver.resolve("implementation", context="default")
     recorder, persisted = _run(workspace, snapshot)
     _assert_all_pi(recorder, persisted)
 
