@@ -68,7 +68,7 @@
   - Write set: `dadaia_workspace/features/telemetry/reader/pi.py` (NEW).
   - Acceptance: A11.
 
-- [-] **T-30-B-04** — WS-PI-6: PI telemetry adapter + registry entry + panel A12 wiring.
+- [x] **T-30-B-04** — WS-PI-6: PI telemetry adapter + registry entry + panel A12 wiring.
   - Goal: `PiRuntimeAdapter` (enrichment + liveness, cost unknown) + `"pi"` in
     `ADAPTER_REGISTRY`; PI session ingestion in service/panel; PI runtime button in panel.
   - Write set: `dadaia_workspace/features/telemetry/aggregator/runtimes.py`;
