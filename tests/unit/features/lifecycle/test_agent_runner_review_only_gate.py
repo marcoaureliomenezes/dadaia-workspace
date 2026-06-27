@@ -209,3 +209,45 @@ def test_pipeline_review_step_blocks_on_rejected_verdict() -> None:
         )
         assert blocked is not None, f"{step.label} should block on REJECTED verdict"  # type: ignore[attr-defined]
         assert blocked.reason == "agent result missing APPROVED verdict"
+
+
+# -- (e) v0.1.32 Wave C — REJECTED-blocks negative via the faked gate path (T-32-C-03) ----
+#
+# A15 / OQ-2: the live half (test_real_pi_worker_review_step_emits_approved_and_gate_passes)
+# proves a real worker's APPROVED verdict PASSES the gate. The REJECTED-blocks negative is
+# proven HERE through the same faked gate — no second credit-burning live run, default CI
+# stays green. These assert the verdict gate BLOCKs a review step on REJECTED and on a
+# missing verdict, even when the payload is otherwise schema-valid (artifact_refs populated),
+# mirroring the ``spec_arch_review`` review step the live e2e exercises.
+
+
+def test_wave_c_review_step_rejected_verdict_blocks_run() -> None:
+    # REJECTED on a review step BLOCKs (A15): the gate refuses to advance despite a
+    # schema-valid payload (non-empty artifact_refs) — only the verdict differs.
+    blocked = _gate(
+        _result(verdict="REJECTED", artifact_refs=(_ARTIFACT,)),
+        is_review=True,
+    )
+    assert blocked is not None, "a REJECTED verdict on a review step must BLOCK the run"
+    assert blocked.reason == "agent result missing APPROVED verdict"
+
+
+def test_wave_c_review_step_missing_verdict_blocks_run() -> None:
+    # The missing-verdict variant (A15): a review step with NO verdict field BLOCKs, even
+    # with a schema-valid payload — the absence of an explicit APPROVED is not a pass.
+    blocked = _gate(
+        _result(verdict=None, artifact_refs=(_ARTIFACT,)),
+        is_review=True,
+    )
+    assert blocked is not None, "a missing verdict on a review step must BLOCK the run"
+    assert blocked.reason == "agent result missing APPROVED verdict"
+
+
+def test_wave_c_review_step_approved_verdict_passes_contrast() -> None:
+    # Positive contrast pinning the negative: the SAME schema-valid payload PASSES iff the
+    # verdict is APPROVED — so the block above is attributable to the verdict, nothing else.
+    blocked = _gate(
+        _result(verdict="APPROVED", artifact_refs=(_ARTIFACT,)),
+        is_review=True,
+    )
+    assert blocked is None, "an APPROVED verdict on a schema-valid review payload must PASS"
