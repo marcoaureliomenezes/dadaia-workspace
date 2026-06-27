@@ -153,7 +153,7 @@ confirm WMP-1..WMP-7 pass over the completed catalog (closure added).
 **Acceptance:** AC-8 (zero ERROR over good catalog; deliberate-bad overlay yields the
 specified findings).
 
-### [ ] T-29-D-02 — Projection + full-suite final checkpoint
+### [x] T-29-D-02 — Projection + full-suite final checkpoint
 **Goal:** project the schema asset and run the full gate.
 **Write set:** (no source — runs `dadaia public stage && dadaia public install --target all
 && dadaia public doctor`; surfaces to operator/devops since PE has no Bash). Then
@@ -161,7 +161,7 @@ specified findings).
 **Acceptance:** AC-11 — full suite green; `dadaia public doctor` exit 0 with
 `[ok] public-privacy`; schema projection consistent.
 
-### [ ] T-29-D-03 — Re-assert carried-forward laws (§3.7)
+### [x] T-29-D-03 — Re-assert carried-forward laws (§3.7)
 **Goal:** confirm default-first (AC-10), auditability snapshot (run reads snapshot
 verbatim), invalid-blocks-execution, resolve-once-before-step-1, Layer-2 codex|pi only
 (AC-9) all still hold after the changes.
