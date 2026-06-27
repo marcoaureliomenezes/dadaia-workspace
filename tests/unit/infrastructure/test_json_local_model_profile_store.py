@@ -66,9 +66,7 @@ def test_satisfies_port() -> None:
 def test_path_is_workspace_local(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     store = JsonLocalModelProfileStore(workspace)
-    assert store.path == (
-        workspace / ".dadaia" / "states" / "workflow_model_profiles.local.json"
-    )
+    assert store.path == (workspace / ".dadaia" / "states" / "workflow_model_profiles.local.json")
 
 
 def test_missing_store_loads_empty_tuple_not_error(tmp_path: Path) -> None:
