@@ -44,10 +44,7 @@ from dadaia_workspace.core.scope_match import is_in_scope
 # secret redaction (CWE-209 parity) and the git seam type (changed_paths parity).
 # The Claude SDK adapter is NOT subprocess-backed, so it deliberately does not
 # inherit ``SubprocessAdapterMixin`` (no Runner / env-allowlist / prompt envelope).
-from dadaia_workspace.infrastructure.headless_adapter_base import (  # noqa: F401 (git seam re-export for parity)
-    RedactionMixin,
-    _GitDiffPort,
-)
+from dadaia_workspace.infrastructure.headless_adapter_base import RedactionMixin
 
 #: ``path -> may the worker write it?`` — the Ring-1 pre-disk decision.
 WritePermission = Callable[[str], bool]
