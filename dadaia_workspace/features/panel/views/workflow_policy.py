@@ -555,10 +555,19 @@ def _semantic_check(
 
     Returns ``None`` when the candidate is valid, else a 400-shaped error dict with a
     structured field path identifying the offending workflow/step.
+
+    T-30-C-05 (nit iii): the workflow set is the **explicit 3-map union** the WMP doctor
+    uses (``contexts | default_harness_overlay | step_harness_overlay``), not the
+    profile-overrides map alone. A workflow that appears *only* in a harness-overlay map
+    (per-workflow default harness or per-step harness) is now validated too — previously it
+    relied on the empty-steps parse side effect and could slip past the panel check while
+    the doctor flagged it (the two now agree).
     """
     resolver = resolver_factory(context, overlay=overlay)
-    workflows = overlay.contexts.get(context, {})
-    for workflow_id in workflows:
+    workflows: set[str] = set(overlay.contexts.get(context, {}))
+    workflows |= set(overlay.default_harness_overlay.get(context, {}))
+    workflows |= set(overlay.step_harness_overlay.get(context, {}))
+    for workflow_id in sorted(workflows):
         try:
             resolver.resolve(workflow_id, context=context)
         except PolicyResolutionError as exc:

@@ -142,19 +142,39 @@ class WorkflowModelPolicyOverlay:
         return None
 
     def to_dict(self) -> dict[str, Any]:
+        # Serialize the UNION of all three context maps plus declared `extends`
+        # parents, so a save/load round-trip is identity even for harness-only
+        # workflows (named only in default_harness_overlay / step_harness_overlay
+        # with no profile `steps` entry) and extends-only contexts. Mirrors the
+        # union the WMP doctor (`_resolve_overlay`) and panel `_semantic_check` use.
+        ctx_keys = (
+            set(self.contexts)
+            | set(self.default_harness_overlay)
+            | set(self.step_harness_overlay)
+            | set(self.extends)
+        )
         contexts: dict[str, Any] = {}
-        for ctx, workflows in self.contexts.items():
+        for ctx in sorted(ctx_keys):
+            workflows = self.contexts.get(ctx, {})
+            ctx_default_harness = self.default_harness_overlay.get(ctx, {})
+            ctx_step_harness = self.step_harness_overlay.get(ctx, {})
+            wf_keys = set(workflows) | set(ctx_default_harness) | set(ctx_step_harness)
             wf_out: dict[str, Any] = {}
-            for wf, steps in workflows.items():
-                entry: dict[str, Any] = {"steps": dict(steps)}
-                default_harness = self.default_harness_overlay.get(ctx, {}).get(wf)
+            for wf in sorted(wf_keys):
+                entry: dict[str, Any] = {}
+                steps = workflows.get(wf, {})
+                if steps:
+                    entry["steps"] = dict(steps)
+                default_harness = ctx_default_harness.get(wf)
                 if default_harness is not None:
                     entry["default_harness"] = default_harness
-                harnesses = self.step_harness_overlay.get(ctx, {}).get(wf, {})
+                harnesses = ctx_step_harness.get(wf, {})
                 if harnesses:
                     entry["harnesses"] = dict(harnesses)
                 wf_out[wf] = entry
-            ctx_out: dict[str, Any] = {"workflows": wf_out}
+            ctx_out: dict[str, Any] = {}
+            if wf_out:
+                ctx_out["workflows"] = wf_out
             parent = self.extends.get(ctx)
             if parent is not None:
                 ctx_out["extends"] = parent

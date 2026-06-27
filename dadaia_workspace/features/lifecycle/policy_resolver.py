@@ -15,12 +15,16 @@ deprecated-without-replacement, or a stale overlay step id anywhere in the chain
 failure (fail-closed). The precedence vocabulary is recorded on the snapshot for
 auditability.
 
-**M3 (Wave A independence):** the library step defaults come from
-:mod:`dadaia_workspace.features.lifecycle.model_profiles` directly — NOT the Wave-B
-``dadaia_catalog``. :func:`library_workflow_catalog` builds the catalog by introspecting
-the implementation pipeline (``implementation_ladder``) and naming a default profile per
-step. Wave B will later make ``dadaia_catalog`` the governed catalog and feed it here, but
-Wave A is green on its own.
+**Production catalog source.** The resolver the CLI + panel run on is fed the **governed**
+catalog from
+:func:`dadaia_workspace.features.workflows.dadaia_catalog.governed_workflow_catalog` (wired
+via ``container.build_workflow_model_profile_registry``) — that is the single governed
+source of truth, with one home for the per-harness default-by-purpose map
+(:data:`DEFAULT_PROFILE_BY_HARNESS_PURPOSE`, which the catalog imports from here).
+:func:`library_workflow_catalog` here is a Wave-A-independent **fallback/standalone**
+catalog built by introspecting the implementation pipeline (``implementation_ladder``); it
+shares the same profile defaults but is NOT the production source consumed by the
+container.
 
 Validation: every override (overlay or CLI) must reference a catalog step id, a known
 profile id (:mod:`model_profiles`), and a profile whose harness matches the step's
@@ -143,12 +147,17 @@ _IMPLEMENTATION_STEP_PROFILE: dict[str, str] = {
     "review_code": "codex-review-deep",
 }
 
-# Per-harness default profile by step purpose (v0.1.29 / T-29-A-01) — the library-catalog
-# twin of ``dadaia_catalog._DEFAULT_PROFILE_BY_HARNESS_PURPOSE``. ``"standard"`` = a
-# producing worker step, ``"deep"`` = a review/gate worker step. Used to populate each
-# ``CatalogStep.default_profiles`` so the resolver can auto-select a profile per effective
-# harness (D-1). PI has no dedicated review profile, so its deep slot is ``pi-reasoning-high``.
-_DEFAULT_PROFILE_BY_HARNESS_PURPOSE: dict[str, dict[str, str]] = {
+# Per-harness default profile by step purpose — the **single shared home** (T-30-C-05 nit i;
+# previously a verbatim twin in ``dadaia_catalog``). ``"standard"`` = a producing worker
+# step, ``"deep"`` = a review/gate worker step. Both the library catalog
+# (:func:`library_workflow_catalog`) and the governed catalog
+# (:func:`dadaia_catalog.governed_workflow_catalog`, which imports this map) populate each
+# ``CatalogStep.default_profiles`` from it so the resolver can auto-select a profile per
+# effective harness (D-1). Governance is enforced by
+# ``dadaia_catalog._assert_catalog_defaults_resolve`` at import time (every profile id
+# resolves + harness matches). PI has no dedicated review profile, so its deep slot is
+# ``pi-reasoning-high``.
+DEFAULT_PROFILE_BY_HARNESS_PURPOSE: dict[str, dict[str, str]] = {
     "codex": {"standard": "codex-implementation-standard", "deep": "codex-review-deep"},
     "pi": {"standard": "pi-implementation-standard", "deep": "pi-reasoning-high"},
 }
@@ -178,7 +187,7 @@ def library_workflow_catalog() -> WorkflowCatalog:
         # for an effective-harness override. Review/gate steps default to the deep profile.
         purpose = "deep" if pstep.label.startswith("review") else "standard"
         default_profiles = {
-            h: by_purpose[purpose] for h, by_purpose in _DEFAULT_PROFILE_BY_HARNESS_PURPOSE.items()
+            h: by_purpose[purpose] for h, by_purpose in DEFAULT_PROFILE_BY_HARNESS_PURPOSE.items()
         }
         fragments = (pstep.fragment_id, *pstep.shared_fragment_ids) if pstep.fragment_id else ()
         steps.append(
@@ -481,6 +490,7 @@ class WorkflowExecutionPolicyResolver:
 
 
 __all__ = [
+    "DEFAULT_PROFILE_BY_HARNESS_PURPOSE",
     "CatalogStep",
     "CatalogWorkflow",
     "PolicyResolutionError",

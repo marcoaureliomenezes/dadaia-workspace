@@ -16,6 +16,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
+    WorkflowModelPolicyOverlay,
     WorkflowModelPolicyStoreError,
 )
 
@@ -60,6 +61,24 @@ def test_save_then_load_round_trips(tmp_path: Path) -> None:
     assert loaded.step_profile("default", "implementation", "implement") == (
         "codex-implementation-standard"
     )
+
+
+def test_save_then_load_round_trips_harness_only_workflow(tmp_path: Path) -> None:
+    """A harness-only overlay (named only in default_harness/step_harness, no profile
+    `steps`) must survive save→load — regression for
+    `overlay-todict-drops-harness-only-workflow` (to_dict iterated only `contexts`)."""
+    store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
+    overlay = WorkflowModelPolicyOverlay(
+        policy_id="default",
+        contexts={},
+        default_harness_overlay={"default": {"implementation": "pi"}},
+        step_harness_overlay={"default": {"implementation": {"implement": "pi"}}},
+    )
+    store.save(overlay)
+    loaded = store.load()
+    assert loaded is not None
+    assert loaded.workflow_default_harness("default", "implementation") == "pi"
+    assert loaded.step_harness("default", "implementation", "implement") == "pi"
 
 
 def test_invalid_json_raises(tmp_path: Path) -> None:

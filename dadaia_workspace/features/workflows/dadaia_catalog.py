@@ -49,6 +49,7 @@ from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.features.lifecycle import model_profiles
 from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
 from dadaia_workspace.features.lifecycle.policy_resolver import (
+    DEFAULT_PROFILE_BY_HARNESS_PURPOSE,
     CatalogStep,
     CatalogWorkflow,
     WorkflowCatalog,
@@ -313,23 +314,11 @@ def _harness_options_for(*, is_worker_step: bool) -> tuple[list[str], dict[str, 
 #
 # Each worker step defaults to a model **profile** per supported harness. A
 # review/gate worker step defaults to the harness's deep-reasoning profile; a producing
-# worker step defaults to the harness's standard implementation profile. The profile ids
-# are governed: ``_assert_catalog_defaults_resolve`` ties them to the built-in registry at
-# import time (mirroring ``model_profiles._assert_profiles_resolve``) — no second table.
-
-#: Per-harness default profile id by step purpose. ``"deep"`` = review/gate worker step,
-#: ``"standard"`` = producing worker step. PI has no dedicated "review" profile, so its
-#: deep slot maps to ``pi-reasoning-high`` (the deepest PI profile).
-_DEFAULT_PROFILE_BY_HARNESS_PURPOSE: dict[str, dict[str, str]] = {
-    harness_models.CODEX_HARNESS: {
-        "standard": "codex-implementation-standard",
-        "deep": "codex-review-deep",
-    },
-    harness_models.PI_HARNESS: {
-        "standard": "pi-implementation-standard",
-        "deep": "pi-reasoning-high",
-    },
-}
+# worker step defaults to the harness's standard implementation profile. The per-harness
+# default-by-purpose map has ONE home — ``policy_resolver.DEFAULT_PROFILE_BY_HARNESS_PURPOSE``
+# (T-30-C-05 nit i; previously a verbatim twin lived here). The profile ids are governed:
+# ``_assert_catalog_defaults_resolve`` ties them to the built-in registry at import time
+# (mirroring ``model_profiles._assert_profiles_resolve``) — no second table.
 
 #: The harness a worker step defaults to when more than one is supported (LAW 1: codex/pi).
 _DEFAULT_WORKER_HARNESS: str = harness_models.CODEX_HARNESS
@@ -350,7 +339,7 @@ def _default_profiles_for(
     purpose = "deep" if is_gate else "standard"
     profiles: dict[str, str] = {}
     for harness in harness_options:
-        by_purpose = _DEFAULT_PROFILE_BY_HARNESS_PURPOSE.get(harness)
+        by_purpose = DEFAULT_PROFILE_BY_HARNESS_PURPOSE.get(harness)
         if by_purpose is None:  # pragma: no cover - guarded by _MODEL_HARNESS_OPTIONS
             continue
         profiles[harness] = by_purpose[purpose]
