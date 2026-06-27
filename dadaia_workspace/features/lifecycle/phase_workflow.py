@@ -34,6 +34,17 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 
+#: The review phases (v0.1.31 / C1). A phase step targeting one of these is a REVIEW step,
+#: so its worker output is gated on ``verdict == APPROVED`` (L1). A step targeting any other
+#: phase (e.g. a create/implementation phase) is a create step and is not verdict-gated.
+_REVIEW_PHASES: frozenset[LifecyclePhase] = frozenset(
+    {
+        LifecyclePhase.QA_REVIEW,
+        LifecyclePhase.SECURITY_REVIEW,
+        LifecyclePhase.CODE_REVIEW,
+    }
+)
+
 
 @dataclass(frozen=True)
 class PhaseWorkflowResult:
@@ -73,8 +84,13 @@ class LifecyclePhaseWorkflow:
         requirements: tuple[GateRequirement, ...] = (),
         current_step: str | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
+        is_review: bool | None = None,
     ) -> PhaseWorkflowResult:
         step = current_step or target_phase.value
+        # The verdict gate is review-only (v0.1.31 / L1). A step targeting a review phase
+        # (QA/SECURITY/CODE) is a review step; otherwise it is a create step. The caller may
+        # override explicitly via ``is_review``; default derives it from the target phase.
+        review = is_review if is_review is not None else target_phase in _REVIEW_PHASES
         # The resolved governance snapshot (T-28-A-07 / LAW 7) is frozen onto the run before
         # the worker call; the resolved per-step model reaches the adapter via the scope's
         # ``resolved_model``. ``dataclasses.replace`` in the runner/state-machine preserves
@@ -104,6 +120,7 @@ class LifecyclePhaseWorkflow:
                 target_phase=target_phase,
                 requirements=requirements,
                 current_step=step,
+                is_review=review,
             ),
         )
         self._run_store.save(decision.run)

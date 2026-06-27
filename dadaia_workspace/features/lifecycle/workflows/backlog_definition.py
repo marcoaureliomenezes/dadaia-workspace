@@ -200,6 +200,7 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
         role="product-engineer",
         kind=BacklogStepKind.MODEL,
         fragment_id="backlog_definition.backlog_authoring",
+        shared_fragment_ids=("shared.output_handoff",),
     ),
     BacklogStep(label="backlog_review_gate", role="python", kind=BacklogStepKind.REVIEW_GATE),
 )
@@ -442,7 +443,12 @@ class BacklogDefinitionWorkflow:
         blocked = runner.evaluate_gate(
             run,
             AgentRunnerInput(
-                request=built.request, target_phase=run.phase, current_step=step.label
+                request=built.request,
+                target_phase=run.phase,
+                current_step=step.label,
+                # backlog_author is a CREATE step (BacklogStep is kind-based, no is_review
+                # boolean): it must pass on a schema-valid payload, never a verdict (L1).
+                is_review=False,
             ),
         )
         run = (

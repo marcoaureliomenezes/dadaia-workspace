@@ -14,7 +14,7 @@
 
 ## Wave A — verdict gate review-only + create-step payload (KEYSTONE; D-1/D-2)
 
-- [ ] **T-31-A-01** — Failing gate-distinction tests (TDD, before the runner change).
+- [x] **T-31-A-01** — Failing gate-distinction tests (TDD, before the runner change).
   - Goal: write the tests that pin the review-only gate: (a) a review step (`is_review=True`)
     BLOCKs on a missing/`REJECTED` verdict; (b) a create step (`is_review=False`) PASSES on a
     schema-valid payload (fenced `schema == expected_schema` → populated `artifact_refs`)
@@ -28,7 +28,7 @@
   - Write set: `tests/unit/features/lifecycle/test_agent_runner_review_only_gate.py` (NEW).
   - Acceptance: A2, A3 (incl. R-A), A4, A5, A8 (tests authored and red against current code).
 
-- [ ] **T-31-A-02** — Thread `is_review` into `AgentRunnerInput` + branch `_blocked_result`.
+- [x] **T-31-A-02** — Thread `is_review` into `AgentRunnerInput` + branch `_blocked_result`.
   - Goal: add `is_review: bool = False` to `AgentRunnerInput`; in `_blocked_result`, apply the
     `verdict == "APPROVED"` check **only** when `data.is_review` is true; create steps require
     `succeeded` + a schema-valid fenced payload (the extractor's `schema`-field equality →
@@ -38,7 +38,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/agent_runner.py`.
   - Acceptance: A1 (field), A2, A3, A4, A7 (docstring) — T-31-A-01 (a)/(b)/(b-adv)/(c) now green.
 
-- [ ] **T-31-A-03** — Thread `is_review=step.is_review` at the four review-capable workflow call sites + fix comment.
+- [x] **T-31-A-03** — Thread `is_review=step.is_review` at the four review-capable workflow call sites + fix comment.
   - Goal: pass `is_review=step.is_review` into `AgentRunnerInput` at each call site, named with the
     runner METHOD it uses (C2): `release_definition` (~339, `evaluate_gate_with_result`), `audit`
     (~281, `evaluate_gate_with_result`), `bug_report` (~276, `evaluate_gate_with_result`),
@@ -50,14 +50,14 @@
     `dadaia_workspace/features/lifecycle/workflows/research.py`.
   - Acceptance: A1, A6, A7.
 
-- [ ] **T-31-A-04** — Thread `is_review=False` at the fifth caller `backlog_definition`.
+- [x] **T-31-A-04** — Thread `is_review=False` at the fifth caller `backlog_definition`.
   - Goal: pass `is_review=False` into `AgentRunnerInput` (~444, `evaluate_gate` — C2) for the
     `backlog_author` model create step (its `BacklogStep` is kind-based, not `is_review`-boolean)
     so the create step is not falsely gated on a verdict.
   - Write set: `dadaia_workspace/features/lifecycle/workflows/backlog_definition.py`.
   - Acceptance: A1, A6.
 
-- [ ] **T-31-A-05** — C1 fix: add `is_review` to `PipelineStep` + thread `pipeline` review steps.
+- [x] **T-31-A-05** — C1 fix: add `is_review` to `PipelineStep` + thread `pipeline` review steps.
   - Goal (DEFINITION-review C1, must-fix): add an `is_review: bool = False` field to `PipelineStep`
     (~lines 79–91); set `is_review=True` on the `review_qa`/`review_security`/`review_code` steps
     (~495–519) and keep `implement` at `is_review=False`; thread `is_review=step.is_review` into
@@ -66,7 +66,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/pipeline.py`.
   - Acceptance: A1, A6, A8 (T-31-A-01 (d) pipeline-review test now green).
 
-- [ ] **T-31-A-06** — C1 fix: thread `phase_workflow` review-phase steps.
+- [x] **T-31-A-06** — C1 fix: thread `phase_workflow` review-phase steps.
   - Goal: in `phase_workflow.run()` thread `is_review` into `AgentRunnerInput` (~102, `run` method
     — C2) so a step targeting a **review phase** (`QA_REVIEW`/`SECURITY_REVIEW`/`CODE_REVIEW`) runs
     as `is_review=True`. Derive `is_review` from whether `target_phase`/`from_phase` is a review
@@ -74,7 +74,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/phase_workflow.py`.
   - Acceptance: A1, A6 (+ a test asserting a review-phase step gates on the verdict).
 
-- [ ] **T-31-A-07** — Failing fragment-bundle test (TDD, before bundling).
+- [x] **T-31-A-07** — Failing fragment-bundle test (TDD, before bundling).
   - Goal (C3 / R-B): a test that **derives the producing-step set programmatically from each
     workflow's `_SEQUENCE`** (not a hard-coded list) and asserts `release_scope`, `spec_create`,
     `plan_create`, `tasks_create`, and `backlog_author` each carry a handoff-emission instruction
@@ -84,7 +84,7 @@
   - Write set: `tests/unit/features/lifecycle/test_create_step_handoff_bundles.py` (NEW).
   - Acceptance: A10, A11 (tests authored and red).
 
-- [ ] **T-31-A-08** — Bundle `shared.output_handoff` into EVERY producing create step.
+- [x] **T-31-A-08** — Bundle `shared.output_handoff` into EVERY producing create step.
   - Goal (C3 / R-B): add `shared.output_handoff` to the `shared_fragment_ids` of `release_scope`
     (alongside `shared.grill_questionnaire`), `plan_create`, `tasks_create`, and `backlog_author`
     (`spec_create` already has it). Reuse the single existing fragment — do NOT fork a

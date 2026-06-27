@@ -85,6 +85,13 @@ class PipelineStep:
     model_profile: str | None = None
     fragment_id: str | None = None
     shared_fragment_ids: tuple[str, ...] = ()
+    # Whether this is a REVIEW step (v0.1.31 / C1 / L4). The ``review_qa`` /
+    # ``review_security`` / ``review_code`` steps gate a release toward the push boundary
+    # and MUST keep their ``verdict == APPROVED`` requirement; ``implement`` is a create
+    # step (``is_review=False``). Threaded into ``AgentRunnerInput`` so the runner applies
+    # the verdict gate to review steps only. Without this field the push-boundary review
+    # gates would silently default to create-step semantics and lose the verdict check.
+    is_review: bool = False
     # The governance-resolved concrete model for this step (T-28-A-07). Threaded into the
     # step's scope/request so the adapter runs the policy-selected model. Additive-optional.
     resolved_model: ResolvedModelConfig | None = None
@@ -207,6 +214,7 @@ class LifecyclePipeline:
                     target_phase=step.target_phase,
                     requirements=step.requirements,
                     current_step=step.label,
+                    is_review=step.is_review,
                 ),
             )
             run = decision.run
@@ -499,6 +507,7 @@ def implementation_ladder(
             target_phase=LifecyclePhase.SECURITY_REVIEW,
             runtime_kind=default_kind,
             model_profile=effort,
+            is_review=True,
             # WS-6: the QA review step is the second fragment-driven pipeline step.
             fragment_id="implementation.qa_review",
         ),
@@ -509,6 +518,7 @@ def implementation_ladder(
             target_phase=LifecyclePhase.CODE_REVIEW,
             runtime_kind=default_kind,
             model_profile=effort,
+            is_review=True,
         ),
         PipelineStep(
             label="review_code",
@@ -517,6 +527,7 @@ def implementation_ladder(
             target_phase=LifecyclePhase.CLOSURE,
             runtime_kind=default_kind,
             model_profile=effort,
+            is_review=True,
         ),
     )
 

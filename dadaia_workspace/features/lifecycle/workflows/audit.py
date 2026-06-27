@@ -279,7 +279,10 @@ class AuditWorkflow:
         worker_result, blocked = runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(
-                request=built.request, target_phase=run.phase, current_step=step.label
+                request=built.request,
+                target_phase=run.phase,
+                current_step=step.label,
+                is_review=step.is_review,
             ),
         )
         if blocked is None:

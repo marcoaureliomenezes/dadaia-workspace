@@ -136,7 +136,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="release_scope",
         role="project-manager",
         fragment_id="release_definition.release_scope",
-        shared_fragment_ids=("shared.grill_questionnaire",),
+        shared_fragment_ids=("shared.grill_questionnaire", "shared.output_handoff"),
         produces="release-scope-handoff-v1",
     ),
     ReleaseStep(
@@ -167,6 +167,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="plan_create",
         role="product-engineer",
         fragment_id="release_definition.plan_create",
+        shared_fragment_ids=("shared.output_handoff",),
         produces="generic-step-handoff-v1",
         consumes=("spec_create",),
     ),
@@ -182,6 +183,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="tasks_create",
         role="product-engineer",
         fragment_id="release_definition.tasks_create",
+        shared_fragment_ids=("shared.output_handoff",),
         produces="generic-step-handoff-v1",
         consumes=("plan_create",),
     ),
@@ -326,18 +328,23 @@ class ReleaseDefinitionWorkflow:
             scope, runtime=runtime.runtime_kind(), prefix=self._prefix
         )
 
-        # Python owns the gate. Every model step — create or review — runs the worker and
-        # reads its structured verdict through the typed gate (APPROVED + in-scope
-        # artifact evidence => pass; REJECTED or missing evidence => BlockedState). The
-        # release stays in RELEASE_DEFINITION across all model steps; only the terminal
-        # Python commit gate transitions the phase. A blocked step stops the sequence —
-        # advancement is never on model say-so. The worker runs ONCE; its structured
-        # output is reused to write the step's produced payload (T-30-D-05).
+        # Python owns the gate, which is REVIEW-ONLY for the verdict (v0.1.31 / L1). A
+        # review step (``step.is_review``) runs the worker and reads its structured verdict
+        # (APPROVED + in-scope artifact evidence => pass; REJECTED or missing evidence =>
+        # BlockedState); a create step passes on a schema-valid payload + in-scope paths,
+        # regardless of the ``verdict`` field. The release stays in RELEASE_DEFINITION
+        # across all model steps; only the terminal Python commit gate transitions the
+        # phase. A blocked step stops the sequence — advancement is never on model say-so.
+        # The worker runs ONCE; its structured output is reused to write the step's
+        # produced payload (T-30-D-05).
         runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
         worker_result, blocked = runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(
-                request=built.request, target_phase=run.phase, current_step=step.label
+                request=built.request,
+                target_phase=run.phase,
+                current_step=step.label,
+                is_review=step.is_review,
             ),
         )
         # Record consumption of every upstream the step declared (A22) and write this
