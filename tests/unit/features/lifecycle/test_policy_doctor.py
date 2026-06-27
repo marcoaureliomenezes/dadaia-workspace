@@ -318,3 +318,102 @@ def test_unresolved_fragment_is_error(tmp_path: Path) -> None:
     wf = CatalogWorkflow(workflow_id="w", steps=(step,))
     findings = run_policy_doctor(workspace_root=workspace, catalog=WorkflowCatalog(workflows=(wf,)))
     assert PolicyDoctorCode.WMP_FRAGMENT in {f.code for f in findings}
+
+
+# ---------------------------------------------------------------------------
+# T-29-D-01 — the harness dimension (v0.1.29). An overlay can now override a
+# step's harness; the doctor must validate it through the same shared resolver.
+# ---------------------------------------------------------------------------
+
+
+def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, object]:
+    """A persisted overlay that only overrides a step's harness (no profile override)."""
+    return {
+        "schema_version": "workflow-model-policy-v1",
+        "policy_id": "default",
+        "contexts": {
+            "default": {"workflows": {workflow: {"harnesses": {step: harness}}}},
+        },
+    }
+
+
+def test_overlay_step_harness_pi_resolves_via_auto_profile(tmp_path: Path) -> None:
+    """A harness-only overlay (pi) on a step with a pi default profile is valid (auto-profile)."""
+    workspace = _workspace(tmp_path)
+    _write_overlay(workspace, _harness_overlay("implementation", step="implement", harness="pi"))
+    findings = run_policy_doctor(workspace_root=workspace)
+    assert [f for f in findings if f.severity is Severity.ERROR] == [], [
+        f.to_dict() for f in findings if f.severity is Severity.ERROR
+    ]
+
+
+# Layering (T-29-D-01): a FORBIDDEN Layer-2 harness (claude/opencode) in an overlay is
+# rejected one layer earlier than the doctor's resolver check — at STORE LOAD, by the
+# overlay schema/parse enum (harness in {codex,pi}). It therefore surfaces as a WMP-STATE
+# error (an invalid/unloadable overlay), not WMP-OVERLAY/WMP-LAYER2-RESIDUE. The invariant
+# the doctor must uphold is: a forbidden Layer-2 harness in the overlay is a HARD ERROR and
+# never silently passes — regardless of which WMP code reports it. The resolver-level
+# WMP-OVERLAY check still guards the residual paths the schema does NOT constrain (an unknown
+# workflow/step harness override, or a valid harness with no step default profile), proven by
+# the unknown-workflow test below + the valid-pi auto-profile test above.
+_FORBIDDEN_HARNESS_CODES = {
+    PolicyDoctorCode.WMP_STATE,
+    PolicyDoctorCode.WMP_OVERLAY,
+    PolicyDoctorCode.WMP_LAYER2_RESIDUE,
+}
+
+
+def test_overlay_step_harness_forbidden_layer2_is_hard_error(tmp_path: Path) -> None:
+    """An overlay step-harness naming a forbidden Layer-2 harness (claude) is a hard error."""
+    workspace = _workspace(tmp_path)
+    _write_overlay(
+        workspace, _harness_overlay("implementation", step="implement", harness="claude")
+    )
+    findings = run_policy_doctor(workspace_root=workspace)  # must not raise
+    codes = {f.code for f in findings if f.severity is Severity.ERROR}
+    assert codes & _FORBIDDEN_HARNESS_CODES, (
+        "a forbidden Layer-2 step harness in the overlay must be a hard doctor error, "
+        f"got {[c.value for c in codes]}"
+    )
+
+
+def test_overlay_default_harness_forbidden_layer2_is_hard_error(tmp_path: Path) -> None:
+    """A forbidden default_harness (claude) is caught as a hard error (schema → WMP-STATE)."""
+    workspace = _workspace(tmp_path)
+    _write_overlay(
+        workspace,
+        {
+            "schema_version": "workflow-model-policy-v1",
+            "policy_id": "default",
+            "contexts": {
+                "default": {"workflows": {"implementation": {"default_harness": "claude"}}},
+            },
+        },
+    )
+    findings = run_policy_doctor(workspace_root=workspace)  # must not raise
+    codes = {f.code for f in findings if f.severity is Severity.ERROR}
+    assert codes & _FORBIDDEN_HARNESS_CODES, (
+        "a forbidden Layer-2 default harness must be a hard doctor error, "
+        f"got {[c.value for c in codes]}"
+    )
+
+
+def test_overlay_harness_unknown_workflow_is_error(tmp_path: Path) -> None:
+    """A harness override targeting a workflow not in the governed catalog is flagged."""
+    workspace = _workspace(tmp_path)
+    _write_overlay(workspace, _harness_overlay("ghost", step="implement", harness="pi"))
+    findings = run_policy_doctor(workspace_root=workspace)
+    msg = " ".join(f.message for f in findings if f.code is PolicyDoctorCode.WMP_OVERLAY)
+    assert "ghost" in msg
+
+
+def test_completed_catalog_with_closure_passes_all_wmp(tmp_path: Path) -> None:
+    """T-29-D-01 (AC-8): WMP-1..WMP-7 pass over the completed catalog (closure added)."""
+    workspace = _workspace(tmp_path)
+    findings = run_policy_doctor(workspace_root=workspace)
+    errors = [f for f in findings if f.severity is Severity.ERROR]
+    assert errors == [], [f.to_dict() for f in errors]
+    # And closure is actually in the governed catalog the doctor validated.
+    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+
+    assert governed_workflow_catalog().workflow("closure") is not None

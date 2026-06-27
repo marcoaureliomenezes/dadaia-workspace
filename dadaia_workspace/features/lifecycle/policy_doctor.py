@@ -19,12 +19,22 @@ The checks keep the layer honest so it cannot rot silently:
   fragment it references declares a non-empty output schema too (the contract a worker
   must satisfy is never blank).
 * **WMP-6** — every persisted overlay override references an existing workflow/step/known
-  profile whose harness matches the step's resolved harness (resolved through the SAME
-  shared resolver the CLI + panel use). A deprecated-without-replacement profile fails.
+  profile whose harness matches the step's *effective* harness (resolved through the SAME
+  shared resolver the CLI + panel use). This now spans the **harness dimension**
+  (v0.1.29 / T-29-D-01): the overlay's per-step harness overrides and per-workflow default
+  harness are validated too — a workflow that appears only in those harness maps is no
+  longer skipped, and an overlay harness referencing an unsupported harness on a step (or a
+  step with no default profile for the effective harness) is flagged. A
+  deprecated-without-replacement profile fails.
 * **WMP-7** — no ``claude``/``opencode`` Layer-2 residue in any built-in profile or in any
   governed catalog step (LAW 1 — Layer-2 workers are ``codex``/``pi`` only).
 * **WMP-8** (``WMP-STATE``) — an invalid policy state file fails with an actionable
-  message and NEVER crashes the caller (so a broken overlay can never blank the panel).
+  message and NEVER crashes the caller (so a broken overlay can never blank the panel). A
+  FORBIDDEN Layer-2 harness (``claude``/``opencode``) in an overlay is caught here, one
+  layer earlier than WMP-6: the overlay schema/parse enum (harness ∈ codex|pi) rejects it
+  at store load, so it surfaces as a WMP-STATE error. WMP-6 guards the residual paths the
+  schema does not constrain (unknown workflow/step harness override; valid harness with no
+  step default profile). Either way a forbidden harness is a hard error — never a silent pass.
 
 The catalog + profile registry are pure (no I/O); only the overlay-store load touches
 disk. The catalog/profiles/loader are injectable so the checks are unit-testable against
@@ -288,11 +298,32 @@ def _check_overlay(
 def _resolve_overlay(
     catalog: WorkflowCatalog, overlay: WorkflowModelPolicyOverlay
 ) -> list[Finding]:
-    """WMP-6: resolve every workflow the overlay names through the shared resolver."""
+    """WMP-6: resolve every workflow the overlay names through the shared resolver.
+
+    The overlay carries three independent maps for the ``default`` context (D-2): per-step
+    profile overrides (``contexts``), a per-workflow default harness
+    (``default_harness_overlay``), and per-step harness overrides
+    (``step_harness_overlay``). The harness dimension (v0.1.29 / T-29-D-01) means a workflow
+    can appear in *only* the harness maps; validating just ``contexts`` would let a
+    harness-only override slip past the doctor. We therefore resolve **every** workflow the
+    overlay names across all three maps through the same shared resolver the CLI + panel use
+    — so an overlay harness that names an unsupported harness on a step, or a step with no
+    default profile for the effective harness, fails here exactly as a run would.
+
+    Layering note (T-29-D-01): a forbidden Layer-2 harness (``claude``/``opencode``) in an
+    overlay is rejected one layer earlier, at store load, by the schema enum (codex|pi) —
+    surfacing as a WMP-STATE finding (handled in :func:`_check_overlay`). This resolver-level
+    check guards the residual paths the schema does NOT constrain: a syntactically-valid
+    harness override on an unknown workflow/step, or a valid harness for which a step
+    declares no default profile.
+    """
     out: list[Finding] = []
     resolver = WorkflowExecutionPolicyResolver(catalog=catalog, overlay=overlay)
-    workflows = overlay.contexts.get(DEFAULT_CONTEXT, {})
-    for workflow_id in workflows:
+    # Every workflow the overlay touches, across profile + default-harness + step-harness.
+    overlay_workflows: set[str] = set(overlay.contexts.get(DEFAULT_CONTEXT, {}))
+    overlay_workflows |= set(overlay.default_harness_overlay.get(DEFAULT_CONTEXT, {}))
+    overlay_workflows |= set(overlay.step_harness_overlay.get(DEFAULT_CONTEXT, {}))
+    for workflow_id in sorted(overlay_workflows):
         if catalog.workflow(workflow_id) is None:
             out.append(
                 Finding(
