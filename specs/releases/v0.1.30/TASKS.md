@@ -196,7 +196,7 @@
 
 ## Wave E — real audit/research/bug_report bodies + ctx-inject dehydration (Item 6) — **CRITICAL**
 
-- [ ] **T-30-E-01** — Real `audit` workflow body.
+- [-] **T-30-E-01** — Real `audit` workflow body.
   - Goal: fragment+gate body (mirror `release_definition`); consumes the Wave-D ledger;
     disposition-ready output; records injected fragments/context.
   - Write set: `dadaia_workspace/features/lifecycle/workflows/audit.py` (NEW);
