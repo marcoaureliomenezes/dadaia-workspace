@@ -19,6 +19,24 @@ exists). Review handoffs under `.dadaia/handoff/dadaia-workspace/`.
 concurrent with pytest), each wave green-checkpointed (ruff/mypy/pytest/import-linter) then
 reviewed (qa-engineer + code-reviewer) before the next wave starts.
 
+**STATUS 2026-06-27 — ALL 5 WAVES IMPLEMENTED + TESTED + REVIEWED (30/30 tasks `[x]`).**
+Full suite 4047 passed / 14 skipped; `mypy --strict` clean (288 files); ruff format+check
+green; `public doctor` exit 0 (`[ok] public-privacy`, `[ok] ai-surface`, `[ok]
+codex:rule-corpus-reachable`); `specs doctor` 0 errors; panel Playwright e2e 69/69 green
+locally (A12 PI surface + handler route changes). Per-wave reviews ALL APPROVE:
+A (security+code), B (security+code), C (security+code), D (security+qa+code), E
+(security+qa+code). Substantive review findings fixed inline (Wave-A dead import; Wave-B A12
+panel wiring + CSP hash + PI styling; Wave-C overlay to_dict 3-map-union bug; Wave-D
+is_cleanup_eligible retention-mode data-loss path + real-provider retention test; Wave-E
+graph-completeness gate test + fragment READMEs). Bugs filed:
+import-linter-contracts-red-but-not-ci-enforced (Open), backlog-doctor-blocks-consumed-item-refactor-commit
+(Open), overlay-todict-drops-harness-only-workflow (Closed, fixed in C). NOT pushed (operator
+ship decision pending). NOT yet run: CLOSURE (T-30-Z-01) — memory atoms, disposition sweep
+(flip the 5 `**Consumes:**` items to terminal tokens — see specs doctor SPEC-DOC-031 warns),
+archive, PR/merge. Deferred review LOWs (research second-hop test, doctor symlink-rglob
+robustness, doctor UNCONSUMED_REQUIRED FAILED-scoping) recorded in review handoffs for the
+closure nit-sweep.
+
 Binding impl-time obligations (carry into the waves when implementation is authorized):
 - Wave A: characterization baseline of all 3 adapter suites green BEFORE refactor; redaction
   parity parametrized across pi/codex/claude_sdk; security-reviewer pass on the hoisted
