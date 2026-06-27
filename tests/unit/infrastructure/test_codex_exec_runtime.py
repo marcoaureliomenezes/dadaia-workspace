@@ -269,7 +269,12 @@ def test_codex_exec_adapter_redacts_successful_json_output(tmp_path: Path) -> No
 
 
 def _git_diff_runner(model_changed: str) -> Callable[..., subprocess.CompletedProcess[str]]:
-    """Runner whose codex output self-reports a (lying) ``changed_paths``."""
+    """Runner whose codex output is a valid result object self-reporting a (lying) ``changed_paths``.
+
+    The payload IS a result object (schema-labelled + non-empty ``artifact_refs``) so it
+    passes the v0.1.32 extraction/reject-guard — the test then exercises whether the git
+    diff OVERRIDES the model's self-reported ``changed_paths`` (Ring-2 boundary).
+    """
 
     def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         argv = args[0]
@@ -278,7 +283,9 @@ def _git_diff_runner(model_changed: str) -> Callable[..., subprocess.CompletedPr
         output.write_text(
             json.dumps(
                 {
+                    "schema": "agent-run-result-v1",
                     "summary": "done",
+                    "artifact_refs": [".dadaia/handoff/dadaia-workspace/g.handoff.json"],
                     "structured_output": {"changed_paths": model_changed},
                 }
             ),
@@ -383,3 +390,172 @@ def test_codex_resolved_model_wins_over_config_and_tier(tmp_path: Path) -> None:
     argv = captured["argv"]
     assert argv[argv.index("-m") + 1] == "gpt-5.5"
     assert 'model_reasoning_effort="high"' in argv
+
+
+# ---------------------------------------------------------------------------
+# T-32-B-01 — codex extractor parity: fenced+bare parse, strict-primary +
+# structural-fallback acceptance, no-op→empty refs, reject-guard (A10/A11/C4).
+# These FAIL against the pre-parity codex (single ``json.loads`` of the whole
+# file, no fenced/bare/sliced candidates, no ``schema`` acceptance, ANY dict
+# mapped to a result).
+# ---------------------------------------------------------------------------
+
+
+def _codex_run_with_message(tmp_path: Path, last_message_text: str) -> Any:
+    """Run the codex adapter, writing *last_message_text* verbatim to the temp file.
+
+    The text is whatever a real codex worker would leave in ``--output-last-message``:
+    a bare JSON object, a fenced ```json block, JSON with trailing prose, or junk.
+    """
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text(last_message_text, encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    return CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request()
+    )
+
+
+def test_codex_strict_primary_accepts_bare_payload(tmp_path: Path) -> None:
+    """A10/A11 — a correctly-labelled BARE codex payload is accepted via the strict path."""
+    bare = json.dumps(
+        {
+            "schema": "agent-run-result-v1",
+            "summary": "bare codex strict",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/c1.handoff.json"],
+            "structured_output": {"verdict": "APPROVED"},
+        }
+    )
+    result = _codex_run_with_message(tmp_path, bare)
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "bare codex strict"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/c1.handoff.json",)
+    assert result.structured_output["verdict"] == "APPROVED"
+
+
+def test_codex_strict_primary_accepts_fenced_payload(tmp_path: Path) -> None:
+    """A10 — a fenced ```json codex payload (trailing prose) is accepted, not dropped.
+
+    The pre-parity codex called ``json.loads`` on the whole fenced text once and FAILED,
+    degrading to a prose-summary result with EMPTY ``artifact_refs`` (would BLOCK a step).
+    """
+    fenced = (
+        "Here is my result.\n```json\n"
+        + json.dumps(
+            {
+                "schema": "agent-run-result-v1",
+                "summary": "fenced codex strict",
+                "artifact_refs": [".dadaia/handoff/dadaia-workspace/c2.handoff.json"],
+                "structured_output": {"verdict": "APPROVED"},
+            }
+        )
+        + "\n```\nDone.\n"
+    )
+    result = _codex_run_with_message(tmp_path, fenced)
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "fenced codex strict"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/c2.handoff.json",)
+    assert result.structured_output["verdict"] == "APPROVED"
+
+
+def test_codex_structural_fallback_accepts_mislabelled_payload(tmp_path: Path) -> None:
+    """A11 — structural fallback parity: a schema-MISLABELLED but valid payload parses."""
+    bare = json.dumps(
+        {
+            "schema": "release-scope-handoff-v1",  # wrong (domain) id
+            "status": "succeeded",
+            "summary": "codex mislabelled but valid",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/c3.handoff.json"],
+            "structured_output": {"verdict": "APPROVED"},
+        }
+    )
+    result = _codex_run_with_message(tmp_path, bare)
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "codex mislabelled but valid"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/c3.handoff.json",)
+    assert result.structured_output["verdict"] == "APPROVED"
+
+
+def test_codex_noop_worker_yields_empty_artifact_refs(tmp_path: Path) -> None:
+    """A11 — a no-op codex worker (no result payload) yields empty ``artifact_refs``."""
+    result = _codex_run_with_message(tmp_path, "I had nothing structured to emit.")
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.artifact_refs == ()
+    assert "verdict" not in result.structured_output
+
+
+def test_codex_reject_guard_drops_shapeless_dict(tmp_path: Path) -> None:
+    """C4 / A11 — codex reject-guard: arbitrary JSON lacking the result shape is dropped.
+
+    A parsed dict with NO ``schema`` match AND no non-empty ``artifact_refs`` is not the
+    result object; the rewired codex must yield empty ``artifact_refs`` (no longer mapping
+    ANY dict to a result). Pins the regression away from the pre-parity unconditional
+    dict acceptance.
+    """
+    shapeless = json.dumps(
+        {"schema": "something-else", "note": "not a result", "verdict": "APPROVED"}
+    )
+    result = _codex_run_with_message(tmp_path, shapeless)
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.artifact_refs == ()
+    assert "verdict" not in result.structured_output
+
+
+# ---------------------------------------------------------------------------
+# T-32-B-03 — A12 / C3: positively prove ONE shared extraction implementation.
+# Patch the shared helper in headless_adapter_base and assert BOTH pi_runtime
+# AND codex_runtime resolve result extraction through it (not a grep).
+# ---------------------------------------------------------------------------
+
+
+def test_pi_and_codex_share_one_extraction_helper(tmp_path: Path, monkeypatch: Any) -> None:
+    """A12 / C3 — both adapters call the SAME ``extract_result_payload`` shared helper.
+
+    A sentinel patch over ``headless_adapter_base.extract_result_payload`` records every
+    call. Driving a real ``pi`` run and a real ``codex`` run (both fully faked at the
+    subprocess seam) must each invoke the patched helper — proving pi and codex resolve
+    result extraction through one implementation, so copy-paste divergence cannot reappear.
+    """
+    from dadaia_workspace.infrastructure import headless_adapter_base
+    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter, PiHeadlessConfig
+
+    calls: list[str] = []
+
+    def _spy(text: str, expected_schema: str | None) -> dict[str, object] | None:
+        calls.append("called")
+        return {
+            "schema": expected_schema,
+            "summary": "spied",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/spy.handoff.json"],
+            "structured_output": {"verdict": "APPROVED"},
+        }
+
+    monkeypatch.setattr(headless_adapter_base, "extract_result_payload", _spy)
+
+    # --- pi run (faked subprocess) ---
+    def _pi_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        message = json.dumps(
+            {"type": "message_end", "message": {"role": "assistant", "content": "bare"}}
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout=message)
+
+    pi_request = AgentRunRequest(
+        role="software-engineer",
+        prompt="work",
+        runtime=AgentRuntimeKind.PI_HEADLESS,
+        context="dadaia-workspace",
+        release_id="v0.1.32",
+        expected_schema="agent-run-result-v1",
+    )
+    PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=_pi_runner, environ={}).run(pi_request)
+    assert len(calls) == 1, "pi_runtime did not call the shared extract_result_payload helper"
+
+    # --- codex run (faked subprocess) ---
+    _codex_run_with_message(tmp_path, '{"summary":"ignored by spy"}')
+    assert len(calls) == 2, "codex_runtime did not call the shared extract_result_payload helper"

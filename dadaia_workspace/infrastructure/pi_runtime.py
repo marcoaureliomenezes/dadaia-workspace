@@ -8,18 +8,23 @@ carries the assistant ``AgentMessage``.
 
 No ``pi`` client is imported at module load — subprocess only — so offline-first
 is preserved and the unit suite runs fully faked through an injected runner.
+
+The security-relevant invariants shared with the other real adapters — secret
+redaction, the env-allowlist filter, the git ``changed_paths`` override, the
+``Runner`` seam, and the prompt envelope — live in
+:mod:`dadaia_workspace.infrastructure.headless_adapter_base`. This module keeps
+only the genuinely PI-CLI-specific logic (``_command``, the JSONL parse, and
+result/stream extraction).
 """
 
 from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -27,8 +32,12 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
-
-Runner = Callable[..., subprocess.CompletedProcess[str]]
+from dadaia_workspace.infrastructure.headless_adapter_base import (
+    Runner,
+    SubprocessAdapterMixin,
+    _GitDiffPort,
+    normalize_artifact_refs,
+)
 
 _DEFAULT_ENV_ALLOWLIST = (
     "ANTHROPIC_API_KEY",
@@ -39,15 +48,6 @@ _DEFAULT_ENV_ALLOWLIST = (
     "XDG_DATA_HOME",
     "TERM",
 )
-_SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
-
-_FENCED_JSON = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
-
-
-class _GitDiffPort(Protocol):
-    """Narrow git seam the adapter needs — satisfied by ``GitSubprocessClient``."""
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,7 @@ class PiHeadlessConfig:
     tools: tuple[str, ...] = ("read", "write", "edit", "bash")
 
 
-class PiHeadlessAdapter:
+class PiHeadlessAdapter(SubprocessAdapterMixin):
     """Run bounded lifecycle worker prompts through ``pi --mode json``.
 
     The adapter is infrastructure-only: it never decides lifecycle transitions,
@@ -94,6 +94,9 @@ class PiHeadlessAdapter:
         self._runner = runner
         self._environ = environ if environ is not None else os.environ
         self._git = git
+        # Wire the mixin seams to this adapter's config.
+        self._env_allowlist = config.env_allowlist
+        self._cwd_for_diff = config.cwd
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.PI_HEADLESS
@@ -166,36 +169,18 @@ class PiHeadlessAdapter:
         model = self._resolve_model(request)
         if model is not None:
             args += ["--model", model]
-        args += ["-p", "-"]
+        # ``--print``/-p is non-interactive; the prompt is piped via stdin
+        # (``subprocess.run(..., input=self._prompt(request))``). PI reads the piped
+        # stdin in print mode — do NOT append a ``-`` stdin marker: ``pi`` has no such
+        # option and rejects it ("Unknown option: -"), which BLOCKs every PI Layer-2
+        # step (bug pi-headless-command-trailing-dash-breaks-layer2).
+        args += ["-p"]
         return args
 
     def _resolve_model(self, request: AgentRunRequest) -> str | None:
         if request.resolved_model is not None:
             return request.resolved_model.model
         return self._config.model
-
-    def _env(self) -> dict[str, str]:
-        return {
-            key: self._environ[key] for key in self._config.env_allowlist if key in self._environ
-        }
-
-    @staticmethod
-    def _prompt(request: AgentRunRequest) -> str:
-        return json.dumps(
-            {
-                "role": request.role,
-                "prompt": request.prompt,
-                "context": request.context,
-                "release_id": request.release_id,
-                "task_id": request.task_id,
-                "allowed_paths": list(request.allowed_paths),
-                "forbidden_paths": list(request.forbidden_paths),
-                "expected_schema": request.expected_schema,
-                "required_evidence": [kind.value for kind in request.required_evidence],
-            },
-            indent=2,
-            sort_keys=True,
-        )
 
     # -- result extraction (WS-PI-2) -------------------------------------
 
@@ -221,16 +206,15 @@ class PiHeadlessAdapter:
             )
 
         assistant_text = self._extract_text(message.get("content"))
-        verdict_payload = self._verdict_payload(assistant_text, request.expected_schema)
+        verdict_payload = self._extract_result_payload(assistant_text, request.expected_schema)
 
         if verdict_payload is not None:
             summary = str(verdict_payload.get("summary", assistant_text))
-            refs_raw = verdict_payload.get("artifact_refs", [])
-            refs = refs_raw if isinstance(refs_raw, list) else []
+            refs = normalize_artifact_refs(verdict_payload)
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(summary or "pi headless completed"),
-                artifact_refs=tuple(self._redact(item) for item in refs if isinstance(item, str)),
+                artifact_refs=tuple(self._redact(path) for path in refs),
                 structured_output=self._structured_from_verdict(verdict_payload),
             )
 
@@ -275,32 +259,6 @@ class PiHeadlessAdapter:
             return "".join(parts)
         return ""
 
-    @staticmethod
-    def _verdict_payload(
-        assistant_text: str,
-        expected_schema: str | None,
-    ) -> dict[str, object] | None:
-        """Parse a fenced ```json verdict block matching the requested schema.
-
-        The fenced-JSON sentinel is the in-band channel for review verdicts ONLY,
-        not the primary transport. Returns None when absent / unparseable / schema
-        mismatch.
-        """
-        if expected_schema is None:
-            return None
-        match = _FENCED_JSON.search(assistant_text)
-        if match is None:
-            return None
-        try:
-            payload = json.loads(match.group(1))
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(payload, dict):
-            return None
-        if payload.get("schema") != expected_schema:
-            return None
-        return payload
-
     def _structured_from_verdict(self, payload: dict[str, object]) -> dict[str, str]:
         structured: dict[str, str] = {}
         for key in ("verdict", "commit_sha", "task_group"):
@@ -312,28 +270,3 @@ class PiHeadlessAdapter:
             for key, value in extra.items():
                 structured[str(key)] = self._redact(str(value))
         return structured
-
-    # -- changed_paths via git diff (Ring-2 root-cause, WS-PI-2) ----------
-
-    def _with_changed_paths(self, result: AgentRunResult) -> AgentRunResult:
-        if self._git is None:
-            return result
-        changed = self._git.diff_name_only(self._config.cwd)
-        structured = dict(result.structured_output)
-        structured["changed_paths"] = ",".join(changed)
-        return AgentRunResult(
-            status=result.status,
-            summary=result.summary,
-            artifact_refs=result.artifact_refs,
-            structured_output=structured,
-            error=result.error,
-        )
-
-    def _redact(self, text: str) -> str:
-        redacted = text
-        for key, value in self._environ.items():
-            if not value:
-                continue
-            if any(part in key.upper() for part in _SECRET_NAME_PARTS):
-                redacted = redacted.replace(value, "[REDACTED]")
-        return redacted

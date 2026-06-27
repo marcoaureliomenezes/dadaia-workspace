@@ -17,12 +17,11 @@ object; do not produce free-form commentary in its place.
 
 ## What the result must carry
 
-Emit one object conforming to the `output_schema` the step declares. Every result
-carries these fields regardless of schema:
+Emit one transport-envelope object. Every result carries these fields:
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | The declared schema id (literal string). |
+| `schema` | The transport envelope id — always the literal string `agent-run-result-v1`. |
 | `agent` | The role you are running as for this step. |
 | `context` | The active Spec Context name. |
 | `produced_at` | UTC timestamp ending in `Z`. |
@@ -36,7 +35,7 @@ Review and gate steps additionally carry:
 |---|---|
 | `verdict` | `APPROVED` or `REJECTED` — the gate keys on this. |
 | `verdict_reason` | One concise sentence justifying the verdict. |
-| `findings` | Array of `{severity, message, detail, fix_recommendation}`; severity is one of CRITICAL, HIGH, MEDIUM, LOW, INFO. |
+| `findings` | Array of `{severity, message, detail_md, fix_recommendation}`; severity is one of CRITICAL, HIGH, MEDIUM, LOW, INFO. |
 
 When the step produced a written artifact (SPEC, PLAN, report) the result names its
 path and a content hash so the gate can confirm the file exists and matches.

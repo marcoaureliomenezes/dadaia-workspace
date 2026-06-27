@@ -211,8 +211,54 @@ def _digest_catalog(raw: str) -> str:
     return json.dumps({"features": digested}, ensure_ascii=False, indent=2)
 
 
+#: Max non-empty lines of ``tech-stack.md`` kept in the bind-time SESSION bootstrap digest.
+#: WS-C dehydration (v0.1.30 / T-30-E-05): the bootstrap is a lean session-orientation aid,
+#: NOT the source of lifecycle-prompt context. Lifecycle prompts compose their context from
+#: the Python dynamic selector (``ContextSelector`` + ``LifecyclePromptBuilder``), so the
+#: hook no longer dumps the FULL tech-stack body — it emits a bounded digest plus a self-pull
+#: pointer. A small tech-stack file (≤ the cap) is emitted in full; a large one is reduced.
+_TECH_STACK_DIGEST_MAX_LINES = 24
+
+
+def _digest_tech_stack(raw: str) -> str:
+    """Return a bounded digest of ``tech-stack.md`` for the lean session bootstrap.
+
+    Keeps the leading non-empty lines, capped at :data:`_TECH_STACK_DIGEST_MAX_LINES`. When
+    the file is already within the cap it is returned verbatim (so a small atom is unchanged).
+    A truncated digest appends a self-pull pointer: the full atom stays on disk and the
+    dynamic selector resolves it per-step when a lifecycle prompt actually needs it. Fail-open
+    is implicit — the caller suppresses OSError around the read.
+    """
+    lines = raw.splitlines()
+    non_empty_total = sum(1 for ln in lines if ln.strip())
+    if non_empty_total <= _TECH_STACK_DIGEST_MAX_LINES:
+        return raw.strip()
+    kept: list[str] = []
+    seen = 0
+    for ln in lines:
+        kept.append(ln)
+        if ln.strip():
+            seen += 1
+        if seen >= _TECH_STACK_DIGEST_MAX_LINES:
+            break
+    return (
+        "\n".join(kept).strip()
+        + "\n\n… (tech-stack digest — self-pull specs/memory/tech-stack.md for full detail; "
+        "lifecycle prompts get tech context from the dynamic selector, not this bootstrap)"
+    )
+
+
 def _build_memory(specs_dir: Path) -> str:
-    """Build the once-per-session memory bootstrap (tech-stack + catalog-digest/index)."""
+    """Build the once-per-session LEAN memory bootstrap (tech-stack digest + catalog digest).
+
+    WS-C (v0.1.30 / T-30-E-05): this is a session-orientation bootstrap for an interactive
+    operator session — it is NOT the context source for lifecycle prompts. Lifecycle workflow
+    steps compose their prompts entirely from the Python dynamic selector
+    (``ContextSelector``) bounded by each fragment's ``max_context_policy``; nothing in the
+    lifecycle prompt path reads this injection or its sentinel (A30). So the bootstrap stays
+    lean — a bounded tech-stack digest + the lean catalog tldr-digest, never the full memory
+    tree.
+    """
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""
@@ -220,7 +266,7 @@ def _build_memory(specs_dir: Path) -> str:
     tech = memory_dir / "tech-stack.md"
     if tech.is_file():
         with contextlib.suppress(OSError):
-            parts.append(tech.read_text(encoding="utf-8"))
+            parts.append(_digest_tech_stack(tech.read_text(encoding="utf-8")))
     catalog = memory_dir / "product" / "catalog.json"
     index = memory_dir / "product" / "index.md"
     if catalog.is_file():

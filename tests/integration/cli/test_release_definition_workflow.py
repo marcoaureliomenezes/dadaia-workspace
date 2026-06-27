@@ -6,8 +6,9 @@ FAKE-backed sequence. It proves the four §8.5 / DoD assertions:
 1. **Full happy path** — the §6.1 sequence walks all 8 model steps + the terminal
    Python ``definition_commit_gate`` and advances the release to IMPLEMENTATION.
 2. **Scoped (non-generic) prompts** — at least one emitted step prompt carries
-   fragment-sourced content (a ``fragment:release_definition.<step>`` id + the step's
-   output schema) and the generic ``"Run the … step"`` suffix never appears.
+   fragment-sourced content (a ``fragment:release_definition.<step>`` id + the coherent
+   ``schema = agent-run-result-v1`` output contract, NOT the domain schema as a competing
+   emit target) and the generic ``"Run the … step"`` suffix never appears.
 3. **Rejected review blocks** — a REJECTED verdict at a review step stops the sequence
    before ``definition_commit_gate`` and the release does NOT reach IMPLEMENTATION.
 4. **Adjacent-harness seam (the key §8.5 assertion)** — two *different* harnesses run on
@@ -214,8 +215,12 @@ def test_emitted_prompts_are_fragment_scoped_not_generic(
     assert scope_step.prompt_text is not None
     # Fragment-sourced content: the explicit fragment id is present...
     assert "fragment:release_definition.release_scope" in scope_step.prompt_text
-    # ...along with the step's declared output schema...
-    assert "release-scope-handoff-v1" in scope_step.prompt_text
+    # ...along with the coherent worker-output contract (v0.1.32 / D-1): the single
+    # transport schema is the worker emit target via `schema`; the fragment's domain schema
+    # is NOT surfaced as a competing schema-to-emit in the "## Required output" section.
+    required = scope_step.prompt_text[scope_step.prompt_text.index("## Required output") :]
+    assert "agent-run-result-v1" in required
+    assert "release-scope-handoff-v1" not in required
     # ...and the generic "Run the {label} step for release …" suffix (pipeline.py) never
     # appears for ANY release-definition step.
     for step in outcome.steps:

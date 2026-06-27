@@ -1,4 +1,12 @@
-"""Unit tests for lifecycle agent runner using a fake AgentRuntimePort."""
+"""Unit tests for lifecycle agent runner using a fake AgentRuntimePort.
+
+These all exercise a REVIEW step (a qa-engineer step targeting ``QA_REVIEW``), so every
+``AgentRunnerInput`` sets ``is_review=True``. Under the v0.1.31 review-only gate the verdict
+requirement keys on the explicit ``is_review`` flag (not the target phase): a review step
+still BLOCKs on a missing/REJECTED verdict, missing artifact evidence, and out-of-scope
+paths. Create-step (``is_review=False``) gate behavior is covered by
+``test_agent_runner_review_only_gate.py``.
+"""
 
 from __future__ import annotations
 
@@ -89,6 +97,7 @@ def test_fake_agent_runtime_can_advance_after_structured_output_and_scope_eviden
             target_phase=LifecyclePhase.QA_REVIEW,
             requirements=(requirement,),
             current_step="qa-review",
+            is_review=True,
         ),
     )
 
@@ -112,6 +121,7 @@ def test_summary_says_approved_without_structured_verdict_does_not_pass_gate() -
             request=_request(),
             target_phase=LifecyclePhase.QA_REVIEW,
             current_step="qa-review",
+            is_review=True,
         ),
     )
 
@@ -136,6 +146,7 @@ def test_agent_says_approved_without_artifact_evidence_does_not_pass_gate() -> N
             request=_request(),
             target_phase=LifecyclePhase.QA_REVIEW,
             current_step="qa-review",
+            is_review=True,
         ),
     )
 
@@ -161,6 +172,7 @@ def test_out_of_scope_artifact_blocks_before_transition() -> None:
             request=_request(),
             target_phase=LifecyclePhase.QA_REVIEW,
             current_step="qa-review",
+            is_review=True,
         ),
     )
 
@@ -187,6 +199,7 @@ def test_sibling_prefix_path_does_not_match_allowed_scope() -> None:
             request=_request(),
             target_phase=LifecyclePhase.QA_REVIEW,
             current_step="qa-review",
+            is_review=True,
         ),
     )
 
@@ -218,6 +231,7 @@ def test_changed_paths_are_validated_against_write_scope() -> None:
             request=_request(),
             target_phase=LifecyclePhase.QA_REVIEW,
             current_step="qa-review",
+            is_review=True,
         ),
     )
 

@@ -148,8 +148,12 @@ def test_emitted_prompt_carries_fragment_content_not_generic_suffix(tmp_path: Pa
     # ...and the generic suffix is gone for this workflow.
     assert "Run the release_scope step" not in scope_step.prompt_text
     assert "Run the release-define step" not in scope_step.prompt_text
-    # The explicit output schema reaches the worker.
-    assert "release-scope-handoff-v1" in scope_step.prompt_text
+    # The coherent contract (v0.1.32 / D-1): the single transport schema is the worker's
+    # emit target via the `schema` field; the fragment's domain schema is NOT surfaced as a
+    # competing schema-to-emit in the "## Required output" section.
+    required = scope_step.prompt_text[scope_step.prompt_text.index("## Required output") :]
+    assert "agent-run-result-v1" in required
+    assert "release-scope-handoff-v1" not in required
 
 
 def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:

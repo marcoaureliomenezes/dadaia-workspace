@@ -255,7 +255,7 @@ def render_api_agents_canonical(
         qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
         _runtime_vals = qs.get("runtime")
         runtime = (_runtime_vals[0].strip().lower() if _runtime_vals else "").strip()
-        if runtime not in ("claude", "codex"):
+        if runtime not in ("claude", "codex", "pi"):
             runtime = "claude"
 
         # Validate active_window_days range.
@@ -554,7 +554,7 @@ def render_api_workflows_list(
         qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
         _runtime_vals = qs.get("runtime")
         _runtime = (_runtime_vals[0].strip().lower() if _runtime_vals else "").strip()
-        if _runtime not in ("claude", "codex"):
+        if _runtime not in ("claude", "codex", "pi"):
             _runtime = "claude"
 
         summaries = service.list_workflow_summaries()
@@ -822,7 +822,7 @@ def render_api_sessions(
     """Return a closure that serves GET /api/sessions.
 
     Query parameters:
-    - runtime: "claude" | "codex" (default: "claude")
+    - runtime: "claude" | "codex" | "pi" (default: "claude")
     - project: optional project slug filter
     - limit:   max rows to return (default 50, must be positive int)
 
@@ -926,7 +926,7 @@ def render_api_session_detail(
     """Return a closure that serves GET /api/sessions/<runtime>/<session_id>.
 
     Path parameters (forwarded as kwargs by the handler):
-    - runtime:    "claude" | "codex"
+    - runtime:    "claude" | "codex" | "pi"
     - session_id: full session identifier
 
     Response envelope on success (200): same fields as SessionRow plus

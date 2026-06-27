@@ -148,27 +148,120 @@ def _assert_profiles_resolve() -> None:
 _assert_profiles_resolve()
 
 
+# ---------------------------------------------------------------------------
+# Operator-local profile merge (WS-PROFILES / T-30-C-02).
+#
+# The operator may register their own Layer-2 profiles in a workspace-local store
+# (loaded through :class:`LocalModelProfileStorePort`). They are merged on top of the
+# built-in registry so :func:`list_profiles` / :func:`profiles_for` / :func:`resolve`
+# surface built-in + operator profiles, while :class:`UnknownProfileError` stays
+# fail-closed. **Default-first (L3):** the operator registry defaults to empty, so when no
+# local store exists the public functions behave byte-identically to the built-in-only
+# world. The merge re-runs the same governance assertions the built-in registry runs (a
+# bad operator profile fails loud), and a built-in id is never shadowed by an operator id.
+# ---------------------------------------------------------------------------
+
+#: The merged-in operator profiles (empty until a local store is loaded). Process-level,
+#: mutated only through :func:`load_operator_profiles` / :func:`clear_operator_profiles`.
+_OPERATOR_PROFILES: tuple[WorkflowModelProfile, ...] = ()
+
+
+def _assert_operator_profiles_resolve(profiles: tuple[WorkflowModelProfile, ...]) -> None:
+    """Fail loudly if an operator profile is ungoverned or collides with a built-in.
+
+    Mirrors :func:`_assert_profiles_resolve` for the operator set: every operator profile
+    must name a Layer-2 harness, never a ``claude-*`` model id, resolve to a real catalog
+    option, carry a replacement when deprecated, and **never** reuse a built-in profile id
+    (a built-in is authoritative — an operator cannot silently redefine it).
+    """
+    built_in_ids = {p.id for p in _BUILT_IN}
+    seen: set[str] = set()
+    for profile in profiles:
+        if profile.id in built_in_ids:
+            raise ValueError(
+                f"operator profile {profile.id!r} collides with a built-in profile id; "
+                "operator profiles must use distinct ids"
+            )
+        if profile.id in seen:
+            raise ValueError(f"duplicate operator profile id {profile.id!r}")
+        seen.add(profile.id)
+        if profile.harness not in _LAYER2_HARNESSES:
+            raise ValueError(
+                f"operator profile {profile.id!r} names non-Layer-2 harness "
+                f"{profile.harness!r}; Layer-2 harnesses: {sorted(_LAYER2_HARNESSES)}"
+            )
+        if profile.model_id.startswith("claude-"):
+            raise ValueError(
+                f"operator profile {profile.id!r} names a Claude id {profile.model_id!r}; "
+                "Layer-2 is GPT-only (ADR-B)"
+            )
+        option = HarnessModelOption(profile.model_id, _as_effort(profile.effort))
+        if option not in harness_models.options_for(profile.harness):
+            valid = ", ".join(harness_models.model_choices(profile.harness))
+            raise ValueError(
+                f"operator profile {profile.id!r} resolves to "
+                f"{profile.model_id}:{profile.effort}, not a {profile.harness} catalog "
+                f"option; valid: {valid}"
+            )
+        if profile.deprecated and not profile.replacement:
+            raise ValueError(
+                f"deprecated operator profile {profile.id!r} must declare a replacement"
+            )
+
+
+def load_operator_profiles(store: object) -> None:
+    """Load + merge operator profiles from a :class:`LocalModelProfileStorePort`.
+
+    Idempotent: replaces the current operator set with the store's profiles. A **missing**
+    store yields an empty set (default-first — L3); a **present-but-invalid** store raises
+    through the store's own typed error (the store validates ``harness == "pi"`` per L1 and
+    rejects API-key-bearing fields per L8), and the merge then re-asserts governance and the
+    no-built-in-collision invariant. The argument is typed ``object`` to keep ``features``
+    from importing the infrastructure adapter; it must expose ``load() -> tuple[...]``.
+    """
+    global _OPERATOR_PROFILES
+    loaded = store.load()  # type: ignore[attr-defined]
+    profiles = tuple(loaded)
+    _assert_operator_profiles_resolve(profiles)
+    _OPERATOR_PROFILES = profiles
+
+
+def clear_operator_profiles() -> None:
+    """Reset the operator set to empty (default-first). Used at teardown / re-bind."""
+    global _OPERATOR_PROFILES
+    _OPERATOR_PROFILES = ()
+
+
+def _all_profiles() -> tuple[WorkflowModelProfile, ...]:
+    """Built-in profiles followed by any merged operator profiles (default-first)."""
+    return (*_BUILT_IN, *_OPERATOR_PROFILES)
+
+
 def list_profiles() -> tuple[WorkflowModelProfile, ...]:
-    """Return all built-in profiles in presentation order."""
-    return _BUILT_IN
+    """Return all profiles (built-in + merged operator) in presentation order.
+
+    Built-in first, then operator profiles. With no local store loaded the operator set is
+    empty, so this is byte-identical to the built-in-only registry (L3 — default-first).
+    """
+    return _all_profiles()
 
 
 def profiles_for(harness: str) -> tuple[WorkflowModelProfile, ...]:
-    """Return the built-in profiles for *harness* (empty for ``fake``/unknown)."""
-    return tuple(p for p in _BUILT_IN if p.harness == harness)
+    """Return the profiles for *harness* (built-in + operator; empty for ``fake``/unknown)."""
+    return tuple(p for p in _all_profiles() if p.harness == harness)
 
 
 def resolve(profile_id: str) -> WorkflowModelProfile:
-    """Resolve a profile id to its :class:`WorkflowModelProfile`.
+    """Resolve a profile id to its :class:`WorkflowModelProfile` (built-in or operator).
 
     Raises:
-        UnknownProfileError: if *profile_id* is not a built-in profile; the message lists
-            the valid ids.
+        UnknownProfileError: if *profile_id* is neither a built-in nor a merged operator
+            profile; the message lists the valid ids (fail-closed).
     """
-    for profile in _BUILT_IN:
+    for profile in _all_profiles():
         if profile.id == profile_id:
             return profile
-    valid = ", ".join(p.id for p in _BUILT_IN)
+    valid = ", ".join(p.id for p in _all_profiles())
     raise UnknownProfileError(f"unknown model profile {profile_id!r}; valid profiles: {valid}")
 
 
@@ -179,7 +272,9 @@ def to_option(profile: WorkflowModelProfile) -> HarnessModelOption:
 
 __all__ = [
     "UnknownProfileError",
+    "clear_operator_profiles",
     "list_profiles",
+    "load_operator_profiles",
     "profiles_for",
     "resolve",
     "to_option",

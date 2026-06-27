@@ -34,6 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from dadaia_workspace.core.models.lifecycle import (
+    AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
     GateEvidenceKind,
@@ -42,6 +43,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
     LifecycleRunStatus,
 )
+from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
@@ -68,6 +70,11 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     build_fragment_suffix,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
+from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    MalformedHandoffError,
+    RequiredHandoffMissingError,
+    WorkflowHandoffResolver,
+)
 
 
 @dataclass(frozen=True)
@@ -86,6 +93,14 @@ class ReleaseStep:
     shared_fragment_ids: tuple[str, ...] = ()
     is_review: bool = False
     runtime_kind: AgentRuntimeKind | None = None
+    # Workflow-step handoff data plane edges (v0.1.30 Item 5 / T-30-D-05). ``produces`` is
+    # the named payload schema this step writes (None ⇒ no ledger payload); ``consumes`` is
+    # the tuple of upstream producer-step labels this step resolves by exact (run id,
+    # producer step, attempt) BEFORE running (A19/A20/A25). The resolver records the
+    # consumption (A22); a missing/malformed required upstream BLOCKS the step before its
+    # prompt runs. These edges are inert unless a resolver is wired (back-compat).
+    produces: str | None = None
+    consumes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -121,47 +136,64 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="release_scope",
         role="project-manager",
         fragment_id="release_definition.release_scope",
-        shared_fragment_ids=("shared.grill_questionnaire",),
+        shared_fragment_ids=("shared.grill_questionnaire", "shared.output_handoff"),
+        produces="release-scope-handoff-v1",
     ),
     ReleaseStep(
         label="spec_create",
         role="product-engineer",
         fragment_id="release_definition.spec_create",
         shared_fragment_ids=("shared.output_handoff",),
+        produces="generic-step-handoff-v1",
+        consumes=("release_scope",),
     ),
     ReleaseStep(
         label="spec_arch_review",
         role="software-architect",
         fragment_id="release_definition.spec_review_architecture",
         is_review=True,
+        produces="spec-review-handoff-v1",
+        consumes=("spec_create",),
     ),
     ReleaseStep(
         label="spec_qa_review",
         role="qa-engineer",
         fragment_id="release_definition.spec_review_qa",
         is_review=True,
+        produces="spec-review-handoff-v1",
+        consumes=("spec_create",),
     ),
     ReleaseStep(
         label="plan_create",
         role="product-engineer",
         fragment_id="release_definition.plan_create",
+        shared_fragment_ids=("shared.output_handoff",),
+        produces="generic-step-handoff-v1",
+        consumes=("spec_create",),
     ),
     ReleaseStep(
         label="plan_review",
         role="qa-engineer, software-architect",
         fragment_id="release_definition.plan_review",
         is_review=True,
+        produces="plan-review-handoff-v1",
+        consumes=("plan_create",),
     ),
     ReleaseStep(
         label="tasks_create",
         role="product-engineer",
         fragment_id="release_definition.tasks_create",
+        shared_fragment_ids=("shared.output_handoff",),
+        produces="generic-step-handoff-v1",
+        consumes=("plan_create",),
     ),
     ReleaseStep(
         label="tasks_implementability_review",
         role="software-engineer",
         fragment_id="release_definition.tasks_review_implementability",
         is_review=True,
+        produces="tasks-review-handoff-v1",
+        consumes=("tasks_create",),
     ),
     ReleaseStep(
         label="definition_commit_gate",
@@ -187,6 +219,7 @@ class ReleaseDefinitionWorkflow:
         prefix: PromptPrefix | None = None,
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
+        handoff_resolver: WorkflowHandoffResolver | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -198,6 +231,12 @@ class ReleaseDefinitionWorkflow:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # When wired, the resolver drives the run-scoped workflow-step handoff data plane
+        # (v0.1.30 Item 5 / T-30-D-05): each step resolves its declared upstream payloads
+        # by exact (run id, producer step, attempt) and writes its own produced payload.
+        # When None the workflow behaves exactly as before (back-compat) — the
+        # produces/consumes edges are inert.
+        self._handoff_resolver = handoff_resolver
 
     # -- public entrypoint ----------------------------------------------
 
@@ -255,12 +294,33 @@ class ReleaseDefinitionWorkflow:
         fragment = self._loader.load_fragment(step.fragment_id)
         shared = tuple(self._loader.load_fragment(fid) for fid in step.shared_fragment_ids)
 
+        # Resolve every declared upstream payload BEFORE the prompt runs (A19/A20/A25).
+        # A missing or malformed required upstream BLOCKS the step here — the worker is
+        # never run on incomplete inputs. The resolved digests are injected into the prompt
+        # (compact, not raw JSON). When no resolver is wired this is a no-op.
+        run, upstream_block, digests = self._resolve_upstream(run, step)
+        if upstream_block is not None:
+            run = self._with_step_outcome(run, step.label, upstream_block)
+            self._run_store.save(run)
+            return run, ReleaseStepResult(
+                label=step.label,
+                accepted=False,
+                is_gate=step.is_review,
+                fragment_id=step.fragment_id,
+                runtime_kind=step.runtime_kind or self._default_kind,
+                blocked=upstream_block,
+            )
+
         audit = self._select_context(step, fragment)
         run = record_injected_context(run, audit)
 
+        selected = self._render_selection(audit)
+        if digests:
+            selected = "\n\n".join(filter(None, (selected, *digests)))
         suffix = build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
-            selected_context=self._render_selection(audit),
+            selected_context=selected,
+            is_review=step.is_review,
         )
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)
@@ -269,19 +329,30 @@ class ReleaseDefinitionWorkflow:
             scope, runtime=runtime.runtime_kind(), prefix=self._prefix
         )
 
-        # Python owns the gate. Every model step — create or review — runs the worker and
-        # reads its structured verdict through the typed gate (APPROVED + in-scope
-        # artifact evidence => pass; REJECTED or missing evidence => BlockedState). The
-        # release stays in RELEASE_DEFINITION across all model steps; only the terminal
-        # Python commit gate transitions the phase. A blocked step stops the sequence —
-        # advancement is never on model say-so.
+        # Python owns the gate, which is REVIEW-ONLY for the verdict (v0.1.31 / L1). A
+        # review step (``step.is_review``) runs the worker and reads its structured verdict
+        # (APPROVED + in-scope artifact evidence => pass; REJECTED or missing evidence =>
+        # BlockedState); a create step passes on a schema-valid payload + in-scope paths,
+        # regardless of the ``verdict`` field. The release stays in RELEASE_DEFINITION
+        # across all model steps; only the terminal Python commit gate transitions the
+        # phase. A blocked step stops the sequence — advancement is never on model say-so.
+        # The worker runs ONCE; its structured output is reused to write the step's
+        # produced payload (T-30-D-05).
         runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
-        blocked = runner.evaluate_gate(
+        worker_result, blocked = runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(
-                request=built.request, target_phase=run.phase, current_step=step.label
+                request=built.request,
+                target_phase=run.phase,
+                current_step=step.label,
+                is_review=step.is_review,
             ),
         )
+        # Record consumption of every upstream the step declared (A22) and write this
+        # step's produced payload (A18/A21) — only on a passing step, only when wired.
+        if blocked is None:
+            run = self._record_consumptions(run, step)
+            run = self._produce_payload(run, step, worker_result)
         run = self._with_step_outcome(run, step.label, blocked)
         # WS-9: complete this step's audit entry with the full prompt composition so the
         # run record is queryable — prefix hash (cacheable-prefix invariant), the discrete
@@ -312,22 +383,107 @@ class ReleaseDefinitionWorkflow:
     def _with_step_outcome(
         run: LifecycleRun, step_label: str, blocked: BlockedState | None
     ) -> LifecycleRun:
-        """Record a model step's outcome on the run, keeping phase = RELEASE_DEFINITION."""
+        """Record a model step's outcome on the run, keeping phase = RELEASE_DEFINITION.
+
+        Uses :func:`dataclasses.replace` so every additive-optional field — notably the
+        ``workflow_steps`` ledger (T-30-D-05) and the ``workflow_policy`` snapshot — is
+        preserved across the step transition rather than silently reset.
+        """
+        from dataclasses import replace
+
         status = LifecycleRunStatus.BLOCKED if blocked is not None else LifecycleRunStatus.RUNNING
         phase = LifecyclePhase.BLOCKED if blocked is not None else run.phase
-        return LifecycleRun(
-            run_id=run.run_id,
-            context=run.context,
-            release_id=run.release_id,
-            command=run.command,
+        return replace(
+            run,
             phase=phase,
             status=status,
             current_step=step_label,
-            expected_artifacts=run.expected_artifacts,
-            idempotency_key=run.idempotency_key,
             blocked=blocked,
-            injected_context=run.injected_context,
         )
+
+    # -- workflow-step handoff data plane (T-30-D-05) -------------------------
+
+    def _resolve_upstream(
+        self, run: LifecycleRun, step: ReleaseStep
+    ) -> tuple[LifecycleRun, BlockedState | None, tuple[str, ...]]:
+        """Resolve every declared upstream payload by exact (run, producer step, attempt).
+
+        Returns the (possibly unchanged) run, a :class:`BlockedState` when a required
+        upstream is missing/malformed (A20), and the compact digests to inject. A no-op
+        when no resolver is wired or the step declares no ``consumes`` edges.
+        """
+        if self._handoff_resolver is None or not step.consumes:
+            return run, None, ()
+        digests: list[str] = []
+        for producer in step.consumes:
+            try:
+                resolved = self._handoff_resolver.resolve_required(
+                    run, producer_step=producer, attempt=0
+                )
+            except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
+                blocked = BlockedState(
+                    reason=f"required upstream handoff unavailable: {exc}",
+                    blocked_at_step=step.label,
+                    detail={"producer_step": producer, "consumer_step": step.label},
+                )
+                return run, blocked, ()
+            digests.append(WorkflowHandoffResolver.render_digest(resolved))
+        return run, None, tuple(digests)
+
+    def _record_consumptions(self, run: LifecycleRun, step: ReleaseStep) -> LifecycleRun:
+        """Record this step's consumption of each declared upstream payload (A22)."""
+        if self._handoff_resolver is None:
+            return run
+        for producer in step.consumes:
+            run = self._handoff_resolver.record_consumption(
+                run,
+                producer_step=producer,
+                producer_attempt=0,
+                consumer_step=step.label,
+                consumer_attempt=0,
+            )
+        return run
+
+    def _produce_payload(
+        self, run: LifecycleRun, step: ReleaseStep, worker_result: AgentRunResult
+    ) -> LifecycleRun:
+        """Write this step's immutable produced payload + ledger entry (A18/A21).
+
+        The payload body is derived from the worker's structured output (verdict / summary)
+        so the data-plane envelope is byte-faithful to what the step emitted. ``declared_consumers``
+        are the downstream steps that declare a ``consumes`` edge on this producer — the set
+        whose consumption flips the payload to ``consumed_all`` / cleanup-eligible.
+        """
+        if self._handoff_resolver is None or step.produces is None:
+            return run
+        payload = self._payload_from_result(step, worker_result)
+        consumers = tuple(s.label for s in _SEQUENCE if step.label in s.consumes)
+        retention = (
+            RetentionMode.PROMOTE_TO_EVIDENCE
+            if step.is_review
+            else RetentionMode.DELETE_AFTER_CONSUMED
+        )
+        run, _ = self._handoff_resolver.produce(
+            run,
+            producer_step=step.label,
+            attempt=0,
+            output_schema=step.produces,
+            payload=payload,
+            declared_consumers=consumers,
+            retention_mode=retention,
+        )
+        return run
+
+    @staticmethod
+    def _payload_from_result(step: ReleaseStep, worker_result: AgentRunResult) -> dict[str, object]:
+        verdict = worker_result.structured_output.get("verdict")
+        payload: dict[str, object] = {"summary": worker_result.summary or step.label}
+        if step.is_review and isinstance(verdict, str):
+            payload["verdict"] = verdict
+            reason = worker_result.structured_output.get("verdict_reason")
+            if isinstance(reason, str):
+                payload["verdict_reason"] = reason
+        return payload
 
     # -- terminal Python gate (no model) --------------------------------
 
@@ -341,24 +497,71 @@ class ReleaseDefinitionWorkflow:
         passed and the release advances; defensively, if the run is already blocked the
         gate refuses to advance.
         """
+        from dataclasses import replace
+
         if run.blocked is not None:
             return run, ReleaseStepResult(
                 label=step.label, accepted=False, is_gate=True, blocked=run.blocked
             )
-        advanced = LifecycleRun(
-            run_id=run.run_id,
-            context=run.context,
-            release_id=run.release_id,
-            command=run.command,
+        # Graph-completeness check (T-30-D-05): when the resolver is wired, every declared
+        # consumes edge in the sequence must have been satisfied — i.e. every producer the
+        # sequence declares actually produced a ledger payload, and every consumer recorded
+        # its consumption. A gap means a prompt-to-prompt edge silently went unfilled; the
+        # gate BLOCKS rather than advancing on an incomplete graph.
+        graph_block = self._graph_completeness_block(run, step)
+        if graph_block is not None:
+            blocked_run = self._with_step_outcome(run, step.label, graph_block)
+            return blocked_run, ReleaseStepResult(
+                label=step.label, accepted=False, is_gate=True, blocked=graph_block
+            )
+        advanced = replace(
+            run,
             phase=LifecyclePhase.IMPLEMENTATION,
             status=LifecycleRunStatus.COMPLETED,
             current_step=step.label,
-            expected_artifacts=run.expected_artifacts,
-            idempotency_key=run.idempotency_key,
             blocked=None,
-            injected_context=run.injected_context,
         )
         return advanced, ReleaseStepResult(label=step.label, accepted=True, is_gate=True)
+
+    def _graph_completeness_block(
+        self, run: LifecycleRun, step: ReleaseStep
+    ) -> BlockedState | None:
+        """Return a BlockedState if the workflow-step handoff graph is incomplete.
+
+        For every model step in the sequence: a ``produces`` step must have a ledger
+        record; for every ``consumes`` edge the consumer must have recorded a consumption
+        of that producer. No-op when no resolver is wired.
+        """
+        if self._handoff_resolver is None:
+            return None
+        for s in _SEQUENCE:
+            if s.fragment_id is None:
+                continue
+            if s.produces is not None and run.workflow_steps.find(s.label, 0) is None:
+                return BlockedState(
+                    reason=f"workflow-step graph incomplete: step {s.label!r} declared "
+                    f"produces={s.produces!r} but wrote no ledger payload",
+                    blocked_at_step=step.label,
+                    detail={"missing_producer": s.label},
+                )
+            for producer in s.consumes:
+                record = run.workflow_steps.find(producer, 0)
+                if record is None:
+                    return BlockedState(
+                        reason=f"workflow-step graph incomplete: {s.label!r} consumes "
+                        f"{producer!r} which has no ledger payload",
+                        blocked_at_step=step.label,
+                        detail={"consumer": s.label, "missing_producer": producer},
+                    )
+                acked = any(c.consumer_step == s.label for c in record.consumptions)
+                if not acked:
+                    return BlockedState(
+                        reason=f"workflow-step graph incomplete: {s.label!r} never recorded "
+                        f"consumption of {producer!r}",
+                        blocked_at_step=step.label,
+                        detail={"consumer": s.label, "unconsumed_producer": producer},
+                    )
+        return None
 
     # -- static-input injection (folded into the cacheable prefix) -------
 

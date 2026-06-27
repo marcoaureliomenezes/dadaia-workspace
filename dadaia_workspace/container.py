@@ -15,11 +15,20 @@ if TYPE_CHECKING:
         WorkflowCatalog,
         WorkflowExecutionPolicyResolver,
     )
+    from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import (
+        WorkflowHandoffDoctor,
+    )
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        WorkflowHandoffResolver,
+    )
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         BacklogDefinitionWorkflow,
     )
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionWorkflow,
+    )
+    from dadaia_workspace.infrastructure.json_local_model_profile_store import (
+        JsonLocalModelProfileStore,
     )
     from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
         JsonWorkflowModelPolicyStore,
@@ -80,6 +89,7 @@ from dadaia_workspace.features.panel.views.workflow_policy import (
     render_api_workflow_fragment,
     render_api_workflow_model_policy,
     render_api_workflow_model_profiles,
+    render_api_workflow_step_ledger,
     render_post_workflow_model_policy_validate,
     render_put_workflow_model_policy,
 )
@@ -577,7 +587,48 @@ def _live_lifecycle_claims(workspace_root: Path) -> Callable[[], frozenset[str]]
                 ref = artifact.lstrip("/")
                 if ref.startswith(swept_prefixes):
                     claims.add(ref)
+            # A live run's workflow-step payloads are sacrosanct — claim each one so the
+            # retention sweep never reclaims a mid-flight step's payload (A23).
+            for step_record in run.workflow_steps:
+                claims.add(step_record.payload_ref.lstrip("/"))
         return frozenset(claims)
+
+    return _provider
+
+
+def _step_payload_reclaim_allow(
+    workspace_root: Path,
+) -> Callable[[], frozenset[str]]:
+    """Provider of cleanup-eligible workflow-step payload refs (T-30-D-07 / A23).
+
+    A step payload is reclaim-eligible only when its ledger record is ``cleanup_eligible``
+    (every declared consumer consumed it AND its retention mode is delete-after-consumed)
+    AND the run is terminal (a live run's payloads are protected by ``_live_lifecycle_claims``).
+    Promoted-to-evidence payloads are never cleanup-eligible, so they are never in this set
+    and always survive. The retention sweep applies its own past-TTL gate on top of this
+    allow-list. Fail-soft: a bad record is skipped, never crashing the sweep.
+    """
+    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+
+    terminal = {LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED}
+
+    def _provider() -> frozenset[str]:
+        store = build_lifecycle_run_store(workspace_root)
+        run_dir = store.root
+        if not run_dir.is_dir():
+            return frozenset()
+        allow: set[str] = set()
+        for record in sorted(run_dir.glob("*.json")):
+            try:
+                run = store.load(record.stem)
+            except Exception:  # noqa: BLE001 — a single bad record never breaks the sweep.
+                continue
+            if run is None or run.status not in terminal:
+                continue
+            for step_record in run.workflow_steps:
+                if step_record.is_cleanup_eligible():
+                    allow.add(step_record.payload_ref.lstrip("/"))
+        return frozenset(allow)
 
     return _provider
 
@@ -604,6 +655,7 @@ def build_retention_sweep(
         policy=policy or SlopPolicy(),
         live_claims=_live_lifecycle_claims(workspace_root),
         important_paths=hygiene.protected_refs,
+        step_payload_reclaim_allow=_step_payload_reclaim_allow(workspace_root),
     )
 
 
@@ -617,6 +669,54 @@ def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
     """Compose lifecycle run-state store."""
     _guard_initialized(workspace_root)
     return JsonLifecycleRunStore(workspace_root)
+
+
+def build_workflow_handoff_doctor(
+    workspace_root: Path,
+    *,
+    now: dt.datetime | None = None,
+) -> "WorkflowHandoffDoctor":
+    """Compose the workflow-step handoff doctor (v0.1.30 Item 5 / T-30-D-08 / A26).
+
+    Read-only reconciliation of every run's ``workflow_steps`` ledger against the on-disk
+    payloads under ``.dadaia/runs/lifecycle/<run>/steps/``; reports orphan / malformed /
+    stale / undeclared / unconsumed-required incoherences. The clock is injectable for
+    hermetic tests.
+    """
+    from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import WorkflowHandoffDoctor
+
+    _guard_initialized(workspace_root)
+    return WorkflowHandoffDoctor(
+        workspace_root,
+        build_lifecycle_run_store(workspace_root),
+        now=now,
+    )
+
+
+def build_workflow_handoff_resolver(
+    workspace_root: Path,
+) -> "WorkflowHandoffResolver":
+    """Compose the run-scoped workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-03).
+
+    The resolver is the queue engine over the ``LifecycleRun.workflow_steps`` control plane
+    (persisted atomically through the run store) and the immutable step payload data plane
+    (written under the WORKSPACE-ROOT ``.dadaia/runs/lifecycle/<run_id>/steps/`` canonical
+    zone by ``FilesystemRuntimeFileAdapter``, which satisfies the narrow
+    ``WorkflowStepPayloadWriter`` port). The clock is injected as an ISO-8601-UTC string
+    factory.
+    """
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
+
+    _guard_initialized(workspace_root)
+
+    def _clock() -> str:
+        return dt.datetime.now(tz=dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    return WorkflowHandoffResolver(
+        run_store=build_lifecycle_run_store(workspace_root),
+        payload_writer=FilesystemRuntimeFileAdapter(workspace_root),
+        clock=_clock,
+    )
 
 
 def build_workflow_model_profile_registry() -> "WorkflowCatalog":
@@ -660,6 +760,40 @@ def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowMode
 
     _guard_initialized(workspace_root)
     return JsonWorkflowModelPolicyStore(workspace_root)
+
+
+def build_local_model_profile_store(
+    workspace_root: Path,
+) -> "JsonLocalModelProfileStore":
+    """Compose the operator-local model-profile store (T-30-C-01 / WS-PROFILES).
+
+    Reads ``.dadaia/states/workflow_model_profiles.local.json`` with atomic temp+rename.
+    ``load()`` returns ``()`` on a missing file (default-first — L3) and raises on a
+    present-but-invalid store (``harness != "pi"`` per L1, any API-key-bearing field per
+    L8, corrupt JSON, unknown field). The store is workspace-local and **never projected**
+    into ``public/`` (L8).
+    """
+    from dadaia_workspace.infrastructure.json_local_model_profile_store import (
+        JsonLocalModelProfileStore,
+    )
+
+    _guard_initialized(workspace_root)
+    return JsonLocalModelProfileStore(workspace_root)
+
+
+def load_operator_model_profiles(workspace_root: Path) -> None:
+    """Load + merge the operator-local profiles into the process registry (WS-PROFILES).
+
+    Idempotent: re-reads the local store and re-registers its profiles with
+    :mod:`features.lifecycle.model_profiles`, so :func:`model_profiles.list_profiles` /
+    :func:`profiles_for` / :func:`resolve` surface built-in + operator profiles. A missing
+    store loads nothing (default-first — L3); a present-but-invalid store raises through the
+    store's typed error, before any model call.
+    """
+    from dadaia_workspace.features.lifecycle import model_profiles
+
+    store = build_local_model_profile_store(workspace_root)
+    model_profiles.load_operator_profiles(store)
 
 
 def build_workflow_policy_resolver(
@@ -1088,6 +1222,7 @@ def build_panel_views(
             policy_store, _resolver_factory
         ),
         "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
+        "api_workflow_step_ledger": render_api_workflow_step_ledger(run_store),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),

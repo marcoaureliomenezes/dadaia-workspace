@@ -2,18 +2,18 @@
 slug: agent-monitoring
 title: agent-monitoring
 category: product
-tldr: telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta
-  abas Agents e Workflows do panel; allowlist gate hardcoded preserva privac...
-summary: telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite;
-  alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privacidade
-  por construção.
+tldr: telemetria local stdlib-only (Claude/Codex/PI sessions) → abas Agents/Workflows do
+  panel; allowlist gate preserva privacidade.
+summary: telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite + PI session
+  jsonl (~/.pi/agent/sessions/); alimenta abas Agents e Workflows do panel; allowlist gate
+  hardcoded preserva privacidade por construção.
 tags:
 - monitoring
 - telemetry
 - sessions
 agent_tier: self-pull
-token_estimate: 1318
-last_updated: '2026-06-01'
+token_estimate: 1500
+last_updated: '2026-06-27'
 release_origin: memory-markdown-source-v1
 ---
 
@@ -22,6 +22,8 @@ CLI surface: integrado ao `dadaia panel` (abas Agents + Workflows) · Closure: a
 ## Propósito
 
 Telemetria local de agentes e workflows consumida exclusivamente de arquivos do operador (Claude Code `~/.claude/projects/*.jsonl` + Codex `~/.codex/sessions.sqlite`) — zero APIs remotas, zero dependências Node, zero `ccusage`. O módulo `features/telemetry/` (peer de `features/panel/`) materializa uma camada SQLite local (`~/.dadaia/state/telemetry/telemetry.sqlite`) com WAL + foreign keys + schema versionado via `PRAGMA user_version`, e expõe dois novos endpoints autenticados (`/api/agents`, `/api/workflows` + drill-down `/api/agents/{id}/sessions`) consumidos por duas novas abas do [[panel]].
+
+**PI é o quarto runtime de telemetria (v0.1.30).** Além de Claude (jsonl) e Codex (sqlite), o `reader/pi.py` ingere metadata de sessão PI de `~/.pi/agent/sessions/` (jsonl por dir-slug) e o `PiRuntimeAdapter` (`ADAPTER_REGISTRY["pi"]`, `aggregator/runtimes.py`) faz enrichment + liveness por mtime de session-file, espelhando a postura Claude/Codex; custo é desconhecido para PI (sem per-event pricing) ⇒ `cumulative_cost_usd=None`/`cost_known=False`, nunca fakeado. Invariant T1 mantido: o reader lê só linhas `session`/`model_change`/`thinking_level_change` (id, cwd, timestamp, modelId, provider) e **exclui a linha `message` inteira** (nenhum body/conteúdo), degradando idle em falha de IO/parse. PI sessions aparecem na aba Agents/Sessions quando existe um source local real (A12).
 
 Resolve a invisibilidade dos custos e padrões de uso por agente: o operador roda em paralelo product-engineer / software-engineer / software-architect / 7 outros agentes especialistas e até a release `agent-monitoring-v1` não tinha forma de inspecionar quem consumiu quanto, por modelo, por Spec Context, por dia. A release entrega uma superfície numbers-only (D-AM-20) — sem thresholds, sem alerts, sem push — onde o operador inspeciona visualmente. Privacidade por construção: **nenhum endpoint serve conteúdo bruto de mensagens** — allowlist gate hardcoded no reader é a única porta para SQLite.
 
@@ -64,7 +66,7 @@ Sem este módulo, `ccusage` (npm) era a única alternativa: dependência Node ex
 
 ## Estado runtime tocado
 
-  * **Read** : `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail com `byte_offset` checkpoint em `reader_state` + inode detection para rotação (devops T7); `~/.codex/sessions.sqlite` via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` com defensive column selection; `.claude/skills/*/SKILL.md` + `.agents/skills/*/SKILL.md` para workflows.
+  * **Read** : `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail com `byte_offset` checkpoint em `reader_state` + inode detection para rotação (devops T7); `~/.codex/sessions.sqlite` via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` com defensive column selection; `~/.pi/agent/sessions/` (PI session jsonl por dir-slug, metadata-only, T1 — v0.1.30); `.claude/skills/*/SKILL.md` + `.agents/skills/*/SKILL.md` para workflows.
   * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.sqlite` (chmod 600, dir 0o700) com schema `PRAGMA user_version=5`: 6 tables (`reader_state`, `sessions`, `agents`, `events`, `workflows`, `workflow_agents`) + 6 indices. WAL + synchronous=NORMAL + foreign_keys=ON. **NO** column de conteúdo (`content`/`text`/`messages`/`snapshot`/`thinking`/`prompt`/`response`) — bloqueado por construção via allowlist gate.
   * **Read+Write** : `~/.dadaia/state/panel.token` (chmod 600) — Bearer token gerado via `secrets.token_urlsafe(32)` em primeiro boot; constant-time compare na validação.
   * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.lock` — process lock via `fcntl.flock` evita refresh concorrente.

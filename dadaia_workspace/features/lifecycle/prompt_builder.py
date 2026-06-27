@@ -37,10 +37,50 @@ class FragmentBundle:
     shared_ids: tuple[str, ...] = ()
 
 
+#: The single transport-envelope schema id a worker emits in the ``schema`` field
+#: (v0.1.32 / L1 / D-1). This is the one schema target named in every "## Required
+#: output" section — never the fragment's descriptive ``output_schema`` (domain) id.
+#: It matches :attr:`PromptScope.expected_schema`'s default, so no per-step
+#: ``expected_schema`` wiring is needed.
+_TRANSPORT_SCHEMA_ID = "agent-run-result-v1"
+
+
+def _required_output_section(*, is_review: bool) -> str:
+    """The step-kind-aware "## Required output" instruction (v0.1.32 / L1·L2·L3 / D-1·D-2·D-3).
+
+    Names exactly ONE schema target — the literal field ``schema`` set to the transport id
+    ``agent-run-result-v1`` — and never surfaces the fragment's domain ``output_schema`` as a
+    competing schema-to-emit. The instruction is step-kind-aware:
+
+    - **review step** (``is_review=True``): emit ``structured_output.verdict`` =
+      APPROVED/REJECTED plus evidence (``verdict_reason``/``findings``);
+    - **create step** (``is_review=False``): emit the produced artifact + ``artifact_refs``
+      and do NOT self-verdict (no ``verdict`` field is required for a create step).
+    """
+    if is_review:
+        body = (
+            "Emit one result object whose `schema` field is the literal transport id "
+            f"`{_TRANSPORT_SCHEMA_ID}`. Because this is a REVIEW step, set "
+            "`structured_output.verdict` to APPROVED or REJECTED and justify it with "
+            "`verdict_reason` (and `findings` when REJECTED). Include `artifact_refs` "
+            "pointing at the handoff document."
+        )
+    else:
+        body = (
+            "Emit one result object whose `schema` field is the literal transport id "
+            f"`{_TRANSPORT_SCHEMA_ID}`. Because this is a CREATE step, emit the produced "
+            "artifact and list it in `artifact_refs` pointing at the handoff document. Do "
+            "NOT self-judge: a create step does not emit an APPROVED/REJECTED decision — "
+            "the review gate owns that."
+        )
+    return f"## Required output\n{body}"
+
+
 def build_fragment_suffix(
     bundle: FragmentBundle,
     *,
     selected_context: str,
+    is_review: bool,
 ) -> str:
     """Assemble a step's variable prompt suffix from a fragment bundle + selected context.
 
@@ -48,14 +88,25 @@ def build_fragment_suffix(
     suffix. The stable, cacheable release context belongs in the :class:`PromptPrefix`
     (assembled once and reused verbatim across steps); this function produces only the
     per-step *variable* suffix: the shared fragments the step cites, the step's own
-    fragment body, the resolved dynamic context, and the explicit output schema the
-    worker must satisfy. The returned text contains fragment-sourced content (the
-    fragment id banner + body), never a generic placeholder.
+    fragment body, the resolved dynamic context, and the step-kind-aware output contract.
+    The returned text contains fragment-sourced content (the fragment id banner + body),
+    never a generic placeholder.
+
+    The "## Required output" section is **coherent by design** (v0.1.32 / L1·L2·L3):
+    it names exactly ONE schema target — the literal field ``schema`` =
+    ``agent-run-result-v1`` (the transport envelope) — and is step-kind-aware. It does NOT
+    surface ``bundle.output_schema`` (the fragment's descriptive *domain* schema) as a
+    competing schema-to-emit; that id stays on :class:`FragmentBundle` for Python tagging of
+    the produced payload, never as a worker emit target.
 
     Args:
-        bundle: the step's fragment bundle (own body + cited shared bodies + schema).
+        bundle: the step's fragment bundle (own body + cited shared bodies + domain schema).
         selected_context: the dynamic context resolved by the context selector,
             already bounded by each fragment's ``max_context_policy``.
+        is_review: whether this is a REVIEW step. **Keyword-only with no default** so every
+            caller is forced to choose (D-2 / C2): a forgotten flag is a call/type error,
+            never a review step silently fed create-step text. Review steps are told to
+            self-verdict; create steps are told to emit an artifact and NOT to self-verdict.
 
     Returns:
         The variable suffix string to append after the cacheable :class:`PromptPrefix`.
@@ -66,12 +117,7 @@ def build_fragment_suffix(
     sections.append(f"<!-- fragment:{bundle.fragment_id} -->\n{bundle.body}".rstrip())
     if selected_context.strip():
         sections.append(f"## Selected context\n{selected_context}".rstrip())
-    sections.append(
-        "## Required output\n"
-        f"Emit a handoff whose structured_output.verdict is APPROVED or REJECTED and that "
-        f"conforms to the output schema `{bundle.output_schema}`, with an artifact_ref "
-        "pointing at the handoff document."
-    )
+    sections.append(_required_output_section(is_review=is_review))
     return "\n\n".join(sections)
 
 

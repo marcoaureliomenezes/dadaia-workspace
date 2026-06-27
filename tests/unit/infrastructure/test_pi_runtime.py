@@ -100,7 +100,10 @@ def test_pi_adapter_builds_controlled_command_and_env(tmp_path: Path) -> None:
     assert argv[argv.index("--mode") : argv.index("--mode") + 2] == ["--mode", "json"]
     assert argv[argv.index("--tools") + 1] == "read,write,edit,bash"
     assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "claude-test"]
-    assert argv[-2:] == ["-p", "-"]
+    # ``-p`` (--print) only; the prompt is piped via stdin — NO trailing ``-`` (pi has no
+    # such option; bug pi-headless-command-trailing-dash-breaks-layer2).
+    assert argv[-1] == "-p"
+    assert "-" not in argv
     assert call["kwargs"]["cwd"] == tmp_path
     # Env is filtered to the allowlist only (ANTHROPIC_API_KEY is allowlisted).
     assert call["kwargs"]["env"] == {
@@ -397,6 +400,95 @@ def test_pi_adapter_fenced_json_ignored_when_schema_mismatch(tmp_path: Path) -> 
     assert "verdict" not in result.structured_output
 
 
+def test_pi_adapter_bare_json_result_without_fence_is_parsed(tmp_path: Path) -> None:
+    """Real-worker tolerance (v0.1.31 R3 / C-02): a bare JSON object (no ```json fence).
+
+    pi runs on the operator's OpenAI Codex subscription; gpt-5.x reliably emits the result
+    object but frequently leaves it UNFENCED — the whole final message is the object. The
+    strict fenced-only parse silently dropped it (live e2e: "agent result missing artifact
+    evidence"). The hardened extractor accepts the whole stripped message as JSON.
+    """
+    bare = json.dumps(
+        {
+            "schema": "agent-run-result-v1",
+            "status": "succeeded",
+            "summary": "scope approved",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/scope.handoff.json"],
+            "structured_output": {"verdict": "APPROVED"},
+        }
+    )
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(bare))
+
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.structured_output["verdict"] == "APPROVED"
+    assert result.summary == "scope approved"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/scope.handoff.json",)
+
+
+def test_pi_adapter_bare_json_accepted_structurally_without_schema_field(tmp_path: Path) -> None:
+    """Structural acceptance: the worker omits the top-level ``schema`` label entirely.
+
+    Observed live: across runs gpt-5.5 inconsistently labels the ``schema`` field — one run
+    carried ``schema: agent-run-result-v1``, the next omitted it and nested
+    ``output_schema: release-scope-handoff-v1`` instead. Rather than BLOCK a correct result
+    on a label mismatch, a payload that structurally IS the result (non-empty
+    ``artifact_refs`` + ``status``/``summary``/``structured_output``) is accepted.
+    """
+    bare = json.dumps(
+        {
+            "status": "succeeded",
+            "summary": "scope approved",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/scope.handoff.json"],
+            "structured_output": {
+                "verdict": "APPROVED",
+                "output_schema": "release-scope-handoff-v1",
+            },
+        }
+    )
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(bare))
+
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.structured_output["verdict"] == "APPROVED"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/scope.handoff.json",)
+
+
+def test_pi_adapter_bare_json_without_result_shape_is_rejected(tmp_path: Path) -> None:
+    """Tolerance does not over-accept: arbitrary JSON lacking the result shape is dropped.
+
+    A schema-mismatched object with NO ``artifact_refs`` is not the result object — the
+    structural path requires a non-empty ``artifact_refs`` list, so it stays rejected.
+    """
+    bare = json.dumps({"schema": "something-else", "note": "not a result", "verdict": "APPROVED"})
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(bare))
+
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert "verdict" not in result.structured_output
+
+
 # ---------------------------------------------------------------------------
 # T-PI-06 — changed_paths from a FAKED git diff (never a model claim)
 # ---------------------------------------------------------------------------
@@ -494,3 +586,123 @@ def test_pi_no_model_flag_when_neither_request_nor_config(tmp_path: Path) -> Non
     )
 
     assert "--model" not in captured[0]
+
+
+# ---------------------------------------------------------------------------
+# T-32-B-01 — strict-primary accept + structural fallback + no-op→BLOCK,
+# pinned by behaviour (C5 / A6-A9). The strict path is the documented contract;
+# structural acceptance is defence-in-depth that must NEVER shadow strict.
+# ---------------------------------------------------------------------------
+
+
+def _pi_run_with_message(tmp_path: Path, content: object) -> AgentRunStatus | Any:
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(content))
+
+    return PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
+
+
+def test_pi_strict_primary_accepts_correctly_labelled_fenced_payload(tmp_path: Path) -> None:
+    """A6 — strict path: a correctly-labelled fenced payload is accepted (schema match)."""
+    fenced = (
+        "Done.\n```json\n"
+        + json.dumps(
+            {
+                "schema": "agent-run-result-v1",
+                "summary": "fenced strict",
+                "artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"],
+                "structured_output": {"verdict": "APPROVED"},
+            }
+        )
+        + "\n```\n"
+    )
+    result = _pi_run_with_message(tmp_path, fenced)
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "fenced strict"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/a.handoff.json",)
+    assert result.structured_output["verdict"] == "APPROVED"
+
+
+def test_pi_strict_primary_accepts_correctly_labelled_bare_payload(tmp_path: Path) -> None:
+    """A6 — strict path: a correctly-labelled BARE (unfenced) payload is accepted."""
+    bare = json.dumps(
+        {
+            "schema": "agent-run-result-v1",
+            "summary": "bare strict",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/b.handoff.json"],
+            "structured_output": {"verdict": "APPROVED"},
+        }
+    )
+    result = _pi_run_with_message(tmp_path, bare)
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "bare strict"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/b.handoff.json",)
+    assert result.structured_output["verdict"] == "APPROVED"
+
+
+def test_pi_structural_fallback_accepts_mislabelled_valid_payload(tmp_path: Path) -> None:
+    """A7 — fallback: a structurally-valid but schema-MISLABELLED payload still parses."""
+    bare = json.dumps(
+        {
+            "schema": "release-scope-handoff-v1",  # wrong (domain, not transport) id
+            "status": "succeeded",
+            "summary": "mislabelled but valid",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/c.handoff.json"],
+            "structured_output": {"verdict": "APPROVED"},
+        }
+    )
+    result = _pi_run_with_message(tmp_path, bare)
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "mislabelled but valid"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/c.handoff.json",)
+    assert result.structured_output["verdict"] == "APPROVED"
+
+
+def test_pi_noop_worker_yields_empty_artifact_refs(tmp_path: Path) -> None:
+    """A8 — a no-op worker (no result payload at all) yields empty ``artifact_refs``.
+
+    The create-step gate still BLOCKs downstream — the extractor is not made permissive.
+    """
+    result = _pi_run_with_message(tmp_path, "I had nothing structured to emit.")
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.artifact_refs == ()
+    assert "verdict" not in result.structured_output
+
+
+def test_pi_strict_primacy_is_pinned_by_behaviour(tmp_path: Path) -> None:
+    """A9 / C5 — strict primacy pinned by BEHAVIOUR (not docstring).
+
+    The shared classifier reports WHICH acceptance path matched. A payload that is BOTH
+    structurally-valid AND ``schema``-matched MUST classify as STRICT; a structurally-valid
+    but ``schema``-mismatched payload MUST classify only as STRUCTURAL (the documented
+    fallback). A future reorder that lets the structural check shadow strict would classify
+    the both-valid payload as STRUCTURAL and FAIL this test.
+    """
+    from dadaia_workspace.infrastructure.headless_adapter_base import (
+        ResultMatch,
+        classify_result_payload,
+    )
+
+    both_valid = {
+        "schema": "agent-run-result-v1",
+        "status": "succeeded",
+        "summary": "both",
+        "artifact_refs": [".dadaia/handoff/dadaia-workspace/d.handoff.json"],
+        "structured_output": {"verdict": "APPROVED"},
+    }
+    structural_only = {
+        "schema": "release-scope-handoff-v1",  # schema mismatch
+        "status": "succeeded",
+        "summary": "structural",
+        "artifact_refs": [".dadaia/handoff/dadaia-workspace/e.handoff.json"],
+        "structured_output": {"verdict": "APPROVED"},
+    }
+    not_a_result = {"schema": "something-else", "note": "no refs"}
+
+    assert classify_result_payload(both_valid, "agent-run-result-v1") is ResultMatch.STRICT
+    assert classify_result_payload(structural_only, "agent-run-result-v1") is ResultMatch.STRUCTURAL
+    assert classify_result_payload(not_a_result, "agent-run-result-v1") is ResultMatch.NONE

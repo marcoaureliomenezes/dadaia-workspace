@@ -103,6 +103,12 @@ class AgentRunnerInput:
     requirements: tuple[GateRequirement, ...] = ()
     resume_token: str | None = None
     current_step: str | None = None
+    # Whether this is a REVIEW step (v0.1.31 / L1). The verdict gate
+    # (``structured_output["verdict"] == "APPROVED"``) applies ONLY to review steps. A
+    # create step (``is_review=False``) passes on a schema-valid payload — which is what
+    # populates ``artifact_refs`` — + in-scope paths, regardless of the ``verdict`` field
+    # (L2 / GRILL D-1/D-2). Threaded from each step's review signal at every call site.
+    is_review: bool = False
 
 
 class LifecycleAgentRunner:
@@ -124,14 +130,31 @@ class LifecycleAgentRunner:
 
         This is the gate decision *without* a phase transition — used by multi-step
         workflows (WS-5) where several bounded worker steps run inside one phase before
-        a single terminal step transitions the release. ``None`` means the worker
-        returned an APPROVED verdict with in-scope artifact evidence (the gate passed);
+        a single terminal step transitions the release. ``None`` means the gate passed;
         a non-``None`` :class:`BlockedState` carries the rejection/missing-evidence
-        reason. The pass/block logic is the same as :meth:`run` so reviews gate
+        reason. The pass condition is **review-only** for the verdict (v0.1.31 / L1): a
+        **review** step (``data.is_review``) passes only on an APPROVED verdict with
+        in-scope artifact evidence; a **create** step passes on a schema-valid payload
+        (populated ``artifact_refs``) + in-scope paths, regardless of the ``verdict``
+        field. The pass/block logic is the same as :meth:`run` so reviews gate
         identically whether or not a transition follows.
         """
         result = self._runtime.run(data.request)
         return self._blocked_result(lifecycle_run, data, result)
+
+    def evaluate_gate_with_result(
+        self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
+    ) -> tuple[AgentRunResult, BlockedState | None]:
+        """Run the request ONCE and return both the worker result and the gate decision.
+
+        Used by the release-definition workflow (T-30-D-05) when the workflow-step handoff
+        resolver is wired: the workflow needs the worker's ``structured_output`` to write
+        the immutable step payload, AND the same single run's gate decision. Running the
+        worker once and returning both avoids a double execution while keeping the gate
+        logic identical to :meth:`evaluate_gate`.
+        """
+        result = self._runtime.run(data.request)
+        return result, self._blocked_result(lifecycle_run, data, result)
 
     def run(self, lifecycle_run: LifecycleRun, data: AgentRunnerInput) -> TransitionDecision:
         result = self._runtime.run(data.request)
@@ -165,7 +188,12 @@ class LifecycleAgentRunner:
     ) -> BlockedState | None:
         if result.status is not AgentRunStatus.SUCCEEDED:
             return self._blocked(lifecycle_run, data, result.error or result.summary)
-        if result.structured_output.get("verdict") != "APPROVED":
+        # L1/L2 (v0.1.31): the verdict requirement is a REVIEW concept. A review step must
+        # carry ``verdict == "APPROVED"``; a create step (``is_review=False``) is never
+        # gated on a self-reported verdict — it passes on a schema-valid payload (which
+        # populates ``artifact_refs``) + in-scope paths, regardless of the ``verdict``
+        # field. The ``artifact_refs`` check below still BLOCKs a no-op create worker.
+        if data.is_review and result.structured_output.get("verdict") != "APPROVED":
             return self._blocked(lifecycle_run, data, "agent result missing APPROVED verdict")
         if not result.artifact_refs:
             return self._blocked(lifecycle_run, data, "agent result missing artifact evidence")

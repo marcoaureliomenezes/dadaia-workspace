@@ -49,6 +49,7 @@ _DEFAULT_STATE_DIR = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
 _DEFAULT_SQLITE_FILENAME = "telemetry.sqlite"
 _DEFAULT_CODEX_PATH = pathlib.Path("~/.codex/state_5.sqlite").expanduser()
 _CLAUDE_PROJECTS_DIR = pathlib.Path("~/.claude/projects").expanduser()
+_DEFAULT_PI_SESSIONS_DIR = pathlib.Path("~/.pi/agent/sessions").expanduser()
 
 
 def _default_refresh_lock() -> TelemetryRefreshLock:
@@ -82,9 +83,12 @@ class TelemetryService:
     aggregator:
         TelemetryAggregator instance (features/telemetry/aggregator/queries.py).
     reader_factory:
-        Callable returning a 2-tuple (claude_reader_module, codex_reader_module).
-        Each module must expose its read function
-        (read_session_file, read_codex_db respectively).
+        Callable returning a tuple of reader modules. The first two elements are
+        (claude_reader_module, codex_reader_module); an optional third element is
+        the PI reader module (WS-PI-6). Each module must expose its read function
+        (read_session_file, read_codex_db, read_pi_sessions respectively). A legacy
+        2-tuple is still accepted — PI ingestion is skipped when no third element
+        is present.
         Workflow ingestion is no longer performed here — workflows are read
         directly from the canonical store (PR3-18 cleanup).
     pricing_module:
@@ -116,7 +120,7 @@ class TelemetryService:
         self,
         dao_factory: Callable[[], Any],
         aggregator: Any,
-        reader_factory: Callable[[], tuple[Any, Any]],
+        reader_factory: Callable[[], tuple[Any, ...]],
         pricing_module: Any,
         workspace_root: pathlib.Path,
         state_dir: pathlib.Path = _DEFAULT_STATE_DIR,
@@ -315,7 +319,12 @@ class TelemetryService:
         if db_path.exists():
             os.chmod(db_path, 0o600)
 
-        claude_reader, codex_reader = self._reader_factory()
+        # The reader factory returns (claude, codex) historically, or
+        # (claude, codex, pi) once the PI reader is wired (WS-PI-6). Unpack
+        # tolerantly so legacy 2-tuple callers keep working unchanged.
+        readers = self._reader_factory()
+        claude_reader, codex_reader = readers[0], readers[1]
+        pi_reader = readers[2] if len(readers) > 2 else None
         now_iso = datetime.datetime.now(tz=datetime.UTC).isoformat()
 
         # --- Claude reader ---
@@ -337,6 +346,18 @@ class TelemetryService:
             codex_reader.read_codex_db(codex_path, dao, now_iso)
         except Exception as exc:  # noqa: BLE001
             logger.warning("TelemetryService: codex reader error: %s", exc)
+
+        # --- PI reader (WS-PI-6) ---
+        # Ingests PI session metadata from ~/.pi/agent/sessions/ (env override:
+        # DADAIA_PI_SESSIONS_DIR). Degrades to a no-op when the dir is absent or
+        # any IO/parse failure occurs (the reader itself is graceful).
+        if pi_reader is not None:
+            pi_dir_env = os.environ.get("DADAIA_PI_SESSIONS_DIR")
+            pi_dir = pathlib.Path(pi_dir_env) if pi_dir_env else _DEFAULT_PI_SESSIONS_DIR
+            try:
+                pi_reader.read_pi_sessions(pi_dir, dao, now_iso)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("TelemetryService: pi reader error: %s", exc)
 
         # --- Cost backfill ---
         self._backfill_costs(dao, now_iso)

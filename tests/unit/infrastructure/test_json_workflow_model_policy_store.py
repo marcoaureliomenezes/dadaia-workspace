@@ -16,6 +16,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
+    WorkflowModelPolicyOverlay,
     WorkflowModelPolicyStoreError,
 )
 
@@ -60,6 +61,24 @@ def test_save_then_load_round_trips(tmp_path: Path) -> None:
     assert loaded.step_profile("default", "implementation", "implement") == (
         "codex-implementation-standard"
     )
+
+
+def test_save_then_load_round_trips_harness_only_workflow(tmp_path: Path) -> None:
+    """A harness-only overlay (named only in default_harness/step_harness, no profile
+    `steps`) must survive save→load — regression for
+    `overlay-todict-drops-harness-only-workflow` (to_dict iterated only `contexts`)."""
+    store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
+    overlay = WorkflowModelPolicyOverlay(
+        policy_id="default",
+        contexts={},
+        default_harness_overlay={"default": {"implementation": "pi"}},
+        step_harness_overlay={"default": {"implementation": {"implement": "pi"}}},
+    )
+    store.save(overlay)
+    loaded = store.load()
+    assert loaded is not None
+    assert loaded.workflow_default_harness("default", "implementation") == "pi"
+    assert loaded.step_harness("default", "implementation", "implement") == "pi"
 
 
 def test_invalid_json_raises(tmp_path: Path) -> None:
@@ -151,8 +170,9 @@ def test_only_default_context_honored(tmp_path: Path) -> None:
     assert parsed.step_profile("default", "implementation", "implement") == (
         "codex-implementation-standard"
     )
-    # a non-default context is inert (D-2): not honored
-    assert parsed.step_profile("other-ctx", "implementation", "implement") is None
+    # WS-OVERLAYS (replaces the D-2 collapse): a non-default context IS now honored. Here
+    # 'other-ctx' declares its own override and inherits 'default' for anything it omits.
+    assert parsed.step_profile("other-ctx", "implementation", "implement") == "pi-reasoning-high"
 
 
 def test_step_profile_absent_returns_none(tmp_path: Path) -> None:
@@ -221,7 +241,10 @@ def test_harness_overlay_to_dict_omits_empty_fields(tmp_path: Path) -> None:
     assert "harnesses" not in wf
 
 
-def test_non_default_harness_context_inert(tmp_path: Path) -> None:
+def test_non_default_harness_context_now_honored(tmp_path: Path) -> None:
+    # WS-OVERLAYS (replaces the D-2 collapse): a non-default context's harness overlay is
+    # now honored. 'other' declares its own default_harness and inherits 'default' for the
+    # per-step harness it omits.
     store = JsonWorkflowModelPolicyStore(_workspace(tmp_path))
     overlay = _harness_overlay()
     contexts = overlay["contexts"]
@@ -230,5 +253,6 @@ def test_non_default_harness_context_inert(tmp_path: Path) -> None:
         "workflows": {"implementation": {"default_harness": "pi", "harnesses": {}}}
     }
     parsed = store.parse(overlay)
-    assert parsed.workflow_default_harness("other", "implementation") is None
-    assert parsed.step_harness("other", "implementation", "implement") is None
+    assert parsed.workflow_default_harness("other", "implementation") == "pi"
+    # 'other' omits the per-step harness, so it inherits the 'default' context value.
+    assert parsed.step_harness("other", "implementation", "implement") == "codex"

@@ -8,7 +8,11 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.models.hygiene import HygieneSnapshot
-from dadaia_workspace.core.protocols.runtime_files import RuntimeFileKind, RuntimeFileRef
+from dadaia_workspace.core.protocols.runtime_files import (
+    RuntimeFileKind,
+    RuntimeFileRef,
+    StepPayloadRef,
+)
 from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 
@@ -74,6 +78,60 @@ class FilesystemRuntimeFileAdapter:
     ) -> RuntimeFileRef:
         path = self._canonical_path("runs", "lifecycle", run_id, filename)
         return self._write_text(RuntimeFileKind.RUN_ARTIFACT, path, content)
+
+    def write_step_payload(
+        self,
+        *,
+        run_id: str,
+        producer_step: str,
+        attempt: int,
+        content: str,
+    ) -> StepPayloadRef:
+        """Write an IMMUTABLE workflow-step payload envelope under the run-scoped steps zone.
+
+        Path: WORKSPACE-ROOT
+        ``.dadaia/runs/lifecycle/<run_id>/steps/<step>-attempt-<n>.step-payload.json``
+        (v0.1.30 Item 5 — the workflow-step handoff data plane). The write is atomic
+        (temp+rename via :func:`_atomic_write_text`) and **immutable**: a payload for an
+        existing ``(run_id, producer_step, attempt)`` is never overwritten — re-producing
+        the same key raises, preserving the addressable-key immutability the resolver's
+        content-hash check depends on.
+
+        ``run_id`` / ``producer_step`` are confined as single path segments (no traversal);
+        ``attempt`` is rendered numerically — a run-id-derived path can never escape the
+        ``.dadaia/runs/lifecycle`` canonical zone (``_canonical_path`` raises on escape).
+        """
+        if attempt < 0:
+            raise RuntimeFilePathError("step payload attempt must be non-negative")
+        filename = f"{producer_step}-attempt-{attempt}.step-payload.json"
+        path = self._canonical_path("runs", "lifecycle", run_id, "steps", filename)
+        if path.exists():
+            raise RuntimeFilePathError(
+                f"step payload already exists (immutable): {self._workspace_ref(path)}"
+            )
+        ref = self._write_text(RuntimeFileKind.RUN_ARTIFACT, path, content)
+        assert ref.content_hash is not None
+        return StepPayloadRef(payload_ref=ref.path, content_hash=ref.content_hash)
+
+    def read_step_payload(self, payload_ref: str) -> str | None:
+        """Return the raw step payload envelope JSON at *payload_ref*, or ``None`` if absent.
+
+        ``payload_ref`` is a workspace-relative path. It is resolved and confined to the
+        ``.dadaia/runs/lifecycle`` zone before any read — a ref pointing outside the zone
+        (traversal / absolute) returns ``None`` rather than reading an arbitrary file.
+        """
+        ref_path = Path(payload_ref)
+        if ref_path.is_absolute() or ".." in ref_path.parts:
+            return None
+        resolved = (self._workspace_root / ref_path).resolve()
+        runs_root = (self._dadaia_root / "runs" / "lifecycle").resolve()
+        try:
+            resolved.relative_to(runs_root)
+        except ValueError:
+            return None
+        if not resolved.is_file():
+            return None
+        return resolved.read_text(encoding="utf-8")
 
     def write_hygiene_snapshot(self, snapshot: HygieneSnapshot) -> RuntimeFileRef:
         text = json.dumps(snapshot.to_dict(), indent=2, sort_keys=True) + "\n"

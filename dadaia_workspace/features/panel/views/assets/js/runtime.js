@@ -2,7 +2,7 @@
 // PR5-D2 (FE): implements window.Runtime with get() / set() backed by localStorage.
 //
 // localStorage key: dadaia-panel-runtime  (per SPEC §NFR3)
-// Valid values:      'claude' | 'codex'    (default: 'claude')
+// Valid values:      'claude' | 'codex' | 'pi'    (default: 'claude')
 //
 // On set(value):
 //   1. Persist to localStorage.
@@ -19,7 +19,7 @@
   'use strict';
 
   var LS_KEY = 'dadaia-panel-runtime';
-  var VALID_VALUES = ['claude', 'codex'];
+  var VALID_VALUES = ['claude', 'codex', 'pi'];
   var DEFAULT_VALUE = 'claude';
 
   // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@
   // ── Core API ──────────────────────────────────────────────────────────────────
 
   /**
-   * Runtime.get() → 'claude' | 'codex'
+   * Runtime.get() → 'claude' | 'codex' | 'pi'
    * Returns the current runtime selection from localStorage, or 'claude' if
    * none is set or the stored value is invalid.
    */

@@ -36,6 +36,15 @@ memory tree. You receive a catalog summary and zero or more pre-selected atoms i
   large and is supplied only when a step's decision touches structure. When it is
   absent, do not assume structural facts.
 
+## Context budget
+
+The per-step context budget is the fragment's declared `max_context_policy` (the
+existing bound on how much each dynamic input returns: `exact-files-only`, `summary`,
+`catalog-only`, `diff-only`, `previous-handoff-only`). There is no separate per-harness
+numeric token cap — `max_context_policy` *is* the budget mechanism. Prefer the leanest
+policy a step can succeed with: a `summary` or `catalog-only` selection over a full-file
+pull whenever the decision does not turn on the exact contract.
+
 ## Rule
 
 Read the relevant atoms before deciding. Working from a stale or absent atom is the

@@ -49,6 +49,11 @@ def render_sessions_section() -> str:
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>\n'
         '        <span class="runtime-btn-label">Codex</span>\n'
         "      </button>\n"
+        '      <button type="button" class="runtime-btn runtime-btn--pi" id="sessions-runtime-btn-pi"\n'
+        '        role="radio" aria-checked="false" data-runtime-value="pi" aria-label="PI runtime">\n'
+        '        <span class="runtime-btn-icon" aria-hidden="true">&#9678;</span>\n'
+        '        <span class="runtime-btn-label">PI</span>\n'
+        "      </button>\n"
         "    </div>\n"
         "  </header>\n"
         '  <div id="sessions-dashboard" class="sessions-dashboard" aria-label="Sessions summary"></div>\n'

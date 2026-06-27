@@ -67,7 +67,7 @@ def render_index(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dadaia Workspace Panel</title>
   <script>(function(){{var t=localStorage.getItem('dadaia-panel-theme');if(t&&(t==='mint'||t==='sage'||t==='warm')){{document.documentElement.dataset.theme=t;}}}})();</script>
-  <script>(function(){{var r=localStorage.getItem('dadaia-panel-runtime');if(r&&(r==='claude'||r==='codex')){{document.documentElement.dataset.runtime=r;}}}})();</script>
+  <script>(function(){{var r=localStorage.getItem('dadaia-panel-runtime');if(r&&(r==='claude'||r==='codex'||r==='pi')){{document.documentElement.dataset.runtime=r;}}}})();</script>
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/projects.css">

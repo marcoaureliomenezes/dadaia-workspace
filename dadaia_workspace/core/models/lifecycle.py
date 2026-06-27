@@ -10,6 +10,7 @@ from dadaia_workspace.core.models.workflow_execution import (
     ResolvedModelConfig,
     WorkflowPolicySnapshot,
 )
+from dadaia_workspace.core.models.workflow_handoff import WorkflowStepLedger
 
 
 class LifecyclePhase(StrEnum):
@@ -293,6 +294,12 @@ class LifecycleRun:
     # Old records (no ``workflow_policy`` key) still load — the run-store ``_SCHEMA_VERSION``
     # literal is deliberately unchanged (M1).
     workflow_policy: WorkflowPolicySnapshot | None = None
+    # Additive-optional workflow-step handoff ledger (v0.1.30 Item 5 / T-30-D-01). The
+    # control plane of the run-scoped step data plane: which step+attempt produced which
+    # immutable payload, who must consume it, and who has. Old run records with no
+    # ``workflow_steps`` key load as an empty ledger (A27) — the run-store
+    # ``_SCHEMA_VERSION`` literal is deliberately unchanged, mirroring ``workflow_policy``.
+    workflow_steps: WorkflowStepLedger = field(default_factory=WorkflowStepLedger)
 
     def prompt_composition(self) -> tuple[dict[str, Any], ...]:
         """Return the per-step prompt composition for this run (WS-9 observability).
@@ -319,6 +326,7 @@ class LifecycleRun:
             "blocked": self.blocked.to_dict() if self.blocked else None,
             "injected_context": [entry.to_dict() for entry in self.injected_context],
             "workflow_policy": (self.workflow_policy.to_dict() if self.workflow_policy else None),
+            "workflow_steps": self.workflow_steps.to_list(),
         }
 
     @classmethod
@@ -336,6 +344,9 @@ class LifecycleRun:
         # Additive-optional: absent ``workflow_policy`` (old v1 records) ⇒ ``None`` (M1).
         policy_raw = data.get("workflow_policy")
         assert policy_raw is None or isinstance(policy_raw, dict)
+        # Additive-optional: absent ``workflow_steps`` (old records) ⇒ empty ledger (A27).
+        steps_raw = data.get("workflow_steps", [])
+        assert isinstance(steps_raw, list)
         return cls(
             run_id=str(data["run_id"]),
             context=str(data["context"]),
@@ -349,6 +360,7 @@ class LifecycleRun:
             blocked=BlockedState.from_dict(blocked_raw) if blocked_raw else None,
             injected_context=tuple(injected),
             workflow_policy=(WorkflowPolicySnapshot.from_dict(policy_raw) if policy_raw else None),
+            workflow_steps=WorkflowStepLedger.from_list(steps_raw),
         )
 
 

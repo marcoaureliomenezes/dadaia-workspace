@@ -115,6 +115,23 @@ Before editing, check for the nearest scoped rule file:
 If a scoped file exists, follow it. Do not duplicate its details in root-level
 instructions.
 
+## Rule-Law Corpus (by-name → on-disk surface)
+
+Agent instructions cite governance rules **by name** (e.g. the `workspace-protocol`
+rule, the `release-governance` rule, the `backlog-ownership` rule). Every by-name rule
+is a real on-disk Markdown file at the workspace root:
+
+```text
+.claude/rules/<rule-name>.md
+```
+
+This corpus is reachable from **every** harness — Claude Code loads it natively, and
+Codex (and any other harness) can read it directly with a file read. When an
+instruction references "the `<name>` rule", open `.claude/rules/<name>.md` to load the
+full rule body. The corpus is generated from `dadaia_workspace/public/rules/` by
+`dadaia public install` and is identical across harnesses; it is the single source of
+truth for the by-name law surface.
+
 ## Active Spec Context
 
 See `workspace-protocol` rule for the full context-resolution and spec-loading procedure.

@@ -348,6 +348,119 @@ class CodexRuntimeAdapter:
 
 
 # ---------------------------------------------------------------------------
+# PI adapter — WS-PI-6 (fourth harness)
+# ---------------------------------------------------------------------------
+
+_PI_SESSIONS_DIR = pathlib.Path.home() / ".pi" / "agent" / "sessions"
+_PI_ACTIVE_MINUTES = 5
+_PI_IDLE_MINUTES = 60
+
+
+class PiRuntimeAdapter:
+    """Enrichment + liveness for PI (pi-coding-agent) sessions.
+
+    Enrichment (cost posture mirrors Codex — L2 "no fake telemetry"):
+    - enrich_row / enrich_detail set cumulative_cost_usd=None and cost_known=False.
+    - PI has no per-event token pricing, so cost is unknown and never faked.
+
+    Liveness:
+    - PI persists sessions per directory as JSONL files under
+      ``~/.pi/agent/sessions/<dir-slug>/<ISO-ts>_<session-id>.jsonl``.  The
+      session id is the trailing uuid component of the filename stem, so we resolve
+      the session's file by scanning the slug dirs for a ``*.jsonl`` whose stem ends
+      with the session id, then use that file's mtime as the last-activity signal.
+    - Classification (mirrors the Claude/Codex posture):
+        delta ≤ 5 min   → "active"
+        delta ≤ 60 min  → "idle"
+        delta > 60 min  → "ended"
+        file absent      → "ended"
+        any IO / parse failure → "idle" (graceful degradation)
+
+    Security note (privacy invariant T1): liveness reads only file metadata
+    (mtime).  No session-file content is opened, read, or logged.
+    """
+
+    def enrich_row(self, row: SessionRow) -> SessionRow:
+        """PI: cost is not tracked; set cumulative_cost_usd=None, cost_known=False."""
+        return SessionRow(
+            session_id=row.session_id,
+            runtime=row.runtime,
+            project=row.project,
+            cwd=row.cwd,
+            model=row.model,
+            started_at=row.started_at,
+            last_activity_at=row.last_activity_at,
+            message_count=row.message_count,
+            context_size_tokens=row.context_size_tokens,
+            cumulative_cost_usd=None,
+            cost_known=False,
+            status=row.status,
+            agent_name=row.agent_name,
+            ai_title=row.ai_title,
+        )
+
+    def enrich_detail(self, detail: SessionDetail) -> SessionDetail:
+        """PI: cost not tracked; set cumulative_cost_usd=None, cost_known=False."""
+        return SessionDetail(
+            session_id=detail.session_id,
+            runtime=detail.runtime,
+            project=detail.project,
+            cwd=detail.cwd,
+            model=detail.model,
+            started_at=detail.started_at,
+            last_activity_at=detail.last_activity_at,
+            message_count=detail.message_count,
+            context_size_tokens=detail.context_size_tokens,
+            cumulative_cost_usd=None,
+            cost_known=False,
+            status=detail.status,
+            agent_name=detail.agent_name,
+            ai_title=detail.ai_title,
+            event_timestamps=detail.event_timestamps,
+        )
+
+    def liveness(self, session_id: str, cwd: str) -> Literal["active", "idle", "ended"]:
+        """Classify PI session liveness from the session file's mtime.
+
+        Returns "ended" when no matching session file exists, the active/idle/ended
+        bucket by mtime delta otherwise, and "idle" on any IO failure.
+        """
+        try:
+            session_file = self._resolve_session_file(session_id)
+            if session_file is None:
+                return "ended"
+            mtime = session_file.stat().st_mtime
+            last_active = datetime.fromtimestamp(mtime, tz=UTC)
+            delta = datetime.now(tz=UTC) - last_active
+            if delta <= timedelta(minutes=_PI_ACTIVE_MINUTES):
+                return "active"
+            if delta <= timedelta(minutes=_PI_IDLE_MINUTES):
+                return "idle"
+            return "ended"
+        except OSError:
+            return "idle"
+
+    @staticmethod
+    def _resolve_session_file(session_id: str) -> pathlib.Path | None:
+        """Find the JSONL file for *session_id* under ~/.pi/agent/sessions/<slug>/.
+
+        The filename is ``<ISO-ts>_<session-id>.jsonl``; we match a file whose stem
+        ends with the session id.  Returns None when the sessions dir is absent or no
+        file matches.  Reads only directory entries / filenames — no file content.
+        """
+        sessions_dir = _PI_SESSIONS_DIR
+        if not sessions_dir.exists():
+            return None
+        for slug_dir in sessions_dir.iterdir():
+            if not slug_dir.is_dir():
+                continue
+            for jsonl_file in slug_dir.glob("*.jsonl"):
+                if jsonl_file.stem.endswith(session_id):
+                    return jsonl_file
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -355,6 +468,7 @@ class CodexRuntimeAdapter:
 ADAPTER_REGISTRY: dict[str, RuntimeAdapter] = {
     "claude": ClaudeRuntimeAdapter(),
     "codex": CodexRuntimeAdapter(),
+    "pi": PiRuntimeAdapter(),
 }
 
 

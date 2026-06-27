@@ -1,4 +1,12 @@
-"""Exec-backed Codex runtime adapter for lifecycle worker requests."""
+"""Exec-backed Codex runtime adapter for lifecycle worker requests.
+
+The security-relevant invariants shared with the other real adapters — secret
+redaction, the env-allowlist filter, the git ``changed_paths`` override, the
+``Runner`` seam, and the prompt envelope — live in
+:mod:`dadaia_workspace.infrastructure.headless_adapter_base`. This module keeps
+only the genuinely Codex-CLI-specific logic (``_command``, ``_model_and_effort``,
+effort narrowing, the ``--output-last-message`` read, and result extraction).
+"""
 
 from __future__ import annotations
 
@@ -6,10 +14,10 @@ import json
 import os
 import subprocess
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, get_args
+from typing import get_args
 
 from dadaia_workspace.core.model_registry import CodexEffort, codex_tier_views
 from dadaia_workspace.core.models.lifecycle import (
@@ -18,8 +26,12 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
-
-Runner = Callable[..., subprocess.CompletedProcess[str]]
+from dadaia_workspace.infrastructure.headless_adapter_base import (
+    Runner,
+    SubprocessAdapterMixin,
+    _GitDiffPort,
+    normalize_artifact_refs,
+)
 
 _DEFAULT_ENV_ALLOWLIST = (
     "PATH",
@@ -30,7 +42,6 @@ _DEFAULT_ENV_ALLOWLIST = (
     "XDG_DATA_HOME",
     "TERM",
 )
-_SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
 _VALID_CODEX_EFFORTS: frozenset[str] = frozenset(get_args(CodexEffort))
 
@@ -49,12 +60,6 @@ def _as_codex_effort(effort: str) -> CodexEffort:
     return effort  # type: ignore[return-value]
 
 
-class _GitDiffPort(Protocol):
-    """Narrow git seam the adapter needs — satisfied by ``GitSubprocessClient``."""
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
-
-
 @dataclass(frozen=True)
 class CodexExecConfig:
     """Explicit controls for one Codex exec adapter instance."""
@@ -69,7 +74,7 @@ class CodexExecConfig:
     timeout_seconds: int = 900
 
 
-class CodexExecAdapter:
+class CodexExecAdapter(SubprocessAdapterMixin):
     """Run bounded lifecycle worker prompts through `codex exec`.
 
     The adapter is intentionally infrastructure-only. It never decides lifecycle
@@ -95,6 +100,9 @@ class CodexExecAdapter:
         self._runner = runner
         self._environ = environ if environ is not None else os.environ
         self._git = git
+        # Wire the mixin seams to this adapter's config.
+        self._env_allowlist = config.env_allowlist
+        self._cwd_for_diff = config.cwd
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.CODEX_EXEC
@@ -140,7 +148,7 @@ class CodexExecAdapter:
                     summary="codex exec returned non-zero exit",
                     error=self._redact((proc.stderr or proc.stdout or "").strip()),
                 )
-            result = self._result_from_output(output_path, proc)
+            result = self._result_from_output(request, output_path, proc)
             return self._with_changed_paths(result)
 
     def _command(self, request: AgentRunRequest, output_path: Path) -> list[str]:
@@ -191,93 +199,66 @@ class CodexExecAdapter:
                 return view.codex_id, view.reasoning_effort
         raise ValueError("Codex dispatch tier is not configured")
 
-    def _env(self) -> dict[str, str]:
-        return {
-            key: self._environ[key] for key in self._config.env_allowlist if key in self._environ
-        }
-
-    @staticmethod
-    def _prompt(request: AgentRunRequest) -> str:
-        return json.dumps(
-            {
-                "role": request.role,
-                "prompt": request.prompt,
-                "context": request.context,
-                "release_id": request.release_id,
-                "task_id": request.task_id,
-                "allowed_paths": list(request.allowed_paths),
-                "forbidden_paths": list(request.forbidden_paths),
-                "expected_schema": request.expected_schema,
-                "required_evidence": [kind.value for kind in request.required_evidence],
-            },
-            indent=2,
-            sort_keys=True,
-        )
-
     def _result_from_output(
         self,
+        request: AgentRunRequest,
         output_path: Path,
         proc: subprocess.CompletedProcess[str],
     ) -> AgentRunResult:
+        """Parse the codex ``--output-last-message`` text into an ``AgentRunResult``.
+
+        v0.1.32 (D-5 / OQ-3) brings codex to pi parity: the result object is extracted
+        through the SHARED :meth:`_extract_result_payload`, so codex gains the same
+        fenced-or-bare candidate scan and the same strict-primary + structural-fallback
+        acceptance — and the same **reject-guard** (a parsed dict lacking the result shape
+        no longer maps to a result; C4). The previous degraded fallbacks are preserved:
+        unparseable text → a redacted prose-summary ``SUCCEEDED``; a non-dict JSON value →
+        a ``structured_output`` value; a dict that is NOT the result object → a redacted
+        prose summary with EMPTY ``artifact_refs`` (which BLOCKs a create step, matching
+        pi). Every surfaced field is ``_redact``-scrubbed (CWE-209).
+        """
         try:
             raw = output_path.read_text(encoding="utf-8")
         except OSError:
             raw = proc.stdout
+
+        # PRIMARY: shared strict-primary / structural-fallback result extraction.
+        payload = self._extract_result_payload(raw, request.expected_schema)
+        if payload is not None:
+            refs = normalize_artifact_refs(payload)
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary=self._redact(str(payload.get("summary", "codex exec completed"))),
+                artifact_refs=tuple(self._redact(path) for path in refs),
+                structured_output=self._structured_from_payload(payload),
+            )
+
+        # FALLBACK: no result object was accepted — degrade safely (never crash, no
+        # synthesized artifact_refs — the reject-guard C4 keeps a shapeless dict from
+        # mapping to a result).
         try:
-            payload = json.loads(raw)
+            parsed = json.loads(raw)
         except json.JSONDecodeError:
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(raw.strip() or "codex exec completed"),
             )
-        if not isinstance(payload, dict):
+        if not isinstance(parsed, dict):
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="codex exec completed",
-                structured_output={"value": self._redact(str(payload))},
+                structured_output={"value": self._redact(str(parsed))},
             )
+        # A parsed dict that is NOT this step's result object: keep a redacted summary if
+        # present, but emit NO artifact_refs / verdict (reject-guard parity with pi).
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
-            summary=self._redact(str(payload.get("summary", "codex exec completed"))),
-            artifact_refs=tuple(
-                self._redact(str(item))
-                for item in payload.get("artifact_refs", [])
-                if isinstance(item, str)
-            ),
-            structured_output={
-                str(key): self._redact(str(value))
-                for key, value in payload.get("structured_output", {}).items()
-                if isinstance(payload.get("structured_output"), dict)
-            },
+            summary=self._redact(str(parsed.get("summary", "codex exec completed"))),
         )
 
-    # -- changed_paths via git diff (Ring-2 root-cause, GAP-B) ------------
-
-    def _with_changed_paths(self, result: AgentRunResult) -> AgentRunResult:
-        """Source ``changed_paths`` from ``git diff``, overriding any model claim.
-
-        When no git client is injected the result is returned untouched (prior
-        behaviour). When present, the real diff UNCONDITIONALLY overwrites any
-        ``changed_paths`` a lying worker may have self-reported.
-        """
-        if self._git is None:
-            return result
-        changed = self._git.diff_name_only(self._config.cwd)
-        structured = dict(result.structured_output)
-        structured["changed_paths"] = ",".join(changed)
-        return AgentRunResult(
-            status=result.status,
-            summary=result.summary,
-            artifact_refs=result.artifact_refs,
-            structured_output=structured,
-            error=result.error,
-        )
-
-    def _redact(self, text: str) -> str:
-        redacted = text
-        for key, value in self._environ.items():
-            if not value:
-                continue
-            if any(part in key.upper() for part in _SECRET_NAME_PARTS):
-                redacted = redacted.replace(value, "[REDACTED]")
-        return redacted
+    def _structured_from_payload(self, payload: dict[str, object]) -> dict[str, str]:
+        """Flatten a result payload's ``structured_output`` into the redacted string map."""
+        extra = payload.get("structured_output")
+        if not isinstance(extra, dict):
+            return {}
+        return {str(key): self._redact(str(value)) for key, value in extra.items()}

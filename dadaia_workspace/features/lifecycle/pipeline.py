@@ -20,6 +20,7 @@ from dadaia_workspace.core.harness_models import (
     options_for,
 )
 from dadaia_workspace.core.models.lifecycle import (
+    AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
     GateEvidenceKind,
@@ -32,6 +33,7 @@ from dadaia_workspace.core.models.workflow_execution import (
     ResolvedModelConfig,
     WorkflowPolicySnapshot,
 )
+from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.lifecycle.agent_runner import (
@@ -55,6 +57,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     build_fragment_suffix,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
+from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
 
 #: ``kind -> adapter`` — injected so tests can supply fakes per harness.
 RuntimeFactory = Callable[[AgentRuntimeKind], AgentRuntimePort]
@@ -82,6 +85,13 @@ class PipelineStep:
     model_profile: str | None = None
     fragment_id: str | None = None
     shared_fragment_ids: tuple[str, ...] = ()
+    # Whether this is a REVIEW step (v0.1.31 / C1 / L4). The ``review_qa`` /
+    # ``review_security`` / ``review_code`` steps gate a release toward the push boundary
+    # and MUST keep their ``verdict == APPROVED`` requirement; ``implement`` is a create
+    # step (``is_review=False``). Threaded into ``AgentRunnerInput`` so the runner applies
+    # the verdict gate to review steps only. Without this field the push-boundary review
+    # gates would silently default to create-step semantics and lose the verdict check.
+    is_review: bool = False
     # The governance-resolved concrete model for this step (T-28-A-07). Threaded into the
     # step's scope/request so the adapter runs the policy-selected model. Additive-optional.
     resolved_model: ResolvedModelConfig | None = None
@@ -105,6 +115,25 @@ class PipelineResult:
     blocked: BlockedState | None = None
 
 
+@dataclass(frozen=True)
+class ImplementReviewRound:
+    """One implement→review round of the bounded retry loop (T-30-D-06)."""
+
+    attempt: int
+    review_verdict: str
+
+
+@dataclass(frozen=True)
+class ImplementReviewLoopResult:
+    """Typed outcome of the implement/review attempt loop (A24)."""
+
+    run_id: str
+    completed: bool
+    attempts: int
+    rounds: tuple[ImplementReviewRound, ...] = ()
+    blocked: BlockedState | None = None
+
+
 class LifecyclePipeline:
     """Thread one run through an ordered, per-step-harness-selectable phase sequence."""
 
@@ -121,6 +150,8 @@ class LifecyclePipeline:
         fragment_loader: FragmentLoader | None = None,
         context_selector: ContextSelector | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
+        handoff_resolver: WorkflowHandoffResolver | None = None,
+        max_review_retries: int = 2,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -129,6 +160,14 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # Workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-06). Drives the
+        # implement/review attempt ledger so ``implement#2`` consumes the EXACT ``qa#1``
+        # rejection by (run, producer step, attempt) — never qa#0 / latest-by-filename.
+        self._handoff_resolver = handoff_resolver
+        # Bounded automatic retry for the implement/review loop (GRILL: default 2). When the
+        # review keeps REJECTING past this many retries the loop BLOCKS for operator
+        # intervention rather than looping forever.
+        self._max_review_retries = max_review_retries
         # The resolved governance snapshot (T-28-A-07 / LAW 7). When present it is frozen
         # onto the run BEFORE the first step; an overlay mutated after start cannot change
         # the in-flight run because the run carries this immutable snapshot, not the live
@@ -175,6 +214,7 @@ class LifecyclePipeline:
                     target_phase=step.target_phase,
                     requirements=step.requirements,
                     current_step=step.label,
+                    is_review=step.is_review,
                 ),
             )
             run = decision.run
@@ -204,6 +244,136 @@ class LifecyclePipeline:
             steps=tuple(results),
         )
 
+    # -- implement/review attempt loop (T-30-D-06 / A24) ---------------------
+
+    def run_implement_review_loop(
+        self,
+        run_id: str,
+        *,
+        implement_step: PipelineStep,
+        review_step: PipelineStep,
+    ) -> ImplementReviewLoopResult:
+        """Run implement → review with run-scoped attempt tracking + bounded retry (A24).
+
+        Each round writes immutable per-attempt payloads through the handoff resolver:
+        ``implement#N`` then ``review#N``. On a REJECTED review the next implement attempt
+        consumes the EXACT ``review#N`` rejection by (run, producer step, attempt) — never
+        ``review#0`` / latest-by-filename. After ``max_review_retries`` rejected rounds the
+        loop BLOCKS for operator intervention rather than retrying forever.
+
+        Requires a wired ``handoff_resolver`` — the loop's whole point is the attempt
+        ledger. The two steps run on their declared harnesses via the runtime factory.
+        """
+        if self._handoff_resolver is None:
+            raise ValueError("run_implement_review_loop requires a wired handoff_resolver")
+        resolver = self._handoff_resolver
+
+        run = LifecycleRun(
+            run_id=run_id,
+            context=self._context,
+            release_id=self._release_id,
+            command="implement_review_loop",
+            phase=implement_step.from_phase,
+            status=LifecycleRunStatus.RUNNING,
+            current_step=implement_step.label,
+            idempotency_key=run_id,
+            workflow_policy=self._policy_snapshot,
+        )
+        self._run_store.save(run)
+
+        rounds: list[ImplementReviewRound] = []
+        # attempt 0 is the first try; up to max_review_retries additional attempts follow.
+        for attempt in range(self._max_review_retries + 1):
+            # implement#attempt — from attempt 1 it consumes the prior review rejection.
+            if attempt > 0:
+                resolved = resolver.resolve_required(
+                    run, producer_step=review_step.label, attempt=attempt - 1
+                )
+                run = resolver.record_consumption(
+                    run,
+                    producer_step=review_step.label,
+                    producer_attempt=attempt - 1,
+                    consumer_step=implement_step.label,
+                    consumer_attempt=attempt,
+                )
+                _ = resolved  # digest would be injected into the implement prompt here.
+            impl_result = self._run_loop_worker(run, implement_step, attempt)
+            run, _ = resolver.produce(
+                run,
+                producer_step=implement_step.label,
+                attempt=attempt,
+                output_schema="implementation-handoff-v1",
+                payload={"summary": impl_result.summary or "implementation"},
+                declared_consumers=(review_step.label,),
+            )
+
+            # review#attempt — consumes implement#attempt, produces its verdict.
+            run = resolver.record_consumption(
+                run,
+                producer_step=implement_step.label,
+                producer_attempt=attempt,
+                consumer_step=review_step.label,
+                consumer_attempt=attempt,
+            )
+            review_result = self._run_loop_worker(run, review_step, attempt)
+            verdict = review_result.structured_output.get("verdict")
+            run, _ = resolver.produce(
+                run,
+                producer_step=review_step.label,
+                attempt=attempt,
+                output_schema="qa-review-handoff-v1",
+                payload={
+                    "verdict": verdict if isinstance(verdict, str) else "REJECTED",
+                    "verdict_reason": review_result.summary or "review",
+                },
+                declared_consumers=(implement_step.label,),
+                retention_mode=RetentionMode.PROMOTE_TO_EVIDENCE,
+            )
+            rounds.append(ImplementReviewRound(attempt=attempt, review_verdict=str(verdict)))
+            if verdict == "APPROVED":
+                from dataclasses import replace
+
+                run = replace(run, status=LifecycleRunStatus.COMPLETED)
+                self._run_store.save(run)
+                return ImplementReviewLoopResult(
+                    run_id=run_id, completed=True, attempts=attempt + 1, rounds=tuple(rounds)
+                )
+
+        # Exhausted the retry budget — BLOCK for operator intervention.
+        from dataclasses import replace
+
+        blocked = BlockedState(
+            reason=(
+                f"implement/review loop exceeded the bounded retry count "
+                f"({self._max_review_retries}); operator intervention required"
+            ),
+            blocked_at_step=review_step.label,
+            detail={"attempts": str(self._max_review_retries + 1)},
+        )
+        run = replace(
+            run, phase=LifecyclePhase.BLOCKED, status=LifecycleRunStatus.BLOCKED, blocked=blocked
+        )
+        self._run_store.save(run)
+        return ImplementReviewLoopResult(
+            run_id=run_id,
+            completed=False,
+            attempts=self._max_review_retries + 1,
+            rounds=tuple(rounds),
+            blocked=blocked,
+        )
+
+    def _run_loop_worker(
+        self, run: LifecycleRun, step: PipelineStep, attempt: int
+    ) -> AgentRunResult:
+        """Run one implement/review worker for *attempt* and return its raw result."""
+        runtime = self._runtime_factory(step.runtime_kind)
+        built = self._prompt_builder.build(
+            self._scope(step, f"{run.run_id}#a{attempt}"),
+            runtime=runtime.runtime_kind(),
+            prefix=self._prefix,
+        )
+        return runtime.run(built.request)
+
     def _scope(self, step: PipelineStep, run_id: str) -> PromptScope:
         prompt = (
             self._fragment_prompt(step)
@@ -223,11 +393,30 @@ class LifecyclePipeline:
         )
 
     def _generic_prompt(self, step: PipelineStep) -> str:
-        return (
-            f"Run the {step.label} step for release {self._release_id} in context "
-            f"{self._context}. Emit a handoff whose structured_output.verdict is APPROVED "
-            "or REJECTED, with an artifact_ref pointing at the handoff document."
+        """Generic (no-fragment) step prompt — step-kind-aware (v0.1.32 / C6 / L2 / A4b).
+
+        This is the second stale surface: it is NOT a ``build_fragment_suffix`` caller and
+        previously hard-coded the universal self-verdict text for every step, re-introducing
+        Drift 1 on the pipeline's generic steps. It now branches on ``step.is_review`` the
+        same way the suffix builder does: review steps self-verdict; create steps emit an
+        artifact and do NOT self-verdict.
+        """
+        lead = (
+            f"Run the {step.label} step for release {self._release_id} in context {self._context}."
         )
+        if step.is_review:
+            tail = (
+                " Because this is a REVIEW step, emit a handoff whose "
+                "structured_output.verdict is APPROVED or REJECTED, with an artifact_ref "
+                "pointing at the handoff document."
+            )
+        else:
+            tail = (
+                " Because this is a CREATE step, emit a handoff with the produced artifact "
+                "in artifact_refs pointing at the handoff document; do NOT self-judge — the "
+                "review gate owns the APPROVED/REJECTED decision."
+            )
+        return lead + tail
 
     def _fragment_prompt(self, step: PipelineStep) -> str:
         """Assemble a fragment-sourced suffix for a step that declares a ``fragment_id``.
@@ -245,6 +434,7 @@ class LifecyclePipeline:
         return build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
             selected_context=self._render_selection(selected),
+            is_review=step.is_review,
         )
 
     def _select_context(self, step: PipelineStep, fragment: Fragment) -> SelectionAudit:
@@ -337,6 +527,7 @@ def implementation_ladder(
             target_phase=LifecyclePhase.SECURITY_REVIEW,
             runtime_kind=default_kind,
             model_profile=effort,
+            is_review=True,
             # WS-6: the QA review step is the second fragment-driven pipeline step.
             fragment_id="implementation.qa_review",
         ),
@@ -347,6 +538,7 @@ def implementation_ladder(
             target_phase=LifecyclePhase.CODE_REVIEW,
             runtime_kind=default_kind,
             model_profile=effort,
+            is_review=True,
         ),
         PipelineStep(
             label="review_code",
@@ -355,6 +547,7 @@ def implementation_ladder(
             target_phase=LifecyclePhase.CLOSURE,
             runtime_kind=default_kind,
             model_profile=effort,
+            is_review=True,
         ),
     )
 
@@ -430,6 +623,8 @@ def apply_resolved_policy(
 
 # Re-exported for callers assembling custom ladders.
 __all__ = [
+    "ImplementReviewLoopResult",
+    "ImplementReviewRound",
     "LifecyclePipeline",
     "PipelineResult",
     "PipelineStep",

@@ -26,7 +26,10 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
-from dadaia_workspace.features.lifecycle.phase_workflow import PhaseWorkflowResult
+from dadaia_workspace.features.lifecycle.phase_workflow import (
+    PhaseWorkflowResult,
+    is_review_phase,
+)
 from dadaia_workspace.features.lifecycle.prompt_builder import PromptScope
 from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandResult,
@@ -71,6 +74,7 @@ release_app = typer.Typer(help="Lifecycle release commands.", no_args_is_help=Tr
 workflow_app = typer.Typer(
     help="Read-only workflow model-governance inspection.", no_args_is_help=True
 )
+handoffs_app = typer.Typer(help="Workflow-step handoff ledger inspection.", no_args_is_help=True)
 
 
 class LifecycleExitCode(IntEnum):
@@ -775,6 +779,33 @@ def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object,
     return tuple(overrides)
 
 
+def _phase_step_prompt(
+    label: str, release_id: str, context: str, target_phase: LifecyclePhase
+) -> str:
+    """Step-kind-aware worker instruction for a single-step lifecycle verb (v0.1.32 D-2/L1).
+
+    The CLI single-step verbs are the third worker-prompt surface (after
+    ``build_fragment_suffix`` and ``pipeline._generic_prompt``). A review-phase verb
+    (qa/security/code) is verdict-gated and must emit a verdict; a create verb
+    (implement/close/backlog|release define) produces an artifact and must NOT self-verdict
+    — its verdict is ignored by the review-only gate, and instructing it to self-verdict is
+    the Drift-1 incoherence this release eliminates.
+    """
+    if is_review_phase(target_phase):
+        output_instruction = (
+            "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
+            "artifact_ref pointing at the handoff document."
+        )
+    else:
+        output_instruction = (
+            "Emit a handoff with an artifact_ref pointing at the handoff document (the "
+            "artifact you produced). Do not self-verdict — create steps are not verdict-gated."
+        )
+    return (
+        f"Run the {label} step for release {release_id} in context {context}. {output_instruction}"
+    )
+
+
 def _run_phase_step(
     *,
     label: str,
@@ -810,11 +841,7 @@ def _run_phase_step(
         context=context,
         release_id=release_id,
         task_id=run_id,
-        prompt=(
-            f"Run the {label} step for release {release_id} in context {context}. "
-            "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
-            "artifact_ref pointing at the handoff document."
-        ),
+        prompt=_phase_step_prompt(label, release_id, context, target_phase),
         allowed_paths=(f".dadaia/handoff/{context}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )
@@ -1265,10 +1292,36 @@ def workflow_doctor(
         raise typer.Exit(LifecycleExitCode.INTERNAL_ERROR)
 
 
+@handoffs_app.command("doctor")
+def handoffs_doctor(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Reconcile the workflow-step handoff ledger against on-disk payloads (A26).
+
+    Fails (exit 3) on any orphan / malformed / stale / undeclared / unconsumed-required
+    workflow-step payload; exit 0 when the ledger and the data plane are coherent.
+    """
+    from dadaia_workspace import container
+
+    workspace_root = resolve_workspace_root()
+    report = container.build_workflow_handoff_doctor(workspace_root).run()
+    if json_output:
+        _emit_json({"status": "ok" if report.ok else "blocked", **report.to_dict()})
+    else:
+        if report.ok:
+            typer.echo("OK workflow-step handoff ledger coherent")
+        else:
+            for finding in report.findings:
+                typer.echo(f"[{finding.kind.value}] {finding.ref}: {finding.message}")
+    if not report.ok:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
 workflow_app.add_typer(workflow_policy_app, name="policy")
 workflow_app.add_typer(workflow_profiles_app, name="profiles")
 
 app.add_typer(hygiene_app, name="hygiene")
+app.add_typer(handoffs_app, name="handoffs")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(release_app, name="release")
 app.add_typer(review_app, name="review")

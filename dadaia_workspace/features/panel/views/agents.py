@@ -68,6 +68,11 @@ def render_agents_subsection() -> str:
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>\n'
         '        <span class="runtime-btn-label">Codex</span>\n'
         "      </button>\n"
+        '      <button type="button" class="runtime-btn runtime-btn--pi" id="agents-runtime-btn-pi"\n'
+        '        role="radio" aria-checked="false" data-runtime-value="pi" aria-label="PI runtime">\n'
+        '        <span class="runtime-btn-icon" aria-hidden="true">&#9678;</span>\n'
+        '        <span class="runtime-btn-label">PI</span>\n'
+        "      </button>\n"
         "    </div>\n"
         "  </div>\n"
         '  <div id="agents-staleness-banner" class="warning-banner" hidden role="status"></div>\n'

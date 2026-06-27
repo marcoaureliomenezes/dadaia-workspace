@@ -58,14 +58,20 @@ _SHARED_IDS = {
 }
 # Workflow dirs that still ship only a `_README.md` stub (no authored step fragments).
 # ``implementation`` left this set in v0.1.24 (T-24-11): it now ships three authored step
-# fragments (implement_tdd, self_verify, qa_review). The implementation workflow's
-# ``closure`` step stays a README-only stub. ``backlog_definition`` left this set in v0.1.26
-# R2 (T-26-02): it now ships four authored step fragments.
+# fragments (implement_tdd, self_verify, qa_review). ``backlog_definition`` left this set in
+# v0.1.26 R2 (T-26-02): it now ships four authored step fragments. ``audit``/``research``/
+# ``bug_report`` left this set in v0.1.30 Wave E (T-30-E-01..03): each now ships real
+# fragment+gate step fragments. ``closure`` stays a README-only stub (its close worker is
+# generic, no fragment).
 _DEFERRED_WORKFLOW_DIRS = {
-    "audit",
-    "bug_report",
     "closure",
+}
+
+# Workflow dirs that ship authored step fragments backing a real fragment+gate body.
+_AUTHORED_WORKFLOW_DIRS = {
+    "audit",
     "research",
+    "bug_report",
 }
 
 _VALID_FRONTMATTER = """\
@@ -176,6 +182,17 @@ def test_deferred_workflow_dirs_present_with_readme_stub_only() -> None:
         )
         readme = loader.root / workflow / "_README.md"
         assert readme.exists(), f"deferred workflow '{workflow}' must ship a _README.md stub"
+
+
+def test_authored_workflow_dirs_ship_step_fragments() -> None:
+    # T-30-E-01..03: audit / research / bug_report are no longer README-only deferred
+    # stubs — each ships real fragment+gate step fragments backing its workflow body.
+    loader = FragmentLoader()
+    for workflow in _AUTHORED_WORKFLOW_DIRS:
+        fragments = loader.list_fragments(workflow=workflow)
+        assert fragments, f"authored workflow '{workflow}' must ship step fragments"
+        for fragment in fragments:
+            assert fragment.workflow == workflow
 
 
 def test_readme_stubs_are_not_treated_as_fragments() -> None:

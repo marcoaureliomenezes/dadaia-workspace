@@ -28,7 +28,6 @@ from dadaia_workspace.features.panel.views.api import (
 from dadaia_workspace.features.panel.views.workflows import render_dadaia_workflows_section
 from dadaia_workspace.features.workflows.dadaia_catalog import (
     AVAILABILITY_AVAILABLE,
-    AVAILABILITY_DEFERRED,
 )
 
 
@@ -79,12 +78,13 @@ class TestDadaiaWorkflowsList:
         # backlog_definition shipped its real workflow body in v0.1.26 R2 — now available.
         assert by_name["backlog_definition"]["availability"] == AVAILABILITY_AVAILABLE
 
-    def test_list_marks_deferred_workflow_unavailable(self) -> None:
-        """A deferred workflow is listed with availability == 'deferred' (unavailable)."""
+    def test_list_marks_wave_e_bodies_available(self) -> None:
+        """T-30-E-04: audit/research/bug_report ship real bodies — listed as available."""
         _status, data = _list()
         by_name = {w["name"]: w for w in data["workflows"]}
-        for deferred in ("audit", "research", "bug_report"):
-            assert by_name[deferred]["availability"] == AVAILABILITY_DEFERRED
+        for name in ("audit", "research", "bug_report"):
+            assert by_name[name]["availability"] == AVAILABILITY_AVAILABLE
+            assert by_name[name]["step_count"] == 4
 
     def test_list_items_carry_purpose_and_step_count(self) -> None:
         _status, data = _list()
@@ -161,11 +161,13 @@ class TestDadaiaWorkflowDetailAdditive:
         # One node per step + the gate-shaped node for the commit gate.
         assert "release scope" in mermaid
 
-    def test_deferred_detail_unavailable_with_no_steps(self) -> None:
+    def test_wave_e_body_detail_available_with_real_steps(self) -> None:
+        """T-30-E-04: the audit detail is a real available body with its fragment+gate steps."""
         status, data = _detail("audit")
         assert status == 200
-        assert data["availability"] == AVAILABILITY_DEFERRED
-        assert data["steps"] == []
+        assert data["availability"] == AVAILABILITY_AVAILABLE
+        labels = [s["label"] for s in data["steps"]]
+        assert labels == ["audit_scope", "drift_scan", "triage", "audit_disposition_gate"]
 
     def test_invalid_name_400(self) -> None:
         status, data = _detail("bad..name")
@@ -184,12 +186,16 @@ class TestDadaiaWorkflowDetailAdditive:
 
 
 class TestDadaiaWorkflowsSectionView:
-    def test_section_renders_mermaid_and_marks_deferred_unavailable(self) -> None:
+    def test_section_renders_mermaid_and_availability_badges(self) -> None:
         html = render_dadaia_workflows_section()
         # Mermaid fence rendered through the shared mistune path → <pre class="mermaid">.
         assert 'pre class="mermaid"' in html
-        # Deferred workflows are visibly marked unavailable.
-        assert "dadaia-wf-badge--unavailable" in html
+        # Each workflow carries an availability badge. As of v0.1.30 Wave E no workflow is
+        # deferred (the --unavailable modifier only renders for deferred), but the
+        # available + partial badges are present.
+        assert "dadaia-wf-badge--available" in html
+        assert "dadaia-wf-badge--partial" in html
+        assert "dadaia-wf-badge--unavailable" not in html
         # Server-rendered SVG DAG is present (offline-safe diagram).
         assert "dadaia-wf-diagram-svg" in html
         # Per-step harness/model options surfaced for the operator.

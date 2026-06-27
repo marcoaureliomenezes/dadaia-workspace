@@ -32,3 +32,11 @@ gate-blocked for ownership reasons.
 
 How a picked backlog set matures into a release is governed separately by
 `release-governance`; this rule governs only **who curates backlog entries**.
+
+> **Decision (OQ-3, v0.1.30).** The author/reader split is settled and the docs must not
+> contradict it: `project-manager` **curates** `specs/backlog/**` (what enters, matures, and
+> leaves it); `product-engineer` **reads** the PM-curated backlog to author SPEC/PLAN/TASKS
+> for a release and never curates the backlog itself. Authoring a single consistent backlog
+> *item* from an operator demand is the `backlog_definition` workflow (owned by
+> FEAT-BACKLOG-DEFINITION-WORKFLOW-01, shipped v0.1.26/27), still under PM curation — not a
+> reader-side power for PE.

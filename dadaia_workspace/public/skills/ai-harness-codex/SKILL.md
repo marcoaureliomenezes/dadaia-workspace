@@ -74,6 +74,19 @@ Current-doc corrections to keep active:
   `public/` and propagate via `dadaia public stage && dadaia public install`.
 - Never put long repeatable workflow into AGENTS.md — that is a skill's job.
 
+### Rule-law corpus reachability (WS-CDX-PROTOCOL — onboarding)
+
+Codex agent instructions cite governance rules **by name** (e.g. "the
+`workspace-protocol` rule §4", "the `release-governance` rule"). Codex has no native
+rule-loading for that corpus the way Claude Code loads `.claude/rules/*.md`, but the
+corpus **is reachable**: every by-name rule is a real on-disk file at
+`.claude/rules/<rule-name>.md` (workspace root, identical across harnesses). When an
+instruction references "the `<name>` rule", a Codex session reads
+`.claude/rules/<name>.md` to load the full body. The projected root `AGENTS.md`
+"Rule-Law Corpus" section documents this surface for every harness. The doctor check
+`check_codex_rule_corpus_reachable` (`[ok] codex:rule-corpus-reachable`) enforces that
+every cited name resolves to a reachable file — a missing file is a hard `[error]`.
+
 ---
 
 ## 2. Naming-collision disambiguation (EXPLICIT — read code/logs correctly)
@@ -331,6 +344,17 @@ done — exactly the SDD shape. Map Codex workflow expectations onto dadaia's ga
 | QA / review | `qa-engineer`, `security-reviewer`, `code-reviewer` | all approve | consolidated verdict |
 | Closure | `product-engineer` | triple evidence | CLOSURE + memory update + archived release |
 
+**`.codex/workflows/` keep-or-drop decision (WS-CDX-HYGIENE — RECORDED: KEEP).**
+The `.codex/workflows/*.workflow.md` files **are** physically projected (mirrored from
+`public/workflows/` by `dadaia public install`), and the `dcx3_workflow_drift` doctor
+check verifies `.codex/workflows/` matches the canonical set exactly. They are NOT
+inert: `classify_workflows` marks each `[reference-only] codex:<wf> (installed, no
+workflow executor)` — Codex has no workflow auto-executor, so they ship as readable
+documentation, not auto-fan-out. Decision: **keep** the projection (it is real,
+consistent, and doctor-verified); there is no dangling/inert reference to remove. The
+`.codex/config.toml` carries no inert keys either (`approved_commands`, `[agents.*]`,
+`[skills]` are all live; `provider`/`api_key`/`telemetry` are forbidden by `dcx10`).
+
 Authoring consequences:
 - Hooks/workflow files enforce *mechanics* of these gates; they must never decide
   product scope, rewrite the SPEC to justify code, or hide human approval.
@@ -383,6 +407,11 @@ the pre-push security-verdict gate run as git hooks and fire regardless of wheth
 any harness hook ran — file-tool-level gating is absent headless, but commits and
 pushes stay deterministically gated. Agent discipline plus doctor checks cover the
 remainder.
+
+`dadaia public doctor` surfaces this boundary honestly as an INFO line
+(`[info] codex:trust-boundary — Codex interactive hooks fire and block; \`codex exec\`
+headless does not`, WS-CDX-HYGIENE) so an operator onboarding to Codex sees it without
+reading this skill.
 
 > **Inject full context once per session, not every prompt.** Wire the full static
 > context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the

@@ -205,6 +205,12 @@ def render_workflows_subsection() -> str:
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>\n'
         '        <span class="runtime-btn-label">Codex</span>\n'
         "      </button>\n"
+        '      <button type="button" class="runtime-btn runtime-btn--pi"\n'
+        '        id="workflows-runtime-btn-pi" role="radio" aria-checked="false"\n'
+        '        data-runtime-value="pi" aria-label="PI runtime">\n'
+        '        <span class="runtime-btn-icon" aria-hidden="true">&#9678;</span>\n'
+        '        <span class="runtime-btn-label">PI</span>\n'
+        "      </button>\n"
         "    </div>\n"
         "  </div>\n"
         '  <p id="workflows-empty" class="empty-state" hidden>' + empty_msg + "</p>\n"
