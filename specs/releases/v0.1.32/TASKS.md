@@ -108,7 +108,7 @@
 
 ## Wave B — strict accept primary + structural fallback + codex parity (D-4/D-5)
 
-- [-] **T-32-B-01** — Failing extractor strict/structural tests (TDD, pi + codex).
+- [x] **T-32-B-01** — Failing extractor strict/structural tests (TDD, pi + codex).
   - Goal: write tests pinning: (pi) strict-primary accept of a correctly-labelled fenced AND bare
     payload (A6); structural fallback accept of a mis-labelled/unlabelled but structurally-valid
     payload (A7); no-op worker → `None` → empty `artifact_refs` (A8); **strict-primacy BEHAVIOUR
@@ -125,7 +125,7 @@
     `tests/unit/infrastructure/test_codex_runtime.py` (additions).
   - Acceptance: A6, A7, A8, A9, A10, A11 (tests authored; codex half + C5 behaviour test red).
 
-- [ ] **T-32-B-02** — Factor the shared extraction/acceptance helper once (A12).
+- [x] **T-32-B-02** — Factor the shared extraction/acceptance helper once (A12).
   - Goal: lift `_json_candidates` + the verdict-payload extraction + `_is_result_payload`
     (strict-primary + structural-fallback) into ONE shared implementation on
     `SubprocessAdapterMixin` (`headless_adapter_base`); rewire `pi_runtime` to call it (behaviour
@@ -138,7 +138,7 @@
   - Acceptance: A6, A7, A8, A9, A12 (pi half) — pi tests from T-32-B-01 green; existing pi
     extractor tests still green.
 
-- [ ] **T-32-B-03** — Codex parity: rewire `_result_from_output` to the shared helper.
+- [x] **T-32-B-03** — Codex parity: rewire `_result_from_output` to the shared helper.
   - Goal: replace codex's single `json.loads(raw)` with the shared candidate scan
     (fenced/bare/sliced) + shared strict-primary/structural-fallback acceptance against
     `request.expected_schema` (so codex gains the **reject-guard** — a shapeless dict no longer

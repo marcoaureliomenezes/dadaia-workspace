@@ -147,7 +147,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
                     summary="codex exec returned non-zero exit",
                     error=self._redact((proc.stderr or proc.stdout or "").strip()),
                 )
-            result = self._result_from_output(output_path, proc)
+            result = self._result_from_output(request, output_path, proc)
             return self._with_changed_paths(result)
 
     def _command(self, request: AgentRunRequest, output_path: Path) -> list[str]:
@@ -200,37 +200,67 @@ class CodexExecAdapter(SubprocessAdapterMixin):
 
     def _result_from_output(
         self,
+        request: AgentRunRequest,
         output_path: Path,
         proc: subprocess.CompletedProcess[str],
     ) -> AgentRunResult:
+        """Parse the codex ``--output-last-message`` text into an ``AgentRunResult``.
+
+        v0.1.32 (D-5 / OQ-3) brings codex to pi parity: the result object is extracted
+        through the SHARED :meth:`_extract_result_payload`, so codex gains the same
+        fenced-or-bare candidate scan and the same strict-primary + structural-fallback
+        acceptance — and the same **reject-guard** (a parsed dict lacking the result shape
+        no longer maps to a result; C4). The previous degraded fallbacks are preserved:
+        unparseable text → a redacted prose-summary ``SUCCEEDED``; a non-dict JSON value →
+        a ``structured_output`` value; a dict that is NOT the result object → a redacted
+        prose summary with EMPTY ``artifact_refs`` (which BLOCKs a create step, matching
+        pi). Every surfaced field is ``_redact``-scrubbed (CWE-209).
+        """
         try:
             raw = output_path.read_text(encoding="utf-8")
         except OSError:
             raw = proc.stdout
+
+        # PRIMARY: shared strict-primary / structural-fallback result extraction.
+        payload = self._extract_result_payload(raw, request.expected_schema)
+        if payload is not None:
+            refs_raw = payload.get("artifact_refs", [])
+            refs = refs_raw if isinstance(refs_raw, list) else []
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary=self._redact(str(payload.get("summary", "codex exec completed"))),
+                artifact_refs=tuple(
+                    self._redact(str(item)) for item in refs if isinstance(item, str)
+                ),
+                structured_output=self._structured_from_payload(payload),
+            )
+
+        # FALLBACK: no result object was accepted — degrade safely (never crash, no
+        # synthesized artifact_refs — the reject-guard C4 keeps a shapeless dict from
+        # mapping to a result).
         try:
-            payload = json.loads(raw)
+            parsed = json.loads(raw)
         except json.JSONDecodeError:
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(raw.strip() or "codex exec completed"),
             )
-        if not isinstance(payload, dict):
+        if not isinstance(parsed, dict):
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="codex exec completed",
-                structured_output={"value": self._redact(str(payload))},
+                structured_output={"value": self._redact(str(parsed))},
             )
+        # A parsed dict that is NOT this step's result object: keep a redacted summary if
+        # present, but emit NO artifact_refs / verdict (reject-guard parity with pi).
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
-            summary=self._redact(str(payload.get("summary", "codex exec completed"))),
-            artifact_refs=tuple(
-                self._redact(str(item))
-                for item in payload.get("artifact_refs", [])
-                if isinstance(item, str)
-            ),
-            structured_output={
-                str(key): self._redact(str(value))
-                for key, value in payload.get("structured_output", {}).items()
-                if isinstance(payload.get("structured_output"), dict)
-            },
+            summary=self._redact(str(parsed.get("summary", "codex exec completed"))),
         )
+
+    def _structured_from_payload(self, payload: dict[str, object]) -> dict[str, str]:
+        """Flatten a result payload's ``structured_output`` into the redacted string map."""
+        extra = payload.get("structured_output")
+        if not isinstance(extra, dict):
+            return {}
+        return {str(key): self._redact(str(value)) for key, value in extra.items()}

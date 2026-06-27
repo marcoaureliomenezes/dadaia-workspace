@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -48,8 +47,6 @@ _DEFAULT_ENV_ALLOWLIST = (
     "XDG_DATA_HOME",
     "TERM",
 )
-
-_FENCED_JSON = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -208,7 +205,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
             )
 
         assistant_text = self._extract_text(message.get("content"))
-        verdict_payload = self._verdict_payload(assistant_text, request.expected_schema)
+        verdict_payload = self._extract_result_payload(assistant_text, request.expected_schema)
 
         if verdict_payload is not None:
             summary = str(verdict_payload.get("summary", assistant_text))
@@ -261,82 +258,6 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                     parts.append(block)
             return "".join(parts)
         return ""
-
-    @staticmethod
-    def _verdict_payload(
-        assistant_text: str,
-        expected_schema: str | None,
-    ) -> dict[str, object] | None:
-        """Parse the step's structured result object from the assistant message.
-
-        The result object is the in-band channel the Python gate reads (a review step's
-        ``verdict``; every step's ``artifact_refs`` / schema evidence). A compliant worker
-        emits it as a fenced ```json block, but real GPT/Codex workers — pi runs on the
-        operator's OpenAI Codex subscription — frequently emit the JSON object **bare**:
-        the whole final message *is* the object, no fence. Both shapes are accepted
-        (proven by the v0.1.31 real-worker e2e, where gpt-5.5 emitted a schema-correct
-        payload unfenced and the strict fenced-only parse silently dropped it →
-        ``artifact evidence missing`` block). Candidates are tried fenced-first, then the
-        whole stripped message, then the outermost ``{...}`` slice. The payload must be a
-        dict whose ``schema`` equals ``expected_schema``; otherwise None (absent /
-        unparseable / schema mismatch).
-        """
-        if expected_schema is None:
-            return None
-        for candidate in PiHeadlessAdapter._json_candidates(assistant_text):
-            try:
-                payload = json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(payload, dict):
-                continue
-            if PiHeadlessAdapter._is_result_payload(payload, expected_schema):
-                return payload
-        return None
-
-    @staticmethod
-    def _is_result_payload(payload: dict[str, object], expected_schema: str) -> bool:
-        """Decide whether a parsed dict IS this step's structured result object.
-
-        Two acceptance paths:
-
-        1. **Exact** — the worker labelled the transport ``schema`` field with the
-           requested ``expected_schema`` id. This is the documented happy path.
-        2. **Structural (real-worker tolerance, v0.1.31 R3)** — a real GPT/Codex worker
-           reliably emits the result *object* but labels the ``schema`` field
-           inconsistently across runs: it omits it, or names the fragment's domain schema
-           (e.g. ``release-scope-handoff-v1``) instead of the transport id
-           (``agent-run-result-v1``) — both observed in the live e2e. Rather than BLOCK a
-           correct result on a label mismatch, accept a payload that *structurally is* the
-           result: a non-empty ``artifact_refs`` list plus a ``status`` / ``summary`` /
-           nested ``structured_output``. This degrades safely — arbitrary JSON lacking the
-           result shape is still rejected (the gate's downstream evidence/scope checks
-           still apply).
-        """
-        if payload.get("schema") == expected_schema:
-            return True
-        refs = payload.get("artifact_refs")
-        if isinstance(refs, list) and refs:
-            return any(key in payload for key in ("status", "summary", "structured_output"))
-        return False
-
-    @staticmethod
-    def _json_candidates(text: str) -> list[str]:
-        """Ordered JSON-string candidates from an assistant message, most-precise first.
-
-        1. each fenced ```json block (the documented contract);
-        2. the whole stripped message (a bare JSON object — the common real-worker shape);
-        3. the outermost ``{...}`` slice (a JSON object trailing some prose).
-        """
-        candidates: list[str] = [match.group(1) for match in _FENCED_JSON.finditer(text or "")]
-        stripped = (text or "").strip()
-        if stripped:
-            candidates.append(stripped)
-            start = stripped.find("{")
-            end = stripped.rfind("}")
-            if start != -1 and end > start:
-                candidates.append(stripped[start : end + 1])
-        return candidates
 
     def _structured_from_verdict(self, payload: dict[str, object]) -> dict[str, str]:
         structured: dict[str, str] = {}
