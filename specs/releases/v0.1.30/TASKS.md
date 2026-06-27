@@ -25,7 +25,7 @@
   - Write set: `dadaia_workspace/infrastructure/pi_runtime.py`.
   - Acceptance: A2, A4 — `test_pi_runtime.py` passes unchanged.
 
-- [ ] **T-30-A-03** — Refactor `codex_runtime` onto the base.
+- [-] **T-30-A-03** — Refactor `codex_runtime` onto the base.
   - Goal: import shared parts; keep only `_command`/`_model_and_effort`/result-extraction.
   - Write set: `dadaia_workspace/infrastructure/codex_runtime.py`.
   - Acceptance: A2, A4 — `test_codex_runtime.py` passes unchanged.
