@@ -140,7 +140,7 @@
     `dadaia_workspace/core/models/lifecycle.py`.
   - Acceptance: A27 (back-compat round-trip).
 
-- [-] **T-30-D-02** — Payload + run-steps JSON schemas; output-handoff field fix.
+- [x] **T-30-D-02** — Payload + run-steps JSON schemas; output-handoff field fix.
   - Goal: `workflow-step-payload-v1` + `lifecycle-run-workflow-steps-v1` schemas; fix
     `output-handoff.md` `detail` → `detail_md`.
   - Write set: `dadaia_workspace/public/schemas/workflow-step-payload-v1.schema.json` (NEW);

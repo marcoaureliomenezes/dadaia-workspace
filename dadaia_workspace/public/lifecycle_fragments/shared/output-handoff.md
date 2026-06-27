@@ -36,7 +36,7 @@ Review and gate steps additionally carry:
 |---|---|
 | `verdict` | `APPROVED` or `REJECTED` — the gate keys on this. |
 | `verdict_reason` | One concise sentence justifying the verdict. |
-| `findings` | Array of `{severity, message, detail, fix_recommendation}`; severity is one of CRITICAL, HIGH, MEDIUM, LOW, INFO. |
+| `findings` | Array of `{severity, message, detail_md, fix_recommendation}`; severity is one of CRITICAL, HIGH, MEDIUM, LOW, INFO. |
 
 When the step produced a written artifact (SPEC, PLAN, report) the result names its
 path and a content hash so the gate can confirm the file exists and matches.
