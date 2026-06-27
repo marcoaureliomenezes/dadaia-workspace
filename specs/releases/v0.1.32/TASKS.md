@@ -108,7 +108,7 @@
 
 ## Wave B — strict accept primary + structural fallback + codex parity (D-4/D-5)
 
-- [ ] **T-32-B-01** — Failing extractor strict/structural tests (TDD, pi + codex).
+- [-] **T-32-B-01** — Failing extractor strict/structural tests (TDD, pi + codex).
   - Goal: write tests pinning: (pi) strict-primary accept of a correctly-labelled fenced AND bare
     payload (A6); structural fallback accept of a mis-labelled/unlabelled but structurally-valid
     payload (A7); no-op worker → `None` → empty `artifact_refs` (A8); **strict-primacy BEHAVIOUR
