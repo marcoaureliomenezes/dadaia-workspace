@@ -35,11 +35,13 @@ auto-SKIPs unless ALL of:
 
   * ``DADAIA_E2E_REAL_WORKER=1`` (explicit operator consent — the single Wave-B/C gate);
   * the ``pi`` binary is present on PATH (or via ``PI_BIN``);
-  * ``ANTHROPIC_API_KEY`` is set (pi is authenticated).
+  * ``pi`` is authenticated — ``~/.pi/agent/auth.json`` exists (``pi login``). pi runs on
+    the operator's OpenAI Codex subscription (provider ``openai-codex``), NOT on an
+    ``ANTHROPIC_API_KEY``.
 
 Run it on demand (from the dadaia-workspace repo root, with the workspace venv):
 
-    DADAIA_E2E_REAL_WORKER=1 PI_BIN="$(command -v pi)" ANTHROPIC_API_KEY=... \\
+    DADAIA_E2E_REAL_WORKER=1 PI_BIN="$(command -v pi)" \\
       /home/marco/workspace/dadaia/.dadaia/.venv/bin/pytest -p no:cacheprovider -q -s \\
       tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py
 """
@@ -96,8 +98,8 @@ def _real_worker_skip_reason() -> str | None:
         return "DADAIA_E2E_REAL_WORKER != 1 (real-worker tests spend operator credits; opt-in only)"
     if _pi_binary() is None:
         return "pi binary absent (install @earendil-works/pi-coding-agent or set PI_BIN)"
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return "ANTHROPIC_API_KEY absent (pi is not authenticated)"
+    if not (Path.home() / ".pi" / "agent" / "auth.json").exists():
+        return "pi not authenticated (~/.pi/agent/auth.json absent — run `pi login`)"
     return None
 
 

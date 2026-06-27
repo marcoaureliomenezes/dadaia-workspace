@@ -146,13 +146,23 @@
   - Write set: `tests/integration/<real_worker>/test_real_layer2_worker_workflow_e2e.py` (NEW).
   - Acceptance: A14, A15, A17.
 
-- [ ] **T-31-C-02** — Prove worker payload compliance OR harden extraction (record residual).
+- [x] **T-31-C-02** — Prove worker payload compliance OR harden extraction (record residual).
   - Goal: from the T-31-C-01 run, determine whether the real `pi` worker reliably emits the fenced
     structured payload for the chosen step(s). If it does → the e2e asserts it (compliance proven).
     If it does not → harden `pi_runtime._verdict_payload` / the structured-output read to degrade
     safely, keep the e2e green via the hardened path, and record the residual for CLOSURE.
-  - Write set: `dadaia_workspace/infrastructure/pi_runtime.py` (only if hardening is required);
-    `tests/integration/<real_worker>/test_real_layer2_worker_workflow_e2e.py`.
+  - **OUTCOME (live run, 2026-06-27): HARDENED.** Real gpt-5.5 did NOT reliably emit the fenced
+    payload: run 1 emitted bare (unfenced) JSON with top-level `schema: agent-run-result-v1`; run 2
+    emitted bare JSON with NO top-level `schema` (nested `output_schema: release-scope-handoff-v1`).
+    Hardened `_verdict_payload` to accept (1) fenced ```json, (2) the whole bare message, (3) the
+    outermost `{...}` slice, and to accept a payload **structurally** (non-empty `artifact_refs` +
+    `status`/`summary`/`structured_output`) when the `schema` label is absent/mismatched. Live e2e
+    now GREEN (real chain advances past step 1). Residual recorded as bug
+    `lifecycle-prompt-names-two-schemas-confusing-real-workers` (the prompt-side root cause — the
+    prompt names two schemas; hardening tolerates it, the bug tracks fixing the prompt).
+  - Write set: `dadaia_workspace/infrastructure/pi_runtime.py`;
+    `tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py`;
+    `tests/unit/infrastructure/test_pi_runtime.py` (3 new extractor tests).
   - Acceptance: A16.
 
 - [ ] **T-31-C-03** — (Optional) codex real-worker second case.

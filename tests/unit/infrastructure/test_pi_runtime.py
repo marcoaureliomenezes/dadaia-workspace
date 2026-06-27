@@ -400,6 +400,95 @@ def test_pi_adapter_fenced_json_ignored_when_schema_mismatch(tmp_path: Path) -> 
     assert "verdict" not in result.structured_output
 
 
+def test_pi_adapter_bare_json_result_without_fence_is_parsed(tmp_path: Path) -> None:
+    """Real-worker tolerance (v0.1.31 R3 / C-02): a bare JSON object (no ```json fence).
+
+    pi runs on the operator's OpenAI Codex subscription; gpt-5.x reliably emits the result
+    object but frequently leaves it UNFENCED — the whole final message is the object. The
+    strict fenced-only parse silently dropped it (live e2e: "agent result missing artifact
+    evidence"). The hardened extractor accepts the whole stripped message as JSON.
+    """
+    bare = json.dumps(
+        {
+            "schema": "agent-run-result-v1",
+            "status": "succeeded",
+            "summary": "scope approved",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/scope.handoff.json"],
+            "structured_output": {"verdict": "APPROVED"},
+        }
+    )
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(bare))
+
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.structured_output["verdict"] == "APPROVED"
+    assert result.summary == "scope approved"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/scope.handoff.json",)
+
+
+def test_pi_adapter_bare_json_accepted_structurally_without_schema_field(tmp_path: Path) -> None:
+    """Structural acceptance: the worker omits the top-level ``schema`` label entirely.
+
+    Observed live: across runs gpt-5.5 inconsistently labels the ``schema`` field — one run
+    carried ``schema: agent-run-result-v1``, the next omitted it and nested
+    ``output_schema: release-scope-handoff-v1`` instead. Rather than BLOCK a correct result
+    on a label mismatch, a payload that structurally IS the result (non-empty
+    ``artifact_refs`` + ``status``/``summary``/``structured_output``) is accepted.
+    """
+    bare = json.dumps(
+        {
+            "status": "succeeded",
+            "summary": "scope approved",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/scope.handoff.json"],
+            "structured_output": {
+                "verdict": "APPROVED",
+                "output_schema": "release-scope-handoff-v1",
+            },
+        }
+    )
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(bare))
+
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.structured_output["verdict"] == "APPROVED"
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/scope.handoff.json",)
+
+
+def test_pi_adapter_bare_json_without_result_shape_is_rejected(tmp_path: Path) -> None:
+    """Tolerance does not over-accept: arbitrary JSON lacking the result shape is dropped.
+
+    A schema-mismatched object with NO ``artifact_refs`` is not the result object — the
+    structural path requires a non-empty ``artifact_refs`` list, so it stays rejected.
+    """
+    bare = json.dumps({"schema": "something-else", "note": "not a result", "verdict": "APPROVED"})
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(bare))
+
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert "verdict" not in result.structured_output
+
+
 # ---------------------------------------------------------------------------
 # T-PI-06 — changed_paths from a FAKED git diff (never a model claim)
 # ---------------------------------------------------------------------------
