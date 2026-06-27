@@ -1,6 +1,6 @@
 ---
 release: v0.1.30
-phase: IMPLEMENTATION
+phase: CLOSURE
 ---
 
 # Active release: v0.1.30 — super release: PI/Codex Layer-2 + workflow system maturation
