@@ -118,6 +118,7 @@ class RetentionSweep:
         policy: SlopPolicy | None = None,
         live_claims: Callable[[], frozenset[str]] | None = None,
         important_paths: Callable[[], frozenset[str]] | None = None,
+        step_payload_reclaim_allow: Callable[[], frozenset[str]] | None = None,
     ) -> None:
         self._workspace_root = workspace_root.resolve()
         self._dadaia_root = self._workspace_root / ".dadaia"
@@ -125,6 +126,15 @@ class RetentionSweep:
         self._policy = policy or SlopPolicy()
         self._live_claims = live_claims or (lambda: frozenset())
         self._important_paths = important_paths or (lambda: frozenset())
+        # Workflow-step payload reclaim allow-list (v0.1.30 Item 5 / T-30-D-07 / A23).
+        # When wired, a step payload under ``runs/lifecycle/<run>/steps/`` is reclaimable
+        # ONLY if its workspace-relative ref is in this set — the set the ledger computes as
+        # cleanup-eligible (consumed_all + delete_after_consumed + past consumed TTL). Every
+        # other step payload (live-run, promoted, not-yet-consumed_all) is PROTECTED, never
+        # reclaimed. When None, step payloads fall back to runs-zone TTL behavior
+        # (back-compat). Activating it switches the steps zone to FILE granularity so
+        # eligible and protected payloads in the same ``steps/`` dir are handled per-file.
+        self._step_payload_reclaim_allow = step_payload_reclaim_allow
 
     @property
     def policy(self) -> SlopPolicy:
@@ -199,6 +209,13 @@ class RetentionSweep:
             return
         if not node.is_dir():
             return
+        # When the step-payload allow-list is active, a ``runs/lifecycle/<run>/steps/`` dir
+        # is collected at FILE granularity (not as one dir-unit) so eligible and protected
+        # payloads in the same dir are reclaimed/spared independently (A23).
+        if self._step_payload_reclaim_allow is not None and self._is_steps_dir(node):
+            for child in sorted(node.iterdir()):
+                self._collect_unit(child, cutoff, out)
+            return
         children = sorted(node.iterdir())
         has_direct_file = any(c.is_file() and not c.is_symlink() for c in children)
         if has_direct_file or not children:
@@ -242,7 +259,37 @@ class RetentionSweep:
             return RetentionSkipReason.LIVE
         if self._touches_important(candidate.rel, important):
             return RetentionSkipReason.IMPORTANT
+        # Workflow-step payload reclaim allow-list (A23): when wired, a step payload is
+        # reclaimable ONLY if its ref is explicitly cleanup-eligible. A step payload not in
+        # the allow set (live-run, promoted, not-yet-consumed_all) is PROTECTED.
+        if self._step_payload_reclaim_allow is not None and self._is_step_payload_ref(
+            candidate.rel
+        ):
+            if candidate.rel not in self._step_payload_reclaim_allow():
+                return RetentionSkipReason.IMPORTANT
         return None
+
+    def _is_steps_dir(self, node: Path) -> bool:
+        rel = self._rel_unresolved(node)
+        if rel is None:
+            return False
+        parts = rel.split("/")
+        return (
+            len(parts) == 5
+            and parts[:2] == [".dadaia", "runs"]
+            and parts[2] == "lifecycle"
+            and parts[4] == "steps"
+        )
+
+    @staticmethod
+    def _is_step_payload_ref(rel: str) -> bool:
+        parts = rel.split("/")
+        return (
+            len(parts) >= 6
+            and parts[:3] == [".dadaia", "runs", "lifecycle"]
+            and parts[4] == "steps"
+            and rel.endswith(".step-payload.json")
+        )
 
     def _is_confined(self, node: Path) -> bool:
         """True iff the *resolved* node stays inside the workspace ``.dadaia/``.

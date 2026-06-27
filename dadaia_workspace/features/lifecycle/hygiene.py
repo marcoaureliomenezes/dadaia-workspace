@@ -7,6 +7,7 @@ import fnmatch
 import json
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from typing import TYPE_CHECKING, Any
 
 from dadaia_workspace.core.models.hygiene import (
     HygieneCandidate,
@@ -16,6 +17,34 @@ from dadaia_workspace.core.models.hygiene import (
     HygieneZone,
     SlopPolicy,
 )
+
+if TYPE_CHECKING:
+    from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
+
+
+@dataclass(frozen=True)
+class WorkflowStepPayloadCounts:
+    """Workflow-step payload state counters (v0.1.30 Item 5 / T-30-D-07).
+
+    Separate from the generic handoff orphan/malformed counters — these count the
+    run-scoped workflow-step data plane (``.dadaia/runs/lifecycle/<run>/steps/``) against
+    the ``LifecycleRun.workflow_steps`` ledger.
+    """
+
+    produced: int = 0
+    consumed_all: int = 0
+    orphan: int = 0
+    malformed: int = 0
+    undeclared: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "produced": self.produced,
+            "consumed_all": self.consumed_all,
+            "orphan": self.orphan,
+            "malformed": self.malformed,
+            "undeclared": self.undeclared,
+        }
 
 
 @dataclass(frozen=True)
@@ -88,6 +117,54 @@ class LifecycleHygieneService:
         protection the file-only cleanup already enforces. Read-only; no mutation.
         """
         return frozenset(self._protected_paths())
+
+    def workflow_step_payload_counts(
+        self, run_store: "LifecycleRunStore"
+    ) -> WorkflowStepPayloadCounts:
+        """Count workflow-step payloads by ledger/disk state (v0.1.30 Item 5 / T-30-D-07).
+
+        Reads every persisted run's ``workflow_steps`` ledger and reconciles it with the
+        on-disk payloads under ``.dadaia/runs/lifecycle/<run>/steps/``:
+
+        - ``produced`` — total ledger records;
+        - ``consumed_all`` — records every declared consumer has consumed (cleanup-eligible);
+        - ``orphan`` — a ledger record whose on-disk payload file is missing;
+        - ``malformed`` — an on-disk ``*.step-payload.json`` that is not valid JSON;
+        - ``undeclared`` — an on-disk payload with no matching ledger record.
+
+        These are workflow-step counters kept separate from the generic handoff
+        orphan/malformed counters (which count ``.dadaia/handoff/*.handoff.json``).
+        """
+        produced = consumed_all = orphan = malformed = undeclared = 0
+        ledger_refs: set[str] = set()
+        for run in run_store.list_runs():
+            for record in run.workflow_steps:
+                produced += 1
+                ledger_refs.add(record.payload_ref)
+                if record.is_cleanup_eligible():
+                    consumed_all += 1
+                if not (self._workspace_root / record.payload_ref).is_file():
+                    orphan += 1
+        steps_root = self._dadaia_root / "runs" / "lifecycle"
+        if steps_root.is_dir():
+            for payload in steps_root.rglob("*.step-payload.json"):
+                if not payload.is_file():
+                    continue
+                rel = self._workspace_ref(payload)
+                try:
+                    json.loads(payload.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    malformed += 1
+                    continue
+                if rel not in ledger_refs:
+                    undeclared += 1
+        return WorkflowStepPayloadCounts(
+            produced=produced,
+            consumed_all=consumed_all,
+            orphan=orphan,
+            malformed=malformed,
+            undeclared=undeclared,
+        )
 
     def status(self) -> HygieneCounters:
         """Return metadata-only counters for canonical runtime zones."""

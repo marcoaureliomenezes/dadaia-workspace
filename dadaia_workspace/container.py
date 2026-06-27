@@ -583,7 +583,48 @@ def _live_lifecycle_claims(workspace_root: Path) -> Callable[[], frozenset[str]]
                 ref = artifact.lstrip("/")
                 if ref.startswith(swept_prefixes):
                     claims.add(ref)
+            # A live run's workflow-step payloads are sacrosanct — claim each one so the
+            # retention sweep never reclaims a mid-flight step's payload (A23).
+            for step_record in run.workflow_steps:
+                claims.add(step_record.payload_ref.lstrip("/"))
         return frozenset(claims)
+
+    return _provider
+
+
+def _step_payload_reclaim_allow(
+    workspace_root: Path,
+) -> Callable[[], frozenset[str]]:
+    """Provider of cleanup-eligible workflow-step payload refs (T-30-D-07 / A23).
+
+    A step payload is reclaim-eligible only when its ledger record is ``cleanup_eligible``
+    (every declared consumer consumed it AND its retention mode is delete-after-consumed)
+    AND the run is terminal (a live run's payloads are protected by ``_live_lifecycle_claims``).
+    Promoted-to-evidence payloads are never cleanup-eligible, so they are never in this set
+    and always survive. The retention sweep applies its own past-TTL gate on top of this
+    allow-list. Fail-soft: a bad record is skipped, never crashing the sweep.
+    """
+    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+
+    terminal = {LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED}
+
+    def _provider() -> frozenset[str]:
+        store = build_lifecycle_run_store(workspace_root)
+        run_dir = store.root
+        if not run_dir.is_dir():
+            return frozenset()
+        allow: set[str] = set()
+        for record in sorted(run_dir.glob("*.json")):
+            try:
+                run = store.load(record.stem)
+            except Exception:  # noqa: BLE001 — a single bad record never breaks the sweep.
+                continue
+            if run is None or run.status not in terminal:
+                continue
+            for step_record in run.workflow_steps:
+                if step_record.is_cleanup_eligible():
+                    allow.add(step_record.payload_ref.lstrip("/"))
+        return frozenset(allow)
 
     return _provider
 
@@ -610,6 +651,7 @@ def build_retention_sweep(
         policy=policy or SlopPolicy(),
         live_claims=_live_lifecycle_claims(workspace_root),
         important_paths=hygiene.protected_refs,
+        step_payload_reclaim_allow=_step_payload_reclaim_allow(workspace_root),
     )
 
 
