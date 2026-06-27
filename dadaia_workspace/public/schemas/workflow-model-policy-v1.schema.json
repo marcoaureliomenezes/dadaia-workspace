@@ -44,12 +44,28 @@
       "properties": {
         "steps": {
           "type": "object",
-          "description": "Per-step profile id, keyed by step label (e.g. 'implement'). The value is a built-in model-profile id valid for the step's harness.",
+          "description": "Per-step profile id, keyed by step label (e.g. 'implement'). The value is a built-in model-profile id valid for the step's effective harness.",
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "default_harness": {
+          "$ref": "#/$defs/layer2Harness",
+          "description": "Optional per-workflow default harness override (v0.1.29 / D-3). When set, every step of this workflow defaults to this Layer-2 harness unless a per-step 'harnesses' entry or a CLI override wins. Omit for the catalog default (codex)."
+        },
+        "harnesses": {
+          "type": "object",
+          "description": "Optional per-step harness override (v0.1.29 / D-3), keyed by step label. Each value is a Layer-2 harness; it beats 'default_harness' for that step.",
+          "additionalProperties": {
+            "$ref": "#/$defs/layer2Harness"
+          }
         }
       }
+    },
+    "layer2Harness": {
+      "type": "string",
+      "enum": ["codex", "pi"],
+      "description": "A Layer-2 worker harness. Only 'codex' and 'pi' are valid (LAW 1); 'claude'/'opencode' are not Layer-2 workers."
     }
   }
 }

@@ -44,7 +44,7 @@ context only); `_parse_workflow` accepts the new optional fields; `to_dict` roun
 **Acceptance:** AC-10 (a v0.1.28 profile-only overlay parses unchanged); round-trip test
 for a harness-carrying overlay.
 
-### [ ] T-29-A-05 — Overlay schema: optional harness fields
+### [x] T-29-A-05 — Overlay schema: optional harness fields
 **Goal:** add optional `default_harness` (enum codex|pi) and `harnesses` (object → enum
 codex|pi) under `workflowOverlay`; keep `additionalProperties:false`.
 **Write set:** `dadaia_workspace/public/schemas/workflow-model-policy-v1.schema.json`.
