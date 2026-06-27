@@ -25,6 +25,20 @@ class RuntimeFileRef:
     ttl_seconds: int | None = None
 
 
+@dataclass(frozen=True)
+class StepPayloadRef:
+    """Where an immutable workflow-step payload was written + its content hash.
+
+    The workflow-step handoff data plane (v0.1.30 Item 5) returns this from the
+    payload-writer port; the content hash is the immutability proof the resolver verifies
+    on every read. Lives in ``core`` so both the ``infrastructure`` adapter and the
+    ``features`` resolver reference it without a layer violation.
+    """
+
+    payload_ref: str
+    content_hash: str
+
+
 @runtime_checkable
 class RuntimeFilePort(Protocol):
     """Create lifecycle runtime files only through canonical paths.
@@ -79,4 +93,19 @@ class RuntimeFilePort(Protocol):
 
     def write_hygiene_snapshot(self, snapshot: HygieneSnapshot) -> RuntimeFileRef:
         """Write a structured hygiene snapshot for a lifecycle run."""
+        ...
+
+    def write_step_payload(
+        self,
+        *,
+        run_id: str,
+        producer_step: str,
+        attempt: int,
+        content: str,
+    ) -> StepPayloadRef:
+        """Write an immutable workflow-step payload envelope under the run steps zone."""
+        ...
+
+    def read_step_payload(self, payload_ref: str) -> str | None:
+        """Return the raw step payload envelope JSON at ``payload_ref``, or ``None``."""
         ...

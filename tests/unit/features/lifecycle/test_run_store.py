@@ -87,6 +87,80 @@ def test_json_store_loads_old_format_record_without_workflow_policy(tmp_path: Pa
     assert loaded.workflow_policy is None
 
 
+def test_json_store_loads_old_format_record_without_workflow_steps(tmp_path: Path) -> None:
+    # A27 (T-30-D-04): an old-format record with NO 'workflow_steps' key still loads,
+    # yielding an empty ledger. The 'lifecycle-run-v1' schema literal is unchanged.
+    import json as _json
+
+    workspace = _workspace(tmp_path)
+    store = JsonLifecycleRunStore(workspace)
+    store.root.mkdir(parents=True, exist_ok=True)
+    legacy_payload = {
+        "schema_version": "lifecycle-run-v1",
+        "run": {
+            "run_id": "legacy-2",
+            "context": "dadaia-workspace",
+            "release_id": "v0.1.29",
+            "command": "release_definition",
+            "phase": "release_definition",
+            "status": "running",
+            "current_step": "release_scope",
+            "expected_artifacts": [],
+            "idempotency_key": "idem-1",
+            "blocked": None,
+            "injected_context": [],
+            "workflow_policy": None,
+            # deliberately NO 'workflow_steps' key.
+        },
+    }
+    (store.root / "legacy-2.json").write_text(
+        _json.dumps(legacy_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+    loaded = store.load("legacy-2")
+    assert loaded is not None
+    assert len(loaded.workflow_steps) == 0
+
+
+def test_json_store_persists_workflow_steps_ledger(tmp_path: Path) -> None:
+    # A18 (T-30-D-04): the workflow-step ledger is persisted atomically as part of the run
+    # record (LifecycleRun.to_dict serialises it; the store's temp+rename is atomic).
+    from dadaia_workspace.core.models.workflow_handoff import (
+        WorkflowStepLedger,
+        WorkflowStepRecord,
+    )
+
+    workspace = _workspace(tmp_path)
+    store = JsonLifecycleRunStore(workspace)
+    record = WorkflowStepRecord(
+        run_id="run-led",
+        producer_step="release_scope",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload_ref=".dadaia/runs/lifecycle/run-led/steps/release_scope-attempt-0.step-payload.json",
+        content_hash="b" * 64,
+        produced_at="2026-06-27T12:00:00Z",
+        declared_consumers=("spec_create",),
+    )
+    run = LifecycleRun(
+        run_id="run-led",
+        context="dadaia-workspace",
+        release_id="v0.1.30",
+        command="release_definition",
+        phase=LifecyclePhase.RELEASE_DEFINITION,
+        status=LifecycleRunStatus.RUNNING,
+        current_step="release_scope",
+        workflow_steps=WorkflowStepLedger(records=(record,)),
+    )
+
+    store.save(run)
+    loaded = store.load("run-led")
+
+    assert loaded is not None
+    assert loaded == run
+    assert loaded.workflow_steps.find("release_scope", 0) is not None
+
+
 def test_json_store_can_persist_under_runs_lifecycle(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     store = JsonLifecycleRunStore(workspace, location="runs")

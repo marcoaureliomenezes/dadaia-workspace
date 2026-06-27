@@ -5,12 +5,14 @@ from dadaia_workspace.core.protocols.runtime_files import (
     RuntimeFileKind,
     RuntimeFilePort,
     RuntimeFileRef,
+    StepPayloadRef,
 )
 
 
 class FakeRuntimeFiles:
     def __init__(self) -> None:
         self.writes: list[RuntimeFileRef] = []
+        self.step_payloads: dict[str, str] = {}
 
     def write_report(
         self,
@@ -84,6 +86,27 @@ class FakeRuntimeFiles:
         )
         self.writes.append(ref)
         return ref
+
+    def write_step_payload(
+        self,
+        *,
+        run_id: str,
+        producer_step: str,
+        attempt: int,
+        content: str,
+    ) -> StepPayloadRef:
+        ref = StepPayloadRef(
+            payload_ref=(
+                f".dadaia/runs/lifecycle/{run_id}/steps/"
+                f"{producer_step}-attempt-{attempt}.step-payload.json"
+            ),
+            content_hash=str(len(content)),
+        )
+        self.step_payloads[ref.payload_ref] = content
+        return ref
+
+    def read_step_payload(self, payload_ref: str) -> str | None:
+        return self.step_payloads.get(payload_ref)
 
 
 def test_fake_runtime_files_satisfies_runtime_file_port() -> None:
