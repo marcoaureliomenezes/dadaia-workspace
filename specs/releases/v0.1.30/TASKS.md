@@ -203,7 +203,7 @@
     `dadaia_workspace/public/lifecycle_fragments/` (audit fragments).
   - Acceptance: A28, A29 (audit half).
 
-- [ ] **T-30-E-02** — Real `research` workflow body.
+- [-] **T-30-E-02** — Real `research` workflow body.
   - Goal: fragment+gate body; records injected fragments + dynamic context.
   - Write set: `dadaia_workspace/features/lifecycle/workflows/research.py` (NEW);
     `dadaia_workspace/public/lifecycle_fragments/` (research fragments).
