@@ -20,7 +20,11 @@ summary: >-
   `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the
   IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude
   SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match`
-  classifier; a cacheable hashed `PromptPrefix` is reused across steps. Anti-slop
+  classifier; a cacheable hashed `PromptPrefix` is reused across steps. v0.1.28 adds the
+  workflow model governance control plane: a built-in WorkflowModelProfile registry over
+  harness_models, an atomic operator overlay (missing != invalid), one shared
+  WorkflowExecutionPolicyResolver (CLI > overlay > library default), a per-run policy
+  snapshot resolved once before step 1, and WMP-* governance doctor checks. Anti-slop
   self-governance is built in: a directory-aware slop metric and a boundary-safe retention
   sweep.
 tags:
@@ -30,12 +34,12 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 1980
+token_estimate: 2180
 last_updated: '2026-06-26'
-release_origin: v0.1.24
+release_origin: v0.1.28
 ---
 
-CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`.
+CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
 
 The engine is the **Layer-2** half of the two-layer model (see [[architecture]] for the
 full two-layer picture): a Layer-1 entry harness invokes `dadaia lifecycle`, which threads
@@ -96,6 +100,83 @@ Lifecycle code depends on `AgentRuntimePort`; `build_agent_runtime(kind, *, cwd=
 The Codex adapter does not read project-local provider/auth/profile configuration, does not pass through `os.environ`, accepts only an explicit environment allowlist, redacts credential-looking values, and records sandbox/profile widening only when operator-controlled input requests it. The Claude SDK adapter derives a real Ring-1 `write_permission` decider from the request's allowed/forbidden paths via the same `core/scope_match` classifier the runner's Ring-2 uses; its transport is injectable (`query_fn`) so permission + result mapping are tested hermetically. `claude-agent-sdk` is an OPTIONAL, operator-installed runtime extra (not a locked dependency, offline-first build); the default transport lazily imports it and returns an actionable `pip install claude-agent-sdk` message when absent.
 
 The PI adapter (`PiHeadlessAdapter` + frozen `PiHeadlessConfig`) is a structural twin of `CodexExecAdapter`: it drives `pi --mode json --tools <csv> -p -` (prompt on stdin) over an injectable subprocess runner, imports no PI client at module load (offline-first preserved), and accepts only an explicit env allowlist (incl. `ANTHROPIC_API_KEY`, redacted from output). Result mapping parses the line-delimited JSON stream and takes the **last** `message_end` event's assistant text from `message.content`, handling both string and content-block shapes; an absent or unparseable `message_end` degrades to raw stdout as the summary (SUCCEEDED, never crashes), and a fenced JSON block matching the request's `expected_schema` populates `structured_output`. A valid terminal `message_end` maps to SUCCEEDED **even when `pi` exits non-zero** — the terminal assistant message is trusted over the raw exit code (deliberate precedence); the downstream verdict gate and the Ring-2 write boundary still apply. PI's Ring-2 write boundary is real: `changed_paths` is computed from the injected git client's `diff_name_only(cwd)` (working-tree + staged + untracked, non-ignored) at result time and written into `structured_output["changed_paths"]`, **unconditionally overwriting any model self-report** — so the runner's Ring-2 out-of-scope block fires for PI exactly as for Codex/OpenCode. The Layer-2 `PI_HEADLESS` worker (this adapter, `pi --mode json` headless) has no CLI-level pre-disk (Ring-1) gate: its enforcement posture is Ring-2 + git chokepoints, identical to Codex/OpenCode. (The **Layer-1** interactive `pi` entry harness is separate and DOES have a Ring-1 SDD-gate extension — `.pi/extensions/dadaia-sdd-gate.ts`, WS-PI-4, active post-trust — see [[architecture]] §"two-layer agentic model".) The first-layer `.pi/` projection (WS-PI-3) shipped in v0.1.18 and the Layer-1 Ring-1 extension (WS-PI-4) in v0.1.21; both are no longer deferred. The live `pi --mode json` event schema — specifically the `AgentMessage.content` shape — is the one upstream-owned unverified seam, verified via the opt-in `DADAIA_PI_LIVE=1` integration test (`tests/integration/pi_live/`), not CI-gated.
+
+## Workflow model governance (control plane, v0.1.28)
+
+Layer-2 model selection is **governed**, not ad hoc: a named profile registry layered over
+the discrete `harness_models` catalog, a validated operator overlay, one shared resolver,
+and a per-run policy snapshot. The resolver is the single policy seam consumed by both the
+CLI and the panel (see [[panel]] for the panel control plane).
+
+- `features/lifecycle/model_profiles.py` — the built-in `WorkflowModelProfile` registry
+  (D-2: **built-in only**). Five profiles: Codex `codex-implementation-standard`
+  (`gpt-5.5:medium`), `codex-review-deep` (`gpt-5.5:high`); PI `pi-implementation-standard`
+  (`gpt-5.3-codex:medium`), `pi-reasoning-high` (`gpt-5.5:high`), `pi-reasoning-low`
+  (`gpt-5.5:low`). Each profile resolves to a real `harness_models.HarnessModelOption`; an
+  import-time `_assert_profiles_resolve` (mirrors `_assert_ids_known`) fails loudly on any
+  ungoverned `(model_id, effort)` pair, a `claude-*` id (GPT-only Layer-2 invariant), a
+  non-Layer-2 harness, a duplicate id, or a deprecated profile without a known replacement —
+  so this is **never a second drifting model table**. Accessors: `list_profiles`,
+  `profiles_for(harness)`, `resolve(profile_id) → WorkflowModelProfile`, `to_option`.
+- `core/models/workflow_execution.py` — the pure DTOs threaded through every layer:
+  `WorkflowModelProfile`, `ResolvedModelConfig` (`profile_id, harness, model, reasoning,
+  source`), and `WorkflowPolicySnapshot` (`workflow_id, policy_id, resolved_at,
+  source_precedence[], steps{step → {harness, model_profile, model, reasoning, fragments[],
+  output_schema}}`). Zero I/O, core-clean.
+- `infrastructure/json_workflow_model_policy_store.py` — the atomic overlay store over the
+  FIXED path `.dadaia/states/workflow_model_policy.json` (schema `workflow-model-policy-v1`).
+  Reuses the `JsonLifecycleRunStore` atomic temp+rename pattern (`mkstemp` 0600 in target dir
+  → `os.replace`); `load()` returns `None` on missing (⇒ library defaults); raises a typed
+  error on invalid JSON / unknown top-level field; `save()` writes `.last-good.json` from the
+  prior valid file before overwriting. **Missing ≠ invalid:** absent file = defaults; a
+  present-but-invalid overlay blocks execution before the first model call with the last-good
+  intact. Only the `default` context is honored this release (D-2).
+- `features/lifecycle/policy_resolver.py` — the single shared
+  `WorkflowExecutionPolicyResolver` over the governed catalog + profile registry + overlay.
+  `resolve(workflow_id, context, cli_overrides) → WorkflowPolicySnapshot` applies the
+  precedence **CLI > context overlay > default overlay > library default**, validating every
+  override against catalog step ids + profile ids + harness match (a deprecated profile
+  without an explicit replacement path is a hard failure).
+- `core/models/lifecycle.py` (extended) — `AgentRunRequest.resolved_model:
+  ResolvedModelConfig | None` (additive; `model_profile` kept for observability) and
+  `LifecycleRun.workflow_policy: WorkflowPolicySnapshot | None` (additive optional; old v1
+  records load to `None` — the run-store schema literal is deliberately unchanged for
+  back-compat read).
+- **Resolve-once-before-step-1 (LAW 7).** The pipeline/phase workflow resolve the policy and
+  freeze the snapshot onto `LifecycleRun.workflow_policy` **before** the first worker call;
+  the snapshot is preserved across transitions via `dataclasses.replace`. An overlay mutated
+  after a run starts does not change the in-flight run; the panel reads the persisted
+  snapshot for run history (current policy only governs future runs).
+- **Adapters consume the resolved model (AC-12).** `CodexExecAdapter` prefers
+  `request.resolved_model` in `_model_and_effort` and passes `-m <id> -c
+  model_reasoning_effort=<effort>`; `PiHeadlessAdapter._command()` adds `--model <id>` from
+  the per-request resolved model; `FakeAgentRuntime` echoes the resolved config so tests
+  assert policy resolution offline. The model string that reaches argv is the profile's
+  registry-constant `model_id` (D-3: no free-text reaches a worker).
+- **CLI (D-3).** `--step-model <step>=<profile-id>` resolves through the profile registry; a
+  raw `<id>:<effort>` string / unknown / harness-mismatched / deprecated profile is rejected
+  with an actionable message. `--show-policy` + `--json` print the resolved policy.
+  Read-only `dadaia lifecycle workflow policy show <workflow> --context --json` and
+  `workflow profiles list --harness --json` make the governance scriptable.
+- **Governed catalog (Wave B).** `features/workflows/dadaia_catalog.py` carries each step's
+  `default_harness` + `default_profile` per supported harness + fragment ids, and is the
+  single governed source the resolver and panel both read (`_assert_catalog_defaults_resolve`
+  ties every default profile to the registry at import). The old `*.workflow.md`
+  (`WorkflowsService.get_detail`/`list_summaries`) is **reference/doc-only** — no longer the
+  authority for executable workflow behavior.
+- **Governance doctor (AC-10).** `dadaia lifecycle workflow doctor` runs the `WMP-*`
+  invariants (`policy_doctor.py`): invalid policy JSON, unknown profile, harness/profile
+  mismatch, stale workflow/step id in an override, missing default profile per supported
+  harness, unresolved fragment/output schema, and any `claude`/`opencode` Layer-2 residue
+  (`WMP-LAYER2-RESIDUE`). A `public doctor` workflow-policy residue scan
+  (`policy_public_doctor.py`) keeps the public surface clean. Doctor never crashes the panel.
+
+> Known limit (v0.1.28): under a `--harness` override the persisted snapshot records the
+> *governed* harness (the codex-defaulted `implementation` catalog), even when the CLI built
+> a different adapter (e.g. `--harness pi` runs the PI adapter with the codex-governed model
+> id). Reconciling snapshot `runtime_kind` with the governed harness is a deferred v0.1.29
+> refinement. Operator PI `.local.json` profiles and per-context overlays (`extends`) are
+> deferred (D-2).
 
 ## Gating note (current behavior)
 

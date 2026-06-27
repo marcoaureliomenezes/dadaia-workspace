@@ -19,8 +19,8 @@ tags:
 - http
 - dashboard
 agent_tier: self-pull
-token_estimate: 3983
-last_updated: '2026-06-12'
+token_estimate: 4180
+last_updated: '2026-06-26'
 release_origin: 0.1.6
 ---
 
@@ -89,6 +89,41 @@ flowchart LR
     ACAD -.calls.- ACS
 ```
 
+## Workflows control plane (v0.1.28)
+
+Workflows is now a **first-class top-level panel area** (D-5), not a subordinate Ops subtab
+— Agents and Kanban remain available during the transition. It is the operator UX for the
+[[lifecycle-foundation]] workflow model governance layer: see, change, audit, and reproduce
+which model runs each prompt step, without reading Python source. The panel never resolves
+policy itself — it reads through the same container-wired `WorkflowExecutionPolicyResolver`
+over the governed `dadaia_catalog` that the CLI uses.
+
+- **Detail view** — diagram (from Python metadata via `render_dag_svg`/`render_step_mermaid`,
+  not browser Mermaid) + a step matrix `Step | Role | Harness | Effective profile | Concrete
+  model | Fragments | Gate`, a **default-vs-effective** diff, and a **run-snapshot evidence**
+  view that reads the persisted `workflow_policy` snapshot per run (so historical inspection
+  shows the model actually used, even after the current policy changes).
+- **Policy editor** — per-step profile dropdown **filtered by harness**, reset-to-default,
+  **validate-before-save**, and save through a guarded mutation route. Writes a **validated
+  JSON overlay** (`.dadaia/states/workflow_model_policy.json`) — never Python source or
+  projected agentic assets. Invalid policy blocks execution; missing policy = library
+  defaults.
+- **Read-only fragment inspector** — each model step links to its prompt-fragment ids +
+  resolved body (via `FragmentLoader`), dynamic-context selectors, and output schema.
+  Editing fragments stays source-controlled release work (the inspector is read-only).
+- **New routes.** GET (read): `GET /api/workflow-catalog[/<id>]`,
+  `GET /api/workflow-model-profiles`, `GET /api/workflow-model-policy`,
+  `GET /api/lifecycle-runs?workflow=&context=`, plus the fragment-body read route. Mutation:
+  `PUT /api/workflow-model-policy` + `POST /api/workflow-model-policy/validate`. The
+  mutation surface enforces the **existing** loopback bind + Host-header allowlist (no
+  bearer) and runs the guard order **Host-guard first → 415 (non-JSON content type) → 413
+  (oversized body, capped before reading the socket) → 400 (invalid JSON / shape with
+  field-path errors) → 400 (D-2 non-`default` context) → 400 (semantic resolve)** BEFORE any
+  atomic write; the store takes a `.last-good.json` backup from the prior valid file so an
+  invalid candidate never overwrites a good one. The fragment-id route validates against a
+  conservative regex (`^[A-Za-z0-9_]+\.[A-Za-z0-9_]+$`) blocking path traversal before any
+  disk read, and never echoes filesystem paths.
+
 ## Trigger típico
 
 O operador quer **visão de controle** do workspace: trocar de tema, conferir quais agentes estão ativos e seu custo cumulativo, inspecionar o estado multi-agente atual no Kanban (qual contexto está em Implementation, em Review, qual sessão está stale), inspecionar a DAG de um workflow antes de despachar, abrir a memory HTML de um Spec Context Project, ver reports produzidos por agentes especialistas, acessar módulos do Academy, e ver se algum dev server está LAN-exposed. Critério mecânico: **se precisa de uma janela única para enxergar e operar o workspace, ele roda`dadaia panel`. Para CI, headless e automação, a CLI direta continua a interface canônica.**
@@ -100,7 +135,7 @@ Sem este panel, o workspace é invisível ao operador casual: precisa-se ler mar
 ## Estado runtime tocado
 
   * Read: `.dadaia/states/server_registry.json`, `.dadaia/states/spec_contexts.json`, `.dadaia/agentic/agents/<name>.md` (16 arquivos), `.dadaia/agentic/workflows/<name>.md` (12 arquivos), `repos/<slug>/specs/memory/<path>` (memory `.md` atoms + assets; rendered in-memory via mistune — D-4), telemetria local via [[agent-monitoring]], `.dadaia/reports/**/*.handoff.json` (indexação para Reports tab), `.dadaia/academy/academy.json` (lista de cursos via AcademyService), `.dadaia/sessions/*.json` (session files R2 — Kanban tab, read-only; sem acesso ao TelemetryDao) — todos via `Path.read_bytes()` / `Path.read_text()` sem mutação.
-  * Write: apenas `DELETE /api/reports/<path>` deleta o arquivo HTML do report e seu sidecar `.handoff.json` quando solicitado — ambos sob path-traversal guard com `Path.resolve()` + `relative_to(workspace_root/.dadaia/reports/)`. O panel em si é read-only para tudo mais — não toca `specs/memory/*`, não escreve em `server_registry.json`, não se registra no registry.
+  * Write: `DELETE /api/reports/<path>` deleta o arquivo HTML do report e seu sidecar `.handoff.json` quando solicitado — ambos sob path-traversal guard com `Path.resolve()` + `relative_to(workspace_root/.dadaia/reports/)`. **`PUT /api/workflow-model-policy` (v0.1.28)** escreve o overlay validado `.dadaia/states/workflow_model_policy.json` via atomic temp(0600)+rename com backup `.last-good.json` (validate-before-write; invalid nunca sobrescreve good); `POST /api/workflow-model-policy/validate` é dry-run (não escreve). O panel não toca `specs/memory/*`, não escreve Python source nem assets projetados, não escreve em `server_registry.json`, não se registra no registry.
   * HTTP routes — **três categorias declaradas em`handler.py`**:
     * **Public** (em `_COMPILED_ROUTES`, sem auth): `GET /`, `GET /static/<name>`, `GET /memory/<slug>/<path>`, `GET /memory-view/<slug>/<file>`, `GET /reports/<path>` (path-traversal guard via `Path.resolve()` + `relative_to()`, 403 se fora do boundary).
     * **Bearer-only** (`_BEARER_ONLY_ROUTES` + `_tel_patterns` dispatch): `GET /api/servers`, `GET /api/contexts` (retorna `local`/`remote` — antes `active`/`inactive`), `GET /api/agents?active_window_days=N&runtime=…`, `GET /api/agents/<id>/prompt`, `GET /api/workflows?runtime=…`, `GET /api/workflows/<name>`, `GET /api/sessions?runtime=…`, `GET /api/sessions/<runtime>/<id>`, `GET /api/academy` (catálogo knowledge_basis: módulos + lesson counts), `GET /academy/<module>/<lesson>` (lição Markdown renderizada; traversal-guarded), `GET /api/reports`, `DELETE /api/reports/<path>`, `GET /api/kanban` (panel-kanban-v1 — board read-only; loopback bypass aplica; POST → 405).

@@ -1,20 +1,19 @@
 ---
-release: v0.1.28
-phase: CLOSURE
+release: none
+phase: ARCHIVED
 ---
 
-# Active release: v0.1.28 — Workflow Model Governance + Panel Control Plane
+No active release.
 
-All 20 implementation tasks (Waves A→D) `[x]`. rc-ship review trio APPROVED:
-- qa-engineer: gate green (3777 passed, 14 skipped); Playwright E2E 5/5 + 7/7 headless.
-- code-reviewer: APPROVE (0 crit/high; 1 MEDIUM → v0.1.29 follow-up: harness/snapshot
-  divergence under `--harness pi`).
-- security-reviewer: APPROVED, `metrics.commit_sha = 28379a71...` (HEAD).
+Last shipped: **v0.1.28 — Workflow Model Governance + Panel Control Plane**
+(CLOSED + Aprovado; closure at `specs/_archive/releases/v0.1.28/CLOSURE.md`). Delivered the
+whole `FEAT-WORKFLOW-MODEL-GOVERNANCE-01` epic A→D: named `WorkflowModelProfile` registry
+over `harness_models`, atomic overlay store, single `WorkflowExecutionPolicyResolver`
+(CLI > overlay > library default), per-run `workflow_policy` snapshot, Codex/PI per-request
+model, Python `dadaia_catalog` as governed source, first-class panel Workflows control
+plane (GET/PUT/validate + editor + run evidence + read-only fragment inspector), and the
+`WMP-*` governance doctor. Layer-2 = codex|pi only.
 
-Public projection done: schema staged + installed, `dadaia public doctor` exit 0
-(`[ok] public-privacy`).
-
-**Phase:** CLOSURE — product-engineer authoring CLOSURE.md + memory atoms (current product
-truth) + backlog disposition for the consumed item.
-
-Branch: `feature/v0.1.28`.
+Deferred to a future release (see backlog `workflow-model-governance-operator-profiles-and-context-overlays`):
+operator-added PI `.local.json` profiles, per-context overlay inheritance, and the
+snapshot `runtime_kind`-vs-governed-harness reconciliation under `--harness` override.

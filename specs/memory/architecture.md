@@ -18,9 +18,9 @@ tags:
 - agents
 - backlog
 agent_tier: self-pull
-token_estimate: 9100
+token_estimate: 12429
 last_updated: '2026-06-26'
-release_origin: v0.1.27
+release_origin: v0.1.28
 ---
 
 ## Visão geral
@@ -471,6 +471,8 @@ Locais canônicos de estado em disco e seu propósito:
   * `specs/_archive/<release-id>/consumed_backlog.json` — sidecar JSON machine-readable (um por release arquivada; entries `{slug, shipped_anchors[]}`) lido por `backlog doctor` BL-STALE via exact slug membership; escrito por `ledger_writer.write_consumed` (v0.1.26) via a facade `BacklogRemovalLifecycle`. **Producer wired na superfície real de release-definition (v0.1.27):** um post-step guardado em `dadaia lifecycle release define` parseia a linha `**Consumes:**` do SPEC da release, liga os slugs declarados a seus shipped-anchors via o registry R1 e chama `consume(...)` para emitir o sidecar — em produção o ledger é escrito. Ausência = no-op (sem false ERROR).
   * `specs/_archive/<release-id>/consumed-backlog/<slug>.md` — cópia durável de um item de backlog full-removed no closure (escrita por `removal.apply_removal` ANTES do unlink — ADR-C copy-before-remove; backlog é gitignored, então esta é a única cópia sobrevivente de um registro de segurança CRITICAL).
   * `.dadaia/states/backlog_subject_aliases.txt` — alias map do backlog mantida pelo operador (uma linha `synonym -> canonical-anchor`); lida por path injetado; em R1 é o único caminho de binding para subjects `panel`/`api`.
+  * `.dadaia/states/workflow_model_policy.json` — overlay de política de modelo de workflow (v0.1.28; schema `workflow-model-policy-v1`); per-step harness/profile choices do operador; path FIXO; escrito por `JsonWorkflowModelPolicyStore` (atomic `mkstemp(0600)`+`os.replace`) via `PUT /api/workflow-model-policy` (validate-before-write); ausente ⇒ library defaults; inválido ⇒ bloqueia execução. Só o contexto `default` é honrado (D-2).
+  * `.dadaia/states/workflow_model_policy.last-good.json` — backup do último overlay válido, escrito do arquivo válido anterior ANTES de cada save; um candidato inválido nunca o sobrescreve. Permite reset/rollback sem perder a config do operador.
 
 **Stores que não existem (não recriar):** `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3), `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (semaphore / Lock 4), `.dadaia/logs/semaphore-reclaims.jsonl`, marcador global de contexto, e qualquer script bash de gate em `.dadaia/scripts/`. O mutex MUTATING é exclusivamente o TTL-lease em `.dadaia/states/ctx_locks/<ctx>.lock.json`; o session record `.dadaia/sessions/<id>.json` não é mecanismo de locking — carrega identidade/modo da sessão (lido pelo gate para resolução de modo) e alimenta o Kanban.
 
@@ -655,6 +657,64 @@ O loop BL-STALE fica provado **end-to-end em release real** (`test_define_close_
 os verbos CLI reais `release define` então `close` sobre um workspace temp: o item totalmente
 consumido some do SET vivo, a cópia de archive precede o unlink, `backlog doctor` reporta zero
 BL-STALE) — não mais só a nível função/integração.
+
+## Workflow control plane subsystem (v0.1.28)
+
+A camada de **governança de modelo** do Layer 2: built sobre os seams existentes (perfil →
+overlay → resolver → run snapshot → panel routes), não um subsistema paralelo. O
+`WorkflowExecutionPolicyResolver` é o **único** seam de política, consumido tanto pela CLI
+(`cli/commands/lifecycle.py`) quanto pelo panel (`features/panel/views/workflow_policy.py`)
+via o `container.py` — nenhuma construção ad-hoc em view/CLI. Ver [[lifecycle-foundation]]
+para o spine do engine e [[panel]] para o control plane do panel.
+
+- **Profile registry** (`features/lifecycle/model_profiles.py`) — registry **built-in only**
+  (D-2) de `WorkflowModelProfile` (5 perfis: 2 Codex + 3 PI) layered sobre o catálogo
+  discreto `core/harness_models.py`. Cada perfil resolve a uma `HarnessModelOption` real; o
+  assert de import-time `_assert_profiles_resolve` (espelha `_assert_ids_known`) garante que
+  nunca é uma segunda tabela de modelo drifting (rejeita id `claude-*`, harness não-Layer-2,
+  par `(model_id, effort)` ausente do catálogo, id duplicado, deprecated sem replacement).
+- **Overlay store** (`infrastructure/json_workflow_model_policy_store.py`) — escreve o path
+  FIXO `.dadaia/states/workflow_model_policy.json` (schema `workflow-model-policy-v1` em
+  `public/data/schemas/`), atomic `mkstemp(0600)`+`os.replace` (mesmo padrão do
+  `JsonLifecycleRunStore`), backup `.last-good.json` do arquivo válido anterior. **Missing ≠
+  invalid:** ausente ⇒ defaults da biblioteca; presente-mas-inválido bloqueia execução antes
+  da primeira chamada de modelo, com o last-good intacto. Só o contexto `default` é honrado
+  (D-2; a shape `contexts{}` pode ser reservada mas chave não-`default` é inerte). Nomes de
+  context/workflow/step/profile são apenas keys de dict JSON dentro do arquivo único — nunca
+  interpolados em path de filesystem (sem path injection).
+- **Resolver** (`features/lifecycle/policy_resolver.py`) — `resolve(workflow_id, context,
+  cli_overrides) → WorkflowPolicySnapshot` com precedência **CLI > context overlay > default
+  overlay > library default**; valida cada override contra step ids do catálogo + profile ids
+  + harness match (deprecated sem replacement = hard failure). Lê o catálogo governado
+  `governed_workflow_catalog()` (Wave B — `features/workflows/dadaia_catalog.py`), a fonte
+  única de verdade executável; o `library_workflow_catalog()` (Wave A) é demo-only.
+- **Run snapshot (LAW 7)** — `core/models/workflow_execution.py` define os DTOs puros
+  (`ResolvedModelConfig`, `WorkflowModelProfile`, `WorkflowPolicySnapshot`); `core/models/
+  lifecycle.py` ganha `AgentRunRequest.resolved_model` + `LifecycleRun.workflow_policy`
+  (ambos additive optional; records v1 antigos carregam `None` — schema literal inalterado,
+  back-compat read). O snapshot é resolvido + congelado no `LifecycleRun` **antes** do
+  primeiro step e preservado por `dataclasses.replace`; run in-flight ignora edições
+  posteriores do overlay; o panel lê o snapshot persistido para histórico.
+- **Panel routes** (`features/panel/handler.py` + `views/workflow_policy.py`) — GET
+  catalog/profiles/policy/runs + `PUT /api/workflow-model-policy` +
+  `POST /api/workflow-model-policy/validate` + fragment-body read. O `do_PUT`/`do_POST`
+  rodam o Host-guard PRIMEIRO; `_read_body` checa Content-Length contra o cap (256KiB) ANTES
+  de ler o socket (413); a view enforça ordem 415 → 413 (64KiB inner) → 400 (JSON/shape com
+  field-path errors) → 400 (D-2 non-default context) → 400 (semantic resolve) ANTES de
+  qualquer write. O fragment-id valida contra `^[A-Za-z0-9_]+\.[A-Za-z0-9_]+$` (bloqueia
+  traversal antes de qualquer disk read; nunca ecoa paths). Sem bearer (postura loopback +
+  Host allowlist existente). O JS (`workflow_policy.js`) escapa todo campo dinâmico via
+  `escHtml` antes de innerHTML.
+- **Governança Layer-2 (LAW 1).** Workflow workers são apenas `codex`/`pi` (`fake`
+  test-only); `claude`/`opencode` são rejeitados na CLI E pelo check de doctor
+  `WMP-LAYER2-RESIDUE`. `--step-model` aceita só profile ids (D-3); o id de modelo que chega
+  ao argv é o `model_id` constante do registry — sem free-text para um worker.
+- **Doctor** — `dadaia lifecycle workflow doctor` (`features/lifecycle/policy_doctor.py`,
+  checks `WMP-1..WMP-8`): invalid policy JSON, unknown profile, harness/profile mismatch,
+  stale workflow/step id, missing default profile per supported harness, unresolved
+  fragment/output schema, e qualquer resíduo `claude`/`opencode` Layer-2; nunca crasha o
+  panel. `policy_public_doctor.py` adiciona um residue scan da superfície pública via
+  `dadaia public doctor`.
 
 ## Multi-harness runtime parity (constitution §4)
 
