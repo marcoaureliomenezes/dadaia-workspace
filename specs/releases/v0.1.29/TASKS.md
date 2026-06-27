@@ -28,7 +28,7 @@ overlay harness; `_resolve_harness` computes the effective harness with preceden
 **Write set:** `dadaia_workspace/features/lifecycle/policy_resolver.py`.
 **Acceptance:** AC-1 precedence table test passes; default path (no overrides) unchanged.
 
-### [ ] T-29-A-03 — Resolver: auto-profile-on-harness-override + match effective harness
+### [x] T-29-A-03 — Resolver: auto-profile-on-harness-override + match effective harness
 **Goal:** when a step's harness is overridden with no explicit profile, the library default
 becomes `default_profiles[effective_harness]`; `_validate_profile` compares against the
 **effective** harness (fixes `policy_resolver.py:288`).
