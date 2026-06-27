@@ -241,7 +241,7 @@
 
 ## Closure / ship (DEFINE-ONLY — NOT run this release cycle)
 
-- [ ] **T-30-Z-01** — Release closure + memory atoms + disposition sweep.
+- [x] **T-30-Z-01** — Release closure + memory atoms + disposition sweep.
   - Goal (CLOSURE phase only, after every wave `[x]` and the trio/QA cadence per
     `release-governance`): write `CLOSURE.md` (template `dadaia-release-closure`); update
     `specs/memory/architecture.md`, `tech-stack.md`, and the affected `product/` atoms;

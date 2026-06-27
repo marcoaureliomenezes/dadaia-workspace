@@ -9,7 +9,8 @@ summary: 'superfície de controle local em http://127.0.0.1:4999/ via dadaia pan
   com agent cards brand-identity (mint/sage/warm palette, WCAG AA badges), 12 workflow
   cards + DAG SVG server-rendered, tabela Sessions 8 colunas com per-cell min-width
   (CSS class selectors, floor 792px) + overflow-x:auto + Codex placeholder ''—'' em
-  PROJECT, theme switcher 3 paletas, per-tab runtime toggle Claude/Codex, memory .md
+  PROJECT, theme switcher 3 paletas, per-tab runtime toggle Claude/Codex/PI (PI telemetry
+  via reader/pi.py + PiRuntimeAdapter, v0.1.30), memory .md
   renderizado in-memory via mistune (D-4, memory-markdown-source-v1), Bearer token +
   CSP/nosniff; loopback bypass (panel-ux-fix-v1): GET /api/* retorna 200 sem token
   quando bind=127.0.0.1 (loopback_bypass=True em make_handler_class()).'
@@ -19,7 +20,7 @@ tags:
 - http
 - dashboard
 agent_tier: self-pull
-token_estimate: 4330
+token_estimate: 4400
 last_updated: '2026-06-27'
 release_origin: 0.1.6
 ---
@@ -162,7 +163,7 @@ Sem este panel, o workspace é invisível ao operador casual: precisa-se ler mar
 
 ## Dependências
 
-  * Roda sobre [[server-registry]] (consome `.dadaia/states/server_registry.json`), [[context-management]] (consome `.dadaia/states/spec_contexts.json`), [[agent-monitoring]] (consome `TelemetryService` via DI para Sessions — `TelemetryAggregator.list_sessions` / `get_session` com `RuntimeAdapter` registry) e [[public-asset-distribution]] (consome `.dadaia/agentic/agents/` e `.dadaia/agentic/workflows/`).
+  * Roda sobre [[server-registry]] (consome `.dadaia/states/server_registry.json`), [[context-management]] (consome `.dadaia/states/spec_contexts.json`), [[agent-monitoring]] (consome `TelemetryService` via DI para Sessions — `TelemetryAggregator.list_sessions` / `get_session` com `RuntimeAdapter` registry `{claude, codex, pi}`; PI é o quarto runtime de telemetria desde v0.1.30 via `reader/pi.py` + `PiRuntimeAdapter`) e [[public-asset-distribution]] (consome `.dadaia/agentic/agents/` e `.dadaia/agentic/workflows/`).
   * [[academy]]: `AcademyService` wired como DI opcional em `PanelService(academy=None)`; instanciado no composition root em `panel.py`; aba Academy consome via `GET /api/academy`.
   * [[specs-doctor]] valida memory atoms via LINT-1 (lint-memory-atoms.py) e o invariante RPT-1 via `dadaia reports doctor` (`features/panel/reports_doctor.py`): sidecar `.handoff.json` com `artifact.path` apontando para arquivo não-HTML ou ausente é flagrado como `[dangling-artifact-path]`. O invariante SPEC-DOC-008 (byte-identity do HTML commitado) foi retirado em memory-markdown-source-v1 — D-4 proíbe HTML commitado na pasta memory. Unit tests em `tests/unit/features/panel/test_views_memory.py` cobrem o render path `.md → HTML` in-memory.
   * [[sdd-gate-v3]] não é tocado — panel é read-only (exceção: DELETE de reports) e nunca escreve em `specs/memory/*`.

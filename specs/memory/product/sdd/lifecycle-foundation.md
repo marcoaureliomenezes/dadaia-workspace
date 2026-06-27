@@ -28,10 +28,13 @@ summary: >-
   an effective-harness precedence chain (CLI step > CLI default > overlay step > overlay
   default_harness > catalog default), profile validated against the effective harness,
   auto-profile-on-harness-override, apply_resolved_policy as the single runtime_kind author
-  (FAKE preserved), overlay default_harness/harnesses fields, and a completed governed
-  catalog of all 7 workflows (3 runnable + closure resolvable + 3 deferred zero-step) — so
-  PI is fully selectable as a Layer-2 worker. Anti-slop self-governance is built in: a
-  directory-aware slop metric and a boundary-safe retention sweep.
+  (FAKE preserved), overlay default_harness/harnesses fields. v0.1.30 ships operator-added PI
+  profiles (a never-projected local store merged with built-ins), per-context overlay `extends`
+  inheritance (the D-2 collapse removed), a run-scoped workflow-step handoff data plane
+  (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver +
+  retention + attempt loop + handoffs doctor), and real audit/research/bug_report fragment+gate
+  workflow bodies (DEFERRED_WORKFLOWS emptied) plus ctx-inject dehydration. Anti-slop
+  self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.
 tags:
 - sdd
 - lifecycle
@@ -39,9 +42,9 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 3050
+token_estimate: 3750
 last_updated: '2026-06-27'
-release_origin: v0.1.29
+release_origin: v0.1.30
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
@@ -90,7 +93,7 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 - `features/lifecycle/phase_workflow.py` (`LifecyclePhaseWorkflow`) threads a scoped prompt → factory-selected `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted run, for any single lifecycle step.
 - `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`).
 - `core/harness_models.py` (v0.1.24) is the discrete per-harness GPT model catalog (LAW 2): `harness → ordered model options` with a `validate(harness, model) → (model_id, effort?)` helper, consistent with — but not a tier-view of — `core/model_registry.py`. **pi → 3:** `(gpt-5.5,high)`, `(gpt-5.5,low)`, `(gpt-5.3-codex,medium)`; **codex → 2:** `(gpt-5.5,high)`, `(gpt-5.5,medium)`. Both catalogs are GPT-only (PI runs on the operator's Codex subscription); no `claude-*` id is ever a Layer-2 option. An invalid `(harness, model)` pair is rejected with the valid set.
-- `features/lifecycle/fragments/loader.py` (v0.1.24) loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`). `features/lifecycle/workflows/release_definition.py` is the first fully fragment-driven dadaia-workflow: each step's prompt is `role + fragment bundle + selected context + output schema + discrete (harness, model)`, Python owns step order and blocks on missing/rejected handoffs. Backlog/audit/research/bug-report workflow bodies are scaffolded + fail-loud (`NotImplementedError("deferred to follow-up release")`).
+- `features/lifecycle/fragments/loader.py` (v0.1.24) loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`). `features/lifecycle/workflows/release_definition.py` is the first fully fragment-driven dadaia-workflow: each step's prompt is `role + fragment bundle + selected context + output schema + discrete (harness, model)`, Python owns step order and blocks on missing/rejected handoffs. **As of v0.1.30 the `backlog_definition`, `audit`, `research`, and `bug_report` workflow bodies are all real fragment+gate bodies too** (the fail-loud `_deferred.py` stubs were removed; `DEFERRED_WORKFLOWS == ()`); each mirrors `release_definition.py` and communicates per step via the workflow-step handoff data plane (see below). `bug_report` writes only ADDITIVE `specs/bugs/**` (enforced at the runner via `core.scope_match.out_of_scope_paths`); `audit` produces disposition-ready output.
 - `features/lifecycle/prompt_builder.py` builds scoped worker prompts; `PromptPrefix.from_sections` assembles a byte-identical, sha256-hashed, order-independent context block, and `build(scope, prefix=)` prepends it verbatim and records `prefix_hash`. The pipeline builds the prefix once and every step reuses the same bytes (provider-cache-friendly). Whole-workspace or repo-wide scopes are rejected. v0.1.24 adds a fragment-suffix path: a workflow step's prompt is assembled from a fragment bundle (not the generic "Run the step" suffix). **Prompt observability (v0.1.24):** each lifecycle run record persists, per step, the fragment ids, dynamic context refs, `prefix_hash`, the discrete model, the runtime kind, the output schema, and the gate result — surfaced in a panel/report view; whole-memory injection is never the default (context selection is scoped).
 - `features/lifecycle/hygiene.py` owns the canonical `SlopPolicy`: reports TTL 48h, handoffs TTL 24h, tmp TTL 24h, safe-zone cleanup, protected residuals, unknown `.dadaia/` top-level detection, malformed/orphan handoffs, and elapsed scan metrics.
 - `features/lifecycle/antislop/slop_scan.py` is the directory-aware slop metric: a directory tree counts as ONE entry with recursive size (closing the directory-blind gap where multi-GB caches/venvs hid from the file-only metric); the canonical manifest derives from `hooks/root_whitelist._WHITELIST`, never hand-copied. Surfaced via `dadaia lifecycle slop`.
@@ -113,8 +116,10 @@ the discrete `harness_models` catalog, a validated operator overlay, one shared 
 and a per-run policy snapshot. The resolver is the single policy seam consumed by both the
 CLI and the panel (see [[panel]] for the panel control plane).
 
-- `features/lifecycle/model_profiles.py` — the built-in `WorkflowModelProfile` registry
-  (D-2: **built-in only**). Five profiles: Codex `codex-implementation-standard`
+- `features/lifecycle/model_profiles.py` — the `WorkflowModelProfile` registry. As of
+  v0.1.30 `list_profiles`/`profiles_for` **merge the built-in recommended profiles with
+  operator-added profiles** from the local store (see "Operator profiles + per-context
+  overlays" below); v0.1.28 shipped built-in only. Five built-in profiles: Codex `codex-implementation-standard`
   (`gpt-5.5:medium`), `codex-review-deep` (`gpt-5.5:high`); PI `pi-implementation-standard`
   (`gpt-5.3-codex:medium`), `pi-reasoning-high` (`gpt-5.5:high`), `pi-reasoning-low`
   (`gpt-5.5:low`). Each profile resolves to a real `harness_models.HarnessModelOption`; an
@@ -135,7 +140,9 @@ CLI and the panel (see [[panel]] for the panel control plane).
   error on invalid JSON / unknown top-level field; `save()` writes `.last-good.json` from the
   prior valid file before overwriting. **Missing ≠ invalid:** absent file = defaults; a
   present-but-invalid overlay blocks execution before the first model call with the last-good
-  intact. Only the `default` context is honored this release (D-2).
+  intact. **v0.1.30:** non-`default` context keys are now honored via an additive `extends`
+  inheritance chain (the v0.1.28 D-2 collapse was removed — see "Operator profiles +
+  per-context overlays" below).
 - `features/lifecycle/policy_resolver.py` — the single shared
   `WorkflowExecutionPolicyResolver` over the governed catalog + profile registry + overlay.
   `resolve(workflow_id, context, cli_overrides) → WorkflowPolicySnapshot` applies the
@@ -219,11 +226,11 @@ the panel toggle — and the executed adapter and the recorded snapshot always a
 - **Completed governed catalog — 7 workflows (D-4).** `closure` is cataloged as its real
   single `close` worker step (role product-engineer, generic/no-fragment) plus the Python
   `closure_removal_gate` modeled as a gate; `governed_workflow_catalog()` projects the
-  `close` step so `policy show closure` resolves. `audit` / `research` / `bug_report` (the
-  three `_deferred.DEFERRED_WORKFLOWS` names) are enumerated as `deferred` with zero governed
-  steps — inspectable at the catalog/panel layer; `resolve(<deferred>)` raises the actionable
-  "no governed steps" error (correct, not a gap). No invented model-step ladders, no second
-  drifting source.
+  `close` step so `policy show closure` resolves. **v0.1.30:** `audit` / `research` /
+  `bug_report` are now real fragment+gate workflow bodies with governed steps (no longer
+  `deferred`); `_deferred.DEFERRED_WORKFLOWS == ()` is empty and `resolve(audit|research|
+  bug_report)` resolves with each body's real governed step labels. No invented model-step
+  ladders, no second drifting source.
 - **Doctor validates the harness dimension (D-doctor).** `dadaia lifecycle workflow doctor`
   resolves every overlay harness override through the shared resolver, so an overlay harness
   referencing a harness the step does not support is a hard ERROR; an overlay harness value
@@ -235,10 +242,45 @@ Carried-forward laws hold unchanged: Layer-2 = codex|pi only (`fake` test-only;
 auditability snapshot frozen before step 1 and read verbatim for history; panel governance
 via validated overlay; resolve-once-before-step-1.
 
-> Still deferred (v0.1.28 D-2): operator-added PI profiles
-> (`.dadaia/states/workflow_model_profiles.local.json`, not loaded — built-in profiles only)
-> and per-context overlays + `extends` inheritance (only the `default` context is honored; a
-> non-`default` key is inert).
+**Operator profiles + per-context overlays (v0.1.30 — the v0.1.28 D-2 deferrals shipped).**
+`model_profiles.list_profiles`/`profiles_for` now **merge built-in recommended profiles with
+operator-added profiles** loaded from `.dadaia/states/workflow_model_profiles.local.json`
+(via a `core/protocols/local_model_profile_store.py` port + the
+`json_local_model_profile_store.py` adapter, wired through `container.py`). Invariants:
+validate `harness: pi` on every operator profile; **never store API keys**; **never project**
+the local store into `public/`; preserve `UnknownProfileError` fail-closed; default-first (L3:
+missing store ⇒ built-in only; present-but-invalid ⇒ fail closed). Per-context overlays now
+honor non-`default` keys via an `extends` chain (`context → extends… → default`) in
+`overlay_for` / `workflow_default_harness` / `step_harness` and the resolver's per-step
+resolution — replacing the D-2 collapse where a non-`default` key was inert. Guardrails: cycle
+detection on `extends`, a missing `extends` parent is a hard validation error, `default` stays
+the inheritance root, and `extends` is additive (an overlay with no `extends` resolves
+byte-identically — back-compat). WS-NITS shipped too: `_DEFAULT_PROFILE_BY_HARNESS_PURPOSE` has
+one shared home (was a verbatim twin in `policy_resolver.py` + `dadaia_catalog.py`), the
+`policy_resolver` docstring names `governed_workflow_catalog()` as the production source, and
+the panel `_semantic_check` mirrors the doctor's explicit 3-map union
+(`contexts | default_harness_overlay | step_harness_overlay`).
+
+## Workflow-step handoff data plane (v0.1.30)
+
+Workflow steps now communicate over a **run-scoped producer→consumer ledger** instead of
+stale prose / "latest handoff by agent filename" directory scans — a separate layer **beside**
+the generic `handoff-v1.1` contract (which stays reserved for durable external evidence in
+`.dadaia/handoff/`). Control plane: `LifecycleRun.workflow_steps`
+(`core/models/workflow_handoff.py` — additive backward-compatible field; old records load).
+Data plane: immutable step payloads under
+`.dadaia/runs/lifecycle/<run_id>/steps/*.step-payload.json`, validated against
+`workflow-step-payload-v1`. `features/lifecycle/workflow_handoffs.py` is the resolver/service:
+it resolves a step's declared upstream refs by exact (run, step, attempt), renders compact
+digests into the next prompt, records consumption (`produced → consumed_partial →
+consumed_all`), and BLOCKS the workflow when a required upstream payload is missing/malformed
+(`RequiredHandoffMissingError`). Retention protects live-run payloads and reclaims
+`consumed_all` past a consumed-TTL; `dadaia lifecycle handoffs doctor` fails on
+orphan/malformed/stale/undeclared/unconsumed-required payloads; the panel exposes the run
+ledger via a minimal API. `release_definition.py` declares per-`ReleaseStep`
+`produces`/`consumes` edges with a terminal graph-completeness gate, and the
+implementation/review loop tracks attempts (bounded retry default 2 → BLOCK) so `implement#2`
+consumes the `qa#1` rejection. See [[architecture]] §"Workflow-step handoff data plane".
 
 ## Gating note (current behavior)
 
@@ -259,8 +301,7 @@ Every single-step verb and the multi-step pipeline run the engine over a real
 release. Deferred: live Claude SDK binding verification (the `_default_query_fn`
 `query()`/`can_use_tool` call is the one unverified piece — offline build) plus provider
 cache-control marker wiring; phase-specific gate refinement (dropping the uniform
-APPROVED-verdict requirement for non-review phases); the full runnable
-backlog/audit/research/bug-report workflow bodies (scaffolded + fail-loud only in v0.1.24);
+APPROVED-verdict requirement for non-review phases);
 **live pi/codex worker runs of the fragment-driven release-definition workflow** (the FAKE
 e2e proves the seam; live confirmation against real PI/Codex workers is deferred to real
 use — the upstream CLI contracts cannot be proven by mocked tests); and persisting explicit
