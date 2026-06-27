@@ -20,7 +20,7 @@
   - Write set: `dadaia_workspace/infrastructure/headless_adapter_base.py` (NEW).
   - Acceptance: A1, A5 — invariants defined once; `mypy --strict` + import-linter green.
 
-- [ ] **T-30-A-02** — Refactor `pi_runtime` onto the base.
+- [-] **T-30-A-02** — Refactor `pi_runtime` onto the base.
   - Goal: import shared parts; keep only `_command`/result-extraction/`PiHeadlessConfig`.
   - Write set: `dadaia_workspace/infrastructure/pi_runtime.py`.
   - Acceptance: A2, A4 — `test_pi_runtime.py` passes unchanged.
