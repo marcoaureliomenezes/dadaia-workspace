@@ -181,7 +181,7 @@
     `dadaia_workspace/features/lifecycle/hygiene.py`.
   - Acceptance: A22, A23.
 
-- [ ] **T-30-D-08** — `dadaia lifecycle handoffs doctor` + minimal panel API exposure.
+- [-] **T-30-D-08** — `dadaia lifecycle handoffs doctor` + minimal panel API exposure.
   - Goal: doctor fails on orphan/malformed/stale/undeclared/unconsumed-required; expose the
     run ledger via a minimal panel API (rich graph view is OUT — Slice C follow-up).
   - Write set: lifecycle handoffs doctor module (NEW or fold into hygiene status);
