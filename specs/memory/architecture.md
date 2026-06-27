@@ -20,7 +20,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 13000
 last_updated: '2026-06-27'
-release_origin: v0.1.31
+release_origin: v0.1.32
 ---
 
 ## Visão geral
@@ -929,22 +929,39 @@ workflow-step handoff (ver a subseção abaixo). A garantia de **harness-univers
 e Codex (`--output-last-message`) via fixtures FAKE com extração de verdict idêntica
 asseverada; a denylist de tokens harness-específicos é lint secundário.
 
-**Typed gate é review-only (v0.1.31).** O `agent_runner._blocked_result` ramifica num sinal
-`is_review` threaded no `AgentRunnerInput`: steps de **review** gating em `verdict == APPROVED` +
-`artifact_refs` + paths in-scope (contrato inalterado); steps de **create** gating num payload
-schema-valid/estrutural + `artifact_refs` + paths in-scope, **ignorando** o campo `verdict` (um
-create step produz artifact, não aprova nada). O fix vive uma vez no runner e é threaded nas
-**sete** call sites (`release_definition`/`audit`/`bug_report`/`research` → `step.is_review`;
-`backlog_definition` `backlog_author` → `False`; `pipeline` + `phase_workflow` → derivado da fase);
-`PipelineStep` ganhou um campo `is_review` para os gates `review_qa`/`review_security`/`review_code`
-(que protegem o push boundary) manterem o requisito `verdict == APPROVED`. Os create steps não
-ficam gate-free: um worker no-op não emite payload ⇒ `artifact_refs` vazio ⇒ ainda BLOQUEIA. Cada
-producing create step bundla o único contrato `shared.output_handoff`. **Provado live end-to-end:**
-um worker `pi` real (gpt-5.5, subscrição Codex do operador) dirige `release_scope → spec_create`
-além do step 1 sob o gate review-only, guardado por um e2e anti-fake env-gated
-(`DADAIA_E2E_REAL_WORKER=1`, skipped by default — CI/`pytest` ficam totalmente faked + green).
-Workers GPT/Codex reais NÃO emitem o payload fenced/labelado de forma confiável, então o extractor
-PI (`pi_runtime._verdict_payload`) aceita fenced-or-bare JSON + aceitação estrutural.
+**Typed gate é review-only + contrato de output coerente by design (v0.1.31 → v0.1.32).** O
+`agent_runner._blocked_result` ramifica num sinal `is_review` threaded no `AgentRunnerInput`:
+steps de **review** gating em `verdict == APPROVED` + `artifact_refs` + paths in-scope (contrato
+inalterado); steps de **create** gating num payload schema-valid/estrutural + `artifact_refs` +
+paths in-scope, **ignorando** o campo `verdict` (um create step produz artifact, não aprova nada).
+O fix vive uma vez no runner e é threaded nas **sete** call sites
+(`release_definition`/`audit`/`bug_report`/`research` → `step.is_review`; `backlog_definition`
+`backlog_author` → `False`; `pipeline` + `phase_workflow` → derivado da fase); `PipelineStep`
+ganhou um campo `is_review` para os gates `review_qa`/`review_security`/`review_code` (que protegem
+o push boundary) manterem o requisito `verdict == APPROVED`. Os create steps não ficam gate-free:
+um worker no-op não emite payload ⇒ `artifact_refs` vazio ⇒ ainda BLOQUEIA.
+
+O **contrato de output do worker é coerente by design (v0.1.32):** o worker é instruído com
+exatamente UM campo (`schema`) e UM valor (o transport id `agent-run-result-v1`); o `output_schema`
+do fragment fica descritivo (Python o aplica via o ledger `produces`), não mais surfaceado como
+"schema a emitir". A instrução "## Required output" é **step-kind-aware** (review → verdict;
+create → artifact, sem self-verdict) e reconciliada nas **três** superfícies de prompt —
+`build_fragment_suffix` (param `is_review` keyword-only sem default, threaded nas seis call sites),
+`pipeline._generic_prompt`, e o `_run_phase_step` da CLI — todas via um único helper
+`is_review_phase`. O fragment `shared.output_handoff` documenta o campo canônico `schema` (era
+`schema_version`). A extração de resultado é **single-sourced** em `headless_adapter_base`
+(`SubprocessAdapterMixin`): um scan de candidatos (fenced/bare/sliced) + uma decisão de aceite —
+strict `schema == expected_schema` como PRIMÁRIO, aceitação estrutural como defence-in-depth
+documentada, `normalize_artifact_refs` aceitando refs string OU objeto — compartilhada por
+`pi_runtime` e `codex_runtime` (um teste patch-the-helper prova que ambos a chamam, então não
+divergem; codex ganhou o reject-guard contra JSON sem o shape de resultado). **Provado live
+end-to-end — o caminho de REVIEW:** um worker `pi` real (gpt-5.5, software-architect) dirige
+`release_scope → spec_create → spec_arch_review`, revisa um SPEC substantivo, emite
+`verdict: APPROVED`, e o gate de verdict do Python PASSA sobre o output real do worker **via o
+caminho STRICT** (o worker emitiu `schema: agent-run-result-v1` — o fallback estrutural não foi
+necessário), guardado por um e2e anti-fake env-gated (`DADAIA_E2E_REAL_WORKER=1`, skipped by
+default — CI/`pytest` ficam totalmente faked + green); o negativo REJECTED-blocks é provado pelo
+caminho de gate faked.
 
 ### Layer-1 entry-harness enforcement parity
 

@@ -1,6 +1,6 @@
 ---
 release: v0.1.32
-phase: IMPLEMENTATION
+phase: CLOSURE
 ---
 
 # Active release: v0.1.32 — harden real-worker workflows (coherent worker-output contract)

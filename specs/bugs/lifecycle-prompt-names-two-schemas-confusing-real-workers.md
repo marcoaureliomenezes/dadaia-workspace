@@ -1,8 +1,10 @@
 ---
 name: lifecycle-prompt-names-two-schemas-confusing-real-workers
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
+closed: 2026-06-27
+closed_by: v0.1.32
 surface: features/lifecycle/prompt_builder.py (envelope + PromptScope.expected_schema), public/lifecycle_fragments/shared/output-handoff.md
 session_id: null
 ---
@@ -54,3 +56,22 @@ defence-in-depth rather than the primary path.
 object regardless of the `schema` label) keeps the real-worker chain green today; this bug
 tracks fixing the prompt so worker compliance no longer *depends* on that tolerance. Apply
 the same disambiguation to the Codex extractor for parity.
+
+**Resolution (Closed — v0.1.32):** Fixed by the coherent worker-output contract. Option (b)
+of the fix direction was taken: `agent-run-result-v1` stays the single transport id and the
+fragment's `output_schema` is no longer surfaced to the worker as a competing "schema to emit".
+The prompt now names exactly ONE field (`schema`) with ONE value (`agent-run-result-v1`) and is
+step-kind-aware (review → verdict; create → artifact), reconciled across all three prompt
+surfaces (`build_fragment_suffix`, `pipeline._generic_prompt`, CLI `_run_phase_step` via the
+shared `is_review_phase` helper). `shared/output-handoff.md` documents `schema` (was
+`schema_version`). With the contract coherent, strict `schema == expected_schema` acceptance is
+restored as PRIMARY (structural acceptance demoted to documented defence-in-depth), single-
+sourced in `headless_adapter_base` and shared by both the pi and codex extractors.
+
+**Evidence:** coherent-contract Wave A (`b266217d`, A1–A3) + strict-primary extractor Wave B
+(`103014f9`, A6/A9) + **live STRICT-path review proof**
+`tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py::test_real_pi_worker_review_step_emits_approved_and_gate_passes`
+PASSED — a real `pi` worker emitted `schema: agent-run-result-v1` matching `expected_schema`,
+so the verdict-carrying payload was accepted via the STRICT path (the structural fallback was
+NOT needed), proving worker compliance no longer depends on extractor tolerance (A14, R5). See
+`specs/_archive/releases/v0.1.32/CLOSURE.md`.

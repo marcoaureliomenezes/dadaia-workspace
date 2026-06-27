@@ -198,7 +198,7 @@
 
 ## Closure / disposition (DEFINE-ONLY — NOT run this release cycle)
 
-- [ ] **T-32-Z-01** — Release closure + memory atoms + disposition sweep.
+- [x] **T-32-Z-01** — Release closure + memory atoms + disposition sweep.
   - Goal (CLOSURE phase only, after every Wave A/B/C task `[x]` and the QA/trio cadence per
     `release-governance`): write `CLOSURE.md` (template `dadaia-release-closure`); update
     `specs/memory/architecture.md` (coherent worker-output contract — one transport schema in
