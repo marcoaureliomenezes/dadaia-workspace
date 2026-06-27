@@ -25,8 +25,10 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     els.map((el) => el.textContent?.trim() ?? '')
   );
 
+  // v0.1.28 (D-5) promoted Workflows to a first-class top-level tab at position 2.
   expect(tabs).toEqual([
     'Projects',
+    'Workflows',
     'Agentic',
     'Sessions',
     'Reports',
