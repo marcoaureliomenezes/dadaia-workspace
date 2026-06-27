@@ -15,9 +15,16 @@ Two load paths, deliberately distinct (LAW 4 / SPEC §1, "missing != invalid"):
   caller (resolver/runner) must fail before the first model call; the ``.last-good.json``
   backup is left untouched.
 
-D-2: only the ``default`` context overlay is honored. The ``contexts`` map reserves the
-per-context shape, but :meth:`WorkflowModelPolicyOverlay.step_profile` only resolves the
-``default`` context — a non-``default`` key is inert.
+Per-context inheritance (v0.1.30 / WS-OVERLAYS, replacing the D-2 collapse): a non-
+``default`` context overlay is now honored. Each context may declare an ``extends`` parent;
+resolution walks ``context → extends… → default`` and returns the first level that defines
+the requested step/workflow value (``default`` is the inheritance root). The ``extends``
+graph is validated **at parse time** (L7 back-compat is preserved — an overlay with no
+``extends`` key parses and resolves byte-identically to v0.1.28/29):
+
+- a **missing** ``extends`` parent is a hard validation error (never a silent fallthrough);
+- an ``extends`` **cycle** is rejected at parse time;
+- ``default`` is the root and may not declare ``extends``.
 """
 
 from __future__ import annotations
@@ -34,7 +41,10 @@ _FILENAME = "workflow_model_policy.json"
 
 #: Allowed top-level keys in the overlay file (unknown key ⇒ hard error).
 _ALLOWED_TOP_LEVEL = frozenset({"schema_version", "policy_id", "contexts"})
-#: The only context honored this release (D-2).
+#: Allowed keys inside one context overlay (v0.1.30 adds the optional ``extends`` parent).
+_ALLOWED_CONTEXT_KEYS = frozenset({"workflows", "extends"})
+#: The inheritance-root context. A non-``default`` context resolves through its ``extends``
+#: chain up to ``default`` (WS-OVERLAYS); ``default`` itself may not declare ``extends``.
 DEFAULT_CONTEXT = "default"
 #: Allowed keys inside one workflow overlay (v0.1.29 adds the optional harness fields).
 _ALLOWED_WORKFLOW_KEYS = frozenset({"steps", "default_harness", "harnesses"})
@@ -64,45 +74,72 @@ class WorkflowModelPolicyOverlay:
     ``default_harness_overlay`` (v0.1.29 / D-3) maps a context to
     ``{workflow_id -> harness}`` (a per-workflow default harness override) and
     ``step_harness_overlay`` to ``{workflow_id -> {step_label -> harness}}`` (a per-step
-    harness override). Only the ``default`` context is honored (D-2); other context keys
-    are retained for round-trip fidelity but the accessors ignore them.
+    harness override). ``extends`` maps a context name to its parent context (WS-OVERLAYS).
 
-    **Back-compat:** the harness overlays default to empty, so a v0.1.28 overlay (no
-    harness field) parses and resolves exactly as before, and :meth:`to_dict` omits the
-    harness fields when empty (byte-stable round-trip).
+    **Per-context inheritance (WS-OVERLAYS).** A non-``default`` context is now honored: the
+    accessors walk ``context → extends… → default`` and return the first level that defines
+    the requested value. ``default`` is the inheritance root. The ``extends`` graph is
+    validated at parse time (every parent exists; no cycles; ``default`` declares no parent),
+    so the accessors can walk safely without re-validating.
+
+    **Back-compat (L7):** ``extends`` defaults to empty and the harness overlays default to
+    empty, so a v0.1.28/29 overlay (no ``extends`` / no harness field) parses and resolves
+    byte-identically; :meth:`to_dict` omits the harness fields when empty and ``extends``
+    when a context declares none (byte-stable round-trip).
     """
 
     policy_id: str
     contexts: dict[str, dict[str, dict[str, str]]]
     default_harness_overlay: dict[str, dict[str, str]] = field(default_factory=dict)
     step_harness_overlay: dict[str, dict[str, dict[str, str]]] = field(default_factory=dict)
+    extends: dict[str, str] = field(default_factory=dict)
+
+    def _resolution_chain(self, context: str) -> list[str]:
+        """Return the ordered context lookup chain ``[context, parent…, default]``.
+
+        Walks ``extends`` from *context* toward ``default``. The graph is parse-validated
+        (no cycles, every parent present), so this terminates; a defensive ``seen`` guard
+        breaks any pathological case rather than looping. ``default`` is always the tail
+        even when *context* is unknown (an unknown context simply inherits the root).
+        """
+        chain: list[str] = []
+        seen: set[str] = set()
+        current: str | None = context
+        while current is not None and current not in seen:
+            chain.append(current)
+            seen.add(current)
+            current = self.extends.get(current)
+        if DEFAULT_CONTEXT not in chain:
+            chain.append(DEFAULT_CONTEXT)
+        return chain
 
     def step_profile(self, context: str, workflow_id: str, step: str) -> str | None:
-        """Return the overridden profile id for a step, or ``None`` when not overridden.
+        """Return the overridden profile id for a step, walking the ``extends`` chain.
 
-        D-2: only the ``default`` context resolves; any other context yields ``None``.
+        Returns the first level (nearest the requested context) that defines the step's
+        profile; ``None`` when no level in the chain overrides it.
         """
-        if context != DEFAULT_CONTEXT:
-            return None
-        return self.contexts.get(context, {}).get(workflow_id, {}).get(step)
+        for level in self._resolution_chain(context):
+            value = self.contexts.get(level, {}).get(workflow_id, {}).get(step)
+            if value is not None:
+                return value
+        return None
 
     def workflow_default_harness(self, context: str, workflow_id: str) -> str | None:
-        """Return the overlay's per-workflow default harness, or ``None`` (D-3).
-
-        D-2: only the ``default`` context resolves; any other context yields ``None``.
-        """
-        if context != DEFAULT_CONTEXT:
-            return None
-        return self.default_harness_overlay.get(context, {}).get(workflow_id)
+        """Return the per-workflow default harness, walking the ``extends`` chain (D-3)."""
+        for level in self._resolution_chain(context):
+            value = self.default_harness_overlay.get(level, {}).get(workflow_id)
+            if value is not None:
+                return value
+        return None
 
     def step_harness(self, context: str, workflow_id: str, step: str) -> str | None:
-        """Return the overlay's per-step harness override, or ``None`` (D-3).
-
-        D-2: only the ``default`` context resolves; any other context yields ``None``.
-        """
-        if context != DEFAULT_CONTEXT:
-            return None
-        return self.step_harness_overlay.get(context, {}).get(workflow_id, {}).get(step)
+        """Return the per-step harness override, walking the ``extends`` chain (D-3)."""
+        for level in self._resolution_chain(context):
+            value = self.step_harness_overlay.get(level, {}).get(workflow_id, {}).get(step)
+            if value is not None:
+                return value
+        return None
 
     def to_dict(self) -> dict[str, Any]:
         contexts: dict[str, Any] = {}
@@ -117,7 +154,11 @@ class WorkflowModelPolicyOverlay:
                 if harnesses:
                     entry["harnesses"] = dict(harnesses)
                 wf_out[wf] = entry
-            contexts[ctx] = {"workflows": wf_out}
+            ctx_out: dict[str, Any] = {"workflows": wf_out}
+            parent = self.extends.get(ctx)
+            if parent is not None:
+                ctx_out["extends"] = parent
+            contexts[ctx] = ctx_out
         return {
             "schema_version": _SCHEMA_VERSION,
             "policy_id": self.policy_id,
@@ -203,33 +244,84 @@ class JsonWorkflowModelPolicyStore:
         contexts: dict[str, dict[str, dict[str, str]]] = {}
         default_harness: dict[str, dict[str, str]] = {}
         step_harness: dict[str, dict[str, dict[str, str]]] = {}
+        extends: dict[str, str] = {}
         for ctx_name, ctx_value in contexts_raw.items():
             ctx_key = str(ctx_name)
-            steps_map, default_h, step_h = self._parse_context(ctx_value, path=path)
+            steps_map, default_h, step_h, parent = self._parse_context(
+                ctx_key, ctx_value, path=path
+            )
             contexts[ctx_key] = steps_map
             if default_h:
                 default_harness[ctx_key] = default_h
             if step_h:
                 step_harness[ctx_key] = step_h
+            if parent is not None:
+                extends[ctx_key] = parent
+        # WS-OVERLAYS: validate the `extends` graph at parse time (every parent present,
+        # no cycles, default declares no parent) so the accessors can walk it safely.
+        self._validate_extends(extends, contexts, path=path)
         return WorkflowModelPolicyOverlay(
             policy_id=policy_id,
             contexts=contexts,
             default_harness_overlay=default_harness,
             step_harness_overlay=step_harness,
+            extends=extends,
         )
 
+    def _validate_extends(
+        self,
+        extends: dict[str, str],
+        contexts: dict[str, dict[str, dict[str, str]]],
+        *,
+        path: Path | None,
+    ) -> None:
+        """Reject a missing ``extends`` parent (hard error) or any ``extends`` cycle.
+
+        A parent must be a context key that exists in the overlay (the inheritance-root
+        ``default`` is an implicit valid parent even when it carries no overrides). A cycle
+        anywhere in the chain — including a context that (transitively) extends itself — is
+        rejected. ``default`` may not declare a parent (it is the root).
+        """
+        for child, parent in extends.items():
+            if child == DEFAULT_CONTEXT:
+                raise WorkflowModelPolicyStoreError(
+                    f"context {DEFAULT_CONTEXT!r} is the inheritance root and may not "
+                    "declare an 'extends' parent",
+                    path,
+                )
+            if parent != DEFAULT_CONTEXT and parent not in contexts:
+                raise WorkflowModelPolicyStoreError(
+                    f"context {child!r} extends unknown parent context {parent!r}; "
+                    "the parent must be a declared context or the 'default' root",
+                    path,
+                )
+        # Cycle detection: walk every context's chain; a repeated node is a cycle.
+        for start in extends:
+            seen: set[str] = set()
+            current: str | None = start
+            while current is not None:
+                if current in seen:
+                    raise WorkflowModelPolicyStoreError(
+                        f"'extends' cycle detected starting at context {start!r} "
+                        f"(revisited {current!r})",
+                        path,
+                    )
+                seen.add(current)
+                current = extends.get(current)
+
     def _parse_context(
-        self, value: object, *, path: Path | None
-    ) -> tuple[dict[str, dict[str, str]], dict[str, str], dict[str, dict[str, str]]]:
+        self, ctx_name: str, value: object, *, path: Path | None
+    ) -> tuple[dict[str, dict[str, str]], dict[str, str], dict[str, dict[str, str]], str | None]:
         if not isinstance(value, dict):
             raise WorkflowModelPolicyStoreError(
                 "workflow-model-policy context overlay must be an object", path
             )
-        unknown = set(value) - {"workflows"}
+        unknown = set(value) - _ALLOWED_CONTEXT_KEYS
         if unknown:
             raise WorkflowModelPolicyStoreError(
                 f"unknown field(s) in context overlay: {', '.join(sorted(unknown))}", path
             )
+        parent = self._parse_extends_value(value.get("extends"), ctx_name=ctx_name, path=path)
         workflows_raw = value.get("workflows", {})
         if not isinstance(workflows_raw, dict):
             raise WorkflowModelPolicyStoreError(
@@ -246,7 +338,22 @@ class JsonWorkflowModelPolicyStore:
                 default_harness[wf_key] = default_h
             if step_h:
                 step_harness[wf_key] = step_h
-        return workflows, default_harness, step_harness
+        return workflows, default_harness, step_harness, parent
+
+    def _parse_extends_value(
+        self, value: object, *, ctx_name: str, path: Path | None
+    ) -> str | None:
+        """Validate an optional ``extends`` parent name (a non-empty string or absent)."""
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise WorkflowModelPolicyStoreError(
+                f"context {ctx_name!r} 'extends' must be a non-empty parent context name",
+                path,
+            )
+        if value == ctx_name:
+            raise WorkflowModelPolicyStoreError(f"context {ctx_name!r} cannot extend itself", path)
+        return value
 
     def _parse_workflow(
         self, value: object, *, path: Path | None

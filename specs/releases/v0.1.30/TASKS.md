@@ -103,7 +103,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/model_profiles.py`.
   - Acceptance: A14 (selectability half).
 
-- [-] **T-30-C-03** — WS-OVERLAYS: `extends` inheritance in the overlay store.
+- [x] **T-30-C-03** — WS-OVERLAYS: `extends` inheritance in the overlay store.
   - Goal: add `extends` to `_ALLOWED_TOP_LEVEL`/schema; walk `context → extends… → default`
     in `overlay_for`/`workflow_default_harness`/`step_harness`; cycle detection; hard error on
     missing parent.

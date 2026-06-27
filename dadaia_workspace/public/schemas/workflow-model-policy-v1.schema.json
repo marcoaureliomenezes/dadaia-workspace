@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "workflow-model-policy-v1",
   "title": "Workflow Model Policy Overlay v1",
-  "description": "Operator-editable, validated JSON overlay that selects per-workflow / per-step model profiles. Missing file = library defaults; an invalid file blocks workflow execution (missing != invalid). D-2: only the 'default' context overlay is honored this release; the 'contexts' shape reserves per-context overlays for a future release but a non-'default' key is inert.",
+  "description": "Operator-editable, validated JSON overlay that selects per-workflow / per-step model profiles. Missing file = library defaults; an invalid file blocks workflow execution (missing != invalid). Per-context inheritance (WS-OVERLAYS): a non-'default' context is honored; each context may declare an 'extends' parent and resolution walks context -> extends... -> default ('default' is the inheritance root). An overlay with no 'extends' parses and resolves byte-identically to v0.1.28/29 (additive back-compat).",
   "type": "object",
   "required": ["schema_version"],
   "additionalProperties": false,
@@ -29,6 +29,11 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "extends": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional parent context this context inherits from (WS-OVERLAYS). Resolution walks context -> extends... -> default; the first level that defines a step/workflow value wins. The parent must be a declared context or the 'default' root; a missing parent or an 'extends' cycle is a hard validation error. The 'default' context is the inheritance root and may not declare 'extends'. Omit for a context that inherits directly from 'default'."
+        },
         "workflows": {
           "type": "object",
           "description": "Per-workflow overrides keyed by workflow id (e.g. 'implementation').",
