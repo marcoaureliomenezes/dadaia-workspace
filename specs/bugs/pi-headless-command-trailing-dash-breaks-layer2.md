@@ -1,11 +1,17 @@
 ---
 name: pi-headless-command-trailing-dash-breaks-layer2
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-27
 surface: infrastructure/pi_runtime.py PiHeadlessAdapter._command
 session_id: null
 ---
+
+> **Closed in release v0.1.31 (2026-06-27).** Solved by the adopted `-p -`→`-p` command fix
+> (`c8513fa5`), re-verified by the PI argv unit assertion (A12) and hardened with a real `pi`
+> smoke (A13). Evidence: live `tests/integration/pi_live/test_pi_command_smoke.py` PASSED — the
+> real `pi` command (pi 0.79.3, gpt-5.5) executes without "Unknown option: -". See
+> `specs/_archive/releases/v0.1.31/CLOSURE.md` (Validations + Dispositions).
 
 **Symptom:** Every PI Layer-2 worker invocation fails immediately. `PiHeadlessAdapter._command`
 builds `pi --mode json --tools <…> [--model X] -p -`. The installed `pi` rejects the trailing

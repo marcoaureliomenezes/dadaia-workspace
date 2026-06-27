@@ -165,12 +165,15 @@
     `tests/unit/infrastructure/test_pi_runtime.py` (3 new extractor tests).
   - Acceptance: A16.
 
-- [ ] **T-31-C-03** — (Optional) codex real-worker second case.
+- [x] **T-31-C-03** — (Optional) codex real-worker second case. **DESCOPED at CLOSURE (optional, not implemented).**
   - Goal: add a codex variant of the e2e ONLY if cheap and credentials are available (OQ-2; `pi`
     is the required case). Same env gate + auto-SKIP. Skip this task if codex creds/cost make it
     impractical — `pi` alone satisfies the core deliverable.
+  - **DECISION (CLOSURE, 2026-06-27): SKIPPED.** `pi` alone satisfies the core deliverable (the
+    live real-worker e2e PASSED on pi/gpt-5.5) and a codex live contract test already exists
+    (`tests/integration/codex_live/`). The optional codex half adds no proof not already covered.
   - Write set: `tests/integration/codex_live/test_real_layer2_worker_workflow_e2e.py` (NEW, optional).
-  - Acceptance: A14 (codex half — optional).
+  - Acceptance: A14 (codex half — optional; satisfied by the pi half).
 
 > **Wave C green checkpoint (CORE):** real-worker e2e present, env-gated, SKIPPED in a default run
 > (A14/A17); with the env flag set it asserts concrete post-step-1 state — not blocked, no
@@ -181,7 +184,7 @@
 
 ## Closure / disposition (DEFINE-ONLY — NOT run this release cycle)
 
-- [ ] **T-31-Z-01** — Release closure + memory atoms + disposition sweep.
+- [x] **T-31-Z-01** — Release closure + memory atoms + disposition sweep.
   - Goal (CLOSURE phase only, after every Wave A/B/C task `[x]` and the QA/trio cadence per
     `release-governance`): write `CLOSURE.md` (template `dadaia-release-closure`); update
     `specs/memory/architecture.md` (review-only gate contract), `specs/memory/tech-stack.md` (the

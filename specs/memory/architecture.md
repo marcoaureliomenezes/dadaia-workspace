@@ -18,9 +18,9 @@ tags:
 - agents
 - backlog
 agent_tier: self-pull
-token_estimate: 12900
+token_estimate: 13000
 last_updated: '2026-06-27'
-release_origin: v0.1.30
+release_origin: v0.1.31
 ---
 
 ## Visão geral
@@ -928,6 +928,23 @@ workflow-step handoff (ver a subseção abaixo). A garantia de **harness-univers
 `output_schema` de cada fragment shipped passa pelos parsers PI (fenced-json/`message_end`)
 e Codex (`--output-last-message`) via fixtures FAKE com extração de verdict idêntica
 asseverada; a denylist de tokens harness-específicos é lint secundário.
+
+**Typed gate é review-only (v0.1.31).** O `agent_runner._blocked_result` ramifica num sinal
+`is_review` threaded no `AgentRunnerInput`: steps de **review** gating em `verdict == APPROVED` +
+`artifact_refs` + paths in-scope (contrato inalterado); steps de **create** gating num payload
+schema-valid/estrutural + `artifact_refs` + paths in-scope, **ignorando** o campo `verdict` (um
+create step produz artifact, não aprova nada). O fix vive uma vez no runner e é threaded nas
+**sete** call sites (`release_definition`/`audit`/`bug_report`/`research` → `step.is_review`;
+`backlog_definition` `backlog_author` → `False`; `pipeline` + `phase_workflow` → derivado da fase);
+`PipelineStep` ganhou um campo `is_review` para os gates `review_qa`/`review_security`/`review_code`
+(que protegem o push boundary) manterem o requisito `verdict == APPROVED`. Os create steps não
+ficam gate-free: um worker no-op não emite payload ⇒ `artifact_refs` vazio ⇒ ainda BLOQUEIA. Cada
+producing create step bundla o único contrato `shared.output_handoff`. **Provado live end-to-end:**
+um worker `pi` real (gpt-5.5, subscrição Codex do operador) dirige `release_scope → spec_create`
+além do step 1 sob o gate review-only, guardado por um e2e anti-fake env-gated
+(`DADAIA_E2E_REAL_WORKER=1`, skipped by default — CI/`pytest` ficam totalmente faked + green).
+Workers GPT/Codex reais NÃO emitem o payload fenced/labelado de forma confiável, então o extractor
+PI (`pi_runtime._verdict_payload`) aceita fenced-or-bare JSON + aceitação estrutural.
 
 ### Layer-1 entry-harness enforcement parity
 

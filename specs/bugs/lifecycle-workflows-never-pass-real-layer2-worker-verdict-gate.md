@@ -1,11 +1,23 @@
 ---
 name: lifecycle-workflows-never-pass-real-layer2-worker-verdict-gate
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-27
 surface: features/lifecycle/workflows/release_definition.py (_SEQUENCE), features/lifecycle/agent_runner.py (_blocked_result), public/lifecycle_fragments/release_definition/release-scope.md
 session_id: null
 ---
+
+> **Closed in release v0.1.31 (2026-06-27).** Solved by scoping the verdict gate to **review**
+> steps (Option 2, GRILL D-1): create steps now pass on a schema-valid/structural payload +
+> `artifact_refs` + in-scope paths, with the `verdict` field ignored. Implemented at
+> `agent_runner._blocked_result` (branch on a threaded `is_review`, all seven runner call sites +
+> `PipelineStep.is_review`) and by bundling `shared.output_handoff` into every producing create
+> step (`e87d54e7`); the PI extractor was hardened to accept bare/inconsistently-labelled real-worker
+> payloads (`beba502c`). Evidence: live
+> `tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py` PASSED — a real `pi` worker
+> (gpt-5.5) drives `release_scope → spec_create` past step 1 with no `"agent result missing APPROVED
+> verdict"` BlockedState. See `specs/_archive/releases/v0.1.31/CLOSURE.md` (Validations +
+> Dispositions + Drifts).
 
 **Symptom:** A `dadaia lifecycle release define --harness pi` (or codex) BLOCKs at the FIRST
 step, `release_scope`, with `reason: "agent result missing APPROVED verdict"` — even after the

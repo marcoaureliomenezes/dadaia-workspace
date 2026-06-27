@@ -42,9 +42,9 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 3750
+token_estimate: 3900
 last_updated: '2026-06-27'
-release_origin: v0.1.30
+release_origin: v0.1.31
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
@@ -107,7 +107,7 @@ Lifecycle code depends on `AgentRuntimePort`; `build_agent_runtime(kind, *, cwd=
 
 The Codex adapter does not read project-local provider/auth/profile configuration, does not pass through `os.environ`, accepts only an explicit environment allowlist, redacts credential-looking values, and records sandbox/profile widening only when operator-controlled input requests it. The Claude SDK adapter derives a real Ring-1 `write_permission` decider from the request's allowed/forbidden paths via the same `core/scope_match` classifier the runner's Ring-2 uses; its transport is injectable (`query_fn`) so permission + result mapping are tested hermetically. `claude-agent-sdk` is an OPTIONAL, operator-installed runtime extra (not a locked dependency, offline-first build); the default transport lazily imports it and returns an actionable `pip install claude-agent-sdk` message when absent.
 
-The PI adapter (`PiHeadlessAdapter` + frozen `PiHeadlessConfig`) is a structural twin of `CodexExecAdapter`: it drives `pi --mode json --tools <csv> -p -` (prompt on stdin) over an injectable subprocess runner, imports no PI client at module load (offline-first preserved), and accepts only an explicit env allowlist (incl. `ANTHROPIC_API_KEY`, redacted from output). Result mapping parses the line-delimited JSON stream and takes the **last** `message_end` event's assistant text from `message.content`, handling both string and content-block shapes; an absent or unparseable `message_end` degrades to raw stdout as the summary (SUCCEEDED, never crashes), and a fenced JSON block matching the request's `expected_schema` populates `structured_output`. A valid terminal `message_end` maps to SUCCEEDED **even when `pi` exits non-zero** — the terminal assistant message is trusted over the raw exit code (deliberate precedence); the downstream verdict gate and the Ring-2 write boundary still apply. PI's Ring-2 write boundary is real: `changed_paths` is computed from the injected git client's `diff_name_only(cwd)` (working-tree + staged + untracked, non-ignored) at result time and written into `structured_output["changed_paths"]`, **unconditionally overwriting any model self-report** — so the runner's Ring-2 out-of-scope block fires for PI exactly as for Codex/OpenCode. The Layer-2 `PI_HEADLESS` worker (this adapter, `pi --mode json` headless) has no CLI-level pre-disk (Ring-1) gate: its enforcement posture is Ring-2 + git chokepoints, identical to Codex/OpenCode. (The **Layer-1** interactive `pi` entry harness is separate and DOES have a Ring-1 SDD-gate extension — `.pi/extensions/dadaia-sdd-gate.ts`, WS-PI-4, active post-trust — see [[architecture]] §"two-layer agentic model".) The first-layer `.pi/` projection (WS-PI-3) shipped in v0.1.18 and the Layer-1 Ring-1 extension (WS-PI-4) in v0.1.21; both are no longer deferred. The live `pi --mode json` event schema — specifically the `AgentMessage.content` shape — is the one upstream-owned unverified seam, verified via the opt-in `DADAIA_PI_LIVE=1` integration test (`tests/integration/pi_live/`), not CI-gated.
+The PI adapter (`PiHeadlessAdapter` + frozen `PiHeadlessConfig`) is a structural twin of `CodexExecAdapter`: it drives `pi --mode json --tools <csv> -p` (prompt on stdin; the trailing `-` was a non-existent `pi` "read stdin" marker that broke every headless run — removed in `c8513fa5`, adopted + re-verified + smoke-hardened in v0.1.31) over an injectable subprocess runner, imports no PI client at module load (offline-first preserved), and accepts only an explicit env allowlist (incl. `ANTHROPIC_API_KEY`, redacted from output). Result mapping parses the line-delimited JSON stream and takes the **last** `message_end` event's assistant text from `message.content`, handling both string and content-block shapes; an absent or unparseable `message_end` degrades to raw stdout as the summary (SUCCEEDED, never crashes). **Structured-payload extraction is hardened (v0.1.31):** real GPT/Codex workers do NOT reliably emit a fenced, exactly-`schema`-labelled block, so `_verdict_payload` extracts a payload from a fenced ```` ```json ```` block, the whole bare message, or the outermost `{…}` slice, and accepts a payload **structurally** (non-empty `artifact_refs` + `status`/`summary`/`structured_output`) when the `schema` label is absent/mismatched — populating `structured_output` without making the create-step gate permissive (a no-op worker still yields empty `artifact_refs` and BLOCKs). The residual prompt-side root cause (the prompt names two schemas) is tracked as a follow-up bug. A valid terminal `message_end` maps to SUCCEEDED **even when `pi` exits non-zero** — the terminal assistant message is trusted over the raw exit code (deliberate precedence); the downstream verdict gate and the Ring-2 write boundary still apply. PI's Ring-2 write boundary is real: `changed_paths` is computed from the injected git client's `diff_name_only(cwd)` (working-tree + staged + untracked, non-ignored) at result time and written into `structured_output["changed_paths"]`, **unconditionally overwriting any model self-report** — so the runner's Ring-2 out-of-scope block fires for PI exactly as for Codex/OpenCode. The Layer-2 `PI_HEADLESS` worker (this adapter, `pi --mode json` headless) has no CLI-level pre-disk (Ring-1) gate: its enforcement posture is Ring-2 + git chokepoints, identical to Codex/OpenCode. (The **Layer-1** interactive `pi` entry harness is separate and DOES have a Ring-1 SDD-gate extension — `.pi/extensions/dadaia-sdd-gate.ts`, WS-PI-4, active post-trust — see [[architecture]] §"two-layer agentic model".) The first-layer `.pi/` projection (WS-PI-3) shipped in v0.1.18 and the Layer-1 Ring-1 extension (WS-PI-4) in v0.1.21; both are no longer deferred. The live `pi --mode json` event schema — specifically the `AgentMessage.content` shape — is verified via the opt-in `DADAIA_PI_LIVE=1` / `DADAIA_E2E_REAL_WORKER=1` integration tests (`tests/integration/pi_live/`), not CI-gated. As of v0.1.31 this seam is **live-verified end-to-end** against the pinned `pi` build (0.79.3, provider openai-codex, model gpt-5.5): the anti-fake real-worker e2e drove a real `pi` worker through `release_scope → spec_create` past step 1 under the review-only gate.
 
 ## Workflow model governance (control plane, v0.1.28)
 
@@ -282,9 +282,30 @@ ledger via a minimal API. `release_definition.py` declares per-`ReleaseStep`
 implementation/review loop tracks attempts (bounded retry default 2 → BLOCK) so `implement#2`
 consumes the `qa#1` rejection. See [[architecture]] §"Workflow-step handoff data plane".
 
-## Gating note (current behavior)
+## Gating note (review-only typed gate, v0.1.31)
 
-The runner applies a uniform APPROVED-verdict gate to every phase: non-review phases (implement/define) also require the worker to emit an APPROVED handoff. Phase-specific gating (implement needs evidence, not self-approval) is a deferred runner refinement.
+The typed gate is **review-only**. `agent_runner._blocked_result` branches on an `is_review`
+signal threaded into `AgentRunnerInput`: **review** steps gate on `verdict == APPROVED` +
+populated `artifact_refs` + in-scope `changed_paths` (unchanged contract); **create** steps gate
+on a schema-valid/structural payload + populated `artifact_refs` + in-scope paths, and the
+`verdict` field is **ignored** for them (a create step produces an artifact, it does not approve
+anything). The fix lands once in the runner so every caller benefits; `is_review` is threaded at
+all **seven** runner call sites — `release_definition`, `audit`, `bug_report`, `research`
+(`step.is_review`), `backlog_definition` (`backlog_author` create step → `False`), and `pipeline`
++ `phase_workflow`. Crucially `PipelineStep` gained an `is_review` field so the
+`review_qa`/`review_security`/`review_code` gates that protect the push boundary keep their
+`verdict == APPROVED` requirement (the C1 regression — they would otherwise default to `False` and
+silently lose it). Create-step gating is not made permissive: a no-op worker emits no payload →
+empty `artifact_refs` → it still BLOCKs. Every producing create step now bundles the single
+`shared.output_handoff` contract so a real worker is instructed to end with its schema'd payload.
+
+**Proven end-to-end on a real Layer-2 worker (v0.1.31).** The dadaia-workflows now run on a real
+Layer-2 worker past step 1: an env-gated **anti-fake** real-worker e2e
+(`DADAIA_E2E_REAL_WORKER=1`, skipped by default — CI/`pytest` stay fully faked + green) drives a
+real `pi` worker (gpt-5.5, on the operator's Codex subscription) through `release_scope →
+spec_create` and asserts concrete post-step-1 state (not blocked, no missing-verdict BlockedState,
+advanced beyond `release_scope`, parsed SUCCEEDED). The e2e is the law that a fake runtime can
+never again mask a worker-contract gap.
 
 ## Blocking and resume
 
@@ -298,12 +319,13 @@ Lifecycle hygiene status measures reports, handoffs, and tmp zones without delet
 
 Every single-step verb and the multi-step pipeline run the engine over a real
 `AgentRuntimePort`, but the engine does not yet autonomously drive a live end-to-end
-release. Deferred: live Claude SDK binding verification (the `_default_query_fn`
-`query()`/`can_use_tool` call is the one unverified piece — offline build) plus provider
-cache-control marker wiring; phase-specific gate refinement (dropping the uniform
-APPROVED-verdict requirement for non-review phases);
-**live pi/codex worker runs of the fragment-driven release-definition workflow** (the FAKE
-e2e proves the seam; live confirmation against real PI/Codex workers is deferred to real
-use — the upstream CLI contracts cannot be proven by mocked tests); and persisting explicit
-per-run tmp working-dir claims in `LifecycleRun` so the retention liveness provider keys on
-a registered workdir.
+release. As of v0.1.31 a real `pi` Layer-2 worker is **proven to advance a workflow past step 1**
+under the review-only gate (the anti-fake e2e), and the phase-specific gate refinement is **done**
+(the gate is review-only — see "Gating note" above). Deferred: live Claude SDK binding
+verification (the `_default_query_fn` `query()`/`can_use_tool` call is the one unverified piece —
+offline build) plus provider cache-control marker wiring; a **full all-steps** live release run
+(the minimal `release_scope → spec_create` chain is the proof, not the whole ladder); a live
+codex worker variant of the e2e (optional — `pi` is the validated case); fixing the prompt-side
+two-schema confusion the v0.1.31 extractor hardening tolerates (tracked as a follow-up bug); and
+persisting explicit per-run tmp working-dir claims in `LifecycleRun` so the retention liveness
+provider keys on a registered workdir.
