@@ -227,7 +227,7 @@
   - Write set: `dadaia_workspace/hooks/ctx_inject.py`.
   - Acceptance: A30.
 
-- [ ] **T-30-E-06** — Record OQ decisions (OQ-3/4/6/7).
+- [-] **T-30-E-06** — Record OQ decisions (OQ-3/4/6/7).
   - Goal: reflect OQ-3/OQ-4/OQ-7 in affected docs/fragments; record the OQ-6 deferral rationale.
   - Write set: affected `public/` fragments/docs (per OQ-3/4/7); OQ-6 rationale captured for
     CLOSURE.
