@@ -107,7 +107,7 @@
 
 ## Wave B — PI command re-verify + real `pi` smoke (adopt `c8513fa5`; D-3)
 
-- [ ] **T-31-B-01** — Re-verify the PI argv unit assertion.
+- [-] **T-31-B-01** — Re-verify the PI argv unit assertion.
   - Goal: confirm `_command` appends `["-p"]` with no trailing `-` and that
     `test_pi_adapter_builds_controlled_command_and_env` asserts `argv[-1] == "-p"` and
     `"-" not in argv` (lines ~105–106). Do NOT re-fix or weaken; this is a verification pass that
@@ -116,7 +116,7 @@
     re-added — otherwise no change, verification only).
   - Acceptance: A12.
 
-- [ ] **T-31-B-02** — Real `pi` smoke (env-gated, skipped by default).
+- [-] **T-31-B-02** — Real `pi` smoke (env-gated, skipped by default).
   - Goal: a smoke that runs the real `pi` binary through `PiHeadlessAdapter` and proves the
     command executes without "Unknown option: -", yielding a typed `AgentRunResult`. Mirror the
     `tests/integration/pi_live/` opt-in gate (`DADAIA_PI_LIVE`/`PI_BIN`/`ANTHROPIC_API_KEY`),
@@ -133,7 +133,7 @@
 
 ## Wave C — anti-fake real-worker e2e (CORE DELIVERABLE; D-4)
 
-- [ ] **T-31-C-01** — Anti-fake real-worker e2e: fixed minimal chain `release_scope` → `spec_create`.
+- [-] **T-31-C-01** — Anti-fake real-worker e2e: fixed minimal chain `release_scope` → `spec_create`.
   - Goal: an e2e that drives a **real** (non-fake) `pi` Layer-2 worker through the **fixed** chain
     `release_scope` → `spec_create` — the exact shipped-failure path (OQ-3, fixed by QA review; no
     alternative chain). Assert **concrete post-step-1 state, NOT "no exception" (R-C):** (a) the
