@@ -174,7 +174,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/pipeline.py`.
   - Acceptance: A24.
 
-- [ ] **T-30-D-07** — Retention + hygiene for step payloads.
+- [-] **T-30-D-07** — Retention + hygiene for step payloads.
   - Goal: protect live step artifacts (extended `live_claims`); reclaim `consumed_all` past
     consumed TTL; prune empty run dirs; hygiene state counters.
   - Write set: `dadaia_workspace/features/lifecycle/antislop/retention.py`;
