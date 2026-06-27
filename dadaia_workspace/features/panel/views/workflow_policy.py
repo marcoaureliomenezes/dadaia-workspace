@@ -407,6 +407,51 @@ def render_api_lifecycle_runs(
     return _view
 
 
+def render_api_workflow_step_ledger(
+    run_store: object,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """GET /api/workflow-step-ledger?run=<run_id>&context=<ctx> — the run-scoped
+    workflow-step handoff ledger (Slice B minimal API; the rich graph view is Slice C).
+
+    Reads each run's persisted ``workflow_steps`` ledger **verbatim** (control plane on
+    ``LifecycleRun``). Metadata only — payload refs/hashes/consumption edges, never the
+    payload bodies (those live in the run-scoped data plane on disk).
+    """
+
+    def _view(qs: dict[str, list[str]] | None = None, **_kwargs: object) -> tuple[int, str, bytes]:
+        params = qs or {}
+        run_filter = _first(params, "run")
+        context_filter = _first(params, "context")
+        runs = run_store.list_runs()  # type: ignore[attr-defined]
+        items: list[dict[str, object]] = []
+        for run in runs:
+            if context_filter is not None and run.context != context_filter:
+                continue
+            if run_filter is not None and run.run_id != run_filter:
+                continue
+            items.append(
+                {
+                    "run_id": run.run_id,
+                    "context": run.context,
+                    "release_id": run.release_id,
+                    "phase": run.phase.value,
+                    "status": run.status.value,
+                    "workflow_steps": run.workflow_steps.to_list(),
+                }
+            )
+        return _json_response(
+            200,
+            {
+                "generated_at": _now_iso(),
+                "run": run_filter,
+                "context": context_filter,
+                "runs": items,
+            },
+        )
+
+    return _view
+
+
 # ---------------------------------------------------------------------------
 # Mutation views (T-28-C-02)
 # ---------------------------------------------------------------------------
@@ -611,6 +656,7 @@ def _empty_overlay_dict(context: str) -> dict[str, object]:
 
 __all__ = [
     "render_api_lifecycle_runs",
+    "render_api_workflow_step_ledger",
     "render_api_workflow_catalog",
     "render_api_workflow_catalog_detail",
     "render_api_workflow_fragment",

@@ -15,6 +15,9 @@ if TYPE_CHECKING:
         WorkflowCatalog,
         WorkflowExecutionPolicyResolver,
     )
+    from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import (
+        WorkflowHandoffDoctor,
+    )
     from dadaia_workspace.features.lifecycle.workflow_handoffs import (
         WorkflowHandoffResolver,
     )
@@ -86,6 +89,7 @@ from dadaia_workspace.features.panel.views.workflow_policy import (
     render_api_workflow_fragment,
     render_api_workflow_model_policy,
     render_api_workflow_model_profiles,
+    render_api_workflow_step_ledger,
     render_post_workflow_model_policy_validate,
     render_put_workflow_model_policy,
 )
@@ -667,6 +671,28 @@ def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
     return JsonLifecycleRunStore(workspace_root)
 
 
+def build_workflow_handoff_doctor(
+    workspace_root: Path,
+    *,
+    now: dt.datetime | None = None,
+) -> "WorkflowHandoffDoctor":
+    """Compose the workflow-step handoff doctor (v0.1.30 Item 5 / T-30-D-08 / A26).
+
+    Read-only reconciliation of every run's ``workflow_steps`` ledger against the on-disk
+    payloads under ``.dadaia/runs/lifecycle/<run>/steps/``; reports orphan / malformed /
+    stale / undeclared / unconsumed-required incoherences. The clock is injectable for
+    hermetic tests.
+    """
+    from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import WorkflowHandoffDoctor
+
+    _guard_initialized(workspace_root)
+    return WorkflowHandoffDoctor(
+        workspace_root,
+        build_lifecycle_run_store(workspace_root),
+        now=now,
+    )
+
+
 def build_workflow_handoff_resolver(
     workspace_root: Path,
 ) -> "WorkflowHandoffResolver":
@@ -1196,6 +1222,7 @@ def build_panel_views(
             policy_store, _resolver_factory
         ),
         "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
+        "api_workflow_step_ledger": render_api_workflow_step_ledger(run_store),
         "api_sessions": render_api_sessions(service),
         "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),

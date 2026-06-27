@@ -232,6 +232,7 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     ),
     (r"^/api/workflow-model-policy$", "api_workflow_model_policy", AuthClass.BEARER),
     (r"^/api/lifecycle-runs$", "api_lifecycle_runs", AuthClass.BEARER),
+    (r"^/api/workflow-step-ledger$", "api_workflow_step_ledger", AuthClass.BEARER),
     # BEARER_TELEMETRY routes (require active telemetry service)
     (
         r"^/api/agents/(?P<agent_id>[^/]+)/sessions$",
@@ -301,6 +302,7 @@ _QS_AWARE_GET_ROUTES: frozenset[str] = frozenset(
         "api_workflow_catalog_detail",
         "api_workflow_model_policy",
         "api_lifecycle_runs",
+        "api_workflow_step_ledger",
     }
 )
 

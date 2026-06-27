@@ -31,6 +31,7 @@ from dadaia_workspace.features.panel.views.workflow_policy import (
     render_api_workflow_catalog_detail,
     render_api_workflow_model_policy,
     render_api_workflow_model_profiles,
+    render_api_workflow_step_ledger,
 )
 from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
@@ -350,6 +351,73 @@ def test_lifecycle_runs_filters_by_workflow_and_context(tmp_path: Path) -> None:
 
     assert status == 200
     assert [r["run_id"] for r in payload["runs"]] == ["run-a"]
+
+    status2, payload2 = _decode(view(qs={"context": ["other-ctx"]}))
+    assert status2 == 200
+    assert payload2["runs"] == []
+
+
+# --- workflow-step ledger API (T-30-D-08 / minimal run-ledger exposure) ------------
+
+
+def _run_with_ledger(run_id: str = "led-1") -> LifecycleRun:
+    from dadaia_workspace.core.models.workflow_handoff import (
+        WorkflowStepLedger,
+        WorkflowStepRecord,
+    )
+
+    record = WorkflowStepRecord(
+        run_id=run_id,
+        producer_step="release_scope",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload_ref=f".dadaia/runs/lifecycle/{run_id}/steps/release_scope-attempt-0.step-payload.json",
+        content_hash="a" * 64,
+        produced_at="2026-06-27T12:00:00Z",
+        declared_consumers=("spec_create",),
+    )
+    return LifecycleRun(
+        run_id=run_id,
+        context="dadaia-workspace",
+        release_id="v0.1.30",
+        command="release_definition",
+        phase=LifecyclePhase.RELEASE_DEFINITION,
+        status=LifecycleRunStatus.RUNNING,
+        current_step="release_scope",
+        workflow_steps=WorkflowStepLedger(records=(record,)),
+    )
+
+
+def test_workflow_step_ledger_returns_metadata_only(tmp_path: Path) -> None:
+    run_store = JsonLifecycleRunStore(_workspace(tmp_path))
+    run_store.save(_run_with_ledger("led-1"))
+    view = render_api_workflow_step_ledger(run_store)
+
+    status, payload = _decode(view(qs={}))
+
+    assert status == 200
+    assert len(payload["runs"]) == 1
+    steps = payload["runs"][0]["workflow_steps"]
+    assert len(steps) == 1
+    record = steps[0]
+    # Metadata only: addressable key, ref, hash, declared consumers — NO payload body.
+    assert record["producer_step"] == "release_scope"
+    assert record["payload_ref"].endswith(".step-payload.json")
+    assert record["content_hash"] == "a" * 64
+    assert "payload" not in record
+    # The serialised JSON carries no payload-body key anywhere.
+    assert '"payload"' not in json.dumps(payload)
+
+
+def test_workflow_step_ledger_filters_by_run_and_context(tmp_path: Path) -> None:
+    run_store = JsonLifecycleRunStore(_workspace(tmp_path))
+    run_store.save(_run_with_ledger("led-a"))
+    run_store.save(_run_with_ledger("led-b"))
+    view = render_api_workflow_step_ledger(run_store)
+
+    status, payload = _decode(view(qs={"run": ["led-a"]}))
+    assert status == 200
+    assert [r["run_id"] for r in payload["runs"]] == ["led-a"]
 
     status2, payload2 = _decode(view(qs={"context": ["other-ctx"]}))
     assert status2 == 200

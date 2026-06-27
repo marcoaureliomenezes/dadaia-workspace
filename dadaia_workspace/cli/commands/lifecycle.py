@@ -71,6 +71,7 @@ release_app = typer.Typer(help="Lifecycle release commands.", no_args_is_help=Tr
 workflow_app = typer.Typer(
     help="Read-only workflow model-governance inspection.", no_args_is_help=True
 )
+handoffs_app = typer.Typer(help="Workflow-step handoff ledger inspection.", no_args_is_help=True)
 
 
 class LifecycleExitCode(IntEnum):
@@ -1265,10 +1266,36 @@ def workflow_doctor(
         raise typer.Exit(LifecycleExitCode.INTERNAL_ERROR)
 
 
+@handoffs_app.command("doctor")
+def handoffs_doctor(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Reconcile the workflow-step handoff ledger against on-disk payloads (A26).
+
+    Fails (exit 3) on any orphan / malformed / stale / undeclared / unconsumed-required
+    workflow-step payload; exit 0 when the ledger and the data plane are coherent.
+    """
+    from dadaia_workspace import container
+
+    workspace_root = resolve_workspace_root()
+    report = container.build_workflow_handoff_doctor(workspace_root).run()
+    if json_output:
+        _emit_json({"status": "ok" if report.ok else "blocked", **report.to_dict()})
+    else:
+        if report.ok:
+            typer.echo("OK workflow-step handoff ledger coherent")
+        else:
+            for finding in report.findings:
+                typer.echo(f"[{finding.kind.value}] {finding.ref}: {finding.message}")
+    if not report.ok:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
 workflow_app.add_typer(workflow_policy_app, name="policy")
 workflow_app.add_typer(workflow_profiles_app, name="profiles")
 
 app.add_typer(hygiene_app, name="hygiene")
+app.add_typer(handoffs_app, name="handoffs")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(release_app, name="release")
 app.add_typer(review_app, name="review")
