@@ -128,6 +128,7 @@ def _effective_steps(
                 "step": cat_step.label,
                 "role": cat_step.role,
                 "harness": entry.harness,
+                "default_harness": cat_step.default_harness,
                 "default_profile": cat_step.default_profile,
                 "effective_profile": entry.model_profile,
                 "model": entry.model,
@@ -136,6 +137,9 @@ def _effective_steps(
                 "fragments": list(entry.fragments),
                 "output_schema": entry.output_schema,
                 "is_overridden": entry.model_profile != cat_step.default_profile,
+                # T-29-C-01: the effective harness differs from the catalog default — the
+                # panel renders a harness-overridden flag alongside the profile flag (D-3).
+                "harness_overridden": entry.harness != cat_step.default_harness,
             }
         )
     return rows
@@ -160,9 +164,11 @@ def _workflow_to_dict(
                 "step": s.label,
                 "role": s.role,
                 "harness": s.default_harness,
+                "default_harness": s.default_harness,
                 "default_profile": s.default_profile,
                 "effective_profile": s.default_profile,
                 "is_overridden": False,
+                "harness_overridden": False,
             }
             for s in (workflow.steps if workflow else ())
         ]

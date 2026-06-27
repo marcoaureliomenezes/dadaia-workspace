@@ -109,7 +109,7 @@ needs closure), `dadaia_workspace/container.py` (verify).
 
 ## Wave C — Panel toggle persistence + E2E (D-3 panel, D-5 proof)
 
-### [-] T-29-C-01 — Panel view: harness flag in catalog diff + harness-carrying overlay
+### [x] T-29-C-01 — Panel view: harness flag in catalog diff + harness-carrying overlay
 **Goal:** `_effective_steps` adds `harness_overridden` + `default_harness` per row; confirm
 PUT/validate accepts a harness-only overlay (resolvable via auto-profile).
 **Write set:** `dadaia_workspace/features/panel/views/workflow_policy.py`.

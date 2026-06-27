@@ -160,6 +160,40 @@ def test_put_then_get_round_trips_the_overlay(tmp_path: Path) -> None:
     assert implement["is_overridden"] is True
 
 
+def test_put_harness_only_overlay_round_trips_and_flags_catalog(tmp_path: Path) -> None:
+    """A harness-only PUT (no profile) returns 200, persists harness, and flags the diff (AC-6)."""
+    handler = make_handler_class(_views(tmp_path))
+    payload = json.dumps(
+        {
+            "schema_version": "workflow-model-policy-v1",
+            "policy_id": "default",
+            "contexts": {
+                "default": {
+                    "workflows": {"implementation": {"steps": {}, "harnesses": {"implement": "pi"}}}
+                }
+            },
+        }
+    ).encode("utf-8")
+
+    put_status, put_body = _put(handler, "/api/workflow-model-policy?context=default", payload)
+    assert put_status == 200 and put_body["saved"] is True
+
+    # GET round-trips the harness override.
+    get_status, get_body = _get(handler, "/api/workflow-model-policy?context=default")
+    assert get_status == 200 and get_body["exists"] is True
+    wf = get_body["policy"]["contexts"]["default"]["workflows"]["implementation"]
+    assert wf["harnesses"]["implement"] == "pi"
+
+    # The catalog diff reflects the harness change: effective harness pi + auto-profile + flag.
+    _cs, cat = _get(handler, "/api/workflow-catalog?context=default")
+    impl = next(w for w in cat["workflows"] if w["workflow_id"] == "implementation")
+    implement = next(s for s in impl["steps"] if s["step"] == "implement")
+    assert implement["harness"] == "pi"
+    assert implement["default_harness"] == "codex"
+    assert implement["harness_overridden"] is True
+    assert implement["effective_profile"] == "pi-implementation-standard"
+
+
 def test_validate_route_rejects_invalid_without_writing(tmp_path: Path) -> None:
     handler = make_handler_class(_views(tmp_path))
     bad = json.dumps(

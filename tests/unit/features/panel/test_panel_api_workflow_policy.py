@@ -116,6 +116,75 @@ def test_catalog_reflects_overlay_override_as_effective(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# GET /api/workflow-catalog — harness dimension (T-29-C-01)
+# ---------------------------------------------------------------------------
+
+
+def test_catalog_row_carries_default_harness_and_unflagged_when_codex(tmp_path: Path) -> None:
+    """With no overlay, every row carries the catalog default harness and no harness flag."""
+    store = _store(tmp_path)
+    catalog = governed_workflow_catalog()
+    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
+
+    _status, payload = _decode(view(qs={}))
+
+    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
+    step = impl["steps"][0]
+    assert step["default_harness"] == "codex"
+    assert step["harness"] == "codex"
+    assert step["harness_overridden"] is False
+
+
+def test_catalog_row_flags_harness_override_from_overlay(tmp_path: Path) -> None:
+    """An overlay step ``harness: pi`` makes the row resolve pi + sets the harness flag."""
+    store = _store(tmp_path)
+    store.save(
+        WorkflowModelPolicyOverlay(
+            policy_id="default",
+            contexts={"default": {"implementation": {}}},
+            step_harness_overlay={"default": {"implementation": {"implement": "pi"}}},
+        )
+    )
+    catalog = governed_workflow_catalog()
+    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
+
+    _status, payload = _decode(view(qs={}))
+
+    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
+    implement = next(s for s in impl["steps"] if s["step"] == "implement")
+    # The catalog default harness stays codex; the effective harness is pi + flagged.
+    assert implement["default_harness"] == "codex"
+    assert implement["harness"] == "pi"
+    assert implement["harness_overridden"] is True
+    # Auto-profile-on-harness-override: the PI default profile is selected, also flagged.
+    assert implement["effective_profile"] == "pi-implementation-standard"
+    assert implement["is_overridden"] is True
+
+
+def test_catalog_error_fallback_row_carries_harness_fields(tmp_path: Path) -> None:
+    """A broken overlay still surfaces default_harness + harness_overridden=False per row."""
+    store = _store(tmp_path)
+    # An overlay naming an unknown step makes resolve() raise → the per-workflow error path.
+    store.save(
+        WorkflowModelPolicyOverlay(
+            policy_id="default",
+            contexts={"default": {"implementation": {"no_such_step": "codex-review-deep"}}},
+        )
+    )
+    catalog = governed_workflow_catalog()
+    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
+
+    _status, payload = _decode(view(qs={}))
+
+    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
+    assert "error" in impl
+    step = impl["steps"][0]
+    assert step["default_harness"] == "codex"
+    assert step["harness"] == "codex"
+    assert step["harness_overridden"] is False
+
+
+# ---------------------------------------------------------------------------
 # GET /api/workflow-catalog/<id>
 # ---------------------------------------------------------------------------
 
