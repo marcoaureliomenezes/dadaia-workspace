@@ -123,7 +123,7 @@ checkpoint.
 **Acceptance:** AC-6 (panel E2E: toggle → PUT → GET round-trips harness; catalog diff
 reflects it).
 
-### [ ] T-29-C-03 — E2E: CLI `--harness pi` proof via FakeAgentRuntime
+### [-] T-29-C-03 — E2E: CLI `--harness pi` proof via FakeAgentRuntime
 **Goal:** an `implementation` pipeline run with `--harness pi` against `FakeAgentRuntime`
 asserts every `received_models[i].harness == "pi"`, `.model` is a PI catalog model, and
 the persisted run snapshot records `harness=pi` per step.
