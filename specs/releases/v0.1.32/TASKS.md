@@ -160,7 +160,7 @@
 
 ## Wave C — prove the REVIEW path live (CORE DELIVERABLE; D-6)
 
-- [ ] **T-32-C-01** — Extend the real-worker e2e chain to include a real review step.
+- [-] **T-32-C-01** — Extend the real-worker e2e chain to include a real review step.
   - Goal (OQ-2, PLAN-selected): extend `_truncated_sequence()` in the v0.1.31 e2e module to
     `release_scope` → `spec_create` → `spec_arch_review` (the first real `is_review=True` step,
     sliced verbatim from `_SEQUENCE`; + the terminal `definition_commit_gate` if needed for clean
@@ -170,7 +170,7 @@
   - Acceptance: A13, A16 (chain includes ≥1 review step; env-gated; SKIPPED by default; run
     command documented).
 
-- [ ] **T-32-C-02** — Live: real `pi` review step emits APPROVED and the gate PASSES.
+- [-] **T-32-C-02** — Live: real `pi` review step emits APPROVED and the gate PASSES.
   - Goal: add `test_real_pi_worker_review_step_emits_approved_and_gate_passes` — env-gated (reuse
     `requires_real_worker`), with the flag set asserts CONCRETE state (A14): (a) `spec_arch_review`
     ran; (b) it yielded a parsed `SUCCEEDED` result carrying `verdict == APPROVED` from the real
@@ -180,7 +180,7 @@
   - Write set: `tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py`.
   - Acceptance: A14 (live, concrete state — verdict gate fired on real worker output and PASSED).
 
-- [ ] **T-32-C-03** — REJECTED-blocks negative (faked gate path, default-CI green).
+- [-] **T-32-C-03** — REJECTED-blocks negative (faked gate path, default-CI green).
   - Goal (OQ-2): prove a review step with `verdict == REJECTED` (and a missing-verdict variant)
     BLOCKs the run, using the faked gate path so no second live credit-burning run is needed and
     default CI stays green. Add/point an explicit assertion in a faked review-gate test (extend
