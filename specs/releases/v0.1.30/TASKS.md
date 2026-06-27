@@ -221,7 +221,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/workflows/_deferred.py`.
   - Acceptance: A28.
 
-- [-] **T-30-E-05** — WS-C ctx-inject dehydration.
+- [x] **T-30-E-05** — WS-C ctx-inject dehydration.
   - Goal: reduce broad session-memory injection; lifecycle prompts get context from the
     dynamic selector; keep bind/session safety + lean generic preflight; chokepoints unchanged.
   - Write set: `dadaia_workspace/hooks/ctx_inject.py`.
