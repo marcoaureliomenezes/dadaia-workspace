@@ -145,7 +145,7 @@ the persisted run snapshot records `harness=pi` per step.
 
 ## Wave D — Doctor + final checkpoint (D-doctor, AC-8, AC-11)
 
-### [ ] T-29-D-01 — Doctor: validate the harness dimension
+### [-] T-29-D-01 — Doctor: validate the harness dimension
 **Goal:** `policy_doctor` flags an overlay harness referencing an unsupported harness on a
 step (WMP-PROFILE/WMP-OVERLAY) and a forbidden Layer-2 harness (WMP-LAYER2-RESIDUE);
 confirm WMP-1..WMP-7 pass over the completed catalog (closure added).
