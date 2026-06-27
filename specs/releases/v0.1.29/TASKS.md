@@ -75,7 +75,7 @@ still completes.
 
 ## Wave B — Catalog completion to 7 workflows (D-4)
 
-### [ ] T-29-B-01 — Catalog: add closure as its real single worker step
+### [-] T-29-B-01 — Catalog: add closure as its real single worker step
 **Goal:** `_closure_steps()` returns the real `close` worker step (role product-engineer,
 generic/no-fragment) + a `closure_removal_gate` Python gate step; register `closure` in
 `_all_workflows()` (availability PARTIAL), purpose, display name; `_governed_step` projects
