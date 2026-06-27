@@ -100,7 +100,7 @@ factory/container sees the closure step; no second catalog source introduced.
 needs closure), `dadaia_workspace/container.py` (verify).
 **Acceptance:** AC-7 (`policy show closure` prints the `close` step).
 
-### [-] T-29-B-04 — Wave B green checkpoint
+### [x] T-29-B-04 — Wave B green checkpoint
 **Goal:** full suite green; catalog-completion tests passing.
 **Write set:** (none — fixes only if red.)
 **Acceptance:** AC-7 satisfied; `ruff/mypy/pytest` green.
