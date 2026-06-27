@@ -21,7 +21,7 @@ auto-select a profile per effective harness.
 **Acceptance:** `_governed_step` sets `default_profiles` from the DTO; back-compat default
 `{}`; existing tests still green. (AC-2 groundwork.)
 
-### [ ] T-29-A-02 — Resolver: effective-harness precedence
+### [x] T-29-A-02 — Resolver: effective-harness precedence
 **Goal:** `resolve()` accepts a default-harness override + a `{step -> harness}` map and an
 overlay harness; `_resolve_harness` computes the effective harness with precedence
 `CLI step > CLI default > overlay step > overlay default_harness > catalog default`.
