@@ -57,7 +57,7 @@ and sets `PipelineStep.runtime_kind`; unmappable harness raises actionable error
 **Write set:** `dadaia_workspace/features/lifecycle/pipeline.py`.
 **Acceptance:** AC-3 (runtime_kind == kind of resolved harness for every step).
 
-### [ ] T-29-A-07 — CLI pipeline verb threads harness into resolve; removes post-resolve swap
+### [-] T-29-A-07 — CLI pipeline verb threads harness into resolve; removes post-resolve swap
 **Goal:** `pipeline` passes `--harness`/`--step-harness` into `resolver.resolve(...)`;
 removes the separate `replace(step, runtime_kind=...)` swap; `--harness fake` still runs
 the fake adapter while the snapshot resolves the governed harness; `--show-policy` reflects
