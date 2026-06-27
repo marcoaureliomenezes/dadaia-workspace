@@ -1,6 +1,6 @@
 ---
 name: overlay-todict-drops-harness-only-workflow
-status: Resolved
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 resolved: 2026-06-27
