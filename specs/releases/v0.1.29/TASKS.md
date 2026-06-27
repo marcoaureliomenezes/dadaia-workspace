@@ -136,7 +136,7 @@ the persisted run snapshot records `harness=pi` per step.
 **Write set:** same/adjacent test module.
 **Acceptance:** AC-5 passes.
 
-### [ ] T-29-C-05 — Wave C green checkpoint
+### [-] T-29-C-05 — Wave C green checkpoint
 **Goal:** full suite + panel E2E green.
 **Write set:** (none — fixes only if red.)
 **Acceptance:** AC-4/AC-5/AC-6 satisfied; `ruff/mypy/pytest` green.
