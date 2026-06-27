@@ -40,14 +40,20 @@ from dadaia_workspace.core.models.lifecycle import (
 )
 from dadaia_workspace.core.scope_match import is_in_scope
 
+# Reuse ONLY the transport-neutral parts of the shared headless-adapter base:
+# secret redaction (CWE-209 parity) and the git seam type (changed_paths parity).
+# The Claude SDK adapter is NOT subprocess-backed, so it deliberately does not
+# inherit ``SubprocessAdapterMixin`` (no Runner / env-allowlist / prompt envelope).
+from dadaia_workspace.infrastructure.headless_adapter_base import (  # noqa: F401 (git seam re-export for parity)
+    RedactionMixin,
+    _GitDiffPort,
+)
+
 #: ``path -> may the worker write it?`` — the Ring-1 pre-disk decision.
 WritePermission = Callable[[str], bool]
 
 #: Tool-input keys that carry a write target for Write/Edit-family tools.
 _WRITE_PATH_KEYS = ("file_path", "path", "notebook_path")
-
-#: Env-var name fragments whose values must never appear in surfaced output.
-_SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
 
 @dataclass(frozen=True)
@@ -72,8 +78,14 @@ _MISSING_SDK = (
 )
 
 
-class ClaudeSdkAdapter:
-    """``AgentRuntimePort`` backed by the Claude Agent SDK (optional runtime extra)."""
+class ClaudeSdkAdapter(RedactionMixin):
+    """``AgentRuntimePort`` backed by the Claude Agent SDK (optional runtime extra).
+
+    Reuses the shared ``RedactionMixin`` (secret scrub of surfaced output) from the
+    headless-adapter base for single-source CWE-209 parity with the CLI adapters,
+    without inheriting any subprocess machinery (this adapter is SDK-backed, not a
+    subprocess CLI).
+    """
 
     def __init__(
         self,
@@ -98,16 +110,6 @@ class ClaudeSdkAdapter:
             return is_in_scope(path, allowed=allowed, forbidden=forbidden)
 
         return _decide
-
-    def _redact(self, text: str) -> str:
-        """Scrub any secret-named env value from surfaced output (adapter parity)."""
-        redacted = text
-        for key, value in self._environ.items():
-            if not value:
-                continue
-            if any(part in key.upper() for part in _SECRET_NAME_PARTS):
-                redacted = redacted.replace(value, "[REDACTED]")
-        return redacted
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         if request.runtime is not AgentRuntimeKind.CLAUDE_SDK:
