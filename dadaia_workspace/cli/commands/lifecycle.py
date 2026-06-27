@@ -1056,6 +1056,7 @@ def pipeline(
     )
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         PolicyResolutionError,
+        StepHarnessOverride,
         StepOverride,
     )
 
@@ -1063,12 +1064,30 @@ def pipeline(
     default_kind = _resolve_harness(harness)
     _ = model  # legacy discrete --model is superseded by profile-id --step-model (D-3).
 
-    overrides: dict[str, AgentRuntimeKind] = {}
+    # Parse --step-harness into label→(kind, name). The kind drives the base ladder's
+    # dry-run sentinel (fake vs real); the name is threaded into the governed resolver.
+    step_harness_kinds: dict[str, AgentRuntimeKind] = {}
+    step_harness_names: dict[str, str] = {}
     for item in step_harness or []:
         label, sep, kind_str = item.partition("=")
         if not sep:
             raise typer.BadParameter(f"--step-harness expects 'label=harness', got {item!r}")
-        overrides[label.strip()] = _resolve_harness(kind_str.strip())
+        clean_label = label.strip()
+        clean_name = kind_str.strip().lower()
+        step_harness_kinds[clean_label] = _resolve_harness(clean_name)
+        step_harness_names[clean_label] = clean_name
+
+    # D-1 (T-29-A-07): thread harness inputs INTO the shared resolver so the governed
+    # snapshot — not just the execution adapter — reflects the chosen harness. ``fake`` is
+    # the dry-run sentinel: it is never a *resolved* governed harness, so it is NOT threaded
+    # into resolve (the base ladder built on FAKE is preserved by apply_resolved_policy).
+    default_harness_name = harness.lower()
+    resolve_default_harness = None if default_harness_name == "fake" else default_harness_name
+    typed_step_harness: tuple[StepHarnessOverride, ...] = tuple(
+        StepHarnessOverride(step=label, harness=name)
+        for label, name in step_harness_names.items()
+        if name != "fake"
+    )
 
     # D-3: --step-model takes profile ids only; the shared resolver applies precedence and
     # validates each override against the catalog (step id + profile id + harness match).
@@ -1079,7 +1098,11 @@ def pipeline(
     resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
     try:
         snapshot = resolver.resolve(
-            "implementation", context="default", cli_overrides=typed_overrides
+            "implementation",
+            context="default",
+            cli_overrides=typed_overrides,
+            default_harness=resolve_default_harness,
+            step_harness_overrides=typed_step_harness,
         )
     except PolicyResolutionError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -1088,8 +1111,13 @@ def pipeline(
         _emit_json(_policy_snapshot_payload(snapshot)) if json_output else _print_policy(snapshot)
         return
 
+    # D-2: apply_resolved_policy is the SINGLE author of runtime_kind — it sets each step's
+    # kind from the resolved harness, preserving FAKE for a fake dry-run. The base ladder
+    # carries only the fake-vs-real selection (so `--harness fake` drives the fake adapter
+    # while the snapshot still records the governed harness); there is no separate
+    # post-resolve runtime_kind swap.
     base = tuple(
-        replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+        replace(step, runtime_kind=step_harness_kinds.get(step.label, default_kind))
         for step in implementation_ladder(default_kind)
     )
     steps = apply_resolved_policy(base, snapshot)

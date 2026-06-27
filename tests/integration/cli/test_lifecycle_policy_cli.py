@@ -174,6 +174,79 @@ def test_pipeline_show_policy_json(tmp_path: Path, monkeypatch) -> None:  # type
     assert steps["implement"]["source"] == "cli"
 
 
+def test_pipeline_harness_pi_show_policy_resolves_pi(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # v0.1.29 / T-29-A-07 — --harness pi threads into the governed resolver: every step's
+    # snapshot resolves harness=pi with the PI default profile auto-selected.
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "v0.1.29",
+            "--harness",
+            "pi",
+            "--show-policy",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    steps = {s["step"]: s for s in payload["steps"]}
+    assert steps["implement"]["harness"] == "pi"
+    assert steps["implement"]["model_profile"] == "pi-implementation-standard"
+    assert steps["review_qa"]["harness"] == "pi"
+    assert steps["review_qa"]["model_profile"] == "pi-reasoning-high"
+
+
+def test_pipeline_harness_pi_with_codex_step_model_rejected(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # --harness pi + a codex --step-model is a clean rejection (effective-harness conflict).
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "v0.1.29",
+            "--harness",
+            "pi",
+            "--step-model",
+            "implement=codex-implementation-standard",
+            "--show-policy",
+        ],
+    )
+    assert result.exit_code != 0
+    text = _norm(result.output).lower()
+    assert "harness" in text
+    assert "pi" in text
+
+
+def test_pipeline_step_harness_pi_only_that_step(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    workspace = _init_states(tmp_path)
+    monkeypatch.chdir(workspace)
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "v0.1.29",
+            "--step-harness",
+            "implement=pi",
+            "--show-policy",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    steps = {s["step"]: s for s in json.loads(result.output)["steps"]}
+    assert steps["implement"]["harness"] == "pi"
+    assert steps["review_qa"]["harness"] == "codex"
+
+
 def test_pipeline_step_model_rejects_raw_model_string(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     workspace = _init_states(tmp_path)
     monkeypatch.chdir(workspace)
