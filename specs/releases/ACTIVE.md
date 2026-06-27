@@ -1,6 +1,6 @@
 ---
 release: v0.1.29
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.29 — Harness as a governed dimension + catalog completion
