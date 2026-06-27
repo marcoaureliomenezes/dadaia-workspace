@@ -54,7 +54,7 @@
     `dadaia_workspace/public/data/AGENTS.md` (if a reachable surface is needed).
   - Acceptance: A6.
 
-- [ ] **T-30-B-02** — WS-CDX-HYGIENE: trust-boundary INFO + keep/drop + inert keys.
+- [-] **T-30-B-02** — WS-CDX-HYGIENE: trust-boundary INFO + keep/drop + inert keys.
   - Goal: doctor INFO line on interactive-vs-headless; resolve `.codex/workflows/` keep-or-drop
     (remove inert reference); drop inert config keys; onboarding note.
   - Write set: `dadaia_workspace/infrastructure/codex_doctor.py`;
