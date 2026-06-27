@@ -1,6 +1,6 @@
 ---
 release: v0.1.31
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.31 — make the dadaia-workflows actually run on a real Layer-2 worker

@@ -1,11 +1,24 @@
 ---
 name: subagent-handoff-resolves-dadaia-inside-repo-cwd
 status: Open
-severity: LOW
+severity: MEDIUM
 reported: 2026-06-24
 surface: handoff emission / .dadaia root resolution when cwd is inside a repo
 session_id: null
 ---
+
+> **Recurrence + escalation (2026-06-27, v0.1.31 implementation).** Hit again: two
+> `product-engineer` handoffs landed in `repos/dadaia-workspace/.dadaia/handoff/...`. This
+> time the repo-internal `.dadaia/` actively **broke a test** — `resolve_mypy_cache_dir`
+> walked up, found the stray in-repo `.dadaia/`, mistook the repo for the workspace root, and
+> resolved the mypy cache to `repos/dadaia-workspace/.dadaia/tmp/ci-preflight/mypy-cache`
+> (inside the repo), failing
+> `tests/unit/features/ci_preflight/test_no_pollution.py::test_mypy_cache_dir_redirected_outside_repo`.
+> So this is no longer a cosmetic stray dir: it corrupts cache-dir resolution and fails the
+> repo-hygiene gate. Severity raised LOW → MEDIUM. Fix direction: subagents must resolve the
+> handoff/`.dadaia` root by walking UP to the true workspace root (the dir whose parent is not
+> itself a repo / that holds the canonical `.dadaia`), never cwd-relative; and
+> `resolve_mypy_cache_dir` should ignore a repo-internal `.dadaia/` when locating the workspace.
 
 **Symptom:** A subagent (qa-engineer) dispatched to operate inside
 `repos/dadaia-workspace/` emitted its handoff to
