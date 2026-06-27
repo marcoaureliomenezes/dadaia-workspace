@@ -488,6 +488,71 @@ def check_memory_phase_single_source(public_dir: Path) -> list[str]:
     return out
 
 
+# By-name rule citation in a Codex-projected artifact, e.g. "`workspace-protocol` rule".
+# The corpus is reachable iff each cited name resolves to .claude/rules/<name>.md on disk
+# (the single source-of-truth law surface, identical across harnesses — WS-CDX-PROTOCOL).
+_CODEX_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
+
+
+def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[str]:
+    """WS-CDX-PROTOCOL (A6): every by-name rule cited by a Codex artifact is reachable.
+
+    A Codex session reaches the load-bearing rule-law corpus through the on-disk
+    surface ``.claude/rules/<rule-name>.md`` (documented in the projected root
+    ``AGENTS.md`` "Rule-Law Corpus" section). This check proves the contract: for
+    every ``\\`<name>\\` rule`` citation in any ``.codex/agents/*.toml`` artifact, the
+    file ``.claude/rules/<name>.md`` must exist. A missing file means a Codex artifact
+    cites a law surface Codex cannot reach.
+
+    Returns ``[ok] codex:rule-corpus-reachable`` when every citation resolves, or one
+    ``[error]`` line per unreachable citation.
+    """
+    codex_agents = workspace_root / ".codex" / "agents"
+    rules_dir = workspace_root / ".claude" / "rules"
+    out: list[str] = []
+    if not codex_agents.exists():
+        return out
+
+    unreachable: set[str] = set()
+    cited_any = False
+    for toml_file in sorted(codex_agents.glob("*.toml")):
+        try:
+            text = toml_file.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for match in _CODEX_RULE_CITATION_RE.finditer(text):
+            name = match.group(1)
+            cited_any = True
+            if not (rules_dir / f"{name}.md").is_file():
+                unreachable.add(name)
+
+    if unreachable:
+        for name in sorted(unreachable):
+            out.append(
+                f"[error] codex:rule-corpus: by-name rule '{name}' cited in a Codex "
+                f"artifact has no reachable surface .claude/rules/{name}.md "
+                "(WS-CDX-PROTOCOL)"
+            )
+    elif cited_any:
+        out.append("[ok] codex:rule-corpus-reachable (WS-CDX-PROTOCOL)")
+    return out
+
+
+def codex_trust_boundary_info() -> list[str]:
+    """WS-CDX-HYGIENE (A7): surface the Codex interactive-vs-headless trust boundary.
+
+    Codex governance hooks fire and block only in **interactive** sessions; under
+    headless ``codex exec`` they never fire, so the headless posture is protected by
+    the git chokepoints (pre-commit lease gate + pre-push security-verdict gate) only.
+    This INFO line states that boundary honestly in ``dadaia public doctor`` output.
+    """
+    return [
+        "[info] codex:trust-boundary — Codex interactive hooks fire and block; "
+        "`codex exec` headless does not (headless is protected by the git "
+        "chokepoints only). (WS-CDX-HYGIENE)"
+    ]
+
+
 def classify_workflows(agentic_dir: Path) -> list[str]:
     """Classify workflows by parallel_group usage for doctor output."""
     out: list[str] = []

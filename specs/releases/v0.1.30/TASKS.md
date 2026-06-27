@@ -47,7 +47,7 @@
 
 ## Wave B — codex-runtime-fidelity (Item 2) + PI WS-PI-6 (Item 3)
 
-- [-] **T-30-B-01** — WS-CDX-PROTOCOL: rule-law corpus reachable from Codex.
+- [x] **T-30-B-01** — WS-CDX-PROTOCOL: rule-law corpus reachable from Codex.
   - Goal: on-disk path transform + read instruction in `transform_for_codex` (or rewrite
     by-name citations to a reachable surface).
   - Write set: `dadaia_workspace/infrastructure/runtime_transforms/codex.py`;

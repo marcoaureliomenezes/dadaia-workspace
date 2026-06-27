@@ -16,8 +16,10 @@ from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
+    check_codex_rule_corpus_reachable,
     check_memory_phase_single_source,
     classify_workflows,
+    codex_trust_boundary_info,
     dcx1_missing_toml,
     dcx2_config_toml_entries,
     dcx3_workflow_drift,
@@ -393,6 +395,8 @@ class FileSystemPublicAssetManager:
 
         reports.extend(classify_workflows(agentic_dir))
         reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
+        reports.extend(check_codex_rule_corpus_reachable(workspace_root))
+        reports.extend(codex_trust_boundary_info())
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(self._check_public_privacy())
