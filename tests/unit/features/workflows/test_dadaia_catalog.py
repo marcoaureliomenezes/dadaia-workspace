@@ -232,3 +232,52 @@ def test_resolver_resolves_closure_policy() -> None:
     for entry in snapshot.steps:
         profile = model_profiles.resolve(entry.model_profile)
         assert entry.harness == profile.harness
+
+
+# ---------------------------------------------------------------------------
+# Wave B (T-29-B-02): all 7 workflows enumerated; deferred ones are honest stubs
+# ---------------------------------------------------------------------------
+
+_DEFERRED = ("audit", "research", "bug_report")
+
+
+def test_catalog_enumerates_all_seven_workflows() -> None:
+    """AC-7: every dadaia-workflow is enumerable in the catalog with availability."""
+    names = {w.name for w in list_dadaia_workflows()}
+    assert names == {
+        "release_definition",
+        "implementation",
+        "backlog_definition",
+        "closure",
+        "audit",
+        "research",
+        "bug_report",
+    }
+
+
+@pytest.mark.parametrize("name", _DEFERRED)
+def test_deferred_workflow_enumerated_with_zero_governed_steps(name: str) -> None:
+    workflow = get_dadaia_workflow(name)
+    assert workflow is not None
+    assert workflow.availability == dadaia_catalog.AVAILABILITY_DEFERRED
+    assert workflow.steps == []
+    assert workflow.step_count == 0
+
+
+@pytest.mark.parametrize("name", _DEFERRED)
+def test_governed_catalog_omits_deferred_workflow_from_resolver_seam(name: str) -> None:
+    catalog = governed_workflow_catalog()
+    assert catalog.workflow(name) is None
+
+
+@pytest.mark.parametrize("name", _DEFERRED)
+def test_resolve_deferred_workflow_raises_actionable_error(name: str) -> None:
+    """A deferred workflow has no governed steps — resolve raises, never silent no-op."""
+    from dadaia_workspace.features.lifecycle.policy_resolver import PolicyResolutionError
+
+    resolver = WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog())
+    with pytest.raises(PolicyResolutionError) as exc:
+        resolver.resolve(name)
+    # The message names the unknown workflow and lists the governed ones (actionable).
+    assert name in str(exc.value)
+    assert "governed workflows" in str(exc.value)

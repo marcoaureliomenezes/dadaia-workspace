@@ -84,7 +84,7 @@ the `close` step onto the resolver seam; `_assert_catalog_defaults_resolve` cove
 **Acceptance:** `governed_workflow_catalog()` includes `closure` with a `close` step;
 `resolve("closure")` resolves a policy for `close`; WMP-5 does not flag the generic step.
 
-### [-] T-29-B-02 — Catalog: confirm audit/research/bug_report enumerated as deferred
+### [x] T-29-B-02 — Catalog: confirm audit/research/bug_report enumerated as deferred
 **Goal:** verify the 3 deferred workflows appear in `list_dadaia_workflows()` with
 `availability=deferred` and zero governed steps; assert `governed_workflow_catalog()`
 omits them from the resolver seam and `resolve(<deferred>)` raises the actionable
