@@ -1,6 +1,6 @@
 ---
 release: v0.1.30
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.30 — super release: PI/Codex Layer-2 + workflow system maturation
@@ -8,12 +8,16 @@ phase: DEFINITION
 Operator `/goal` 2026-06-27: a super release taking 6 correlated open backlog items
 (new architecture / PI / Codex / 2nd agentic layer / workflows).
 
-**Phase:** DEFINITION — **COMPLETE, awaiting operator go-ahead before IMPLEMENTATION** (D-4
-define-only). SPEC/PLAN/TASKS Aprovado (30 tasks, waves A→E); `specs doctor` 0 errors.
-DEFINITION review APPROVED: software-architect (0 crit/high; 5 MEDIUM impl-time advisories)
-+ qa-engineer (0 crit; 1 HIGH = WS-PI-6 real-shape fixture obligation, verified
-`~/.pi/agent/sessions/<dir-slug>/*.jsonl` exists). Review handoffs under
-`.dadaia/handoff/dadaia-workspace/`.
+**Phase:** IMPLEMENTATION — operator `/goal` 2026-06-27 authorized "implement, test and review
+in sequence waves A, B, C, D and E" (D-4 define-only checkpoint released). SPEC/PLAN/TASKS
+Aprovado (30 tasks, waves A→E); `specs doctor` 0 errors. DEFINITION review APPROVED:
+software-architect (0 crit/high; 5 MEDIUM impl-time advisories) + qa-engineer (0 crit; 1 HIGH
+= WS-PI-6 real-shape fixture obligation, verified `~/.pi/agent/sessions/<dir-slug>/*.jsonl`
+exists). Review handoffs under `.dadaia/handoff/dadaia-workspace/`.
+
+**Cadence:** one software-engineer per wave (sequential — snapshot-guard forbids repo-writes
+concurrent with pytest), each wave green-checkpointed (ruff/mypy/pytest/import-linter) then
+reviewed (qa-engineer + code-reviewer) before the next wave starts.
 
 Binding impl-time obligations (carry into the waves when implementation is authorized):
 - Wave A: characterization baseline of all 3 adapter suites green BEFORE refactor; redaction
