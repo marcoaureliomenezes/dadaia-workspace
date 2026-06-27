@@ -167,7 +167,12 @@ def test_emitted_prompt_carries_fragment_not_generic(tmp_path: Path) -> None:
     assert intake.prompt_text is not None
     assert "backlog_definition.intake_grill" in intake.prompt_text
     assert "Run the intake_grill step" not in intake.prompt_text
-    assert "backlog-demand-v1" in intake.prompt_text
+    # Coherent worker-output contract (v0.1.32 / D-1): the single transport schema is the
+    # worker emit target via `schema`; the fragment's domain schema is NOT surfaced as a
+    # competing schema-to-emit in the "## Required output" section.
+    required = intake.prompt_text[intake.prompt_text.index("## Required output") :]
+    assert "agent-run-result-v1" in required
+    assert "backlog-demand-v1" not in required
 
 
 # ---------------------------------------------------------------------------

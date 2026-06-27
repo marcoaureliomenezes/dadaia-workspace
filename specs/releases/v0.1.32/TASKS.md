@@ -14,7 +14,7 @@
 
 ## Wave A — coherent worker-output contract (KEYSTONE; D-1/D-2/D-3)
 
-- [ ] **T-32-A-01** — Failing suffix-contract tests (TDD, before the prompt change).
+- [x] **T-32-A-01** — Failing suffix-contract tests (TDD, before the prompt change).
   - Goal: write the tests that pin the coherent contract: (a) a **review**-step
     `build_fragment_suffix` (`is_review=True`) instructs `structured_output.verdict` =
     APPROVED/REJECTED + evidence; a **create**-step (`is_review=False`) does NOT instruct a
@@ -28,7 +28,7 @@
   - Acceptance: A1, A2, A4b (tests authored and red against current
     `build_fragment_suffix` / `_generic_prompt`).
 
-- [ ] **T-32-A-02** — Make `build_fragment_suffix` `is_review`-aware + one-schema/canonical text.
+- [x] **T-32-A-02** — Make `build_fragment_suffix` `is_review`-aware + one-schema/canonical text.
   - Goal: add a **keyword-only, NO-default** `is_review: bool` parameter to
     `build_fragment_suffix` (signature `build_fragment_suffix(bundle, *, selected_context,
     is_review)` — DEFINITION-review C2; no default so a forgotten flag is a call/type error, never
@@ -42,7 +42,7 @@
   - Write set: `dadaia_workspace/features/lifecycle/prompt_builder.py`.
   - Acceptance: A1, A2, A5 (default unchanged) — T-32-A-01 (a)/(b) now green.
 
-- [ ] **T-32-A-03** — Failing threading test (TDD, before threading the call sites).
+- [x] **T-32-A-03** — Failing threading test (TDD, before threading the call sites).
   - Goal (C2): a test that **ENUMERATES the `build_fragment_suffix` callers** and asserts each
     passes the correct `is_review`: the four release-style workflows (`release_definition`,
     `audit`, `bug_report`, `research`) and `pipeline` thread `step.is_review`;
@@ -54,7 +54,7 @@
   - Write set: `tests/unit/features/lifecycle/test_suffix_is_review_threading.py` (NEW).
   - Acceptance: A4 (enumerating test authored and red).
 
-- [ ] **T-32-A-04** — Thread `is_review` at the six `build_fragment_suffix` call sites.
+- [x] **T-32-A-04** — Thread `is_review` at the six `build_fragment_suffix` call sites.
   - Goal: pass the correct `is_review` into `build_fragment_suffix`:
     `release_definition.py` (~320) `is_review=step.is_review`; `audit.py` (~267)
     `is_review=step.is_review`; `bug_report.py` (~262) `is_review=step.is_review`;
@@ -75,7 +75,7 @@
   - Acceptance: A4 (six callers threaded — T-32-A-03 green), A4b (`_generic_prompt` step-kind-aware
     — T-32-A-01 (c) green).
 
-- [ ] **T-32-A-05** — Canonical field `schema` in the shared fragment (D-3).
+- [x] **T-32-A-05** — Canonical field `schema` in the shared fragment (D-3).
   - Goal: edit `shared/output-handoff.md` so the documented result field is **`schema`** (literal
     transport id `agent-run-result-v1`), not `schema_version`. Keep the review-only
     `verdict`/`verdict_reason`/`findings` rows and the `output_schema: handoff-v1.1` frontmatter
@@ -84,7 +84,7 @@
   - Write set: `dadaia_workspace/public/lifecycle_fragments/shared/output-handoff.md`.
   - Acceptance: A3 — `dadaia public doctor` `[ok]`.
 
-- [ ] **T-32-A-06** — Fragment-guard test — both halves of Drift 2/3 die in the body (C1).
+- [x] **T-32-A-06** — Fragment-guard test — both halves of Drift 2/3 die in the body (C1).
   - Goal (DEFINITION-review C1): a test that asserts in the `shared/output-handoff.md` **body**:
     (a) **NO `schema_version` field** AND it instructs exactly `schema` = `agent-run-result-v1`
     as the field to emit (kills Drift 3); AND (b) **NO residual "conform to the `output_schema`"

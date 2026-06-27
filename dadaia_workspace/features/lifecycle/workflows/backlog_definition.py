@@ -432,6 +432,9 @@ class BacklogDefinitionWorkflow:
         suffix = build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
             selected_context=self._render_selection(audit),
+            # backlog_author is a CREATE step (BacklogStep is kind-based, no is_review
+            # field) — it emits an artifact, never a self-verdict (D-2 / A4).
+            is_review=False,
         )
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)

@@ -267,6 +267,7 @@ class AuditWorkflow:
         suffix = build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
             selected_context=selected,
+            is_review=step.is_review,
         )
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)

@@ -17,12 +17,11 @@ object; do not produce free-form commentary in its place.
 
 ## What the result must carry
 
-Emit one object conforming to the `output_schema` the step declares. Every result
-carries these fields regardless of schema:
+Emit one transport-envelope object. Every result carries these fields:
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | The declared schema id (literal string). |
+| `schema` | The transport envelope id — always the literal string `agent-run-result-v1`. |
 | `agent` | The role you are running as for this step. |
 | `context` | The active Spec Context name. |
 | `produced_at` | UTC timestamp ending in `Z`. |

@@ -393,11 +393,30 @@ class LifecyclePipeline:
         )
 
     def _generic_prompt(self, step: PipelineStep) -> str:
-        return (
-            f"Run the {step.label} step for release {self._release_id} in context "
-            f"{self._context}. Emit a handoff whose structured_output.verdict is APPROVED "
-            "or REJECTED, with an artifact_ref pointing at the handoff document."
+        """Generic (no-fragment) step prompt — step-kind-aware (v0.1.32 / C6 / L2 / A4b).
+
+        This is the second stale surface: it is NOT a ``build_fragment_suffix`` caller and
+        previously hard-coded the universal self-verdict text for every step, re-introducing
+        Drift 1 on the pipeline's generic steps. It now branches on ``step.is_review`` the
+        same way the suffix builder does: review steps self-verdict; create steps emit an
+        artifact and do NOT self-verdict.
+        """
+        lead = (
+            f"Run the {step.label} step for release {self._release_id} in context {self._context}."
         )
+        if step.is_review:
+            tail = (
+                " Because this is a REVIEW step, emit a handoff whose "
+                "structured_output.verdict is APPROVED or REJECTED, with an artifact_ref "
+                "pointing at the handoff document."
+            )
+        else:
+            tail = (
+                " Because this is a CREATE step, emit a handoff with the produced artifact "
+                "in artifact_refs pointing at the handoff document; do NOT self-judge — the "
+                "review gate owns the APPROVED/REJECTED decision."
+            )
+        return lead + tail
 
     def _fragment_prompt(self, step: PipelineStep) -> str:
         """Assemble a fragment-sourced suffix for a step that declares a ``fragment_id``.
@@ -415,6 +434,7 @@ class LifecyclePipeline:
         return build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
             selected_context=self._render_selection(selected),
+            is_review=step.is_review,
         )
 
     def _select_context(self, step: PipelineStep, fragment: Fragment) -> SelectionAudit:
