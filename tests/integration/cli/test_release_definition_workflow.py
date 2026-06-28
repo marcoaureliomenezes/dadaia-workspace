@@ -234,6 +234,20 @@ def test_full_sequence_reaches_commit_gate_and_advances(
     assert commit_gate["accepted"] is True
 
 
+def test_cli_fake_runtime_writes_canonical_create_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _define(["--harness", "fake"])
+
+    assert result.exit_code == 0, result.output
+    assert (workspace / "specs" / "releases" / _RELEASE / "SPEC.md").is_file()
+    assert (workspace / "specs" / "releases" / _RELEASE / "PLAN.md").is_file()
+    assert (workspace / "specs" / "releases" / _RELEASE / "TASKS.md").is_file()
+
+
 # 2 -- scoped (non-generic) fragment prompts --------------------------------
 
 

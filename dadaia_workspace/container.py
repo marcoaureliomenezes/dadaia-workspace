@@ -919,22 +919,57 @@ def _release_definition_runtime_factory(
     requirement), exercising every fragment-assembled prompt and Python gate without a
     live worker. The artifact_ref stays inside the step's allowed handoff path.
     """
+    import hashlib
+
     from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
         AgentRunResult,
         AgentRunStatus,
     )
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake release-definition worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{context}/release-definition-step.handoff.json",),
-        structured_output={"verdict": "APPROVED"},
-    )
+    class ReleaseDefinitionFakeRuntime:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            artifact_ref = self._write_create_artifact(request)
+            if artifact_ref is None:
+                return AgentRunResult(
+                    status=AgentRunStatus.SUCCEEDED,
+                    summary="fake release-definition worker: APPROVED",
+                    artifact_refs=(
+                        f".dadaia/handoff/{context}/release-definition-step.handoff.json",
+                    ),
+                    structured_output={"verdict": "APPROVED"},
+                )
+            digest = hashlib.sha256((run_cwd / artifact_ref).read_bytes()).hexdigest()
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake release-definition worker: wrote canonical artifact",
+                artifact_refs=(
+                    f".dadaia/handoff/{context}/release-definition-step.handoff.json",
+                    artifact_ref,
+                ),
+                structured_output={"content_hash": digest},
+            )
+
+        @staticmethod
+        def _write_create_artifact(request: AgentRunRequest) -> str | None:
+            for allowed in request.allowed_paths:
+                if not allowed.endswith(("SPEC.md", "PLAN.md", "TASKS.md")):
+                    continue
+                path = run_cwd / allowed
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    f"# {path.name}\n\nGenerated for {request.task_id or 'release-definition'}.\n",
+                    encoding="utf-8",
+                )
+                return allowed
+            return None
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            return FakeAgentRuntime(result=approving)
+            return ReleaseDefinitionFakeRuntime()
         return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
 
     return factory
