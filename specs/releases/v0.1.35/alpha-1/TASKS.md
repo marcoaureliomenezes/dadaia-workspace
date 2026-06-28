@@ -14,7 +14,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-35-01 — Add explicit release-definition scope inputs
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/cli/commands/lifecycle.py`
@@ -26,7 +26,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-35-02 — Gate create steps on canonical artifacts
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/features/lifecycle/workflows/release_definition.py`
@@ -38,7 +38,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-35-03 — Dogfood bug-report workflow and inspect transcript noise
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/**`

@@ -31,7 +31,9 @@ so the composition of each prompt is auditable.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
@@ -114,6 +116,47 @@ class ReleaseStepResult:
     prompt_text: str | None = None
     runtime_kind: AgentRuntimeKind | None = None
     blocked: BlockedState | None = None
+
+
+@dataclass(frozen=True)
+class ReleaseDefinitionScopeInput:
+    """Operator-selected scope for release definition.
+
+    This is the product-scope channel for the workflow. Operational identifiers such as
+    ``run_id`` and ``task_id`` stay opaque; they are never mined for requirements.
+    """
+
+    intent: str | None = None
+    backlog_slugs: tuple[str, ...] = ()
+    bug_slugs: tuple[str, ...] = ()
+    audit_refs: tuple[str, ...] = ()
+
+    def is_empty(self) -> bool:
+        return not (
+            (self.intent and self.intent.strip())
+            or self.backlog_slugs
+            or self.bug_slugs
+            or self.audit_refs
+        )
+
+    def render_markdown(self) -> str:
+        lines = [
+            "### operator_scope",
+            "Treat these values as the authoritative operator-selected release scope.",
+            "Treat run_id/task_id as opaque operational identifiers, not product scope.",
+        ]
+        if self.intent and self.intent.strip():
+            lines.append(f"- intent: {self.intent.strip()}")
+        if self.backlog_slugs:
+            lines.append("- backlog:")
+            lines.extend(f"  - {slug}" for slug in self.backlog_slugs)
+        if self.bug_slugs:
+            lines.append("- bugs:")
+            lines.extend(f"  - {slug}" for slug in self.bug_slugs)
+        if self.audit_refs:
+            lines.append("- audits:")
+            lines.extend(f"  - {ref}" for ref in self.audit_refs)
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -220,6 +263,7 @@ class ReleaseDefinitionWorkflow:
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
         handoff_resolver: WorkflowHandoffResolver | None = None,
+        scope_input: ReleaseDefinitionScopeInput | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -237,6 +281,7 @@ class ReleaseDefinitionWorkflow:
         # When None the workflow behaves exactly as before (back-compat) — the
         # produces/consumes edges are inert.
         self._handoff_resolver = handoff_resolver
+        self._scope_input = scope_input or ReleaseDefinitionScopeInput()
 
     # -- public entrypoint ----------------------------------------------
 
@@ -315,6 +360,10 @@ class ReleaseDefinitionWorkflow:
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
+        if step.label == "release_scope" and not self._scope_input.is_empty():
+            selected = "\n\n".join(
+                block for block in (self._scope_input.render_markdown(), selected) if block
+            )
         if digests:
             selected = "\n\n".join(filter(None, (selected, *digests)))
         suffix = build_fragment_suffix(
@@ -348,6 +397,8 @@ class ReleaseDefinitionWorkflow:
                 is_review=step.is_review,
             ),
         )
+        if blocked is None:
+            blocked = self._canonical_artifact_block(run, step, worker_result)
         # Record consumption of every upstream the step declared (A22) and write this
         # step's produced payload (A18/A21) — only on a passing step, only when wired.
         if blocked is None:
@@ -563,6 +614,92 @@ class ReleaseDefinitionWorkflow:
                     )
         return None
 
+    # -- canonical release artifact evidence ---------------------------
+
+    _CREATE_ARTIFACTS = {
+        "spec_create": "SPEC.md",
+        "plan_create": "PLAN.md",
+        "tasks_create": "TASKS.md",
+    }
+
+    def _canonical_artifact_block(
+        self,
+        run: LifecycleRun,
+        step: ReleaseStep,
+        worker_result: AgentRunResult,
+    ) -> BlockedState | None:
+        artifact_name = self._CREATE_ARTIFACTS.get(step.label)
+        if artifact_name is None:
+            return None
+        expected_path = self._expected_release_artifact_path(artifact_name)
+        if not expected_path.is_file():
+            return BlockedState(
+                reason=f"{step.label} missing canonical release artifact {artifact_name}",
+                blocked_at_step=step.label,
+                detail={"expected_path": self._specs_relative(expected_path)},
+            )
+        expected_ref = self._specs_relative(expected_path)
+        if expected_ref not in worker_result.artifact_refs:
+            return BlockedState(
+                reason=f"{step.label} missing canonical artifact ref {expected_ref}",
+                blocked_at_step=step.label,
+                detail={
+                    "expected_ref": expected_ref,
+                    "artifact_refs": ",".join(worker_result.artifact_refs),
+                },
+            )
+        actual_hash = hashlib.sha256(expected_path.read_bytes()).hexdigest()
+        reported_hash = (
+            worker_result.structured_output.get("content_hash")
+            or worker_result.structured_output.get(f"{artifact_name.removesuffix('.md').lower()}_hash")
+        )
+        if reported_hash != actual_hash:
+            return BlockedState(
+                reason=f"{step.label} missing canonical artifact content hash",
+                blocked_at_step=step.label,
+                detail={
+                    "expected_ref": expected_ref,
+                    "expected_hash": actual_hash,
+                    "reported_hash": str(reported_hash or ""),
+                },
+            )
+        return None
+
+    def _expected_release_artifact_path(self, artifact_name: str) -> Path:
+        specs_dir = self._selector.specs_dir
+        active = self._active_release_segment(specs_dir)
+        if active is not None:
+            release_id, segment = active
+            if release_id == self._release_id and segment:
+                return specs_dir / "releases" / release_id / segment / artifact_name
+        return specs_dir / "releases" / self._release_id / artifact_name
+
+    @staticmethod
+    def _active_release_segment(specs_dir: Path) -> tuple[str, str | None] | None:
+        active_path = specs_dir / "releases" / "ACTIVE.md"
+        if not active_path.is_file():
+            return None
+        release_id: str | None = None
+        segment: str | None = None
+        for raw in active_path.read_text(encoding="utf-8").splitlines():
+            key, sep, value = raw.partition(":")
+            if not sep:
+                continue
+            if key.strip() == "release":
+                release_id = value.strip()
+            elif key.strip() == "segment":
+                segment = value.strip() or None
+        if release_id:
+            return release_id, segment
+        return None
+
+    def _specs_relative(self, path: Path) -> str:
+        specs_dir = self._selector.specs_dir
+        try:
+            return path.relative_to(specs_dir.parent).as_posix()
+        except ValueError:
+            return path.as_posix()
+
     # -- static-input injection (folded into the cacheable prefix) -------
 
     def _prefix_with_static_inputs(self, sequence: tuple[ReleaseStep, ...]) -> PromptPrefix | None:
@@ -645,19 +782,24 @@ class ReleaseDefinitionWorkflow:
         return "\n\n".join(blocks)
 
     def _scope(self, step: ReleaseStep, run_id: str, suffix: str) -> PromptScope:
+        allowed_paths = [f".dadaia/handoff/{self._context}/**"]
+        artifact_name = self._CREATE_ARTIFACTS.get(step.label)
+        if artifact_name is not None:
+            allowed_paths.append(self._specs_relative(self._expected_release_artifact_path(artifact_name)))
         return PromptScope(
             role=step.role,
             context=self._context,
             release_id=self._release_id,
             task_id=f"{run_id}:{step.label}",
             prompt=suffix,
-            allowed_paths=(f".dadaia/handoff/{self._context}/**",),
+            allowed_paths=tuple(allowed_paths),
             required_evidence=(GateEvidenceKind.HANDOFF,),
         )
 
 
 __all__ = [
     "ReleaseDefinitionResult",
+    "ReleaseDefinitionScopeInput",
     "ReleaseDefinitionWorkflow",
     "ReleaseStep",
     "ReleaseStepResult",

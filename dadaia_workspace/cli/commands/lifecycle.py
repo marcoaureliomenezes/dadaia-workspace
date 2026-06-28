@@ -490,6 +490,26 @@ def release_define(
     context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
+    intent: str | None = typer.Option(
+        None,
+        "--intent",
+        help="Explicit operator intent for this release. Never inferred from run id.",
+    ),
+    backlog: list[str] | None = typer.Option(
+        None,
+        "--backlog",
+        help="Selected backlog slug for release scope. Repeatable.",
+    ),
+    bug: list[str] | None = typer.Option(
+        None,
+        "--bug",
+        help="Selected bug slug for release scope. Repeatable.",
+    ),
+    audit: list[str] | None = typer.Option(
+        None,
+        "--audit",
+        help="Selected audit finding/ref for release scope. Repeatable.",
+    ),
     harness: str = typer.Option(
         "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
@@ -521,7 +541,10 @@ def release_define(
     advances the release to IMPLEMENTATION only when every gate passed.
     """
     from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        _SEQUENCE,
+        ReleaseDefinitionScopeInput,
+    )
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
@@ -565,6 +588,12 @@ def release_define(
         release_id=release_id,
         default_runtime_kind=default_kind,
         models=models,
+        scope_input=ReleaseDefinitionScopeInput(
+            intent=intent,
+            backlog_slugs=tuple(backlog or ()),
+            bug_slugs=tuple(bug or ()),
+            audit_refs=tuple(audit or ()),
+        ),
     )
     from dataclasses import replace as _replace
 

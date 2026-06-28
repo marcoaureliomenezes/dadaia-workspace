@@ -1,6 +1,6 @@
 ---
 name: release-definition-lacks-operator-intent-channel-and-infers-scope-from-run-id
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 surface: lifecycle release define CLI / release_scope prompt inputs
@@ -44,3 +44,22 @@ and operator intent; ensure the `release_scope` prompt receives those inputs and
 mine semantic scope from `run_id`/`task_id` except as an opaque identifier. Add a test
 where a run id contains misleading words and the selected scope still follows the
 explicit intent.
+
+## Resolution
+
+Fixed in `v0.1.35`.
+
+Root cause: the release-definition command only accepted operational fields
+(`--context`, `--release-id`, `--run-id`, harness/model selection). The workflow then had
+no first-class product-scope input to inject into `release_scope`, so real workers could
+overweight semantic words in the run id.
+
+Fix: `dadaia lifecycle release define` now accepts `--intent`, repeatable `--backlog`,
+repeatable `--bug`, and repeatable `--audit`. These values are carried as
+`ReleaseDefinitionScopeInput` and injected into the `release_scope` selected context with
+an explicit instruction that `run_id`/`task_id` are opaque operational identifiers.
+
+Evidence:
+
+- `tests/integration/cli/test_release_definition_workflow.py::test_release_scope_receives_explicit_operator_scope_not_run_id`
+- `python -m pytest -q -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py`

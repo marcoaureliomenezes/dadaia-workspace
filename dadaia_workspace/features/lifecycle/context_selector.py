@@ -253,6 +253,11 @@ class ContextSelector:
         results = tuple(self.select(name, resolved) for name in names)
         return SelectionAudit(step=step, results=results, fragment_ids=fragment_ids)
 
+    @property
+    def specs_dir(self) -> Path:
+        """Return the specs directory this selector reads from."""
+        return self._ctx.specs_dir
+
     # -- single API ------------------------------------------------------
 
     def select(self, name: str, policy: MaxContextPolicy | str) -> SelectionResult:

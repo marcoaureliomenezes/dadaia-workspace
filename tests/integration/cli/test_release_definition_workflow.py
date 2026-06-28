@@ -29,6 +29,7 @@ varies per step while no live worker is ever spawned.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -80,9 +81,49 @@ class _KindReportingFake:
 
     kind: AgentRuntimeKind
     result: AgentRunResult
+    write_create_artifacts: bool = True
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        if not self.write_create_artifacts:
+            return self.result
+        artifact_ref = _write_create_artifact(request)
+        if artifact_ref is None:
+            return self.result
+        content_hash = hashlib.sha256((Path.cwd() / artifact_ref).read_bytes()).hexdigest()
+        return AgentRunResult(
+            status=self.result.status,
+            summary=self.result.summary,
+            artifact_refs=(*self.result.artifact_refs, artifact_ref),
+            structured_output={**self.result.structured_output, "content_hash": content_hash},
+            error=self.result.error,
+        )
+
+
+def _write_create_artifact(request: AgentRunRequest) -> str | None:
+    for allowed in request.allowed_paths:
+        if not allowed.startswith("repos/") and not allowed.startswith("specs/"):
+            continue
+        if not allowed.endswith(("SPEC.md", "PLAN.md", "TASKS.md")):
+            continue
+        path = Path.cwd() / allowed
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f"# {path.name}\n\nGenerated for {request.task_id}.\n",
+            encoding="utf-8",
+        )
+        return allowed
+    return None
+
+
+@dataclass
+class _StaticFake:
+    result: AgentRunResult
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return AgentRuntimeKind.FAKE
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:  # noqa: ARG002
         return self.result
@@ -110,6 +151,7 @@ def _install_fake_factory(
     monkeypatch: pytest.MonkeyPatch,
     *,
     reject_kind: AgentRuntimeKind | None = None,
+    write_create_artifacts: bool = True,
 ) -> None:
     """Make the real release-define CLI path drive every kind through a kind-reporting fake.
 
@@ -127,8 +169,12 @@ def _install_fake_factory(
     ) -> object:
         def factory(kind: AgentRuntimeKind) -> _KindReportingFake:
             if reject_kind is not None and kind is reject_kind:
-                return _KindReportingFake(kind, _rejecting_result())
-            return _KindReportingFake(kind, _approving_result())
+                return _KindReportingFake(
+                    kind, _rejecting_result(), write_create_artifacts=write_create_artifacts
+                )
+            return _KindReportingFake(
+                kind, _approving_result(), write_create_artifacts=write_create_artifacts
+            )
 
         return factory
 
@@ -199,6 +245,7 @@ def test_emitted_prompts_are_fragment_scoped_not_generic(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    _install_fake_factory(monkeypatch)
 
     # Build the same workflow the CLI builds and capture the emitted prompt text. (The
     # JSON envelope omits prompt_text by design; we inspect it via the workflow object,
@@ -234,6 +281,41 @@ def test_emitted_prompts_are_fragment_scoped_not_generic(
     assert model_labels <= emitted_with_prompt
 
 
+def test_release_scope_receives_explicit_operator_scope_not_run_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        ReleaseDefinitionScopeInput,
+    )
+
+    wf = container.build_release_definition_workflow(
+        workspace,
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        default_runtime_kind=AgentRuntimeKind.FAKE,
+        scope_input=ReleaseDefinitionScopeInput(
+            intent="Harden release-definition workflow scope input.",
+            backlog_slugs=("workflow-model-governance-operator-profiles-and-context-overlays",),
+            bug_slugs=("release-definition-lacks-operator-intent-channel-and-infers-scope-from-run-id",),
+            audit_refs=("audit-123",),
+        ),
+    )
+
+    outcome = wf.run("misleading-default-model-run-id")
+
+    scope_step = next(s for s in outcome.steps if s.label == "release_scope")
+    assert scope_step.prompt_text is not None
+    assert "### operator_scope" in scope_step.prompt_text
+    assert "Harden release-definition workflow scope input." in scope_step.prompt_text
+    assert "release-definition-lacks-operator-intent-channel-and-infers-scope-from-run-id" in (
+        scope_step.prompt_text
+    )
+    assert "Treat run_id/task_id as opaque operational identifiers" in scope_step.prompt_text
+
+
 # 3 -- rejected review blocks advancement -----------------------------------
 
 
@@ -265,6 +347,27 @@ def test_rejected_review_blocks_before_commit_gate(
     assert steps[-1]["accepted"] is False
     blocked = payload["blocked"]
     assert isinstance(blocked, dict)
+
+
+def test_handoff_only_spec_create_blocks_at_spec_create(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    _install_fake_factory(monkeypatch, write_create_artifacts=False)
+
+    result = _define(["--harness", "fake"])
+
+    assert result.exit_code == 3, result.output
+    payload = _payload(result.output)
+    assert payload["status"] == "BLOCKED"
+    steps = payload["steps"]
+    assert isinstance(steps, list)
+    assert steps[-1]["label"] == "spec_create"
+    blocked = payload["blocked"]
+    assert isinstance(blocked, dict)
+    assert blocked["blocked_at_step"] == "spec_create"
+    assert "missing canonical release artifact" in blocked["reason"]
 
 
 # 4 -- adjacent-harness seam (the key §8.5 assertion) -----------------------

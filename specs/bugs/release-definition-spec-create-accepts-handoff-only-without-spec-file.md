@@ -1,6 +1,6 @@
 ---
 name: release-definition-spec-create-accepts-handoff-only-without-spec-file
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-27
 surface: lifecycle release_definition workflow / spec_create gate / context selector
@@ -62,3 +62,24 @@ no release directory and no actionable SPEC file to review or repair.
 requires a real `specs/releases/<release-id>/SPEC.md` (or explicitly documented draft
 path) plus artifact path/hash evidence; add a regression test that a handoff-only SPEC
 payload is rejected at `spec_create`.
+
+## Resolution
+
+Fixed in `v0.1.35`.
+
+Root cause: release-definition reused the generic create-step gate, which only required
+some artifact reference plus in-scope paths. That was valid for generic handoff-producing
+steps but too weak for SPEC/PLAN/TASKS authoring: a handoff-only draft could pass
+`spec_create` even when the canonical release artifact did not exist.
+
+Fix: release-definition now applies an additional canonical-artifact gate for
+`spec_create`, `plan_create`, and `tasks_create`. The step only passes if the expected
+canonical artifact exists, the worker reports that path in `artifact_refs`, and
+`structured_output.content_hash` matches the file's SHA-256. The path resolver is
+segment-aware when `ACTIVE.md` points at the same release, with a flat fallback for older
+contexts.
+
+Evidence:
+
+- `tests/integration/cli/test_release_definition_workflow.py::test_handoff_only_spec_create_blocks_at_spec_create`
+- `python -m pytest -q -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py`

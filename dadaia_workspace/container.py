@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         BacklogDefinitionWorkflow,
     )
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        ReleaseDefinitionScopeInput,
         ReleaseDefinitionWorkflow,
     )
     from dadaia_workspace.infrastructure.json_local_model_profile_store import (
@@ -944,6 +945,7 @@ def build_release_definition_workflow(
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
     models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    scope_input: "ReleaseDefinitionScopeInput | None" = None,
 ) -> "ReleaseDefinitionWorkflow":
     """Compose the fragment-driven release-definition workflow (WS-5 / §6.1).
 
@@ -959,6 +961,7 @@ def build_release_definition_workflow(
         SpecContext,
     )
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        ReleaseDefinitionScopeInput,
         ReleaseDefinitionWorkflow,
     )
 
@@ -984,6 +987,7 @@ def build_release_definition_workflow(
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
+        scope_input=scope_input or ReleaseDefinitionScopeInput(),
     )
 
 
