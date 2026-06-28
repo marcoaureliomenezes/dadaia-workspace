@@ -196,6 +196,21 @@ def _define(args: list[str]) -> Result:
     )
 
 
+def _define_release(release_id: str, args: list[str]) -> Result:
+    return _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "release",
+            "define",
+            "--release-id",
+            release_id,
+            "--json",
+            *args,
+        ],
+    )
+
+
 # 1 -- full happy path ------------------------------------------------------
 
 
@@ -246,6 +261,18 @@ def test_cli_fake_runtime_writes_canonical_create_artifacts(
     assert (workspace / "specs" / "releases" / _RELEASE / "SPEC.md").is_file()
     assert (workspace / "specs" / "releases" / _RELEASE / "PLAN.md").is_file()
     assert (workspace / "specs" / "releases" / _RELEASE / "TASKS.md").is_file()
+
+
+def test_release_definition_rejects_traversal_release_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _define_release("../outside", ["--harness", "fake"])
+
+    assert result.exit_code != 0
+    assert not (workspace.parent / "outside").exists()
 
 
 # 2 -- scoped (non-generic) fragment prompts --------------------------------

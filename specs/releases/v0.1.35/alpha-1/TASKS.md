@@ -57,6 +57,6 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   - `specs/releases/v0.1.35/alpha-1/TASKS.md`
 - **Acceptance:** focused tests and specs doctor pass; Codex workflow smoke is attempted
   with explicit v0.1.35 scope; branch is committed and pushed.
-- **Evidence:** Focused workflow suite: `9 passed`. Codex smoke:
+- **Evidence:** Focused workflow suite: `10 passed`. Codex smoke:
   `v0135-codex-scope-smoke` completed with `release_scope` on `codex_exec` and
   downstream fake steps, final phase `implementation`.

@@ -667,12 +667,31 @@ class ReleaseDefinitionWorkflow:
 
     def _expected_release_artifact_path(self, artifact_name: str) -> Path:
         specs_dir = self._selector.specs_dir
+        release_id = self._safe_path_component(self._release_id, "release_id")
         active = self._active_release_segment(specs_dir)
         if active is not None:
-            release_id, segment = active
-            if release_id == self._release_id and segment:
-                return specs_dir / "releases" / release_id / segment / artifact_name
-        return specs_dir / "releases" / self._release_id / artifact_name
+            active_release_id, segment = active
+            if active_release_id == self._release_id and segment:
+                safe_segment = self._safe_path_component(segment, "segment")
+                return self._confined_release_artifact(
+                    specs_dir / "releases" / release_id / safe_segment,
+                    artifact_name,
+                )
+        return self._confined_release_artifact(specs_dir / "releases" / release_id, artifact_name)
+
+    @staticmethod
+    def _safe_path_component(value: str, label: str) -> str:
+        if not value or value in {".", ".."} or "/" in value or "\\" in value:
+            raise ValueError(f"{label} must be a single path-safe component")
+        return value
+
+    @staticmethod
+    def _confined_release_artifact(release_dir: Path, artifact_name: str) -> Path:
+        root = release_dir.resolve()
+        candidate = (release_dir / artifact_name).resolve()
+        if not candidate.is_relative_to(root):
+            raise ValueError("release artifact path escapes release directory")
+        return candidate
 
     @staticmethod
     def _active_release_segment(specs_dir: Path) -> tuple[str, str | None] | None:
