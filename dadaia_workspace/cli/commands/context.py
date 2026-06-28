@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace import container
+from dadaia_workspace.core import lock_liveness
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextLockedError,
@@ -25,7 +26,9 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.protocols.process_ancestry import Ancestry
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.spec_context import lease as context_lease
 from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.spec_context.locking import (
     workspace_lock,
@@ -301,6 +304,29 @@ _BIND_MODE_ALIASES: dict[str, str] = {
 _LEASE_TAKING_MODES = ("IMPLEMENTATION", "REVIEW")
 
 
+def _int_or_none(value: object) -> int | None:
+    if isinstance(value, int):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def _holder_pid_is_caller_owned(holder_pid: int | None, caller_pid: int) -> bool:
+    if holder_pid is None:
+        return False
+    if holder_pid == caller_pid:
+        return True
+    try:
+        ancestry_probe = container.build_process_ancestry()
+        return ancestry_probe.is_ancestor(holder_pid, caller_pid) is Ancestry.ANCESTOR
+    except Exception:  # noqa: BLE001 — indeterminate ancestry must not rewrite ownership.
+        return False
+
+
 @app.command()
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
@@ -397,18 +423,51 @@ def bind(
         "is_stale": False,
     }
 
-    # Persist the session record via the single session-identity owner (FR-R4-02 / R3),
-    # and refresh the CONTEXT incumbent pointer to this bind's session id (NF-2 fix). The
-    # incumbent pointer makes the bind bind the CONTEXT, not just a throwaway sid: the SDD
-    # gate resolves a harness session's mode through ``resolve_identity(ctx)`` →
-    # ``<ctx>.ptr`` → this record, so a default in-session `dadaia context bind --mode read`
-    # (whose minted sid no harness reports) is honored with no env var. For lease-taking
-    # binds the pointer is harmless — ``lease.acquire`` rewrites ``<ctx>.ptr`` to the real
-    # acquiring harness sid on first MUTATING write, so the incumbent self-corrects.
+    # Persist the session record via the single session-identity owner (FR-R4-02 / R3).
+    # With no live lease holder, refresh the CONTEXT incumbent pointer to this bind's
+    # session id (NF-2 fix): the SDD gate resolves a harness session's mode through
+    # ``resolve_identity(ctx)`` → ``<ctx>.ptr`` → this record, so a default in-session
+    # bind (whose minted sid no harness reports) binds the CONTEXT with no env var.
+    #
+    # If a live holder exists, the pointer is lease-incumbency and must not be moved to a
+    # throwaway CLI sid. For caller-owned lease-taking rebinds, update the HOLDER's session
+    # record + lock metadata to the requested release/mode and keep the pointer coherent.
+    # For foreign live holders, write only the CLI session record and bind epoch; the live
+    # holder continues to define the incumbent.
     try:
         with workspace_lock(workspace_root):
+            live_holder = context_lease.read_record(workspace_root, name)
+            holder_sid = str(live_holder.get("session_id", "")) if live_holder else ""
+            holder_pid = _int_or_none(live_holder.get("pid")) if live_holder else None
+            holder_is_live = bool(
+                live_holder
+                and holder_sid
+                and not lock_liveness.is_stale(
+                    live_holder,
+                    pid_probe=container._build_pid_probe(),
+                )
+            )
+            holder_is_caller_owned = holder_is_live and _holder_pid_is_caller_owned(
+                holder_pid, os.getpid()
+            )
+
             session_identity.write_session(workspace_root, session_id, session_data)
-            session_identity.set_incumbent(workspace_root, name, session_id)
+            if holder_is_caller_owned and resolved_mode in _LEASE_TAKING_MODES:
+                holder_session = {
+                    **session_data,
+                    "session_id": holder_sid,
+                    "pid": holder_pid or pid,
+                }
+                session_identity.write_session(workspace_root, holder_sid, holder_session)
+                context_lease.rebind_holder_metadata(
+                    workspace_root,
+                    name,
+                    holder_sid,
+                    release=release or "",
+                    mode=persisted_mode,
+                )
+            elif not holder_is_live:
+                session_identity.set_incumbent(workspace_root, name, session_id)
             # FR-W2-02 (ADR-G5): stamp the bind-epoch marker. This is the SOLE trigger for
             # context-memory injection and the ctx-inject hook's harness-real discovery
             # source — the bind CLI's minted sid is invisible to the harness, so the marker's

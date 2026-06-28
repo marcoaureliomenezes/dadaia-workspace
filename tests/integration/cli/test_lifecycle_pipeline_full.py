@@ -68,6 +68,19 @@ def _passing_result(label: str) -> AgentRunResult:
     )
 
 
+def _rejected_result(label: str) -> AgentRunResult:
+    """A review worker result that should block while preserving rejection detail."""
+    return AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary=f"fake runtime: {label} REJECTED",
+        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/{label}.handoff.json",),
+        structured_output={
+            "verdict": "REJECTED",
+            "verdict_reason": "Security boundary coverage is missing.",
+        },
+    )
+
+
 def _inject_passing_fake(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -150,6 +163,43 @@ def test_pipeline_runs_to_closure_on_fake(
     assert all(step["runtime"] == "fake" for step in payload["steps"])
     # The last accepted step landed the run in CLOSURE.
     assert payload["steps"][-1]["phase"] == LifecyclePhase.CLOSURE.value
+
+
+def test_review_block_reports_rejected_verdict_detail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A rejected review should explain the rejection, not look like a missing verdict."""
+    _inject_passing_fake(monkeypatch, default=_rejected_result("review_security"))
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "review",
+            "security",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--run-id",
+            "security-rejected-detail",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 3, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "BLOCKED"
+    blocked = payload["blocked"]
+    assert blocked["reason"] == "agent result verdict REJECTED (expected APPROVED)"
+    assert blocked["detail"] == {
+        "actual_verdict": "REJECTED",
+        "verdict_reason": "Security boundary coverage is missing.",
+    }
 
 
 def test_pipeline_qa_review_backtracks_to_implementation_on_fake(

@@ -1,6 +1,7 @@
 """Public CLI contracts for `dadaia context`."""
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -392,6 +393,73 @@ def test_context_bind_review_persists_bound_review(workspace: Path) -> None:
 
     lock_file = workspace / ".dadaia" / "locks" / "implementation" / "myctx__v1.json"
     assert not lock_file.exists(), "Review bind must NOT create implementation lock"
+
+
+def test_context_bind_implementation_rebinds_same_harness_live_holder_coherently(
+    workspace: Path,
+) -> None:
+    """A lease-taking rebind must not point `.ptr` at the CLI's throwaway sid.
+
+    The live lock holder is the coherent runtime identity. Rebinding from the same process
+    tree updates the holder's session record + lease release/mode and keeps doctor-visible
+    identity sources aligned.
+    """
+    from dadaia_workspace.features.spec_context import lease, session_identity
+
+    _register_alive_ctx(workspace)
+    holder_sid = "sess_holder"
+    lease.acquire(
+        workspace,
+        "myctx",
+        holder_sid,
+        "v0",
+        "BOUND_IMPLEMENTATION",
+        pid=os.getpid(),
+    )
+
+    result = _runner.invoke(
+        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
+    )
+    assert result.exit_code == 0, result.output
+    cli_record = _session_record_for(workspace, result.output)
+    assert cli_record["session_id"] != holder_sid
+
+    lock_record = lease.read_record(workspace, "myctx")
+    assert lock_record is not None
+    assert lock_record["session_id"] == holder_sid
+    assert lock_record["release"] == "v1"
+    assert lock_record["mode"] == "BOUND_IMPLEMENTATION"
+    assert session_identity.read_incumbent_ptr(workspace, "myctx") == holder_sid
+
+    holder_record = session_identity.read_session(workspace, holder_sid)
+    assert holder_record is not None
+    assert holder_record["session_id"] == holder_sid
+    assert holder_record["release"] == "v1"
+    assert holder_record["mode"] == "BOUND_IMPLEMENTATION"
+    assert session_identity.coherence(workspace, "myctx", lock_holder=holder_sid) is None
+
+
+def test_context_bind_read_does_not_move_incumbent_from_live_holder(workspace: Path) -> None:
+    """A read bind must not create doctor-visible incoherence against a live holder."""
+    from dadaia_workspace.features.spec_context import lease, session_identity
+
+    _register_alive_ctx(workspace)
+    holder_sid = "sess_holder"
+    lease.acquire(
+        workspace,
+        "myctx",
+        holder_sid,
+        "v0",
+        "BOUND_IMPLEMENTATION",
+        pid=os.getpid(),
+    )
+
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    assert result.exit_code == 0, result.output
+    cli_record = _session_record_for(workspace, result.output)
+    assert cli_record["mode"] == "READ"
+    assert session_identity.read_incumbent_ptr(workspace, "myctx") == holder_sid
+    assert session_identity.coherence(workspace, "myctx", lock_holder=holder_sid) is None
 
 
 # --- legacy alias mapping --------------------------------------------------

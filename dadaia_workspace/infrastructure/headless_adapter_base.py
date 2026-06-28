@@ -96,8 +96,10 @@ def classify_result_payload(payload: dict[str, object], expected_schema: str) ->
        it, or names the fragment's domain schema instead of the transport id — both
        observed live). Rather than BLOCK a correct result on a label mismatch, accept a
        payload that *structurally is* the result: a non-empty ``artifact_refs`` list plus a
-       ``status`` / ``summary`` / nested ``structured_output``. This is defence-in-depth,
-       NOT the primary contract.
+       ``status`` / ``summary`` / nested ``structured_output``. A current
+       ``handoff-v1.1`` document with a top-level ``verdict`` and a metrics/artifact path is
+       also structural result evidence: real review workers may make the handoff itself the
+       final assistant payload. This is defence-in-depth, NOT the primary contract.
     3. **NONE** — arbitrary JSON lacking the result shape (no schema match AND no non-empty
        ``artifact_refs``) is rejected; a no-op worker (no payload) yields no result → BLOCK.
     """
@@ -108,6 +110,17 @@ def classify_result_payload(payload: dict[str, object], expected_schema: str) ->
         isinstance(refs, list)
         and refs
         and any(key in payload for key in ("status", "summary", "structured_output"))
+    ):
+        return ResultMatch.STRUCTURAL
+    metrics = payload.get("metrics")
+    artifact = payload.get("artifact")
+    if (
+        payload.get("schema_version") in {"handoff-v1", "handoff-v1.1"}
+        and payload.get("verdict")
+        and (
+            (isinstance(metrics, dict) and isinstance(metrics.get("artifact_ref"), str))
+            or (isinstance(artifact, dict) and isinstance(artifact.get("path"), str))
+        )
     ):
         return ResultMatch.STRUCTURAL
     return ResultMatch.NONE
@@ -136,6 +149,16 @@ def normalize_artifact_refs(payload: dict[str, object]) -> tuple[str, ...]:
     """
     raw = payload.get("artifact_refs")
     if not isinstance(raw, list):
+        metrics = payload.get("metrics")
+        if isinstance(metrics, dict):
+            artifact_ref = metrics.get("artifact_ref")
+            if isinstance(artifact_ref, str) and artifact_ref.strip():
+                return (artifact_ref,)
+        artifact = payload.get("artifact")
+        if isinstance(artifact, dict):
+            path = artifact.get("path")
+            if isinstance(path, str) and path.strip():
+                return (path,)
         return ()
     paths: list[str] = []
     for item in raw:

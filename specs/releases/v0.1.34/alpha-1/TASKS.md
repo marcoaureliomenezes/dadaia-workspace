@@ -79,6 +79,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 - **Acceptance:** Test collection is reduced to 1000-1500 tests. Deleted tests are
   low-value, redundant, residue-only, or implementation-shape assertions. Retained tests
   are documented by behavior layer and feature family in `quality-assurance.md`.
-- **Evidence:** Default collection is 1351 tests. Default behavior suite:
-  `1340 passed, 11 skipped, 1 deselected`. Focused changed-test slice: `43 passed`.
-  `specs doctor` reports 0 errors; `backlog doctor` is clean.
+- **Evidence:** Default collection is 1361 selected tests plus 1 deselected. Last full
+  default behavior suite before final regression additions: `1340 passed, 11 skipped,
+  1 deselected`. Final focused regression/security slice: `9 passed`. `specs doctor`
+  reports 0 errors; `backlog doctor` is clean.

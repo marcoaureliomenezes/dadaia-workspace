@@ -80,6 +80,7 @@ __all__ = [
     "is_held",
     "read_record",
     "reclaim",
+    "rebind_holder_metadata",
     "release",
     "release_context_if_caller_owned",
     "release_for_session",
@@ -415,6 +416,56 @@ def _new_record(
         "heartbeat": now,
         "ttl": ttl,
     }
+
+
+def rebind_holder_metadata(
+    workspace: Path,
+    ctx: str,
+    session_id: str,
+    *,
+    release: str,
+    mode: str,
+    clock: Callable[[], datetime] = _utcnow,
+    permission_setter: FilePermissionSetter | None = None,
+) -> bool:
+    """Update release/mode metadata for the current holder without transferring ownership.
+
+    ``dadaia context bind`` can be invoked while the same long-lived harness already holds
+    the live lease. In that case the coherent identity remains the lock holder's session id;
+    only the requested release/mode metadata needs to move forward. This helper performs
+    that refresh under the same O_EXCL CAS as acquire/release and refuses to touch a foreign
+    holder.
+    """
+    _validate(ctx, field="context")
+    _validate(session_id, field="session_id")
+    sentinel = _sentinel_path(workspace, ctx, permission_setter)
+    record_path = _record_path(workspace, ctx, permission_setter)
+    backoff = _INITIAL_BACKOFF
+    for attempt in range(_MAX_RETRIES + 1):
+        _gc_orphan_sentinel(sentinel)
+        try:
+            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
+                pass
+        except FileExistsError:
+            if attempt >= _MAX_RETRIES:
+                return False
+            time.sleep(backoff)
+            backoff *= 2
+            continue
+        try:
+            rec = read_record(workspace, ctx)
+            if rec is None or rec.get("session_id") != session_id:
+                return False
+            rec["release"] = release
+            rec["mode"] = mode
+            rec["heartbeat"] = clock().isoformat()
+            _write_record(record_path, rec)
+            _index_add(workspace, ctx, session_id)
+            _write_ptr(workspace, ctx, session_id)
+            return True
+        finally:
+            sentinel.unlink(missing_ok=True)
+    return False
 
 
 def _gc_orphan_sentinel(sentinel: Path) -> None:

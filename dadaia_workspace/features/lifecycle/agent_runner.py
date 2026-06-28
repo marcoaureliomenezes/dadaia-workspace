@@ -199,6 +199,18 @@ class LifecycleAgentRunner:
         # populates ``artifact_refs``) + in-scope paths, regardless of the ``verdict``
         # field. The ``artifact_refs`` check below still BLOCKs a no-op create worker.
         if data.is_review and result.structured_output.get("verdict") != "APPROVED":
+            verdict = result.structured_output.get("verdict")
+            if verdict:
+                detail = {"actual_verdict": str(verdict)}
+                verdict_reason = result.structured_output.get("verdict_reason")
+                if verdict_reason:
+                    detail["verdict_reason"] = str(verdict_reason)
+                return self._blocked(
+                    lifecycle_run,
+                    data,
+                    f"agent result verdict {verdict} (expected APPROVED)",
+                    detail=detail,
+                )
             return self._blocked(lifecycle_run, data, "agent result missing APPROVED verdict")
         if not result.artifact_refs and not (
             data.structured_output_evidence and result.structured_output
