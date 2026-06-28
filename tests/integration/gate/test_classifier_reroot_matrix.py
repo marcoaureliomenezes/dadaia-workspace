@@ -1,9 +1,8 @@
 """T-010-03 / WS-R1 (AC-R1-01/02): full-pipeline gate matrix + lease-theft incident regression.
 
-Where ``tests/unit/features/spec_context/test_gate_policy.py`` asserts *classification* in
-isolation, this suite drives the **whole gate decision pipeline** (``gate_policy.evaluate``,
-which classifies then acquires/blocks the per-context lease) for in-repo paths across both
-the default and a non-default slug. It proves three things the audit (CONF-1) demanded:
+This suite drives the **whole gate decision pipeline** (``gate_policy.evaluate``, which
+classifies then acquires/blocks the per-context lease) for in-repo paths across both the
+default and a non-default slug. It proves three things the audit (CONF-1) demanded:
 
 1. In-repo ADDITIVE writes take **no** lease (the lease record stays absent) — the
    lease-theft surface is closed (FR-R1-01).

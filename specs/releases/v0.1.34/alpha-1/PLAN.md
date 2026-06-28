@@ -79,9 +79,10 @@ Run collection before/after and focused suites:
 .dadaia/.venv/bin/python -m pytest --collect-only -q -p no:cacheprovider
 .dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider \
   tests/contract \
-  tests/unit/features/spec_context \
-  tests/unit/features/panel \
-  tests/unit/features/lifecycle
+  tests/integration/gate \
+  tests/integration/panel \
+  tests/integration/cli \
+  tests/e2e
 .dadaia/.venv/bin/dadaia specs doctor --specs-dir repos/dadaia-workspace/specs
 ```
 

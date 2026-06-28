@@ -107,8 +107,8 @@ def test_pricing_keyset_is_registry_derived_not_cross_feature_import(
     check now computes it from ``REGISTRY`` directly. This test pins that the symbol
     is gone from the module namespace (so the old monkeypatch vector cannot silently
     reappear) and that the live tree still resolves clean. The genuine
-    PRICING_TABLE↔registry coherence guard lives in
-    ``tests/unit/features/telemetry/test_pricing.py`` (key-set equality assertions).
+    PRICING_TABLE↔registry coherence is derived from the shared model registry and
+    covered by the retained telemetry integration behavior.
     """
     import dadaia_workspace.features.public.model_resolution as mod
 

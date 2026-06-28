@@ -8,8 +8,8 @@ Coverage areas:
   - Static route is accessible without any credential
 
 Panel auth removed by operator decision 2026-06-11 — the panel serves every
-route without a credential; the no-auth + Host-guard contract is pinned in
-tests/unit/features/panel/test_no_auth_contract.py.
+route without a credential; the no-auth + Host-guard contract is pinned in the
+retained panel integration and E2E behavior suite.
 """
 
 from __future__ import annotations

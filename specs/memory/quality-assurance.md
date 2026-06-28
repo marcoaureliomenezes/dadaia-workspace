@@ -2,7 +2,7 @@
 slug: quality-assurance
 title: quality-assurance
 category: product
-tldr: 'Behavior-first quality schema; historical residue tests are exceptional.'
+tldr: 'Behavior-first quality schema; current suite budget is 1000-1500 tests.'
 summary: >-
   The dadaia-workspace quality model is behavior-first. Tests are admitted only
   when they can fail for a meaningful regression in current product behavior,
@@ -17,7 +17,7 @@ tags:
   - quality
   - test-architecture
 agent_tier: self-pull
-token_estimate: 1400
+token_estimate: 1800
 last_updated: '2026-06-28'
 release_origin: v0.1.34
 ---
@@ -58,20 +58,24 @@ unless they own a current public contract or safety boundary.
 
 ## Layer Schema
 
-`tests/unit/**` is for pure or near-pure behavior. Unit tests may use `tmp_path` and
-small fakes, but must not start real subprocesses, servers, browsers, public
-stage/install workflows, full workspace initialization, or sleeps. A unit test should
-usually explain one rule of one function or service.
+`tests/unit/**` is for compact public-service islands and pure rules that cannot be
+tested more clearly at a higher layer. Unit tests may use `tmp_path` and small fakes, but
+must not start real subprocesses, servers, browsers, public stage/install workflows, full
+workspace initialization, or sleeps. Unit tests are not the default home for Panel view
+strings, lifecycle prompt plumbing, hook parser permutations, infrastructure adapter
+details, or specs-doctor implementation branches when those behaviors are already
+protected by contract/integration/E2E tests.
 
 `tests/contract/**` is for stable public contracts: CLI output shape, API/schema shape,
 security boundaries, projection privacy, and governance invariants. Contract tests must
 not become release-history pins. A residue grep is allowed only when it names the current
 boundary being protected, the owner, and the condition under which the grep can retire.
 
-`tests/integration/**` is for multi-component wiring: real temporary filesystem trees,
-Typer `CliRunner`, service composition, stores, or command paths. Integration tests
-should prove one meaningful path through collaborating components, not duplicate every
-unit matrix.
+`tests/integration/**` is the main behavior layer for dadaia-workspace. It owns
+multi-component wiring: real temporary filesystem trees, Typer `CliRunner`, service
+composition, stores, command paths, panel routes, lifecycle commands, public projection,
+and gate behavior. Integration tests should prove one meaningful path through
+collaborating components, not duplicate every unit matrix.
 
 `tests/e2e/**` is for named user journeys. E2E tests must drive the behavior the user
 depends on: click the tab, trigger the route, inspect the response, follow the iframe,
@@ -88,12 +92,14 @@ collection and must be deleted or promoted before release closure.
 
 ## Budgets
 
-The target suite size is **1000-1500 total tests** for the source repo. A healthy split is:
+The target suite size is **1000-1500 collected tests** for the source repo. The v0.1.34
+architecture keeps the suite centered on behavior layers; collected count after the
+collapse is expected to stay near 1350 tests. A healthy split is:
 
-- 700-850 unit tests;
+- 450-650 unit tests for compact public-service islands and pure rules;
 - 100-150 contract tests;
-- 200-300 integration tests;
-- 40-80 E2E and browser journey tests;
+- 450-550 integration tests;
+- 70-100 E2E and browser journey tests;
 - opt-in performance tests outside the default count.
 
 These are budgets, not quotas. Adding a test above budget requires either deleting lower
@@ -115,10 +121,11 @@ behavior suite, excluding E2E and performance unless explicitly requested:
 .dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider --ignore=tests/e2e -m "not performance"
 ```
 
-The full release validation adds integration, E2E, and selected browser journeys:
+The full release validation adds integration, E2E, and selected browser journeys while
+still excluding opt-in performance checks:
 
 ```bash
-.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider
+.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider -m "not performance"
 ```
 
 Performance validation is explicit:
@@ -130,6 +137,32 @@ Performance validation is explicit:
 Coverage is a diagnostic, not the default local loop. Use coverage on curated
 unit/contract suites only; do not write padding tests to lift a percentage.
 
+## Retained Feature Coverage
+
+The retained suite evaluates features by the cheapest layer that proves product behavior:
+
+- **Spec Context Projects** — contract CLI tests, integration gate/classifier tests,
+  context CLI flows, and E2E lease/chokepoint journeys. Deleted private unit matrices for
+  lease states, hook path parsing, and doctor cleanup branches were duplicate
+  implementation-shape coverage.
+- **Panel** — integration panel route/API tests plus the panel E2E journey. Deleted unit
+  view-string tests, CSS/token assertions, and handler fragment checks duplicated route
+  and browser behavior while failing on private markup churn.
+- **dadaia-workflows/lifecycle** — integration lifecycle CLI/pipeline/workflow tests,
+  live harness contracts, and E2E lifecycle smoke. Deleted unit prompt/fragment/policy
+  micro-tests duplicated command-path and workflow behavior or pinned prompt assembly
+  internals.
+- **Public projection and source hygiene** — contract and integration projection tests
+  remain. Deleted infrastructure public-assets helper matrices that retested private TOML,
+  hashing, and parsing helpers after the public install/doctor behavior was covered.
+- **Telemetry, reports, server registry, academy, workflows, backlog** — kept as smaller
+  unit or integration islands where they own a current service/API behavior; removed
+  low-level infrastructure and adapter permutations.
+
+Deleted tests are release evidence, not product truth. Reintroducing a removed file
+requires naming the current behavior boundary and explaining why a retained layer cannot
+catch the regression.
+
 ## No-Slop Law
 
 Every test must have a purpose sentence that can be read as a current regression risk.
@@ -140,6 +173,7 @@ Delete or rewrite tests that primarily do any of the following:
 - assert release/task/PR history instead of current behavior;
 - snapshot internal text with no public contract;
 - repeat the same matrix at unit, integration, and E2E layers;
+- test private helper branches after the public behavior is already protected elsewhere;
 - mock every dependency and then call the result "E2E";
 - gate pre-push on host-load-sensitive wall-clock performance.
 

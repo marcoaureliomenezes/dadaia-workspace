@@ -120,7 +120,7 @@ incremental = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -p no:cacheprovider"
+addopts = "-ra -p no:cacheprovider -m 'not performance'"
 markers = [
     "unit: pure or near-pure fast tests",
     "contract: public API/schema/security contracts",

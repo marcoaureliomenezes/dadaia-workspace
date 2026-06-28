@@ -165,8 +165,8 @@ Como rodar, testar, lintar e empacotar:
     dadaia <subcommand>
 
     # Tests
-    pytest                                  # all
-    pytest tests/unit/features/specs/       # specs doctor unit tests
+    pytest                                  # default behavior suite; performance deselected
+    pytest tests/integration/cli/           # CLI/integration behavior slice
     pytest -k test_clean_tree               # by name
 
     # Lint + format

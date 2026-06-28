@@ -15,11 +15,10 @@ unless ALL of the following hold:
   * ``~/.codex/auth.json`` is present (codex is authenticated).
 
 This module is NOT CI-gated. With ``DADAIA_CODEX_LIVE`` unset it is collected and
-skipped — no live call. All adapter mapping logic is real and fully faked-tested
-offline in ``tests/unit/infrastructure/test_codex_exec_runtime.py``; this seam
-exists only to confirm the live ``codex exec --output-last-message`` contract
-against a pinned ``codex`` build and to record the verified version in
-``specs/memory/tech-stack.md`` at CLOSURE.
+skipped — no live call. The retained behavior suite covers the offline lifecycle
+and harness wiring; this seam exists only to confirm the live
+``codex exec --output-last-message`` contract against a pinned ``codex`` build
+and to record the verified version in ``specs/memory/tech-stack.md`` at CLOSURE.
 
 The sandbox runs under ``.dadaia/tmp/`` with an isolated ``CODEX_HOME`` (auth
 copied, chmod 600) — the user's real ``~/.codex`` is never modified.

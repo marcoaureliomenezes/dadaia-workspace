@@ -69,7 +69,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-34-06 — Collapse full suite to behavior budget
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer
 - **Write set:**
   - `tests/**`
@@ -79,3 +79,6 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 - **Acceptance:** Test collection is reduced to 1000-1500 tests. Deleted tests are
   low-value, redundant, residue-only, or implementation-shape assertions. Retained tests
   are documented by behavior layer and feature family in `quality-assurance.md`.
+- **Evidence:** Default collection is 1351 tests. Default behavior suite:
+  `1340 passed, 11 skipped, 1 deselected`. Focused changed-test slice: `43 passed`.
+  `specs doctor` reports 0 errors; `backlog doctor` is clean.

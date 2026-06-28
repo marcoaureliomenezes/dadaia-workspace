@@ -1,11 +1,9 @@
 """Real `pi` command smoke — proves the headless command actually executes (T-31-B-02).
 
-This is the regression guard the frozen-fake unit test could not provide for bug
-``pi-headless-command-trailing-dash-breaks-layer2``: the unit test
-(``tests/unit/infrastructure/test_pi_runtime.py::test_pi_adapter_builds_controlled_command_and_env``)
-asserts the argv ends ``-p`` with no trailing ``-`` against a *fake* runner, so a
-malformed real command could once ship green. Here we run the **real** ``pi`` binary
-through :class:`PiHeadlessAdapter` and prove the command executes WITHOUT the
+This is the regression guard fake adapter tests could not provide for bug
+``pi-headless-command-trailing-dash-breaks-layer2``: a malformed real command
+could once ship green when only fake runners were exercised. Here we run the
+**real** ``pi`` binary through :class:`PiHeadlessAdapter` and prove the command executes WITHOUT the
 "Unknown option: -" failure, returning a typed :class:`AgentRunResult` (SPEC v0.1.31
 Cluster 3 / A13; L5 — adopt+verify the ``c8513fa5`` fix, never re-fix it).
 

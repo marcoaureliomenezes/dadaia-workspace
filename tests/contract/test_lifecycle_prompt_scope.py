@@ -21,7 +21,7 @@ def test_prompt_contract_excludes_whole_workspace_context() -> None:
             prompt="Implement the prompt builder only.",
             allowed_paths=(
                 "dadaia_workspace/features/lifecycle/prompt_builder.py",
-                "tests/unit/features/lifecycle/test_prompt_builder.py",
+                "tests/contract/test_lifecycle_prompt_scope.py",
             ),
             forbidden_paths=("repos/other-project/src/**", "specs/_archive/**"),
             required_evidence=(GateEvidenceKind.HANDOFF,),
@@ -36,7 +36,7 @@ def test_prompt_contract_excludes_whole_workspace_context() -> None:
     assert payload["write_scope"] == {
         "allowed_paths": [
             "dadaia_workspace/features/lifecycle/prompt_builder.py",
-            "tests/unit/features/lifecycle/test_prompt_builder.py",
+            "tests/contract/test_lifecycle_prompt_scope.py",
         ],
         "forbidden_paths": ["repos/other-project/src/**", "specs/_archive/**"],
     }

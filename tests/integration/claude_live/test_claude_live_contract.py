@@ -15,11 +15,10 @@ Every test auto-SKIPs unless ALL of the following hold:
   * ``ANTHROPIC_API_KEY`` is set in the environment.
 
 This module is NOT CI-gated. With ``DADAIA_CLAUDE_LIVE`` unset it is collected and
-skipped — no live call, no import of the optional SDK. All adapter mapping and
-the security-critical permission wiring are real and fully faked-tested offline in
-``tests/unit/infrastructure/test_claude_sdk_runtime.py``; this seam exists only to
-confirm the upstream async API against a pinned ``claude-agent-sdk`` build and to
-record the verified version in ``specs/memory/tech-stack.md`` at CLOSURE.
+skipped — no live call, no import of the optional SDK. The retained behavior suite
+covers offline lifecycle and permission wiring; this seam exists only to confirm
+the upstream async API against a pinned ``claude-agent-sdk`` build and to record
+the verified version in ``specs/memory/tech-stack.md`` at CLOSURE.
 """
 
 from __future__ import annotations

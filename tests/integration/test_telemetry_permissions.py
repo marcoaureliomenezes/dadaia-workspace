@@ -30,7 +30,7 @@ from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Stubs — same pattern as tests/unit/features/telemetry/test_service.py
+# Stubs for telemetry service collaborators.
 # ---------------------------------------------------------------------------
 
 

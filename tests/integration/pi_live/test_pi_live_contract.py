@@ -14,10 +14,10 @@ Every test auto-SKIPs unless ALL of the following hold:
   * ``ANTHROPIC_API_KEY`` is set in the environment.
 
 This module is NOT CI-gated. With ``DADAIA_PI_LIVE`` unset it is collected and
-skipped — no live call. All adapter mapping/integration logic is real and fully
-faked-tested offline in ``tests/unit/infrastructure/test_pi_runtime.py``; this
-seam exists only to confirm the upstream schema against a pinned ``pi`` build and
-to record the verified version in ``specs/memory/tech-stack.md`` at CLOSURE.
+skipped — no live call. The retained behavior suite covers the offline lifecycle
+and harness wiring; this seam exists only to confirm the upstream schema against
+a pinned ``pi`` build and to record the verified version in
+``specs/memory/tech-stack.md`` at CLOSURE.
 """
 
 from __future__ import annotations
