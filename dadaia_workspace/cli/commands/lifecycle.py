@@ -784,7 +784,9 @@ def bug_report(
         )
     else:
         trail = " -> ".join(f"{s.label}:{'ok' if s.accepted else 'BLOCKED'}" for s in result.steps)
-        typer.echo(f"{status} bug-report run={result.run_id} phase={result.final_phase.value} {trail}")
+        typer.echo(
+            f"{status} bug-report run={result.run_id} phase={result.final_phase.value} {trail}"
+        )
     if not result.completed:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 

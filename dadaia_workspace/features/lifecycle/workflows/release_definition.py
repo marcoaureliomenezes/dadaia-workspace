@@ -649,9 +649,10 @@ class ReleaseDefinitionWorkflow:
                 },
             )
         actual_hash = hashlib.sha256(expected_path.read_bytes()).hexdigest()
-        reported_hash = (
-            worker_result.structured_output.get("content_hash")
-            or worker_result.structured_output.get(f"{artifact_name.removesuffix('.md').lower()}_hash")
+        reported_hash = worker_result.structured_output.get(
+            "content_hash"
+        ) or worker_result.structured_output.get(
+            f"{artifact_name.removesuffix('.md').lower()}_hash"
         )
         if reported_hash != actual_hash:
             return BlockedState(
@@ -804,7 +805,9 @@ class ReleaseDefinitionWorkflow:
         allowed_paths = [f".dadaia/handoff/{self._context}/**"]
         artifact_name = self._CREATE_ARTIFACTS.get(step.label)
         if artifact_name is not None:
-            allowed_paths.append(self._specs_relative(self._expected_release_artifact_path(artifact_name)))
+            allowed_paths.append(
+                self._specs_relative(self._expected_release_artifact_path(artifact_name))
+            )
         return PromptScope(
             role=step.role,
             context=self._context,

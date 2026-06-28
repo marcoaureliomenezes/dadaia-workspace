@@ -340,7 +340,9 @@ def test_release_scope_receives_explicit_operator_scope_not_run_id(
         scope_input=ReleaseDefinitionScopeInput(
             intent="Harden release-definition workflow scope input.",
             backlog_slugs=("workflow-model-governance-operator-profiles-and-context-overlays",),
-            bug_slugs=("release-definition-lacks-operator-intent-channel-and-infers-scope-from-run-id",),
+            bug_slugs=(
+                "release-definition-lacks-operator-intent-channel-and-infers-scope-from-run-id",
+            ),
             audit_refs=("audit-123",),
         ),
     )
