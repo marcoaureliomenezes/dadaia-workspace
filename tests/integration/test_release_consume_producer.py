@@ -19,6 +19,7 @@ All roots live under ``tmp_path`` — the CLI resolves them via ``resolve_worksp
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,8 +63,33 @@ class _KindReportingFake:
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
 
-    def run(self, request: AgentRunRequest) -> AgentRunResult:  # noqa: ARG002
-        return self.result
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        artifact_ref = _write_create_artifact(request)
+        if artifact_ref is None:
+            return self.result
+        content_hash = hashlib.sha256((Path.cwd() / artifact_ref).read_bytes()).hexdigest()
+        return AgentRunResult(
+            status=self.result.status,
+            summary=self.result.summary,
+            artifact_refs=(*self.result.artifact_refs, artifact_ref),
+            structured_output={**self.result.structured_output, "content_hash": content_hash},
+            error=self.result.error,
+        )
+
+
+def _write_create_artifact(request: AgentRunRequest) -> str | None:
+    for allowed in request.allowed_paths:
+        if not allowed.endswith(("SPEC.md", "PLAN.md", "TASKS.md")):
+            continue
+        path = Path.cwd() / allowed
+        if path.is_file():
+            content = path.read_text(encoding="utf-8")
+        else:
+            content = f"# {path.name}\n\nGenerated for {request.task_id or 'release-definition'}.\n"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return allowed
+    return None
 
 
 def _install_fake_factory(monkeypatch: pytest.MonkeyPatch) -> None:
