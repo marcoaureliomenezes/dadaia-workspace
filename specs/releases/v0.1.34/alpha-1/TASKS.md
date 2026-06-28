@@ -66,3 +66,16 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
   - `specs/releases/v0.1.34/alpha-1/TASKS.md`
 - **Acceptance:** Focused contract/spec-context/panel/lifecycle tests pass; collection
   count is lower than the baseline; specs doctor reports 0 errors.
+
+### T-34-06 — Collapse full suite to behavior budget
+
+- **Status:** [-]
+- **Owner:** software-engineer
+- **Write set:**
+  - `tests/**`
+  - `pyproject.toml`
+  - `specs/memory/quality-assurance.md`
+  - `specs/releases/v0.1.34/alpha-1/{SPEC.md,PLAN.md,TASKS.md}`
+- **Acceptance:** Test collection is reduced to 1000-1500 tests. Deleted tests are
+  low-value, redundant, residue-only, or implementation-shape assertions. Retained tests
+  are documented by behavior layer and feature family in `quality-assurance.md`.

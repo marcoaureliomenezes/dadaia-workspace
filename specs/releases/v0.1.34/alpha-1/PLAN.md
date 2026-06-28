@@ -10,9 +10,9 @@
 
 ## Approach
 
-Start with governance and the highest-confidence slop removals. Keep the blast radius
-small enough to validate, but make the direction irreversible: tests must be justified by
-current behavior, not by release history.
+Start with governance and the highest-confidence slop removals, then collapse redundant
+test clusters until the collected suite lands in the 1000-1500 range. Tests must be
+justified by current behavior, not by release history.
 
 ## Implementation Plan
 
@@ -54,7 +54,24 @@ Introduce a `performance` pytest marker and mark
 Update `dadaia_workspace/features/ci_preflight/service.py` and tests so pre-push uses
 the behavior suite, not synthetic wall-clock performance.
 
-### 5. Validate and count
+### 5. Collapse redundant clusters to budget
+
+Use collection data to identify high-count clusters. For each cluster, keep tests that
+protect distinct current behavior and delete tests that only restate helper mechanics,
+deleted implementation history, fixture plumbing, or duplicate permutations already
+covered at a better layer.
+
+Primary reduction order:
+
+- redundant unit tests around internal helper branches when an integration or contract
+  test already proves the public behavior;
+- generated/schema round-trip permutations that do not add boundary coverage;
+- panel view string-shape tests that duplicate route/API tests;
+- lifecycle workflow micro-tests that duplicate the state-machine, pipeline, or real
+  workflow-path tests;
+- E2E/browser scenarios that are not real operator journeys.
+
+### 6. Validate and count
 
 Run collection before/after and focused suites:
 
@@ -75,6 +92,4 @@ Record remaining count and any deferred cleanup in the closure evidence.
 - Do not delete tests that are the only guard for a security boundary.
 - Prefer converting a residue test into a current behavior test when the boundary still
   matters.
-- Keep browser E2E reductions conservative in alpha-1; first remove policy ratchets and
-  obvious history pins.
-
+- Keep at least one behavior guard per critical public boundary before deleting a cluster.

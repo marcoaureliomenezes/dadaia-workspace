@@ -10,9 +10,9 @@
 
 ## Objective
 
-Reduce the dadaia-workspace test suite from accumulated historical coverage toward a
-behavior-first suite that protects current product value: Spec Context Projects, the
-Dadaia Workspace Panel, and dadaia-workflows/lifecycle.
+Reduce the dadaia-workspace test suite from accumulated historical coverage into a
+behavior-first suite of **1000-1500 collected tests** that protects current product
+value: Spec Context Projects, the Dadaia Workspace Panel, and dadaia-workflows/lifecycle.
 
 The release must update `quality-assurance.md` so it becomes the canonical quality
 schema for the project, not an aspirational description contradicted by the current
@@ -74,8 +74,7 @@ kept out of default preflight.
 - Rewriting production feature behavior solely to fit existing tests.
 - Removing legitimate security or compatibility contracts.
 - Solving every open panel or lifecycle bug unrelated to test architecture.
-- Achieving the final 1000-1500 test target in one alpha if doing so would destroy
-  useful coverage without replacement.
+- Replacing deleted low-value tests with equally low-value renamed tests.
 
 ## Acceptance Criteria
 
@@ -87,7 +86,9 @@ kept out of default preflight.
 4. At least the obvious residue-only contract tests are deleted or converted into
    behavior tests with a current boundary.
 5. The synthetic performance test is marked so default pytest/preflight can exclude it.
-6. Python test collection count is materially reduced and recorded in release evidence.
+6. Python test collection count is between 1000 and 1500 and recorded in release
+   evidence.
 7. Focused tests for retained Spec Context Project, Panel, and lifecycle behavior pass.
 8. `dadaia specs doctor --specs-dir repos/dadaia-workspace/specs` reports 0 errors.
-
+9. The final test architecture is compactly documented: each retained layer explains
+   what behavior it protects and which feature families it evaluates.
