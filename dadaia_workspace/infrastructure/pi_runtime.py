@@ -55,12 +55,9 @@ class PiHeadlessConfig:
     """Explicit controls for one headless PI adapter instance.
 
     ``model`` is the discrete Layer-2 GPT id (LAW 2 / ADR-B) PI runs against its Codex
-    subscription; it is passed verbatim as ``pi --model <id>``. ``reasoning_effort``
-    carries the chosen option's effort for observability/parity, but PI's CLI exposes
-    **no verified separate reasoning-effort flag**, so the effort is *not* forwarded as
-    a flag — only ``--model`` reaches the command. (Limitation noted per WS-2: a unit
-    test asserts the discrete id reaches ``pi --model``; effort honoring is upstream-CLI
-    dependent and is a follow-up if/when PI exposes the flag.)
+    subscription. PI's CLI resolves bare ids through its provider stack, so the adapter
+    qualifies GPT ids as ``openai-codex/<id>`` before passing ``--model``. The selected
+    reasoning effort is forwarded through PI's native ``--thinking`` flag.
     """
 
     cwd: Path
@@ -156,8 +153,9 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
            selection (legacy LAW-2 path).
         3. neither ⇒ no ``--model`` flag (PI uses its own default).
 
-        PI exposes no verified separate reasoning-effort flag, so only ``--model`` is
-        forwarded (see :class:`PiHeadlessConfig`).
+        PI resolves bare ids provider-first, so the model is provider-qualified before it
+        reaches ``--model``. Reasoning effort is forwarded with ``--thinking`` when
+        present.
         """
         args = [
             self._config.pi_bin,
@@ -168,7 +166,10 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         ]
         model = self._resolve_model(request)
         if model is not None:
-            args += ["--model", model]
+            args += ["--model", self._pi_model_pattern(model)]
+        effort = self._resolve_thinking(request)
+        if effort is not None:
+            args += ["--thinking", effort]
         # ``--print``/-p is non-interactive; the prompt is piped via stdin
         # (``subprocess.run(..., input=self._prompt(request))``). PI reads the piped
         # stdin in print mode — do NOT append a ``-`` stdin marker: ``pi`` has no such
@@ -181,6 +182,17 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         if request.resolved_model is not None:
             return request.resolved_model.model
         return self._config.model
+
+    def _resolve_thinking(self, request: AgentRunRequest) -> str | None:
+        if request.resolved_model is not None:
+            return request.resolved_model.reasoning
+        return self._config.reasoning_effort
+
+    @staticmethod
+    def _pi_model_pattern(model: str) -> str:
+        if "/" in model:
+            return model
+        return f"openai-codex/{model}"
 
     # -- result extraction (WS-PI-2) -------------------------------------
 

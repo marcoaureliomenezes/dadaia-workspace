@@ -4,7 +4,7 @@ The operator's two-layer model (v0.1.24 ADR-B) makes the Layer-2 worker model a
 **discrete choice on the CLI call**, not a tier abstraction. Each Layer-2 harness
 exposes an ordered, finite set of ``(model_id, reasoning_effort)`` options:
 
-- **pi → 3 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, low)``, ``(gpt-5.3-codex, medium)``
+- **pi → 3 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, low)``, ``(gpt-5.3-codex-spark, medium)``
 - **codex → 2 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, medium)``
 
 **GPT-only invariant (ADR-B).** PI runs on the operator's *Codex* subscription, so
@@ -62,7 +62,7 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
     PI_HARNESS: (
         HarnessModelOption("gpt-5.5", "high"),
         HarnessModelOption("gpt-5.5", "low"),
-        HarnessModelOption("gpt-5.3-codex", "medium"),
+        HarnessModelOption("gpt-5.3-codex-spark", "medium"),
     ),
     CODEX_HARNESS: (
         HarnessModelOption("gpt-5.5", "high"),
@@ -134,8 +134,8 @@ def validate(harness: str, model: str) -> HarnessModelOption:
     *model* is matched against each option's ``"<model_id>:<effort>"`` choice string
     (the canonical CLI form) and, as a convenience, against a bare ``model_id`` **only
     when that id is unambiguous** for the harness (exactly one effort). This keeps the
-    common ``gpt-5.3-codex`` case ergonomic while forcing the ambiguous ``gpt-5.5`` to
-    be disambiguated by effort.
+    common single-effort case ergonomic while forcing the ambiguous ``gpt-5.5`` to be
+    disambiguated by effort.
 
     Args:
         harness: the Layer-2 harness name (e.g. ``"pi"``, ``"codex"``).

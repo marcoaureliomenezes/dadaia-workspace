@@ -5,6 +5,7 @@ import dataclasses
 import pytest
 
 from dadaia_workspace.core.models.lifecycle import (
+    ActiveWorker,
     AgentRunRequest,
     AgentRunResult,
     AgentRunStatus,
@@ -76,6 +77,34 @@ def test_lifecycle_run_round_trips_to_primitive_dict() -> None:
         "detail": {"branch": "feature/v0.1.15"},
     }
 
+    assert LifecycleRun.from_dict(data) == run
+
+
+def test_lifecycle_run_round_trips_active_worker_marker() -> None:
+    run = LifecycleRun(
+        run_id="run-1",
+        context="dadaia-workspace",
+        release_id="v0.1.36",
+        command="release_definition",
+        phase=LifecyclePhase.RELEASE_DEFINITION,
+        status=LifecycleRunStatus.RUNNING,
+        current_step="release_scope",
+        active_worker=ActiveWorker(
+            step="release_scope",
+            runtime_kind="pi_headless",
+            started_at="2026-06-28T22:00:00+00:00",
+            heartbeat="2026-06-28T22:00:00+00:00",
+        ),
+    )
+
+    data = run.to_dict()
+
+    assert data["active_worker"] == {
+        "step": "release_scope",
+        "runtime_kind": "pi_headless",
+        "started_at": "2026-06-28T22:00:00+00:00",
+        "heartbeat": "2026-06-28T22:00:00+00:00",
+    }
     assert LifecycleRun.from_dict(data) == run
 
 

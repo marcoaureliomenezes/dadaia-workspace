@@ -40,7 +40,7 @@ from dadaia_workspace.features.lifecycle.pipeline import (
 )
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-_PI_MODELS = {"gpt-5.3-codex", "gpt-5.5"}
+_PI_MODELS = {"gpt-5.3-codex-spark", "gpt-5.5"}
 
 
 def _init_workspace(path: Path) -> Path:

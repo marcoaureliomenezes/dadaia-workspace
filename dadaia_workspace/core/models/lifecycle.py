@@ -277,6 +277,33 @@ class InjectedContext:
 
 
 @dataclass(frozen=True)
+class ActiveWorker:
+    """Observable marker for a live Layer-2 worker call inside a lifecycle run."""
+
+    step: str
+    runtime_kind: str
+    started_at: str
+    heartbeat: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "step": self.step,
+            "runtime_kind": self.runtime_kind,
+            "started_at": self.started_at,
+            "heartbeat": self.heartbeat,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> ActiveWorker:
+        return cls(
+            step=str(data["step"]),
+            runtime_kind=str(data["runtime_kind"]),
+            started_at=str(data["started_at"]),
+            heartbeat=str(data["heartbeat"]),
+        )
+
+
+@dataclass(frozen=True)
 class LifecycleRun:
     run_id: str
     context: str
@@ -300,6 +327,8 @@ class LifecycleRun:
     # ``workflow_steps`` key load as an empty ledger (A27) — the run-store
     # ``_SCHEMA_VERSION`` literal is deliberately unchanged, mirroring ``workflow_policy``.
     workflow_steps: WorkflowStepLedger = field(default_factory=WorkflowStepLedger)
+    # Additive-optional live-worker marker. Old run records load as ``None``.
+    active_worker: ActiveWorker | None = None
 
     def prompt_composition(self) -> tuple[dict[str, Any], ...]:
         """Return the per-step prompt composition for this run (WS-9 observability).
@@ -327,6 +356,7 @@ class LifecycleRun:
             "injected_context": [entry.to_dict() for entry in self.injected_context],
             "workflow_policy": (self.workflow_policy.to_dict() if self.workflow_policy else None),
             "workflow_steps": self.workflow_steps.to_list(),
+            "active_worker": self.active_worker.to_dict() if self.active_worker else None,
         }
 
     @classmethod
@@ -347,6 +377,8 @@ class LifecycleRun:
         # Additive-optional: absent ``workflow_steps`` (old records) ⇒ empty ledger (A27).
         steps_raw = data.get("workflow_steps", [])
         assert isinstance(steps_raw, list)
+        active_worker_raw = data.get("active_worker")
+        assert active_worker_raw is None or isinstance(active_worker_raw, dict)
         return cls(
             run_id=str(data["run_id"]),
             context=str(data["context"]),
@@ -361,6 +393,9 @@ class LifecycleRun:
             injected_context=tuple(injected),
             workflow_policy=(WorkflowPolicySnapshot.from_dict(policy_raw) if policy_raw else None),
             workflow_steps=WorkflowStepLedger.from_list(steps_raw),
+            active_worker=(
+                ActiveWorker.from_dict(active_worker_raw) if active_worker_raw else None
+            ),
         )
 
 

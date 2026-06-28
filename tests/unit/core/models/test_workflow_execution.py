@@ -109,7 +109,7 @@ def test_resolved_model_config_round_trip() -> None:
 def test_resolved_model_config_is_frozen() -> None:
     resolved = _resolved()
     with pytest.raises(dataclasses.FrozenInstanceError):
-        resolved.model = "gpt-5.3-codex"  # type: ignore[misc]
+        resolved.model = "gpt-5.3-codex-spark"  # type: ignore[misc]
 
 
 def test_step_entry_round_trip() -> None:

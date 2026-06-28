@@ -1,6 +1,6 @@
 ---
 name: backlog-definition-pi-intake-grill-artifact-evidence-gate
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 session_id: sess_5aabaf1d
@@ -37,3 +37,21 @@ an artifact-writing create step.
 **Notes:** The first sandboxed run also failed before PI started because PI needed to
 create lock files under `/home/marco/.pi/agent`; rerunning with approved escalation allowed
 PI to run and exposed the real workflow gate block above. No secrets included.
+
+## Resolution — v0.1.36 alpha-1
+
+The current backlog-definition workflow marks `intake_grill` as a structured-data
+producer (`structured_output_evidence=True`), and `LifecycleAgentRunner` accepts such a
+step when the worker returns non-empty `structured_output` even without `artifact_refs`.
+That preserves the artifact-evidence requirement for create steps that must write files,
+while allowing `intake_grill -> subject_bind` to pass schema-valid data to Python.
+
+Regression:
+
+```bash
+.dadaia/.venv/bin/python -m pytest -p no:cacheprovider \
+  repos/dadaia-workspace/tests/integration/test_backlog_definition_workflow.py::test_intake_grill_accepts_structured_data_without_artifact_refs \
+  repos/dadaia-workspace/tests/integration/test_cli_backlog_define.py -q
+```
+
+Evidence: `6 passed` on 2026-06-28.

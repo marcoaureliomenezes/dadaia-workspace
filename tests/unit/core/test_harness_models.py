@@ -32,7 +32,7 @@ def test_pi_catalog_is_the_confirmed_operator_set() -> None:
     assert options_for(PI_HARNESS) == (
         HarnessModelOption("gpt-5.5", "high"),
         HarnessModelOption("gpt-5.5", "low"),
-        HarnessModelOption("gpt-5.3-codex", "medium"),
+        HarnessModelOption("gpt-5.3-codex-spark", "medium"),
     )
 
 
@@ -65,7 +65,11 @@ def test_every_catalog_id_exists_as_registry_codex_id() -> None:
     [
         (PI_HARNESS, "gpt-5.5:high", HarnessModelOption("gpt-5.5", "high")),
         (PI_HARNESS, "gpt-5.5:low", HarnessModelOption("gpt-5.5", "low")),
-        (PI_HARNESS, "gpt-5.3-codex:medium", HarnessModelOption("gpt-5.3-codex", "medium")),
+        (
+            PI_HARNESS,
+            "gpt-5.3-codex-spark:medium",
+            HarnessModelOption("gpt-5.3-codex-spark", "medium"),
+        ),
         (CODEX_HARNESS, "gpt-5.5:high", HarnessModelOption("gpt-5.5", "high")),
         (CODEX_HARNESS, "gpt-5.5:medium", HarnessModelOption("gpt-5.5", "medium")),
     ],
@@ -76,7 +80,9 @@ def test_valid_pairs_resolve(harness: str, model: str, expected: HarnessModelOpt
 
 def test_unambiguous_bare_model_id_resolves() -> None:
     """A bare id with a single effort resolves without the ``:effort`` suffix."""
-    assert validate(PI_HARNESS, "gpt-5.3-codex") == HarnessModelOption("gpt-5.3-codex", "medium")
+    assert validate(PI_HARNESS, "gpt-5.3-codex-spark") == HarnessModelOption(
+        "gpt-5.3-codex-spark", "medium"
+    )
 
 
 def test_ambiguous_bare_model_id_is_rejected() -> None:
@@ -106,7 +112,7 @@ def test_model_choices_are_disambiguated_pairs() -> None:
     assert model_choices(PI_HARNESS) == (
         "gpt-5.5:high",
         "gpt-5.5:low",
-        "gpt-5.3-codex:medium",
+        "gpt-5.3-codex-spark:medium",
     )
 
 

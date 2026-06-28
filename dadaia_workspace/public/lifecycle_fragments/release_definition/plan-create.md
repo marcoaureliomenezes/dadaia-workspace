@@ -47,5 +47,8 @@ PLAN says in what order and by what strategy.
 
 ## Output
 
-A PLAN draft plus its SPEC-requirement coverage mapping, emitted per the output
-contract. The PLAN enters review as a draft.
+Write the PLAN draft to the canonical release artifact path named in your allowed write
+scope: `PLAN.md` under the current release directory. Then emit one `agent-run-result-v1`
+object whose `artifact_refs` includes that exact path, and whose `structured_output`
+includes `content_hash` equal to the SHA-256 of the written file bytes. The PLAN enters
+review as a draft.

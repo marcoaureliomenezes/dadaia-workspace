@@ -984,6 +984,7 @@ def build_release_definition_workflow(
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
     models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    step_models: dict[str, HarnessModelOption] | None = None,
     scope_input: "ReleaseDefinitionScopeInput | None" = None,
 ) -> "ReleaseDefinitionWorkflow":
     """Compose the fragment-driven release-definition workflow (WS-5 / §6.1).
@@ -1027,6 +1028,7 @@ def build_release_definition_workflow(
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         scope_input=scope_input or ReleaseDefinitionScopeInput(),
+        step_models=step_models,
     )
 
 

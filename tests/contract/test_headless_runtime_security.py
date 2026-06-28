@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.container import build_agent_runtime
+from dadaia_workspace.core.harness_models import HarnessModelOption
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunResult,
@@ -244,6 +245,30 @@ def test_pi_nonzero_without_message_end_surfaces_runtime_failure(tmp_path: Path)
     assert result.summary == "pi headless returned non-zero exit"
     assert "No API key found" in (result.error or "")
     assert result.artifact_refs == ()
+
+
+def test_pi_command_qualifies_model_and_threads_thinking(tmp_path: Path) -> None:
+    captured: list[str] = []
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured.extend(str(part) for part in argv)
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="stop before worker")
+
+    adapter = build_agent_runtime(
+        AgentRuntimeKind.PI_HEADLESS,
+        cwd=tmp_path,
+        model=HarnessModelOption("gpt-5.3-codex-spark", "medium"),
+    )
+    assert isinstance(adapter, pi_runtime.PiHeadlessAdapter)
+    adapter._runner = fake_runner
+
+    result = adapter.run(_request(AgentRuntimeKind.PI_HEADLESS))
+
+    assert result.status is AgentRunStatus.FAILED
+    assert captured[captured.index("--model") + 1] == "openai-codex/gpt-5.3-codex-spark"
+    assert captured[captured.index("--thinking") + 1] == "medium"
 
 
 def test_codex_handoff_final_payload_surfaces_review_verdict(tmp_path: Path) -> None:

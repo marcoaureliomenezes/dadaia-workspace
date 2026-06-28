@@ -124,7 +124,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
     ),
     ModelEntry(
         claude_id="claude-sonnet-4-6",
-        codex_id="gpt-5.3-codex",
+        codex_id="gpt-5.3-codex-spark",
         pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2025, 1, 1)),),
         tier="plugin",
     ),

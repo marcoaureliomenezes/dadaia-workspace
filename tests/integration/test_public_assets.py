@@ -526,7 +526,7 @@ def test_render_codex_agent_toml_emits_read_only_boundary_for_reviewers() -> Non
     for name in ("qa-engineer", "code-reviewer", "security-reviewer", "project-auditor"):
         result = _render_codex_agent_toml(
             name,
-            "gpt-5.3-codex",
+            "gpt-5.3-codex-spark",
             "Review without production edits.",
         )
 

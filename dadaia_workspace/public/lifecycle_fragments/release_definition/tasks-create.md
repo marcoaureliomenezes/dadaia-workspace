@@ -49,5 +49,8 @@ role, its write set, and how it is validated.
 
 ## Output
 
-A TASKS draft with task groups, owners, write sets, validations, and dependency
-order, emitted per the output contract. The TASKS enter implementability review.
+Write the TASKS draft to the canonical release artifact path named in your allowed write
+scope: `TASKS.md` under the current release directory. Then emit one
+`agent-run-result-v1` object whose `artifact_refs` includes that exact path, and whose
+`structured_output` includes `content_hash` equal to the SHA-256 of the written file
+bytes. The TASKS enter implementability review.

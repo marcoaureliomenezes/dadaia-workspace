@@ -885,12 +885,12 @@ só no Layer 2. **OpenCode foi removido inteiramente em v0.1.24** (ambas as laye
   harness has a discrete model catalog selected on the CLI (`--model` / `--step-model`),
   validated against the chosen harness's set; an invalid `(harness, model)` pair is rejected
   with the valid set. **pi → 3 models:** `(gpt-5.5, high)`, `(gpt-5.5, low)`,
-  `(gpt-5.3-codex, medium)`. **codex → 2 models:** `(gpt-5.5, high)`, `(gpt-5.5, medium)`.
+  `(gpt-5.3-codex-spark, medium)`. **codex → 2 models:** `(gpt-5.5, high)`, `(gpt-5.5, medium)`.
   Both catalogs are **GPT-only** by construction (PI runs on the operator's Codex
   subscription → GPT ids): no `claude-*` id (including the region-restricted
   `claude-fable-5`) is **ever** selectable at Layer 2. The catalog is explicit GPT data
   keyed by harness (`core/harness_models.py`), consistent with — but not a tier-view of —
-  `core/model_registry.py`; PI honors the model (`pi --model <id>`), Codex takes the
+  `core/model_registry.py`; PI honors the model (`pi --model openai-codex/<id>` plus `--thinking <effort>`), Codex takes the
   discrete `(id, effort)`.
 
 A harness can exist at one layer and not the other. PI ships as a real **Layer-2**

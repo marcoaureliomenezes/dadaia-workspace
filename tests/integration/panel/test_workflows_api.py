@@ -140,7 +140,7 @@ class TestDadaiaWorkflowDetailAdditive:
         assert worker["model_options"]["pi"] == [
             "gpt-5.5:high",
             "gpt-5.5:low",
-            "gpt-5.3-codex:medium",
+            "gpt-5.3-codex-spark:medium",
         ]
         assert worker["model_options"]["codex"] == ["gpt-5.5:high", "gpt-5.5:medium"]
 

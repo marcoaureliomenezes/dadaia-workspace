@@ -32,10 +32,13 @@ so the composition of each prompt is auditable.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.harness_models import HarnessModelOption
 from dadaia_workspace.core.models.lifecycle import (
+    ActiveWorker,
     AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
@@ -45,6 +48,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
     LifecycleRunStatus,
 )
+from dadaia_workspace.core.models.workflow_execution import PolicySource, ResolvedModelConfig
 from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.lifecycle.agent_runner import (
@@ -264,6 +268,7 @@ class ReleaseDefinitionWorkflow:
         state_machine: LifecycleStateMachine | None = None,
         handoff_resolver: WorkflowHandoffResolver | None = None,
         scope_input: ReleaseDefinitionScopeInput | None = None,
+        step_models: dict[str, HarnessModelOption] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -282,6 +287,7 @@ class ReleaseDefinitionWorkflow:
         # produces/consumes edges are inert.
         self._handoff_resolver = handoff_resolver
         self._scope_input = scope_input or ReleaseDefinitionScopeInput()
+        self._step_models = step_models or {}
 
     # -- public entrypoint ----------------------------------------------
 
@@ -358,6 +364,11 @@ class ReleaseDefinitionWorkflow:
 
         audit = self._select_context(step, fragment)
         run = record_injected_context(run, audit)
+        # Persist the pre-worker prompt/context audit before a live runtime can spend a
+        # long time inside subprocess.run(). Without this save, a PI/Codex worker may be
+        # active while the lifecycle state still shows no injected context or prompt
+        # composition for the current step.
+        self._run_store.save(run)
 
         selected = self._render_selection(audit)
         if step.label == "release_scope" and not self._scope_input.is_empty():
@@ -377,6 +388,17 @@ class ReleaseDefinitionWorkflow:
         built = self._prompt_builder.build(
             scope, runtime=runtime.runtime_kind(), prefix=self._prefix
         )
+        worker_started_at = datetime.now(UTC).isoformat()
+        run = replace(
+            run,
+            active_worker=ActiveWorker(
+                step=step.label,
+                runtime_kind=runtime.runtime_kind().value,
+                started_at=worker_started_at,
+                heartbeat=worker_started_at,
+            ),
+        )
+        self._run_store.save(run)
 
         # Python owns the gate, which is REVIEW-ONLY for the verdict (v0.1.31 / L1). A
         # review step (``step.is_review``) runs the worker and reads its structured verdict
@@ -397,6 +419,8 @@ class ReleaseDefinitionWorkflow:
                 is_review=step.is_review,
             ),
         )
+        run = replace(run, active_worker=None)
+        self._run_store.save(run)
         if blocked is None:
             blocked = self._canonical_artifact_block(run, step, worker_result)
         # Record consumption of every upstream the step declared (A22) and write this
@@ -808,6 +832,7 @@ class ReleaseDefinitionWorkflow:
             allowed_paths.append(
                 self._specs_relative(self._expected_release_artifact_path(artifact_name))
             )
+        resolved_model = self._resolved_model_for_step(step)
         return PromptScope(
             role=step.role,
             context=self._context,
@@ -816,7 +841,37 @@ class ReleaseDefinitionWorkflow:
             prompt=suffix,
             allowed_paths=tuple(allowed_paths),
             required_evidence=(GateEvidenceKind.HANDOFF,),
+            model_profile=(
+                f"cli:{resolved_model.model}:{resolved_model.reasoning}"
+                if resolved_model is not None
+                else None
+            ),
+            resolved_model=resolved_model,
         )
+
+    def _resolved_model_for_step(self, step: ReleaseStep) -> ResolvedModelConfig | None:
+        option = self._step_models.get(step.label)
+        if option is None:
+            return None
+        kind = step.runtime_kind or self._default_kind
+        harness = _runtime_kind_to_harness(kind)
+        if harness is None:
+            return None
+        return ResolvedModelConfig(
+            profile_id=f"cli:{option.model_id}:{option.effort}",
+            harness=harness,
+            model=option.model_id,
+            reasoning=option.effort,
+            source=PolicySource.CLI,
+        )
+
+
+def _runtime_kind_to_harness(kind: AgentRuntimeKind) -> str | None:
+    if kind is AgentRuntimeKind.PI_HEADLESS:
+        return "pi"
+    if kind is AgentRuntimeKind.CODEX_EXEC:
+        return "codex"
+    return None
 
 
 __all__ = [

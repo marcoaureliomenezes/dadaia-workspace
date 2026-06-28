@@ -359,6 +359,96 @@ def test_release_scope_receives_explicit_operator_scope_not_run_id(
     assert "Treat run_id/task_id as opaque operational identifiers" in scope_step.prompt_text
 
 
+def test_release_definition_threads_step_model_by_label_not_runtime_kind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    received: list[AgentRunRequest] = []
+
+    @dataclass
+    class RecordingFake(_KindReportingFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            received.append(request)
+            return super().run(request)
+
+    def fake_factory(
+        *,
+        context: str,  # noqa: ARG001
+        run_cwd: Path,  # noqa: ARG001
+        model_by_kind: dict[AgentRuntimeKind, object],  # noqa: ARG001
+    ) -> object:
+        def factory(kind: AgentRuntimeKind) -> RecordingFake:
+            return RecordingFake(kind, _approving_result())
+
+        return factory
+
+    monkeypatch.setattr(container, "_release_definition_runtime_factory", fake_factory)
+
+    result = _define(
+        [
+            "--harness",
+            "pi",
+            "--model",
+            "gpt-5.5:high",
+            "--step-model",
+            "release_scope=gpt-5.5:low",
+            "--step-model",
+            "spec_create=gpt-5.3-codex-spark:medium",
+        ]
+    )
+
+    assert result.exit_code == 0, result.output
+    by_label = {req.task_id.rsplit(":", 1)[-1]: req for req in received}
+    release_scope = by_label["release_scope"].resolved_model
+    spec_create = by_label["spec_create"].resolved_model
+    assert release_scope is not None
+    assert spec_create is not None
+    assert (release_scope.model, release_scope.reasoning) == ("gpt-5.5", "low")
+    assert (spec_create.model, spec_create.reasoning) == ("gpt-5.3-codex-spark", "medium")
+
+
+def test_release_definition_persists_injected_context_before_worker_returns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    store = container.build_lifecycle_run_store(workspace)
+
+    @dataclass
+    class InspectingFake(_KindReportingFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            assert request.task_id is not None
+            run_id, _, step_label = request.task_id.partition(":")
+            persisted = store.load(run_id)
+            assert persisted is not None
+            assert any(entry.step == step_label for entry in persisted.injected_context)
+            assert persisted.active_worker is not None
+            assert persisted.active_worker.step == step_label
+            assert persisted.active_worker.runtime_kind == self.kind.value
+            return super().run(request)
+
+    def fake_factory(
+        *,
+        context: str,  # noqa: ARG001
+        run_cwd: Path,  # noqa: ARG001
+        model_by_kind: dict[AgentRuntimeKind, object],  # noqa: ARG001
+    ) -> object:
+        def factory(kind: AgentRuntimeKind) -> InspectingFake:
+            return InspectingFake(kind, _approving_result())
+
+        return factory
+
+    monkeypatch.setattr(container, "_release_definition_runtime_factory", fake_factory)
+
+    result = _define(["--harness", "pi"])
+
+    assert result.exit_code == 0, result.output
+    completed = store.load("release-define")
+    assert completed is not None
+    assert completed.active_worker is None
+
+
 # 3 -- rejected review blocks advancement -----------------------------------
 
 

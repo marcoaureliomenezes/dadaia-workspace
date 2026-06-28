@@ -48,5 +48,8 @@ into a precise, testable specification.
 
 ## Output
 
-A SPEC draft plus its traceability table, emitted per the output contract. The SPEC
-enters review as a draft; it is not approved by you.
+Write the SPEC draft to the canonical release artifact path named in your allowed write
+scope: `SPEC.md` under the current release directory. Then emit one `agent-run-result-v1`
+object whose `artifact_refs` includes that exact path, and whose `structured_output`
+includes `content_hash` equal to the SHA-256 of the written file bytes. The SPEC enters
+review as a draft; it is not approved by you.

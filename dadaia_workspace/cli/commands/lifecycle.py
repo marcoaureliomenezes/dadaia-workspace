@@ -567,9 +567,11 @@ def release_define(
         overrides[clean_label] = _resolve_harness(kind_str.strip())
         harness_by_label[clean_label] = kind_str.strip()
 
-    # LAW 2 — resolve the discrete model per runtime kind. The default --model applies to
-    # the default harness; --step-model overrides per label (keyed onto its step's kind).
+    # LAW 2 — resolve the discrete model per runtime kind for the default, and per label
+    # for explicit --step-model overrides. Label-specific models are threaded into the
+    # request as resolved_model so two steps on the same harness can use different models.
     models: dict[AgentRuntimeKind, HarnessModelOption] = {}
+    step_models: dict[str, HarnessModelOption] = {}
     default_model = _resolve_model(harness, model)
     if default_model is not None:
         models[default_kind] = default_model
@@ -581,7 +583,7 @@ def release_define(
         step_harness_name = harness_by_label.get(clean_label, harness)
         resolved = _resolve_model(step_harness_name, model_str.strip())
         if resolved is not None:
-            models[_resolve_harness(step_harness_name)] = resolved
+            step_models[clean_label] = resolved
 
     workflow = container.build_release_definition_workflow(
         workspace_root,
@@ -589,6 +591,7 @@ def release_define(
         release_id=release_id,
         default_runtime_kind=default_kind,
         models=models,
+        step_models=step_models,
         scope_input=ReleaseDefinitionScopeInput(
             intent=intent,
             backlog_slugs=tuple(backlog or ()),
