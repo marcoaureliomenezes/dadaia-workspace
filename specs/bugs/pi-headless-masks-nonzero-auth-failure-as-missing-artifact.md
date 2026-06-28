@@ -1,6 +1,6 @@
 ---
 name: pi-headless-masks-nonzero-auth-failure-as-missing-artifact
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-27
 surface: lifecycle PI Layer-2 runtime adapter / release-definition workflow
@@ -65,3 +65,18 @@ configuration problem.
 **Acceptance:** Add a unit test for non-zero PI return code + stdout session event +
 stderr error + no `message_end`; assert `AgentRunStatus.FAILED` with a redacted error
 containing the PI failure message.
+
+## Resolution
+
+Fixed in `v0.1.35`.
+
+`PiHeadlessAdapter` now treats a non-zero `pi --mode json` exit with no terminal
+`message_end` as a runtime failure even when PI emitted partial session JSON on stdout.
+The adapter surfaces redacted stderr/stdout as the error, so workflow users see the real
+provider/auth/configuration failure instead of a later generic artifact-evidence block.
+
+Evidence:
+
+- `dadaia_workspace/infrastructure/pi_runtime.py#PiHeadlessAdapter._result_from_output`
+- `tests/contract/test_headless_runtime_security.py::test_pi_nonzero_without_message_end_surfaces_runtime_failure`
+- Focused validation: `.dadaia/.venv/bin/python -m pytest -p no:cacheprovider repos/dadaia-workspace/tests/contract/test_headless_runtime_security.py` -> `10 passed`

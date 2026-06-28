@@ -1,6 +1,6 @@
 ---
 name: codex-lifecycle-read-only-sandbox-blocks-layer2-worker-init
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-27
 surface: lifecycle Codex Layer-2 runtime adapter / backlog-definition workflow
@@ -56,3 +56,19 @@ step even though the worker never had a chance to comply.
 add a regression test proving a container-built Codex adapter uses `--sandbox
 workspace-write`; rerun a live Codex-backed workflow smoke and confirm it gets past Codex
 initialization.
+
+## Resolution
+
+Fixed in `v0.1.35`.
+
+`CodexExecConfig.sandbox` now defaults to `workspace-write`, and
+`CodexExecAdapter._command()` passes that sandbox value to `codex exec`. This lets the
+Layer-2 worker initialize and write scoped workflow artifacts before Python gates inspect
+the result.
+
+Evidence:
+
+- `dadaia_workspace/infrastructure/codex_runtime.py#CodexExecConfig`
+- `dadaia_workspace/infrastructure/codex_runtime.py#CodexExecAdapter._command`
+- `specs/releases/v0.1.35/alpha-1/TASKS.md` T-35-04 Codex smoke:
+  `v0135-codex-scope-smoke` completed `release_scope` on `codex_exec`.

@@ -1,6 +1,6 @@
 ---
 name: codex-lifecycle-workspace-root-requires-skip-git-repo-check
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-27
 surface: lifecycle Codex Layer-2 runtime adapter / backlog-definition workflow
@@ -43,3 +43,17 @@ correct.
 **Acceptance:** Add `--skip-git-repo-check` to the Codex exec adapter command and pin it
 in command-construction tests; rerun a Codex-backed workflow smoke past this startup
 guard.
+
+## Resolution
+
+Fixed in `v0.1.35`.
+
+`CodexExecAdapter._command()` now passes `--skip-git-repo-check` for non-interactive
+Layer-2 lifecycle execution from the dadaia workspace root. Workflow write safety remains
+owned by the Python gates, Ring-2 changed-path checks, and git chokepoints.
+
+Evidence:
+
+- `dadaia_workspace/infrastructure/codex_runtime.py#CodexExecAdapter._command`
+- `specs/releases/v0.1.35/alpha-1/TASKS.md` T-35-04 Codex smoke:
+  `v0135-codex-scope-smoke` completed `release_scope` on `codex_exec`.

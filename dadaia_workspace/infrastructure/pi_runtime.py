@@ -134,7 +134,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                 error=self._redact(str(exc)),
             )
 
-        result = self._result_from_output(request, proc.stdout, proc.returncode)
+        result = self._result_from_output(request, proc.stdout, proc.stderr, proc.returncode)
         if result.status is AgentRunStatus.FAILED:
             if not (result.error or "").strip():
                 result = AgentRunResult(
@@ -188,17 +188,18 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         self,
         request: AgentRunRequest,
         stdout: str,
+        stderr: str,
         returncode: int,
     ) -> AgentRunResult:
         message = self._last_message_end(stdout)
         if message is None:
             # Degraded fallback: no usable message_end. Never crash.
             text = (stdout or "").strip()
-            if returncode != 0 and not text:
+            if returncode != 0:
                 return AgentRunResult(
                     status=AgentRunStatus.FAILED,
                     summary="pi headless returned non-zero exit",
-                    error="",
+                    error=self._redact((stderr or stdout or "").strip()),
                 )
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,

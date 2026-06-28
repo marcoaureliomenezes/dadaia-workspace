@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.container import build_agent_runtime
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunResult,
@@ -192,6 +193,56 @@ def test_codex_error_output_is_redacted_and_has_no_artifact_refs(tmp_path: Path)
 
     assert result.status is AgentRunStatus.FAILED
     assert result.error == "failed [REDACTED]"
+    assert result.artifact_refs == ()
+
+
+def test_codex_exec_command_uses_supported_lifecycle_startup_flags(tmp_path: Path) -> None:
+    captured: list[str] = []
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured.extend(str(part) for part in argv)
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="stop before model")
+
+    result = codex_runtime.CodexExecAdapter(
+        codex_runtime.CodexExecConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request(AgentRuntimeKind.CODEX_EXEC))
+
+    assert result.status is AgentRunStatus.FAILED
+    assert "--ask-for-approval" not in captured
+    assert "--sandbox" in captured
+    assert captured[captured.index("--sandbox") + 1] == "workspace-write"
+    assert "--skip-git-repo-check" in captured
+    assert "--ignore-user-config" in captured
+
+
+def test_container_built_codex_adapter_uses_writable_workflow_sandbox(tmp_path: Path) -> None:
+    adapter = build_agent_runtime(AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path)
+
+    assert isinstance(adapter, codex_runtime.CodexExecAdapter)
+    assert adapter._config.sandbox == "workspace-write"
+
+
+def test_pi_nonzero_without_message_end_surfaces_runtime_failure(tmp_path: Path) -> None:
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        stdout = json.dumps({"type": "session", "id": "sess_live"}) + "\n"
+        stderr = "No API key found for azure-openai-responses. Use /login."
+        return subprocess.CompletedProcess(argv, 1, stdout=stdout, stderr=stderr)
+
+    result = pi_runtime.PiHeadlessAdapter(
+        pi_runtime.PiHeadlessConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request(AgentRuntimeKind.PI_HEADLESS))
+
+    assert result.status is AgentRunStatus.FAILED
+    assert result.summary == "pi headless returned non-zero exit"
+    assert "No API key found" in (result.error or "")
     assert result.artifact_refs == ()
 
 

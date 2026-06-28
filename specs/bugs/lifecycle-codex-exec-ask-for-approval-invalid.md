@@ -1,6 +1,6 @@
 ---
 name: lifecycle-codex-exec-ask-for-approval-invalid
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-27
 surface: dadaia lifecycle release define (codex harness / codex_exec runtime)
@@ -30,3 +30,17 @@ Usage: codex exec [OPTIONS] [PROMPT]
 - `codex exec --help` shows no `--ask-for-approval` flag; approval behavior is configured via `config.toml` or `-c` overrides.
 - The blocked run state is stored at `.dadaia/states/lifecycle/release-define.json` (run id `release-define`).
 - This blocks any Codex-harnessed lifecycle workflow; other harnesses (`fake`, `pi`) may be unaffected.
+
+## Resolution
+
+Fixed in `v0.1.35`.
+
+`CodexExecAdapter._command()` no longer emits the stale `--ask-for-approval` flag. The
+adapter leaves approval behavior to Codex config / command policy and controls only
+sandbox, cwd, model/effort, git trust bypass, and output capture.
+
+Evidence:
+
+- `dadaia_workspace/infrastructure/codex_runtime.py#CodexExecAdapter._command`
+- `specs/releases/v0.1.35/alpha-1/TASKS.md` T-35-04 Codex smoke:
+  `v0135-codex-scope-smoke` completed `release_scope` on `codex_exec`.

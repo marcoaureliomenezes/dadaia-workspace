@@ -15,8 +15,10 @@ intents:
 **ID:** FEAT-GOV-V2-01
 **Reported:** 2026-06-12 (operator long-prompt + grill `fc45dd8c`).
 **Owner:** project-manager (curates) → product-engineer (release definition after grill).
-**Status:** PARTIALLY CONSUMED — v0.1.15 shipped the Codex deterministic lifecycle
-foundation slice. Residual = the three governance-v2 pillars below.
+**Status:** OPEN — PARTIALLY CONSUMED. v0.1.15 shipped the Codex deterministic lifecycle
+foundation slice. Later releases also shipped adjacent backlog-consumption and
+audit-workflow machinery. The remaining release scope is limited to the governance-v2
+pillars below, with delivered pieces called out so they are not reimplemented.
 
 > **Scope correction (2026-06-26):** OpenCode was removed entirely in v0.1.24 (both
 > layers). All OpenCode-enforcement / OpenCode-projection-parity scope is **dead** and has
@@ -30,8 +32,7 @@ Three governance pillars remain open after v0.1.15:
 
 1. a canonical **specs taxonomy** with archive flows + path-class gate changes for every
    artifact class (`specs/backlog/_archive/`, `specs/audits/_archive/`,
-   `specs/bugs/_archive/` classified FROZEN; consumed-backlog and undisposed-audit doctor
-   invariants);
+   `specs/bugs/_archive/` classified FROZEN; `specs/_archive/**` is already FROZEN);
 2. append-only **event-sourced bug telemetry** (JSONL);
 3. an **audit-disposition law** (disposition-complete, not solve-all).
 
@@ -58,14 +59,17 @@ bug-events, and audit-disposition pillars are genuinely residual.
 ## 3. Specs taxonomy + archive gate classes
 
 - Create `specs/backlog/_archive/`, `specs/audits/_archive/`, `specs/bugs/_archive/`
-  (workspace + scaffold + consumer-onboarding paths).
-- Gate (`features/spec_context/gate_policy.py`): classify the three `_archive` dirs as
-  **FROZEN** for file-write tools; archive moves happen via `git mv` outside the gate
-  envelope.
-- Backlog archive flow: CLOSURE moves a consumed backlog entry to `specs/backlog/_archive/`.
-- Doctor: `_archive` dirs exist per class; consumed-but-unarchived backlog detection;
-  audit-without-disposition detection (an archived audit must reference its disposing
-  release).
+  (workspace + scaffold + consumer-onboarding paths), or explicitly reject per-class
+  archives in favor of the current central `specs/_archive/` model.
+- Gate (`features/spec_context/gate_policy.py`): classify the three per-class `_archive`
+  dirs as **FROZEN** for file-write tools if the per-class archive model is accepted.
+  Archive moves happen via `git mv` outside the gate envelope.
+- Backlog archive flow: current production behavior removes consumed backlog entries via
+  the `consumed_backlog` ledger and durable copy under `specs/_archive/<release>/`.
+  Do not replace this unless the release explicitly migrates the closure contract.
+- Doctor: `_archive` dirs exist per accepted class; consumed-backlog checks stay aligned
+  with the shipped ledger model; add audit-without-disposition detection if the audit law
+  is accepted.
 
 ## 4. Audit-disposition law
 
