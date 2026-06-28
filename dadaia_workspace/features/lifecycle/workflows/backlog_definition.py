@@ -144,6 +144,7 @@ class BacklogStep:
     fragment_id: str | None = None
     shared_fragment_ids: tuple[str, ...] = ()
     runtime_kind: AgentRuntimeKind | None = None
+    structured_output_evidence: bool = False
 
 
 @dataclass(frozen=True)
@@ -182,6 +183,7 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
         kind=BacklogStepKind.MODEL,
         fragment_id="backlog_definition.intake_grill",
         shared_fragment_ids=("shared.grill_questionnaire",),
+        structured_output_evidence=True,
     ),
     BacklogStep(label="subject_bind", role="python", kind=BacklogStepKind.SUBJECT_BIND),
     BacklogStep(
@@ -194,6 +196,7 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
         kind=BacklogStepKind.CONFLICT_GRILL,
         fragment_id="backlog_definition.conflict_resolution_grill",
         shared_fragment_ids=("shared.grill_questionnaire",),
+        structured_output_evidence=True,
     ),
     BacklogStep(
         label="backlog_author",
@@ -452,6 +455,7 @@ class BacklogDefinitionWorkflow:
                 # backlog_author is a CREATE step (BacklogStep is kind-based, no is_review
                 # boolean): it must pass on a schema-valid payload, never a verdict (L1).
                 is_review=False,
+                structured_output_evidence=step.structured_output_evidence,
             ),
         )
         run = (

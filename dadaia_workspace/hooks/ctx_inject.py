@@ -170,6 +170,8 @@ def _resolve_context(workspace: Path, session_id: str, sentinel_mtime: float | N
 def _emit(payload: str) -> None:
     """Emit the payload per ``DADAIA_HOOK_OUTPUT`` (codex-json/json envelope or raw)."""
     output = os.environ.get("DADAIA_HOOK_OUTPUT", "")
+    if output == "codex-json":
+        payload = _codex_visible_payload(payload)
     if output in ("codex-json", "json"):
         event = os.environ.get("DADAIA_HOOK_EVENT", "UserPromptSubmit")
         print(
@@ -184,6 +186,32 @@ def _emit(payload: str) -> None:
         )
     else:
         sys.stdout.write(payload)
+
+
+def _codex_visible_payload(payload: str) -> str:
+    """Return a transcript-bounded Codex hook payload.
+
+    Codex surfaces ``hookSpecificOutput.additionalContext`` in the operator-visible stream.
+    The full bind-time bootstrap is useful model context but poor transcript UX: it includes
+    dispatcher law plus the ranked catalog JSON. For Codex, keep only the context marker and
+    self-pull pointers; repeat prompts are already silent by the sentinel guard.
+    """
+    first = next((line.strip() for line in payload.splitlines() if line.strip()), "")
+    if first.startswith("[") and first.endswith("]") and first != "[no bound context]":
+        context = first[1:-1]
+        return (
+            f"[{context}]\n\n"
+            "dadaia context loaded. Self-pull memory on demand from "
+            "specs/memory/tech-stack.md and specs/memory/product/catalog.json; "
+            "load feature atoms only when task-relevant.\n"
+        )
+    if first == "[no bound context]":
+        return (
+            "[no bound context]\n\n"
+            "Bind a Spec Context Project to load context memory. Run "
+            "`dadaia context bind <name>` when needed.\n"
+        )
+    return payload
 
 
 def _digest_catalog(raw: str) -> str:

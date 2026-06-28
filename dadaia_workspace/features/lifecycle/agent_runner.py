@@ -109,6 +109,11 @@ class AgentRunnerInput:
     # populates ``artifact_refs`` — + in-scope paths, regardless of the ``verdict`` field
     # (L2 / GRILL D-1/D-2). Threaded from each step's review signal at every call site.
     is_review: bool = False
+    # Most create steps write an artifact and must prove it via ``artifact_refs``. A small
+    # class of workflow steps only produces structured data consumed by the next Python
+    # gate (for example backlog_definition.intake_grill -> subject_bind). Those callers
+    # may opt in here; no-op output with empty ``structured_output`` still blocks.
+    structured_output_evidence: bool = False
 
 
 class LifecycleAgentRunner:
@@ -195,7 +200,9 @@ class LifecycleAgentRunner:
         # field. The ``artifact_refs`` check below still BLOCKs a no-op create worker.
         if data.is_review and result.structured_output.get("verdict") != "APPROVED":
             return self._blocked(lifecycle_run, data, "agent result missing APPROVED verdict")
-        if not result.artifact_refs:
+        if not result.artifact_refs and not (
+            data.structured_output_evidence and result.structured_output
+        ):
             return self._blocked(lifecycle_run, data, "agent result missing artifact evidence")
         out_of_scope = self._out_of_scope_paths(
             data.request,

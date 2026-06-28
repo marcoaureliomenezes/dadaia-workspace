@@ -120,9 +120,30 @@ def test_secret_name_parts_not_redefined_in_adapter_modules() -> None:
 def test_env_filter_and_prompt_envelope_are_single_sourced() -> None:
     """The CLI adapters share the env-filter and prompt-envelope surface."""
     assert pi_runtime.PiHeadlessAdapter._env is SubprocessAdapterMixin._env
-    assert codex_runtime.CodexExecAdapter._env is SubprocessAdapterMixin._env
     assert pi_runtime.PiHeadlessAdapter._prompt is SubprocessAdapterMixin._prompt
     assert codex_runtime.CodexExecAdapter._prompt is SubprocessAdapterMixin._prompt
+
+
+def test_codex_env_extends_shared_filter_with_isolated_runtime_home(tmp_path: Path) -> None:
+    """Codex keeps the shared env allowlist, then overlays isolated runtime dirs."""
+    workspace = tmp_path / "workspace"
+    (workspace / ".dadaia").mkdir(parents=True)
+    (workspace / "repos").mkdir()
+    adapter = codex_runtime.CodexExecAdapter(
+        codex_runtime.CodexExecConfig(cwd=workspace),
+        environ={
+            "PATH": "/bin",
+            "HOME": str(tmp_path / "host-home"),
+            "OPENAI_API_KEY": "sk-secret",
+        },
+    )
+
+    env = adapter._env()
+
+    assert env["PATH"] == "/bin"
+    assert "OPENAI_API_KEY" not in env
+    assert env["HOME"] == str(workspace / ".dadaia" / "tmp" / "codex-runtime" / "home")
+    assert env["CODEX_HOME"] == str(workspace / ".dadaia" / "tmp" / "codex-runtime" / "codex-home")
 
 
 # --------------------------------------------------------------------------- #

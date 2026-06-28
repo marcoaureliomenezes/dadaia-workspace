@@ -72,6 +72,7 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
             model="gpt-test",
             reasoning_effort="medium",
             sandbox="workspace-write",
+            isolate_home=False,
         ),
         runner=fake_runner,
         environ={
@@ -92,17 +93,44 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
     assert argv[:2] == ["/usr/bin/codex", "exec"]
     assert "--ignore-user-config" in argv
     assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "workspace-write"]
-    assert argv[argv.index("--ask-for-approval") :][:2] == [
-        "--ask-for-approval",
-        "never",
-    ]
+    assert "--ask-for-approval" not in argv
     assert ["--cd", str(tmp_path)] == argv[argv.index("--cd") :][:2]
+    assert "--skip-git-repo-check" in argv
     assert argv[argv.index("-m") :][:2] == ["-m", "gpt-test"]
     assert 'model_reasoning_effort="medium"' in argv
     assert argv[-1] == "-"
     assert call["kwargs"]["cwd"] == tmp_path
     assert call["kwargs"]["env"] == {"PATH": "/bin", "HOME": "/home/operator"}
     assert "secret-key" not in str(call["kwargs"])
+
+
+def test_codex_exec_adapter_isolates_home_inside_workspace_tmp(tmp_path: Path) -> None:
+    captured: dict[str, dict[str, str]] = {}
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured["env"] = kwargs["env"]
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text('{"summary":"done"}', encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    adapter = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin", "HOME": "/home/operator"},
+    )
+
+    result = adapter.run(_request())
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    env = captured["env"]
+    runtime_root = tmp_path / ".dadaia" / "tmp" / "codex-runtime"
+    assert env["HOME"] == str(runtime_root / "home")
+    assert env["CODEX_HOME"] == str(runtime_root / "codex-home")
+    assert env["XDG_CONFIG_HOME"] == str(runtime_root / "xdg" / "config")
+    assert env["XDG_CACHE_HOME"] == str(runtime_root / "xdg" / "cache")
+    assert env["XDG_DATA_HOME"] == str(runtime_root / "xdg" / "data")
 
 
 def test_codex_exec_adapter_resolves_model_from_registry_tier(tmp_path: Path) -> None:
@@ -184,6 +212,7 @@ def test_codex_tier_fallback_used_when_no_discrete_model(tmp_path: Path) -> None
     argv = captured["argv"]
     # 'fast' tier resolves to gpt-5.4-mini via codex_tier_views().
     assert argv[argv.index("-m") + 1] == "gpt-5.4-mini"
+    assert argv[argv.index("--sandbox") + 1] == "workspace-write"
 
 
 def test_codex_exec_adapter_rejects_wrong_runtime_without_calling_codex(tmp_path: Path) -> None:

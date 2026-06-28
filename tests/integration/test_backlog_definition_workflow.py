@@ -90,6 +90,15 @@ def _approved() -> AgentRunResult:
     )
 
 
+def _structured_intake() -> AgentRunResult:
+    return AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="intake complete",
+        artifact_refs=(),
+        structured_output={"proposed_intents": "[]", "open_questions": "[]"},
+    )
+
+
 def _registry(tmp_path: Path) -> Registry:
     """A registry that binds pkg/a.py#A and pkg/c.py#C (planted source) — nothing else."""
     specs = tmp_path / "specs"
@@ -173,6 +182,29 @@ def test_emitted_prompt_carries_fragment_not_generic(tmp_path: Path) -> None:
     required = intake.prompt_text[intake.prompt_text.index("## Required output") :]
     assert "agent-run-result-v1" in required
     assert "backlog-demand-v1" not in required
+
+
+def test_intake_grill_accepts_structured_data_without_artifact_refs(tmp_path: Path) -> None:
+    store = _MemoryRunStore()
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs, release_id=_RELEASE, handoff_dir=tmp_path / "handoff")
+    )
+    wf = BacklogDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=store,
+        runtime_factory=lambda kind: _KindFake(kind, _structured_intake()),
+        context_selector=selector,
+        registry=_registry(tmp_path),
+    )
+
+    result = wf.run("bd-intake-structured", _new_demand(), sequence=(_SEQUENCE[0],))
+
+    assert result.completed is True
+    assert result.steps[0].label == "intake_grill"
+    assert result.steps[0].accepted is True
 
 
 # ---------------------------------------------------------------------------

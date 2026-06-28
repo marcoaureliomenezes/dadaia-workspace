@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from collections.abc import Mapping
@@ -60,6 +61,34 @@ def _as_codex_effort(effort: str) -> CodexEffort:
     return effort  # type: ignore[return-value]
 
 
+def _workspace_state_root(cwd: Path) -> Path:
+    """Return the workspace root whose `.dadaia/tmp` may hold runtime state.
+
+    Lifecycle callers usually pass the dadaia workspace root as cwd. Tests and direct
+    adapter probes may pass a throwaway fixture. Walk upward so a repo cwd resolves to the
+    containing workspace instead of creating a forbidden repo-local `.dadaia/` directory.
+    """
+    current = cwd.resolve()
+    for candidate in (current, *current.parents):
+        marker = candidate / ".dadaia"
+        if marker.is_dir() and (candidate / "repos").is_dir():
+            return candidate
+    return current
+
+
+def _copy_codex_runtime_file(src: Path, dest: Path) -> None:
+    """Copy a non-secret-path runtime file into isolated CODEX_HOME when available."""
+    if not src.is_file():
+        return
+    try:
+        shutil.copy2(src, dest)
+        dest.chmod(0o600)
+    except OSError:
+        # The adapter can still start without optional config/auth; Codex will surface any
+        # real authentication failure in its own stderr, which we redact before returning.
+        return
+
+
 @dataclass(frozen=True)
 class CodexExecConfig:
     """Explicit controls for one Codex exec adapter instance."""
@@ -68,10 +97,18 @@ class CodexExecConfig:
     codex_bin: str = "codex"
     model: str | None = None
     reasoning_effort: CodexEffort | None = None
-    sandbox: str = "read-only"
+    # Lifecycle workers must be able to write scoped artifacts (handoffs, specs, reports).
+    # Codex CLI also initializes local client state before answering. A read-only Codex
+    # sandbox fails before the Python workflow gates can evaluate the worker result.
+    sandbox: str = "workspace-write"
+    # Codex CLI 0.142.x no longer accepts the historical
+    # ``--ask-for-approval <policy>`` flag. Approval policy is owned by Codex config /
+    # command approval rules; the workflow adapter controls sandbox, cwd, model, and
+    # output capture only.
     approval_policy: str = "never"
     env_allowlist: tuple[str, ...] = _DEFAULT_ENV_ALLOWLIST
     timeout_seconds: int = 900
+    isolate_home: bool = True
 
 
 class CodexExecAdapter(SubprocessAdapterMixin):
@@ -103,6 +140,39 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         # Wire the mixin seams to this adapter's config.
         self._env_allowlist = config.env_allowlist
         self._cwd_for_diff = config.cwd
+
+    def _env(self) -> dict[str, str]:
+        env = super()._env()
+        if not self._config.isolate_home:
+            return env
+
+        root = _workspace_state_root(self._config.cwd)
+        runtime_root = root / ".dadaia" / "tmp" / "codex-runtime"
+        home = runtime_root / "home"
+        codex_home = runtime_root / "codex-home"
+        xdg_root = runtime_root / "xdg"
+        for path in (
+            home,
+            codex_home,
+            xdg_root / "config",
+            xdg_root / "cache",
+            xdg_root / "data",
+        ):
+            path.mkdir(parents=True, exist_ok=True)
+
+        source_codex_home = Path(
+            self._environ.get("CODEX_HOME")
+            or Path(self._environ.get("HOME", str(Path.home()))) / ".codex"
+        )
+        _copy_codex_runtime_file(source_codex_home / "auth.json", codex_home / "auth.json")
+        _copy_codex_runtime_file(source_codex_home / "config.toml", codex_home / "config.toml")
+
+        env["HOME"] = str(home)
+        env["CODEX_HOME"] = str(codex_home)
+        env["XDG_CONFIG_HOME"] = str(xdg_root / "config")
+        env["XDG_CACHE_HOME"] = str(xdg_root / "cache")
+        env["XDG_DATA_HOME"] = str(xdg_root / "data")
+        return env
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.CODEX_EXEC
@@ -159,10 +229,9 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             "--ignore-user-config",
             "--sandbox",
             self._config.sandbox,
-            "--ask-for-approval",
-            self._config.approval_policy,
             "--cd",
             str(self._config.cwd),
+            "--skip-git-repo-check",
             "--output-last-message",
             str(output_path),
             "-m",

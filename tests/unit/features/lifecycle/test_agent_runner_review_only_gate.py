@@ -63,8 +63,9 @@ def _result(
     *,
     verdict: str | None,
     artifact_refs: tuple[str, ...],
+    structured_output: dict[str, str] | None = None,
 ) -> AgentRunResult:
-    structured: dict[str, str] = {}
+    structured: dict[str, str] = dict(structured_output or {})
     if verdict is not None:
         structured["verdict"] = verdict
     return AgentRunResult(
@@ -79,6 +80,7 @@ def _gate(
     result: AgentRunResult,
     *,
     is_review: bool,
+    structured_output_evidence: bool = False,
 ) -> object:
     runner = LifecycleAgentRunner(runtime=FakeAgentRuntime(result=result))
     return runner.evaluate_gate(
@@ -88,6 +90,7 @@ def _gate(
             target_phase=LifecyclePhase.RELEASE_DEFINITION,
             current_step="step",
             is_review=is_review,
+            structured_output_evidence=structured_output_evidence,
         ),
     )
 
@@ -161,6 +164,42 @@ def test_noop_create_step_still_blocks_on_empty_artifact_refs() -> None:
     # the existing artifact_refs check still BLOCKs (L2 / OQ-1: not made permissive).
     blocked = _gate(
         _result(verdict="APPROVED", artifact_refs=()),
+        is_review=False,
+    )
+    assert blocked is not None
+    assert blocked.reason == "agent result missing artifact evidence"
+
+
+def test_structured_data_create_step_passes_without_artifact_refs_when_opted_in() -> None:
+    blocked = _gate(
+        _result(
+            verdict=None,
+            artifact_refs=(),
+            structured_output={"proposed_intents": "[]", "open_questions": "[]"},
+        ),
+        is_review=False,
+        structured_output_evidence=True,
+    )
+    assert blocked is None
+
+
+def test_structured_data_create_step_blocks_noop_even_when_opted_in() -> None:
+    blocked = _gate(
+        _result(verdict=None, artifact_refs=(), structured_output={}),
+        is_review=False,
+        structured_output_evidence=True,
+    )
+    assert blocked is not None
+    assert blocked.reason == "agent result missing artifact evidence"
+
+
+def test_artifact_create_step_still_blocks_without_artifact_refs_by_default() -> None:
+    blocked = _gate(
+        _result(
+            verdict=None,
+            artifact_refs=(),
+            structured_output={"proposed_intents": "[]"},
+        ),
         is_review=False,
     )
     assert blocked is not None

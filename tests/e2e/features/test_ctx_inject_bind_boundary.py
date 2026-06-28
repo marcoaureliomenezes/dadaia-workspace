@@ -36,7 +36,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import claude_hook_env, codex_hook_env, run_hook_subprocess
 
 
 def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
@@ -104,6 +104,24 @@ def _inject(workspace: Path, session_id: str) -> str:
     result = run_hook_subprocess("ctx_inject", {"session_id": session_id}, env)
     assert result.returncode == 0, result.stderr
     return result.stdout
+
+
+def _inject_codex_json(workspace: Path, session_id: str) -> dict[str, object] | None:
+    """Run ctx_inject through the Codex JSON envelope; return parsed stdout or None."""
+    env = codex_hook_env(
+        workspace,
+        session_id="harness-native-ignored",
+        extra={"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "UserPromptSubmit"},
+    )
+    env.pop("CODEX_SESSION_ID", None)
+    env.pop("DADAIA_CONTEXT", None)
+    result = run_hook_subprocess("ctx_inject", {"session_id": session_id}, env)
+    assert result.returncode == 0, result.stderr
+    if result.stdout.strip() == "":
+        return None
+    parsed = json.loads(result.stdout)
+    assert isinstance(parsed, dict)
+    return parsed
 
 
 def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path) -> None:
@@ -181,3 +199,56 @@ def test_seed3_distinct_bind_sid_is_not_the_hook_sid(tmp_path: Path) -> None:
     out = _inject(tmp_path, sid)
     assert "[alpha]" in out
     assert "ALPHA-MARKER" in out
+
+
+def test_codex_json_bind_injection_is_transcript_bounded_and_repeat_silent(
+    tmp_path: Path,
+) -> None:
+    """Codex additionalContext is human-visible, so it must not carry catalog JSON noise."""
+    _add_context(
+        tmp_path,
+        "alpha",
+        tech="# tech alpha\nPython 3.12 ALPHA-MARKER\n",
+    )
+    catalog = tmp_path / "repos" / "alpha" / "specs" / "memory" / "product" / "catalog.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "features": [
+                    {
+                        "rank": 1,
+                        "slug": "alpha-feature",
+                        "title": "Alpha Feature",
+                        "tldr": "short",
+                        "path": "specs/memory/product/alpha.md",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    sid = "s-codex-visible"
+    first = _inject_codex_json(tmp_path, sid)
+    assert first is not None
+    generic = first["hookSpecificOutput"]["additionalContext"]  # type: ignore[index]
+    assert "[no bound context]" in generic
+    assert "features" not in generic
+    assert "rank" not in generic
+
+    bind_alpha = _real_bind(tmp_path, "alpha")
+    assert bind_alpha.returncode == 0, bind_alpha.stderr or bind_alpha.stdout
+
+    bound = _inject_codex_json(tmp_path, sid)
+    assert bound is not None
+    payload = bound["hookSpecificOutput"]["additionalContext"]  # type: ignore[index]
+    assert "[alpha]" in payload
+    assert "dadaia context loaded" in payload
+    assert "specs/memory/product/catalog.json" in payload
+    assert "ALPHA-MARKER" not in payload
+    assert "features" not in payload
+    assert "rank" not in payload
+    assert "dispatcher preflight" not in payload
+
+    repeat = _inject_codex_json(tmp_path, sid)
+    assert repeat is None
