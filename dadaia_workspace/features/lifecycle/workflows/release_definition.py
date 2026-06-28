@@ -422,7 +422,7 @@ class ReleaseDefinitionWorkflow:
         run = replace(run, active_worker=None)
         self._run_store.save(run)
         if blocked is None:
-            blocked = self._canonical_artifact_block(run, step, worker_result)
+            worker_result, blocked = self._canonical_artifact_result(run, step, worker_result)
         # Record consumption of every upstream the step declared (A22) and write this
         # step's produced payload (A18/A21) — only on a passing step, only when wired.
         if blocked is None:
@@ -553,6 +553,12 @@ class ReleaseDefinitionWorkflow:
     def _payload_from_result(step: ReleaseStep, worker_result: AgentRunResult) -> dict[str, object]:
         verdict = worker_result.structured_output.get("verdict")
         payload: dict[str, object] = {"summary": worker_result.summary or step.label}
+        if worker_result.artifact_refs:
+            payload["artifact_refs"] = list(worker_result.artifact_refs)
+        for key in ("content_hash", "spec_hash", "plan_hash", "tasks_hash"):
+            value = worker_result.structured_output.get(key)
+            if isinstance(value, str):
+                payload[key] = value
         if step.is_review and isinstance(verdict, str):
             payload["verdict"] = verdict
             reason = worker_result.structured_output.get("verdict_reason")
@@ -646,49 +652,49 @@ class ReleaseDefinitionWorkflow:
         "tasks_create": "TASKS.md",
     }
 
-    def _canonical_artifact_block(
+    def _canonical_artifact_result(
         self,
         run: LifecycleRun,
         step: ReleaseStep,
         worker_result: AgentRunResult,
-    ) -> BlockedState | None:
+    ) -> tuple[AgentRunResult, BlockedState | None]:
         artifact_name = self._CREATE_ARTIFACTS.get(step.label)
         if artifact_name is None:
-            return None
+            return worker_result, None
         expected_path = self._expected_release_artifact_path(artifact_name)
         if not expected_path.is_file():
-            return BlockedState(
-                reason=f"{step.label} missing canonical release artifact {artifact_name}",
-                blocked_at_step=step.label,
-                detail={"expected_path": self._specs_relative(expected_path)},
+            return (
+                worker_result,
+                BlockedState(
+                    reason=f"{step.label} missing canonical release artifact {artifact_name}",
+                    blocked_at_step=step.label,
+                    detail={"expected_path": self._specs_relative(expected_path)},
+                ),
             )
         expected_ref = self._specs_relative(expected_path)
         if expected_ref not in worker_result.artifact_refs:
-            return BlockedState(
-                reason=f"{step.label} missing canonical artifact ref {expected_ref}",
-                blocked_at_step=step.label,
-                detail={
-                    "expected_ref": expected_ref,
-                    "artifact_refs": ",".join(worker_result.artifact_refs),
-                },
+            return (
+                worker_result,
+                BlockedState(
+                    reason=f"{step.label} missing canonical artifact ref {expected_ref}",
+                    blocked_at_step=step.label,
+                    detail={
+                        "expected_ref": expected_ref,
+                        "artifact_refs": ",".join(worker_result.artifact_refs),
+                    },
+                ),
             )
         actual_hash = hashlib.sha256(expected_path.read_bytes()).hexdigest()
-        reported_hash = worker_result.structured_output.get(
-            "content_hash"
-        ) or worker_result.structured_output.get(
-            f"{artifact_name.removesuffix('.md').lower()}_hash"
+        hash_key = f"{artifact_name.removesuffix('.md').lower()}_hash"
+        structured_output = {
+            **worker_result.structured_output,
+            "content_hash": actual_hash,
+            hash_key: actual_hash,
+        }
+        return (
+            replace(worker_result, structured_output=structured_output),
+            None,
         )
-        if reported_hash != actual_hash:
-            return BlockedState(
-                reason=f"{step.label} missing canonical artifact content hash",
-                blocked_at_step=step.label,
-                detail={
-                    "expected_ref": expected_ref,
-                    "expected_hash": actual_hash,
-                    "reported_hash": str(reported_hash or ""),
-                },
-            )
-        return None
 
     def _expected_release_artifact_path(self, artifact_name: str) -> Path:
         specs_dir = self._selector.specs_dir

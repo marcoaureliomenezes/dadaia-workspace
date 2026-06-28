@@ -31,6 +31,7 @@ All tasks in `TASKS.md` are `[x] DONE`.
 | T3 | Require canonical artifacts from release-definition create fragments | this commit |
 | T4 | Update PI bug records and live validation evidence | this commit |
 | T5 | Persist active-worker state for live release-definition steps | this commit |
+| T6 | Make canonical artifact hashes Python-authoritative | follow-up alpha-1 commit |
 
 ## Validations
 
@@ -42,6 +43,9 @@ All tasks in `TASKS.md` are `[x] DONE`.
 | Direct real PI provider-qualified command smoke | `pi --mode json --model openai-codex/gpt-5.3-codex-spark --thinking low --no-tools --no-session --no-context-files -p "Reply with exactly: OK"` | PI returned provider `openai-codex`, model `gpt-5.3-codex-spark`, final text `OK` |
 | Bounded real PI workflow active-worker smoke | `timeout 60s .dadaia/.venv/bin/dadaia lifecycle release define --context dadaia-workspace --release-id v0.1.36-pi-active-worker-smoke --run-id v0136-pi-active-worker-smoke --harness fake --step-harness release_scope=pi --step-model release_scope=gpt-5.3-codex-spark:medium --json` | During the run, `.dadaia/states/lifecycle/v0136-pi-active-worker-smoke.json` showed `active_worker.step=release_scope`, `active_worker.runtime_kind=pi_headless`, populated timestamps, and non-empty `injected_context` |
 | PI backlog-definition structured-data gate regression | `.dadaia/.venv/bin/python -m pytest -p no:cacheprovider repos/dadaia-workspace/tests/integration/test_backlog_definition_workflow.py::test_intake_grill_accepts_structured_data_without_artifact_refs repos/dadaia-workspace/tests/integration/test_cli_backlog_define.py -q` | `6 passed` |
+| Release-definition wrong worker-hash regression | `.dadaia/.venv/bin/python -m pytest -p no:cacheprovider repos/dadaia-workspace/tests/integration/cli/test_release_definition_workflow.py -q` | `11 passed` |
+| Real PI Layer-2 command/create workflow e2e before T6 | `DADAIA_E2E_REAL_WORKER=1 PI_BIN="$(command -v pi)" timeout 900 .dadaia/.venv/bin/python -m pytest -p no:cacheprovider -q -s repos/dadaia-workspace/tests/integration/pi_live/test_pi_command_smoke.py repos/dadaia-workspace/tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py` | `test_pi_command_smoke` and `test_real_pi_worker_advances_past_release_scope_to_spec_create` passed; review-path test exposed the T6 hash-authority bug |
+| Real PI Layer-2 review gate after T6 + fixture correction | `DADAIA_E2E_REAL_WORKER=1 PI_BIN="$(command -v pi)" timeout 900 .dadaia/.venv/bin/python -m pytest -p no:cacheprovider -q -s repos/dadaia-workspace/tests/integration/pi_live/test_real_layer2_worker_workflow_e2e.py::test_real_pi_worker_review_step_emits_approved_and_gate_passes` | `1 passed in 340.50s`; `spec_arch_review` accepted with gate verdict `APPROVED` |
 | Public asset projection doctor | `.dadaia/.venv/bin/dadaia public stage`; `.dadaia/.venv/bin/dadaia public doctor` | staged lifecycle fragments are coherent; doctor reports `[ok] public-privacy`, `[ok] model-resolution`, `[ok] workflow-policy`; only expected dirty-source warnings |
 | Repo hygiene scan | `find repos/dadaia-workspace -type d \( -name .pytest_cache -o -name .ruff_cache -o -name .mypy_cache -o -name test-results -o -name playwright-report -o -name .dadaia \) -print` | no output |
 
@@ -99,6 +103,8 @@ Files written during this CLOSURE phase:
 | `specs/bugs/bug-spec-create-pi-no-artifact-bug_write.md` | bug | `Closed` | T3; canonical create-fragment artifact contract |
 | `specs/bugs/release-define-pi-worker-long-running-no-progress-heartbeat.md` | bug | `Closed` | T5; active-worker run-state regression + bounded PI smoke |
 | `specs/bugs/backlog-definition-pi-intake-grill-artifact-evidence-gate.md` | bug | `Closed` | Structured-data gate regression; `intake_grill` accepts schema-valid data without artifact refs |
+| `specs/bugs/release-definition-pi-create-step-blocks-on-model-reported-hash.md` | bug | `Closed` | T6; Python-computed canonical artifact hashes |
+| `specs/bugs/live-pi-review-e2e-fixture-stale-cli-architecture.md` | bug | `Closed` | Live PI review gate e2e fixture corrected; review gate now passes with real PI |
 
 ## Backlog returns
 

@@ -82,6 +82,7 @@ class _KindReportingFake:
     kind: AgentRuntimeKind
     result: AgentRunResult
     write_create_artifacts: bool = True
+    reported_content_hash: str | None = None
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
@@ -92,7 +93,9 @@ class _KindReportingFake:
         artifact_ref = _write_create_artifact(request)
         if artifact_ref is None:
             return self.result
-        content_hash = hashlib.sha256((Path.cwd() / artifact_ref).read_bytes()).hexdigest()
+        content_hash = self.reported_content_hash or hashlib.sha256(
+            (Path.cwd() / artifact_ref).read_bytes()
+        ).hexdigest()
         return AgentRunResult(
             status=self.result.status,
             summary=self.result.summary,
@@ -152,6 +155,7 @@ def _install_fake_factory(
     *,
     reject_kind: AgentRuntimeKind | None = None,
     write_create_artifacts: bool = True,
+    reported_content_hash: str | None = None,
 ) -> None:
     """Make the real release-define CLI path drive every kind through a kind-reporting fake.
 
@@ -170,10 +174,16 @@ def _install_fake_factory(
         def factory(kind: AgentRuntimeKind) -> _KindReportingFake:
             if reject_kind is not None and kind is reject_kind:
                 return _KindReportingFake(
-                    kind, _rejecting_result(), write_create_artifacts=write_create_artifacts
+                    kind,
+                    _rejecting_result(),
+                    write_create_artifacts=write_create_artifacts,
+                    reported_content_hash=reported_content_hash,
                 )
             return _KindReportingFake(
-                kind, _approving_result(), write_create_artifacts=write_create_artifacts
+                kind,
+                _approving_result(),
+                write_create_artifacts=write_create_artifacts,
+                reported_content_hash=reported_content_hash,
             )
 
         return factory
@@ -261,6 +271,23 @@ def test_cli_fake_runtime_writes_canonical_create_artifacts(
     assert (workspace / "specs" / "releases" / _RELEASE / "SPEC.md").is_file()
     assert (workspace / "specs" / "releases" / _RELEASE / "PLAN.md").is_file()
     assert (workspace / "specs" / "releases" / _RELEASE / "TASKS.md").is_file()
+
+
+def test_release_definition_uses_python_hash_when_worker_reports_wrong_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    _install_fake_factory(monkeypatch, reported_content_hash="not-a-real-sha256")
+
+    result = _define(["--harness", "fake"])
+
+    assert result.exit_code == 0, result.output
+    payload = _payload(result.output)
+    assert payload["status"] == "OK"
+    spec_path = workspace / "specs" / "releases" / _RELEASE / "SPEC.md"
+    assert spec_path.is_file()
+    assert hashlib.sha256(spec_path.read_bytes()).hexdigest() != "not-a-real-sha256"
 
 
 def test_release_definition_rejects_traversal_release_id(

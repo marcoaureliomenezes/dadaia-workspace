@@ -178,24 +178,27 @@ version and exits 0.
 - No new dependency. No change to any subcommand. No version-bump policy change.
 
 ## 5. Architecture fit
-Extends the existing root Typer app callback (presentation/CLI layer only). Reads the
-version via the standard library `importlib.metadata.version("dadaia-workspace")` — no new
-layer, no new seam, no domain/infrastructure change. Prior art: the CLI already uses Typer
-callbacks for global options, so this follows the established pattern.
+Extends the existing root Typer app in `dadaia_workspace/cli/main.py` (presentation/CLI
+layer only). Add an eager Typer option on the root app callback; if the root app has no
+callback yet, introduce one in `cli/main.py` without moving command registration. Read the
+version via the standard library `importlib.metadata.version("dadaia-workspace")`, falling
+back to a package-local `__version__` only if metadata is unavailable in editable/dev
+contexts. No feature/core/infrastructure layer changes are required.
 
 ## 6. Testable acceptance
-- Unit: invoke the app with `--version` via Typer's testing runner; assert stdout equals the
-  metadata version and exit code is 0 (A1/A2).
-- Regression: an existing subcommand still runs unchanged with no `--version` (A3).
+- CLI test: invoke the app with `--version` via Typer's testing runner; assert stdout equals
+  the resolved version string and exit code is 0 (A1/A2).
+- Regression: invoke one existing lightweight command without `--version` and assert its
+  behavior is unchanged (A3).
 """
 
 _ARCHITECTURE_MD = """# Architecture
 
 Hexagonal layering: `core` (domain models/protocols, no I/O) ← `features` (use-cases) ←
 `infrastructure` (adapters) and `cli` (Typer presentation). The CLI layer composes the
-root Typer app and may add global eager options in the app callback without touching
-features/core. Code map: `dadaia_workspace/cli/app.py` defines the root app + callback;
-package metadata is the version source of truth.
+root Typer app and may add global eager options on the root app without touching
+features/core. Code map: `dadaia_workspace/cli/main.py` defines the root app and registers
+top-level command groups; package metadata is the version source of truth.
 """
 
 

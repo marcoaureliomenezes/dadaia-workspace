@@ -51,3 +51,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 - **Write set:** `dadaia_workspace/core/models/lifecycle.py`, `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, related tests
 - **Acceptance:** Before `runtime.run()` blocks on a PI/Codex worker, the persisted lifecycle run records `active_worker` with step/runtime/timestamps; after the worker returns, the marker is cleared.
 - **Validation:** `pytest -p no:cacheprovider tests/unit/core/test_lifecycle_models.py tests/integration/cli/test_release_definition_workflow.py::test_release_definition_persists_injected_context_before_worker_returns`; bounded real-PI scratch run `v0136-pi-active-worker-smoke` showed `active_worker.runtime_kind=pi_headless` while PI was running.
+
+### T6 - Make canonical artifact hashes Python-authoritative
+
+- **Status:** [x] DONE
+- **Owner:** software-engineer
+- **Write set:** `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, `tests/integration/cli/test_release_definition_workflow.py`, `specs/bugs/release-definition-pi-create-step-blocks-on-model-reported-hash.md`
+- **Acceptance:** `spec_create`/`plan_create`/`tasks_create` still block when the canonical file or artifact ref is missing, but a wrong model-reported hash no longer blocks once Python can read the artifact and compute the authoritative SHA-256.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py`; real PI review-path e2e rerun.
