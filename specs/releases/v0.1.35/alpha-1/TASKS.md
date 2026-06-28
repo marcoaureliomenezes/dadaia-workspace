@@ -38,7 +38,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-35-03 — Dogfood bug-report workflow and inspect transcript noise
 
-- **Status:** [-]
+- **Status:** [x]
 - **Owner:** software-engineer
 - **Write set:**
   - `dadaia_workspace/**`
@@ -51,7 +51,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T-35-04 — Verify and push
 
-- **Status:** [ ]
+- **Status:** [-]
 - **Owner:** software-engineer
 - **Write set:**
   - `specs/releases/v0.1.35/alpha-1/TASKS.md`

@@ -24,6 +24,10 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         BacklogDefinitionWorkflow,
     )
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import (
+        BugReportInput,
+        BugReportWorkflow,
+    )
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionScopeInput,
         ReleaseDefinitionWorkflow,
@@ -988,6 +992,130 @@ def build_release_definition_workflow(
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         scope_input=scope_input or ReleaseDefinitionScopeInput(),
+    )
+
+
+def _bug_report_runtime_factory(
+    *,
+    context: str,
+    run_cwd: Path,
+    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Build the per-step runtime factory for the bug-report workflow."""
+    import hashlib
+    import re
+    from dataclasses import dataclass
+
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
+        AgentRunResult,
+        AgentRunStatus,
+    )
+
+    @dataclass(frozen=True)
+    class BugReportFakeRuntime:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            bug_ref = self._write_bug_file(request)
+            if bug_ref is None:
+                return AgentRunResult(
+                    status=AgentRunStatus.SUCCEEDED,
+                    summary="fake bug-report worker: APPROVED",
+                    artifact_refs=(f".dadaia/handoff/{context}/bug-report-step.handoff.json",),
+                    structured_output={"verdict": "APPROVED"},
+                )
+            digest = hashlib.sha256((run_cwd / bug_ref).read_bytes()).hexdigest()
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake bug-report worker: wrote bug record",
+                artifact_refs=(bug_ref,),
+                structured_output={"content_hash": digest},
+            )
+
+        @staticmethod
+        def _slug(value: str) -> str:
+            slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-").lower()
+            return slug or "bug-report"
+
+        def _write_bug_file(self, request: AgentRunRequest) -> str | None:
+            bug_roots = [
+                path.removesuffix("/**")
+                for path in request.allowed_paths
+                if path.endswith("specs/bugs/**")
+            ]
+            for root in bug_roots:
+                base = run_cwd / root
+                if root.startswith("repos/") and not base.parent.is_dir():
+                    continue
+                base.mkdir(parents=True, exist_ok=True)
+                slug = self._slug(request.task_id or "bug-report")
+                ref = f"{root}/{slug}.md"
+                (run_cwd / ref).write_text(
+                    "---\n"
+                    f"name: {slug}\n"
+                    "status: Open\n"
+                    "severity: LOW\n"
+                    "surface: fake bug-report workflow\n"
+                    "---\n\n"
+                    "**Symptom:** Fake bug-report workflow record.\n",
+                    encoding="utf-8",
+                )
+                return ref
+            return None
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return BugReportFakeRuntime()
+        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+
+    return factory
+
+
+def build_bug_report_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    bug_input: "BugReportInput | None" = None,
+) -> "BugReportWorkflow":
+    """Compose the fragment-driven bug-report workflow."""
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import (
+        BugReportInput,
+        BugReportWorkflow,
+    )
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    model_by_kind = models or {}
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    return BugReportWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_bug_report_runtime_factory(
+            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
+        ),
+        context_selector=selector,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+        bug_input=bug_input or BugReportInput(summary="unspecified bug report"),
     )
 
 

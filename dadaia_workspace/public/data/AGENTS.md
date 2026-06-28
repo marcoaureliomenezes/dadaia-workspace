@@ -141,8 +141,20 @@ See `workspace-protocol` rule for the full context-resolution and spec-loading p
 Any time you hit a **bug** while operating dadaia-workspace tooling — projection,
 `specs doctor`/`upgrade`, scaffolding/onboarding, hooks, the SDD gate, locks,
 context bind/alive/dead, panel, reports, the `dadaia` CLI, or any production
-behavior that breaks its own contract — you MUST register a bug file before the
-turn ends. In this self-hosting source workspace, bugs go to
+behavior that breaks its own contract — you MUST register it before the turn
+ends. Workflow-first path:
+
+```bash
+dadaia lifecycle bug report --context <ctx> --release-id <release> \
+  --summary "<symptom>" --repro "<command or steps>" --expected "<contract>" \
+  --actual "<observed behavior>"
+```
+
+Use the bug-report workflow whenever the CLI is available: it performs intake,
+dedupe, additive bug write, and a terminal Python gate. Direct Markdown bug files
+are an emergency fallback only when the bug-report workflow itself is unavailable
+or is the component being debugged; in that case, record the workflow failure in
+the bug notes. In this self-hosting source workspace, fallback bugs go to
 `repos/dadaia-workspace/specs/bugs/`; in a consumer workspace, to the active
 context's `specs/bugs/` plus an upstream report. Bug files are ADDITIVE — the gate's
 path classifier resolves `specs/bugs/` (at the workspace root **and** inside any

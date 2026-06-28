@@ -1,6 +1,6 @@
 ---
 name: agents-bypass-bug-report-workflow-and-handwrite-bug-files
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-28
 surface: agent instructions / lifecycle bug_report workflow / bug registry format
@@ -65,3 +65,26 @@ SDD/lifecycle work instead of invoking dadaia-workflows as the primary control p
 It spans public instructions, CLI discoverability, and workflow availability. The
 existing `bug_report` workflow body and policy are present in source/memory, but the
 Layer-1 operational surface does not make it the natural or mandatory reporting path.
+
+## Resolution
+
+Fixed in `v0.1.35`.
+
+Root cause: the `bug_report` workflow body and governed catalog entry existed, but the
+CLI exposed no runnable `dadaia lifecycle bug report` command and the public root rules
+still instructed agents to write Markdown bug files directly as the primary path.
+
+Fix:
+
+- Added `dadaia lifecycle bug report`.
+- Added explicit symptom inputs: `--summary`, `--details`, `--repro`, `--expected`,
+  `--actual`, and `--severity`.
+- Threaded the input into the `bug_intake` prompt as authoritative reported-bug context.
+- Added a container builder for the bug-report workflow.
+- Updated public AGENTS/rule text so bug registration is workflow-first and direct
+  Markdown is only an emergency fallback when the workflow itself is unavailable.
+
+Evidence:
+
+- `tests/integration/cli/test_lifecycle_bug_report_workflow.py::test_bug_report_workflow_is_runnable_from_lifecycle_cli`
+- `python -m pytest -q -p no:cacheprovider tests/integration/cli/test_lifecycle_bug_report_workflow.py`

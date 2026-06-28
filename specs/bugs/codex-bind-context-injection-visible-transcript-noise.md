@@ -1,6 +1,6 @@
 ---
 name: codex-bind-context-injection-visible-transcript-noise
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 session_id: sess_5aabaf1d
@@ -72,3 +72,20 @@ evaluate:
 
 Whichever option is chosen, tests should assert that repeat prompts remain silent and that
 the first post-bind visible payload is bounded and operator-readable.
+
+## Resolution
+
+Fixed before `v0.1.35`; verified and closed in `v0.1.35`.
+
+Root cause: Codex displays `hookSpecificOutput.additionalContext` in the human-visible
+transcript. The hook emitted the full bind-time bootstrap into that field, so dispatcher
+preflight and ranked catalog JSON were visible to the operator.
+
+Fix present in code: `ctx_inject._emit()` now routes `DADAIA_HOOK_OUTPUT=codex-json`
+through `_codex_visible_payload()`, which keeps only a bounded context-loaded message and
+self-pull pointers. Repeat prompts remain silent via the existing sentinel.
+
+Evidence:
+
+- `tests/e2e/features/test_ctx_inject_bind_boundary.py::test_codex_json_bind_injection_is_transcript_bounded_and_repeat_silent`
+- `python -m pytest -q -p no:cacheprovider tests/e2e/features/test_ctx_inject_bind_boundary.py::test_codex_json_bind_injection_is_transcript_bounded_and_repeat_silent`

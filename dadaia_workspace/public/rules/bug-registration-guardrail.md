@@ -5,7 +5,7 @@ This rule is always active, for every Layer-1 entry harness (Claude, Codex, PI).
 ## Law
 
 Any time you encounter a **bug** while operating dadaia-workspace tooling, you
-MUST register it as a bug file before you finish the turn. "Operating the
+MUST register it before you finish the turn. "Operating the
 tooling" includes: projection (`dadaia public stage/install/doctor`), `specs
 doctor`/`specs upgrade`, scaffolding/onboarding, hooks, the SDD gate, locks &
 leases, context bind/alive/dead, the panel, reports/handoffs, the `dadaia` CLI,
@@ -17,12 +17,27 @@ tool did not behave as its contract promises. (See `source-vs-instance`: a
 failed workspace operation is a **product bug of the library**, never a local
 quirk.)
 
-## Where bugs go
+## Workflow-first registration
+
+Use the runnable bug-report workflow whenever the CLI is available:
+
+```bash
+dadaia lifecycle bug report --context <ctx> --release-id <release> \
+  --summary "<symptom>" --repro "<command or steps>" --expected "<contract>" \
+  --actual "<observed behavior>"
+```
+
+The workflow owns intake, dedupe, additive bug write, and its terminal Python gate.
+Direct Markdown bug files are an emergency fallback only when the bug-report workflow
+itself is unavailable or is the component being debugged. When using the fallback, record
+that workflow failure in the bug notes.
+
+## Fallback location
 
 - **Self-hosting workspace** (the `dadaia-workspace` source repo is present under
-  `repos/dadaia-workspace/`): register the bug in
+  `repos/dadaia-workspace/`): write the fallback bug in
   `repos/dadaia-workspace/specs/bugs/`.
-- **Consumer workspace** (no source repo checked out): register the bug in the
+- **Consumer workspace** (no source repo checked out): write the fallback bug in the
   active spec-context's `specs/bugs/`, and report it upstream to the
   dadaia-workspace project.
 

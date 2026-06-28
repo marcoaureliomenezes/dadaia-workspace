@@ -71,6 +71,7 @@ hygiene_app = typer.Typer(help="Lifecycle hygiene commands.", no_args_is_help=Tr
 review_app = typer.Typer(help="Lifecycle review commands.", no_args_is_help=True)
 backlog_app = typer.Typer(help="Lifecycle backlog commands.", no_args_is_help=True)
 release_app = typer.Typer(help="Lifecycle release commands.", no_args_is_help=True)
+bug_app = typer.Typer(help="Lifecycle bug-report commands.", no_args_is_help=True)
 workflow_app = typer.Typer(
     help="Read-only workflow model-governance inspection.", no_args_is_help=True
 )
@@ -656,6 +657,134 @@ def release_define(
             typer.echo(f"  post_step: {post_step_result}")
         if post_step_error is not None:
             typer.echo(f"  post_step ERROR: {post_step_error}")
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
+@bug_app.command("report")
+def bug_report(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("bug-report", "--run-id", help="Lifecycle run id."),
+    summary: str = typer.Option(..., "--summary", help="Short reported symptom."),
+    details: str | None = typer.Option(None, "--details", help="Additional bug details."),
+    repro: str | None = typer.Option(None, "--repro", help="Reproduction command or steps."),
+    expected: str | None = typer.Option(None, "--expected", help="Expected behavior."),
+    actual: str | None = typer.Option(None, "--actual", help="Actual behavior."),
+    severity: str | None = typer.Option(None, "--severity", help="Operator severity hint."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Default discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+    ),
+    step_harness: list[str] | None = typer.Option(
+        None,
+        "--step-harness",
+        help="Per-step harness override 'step=harness' (repeatable); steps are the "
+        "bug_report model-step labels (bug_intake, dedupe, bug_write).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=model' (repeatable); model is "
+        "'<id>:<effort>' valid for that step's harness (LAW 2).",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the bug-report workflow as intake -> dedupe -> bug_write -> gate."""
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import (
+        _SEQUENCE,
+        BugReportInput,
+    )
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+
+    valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
+    overrides: dict[str, AgentRuntimeKind] = {}
+    harness_by_label: dict[str, str] = {}
+    for item in step_harness or []:
+        label, sep, kind_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
+        clean_label = label.strip()
+        if clean_label not in valid_labels:
+            raise typer.BadParameter(
+                f"unknown bug-report step {clean_label!r}; "
+                f"valid steps: {', '.join(sorted(valid_labels))}"
+            )
+        overrides[clean_label] = _resolve_harness(kind_str.strip())
+        harness_by_label[clean_label] = kind_str.strip()
+
+    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
+    default_model = _resolve_model(harness, model)
+    if default_model is not None:
+        models[default_kind] = default_model
+    for item in step_model or []:
+        label, sep, model_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-model expects 'step=model', got {item!r}")
+        clean_label = label.strip()
+        step_harness_name = harness_by_label.get(clean_label, harness)
+        resolved = _resolve_model(step_harness_name, model_str.strip())
+        if resolved is not None:
+            models[_resolve_harness(step_harness_name)] = resolved
+
+    workflow = container.build_bug_report_workflow(
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        default_runtime_kind=default_kind,
+        models=models,
+        bug_input=BugReportInput(
+            summary=summary,
+            details=details,
+            repro=repro,
+            expected=expected,
+            actual=actual,
+            severity=severity,
+        ),
+    )
+    sequence = tuple(
+        _replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
+        for step in _SEQUENCE
+    )
+    result = workflow.run(run_id, sequence=sequence)
+
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "final_phase": result.final_phase.value,
+                "steps": [
+                    {
+                        "label": step.label,
+                        "is_gate": step.is_gate,
+                        "fragment_id": step.fragment_id,
+                        "accepted": step.accepted,
+                        "runtime": step.runtime_kind.value if step.runtime_kind else None,
+                    }
+                    for step in result.steps
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        trail = " -> ".join(f"{s.label}:{'ok' if s.accepted else 'BLOCKED'}" for s in result.steps)
+        typer.echo(f"{status} bug-report run={result.run_id} phase={result.final_phase.value} {trail}")
     if not result.completed:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
@@ -1353,5 +1482,6 @@ app.add_typer(hygiene_app, name="hygiene")
 app.add_typer(handoffs_app, name="handoffs")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(release_app, name="release")
+app.add_typer(bug_app, name="bug")
 app.add_typer(review_app, name="review")
 app.add_typer(workflow_app, name="workflow")

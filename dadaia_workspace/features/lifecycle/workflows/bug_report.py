@@ -78,6 +78,7 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import (
 )
 
 __all__ = [
+    "BugReportInput",
     "BugReportResult",
     "BugReportStep",
     "BugReportStepResult",
@@ -115,6 +116,36 @@ class BugReportStepResult:
     prompt_text: str | None = None
     runtime_kind: AgentRuntimeKind | None = None
     blocked: BlockedState | None = None
+
+
+@dataclass(frozen=True)
+class BugReportInput:
+    """Operator-provided symptom data for the bug-report workflow."""
+
+    summary: str
+    details: str | None = None
+    repro: str | None = None
+    expected: str | None = None
+    actual: str | None = None
+    severity: str | None = None
+
+    def render_markdown(self) -> str:
+        lines = [
+            "### reported_bug",
+            "Treat this operator-provided report as the authoritative symptom input.",
+            f"- summary: {self.summary.strip()}",
+        ]
+        optional = (
+            ("details", self.details),
+            ("repro", self.repro),
+            ("expected", self.expected),
+            ("actual", self.actual),
+            ("severity", self.severity),
+        )
+        for label, value in optional:
+            if value and value.strip():
+                lines.append(f"- {label}: {value.strip()}")
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -176,6 +207,7 @@ class BugReportWorkflow:
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
         handoff_resolver: WorkflowHandoffResolver | None = None,
+        bug_input: BugReportInput | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -188,6 +220,7 @@ class BugReportWorkflow:
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
         self._handoff_resolver = handoff_resolver
+        self._bug_input = bug_input
 
     # -- public entrypoint ----------------------------------------------
 
@@ -257,6 +290,10 @@ class BugReportWorkflow:
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
+        if step.label == "bug_intake" and self._bug_input is not None:
+            selected = "\n\n".join(
+                block for block in (self._bug_input.render_markdown(), selected) if block
+            )
         if digests:
             selected = "\n\n".join(filter(None, (selected, *digests)))
         suffix = build_fragment_suffix(
