@@ -166,10 +166,10 @@ def test_all_five_checks_built_through_resolve_tool(tmp_path: Path) -> None:
     assert by_name["ruff format --check"][0] == str(ruff)
     assert by_name["ruff check"][0] == str(ruff)
     assert by_name["mypy --strict"][0] == str(mypy)
-    assert by_name["pytest"][0] == str(pytest_exe)
+    assert by_name["pytest (no performance)"][0] == str(pytest_exe)
 
     quick_by_name = {c.name: c.argv for c in quick}
-    assert quick_by_name["pytest (no e2e)"][0] == str(pytest_exe)
+    assert quick_by_name["pytest (no e2e/performance)"][0] == str(pytest_exe)
 
     # No check argv begins with the bare 'poetry' literal when tools resolve.
     for c in (*full, *quick):

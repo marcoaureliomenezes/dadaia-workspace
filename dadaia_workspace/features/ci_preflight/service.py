@@ -165,10 +165,10 @@ def _pytest_check(
 ) -> Check:
     """Build the pytest check, resolving the pytest executable via ``_resolve_tool``."""
     pytest = _resolve_tool("pytest", python_executable=python_executable, dadaia_bin=dadaia_bin)
-    base = (*pytest, "-q", "-p", "no:cacheprovider")
+    base = (*pytest, "-q", "-p", "no:cacheprovider", "-m", "not performance")
     if quick:
-        return Check("pytest (no e2e)", (*base, "--ignore=tests/e2e"))
-    return Check("pytest", base)
+        return Check("pytest (no e2e/performance)", (*base, "--ignore=tests/e2e"))
+    return Check("pytest (no performance)", base)
 
 
 def checks_for(

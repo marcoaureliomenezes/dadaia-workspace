@@ -16,16 +16,19 @@ def _pass(argv: Sequence[str]) -> tuple[int, str]:
     return 0, "ok"
 
 
-def test_checks_for_full_has_lint_type_and_full_pytest() -> None:
+def test_checks_for_full_has_lint_type_and_default_pytest_without_performance() -> None:
     names = [c.name for c in checks_for(quick=False)]
     assert names[:3] == ["ruff format --check", "ruff check", "mypy --strict"]
-    assert names[-1] == "pytest"
+    assert names[-1] == "pytest (no performance)"
+    assert checks_for(quick=False)[-1].argv[-2:] == ("-m", "not performance")
 
 
-def test_checks_for_quick_swaps_in_no_e2e_pytest() -> None:
+def test_checks_for_quick_swaps_in_no_e2e_or_performance_pytest() -> None:
     names = [c.name for c in checks_for(quick=True)]
     assert names[:3] == ["ruff format --check", "ruff check", "mypy --strict"]
-    assert names[-1] == "pytest (no e2e)"
+    assert names[-1] == "pytest (no e2e/performance)"
+    assert "-m" in checks_for(quick=True)[-1].argv
+    assert "not performance" in checks_for(quick=True)[-1].argv
 
 
 def test_run_preflight_all_pass() -> None:

@@ -126,6 +126,7 @@ markers = [
     "contract: public API/schema/security contracts",
     "integration: multi-component tests using real tmp filesystem or CLI runner",
     "e2e: full user journeys and browser-backed flows",
+    "performance: opt-in performance bounds excluded from default pre-push",
     "slow: tests over 1s or tests that start a server/subprocess",
     "tmp: temporary debugging tests excluded from default runs",
 ]

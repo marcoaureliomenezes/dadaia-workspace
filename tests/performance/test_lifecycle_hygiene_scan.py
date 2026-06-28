@@ -15,6 +15,8 @@ import pytest
 from dadaia_workspace.core.models.hygiene import HygieneZone
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
 
+pytestmark = pytest.mark.performance
+
 NOW = dt.datetime(2026, 6, 18, 12, 0, tzinfo=dt.UTC)
 REPORT_FILES = 122
 HANDOFF_FILES = 295

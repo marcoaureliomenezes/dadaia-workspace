@@ -1,11 +1,18 @@
 ---
 name: prepush-gate-blocked-by-loadsensitive-perf-test-wallclock-bound
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-26
+resolved_in: v0.1.34
 surface: dadaia ci preflight (pre-push gate) / tests/performance/test_lifecycle_hygiene_scan.py
 session_id: null
 ---
+
+**Resolution (v0.1.34):** Marked the synthetic hygiene scan as `pytest.mark.performance`
+and added the `performance` marker to `pyproject.toml`. The ci-preflight pytest check now
+runs with `-m "not performance"` in both full and quick profiles, so the wall-clock-bound
+synthetic performance test remains explicitly runnable but no longer blocks ordinary
+pre-push/default validation under host load.
 
 **Symptom:** The pre-push CI gate (`dadaia ci preflight`, run by the git pre-push hook)
 runs the full pytest suite, which includes

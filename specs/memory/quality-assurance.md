@@ -2,13 +2,14 @@
 slug: quality-assurance
 title: quality-assurance
 category: product
-tldr: 'Five-layer pytest architecture, multi-job CI (10 quality + 4 governance), no-slop policy — design-of-record for implementers and qa-engineer.'
+tldr: 'Behavior-first quality schema; historical residue tests are exceptional.'
 summary: >-
-  Enforced five-layer test architecture (unit/contract/integration/e2e/tmp) with
-  machine-readable pytest markers, a CI split into 10 quality jobs (plus 4 governance
-  jobs) with explicit timeouts,
-  and a no-slop policy. This atom is the single source of truth for test design,
-  absorbing test-suite-architecture.md (v0.1.7).
+  The dadaia-workspace quality model is behavior-first. Tests are admitted only
+  when they can fail for a meaningful regression in current product behavior,
+  public contract, security boundary, data integrity, or a real operator journey.
+  The suite is organized by layer, budgeted by cost, and optimized around the
+  three critical product surfaces: Spec Context Projects, the Panel, and
+  dadaia-workflows/lifecycle.
 tags:
   - testing
   - pytest
@@ -16,129 +17,165 @@ tags:
   - quality
   - test-architecture
 agent_tier: self-pull
-token_estimate: 1150
-last_updated: '2026-06-25'
-release_origin: v0.1.19
+token_estimate: 1400
+last_updated: '2026-06-28'
+release_origin: v0.1.34
 ---
 
-## Propósito
+## Purpose
 
-dadaia-workspace uses an enforced five-layer test architecture. The five layers
-are: `unit` (pure or near-pure functions, fastest), `contract` (public CLI/API/
-schema/security contracts), `integration` (multi-component with real filesystem or
-CLI runner), `e2e` (named user journeys, browser or process-boundary), and `tmp`
-(one-off debugging reproductions, quarantined and excluded from default collection).
+Quality assurance in dadaia-workspace is a product contract, not a coverage contest.
+The test suite must prove that the current system works and remains safe to change. A
+test is allowed only when it protects one of these things:
 
-Each layer has a machine-readable pytest marker declared in `pyproject.toml`. The
-default local invocation (`pytest`) does not run coverage; coverage is measured only
-in CI's dedicated `contract-coverage` job, keeping local runs fast and avoiding
-coverage inflation that hides weak contracts.
+- current product behavior used by an operator or agent;
+- public CLI/API/schema/projection contracts;
+- security and workspace-boundary guarantees;
+- data integrity for specs, sessions, handoffs, reports, run records, and policy stores;
+- real end-to-end journeys for the product's critical surfaces.
 
-```mermaid
-flowchart TB
-    subgraph PYR["Test architecture — 5 layers (pytest markers)"]
-        direction TB
-        E["e2e — named user journeys · process boundary"]
-        IT["integration — real fs · Typer CliRunner · multi-component"]
-        CT["contract — CLI / API / schema / security / projection"]
-        U["unit — pure / near-pure · fastest (base)"]
-        E --> IT --> CT --> U
-        TM["tmp — one-off repro · quarantined · excluded from default collection"]
-    end
-    PYR --> CI
-    subgraph CI["CI — 10 quality jobs (+ 4 governance) · cada um com timeout + marker filter"]
-        direction LR
-        J0["importability-smoke"]
-        J1["lint<br/>ruff + import-linter"]
-        J2["typecheck<br/>mypy --strict"]
-        J3["unit-fast<br/>(+ unit-fast-cross)"]
-        J4["contract-coverage<br/>(+ contract-coverage-cross)"]
-        J5["integration"]
-        J6["e2e-python"]
-        J7["e2e-panel<br/>(playwright)"]
-    end
+Tests must not exist just because a release once had a bug, a folder was once deleted, a
+private implementation string once drifted, or an old feature name might reappear. That
+history belongs in bugs, release notes, and closure evidence unless it still protects a
+named current boundary.
+
+## Critical Surfaces
+
+The suite is budgeted around the product's actual load-bearing surfaces.
+
+1. **Spec Context Projects** — context binding, ALIVE/DEAD state, repo/workspace
+   boundary detection, session identity, leases, SDD gate path classification, and
+   chokepoint behavior.
+2. **Dadaia Workspace Panel** — route dispatch, Host/security guards, active tab APIs,
+   workflow policy mutation validation, telemetry/session rendering contracts, and a
+   small set of browser journeys that click through real operator paths.
+3. **dadaia-workflows/lifecycle** — run state transitions, handoff gates, runtime/model
+   selection, prompt/context scoping, workflow-step handoff data, run-store safety, and
+   retention/slop boundaries.
+
+Secondary features still get coverage, but they do not get permanent matrix expansion
+unless they own a current public contract or safety boundary.
+
+## Layer Schema
+
+`tests/unit/**` is for pure or near-pure behavior. Unit tests may use `tmp_path` and
+small fakes, but must not start real subprocesses, servers, browsers, public
+stage/install workflows, full workspace initialization, or sleeps. A unit test should
+usually explain one rule of one function or service.
+
+`tests/contract/**` is for stable public contracts: CLI output shape, API/schema shape,
+security boundaries, projection privacy, and governance invariants. Contract tests must
+not become release-history pins. A residue grep is allowed only when it names the current
+boundary being protected, the owner, and the condition under which the grep can retire.
+
+`tests/integration/**` is for multi-component wiring: real temporary filesystem trees,
+Typer `CliRunner`, service composition, stores, or command paths. Integration tests
+should prove one meaningful path through collaborating components, not duplicate every
+unit matrix.
+
+`tests/e2e/**` is for named user journeys. E2E tests must drive the behavior the user
+depends on: click the tab, trigger the route, inspect the response, follow the iframe,
+run the CLI command. Browser component harnesses with mocked APIs are allowed only when
+the test is explicitly a browser-component test and cannot masquerade as full E2E.
+
+`tests/performance/**` is explicit and opt-in. Performance tests may enforce operation
+count, scan bounds, or wall-clock budgets, but they are not part of the blocking local
+pre-push profile unless the measurement is robust under ordinary developer-machine
+contention.
+
+`tests/tmp/**` is for short-lived reproductions only. It is excluded from default
+collection and must be deleted or promoted before release closure.
+
+## Budgets
+
+The target suite size is **1000-1500 total tests** for the source repo. A healthy split is:
+
+- 700-850 unit tests;
+- 100-150 contract tests;
+- 200-300 integration tests;
+- 40-80 E2E and browser journey tests;
+- opt-in performance tests outside the default count.
+
+These are budgets, not quotas. Adding a test above budget requires either deleting lower
+value coverage or documenting why the new behavior is more important than the cost.
+
+## Profiles
+
+The local developer loop is the smallest behavior suite that should catch ordinary
+regressions:
+
+```bash
+.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider -m "unit and not slow" tests/unit
 ```
 
-Os quatro adapters de harness (Codex/Claude-SDK/OpenCode/PI) seguem a mesma taxonomia:
-`unit` para construção de comando/parse/redaction/Ring-2, `integration` para projeção
-Layer-1 e o seam CLI `--harness`, e um teste `live` **opt-in** (`DADAIA_*_LIVE=1`, nunca
-CI-gated) para o binding upstream real.
+The pre-push/default quality gate should run lint, typecheck, contracts, and the curated
+behavior suite, excluding E2E and performance unless explicitly requested:
 
-The no-slop policy is the durable rule that prevents a test pile from accumulating:
-no test may be named after a PR, release, or task id; no test may assert that
-deleted code remains deleted; private constants must not be duplicated into test
-code as the source of truth; one-off debugging tests go to `tests/tmp/` only with
-an expiry note.
+```bash
+.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider --ignore=tests/e2e -m "not performance"
+```
 
-This atom is the design-of-record for implementers and qa-engineer. It is the
-canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the
-normative vision §6.
+The full release validation adds integration, E2E, and selected browser journeys:
 
-## Fluxo de uso
+```bash
+.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider
+```
 
-1. Developer picks the test layer based on what the test exercises: pure function
-   → `unit`; public CLI/schema/security → `contract`; multi-component with real
-   filesystem or CLI runner → `integration`; user journey or browser → `e2e`.
-2. Test receives the corresponding `@pytest.mark.<layer>` decorator. Any test over
-   1 second or that starts a server or subprocess also receives
-   `@pytest.mark.slow`.
-3. Local fast path: `pytest -q -m "unit and not slow" tests/unit` — runs in under
-   10 seconds without coverage instrumentation.
-4. CI runs 10 quality jobs: importability-smoke, lint, typecheck, unit-fast,
-   unit-fast-cross, contract-coverage, contract-coverage-cross, integration,
-   e2e-python, e2e-panel — each with an explicit timeout and a targeted marker
-   filter (the `-cross` jobs run the same markers on the Windows/macOS matrix). A
-   further 4 governance jobs (pr-title, repo-hygiene, hotfix-branch-name,
-   verdict-gate) gate PR shape and the security push verdict.
-5. One-off debugging reproductions go to `tests/tmp/` with an expiry note; they
-   are never counted toward coverage or release closure and are excluded from
-   default collection.
+Performance validation is explicit:
 
-## Trigger típico
+```bash
+.dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider -m performance tests/performance
+```
 
-Used when implementing a new feature, refactoring a public contract, or reproducing
-a CI failure.
+Coverage is a diagnostic, not the default local loop. Use coverage on curated
+unit/contract suites only; do not write padding tests to lift a percentage.
 
-## Diferencial
+## No-Slop Law
 
-Without the layer taxonomy there is no enforceable boundary between fast pure-unit
-tests and slow process-boundary journeys: local runs become slow, coverage
-instrumentation in default addopts inflates numbers and hides weak contracts, and
-release-history tests accumulate protecting deleted code. The three failure modes
-are closed simultaneously by: the layer taxonomy (boundary enforcement via markers),
-the CI split into per-layer jobs (each job targets its layer, with its own timeout), and
-the no-slop policy (prevents re-accumulation).
+Every test must have a purpose sentence that can be read as a current regression risk.
+Delete or rewrite tests that primarily do any of the following:
 
-## Estado runtime tocado
+- prove deleted code, retired command names, or old file paths remain absent;
+- duplicate private constants as a second source of truth;
+- assert release/task/PR history instead of current behavior;
+- snapshot internal text with no public contract;
+- repeat the same matrix at unit, integration, and E2E layers;
+- mock every dependency and then call the result "E2E";
+- gate pre-push on host-load-sensitive wall-clock performance.
 
-Files the test suite reads or writes at runtime:
+Residue checks are exceptional. They are allowed only for a named current boundary such
+as credential leakage, unsupported public CLI resurrection, projected privacy, or
+backward compatibility. Each residue check must state the protected boundary and its
+retirement condition.
 
-- `pyproject.toml` — pytest configuration, marker declarations, `norecursedirs`,
-  coverage data redirect to `/tmp/dadaia-ws-toolcache/coverage/.coverage`.
-- `tests/unit/**` — pure or near-pure fast tests; forbidden: CLI runner,
-  subprocess, server threads, public stage/install, full workspace init, sleeps.
-- `tests/contract/**` — public CLI/API/schema/security/projection contracts;
-  forbidden: browser, long journey setup, private implementation matrices.
-- `tests/integration/**` — real tmp filesystem, Typer `CliRunner`, multi-component
-  service wiring; forbidden: browser, real remotes, duplicate unit matrices.
-- `tests/e2e/**` — named user journeys and process-boundary flows; forbidden:
-  micro assertions, implementation internals, exhaustive branch matrices.
-- `tests/tmp/**` — one-off debugging reproductions only; excluded from default
-  collection, CI, and coverage. Each subdirectory must include an expiry note.
-- `.github/workflows/ci.yml` — 10 quality jobs (importability-smoke, lint,
-  typecheck, unit-fast(+cross), contract-coverage(+cross), integration, e2e-python,
-  e2e-panel) consuming the layer-specific pytest commands with explicit timeouts,
-  plus 4 governance jobs (pr-title, repo-hygiene, hotfix-branch-name, verdict-gate).
-- `tests/conftest.py` — backstop guard preventing real venv creation inside test
-  runs; `tmp_path_retention_policy = "failed"`.
+## Ownership
 
-## Dependências
+Implementers own focused unit and integration tests for their change. `qa-engineer` owns
+journey selection, test-value review, and deletion pressure. `security-reviewer` owns
+security-boundary tests. `product-engineer` owns this memory atom and decides when a
+historical test should become release evidence instead of permanent suite cost.
 
-- [[specs-doctor]] — `dadaia specs doctor` validates SDD structural invariants;
-  the test layer and the specs gate are separate quality gates at different scopes.
-- [[public-asset-distribution]] — `tests/contract/test_source_repo_hygiene.py` and
-  `tests/unit/features/public/` hold contracts for the public asset pipeline.
-- [[agent-comms]] — `tests/contract/test_handoff_schema_contract.py` protects the
-  handoff-v1.1 JSON schema contract.
-- [[sdd-gate-v3]] — `tests/unit/gate/` and `tests/integration/gate/` hold
-  the unit and integration tests for the SDD enforcement gate.
+When a bug escapes, the fix is not automatically "add one permanent test." First identify
+the missed behavior boundary. Then choose the cheapest layer that would have caught it.
+Only add an E2E test when the failure truly required a journey-level signal.
+
+## Runtime State Touched
+
+- `pyproject.toml` declares pytest markers and collection policy.
+- `tests/AGENTS.md` is the scoped operational rule for all test files.
+- `tests/contract/README.md` inventories public contracts and must not contradict the
+  no-slop law.
+- `dadaia_workspace/features/ci_preflight/service.py` defines the local/pre-push gate.
+- `.github/workflows/*.yml` may run broader CI profiles, but local hooks must stay
+  deterministic and useful.
+
+## Dependencies
+
+- [[spec-context-project]] — the central product surface that test architecture must keep
+  safe.
+- [[panel]] — the primary local operator UI; browser tests must cover real interactions,
+  not only labels.
+- [[lifecycle-foundation]] — the deterministic workflow engine; tests must protect Python
+  gates and runtime boundaries without overfitting to prompt history.
+- [[public-asset-distribution]] — projection privacy and drift checks remain legitimate
+  contract coverage when they protect shipped runtime surfaces.
